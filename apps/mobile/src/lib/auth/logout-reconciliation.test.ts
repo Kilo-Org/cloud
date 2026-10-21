@@ -3,13 +3,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type LogoutCleanupRecord } from '@/lib/auth/logout-cleanup';
 
-const cleanupMock = vi.hoisted(() => ({
-  awaitActivityCleanupSettled: vi.fn().mockResolvedValue(undefined),
-  readLogoutCleanupRecords: vi.fn<() => Promise<LogoutCleanupRecord[]>>(),
-  writeLogoutCleanupRecords: vi.fn().mockResolvedValue(undefined),
-  hasLogoutCleanupObligation: (record: LogoutCleanupRecord) =>
-    record.pushLookupPending || record.pushTokens.length > 0 || record.needsActivityUnregister,
-}));
+const cleanupMock = vi.hoisted(() => {
+  const readState: { records: LogoutCleanupRecord[]; unreadable: boolean } = {
+    records: [],
+    unreadable: false,
+  };
+  return {
+    readState,
+    defaultStoreRead: async () => {
+      await Promise.resolve();
+      return readState.unreadable
+        ? ({ status: 'unreadable' } as const)
+        : ({ status: 'records', records: readState.records } as const);
+    },
+    awaitActivityCleanupSettled: vi.fn().mockResolvedValue(undefined),
+    readLogoutCleanupStore: vi.fn(),
+    writeLogoutCleanupRecords: vi.fn().mockResolvedValue(undefined),
+    hasLogoutCleanupObligation: (record: LogoutCleanupRecord) =>
+      record.pushLookupPending || record.pushTokens.length > 0 || record.needsActivityUnregister,
+  };
+});
 
 const trpcMock = vi.hoisted(() => ({
   unregisterPushToken: { mutate: vi.fn() },
@@ -57,7 +70,9 @@ describe('attemptLogoutReconciliation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetLogoutReconciliationForTests();
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([]);
+    cleanupMock.readState.records = [];
+    cleanupMock.readState.unreadable = false;
+    cleanupMock.readLogoutCleanupStore.mockImplementation(cleanupMock.defaultStoreRead);
     cleanupMock.writeLogoutCleanupRecords.mockResolvedValue(undefined);
   });
 
@@ -68,10 +83,21 @@ describe('attemptLogoutReconciliation', () => {
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
   });
 
+  it('leaves an unreadable store untouched without a network call', async () => {
+    cleanupMock.readState.unreadable = true;
+
+    const outcome = await attemptLogoutReconciliation('u1');
+
+    // A store that cannot be read must not be rewritten from an empty list.
+    expect(outcome).toEqual({ kind: 'unreadable-store' });
+    expect(cleanupMock.writeLogoutCleanupRecords).not.toHaveBeenCalled();
+    expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
+  });
+
   it('discards a record older than 30 days without a network call', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+    cleanupMock.readState.records = [
       makeRecord({ failedAt: Date.now() - TOMBSTONE_MAX_AGE_MS - DAY_MS }),
-    ]);
+    ];
 
     const outcome = await attemptLogoutReconciliation('u1');
 
@@ -81,9 +107,9 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('retains an expired record when its rewrite rejects', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+    cleanupMock.readState.records = [
       makeRecord({ failedAt: Date.now() - TOMBSTONE_MAX_AGE_MS - DAY_MS }),
-    ]);
+    ];
     cleanupMock.writeLogoutCleanupRecords.mockRejectedValueOnce(new Error('secure store down'));
 
     const outcome = await attemptLogoutReconciliation('u1');
@@ -92,9 +118,9 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('keeps a record of another known account untouched', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+    cleanupMock.readState.records = [
       makeRecord({ userId: 'u1', pushTokens: ['push-stored'], pushLookupPending: false }),
-    ]);
+    ];
 
     const outcome = await attemptLogoutReconciliation('u2');
 
@@ -106,14 +132,14 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('purges an expired record of another account', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+    cleanupMock.readState.records = [
       makeRecord({
         userId: 'u1',
         pushTokens: ['push-stored'],
         pushLookupPending: false,
         failedAt: Date.now() - TOMBSTONE_MAX_AGE_MS - DAY_MS,
       }),
-    ]);
+    ];
 
     const outcome = await attemptLogoutReconciliation('u2');
 
@@ -122,9 +148,7 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('re-reads the device token for the owner and clears the record', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
-      makeRecord({ pushLookupPending: true }),
-    ]);
+    cleanupMock.readState.records = [makeRecord({ pushLookupPending: true })];
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({
       kind: 'token',
       token: 'push-9',
@@ -139,9 +163,9 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('uses the recorded push tokens instead of re-reading the device', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+    cleanupMock.readState.records = [
       makeRecord({ pushTokens: ['push-stored'], pushLookupPending: false }),
-    ]);
+    ];
     trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
 
     const outcome = await attemptLogoutReconciliation('u1');
@@ -152,9 +176,7 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('treats a re-read none outcome as terminal for the push part', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
-      makeRecord({ pushLookupPending: true }),
-    ]);
+    cleanupMock.readState.records = [makeRecord({ pushLookupPending: true })];
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'none' });
 
     const outcome = await attemptLogoutReconciliation('u1');
@@ -164,9 +186,7 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('keeps the lookup pending when the re-read lookup fails', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
-      makeRecord({ pushLookupPending: true }),
-    ]);
+    cleanupMock.readState.records = [makeRecord({ pushLookupPending: true })];
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'lookup-failed' });
 
     const outcome = await attemptLogoutReconciliation('u1');
@@ -178,9 +198,9 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('keeps the token that rejects and drops the token that unregistered', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+    cleanupMock.readState.records = [
       makeRecord({ pushTokens: ['push-ok', 'push-failed'], pushLookupPending: false }),
-    ]);
+    ];
     trpcMock.unregisterPushToken.mutate.mockImplementation(async ({ token }: { token: string }) => {
       await Promise.resolve();
       if (token === 'push-failed') {
@@ -198,13 +218,13 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('unregisters each recorded activity token and clears the record when all succeed', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+    cleanupMock.readState.records = [
       makeRecord({
         pushLookupPending: false,
         needsActivityUnregister: true,
         activityTokens: ['activity-1', 'activity-2'],
       }),
-    ]);
+    ];
     trpcMock.unregisterActivityToken.mutate.mockResolvedValue({ success: true });
 
     const outcome = await attemptLogoutReconciliation('u1');
@@ -217,13 +237,13 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('keeps the record when any recorded activity token unregister rejects', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+    cleanupMock.readState.records = [
       makeRecord({
         pushLookupPending: false,
         needsActivityUnregister: true,
         activityTokens: ['activity-1', 'activity-2'],
       }),
-    ]);
+    ];
     trpcMock.unregisterActivityToken.mutate
       .mockResolvedValueOnce({ success: true })
       .mockRejectedValueOnce(new Error('server 500'));
@@ -243,7 +263,7 @@ describe('attemptLogoutReconciliation', () => {
 
   it('clears the activity part after success while the push part stays outstanding', async () => {
     const failedAt = Date.now();
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+    cleanupMock.readState.records = [
       makeRecord({
         pushTokens: ['push-stored'],
         pushLookupPending: false,
@@ -251,7 +271,7 @@ describe('attemptLogoutReconciliation', () => {
         activityTokens: ['activity-1'],
         failedAt,
       }),
-    ]);
+    ];
     trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
     trpcMock.unregisterActivityToken.mutate.mockResolvedValue({ success: true });
 
@@ -272,9 +292,7 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('reconciles the record of an unknown identity under the signed-in account', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
-      makeRecord({ userId: null, pushLookupPending: true }),
-    ]);
+    cleanupMock.readState.records = [makeRecord({ userId: null, pushLookupPending: true })];
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'none' });
 
     const outcome = await attemptLogoutReconciliation('u1');
@@ -284,7 +302,7 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('reconciles its own record and retains the record of another account', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+    cleanupMock.readState.records = [
       makeRecord({
         userId: 'u2',
         pushTokens: ['other-push'],
@@ -293,7 +311,7 @@ describe('attemptLogoutReconciliation', () => {
         activityTokens: ['other-activity'],
       }),
       makeRecord({ userId: 'u1', pushLookupPending: true }),
-    ]);
+    ];
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'none' });
 
     const outcome = await attemptLogoutReconciliation('u1');
@@ -313,7 +331,7 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('skips a second attempt within the 60 s spacing window', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([makeRecord()]);
+    cleanupMock.readState.records = [makeRecord()];
     trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'none' });
 
@@ -326,9 +344,9 @@ describe('attemptLogoutReconciliation', () => {
 
   it('single-flights concurrent attempts', async () => {
     const { promise: readGate, resolve: openReadGate } = Promise.withResolvers<undefined>();
-    cleanupMock.readLogoutCleanupRecords.mockImplementation(async () => {
+    cleanupMock.readLogoutCleanupStore.mockImplementation(async () => {
       await readGate;
-      return [makeRecord()];
+      return { status: 'records' as const, records: [makeRecord()] };
     });
     trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'none' });
@@ -343,9 +361,9 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('regression: retains the record when the auth epoch moves during the attempt', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+    cleanupMock.readState.records = [
       makeRecord({ pushTokens: ['push-1'], pushLookupPending: false }),
-    ]);
+    ];
     const { promise: unregisterGate, resolve: openUnregisterGate } =
       Promise.withResolvers<undefined>();
     trpcMock.unregisterPushToken.mutate.mockImplementation(async () => {
@@ -370,7 +388,7 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('regression: a record write rejection is retained and does not reject the attempt', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([makeRecord()]);
+    cleanupMock.readState.records = [makeRecord()];
     trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
     notificationsMock.getDevicePushTokenOutcome.mockResolvedValue({ kind: 'none' });
     cleanupMock.writeLogoutCleanupRecords.mockRejectedValueOnce(new Error('secure store down'));
@@ -383,9 +401,9 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('reports a pending activity unregister while the record still needs it', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+    cleanupMock.readState.records = [
       makeRecord({ needsActivityUnregister: true, activityTokens: ['activity-1'] }),
-    ]);
+    ];
 
     await expect(hasPendingActivityUnregister('u1')).resolves.toBe(true);
   });
@@ -397,22 +415,22 @@ describe('attemptLogoutReconciliation', () => {
   ])(
     'scopes the activity guard to owner $owner and current user $currentUser',
     async ({ owner, currentUser, pending }) => {
-      cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+      cleanupMock.readState.records = [
         makeRecord({
           userId: owner,
           needsActivityUnregister: true,
           activityTokens: ['activity-1'],
         }),
-      ]);
+      ];
 
       await expect(hasPendingActivityUnregister(currentUser)).resolves.toBe(pending);
     }
   );
 
   it('does not block a new account when the other record survives and the retry is spacing-skipped', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+    cleanupMock.readState.records = [
       makeRecord({ needsActivityUnregister: true, activityTokens: ['activity-1'] }),
-    ]);
+    ];
 
     await attemptLogoutReconciliation('u2');
     expect(await attemptLogoutReconciliation('u2')).toEqual({ kind: 'spacing-skipped' });
@@ -420,9 +438,9 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('reports no pending activity unregister when the record needs only the push part', async () => {
-    cleanupMock.readLogoutCleanupRecords.mockResolvedValue([
+    cleanupMock.readState.records = [
       makeRecord({ needsActivityUnregister: false, pushLookupPending: true }),
-    ]);
+    ];
 
     await expect(hasPendingActivityUnregister('u1')).resolves.toBe(false);
   });

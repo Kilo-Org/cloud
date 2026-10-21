@@ -1,4 +1,5 @@
 import * as SecureStore from '@/lib/auth/secure-store';
+import { readStoredValueForUpdate } from '@/lib/auth/secure-store-value';
 import * as Sentry from '@sentry/react-native';
 import * as z from 'zod';
 
@@ -78,10 +79,61 @@ const legacyLogoutCleanupRecordSchema = z.object({
 
 const LOGOUT_CLEANUP_STORE_VERSION = 2;
 
-const logoutCleanupStoreSchema = z.object({
-  version: z.literal(LOGOUT_CLEANUP_STORE_VERSION),
-  records: z.array(logoutCleanupRecordSchema),
+/** The versioned store envelope; its entries are validated one by one. */
+const logoutCleanupStoreEnvelopeSchema = z.object({
+  version: z.number(),
+  records: z.array(z.unknown()),
 });
+
+/**
+ * A read that feeds a read-modify-write keeps "nothing stored" and "could not
+ * read" apart, so a mutation aborts instead of persisting a list derived from
+ * a store it never read.
+ */
+export type LogoutCleanupStoreRead =
+  | { readonly status: 'records'; readonly records: LogoutCleanupRecord[] }
+  | { readonly status: 'unreadable' };
+
+type ParsedJson = { readonly ok: true; readonly value: unknown } | { readonly ok: false };
+
+function parseJson(raw: string): ParsedJson {
+  try {
+    return { ok: true, value: JSON.parse(raw) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function parseStoredRecords(raw: string | null): LogoutCleanupStoreRead {
+  if (raw === null) {
+    return { status: 'records', records: [] };
+  }
+  const parsed = parseJson(raw);
+  if (!parsed.ok) {
+    return { status: 'unreadable' };
+  }
+  const envelope = logoutCleanupStoreEnvelopeSchema.safeParse(parsed.value);
+  if (envelope.success) {
+    // An unknown store version may carry entries this build cannot interpret;
+    // rewriting it would drop them.
+    if (envelope.data.version !== LOGOUT_CLEANUP_STORE_VERSION) {
+      return { status: 'unreadable' };
+    }
+    // Validate per entry: one malformed record must not discard the rest.
+    const records: LogoutCleanupRecord[] = [];
+    for (const entry of envelope.data.records) {
+      const record = logoutCleanupRecordSchema.safeParse(entry);
+      if (record.success) {
+        records.push(record.data);
+      }
+    }
+    return { status: 'records', records: dedupeByOwner(records) };
+  }
+  const legacy = legacyLogoutCleanupRecordSchema.safeParse(parsed.value);
+  return legacy.success
+    ? { status: 'records', records: [fromLegacyRecord(legacy.data)] }
+    : { status: 'unreadable' };
+}
 
 function fromLegacyRecord(
   legacy: z.infer<typeof legacyLogoutCleanupRecordSchema>
@@ -109,28 +161,24 @@ function dedupeByOwner(records: readonly LogoutCleanupRecord[]): LogoutCleanupRe
 }
 
 /**
- * Reads every stored record, validating each one. A corrupt entry is discarded
- * instead of being interpreted as a different-account skip or driving unsafe
- * remote cleanup.
+ * Reads the stored records for a read-modify-write. A failed keychain read, an
+ * unparseable payload, or an unknown store version is `unreadable`: a caller
+ * must then leave the key alone rather than persist a list derived from a
+ * store it never read. A malformed entry inside the current version is
+ * discarded on its own so the valid records survive.
  */
-export async function readLogoutCleanupRecords(): Promise<LogoutCleanupRecord[]> {
-  try {
-    const raw = await SecureStore.getItemAsync(LOGOUT_CLEANUP_TOMBSTONE_KEY);
-    if (!raw) {
-      return [];
-    }
-    const parsed: unknown = JSON.parse(raw);
-    const store = logoutCleanupStoreSchema.safeParse(parsed);
-    if (store.success) {
-      return dedupeByOwner(store.data.records);
-    }
-    const legacy = legacyLogoutCleanupRecordSchema.safeParse(parsed);
-    return legacy.success ? [fromLegacyRecord(legacy.data)] : [];
-  } catch {
-    // A corrupt record list is discarded as absent: nothing is actionable, and
-    // the next failed logout writes a fresh record.
-    return [];
+export async function readLogoutCleanupStore(): Promise<LogoutCleanupStoreRead> {
+  const stored = await readStoredValueForUpdate(LOGOUT_CLEANUP_TOMBSTONE_KEY);
+  if (stored.status === 'unreadable') {
+    return { status: 'unreadable' };
   }
+  return parseStoredRecords(stored.value);
+}
+
+/** Read-only view of the pending records; an unreadable store reads as none. */
+export async function readLogoutCleanupRecords(): Promise<LogoutCleanupRecord[]> {
+  const read = await readLogoutCleanupStore();
+  return read.status === 'records' ? read.records : [];
 }
 
 function logoutCleanupRecordFor(
@@ -191,8 +239,12 @@ async function chainLogoutCleanupRecords(
   mutate: (records: LogoutCleanupRecord[]) => LogoutCleanupRecord[]
 ): Promise<void> {
   await chainSave(LOGOUT_CLEANUP_TOMBSTONE_KEY, async () => {
-    const records = await readLogoutCleanupRecords();
-    await writeLogoutCleanupRecords(mutate(records));
+    const read = await readLogoutCleanupStore();
+    if (read.status === 'unreadable') {
+      // Nothing safe to modify: keep the stored payload for a later read.
+      return;
+    }
+    await writeLogoutCleanupRecords(mutate(read.records));
   });
 }
 
@@ -367,7 +419,12 @@ async function runActivityCleanup(
     // Reconciliation must finish with its captured record before this merge
     // adds obligations that its deletion or partial-success rewrite cannot see.
     await chainSave(LOGOUT_CLEANUP_TOMBSTONE_KEY, async () => {
-      const records = await readLogoutCleanupRecords();
+      const read = await readLogoutCleanupStore();
+      if (read.status === 'unreadable') {
+        // Nothing safe to modify: keep the stored payload for a later read.
+        return;
+      }
+      const records = read.records;
       const pending = logoutCleanupRecordFor(records, userId);
       await writeLogoutCleanupRecords(
         upsertLogoutCleanupRecord(records, {

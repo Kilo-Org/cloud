@@ -136,7 +136,7 @@ describe('runLogoutCleanup', () => {
   });
 
   it('revokes the session and unregisters the token, then stores no record on full success', async () => {
-    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify({ stale: true }));
+    seedRecords([]);
     pushOutcome('token');
     trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
     trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
@@ -494,6 +494,66 @@ describe('runLogoutCleanup', () => {
     await expect(readLogoutCleanupRecords()).resolves.toMatchObject([
       { userId: 'u1', pushTokens: ['push-1'] },
     ]);
+  });
+
+  it('keeps the valid records when one stored entry is malformed', async () => {
+    store.set(
+      LOGOUT_CLEANUP_TOMBSTONE_KEY,
+      JSON.stringify({
+        version: 2,
+        records: [makeRecord({ userId: 'u1', pushTokens: ['push-a'] }), { userId: 'broken' }],
+      })
+    );
+    seedUser('u2');
+    pushOutcome('none');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+
+    await runLogoutCleanup();
+
+    expect(await storedRecordFor('u1')).toMatchObject({ userId: 'u1', pushTokens: ['push-a'] });
+    expect(await storedRecordFor('u2')).toBeUndefined();
+  });
+
+  it('leaves an unreadable stored payload untouched when a logout records nothing', async () => {
+    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, '{not json');
+    pushOutcome('none');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+
+    await runLogoutCleanup();
+
+    expect(store.get(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe('{not json');
+  });
+
+  it('leaves a stored payload of an unknown version untouched', async () => {
+    const payload = JSON.stringify({ version: 3, records: [{ userId: 'u9' }] });
+    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, payload);
+    pushOutcome('token', 'push-1');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
+
+    await runLogoutCleanup();
+
+    expect(store.get(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(payload);
+  });
+
+  it('leaves the store untouched when the keychain read fails', async () => {
+    const { getItemAsync } = await import('expo-secure-store');
+    seedRecords([makeRecord({ userId: 'u1', pushTokens: ['push-a'] })]);
+    vi.mocked(getItemAsync).mockRejectedValueOnce(new Error('keychain unavailable'));
+    seedUser('u2');
+    pushOutcome('token', 'push-1');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
+
+    await runLogoutCleanup();
+
+    expect(await storedRecordFor('u1')).toMatchObject({ userId: 'u1', pushTokens: ['push-a'] });
+  });
+
+  it('reads an unreadable stored payload as no pending records', async () => {
+    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, 'not-json');
+
+    await expect(readLogoutCleanupRecords()).resolves.toEqual([]);
   });
 });
 

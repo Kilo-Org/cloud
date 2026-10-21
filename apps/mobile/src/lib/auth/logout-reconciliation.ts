@@ -3,7 +3,7 @@ import {
   awaitActivityCleanupSettled,
   hasLogoutCleanupObligation,
   type LogoutCleanupRecord,
-  readLogoutCleanupRecords,
+  readLogoutCleanupStore,
   writeLogoutCleanupRecords,
 } from '@/lib/auth/logout-cleanup';
 import { chainSave } from '@/lib/hooks/save-chain';
@@ -42,6 +42,7 @@ export type ReconciliationAttemptOutcome =
   | { kind: 'expired-discarded' }
   | { kind: 'expired-retained' }
   | { kind: 'different-user-retained' }
+  | { kind: 'unreadable-store' }
   | { kind: 'attempted'; tombstoneDeleted: boolean };
 
 /** Test-only: clears the single-flight and spacing state between tests. */
@@ -106,8 +107,11 @@ export async function awaitLogoutReconciliationSettled(): Promise<void> {
  */
 export async function hasPendingActivityUnregister(userId: string | null): Promise<boolean> {
   await awaitActivityCleanupSettled();
-  const records = await readLogoutCleanupRecords();
-  return records.some(
+  const read = await readLogoutCleanupStore();
+  if (read.status === 'unreadable') {
+    return false;
+  }
+  return read.records.some(
     record =>
       record.needsActivityUnregister &&
       (userId === null || record.userId === null || record.userId === userId)
@@ -118,7 +122,12 @@ async function runReconciliation(
   userId: string,
   epoch: number
 ): Promise<ReconciliationAttemptOutcome> {
-  const records = await readLogoutCleanupRecords();
+  const stored = await readLogoutCleanupStore();
+  if (stored.status === 'unreadable') {
+    // Nothing safe to retry or rewrite: keep the payload for a later read.
+    return { kind: 'unreadable-store' };
+  }
+  const records = stored.records;
   const now = Date.now();
   const live = records.filter(record => now - record.failedAt <= TOMBSTONE_MAX_AGE_MS);
   const expiredPurged = live.length !== records.length;

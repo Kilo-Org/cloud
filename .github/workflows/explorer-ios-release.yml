@@ -28,7 +28,8 @@ permissions:
 jobs:
   build:
     runs-on: macos-26
-    # A cold Release build takes about 56 minutes and one needed 83; the explorer client waits 150 minutes.
+    # A cold Release build takes about 56 minutes and one needed 83. The explorer client waits 160 minutes,
+    # so this limit reports its own failure first.
     timeout-minutes: 150
     env:
       CLOUD_REF: ${{ inputs.cloud_ref }}

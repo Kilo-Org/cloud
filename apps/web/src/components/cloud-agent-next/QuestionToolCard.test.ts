@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { createRequire } from 'node:module';
-import { act, createElement, type ReactNode } from 'react';
+import React, { act, createElement, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
 import type { QuestionInfo } from '@/types/opencode.gen';
@@ -35,6 +35,7 @@ function installLinkedomDom(): {
   );
 
   const previous = {
+    React: (globalThis as { React?: unknown }).React,
     window: globalThis.window,
     document: globalThis.document,
     HTMLElement: globalThis.HTMLElement,
@@ -46,6 +47,7 @@ function installLinkedomDom(): {
   };
 
   Object.assign(globalThis, {
+    React,
     window,
     document,
     HTMLElement: window.HTMLElement,

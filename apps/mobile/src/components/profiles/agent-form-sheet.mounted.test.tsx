@@ -211,4 +211,32 @@ describe('AgentFormSheet parity fields', () => {
 
     unmount();
   });
+
+  it('refuses an over-long description inline and keeps the sheet open', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    changeText(renderer.root, 'Agent description', 'd'.repeat(2001));
+    pressDone(renderer.root);
+
+    expect(h.onSave).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Agent description').props.error).toBe(
+      'Use at most 2000 characters'
+    );
+
+    unmount();
+  });
+
+  it('refuses a non-ASCII slug with the character rule instead of calling it empty', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    changeText(renderer.root, 'Agent slug', 'नमूना एजेंट स्लग');
+    pressDone(renderer.root);
+
+    expect(h.onSave).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Agent slug').props.error).toBe(
+      'Slug must start with a lowercase ASCII letter and use only ASCII lowercase letters, digits, and dashes, up to 50 characters'
+    );
+
+    unmount();
+  });
 });

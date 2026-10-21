@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted case per variable-screen state: loading, error, empty, add, edit, delete, and the inline refusals share one harness */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -200,6 +201,41 @@ describe('ProfileVariablesScreen', () => {
     expect(findField(renderer.root, 'Key').props.error).toBe(
       'This key already exists in the profile'
     );
+
+    unmount();
+  });
+
+  it('non-retryable: clearing an existing value shows the required message instead of doing nothing', async () => {
+    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'API_KEY');
+    changeText(renderer.root, 'Value', '');
+    pressButton(renderer.root, 'Save');
+
+    expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Value').props.error).toBe('Enter a value');
+
+    // Typing a value clears the message without another save attempt.
+    changeText(renderer.root, 'Value', '2');
+    expect(findField(renderer.root, 'Value').props.error).toBeUndefined();
+
+    unmount();
+  });
+
+  it('non-retryable: a new variable needs a value', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Key', 'API_KEY');
+    pressButton(renderer.root, 'Save');
+
+    expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Value').props.error).toBe('Enter a value');
+    expect(findField(renderer.root, 'Key').props.error).toBeUndefined();
 
     unmount();
   });

@@ -44,12 +44,13 @@ export function variableRows(vars: readonly ProfileVarSource[]): VariableRow[] {
   }));
 }
 
-export type VariableInputError = 'empty' | 'too-long' | 'duplicate';
+export type VariableInputError = 'empty' | 'too-long' | 'duplicate' | 'value-required';
 
 /**
  * Validate the edited variable before a save. Matches the server's
- * `VarSchema` key bound (`z.string().min(1).max(256)`); `value` is part of the
- * form's input but unconstrained, matching the server. `takenKeys` are the
+ * `VarSchema` key bound (`z.string().min(1).max(256)`); the value must be
+ * non-blank, because an empty field offers the reader nothing to save and the
+ * server would accept it silently. `takenKeys` are the
  * profile's stored keys: the server upserts on `(profile_id, key)` with the
  * cleaned key the form sends, so a new key that normalizes onto an existing one
  * would silently replace that variable. Returns an error code, or `null` when
@@ -68,6 +69,9 @@ export function validateVariableInput(
   }
   if (takenKeys.includes(cleanVariableKey(key))) {
     return 'duplicate';
+  }
+  if (input.value.trim().length === 0) {
+    return 'value-required';
   }
   return null;
 }

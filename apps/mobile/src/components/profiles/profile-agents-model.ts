@@ -198,13 +198,34 @@ export function initialAgentFormState(agent?: AgentSource): AgentFormState {
 
 const AGENT_SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
 
-export type AgentFormError = 'slug-required' | 'slug-invalid' | 'slug-conflict' | 'name-required';
+/**
+ * Server bounds, mirrored so the form refuses an over-long value instead of
+ * letting the request fail with no message beside the field:
+ * `agentSlugSchema` caps the slug at 50, `agentNameSchema` the name at 100, and
+ * `AgentConfigSchema.description` the config description at 2000.
+ */
+const AGENT_SLUG_MAX_LENGTH = 50;
+export const AGENT_NAME_MAX_LENGTH = 100;
+export const AGENT_DESCRIPTION_MAX_LENGTH = 2000;
+
+export type AgentFormError =
+  | 'slug-required'
+  | 'slug-invalid'
+  | 'slug-conflict'
+  | 'name-required'
+  | 'name-too-long'
+  | 'description-too-long';
 
 /**
  * Validate the form before a save. Returns the field at fault, or `null` when
- * valid. Mirrors the server's `agentSlugSchema`/`agentNameSchema`: a non-empty
- * display name, and a slug that starts with a lowercase letter, stays in
- * `[a-z0-9-]`, and does not collide with a built-in agent.
+ * valid. Mirrors the server's `agentSlugSchema`/`agentNameSchema`/
+ * `AgentConfigSchema`: a non-empty display name within 100 characters, a
+ * description within 2000, and a slug that starts with a lowercase letter,
+ * stays in `[a-z0-9-]` within 50 characters, and does not collide with a
+ * built-in agent.
+ *
+ * Values are trimmed first because `buildAgentPayload` sends them trimmed, so
+ * the bounds apply to what the server receives.
  *
  * `otherSlugs` carries the slugs of the profile's other agents. The server also
  * holds one agent per slug per profile (`UQ_agent_env_profile_agents_profile_slug`),
@@ -219,14 +240,21 @@ export function validateAgentForm(
   if (slug.length === 0) {
     return 'slug-required';
   }
-  if (!AGENT_SLUG_PATTERN.test(slug)) {
+  if (slug.length > AGENT_SLUG_MAX_LENGTH || !AGENT_SLUG_PATTERN.test(slug)) {
     return 'slug-invalid';
   }
   if (BUILTIN_AGENT_SLUGS.has(slug) || otherSlugs.some(item => item.toLowerCase() === slug)) {
     return 'slug-conflict';
   }
-  if (state.name.trim().length === 0) {
+  const name = state.name.trim();
+  if (name.length === 0) {
     return 'name-required';
+  }
+  if (name.length > AGENT_NAME_MAX_LENGTH) {
+    return 'name-too-long';
+  }
+  if (state.description.trim().length > AGENT_DESCRIPTION_MAX_LENGTH) {
+    return 'description-too-long';
   }
   return null;
 }

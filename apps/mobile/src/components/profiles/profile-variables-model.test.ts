@@ -32,8 +32,16 @@ describe('variableRows', () => {
 
 describe('validateVariableInput', () => {
   it('accepts a non-empty key within the 1..256 bound', () => {
-    expect(validateVariableInput({ key: 'API_KEY', value: '' })).toBeNull();
+    expect(validateVariableInput({ key: 'API_KEY', value: 'x' })).toBeNull();
     expect(validateVariableInput({ key: 'a'.repeat(256), value: 'x' })).toBeNull();
+  });
+
+  it('requires a value that is not blank', () => {
+    expect(validateVariableInput({ key: 'API_KEY', value: '' })).toBe('value-required');
+    expect(validateVariableInput({ key: 'API_KEY', value: '   ' })).toBe('value-required');
+    expect(validateVariableInput({ key: 'API_KEY', value: '\n\t' })).toBe('value-required');
+    expect(validateVariableInput({ key: 'API_KEY', value: ' ' })).toBe('value-required');
+    expect(validateVariableInput({ key: 'API_KEY', value: ' x ' })).toBeNull();
   });
 
   it('reports an empty key after trimming', () => {

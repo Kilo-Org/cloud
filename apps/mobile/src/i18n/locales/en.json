@@ -3641,6 +3641,8 @@
     "keyTooLong": "Key must be 256 characters or fewer",
     "keyDuplicate": "This key already exists in the profile",
     "valueLabel": "Value",
+    "valueRequired": "Enter a value",
+    "tooLong": "Use at most {{max}} characters",
     "secretLabel": "Secret",
     "secrets": {
       "markSecret": "Mark as secret",
@@ -3688,7 +3690,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Enter a server name",
-      "nameInvalid": "Name can use only letters, numbers, underscores, and dashes",
+      "nameInvalid": "Name can use only ASCII letters, numbers, underscores, and dashes, up to 100 characters",
       "commandRequired": "Enter a command",
       "commandTooLong": "Use at most 50 arguments of 500 characters each",
       "urlRequired": "Enter a URL",
@@ -3727,7 +3729,7 @@
       "saveFailed": "Couldn't save agent",
       "nameRequired": "Enter an agent name",
       "slugRequired": "Enter an agent slug",
-      "slugInvalid": "Slug must start with a letter and use only lowercase letters, digits, and dashes",
+      "slugInvalid": "Slug must start with a lowercase ASCII letter and use only ASCII lowercase letters, digits, and dashes, up to 50 characters",
       "slugConflict": "That slug is already taken by a built-in or another agent in this profile",
       "edit": "Edit agent"
     },

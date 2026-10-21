@@ -82,17 +82,30 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     ...balanceOptions,
     enabled: enabled && hasUserId,
     placeholderData: keepPreviousData,
+    // The card must stop waiting while the online manager reports offline: a
+    // paused read is pending without fetching, so the skeleton below had no
+    // exit. This one either answers or fails once the control-plane deadline
+    // lands, and `balanceFailed` then offers the retry.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
   });
 
   const { data: personalCreditData, isLoading: personalCreditsLoading } = useQuery({
     ...personalCreditOptions,
     enabled: enabled && hasUserId && !selectedOrgId,
+    networkMode: 'always',
+    refetchOnReconnect: true,
   });
 
   const { data: orgCreditData, isLoading: orgCreditsLoading } = useQuery({
     ...orgCreditOptions,
     enabled: enabled && hasUserId && Boolean(selectedOrgId),
     placeholderData: keepPreviousData,
+    networkMode: 'always',
+    refetchOnReconnect: true,
   });
 
   // A failed getMe (no userId) can never render a trusted balance, so it shares
@@ -103,10 +116,12 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const creditsLoading = selectedOrgId ? orgCreditsLoading : personalCreditsLoading;
 
   const balanceDollars = balance?.balance ?? 0;
-  // A paused query (offline/unknown connectivity, empty cache) is pending but
-  // not fetching, so `balanceLoading` (isLoading) is false while `balance`
-  // is still undefined. Treat "no data yet" as loading so the card shows a
-  // skeleton instead of `$0` on a cold launch before NetInfo settles.
+  // A read that has not answered yet is pending without fetching while the
+  // owner is still unresolved (the balance query is gated on the identity), so
+  // `balanceLoading` (isLoading) is false while `balance` is still undefined.
+  // Treat "no data yet" as loading so the card shows a skeleton instead of `$0`
+  // on a cold launch. The read itself settles regardless of the online manager,
+  // and an unreachable one lands on `balanceFailed` instead of this branch.
   const balancePending = balance === undefined && !balanceFailed;
   const showBalanceSkeleton =
     (balanceLoading || balancePending || !hideBalanceLoaded) && !balanceFailed;

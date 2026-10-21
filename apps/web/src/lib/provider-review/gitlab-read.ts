@@ -42,6 +42,7 @@ import {
   authorizeOwner,
   authorizeProject,
   classifyGitLabError,
+  classifyGitLabErrorForOwner,
   GitLabApiStatusError,
   GitLabReviewError,
   type GitLabProjectAccess,
@@ -155,6 +156,8 @@ export async function requestGitLabJson<T>(
     }
     return (await response.json()) as T;
   } catch (error) {
+    // This layer has no owner: the status travels on the classified error so
+    // the owner-aware caller can weigh a 403 against the connection's owner.
     throw classifyGitLabError(error);
   }
 }
@@ -409,9 +412,9 @@ export async function getMergeRequest(
     // Counts come from the diffs. Fold every page GitLab will serve — it caps
     // a merge request's diff collection at the project's `diff_max_files`
     // (1000 by default), which the page bound covers — so a large merge
-    // request reports complete totals instead of its first 150 files. Each page
-    // is folded into the running counters the moment it arrives and dropped, so
-    // the walk never holds the parsed diff text it only reads once.
+    // request reports complete totals. Each page is folded into the running
+    // counters the moment it arrives and dropped, so the walk never holds the
+    // parsed diff text it only reads once.
     let diffFileCount = 0;
     let additions = 0;
     let deletions = 0;
@@ -458,7 +461,7 @@ export async function getMergeRequest(
       updatedAt: detail.updated_at ?? '',
     };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -479,7 +482,7 @@ export async function listChangedFiles(
       nextCursor: cursorForPage(access.projectPath, page, diffs.length),
     };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -522,7 +525,7 @@ export async function getFileLines(
     const end = Math.max(start, Math.min(cappedEnd, allLines.length));
     return { lines: allLines.slice(start - 1, end), totalLines: allLines.length };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -587,7 +590,7 @@ export async function listDiscussions(
       nextCursor: cursorForPage(access.projectPath, page, discussions.length),
     };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -629,7 +632,7 @@ export async function listChecks(
     }
     return { checks };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -688,7 +691,7 @@ export async function listInbox(
     }
     return { items, nextCursor: cursorForPage(identity, page, mergeRequests.length) };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -830,7 +833,7 @@ export async function getMergeState(
       blockedReasons,
     };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 

@@ -18,6 +18,7 @@ import {
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { cn } from '@/lib/utils';
 
@@ -94,6 +95,24 @@ export function AgentFormSheet({
     models.find(option => option.id === model.trim())?.variants ?? [];
   const variants = variantsFor(modelValue);
 
+  const hasUnsavedEdits = () =>
+    slugRef.current !== initial.slug ||
+    nameRef.current !== initial.name ||
+    descriptionRef.current !== initial.description ||
+    promptRef.current !== initial.prompt ||
+    modelRef.current !== initial.model ||
+    stepsRef.current !== initial.steps ||
+    temperatureRef.current !== initial.temperature ||
+    topPRef.current !== initial.topP ||
+    visibility !== initial.visibility ||
+    variant !== initial.variant ||
+    disabledTools.length !== initial.disabledTools.length ||
+    disabledTools.some(tool => !initial.disabledTools.includes(tool));
+  const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
+    isDirty: hasUnsavedEdits,
+    onDiscard: onClose,
+  });
+
   const submit = () => {
     const state: AgentFormState = {
       slug: slugRef.current,
@@ -118,13 +137,13 @@ export function AgentFormSheet({
   };
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
       <SheetHeader
         title={agent === null ? t('profiles.agents.add') : agent.name}
         onDone={submit}
-        onCancel={onClose}
+        onCancel={requestClose}
         doneLabel={t('common.save')}
-        disabled={isSaving}
+        doneDisabled={isSaving}
         topInset="ios-page-sheet"
       />
       <ScrollView
@@ -308,6 +327,7 @@ export function AgentFormSheet({
         </View>
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
+      {dialog}
     </SessionPageSheet>
   );
 }

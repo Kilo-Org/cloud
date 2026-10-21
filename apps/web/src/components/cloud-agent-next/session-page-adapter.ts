@@ -2,6 +2,7 @@ import {
   type KiloSdkMessageHistory,
   type KiloSdkMessageHistoryPage,
   type KiloSessionId,
+  type PreparationAttempt,
   type SessionSnapshotPage,
   type SessionSnapshotPageOutcome,
 } from '@kilocode/cloud-agent-sdk';
@@ -10,6 +11,7 @@ type SessionMessagesPageResult = {
   kiloSessionId: string;
   history: KiloSdkMessageHistory | null;
   watermarkEventId?: number | null;
+  preparationAttempts?: PreparationAttempt[];
 };
 
 export type SessionPageTrpcClient = {
@@ -35,6 +37,12 @@ export async function fetchWebSessionSnapshotPage(
   });
 
   const history = result.history;
+  const pageState = {
+    ...(result.watermarkEventId != null ? { watermarkEventId: result.watermarkEventId } : {}),
+    ...(result.preparationAttempts?.length
+      ? { preparationAttempts: result.preparationAttempts }
+      : {}),
+  };
   if (history === null) {
     return {
       kind: 'success',
@@ -42,7 +50,7 @@ export async function fetchWebSessionSnapshotPage(
       messages: [],
       nextCursor: null,
       omittedItemCount: 0,
-      ...(result.watermarkEventId != null ? { watermarkEventId: result.watermarkEventId } : {}),
+      ...pageState,
     };
   }
 
@@ -53,7 +61,7 @@ export async function fetchWebSessionSnapshotPage(
       messages: history.messages as SessionSnapshotPage['messages'],
       nextCursor: history.nextCursor,
       omittedItemCount: history.omittedItemCount,
-      ...(result.watermarkEventId != null ? { watermarkEventId: result.watermarkEventId } : {}),
+      ...pageState,
     };
   }
 

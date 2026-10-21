@@ -1,11 +1,20 @@
-FROM docker.io/cloudflare/sandbox:0.12.9
+ARG NODE_VERSION="24.22.0"
+FROM docker.io/library/node:${NODE_VERSION}-slim AS node-runtime
+
+FROM docker.io/cloudflare/sandbox:0.12.12
+
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack
+COPY --from=node-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
 
 # Build arguments for metadata (all optional with defaults)
 ARG BUILD_DATE=""
 ARG VCS_REF=""
 ARG KILOCODE_CLI_VERSION="7.8.1"
-ARG PNPM_VERSION="11.1.2"
-ARG GLAB_VERSION="1.93.0"
+ARG BUN_VERSION="1.3.14"
+ARG PNPM_VERSION="12.14.0"
+ARG GLAB_VERSION="1.124.0"
+ARG GH_VERSION="2.102.0"
 
 # Build the kilo binary:
 #   cd ~/projects/kilocode-backend/cloud-agent
@@ -26,18 +35,12 @@ RUN set -eux; \
 		software-properties-common \
 		wget; \
 	add-apt-repository -y ppa:git-core/ppa; \
-	mkdir -p -m 755 /etc/apt/keyrings; \
-	wget -nv -O /etc/apt/keyrings/githubcli-archive-keyring.gpg https://cli.github.com/packages/githubcli-archive-keyring.gpg; \
-	chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg; \
-	mkdir -p -m 755 /etc/apt/sources.list.d; \
-	echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-		| tee /etc/apt/sources.list.d/github-cli.list > /dev/null; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
 		git \
 		git-lfs \
-		gh \
 		jq \
+		libatomic1 \
 		locales \
 		openssh-client \
 		ripgrep; \
@@ -48,6 +51,11 @@ RUN set -eux; \
 	rm -rf /var/lib/apt/lists/*
 ENV LC_ALL=en_US.UTF-8
 ENV LANG=en_US.UTF-8
+
+RUN wget -nv -O /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
+	&& tar -xzf /tmp/gh.tar.gz -C /tmp \
+	&& install -m 0755 "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh \
+	&& rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64"
 
 
 # Install GitLab CLI (glab) - download official .deb from GitLab releases.
@@ -61,7 +69,8 @@ RUN chmod +x /opt/kilo-cloud/kilo-git-credential \
 	&& ln -sf /opt/kilo-cloud/kilo-git-credential /usr/local/bin/kilo-git-credential
 
 # Install pnpm and kilocode 
-RUN npm install -g pnpm@${PNPM_VERSION} @kilocode/cli@${KILOCODE_CLI_VERSION}
+RUN rm -f /usr/local/bin/bun \
+	&& npm install -g bun@${BUN_VERSION} pnpm@${PNPM_VERSION} @kilocode/cli@${KILOCODE_CLI_VERSION}
 
 # Copy to install pre-built kilo binary (built via ./cloud-agent-build.sh)
 #COPY kilo /usr/local/bin/kilo

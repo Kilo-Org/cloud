@@ -55,8 +55,10 @@ import {
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
+import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
 import {
   recordKiloAdminElevation,
   UNSCOPED_TARGET,
@@ -110,8 +112,8 @@ const privateTranscriptPathFields = new Set([
 ]);
 const privateTranscriptPathArrays = new Set(['files', 'visibleFiles', 'openTabs']);
 
-function isAbsoluteTranscriptPath(value: string): boolean {
-  return /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value);
+function isPrivateTranscriptPath(value: string, directory: string): boolean {
+  return /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value) && !value.startsWith(`${directory}/`);
 }
 
 function projectGroupedTranscriptPaths(value: unknown, directory: string): void {
@@ -132,7 +134,7 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
         key === 'directory' ||
         key === 'cwd' ||
         key === 'root' ||
-        (privateTranscriptPathFields.has(key) && isAbsoluteTranscriptPath(current))
+        (privateTranscriptPathFields.has(key) && isPrivateTranscriptPath(current, directory))
       ) {
         Reflect.set(value, key, directory);
       } else if ((key === 'url' || key === 'uri') && /^file:/i.test(current)) {
@@ -144,7 +146,7 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
     if (Array.isArray(current) && privateTranscriptPathArrays.has(key)) {
       for (let index = 0; index < current.length; index += 1) {
         const path = current[index];
-        if (typeof path === 'string' && isAbsoluteTranscriptPath(path)) {
+        if (typeof path === 'string' && isPrivateTranscriptPath(path, directory)) {
           current[index] = directory;
         } else {
           projectGroupedTranscriptPaths(path, directory);
@@ -893,15 +895,9 @@ async function addOrganizationCondition(
         target: UNSCOPED_TARGET,
       });
     } else {
-      whereConditions.push(sql`(
-        ${cli_sessions_v2.organization_id} IS NULL
-        OR EXISTS (
-          SELECT 1
-          FROM ${organization_memberships}
-          WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
-            AND ${organization_memberships.kilo_user_id} = ${ctx.user.id}
-        )
-      )`);
+      whereConditions.push(
+        activeOrganizationAccessSql(cli_sessions_v2.organization_id, ctx.user.id)
+      );
     }
     return;
   }
@@ -1686,9 +1682,9 @@ export const cliSessionsV2Router = createTRPCRouter({
    * This combines the DB fetch (ownership check + metadata) with the DO fetch
    * (mode, model, repository, execution state) in a single call.
    *
-   * For V2 sessions (those with cloud_agent_session_id), this also fetches
-   * runtime state from the cloud-agent DO. For CLI sessions without a
-   * cloud_agent_session_id, runtimeState will be null.
+   * Runtime state is null when no cloud runtime is recorded, its stored ID
+   * is unsupported by the current runtime, or the runtime no longer exists.
+   * Failures reading a supported runtime ID still propagate to the caller.
    */
   getWithRuntimeState: baseProcedure
     .input(GetSessionInputSchema)
@@ -1764,7 +1760,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       // 2. If session has cloud_agent_session_id, fetch runtime state from DO
       let runtimeState: z.infer<typeof baseGetSessionNextOutputSchema> | null = null;
 
-      if (session.cloud_agent_session_id) {
+      if (session.cloud_agent_session_id && SESSION_ID_RE.test(session.cloud_agent_session_id)) {
         try {
           const authToken = (
             await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
@@ -1795,6 +1791,8 @@ export const cliSessionsV2Router = createTRPCRouter({
             });
           }
         }
+      } else if (session.cloud_agent_session_id) {
+        console.debug('Stored runtime identifier is unsupported; returning historical metadata');
       }
 
       return {

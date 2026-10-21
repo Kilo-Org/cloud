@@ -62,7 +62,7 @@ export function hasSameGlanceableContent(
     a.snapshot.status === b.snapshot.status &&
     a.snapshot.running === b.snapshot.running &&
     a.snapshot.needsInput === b.snapshot.needsInput &&
-    (a.snapshot.needsApproval ?? 0) === (b.snapshot.needsApproval ?? 0) &&
+    a.snapshot.needsApproval === b.snapshot.needsApproval &&
     a.snapshot.idle === b.snapshot.idle &&
     a.snapshot.scheduled === b.snapshot.scheduled &&
     a.snapshot.needsInputSince === b.snapshot.needsInputSince &&

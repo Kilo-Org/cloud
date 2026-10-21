@@ -180,7 +180,7 @@ export async function isCustomLlm(modelId: string): Promise<boolean> {
  * reuses a Kilo-exclusive id. The same holds while the catalog is unavailable
  * for an id a custom LLM could shadow.
  */
-export async function getCustomLlmInferenceProviderRestriction(
+export async function getCustomLlmInferenceProviders(
   modelId: string
 ): Promise<ReadonlySet<string> | null> {
   const lookup = await lookupCustomLlm(modelId);

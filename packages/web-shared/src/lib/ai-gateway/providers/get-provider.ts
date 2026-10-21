@@ -35,6 +35,7 @@ import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-
 import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   getLocalFakeLlmProvider,
   getLocalFakeTranscriptionProvider,
@@ -46,6 +47,7 @@ export type GetProviderProviderResult = {
   kind: 'provider';
   provider: Provider;
   userByok: BYOKResult[] | null;
+  readonly isFree: boolean;
   /** Skip balance, paid-auth, and organization policy checks entirely. Used
    *  by direct-byok and non-public custom_llm2 because both already require
    *  explicit admin opt-in. */
@@ -97,6 +99,7 @@ async function checkDirectBYOK(
       },
     } satisfies Provider,
     userByok,
+    isFree: isFreeModelExcludingCustomLlms(requestedModel),
     bypassAccessCheck: true,
   };
 }
@@ -176,6 +179,7 @@ async function resolveCustomLlmProvider(
       await resolveCustomLlmAuth(credentials)
     ),
     userByok: null,
+    isFree: true,
     bypassAccessCheck: !isPublicCustomLlm(definition),
   };
 }
@@ -222,6 +226,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
         kind: 'provider',
         provider: localFakeProvider,
         userByok: null,
+        isFree: true,
         bypassAccessCheck: true,
       };
     }
@@ -256,7 +261,10 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     return { kind: 'chatgpt-reconnect', message: openAiChatGptByok.message };
   }
   if (openAiChatGptByok) {
-    return openAiChatGptByok;
+    return {
+      ...openAiChatGptByok,
+      isFree: isFreeModelExcludingCustomLlms(requestedModel),
+    };
   }
 
   const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);
@@ -265,6 +273,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
       kind: 'provider',
       provider: VERCEL_AI_GATEWAY,
       userByok: vercelByok,
+      isFree: isFreeModelExcludingCustomLlms(requestedModel),
       bypassAccessCheck: false,
     };
   }
@@ -284,6 +293,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
       kind: 'provider',
       provider: VERCEL_AI_GATEWAY,
       userByok: null,
+      isFree: isFreeModelExcludingCustomLlms(requestedModel),
       bypassAccessCheck: false,
     };
   }
@@ -292,6 +302,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     kind: 'provider',
     provider: kiloExclusiveModel?.provider ?? OPENROUTER,
     userByok: null,
+    isFree: isFreeModelExcludingCustomLlms(requestedModel),
     bypassAccessCheck: false,
   };
 }
@@ -300,15 +311,16 @@ export async function getEmbeddingProvider(
   requestedModel: string,
   user: User | AnonymousUserContext,
   organizationId: string | undefined
-): Promise<{ provider: Provider; userByok: BYOKResult[] | null }> {
+): Promise<{ provider: Provider; userByok: BYOKResult[] | null; isFree: boolean }> {
+  const isFree = isFreeModelExcludingCustomLlms(requestedModel);
   // 1. BYOK check — route through Vercel AI Gateway when user has their own key
   const userByok = await checkVercelBYOK(user, requestedModel, organizationId);
   if (userByok) {
-    return { provider: VERCEL_AI_GATEWAY, userByok };
+    return { provider: VERCEL_AI_GATEWAY, userByok, isFree };
   }
 
   // 2. All non-BYOK embedding requests go through OpenRouter
-  return { provider: OPENROUTER, userByok: null };
+  return { provider: OPENROUTER, userByok: null, isFree };
 }
 
 export async function getTranscriptionProvider(): Promise<{

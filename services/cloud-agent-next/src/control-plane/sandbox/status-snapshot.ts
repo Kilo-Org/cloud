@@ -7,6 +7,7 @@
  * This is a passive snapshot: `observedAt` is creation time, not a fresh probe.
  */
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
+import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../../sandbox-containers/instance-size.js';
 import {
   getSandboxProviderLabel,
   type SandboxStatusSnapshot,
@@ -46,7 +47,9 @@ export function projectAllocationStatusSnapshot(
                 ? ('containers-standard-3' as const)
                 : containersInstance === 'standard-4'
                   ? ('containers-standard-4' as const)
-                  : null,
+                  : containersInstance === CODE_REVIEW_CONTAINERS_INSTANCE
+                    ? ('code-review' as const)
+                    : null,
             kiloCliVersion: null,
             wrapperVersion: null,
             startedAt: null,

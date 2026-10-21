@@ -34,11 +34,10 @@ const validDefinition: CustomLlmDefinition = {
 const publicDefinition: CustomLlmDefinition = {
   internal_id: 'upstream-model',
   display_name: 'Public model',
-  description: 'A public custom model',
   context_length: 128000,
   max_completion_tokens: 4096,
   base_url: 'https://upstream.example.com/v1',
-  public: { inference_providers: ['acme'] },
+  public: { inference_providers: ['acme'], description: 'A public custom model' },
 };
 
 beforeEach(async () => {
@@ -561,13 +560,16 @@ describe('adminCustomLlmRouter', () => {
         credentials,
       });
 
-      expect(result.definition.public).toEqual({ inference_providers: ['acme'] });
+      expect(result.definition.public).toEqual({
+        inference_providers: ['acme'],
+        description: 'A public custom model',
+      });
     });
 
     it.each([
       ['organization_ids', { organization_ids: [] }],
       ['group_ids', { group_ids: ['00000000-0000-4000-8000-000000000123'] }],
-      ['description', { description: undefined }],
+      ['description', { public: { inference_providers: ['acme'], description: ' ' } }],
     ])('rejects a public definition with an invalid %s', async (_field, overrides) => {
       const caller = await createCallerForUser(admin.id);
 
@@ -580,13 +582,21 @@ describe('adminCustomLlmRouter', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
 
-    it('requires organization_ids on a private definition', async () => {
+    it('stores a private definition that nobody is granted yet', async () => {
       const caller = await createCallerForUser(admin.id);
-      const { organization_ids: _organizationIds, ...definition } = validDefinition;
+      const {
+        organization_ids: _organizationIds,
+        group_ids: _groupIds,
+        ...definition
+      } = validDefinition;
 
-      await expect(
-        caller.admin.customLlm.upsert({ public_id: 'acme/private-model', definition, credentials })
-      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      const result = await caller.admin.customLlm.upsert({
+        public_id: 'acme/unassigned-model',
+        definition,
+        credentials,
+      });
+
+      expect(result.definition.organization_ids).toBeUndefined();
     });
 
     it('rejects an inference provider that is not a lowercase slug', async () => {

@@ -74,7 +74,7 @@
     "CONTAINER_BILLING_HEARTBEAT_SECONDS": "300",
     "RUNTIME_ISOLATION_ENABLED": "true",
     "SANDBOX_SELECTION_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55",
-    "CONTAINER_REPO_SNAPSHOT_IDS": "2bbc9955-5dc2-428c-a353-be59d89a8130",
+    "CONTAINER_REPO_SNAPSHOT_IDS": "",
     "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
     "PREVIEW_HOST_SUFFIX": "cloud-agent.kiloapps.ai",
     "PREVIEW_ENABLED_IDS": "*",
@@ -87,6 +87,7 @@
     "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "",
     "VERCEL_SANDBOX_EXTEND_DURATION_MS": "",
     "CODE_REVIEW_CONTROL_PLANE_IDS": "*",
+    "CODE_REVIEW_CONTAINERS_ORG_IDS": "*",
   },
   "placement": { "mode": "smart" },
   /**
@@ -194,7 +195,7 @@
         "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.15",
       },
       "max_instances": 40,
       "rollout_active_grace_period": 1800,
@@ -208,7 +209,7 @@
         "disk_mb": 10000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.15",
       },
       "max_instances": 5,
       "rollout_active_grace_period": 1800,
@@ -222,7 +223,7 @@
         "disk_mb": 10000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.15",
       },
       "max_instances": 5,
       "rollout_active_grace_period": 1800,
@@ -236,7 +237,7 @@
         "disk_mb": 8000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.15",
       },
       "max_instances": 5,
       "rollout_active_grace_period": 1800,
@@ -250,7 +251,7 @@
         "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.15",
       },
       "max_instances": 300,
       "rollout_active_grace_period": 1800,
@@ -264,7 +265,7 @@
         "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.15",
       },
       "max_instances": 1500,
       "rollout_active_grace_period": 1800,
@@ -278,7 +279,7 @@
         "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.15",
       },
       "max_instances": 1500,
       "rollout_active_grace_period": 1800,
@@ -290,7 +291,7 @@
       "images": {
         "app": {
           "dockerfile": "./Dockerfile.containers",
-          "build_vars": { "KILOCODE_CLI_VERSION": "7.8.1" },
+          "build_vars": { "KILOCODE_CLI_VERSION": "7.8.15" },
         },
       },
     },
@@ -499,6 +500,7 @@
         "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "",
         "CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS": "",
         "CODE_REVIEW_CONTROL_PLANE_IDS": "*",
+        "CODE_REVIEW_CONTAINERS_ORG_IDS": "",
         "RUNTIME_ISOLATION_ENABLED": "true",
         "SANDBOX_SELECTION_IDS": "*",
         "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
@@ -560,7 +562,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.15",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -570,7 +572,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.15",
           },
           "max_instances": 6,
           "rollout_active_grace_period": 60,
@@ -580,7 +582,7 @@
           "image": "./Dockerfile.dind",
           "instance_type": "standard-3",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.15",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -594,7 +596,7 @@
             "disk_mb": 8000,
           },
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.15",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -604,7 +606,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.15",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -614,7 +616,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.15",
           },
           "max_instances": 6,
           "rollout_active_grace_period": 60,
@@ -628,7 +630,7 @@
             "disk_mb": 8000,
           },
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.15",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -640,7 +642,7 @@
           "images": {
             "app": {
               "dockerfile": "./Dockerfile.containers",
-              "build_vars": { "KILOCODE_CLI_VERSION": "7.8.1" },
+              "build_vars": { "KILOCODE_CLI_VERSION": "7.8.15" },
             },
           },
         },

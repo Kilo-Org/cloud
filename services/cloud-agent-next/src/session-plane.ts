@@ -15,6 +15,7 @@ export const CODE_REVIEW_PLATFORM = 'code-review';
  */
 const CONTROL_PLANE_ORIGINS: ReadonlySet<string> = new Set([
   'cloud-agent-web',
+  'desktop',
   'slack',
   'github',
   'linear',
@@ -27,6 +28,7 @@ const CONTROL_PLANE_ORIGINS: ReadonlySet<string> = new Set([
 
 export type ControlPlaneOwnerEnv = {
   CODE_REVIEW_CONTROL_PLANE_IDS?: string;
+  CODE_REVIEW_CONTAINERS_ORG_IDS?: string;
 };
 
 export function sessionPlaneFromId(sessionId: string): SessionPlane {
@@ -141,6 +143,21 @@ export function isCodeReviewControlPlaneOwner(
   );
 }
 
+/**
+ * Owners whose Code Reviewer sessions use the DO-managed Cloudflare Containers
+ * runtime. That runtime exists only on the control plane, so this enrollment
+ * implies control-plane routing.
+ */
+export function isCodeReviewContainersOwner(
+  env: ControlPlaneOwnerEnv,
+  owner: { userId: string; orgId?: string }
+): boolean {
+  return (
+    ownerIdInList(env.CODE_REVIEW_CONTAINERS_ORG_IDS, owner.userId) ||
+    ownerIdInList(env.CODE_REVIEW_CONTAINERS_ORG_IDS, owner.orgId)
+  );
+}
+
 /** UI gate only: hides the preview button and links; entry still checks session access. */
 export function isPreviewOwner(
   env: { PREVIEW_ENABLED_IDS?: string },
@@ -158,7 +175,9 @@ export function sessionPlaneForNewOwner(
   origin?: SessionCreateOrigin
 ): SessionPlane {
   if (isCodeReviewSession(origin)) {
-    return isCodeReviewControlPlaneOwner(env, owner) ? 'control' : 'legacy';
+    return isCodeReviewControlPlaneOwner(env, owner) || isCodeReviewContainersOwner(env, owner)
+      ? 'control'
+      : 'legacy';
   }
   return isControlPlaneOrigin(origin) ? 'control' : 'legacy';
 }

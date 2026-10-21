@@ -6,7 +6,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   findCustomLlm,
-  getCustomLlmInferenceProviderRestriction,
+  getCustomLlmInferenceProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { hasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
@@ -60,12 +60,11 @@ export async function isModelRestrictionExempt(
  * LLM, which shadows any built-in model with the same id, or those of a
  * Kilo-exclusive model. Undefined when the snapshot decides.
  */
-export async function getModelInferenceProviderRestriction(
+export async function getModelInferenceProviders(
   modelId: string
 ): Promise<ReadonlySet<string> | undefined> {
   return (
-    (await getCustomLlmInferenceProviderRestriction(modelId)) ??
-    getKiloExclusiveInferenceProviders(modelId)
+    (await getCustomLlmInferenceProviders(modelId)) ?? getKiloExclusiveInferenceProviders(modelId)
   );
 }
 
@@ -90,7 +89,7 @@ export function createAllowPredicateFromProviderAllowList(
       return false;
     }
     const providerSlugs =
-      (await getModelInferenceProviderRestriction(modelId)) ?? (await providerLookup(modelId));
+      (await getModelInferenceProviders(modelId)) ?? (await providerLookup(modelId));
     if (providerSlugs.size === 0) return false;
     if (!providerAllowSet) return true;
     return [...providerSlugs].some(slug => providerAllowSet.has(slug));

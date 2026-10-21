@@ -14,9 +14,11 @@ const publicCustomLlm: CustomLlm = {
   encrypted_api_key: null,
   definition: {
     ...baseDefinition,
-    description: 'A free Acme model',
     supports_image_input: true,
-    public: { inference_providers: ['acme', 'together', 'acme'] },
+    public: {
+      inference_providers: ['acme', 'together', 'acme'],
+      description: 'A free Acme model',
+    },
   },
 };
 

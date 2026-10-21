@@ -16,7 +16,7 @@ export function convertCustomLlmToCatalogModel(publicId: string, model: CustomLl
     name: model.display_name,
     isCustomLlm: true,
     created: 1756238927,
-    description: model.description ?? PRIVATE_CUSTOM_LLM_DESCRIPTION,
+    description: model.public?.description ?? PRIVATE_CUSTOM_LLM_DESCRIPTION,
     context_length: model.context_length,
     architecture: {
       modality: model.supports_image_input ? 'text+image-\u003Etext' : 'text-\u003Etext',

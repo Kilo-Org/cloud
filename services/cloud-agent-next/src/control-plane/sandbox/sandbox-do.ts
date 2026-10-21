@@ -173,6 +173,7 @@ import {
   CONTROL_PLANE_REQUEST_TIMEOUT_MS,
   controlPlaneAnswerPayloadSchema,
   controlPlaneDeliverPayloadSchema,
+  controlPlaneKiloRequestInputSchema,
   controlPlanePrepareInputSchema,
   controlPlaneRouteSpecSchema,
   controlPlaneSessionCredentialsPayloadSchema,
@@ -189,6 +190,7 @@ import {
   type ControlPlaneDispatchResult,
   type ControlPlaneEventsNotification,
   type ControlPlaneFailureReason,
+  type ControlPlaneKiloRequestInput,
   type ControlPlaneOutcome,
   type ControlPlaneRouteSpec,
   type ControlPlaneRouteUpdate,
@@ -378,6 +380,9 @@ function materializationStage(error: unknown): PrepareFrameMaterializationStage 
  * binding exists; tests inject a fake peer instead.
  */
 export type ControlPlaneSessionPeer = {
+  issueCloudAgentMcpGrant?(): Promise<
+    { url: string; token: string; expiresAt: number } | undefined
+  >;
   onRoute(update: ControlPlaneRouteUpdate): Promise<void>;
   onEvents(notification: ControlPlaneEventsNotification): Promise<void>;
   onOutcome(outcome: ControlPlaneOutcome): Promise<void>;
@@ -544,6 +549,27 @@ function controlRequestFailure(
   retryable: boolean
 ): ControlPlaneControlResult {
   return { ok: false, error: { code, message, retryable } };
+}
+
+/**
+ * The wrapper result frames that answer a correlated control request. Kept as
+ * one list so a new request kind cannot be registered without its reply being
+ * resolvable (spec §10).
+ */
+const CORRELATED_RESULT_FRAME_TYPES = new Set<string>([
+  'worktree.result',
+  'terminal.result',
+  'kilo.result',
+]);
+
+type CorrelatedResultFrame = Extract<
+  ControlPlaneWrapperFrame,
+  { type: 'worktree.result' | 'terminal.result' | 'kilo.result' }
+>;
+
+function isCorrelatedResultFrame(frame: unknown): frame is CorrelatedResultFrame {
+  if (!isRecord(frame)) return false;
+  return typeof frame.type === 'string' && CORRELATED_RESULT_FRAME_TYPES.has(frame.type);
 }
 
 /** Maps one terminal request to its wrapper frame, preserving the operation. */
@@ -1177,6 +1203,32 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
+   * Session DO -> Sandbox DO (spec §10). Forwards one allowlisted native Kilo
+   * read to the live wrapper. It never starts or wakes an allocation: only a
+   * bound wrapper socket answers, so a stopped session returns `not_ready`
+   * without any provider call. The socket binding is the allocation and
+   * connection fence, so a superseded wrapper cannot answer for its successor.
+   */
+  async kiloRequest(input: ControlPlaneKiloRequestInput): Promise<ControlPlaneControlResult> {
+    await this.initialized;
+    const parsed = controlPlaneKiloRequestInputSchema.parse(input);
+    const handoff = await this.enqueue(() => this.beginKiloRequest(parsed));
+    return 'error' in handoff ? handoff.error : handoff.promise;
+  }
+
+  private async beginKiloRequest(
+    input: ControlPlaneKiloRequestInput
+  ): Promise<ControlRequestHandoff> {
+    const frame: ControlPlaneWrapperFrame = {
+      type: 'kilo.request',
+      requestId: crypto.randomUUID(),
+      session: input.session,
+      operation: input.operation,
+    };
+    return this.beginWrapperControlRequest(frame);
+  }
+
+  /**
    * Off-queue read the Session DO uses to resolve one preview's provider
    * coordinates. It never enqueues, so a preview never waits behind the control
    * operation queue. The allocation and route are two separate reads, not one
@@ -1277,17 +1329,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     } catch {
       return;
     }
-    if (
-      !isRecord(parsed) ||
-      (parsed.type !== 'worktree.result' && parsed.type !== 'terminal.result')
-    ) {
+    if (!isCorrelatedResultFrame(parsed)) {
       return;
     }
     const result = controlPlaneWrapperFrameSchema.safeParse(parsed);
-    if (
-      !result.success ||
-      (result.data.type !== 'worktree.result' && result.data.type !== 'terminal.result')
-    ) {
+    if (!result.success || !isCorrelatedResultFrame(result.data)) {
       return;
     }
     const frame = result.data;
@@ -2710,15 +2756,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
     } catch {
       return 'failed';
     }
+    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(route.sessionId);
     if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';
     const next: RouteRecord = { ...route, grant: issued.grant, spec: issued.spec };
     this.publishRouteGrant(next);
     // Git/alias material is independent of the runtime-proxy handle, so a
     // re-issue still sends the frame even when the handle string did not change.
     // The canonical handoff runs separately in `runDeliver` maintenance.
-    const payload: ControlPlaneSessionCredentialsPayload = {
+    const payload = controlPlaneSessionCredentialsPayloadSchema.parse({
       ...sessionCredentialsPayloadFromGrant(issued.grant, route.sessionId),
-    };
+      ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
+    });
     if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
       await this.markRouteCredentialsSent(route.sessionId, issued.grant);
     }
@@ -3709,6 +3757,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     attemptId: string,
     expectedFence: ControlRuntimeCredentialProxyFence | null
   ): Promise<void> {
+    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(sessionId);
     const state = await this.readAllocation();
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return;
@@ -3730,7 +3779,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const sent = this.trySendFrame(socket, {
       type: 'session.prepare',
       spec,
-      credentials: this.prepareCredentials(latest.grant, sessionId),
+      credentials: controlPlaneSessionCredentialsPayloadSchema.parse({
+        ...this.prepareCredentials(latest.grant, sessionId),
+        ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
+      }),
     });
     if (sent) await this.markRouteCredentialsSent(sessionId, latest.grant);
   }
@@ -3924,6 +3976,26 @@ export class SandboxControlV2 extends DurableObject<Env> {
   ): Promise<{ exp: number; sessionId: string } | null> {
     const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle);
     return claims === null ? null : { exp: claims.exp, sessionId: claims.sessionId };
+  }
+
+  private async tryIssueCloudAgentMcpGrant(
+    sessionId: string
+  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
+    try {
+      const ownerId = await this.requireOwner();
+      const peer = ownerId === null ? null : this.sessionPeerFor(ownerId, sessionId);
+      if (peer?.issueCloudAgentMcpGrant === undefined) return undefined;
+      return await withTimeout(
+        peer.issueCloudAgentMcpGrant(),
+        this.grantIssueTimeoutMs(),
+        'Cloud Agent MCP grant issuance timed out'
+      );
+    } catch {
+      logger
+        .withFields({ sandboxId: this.sandboxId, sessionId })
+        .warn('Optional Cloud Agent MCP grant unavailable; continuing without it');
+      return undefined;
+    }
   }
 
   /** Mint one runtime proxy handle for `fence`, bounded by the grant timeout. */

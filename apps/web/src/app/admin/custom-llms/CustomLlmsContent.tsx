@@ -606,12 +606,14 @@ export function CustomLlmsContent() {
                 Custom LLMs are always free for users. To make the model available to every user,
                 replace <code>organization_ids</code> and <code>group_ids</code> with{' '}
                 <code>
-                  &quot;public&quot;: {'{'} &quot;inference_providers&quot;: [&quot;acme&quot;]{' '}
-                  {'}'}
-                </code>{' '}
-                and add a <code>description</code>. Organization provider allow lists apply to these
-                providers. Unknown providers appear in the provider list after the next provider
-                sync. Saved changes reach every server within a minute.
+                  &quot;public&quot;: {'{'} &quot;inference_providers&quot;: [&quot;acme&quot;],
+                  &quot;description&quot;: &quot;…&quot; {'}'}
+                </code>
+                . Organization provider allow lists apply to these providers. Unknown providers
+                appear in the provider list after the next provider sync. Without{' '}
+                <code>public</code>, <code>organization_ids</code>, or <code>group_ids</code>, the
+                model is stored but nobody can use it. Saved changes reach every server within a
+                minute.
               </p>
             </div>
 

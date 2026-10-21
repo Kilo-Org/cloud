@@ -2345,6 +2345,8 @@ export const CustomLlmPublicSchema = z.object({
    * the models-by-provider snapshot and enforced against provider allow lists.
    * A slug that OpenRouter does not know becomes a synthesized provider. */
   inference_providers: z.array(CustomLlmInferenceProviderSlugSchema).min(1),
+  /** Shown in model pickers instead of the private custom LLM disclaimer. */
+  description: z.string().trim().min(1),
 });
 
 export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
@@ -2354,22 +2356,13 @@ export const CustomLlmDefinitionSchema = z
     ...CustomLlmMetadataSchema.shape,
     ...CustomLlmApiConfigSchema.shape,
     display_name: z.string(),
-    description: z.string().trim().min(1).optional(),
+    /** Without organization or group grants, a private custom LLM is stored but reachable by nobody. */
     organization_ids: z.array(z.uuid()).optional(),
     group_ids: z.array(z.uuid()).optional(),
     public: CustomLlmPublicSchema.optional(),
   })
   .superRefine((definition, ctx) => {
-    if (!definition.public) {
-      if (definition.organization_ids === undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['organization_ids'],
-          message: 'organization_ids is required unless public is set',
-        });
-      }
-      return;
-    }
+    if (!definition.public) return;
     for (const key of ['organization_ids', 'group_ids'] as const) {
       if (definition[key] !== undefined) {
         ctx.addIssue({
@@ -2378,13 +2371,6 @@ export const CustomLlmDefinitionSchema = z
           message: `${key} must not be set when public is set`,
         });
       }
-    }
-    if (definition.description === undefined) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['description'],
-        message: 'description is required when public is set',
-      });
     }
   });
 

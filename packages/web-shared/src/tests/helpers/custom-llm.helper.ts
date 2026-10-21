@@ -30,8 +30,7 @@ export function publicCustomLlmDefinition(
   return {
     ...baseDefinition,
     display_name: 'Public custom LLM',
-    description: 'A public custom LLM',
-    public: { inference_providers: inferenceProviders },
+    public: { inference_providers: inferenceProviders, description: 'A public custom LLM' },
     ...overrides,
   };
 }

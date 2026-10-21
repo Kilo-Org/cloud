@@ -26,7 +26,7 @@ export function buildPublicCustomLlmSnapshotModels(
       slug: normalizeModelId(public_id),
       name: definition.display_name,
       author: 'Other',
-      description: definition.description ?? '',
+      description: definition.public.description,
       context_length: definition.context_length,
       input_modalities: definition.supports_image_input ? ['text', 'image'] : ['text'],
       output_modalities: ['text'],

@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/gl
 import { custom_llm2 } from '@kilocode/db/schema';
 import {
   findCustomLlm,
-  getCustomLlmInferenceProviderRestriction,
+  getCustomLlmInferenceProviders,
   isCustomLlm,
   lookupCustomLlm,
   requireCustomLlmsById,
@@ -78,7 +78,7 @@ describe('custom LLM catalog', () => {
     await expect(lookupCustomLlm(exclusiveId)).resolves.toEqual({ kind: 'unknown' });
     await expect(lookupCustomLlm(unclaimableExclusiveId)).resolves.toEqual({ kind: 'none' });
     await expect(lookupCustomLlm('acme/public-model')).resolves.toEqual({ kind: 'none' });
-    await expect(getCustomLlmInferenceProviderRestriction(exclusiveId)).resolves.toEqual(new Set());
+    await expect(getCustomLlmInferenceProviders(exclusiveId)).resolves.toEqual(new Set());
     await expect(findCustomLlm(exclusiveId)).resolves.toBeNull();
     await expect(requireCustomLlmsById()).rejects.toThrow('custom LLM catalog could not be read');
     expect(select).toHaveBeenCalledTimes(1);
@@ -98,13 +98,11 @@ describe('custom LLM catalog', () => {
   });
 
   test('pins public custom LLMs to their providers and private ones to none', async () => {
-    await expect(getCustomLlmInferenceProviderRestriction('acme/public-model')).resolves.toEqual(
+    await expect(getCustomLlmInferenceProviders('acme/public-model')).resolves.toEqual(
       new Set(['acme'])
     );
-    await expect(getCustomLlmInferenceProviderRestriction('acme/private-model')).resolves.toEqual(
-      new Set()
-    );
-    await expect(getCustomLlmInferenceProviderRestriction(exclusiveId)).resolves.toEqual(new Set());
-    await expect(getCustomLlmInferenceProviderRestriction('openai/gpt-4o')).resolves.toBeNull();
+    await expect(getCustomLlmInferenceProviders('acme/private-model')).resolves.toEqual(new Set());
+    await expect(getCustomLlmInferenceProviders(exclusiveId)).resolves.toEqual(new Set());
+    await expect(getCustomLlmInferenceProviders('openai/gpt-4o')).resolves.toBeNull();
   });
 });

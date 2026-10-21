@@ -500,7 +500,7 @@ describe('GET /api/v1/models', () => {
         max_completion_tokens: 100,
         base_url: 'https://upstream.example.com/v1',
         ...(isPublic
-          ? { description: 'Public custom model', public: { inference_providers: ['acme'] } }
+          ? { public: { inference_providers: ['acme'], description: 'Public custom model' } }
           : { organization_ids: [] }),
       },
     });

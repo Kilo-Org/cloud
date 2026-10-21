@@ -13,7 +13,7 @@ import {
   withoutVirtualProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import {
-  getModelInferenceProviderRestriction,
+  getModelInferenceProviders,
   isModelRestrictionExempt,
   type CustomLlmGrantee,
 } from '@kilocode/web-shared/lib/model-allow.server';
@@ -169,7 +169,7 @@ export async function getEffectiveModelDecision(
   ) {
     return { allowed: false, denialSource: 'organization_model' };
   }
-  const pinnedProviders = await getModelInferenceProviderRestriction(modelId);
+  const pinnedProviders = await getModelInferenceProviders(modelId);
   const currentModelProviders =
     pinnedProviders ??
     (policy.requireModelInCurrentSnapshot ? await providerLookup(modelId) : undefined);

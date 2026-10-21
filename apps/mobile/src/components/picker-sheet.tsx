@@ -18,6 +18,7 @@ export function PickerSheet({
   expired = false,
   scrollable = true,
   disabled = false,
+  doneDisabled = false,
   /**
    * Half-detent-only shells (mode-picker pins `sheetAllowedDetents: [0.5]`)
    * can never reach the window top, so their header must not reserve the
@@ -43,6 +44,8 @@ export function PickerSheet({
   scrollable?: boolean;
   /** Disables the header Done/Cancel controls while the caller applies a choice. */
   disabled?: boolean;
+  /** Disables Done alone, so Cancel stays usable while the choice is invalid. */
+  doneDisabled?: boolean;
   topInset?: SheetHeaderTopInset;
 }) {
   const { t } = useTranslation();
@@ -71,6 +74,7 @@ export function PickerSheet({
           doneLabel={doneLabel}
           cancelLabel={cancelLabel}
           disabled={disabled}
+          doneDisabled={doneDisabled}
           topInset={topInset}
         />
         {headerContent}

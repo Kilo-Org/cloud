@@ -383,6 +383,46 @@ describe('TriggerDO', () => {
     });
   });
 
+  describe('exists', () => {
+    it('should return false for unconfigured trigger', async () => {
+      const id = env.TRIGGER_DO.idFromName('unconfigured/trigger');
+      const stub = env.TRIGGER_DO.get(id);
+
+      expect(await stub.exists()).toBe(false);
+    });
+
+    it('should distinguish a paused trigger from a missing one', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+      await stub.updateConfig({ isActive: false });
+
+      expect(await stub.isActive()).toBe(false);
+      expect(await stub.exists()).toBe(true);
+    });
+
+    it('should return false after deletion', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+      await stub.deleteTrigger();
+
+      expect(await stub.exists()).toBe(false);
+    });
+  });
+
   describe('captureRequest', () => {
     it('should fail for unconfigured trigger', async () => {
       const id = env.TRIGGER_DO.idFromName('unconfigured/trigger');
@@ -803,6 +843,37 @@ describe('TriggerDO', () => {
   });
 
   describe('listRequests', () => {
+    it('should return captured requests for a paused trigger', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      const captured = await stub.captureRequest({
+        method: 'POST',
+        path: '/while-active',
+        queryString: null,
+        headers: {},
+        body: 'body',
+        contentType: null,
+        sourceIp: null,
+      });
+      expect(captured.success).toBe(true);
+
+      await stub.updateConfig({ isActive: false });
+
+      const result = await stub.listRequests();
+      expect(result.requests).toHaveLength(1);
+      expect(result.requests[0].path).toBe('/while-active');
+      if (!captured.success) throw new Error('capture failed');
+      expect(await stub.getRequest(captured.requestId)).toMatchObject({ path: '/while-active' });
+    });
+
     it('should return empty array for new trigger', async () => {
       const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
       const stub = env.TRIGGER_DO.get(id);

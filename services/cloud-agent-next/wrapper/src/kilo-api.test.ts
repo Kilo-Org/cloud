@@ -406,6 +406,22 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       invoke: (client, directory) => client.getSessionStatuses(directory),
     },
     {
+      name: 'session diff',
+      method: 'GET',
+      pathname: '/session/ses_1/diff',
+      response: [
+        {
+          file: 'src/file.ts',
+          patch:
+            'diff --git a/src/file.ts b/src/file.ts\n--- a/src/file.ts\n+++ b/src/file.ts\n@@ -1 +1 @@\n-before\n+after\n',
+          additions: 1,
+          deletions: 1,
+          status: 'modified',
+        },
+      ],
+      invoke: (client, directory) => client.getSessionDiff('ses_1', directory),
+    },
+    {
       name: 'question list',
       method: 'GET',
       pathname: '/question',
@@ -832,6 +848,19 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     expect(await createClient(startStub(200, {}).url).getSessionStatuses()).toEqual({});
     expect(await createClient(startStub(200, []).url).getQuestions()).toEqual([]);
     expect(await createClient(startStub(200, []).url).getPermissions()).toEqual([]);
+    expect(await createClient(startStub(200, []).url).getSessionDiff('ses_1')).toEqual([]);
+  });
+
+  it('cancels a native diff HTTP read without treating it as an empty result', async () => {
+    const stub = startStub(200, []);
+    const controller = new AbortController();
+    controller.abort(new Error('Diff request cancelled'));
+    const error: unknown = await createClient(stub.url)
+      .getSessionDiff('ses_1', '/attached', controller.signal)
+      .catch(error => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ message: 'Session diff ses_1 failed: request error' });
+    expect(stub.requests).toHaveLength(0);
   });
 
   it('scopes question lists, answers, and rejections to the owning checkout directory', async () => {

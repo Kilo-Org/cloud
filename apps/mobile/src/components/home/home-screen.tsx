@@ -7,10 +7,9 @@ import Animated, { LinearTransition } from 'react-native-reanimated';
 import logo from '@/../assets/images/logo.png';
 import { Image } from '@/components/ui/image';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import {
-  AgentSessionsSection,
-  LiveSessionFeedback,
-} from '@/components/home/agent-sessions-section';
+import { BriefingCard, useHomeBriefing } from '@/components/agent-briefing/briefing-card';
+import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
+import { AgentSessionsSection } from '@/components/home/home-agent-sessions-section';
 import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
 import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
@@ -30,6 +29,7 @@ export function HomeScreen() {
     organizationId: context.organizationId,
     enabled: context.isReady,
   });
+  const homeBriefing = useHomeBriefing();
   const refetch = context.isError ? context.refetch : sessions.refetch;
   const headerTitle = buildTimedGreeting();
   const liveContent = liveSessionContent(context, sessions);
@@ -91,7 +91,16 @@ export function HomeScreen() {
             }
           >
             <Animated.View layout={LinearTransition} className="gap-2">
-              <AgentSessionsSection context={context} sessions={sessions} />
+              <AgentSessionsSection
+                context={context}
+                sessions={sessions}
+                briefing={{
+                  visible: homeBriefing.briefing !== undefined,
+                  card: homeBriefing.frameReport ? (
+                    <BriefingCard report={homeBriefing.frameReport} embedded />
+                  ) : null,
+                }}
+              />
               <UpNextSection organizationId={context.organizationId} enabled={context.isReady} />
               {context.isReady && (
                 <View className="gap-2 pt-4">

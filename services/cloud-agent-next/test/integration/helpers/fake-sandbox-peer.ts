@@ -8,6 +8,8 @@ import type {
   ControlPlaneDeliverResult,
   ControlPlanePrepareInput,
   ControlPlaneRouteView,
+  ControlPlaneSessionControlInput,
+  ControlPlaneSessionControlResult,
 } from '../../../src/shared/control-plane-protocol.js';
 
 /**
@@ -59,6 +61,13 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   deliverResults: ControlPlaneDeliverResult[] = [];
   readonly prepareCalls: ControlPlanePrepareInput[] = [];
   readonly deliverCalls: ControlPlaneDeliverPayload[] = [];
+  readonly sessionControlCalls: ControlPlaneSessionControlInput[] = [];
+  sessionControlResult: ControlPlaneSessionControlResult = {
+    type: 'coverage',
+    coveredMessageIds: [],
+  };
+  sessionControlResults: ControlPlaneSessionControlResult[] = [];
+  sessionControlError: Error | null = null;
   readonly abortCalls: string[] = [];
   readonly answerCalls: ControlPlaneAnswerPayload[] = [];
 
@@ -85,6 +94,22 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   async abort(payload: { sessionId: string }): Promise<'sent'> {
     this.abortCalls.push(payload.sessionId);
     return 'sent';
+  }
+
+  async sessionControl(
+    input: ControlPlaneSessionControlInput
+  ): Promise<{ ok: true; result: ControlPlaneSessionControlResult }> {
+    this.sessionControlCalls.push(input);
+    if (this.sessionControlError !== null) throw this.sessionControlError;
+    const queued = this.sessionControlResults.shift();
+    if (queued !== undefined) return { ok: true, result: queued };
+    return {
+      ok: true,
+      result:
+        input.action === 'abandon'
+          ? { type: 'abandon', outcome: 'absent', cleanedMessageIds: [] }
+          : this.sessionControlResult,
+    };
   }
 
   async answer(payload: ControlPlaneAnswerPayload): Promise<'sent'> {

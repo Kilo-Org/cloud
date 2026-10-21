@@ -363,6 +363,7 @@ export type KiloRuntime = {
   ): Promise<void>;
   /** Restarts with the pending credentials when the runtime is idle. B8 calls this. */
   applyPendingCredentials(canRestart: () => boolean): Promise<boolean>;
+  recoverAbandonedAbort(): Promise<boolean>;
   isRetiredClient(client: WrapperKiloClient): boolean;
   /** The live phase; the native status line counts these without a second reader. */
   phase(): KiloRuntimePhase;
@@ -1264,6 +1265,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       }
     },
     applyPendingCredentials,
+    recoverAbandonedAbort: () => restart('hang', undefined),
     needsCompute: () => activity?.needsCompute() ?? false,
     sessionState: id => activity?.state(id),
     refreshActivity: () => activity?.refresh() ?? Promise.resolve(),

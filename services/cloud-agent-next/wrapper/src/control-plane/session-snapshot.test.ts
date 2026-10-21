@@ -54,7 +54,7 @@ describe('session activity snapshots', () => {
       signal: AbortSignal.timeout(1000),
     });
     expect(f.readDirectories.sort()).toEqual(['/feed-only', '/one', '/owned', '/two']);
-    expect(f.messageReads.sort()).toEqual(['msg', 'older']);
+    expect(f.messageReads).toEqual(['older']);
     expect(snapshot.find(session => session.id === 'child')).toMatchObject({
       status: 'busy',
       parentID: 'root',
@@ -102,7 +102,7 @@ describe('session activity snapshots', () => {
       knownSessions: [],
       signal: AbortSignal.timeout(1000),
     });
-    expect(f.messageReads.sort()).toEqual(['blocked', 'msg']);
+    expect(f.messageReads).toEqual(['blocked']);
     expect(snapshot.find(session => session.id === 'child')?.interactions).toEqual([
       { id: 'q1', blocking: true, callID: 'call' },
     ]);

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { createControlDiagnosticProjector } from '../../../src/shared/control-diagnostics.js';
 import { createControlDiagnostics } from './diagnostics.js';
 import { createControlFileLogUploader } from './file-log-uploader.js';
+import { createControlLogUploadAuth } from './log-upload-auth.js';
 
 const UPLOAD_URL = 'https://control.example/sandbox-logs/a/b/c';
 const UPLOAD_GRANT = 'grant';
@@ -24,6 +25,248 @@ function collectLines(enabled = true) {
 function bufferHeartbeat(diagnostics: ReturnType<typeof createControlDiagnostics>): void {
   diagnostics.onDiagnostic('control.heartbeat', { phase: 'sent' });
 }
+
+describe('control log upload credential rotation', () => {
+  it.each([true, false])(
+    'bounds both final uploads while credential renewal replies %s',
+    async replies => {
+      const dir = await mkdtemp(join(tmpdir(), 'control-final-renewal-'));
+      const headers: string[] = [];
+      const auth = createControlLogUploadAuth({ initialGrant: 'old-token', send() {} });
+      auth.connected();
+      void auth.rejected('old-token');
+      expect(auth.current()).toBeUndefined();
+      const fetch = async (_url: string, init: RequestInit) => {
+        headers.push(new Headers(init.headers).get('Authorization') ?? '');
+        return new Response(null, { status: 204 });
+      };
+      const diagnostics = createControlDiagnostics({ uploadUrl: UPLOAD_URL, auth, fetch });
+      const wrapperLogPath = join(dir, 'wrapper.log');
+      await writeFile(wrapperLogPath, 'final log');
+      const files = createControlFileLogUploader({
+        uploadUrl: UPLOAD_URL,
+        auth,
+        fetch,
+        wrapperLogPath,
+        homeRoots: [],
+      });
+      try {
+        bufferHeartbeat(diagnostics);
+        const started = performance.now();
+        const finished = Promise.all([
+          diagnostics.finalize(replies ? 1000 : 20),
+          files.finalize(replies ? 1000 : 20),
+        ]);
+        if (replies) {
+          await new Promise(resolve => setTimeout(resolve, 20));
+          expect(headers).toEqual([]);
+          auth.receive({
+            type: 'logs.credentials',
+            grant: 'new-token',
+            expiresAt: Date.now() + 4 * 60 * 60_000,
+          });
+        }
+        await finished;
+        expect(performance.now() - started).toBeLessThan(replies ? 1500 : 500);
+        expect(headers).toEqual(replies ? ['Bearer new-token', 'Bearer new-token'] : []);
+      } finally {
+        auth.stop();
+        files.stop();
+        await rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('finalizes within its bound when rotating credentials are temporarily unavailable', async () => {
+    let attempts = 0;
+    const diagnostics = createControlDiagnostics({
+      uploadUrl: 'https://worker.example/control/logs',
+      auth: { current: () => undefined, rejected: async () => false },
+      fetch: async () => {
+        attempts++;
+        return new Response(null, { status: 204 });
+      },
+    });
+    bufferHeartbeat(diagnostics);
+    const started = performance.now();
+    await diagnostics.finalize(10);
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(attempts).toBe(0);
+  });
+
+  it.each(['diagnostics', 'files'] as const)(
+    'permanently stops %s uploads on a scope-forbidden response without refreshing',
+    async kind => {
+      let attempts = 0;
+      let refreshes = 0;
+      const auth = {
+        current: () => ({ token: 'grant', expiresAt: Date.now() + 60_000 }),
+        rejected: async () => {
+          refreshes++;
+          return false;
+        },
+      };
+      const upload = async () => {
+        attempts++;
+        return new Response(null, { status: 403 });
+      };
+      if (kind === 'diagnostics') {
+        const diagnostics = createControlDiagnostics({
+          uploadUrl: 'https://worker.example/control/logs',
+          auth,
+          fetch: upload,
+        });
+        bufferHeartbeat(diagnostics);
+        await diagnostics.flush();
+        bufferHeartbeat(diagnostics);
+        await diagnostics.flush();
+        await diagnostics.finalize(10);
+      } else {
+        const root = await mkdtemp(join(tmpdir(), 'control-forbidden-'));
+        try {
+          const wrapperLogPath = join(root, 'wrapper.log');
+          await writeFile(wrapperLogPath, 'log');
+          const uploader = createControlFileLogUploader({
+            uploadUrl: 'https://worker.example/control/logs',
+            auth,
+            wrapperLogPath,
+            homeRoots: [],
+            fetch: upload,
+          });
+          await uploader.uploadNow();
+          await uploader.uploadNow();
+          uploader.stop();
+        } finally {
+          await rm(root, { recursive: true, force: true });
+        }
+      }
+      expect(attempts).toBe(1);
+      expect(refreshes).toBe(0);
+    }
+  );
+
+  it('does not extend finalize behind a hanging renewal', async () => {
+    const auth = {
+      current: () => ({ token: 'old-token', expiresAt: Number.POSITIVE_INFINITY }),
+      rejected: () => new Promise<boolean>(() => {}),
+    };
+    const diagnostics = createControlDiagnostics({
+      uploadUrl: UPLOAD_URL,
+      auth,
+      fetch: () => Promise.resolve(new Response(null, { status: 401 })),
+      now: () => 1,
+    });
+    bufferHeartbeat(diagnostics);
+    const started = Date.now();
+    await diagnostics.finalize(50);
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
+  it('reads the newest token when a queued archive actually uploads', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'control-upload-queued-'));
+    const wrapperLogPath = join(dir, 'wrapper.log');
+    let token = 'old-token';
+    let releaseFirst: (response: Response) => void = () => undefined;
+    let markFirstStarted: () => void = () => undefined;
+    const firstStarted = new Promise<void>(resolve => {
+      markFirstStarted = resolve;
+    });
+    const headers: string[] = [];
+    try {
+      await writeFile(wrapperLogPath, 'wrapper log bytes');
+      const auth = {
+        current: () => ({ token, expiresAt: Number.POSITIVE_INFINITY }),
+        rejected: async () => false,
+      };
+      const fileLogs = createControlFileLogUploader({
+        uploadUrl: UPLOAD_URL,
+        auth,
+        wrapperLogPath,
+        homeRoots: [dir],
+        fetch: (_url, init) => {
+          headers.push(new Headers(init.headers).get('Authorization') ?? '');
+          if (headers.length === 1) {
+            markFirstStarted();
+            return new Promise<Response>(resolve => {
+              releaseFirst = resolve;
+            });
+          }
+          return Promise.resolve(new Response(null, { status: 204 }));
+        },
+      });
+
+      const first = fileLogs.uploadNow();
+      await firstStarted;
+      const second = fileLogs.uploadNow();
+      token = 'new-token';
+      releaseFirst(new Response(null, { status: 204 }));
+      await Promise.all([first, second]);
+      expect(headers).toEqual(['Bearer old-token', 'Bearer new-token']);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the pending diagnostic batch and rotates the archive uploader with the shared owner', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'control-upload-rotation-'));
+    const wrapperLogPath = join(dir, 'wrapper.log');
+    try {
+      await writeFile(wrapperLogPath, 'wrapper log bytes');
+      let token = 'old-token';
+      const rejected: string[] = [];
+      const auth = {
+        current: () => ({ token, expiresAt: Number.POSITIVE_INFINITY }),
+        rejected: async (used: string) => {
+          rejected.push(used);
+          return false;
+        },
+      };
+      const diagnosticHeaders: string[] = [];
+      const archiveHeaders: string[] = [];
+      const diagnostics = createControlDiagnostics({
+        uploadUrl: UPLOAD_URL,
+        auth,
+        fetch: (_url, init) => {
+          const header = new Headers(init.headers).get('Authorization') ?? '';
+          diagnosticHeaders.push(header);
+          return Promise.resolve(
+            new Response(null, { status: header === 'Bearer new-token' ? 204 : 401 })
+          );
+        },
+        now: () => 1,
+      });
+      const fileLogs = createControlFileLogUploader({
+        uploadUrl: UPLOAD_URL,
+        auth,
+        wrapperLogPath,
+        homeRoots: [dir],
+        fetch: (_url, init) => {
+          const header = new Headers(init.headers).get('Authorization') ?? '';
+          archiveHeaders.push(header);
+          return Promise.resolve(
+            new Response(null, { status: header === 'Bearer new-token' ? 204 : 401 })
+          );
+        },
+      });
+
+      bufferHeartbeat(diagnostics);
+      await diagnostics.flush();
+      await fileLogs.uploadNow();
+      expect(rejected).toEqual(['old-token', 'old-token']);
+      // A rejected batch is retained rather than dropped.
+      expect(diagnosticHeaders).toEqual(['Bearer old-token']);
+      expect(archiveHeaders).toEqual(['Bearer old-token']);
+
+      token = 'new-token';
+      await diagnostics.flush();
+      await fileLogs.uploadNow();
+      expect(diagnosticHeaders).toEqual(['Bearer old-token', 'Bearer new-token']);
+      expect(archiveHeaders).toEqual(['Bearer old-token', 'Bearer new-token']);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('native upload episode projection', () => {
   it('keeps archive and diagnostic episodes independent, resets on success, and projects after 403', async () => {

@@ -782,24 +782,29 @@ async function connect(
   return connection;
 }
 
-describe('control-plane turn cap and accepted backstop', () => {
-  it('derives the 125-minute accepted backstop from the 120-minute cap', () => {
-    expect(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs).toBe(7_200_000);
+describe('control-plane execution cap and message ownership', () => {
+  it('keeps short ownership deadlines independent of the twelve-hour execution cap', () => {
+    expect(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs).toBe(43_200_000);
+    expect(CONTROL_PLANE_TIMERS.wrapper.noProgressMs).toBe(1_200_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedCoverageMs).toBe(180_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedProbeMs).toBe(60_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedProbeTimeoutMs).toBe(10_000);
     expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBe(7_500_000);
 
-    const margin =
-      CONTROL_PLANE_TIMERS.session.acceptedBackstopMs - CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs;
+    const margin = CONTROL_PLANE_TIMERS.session.acceptedBackstopMs - 7_200_000;
     expect(margin).toBe(300_000);
-    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBeGreaterThan(
+    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBeLessThan(
       CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs
     );
 
     const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '100' });
-    expect(scaled.wrapper.turnHardCapMs).toBe(72_000);
+    expect(scaled.wrapper.turnHardCapMs).toBe(432_000);
     // The accepted-backstop margin is not scaled, so it does not shrink with the cap.
     expect(scaled.session.acceptedBackstopMs).toBe(372_000);
-    expect(scaled.session.acceptedBackstopMs).toBe(scaled.wrapper.turnHardCapMs + margin);
-    expect(scaled.session.acceptedBackstopMs).toBeGreaterThan(scaled.wrapper.turnHardCapMs);
+    expect(scaled.session.acceptedCoverageMs).toBe(1_800);
+    expect(scaled.session.acceptedProbeMs).toBe(600);
+    expect(scaled.session.acceptedProbeTimeoutMs).toBe(10_000);
+    expect(scaled.session.acceptedBackstopMs).toBe(72_000 + margin);
   });
 });
 

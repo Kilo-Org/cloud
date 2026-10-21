@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { cloudAgentFileLabel } from '@/lib/cloud-agent-path';
 import { formatNumber } from '@/lib/format';
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -25,23 +26,6 @@ import { ReasoningPartRenderer } from './reasoning-part-renderer';
 import { TextPartRenderer } from './text-part-renderer';
 import { ToolPartRenderer } from './tool-part-renderer';
 import { type OpenChildSession } from './child-session-section';
-
-/**
- * The absolute cloud-agent workspace prefixes a patch path can carry:
- * `/workspace/<userId>/sessions/<sessionId>/` for a session workspace and
- * `/workspace/<userId>/worktrees/<worktreeId>/` for a worktree-backed session
- * (either optionally with an organization segment before the user id) — the
- * repo is cloned at that root, so dropping it leaves the repo-relative path a
- * reader wants instead of the workspace ids.
- *
- * services/cloud-agent-next/src/workspace.ts:202,211,371
- */
-const CLOUD_AGENT_WORKSPACE_PREFIX =
-  /^\/workspace\/(?:[^/]+\/)?[^/]+\/(?:sessions|worktrees)\/[^/]+\//;
-
-export function patchPartFileLabel(path: string): string {
-  return path.replace(CLOUD_AGENT_WORKSPACE_PREFIX, '');
-}
 
 type PartRendererProps = {
   part: Part;
@@ -127,7 +111,7 @@ export function PartRenderer({
               numberOfLines={1}
               ellipsizeMode="middle"
             >
-              {patchPartFileLabel(file)}
+              {cloudAgentFileLabel(file)}
             </Text>
           ))}
         </View>

@@ -9,9 +9,10 @@ import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import { cloudAgentFileLabel } from '@/lib/cloud-agent-path';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
-import { PartRenderer, patchPartFileLabel } from './part-renderer';
+import { PartRenderer } from './part-renderer';
 import { ReasoningPartRenderer } from './reasoning-part-renderer';
 import { TextPartRenderer } from './text-part-renderer';
 import { PatchToolCardBody } from './tool-cards/patch-tool-card';
@@ -376,7 +377,7 @@ describe('PartRenderer patch part summary', () => {
 
   it('strips an org-scoped worktree workspace prefix from a nested path', () => {
     expect(
-      patchPartFileLabel('/workspace/org-1/user-1/worktrees/worktree_9b1deb4d/src/nested/a.ts')
+      cloudAgentFileLabel('/workspace/org-1/user-1/worktrees/worktree_9b1deb4d/src/nested/a.ts')
     ).toBe('src/nested/a.ts');
   });
 
@@ -393,11 +394,11 @@ describe('PartRenderer patch part summary', () => {
   });
 
   it('leaves a path without the workspace prefix untouched', () => {
-    expect(patchPartFileLabel('src/a.ts')).toBe('src/a.ts');
+    expect(cloudAgentFileLabel('src/a.ts')).toBe('src/a.ts');
   });
 
   it('strips the absolute workspace prefix from a nested path', () => {
-    expect(patchPartFileLabel(`${WORKSPACE_ROOT}/src/nested/a.ts`)).toBe('src/nested/a.ts');
+    expect(cloudAgentFileLabel(`${WORKSPACE_ROOT}/src/nested/a.ts`)).toBe('src/nested/a.ts');
   });
 
   it('returns null for a patch part with no files', () => {

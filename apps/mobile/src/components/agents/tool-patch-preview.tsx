@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { DiffLine } from '@/components/pr-review/diff/diff-line';
+import { cloudAgentFileLabel } from '@/lib/cloud-agent-path';
 
 import { type ToolPatchFile, type ToolPatchModel } from './tool-patch-model';
 
@@ -37,7 +38,9 @@ export function ToolPatchPreview({ model, partId }: Readonly<ToolPatchPreviewPro
       {model.files.map((file, fileIndex) => (
         <View key={`${partId}:${fileIndex}`}>
           <View className="flex-row items-center gap-2 px-1 py-1">
-            <Text className="font-mono text-xs font-medium text-foreground">{file.path}</Text>
+            <Text className="font-mono text-xs font-medium text-foreground">
+              {cloudAgentFileLabel(file.path)}
+            </Text>
             <Text className="text-xs text-muted-foreground">{operationLabel[file.operation]}</Text>
           </View>
           {file.lines.map((line, lineIndex) => (

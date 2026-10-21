@@ -3645,9 +3645,15 @@
     "loadFailed": "Couldn't load profiles",
     "counts": {
       "vars": "{{count}} vars",
+      "vars_one": "{{count}} var",
+      "vars_other": "{{count}} vars",
       "mcp": "{{count}} MCP",
       "skills": "{{count}} skills",
+      "skills_one": "{{count}} skill",
+      "skills_other": "{{count}} skills",
       "commands": "{{count}} cmds",
+      "commands_one": "{{count}} cmd",
+      "commands_other": "{{count}} cmds",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}s",
       "commandsShort": "{{count}}c"

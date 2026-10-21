@@ -366,6 +366,11 @@ function run() {
 
   if (!sourceOnly) {
     const families = englishPluralFamilies(english);
+    const countedBases = new Set(
+      [...english]
+        .filter(([, value]) => /{{\s*count\s*}}/.test(value))
+        .map(([key]) => pluralFamilyBase(key) ?? key)
+    );
     const report = [];
     let totalKeys = 0;
     for (const tag of localeTags()) {
@@ -376,6 +381,15 @@ function run() {
       const categories = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
       let flagged = 0;
       for (const family of families) {
+        // A locale may keep the flat counted key and fall back to it when the
+        // copy inflects no word of its own; it only owes categories once it
+        // (or the audit's own rule) declares the family.
+        const localeDeclared = [...catalog.keys()].some(key => pluralFamilyBase(key) === family);
+        const mandatory =
+          localeDeclared || (hasFamily(english, family) && !countedBases.has(family));
+        if (!mandatory) {
+          continue;
+        }
         if (categories.some(category => !catalog.has(`${family}_${category}`))) {
           flagged++;
         }

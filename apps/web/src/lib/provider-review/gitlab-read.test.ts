@@ -14,6 +14,7 @@ import {
   listChecks,
   listDiscussions,
   listInbox,
+  requestGitLabJson,
 } from './gitlab-read';
 import { GitLabReviewError } from './gitlab-authorization';
 
@@ -1028,5 +1029,97 @@ describe('request transport binds to the resolved address (no DNS rebinding)', (
     expect(error.kind).toBe('not_found');
     expect(error.message).not.toContain('gitlab.example.com');
     expect(error.message).not.toContain('glpat-mock-token');
+  });
+});
+
+describe('plain transport limits the response body', () => {
+  const LIMIT = 10 * 1024 * 1024;
+
+  /** A diffs payload padded with an unescaped run so its JSON is exactly `size` bytes. */
+  function diffBodyOfSize(size: number): Uint8Array<ArrayBuffer> {
+    const undiffed = JSON.stringify([{ ...diffFixture[0], diff: '' }]);
+    const json = JSON.stringify([{ ...diffFixture[0], diff: 'a'.repeat(size - undiffed.length) }]);
+    const body = new Uint8Array(new ArrayBuffer(json.length));
+    body.set(new TextEncoder().encode(json));
+    return body;
+  }
+
+  it('reads a reply at the limit', async () => {
+    const body = diffBodyOfSize(LIMIT);
+    expect(body.byteLength).toBe(LIMIT);
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(
+        new Response(body, {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            'content-length': String(body.byteLength),
+          },
+        })
+      )
+    );
+
+    const page = await listChangedFiles(OWNER, PROJECT_PATH, 12);
+
+    expect(page.files).toHaveLength(1);
+  });
+
+  it('answers a reply one byte over the limit with the retryable error', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(diffBodyOfSize(LIMIT + 1));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(
+        new Response(stream, { status: 200, headers: { 'content-type': 'application/json' } })
+      )
+    );
+
+    const error = await captureRejection(listChangedFiles(OWNER, PROJECT_PATH, 12));
+
+    expect(error.kind).toBe('retryable');
+    expect(error.retryable).toBe(true);
+    expect(cancelled).toBe(true);
+  });
+
+  it('answers a declared length over the limit without reading the body', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(diffFixture)));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(
+        new Response(stream, {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            'content-length': String(LIMIT + 1),
+          },
+        })
+      )
+    );
+
+    const error = await captureRejection(listChangedFiles(OWNER, PROJECT_PATH, 12));
+
+    expect(error.kind).toBe('retryable');
+    expect(cancelled).toBe(true);
+  });
+
+  it('still returns undefined for a 204 with no body', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(new Response(null, { status: 204 })));
+
+    await expect(
+      requestGitLabJson({ accessToken: 'glpat-mock-token', instanceUrl: INSTANCE_URL }, '/api/v4/x')
+    ).resolves.toBeUndefined();
   });
 });

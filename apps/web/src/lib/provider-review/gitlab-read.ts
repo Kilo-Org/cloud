@@ -52,6 +52,8 @@ const GITLAB_PAGE_SIZE = 50;
 const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
 /** Same response cap the adapter applies, so a hostile instance cannot stream unbounded bytes. */
 const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
+/** The message both transports use when a reply exceeds the limit. */
+const GITLAB_RESPONSE_TOO_LARGE_MESSAGE = 'GitLab response exceeded size limit';
 /**
  * The diff-page bound for the summary's change counts: GitLab caps a merge
  * request's diff collection at the project's `diff_max_files` setting (1000
@@ -162,14 +164,65 @@ export async function requestGitLabJson<T>(
 /**
  * Resolve the URL once (refusing unsafe hosts), then send the request bound
  * to the resolved address. Only an IP literal or gitlab.com keeps the plain
- * transport — the same split the adapter's fetchGitLabOnce makes.
+ * transport — the same split the adapter's fetchGitLabOnce makes. Both
+ * transports read the reply within MAX_GITLAB_RESPONSE_BYTES; the plain
+ * transport returns it buffered within that limit.
  */
 async function fetchGitLabValidated(url: string, init: RequestInit): Promise<Response> {
   const resolvedUrl = await resolveGitLabUrlSafely(url);
   if (!resolvedUrl.address) {
-    return fetch(url, { ...init, redirect: 'manual' });
+    return readBoundedGitLabResponse(await fetch(url, { ...init, redirect: 'manual' }));
   }
   return fetchGitLabBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
+}
+
+/**
+ * Read the plain transport's reply within MAX_GITLAB_RESPONSE_BYTES, mirroring
+ * fetchGitLabBoundToAddress: a declared length above the limit is answered
+ * without reading the body, and the reply is otherwise returned buffered
+ * within the limit.
+ */
+async function readBoundedGitLabResponse(response: Response): Promise<Response> {
+  // Response rejects a body for these statuses, so they keep their own object.
+  if (response.body === null || [204, 205, 304].includes(response.status)) {
+    return response;
+  }
+
+  const declaredLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_GITLAB_RESPONSE_BYTES) {
+    await response.body.cancel().catch(() => undefined);
+    throw new Error(GITLAB_RESPONSE_TOO_LARGE_MESSAGE);
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let responseBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      responseBytes += value.byteLength;
+      if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error(GITLAB_RESPONSE_TOO_LARGE_MESSAGE);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(responseBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }
 
 /**
@@ -209,7 +262,7 @@ function fetchGitLabBoundToAddress(
           const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
           responseBytes += buffer.byteLength;
           if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
-            const error = new Error('GitLab response exceeded size limit');
+            const error = new Error(GITLAB_RESPONSE_TOO_LARGE_MESSAGE);
             response.destroy(error);
             req.destroy(error);
             reject(error);

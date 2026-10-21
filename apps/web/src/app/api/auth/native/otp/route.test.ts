@@ -174,6 +174,28 @@ describe('POST /api/auth/native/otp', () => {
     expect(mockSendSignInCodeEmail).toHaveBeenCalledWith('new@example.com', '123456');
   });
 
+  it('counts a signup-disabled delivery against the total send budget', async () => {
+    mockCheckEmailSignInEligibility.mockResolvedValue({
+      ok: false,
+      status: 403,
+      errorCode: 'EMAIL-SIGNUP-DISABLED',
+      body: { success: false, error: 'EMAIL-SIGNUP-DISABLED' },
+    });
+    mockCheckGlobalSendBudget.mockResolvedValue({
+      ok: false,
+      status: 429,
+      errorCode: 'SIGNUP-RATE-LIMITED',
+    });
+
+    const response = await POST(createRequest({ email: 'new@example.com' }));
+    const data = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(data).toEqual({ success: false, error: 'SIGNUP-RATE-LIMITED' });
+    expect(mockCreateSignInCode).not.toHaveBeenCalled();
+    expect(mockSendSignInCodeEmail).not.toHaveBeenCalled();
+  });
+
   it('returns opaque 200 with a challengeId for a blocked domain', async () => {
     mockCheckEmailSignInEligibility.mockResolvedValue({
       ok: false,

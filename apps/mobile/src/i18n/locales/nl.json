@@ -2220,6 +2220,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Je actieve sessies zijn pas beschikbaar nadat de gegevens zijn geladen.",
     "currentDeviceUnidentified": "Het huidige apparaat kon niet worden herkend.",
+    "kiloApp": "Kilo-app",
     "noSessions": "Geen actieve sessies",
     "noSessionsDescription": "Meld je in de Kilo-app aan op een ander apparaat. Dat apparaat verschijnt dan hier.",
     "onlyKiloAppSignIns": "Alleen aanmeldingen van de Kilo-app verschijnen hier. Editor- en CLI-aanmeldingen worden niet vermeld.",

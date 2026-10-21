@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "მონაცემების ჩატვირთვამდე თქვენი აქტიური სესიები მიუწვდომელია.",
     "currentDeviceUnidentified": "მიმდინარე მოწყობილობის ამოცნობა ვერ მოხერხდა.",
+    "kiloApp": "Kilo-ს აპი",
     "noSessions": "აქტიური სესიები არ არის",
     "noSessionsDescription": "სხვა მოწყობილობაზე შედით Kilo-ს აპში და ეს მოწყობილობა აქ გამოჩნდება.",
     "onlyKiloAppSignIns": "აქ მხოლოდ Kilo-ს აპში შესვლის სესიები ჩანს. რედაქტორისა და CLI-ის სესიები ამ სიაში არ შედის.",

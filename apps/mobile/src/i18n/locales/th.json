@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "ยังไม่สามารถแสดงเซสชันที่ใช้งานอยู่ได้จนกว่าจะโหลดข้อมูลเสร็จ",
     "currentDeviceUnidentified": "ระบุอุปกรณ์ปัจจุบันไม่ได้",
+    "kiloApp": "แอป Kilo",
     "noSessions": "ไม่มีเซสชันที่ใช้งานอยู่",
     "noSessionsDescription": "เข้าสู่ระบบในแอป Kilo บนอุปกรณ์อื่น แล้วอุปกรณ์นั้นจะแสดงที่นี่",
     "onlyKiloAppSignIns": "หน้านี้แสดงเฉพาะการเข้าสู่ระบบผ่านแอป Kilo ไม่รวมการเข้าสู่ระบบผ่านโปรแกรมแก้ไขโค้ดหรือ CLI",

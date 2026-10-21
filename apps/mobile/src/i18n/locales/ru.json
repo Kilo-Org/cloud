@@ -2266,6 +2266,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Список активных сеансов будет доступен после загрузки данных.",
     "currentDeviceUnidentified": "Не удалось определить текущее устройство.",
+    "kiloApp": "Приложение Kilo",
     "noSessions": "Нет активных сеансов",
     "noSessionsDescription": "Войдите в приложение Kilo на другом устройстве, и оно появится здесь.",
     "onlyKiloAppSignIns": "Здесь отображаются только входы через приложение Kilo. Входы через редактор и CLI не показаны.",

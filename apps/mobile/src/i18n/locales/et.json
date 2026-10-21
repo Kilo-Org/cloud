@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Sinu aktiivsed seansid on saadaval alles pärast andmete laadimist.",
     "currentDeviceUnidentified": "Praegust seadet ei õnnestunud tuvastada.",
+    "kiloApp": "Kilo rakendus",
     "noSessions": "Aktiivseid seansse pole",
     "noSessionsDescription": "Logi teises seadmes Kilo rakendusse sisse ja see seade ilmub siia.",
     "onlyKiloAppSignIns": "Siin kuvatakse ainult Kilo rakendusse sisselogimised. Redaktori ja CLI kaudu sisselogimisi ei kuvata.",

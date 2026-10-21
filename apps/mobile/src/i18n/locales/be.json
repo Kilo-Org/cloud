@@ -2810,6 +2810,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Актыўныя сеансы будуць недаступныя да завяршэння загрузкі даных.",
     "currentDeviceUnidentified": "Не ўдалося вызначыць бягучую прыладу.",
+    "kiloApp": "Праграма Kilo",
     "noSessions": "Няма актыўных сеансаў",
     "noSessionsDescription": "Увайдзіце ў праграму Kilo на іншай прыладзе, і яна з'явіцца тут.",
     "onlyKiloAppSignIns": "Тут паказваюцца толькі ўваходы праз праграму Kilo. Уваходы праз рэдактар і CLI не паказваюцца.",

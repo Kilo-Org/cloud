@@ -2888,6 +2888,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Nid yw eich sesiynau gweithredol ar gael nes bod y data hwn wedi llwytho.",
     "currentDeviceUnidentified": "Methu adnabod y ddyfais gyfredol.",
+    "kiloApp": "Ap Kilo",
     "noSessions": "Dim sesiynau gweithredol",
     "noSessionsDescription": "Mewngofnodwch i ap Kilo ar ddyfais arall a bydd y sesiwn yn ymddangos yma.",
     "onlyKiloAppSignIns": "Dim ond sesiynau ap Kilo sy'n ymddangos yma. Nid yw sesiynau'r golygydd na'r CLI wedi'u rhestru.",

@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Jou aktiewe sessies is nie beskikbaar voordat die data gelaai is nie.",
     "currentDeviceUnidentified": "Die huidige toestel kon nie geïdentifiseer word nie.",
+    "kiloApp": "Kilo-toep",
     "noSessions": "Geen aktiewe sessies nie",
     "noSessionsDescription": "Teken op 'n ander toestel met die Kilo-toep in en dit sal hier verskyn.",
     "onlyKiloAppSignIns": "Slegs sessies wat met die Kilo-toep begin is, verskyn hier. Redigeerder- en CLI-sessies word nie gelys nie.",

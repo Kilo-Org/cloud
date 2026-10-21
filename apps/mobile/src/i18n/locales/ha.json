@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Ba za a iya nuna zamanninka da ke aiki ba har sai an loda waɗannan bayanan.",
     "currentDeviceUnidentified": "An kasa gano na'urar da ake amfani da ita.",
+    "kiloApp": "Manhajar Kilo",
     "noSessions": "Babu zamannin da ke aiki",
     "noSessionsDescription": "Shiga ta manhajar Kilo a wata na'ura, kuma za ta bayyana a nan.",
     "onlyKiloAppSignIns": "Shiga ta manhajar Kilo kawai ake nunawa a nan. Ba a nuna shiga ta editan lambar shiri ko CLI ba.",

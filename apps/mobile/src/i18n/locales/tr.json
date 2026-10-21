@@ -2220,6 +2220,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Liste yüklenene kadar etkin oturumların görüntülenemez.",
     "currentDeviceUnidentified": "Bu cihaz tanınamadı.",
+    "kiloApp": "Kilo uygulaması",
     "noSessions": "Etkin oturum yok",
     "noSessionsDescription": "Başka bir cihazda Kilo uygulamasıyla oturum açtığında o cihaz burada görünür.",
     "onlyKiloAppSignIns": "Burada yalnızca Kilo uygulaması oturumları görünür. Editör ve CLI oturumları listelenmez.",

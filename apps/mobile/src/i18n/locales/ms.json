@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Sesi aktif anda tidak dapat dipaparkan sehingga data ini selesai dimuatkan.",
     "currentDeviceUnidentified": "Peranti semasa tidak dapat dikenal pasti.",
+    "kiloApp": "Apl Kilo",
     "noSessions": "Tiada sesi aktif",
     "noSessionsDescription": "Log masuk dengan apl Kilo pada peranti lain dan ia akan muncul di sini.",
     "onlyKiloAppSignIns": "Hanya sesi log masuk apl Kilo dipaparkan di sini. Sesi log masuk penyunting dan CLI tidak disenaraikan.",

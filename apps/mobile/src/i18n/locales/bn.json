@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "এটি লোড না হওয়া পর্যন্ত আপনার সক্রিয় সেশনগুলো দেখা যাবে না।",
     "currentDeviceUnidentified": "বর্তমান ডিভাইস শনাক্ত করা যায়নি।",
+    "kiloApp": "Kilo অ্যাপ",
     "noSessions": "কোনো সক্রিয় সেশন নেই",
     "noSessionsDescription": "অন্য ডিভাইসে Kilo অ্যাপ দিয়ে সাইন ইন করলে সেটি এখানে দেখা যাবে।",
     "onlyKiloAppSignIns": "এখানে শুধু Kilo অ্যাপ দিয়ে সাইন ইন করা সেশনগুলো দেখা যায়। এডিটর ও CLI দিয়ে সাইন ইন করা সেশনগুলো এই তালিকায় থাকে না।",

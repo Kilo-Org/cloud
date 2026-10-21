@@ -2220,6 +2220,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "読み込みが完了するまで、サインイン中のセッションは表示できません。",
     "currentDeviceUnidentified": "現在のデバイスを特定できませんでした。",
+    "kiloApp": "Kiloアプリ",
     "noSessions": "サインイン中のセッションはありません",
     "noSessionsDescription": "別のデバイスでKiloアプリにサインインすると、ここに表示されます。",
     "onlyKiloAppSignIns": "ここにはKiloアプリのサインインのみ表示されます。エディターとCLIのサインインは表示されません。",

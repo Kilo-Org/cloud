@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Tsy azo aseho ny fotoam-piasanao mandeha raha tsy voaray ny angona.",
     "currentDeviceUnidentified": "Tsy fantatra ny fitaovana ampiasaina izao.",
+    "kiloApp": "Rindranasa Kilo",
     "noSessions": "Tsy misy fotoam-piasana mandeha",
     "noSessionsDescription": "Midira amin'ny rindranasa Kilo amin'ny fitaovana hafa, dia hiseho eto izany.",
     "onlyKiloAppSignIns": "Ny fidirana amin'ny rindranasa Kilo ihany no hita eto. Tsy voatanisa ny fidirana amin'ny mpanova kaody sy ny CLI.",

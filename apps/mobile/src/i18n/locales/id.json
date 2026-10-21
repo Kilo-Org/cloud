@@ -2220,6 +2220,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Sesi aktifmu tidak dapat ditampilkan sampai data selesai dimuat.",
     "currentDeviceUnidentified": "Perangkat ini tidak dapat diidentifikasi.",
+    "kiloApp": "Aplikasi Kilo",
     "noSessions": "Tidak ada sesi aktif",
     "noSessionsDescription": "Masuk ke aplikasi Kilo di perangkat lain agar perangkat tersebut muncul di sini.",
     "onlyKiloAppSignIns": "Hanya sesi masuk melalui aplikasi Kilo yang muncul di sini. Sesi masuk melalui editor dan CLI tidak ditampilkan.",

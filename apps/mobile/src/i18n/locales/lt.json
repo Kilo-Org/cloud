@@ -2810,6 +2810,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Kol duomenys neįkelti, aktyvių sesijų peržiūrėti negalima.",
     "currentDeviceUnidentified": "Nepavyko atpažinti šio įrenginio.",
+    "kiloApp": "Kilo programėlė",
     "noSessions": "Nėra aktyvių sesijų",
     "noSessionsDescription": "Prisijunkite prie Kilo programėlės kitame įrenginyje, ir jis bus rodomas čia.",
     "onlyKiloAppSignIns": "Čia rodomi tik prisijungimai prie Kilo programėlės. Prisijungimai per redaktorių ir CLI nerodomi.",

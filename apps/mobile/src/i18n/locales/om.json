@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Hanga kun fe'amutti turtiiwwan kee hojiirra jiran hin argaman.",
     "currentDeviceUnidentified": "Meeshaa ammaa adda baasuu hin danda'amne.",
+    "kiloApp": "Appilikeeshinii Kilo",
     "noSessions": "Turtiiwwan hojiirra jiran hin jiran",
     "noSessionsDescription": "Meeshaa biraa irratti appilikeeshinii Kilo tiin seeni; meeshaan sun asitti mul'ata.",
     "onlyKiloAppSignIns": "Seensawwan appilikeeshinii Kilo qofa asitti mul'atu. Seensawwan gulaalaa fi CLI hin tarreeffaman.",

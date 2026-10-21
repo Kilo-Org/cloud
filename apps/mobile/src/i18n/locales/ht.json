@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Sesyon aktif ou yo pa disponib toutotan done yo poko chaje.",
     "currentDeviceUnidentified": "Nou pa t ka idantifye aparèy aktyèl la.",
+    "kiloApp": "Aplikasyon Kilo",
     "noSessions": "Pa gen sesyon aktif",
     "noSessionsDescription": "Konekte nan aplikasyon Kilo sou yon lòt aparèy pou li parèt isit la.",
     "onlyKiloAppSignIns": "Se sèlman koneksyon nan aplikasyon Kilo ki parèt isit la. Koneksyon nan editè a ak CLI pa nan lis la.",

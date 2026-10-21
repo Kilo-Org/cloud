@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Активните ти сесии ще са достъпни след зареждането на данните.",
     "currentDeviceUnidentified": "Не успяхме да разпознаем текущото устройство.",
+    "kiloApp": "Приложение Kilo",
     "noSessions": "Няма активни сесии",
     "noSessionsDescription": "Влез в приложението Kilo на друго устройство и то ще се появи тук.",
     "onlyKiloAppSignIns": "Тук се показват само влизанията в приложението Kilo. Влизанията през редактора и CLI не са включени.",

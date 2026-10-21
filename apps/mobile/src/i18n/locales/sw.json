@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Vikao vyako vinavyoendelea havipatikani hadi taarifa zipakiwe.",
     "currentDeviceUnidentified": "Imeshindikana kutambua kifaa cha sasa.",
+    "kiloApp": "Programu ya Kilo",
     "noSessions": "Hakuna vikao vinavyoendelea",
     "noSessionsDescription": "Ingia kwenye akaunti kwa kutumia programu ya Kilo kwenye kifaa kingine. Kifaa hicho kitaonekana hapa.",
     "onlyKiloAppSignIns": "Ni vikao vya kuingia kupitia programu ya Kilo pekee vinavyoonekana hapa. Vikao vya kihariri na CLI havijaorodheshwa.",

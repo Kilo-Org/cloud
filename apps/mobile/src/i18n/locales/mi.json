@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Kāore ō wātū hohe e wātea kia oti rā anō te uta.",
     "currentDeviceUnidentified": "Kāore i taea te tautohu i te pūrere o nāianei.",
+    "kiloApp": "Taupānga Kilo",
     "noSessions": "Kāore he wātū hohe",
     "noSessionsDescription": "Takiuru mā te taupānga Kilo ki tētahi atu pūrere, ka puta taua pūrere ki konei.",
     "onlyKiloAppSignIns": "Ko ngā takiuru ki te taupānga Kilo anake ka puta ki konei. Kāore ngā takiuru ki te ētita me te CLI e rārangitia.",

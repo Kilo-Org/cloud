@@ -2771,6 +2771,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Tavas aktīvās sesijas būs pieejamas pēc datu ielādes.",
     "currentDeviceUnidentified": "Neizdevās identificēt pašreizējo ierīci.",
+    "kiloApp": "Kilo lietotne",
     "noSessions": "Nav aktīvu sesiju",
     "noSessionsDescription": "Pieraksties Kilo lietotnē citā ierīcē, un tā būs redzama šeit.",
     "onlyKiloAppSignIns": "Šeit ir redzamas tikai Kilo lietotnes sesijas. Redaktora un CLI sesijas nav iekļautas.",

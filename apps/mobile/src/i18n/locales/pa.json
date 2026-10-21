@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "ਜਦੋਂ ਤੱਕ ਇਹ ਲੋਡ ਨਹੀਂ ਹੁੰਦਾ, ਤੁਹਾਡੇ ਸਰਗਰਮ ਸੈਸ਼ਨ ਉਪਲਬਧ ਨਹੀਂ ਹੋਣਗੇ।",
     "currentDeviceUnidentified": "ਮੌਜੂਦਾ ਡਿਵਾਈਸ ਦੀ ਪਛਾਣ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
+    "kiloApp": "Kilo ਐਪ",
     "noSessions": "ਕੋਈ ਸਰਗਰਮ ਸੈਸ਼ਨ ਨਹੀਂ",
     "noSessionsDescription": "ਕਿਸੇ ਹੋਰ ਡਿਵਾਈਸ 'ਤੇ Kilo ਐਪ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ। ਉਸ ਦਾ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਵੇਗਾ।",
     "onlyKiloAppSignIns": "ਇੱਥੇ ਸਿਰਫ਼ Kilo ਐਪ ਰਾਹੀਂ ਕੀਤੇ ਸਾਈਨ ਇਨ ਦਿਖਾਈ ਦਿੰਦੇ ਹਨ। ਐਡੀਟਰ ਅਤੇ CLI ਰਾਹੀਂ ਕੀਤੇ ਸਾਈਨ ਇਨ ਇਸ ਸੂਚੀ ਵਿੱਚ ਨਹੀਂ ਹਨ।",

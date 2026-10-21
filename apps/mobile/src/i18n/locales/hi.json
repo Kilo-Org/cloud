@@ -2220,6 +2220,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "डेटा लोड होने तक आपके सक्रिय सत्र उपलब्ध नहीं होंगे।",
     "currentDeviceUnidentified": "इस डिवाइस की पहचान नहीं हो सकी।",
+    "kiloApp": "Kilo ऐप",
     "noSessions": "कोई सक्रिय सत्र नहीं",
     "noSessionsDescription": "किसी अन्य डिवाइस पर Kilo ऐप से साइन इन करें और वह यहाँ दिखाई देगा।",
     "onlyKiloAppSignIns": "यहाँ केवल Kilo ऐप में किए गए साइन इन दिखाई देते हैं। एडिटर और CLI के साइन इन इस सूची में नहीं हैं।",

@@ -2175,6 +2175,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Vos sessions actives restent indisponibles tant que leur chargement n'a pas abouti.",
     "currentDeviceUnidentified": "Impossible d'identifier l'appareil actuel.",
+    "kiloApp": "Application Kilo",
     "noSessions": "Aucune session active",
     "noSessionsDescription": "Connectez-vous à l'application Kilo sur un autre appareil pour le voir apparaître ici.",
     "onlyKiloAppSignIns": "Seules les connexions à l'application Kilo apparaissent ici. Les connexions depuis l'éditeur ou la CLI ne sont pas affichées.",

@@ -2243,6 +2243,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Le tue sessioni attive saranno disponibili al termine del caricamento.",
     "currentDeviceUnidentified": "Impossibile identificare il dispositivo attuale.",
+    "kiloApp": "App Kilo",
     "noSessions": "Nessuna sessione attiva",
     "noSessionsDescription": "Accedi con l'app Kilo su un altro dispositivo e apparirà qui.",
     "onlyKiloAppSignIns": "Qui compaiono solo gli accessi tramite l'app Kilo. Gli accessi tramite editor e CLI non sono elencati.",

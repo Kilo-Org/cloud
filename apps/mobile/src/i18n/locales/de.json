@@ -2220,6 +2220,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Deine aktiven Sitzungen können erst angezeigt werden, wenn die Daten geladen wurden.",
     "currentDeviceUnidentified": "Das aktuelle Gerät konnte nicht identifiziert werden.",
+    "kiloApp": "Kilo-App",
     "noSessions": "Keine aktiven Sitzungen",
     "noSessionsDescription": "Melde dich auf einem anderen Gerät in der Kilo-App an. Das Gerät erscheint dann hier.",
     "onlyKiloAppSignIns": "Hier erscheinen nur Kilo-App-Anmeldungen. Editor- und CLI-Anmeldungen werden nicht aufgeführt.",

@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Kalfadhiyadaada firfircoon lama heli karo ilaa xogtan la soo shubo.",
     "currentDeviceUnidentified": "Aaladda hadda la isticmaalayo lama aqoonsan karin.",
+    "kiloApp": "Barnaamijka Kilo",
     "noSessions": "Ma jiraan kalfadhiyo firfircoon",
     "noSessionsDescription": "Ka soo gal barnaamijka Kilo aalad kale, waxayna halkan ka soo muuqan doontaa.",
     "onlyKiloAppSignIns": "Halkan waxaa ka muuqda oo keliya gelitaanka barnaamijka Kilo. Gelitaanka tifaftiraha iyo CLI kuma jiraan liiska.",

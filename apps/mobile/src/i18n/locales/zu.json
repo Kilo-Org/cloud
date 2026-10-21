@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Iziseshini zakho ezisebenzayo azitholakali kuze kuphele lokhu kulayisha.",
     "currentDeviceUnidentified": "Asikwazanga ukuhlonza idivayisi yamanje.",
+    "kiloApp": "Uhlelo lokusebenza lwe-Kilo",
     "noSessions": "Azikho iziseshini ezisebenzayo",
     "noSessionsDescription": "Ngena ngemvume ngohlelo lokusebenza lwe-Kilo kwenye idivayisi, bese ivela lapha.",
     "onlyKiloAppSignIns": "Kuvela lapha kuphela ukungena ngemvume ngohlelo lokusebenza lwe-Kilo. Ukungena ngemvume ngesihleli sekhodi nange-CLI akuveli kulolu hlu.",

@@ -2220,6 +2220,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "載入完成前，無法查看目前登入的工作階段。",
     "currentDeviceUnidentified": "無法辨識目前的裝置。",
+    "kiloApp": "Kilo 應用程式",
     "noSessions": "沒有已登入的工作階段",
     "noSessionsDescription": "在其他裝置上登入 Kilo 應用程式後，該裝置就會顯示在這裡。",
     "onlyKiloAppSignIns": "這裡只會顯示 Kilo 應用程式的登入工作階段，不會列出編輯器與 CLI 的登入工作階段。",

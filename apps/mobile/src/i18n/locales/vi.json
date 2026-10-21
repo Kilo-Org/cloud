@@ -2220,6 +2220,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Bạn chưa thể xem các phiên đang hoạt động cho đến khi tải xong dữ liệu.",
     "currentDeviceUnidentified": "Không thể xác định thiết bị hiện tại.",
+    "kiloApp": "Ứng dụng Kilo",
     "noSessions": "Không có phiên đang hoạt động",
     "noSessionsDescription": "Đăng nhập vào ứng dụng Kilo trên thiết bị khác để thiết bị đó xuất hiện tại đây.",
     "onlyKiloAppSignIns": "Chỉ các phiên đăng nhập qua ứng dụng Kilo xuất hiện tại đây. Các phiên đăng nhập qua trình soạn thảo mã và CLI không được liệt kê.",

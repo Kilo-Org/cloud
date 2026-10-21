@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Virku loturnar þínar eru ekki tiltækar fyrr en upplýsingarnar hafa hlaðist.",
     "currentDeviceUnidentified": "Ekki tókst að bera kennsl á þetta tæki.",
+    "kiloApp": "Kilo-forrit",
     "noSessions": "Engar virkar lotur",
     "noSessionsDescription": "Skráðu þig inn í Kilo-forritið á öðru tæki til að það birtist hér.",
     "onlyKiloAppSignIns": "Aðeins innskráningar í Kilo-forritið birtast hér. Innskráningar í kóðaritil og CLI eru ekki á listanum.",

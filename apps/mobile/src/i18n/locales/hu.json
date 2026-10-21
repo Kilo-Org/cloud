@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "A betöltés befejezéséig az aktív munkameneteid nem érhetők el.",
     "currentDeviceUnidentified": "Nem sikerült azonosítani az aktuális eszközt.",
+    "kiloApp": "Kilo alkalmazás",
     "noSessions": "Nincs aktív munkamenet",
     "noSessionsDescription": "Jelentkezz be a Kilo alkalmazásba egy másik eszközön, és az eszköz itt is megjelenik.",
     "onlyKiloAppSignIns": "Itt csak a Kilo alkalmazásba történő bejelentkezések jelennek meg. A szerkesztőbe és a CLI-be történő bejelentkezéseket nem soroljuk fel.",

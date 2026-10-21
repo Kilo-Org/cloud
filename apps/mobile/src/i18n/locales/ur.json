@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "آپ کے فعال سیشن اس وقت تک دستیاب نہیں ہیں جب تک یہ لوڈ نہ ہو۔",
     "currentDeviceUnidentified": "موجودہ ڈیوائس کی شناخت نہیں ہو سکی۔",
+    "kiloApp": "Kilo ایپ",
     "noSessions": "کوئی فعال سیشن نہیں",
     "noSessionsDescription": "کسی دوسری ڈیوائس پر Kilo ایپ سے سائن ان کریں۔ اس کا سیشن یہاں نظر آئے گا۔",
     "onlyKiloAppSignIns": "صرف Kilo ایپ کے سائن ان یہاں ظاہر ہوتے ہیں۔ ایڈیٹر اور CLI سائن ان درج نہیں ہیں۔",

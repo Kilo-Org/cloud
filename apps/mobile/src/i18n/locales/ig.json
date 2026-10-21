@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Nnọkọ gị ndị na-arụ ọrụ agaghị adị ruo mgbe nke a budatara.",
     "currentDeviceUnidentified": "Enweghị ike ịmata ngwaọrụ a.",
+    "kiloApp": "Ngwa Kilo",
     "noSessions": "Enweghị nnọkọ na-arụ ọrụ",
     "noSessionsDescription": "Banye na ngwa Kilo na ngwaọrụ ọzọ, ọ ga-apụta ebe a.",
     "onlyKiloAppSignIns": "Naanị nbanye ngwa Kilo na-apụta ebe a. A naghị edepụta nbanye ihe ndezi koodu na CLI.",

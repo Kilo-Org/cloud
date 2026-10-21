@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "ይህ እስኪጫን ድረስ ንቁ ክፍለ ጊዜዎችዎ አይገኙም።",
     "currentDeviceUnidentified": "የአሁኑን መሣሪያ መለየት አልተቻለም።",
+    "kiloApp": "የKilo መተግበሪያ",
     "noSessions": "ንቁ ክፍለ ጊዜዎች የሉም",
     "noSessionsDescription": "በሌላ መሣሪያ ላይ በKilo መተግበሪያ ይግቡ፤ እዚህ ይታያል።",
     "onlyKiloAppSignIns": "የKilo መተግበሪያ መግቢያዎች ብቻ እዚህ ይታያሉ። የአርታዒ እና የCLI መግቢያዎች አይዘረዘሩም።",

@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "આ લોડ ન થાય ત્યાં સુધી તમારા સક્રિય સત્રો ઉપલબ્ધ નથી.",
     "currentDeviceUnidentified": "વર્તમાન ઉપકરણ ઓળખી શકાયું નહીં.",
+    "kiloApp": "Kilo એપ",
     "noSessions": "કોઈ સક્રિય સત્ર નથી",
     "noSessionsDescription": "અન્ય ઉપકરણ પર Kilo એપમાં સાઇન ઇન કરો. તે ઉપકરણ અહીં દેખાશે.",
     "onlyKiloAppSignIns": "અહીં માત્ર Kilo એપમાં કરેલા સાઇન ઇન દેખાય છે. એડિટર અને CLIમાં કરેલા સાઇન ઇન અહીં દેખાતા નથી.",

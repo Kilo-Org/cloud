@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Ma'lumotlar yuklanmaguncha faol sessiyalaringizni ko'rsatib bo'lmaydi.",
     "currentDeviceUnidentified": "Joriy qurilmani aniqlab bo'lmadi.",
+    "kiloApp": "Kilo ilovasi",
     "noSessions": "Faol sessiyalar yo'q",
     "noSessionsDescription": "Boshqa qurilmadagi Kilo ilovasida tizimga kiring. Shunda u shu yerda ko'rinadi.",
     "onlyKiloAppSignIns": "Bu yerda faqat Kilo ilovasidagi sessiyalar ko'rsatiladi. Muharrir va CLI orqali kirilgan sessiyalar ko'rsatilmaydi.",

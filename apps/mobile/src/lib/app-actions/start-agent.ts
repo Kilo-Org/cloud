@@ -224,11 +224,7 @@ async function resolveActionRepository(
  * provider is known and the message names none.
  */
 function noRepositoryFailure(): AppActionResult {
-  return startAgentFailure(
-    'no-repository',
-    false,
-    i18n.t('appActions.start.repositoryRequired')
-  );
+  return startAgentFailure('no-repository', false, i18n.t('appActions.start.repositoryRequired'));
 }
 
 /**

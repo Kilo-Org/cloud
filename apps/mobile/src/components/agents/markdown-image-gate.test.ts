@@ -68,6 +68,18 @@ describe('gateMarkdownImages', () => {
     expect(gated.startsWith(`\\${IMAGE} and [`)).toBe(true);
   });
 
+  it('rewrites an image whose URL cannot be percent-encoded without a load link', () => {
+    const value = '![a](https://evil.example/\uD800.png)';
+    const [image] = findMarkdownImages(value);
+    expect(image).toBeDefined();
+    if (image) {
+      expect(() => encodeURIComponent(image.href)).toThrow();
+    }
+    const gated = gate(value);
+    expect(gated).not.toContain('kilo-image-load:');
+    expect(gated).not.toContain(IMAGE);
+  });
+
   it('rewrites every copy without lexing per copy once the probe budget is spent', () => {
     const lexer = vi.spyOn(marked, 'lexer');
     const value = `${Array.from({ length: 50 }, () => IMAGE).join('\n\n')}\n\n\\${IMAGE}`;

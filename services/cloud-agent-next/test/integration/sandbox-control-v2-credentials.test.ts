@@ -2139,6 +2139,8 @@ type GrantBrokerService = {
   issueGitHubSessionCapability: () => Promise<unknown>;
   issueGitLabSessionCapability: () => Promise<unknown>;
   authorizeCloudAgentGitHubRepo: () => Promise<unknown>;
+  /** Present only in the cold-grant GitHub resolution cases below. */
+  getCloudAgentAuthForRepo?: (params: Record<string, unknown>) => Promise<unknown>;
 };
 
 function createGrantBroker(): { calls: GrantBrokerCalls; service: GrantBrokerService } {
@@ -2682,6 +2684,268 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       grantFailureReason: 'issuance_timeout',
       tokenClass: 'legacy',
     });
+  });
+
+  it('labels a contained GitHub resolution failure with the broker reason', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const authCalls: Record<string, unknown>[] = [];
+    broker.service.getCloudAgentAuthForRepo = async params => {
+      authCalls.push(params);
+      return { success: false, reason: 'repository_not_installed' };
+    };
+    const stub = await setupVercel(provider, createFakeCredentialBroker());
+    await installGrantBroker(stub, broker.service);
+    const source = {
+      ...credentialsSource(SESSION, {
+        repository: {
+          type: 'github' as const,
+          repo: 'acme/widgets',
+          githubIntegrationId: GITHUB_INTEGRATION_ID,
+          githubAccessPurpose: 'agent' as const,
+        },
+      }),
+      createdOnPlatform: 'cloud-agent-web',
+    };
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare(prepareInput(SESSION, source));
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(view).toEqual({
+      state: 'failed',
+      attemptId: expect.any(String),
+      reason: 'workspace_setup_failed',
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      stage: 'credential_grant_failed',
+      reason: 'workspace_setup_failed',
+      grantPhase: 'broker_issuance',
+      grantFailureReason: 'repository_not_installed',
+    });
+    expect(authCalls).toHaveLength(1);
+    // `cloud-agent-web` would make the repository flag true; the contained
+    // caller must pass false regardless.
+    expect(authCalls[0]).toMatchObject({
+      allowUserAuthorization: false,
+      accessPurpose: 'agent',
+      orgId: 'org_123',
+      expectedIntegrationId: GITHUB_INTEGRATION_ID,
+      userId: 'user_123',
+      githubRepo: 'acme/widgets',
+    });
+    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
+  });
+
+  it('collapses an unlisted contained-off GitHub resolution reason to unknown', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const authCalls: Record<string, unknown>[] = [];
+    broker.service.getCloudAgentAuthForRepo = async params => {
+      authCalls.push(params);
+      return { success: false, reason: 'https://secret.example/leak' };
+    };
+    const stub = await setup(provider, createFakeCredentialBroker(), {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+    });
+    await installGrantBroker(stub, broker.service);
+    const source: ControlPlaneCredentialSource = {
+      ...credentialsSource(SESSION),
+      createdOnPlatform: 'slack',
+    };
+    delete source.orgId;
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare({
+      ...prepareInput(SESSION, source),
+      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+    });
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(view).toEqual({
+      state: 'failed',
+      attemptId: expect.any(String),
+      reason: 'workspace_setup_failed',
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      stage: 'credential_grant_failed',
+      reason: 'workspace_setup_failed',
+      grantPhase: 'broker_issuance',
+      grantFailureReason: 'unknown',
+    });
+    expect(authCalls).toHaveLength(1);
+    // `slack` makes the repository flag true; the direct caller must pass it.
+    expect(authCalls[0]).toMatchObject({
+      allowUserAuthorization: true,
+      accessPurpose: 'workflow',
+      userId: 'user_123',
+      githubRepo: 'acme/widgets',
+    });
+    expect(authCalls[0]).not.toHaveProperty('orgId');
+    expect(authCalls[0]).not.toHaveProperty('expectedIntegrationId');
+    expect(JSON.stringify(events)).not.toContain('https://secret.example/leak');
+  });
+
+  it('maps a contained-off GitHub configuration reason to the configuration phase', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const authCalls: Record<string, unknown>[] = [];
+    broker.service.getCloudAgentAuthForRepo = async params => {
+      authCalls.push(params);
+      return { success: false, reason: 'service_not_configured' };
+    };
+    const stub = await setup(provider, createFakeCredentialBroker(), {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+    });
+    await installGrantBroker(stub, broker.service);
+    const source: ControlPlaneCredentialSource = {
+      ...credentialsSource(SESSION),
+      createdOnPlatform: 'slack',
+    };
+    delete source.orgId;
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare({
+      ...prepareInput(SESSION, source),
+      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+    });
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    // The shared helper still routes through `brokerGrantFailure`, so an
+    // operator-setting reason overrides the `broker_issuance` phase.
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      grantPhase: 'configuration',
+      grantFailureReason: 'service_not_configured',
+    });
+    expect(authCalls).toHaveLength(1);
+  });
+
+  it('rejects a managed GitHub resolve that returns no native token', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const authCalls: Record<string, unknown>[] = [];
+    broker.service.getCloudAgentAuthForRepo = async params => {
+      authCalls.push(params);
+      return {
+        success: true,
+        githubToken: '',
+        installationId: 1,
+        appType: 'standard',
+        accountLogin: 'acme',
+        source: 'installation',
+        gitAuthor: { name: 'acme[bot]', email: '1+acme[bot]@users.noreply.github.com' },
+      };
+    };
+    const stub = await setup(provider, createFakeCredentialBroker(), {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+    });
+    await installGrantBroker(stub, broker.service);
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare({
+      ...prepareInput(SESSION),
+      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+    });
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      grantPhase: 'validation',
+      grantFailureReason: 'missing_native_token',
+    });
+    // The broker call happened; the empty token is the post-assignment check.
+    expect(authCalls).toHaveLength(1);
+  });
+
+  it('keeps the resolved GitHub app and alias for a contained Vercel grant', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const authCalls: Record<string, unknown>[] = [];
+    broker.service.getCloudAgentAuthForRepo = async params => {
+      authCalls.push(params);
+      return {
+        success: true,
+        githubToken: 'native-github-contained-token',
+        installationId: 1,
+        appType: 'lite',
+        accountLogin: 'acme',
+        source: 'installation',
+        gitAuthor: {
+          name: 'review-lite[bot]',
+          email: '456+review-lite[bot]@users.noreply.github.com',
+        },
+      };
+    };
+    const stub = await setupVercel(provider, createFakeCredentialBroker());
+    await installGrantBroker(stub, broker.service);
+    const source = {
+      ...credentialsSource(SESSION, {
+        repository: { type: 'github' as const, repo: 'acme/widgets' },
+      }),
+      createdOnPlatform: 'cloud-agent-web',
+    };
+
+    const view = await stub.prepare(prepareInput(SESSION, source));
+    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
+
+    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      scm?: {
+        nativeToken?: string;
+        alias?: string;
+        githubAppType?: string;
+        author?: { name: string; email: string };
+      };
+    };
+    expect(grant.scm?.nativeToken).toBe('native-github-contained-token');
+    expect(grant.scm?.alias).toBeDefined();
+    expect(grant.scm?.githubAppType).toBe('lite');
+    expect(grant.scm?.author).toEqual({
+      name: 'review-lite[bot]',
+      email: '456+review-lite[bot]@users.noreply.github.com',
+    });
+    expect(authCalls).toHaveLength(1);
+    expect(authCalls[0]).toMatchObject({ allowUserAuthorization: false });
+  });
+
+  it('keeps an explicit native GitHub token without calling the broker', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const authCalls: Record<string, unknown>[] = [];
+    broker.service.getCloudAgentAuthForRepo = async params => {
+      authCalls.push(params);
+      return { success: false, reason: 'unexpected' };
+    };
+    const stub = await setup(provider, createFakeCredentialBroker(), {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+    });
+    await installGrantBroker(stub, broker.service);
+    const explicitToken = 'ghp_explicit_native_token_value';
+    const source = credentialsSource(SESSION, {
+      repository: { type: 'github', repo: 'acme/widgets', token: explicitToken },
+    });
+
+    const view = await stub.prepare({
+      ...prepareInput(SESSION, source),
+      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+    });
+    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
+
+    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      scm?: { nativeToken?: string; alias?: string; githubAppType?: string; author?: unknown };
+    };
+    expect(grant.scm?.nativeToken).toBe(explicitToken);
+    expect(grant.scm?.alias).toBeUndefined();
+    expect(grant.scm?.githubAppType).toBeUndefined();
+    expect(grant.scm?.author).toBeUndefined();
+    expect(authCalls).toHaveLength(0);
+    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
   });
 });
 

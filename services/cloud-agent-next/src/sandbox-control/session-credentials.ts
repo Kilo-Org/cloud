@@ -990,6 +990,68 @@ function preparedPayload(input: {
   };
 }
 
+/**
+ * The one GitHub native-credential decision both the direct and the contained
+ * non-proxy path share: resolve a managed token through the broker, keep the
+ * explicit token when the repository is not managed, and reject with the same
+ * grant-phase diagnostic pair. `allowUserAuthorization` is an input, not a
+ * hidden mode; `alias` belongs to the contained caller only.
+ */
+async function resolveGitHubNativeCredential(
+  env: CredentialEnv,
+  input: {
+    userId: string;
+    orgId: string | undefined;
+    repository: Extract<CredentialRepository, { type: 'github' }>;
+    repositoryToken: string | undefined;
+    allowUserAuthorization: boolean;
+    diagnostic?: GrantDiagnostic;
+  }
+): Promise<{
+  purpose: 'github';
+  gitUrl: string;
+  nativeToken: string;
+  author?: { name: string; email: string };
+  githubAppType?: 'standard' | 'lite';
+}> {
+  let nativeToken = input.repositoryToken;
+  let author: { name: string; email: string } | undefined;
+  let githubAppType: 'standard' | 'lite' | undefined;
+  if (input.repository.authentication === 'managed') {
+    const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
+      userId: input.userId,
+      githubRepo: input.repository.repo,
+      accessPurpose: input.repository.accessPurpose ?? 'workflow',
+      allowUserAuthorization: input.allowUserAuthorization,
+      ...(input.orgId ? { orgId: input.orgId } : {}),
+      ...(input.repository.expectedIntegrationId
+        ? { expectedIntegrationId: input.repository.expectedIntegrationId }
+        : {}),
+    });
+    if (!resolved.success) {
+      input.diagnostic?.record(brokerGrantFailure('broker_issuance', resolved.error.reason));
+      throw new Error('GitHub credential is unavailable');
+    }
+    nativeToken = resolved.value.githubToken;
+    author = resolved.value.gitAuthor;
+    githubAppType = resolved.value.appType;
+  }
+  if (!nativeToken) {
+    input.diagnostic?.record({
+      grantPhase: 'validation',
+      grantFailureReason: 'missing_native_token',
+    });
+    invalidCredentials();
+  }
+  return {
+    purpose: 'github',
+    gitUrl: `https://github.com/${input.repository.repo}.git`,
+    nativeToken,
+    ...(author ? { author } : {}),
+    ...(githubAppType ? { githubAppType } : {}),
+  };
+}
+
 async function resolveDirectScmCredentials(
   env: CredentialEnv,
   grant: SessionCredentialGrant,
@@ -1000,41 +1062,15 @@ async function resolveDirectScmCredentials(
   if (!repository || repository.type === 'git') return grant;
   const common = { userId: grant.userId, ...(grant.orgId ? { orgId: grant.orgId } : {}) };
   if (repository.type === 'github') {
-    let nativeToken = repositoryToken;
-    let author: { name: string; email: string } | undefined;
-    let githubAppType: 'standard' | 'lite' | undefined;
-    if (repository.authentication === 'managed') {
-      const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
-        ...common,
-        githubRepo: repository.repo,
-        accessPurpose: repository.accessPurpose ?? 'workflow',
-        allowUserAuthorization: repository.allowUserAuthorization,
-        ...(repository.expectedIntegrationId
-          ? { expectedIntegrationId: repository.expectedIntegrationId }
-          : {}),
-      });
-      if (!resolved.success) {
-        diagnostic?.record(brokerGrantFailure('broker_issuance', resolved.error.reason));
-        throw new Error('GitHub credential is unavailable');
-      }
-      nativeToken = resolved.value.githubToken;
-      author = resolved.value.gitAuthor;
-      githubAppType = resolved.value.appType;
-    }
-    if (!nativeToken) {
-      diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'missing_native_token' });
-      invalidCredentials();
-    }
-    return {
-      ...grant,
-      scm: {
-        purpose: 'github',
-        gitUrl: `https://github.com/${repository.repo}.git`,
-        nativeToken,
-        ...(author ? { author } : {}),
-        ...(githubAppType ? { githubAppType } : {}),
-      },
-    };
+    const github = await resolveGitHubNativeCredential(env, {
+      userId: grant.userId,
+      orgId: grant.orgId,
+      repository,
+      repositoryToken,
+      allowUserAuthorization: repository.allowUserAuthorization,
+      ...(diagnostic ? { diagnostic } : {}),
+    });
+    return { ...grant, scm: github };
   }
   if (repository.type === 'gitlab') {
     const resolved = await resolveManagedGitLabToken(env, {
@@ -1363,41 +1399,19 @@ export async function prepareCredentialGrant(
       diagnostic
     );
   } else if (repository?.type === 'github') {
-    let nativeToken = repositoryToken;
-    let author: { name: string; email: string } | undefined;
-    let githubAppType: 'standard' | 'lite' | undefined;
-    if (repository.authentication === 'managed') {
-      const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
-        githubRepo: repository.repo,
-        accessPurpose: repository.accessPurpose ?? 'workflow',
-        allowUserAuthorization: false,
-        userId: grant.userId,
-        ...(grant.orgId ? { orgId: grant.orgId } : {}),
-        ...(repository.expectedIntegrationId
-          ? { expectedIntegrationId: repository.expectedIntegrationId }
-          : {}),
-      });
-      if (!resolved.success) {
-        diagnostic?.record(brokerGrantFailure('broker_issuance', resolved.error.reason));
-        throw new Error('GitHub credential is unavailable');
-      }
-      nativeToken = resolved.value.githubToken;
-      author = resolved.value.gitAuthor;
-      githubAppType = resolved.value.appType;
-    }
-    if (!nativeToken) {
-      diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'missing_native_token' });
-      invalidCredentials();
-    }
+    const github = await resolveGitHubNativeCredential(env, {
+      userId: grant.userId,
+      orgId: grant.orgId,
+      repository,
+      repositoryToken,
+      allowUserAuthorization: false,
+      ...(diagnostic ? { diagnostic } : {}),
+    });
     grant = {
       ...grant,
       scm: {
-        purpose: 'github',
+        ...github,
         alias: existing?.scm?.alias ?? createControlPlaneCredential(sandboxId, 'github'),
-        gitUrl: `https://github.com/${repository.repo}.git`,
-        nativeToken,
-        ...(author ? { author } : {}),
-        ...(githubAppType ? { githubAppType } : {}),
       },
     };
   }

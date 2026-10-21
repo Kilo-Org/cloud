@@ -427,6 +427,22 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
+  it('disables only Done when the commit is what waits', async () => {
+    const props = {
+      title: 'report.pdf',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    };
+    const renderer = await mount({ ...props, doneDisabled: true });
+
+    expect(pressablesByLabel(renderer.root, 'Done')[0]?.props.disabled).toBe(true);
+    // A full-window sheet no longer dismisses by a drag, so Cancel has to stay
+    // usable while the commit waits or the sheet has no way out.
+    expect(pressablesByLabel(renderer.root, 'Cancel')[0]?.props.disabled).toBe(false);
+
+    renderer.unmount();
+  });
+
   it.each([
     ['Finish', 'Completed'],
     ['Back', 'Previous picker'],

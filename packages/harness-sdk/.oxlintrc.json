@@ -93,7 +93,7 @@
       }
     },
     {
-      "files": ["src/plugins/remote-mcp/client.ts"],
+      "files": ["src/plugins/remote-mcp/validator.ts"],
       "rules": {
         "typescript/no-unsafe-type-assertion": "off"
       }

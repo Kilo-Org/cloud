@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Vista breytingar",
       "unsavedTitle": "Óvistaðar breytingar",
-      "unsavedMessage": "Viltu vista breytingarnar áður en þú ferð af þessum skjá?"
+      "unsavedMessage": "Viltu vista breytingarnar áður en þú ferð af þessum skjá?",
+      "unsavedInvalidMessage": "Ekki er hægt að vista þessar breytingar ennþá. Lagaðu þær til að vista eða fargaðu þeim til að fara."
     },
     "auditReportButton": {
       "viewA11y": "Skoða endurskoðunarskýrslu"

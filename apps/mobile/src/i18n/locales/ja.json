@@ -1403,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "変更を保存",
       "unsavedMessage": "この画面を離れる前に変更を保存しますか？",
+      "unsavedInvalidMessage": "これらの変更はまだ保存できません。保存するには修正し、離れるには破棄してください。",
       "unsavedTitle": "未保存の変更"
     },
     "setup": {

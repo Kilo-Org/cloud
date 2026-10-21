@@ -1895,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Saglabāt izmaiņas",
       "unsavedTitle": "Nesaglabātas izmaiņas",
-      "unsavedMessage": "Saglabāt izmaiņas pirms šī ekrāna aizvēršanas?"
+      "unsavedMessage": "Saglabāt izmaiņas pirms šī ekrāna aizvēršanas?",
+      "unsavedInvalidMessage": "Šīs izmaiņas vēl nevar saglabāt. Izlabojiet tās, lai saglabātu, vai atmetiet, lai aizietu."
     },
     "auditReportButton": {
       "viewA11y": "Skatīt audita ziņojumu"

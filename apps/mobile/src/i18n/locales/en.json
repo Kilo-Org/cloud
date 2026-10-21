@@ -1936,7 +1936,8 @@
     "settingsSave": {
       "saveChanges": "Save changes",
       "unsavedTitle": "Unsaved changes",
-      "unsavedMessage": "Save your changes before leaving this screen?"
+      "unsavedMessage": "Save your changes before leaving this screen?",
+      "unsavedInvalidMessage": "These changes can't be saved yet. Fix them to save, or discard them to leave."
     },
     "auditReportButton": {
       "viewA11y": "View audit report"

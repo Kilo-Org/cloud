@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Gem ændringer",
       "unsavedTitle": "Ugemte ændringer",
-      "unsavedMessage": "Vil du gemme dine ændringer, før du forlader denne skærm?"
+      "unsavedMessage": "Vil du gemme dine ændringer, før du forlader denne skærm?",
+      "unsavedInvalidMessage": "Disse ændringer kan ikke gemmes endnu. Ret dem for at gemme, eller kassér dem for at forlade."
     },
     "auditReportButton": {
       "viewA11y": "Vis revisionsrapport"

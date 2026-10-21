@@ -1964,7 +1964,8 @@
     "settingsSave": {
       "saveChanges": "Cadw newidiadau",
       "unsavedTitle": "Newidiadau heb eu cadw",
-      "unsavedMessage": "Cadw eich newidiadau cyn gadael y sgrin hon?"
+      "unsavedMessage": "Cadw eich newidiadau cyn gadael y sgrin hon?",
+      "unsavedInvalidMessage": "Ni ellir cadw'r newidiadau hyn eto. Trwsiwch nhw i gadw, neu eu gwaredu i adael."
     },
     "auditReportButton": {
       "viewA11y": "Gweld adroddiad archwilio"

@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Változtatások mentése",
       "unsavedTitle": "El nem mentett változtatások",
-      "unsavedMessage": "Mented a változtatásokat, mielőtt elhagyod ezt a képernyőt?"
+      "unsavedMessage": "Mented a változtatásokat, mielőtt elhagyod ezt a képernyőt?",
+      "unsavedInvalidMessage": "Ezek a változtatások még nem menthetők. Javítsd ki őket a mentéshez, vagy vesd el őket az elhagyáshoz."
     },
     "auditReportButton": {
       "viewA11y": "Auditjelentés megtekintése"

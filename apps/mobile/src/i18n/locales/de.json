@@ -1403,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "Änderungen speichern",
       "unsavedMessage": "Möchtest du deine Änderungen speichern, bevor du diesen Bildschirm verlässt?",
+      "unsavedInvalidMessage": "Diese Änderungen können noch nicht gespeichert werden. Behebe sie, um zu speichern, oder verwirf sie, um den Bildschirm zu verlassen.",
       "unsavedTitle": "Ungespeicherte Änderungen"
     },
     "setup": {

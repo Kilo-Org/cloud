@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Ajiye canje-canje",
       "unsavedTitle": "Canje-canjen da ba a ajiye ba",
-      "unsavedMessage": "A ajiye canje-canjenka kafin barin wannan allon?"
+      "unsavedMessage": "A ajiye canje-canjenka kafin barin wannan allon?",
+      "unsavedInvalidMessage": "Ba za a iya ajiye waɗannan canje-canje ba tukuna. Gyara su don ajiyewa, ko yi watsi da su don barin."
     },
     "auditReportButton": {
       "viewA11y": "Duba rahoton bincike"

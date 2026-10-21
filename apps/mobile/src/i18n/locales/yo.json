@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Fi àwọn àyípadà pamọ́",
       "unsavedTitle": "Àwọn àyípadà tí a kò tíì fi pamọ́",
-      "unsavedMessage": "Ṣé o fẹ́ fi àwọn àyípadà rẹ pamọ́ kí o tó kúrò lójú ìbòjú yìí?"
+      "unsavedMessage": "Ṣé o fẹ́ fi àwọn àyípadà rẹ pamọ́ kí o tó kúrò lójú ìbòjú yìí?",
+      "unsavedInvalidMessage": "Àwọn àyípadà yìí kò tíì lè fi pamọ́. Tún wọn ṣe láti fi pamọ́, tàbí jù wọ́n sílẹ̀ láti kúrò."
     },
     "auditReportButton": {
       "viewA11y": "Wo ìròyìn àyẹ̀wò"

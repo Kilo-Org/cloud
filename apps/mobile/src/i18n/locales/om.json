@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Jijjiiramoota olkaa'i",
       "unsavedTitle": "Jijjiiramoota hin olkaa'amne",
-      "unsavedMessage": "Fuula kana keessaa ba'uu dura jijjiiramoota kee olkaa'uu?"
+      "unsavedMessage": "Fuula kana keessaa ba'uu dura jijjiiramoota kee olkaa'uu?",
+      "unsavedInvalidMessage": "Jijjiiramoonni kunniin ammattiin olkaa'amuu hin danda'an. Olkaa'uuf isaan sirreessi, yookaan ba'uuf isaan dhiisi."
     },
     "auditReportButton": {
       "viewA11y": "Gabaasa qorannoo ilaali"

@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Hifadhi mabadiliko",
       "unsavedTitle": "Mabadiliko ambayo hayajahifadhiwa",
-      "unsavedMessage": "Ungependa kuhifadhi mabadiliko yako kabla ya kuondoka kwenye skrini hii?"
+      "unsavedMessage": "Ungependa kuhifadhi mabadiliko yako kabla ya kuondoka kwenye skrini hii?",
+      "unsavedInvalidMessage": "Mabadiliko haya bado hayawezi kuhifadhiwa. Yarekebishe ili kuhifadhi, au yatupe ili kuondoka."
     },
     "auditReportButton": {
       "viewA11y": "Tazama ripoti ya ukaguzi"

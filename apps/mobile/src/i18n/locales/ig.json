@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Chekwaa mgbanwe",
       "unsavedTitle": "Mgbanwe echekwaghị",
-      "unsavedMessage": "Chekwaa mgbanwe gị tupu ịhapụ ihuenyo a?"
+      "unsavedMessage": "Chekwaa mgbanwe gị tupu ịhapụ ihuenyo a?",
+      "unsavedInvalidMessage": "Enweghị ike ichekwa mgbanwe ndị a ugbu a. Dozie ha iji chekwaa, ma ọ bụ tụfuo ha iji pụọ."
     },
     "auditReportButton": {
       "viewA11y": "Lee akụkọ nyocha"

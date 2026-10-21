@@ -35,6 +35,8 @@
     "connectGithub": "连接 GitHub",
     "cost": "费用",
     "discard": "放弃",
+    "discardChangesMessage": "您的更改将丢失。",
+    "discardChangesTitle": "放弃更改？",
     "findings": "问题",
     "mergeRequest": "合并请求",
     "notConnected": "未连接",

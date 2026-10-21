@@ -35,6 +35,8 @@
     "connectGithub": "GitHub-u qoş",
     "cost": "Xərc",
     "discard": "Ləğv et",
+    "discardChangesMessage": "Dəyişiklikləriniz itiriləcək.",
+    "discardChangesTitle": "Dəyişiklikləri ləğv et?",
     "findings": "Aşkarlanan problemlər",
     "mergeRequest": "merge sorğusu",
     "notConnected": "Qoşulmayıb",

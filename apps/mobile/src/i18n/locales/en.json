@@ -99,6 +99,8 @@
     "connectGithub": "Connect GitHub",
     "cost": "Cost",
     "discard": "Discard",
+    "discardChangesMessage": "Your changes will be lost.",
+    "discardChangesTitle": "Discard changes?",
     "findings": "Findings",
     "mergeRequest": "merge request",
     "notConnected": "Not connected",

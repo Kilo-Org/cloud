@@ -35,6 +35,8 @@
     "connectGithub": "Pievienot GitHub",
     "cost": "Izmaksas",
     "discard": "Atmest",
+    "discardChangesMessage": "Jūsu izmaiņas tiks zaudētas.",
+    "discardChangesTitle": "Atmest izmaiņas?",
     "findings": "Konstatējumi",
     "mergeRequest": "merge request",
     "notConnected": "Nav pievienots",

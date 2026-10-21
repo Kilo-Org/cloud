@@ -35,6 +35,8 @@
     "connectGithub": "Միացնել GitHub-ը",
     "cost": "Արժեք",
     "discard": "Հրաժարվել",
+    "discardChangesMessage": "Ձեր փոփոխությունները կկորեն։",
+    "discardChangesTitle": "Հրաժարվե՞լ փոփոխություններից",
     "findings": "Հայտնաբերված խնդիրներ",
     "mergeRequest": "միաձուլման հարցում",
     "notConnected": "Միացված չէ",

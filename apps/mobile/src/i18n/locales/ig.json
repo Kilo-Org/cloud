@@ -35,6 +35,8 @@
     "connectGithub": "Jikọọ GitHub",
     "cost": "Ọnụ ahịa",
     "discard": "Tụfuo",
+    "discardChangesMessage": "Mgbanwe gị ga-efu.",
+    "discardChangesTitle": "Tụfuo mgbanwe?",
     "findings": "Ihe achọpụtara",
     "mergeRequest": "arịrịọ njikọta",
     "notConnected": "Ejikọghị",

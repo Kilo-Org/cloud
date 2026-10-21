@@ -35,6 +35,8 @@
     "connectGithub": "GitHub உடன் இணைக்கவும்",
     "cost": "செலவு",
     "discard": "கைவிடவும்",
+    "discardChangesMessage": "உங்கள் மாற்றங்கள் இழக்கப்படும்.",
+    "discardChangesTitle": "மாற்றங்களைக் கைவிடவும்",
     "findings": "கண்டறிந்த சிக்கல்கள்",
     "mergeRequest": "இணைப்புக் கோரிக்கை",
     "notConnected": "இணைக்கப்படவில்லை",

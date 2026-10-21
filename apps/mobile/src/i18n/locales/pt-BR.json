@@ -35,6 +35,8 @@
     "connectGithub": "Conectar GitHub",
     "cost": "Custo",
     "discard": "Descartar",
+    "discardChangesMessage": "Suas alterações serão perdidas.",
+    "discardChangesTitle": "Descartar alterações?",
     "findings": "Problemas",
     "mergeRequest": "merge request",
     "notConnected": "Não conectado",

@@ -35,6 +35,8 @@
     "connectGithub": "Koppel GitHub",
     "cost": "Koste",
     "discard": "Gooi weg",
+    "discardChangesMessage": "Jou wysigings sal verlore gaan.",
+    "discardChangesTitle": "Gooi wysigings weg?",
     "findings": "Bevindings",
     "mergeRequest": "merge request",
     "notConnected": "Nie gekoppel nie",

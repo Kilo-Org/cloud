@@ -35,6 +35,8 @@
     "connectGithub": "Připojit GitHub",
     "cost": "Náklady",
     "discard": "Zahodit",
+    "discardChangesMessage": "Vaše změny budou ztraceny.",
+    "discardChangesTitle": "Zahodit změny?",
     "findings": "Zjištění",
     "mergeRequest": "merge request",
     "notConnected": "Nepřipojeno",

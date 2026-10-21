@@ -35,6 +35,8 @@
     "connectGithub": "GitHub සම්බන්ධ කරන්න",
     "cost": "පිරිවැය",
     "discard": "ඉවතලන්න",
+    "discardChangesMessage": "ඔබගේ වෙනස්කම් නැති වී යයි.",
+    "discardChangesTitle": "වෙනස්කම් ඉවතලන්න?",
     "findings": "හඳුනාගත් ගැටලු",
     "mergeRequest": "මර්ජ ඉල්ලීම",
     "notConnected": "සම්බන්ධ නැත",

@@ -35,6 +35,8 @@
     "connectGithub": "Konekte GitHub",
     "cost": "Pri",
     "discard": "Jete",
+    "discardChangesMessage": "Chanjman ou yo pral pèdi.",
+    "discardChangesTitle": "Jete chanjman yo?",
     "findings": "Pwoblèm detekte",
     "mergeRequest": "merge request",
     "notConnected": "Pa konekte",

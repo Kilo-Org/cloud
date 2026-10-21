@@ -35,6 +35,8 @@
     "connectGithub": "Konektatu GitHub",
     "cost": "Kostua",
     "discard": "Baztertu",
+    "discardChangesMessage": "Zure aldaketak galduko dira.",
+    "discardChangesTitle": "Baztertu aldaketak?",
     "findings": "Antzemandako arazoak",
     "mergeRequest": "merge-eskaera",
     "notConnected": "Konektatu gabe",

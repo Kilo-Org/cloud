@@ -35,6 +35,8 @@
     "connectGithub": "Hono ki GitHub",
     "cost": "Utu",
     "discard": "Whakarere",
+    "discardChangesMessage": "Ka ngaro ō huringa.",
+    "discardChangesTitle": "Whakarere ngā huringa?",
     "findings": "Ngā kitenga",
     "mergeRequest": "tono whakakotahi",
     "notConnected": "Kāore anō kia hono",

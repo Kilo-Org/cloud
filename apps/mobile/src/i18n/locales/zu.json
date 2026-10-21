@@ -35,6 +35,8 @@
     "connectGithub": "Xhuma i-GitHub",
     "cost": "Izindleko",
     "discard": "Lahla",
+    "discardChangesMessage": "Izinguquko zakho zizolahleka.",
+    "discardChangesTitle": "Lahla izinguquko?",
     "findings": "Okutholakele",
     "mergeRequest": "isicelo sokuhlanganisa",
     "notConnected": "Ayixhunyiwe",

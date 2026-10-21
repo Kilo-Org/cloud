@@ -35,6 +35,8 @@
     "connectGithub": "Lidhu me GitHub",
     "cost": "Kostoja",
     "discard": "Mos ruaj",
+    "discardChangesMessage": "Ndryshimet tuaja do të humbin.",
+    "discardChangesTitle": "Mos ruaj ndryshimet?",
     "findings": "Gjetjet",
     "mergeRequest": "kërkesë integrimi",
     "notConnected": "Pa lidhje",

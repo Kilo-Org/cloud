@@ -35,6 +35,8 @@
     "connectGithub": "GitHub walitti hidhi",
     "cost": "Baasii",
     "discard": "Dhiisi",
+    "discardChangesMessage": "Jijjiiramaan kee dhabama.",
+    "discardChangesTitle": "Jijjiirama dhiisi?",
     "findings": "Argannoowwan",
     "mergeRequest": "gaaffii walitti makuu",
     "notConnected": "Walitti hin hidhamne",

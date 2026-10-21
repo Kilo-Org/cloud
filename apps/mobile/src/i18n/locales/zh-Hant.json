@@ -35,6 +35,8 @@
     "connectGithub": "連結 GitHub",
     "cost": "費用",
     "discard": "捨棄",
+    "discardChangesMessage": "您的變更將會遺失。",
+    "discardChangesTitle": "捨棄變更？",
     "findings": "問題",
     "mergeRequest": "合併請求",
     "notConnected": "未連結",

@@ -35,6 +35,8 @@
     "connectGithub": "GitHub ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
     "cost": "ವೆಚ್ಚ",
     "discard": "ತ್ಯಜಿಸಿ",
+    "discardChangesMessage": "ನಿಮ್ಮ ಬದಲಾವಣೆಗಳು ಕಳೆದುಹೋಗುತ್ತವೆ.",
+    "discardChangesTitle": "ಬದಲಾವಣೆಗಳನ್ನು ತ್ಯಜಿಸಬೇಕೆ?",
     "findings": "ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಗಳು",
     "mergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್",
     "notConnected": "ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",

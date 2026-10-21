@@ -35,6 +35,8 @@
     "connectGithub": "เชื่อมต่อ GitHub",
     "cost": "ค่าใช้จ่าย",
     "discard": "ทิ้ง",
+    "discardChangesMessage": "การเปลี่ยนแปลงของคุณจะหายไป",
+    "discardChangesTitle": "ทิ้งการเปลี่ยนแปลง",
     "findings": "ข้อค้นพบ",
     "mergeRequest": "merge request",
     "notConnected": "ยังไม่เชื่อมต่อ",

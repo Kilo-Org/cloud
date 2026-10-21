@@ -35,6 +35,8 @@
     "connectGithub": "GitHub ချိတ်ဆက်ပါ",
     "cost": "ကုန်ကျစရိတ်",
     "discard": "ပယ်ဖျက်ပါ",
+    "discardChangesMessage": "သင်၏ အပြောင်းအလဲများ ဆုံးရှုံးသွားပါလိမ့်မည်။",
+    "discardChangesTitle": "အပြောင်းအလဲများကို ပယ်ဖျက်မလား?",
     "findings": "တွေ့ရှိချက်များ",
     "mergeRequest": "merge request",
     "notConnected": "မချိတ်ဆက်ထား",

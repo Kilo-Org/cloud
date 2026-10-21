@@ -35,6 +35,8 @@
     "connectGithub": "Yhdistä GitHub-tili",
     "cost": "Kustannus",
     "discard": "Hylkää",
+    "discardChangesMessage": "Muutokset menetetään.",
+    "discardChangesTitle": "Hylätäänkö muutokset?",
     "findings": "Havainnot",
     "mergeRequest": "yhdistämispyyntö",
     "notConnected": "Ei yhdistetty",

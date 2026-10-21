@@ -35,6 +35,8 @@
     "connectGithub": "Ühenda GitHub",
     "cost": "Kulu",
     "discard": "Loobu",
+    "discardChangesMessage": "Sinu muudatused lähevad kaotsi.",
+    "discardChangesTitle": "Loobu muudatustest?",
     "findings": "Leiud",
     "mergeRequest": "liitmistaotlus",
     "notConnected": "Pole ühendatud",

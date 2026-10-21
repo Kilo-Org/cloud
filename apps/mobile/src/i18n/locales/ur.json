@@ -35,6 +35,8 @@
     "connectGithub": "GitHub کو منسلک کریں",
     "cost": "لاگت",
     "discard": "ضائع کریں",
+    "discardChangesMessage": "آپ کی تبدیلیاں ضائع ہو جائیں گی۔",
+    "discardChangesTitle": "تبدیلیاں ضائع کریں؟",
     "findings": "شناخت شدہ مسائل",
     "mergeRequest": "مرج ریکویسٹ",
     "notConnected": "منسلک نہیں",

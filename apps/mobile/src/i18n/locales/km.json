@@ -35,6 +35,8 @@
     "connectGithub": "ភ្ជាប់ GitHub",
     "cost": "ចំណាយ",
     "discard": "បោះបង់",
+    "discardChangesMessage": "ការផ្លាស់ប្តូររបស់អ្នកនឹងបាត់បង់។",
+    "discardChangesTitle": "បោះបង់ការផ្លាស់ប្តូរ?",
     "findings": "បញ្ហាដែលរកឃើញ",
     "mergeRequest": "សំណើបញ្ចូល",
     "notConnected": "មិនទាន់ភ្ជាប់",

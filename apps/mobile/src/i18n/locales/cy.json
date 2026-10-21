@@ -35,6 +35,8 @@
     "connectGithub": "Cysylltu â GitHub",
     "cost": "Y gost",
     "discard": "Gwaredu",
+    "discardChangesMessage": "Bydd eich newidiadau'n cael eu colli.",
+    "discardChangesTitle": "Gwaredu newidiadau?",
     "findings": "Canfyddiadau",
     "mergeRequest": "cais uno",
     "notConnected": "Heb gysylltu",

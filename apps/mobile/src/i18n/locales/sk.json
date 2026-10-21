@@ -35,6 +35,8 @@
     "connectGithub": "Pripojiť GitHub",
     "cost": "Cena",
     "discard": "Zahodiť",
+    "discardChangesMessage": "Vaše zmeny sa stratia.",
+    "discardChangesTitle": "Zahodiť zmeny?",
     "findings": "Zistenia",
     "mergeRequest": "merge request",
     "notConnected": "Nepripojené",

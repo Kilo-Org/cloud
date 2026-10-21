@@ -35,6 +35,8 @@
     "connectGithub": "Σύνδεση με το GitHub",
     "cost": "Κόστος",
     "discard": "Απόρριψη",
+    "discardChangesMessage": "Οι αλλαγές σας θα χαθούν.",
+    "discardChangesTitle": "Απόρριψη αλλαγών;",
     "findings": "Ευρήματα",
     "mergeRequest": "αίτημα συγχώνευσης",
     "notConnected": "Χωρίς σύνδεση",

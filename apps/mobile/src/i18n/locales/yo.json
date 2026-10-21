@@ -35,6 +35,8 @@
     "connectGithub": "Sopọ̀ mọ́ GitHub",
     "cost": "Iye owó",
     "discard": "Jù sílẹ̀",
+    "discardChangesMessage": "Àwọn àtúnṣe rẹ máa sọ̀nu.",
+    "discardChangesTitle": "Jù àwọn àtúnṣe sílẹ̀?",
     "findings": "Àwọn àwárí",
     "mergeRequest": "ìbéèrè ìṣọ̀kan",
     "notConnected": "Kò sopọ̀",

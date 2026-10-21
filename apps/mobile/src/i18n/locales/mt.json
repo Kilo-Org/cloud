@@ -35,6 +35,8 @@
     "connectGithub": "Qabbad GitHub",
     "cost": "Spiża",
     "discard": "Warrab",
+    "discardChangesMessage": "It-tibdiliet tiegħek jintilfu.",
+    "discardChangesTitle": "Warrab it-tibdiliet?",
     "findings": "Sejbiet",
     "mergeRequest": "merge request",
     "notConnected": "Mhux imqabbad",

@@ -35,6 +35,8 @@
     "connectGithub": "חיבור ל-GitHub",
     "cost": "עלות",
     "discard": "ויתור על השינויים",
+    "discardChangesMessage": "השינויים שלך יאבדו.",
+    "discardChangesTitle": "ויתור על השינויים?",
     "findings": "ממצאים",
     "mergeRequest": "בקשת מיזוג",
     "notConnected": "לא מחובר",

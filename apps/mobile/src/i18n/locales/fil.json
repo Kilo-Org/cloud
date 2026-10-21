@@ -35,6 +35,8 @@
     "connectGithub": "Ikonekta ang GitHub",
     "cost": "Gastos",
     "discard": "Itapon",
+    "discardChangesMessage": "Mawawala ang iyong mga pagbabago.",
+    "discardChangesTitle": "Itatapon ang mga pagbabago?",
     "findings": "Mga natukoy na isyu",
     "mergeRequest": "merge request",
     "notConnected": "Hindi nakakonekta",

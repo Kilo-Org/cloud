@@ -35,6 +35,8 @@
     "connectGithub": "Poveži GitHub",
     "cost": "Trošak",
     "discard": "Odbaci",
+    "discardChangesMessage": "Vaše izmene će biti izgubljene.",
+    "discardChangesTitle": "Odbaci izmene?",
     "findings": "Nalazi",
     "mergeRequest": "merge request",
     "notConnected": "Nepovezano",

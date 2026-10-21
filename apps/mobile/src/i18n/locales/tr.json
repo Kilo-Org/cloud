@@ -35,6 +35,8 @@
     "connectGithub": "GitHub hesabını bağla",
     "cost": "Maliyet",
     "discard": "Vazgeç",
+    "discardChangesMessage": "Değişiklikleriniz kaybedilecek.",
+    "discardChangesTitle": "Değişikliklerden vazgeç?",
     "findings": "Bulgular",
     "mergeRequest": "birleştirme isteği",
     "notConnected": "Bağlı değil",

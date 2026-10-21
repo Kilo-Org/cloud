@@ -35,6 +35,8 @@
     "connectGithub": "GitHubను కనెక్ట్ చేయండి",
     "cost": "ఖర్చు",
     "discard": "విస్మరించండి",
+    "discardChangesMessage": "మీ మార్పులు కోల్పోతాయి.",
+    "discardChangesTitle": "మార్పులను విస్మరించండి",
     "findings": "గుర్తించిన సమస్యలు",
     "mergeRequest": "మెర్జ్ రిక్వెస్ట్",
     "notConnected": "కనెక్ట్ కాలేదు",

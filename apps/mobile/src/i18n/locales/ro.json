@@ -35,6 +35,8 @@
     "connectGithub": "Conectează GitHub",
     "cost": "Costuri",
     "discard": "Renunță",
+    "discardChangesMessage": "Modificările tale vor fi pierdute.",
+    "discardChangesTitle": "Renunți la modificări?",
     "findings": "Probleme detectate",
     "mergeRequest": "merge request",
     "notConnected": "Neconectat",

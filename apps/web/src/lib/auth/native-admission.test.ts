@@ -36,7 +36,6 @@ import {
   type AdmissionPayload,
 } from './native-admission';
 import { captureMessage } from '@sentry/nextjs';
-import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { checkRateLimit } from '@vercel/firewall';
 import { verifyAppleAttestation, verifyAppleAssertion } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
@@ -76,7 +75,6 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 }));
 
 const mockCaptureMessage = jest.mocked(captureMessage);
-const mockWarnExceptInTest = jest.mocked(warnExceptInTest);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockVerifyAppleAttestation = jest.mocked(verifyAppleAttestation);
 const mockVerifyAppleAssertion = jest.mocked(verifyAppleAssertion);
@@ -921,38 +919,19 @@ describe('countAdmissionCondition', () => {
     jestGlobal.restoreAllMocks();
   });
 
-  test('aggregates refusals into one window line instead of one Sentry event each', () => {
+  test('records a refusal without emitting one Sentry event per request', () => {
     const now = jestGlobal.spyOn(Date, 'now');
     now.mockReturnValue(1_000_000);
 
     countAdmissionCondition('native_admission_refused');
     countAdmissionCondition('native_admission_refused');
-    countAdmissionCondition('native_admission_refused');
-    expect(mockWarnExceptInTest).not.toHaveBeenCalled();
 
-    // The next request after the interval flushes one line with the count.
-    now.mockReturnValue(1_000_000 + 61_000);
-    requireAdmissionPayload({});
-
-    expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
-    const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
-    expect(line).toMatchObject({
-      event: 'native_admission_aggregate',
-      metric: 'native_admission_refused',
-      count: 3,
-    });
     expect(mockCaptureMessage).not.toHaveBeenCalled();
-  });
-
-  test('keeps the window open until the interval elapses', () => {
-    const now = jestGlobal.spyOn(Date, 'now');
-    now.mockReturnValue(2_000_000);
-
-    countAdmissionCondition('native_admission_missing');
-    now.mockReturnValue(2_000_000 + 59_000);
+    // The count is folded into the window line, not dropped: the next request
+    // after the interval flushes it instead of emitting per-request events.
+    now.mockReturnValue(1_061_000);
     requireAdmissionPayload({});
-
-    expect(mockWarnExceptInTest).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 });
 

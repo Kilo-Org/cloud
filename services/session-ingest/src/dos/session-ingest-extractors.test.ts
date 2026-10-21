@@ -8,6 +8,8 @@ import {
   extractNormalizedGitUrlFromItem,
   extractNormalizedGitBranchFromItem,
   extractSessionPrLink,
+  extractStatusOccurredAtFromItem,
+  extractStatusTransitionIdFromItem,
 } from './session-ingest-extractors';
 
 function sessionItem(data: Record<string, unknown>): IngestBatch[number] {
@@ -26,6 +28,40 @@ function kiloMetaItem(data: {
 function messageItem(): IngestBatch[number] {
   return { type: 'message', data: { id: 'msg-1' } } as IngestBatch[number];
 }
+describe('extractStatusOccurredAtFromItem', () => {
+  it('carries a producer occurrence time and explicitly marks legacy status time unknown', () => {
+    expect(
+      extractStatusOccurredAtFromItem({
+        type: 'session_status',
+        data: {
+          status: 'question',
+          occurredAt: '2026-07-24T07:59:00.000Z',
+        },
+      })
+    ).toBe('2026-07-24T07:59:00.000Z');
+    expect(
+      extractStatusOccurredAtFromItem({ type: 'session_status', data: { status: 'question' } })
+    ).toBeNull();
+    expect(extractStatusOccurredAtFromItem(messageItem())).toBeUndefined();
+  });
+});
+describe('extractStatusTransitionIdFromItem', () => {
+  it('carries source identity and explicitly clears identity for a legacy status', () => {
+    expect(
+      extractStatusTransitionIdFromItem({
+        type: 'session_status',
+        data: {
+          status: 'question',
+          transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        },
+      })
+    ).toBe('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+    expect(
+      extractStatusTransitionIdFromItem({ type: 'session_status', data: { status: 'question' } })
+    ).toBeNull();
+    expect(extractStatusTransitionIdFromItem(messageItem())).toBeUndefined();
+  });
+});
 
 describe('extractNormalizedTitleFromItem', () => {
   it('extracts title from session item', () => {

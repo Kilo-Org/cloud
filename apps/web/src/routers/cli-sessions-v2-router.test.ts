@@ -2,10 +2,8 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
-  cloud_agent_webhook_triggers,
   cli_sessions_v2,
   github_branch_pull_requests,
-  agent_environment_profiles,
   kilocode_users,
   organizations,
   organization_memberships,
@@ -32,11 +30,13 @@ import { captureException } from '@sentry/nextjs';
 
 // Mock the cloud agent client for watermark and runtime-state tests.
 const mockGetSession = jest.fn().mockRejectedValue(new Error('not mocked'));
+const mockGetPreparationAttempts = jest.fn().mockResolvedValue([]);
 const mockDeleteCloudAgentSession = jest.fn().mockResolvedValue({ success: true });
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(() => ({
     getSession: mockGetSession,
+    getPreparationAttempts: mockGetPreparationAttempts,
     deleteSession: mockDeleteCloudAgentSession,
   })),
   rethrowCloudAgentError: jest.fn(),
@@ -385,8 +385,14 @@ describe('cli-sessions-v2-router', () => {
                     type: 'tool',
                     state: {
                       status: 'completed',
+                      input: {
+                        filePath: `${privateDirectory}/services/cloud-agent-next/.dev.vars.example`,
+                      },
                       output: `Updated ${privateDirectory}/src/app.ts and src/relative.ts`,
                       metadata: {
+                        filediff: {
+                          file: `${privateDirectory}/services/cloud-agent-next/.dev.vars.example`,
+                        },
                         outputs: [
                           `${privateDirectory}/result.txt`,
                           {
@@ -441,40 +447,82 @@ describe('cli-sessions-v2-router', () => {
 
       expect(result.info).toMatchObject({
         directory: publicDirectory,
-        summary: { diffs: [{ file: publicDirectory }] },
-        permission: [{ pattern: publicDirectory }],
+        path: `${publicDirectory}/session.json`,
+        summary: { diffs: [{ file: `${publicDirectory}/src/app.ts` }] },
+        permission: [{ pattern: `${publicDirectory}/src` }],
       });
       expect(result.messages[0]).toMatchObject({
         info: { path: { cwd: publicDirectory, root: publicDirectory } },
         parts: [
-          { url: '', source: { path: publicDirectory } },
+          { url: '', source: { path: `${publicDirectory}/attachment.txt` } },
           {
             state: {
+              input: { filePath: `${publicDirectory}/services/cloud-agent-next/.dev.vars.example` },
               output: `Updated ${publicDirectory}/src/app.ts and src/relative.ts`,
               metadata: {
+                filediff: {
+                  file: `${publicDirectory}/services/cloud-agent-next/.dev.vars.example`,
+                },
                 outputs: [
                   `${publicDirectory}/result.txt`,
                   { output: `Read ${publicDirectory}/nested.txt`, relative: 'src/relative.ts' },
                 ],
               },
-              attachments: [{ url: '', source: { path: publicDirectory } }],
+              attachments: [{ url: '', source: { path: `${publicDirectory}/nested.ts` } }],
             },
           },
-          { files: [publicDirectory, 'relative.ts'] },
+          { files: [`${publicDirectory}/src/app.ts`, 'relative.ts'] },
           { text: `Read ${publicDirectory}/src/app.ts and src/relative.ts` },
         ],
       });
       expect(result.messages[1]).toMatchObject({
         info: {
           editorContext: {
-            visibleFiles: [publicDirectory],
-            openTabs: [publicDirectory],
-            activeFile: publicDirectory,
+            visibleFiles: [`${publicDirectory}/visible.ts`],
+            openTabs: [`${publicDirectory}/open.ts`],
+            activeFile: `${publicDirectory}/active.ts`,
           },
-          summary: { diffs: [{ file: publicDirectory }] },
+          summary: { diffs: [{ file: `${publicDirectory}/summary.ts` }] },
         },
       });
       expect(JSON.stringify(result)).not.toContain(privateDirectory);
+    });
+
+    it.each([
+      ['src/relative.ts', 'src/relative.ts'],
+      [
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      [`/cloud-agent/sessions/${sessionId}-other/src/app.ts`, `/cloud-agent/sessions/${sessionId}`],
+      ['/unrecognized/private/src/app.ts', `/cloud-agent/sessions/${sessionId}`],
+      ['C:\\private\\src\\app.ts', `/cloud-agent/sessions/${sessionId}`],
+      ['\\\\server\\private\\src\\app.ts', `/cloud-agent/sessions/${sessionId}`],
+    ])('projects grouped snapshot file path %s to %s', async (path, expected) => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            info: { id: sessionId, summary: { diffs: [{ file: path }] } },
+            messages: [
+              {
+                info: { id: 'msg_assistant', role: 'assistant' },
+                parts: [{ id: 'prt_patch', type: 'patch', files: [path] }],
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+      const caller = await createCallerForUser(regularUser.id);
+
+      const result = await caller.cliSessionsV2.getSessionMessages({ session_id: sessionId });
+
+      expect(result.info).toMatchObject({ summary: { diffs: [{ file: expected }] } });
+      expect(result.messages[0].parts[0]).toMatchObject({ files: [expected] });
     });
 
     it.each([true, false])(
@@ -631,6 +679,7 @@ describe('cli-sessions-v2-router', () => {
               title: 'Read file',
               time: { start: 1761000000100, end: 1761000000200 },
               metadata: {
+                filediff: { file: `${privateDirectory}/src/app.ts` },
                 outputs: [
                   `${privateDirectory}/result.txt`,
                   { output: `Read ${privateDirectory}/nested.txt`, relative: 'src/relative.ts' },
@@ -712,6 +761,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history,
         watermarkEventId: null,
+        preparationAttempts: [],
       });
       expect(fetchSessionMessagesPage).toHaveBeenCalledWith(sessionId, regularUser.id, {
         limit: 50,
@@ -747,13 +797,14 @@ describe('cli-sessions-v2-router', () => {
             {
               info: { path: { cwd: publicDirectory, root: publicDirectory } },
               parts: [
-                { url: '', source: { path: publicDirectory } },
-                { files: [publicDirectory, 'relative.ts'] },
+                { url: '', source: { path: `${publicDirectory}/attachment.txt` } },
+                { files: [`${publicDirectory}/src/app.ts`, 'relative.ts'] },
                 {
                   state: {
-                    input: { filePath: publicDirectory },
+                    input: { filePath: `${publicDirectory}/src/app.ts` },
                     output: `Read ${publicDirectory}/src/app.ts and src/relative.ts`,
                     metadata: {
+                      filediff: { file: `${publicDirectory}/src/app.ts` },
                       outputs: [
                         `${publicDirectory}/result.txt`,
                         {
@@ -772,6 +823,7 @@ describe('cli-sessions-v2-router', () => {
           omittedItemCount: 2,
         },
         watermarkEventId: null,
+        preparationAttempts: [],
       });
       expect(JSON.stringify(result)).not.toContain(privateDirectory);
       expect(message).toEqual(privateAssistantMessage());
@@ -785,7 +837,12 @@ describe('cli-sessions-v2-router', () => {
 
       await expect(
         caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
-      ).resolves.toEqual({ kiloSessionId: sessionId, history, watermarkEventId: null });
+      ).resolves.toEqual({
+        kiloSessionId: sessionId,
+        history,
+        watermarkEventId: null,
+        preparationAttempts: [],
+      });
     });
 
     it.each([null, { kind: 'retryable_failure' as const, phase: 'page_parts' as const }])(
@@ -800,7 +857,12 @@ describe('cli-sessions-v2-router', () => {
 
         await expect(
           caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
-        ).resolves.toEqual({ kiloSessionId: sessionId, history, watermarkEventId: null });
+        ).resolves.toEqual({
+          kiloSessionId: sessionId,
+          history,
+          watermarkEventId: null,
+          preparationAttempts: [],
+        });
       }
     );
 
@@ -886,6 +948,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history: { messages: [], nextCursor: null, omittedItemCount: 0 },
         watermarkEventId: null,
+        preparationAttempts: [],
         sessionGoal: goal,
       });
       expect(result).not.toHaveProperty('sessionMetadata');
@@ -911,6 +974,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history,
         watermarkEventId: null,
+        preparationAttempts: [],
       });
     });
 
@@ -937,6 +1001,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: sessionId,
           history,
           watermarkEventId: null,
+          preparationAttempts: [],
         });
       }
     });
@@ -957,6 +1022,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history: { messages: [], nextCursor: null, omittedItemCount: 0 },
         watermarkEventId: null,
+        preparationAttempts: [],
       });
     });
 
@@ -1144,6 +1210,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: 42,
+          preparationAttempts: [],
         });
         expect(mockGetSession).toHaveBeenCalledWith(cloudAgentSessionId);
         // Verify both the watermark and the page were fetched.
@@ -1167,6 +1234,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          preparationAttempts: [],
         });
       });
 
@@ -1188,6 +1256,40 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          preparationAttempts: [],
+        });
+      });
+
+      it('carries the preparation attempts and fails open to none', async () => {
+        const attempt = {
+          id: 'attempt-1',
+          triggerMessageId: 'msg-1',
+          status: 'completed',
+          startedAt: 1000,
+          completedAt: 2000,
+          revision: 3,
+          steps: [],
+        };
+        mockGetSession.mockResolvedValue({ latestEventId: 42 });
+        mockGetPreparationAttempts.mockResolvedValueOnce([attempt]);
+        fetchSessionMessagesPage.mockResolvedValue({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        });
+        const caller = await createCallerForUser(regularUser.id);
+        const read = () =>
+          caller.cliSessionsV2.getSessionMessagesPage({
+            session_id: watermarkSessionId,
+            limit: 50,
+          });
+
+        await expect(read()).resolves.toMatchObject({ preparationAttempts: [attempt] });
+        expect(mockGetPreparationAttempts).toHaveBeenCalledWith(cloudAgentSessionId);
+
+        mockGetPreparationAttempts.mockRejectedValueOnce(new Error('No procedure found'));
+        await expect(read()).resolves.toMatchObject({
+          watermarkEventId: 42,
+          preparationAttempts: [],
         });
       });
 
@@ -1214,6 +1316,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          preparationAttempts: [],
         });
       });
 
@@ -1286,6 +1389,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: 99,
+          preparationAttempts: [],
         });
       });
 
@@ -1457,244 +1561,6 @@ describe('cli-sessions-v2-router', () => {
     });
   });
 
-  describe('shareForWebhookTrigger', () => {
-    let triggerId: string;
-    let profileId: string;
-    const testTriggerId = 'test-trigger-share-v2';
-
-    beforeAll(async () => {
-      const [profile] = await db
-        .insert(agent_environment_profiles)
-        .values({
-          owned_by_user_id: regularUser.id,
-          name: 'share-test-profile-v2',
-        })
-        .returning({ id: agent_environment_profiles.id });
-      profileId = profile.id;
-
-      const [trigger] = await db
-        .insert(cloud_agent_webhook_triggers)
-        .values({
-          trigger_id: testTriggerId,
-          user_id: regularUser.id,
-          github_repo: 'test/repo',
-          profile_id: profileId,
-        })
-        .returning({ id: cloud_agent_webhook_triggers.id });
-      triggerId = trigger.id;
-    });
-
-    afterAll(async () => {
-      await db
-        .delete(cloud_agent_webhook_triggers)
-        .where(eq(cloud_agent_webhook_triggers.id, triggerId));
-      await db
-        .delete(agent_environment_profiles)
-        .where(eq(agent_environment_profiles.id, profileId));
-    });
-
-    const v2SessionId = 'ses_test_share_v2_session_1234';
-    let fetchSpy: jest.SpyInstance;
-
-    beforeEach(async () => {
-      await db.insert(cli_sessions_v2).values({
-        session_id: v2SessionId,
-        kilo_user_id: regularUser.id,
-        created_on_platform: 'webhook',
-      });
-
-      fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ success: true, share_token: 'test.share.token' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      );
-    });
-
-    afterEach(async () => {
-      fetchSpy.mockRestore();
-      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, v2SessionId));
-    });
-
-    it('should share a v2 session via the session-ingest worker', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-
-      const result = await caller.cliSessionsV2.shareForWebhookTrigger({
-        kilo_session_id: v2SessionId,
-        trigger_id: testTriggerId,
-      });
-
-      expect(result).toEqual({
-        share_token: 'test.share.token',
-        session_id: v2SessionId,
-      });
-
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
-      const [fetchUrl, fetchOpts] = fetchSpy.mock.calls[0];
-      expect(fetchUrl).toBe(
-        `https://test-ingest.example.com/api/session/${encodeURIComponent(v2SessionId)}/share`
-      );
-      expect(fetchOpts.method).toBe('POST');
-      expect(fetchOpts.headers.Authorization).toMatch(/^Bearer .+/);
-    });
-
-    it('should throw NOT_FOUND for non-existent v2 session', async () => {
-      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, v2SessionId));
-
-      const caller = await createCallerForUser(regularUser.id);
-
-      await expect(
-        caller.cliSessionsV2.shareForWebhookTrigger({
-          kilo_session_id: 'ses_nonexistent_session_12345',
-          trigger_id: testTriggerId,
-        })
-      ).rejects.toThrow('Session not found');
-    });
-
-    it('should throw INTERNAL_SERVER_ERROR when session-ingest returns an error', async () => {
-      fetchSpy.mockResolvedValueOnce(
-        new Response('Internal Server Error', {
-          status: 500,
-          statusText: 'Internal Server Error',
-        })
-      );
-
-      const caller = await createCallerForUser(regularUser.id);
-
-      await expect(
-        caller.cliSessionsV2.shareForWebhookTrigger({
-          kilo_session_id: v2SessionId,
-          trigger_id: testTriggerId,
-        })
-      ).rejects.toThrow('Session ingest share failed: 500 Internal Server Error');
-    });
-
-    it('should throw NOT_FOUND when session belongs to a different user (personal trigger)', async () => {
-      // Session is created by regularUser (via beforeEach), but otherUser tries to share it
-      // otherUser needs their own trigger to pass verifyWebhookTriggerAccess
-      const [otherProfile] = await db
-        .insert(agent_environment_profiles)
-        .values({
-          owned_by_user_id: otherUser.id,
-          name: 'other-user-share-profile-v2',
-        })
-        .returning({ id: agent_environment_profiles.id });
-
-      const otherTriggerId = 'test-trigger-share-other-user-v2';
-      const [otherTrigger] = await db
-        .insert(cloud_agent_webhook_triggers)
-        .values({
-          trigger_id: otherTriggerId,
-          user_id: otherUser.id,
-          github_repo: 'test/other-repo',
-          profile_id: otherProfile.id,
-        })
-        .returning({ id: cloud_agent_webhook_triggers.id });
-
-      try {
-        const caller = await createCallerForUser(otherUser.id);
-        await expect(
-          caller.cliSessionsV2.shareForWebhookTrigger({
-            kilo_session_id: v2SessionId,
-            trigger_id: otherTriggerId,
-          })
-        ).rejects.toThrow('Session not found');
-      } finally {
-        await db
-          .delete(cloud_agent_webhook_triggers)
-          .where(eq(cloud_agent_webhook_triggers.id, otherTrigger.id));
-        await db
-          .delete(agent_environment_profiles)
-          .where(eq(agent_environment_profiles.id, otherProfile.id));
-      }
-    });
-
-    it('should throw NOT_FOUND when session belongs to a different org (org trigger)', async () => {
-      // Create a session belonging to testOrganization
-      const orgSessionId = 'ses_test_share_v2_org_session_1234';
-      await db.insert(cli_sessions_v2).values({
-        session_id: orgSessionId,
-        kilo_user_id: regularUser.id,
-        created_on_platform: 'webhook',
-        organization_id: testOrganization.id,
-      });
-
-      // Create a second org and an org trigger for it
-      const [otherOrg] = await db
-        .insert(organizations)
-        .values({
-          name: 'Other Org for Share Test V2',
-          created_by_kilo_user_id: regularUser.id,
-        })
-        .returning();
-
-      await db.insert(organization_memberships).values({
-        organization_id: otherOrg.id,
-        kilo_user_id: regularUser.id,
-        role: 'owner',
-      });
-
-      const [otherProfile] = await db
-        .insert(agent_environment_profiles)
-        .values({
-          name: 'other-org-share-profile-v2',
-          owned_by_organization_id: otherOrg.id,
-        })
-        .returning({ id: agent_environment_profiles.id });
-
-      const otherOrgTriggerId = 'test-trigger-share-other-org-v2';
-      const [otherOrgTrigger] = await db
-        .insert(cloud_agent_webhook_triggers)
-        .values({
-          trigger_id: otherOrgTriggerId,
-          organization_id: otherOrg.id,
-          github_repo: 'test/other-org-repo',
-          profile_id: otherProfile.id,
-        })
-        .returning({ id: cloud_agent_webhook_triggers.id });
-
-      try {
-        const caller = await createCallerForUser(regularUser.id);
-        // Try to share orgSession (belongs to testOrganization) via otherOrg's trigger
-        await expect(
-          caller.cliSessionsV2.shareForWebhookTrigger({
-            kilo_session_id: orgSessionId,
-            trigger_id: otherOrgTriggerId,
-            organization_id: otherOrg.id,
-          })
-        ).rejects.toThrow('Session not found');
-      } finally {
-        await db
-          .delete(cloud_agent_webhook_triggers)
-          .where(eq(cloud_agent_webhook_triggers.id, otherOrgTrigger.id));
-        await db
-          .delete(agent_environment_profiles)
-          .where(eq(agent_environment_profiles.id, otherProfile.id));
-        await db
-          .delete(organization_memberships)
-          .where(
-            and(
-              eq(organization_memberships.organization_id, otherOrg.id),
-              eq(organization_memberships.kilo_user_id, regularUser.id)
-            )
-          );
-        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, orgSessionId));
-        await db.delete(organizations).where(eq(organizations.id, otherOrg.id));
-      }
-    });
-
-    it('should throw NOT_FOUND for non-existent trigger', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-
-      await expect(
-        caller.cliSessionsV2.shareForWebhookTrigger({
-          kilo_session_id: v2SessionId,
-          trigger_id: 'non-existent-trigger',
-        })
-      ).rejects.toThrow('Trigger not found');
-    });
-  });
-
   describe('session authorization', () => {
     const organizationSessionId = 'ses_read_auth_org_1234';
     const cloudAgentSessionId = 'cloud-agent-read-auth-org-1234';
@@ -1756,6 +1622,27 @@ describe('cli-sessions-v2-router', () => {
         );
       } finally {
         await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, personalSessionId));
+      }
+    });
+
+    it('list omits organization sessions after the organization is soft-deleted', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      try {
+        await db
+          .update(organizations)
+          .set({ deleted_at: new Date().toISOString() })
+          .where(eq(organizations.id, testOrganization.id));
+
+        const result = await caller.cliSessionsV2.list({});
+        expect(result.cliSessions.map(session => session.session_id)).not.toContain(
+          organizationSessionId
+        );
+      } finally {
+        await db
+          .update(organizations)
+          .set({ deleted_at: null })
+          .where(eq(organizations.id, testOrganization.id));
       }
     });
 
@@ -2109,6 +1996,57 @@ describe('cli-sessions-v2-router', () => {
       expect(parseGitHubPrUrl('https://github.com/kilo/repo/pull/abc')).toBeNull();
       expect(parseGitHubPrUrl('not-a-url')).toBeNull();
     });
+  });
+
+  describe('getWithRuntimeState stored runtime identifiers', () => {
+    const sessionId = 'ses_stored_runtime_identifier';
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+      mockGetSession.mockReset();
+      mockGetSession.mockRejectedValue(new Error('not mocked'));
+    });
+
+    it.each(['11111111-1111-4111-8111-111111111111', 'agent_legacy'])(
+      'returns historical metadata for unsupported runtime identifier %s',
+      async cloudAgentSessionId => {
+        await db.insert(cli_sessions_v2).values({
+          session_id: sessionId,
+          kilo_user_id: regularUser.id,
+          title: 'Stored conversation',
+          created_on_platform: 'cloud-agent',
+          cloud_agent_session_id: cloudAgentSessionId,
+        });
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId });
+        expect(result).toMatchObject({
+          session_id: sessionId,
+          title: 'Stored conversation',
+          cloud_agent_session_id: cloudAgentSessionId,
+          runtimeState: null,
+        });
+      }
+    );
+
+    it.each(['agent', 'workspace'])(
+      'preserves runtime failures for current %s identifiers',
+      async prefix => {
+        await db.insert(cli_sessions_v2).values({
+          session_id: sessionId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          cloud_agent_session_id: `${prefix}_11111111-1111-4111-8111-111111111111`,
+        });
+        mockGetSession.mockRejectedValue(new Error('Runtime unavailable'));
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId })
+        ).rejects.toMatchObject({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch session runtime state',
+        });
+      }
+    );
   });
 
   describe('getWithRuntimeState associatedPr', () => {

@@ -22,13 +22,14 @@ import {
   type InternalClientEvalPlanRequest,
   type InternalClientEvalResultRequest,
 } from '@kilocode/auto-routing-contracts';
-import type { UsageRecordRequest } from '@kilocode/usage-contracts';
+import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import type { UsageWriteOutcome } from '@kilocode/worker-utils/usage-writer-client';
 import type { Hono } from 'hono';
 import type * as z from 'zod';
 import { DECIDER_CLI_TIMEOUT_MS, deciderCliPrompt } from './cli-runner';
 import {
+  clearPendingGraderUsage,
   clientCaseKey,
   clientPairKey,
   deleteClientCaseUpload,
@@ -211,6 +212,32 @@ export async function gradeClientEvalResult(
   const plannedResults = deciderCasesForRouter(request.baseRouter).length * current.repetitions;
   const stored = await getClientCase(db, caseKey);
   if (stored?.ran) {
+    if (stored.pendingGraderUsage !== null) {
+      const storedKey = { ...caseKey, revision: stored.revision };
+      let pending: unknown;
+      try {
+        pending = JSON.parse(stored.pendingGraderUsage);
+      } catch {
+        pending = null;
+      }
+      const usage = UsageRecordRequestSchema.safeParse(pending);
+      if (!usage.success) {
+        // An unreadable record cannot be billed; drop the result so a retry grades it again.
+        console.error(
+          JSON.stringify({
+            event: 'client_eval_pending_usage_invalid',
+            profileId: profile.id,
+            caseId: request.caseId,
+            rep: request.rep,
+          })
+        );
+        await deleteClientCaseUpload(db, storedKey);
+        await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
+        throw graderUsageNotRecorded();
+      }
+      if (!(await recordGraderUsage(deps, usage.data))) throw graderUsageNotRecorded();
+      await clearPendingGraderUsage(db, storedKey);
+    }
     await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
     return { score: stored.score };
   }
@@ -227,6 +254,29 @@ export async function gradeClientEvalResult(
     throw new ClientEvalError('internal_error', 'The grader is unavailable; retry the upload.');
   }
 
+  const usage =
+    grade.costUsd > 0
+      ? await buildGraderUsage(
+          request.billing,
+          [
+            request.billing.userId,
+            request.billing.organizationId,
+            request.ownerType,
+            request.ownerId,
+            request.baseRouter,
+            entryKey,
+            request.variant,
+            current.engineIdentity,
+            current.repetitions,
+            request.caseId,
+            request.rep,
+          ],
+          grade.costUsd,
+          nowIso
+        ).catch(() => {
+          throw graderUsageNotRecorded();
+        })
+      : null;
   const revision = await saveClientCaseResult(db, {
     profile_id: profile.id,
     case_id: request.caseId,
@@ -240,48 +290,35 @@ export async function gradeClientEvalResult(
     score: grade.score,
     grader_cost_usd: grade.costUsd,
     uploaded_at: nowIso,
+    pending_grader_usage: usage === null ? null : JSON.stringify(usage),
   });
   if (revision === null) {
     await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
     return { score: (await getClientCase(db, caseKey))?.score ?? grade.score };
   }
 
-  if (grade.costUsd > 0) {
-    const billed = await buildGraderUsage(
-      request.billing,
-      [
-        request.billing.userId,
-        request.billing.organizationId,
-        request.ownerType,
-        request.ownerId,
-        request.baseRouter,
-        entryKey,
-        request.variant,
-        current.engineIdentity,
-        current.repetitions,
-        request.caseId,
-        request.rep,
-      ],
-      grade.costUsd,
-      nowIso
-    )
-      .then(usage => deps.writeUsage(usage))
-      .then(
-        outcome => outcome.kind !== 'unavailable',
-        () => false
-      );
-    if (!billed) {
+  if (usage !== null) {
+    if (!(await recordGraderUsage(deps, usage))) {
       await deleteClientCaseUpload(db, { ...caseKey, revision });
       await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
-      throw new ClientEvalError(
-        'internal_error',
-        'Grader usage was not recorded; retry the upload.'
-      );
+      throw graderUsageNotRecorded();
     }
+    await clearPendingGraderUsage(db, { ...caseKey, revision });
   }
 
   await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
   return { score: grade.score };
+}
+
+function recordGraderUsage(deps: ClientEvalDeps, usage: UsageRecordRequest): Promise<boolean> {
+  return deps.writeUsage(usage).then(
+    outcome => outcome.kind !== 'unavailable',
+    () => false
+  );
+}
+
+function graderUsageNotRecorded(): ClientEvalError {
+  return new ClientEvalError('internal_error', 'Grader usage was not recorded; retry the upload.');
 }
 
 async function requireConfig(db: D1Database, router: AutoRouter): Promise<BenchmarkConfig> {

@@ -82,7 +82,6 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
-    setPageLoaded(false);
     setDocumentState({ kind: 'loading' });
     const read = async () => {
       const document = await readRemoteMcpView(view, controller.signal);
@@ -100,6 +99,15 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
       controller.abort();
     };
   }, [attempt, view]);
+
+  // A retry mounts a page of its own, so the old page's loaded flag is not the
+  // new page's: the document read alone must not reset it, because a re-read for
+  // the same mounted page would then wait for a load that never comes again.
+  useEffect(() => {
+    if (attempt > 0) {
+      setPageLoaded(false);
+    }
+  }, [attempt]);
 
   // A retry or a new document tears the old bridge down before the new one opens.
   useEffect(

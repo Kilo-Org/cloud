@@ -38,10 +38,18 @@ function forget(callId: string): void {
   }
 }
 
-/** Keeps one answer, evicting the oldest until the collected answers fit. */
+/**
+ * Keeps one answer, evicting the oldest until the collected answers fit. An
+ * answer that is over the cap on its own is not kept at all: the bound is what
+ * keeps a server's payload out of the app's memory, and one payload larger than
+ * all the others is exactly what it is for.
+ */
 export function rememberCallResult(answered: RemoteMcpCallAnswered): void {
   forget(answered.callId);
   const chars = charsOf(answered);
+  if (chars > MAX_CHARS) {
+    return;
+  }
   kept.set(answered.callId, { answered, chars });
   keptChars += chars;
   for (const callId of kept.keys()) {

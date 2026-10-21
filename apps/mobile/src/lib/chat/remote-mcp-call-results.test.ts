@@ -39,11 +39,19 @@ describe('the answers kept for a view', () => {
     expect(mcpCallResultOf('call_0')).toBeUndefined();
   });
 
-  it('evicts on size, so one huge answer does not pin a payload forever', () => {
-    rememberCallResult(answered('call_old', 'small'));
+  it('keeps what fits and drops the oldest, so the size bound holds', () => {
+    rememberCallResult(answered('call_old', 'x'.repeat(900_000)));
+    rememberCallResult(answered('call_new', 'y'.repeat(900_000)));
+
+    expect(mcpCallResultOf('call_new')).toBeDefined();
+    expect(mcpCallResultOf('call_old')).toBeUndefined();
+  });
+
+  it('does not keep an answer that is over the bound on its own', () => {
+    rememberCallResult(answered('call_kept', 'small'));
     rememberCallResult(answered('call_huge', 'x'.repeat(1_200_000)));
 
-    expect(mcpCallResultOf('call_huge')).toBeDefined();
-    expect(mcpCallResultOf('call_old')).toBeUndefined();
+    expect(mcpCallResultOf('call_huge')).toBeUndefined();
+    expect(mcpCallResultOf('call_kept')).toBeDefined();
   });
 });

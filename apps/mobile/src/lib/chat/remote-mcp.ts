@@ -383,10 +383,17 @@ export async function readRemoteMcpView(
   if (source === undefined) {
     return { kind: 'unavailable' };
   }
-  const document = await readViewDocument(
-    { ...source, deps: { ...source.deps, timeoutMs: VIEW_READ_TIMEOUT_MS, signal } },
-    view
-  );
+  /* A read is not a call: a row that scrolls away aborts it, and a read the
+     person's own row cancelled must not be published as that server failing —
+     which is what the deps' `onCallFailure` would do. The row's own Retry is
+     where a read that did not answer is reported. */
+  const deps: RemoteMcpClientDeps = {
+    ...source.deps,
+    timeoutMs: VIEW_READ_TIMEOUT_MS,
+    signal,
+  };
+  delete deps.onCallFailure;
+  const document = await readViewDocument({ ...source, deps }, view);
   return document;
 }
 

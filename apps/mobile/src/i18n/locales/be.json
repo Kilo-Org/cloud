@@ -35,6 +35,8 @@
     "connectGithub": "Падключыць GitHub",
     "cost": "Кошт",
     "discard": "Адкінуць",
+    "discardChangesMessage": "Вашы змены будуць страчаны.",
+    "discardChangesTitle": "Адкінуць змены?",
     "findings": "Выяўленыя праблемы",
     "mergeRequest": "merge-запыт",
     "notConnected": "Не падключана",
@@ -109,7 +111,9 @@
     "online": "У сетцы",
     "open": "Адкрыць {{name}}",
     "openPullRequest": "Адкрыць запыт на зліццё",
+    "completed": "Завершана",
     "pending": "Чакае",
+    "running": "Працуе",
     "performance": "Прадукцыйнасць",
     "preferences": "Налады",
     "privacyPolicy": "Палітыка прыватнасці",
@@ -1572,8 +1576,6 @@
     "updateFailed": "Не атрымалася абнавіць агента праверкі кода.",
     "configSaveFailed": "Не атрымалася захаваць налады праверкі кода.",
     "status": {
-      "running": "Працуе",
-      "completed": "Завершана",
       "interrupted": "Перапынена"
     },
     "reviewStyle": {
@@ -1701,7 +1703,14 @@
       "whereFound": "Месцы выяўлення ({{displayCount}})",
       "fullReport": "Поўная згенераваная справаздача",
       "yes": "Так",
-      "no": "Не"
+      "no": "Не",
+      "action": {
+        "analyzeCodebase": "Аналізаваць кодавую базу",
+        "dismiss": "Адхіліць",
+        "manualReview": "Ручная праверка",
+        "monitor": "Назіраць",
+        "openPr": "Адкрыць запыт на зліццё"
+      }
     },
     "dashboard": {
       "findingsCount": "Праблем: {{displayCount}}",
@@ -1909,7 +1918,8 @@
     "settingsSave": {
       "saveChanges": "Захаваць змены",
       "unsavedTitle": "Незахаваныя змены",
-      "unsavedMessage": "Захаваць змены перад выхадам з гэтага экрана?"
+      "unsavedMessage": "Захаваць змены перад выхадам з гэтага экрана?",
+      "unsavedInvalidMessage": "Гэтыя змены пакуль нельга захаваць. Выпраўце іх, каб захаваць, або адкіньце, каб выйсці."
     },
     "auditReportButton": {
       "viewA11y": "Праглядзець справаздачу аўдыту"
@@ -1926,7 +1936,24 @@
       "title": "Справаздача аўдыту",
       "unavailable": "Справаздача аўдыту недаступная",
       "unavailableDescription": "Толькі ўладальнікі арганізацыі і адміністратары аплаты могуць праглядаць справаздачы аўдыту. Папрасіце ўладальніка або адміністратара аплаты даць вам доступ.",
-      "queryFailed": "Не атрымалася завяршыць запыт справаздачы. Паспрабуйце яшчэ раз."
+      "queryFailed": "Не атрымалася завяршыць запыт справаздачы. Паспрабуйце яшчэ раз.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Аналіз завершаны",
+        "findingAnalysisFailed": "Памылка аналізу",
+        "findingAutoDismissed": "Аўтаматычна адхілена",
+        "findingCreated": "Імпартавана",
+        "findingDeleted": "Выдалена",
+        "findingDismissed": "Адхілена",
+        "findingSeverityChanged": "Сур’ёзнасць зменена",
+        "findingStatusChange": "Статус зменены",
+        "findingSuperseded": "Заменена",
+        "remediationBlocked": "Выпраўленне заблакіравана",
+        "remediationCancelled": "Адменена",
+        "remediationFailed": "Не атрымалася выканаць выпраўленне",
+        "remediationNoChangesNeeded": "Змены не патрэбныя",
+        "remediationPrOpened": "PR адкрыты",
+        "remediationQueued": "Запыт на выпраўленне атрыманы"
+      }
     },
     "notifications": {
       "couldNotLoad": "Не атрымалася загрузіць налады апавяшчэнняў.",
@@ -1958,7 +1985,6 @@
       "installApp": "Усталяваць праграму GitHub",
       "reauthorizeButton": "Паўторна аўтарызаваць праграму GitHub",
       "reauthorizeDescription": "Агенту бяспекі патрэбны дазвол vulnerability_alerts для доступу да апавяшчэнняў Dependabot. Паўторна аўтарызуйце праграму GitHub, каб даць гэты дазвол.",
-      "reauthorizeFailed": "Не атрымалася пачаць паўторную аўтарызацыю. Паспрабуйце яшчэ раз.",
       "reauthorizeTitle": "Патрабуюцца дадатковыя дазволы",
       "setupFailed": "Не атрымалася пачаць наладжванне GitHub. Паспрабуйце яшчэ раз."
     },
@@ -2350,7 +2376,8 @@
       "matchesBadge_other": "супадзенняў: {{displayCount}}",
       "matchesBadge_few": "супадзенні: {{displayCount}}",
       "matchesBadge_many": "супадзенняў: {{displayCount}}",
-      "noOutput": "Няма вываду."
+      "noOutput": "Няма вываду.",
+      "translationFailed": "Пераклад не ўдаўся"
     },
     "readToolMarkdown": {
       "linesTruncated": "радкі {{start}}–{{end}} (скарочана)",
@@ -3707,7 +3734,7 @@
       "empty": "Сервераў MCP пакуль няма",
       "name": "Імя сервера",
       "type": "Тып сервера",
-      "localType": "Мясцовы",
+      "localType": "Лакальны",
       "remoteType": "Дыстанцыйнае",
       "command": "Камандны радок",
       "url": "URL",
@@ -3770,6 +3797,7 @@
       "description": "Апісанне каманды",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Растлумачце $ARGUMENTS",
       "subtask": "Запуск як падзадача",
       "edit": "Рэдагаваць каманду касой рысы",
@@ -3928,7 +3956,7 @@
     "view": "Чытаць зводку",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Паказаць бягучы стан",
+    "dismiss": "Адхіліць зводку",
     "offline": "Па-за сеткай · захаваная зводка",
     "cached": "Захаваная справаздача · абнаўленне недаступнае",
     "revised": "Абноўлена · {{revision}}",

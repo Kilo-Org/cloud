@@ -35,6 +35,8 @@
     "connectGithub": "Tengja GitHub",
     "cost": "Kostnaður",
     "discard": "Farga",
+    "discardChangesMessage": "Breytingar þínar munu glatast.",
+    "discardChangesTitle": "Farga breytingum?",
     "findings": "Niðurstöður",
     "mergeRequest": "merge request",
     "notConnected": "Ekki tengt",
@@ -109,7 +111,9 @@
     "online": "Á netinu",
     "open": "Opna {{name}}",
     "openPullRequest": "Opna samrunabeiðni",
+    "completed": "Lokið",
     "pending": "Í bið",
+    "running": "Í gangi",
     "performance": "Afköst",
     "preferences": "Kjörstillingar",
     "privacyPolicy": "Persónuverndarstefna",
@@ -1534,8 +1538,6 @@
     "updateFailed": "Ekki tókst að uppfæra kóðarýninn.",
     "configSaveFailed": "Ekki tókst að vista yfirferðarstillingar.",
     "status": {
-      "running": "Í gangi",
-      "completed": "Lokið",
       "interrupted": "Rofið"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "Staðsetningar fráviks ({{displayCount}})",
       "fullReport": "Sjálfvirk skýrsla í heild",
       "yes": "Já",
-      "no": "Nei"
+      "no": "Nei",
+      "action": {
+        "analyzeCodebase": "Greina kóðagrunn",
+        "dismiss": "Hunsa",
+        "manualReview": "Handvirk endurskoðun",
+        "monitor": "Fylgjast með",
+        "openPr": "Opna togbeiðni"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} frávik",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Vista breytingar",
       "unsavedTitle": "Óvistaðar breytingar",
-      "unsavedMessage": "Viltu vista breytingarnar áður en þú ferð af þessum skjá?"
+      "unsavedMessage": "Viltu vista breytingarnar áður en þú ferð af þessum skjá?",
+      "unsavedInvalidMessage": "Ekki er hægt að vista þessar breytingar ennþá. Lagaðu þær til að vista eða fargaðu þeim til að fara."
     },
     "auditReportButton": {
       "viewA11y": "Skoða endurskoðunarskýrslu"
@@ -1880,7 +1890,24 @@
       "title": "Endurskoðunarskýrsla",
       "unavailable": "Endurskoðunarskýrsla ekki tiltæk",
       "unavailableDescription": "Aðeins eigendur fyrirtækisins og greiðslustjórar geta skoðað endurskoðunarskýrslur. Biddu eiganda eða greiðslustjóra um að veita þér aðgang.",
-      "queryFailed": "Fyrirspurn um skýrsluna lauk ekki. Reyndu aftur."
+      "queryFailed": "Fyrirspurn um skýrsluna lauk ekki. Reyndu aftur.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Greining lokið",
+        "findingAnalysisFailed": "Greining mistókst",
+        "findingAutoDismissed": "Sjálfvirkt hunsað",
+        "findingCreated": "Flutt inn",
+        "findingDeleted": "Eytt",
+        "findingDismissed": "Hunsað",
+        "findingSeverityChanged": "Mikilvægi breytt",
+        "findingStatusChange": "Staða breytt",
+        "findingSuperseded": "Skipt út",
+        "remediationBlocked": "Úrbætur hindraðar",
+        "remediationCancelled": "Hætt við",
+        "remediationFailed": "Úrbætur mistókust",
+        "remediationNoChangesNeeded": "Engar breytingar nauðsynlegar",
+        "remediationPrOpened": "Togbeiðni opnuð",
+        "remediationQueued": "Óskað eftir úrbótum"
+      }
     },
     "notifications": {
       "couldNotLoad": "Ekki tókst að sækja tilkynningastillingar.",
@@ -1912,7 +1939,6 @@
       "installApp": "Setja upp GitHub-forrit",
       "reauthorizeButton": "Endurnýja heimildir GitHub-forritsins",
       "reauthorizeDescription": "Öryggisvakinn þarf heimildina vulnerability_alerts til að fá aðgang að Dependabot-viðvörunum. Endurnýjaðu heimildir GitHub-forritsins til að veita þessa heimild.",
-      "reauthorizeFailed": "Ekki tókst að hefja endurnýjun heimilda. Reyndu aftur.",
       "reauthorizeTitle": "Viðbótarheimildir nauðsynlegar",
       "setupFailed": "Ekki tókst að hefja uppsetningu GitHub. Reyndu aftur."
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} línur",
       "matchesBadge_one": "{{displayCount}} samsvörun",
       "matchesBadge_other": "{{displayCount}} samsvaranir",
-      "noOutput": "Ekkert úttak."
+      "noOutput": "Ekkert úttak.",
+      "translationFailed": "Þýðing mistókst"
     },
     "readToolMarkdown": {
       "linesTruncated": "línur {{start}}–{{end}} (stytt)",
@@ -3688,6 +3715,7 @@
       "description": "Skipunarlýsing",
       "template": "Sniðmát",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Útskýrðu $ARGUMENTS",
       "subtask": "Keyra sem undirverkefni",
       "edit": "Breyta skástrik skipun",
@@ -3838,7 +3866,7 @@
     "view": "Lesa yfirlit",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Sýna rauntímastöðu",
+    "dismiss": "Vísa yfirliti frá",
     "offline": "Ótengt · vistað yfirlit",
     "cached": "Vistuð skýrsla · ekki hægt að uppfæra",
     "revised": "Endurskoðað · {{revision}}",

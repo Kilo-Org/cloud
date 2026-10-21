@@ -35,6 +35,8 @@
     "connectGithub": "GitHub-u qoş",
     "cost": "Xərc",
     "discard": "Ləğv et",
+    "discardChangesMessage": "Dəyişiklikləriniz itiriləcək.",
+    "discardChangesTitle": "Dəyişiklikləri ləğv et?",
     "findings": "Aşkarlanan problemlər",
     "mergeRequest": "merge sorğusu",
     "notConnected": "Qoşulmayıb",
@@ -109,7 +111,9 @@
     "online": "Onlayn",
     "open": "{{name}} aç",
     "openPullRequest": "Açıq birləşdirmə sorğusu",
+    "completed": "Tamamlanıb",
     "pending": "Gözləyir",
+    "running": "İşləyir",
     "performance": "Məhsuldarlıq",
     "preferences": "Seçimlər",
     "privacyPolicy": "Məxfilik siyasəti",
@@ -1534,8 +1538,6 @@
     "updateFailed": "Kod yoxlayıcısını yeniləmək mümkün olmadı.",
     "configSaveFailed": "Kod yoxlamasının parametrlərini yadda saxlamaq mümkün olmadı.",
     "status": {
-      "running": "İşləyir",
-      "completed": "Tamamlanıb",
       "interrupted": "Yarımçıq qalıb"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "Aşkar edildiyi yerlər ({{displayCount}})",
       "fullReport": "Hazırlanmış tam hesabat",
       "yes": "Bəli",
-      "no": "Xeyr"
+      "no": "Xeyr",
+      "action": {
+        "analyzeCodebase": "Kod bazasını təhlil et",
+        "dismiss": "Rədd et",
+        "manualReview": "Əl ilə kod yoxlaması",
+        "monitor": "İzlə",
+        "openPr": "PR aç"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} tapıntı",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Dəyişiklikləri yadda saxla",
       "unsavedTitle": "Yadda saxlanılmamış dəyişikliklər",
-      "unsavedMessage": "Bu ekrandan çıxmazdan əvvəl dəyişikliklər yadda saxlanılsın?"
+      "unsavedMessage": "Bu ekrandan çıxmazdan əvvəl dəyişikliklər yadda saxlanılsın?",
+      "unsavedInvalidMessage": "Bu dəyişiklikləri hələ yadda saxlamaq olmaz. Yadda saxlamaq üçün onları düzəlt və ya çıxmaq üçün ləğv et."
     },
     "auditReportButton": {
       "viewA11y": "Audit hesabatına bax"
@@ -1880,7 +1890,24 @@
       "title": "Audit hesabatı",
       "unavailable": "Audit hesabatı mövcud deyil",
       "unavailableDescription": "Audit hesabatlarına yalnız təşkilat sahibləri və ödəniş menecerləri baxa bilər. Giriş icazəsi üçün təşkilat sahibinə və ya ödəniş menecerinə müraciət et.",
-      "queryFailed": "Hesabat sorğusu tamamlanmadı. Yenidən cəhd et."
+      "queryFailed": "Hesabat sorğusu tamamlanmadı. Yenidən cəhd et.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiz tamamlandı",
+        "findingAnalysisFailed": "Təhlil uğursuz oldu",
+        "findingAutoDismissed": "Avtomatik rədd edildi",
+        "findingCreated": "İdxal edildi",
+        "findingDeleted": "Silindi",
+        "findingDismissed": "Rədd edilib",
+        "findingSeverityChanged": "Ağırlıq dərəcəsi dəyişdirildi",
+        "findingStatusChange": "Status dəyişdirildi",
+        "findingSuperseded": "Əvəz edilib",
+        "remediationBlocked": "Düzəliş bloklandı",
+        "remediationCancelled": "Ləğv edildi",
+        "remediationFailed": "Düzəliş uğursuz oldu",
+        "remediationNoChangesNeeded": "Dəyişiklik lazım deyil",
+        "remediationPrOpened": "PR açıldı",
+        "remediationQueued": "Düzəliş tələb edildi"
+      }
     },
     "notifications": {
       "couldNotLoad": "Bildiriş parametrlərini yükləmək mümkün olmadı.",
@@ -1912,7 +1939,6 @@
       "installApp": "GitHub tətbiqini quraşdır",
       "reauthorizeButton": "GitHub tətbiqinə yenidən icazə ver",
       "reauthorizeDescription": "Təhlükəsizlik agentinə Dependabot bildirişlərinə giriş üçün vulnerability_alerts icazəsi lazımdır. Bu icazəni vermək üçün GitHub tətbiqinə yenidən icazə ver.",
-      "reauthorizeFailed": "Yenidən icazə vermə prosesini başlatmaq mümkün olmadı. Yenidən cəhd et.",
       "reauthorizeTitle": "Əlavə icazələr tələb olunur",
       "setupFailed": "GitHub quraşdırmasını başlatmaq mümkün olmadı. Yenidən cəhd et."
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} sətir",
       "matchesBadge_one": "{{displayCount}} uyğunluq",
       "matchesBadge_other": "{{displayCount}} uyğunluq",
-      "noOutput": "Çıxış yoxdur."
+      "noOutput": "Çıxış yoxdur.",
+      "translationFailed": "Tərcümə alınmadı"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} sətirləri (qısaldılıb)",
@@ -3688,6 +3715,7 @@
       "description": "Komandanın təsviri",
       "template": "Şablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS-i izah edin",
       "subtask": "Alt tapşırıq kimi işləyin",
       "edit": "Slash əmrini redaktə edin",
@@ -3838,7 +3866,7 @@
     "view": "Brifinqi oxu",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Canlı statusu göstər",
+    "dismiss": "Brifinqi rədd et",
     "offline": "Oflayn · saxlanmış brifinq",
     "cached": "Saxlanmış hesabat · yeniləmə mümkün deyil",
     "revised": "Yenilənib · {{revision}}",

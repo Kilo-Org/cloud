@@ -35,6 +35,8 @@
     "connectGithub": "חיבור ל-GitHub",
     "cost": "עלות",
     "discard": "ויתור על השינויים",
+    "discardChangesMessage": "השינויים שלך יאבדו.",
+    "discardChangesTitle": "ויתור על השינויים?",
     "findings": "ממצאים",
     "mergeRequest": "בקשת מיזוג",
     "notConnected": "לא מחובר",
@@ -109,7 +111,9 @@
     "online": "מקוון",
     "open": "פתיחת {{name}}",
     "openPullRequest": "PR פתוח",
+    "completed": "הושלם",
     "pending": "ממתין",
+    "running": "בהרצה",
     "performance": "ביצועים",
     "preferences": "העדפות",
     "privacyPolicy": "מדיניות פרטיות",
@@ -1022,8 +1026,6 @@
     "updateFailed": "עדכון סוקר הקוד נכשל.",
     "configSaveFailed": "שמירת הגדרות הסקירה נכשלה.",
     "status": {
-      "running": "בהרצה",
-      "completed": "הושלם",
       "interrupted": "הופסקה"
     },
     "reviewStyle": {
@@ -1116,7 +1118,14 @@
       "triageReasoning": "נימוקי המיון הראשוני",
       "watchInCloudAgent": "צפייה בסוכן הענן",
       "whereFound": "מיקומי הממצא ({{displayCount}})",
-      "yes": "כן"
+      "yes": "כן",
+      "action": {
+        "analyzeCodebase": "נתח את בסיס הקוד",
+        "dismiss": "דחייה",
+        "manualReview": "בדיקה ידנית",
+        "monitor": "מעקב",
+        "openPr": "פתיחת בקשת משיכה"
+      }
     },
     "analysisSettings": {
       "analysisModel": "מודל לניתוח",
@@ -1138,7 +1147,24 @@
       "summary": "סיכום הדוח",
       "title": "דוח ביקורת",
       "unavailable": "דוח הביקורת אינו זמין",
-      "unavailableDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לצפות בדוחות ביקורת. בקש מאחד מבעלי הארגון או ממנהל החיוב לתת לך גישה."
+      "unavailableDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לצפות בדוחות ביקורת. בקש מאחד מבעלי הארגון או ממנהל החיוב לתת לך גישה.",
+      "eventActions": {
+        "findingAnalysisCompleted": "הניתוח הושלם",
+        "findingAnalysisFailed": "הניתוח נכשל",
+        "findingAutoDismissed": "נדחה אוטומטית",
+        "findingCreated": "יובא",
+        "findingDeleted": "נמחק",
+        "findingDismissed": "נדחה",
+        "findingSeverityChanged": "החומרה שונתה",
+        "findingStatusChange": "הסטטוס שונה",
+        "findingSuperseded": "הוחלף",
+        "remediationBlocked": "התיקון נחסם",
+        "remediationCancelled": "בוטל",
+        "remediationFailed": "התיקון נכשל",
+        "remediationNoChangesNeeded": "לא נדרשים שינויים",
+        "remediationPrOpened": "נפתחה בקשת משיכה",
+        "remediationQueued": "התקבלה בקשה לתיקון"
+      }
     },
     "auditReportButton": {
       "viewA11y": "צפייה בדוח הביקורת"
@@ -1361,7 +1387,6 @@
       "installApp": "התקנת אפליקציית GitHub",
       "reauthorizeButton": "חידוש ההרשאה לאפליקציית GitHub",
       "reauthorizeDescription": "סוכן האבטחה זקוק להרשאת vulnerability_alerts כדי לגשת להתראות Dependabot. חדש את ההרשאה לאפליקציית GitHub כדי לתת לו גישה.",
-      "reauthorizeFailed": "לא ניתן להתחיל את חידוש ההרשאה. נסה שוב.",
       "reauthorizeTitle": "נדרשות הרשאות נוספות",
       "setupFailed": "לא ניתן להתחיל את הגדרת GitHub. נסה שוב."
     },
@@ -1385,6 +1410,7 @@
     "settingsSave": {
       "saveChanges": "שמירת שינויים",
       "unsavedMessage": "לשמור את השינויים לפני היציאה מהמסך?",
+      "unsavedInvalidMessage": "לא ניתן עדיין לשמור את השינויים האלה. תקן אותם כדי לשמור, או ויתר עליהם כדי לצאת.",
       "unsavedTitle": "שינויים שלא נשמרו"
     },
     "setup": {
@@ -1787,7 +1813,8 @@
       "matchesBadge_one": "{{displayCount}} התאמה",
       "matchesBadge_other": "{{displayCount}} התאמות",
       "matchesBadge_two": "{{displayCount}} התאמות",
-      "noOutput": "אין פלט."
+      "noOutput": "אין פלט.",
+      "translationFailed": "התרגום נכשל"
     },
     "readToolMarkdown": {
       "linesTruncated": "שורות {{start}}–{{end}} (התוכן נחתך)",
@@ -3729,6 +3756,7 @@
       "description": "תיאור הפקודה",
       "template": "תבנית",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "הסבר $ARGUMENTS",
       "subtask": "הפעל כתת-מטלת",
       "edit": "ערוך פקודת נטוי",
@@ -3883,7 +3911,7 @@
     "view": "קריאת התדריך",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "הצגת סטטוס חי",
+    "dismiss": "התעלמות מהתדריך",
     "offline": "לא מקוון · תדריך שמור",
     "cached": "דוח שמור · רענון לא זמין",
     "revised": "עודכן · {{revision}}",

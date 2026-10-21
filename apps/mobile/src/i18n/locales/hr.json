@@ -35,6 +35,8 @@
     "connectGithub": "Poveži GitHub",
     "cost": "Trošak",
     "discard": "Odbaci",
+    "discardChangesMessage": "Vaše promjene bit će izgubljene.",
+    "discardChangesTitle": "Odbaciti promjene?",
     "findings": "Nalazi",
     "mergeRequest": "merge request",
     "notConnected": "Nije povezano",
@@ -109,7 +111,9 @@
     "online": "Na mreži",
     "open": "Otvori {{name}}",
     "openPullRequest": "Otvori zahtjev za spajanje",
+    "completed": "Dovršeno",
     "pending": "Na čekanju",
+    "running": "U tijeku",
     "performance": "Performanse",
     "preferences": "Postavke",
     "privacyPolicy": "Politika privatnosti",
@@ -1553,8 +1557,6 @@
     "updateFailed": "Nije moguće ažurirati agenta za pregled koda.",
     "configSaveFailed": "Nije moguće spremiti postavke pregleda.",
     "status": {
-      "running": "U tijeku",
-      "completed": "Dovršeno",
       "interrupted": "Prekinuto"
     },
     "reviewStyle": {
@@ -1681,7 +1683,14 @@
       "whereFound": "Mjesta nalaza ({{displayCount}})",
       "fullReport": "Cijelo generirano izvješće",
       "yes": "Da",
-      "no": "Ne"
+      "no": "Ne",
+      "action": {
+        "analyzeCodebase": "Analiziraj kodnu bazu",
+        "dismiss": "Odbaci",
+        "manualReview": "Ručna provjera",
+        "monitor": "Praćenje",
+        "openPr": "Otvori PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} nalaza",
@@ -1886,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Spremi izmjene",
       "unsavedTitle": "Nespremljene izmjene",
-      "unsavedMessage": "Želiš li spremiti izmjene prije izlaska s ovog zaslona?"
+      "unsavedMessage": "Želiš li spremiti izmjene prije izlaska s ovog zaslona?",
+      "unsavedInvalidMessage": "Ove izmjene još nije moguće spremiti. Ispravi ih da bi ih spremio ili ih odbaci da bi izašao."
     },
     "auditReportButton": {
       "viewA11y": "Pogledaj izvješće o reviziji"
@@ -1903,7 +1913,24 @@
       "title": "Izvješće o reviziji",
       "unavailable": "Izvješće o reviziji nedostupno",
       "unavailableDescription": "Samo vlasnici organizacije i voditelji naplate mogu pregledavati izvješća o reviziji. Zamoli vlasnika ili voditelja naplate da ti odobri pristup.",
-      "queryFailed": "Upit za izvješće nije dovršen. Pokušaj ponovno."
+      "queryFailed": "Upit za izvješće nije dovršen. Pokušaj ponovno.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiza dovršena",
+        "findingAnalysisFailed": "Analiza nije uspjela",
+        "findingAutoDismissed": "Automatski odbačeno",
+        "findingCreated": "Uvezeno",
+        "findingDeleted": "Izbrisano",
+        "findingDismissed": "Odbačeno",
+        "findingSeverityChanged": "Promijenjena ozbiljnost",
+        "findingStatusChange": "Promijenjen status",
+        "findingSuperseded": "Zamijenjeno",
+        "remediationBlocked": "Sanacija blokirana",
+        "remediationCancelled": "Otkazano",
+        "remediationFailed": "Sanacija nije uspjela",
+        "remediationNoChangesNeeded": "Nisu potrebne promjene",
+        "remediationPrOpened": "PR otvoren",
+        "remediationQueued": "Zatražena sanacija"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nije moguće učitati postavke obavijesti.",
@@ -1935,7 +1962,6 @@
       "installApp": "Instaliraj aplikaciju GitHub",
       "reauthorizeButton": "Ponovno autoriziraj aplikaciju GitHub",
       "reauthorizeDescription": "Sigurnosni agent treba dopuštenje vulnerability_alerts za pristup upozorenjima iz Dependabota. Ponovno autoriziraj aplikaciju GitHub da joj dodijeliš to dopuštenje.",
-      "reauthorizeFailed": "Nije moguće pokrenuti ponovnu autorizaciju. Pokušaj ponovno.",
       "reauthorizeTitle": "Potrebna dodatna dopuštenja",
       "setupFailed": "Nije moguće pokrenuti postavljanje za GitHub. Pokušaj ponovno."
     },
@@ -2318,7 +2344,8 @@
       "matchesBadge_one": "podudaranje: {{displayCount}}",
       "matchesBadge_other": "podudaranja: {{displayCount}}",
       "matchesBadge_few": "podudaranja: {{displayCount}}",
-      "noOutput": "Nema izlaza."
+      "noOutput": "Nema izlaza.",
+      "translationFailed": "Prijevod nije uspio"
     },
     "readToolMarkdown": {
       "linesTruncated": "retci {{start}}–{{end}} (skraćeno)",
@@ -3729,6 +3756,7 @@
       "description": "Opis naredbe",
       "template": "Predložak",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Objasnite $ARGUMENTS",
       "subtask": "Pokreni kao podzadatak",
       "edit": "Naredba za uređivanje kose crte",
@@ -3883,7 +3911,7 @@
     "view": "Pročitaj pregled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Prikaži trenutačni status",
+    "dismiss": "Odbaci pregled",
     "offline": "Izvan mreže · spremljeni pregled",
     "cached": "Spremljeno izvješće · osvježavanje nije dostupno",
     "revised": "Revidirano · {{revision}}",

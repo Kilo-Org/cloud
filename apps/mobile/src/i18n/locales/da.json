@@ -35,6 +35,8 @@
     "connectGithub": "Tilknyt GitHub",
     "cost": "Pris",
     "discard": "Kassér",
+    "discardChangesMessage": "Dine ændringer går tabt.",
+    "discardChangesTitle": "Kassér ændringer?",
     "findings": "Fund",
     "mergeRequest": "merge request",
     "notConnected": "Ikke tilknyttet",
@@ -109,7 +111,9 @@
     "online": "Forbundet",
     "open": "Åbn {{name}}",
     "openPullRequest": "Åbn PR",
+    "completed": "Afsluttet",
     "pending": "Afventer",
+    "running": "Kører",
     "performance": "Ydeevne",
     "preferences": "Indstillinger",
     "privacyPolicy": "Privatlivspolitik",
@@ -1534,8 +1538,6 @@
     "updateFailed": "Code Reviewer kunne ikke opdateres.",
     "configSaveFailed": "Indstillingerne for gennemgange kunne ikke gemmes.",
     "status": {
-      "running": "Kører",
-      "completed": "Afsluttet",
       "interrupted": "Afbrudt"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "Fundsteder ({{displayCount}})",
       "fullReport": "Den fulde genererede rapport",
       "yes": "Ja",
-      "no": "Nej"
+      "no": "Nej",
+      "action": {
+        "analyzeCodebase": "Analysér kodebasen",
+        "dismiss": "Afvis",
+        "manualReview": "Manuel gennemsyn",
+        "monitor": "Overvåg",
+        "openPr": "Åbn PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} fund",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Gem ændringer",
       "unsavedTitle": "Ugemte ændringer",
-      "unsavedMessage": "Vil du gemme dine ændringer, før du forlader denne skærm?"
+      "unsavedMessage": "Vil du gemme dine ændringer, før du forlader denne skærm?",
+      "unsavedInvalidMessage": "Disse ændringer kan ikke gemmes endnu. Ret dem for at gemme, eller kassér dem for at forlade."
     },
     "auditReportButton": {
       "viewA11y": "Vis revisionsrapport"
@@ -1880,7 +1890,24 @@
       "title": "Revisionsrapport",
       "unavailable": "Revisionsrapport utilgængelig",
       "unavailableDescription": "Kun organisationsejere og faktureringsadministratorer kan se revisionsrapporter. Bed en ejer eller faktureringsadministrator om at give dig adgang.",
-      "queryFailed": "Forespørgslen om rapporten blev ikke fuldført. Prøv igen."
+      "queryFailed": "Forespørgslen om rapporten blev ikke fuldført. Prøv igen.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyse fuldført",
+        "findingAnalysisFailed": "Analyse mislykkedes",
+        "findingAutoDismissed": "Afvist automatisk",
+        "findingCreated": "Importeret",
+        "findingDeleted": "Slettet",
+        "findingDismissed": "Afvist",
+        "findingSeverityChanged": "Alvorlighed ændret",
+        "findingStatusChange": "Status ændret",
+        "findingSuperseded": "Erstattet",
+        "remediationBlocked": "Udbedring blokeret",
+        "remediationCancelled": "Annulleret",
+        "remediationFailed": "Udbedring mislykkedes",
+        "remediationNoChangesNeeded": "Ingen ændringer nødvendige",
+        "remediationPrOpened": "PR åbnet",
+        "remediationQueued": "Anmodet om udbedring"
+      }
     },
     "notifications": {
       "couldNotLoad": "Indstillingerne for notifikationer kunne ikke indlæses.",
@@ -1912,7 +1939,6 @@
       "installApp": "Installér GitHub-appen",
       "reauthorizeButton": "Godkend GitHub-appen igen",
       "reauthorizeDescription": "Security Agent kræver tilladelsen vulnerability_alerts for at få adgang til Dependabot-advarsler. Godkend GitHub-appen igen for at give denne tilladelse.",
-      "reauthorizeFailed": "En ny godkendelse kunne ikke startes. Prøv igen.",
       "reauthorizeTitle": "Yderligere tilladelser påkrævet",
       "setupFailed": "Opsætningen af GitHub kunne ikke startes. Prøv igen."
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} linjer",
       "matchesBadge_one": "{{displayCount}} resultat",
       "matchesBadge_other": "{{displayCount}} resultater",
-      "noOutput": "Ingen output."
+      "noOutput": "Ingen output.",
+      "translationFailed": "Oversættelse mislykkedes"
     },
     "readToolMarkdown": {
       "linesTruncated": "linje {{start}}–{{end}} (forkortet)",
@@ -3688,6 +3715,7 @@
       "description": "Kommandobeskrivelse",
       "template": "Skabelon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Forklar $ARGUMENTS",
       "subtask": "Kør som underopgave",
       "edit": "Rediger skråstreg kommando",
@@ -3838,7 +3866,7 @@
     "view": "Læs briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Vis live-status",
+    "dismiss": "Afvis briefing",
     "offline": "Offline · gemt briefing",
     "cached": "Gemt rapport · kan ikke opdateres",
     "revised": "Revideret · {{revision}}",

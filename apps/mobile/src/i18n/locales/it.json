@@ -35,6 +35,8 @@
     "connectGithub": "Collega GitHub",
     "cost": "Costo",
     "discard": "Scarta",
+    "discardChangesMessage": "Le tue modifiche andranno perse.",
+    "discardChangesTitle": "Scartare le modifiche?",
     "findings": "Problemi rilevati",
     "mergeRequest": "merge request",
     "notConnected": "Non collegato",
@@ -109,7 +111,9 @@
     "online": "In linea",
     "open": "Apri {{name}}",
     "openPullRequest": "Apri la PR",
+    "completed": "Completata",
     "pending": "In attesa",
+    "running": "In esecuzione",
     "performance": "Prestazioni",
     "preferences": "Preferenze",
     "privacyPolicy": "Informativa sulla privacy",
@@ -991,8 +995,6 @@
     "updateFailed": "Impossibile aggiornare il revisore.",
     "configSaveFailed": "Impossibile salvare la configurazione della revisione.",
     "status": {
-      "running": "In esecuzione",
-      "completed": "Completata",
       "interrupted": "Interrotta"
     },
     "reviewStyle": {
@@ -1085,7 +1087,14 @@
       "triageReasoning": "Motivazioni della valutazione preliminare",
       "watchInCloudAgent": "Segui in Cloud Agent",
       "whereFound": "Punti di rilevamento ({{displayCount}})",
-      "yes": "Sì"
+      "yes": "Sì",
+      "action": {
+        "analyzeCodebase": "Analizza codebase",
+        "dismiss": "Ignora",
+        "manualReview": "Revisione manuale",
+        "monitor": "Monitora",
+        "openPr": "Apri richiesta di pull"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Modello di analisi",
@@ -1107,7 +1116,24 @@
       "summary": "Riepilogo del report",
       "title": "Report di audit",
       "unavailable": "Report di audit non disponibile",
-      "unavailableDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono visualizzare i report di audit. Chiedi a un proprietario o a un responsabile della fatturazione di concederti l'accesso."
+      "unavailableDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono visualizzare i report di audit. Chiedi a un proprietario o a un responsabile della fatturazione di concederti l'accesso.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analisi completata",
+        "findingAnalysisFailed": "Analisi non riuscita",
+        "findingAutoDismissed": "Ignorato automaticamente",
+        "findingCreated": "Importato",
+        "findingDeleted": "Eliminato",
+        "findingDismissed": "Ignorato",
+        "findingSeverityChanged": "Gravità modificata",
+        "findingStatusChange": "Stato modificato",
+        "findingSuperseded": "Sostituito",
+        "remediationBlocked": "Correzione bloccata",
+        "remediationCancelled": "Annullato",
+        "remediationFailed": "Correzione non riuscita",
+        "remediationNoChangesNeeded": "Nessuna modifica necessaria",
+        "remediationPrOpened": "Richiesta di pull aperta",
+        "remediationQueued": "Correzione richiesta"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Visualizza il report di audit"
@@ -1330,7 +1356,6 @@
       "installApp": "Installa l'app GitHub",
       "reauthorizeButton": "Riautorizza l'app GitHub",
       "reauthorizeDescription": "Security Agent richiede l'autorizzazione vulnerability_alerts per accedere agli avvisi di Dependabot. Riautorizza l'app GitHub per concederla.",
-      "reauthorizeFailed": "Impossibile avviare la riautorizzazione. Riprova.",
       "reauthorizeTitle": "Servono autorizzazioni aggiuntive",
       "setupFailed": "Impossibile avviare la configurazione di GitHub. Riprova."
     },
@@ -1354,6 +1379,7 @@
     "settingsSave": {
       "saveChanges": "Salva le modifiche",
       "unsavedMessage": "Salvare le modifiche prima di uscire da questa schermata?",
+      "unsavedInvalidMessage": "Queste modifiche non possono ancora essere salvate. Correggile per salvare o scartale per uscire.",
       "unsavedTitle": "Modifiche non salvate"
     },
     "setup": {
@@ -1756,7 +1782,8 @@
       "matchesBadge_one": "{{displayCount}} corrispondenza",
       "matchesBadge_other": "{{displayCount}} corrispondenze",
       "matchesBadge_many": "{{displayCount}} corrispondenze",
-      "noOutput": "Nessun output."
+      "noOutput": "Nessun output.",
+      "translationFailed": "Traduzione non riuscita"
     },
     "readToolMarkdown": {
       "linesTruncated": "righe {{start}}–{{end}} (troncate)",
@@ -3695,11 +3722,11 @@
       "add": "Aggiungi agente",
       "empty": "Nessun agente ancora",
       "name": "Nome dell'agente",
-      "slug": "Lumaca dell'agente",
+      "slug": "Slug dell'agente",
       "description": "Descrizione dell'agente",
       "model": "Sostituzione del modello",
       "modelPlaceholder": "Utilizza l'impostazione predefinita della sessione",
-      "prompt": "Richiesta di sistema",
+      "prompt": "Prompt di sistema",
       "steps": "Passi massimi",
       "stepsPlaceholder": "es. 50",
       "temperature": "Temperatura",
@@ -3729,6 +3756,7 @@
       "description": "Descrizione del comando",
       "template": "Modello",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Spiega $ARGUMENTS",
       "subtask": "Esegui come attività secondaria",
       "edit": "Comando Modifica barra",
@@ -3883,7 +3911,7 @@
     "view": "Leggi briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Mostra stato live",
+    "dismiss": "Ignora il briefing",
     "offline": "Offline · briefing salvato",
     "cached": "Report salvato · aggiornamento non disponibile",
     "revised": "Revisionato · {{revision}}",

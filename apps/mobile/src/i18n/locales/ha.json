@@ -35,6 +35,8 @@
     "connectGithub": "Haɗa GitHub",
     "cost": "Farashi",
     "discard": "Yi watsi",
+    "discardChangesMessage": "Za a rasa canje-canjenka.",
+    "discardChangesTitle": "A yi watsi da canje-canje?",
     "findings": "Sakamakon bincike",
     "mergeRequest": "buƙatar haɗawa",
     "notConnected": "Ba a haɗa ba",
@@ -109,7 +111,9 @@
     "online": "Kan layi",
     "open": "Buɗe {{name}}",
     "openPullRequest": "Buɗe buƙatar haɗa canje-canje",
+    "completed": "An kammala",
     "pending": "Yana jira",
+    "running": "Ana gudanarwa",
     "performance": "Ƙarfin aiki",
     "preferences": "Zaɓuɓɓuka",
     "privacyPolicy": "Manufar sirri",
@@ -1534,8 +1538,6 @@
     "updateFailed": "An kasa sabunta mai bita.",
     "configSaveFailed": "An kasa ajiye saitunan bita.",
     "status": {
-      "running": "Ana gudanarwa",
-      "completed": "An kammala",
       "interrupted": "An katse"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "Inda aka samu wannan ({{displayCount}})",
       "fullReport": "Cikakken rahoton da aka samar",
       "yes": "Ee",
-      "no": "A'a"
+      "no": "A'a",
+      "action": {
+        "analyzeCodebase": "Bincika lambar tushe",
+        "dismiss": "Ware",
+        "manualReview": "Bincike da hannu",
+        "monitor": "Sa ido",
+        "openPr": "Buɗe PR"
+      }
     },
     "dashboard": {
       "findingsCount": "Matsaloli {{displayCount}} da aka gano",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Ajiye canje-canje",
       "unsavedTitle": "Canje-canjen da ba a ajiye ba",
-      "unsavedMessage": "A ajiye canje-canjenka kafin barin wannan allon?"
+      "unsavedMessage": "A ajiye canje-canjenka kafin barin wannan allon?",
+      "unsavedInvalidMessage": "Ba za a iya ajiye waɗannan canje-canje ba tukuna. Gyara su don ajiyewa, ko yi watsi da su don barin."
     },
     "auditReportButton": {
       "viewA11y": "Duba rahoton bincike"
@@ -1880,7 +1890,24 @@
       "title": "Rahoton bincike",
       "unavailable": "Ba a iya samun rahoton bincike",
       "unavailableDescription": "Masu mallakar ƙungiya da masu kula da biyan kuɗi kawai za su iya duba rahotannin bincike. Nemi mai ƙungiya ko mai kula da biyan kuɗi ya ba ka dama.",
-      "queryFailed": "Ba a kammala neman bayanan rahoton ba. Sake gwadawa."
+      "queryFailed": "Ba a kammala neman bayanan rahoton ba. Sake gwadawa.",
+      "eventActions": {
+        "findingAnalysisCompleted": "An kammala bincike",
+        "findingAnalysisFailed": "Bincike ya gaza",
+        "findingAutoDismissed": "An ware ta atomatik",
+        "findingCreated": "An shigo da shi",
+        "findingDeleted": "An share",
+        "findingDismissed": "An ware",
+        "findingSeverityChanged": "An canza tsanani",
+        "findingStatusChange": "An canza matsayi",
+        "findingSuperseded": "An maye gurbinsa",
+        "remediationBlocked": "An toshe gyara",
+        "remediationCancelled": "An soke",
+        "remediationFailed": "Gyara ya gaza",
+        "remediationNoChangesNeeded": "Babu buƙatar canje-canje",
+        "remediationPrOpened": "An buɗe PR",
+        "remediationQueued": "An nemi gyara"
+      }
     },
     "notifications": {
       "couldNotLoad": "An kasa loda saitunan sanarwa.",
@@ -1912,7 +1939,6 @@
       "installApp": "Shigar da manhajar GitHub",
       "reauthorizeButton": "Sake ba manhajar GitHub izini",
       "reauthorizeDescription": "Wakilin tsaro yana buƙatar izinin vulnerability_alerts don samun faɗakarwar Dependabot. Sake ba manhajar GitHub izini don ba ta wannan damar.",
-      "reauthorizeFailed": "An kasa fara sake ba da izini. Sake gwadawa.",
       "reauthorizeTitle": "Ana buƙatar ƙarin izini",
       "setupFailed": "An kasa fara saitin GitHub. Sake gwadawa."
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "layuka {{displayCount}}",
       "matchesBadge_one": "sakamako {{displayCount}}",
       "matchesBadge_other": "sakamako {{displayCount}}",
-      "noOutput": "Babu fitarwa."
+      "noOutput": "Babu fitarwa.",
+      "translationFailed": "Fassarar ta kasa"
     },
     "readToolMarkdown": {
       "linesTruncated": "layuka {{start}}–{{end}} (an rage)",
@@ -3688,6 +3715,7 @@
       "description": "Bayanin umarni",
       "template": "Samfura",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Yi bayani $ARGUMENTS",
       "subtask": "Gudu azaman ƙaramin aiki",
       "edit": "Gyara umarnin slash",
@@ -3838,7 +3866,7 @@
     "view": "Karanta bayani",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Nuna matsayi kai tsaye",
+    "dismiss": "Yi watsi da bayani",
     "offline": "Ba intanet · bayanin da aka adana",
     "cached": "Rahoton da aka adana · ba za a iya sabuntawa ba",
     "revised": "An gyara · {{revision}}",

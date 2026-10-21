@@ -35,6 +35,8 @@
     "connectGithub": "Konektatu GitHub",
     "cost": "Kostua",
     "discard": "Baztertu",
+    "discardChangesMessage": "Zure aldaketak galduko dira.",
+    "discardChangesTitle": "Baztertu aldaketak?",
     "findings": "Antzemandako arazoak",
     "mergeRequest": "merge-eskaera",
     "notConnected": "Konektatu gabe",
@@ -109,7 +111,9 @@
     "online": "Konektatuta",
     "open": "Ireki {{name}}",
     "openPullRequest": "Ireki bateratze-eskaera",
+    "completed": "Amaituta",
     "pending": "Zain",
+    "running": "Martxan",
     "performance": "Errendimendua",
     "preferences": "Hobespenak",
     "privacyPolicy": "Pribatutasun-politika",
@@ -1534,8 +1538,6 @@
     "updateFailed": "Ezin izan da berrikuslea eguneratu.",
     "configSaveFailed": "Ezin izan da berrikuspenaren konfigurazioa gorde.",
     "status": {
-      "running": "Martxan",
-      "completed": "Amaituta",
       "interrupted": "Etenda"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "Non aurkitu den ({{displayCount}})",
       "fullReport": "Sortutako txosten osoa",
       "yes": "Bai",
-      "no": "Ez"
+      "no": "Ez",
+      "action": {
+        "analyzeCodebase": "Analizatu kode-oinarria",
+        "dismiss": "Baztertu",
+        "manualReview": "Eskuzko berrikuspena",
+        "monitor": "Monitorizatu",
+        "openPr": "Ireki PRa"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} aurkikuntza",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Gorde aldaketak",
       "unsavedTitle": "Gorde gabeko aldaketak",
-      "unsavedMessage": "Aldaketak gorde nahi dituzu pantaila honetatik irten aurretik?"
+      "unsavedMessage": "Aldaketak gorde nahi dituzu pantaila honetatik irten aurretik?",
+      "unsavedInvalidMessage": "Aldaketa hauek ezin dira oraindik gorde. Zuzendu itzazu gordetzeko, edo baztertu irteteko."
     },
     "auditReportButton": {
       "viewA11y": "Ikusi auditoria-txostena"
@@ -1880,7 +1890,24 @@
       "title": "Auditoria-txostena",
       "unavailable": "Auditoria-txostena ez dago erabilgarri",
       "unavailableDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik ikus ditzakete auditoria-txostenak. Eskatu jabe bati edo fakturazio-kudeatzaile bati sarbidea emateko.",
-      "queryFailed": "Txostenaren kontsulta ez da amaitu. Saiatu berriro."
+      "queryFailed": "Txostenaren kontsulta ez da amaitu. Saiatu berriro.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analisia amaitu da",
+        "findingAnalysisFailed": "Analisiak huts egin du",
+        "findingAutoDismissed": "Automatikoki baztertua",
+        "findingCreated": "Inportatuta",
+        "findingDeleted": "Ezabatua",
+        "findingDismissed": "Baztertua",
+        "findingSeverityChanged": "Larritasuna aldatu da",
+        "findingStatusChange": "Egoera aldatu da",
+        "findingSuperseded": "Ordezkatua",
+        "remediationBlocked": "Konponketa blokeatu da",
+        "remediationCancelled": "Baliogabetua",
+        "remediationFailed": "Konponketak huts egin du",
+        "remediationNoChangesNeeded": "Ez da aldaketarik behar",
+        "remediationPrOpened": "PRa ireki da",
+        "remediationQueued": "Konponketa eskatu da"
+      }
     },
     "notifications": {
       "couldNotLoad": "Ezin izan dira jakinarazpen-ezarpenak kargatu.",
@@ -1912,7 +1939,6 @@
       "installApp": "Instalatu GitHub aplikazioa",
       "reauthorizeButton": "Baimendu berriro GitHub aplikazioa",
       "reauthorizeDescription": "Segurtasun-agenteak vulnerability_alerts baimena behar du Dependabot-en abisuak atzitzeko. Baimendu berriro GitHub aplikazioa baimen hori emateko.",
-      "reauthorizeFailed": "Ezin izan da berriro baimentzeko prozesua hasi. Saiatu berriro.",
       "reauthorizeTitle": "Baimen gehigarriak behar dira",
       "setupFailed": "Ezin izan da GitHub konfiguratzeko prozesua hasi. Saiatu berriro."
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} lerro",
       "matchesBadge_one": "{{displayCount}} bat etortze",
       "matchesBadge_other": "{{displayCount}} bat etortze",
-      "noOutput": "Irteerarik ez."
+      "noOutput": "Irteerarik ez.",
+      "translationFailed": "Itzulpena huts egin du"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} lerroak (moztuta)",
@@ -3688,6 +3715,7 @@
       "description": "Komandoaren deskribapena",
       "template": "Txantiloia",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Azaldu $ARGUMENTS",
       "subtask": "Exekutatu azpizeregin gisa",
       "edit": "Editatu barra komandoa",
@@ -3838,7 +3866,7 @@
     "view": "Irakurri laburpena",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Erakutsi zuzeneko egoera",
+    "dismiss": "Baztertu laburpena",
     "offline": "Lineaz kanpo · gordetako laburpena",
     "cached": "Gordetako txostena · ezin da freskatu",
     "revised": "Berrikusia · {{revision}}",

@@ -35,6 +35,8 @@
     "connectGithub": "GitHub کو منسلک کریں",
     "cost": "لاگت",
     "discard": "ضائع کریں",
+    "discardChangesMessage": "آپ کی تبدیلیاں ضائع ہو جائیں گی۔",
+    "discardChangesTitle": "تبدیلیاں ضائع کریں؟",
     "findings": "شناخت شدہ مسائل",
     "mergeRequest": "مرج ریکویسٹ",
     "notConnected": "منسلک نہیں",
@@ -109,7 +111,9 @@
     "online": "آن لائن",
     "open": "{{name}} کھولیں",
     "openPullRequest": "پل ریکویسٹ کھولیں",
+    "completed": "مکمل",
     "pending": "زیر التوا",
+    "running": "چل رہا ہے",
     "performance": "کارکردگی",
     "preferences": "ترجیحات",
     "privacyPolicy": "رازداری کی پالیسی",
@@ -1534,8 +1538,6 @@
     "updateFailed": "ریویور کو اپ ڈیٹ نہیں کیا جا سکا۔",
     "configSaveFailed": "جائزے کی ترتیبات محفوظ نہیں ہو سکیں۔",
     "status": {
-      "running": "چل رہا ہے",
-      "completed": "مکمل",
       "interrupted": "رک گیا"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "مسئلہ ملنے کے مقامات ({{displayCount}})",
       "fullReport": "تیار کردہ مکمل رپورٹ",
       "yes": "ہاں",
-      "no": "نہیں"
+      "no": "نہیں",
+      "action": {
+        "analyzeCodebase": "کوڈ بیس کا تجزیہ کریں",
+        "dismiss": "مسترد کریں",
+        "manualReview": "دستی جائزہ",
+        "monitor": "نگرانی کریں",
+        "openPr": "پل ریکوئسٹ کھولیں"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} مسائل",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "تبدیلیاں محفوظ کریں",
       "unsavedTitle": "محفوظ نہ کی گئی تبدیلیاں",
-      "unsavedMessage": "اس اسکرین سے جانے سے پہلے اپنی تبدیلیاں محفوظ کریں؟"
+      "unsavedMessage": "اس اسکرین سے جانے سے پہلے اپنی تبدیلیاں محفوظ کریں؟",
+      "unsavedInvalidMessage": "یہ تبدیلیاں ابھی محفوظ نہیں کی جا سکتیں۔ محفوظ کرنے کے لیے انہیں ٹھیک کریں، یا جانے کے لیے انہیں ضائع کریں۔"
     },
     "auditReportButton": {
       "viewA11y": "آڈٹ رپورٹ دیکھیں"
@@ -1880,7 +1890,24 @@
       "title": "آڈٹ رپورٹ",
       "unavailable": "آڈٹ رپورٹ دستیاب نہیں",
       "unavailableDescription": "صرف تنظیم کے مالکان اور بلنگ مینیجر آڈٹ رپورٹس دیکھ سکتے ہیں۔ رسائی دینے کے لیے کسی مالک یا بلنگ مینیجر سے کہیں۔",
-      "queryFailed": "رپورٹ کے لیے ڈیٹا حاصل نہیں ہو سکا۔ دوبارہ کوشش کریں۔"
+      "queryFailed": "رپورٹ کے لیے ڈیٹا حاصل نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+      "eventActions": {
+        "findingAnalysisCompleted": "تجزیہ مکمل ہوا",
+        "findingAnalysisFailed": "تجزیہ ناکام ہو گیا",
+        "findingAutoDismissed": "خودکار طور پر مسترد کیا گیا",
+        "findingCreated": "درآمد کیا گیا",
+        "findingDeleted": "حذف کر دیا گیا",
+        "findingDismissed": "مسترد کیا گیا",
+        "findingSeverityChanged": "شدت تبدیل ہو گئی",
+        "findingStatusChange": "اسٹیٹس تبدیل ہو گیا",
+        "findingSuperseded": "جگہ لی گئی",
+        "remediationBlocked": "اصلاح روک دی گئی",
+        "remediationCancelled": "منسوخ کر دیا گیا",
+        "remediationFailed": "اصلاح ناکام ہو گئی",
+        "remediationNoChangesNeeded": "کوئی تبدیلی کی ضرورت نہیں",
+        "remediationPrOpened": "پل ریکوئسٹ کھول دیا گیا",
+        "remediationQueued": "اصلاح کی درخواست کی گئی"
+      }
     },
     "notifications": {
       "couldNotLoad": "اطلاعات کی ترتیبات لوڈ نہیں ہو سکیں۔",
@@ -1912,7 +1939,6 @@
       "installApp": "GitHub ایپ انسٹال کریں",
       "reauthorizeButton": "GitHub ایپ کو دوبارہ اجازت دیں",
       "reauthorizeDescription": "سکیورٹی ایجنٹ کو Dependabot کی اطلاعات تک رسائی کے لیے vulnerability_alerts کی اجازت درکار ہے۔ یہ اجازت دینے کے لیے GitHub ایپ کو دوبارہ مجاز بنائیں۔",
-      "reauthorizeFailed": "دوبارہ اجازت دینے کا عمل شروع نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
       "reauthorizeTitle": "اضافی اجازتیں درکار ہیں",
       "setupFailed": "GitHub سیٹ اپ شروع نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔"
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} سطریں",
       "matchesBadge_one": "{{displayCount}} مماثلت",
       "matchesBadge_other": "{{displayCount}} مماثلتیں",
-      "noOutput": "کوئی آؤٹ پٹ نہیں ہے۔"
+      "noOutput": "کوئی آؤٹ پٹ نہیں ہے۔",
+      "translationFailed": "ترجمہ ناکام رہا"
     },
     "readToolMarkdown": {
       "linesTruncated": "سطریں {{start}}–{{end}} (نامکمل متن)",
@@ -3688,6 +3715,7 @@
       "description": "کمانڈ کی تفصیل",
       "template": "سانچہ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS کی وضاحت کریں۔",
       "subtask": "ذیلی کام کے طور پر چلائیں۔",
       "edit": "سلیش کمانڈ میں ترمیم کریں۔",
@@ -3838,7 +3866,7 @@
     "view": "بریفنگ پڑھیں",
     "viewWithPreview": "$t(agentBriefing.view)۔ {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "لائیو اسٹیٹس دکھائیں",
+    "dismiss": "بریفنگ نظر انداز کریں",
     "offline": "آف لائن · محفوظ شدہ بریفنگ",
     "cached": "محفوظ شدہ رپورٹ · ریفریش دستیاب نہیں",
     "revised": "نظرثانی شدہ · {{revision}}",

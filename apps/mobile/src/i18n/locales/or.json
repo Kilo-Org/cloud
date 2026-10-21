@@ -35,6 +35,8 @@
     "connectGithub": "GitHub ସହ ସଂଯୋଗ କରନ୍ତୁ",
     "cost": "ଖର୍ଚ୍ଚ",
     "discard": "ଛାଡ଼ିଦିଅନ୍ତୁ",
+    "discardChangesMessage": "ଆପଣଙ୍କର ପରିବର୍ତ୍ତନଗୁଡ଼ିକ ନଷ୍ଟ ହୋଇଯିବ।",
+    "discardChangesTitle": "ପରିବର୍ତ୍ତନଗୁଡ଼ିକ ଛାଡ଼ିଦିଅନ୍ତୁ?",
     "findings": "ଚିହ୍ନଟ ସମସ୍ୟା",
     "mergeRequest": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ",
     "notConnected": "ସଂଯୋଗ ହୋଇନାହିଁ",
@@ -109,7 +111,9 @@
     "online": "ଅନଲାଇନ୍",
     "open": "{{name}} ଖୋଲନ୍ତୁ",
     "openPullRequest": "ଖୋଲା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
+    "completed": "ସମାପ୍ତ",
     "pending": "ଅପେକ୍ଷାରତ",
+    "running": "ଚାଲୁଛି",
     "performance": "କାର୍ଯ୍ୟଦକ୍ଷତା",
     "preferences": "ପସନ୍ଦ",
     "privacyPolicy": "ଗୋପନୀୟତା ନୀତି",
@@ -1534,8 +1538,6 @@
     "updateFailed": "କୋଡ୍ ସମୀକ୍ଷକ ଅପଡେଟ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "configSaveFailed": "ସମୀକ୍ଷା ସେଟିଂସ୍ ସଂରକ୍ଷଣ ହୋଇପାରିଲା ନାହିଁ।",
     "status": {
-      "running": "ଚାଲୁଛି",
-      "completed": "ସମାପ୍ତ",
       "interrupted": "ବ୍ୟାହତ"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "ଚିହ୍ନଟ ହୋଇଥିବା ସ୍ଥାନ ({{displayCount}})",
       "fullReport": "ତିଆରି ହୋଇଥିବା ସମ୍ପୂର୍ଣ୍ଣ ରିପୋର୍ଟ",
       "yes": "ହଁ",
-      "no": "ନା"
+      "no": "ନା",
+      "action": {
+        "analyzeCodebase": "କୋଡବେସ୍ ବିଶ୍ଳେଷଣ କରନ୍ତୁ",
+        "dismiss": "ଖାରଜ କରନ୍ତୁ",
+        "manualReview": "ମାନୁଆଲ୍ ସମୀକ୍ଷା",
+        "monitor": "ନିରୀକ୍ଷଣ କରନ୍ତୁ",
+        "openPr": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲନ୍ତୁ"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}}ଟି ଚିହ୍ନଟ ସମସ୍ୟା",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରନ୍ତୁ",
       "unsavedTitle": "ସଂରକ୍ଷିତ ହୋଇନଥିବା ପରିବର୍ତ୍ତନ",
-      "unsavedMessage": "ଏହି ସ୍କ୍ରିନରୁ ବାହାରିବା ପୂର୍ବରୁ ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରିବେ?"
+      "unsavedMessage": "ଏହି ସ୍କ୍ରିନରୁ ବାହାରିବା ପୂର୍ବରୁ ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରିବେ?",
+      "unsavedInvalidMessage": "ଏହି ପରିବର୍ତ୍ତନଗୁଡ଼ିକ ଏବେ ସଂରକ୍ଷଣ କରାଯାଇପାରିବ ନାହିଁ। ସଂରକ୍ଷଣ କରିବାକୁ ସେଗୁଡ଼ିକୁ ସଜାଡ଼ନ୍ତୁ, କିମ୍ବା ବାହାରିଯିବାକୁ ସେଗୁଡ଼ିକୁ ଛାଡ଼ିଦିଅନ୍ତୁ।"
     },
     "auditReportButton": {
       "viewA11y": "ଅଡିଟ୍ ରିପୋର୍ଟ ଦେଖନ୍ତୁ"
@@ -1880,7 +1890,24 @@
       "title": "ଅଡିଟ୍ ରିପୋର୍ଟ",
       "unavailable": "ଅଡିଟ୍ ରିପୋର୍ଟ ଉପଲବ୍ଧ ନୁହେଁ",
       "unavailableDescription": "କେବଳ ସଂଗଠନର ମାଲିକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଅଡିଟ୍ ରିପୋର୍ଟ ଦେଖିପାରିବେ। ଅନୁମତି ପାଇଁ ମାଲିକ କିମ୍ବା ବିଲିଂ ପରିଚାଳକଙ୍କୁ ଅନୁରୋଧ କରନ୍ତୁ।",
-      "queryFailed": "ରିପୋର୍ଟ ପାଇଁ ତଥ୍ୟ ଆଣିବା ସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+      "queryFailed": "ରିପୋର୍ଟ ପାଇଁ ତଥ୍ୟ ଆଣିବା ସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "eventActions": {
+        "findingAnalysisCompleted": "ବିଶ୍ଳେଷଣ ସମ୍ପୂର୍ଣ୍ଣ ହୋଇଛି",
+        "findingAnalysisFailed": "ବିଶ୍ଳେଷଣ ବିଫଳ ହୋଇଛି",
+        "findingAutoDismissed": "ସ୍ୱୟଂଚାଳିତ ଭାବେ ଖାରଜ କରାଯାଇଛି",
+        "findingCreated": "ଆମଦାନୀ ହୋଇଛି",
+        "findingDeleted": "ଅପସାରିତ ହୋଇଛି",
+        "findingDismissed": "ଖାରଜ କରାଯାଇଛି",
+        "findingSeverityChanged": "ଗମ୍ଭୀରତା ବଦଳିଛି",
+        "findingStatusChange": "ସ୍ଥିତି ବଦଳିଛି",
+        "findingSuperseded": "ପ୍ରତିସ୍ଥାପିତ ହୋଇଛି",
+        "remediationBlocked": "ସମାଧାନ ଅବରୋଧିତ ହୋଇଛି",
+        "remediationCancelled": "ରଦ୍ଦ କରାଯାଇଛି",
+        "remediationFailed": "ସମାଧାନ ବିଫଳ ହୋଇଛି",
+        "remediationNoChangesNeeded": "କୌଣସି ପରିବର୍ତ୍ତନ ଆବଶ୍ୟକ ନାହିଁ",
+        "remediationPrOpened": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲାଯାଇଛି",
+        "remediationQueued": "ସମାଧାନ ପାଇଁ ଅନୁରୋଧ କରାଯାଇଛି"
+      }
     },
     "notifications": {
       "couldNotLoad": "ବିଜ୍ଞପ୍ତି ସେଟିଂସ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
@@ -1912,7 +1939,6 @@
       "installApp": "GitHub ଆପ୍ ସଂସ୍ଥାପନ କରନ୍ତୁ",
       "reauthorizeButton": "GitHub ଆପ୍‌କୁ ପୁଣି ଅନୁମତି ଦିଅନ୍ତୁ",
       "reauthorizeDescription": "Dependabot ସତର୍କତା ଦେଖିବାକୁ ସୁରକ୍ଷା ଏଜେଣ୍ଟକୁ vulnerability_alerts ଅନୁମତି ଆବଶ୍ୟକ। ଏହି ଅନୁମତି ଦେବାକୁ GitHub ଆପ୍‌କୁ ପୁଣି ଅନୁମତି ଦିଅନ୍ତୁ।",
-      "reauthorizeFailed": "ପୁଣି ଅନୁମତି ଦେବା ପ୍ରକ୍ରିୟା ଆରମ୍ଭ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "reauthorizeTitle": "ଅତିରିକ୍ତ ଅନୁମତି ଆବଶ୍ୟକ",
       "setupFailed": "GitHub ସେଟଅପ୍ ଆରମ୍ଭ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}}ଟି ଧାଡ଼ି",
       "matchesBadge_one": "{{displayCount}}ଟି ମେଳ",
       "matchesBadge_other": "{{displayCount}}ଟି ମେଳ",
-      "noOutput": "କୌଣସି ଆଉଟପୁଟ୍ ନାହିଁ।"
+      "noOutput": "କୌଣସି ଆଉଟପୁଟ୍ ନାହିଁ।",
+      "translationFailed": "ଅନୁବାଦ ବିଫଳ ହେଲା"
     },
     "readToolMarkdown": {
       "linesTruncated": "ଧାଡ଼ି {{start}}–{{end}} (କାଟି ଦିଆଯାଇଛି)",
@@ -3688,6 +3715,7 @@
       "description": "ନିର୍ଦ୍ଦେଶ ବର୍ଣ୍ଣନା",
       "template": "ଟେମ୍ପଲେଟ୍।",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ବ୍ୟାଖ୍ୟା କର।",
       "subtask": "ସବଟାସ୍କ ଭାବରେ ଚଲାନ୍ତୁ।",
       "edit": "ସ୍ଲାସ୍ କମାଣ୍ଡ୍ ଏଡିଟ୍ କରନ୍ତୁ।",
@@ -3838,7 +3866,7 @@
     "view": "ସାରାଂଶ ପଢନ୍ତୁ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "ଲାଇଭ ସ୍ଥିତି ଦେଖାନ୍ତୁ",
+    "dismiss": "ସାରାଂଶ ଖାରଜ କରନ୍ତୁ",
     "offline": "ଅଫଲାଇନ · ସଂରକ୍ଷିତ ସାରାଂଶ",
     "cached": "ସଂରକ୍ଷିତ ରିପୋର୍ଟ · ରିଫ୍ରେସ ଉପଲବ୍ଧ ନାହିଁ",
     "revised": "ସଂଶୋଧିତ · {{revision}}",

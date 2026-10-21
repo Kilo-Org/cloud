@@ -35,6 +35,8 @@
     "connectGithub": "Konekte GitHub",
     "cost": "Pri",
     "discard": "Jete",
+    "discardChangesMessage": "Chanjman ou yo pral pèdi.",
+    "discardChangesTitle": "Jete chanjman yo?",
     "findings": "Pwoblèm detekte",
     "mergeRequest": "merge request",
     "notConnected": "Pa konekte",
@@ -109,7 +111,9 @@
     "online": "Sou entènèt",
     "open": "Louvri {{name}}",
     "openPullRequest": "Louvri demann fizyon an",
+    "completed": "Fini",
     "pending": "An atant",
+    "running": "Ap fonksyone",
     "performance": "Pèfòmans",
     "preferences": "Preferans",
     "privacyPolicy": "Règleman sou vi prive",
@@ -1534,8 +1538,6 @@
     "updateFailed": "Nou pa t ka mete revizè a ajou.",
     "configSaveFailed": "Nou pa t ka anrejistre konfigirasyon revizyon an.",
     "status": {
-      "running": "Ap fonksyone",
-      "completed": "Fini",
       "interrupted": "Entèwonp"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "Kote yo jwenn sa ({{displayCount}})",
       "fullReport": "Rapò konplè ki pwodui a",
       "yes": "Wi",
-      "no": "Non"
+      "no": "Non",
+      "action": {
+        "analyzeCodebase": "Analize baz kòd la",
+        "dismiss": "Rejte",
+        "manualReview": "Revizyon manyèl",
+        "monitor": "Siveye",
+        "openPr": "Ouvri PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} konsta",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Anrejistre chanjman yo",
       "unsavedTitle": "Chanjman ki pa anrejistre",
-      "unsavedMessage": "Anrejistre chanjman ou yo anvan ou kite ekran sa a?"
+      "unsavedMessage": "Anrejistre chanjman ou yo anvan ou kite ekran sa a?",
+      "unsavedInvalidMessage": "Chanjman sa yo poko ka anrejistre. Korije yo pou anrejistre, oswa jete yo pou kite."
     },
     "auditReportButton": {
       "viewA11y": "Gade rapò odit la"
@@ -1880,7 +1890,24 @@
       "title": "Rapò odit",
       "unavailable": "Rapò odit la pa disponib",
       "unavailableDescription": "Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka wè rapò odit yo. Mande yon pwopriyetè oswa yon responsab faktirasyon pou ba ou aksè.",
-      "queryFailed": "Rekèt pou rapò a pa t fini. Eseye ankò."
+      "queryFailed": "Rekèt pou rapò a pa t fini. Eseye ankò.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiz la konplè",
+        "findingAnalysisFailed": "Analiz la echwe",
+        "findingAutoDismissed": "Rejte otomatikman",
+        "findingCreated": "Enpòte",
+        "findingDeleted": "Efase",
+        "findingDismissed": "Rejte",
+        "findingSeverityChanged": "Gravite a chanje",
+        "findingStatusChange": "Estati a chanje",
+        "findingSuperseded": "Ranplase",
+        "remediationBlocked": "Koreksyon an bloke",
+        "remediationCancelled": "Anile",
+        "remediationFailed": "Koreksyon an echwe",
+        "remediationNoChangesNeeded": "Pa gen chanjman nesesè",
+        "remediationPrOpened": "PR ouvè",
+        "remediationQueued": "Koreksyon mande"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nou pa t ka chaje paramèt notifikasyon yo.",
@@ -1912,7 +1939,6 @@
       "installApp": "Enstale aplikasyon GitHub la",
       "reauthorizeButton": "Otorize aplikasyon GitHub la ankò",
       "reauthorizeDescription": "Ajan sekirite a bezwen pèmisyon vulnerability_alerts pou jwenn aksè nan alèt Dependabot yo. Otorize aplikasyon GitHub la ankò pou bay pèmisyon sa a.",
-      "reauthorizeFailed": "Nou pa t ka kòmanse pwosesis pou bay otorizasyon ankò. Tanpri eseye ankò.",
       "reauthorizeTitle": "Plis pèmisyon nesesè",
       "setupFailed": "Nou pa t ka kòmanse konfigirasyon GitHub la. Tanpri eseye ankò."
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} liy",
       "matchesBadge_one": "{{displayCount}} rezilta",
       "matchesBadge_other": "{{displayCount}} rezilta",
-      "noOutput": "Pa gen rezilta."
+      "noOutput": "Pa gen rezilta.",
+      "translationFailed": "Tradiksyon echwe"
     },
     "readToolMarkdown": {
       "linesTruncated": "liy {{start}}–{{end}} (koupe)",
@@ -3688,6 +3715,7 @@
       "description": "Kòmandman deskripsyon",
       "template": "Modèl",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Eksplike $ARGUMENTS",
       "subtask": "Kouri kòm subtach",
       "edit": "Edit lòd koupe",
@@ -3838,7 +3866,7 @@
     "view": "Li rezime a",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Montre estati an dirèk",
+    "dismiss": "Rejte rezime a",
     "offline": "Hò liy · rezime anrejistre",
     "cached": "Rapò anrejistre · pa ka rafrechi",
     "revised": "Revize · {{revision}}",

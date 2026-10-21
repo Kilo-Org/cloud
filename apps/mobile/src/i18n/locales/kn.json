@@ -35,6 +35,8 @@
     "connectGithub": "GitHub ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
     "cost": "ವೆಚ್ಚ",
     "discard": "ತ್ಯಜಿಸಿ",
+    "discardChangesMessage": "ನಿಮ್ಮ ಬದಲಾವಣೆಗಳು ಕಳೆದುಹೋಗುತ್ತವೆ.",
+    "discardChangesTitle": "ಬದಲಾವಣೆಗಳನ್ನು ತ್ಯಜಿಸಬೇಕೆ?",
     "findings": "ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಗಳು",
     "mergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್",
     "notConnected": "ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",
@@ -109,7 +111,9 @@
     "online": "ಆನ್‌ಲೈನ್",
     "open": "{{name}} ತೆರೆಯಿರಿ",
     "openPullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯಿರಿ",
+    "completed": "ಪೂರ್ಣಗೊಂಡಿದೆ",
     "pending": "ಬಾಕಿ ಇದೆ",
+    "running": "ಚಾಲನೆಯಲ್ಲಿದೆ",
     "performance": "ಕಾರ್ಯಕ್ಷಮತೆ",
     "preferences": "ಆದ್ಯತೆಗಳು",
     "privacyPolicy": "ಗೌಪ್ಯತಾ ನೀತಿ",
@@ -1534,8 +1538,6 @@
     "updateFailed": "ಕೋಡ್ ಪರಿಶೀಲಕವನ್ನು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "configSaveFailed": "ಪರಿಶೀಲನೆಯ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "status": {
-      "running": "ಚಾಲನೆಯಲ್ಲಿದೆ",
-      "completed": "ಪೂರ್ಣಗೊಂಡಿದೆ",
       "interrupted": "ಮಧ್ಯದಲ್ಲಿ ನಿಂತಿದೆ"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "ಇದು ಕಂಡುಬಂದ ಸ್ಥಳಗಳು ({{displayCount}})",
       "fullReport": "ರಚಿಸಲಾದ ಸಂಪೂರ್ಣ ವರದಿ",
       "yes": "ಹೌದು",
-      "no": "ಇಲ್ಲ"
+      "no": "ಇಲ್ಲ",
+      "action": {
+        "analyzeCodebase": "ಕೋಡ್‌ಬೇಸ್ ವಿಶ್ಲೇಷಿಸಿ",
+        "dismiss": "ತಿರಸ್ಕರಿಸು",
+        "manualReview": "ಹಸ್ತಚಾಲಿತ ಪರಿಶೀಲನೆ",
+        "monitor": "ಮೇಲ್ವಿಚಾರಣೆ",
+        "openPr": "ಪುಲ್ ವಿನಂತಿಯನ್ನು ತೆರೆಯಿರಿ"
+      }
     },
     "dashboard": {
       "findingsCount": "ಪತ್ತೆಯಾದ {{displayCount}} ಸಮಸ್ಯೆಗಳು",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "ಬದಲಾವಣೆಗಳನ್ನು ಉಳಿಸಿ",
       "unsavedTitle": "ಉಳಿಸದ ಬದಲಾವಣೆಗಳು",
-      "unsavedMessage": "ಈ ಪರದೆಯಿಂದ ಹೊರಹೋಗುವ ಮೊದಲು ನಿಮ್ಮ ಬದಲಾವಣೆಗಳನ್ನು ಉಳಿಸಬೇಕೇ?"
+      "unsavedMessage": "ಈ ಪರದೆಯಿಂದ ಹೊರಹೋಗುವ ಮೊದಲು ನಿಮ್ಮ ಬದಲಾವಣೆಗಳನ್ನು ಉಳಿಸಬೇಕೇ?",
+      "unsavedInvalidMessage": "ಈ ಬದಲಾವಣೆಗಳನ್ನು ಇನ್ನೂ ಉಳಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಉಳಿಸಲು ಅವುಗಳನ್ನು ಸರಿಪಡಿಸಿ, ಅಥವಾ ಹೊರಹೋಗಲು ಅವುಗಳನ್ನು ತ್ಯಜಿಸಿ."
     },
     "auditReportButton": {
       "viewA11y": "ಆಡಿಟ್ ವರದಿಯನ್ನು ನೋಡಿ"
@@ -1880,7 +1890,24 @@
       "title": "ಆಡಿಟ್ ವರದಿ",
       "unavailable": "ಆಡಿಟ್ ವರದಿ ಲಭ್ಯವಿಲ್ಲ",
       "unavailableDescription": "ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು ಮತ್ತು ಬಿಲ್ಲಿಂಗ್ ನಿರ್ವಾಹಕರು ಮಾತ್ರ ಆಡಿಟ್ ವರದಿಗಳನ್ನು ನೋಡಬಹುದು. ನಿಮಗೆ ಪ್ರವೇಶ ನೀಡುವಂತೆ ಮಾಲೀಕರನ್ನು ಅಥವಾ ಬಿಲ್ಲಿಂಗ್ ನಿರ್ವಾಹಕರನ್ನು ಕೇಳಿ.",
-      "queryFailed": "ವರದಿಗಾಗಿ ಡೇಟಾ ಪಡೆಯುವ ಪ್ರಕ್ರಿಯೆ ಪೂರ್ಣಗೊಳ್ಳಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+      "queryFailed": "ವರದಿಗಾಗಿ ಡೇಟಾ ಪಡೆಯುವ ಪ್ರಕ್ರಿಯೆ ಪೂರ್ಣಗೊಳ್ಳಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "eventActions": {
+        "findingAnalysisCompleted": "ವಿಶ್ಲೇಷಣೆ ಪೂರ್ಣಗೊಂಡಿದೆ",
+        "findingAnalysisFailed": "ವಿಶ್ಲೇಷಣೆ ವಿಫಲವಾಗಿದೆ",
+        "findingAutoDismissed": "ಸ್ವಯಂಚಾಲಿತವಾಗಿ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ",
+        "findingCreated": "ಆಮದು ಮಾಡಲಾಗಿದೆ",
+        "findingDeleted": "ಅಳಿಸಲಾಗಿದೆ",
+        "findingDismissed": "ತಿರಸ್ಕರಿಸಲಾಗಿದೆ",
+        "findingSeverityChanged": "ತೀವ್ರತೆ ಬದಲಾಗಿದೆ",
+        "findingStatusChange": "ಸ್ಥಿತಿ ಬದಲಾಗಿದೆ",
+        "findingSuperseded": "ಬದಲಾಯಿಸಲಾಗಿದೆ",
+        "remediationBlocked": "ಪರಿಹಾರ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ",
+        "remediationCancelled": "ರದ್ದುಮಾಡಲಾಗಿದೆ",
+        "remediationFailed": "ಪರಿಹಾರ ವಿಫಲವಾಗಿದೆ",
+        "remediationNoChangesNeeded": "ಬದಲಾವಣೆಗಳ ಅಗತ್ಯವಿಲ್ಲ",
+        "remediationPrOpened": "ಪುಲ್ ವಿನಂತಿ ತೆರೆಯಲಾಗಿದೆ",
+        "remediationQueued": "ಪರಿಹಾರಕ್ಕಾಗಿ ವಿನಂತಿಸಲಾಗಿದೆ"
+      }
     },
     "notifications": {
       "couldNotLoad": "ಅಧಿಸೂಚನೆಗಳ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
@@ -1912,7 +1939,6 @@
       "installApp": "GitHub ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ಸ್ಥಾಪಿಸಿ",
       "reauthorizeButton": "GitHub ಅಪ್ಲಿಕೇಶನ್‌ಗೆ ಮತ್ತೆ ಅನುಮತಿ ನೀಡಿ",
       "reauthorizeDescription": "Dependabot ಎಚ್ಚರಿಕೆಗಳನ್ನು ಪ್ರವೇಶಿಸಲು ಭದ್ರತಾ ಏಜೆಂಟ್‌ಗೆ vulnerability_alerts ಅನುಮತಿ ಬೇಕು. ಈ ಅನುಮತಿಯನ್ನು ನೀಡಲು GitHub ಅಪ್ಲಿಕೇಶನ್‌ಗೆ ಮತ್ತೆ ಅಧಿಕಾರ ನೀಡಿ.",
-      "reauthorizeFailed": "ಮತ್ತೆ ಅನುಮತಿ ನೀಡುವ ಪ್ರಕ್ರಿಯೆಯನ್ನು ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "reauthorizeTitle": "ಹೆಚ್ಚುವರಿ ಅನುಮತಿಗಳು ಅಗತ್ಯ",
       "setupFailed": "GitHub ಸೆಟಪ್ ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} ಸಾಲುಗಳು",
       "matchesBadge_one": "{{displayCount}} ಹೊಂದಾಣಿಕೆ",
       "matchesBadge_other": "{{displayCount}} ಹೊಂದಾಣಿಕೆಗಳು",
-      "noOutput": "ಯಾವುದೇ ಔಟ್ಪುಟ್ ಇಲ್ಲ."
+      "noOutput": "ಯಾವುದೇ ಔಟ್ಪುಟ್ ಇಲ್ಲ.",
+      "translationFailed": "ಅನುವಾದ ವಿಫಲವಾಗಿದೆ"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} ಸಾಲುಗಳು (ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ)",
@@ -3688,6 +3715,7 @@
       "description": "ಆಜ್ಞೆಯ ವಿವರಣೆ",
       "template": "ಟೆಂಪ್ಲೇಟ್",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ಅನ್ನು ವಿವರಿಸಿ",
       "subtask": "ಉಪಕಾರ್ಯದಂತೆ ರನ್ ಮಾಡಿ",
       "edit": "ಸ್ಲಾಶ್ ಆಜ್ಞೆಯನ್ನು ಸಂಪಾದಿಸಿ",
@@ -3838,7 +3866,7 @@
     "view": "ಸಾರಾಂಶ ಓದಿ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "ಲೈವ್ ಸ್ಥಿತಿ ತೋರಿಸಿ",
+    "dismiss": "ಸಾರಾಂಶವನ್ನು ಕಡೆಗಣಿಸಿ",
     "offline": "ಆಫ್‌ಲೈನ್ · ಉಳಿಸಿದ ಸಾರಾಂಶ",
     "cached": "ಉಳಿಸಿದ ವರದಿ · ರಿಫ್ರೆಶ್ ಲಭ್ಯವಿಲ್ಲ",
     "revised": "ಪರಿಷ್ಕೃತ · {{revision}}",

@@ -35,6 +35,8 @@
     "connectGithub": "Cysylltu â GitHub",
     "cost": "Y gost",
     "discard": "Gwaredu",
+    "discardChangesMessage": "Bydd eich newidiadau'n cael eu colli.",
+    "discardChangesTitle": "Gwaredu newidiadau?",
     "findings": "Canfyddiadau",
     "mergeRequest": "cais uno",
     "notConnected": "Heb gysylltu",
@@ -109,7 +111,9 @@
     "online": "Ar-lein",
     "open": "Agor {{name}}",
     "openPullRequest": "Agor cais tynnu",
+    "completed": "Wedi'i gwblhau",
     "pending": "Yn aros",
+    "running": "Yn rhedeg",
     "performance": "Perfformiad",
     "preferences": "Dewisiadau",
     "privacyPolicy": "Polisi preifatrwydd",
@@ -1610,8 +1614,6 @@
     "updateFailed": "Ni ellid diweddaru'r adolygydd.",
     "configSaveFailed": "Ni ellid cadw gosodiadau'r adolygiad.",
     "status": {
-      "running": "Yn rhedeg",
-      "completed": "Wedi'i gwblhau",
       "interrupted": "Wedi'i atal"
     },
     "reviewStyle": {
@@ -1741,7 +1743,14 @@
       "whereFound": "Lle canfuwyd hyn ({{displayCount}})",
       "fullReport": "Adroddiad llawn a gynhyrchwyd",
       "yes": "Ie",
-      "no": "Na"
+      "no": "Na",
+      "action": {
+        "analyzeCodebase": "Dadansoddi'r cod",
+        "dismiss": "Diystyru",
+        "manualReview": "Adolygiad â llaw",
+        "monitor": "Monitro",
+        "openPr": "Agor PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} canfyddiad",
@@ -1955,7 +1964,8 @@
     "settingsSave": {
       "saveChanges": "Cadw newidiadau",
       "unsavedTitle": "Newidiadau heb eu cadw",
-      "unsavedMessage": "Cadw eich newidiadau cyn gadael y sgrin hon?"
+      "unsavedMessage": "Cadw eich newidiadau cyn gadael y sgrin hon?",
+      "unsavedInvalidMessage": "Ni ellir cadw'r newidiadau hyn eto. Trwsiwch nhw i gadw, neu eu gwaredu i adael."
     },
     "auditReportButton": {
       "viewA11y": "Gweld adroddiad archwilio"
@@ -1972,7 +1982,24 @@
       "title": "Adroddiad archwilio",
       "unavailable": "Nid yw'r adroddiad archwilio ar gael",
       "unavailableDescription": "Dim ond perchnogion y sefydliad a rheolwyr bilio sy'n gallu gweld adroddiadau archwilio. Gofynnwch i berchennog neu reolwr bilio roi mynediad i chi.",
-      "queryFailed": "Ni chwblhawyd yr ymholiad am yr adroddiad. Ceisiwch eto."
+      "queryFailed": "Ni chwblhawyd yr ymholiad am yr adroddiad. Ceisiwch eto.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Cwblhawyd yr analisis",
+        "findingAnalysisFailed": "Methodd yr analisis",
+        "findingAutoDismissed": "Diystyrwyd yn awtomatig",
+        "findingCreated": "Mewnforiwyd",
+        "findingDeleted": "Dilëwyd",
+        "findingDismissed": "Diystyrwyd",
+        "findingSeverityChanged": "Newidiwyd y difrifoldeb",
+        "findingStatusChange": "Newidiwyd y statws",
+        "findingSuperseded": "Disodlwyd",
+        "remediationBlocked": "Cafodd y cywiro ei rwystro",
+        "remediationCancelled": "Cafodd y cywiro ei ddiddymu",
+        "remediationFailed": "Methodd y cywiro",
+        "remediationNoChangesNeeded": "Dim newidiadau angenrheidiol",
+        "remediationPrOpened": "Agorwyd y PR",
+        "remediationQueued": "Gofynnwyd am gywiro"
+      }
     },
     "notifications": {
       "couldNotLoad": "Ni ellid llwytho'r gosodiadau hysbysu.",
@@ -2004,7 +2031,6 @@
       "installApp": "Gosod ap GitHub",
       "reauthorizeButton": "Ailawdurdodi ap GitHub",
       "reauthorizeDescription": "Mae angen y caniatâd vulnerability_alerts ar yr Asiant diogelwch i gael mynediad at rybuddion Dependabot. Ailawdurdodwch ap GitHub i roi'r caniatâd hwn.",
-      "reauthorizeFailed": "Ni ellid dechrau ailawdurdodi. Ceisiwch eto.",
       "reauthorizeTitle": "Angen caniatadau ychwanegol",
       "setupFailed": "Ni ellid dechrau sefydlu GitHub. Ceisiwch eto."
     },
@@ -2414,7 +2440,8 @@
       "matchesBadge_two": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_few": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_many": "{{displayCount}} cyfatebiaeth",
-      "noOutput": "Dim allbwn."
+      "noOutput": "Dim allbwn.",
+      "translationFailed": "Methodd y cyfieithiad"
     },
     "readToolMarkdown": {
       "linesTruncated": "llinellau {{start}}–{{end}} (wedi'u cwtogi)",
@@ -3852,6 +3879,7 @@
       "description": "Disgrifiad gorchymyn",
       "template": "Templed",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Eglurwch $ARGUMENTS",
       "subtask": "Rhedeg fel is-dasg",
       "edit": "Golygu gorchymyn slaes",
@@ -4018,7 +4046,7 @@
     "view": "Darllen y briff",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Dangos statws byw",
+    "dismiss": "Diystyru'r briff",
     "offline": "All-lein · briff wedi'i gadw",
     "cached": "Adroddiad wedi'i gadw · methu adnewyddu",
     "revised": "Diwygiwyd · {{revision}}",

@@ -35,6 +35,8 @@
     "connectGithub": "GitHub જોડો",
     "cost": "ખર્ચ",
     "discard": "કાઢી નાખો",
+    "discardChangesMessage": "તમારા ફેરફારો ખોવાઈ જશે.",
+    "discardChangesTitle": "ફેરફારો કાઢી નાખવા છે?",
     "findings": "તારણો",
     "mergeRequest": "મર્જ રિક્વેસ્ટ",
     "notConnected": "જોડાયેલું નથી",
@@ -109,7 +111,9 @@
     "online": "ઑનલાઇન",
     "open": "{{name}} ખોલો",
     "openPullRequest": "પુલ રિક્વેસ્ટ ખોલો",
+    "completed": "પૂર્ણ",
     "pending": "બાકી",
+    "running": "ચાલી રહ્યું છે",
     "performance": "કાર્યક્ષમતા",
     "preferences": "પસંદગીઓ",
     "privacyPolicy": "ગોપનીયતા નીતિ",
@@ -1534,8 +1538,6 @@
     "updateFailed": "કોડ સમીક્ષક અપડેટ કરી શકાયો નહીં.",
     "configSaveFailed": "સમીક્ષાની ગોઠવણી સાચવી શકાઈ નહીં.",
     "status": {
-      "running": "ચાલી રહ્યું છે",
-      "completed": "પૂર્ણ",
       "interrupted": "અધવચ્ચે અટક્યું"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "તારણ મળ્યું હોય તેવાં સ્થાન ({{displayCount}})",
       "fullReport": "તૈયાર કરેલો સંપૂર્ણ અહેવાલ",
       "yes": "હા",
-      "no": "ના"
+      "no": "ના",
+      "action": {
+        "analyzeCodebase": "કોડબેઝનું વિશ્લેષણ કરો",
+        "dismiss": "નકારી કાઢો",
+        "manualReview": "મેન્યુઅલ સમીક્ષા",
+        "monitor": "નિરીક્ષણ કરો",
+        "openPr": "પુલ રિક્વેસ્ટ ખોલો"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} તારણો",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "ફેરફારો સાચવો",
       "unsavedTitle": "સાચવ્યા વગરના ફેરફારો",
-      "unsavedMessage": "આ સ્ક્રીન છોડતાં પહેલાં તમારા ફેરફારો સાચવવા છે?"
+      "unsavedMessage": "આ સ્ક્રીન છોડતાં પહેલાં તમારા ફેરફારો સાચવવા છે?",
+      "unsavedInvalidMessage": "આ ફેરફારો હજી સાચવી શકાતા નથી. સાચવવા માટે તેમને સુધારો, અથવા છોડી જવા માટે તેમને કાઢી નાખો."
     },
     "auditReportButton": {
       "viewA11y": "ઑડિટ અહેવાલ જુઓ"
@@ -1880,7 +1890,24 @@
       "title": "ઑડિટ અહેવાલ",
       "unavailable": "ઑડિટ અહેવાલ ઉપલબ્ધ નથી",
       "unavailableDescription": "માત્ર સંસ્થાના માલિકો અને બિલિંગ મેનેજરો જ ઑડિટ અહેવાલ જોઈ શકે છે. તે જોવાની પરવાનગી માટે માલિક અથવા બિલિંગ મેનેજરને વિનંતી કરો.",
-      "queryFailed": "અહેવાલ માટેની ક્વેરી પૂરી થઈ નહીં. ફરી પ્રયાસ કરો."
+      "queryFailed": "અહેવાલ માટેની ક્વેરી પૂરી થઈ નહીં. ફરી પ્રયાસ કરો.",
+      "eventActions": {
+        "findingAnalysisCompleted": "વિશ્લેષણ પૂર્ણ થયું",
+        "findingAnalysisFailed": "વિશ્લેષણ નિષ્ફળ ગયું",
+        "findingAutoDismissed": "આપોઆપ નકારી કાઢેલ",
+        "findingCreated": "આયાત થયેલ",
+        "findingDeleted": "કાઢી નાખેલ",
+        "findingDismissed": "નકારી કાઢેલ",
+        "findingSeverityChanged": "ગંભીરતા બદલાઈ",
+        "findingStatusChange": "સ્થિતિ બદલાઈ",
+        "findingSuperseded": "બદલી દેવાયેલ",
+        "remediationBlocked": "સુધારણા અવરોધિત થઈ",
+        "remediationCancelled": "રદ કરેલી",
+        "remediationFailed": "સુધારણા નિષ્ફળ ગઈ",
+        "remediationNoChangesNeeded": "કોઈ ફેરફારોની જરૂર નથી",
+        "remediationPrOpened": "પુલ રિક્વેસ્ટ ખોલાઈ",
+        "remediationQueued": "સુધારણા માટે વિનંતી કરી"
+      }
     },
     "notifications": {
       "couldNotLoad": "સૂચનાઓની સેટિંગ્સ લોડ કરી શકાઈ નહીં.",
@@ -1912,7 +1939,6 @@
       "installApp": "GitHub ઍપ ઇન્સ્ટોલ કરો",
       "reauthorizeButton": "GitHub ઍપને ફરી અધિકૃત કરો",
       "reauthorizeDescription": "સુરક્ષા એજન્ટને Dependabot ની ચેતવણીઓ મેળવવા vulnerability_alerts પરવાનગી જરૂરી છે. આ પરવાનગી આપવા GitHub ઍપને ફરી અધિકૃત કરો.",
-      "reauthorizeFailed": "ફરી અધિકૃત કરવાની પ્રક્રિયા શરૂ કરી શકાઈ નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
       "reauthorizeTitle": "વધારાની પરવાનગીઓ જરૂરી છે",
       "setupFailed": "GitHub સેટઅપ શરૂ થઈ શક્યું નથી. કૃપા કરીને ફરી પ્રયાસ કરો."
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} પંક્તિઓ",
       "matchesBadge_one": "{{displayCount}} મેળ",
       "matchesBadge_other": "{{displayCount}} મેળ",
-      "noOutput": "કોઈ આઉટપુટ નથી."
+      "noOutput": "કોઈ આઉટપુટ નથી.",
+      "translationFailed": "અનુવાદ નિષ્ફળ ગયો"
     },
     "readToolMarkdown": {
       "linesTruncated": "પંક્તિઓ {{start}}–{{end}} (ટૂંકાવેલી)",
@@ -3688,6 +3715,7 @@
       "description": "આદેશનું વર્ણન",
       "template": "ઢાંચો",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS સમજાવો",
       "subtask": "સબટાસ્ક તરીકે ચલાવો",
       "edit": "સ્લેશ આદેશ સંપાદિત કરો",
@@ -3838,7 +3866,7 @@
     "view": "સારાંશ વાંચો",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "લાઇવ સ્થિતિ બતાવો",
+    "dismiss": "સારાંશ ખારિજ કરો",
     "offline": "ઑફલાઇન · સાચવેલ સારાંશ",
     "cached": "સાચવેલ રિપોર્ટ · રિફ્રેશ ઉપલબ્ધ નથી",
     "revised": "સુધારેલ · {{revision}}",

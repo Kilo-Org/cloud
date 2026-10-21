@@ -35,6 +35,8 @@
     "connectGithub": "Ampifandraiso ny GitHub",
     "cost": "Sarany",
     "discard": "Ario",
+    "discardChangesMessage": "Ho very ny fanovanao.",
+    "discardChangesTitle": "Ario ny fanovana?",
     "findings": "Olana hita",
     "mergeRequest": "fangatahana fampiraisana",
     "notConnected": "Tsy mifandray",
@@ -109,7 +111,9 @@
     "online": "An-tserasera",
     "open": "Sokafy ny {{name}}",
     "openPullRequest": "Sokafy ny PR",
+    "completed": "Vita",
     "pending": "Miandry",
+    "running": "Mandeha",
     "performance": "Fahombiazana",
     "preferences": "Safidy",
     "privacyPolicy": "Politika momba ny fiainana manokana",
@@ -1534,8 +1538,6 @@
     "updateFailed": "Tsy nahomby ny fanavaozana ny mpanamarina.",
     "configSaveFailed": "Tsy nahomby ny fitahirizana ny fikiran'ny fanamarinana.",
     "status": {
-      "running": "Mandeha",
-      "completed": "Vita",
       "interrupted": "Tapaka"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "Toerana nahitana ilay olana ({{displayCount}})",
       "fullReport": "Tatitra feno noforonina",
       "yes": "Eny",
-      "no": "Tsia"
+      "no": "Tsia",
+      "action": {
+        "analyzeCodebase": "Diniho ny kaody",
+        "dismiss": "Lavina",
+        "manualReview": "Fanamarinana an-tanana",
+        "monitor": "Araho",
+        "openPr": "Sokafy PR"
+      }
     },
     "dashboard": {
       "findingsCount": "Olana hita {{displayCount}}",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Tehirizo ny fiovana",
       "unsavedTitle": "Fiovana tsy voatahiry",
-      "unsavedMessage": "Hotehirizina ve ny fanovanao alohan'ny hialana amin'ity efijery ity?"
+      "unsavedMessage": "Hotehirizina ve ny fanovanao alohan'ny hialana amin'ity efijery ity?",
+      "unsavedInvalidMessage": "Tsy afaka tehirizina ireo fiovana ireo aloha. Amboary izy ireo raha hotehirizina, na ario raha hialana."
     },
     "auditReportButton": {
       "viewA11y": "Jereo ny tatitra fanaraha-maso"
@@ -1880,7 +1890,24 @@
       "title": "Tatitra fanaraha-maso",
       "unavailable": "Tsy azo jerena ny tatitra fanaraha-maso",
       "unavailableDescription": "Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka mijery tatitra fanaraha-maso. Mangataha alalana hijery izany amin'ny iray amin'izy ireo.",
-      "queryFailed": "Tsy vita ny fangatahana ny tatitra. Andramo indray."
+      "queryFailed": "Tsy vita ny fangatahana ny tatitra. Andramo indray.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Vita ny fanadihadiana",
+        "findingAnalysisFailed": "Tsy nahomby ny fanadihadiana",
+        "findingAutoDismissed": "Nolavina ho azy",
+        "findingCreated": "Nampidirina",
+        "findingDeleted": "Voafafa",
+        "findingDismissed": "Nolavina",
+        "findingSeverityChanged": "Voaova ny hamafy",
+        "findingStatusChange": "Niova ny sata",
+        "findingSuperseded": "Nosoloina",
+        "remediationBlocked": "Voasakana ny fanarenana",
+        "remediationCancelled": "Nofoanana",
+        "remediationFailed": "Tsy nahomby ny fanarenana",
+        "remediationNoChangesNeeded": "Tsy mila fanovana",
+        "remediationPrOpened": "Nosokafana ny PR",
+        "remediationQueued": "Nangatahana ny fanarenana"
+      }
     },
     "notifications": {
       "couldNotLoad": "Tsy nety nampidirina ny fikiran'ny fampandrenesana.",
@@ -1912,7 +1939,6 @@
       "installApp": "Apetraho ny rindranasa GitHub",
       "reauthorizeButton": "Omeo alalana indray ny rindranasa GitHub",
       "reauthorizeDescription": "Mila ny alalana vulnerability_alerts ny Security Agent mba hijery ny fampandrenesan'ny Dependabot. Omeo alalana indray ny rindranasa GitHub mba hanomezana azy io alalana io.",
-      "reauthorizeFailed": "Tsy nety natomboka ny fanomezana alalana indray. Andramo indray azafady.",
       "reauthorizeTitle": "Ilaina ny alalana fanampiny",
       "setupFailed": "Tsy nety natomboka ny fametrahana ny GitHub. Andramo indray azafady."
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "Andalana {{displayCount}}",
       "matchesBadge_one": "Valiny mifanaraka {{displayCount}}",
       "matchesBadge_other": "Valiny mifanaraka {{displayCount}}",
-      "noOutput": "Tsy misy vokatra."
+      "noOutput": "Tsy misy vokatra.",
+      "translationFailed": "Tsy nahomby ny fandikana"
     },
     "readToolMarkdown": {
       "linesTruncated": "andalana {{start}}–{{end}} (nohafohezina)",
@@ -3688,6 +3715,7 @@
       "description": "Famaritana ny baiko",
       "template": "Endrika",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Hazavao ny $ARGUMENTS",
       "subtask": "Mihazakazaka toy ny subtask",
       "edit": "Ahitsio slash command",
@@ -3838,7 +3866,7 @@
     "view": "Vakio ny tatitra",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Asehoy ny sata ankehitriny",
+    "dismiss": "Esory ny tatitra",
     "offline": "Tsy misy tambajotra · tatitra voatahiry",
     "cached": "Tatitra voatahiry · tsy azo havaozina",
     "revised": "Nohavaozina · {{revision}}",

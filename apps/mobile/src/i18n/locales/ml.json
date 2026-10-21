@@ -35,6 +35,8 @@
     "connectGithub": "GitHub ബന്ധിപ്പിക്കുക",
     "cost": "ചെലവ്",
     "discard": "ഉപേക്ഷിക്കുക",
+    "discardChangesMessage": "നിങ്ങളുടെ മാറ്റങ്ങൾ നഷ്ടപ്പെടും.",
+    "discardChangesTitle": "മാറ്റങ്ങൾ ഉപേക്ഷിക്കണോ?",
     "findings": "കണ്ടെത്തലുകൾ",
     "mergeRequest": "മെർജ് റിക്വസ്റ്റ്",
     "notConnected": "ബന്ധിപ്പിച്ചിട്ടില്ല",
@@ -109,7 +111,9 @@
     "online": "ഓൺലൈൻ",
     "open": "{{name}} തുറക്കുക",
     "openPullRequest": "തുറന്ന പുൾ റിക്വസ്റ്റ്",
+    "completed": "പൂർത്തിയായി",
     "pending": "കാത്തിരിക്കുന്നു",
+    "running": "പ്രവർത്തിക്കുന്നു",
     "performance": "പ്രവർത്തനക്ഷമത",
     "preferences": "മുൻഗണനകൾ",
     "privacyPolicy": "സ്വകാര്യതാ നയം",
@@ -1534,8 +1538,6 @@
     "updateFailed": "കോഡ് അവലോകന ഏജന്റ് പുതുക്കാൻ കഴിഞ്ഞില്ല.",
     "configSaveFailed": "അവലോകന ക്രമീകരണങ്ങൾ സംരക്ഷിക്കാൻ കഴിഞ്ഞില്ല.",
     "status": {
-      "running": "പ്രവർത്തിക്കുന്നു",
-      "completed": "പൂർത്തിയായി",
       "interrupted": "തടസ്സപ്പെട്ടു"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "ഇത് കണ്ടെത്തിയ ഇടങ്ങൾ ({{displayCount}})",
       "fullReport": "തയ്യാറാക്കിയ പൂർണ്ണ റിപ്പോർട്ട്",
       "yes": "അതെ",
-      "no": "ഇല്ല"
+      "no": "ഇല്ല",
+      "action": {
+        "analyzeCodebase": "കോഡ്ബേസ് വിശകലനം ചെയ്യുക",
+        "dismiss": "തള്ളുക",
+        "manualReview": "കൈകൊണ്ടുള്ള സംശോധന",
+        "monitor": "നിരീക്ഷിക്കുക",
+        "openPr": "PR തുറക്കുക"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} കണ്ടെത്തലുകൾ",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "മാറ്റങ്ങൾ സംരക്ഷിക്കുക",
       "unsavedTitle": "സംരക്ഷിക്കാത്ത മാറ്റങ്ങൾ",
-      "unsavedMessage": "ഈ സ്ക്രീനിൽ നിന്ന് പോകുന്നതിന് മുമ്പ് മാറ്റങ്ങൾ സംരക്ഷിക്കണോ?"
+      "unsavedMessage": "ഈ സ്ക്രീനിൽ നിന്ന് പോകുന്നതിന് മുമ്പ് മാറ്റങ്ങൾ സംരക്ഷിക്കണോ?",
+      "unsavedInvalidMessage": "ഈ മാറ്റങ്ങൾ ഇപ്പോൾ സംരക്ഷിക്കാൻ കഴിയില്ല. സംരക്ഷിക്കാൻ അവ തിരുത്തുക, അല്ലെങ്കിൽ പോകാൻ അവ ഉപേക്ഷിക്കുക."
     },
     "auditReportButton": {
       "viewA11y": "ഓഡിറ്റ് റിപ്പോർട്ട് കാണുക"
@@ -1880,7 +1890,24 @@
       "title": "ഓഡിറ്റ് റിപ്പോർട്ട്",
       "unavailable": "ഓഡിറ്റ് റിപ്പോർട്ട് ലഭ്യമല്ല",
       "unavailableDescription": "ഓർഗനൈസേഷൻ ഉടമകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ ഓഡിറ്റ് റിപ്പോർട്ടുകൾ കാണാൻ കഴിയൂ. അനുമതി നൽകാൻ ഒരു ഉടമയോടോ ബില്ലിംഗ് മാനേജറോടോ ആവശ്യപ്പെടുക.",
-      "queryFailed": "റിപ്പോർട്ടിനായുള്ള ഡാറ്റാ അന്വേഷണം പൂർത്തിയായില്ല. വീണ്ടും ശ്രമിക്കുക."
+      "queryFailed": "റിപ്പോർട്ടിനായുള്ള ഡാറ്റാ അന്വേഷണം പൂർത്തിയായില്ല. വീണ്ടും ശ്രമിക്കുക.",
+      "eventActions": {
+        "findingAnalysisCompleted": "വിശകലനം പൂർത്തിയായി",
+        "findingAnalysisFailed": "വിശകലനം പരാജയപ്പെട്ടു",
+        "findingAutoDismissed": "സ്വയമേവ തള്ളിക്കളഞ്ഞു",
+        "findingCreated": "ഇറക്കുമതി ചെയ്തു",
+        "findingDeleted": "ഇല്ലാതാക്കി",
+        "findingDismissed": "തള്ളിക്കളഞ്ഞു",
+        "findingSeverityChanged": "തീവ്രത മാറി",
+        "findingStatusChange": "നില മാറി",
+        "findingSuperseded": "മാറ്റിസ്ഥാപിച്ചു",
+        "remediationBlocked": "പരിഹാരം തടഞ്ഞു",
+        "remediationCancelled": "റദ്ദാക്കി",
+        "remediationFailed": "പരിഹാരം പരാജയപ്പെട്ടു",
+        "remediationNoChangesNeeded": "മാറ്റങ്ങളൊന്നും ആവശ്യമില്ല",
+        "remediationPrOpened": "PR തുറന്നു",
+        "remediationQueued": "പരിഹാരം അഭ്യർത്ഥിച്ചു"
+      }
     },
     "notifications": {
       "couldNotLoad": "അറിയിപ്പ് ക്രമീകരണങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
@@ -1912,7 +1939,6 @@
       "installApp": "GitHub ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",
       "reauthorizeButton": "GitHub ആപ്പിന് വീണ്ടും അനുമതി നൽകുക",
       "reauthorizeDescription": "Dependabot അറിയിപ്പുകൾ ലഭിക്കാൻ സുരക്ഷാ ഏജന്റിന് vulnerability_alerts അനുമതി ആവശ്യമാണ്. ഈ അനുമതി നൽകാൻ GitHub ആപ്പിന് വീണ്ടും അനുമതി നൽകുക.",
-      "reauthorizeFailed": "വീണ്ടും അനുമതി നൽകുന്ന പ്രക്രിയ ആരംഭിക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "reauthorizeTitle": "കൂടുതൽ അനുമതികൾ ആവശ്യമാണ്",
       "setupFailed": "GitHub സജ്ജീകരണം ആരംഭിക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക."
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} വരികൾ",
       "matchesBadge_one": "{{displayCount}} പൊരുത്തം",
       "matchesBadge_other": "{{displayCount}} പൊരുത്തങ്ങൾ",
-      "noOutput": "ഔട്ട്പുട്ട് ഇല്ല."
+      "noOutput": "ഔട്ട്പുട്ട് ഇല്ല.",
+      "translationFailed": "പരിഭാഷ പരാജയപ്പെട്ടു"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} വരികൾ (ഭാഗികം)",
@@ -3688,6 +3715,7 @@
       "description": "കമാൻഡ് വിവരണം",
       "template": "ടെംപ്ലേറ്റ്",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS വിശദീകരിക്കുക",
       "subtask": "ഉപടാസ്‌കായി പ്രവർത്തിപ്പിക്കുക",
       "edit": "സ്ലാഷ് കമാൻഡ് എഡിറ്റ് ചെയ്യുക",
@@ -3838,7 +3866,7 @@
     "view": "ബ്രീഫിംഗ് വായിക്കുക",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "തത്സമയ നില കാണിക്കുക",
+    "dismiss": "ബ്രീഫിംഗ് ഒഴിവാക്കുക",
     "offline": "ഓഫ്‌ലൈൻ · സംരക്ഷിച്ച ബ്രീഫിംഗ്",
     "cached": "സംരക്ഷിച്ച റിപ്പോർട്ട് · പുതുക്കാനാവില്ല",
     "revised": "പുതുക്കിയത് · {{revision}}",

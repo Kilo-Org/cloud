@@ -35,6 +35,8 @@
     "connectGithub": "GitHub ونښلوئ",
     "cost": "لګښت",
     "discard": "لغوه کړئ",
+    "discardChangesMessage": "ستاسو بدلونونه به له لاسه ورک شي.",
+    "discardChangesTitle": "تغییرات لغوه کړئ؟",
     "findings": "موندنې",
     "mergeRequest": "د یوځای کولو غوښتنه",
     "notConnected": "نه دی نښلول شوی",
@@ -109,7 +111,9 @@
     "online": "آنلاین",
     "open": "{{name}} پرانیزئ",
     "openPullRequest": "پل ریکویسټ پرانیزئ",
+    "completed": "بشپړ شوی",
     "pending": "په انتظار",
+    "running": "روان",
     "performance": "کارکردګي",
     "preferences": "غوره توبونه",
     "privacyPolicy": "د محرمیت تګلاره",
@@ -1534,8 +1538,6 @@
     "updateFailed": "بیاکتونکی تازه نه شو.",
     "configSaveFailed": "د بیاکتنې ترتیبات خوندي نه شول.",
     "status": {
-      "running": "روان",
-      "completed": "بشپړ شوی",
       "interrupted": "نیمګړی درېدلی"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "د موندلو ځایونه ({{displayCount}})",
       "fullReport": "بشپړ جوړ شوی راپور",
       "yes": "هو",
-      "no": "نه"
+      "no": "نه",
+      "action": {
+        "analyzeCodebase": "کوډبېس تحلیل کړئ",
+        "dismiss": "رد کړئ",
+        "manualReview": "لاسي بیاکتنه",
+        "monitor": "څارنه وکړئ",
+        "openPr": "پول ریکوئسټ پرانیزه"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} موندنې",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "بدلونونه خوندي کړئ",
       "unsavedTitle": "خوندي نه شوي بدلونونه",
-      "unsavedMessage": "له دې پردې څخه تر وتلو مخکې مو بدلونونه خوندي شي؟"
+      "unsavedMessage": "له دې پردې څخه تر وتلو مخکې مو بدلونونه خوندي شي؟",
+      "unsavedInvalidMessage": "دا بدلونونه لا تر اوسه خوندي کېدای نشي. د خوندي کولو لپاره یې سم کړئ، یا د وتلو لپاره یې لغوه کړئ."
     },
     "auditReportButton": {
       "viewA11y": "د پلټنې راپور وګورئ"
@@ -1880,7 +1890,24 @@
       "title": "د پلټنې راپور",
       "unavailable": "د پلټنې راپور نشته",
       "unavailableDescription": "یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي د پلټنې راپورونه وګوري. له یوه مالک یا د تادیاتو له مدیر څخه د لاسرسي اجازه وغواړئ.",
-      "queryFailed": "د راپور د معلوماتو غوښتنه بشپړه نه شوه. بیا هڅه وکړئ."
+      "queryFailed": "د راپور د معلوماتو غوښتنه بشپړه نه شوه. بیا هڅه وکړئ.",
+      "eventActions": {
+        "findingAnalysisCompleted": "تحلیل بشپړ شو",
+        "findingAnalysisFailed": "تحلیل ناکام شو",
+        "findingAutoDismissed": "په اتوماتيک ډول رد شو",
+        "findingCreated": "درآول شوی",
+        "findingDeleted": "ړنګ شو",
+        "findingDismissed": "رد شو",
+        "findingSeverityChanged": "د شدت بدلون",
+        "findingStatusChange": "د حالت بدلون",
+        "findingSuperseded": "ځای ناستی شو",
+        "remediationBlocked": "د اصلاح مخه ونیول شوه",
+        "remediationCancelled": "لغوه شو",
+        "remediationFailed": "اصلاح ناکام شو",
+        "remediationNoChangesNeeded": "بدلونونو ته اړتیا نشته",
+        "remediationPrOpened": "پول ریکوئسټ پرانیستل شو",
+        "remediationQueued": "د اصلاح غوښتنه وشوه"
+      }
     },
     "notifications": {
       "couldNotLoad": "د خبرتیاوو ترتیبات بار نه شول.",
@@ -1912,7 +1939,6 @@
       "installApp": "د GitHub اپ نصب کړئ",
       "reauthorizeButton": "د GitHub اپ ته بیا اجازه ورکړئ",
       "reauthorizeDescription": "امنیتي اجنټ د Dependabot خبرتیاوو ته د لاسرسي لپاره د vulnerability_alerts اجازې ته اړتیا لري. د دې اجازې د ورکولو لپاره د GitHub اپ ته بیا اجازه ورکړئ.",
-      "reauthorizeFailed": "بیا اجازه ورکول پیل نه شول. مهرباني وکړئ بیا هڅه وکړئ.",
       "reauthorizeTitle": "نورو اجازو ته اړتیا ده",
       "setupFailed": "د GitHub ترتیب پیل نه شو. مهرباني وکړئ بیا هڅه وکړئ."
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} کرښې",
       "matchesBadge_one": "{{displayCount}} پایلې",
       "matchesBadge_other": "{{displayCount}} پایلې",
-      "noOutput": "هېڅ پایلې نشته."
+      "noOutput": "هېڅ پایلې نشته.",
+      "translationFailed": "ژباړه ناکامه شوه"
     },
     "readToolMarkdown": {
       "linesTruncated": "کرښې {{start}}–{{end}} (لنډې شوې)",
@@ -3688,6 +3715,7 @@
       "description": "د قوماندې توضیحات",
       "template": "کينډۍ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS تشریح کړئ",
       "subtask": "د فرعي دندې په توګه چلول",
       "edit": "د سلیش کمانډ ایډیټ کړئ",
@@ -3838,7 +3866,7 @@
     "view": "لنډیز ولولئ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "ژوندی حالت وښایاست",
+    "dismiss": "لنډیز له پامه وغورځوئ",
     "offline": "آفلاین · خوندي شوی لنډیز",
     "cached": "خوندي شوی راپور · تازه کول شوني نه دي",
     "revised": "بیاکتل شوی · {{revision}}",

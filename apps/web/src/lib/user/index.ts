@@ -143,6 +143,7 @@ import {
   type SignupStepUpMethod,
 } from '@kilocode/web-shared/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
+import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult, successResult, trpcFailure } from '@kilocode/web-shared/lib/maybe-result';
@@ -604,6 +605,19 @@ export async function createOrUpdateUser(
       });
       return failureResult('DIFFERENT-OAUTH');
     }
+  }
+
+  // A normalized match keeps its EMAIL-ALREADY-USED outcome from the insert transaction below.
+  if (
+    args.provider === 'email' &&
+    isEmailSignupDisabled() &&
+    !(await findUserByNormalizedEmail(args.google_user_email))
+  ) {
+    console.info('[auth] Signup creation outcome', {
+      outcome: 'rejected',
+      reason: 'email_signup_disabled',
+    });
+    return failureResult('EMAIL-SIGNUP-DISABLED');
   }
 
   if (turnstile_guid && (await findUserById(turnstile_guid)))

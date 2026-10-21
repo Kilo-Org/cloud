@@ -14,9 +14,10 @@ const CLEARANCE = LINE_HEIGHT;
 
 /**
  * The shipped new-session screen on the Android emulator (1080x2400 at 420dpi),
- * measured by the prompt itself with a 3000-character draft and the keyboard
- * up: frame 339dp, card top 14dp, card chrome 101.33dp, and the block under the
- * card 167dp — the Organization section (80dp) above the Run on row (89dp).
+ * measured by the prompt itself with the keyboard up and a draft long enough to
+ * pin the input at its cap: frame 339dp, card top 14dp, card chrome 101.33dp,
+ * and the block under the card 167dp — the Organization section (80dp) above
+ * the Run on row (89dp).
  */
 const ANDROID_KEYBOARD = {
   frameHeight: 339,

@@ -53,7 +53,10 @@ const CLEARANCE = LINE_HEIGHT;
  * new-session frame measures 256pt tall and the card starts 14pt down, with
  * 101.33pt of card chrome and an 86pt Run on block under it. Whole lines cannot
  * hold the 3-line composer and that block at once, so the cap keeps the floor
- * and lets the block scroll into view.
+ * and lets the block scroll into view. The fallback ignores the block, so this
+ * frame gives the same 136pt cap once the Organization section joins the block
+ * (the further 80pt only lowers the room in the reserve branch, which is not
+ * taken here).
  */
 const IPHONE_KEYBOARD = {
   frameHeight: 256,

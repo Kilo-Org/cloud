@@ -87,6 +87,20 @@ describe('briefing model pricing', () => {
     );
   });
 
+  it('refuses a batch variant the picker never lists', async () => {
+    const batch = catalogModel('aion-labs/aion-3.5-mini:batch', {
+      prompt: '0.00000035',
+      completion: '0.0000007',
+    });
+    jest
+      .mocked(getRawOpenRouterModels)
+      .mockResolvedValue({ data: [batch] } satisfies OpenRouterModelsResponse);
+
+    await expect(briefingPriceBound(batch.id, 'Overnight activity', 2_000_000)).rejects.toThrow(
+      'model_not_allowed'
+    );
+  });
+
   it('rejects a picker price with unknown rates', async () => {
     await expect(
       briefingPriceBound('kilo-auto/frontier', 'Overnight activity', 2_000_000)

@@ -11,7 +11,7 @@ import {
   recordExaUsage,
 } from '@/lib/exa-usage';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { EXA_ALLOWED_PATHS, isExaAllowedPath } from '@/lib/exa-paths';
@@ -73,17 +73,17 @@ export async function POST(request: NextRequest) {
   // Check monthly allowance and balance.
   // freeAllowance is the stored value from the first request of the month;
   // null means no row yet, so we compute from the helper.
-  // Use read replica for monthly usage check - this is a read-only operation that can tolerate
-  // slight replication lag, and provides lower latency for US users
+  // Read the primary: the gate must not admit requests on a replica snapshot
+  // that predates the usage already recorded for this user.
   const { usage: monthlyUsage, freeAllowance: storedAllowance } = await getExaMonthlyUsage(
     user.id,
-    readDb
+    db
   );
   const allowance = storedAllowance ?? getExaFreeAllowanceMicrodollars(new Date(), user);
-  const isPaidRequest = monthlyUsage >= allowance;
+  const allowanceExhausted = monthlyUsage >= allowance;
 
-  if (isPaidRequest) {
-    const { balance } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+  if (allowanceExhausted) {
+    const { balance } = await getBalanceAndOrgSettings(organizationId, user, db);
     if (balance <= 0) {
       return NextResponse.json(
         {
@@ -136,7 +136,6 @@ export async function POST(request: NextRequest) {
         organizationId,
         path: exaPath,
         costMicrodollars,
-        chargedToBalance: isPaidRequest,
         freeAllowanceMicrodollars: allowance,
         featureId,
         type,

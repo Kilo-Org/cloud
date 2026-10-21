@@ -13,6 +13,22 @@ import { getExaMonthlyUsage, getExaFreeAllowanceMicrodollars, recordExaUsage } f
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 
+async function seedMonthlyUsage(
+  userId: string,
+  totalCostMicrodollars: number,
+  organizationId?: string
+) {
+  await db.insert(exa_monthly_usage).values({
+    kilo_user_id: userId,
+    organization_id: organizationId ?? null,
+    month: sql`date_trunc('month', now())::date`.mapWith(String),
+    total_cost_microdollars: totalCostMicrodollars,
+    total_charged_microdollars: 0,
+    request_count: 1,
+    free_allowance_microdollars: 10_000_000,
+  });
+}
+
 // Mock next/server's after function which requires request context
 jest.mock('next/server', () => ({
   ...jest.requireActual('next/server'),
@@ -90,7 +106,6 @@ describe('Exa Usage Tracking', () => {
         organizationId: undefined,
         path: '/search',
         costMicrodollars: 7000,
-        chargedToBalance: false,
         freeAllowanceMicrodollars: 10_000_000,
       });
 
@@ -114,7 +129,6 @@ describe('Exa Usage Tracking', () => {
         organizationId: undefined,
         path: '/search',
         costMicrodollars: 3000,
-        chargedToBalance: false,
         freeAllowanceMicrodollars: 10_000_000,
       });
 
@@ -123,7 +137,6 @@ describe('Exa Usage Tracking', () => {
         organizationId: undefined,
         path: '/contents',
         costMicrodollars: 5000,
-        chargedToBalance: false,
         freeAllowanceMicrodollars: 10_000_000,
       });
 
@@ -146,7 +159,6 @@ describe('Exa Usage Tracking', () => {
         organizationId: undefined,
         path: '/search',
         costMicrodollars: 1000,
-        chargedToBalance: false,
         freeAllowanceMicrodollars: 10_000_000,
       });
 
@@ -156,7 +168,6 @@ describe('Exa Usage Tracking', () => {
         organizationId: undefined,
         path: '/search',
         costMicrodollars: 2000,
-        chargedToBalance: false,
         freeAllowanceMicrodollars: 20_000_000,
       });
 
@@ -171,48 +182,118 @@ describe('Exa Usage Tracking', () => {
       expect(rows[0].total_cost_microdollars).toBe(3000);
     });
 
-    test('tracks charged amount separately when chargedToBalance is true', async () => {
-      const user = await insertTestUser();
+    test('charges only the part of a request above the free allowance', async () => {
+      const user = await insertTestUser({ microdollars_used: 0 });
+      await seedMonthlyUsage(user.id, 9_999_000);
 
       await recordExaUsage({
         userId: user.id,
         organizationId: undefined,
         path: '/search',
-        costMicrodollars: 5000,
-        chargedToBalance: false,
+        costMicrodollars: 2000,
         freeAllowanceMicrodollars: 10_000_000,
       });
+
+      const [row] = await db
+        .select()
+        .from(exa_monthly_usage)
+        .where(eq(exa_monthly_usage.kilo_user_id, user.id));
+
+      expect(row.total_cost_microdollars).toBe(10_001_000);
+      expect(row.total_charged_microdollars).toBe(1000);
+
+      const [logRow] = await db
+        .select()
+        .from(exa_usage_log)
+        .where(eq(exa_usage_log.kilo_user_id, user.id));
+      expect(logRow.charged_to_balance).toBe(true);
+
+      const [updated] = await db
+        .select({ microdollars_used: kilocode_users.microdollars_used })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, user.id));
+      expect(updated.microdollars_used).toBe(1000);
+    });
+
+    test('charges every request in full once the allowance is exhausted', async () => {
+      const user = await insertTestUser({ microdollars_used: 0 });
+      await seedMonthlyUsage(user.id, 10_000_000);
 
       await recordExaUsage({
         userId: user.id,
         organizationId: undefined,
         path: '/search',
         costMicrodollars: 3000,
-        chargedToBalance: true,
         freeAllowanceMicrodollars: 10_000_000,
       });
 
-      const rows = await db
+      await recordExaUsage({
+        userId: user.id,
+        organizationId: undefined,
+        path: '/contents',
+        costMicrodollars: 5000,
+        freeAllowanceMicrodollars: 10_000_000,
+      });
+
+      const [row] = await db
         .select()
         .from(exa_monthly_usage)
         .where(eq(exa_monthly_usage.kilo_user_id, user.id));
 
-      expect(rows[0].total_cost_microdollars).toBe(8000);
-      expect(rows[0].total_charged_microdollars).toBe(3000);
+      expect(row.total_cost_microdollars).toBe(10_008_000);
+      expect(row.total_charged_microdollars).toBe(8000);
+      expect(row.request_count).toBe(3);
+
+      const [updated] = await db
+        .select({ microdollars_used: kilocode_users.microdollars_used })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, user.id));
+      expect(updated.microdollars_used).toBe(8000);
     });
 
-    test('deducts from personal balance when chargedToBalance is true and no org', async () => {
+    test('charges the excess of concurrent requests that cross the allowance together', async () => {
+      const user = await insertTestUser({ microdollars_used: 0 });
+      await seedMonthlyUsage(user.id, 9_990_000);
+
+      await Promise.all(
+        Array.from({ length: 4 }, () =>
+          recordExaUsage({
+            userId: user.id,
+            organizationId: undefined,
+            path: '/search',
+            costMicrodollars: 5000,
+            freeAllowanceMicrodollars: 10_000_000,
+          })
+        )
+      );
+
+      const [row] = await db
+        .select()
+        .from(exa_monthly_usage)
+        .where(eq(exa_monthly_usage.kilo_user_id, user.id));
+
+      expect(row.total_cost_microdollars).toBe(10_010_000);
+      expect(row.total_charged_microdollars).toBe(10_000);
+
+      const [updated] = await db
+        .select({ microdollars_used: kilocode_users.microdollars_used })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, user.id));
+      expect(updated.microdollars_used).toBe(10_000);
+    });
+
+    test('deducts the excess from the personal balance', async () => {
       const user = await insertTestUser({
         microdollars_used: 0,
         total_microdollars_acquired: 100_000_000,
       });
+      await seedMonthlyUsage(user.id, 10_000_000);
 
       await recordExaUsage({
         userId: user.id,
         organizationId: undefined,
         path: '/search',
         costMicrodollars: 7000,
-        chargedToBalance: true,
         freeAllowanceMicrodollars: 10_000_000,
       });
 
@@ -227,13 +308,13 @@ describe('Exa Usage Tracking', () => {
     test('charges organization and tracks member usage', async () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Exa usage organization', user.id, 50_000);
+      await seedMonthlyUsage(user.id, 10_000_000, organization.id);
 
       await recordExaUsage({
         userId: user.id,
         organizationId: organization.id,
         path: '/contents',
         costMicrodollars: 9000,
-        chargedToBalance: true,
         freeAllowanceMicrodollars: 10_000_000,
       });
 
@@ -255,6 +336,7 @@ describe('Exa Usage Tracking', () => {
 
     test('rolls back charged Exa source and monthly rows when the user row is missing', async () => {
       const missingUserId = `missing-exa-user-${crypto.randomUUID()}`;
+      await seedMonthlyUsage(missingUserId, 10_000_000);
 
       await expect(
         recordExaUsage({
@@ -262,7 +344,6 @@ describe('Exa Usage Tracking', () => {
           organizationId: undefined,
           path: '/search',
           costMicrodollars: 1000,
-          chargedToBalance: true,
           freeAllowanceMicrodollars: 10_000_000,
         })
       ).rejects.toThrow('user disappeared during Exa consumption');
@@ -276,10 +357,12 @@ describe('Exa Usage Tracking', () => {
         .from(exa_monthly_usage)
         .where(eq(exa_monthly_usage.kilo_user_id, missingUserId));
       expect(sourceRows).toHaveLength(0);
-      expect(monthlyRows).toHaveLength(0);
+      expect(monthlyRows).toHaveLength(1);
+      expect(monthlyRows[0].total_cost_microdollars).toBe(10_000_000);
+      expect(monthlyRows[0].request_count).toBe(1);
     });
 
-    test('does not deduct from balance when chargedToBalance is false', async () => {
+    test('does not charge usage within the free allowance', async () => {
       const user = await insertTestUser({ microdollars_used: 0 });
 
       await recordExaUsage({
@@ -287,7 +370,6 @@ describe('Exa Usage Tracking', () => {
         organizationId: undefined,
         path: '/search',
         costMicrodollars: 7000,
-        chargedToBalance: false,
         freeAllowanceMicrodollars: 10_000_000,
       });
 
@@ -309,7 +391,6 @@ describe('Exa Usage Tracking', () => {
         organizationId: undefined,
         path: '/search',
         costMicrodollars: 3000,
-        chargedToBalance: false,
         freeAllowanceMicrodollars: 10_000_000,
       });
 
@@ -319,7 +400,6 @@ describe('Exa Usage Tracking', () => {
         organizationId: orgId,
         path: '/search',
         costMicrodollars: 5000,
-        chargedToBalance: false,
         freeAllowanceMicrodollars: 10_000_000,
       });
 
@@ -344,7 +424,6 @@ describe('Exa Usage Tracking', () => {
         organizationId: undefined,
         path: '/search',
         costMicrodollars: 1000,
-        chargedToBalance: false,
         freeAllowanceMicrodollars: 10_000_000,
         featureId: 'kiloclaw',
         type: 'deep',

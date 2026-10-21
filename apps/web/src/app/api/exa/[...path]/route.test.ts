@@ -12,6 +12,7 @@ import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/con
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { captureException } from '@sentry/nextjs';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
 // Capture promises scheduled via next/server `after` so tests can await them.
 let afterCallbacks: (() => Promise<void>)[] = [];
@@ -284,6 +285,21 @@ describe('POST /api/exa/[...path]', () => {
       );
     });
 
+    it('reads monthly usage and balance from the primary database', async () => {
+      setUserAuth();
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 10_000_000, freeAllowance: 10_000_000 });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({ balance: 5.0 });
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ results: [] }));
+
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest('/search') as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedGetExaMonthlyUsage.mock.calls[0][1]).toBe(db);
+      expect(mockedGetBalanceAndOrgSettings.mock.calls[0][0]).toBeUndefined();
+      expect(mockedGetBalanceAndOrgSettings.mock.calls[0][2]).toBe(db);
+    });
+
     it('returns 402 when free tier is exhausted and no balance', async () => {
       setUserAuth();
       mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 10_000_000, freeAllowance: 10_000_000 });
@@ -335,14 +351,13 @@ describe('POST /api/exa/[...path]', () => {
         organizationId: undefined,
         path: '/search',
         costMicrodollars: 7000,
-        chargedToBalance: false,
         freeAllowanceMicrodollars: EXA_MONTHLY_ALLOWANCE_MICRODOLLARS,
         featureId: undefined,
         type: undefined,
       });
     });
 
-    it('records cost with chargedToBalance when over free tier', async () => {
+    it('records cost when over the free tier', async () => {
       setUserAuth();
       mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 10_000_000, freeAllowance: 10_000_000 });
       mockedGetBalanceAndOrgSettings.mockResolvedValue({ balance: 5.0 });
@@ -359,7 +374,6 @@ describe('POST /api/exa/[...path]', () => {
         organizationId: undefined,
         path: '/search',
         costMicrodollars: 5000,
-        chargedToBalance: true,
         freeAllowanceMicrodollars: 10_000_000,
         featureId: undefined,
         type: undefined,

@@ -203,13 +203,11 @@ describe('fetchTopUpTransactionForStripeSession', () => {
     const owner = await insertTestUser();
     const billingManager = await insertTestUser();
     const organization = await createTestOrganization('Top-up org', owner.id, 0);
-    await db
-      .insert(organization_memberships)
-      .values({
-        organization_id: organization.id,
-        kilo_user_id: billingManager.id,
-        role: 'billing_manager',
-      });
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: billingManager.id,
+      role: 'billing_manager',
+    });
     const transactionId = await insertLedgerRow({
       kiloUserId: owner.id,
       organizationId: organization.id,

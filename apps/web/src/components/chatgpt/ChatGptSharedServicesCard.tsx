@@ -17,7 +17,7 @@ import type { OpenAiChatGptStatus } from '@/lib/openai-chatgpt/status';
 /**
  * The organization's shared-services ChatGPT connection. It is one connection
  * per organization, it is not any member's own connection, and Kilo's shared
- * services (code reviews, the Slack bot, auto-triage) use it instead of
+ * services (code reviews, the Slack bot) use it instead of
  * spending a member's plan.
  */
 

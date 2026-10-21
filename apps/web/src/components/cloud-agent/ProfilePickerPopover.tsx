@@ -140,21 +140,6 @@ export function ProfilePickerPopover({
 
   const chipName = topProfile?.name ?? baseProfile?.name ?? null;
 
-  const chipCounts = useMemo(() => {
-    const vars = Math.max(baseProfile?.varCount ?? 0, topProfile?.varCount ?? 0);
-    const mcps = (baseProfile?.mcpServerCount ?? 0) + (topProfile?.mcpServerCount ?? 0);
-    const skills = (baseProfile?.skillCount ?? 0) + (topProfile?.skillCount ?? 0);
-    const cmds = (baseProfile?.kiloCommandCount ?? 0) + (topProfile?.kiloCommandCount ?? 0);
-    return [
-      vars > 0 && `${vars} vars`,
-      mcps > 0 && `${mcps} MCP`,
-      skills > 0 && `${skills} skills`,
-      cmds > 0 && `${cmds} cmds`,
-    ]
-      .filter(Boolean)
-      .join(' · ');
-  }, [baseProfile, topProfile]);
-
   function formatCounts(profile: ProfileSummaryWithOwner) {
     return [
       profile.varCount > 0 && `${profile.varCount} vars`,
@@ -165,11 +150,6 @@ export function ProfilePickerPopover({
       .filter(Boolean)
       .join(' · ');
   }
-
-  // Two layers are present (repo + something on top). Used for the "+1" hint
-  // and the "on top of …" affordance regardless of whether the top is an
-  // explicit pick or just the default.
-  const hasTwoLayers = !!topProfile && !!baseProfile;
 
   return (
     <>
@@ -184,15 +164,7 @@ export function ProfilePickerPopover({
             )}
           >
             <Layers className="h-3 w-3 shrink-0" />
-            {chipName ? (
-              <>
-                <span className="font-medium">{chipName}</span>
-                {chipCounts && <span className="opacity-60">· {chipCounts}</span>}
-                {hasTwoLayers && <span className="text-primary/80 ml-0.5">+1</span>}
-              </>
-            ) : (
-              <span>No profile</span>
-            )}
+            {chipName ? <span className="font-medium">{chipName}</span> : <span>No profile</span>}
             <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
           </button>
         </PopoverTrigger>

@@ -10,6 +10,7 @@ import { platformIntegrationHealthSql } from '@/lib/integrations/core/health';
 import {
   findPendingInstallationByKiloUserId,
   getGitHubIntegrationById,
+  personalGitHubIntegrationOrder,
   updateIntegrationMetadataForOwner,
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
@@ -54,11 +55,13 @@ export async function getInstallation(owner: Owner): Promise<PlatformIntegration
     .from(platform_integrations)
     .where(and(ownershipCondition, eq(platform_integrations.platform, 'github')))
     .orderBy(
-      desc(platformIntegrationHealthSql()),
-      owner.type === 'org'
-        ? asc(platform_integrations.created_at)
-        : desc(platform_integrations.updated_at),
-      asc(platform_integrations.id)
+      ...(owner.type === 'org'
+        ? [
+            desc(platformIntegrationHealthSql()),
+            asc(platform_integrations.created_at),
+            asc(platform_integrations.id),
+          ]
+        : personalGitHubIntegrationOrder())
     )
     .limit(1);
 

@@ -41,9 +41,6 @@ type ConsentCardProps = {
  */
 export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.6;
 
-const consentDetailsHref = (mode: ConsentMode) =>
-  mode === 'review' ? '/(app)/consent-details?mode=review' : '/(app)/consent-details';
-
 export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -293,7 +290,11 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
 
           <Pressable
             onPress={() => {
-              router.push(consentDetailsHref(mode));
+              router.push(
+                mode === 'review'
+                  ? ('/(app)/consent-details?mode=review' as Href)
+                  : ('/(app)/consent-details' as Href)
+              );
             }}
             hitSlop={8}
             accessibilityLabel={t('consent.seeFullDetails')}

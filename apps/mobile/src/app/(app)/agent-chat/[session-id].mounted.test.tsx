@@ -88,6 +88,10 @@ const queryState = vi.hoisted(() => ({
   fetchStatus: 'fetching' as 'fetching' | 'paused' | 'idle',
   error: null as { data?: { code?: string } } | null,
   data: null as { organization_id?: string | null; id?: string } | null,
+  // Epoch ms of the successful read, or 0 before one. The route's
+  // rendered-session guard reads this to tell a fresh open's data from a
+  // previous mount's cached row.
+  dataUpdatedAt: 0,
   refetch: vi.fn(),
 }));
 
@@ -389,9 +393,22 @@ async function updateRoute(renderer: TestRenderer.ReactTestRenderer) {
   });
 }
 
+function metadataQueryOptions(): { enabled?: boolean; queryKey?: string[] } | undefined {
+  // The route mounts its metadata query after `useRestoredAccountId`'s
+  // `user.getMe` read, so the shared `useQuery` mock sees both; the metadata
+  // call is the last one whose query key is not the getMe key.
+  const calls = useQueryMock.mock.calls as { queryKey?: string[]; enabled?: boolean }[][];
+  for (let index = calls.length - 1; index >= 0; index -= 1) {
+    const options = calls[index]?.[0];
+    if (options?.queryKey?.[0] !== 'user') {
+      return options;
+    }
+  }
+  return undefined;
+}
+
 function queryEnabled(): boolean | undefined {
-  const options = useQueryMock.mock.calls[0]?.[0] as { enabled?: boolean } | undefined;
-  return options?.enabled;
+  return metadataQueryOptions()?.enabled;
 }
 
 function queryInput(): { session_id?: string } | undefined {
@@ -541,6 +558,9 @@ beforeEach(() => {
   queryState.fetchStatus = 'fetching';
   queryState.error = null;
   queryState.data = {};
+  // No successful read yet (dataUpdatedAt 0); tests that need the
+  // rendered-session guard armed set a fresh timestamp after mounting.
+  queryState.dataUpdatedAt = 0;
   queryState.refetch.mockReset();
   secureStoreMock.getItemAsync.mockReset();
   secureStoreMock.getItemAsync.mockResolvedValue(null);
@@ -922,6 +942,48 @@ describe('SessionDetailScreen valid session-id', () => {
     expect(transcriptText(renderer, 'RootText')).toBe('Account A root row');
     expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
     expect(managers.at(-1)?.manager).toBe(manager);
+  });
+
+  it.each(['NOT_FOUND', 'UNAUTHORIZED', 'FORBIDDEN'])(
+    'keeps the mounted transcript when a background metadata refresh returns %s',
+    async code => {
+      useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
+      const renderer = await mountRoute();
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+      const manager = managers.at(-1)?.manager;
+
+      // The metadata read landed during this open: its success timestamp is
+      // fresh for the open the rendered-session guard measures from.
+      queryState.dataUpdatedAt = Date.now();
+      // A denial arriving on a background refresh after the session rendered
+      // must not blank the screen: the cached metadata beside the error still
+      // scopes the provider, and the transcript stays for the reader.
+      queryState.isError = true;
+      queryState.error = { data: { code } };
+      await updateRoute(renderer);
+
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+      expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
+      expect(managers.at(-1)?.manager).toBe(manager);
+      expect(transcriptText(renderer, 'RootText')).toBe('Account A root row');
+    }
+  );
+
+  it('retires a session whose metadata was cached by a previous mount', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
+    const renderer = await mountRoute();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+
+    // The row in the query cache succeeded on a PREVIOUS mount: its timestamp
+    // predates this open, so the rendered-session guard does not arm and the
+    // denial retires the screen immediately.
+    queryState.dataUpdatedAt = 1;
+    queryState.isError = true;
+    queryState.error = { data: { code: 'NOT_FOUND' } };
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    expect(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry')).toBeUndefined();
   });
 
   it('renders the session content with the parsed session-id and enables the query', async () => {
@@ -1317,6 +1379,10 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     { code: 'UNAUTHORIZED', variant: 'permission' },
   ])('keeps $code terminal with no retry action', async ({ code, variant }) => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
+    // First-load denial: no cached metadata beside the error (the
+    // background-refetch denial with cached data keeps the session mounted —
+    // see the mounted-transcript suite above).
+    queryState.data = null;
     queryState.isError = true;
     queryState.error = { data: { code } };
     const renderer = await mountRoute();

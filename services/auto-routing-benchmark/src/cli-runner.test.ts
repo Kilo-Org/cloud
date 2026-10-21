@@ -3,6 +3,7 @@ import {
   destroyDeciderCliContainer,
   isCatalogLoadFailureResult,
   isExactModelUnavailableResult,
+  isUnsupportedModelResult,
   parseContainerRunResponse,
   runDeciderCaseViaCli,
   warmUpCliContainer,
@@ -197,11 +198,19 @@ describe('CLI catalog load failures', () => {
     ).toBe(true);
   });
 
+  it('treats an empty catalog as a transient catalog failure', () => {
+    const empty = {
+      ...emptyResult,
+      stderrTail: 'Model not found: kilo/candidate/model. No models are currently available.',
+    };
+    expect(isCatalogLoadFailureResult(empty)).toBe(true);
+    expect(isExactModelUnavailableResult(empty, 'candidate/model')).toBe(false);
+  });
+
   it.each([
     { text: 'answer' },
     { costUsd: 0.01 },
     { timedOut: true },
-    { stderrTail: 'Model not found: kilo/candidate/model. No models are currently available.' },
     { stderrTail: 'Provider API failed (network). Check your connection and credentials.' },
     { stderrTail: '' },
   ])('preserves measurements and unrelated failures: %j', overrides => {
@@ -242,6 +251,60 @@ describe('CLI catalog load failures', () => {
   });
 });
 
+describe('gateway model resolution failures', () => {
+  const emptyResult = { text: '', stderrTail: '', costUsd: null, timedOut: false };
+  const diagnostic = '\u001b[91m\u001b[1mError: \u001b[0mUnsupported model mimo-v2.5\n';
+
+  it.each([null, 0])('recognizes an unbilled rejection with cost %s', costUsd => {
+    expect(
+      isUnsupportedModelResult(
+        { ...emptyResult, costUsd, stderrTail: diagnostic },
+        'xiaomi/mimo-v2.5'
+      )
+    ).toBe(true);
+  });
+
+  it('accepts the kilo-prefixed identifier', () => {
+    expect(
+      isUnsupportedModelResult(
+        { ...emptyResult, stderrTail: 'Error: Unsupported model kilo/xiaomi/mimo-v2.5' },
+        'xiaomi/mimo-v2.5'
+      )
+    ).toBe(true);
+  });
+
+  it('tolerates trailing punctuation and a suffix after the model name', () => {
+    expect(
+      isUnsupportedModelResult(
+        {
+          ...emptyResult,
+          stderrTail: 'Error: Unsupported model mimo-v2.5. Pick another model to continue.',
+        },
+        'xiaomi/mimo-v2.5'
+      )
+    ).toBe(true);
+    expect(
+      isUnsupportedModelResult(
+        { ...emptyResult, stderrTail: 'Unsupported model mimo-v2.5,' },
+        'xiaomi/mimo-v2.5'
+      )
+    ).toBe(true);
+  });
+
+  it.each([
+    { text: 'answer', stderrTail: diagnostic },
+    { costUsd: 0.01, stderrTail: diagnostic },
+    { timedOut: true, stderrTail: diagnostic },
+    { stderrTail: 'Error: Unsupported model other/model' },
+    { stderrTail: 'Error: Unsupported model mimo-v2.5-extra' },
+    { stderrTail: 'Error: Model not found: kilo/xiaomi/mimo-v2.5.' },
+  ])('does not treat other outcomes as a resolution failure: %j', overrides => {
+    expect(isUnsupportedModelResult({ ...emptyResult, ...overrides }, 'xiaomi/mimo-v2.5')).toBe(
+      false
+    );
+  });
+});
+
 describe('exact CLI model unavailability', () => {
   const emptyResult = { text: '', stderrTail: '', costUsd: null, timedOut: false };
 
@@ -274,7 +337,6 @@ describe('exact CLI model unavailability', () => {
     for (const diagnostic of [
       'Error: Model not found: kilo/candidate/model\nTry: `kilo models` to list available models',
       '\u001b[31mError:\u001b[0m Model not found: candidate/model',
-      'Error: Model not found: kilo/candidate/model. No models are currently available.',
       'Error: Model not found: kilo/candidate/model. Did you mean: candidate/other?',
     ]) {
       expect(
@@ -301,7 +363,7 @@ describe('exact CLI model unavailability', () => {
     ).toBe(false);
   });
 
-  it('persists stderr lookup failures even when the CLI returns a successful process exit', () => {
+  it('does not retain a lookup identity for an empty catalog', () => {
     const result = parseContainerRunResponse(
       {
         exitCode: 0,
@@ -313,8 +375,9 @@ describe('exact CLI model unavailability', () => {
       Date.now(),
       'candidate/model'
     );
-    expect(result.unavailableModelId).toBe('candidate/model');
-    expect(isExactModelUnavailableResult(result, 'different/model')).toBe(false);
+    expect(result.unavailableModelId).toBeUndefined();
+    expect(isCatalogLoadFailureResult(result)).toBe(true);
+    expect(isExactModelUnavailableResult(result, 'candidate/model')).toBe(false);
   });
 
   it.each([

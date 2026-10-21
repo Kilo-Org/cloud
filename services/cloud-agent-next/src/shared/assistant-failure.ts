@@ -239,6 +239,17 @@ function classifySdkStatus(source: unknown): CloudAgentAssistantFailureReason | 
 
   const directStatus = httpStatusSchema.safeParse(data.statusCode);
   if (directStatus.success) {
+    // A direct 499 is unresolved by the status alone. The gateway can tag the
+    // bounded body with its recognized `upstream_error` origin, which names a
+    // model-serving failure that the generic 4xx `invalid_request` mapping
+    // would misattribute. Only this exact token bypasses the status mapping;
+    // every other status and every unrecognized body keeps the status result.
+    if (
+      directStatus.data === 499 &&
+      parseResponseBody(data.responseBody)?.error_type?.toLocaleLowerCase() === 'upstream_error'
+    ) {
+      return 'provider_unavailable';
+    }
     const reason = classifyHttpStatus(directStatus.data);
     if (reason !== undefined) return reason;
     // A well-formed but unmapped status (100–399) is authoritative: do not

@@ -661,7 +661,8 @@
       "description": "Csatlakoztasd a GitHub-fiókodat a módosítási kérelmek mobilos kódellenőrzéséhez.",
       "gitlabDescription": "Csatlakoztasd a GitLab-fiókodat a merge requests kódellenőrzéséhez mobilon.",
       "bitbucketDescription": "Csatlakoztasd a Bitbucketot ehhez a szervezethez a módosítási kérelmek mobilos kódellenőrzéséhez.",
-      "bitbucketOrgOnlyDescription": "Válassz szervezetet a profilodban, hogy átnézd annak Bitbucket-módosítási kérelmeit."
+      "bitbucketOrgOnlyDescription": "Váltsd a fenti fiókot egy szervezetre a Bitbucket-módosítási kérelmek kódellenőrzéséhez.",
+      "contextLine": "{{organization}} számára"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "Ez a kódellenőrzés a jelenlegi formájában nem küldhető el. Lehet, hogy a PR megváltozott, vagy a saját módosítási kérelmedet próbálod ellenőrizni, ami nem engedélyezett.",
       "reviewNotSubmittedTerm": "Ez a kódellenőrzés a jelenlegi formájában nem küldhető el. Lehet, hogy a {{term}} megváltozott, vagy nem ellenőrizheted a saját {{term}}.",
       "couldNotPostComment": "Nem sikerült közzétenni a hozzászólást.",
-      "couldNotSubmitReview": "Nem sikerült elküldeni a kódellenőrzést. Ellenőrizd az internetkapcsolatot, és próbáld újra."
+      "couldNotSubmitReview": "Nem sikerült elküldeni a kódellenőrzést. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
+      "rateLimited": "Túl sok kérés. Próbáld újra később.",
+      "conflict": "Ez megváltozott, miközben dolgoztál rajta. Töltsd újra, és próbáld újra."
     },
     "operation": {
       "couldNotReply": "Nem sikerült válaszolni.",
@@ -1545,7 +1548,8 @@
       "bugs": "Hibák",
       "style": "Stílus",
       "testing": "Tesztelés",
-      "documentation": "Dokumentáció"
+      "documentation": "Dokumentáció",
+      "unknown": "Egyéb ({{area}})"
     },
     "gateThreshold": {
       "warning": "Figyelmeztetés"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "Ez a modell már nem érhető el: {{model}}. Helyette az alapértelmezett modelledet használjuk.",
       "couldNotReadPendingSessions": "Nem sikerült beolvasni a függőben lévő munkameneteket. Próbáld újra.",
       "failedToCreate": "Nem sikerült létrehozni a munkamenetet.",
+      "checkOrganizationAccess": "Ellenőrizd a hozzáférésed ehhez a szervezethez, majd próbáld újra.",
       "couldNotRefreshRepositories": "Nem sikerült frissíteni a tárolókat. Próbáld újra.",
       "discardDraftTitle": "Piszkozat elvetése?",
       "discardDraftMessage": "Az utasításod elvész.",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "A betöltés befejezéséig az aktív munkameneteid nem érhetők el.",
     "currentDeviceUnidentified": "Nem sikerült azonosítani az aktuális eszközt.",
+    "kiloApp": "Kilo alkalmazás",
     "noSessions": "Nincs aktív munkamenet",
     "noSessionsDescription": "Jelentkezz be a Kilo alkalmazásba egy másik eszközön, és az eszköz itt is megjelenik.",
     "onlyKiloAppSignIns": "Itt csak a Kilo alkalmazásba történő bejelentkezések jelennek meg. A szerkesztőbe és a CLI-be történő bejelentkezéseket nem soroljuk fel.",
@@ -2884,6 +2890,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Mielőtt elkezdjük",
+    "summaryTitle": "Adatmegosztási beállítások",
     "introDescription": "A Kilo elküldi az üzeneteidet az AI-szolgáltatóknak, hogy válaszokat készítsenek. Az alábbiakban láthatod, milyen adatokat osztunk meg, és kikkel.",
     "required": "A Kilo használatához szükséges",
     "promptsTitle": "Az utasításaid és beszélgetéseid",
@@ -2892,7 +2899,6 @@
     "accountDescription": "A Kilo-fiókod azonosítóját és a kérések metaadatait a hitelesítésedhez és a használat méréséhez használjuk.",
     "diagnosticsTitle": "Az alkalmazás diagnosztikája",
     "diagnosticsDescription": "Összeomlási és hibajelentések az alkalmazás stabil működéséhez. Az alkalmazás tartalmát eltávolítjuk belőlük.",
-    "optional": "Opcionális",
     "helpImprove": "Segíts a Kilo fejlesztésében",
     "helpImproveDescription": "Oszd meg névtelenül az alkalmazás használati adatait és a telepítés forrását. Ezt bármikor módosíthatod a beállításokban.",
     "seeFullDetails": "Részletek megtekintése",
@@ -3471,6 +3477,9 @@
     "localModels": {
       "title": "Eszközön futó modellek",
       "help": "Az eszközön futó modellek ezen a telefonon működnek. A kérései és a válaszok az eszközön maradnak.",
+      "switchTitle": "Eszközön futó modellre váltasz?",
+      "switchMessage": "Ha erre váltasz: {{name}}, a beszélgetés utasításait és kontextusát ezen a telefonon dolgozzuk fel, nem egy távoli szerveren.",
+      "switchConfirm": "Modell váltása",
       "systemPurpose": "Az eszköz rendszerébe épített modell. Az eszközön működik.",
       "apple": "Apple Intelligence (az eszközön)",
       "checking": "Elérhetőség ellenőrzése…",
@@ -3567,7 +3576,6 @@
     "personalDefaultDescription": "Automatikusan betöltődik, ha egyetlen lerakat sem rendelkezik rögzített profillal.",
     "organizationDefaultDescription": "Automatikusan betöltve azon tagok számára, akiknek nincs személyes alapértelmezésük.",
     "setAsDefault": "Beállítás alapértelmezettként",
-    "removeDefault": "Eltávolítás alapértelmezettként",
     "saveFailed": "Nem sikerült menteni a profilt",
     "deleteTitle": "Profil törlése",
     "deleteMessage": "Ezzel véglegesen eltávolítja a profilt és beállításait. Ezt nem lehet visszavonni.",
@@ -3593,11 +3601,13 @@
     "commandsTitle": "Beállítási parancsok",
     "addCommand": "Parancs hozzáadása",
     "commandLabel": "Parancs",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "pl. pnpm install",
     "commandsEmpty": "Még nincsenek beállítási parancsok",
     "commandsSaveFailed": "Nem sikerült menteni a beállítási parancsokat",
     "moveUp": "Lépj felfelé",
     "moveDown": "Mozgás lefelé",
+    "moveCommandUp": "{{position}}. parancs áthelyezése feljebb",
+    "moveCommandDown": "{{position}}. parancs áthelyezése lejjebb",
     "skillsTitle": "Készségek",
     "addSkill": "Add hozzá a készségeket",
     "skillNameLabel": "Képesség neve",

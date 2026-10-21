@@ -661,7 +661,8 @@
       "description": "Ku xir akoonkaaga GitHub si aad taleefanka uga eegto codsiyada isku-darka.",
       "gitlabDescription": "Ku xir xisaabtaada GitLab si aad mobilka ugu eegto merge request-yada.",
       "bitbucketDescription": "Bitbucket ku xir hay'addan si aad mobilka ugu eegto PR-yada.",
-      "bitbucketOrgOnlyDescription": "Ka dooro hay'ad profile-kaaga si aad ugu eegto PR-yada Bitbucket ee hay'addaas."
+      "bitbucketOrgOnlyDescription": "Beddel xisaabta kor ku qoran hay'ad si aad u eegto PR-yadeeda Bitbucket.",
+      "contextLine": "{{organization}} u"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "Dib-u-eegistan lama gudbin karo sida ay tahay. Waxaa laga yaabaa in PR-ka la beddelay ama inaadan dib u eegi karin codsigaaga isku-darka.",
       "reviewNotSubmittedTerm": "Dib-u-eegistan laguma diri karo sida uu yahay. {{term}} waa la yaabaa inuu isbeddelay, ama ma dib-u-eegi kartid {{term}} kaa ah.",
       "couldNotPostComment": "Faallada lama daabici karin.",
-      "couldNotSubmitReview": "Dib-u-eegista lama gudbin karin. Hubi xiriirkaaga oo mar kale isku day."
+      "couldNotSubmitReview": "Dib-u-eegista lama gudbin karin. Hubi xiriirkaaga oo mar kale isku day.",
+      "rateLimited": "Codsiyo aad u badan. Fadlan mar kale isku day.",
+      "conflict": "Tani way isbedhesay markaad ku shaqaynayso. Fadlan mar kale soo shubo oo isku day."
     },
     "operation": {
       "couldNotReply": "Lama jawaabi karin.",
@@ -1545,7 +1548,8 @@
       "bugs": "Cilladaha",
       "style": "Qaabka",
       "testing": "Tijaabinta",
-      "documentation": "Dukumentiyada"
+      "documentation": "Dukumentiyada",
+      "unknown": "Kale ({{area}})"
     },
     "gateThreshold": {
       "warning": "Digniin"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} mar dambe lama heli karo. Waxaa la isticmaalayaa moodeelkaaga caadiga ah.",
       "couldNotReadPendingSessions": "Kalfadhiyada sugaya lama akhrin karin. Mar kale isku day.",
       "failedToCreate": "Kalfadhiga lama abuuri karin.",
+      "checkOrganizationAccess": "Hubi gelitaankaada ururkan, markaa mar kale isku day.",
       "couldNotRefreshRepositories": "Kaydadka lama cusboonaysiin karin. Fadlan mar kale isku day.",
       "discardDraftTitle": "Ma tirtiraysaa qabyada?",
       "discardDraftMessage": "Tilmaantaadu way lumi doontaa.",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Kalfadhiyadaada firfircoon lama heli karo ilaa xogtan la soo shubo.",
     "currentDeviceUnidentified": "Aaladda hadda la isticmaalayo lama aqoonsan karin.",
+    "kiloApp": "Barnaamijka Kilo",
     "noSessions": "Ma jiraan kalfadhiyo firfircoon",
     "noSessionsDescription": "Ka soo gal barnaamijka Kilo aalad kale, waxayna halkan ka soo muuqan doontaa.",
     "onlyKiloAppSignIns": "Halkan waxaa ka muuqda oo keliya gelitaanka barnaamijka Kilo. Gelitaanka tifaftiraha iyo CLI kuma jiraan liiska.",
@@ -2884,6 +2890,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Ka hor inta aynaan bilaabin",
+    "summaryTitle": "Doorashada la wadaagista xogta",
     "introDescription": "Kilo wuxuu farriimahaaga u diraa bixiyeyaasha AI si ay jawaabo u soo saaraan. Hoos ka eeg waxa la wadaago iyo cidda lala wadaago.",
     "required": "Loo baahan yahay si loo isticmaalo Kilo",
     "promptsTitle": "Tilmaamahaaga iyo wadahadalladaada",
@@ -2892,7 +2899,6 @@
     "accountDescription": "Aqoonsiga akoonkaaga Kilo iyo xogta dheeraadka ah ee codsiga, oo loo isticmaalo xaqiijinta aqoonsigaaga iyo cabbirka isticmaalka.",
     "diagnosticsTitle": "Cilad-baarista barnaamijka",
     "diagnosticsDescription": "Warbixinno ku saabsan burburka iyo ciladaha, oo nuxurka barnaamijka laga saaray, si barnaamijku si deggan ugu shaqeeyo.",
-    "optional": "Ikhtiyaari",
     "helpImprove": "Ka caawi horumarinta Kilo",
     "helpImproveDescription": "Wadaag xogta falanqaynta isticmaalka ee aan aqoonsigaaga muujin iyo halka rakibaaddu ka timid. Tan waad beddeli kartaa wakhti kasta adigoo furaya Dejinta.",
     "seeFullDetails": "Eeg faahfaahinta buuxda",
@@ -3471,6 +3477,9 @@
     "localModels": {
       "title": "Moodeelada aaladda gudaheeda",
       "help": "Moodeelada aaladda gudaheeda waxay ku shaqeeyaan taleefankan. Codsiyadaada iyo jawaabaha waxay ku jiraan aaladda.",
+      "switchTitle": "Ma u wareegtaa moodeel aaladda gudaheeda ku shaqeeya?",
+      "switchMessage": "U wareegidda {{name}} waxay keenaysaa in farriimaha gelinta iyo macnaha guud ee wada sheekaysigan lagu farsameeyo taleefankan, ee aan lagu farsamayn server fog.",
+      "switchConfirm": "Beddel moodeelka",
       "systemPurpose": "Moodeelka ku dhisan nidaamka aaladdan. Wuxuu ku shaqeeyaa aaladda gudaheeda.",
       "apple": "Apple Intelligence (aaladda gudaheeda)",
       "checking": "Waxaa la hubinayaa helitaanka…",
@@ -3567,7 +3576,6 @@
     "personalDefaultDescription": "Si otomaatig ah ayaa loo raray marka aysan jirin meel kayd ah oo leh astaan ku dheggan",
     "organizationDefaultDescription": "Si otomaatig ah ayaa loogu shubay xubnaha aan lahayn khaladka gaarka ah.",
     "setAsDefault": "U deji sidii hore",
-    "removeDefault": "Ka saar sidii hore",
     "saveFailed": "Waa la kaydin kari waayay astaanta guud",
     "deleteTitle": "Tirtir astaanta guud",
     "deleteMessage": "Tani waxay si joogto ah meesha uga saaraysaa astaanta guud iyo dejinta Tan lama celin karo.",
@@ -3593,11 +3601,13 @@
     "commandsTitle": "Dejinta amarrada",
     "addCommand": "Ku dar amar",
     "commandLabel": "Taliska",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "tus. pnpm install",
     "commandsEmpty": "Ma jiro amar dejin weli",
     "commandsSaveFailed": "Ma kaydin kari waayay amarrada dejinta",
     "moveUp": "Kor u dhaqaaq",
     "moveDown": "Hoos u dhaqaaq",
+    "moveCommandUp": "U rari taliska {{position}} kor",
+    "moveCommandDown": "U rari taliska {{position}} hoos",
     "skillsTitle": "Xirfadaha",
     "addSkill": "Ku dar xirfad",
     "skillNameLabel": "Magaca xirfada",

@@ -1033,7 +1033,8 @@
       "bugs": "程式錯誤",
       "style": "程式碼風格",
       "testing": "測試",
-      "documentation": "文件"
+      "documentation": "文件",
+      "unknown": "其他（{{area}}）"
     },
     "gateThreshold": {
       "warning": "警告"
@@ -1700,6 +1701,7 @@
       "prefillModelUnavailable": "{{model}} 已無法使用。目前使用你的預設模型。",
       "couldNotReadPendingSessions": "無法讀取待處理的工作階段。請再試一次。",
       "failedToCreate": "無法建立工作階段。",
+      "checkOrganizationAccess": "請檢查您對此組織的存取權限，然後再試一次。",
       "couldNotRefreshRepositories": "無法重新整理儲存庫。請再試一次。",
       "discardDraftTitle": "捨棄草稿？",
       "discardDraftMessage": "你輸入的提示詞將不會保留。",
@@ -2220,6 +2222,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "載入完成前，無法查看目前登入的工作階段。",
     "currentDeviceUnidentified": "無法辨識目前的裝置。",
+    "kiloApp": "Kilo 應用程式",
     "noSessions": "沒有已登入的工作階段",
     "noSessionsDescription": "在其他裝置上登入 Kilo 應用程式後，該裝置就會顯示在這裡。",
     "onlyKiloAppSignIns": "這裡只會顯示 Kilo 應用程式的登入工作階段，不會列出編輯器與 CLI 的登入工作階段。",
@@ -2372,6 +2375,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "開始之前",
+    "summaryTitle": "資料分享偏好設定",
     "introDescription": "Kilo 會將你的訊息傳送給 AI 供應商，以產生回覆。以下說明分享的內容與對象。",
     "required": "使用 Kilo 必須分享的資料",
     "promptsTitle": "你的提示詞與對話",
@@ -2380,7 +2384,6 @@
     "accountDescription": "你的 Kilo 帳戶 ID 與請求中繼資料，用於驗證身分並計算用量。",
     "diagnosticsTitle": "應用程式診斷",
     "diagnosticsDescription": "已移除應用程式內容的當機與錯誤報告，用於維持應用程式的穩定性。",
-    "optional": "選用",
     "helpImprove": "協助改善 Kilo",
     "helpImproveDescription": "分享匿名的產品分析資料與安裝來源。你可以隨時在「設定」中變更此選項。",
     "seeFullDetails": "查看完整說明",
@@ -2505,7 +2508,8 @@
       "description": "連結你的 GitHub 帳戶，即可在行動裝置上審查提取請求。",
       "gitlabDescription": "連結你的 GitLab 帳戶，以便在行動裝置上審查合併請求。",
       "bitbucketDescription": "將 Bitbucket 連結到此組織，以便在行動裝置上審查提取請求。",
-      "bitbucketOrgOnlyDescription": "在你的個人資料中選取一個組織，以審查其 Bitbucket 提取請求。"
+      "bitbucketOrgOnlyDescription": "將上方的帳戶切換為某個組織，以便審查其 Bitbucket 提取請求。",
+      "contextLine": "適用於 {{organization}}"
     },
     "connectionExpired": "GitHub 連線已過期。",
     "couldNotLoadPullRequest": "無法載入提取請求。",
@@ -2932,7 +2936,9 @@
       "reviewNotSubmitted": "目前無法送出此審查。可能是 PR 已更新，或你正在審查自己的提取請求。",
       "reviewNotSubmittedTerm": "此審查無法依現況提交。{{term}}可能已變更，或者你不能審查自己的{{term}}。",
       "couldNotPostComment": "無法發佈留言。",
-      "couldNotSubmitReview": "無法送出審查。請檢查連線後再試一次。"
+      "couldNotSubmitReview": "無法送出審查。請檢查連線後再試一次。",
+      "rateLimited": "要求過多。請稍後再試一次。",
+      "conflict": "此項目在您編輯時已變更。請重新載入並再試一次。"
     },
     "operation": {
       "couldNotReply": "無法回覆。",
@@ -3471,6 +3477,9 @@
     "localModels": {
       "title": "裝置端模型",
       "help": "裝置端模型會在這支手機上執行。你的提示和回覆都會保留在裝置上。",
+      "switchTitle": "要切換至裝置端模型嗎？",
+      "switchMessage": "切換至 {{name}} 後，此對話的提示與上下文會在這支手機上處理，而非在遠端伺服器上。",
+      "switchConfirm": "切換模型",
       "systemPurpose": "此裝置系統內建的模型。它會在裝置上執行。",
       "apple": "Apple Intelligence（裝置端）",
       "checking": "正在檢查可用性⋯",
@@ -3567,7 +3576,6 @@
     "personalDefaultDescription": "當沒有儲存庫具有固定設定檔時自動載入。",
     "organizationDefaultDescription": "為沒有個人預設值的會員自動載入。",
     "setAsDefault": "設為預設",
-    "removeDefault": "取消預設",
     "saveFailed": "無法儲存設定檔",
     "deleteTitle": "刪除設定檔",
     "deleteMessage": "這將永久刪除設定檔及其設定。此操作無法撤銷。",
@@ -3593,11 +3601,13 @@
     "commandsTitle": "設定命令",
     "addCommand": "新增命令",
     "commandLabel": "命令",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "例如 pnpm install",
     "commandsEmpty": "還沒有設定命令",
     "commandsSaveFailed": "無法儲存設定命令",
     "moveUp": "向上移動",
     "moveDown": "下移",
+    "moveCommandUp": "上移命令 {{position}}",
+    "moveCommandDown": "下移命令 {{position}}",
     "skillsTitle": "技能",
     "addSkill": "添加技能",
     "skillNameLabel": "技能名稱",

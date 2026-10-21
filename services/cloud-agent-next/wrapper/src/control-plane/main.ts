@@ -37,6 +37,7 @@ import { createControlPlaneTerminals, type ControlPlaneTerminalRuntime } from '.
 import { createNativeStatusReporter } from './native-status.js';
 import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
 import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
+import { createControlPlaneKiloRequests } from './kilo-requests.js';
 import { createWorktreeKiloCleanupClient } from '../control/delete-worktree.js';
 import {
   CONTROL_SANDBOX_PROVIDER_ENV,
@@ -180,7 +181,6 @@ export function createControlPlaneSessionHost(options: {
   >;
   turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
   isPreparing(): boolean;
-  hasRecentTerminalInput(): boolean;
 }) {
   const runtimes = createKiloRuntimes({
     ...options.runtime,
@@ -198,11 +198,7 @@ export function createControlPlaneSessionHost(options: {
     runtimes,
     turns: manager,
     getHeartbeat: () => ({
-      active:
-        options.isPreparing() ||
-        runtimes.needsCompute() ||
-        manager.hasPendingWork() ||
-        options.hasRecentTerminalInput(),
+      active: options.isPreparing() || runtimes.needsCompute() || manager.hasPendingWork(),
       degraded: runtimes.suspected(),
     }),
   };
@@ -221,6 +217,7 @@ export type ControlPlaneFrameDispatcherDeps = {
   capture: { current?: WorkspaceCapture };
   worktreeChanges: { current?: ReturnType<typeof createControlPlaneWorktreeChanges> };
   worktreeDeletion: { current?: ReturnType<typeof createControlPlaneWorktreeDeletion> };
+  kiloRequests: { current?: ReturnType<typeof createControlPlaneKiloRequests> };
   send: (frame: ControlPlaneWrapperFrame) => void;
   log: (message: string) => void;
 };
@@ -258,7 +255,9 @@ export function createControlPlaneFrameDispatcher(
         deps.capture.current?.onCaptured(frame.sessionId, frame.ok);
         return;
       case 'session.credentials':
-        void deps.preparation.current?.installCredentials(frame);
+        void deps.preparation.current?.installCredentials(frame).catch(() => {
+          deps.log('control-plane session credential refresh failed');
+        });
         return;
       case 'session.prompt':
         deps.turns.current?.submit(frame.sessionId, frame.payload);
@@ -281,6 +280,9 @@ export function createControlPlaneFrameDispatcher(
       case 'worktree.prepareDeletion':
       case 'worktree.delete':
         void deps.worktreeDeletion.current?.handle(frame);
+        return;
+      case 'kilo.request':
+        void deps.kiloRequests.current?.handle(frame);
         return;
       case 'terminal.create':
       case 'terminal.resize':
@@ -371,6 +373,10 @@ export async function runControlPlaneWrapper(
   const worktreeDeletionRef: {
     current?: ReturnType<typeof createControlPlaneWorktreeDeletion>;
   } = {};
+  // Allowlisted native reads answer over the same connection.
+  const kiloRequestsRef: {
+    current?: ReturnType<typeof createControlPlaneKiloRequests>;
+  } = {};
   const sandboxProvider = parseAgentSandboxProvider(env[CONTROL_SANDBOX_PROVIDER_ENV]);
   const host = createControlPlaneSessionHost({
     runtime: {
@@ -387,7 +393,6 @@ export async function runControlPlaneWrapper(
       onNativeDiagnostic: projector,
     },
     isPreparing: () => preparationRef.current?.isPreparing() ?? false,
-    hasRecentTerminalInput: () => terminalsRef.current?.hasRecentInput() ?? false,
   });
   const { runtimes } = host;
   turnsRef.current = host.turns;
@@ -406,6 +411,7 @@ export async function runControlPlaneWrapper(
       capture: captureRef,
       worktreeChanges: worktreeChangesRef,
       worktreeDeletion: worktreeDeletionRef,
+      kiloRequests: kiloRequestsRef,
       send: frame => connection.send(frame),
       log: logToFile,
     }),
@@ -426,8 +432,8 @@ export async function runControlPlaneWrapper(
     capture: captureRef.current,
     runtimes: {
       ensure: input => runtimes.ensure(input),
-      installCredentials: async (key, nextEnv) => {
-        await runtimes.get(key)?.installCredentials(nextEnv);
+      installCredentials: async (key, nextEnv, cloudAgentMcp) => {
+        await runtimes.get(key)?.installCredentials(nextEnv, cloudAgentMcp);
         turnsRef.current?.credentialsInstalled(key);
       },
       isUnavailable: key => {
@@ -459,6 +465,12 @@ export async function runControlPlaneWrapper(
     detachTerminals: directory =>
       terminalsRef.current?.detachDirectory(directory) ?? Promise.resolve(),
     onDiagnostic: diagnostics.onDiagnostic,
+    log: logToFile,
+  });
+  kiloRequestsRef.current = createControlPlaneKiloRequests({
+    emit: frame => connection.send(frame),
+    preparedRoute: sessionId => preparationRef.current?.preparedRoute(sessionId) ?? null,
+    clientFor: key => liveRuntimeClient(runtimes.get(key)) ?? null,
     log: logToFile,
   });
   const nativeStatus = createNativeStatusReporter({

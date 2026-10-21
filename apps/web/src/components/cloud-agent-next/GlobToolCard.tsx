@@ -2,6 +2,7 @@ import { Search } from 'lucide-react';
 import { ToolCardShell } from './ToolCardShell';
 import { ToolCodeBlock, ToolMarkdown } from './ToolOutput';
 import { getDirectoryName } from './toolCardUtils';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import type { ToolPart } from './types';
 
 type GlobToolCardProps = {
@@ -10,7 +11,7 @@ type GlobToolCardProps = {
 
 export function GlobToolCard({ toolPart }: GlobToolCardProps) {
   const state = toolPart.state;
-  const path = typeof state.input.path === 'string' ? state.input.path : '';
+  const path = typeof state.input.path === 'string' ? cloudAgentFileLabel(state.input.path) : '';
   const pattern = typeof state.input.pattern === 'string' ? state.input.pattern : '';
   const subtitle = [getDirectoryName(path), pattern && `pattern=${pattern}`]
     .filter(Boolean)

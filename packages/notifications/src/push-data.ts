@@ -105,6 +105,10 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     organizationId: nonEmptyStringSchema.optional(),
   }),
   z.object({
+    type: z.literal('agent_briefing'),
+    url: z.literal('/agent-briefing'),
+  }),
+  z.object({
     type: z.literal('low_balance'),
     organizationId: nonEmptyStringSchema,
   }),

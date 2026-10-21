@@ -291,8 +291,6 @@ export class GlanceablePublisher {
       return;
     }
 
-    // `needsApproval` gates the Approve control, so its change decides the
-    // coalesce path below.
     const previousNeedsApproval = this.current?.needsApproval ?? 0;
 
     if (isEligibleGlanceableWork(snapshot)) {

@@ -2,6 +2,7 @@ import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
 import { z } from 'zod';
 import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { timingSafeEqual } from '@kilocode/encryption';
 
 import crypto from 'crypto';
 import type { InstallationToken } from '@/lib/integrations/core/types';
@@ -50,11 +51,7 @@ export function verifyGitHubWebhookSignature(
   const hmac = crypto.createHmac('sha256', credentials.webhookSecret);
   const digest = 'sha256=' + hmac.update(payload).digest('hex');
 
-  try {
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
-  } catch {
-    return false;
-  }
+  return timingSafeEqual(signature, digest);
 }
 
 export async function generateGitHubInstallationToken(

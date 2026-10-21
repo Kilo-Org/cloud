@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from '@kilocode/encryption';
 
 import { createGateway, generateText } from 'ai';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
@@ -178,19 +178,12 @@ export async function resolveBytePlusSeatId(input: {
     logBytePlusValidationFailure('seat_match', 'seat_api_key_missing');
     return null;
   }
-  if (!constantTimeEqual(seat.apiKey, input.apiKey)) {
+  if (!timingSafeEqual(seat.apiKey, input.apiKey)) {
     logBytePlusValidationFailure('seat_match', 'seat_api_key_mismatch');
     return null;
   }
 
   return seat.seatId;
-}
-
-function constantTimeEqual(left: string, right: string): boolean {
-  const leftBuffer = Buffer.from(left, 'utf8');
-  const rightBuffer = Buffer.from(right, 'utf8');
-  if (leftBuffer.length !== rightBuffer.length) return false;
-  return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 export async function validateCodingPlanCredential({

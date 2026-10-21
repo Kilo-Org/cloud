@@ -1,5 +1,6 @@
 import 'server-only';
 import crypto from 'node:crypto';
+import { timingSafeEqual } from '@kilocode/encryption';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 const HMAC_ALGORITHM = 'sha256';
@@ -73,13 +74,8 @@ export function verifySignedTokenDetailed<T>(
   const encodedPayload = token.slice(0, dotIndex);
   const providedSig = token.slice(dotIndex + 1);
   const expectedSig = hmacSign(encodedPayload);
-  const providedSigBytes = Buffer.from(providedSig);
-  const expectedSigBytes = Buffer.from(expectedSig);
 
-  if (
-    providedSigBytes.length !== expectedSigBytes.length ||
-    !crypto.timingSafeEqual(providedSigBytes, expectedSigBytes)
-  ) {
+  if (!timingSafeEqual(providedSig, expectedSig)) {
     return { status: 'invalid', reason: 'signature_invalid' };
   }
 

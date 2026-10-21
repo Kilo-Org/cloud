@@ -1,8 +1,6 @@
-import { timingSafeEqual } from 'crypto';
+import { timingSafeEqual } from '@kilocode/encryption';
 
 export function isCronAuthorizationValid(authHeader: string | null, cronSecret: string): boolean {
   if (!authHeader) return false;
-  const provided = Buffer.from(authHeader);
-  const expected = Buffer.from(`Bearer ${cronSecret}`);
-  return provided.length === expected.length && timingSafeEqual(provided, expected);
+  return timingSafeEqual(authHeader, `Bearer ${cronSecret}`);
 }

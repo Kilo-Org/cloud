@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import type { Chat, WebhookOptions } from 'chat';
 import type { LinearAdapter } from '@chat-adapter/linear';
 import { captureException } from '@sentry/nextjs';
+import { timingSafeEqual } from '@kilocode/encryption';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { deleteInstallationByOrganizationId } from '@/lib/integrations/linear-service';
 import { LINEAR_WEBHOOK_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -50,16 +51,7 @@ function verifyLinearSignature(rawBody: string, request: Request): boolean {
     .update(rawBody)
     .digest('hex');
 
-  const expectedBuf = Buffer.from(expectedHex);
-  const signatureBuf = Buffer.from(signature);
-
-  if (expectedBuf.length !== signatureBuf.length) return false;
-
-  try {
-    return crypto.timingSafeEqual(expectedBuf, signatureBuf);
-  } catch {
-    return false;
-  }
+  return timingSafeEqual(expectedHex, signature);
 }
 
 function isLinearOAuthAppRevokedPayload(payload: unknown): payload is LinearOAuthAppRevokedPayload {

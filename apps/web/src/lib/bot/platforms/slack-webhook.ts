@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import type { Chat, WebhookOptions } from 'chat';
 import type { SlackAdapter } from '@chat-adapter/slack';
 import { captureException } from '@sentry/nextjs';
+import { timingSafeEqual } from '@kilocode/encryption';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { deleteInstallationByTeamId } from '@/lib/integrations/slack-service';
 import { SLACK_SIGNING_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -38,11 +39,7 @@ function verifySlackSignature(body: string, request: Request): boolean {
     .update(signatureBaseString)
     .digest('hex')}`;
 
-  try {
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
-  } catch {
-    return false;
-  }
+  return timingSafeEqual(signature, expectedSignature);
 }
 
 function isSlackAppUninstalledPayload(payload: unknown): payload is SlackAppUninstalledPayload {

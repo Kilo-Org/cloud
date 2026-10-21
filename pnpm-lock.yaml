@@ -537,7 +537,7 @@ importers:
         version: 1.5.2(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
       '@sentry/react-native':
         specifier: ~8.29.0
-        version: 8.29.0(@babel/core@7.29.7)(@expo/config-types@57.0.2)(@expo/config@57.0.9(typescript@7.0.2))(@expo/env@2.4.3)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@57.0.24)(expo@57.0.26)(metro-config@0.84.5)(metro-resolver@0.84.5)(open@11.0.0)(promise@8.3.0)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))
+        version: 8.29.0(@babel/core@7.29.7)(@expo/config-types@57.0.2)(@expo/config@57.0.9(typescript@7.0.2))(@expo/env@2.4.3)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@57.0.24)(expo@57.0.26)(metro-config@0.84.5(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.84.5)(open@11.0.0)(promise@8.3.0)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))
       '@shopify/flash-list':
         specifier: 2.3.3
         version: 2.3.3(@babel/runtime@7.29.7)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
@@ -1702,15 +1702,15 @@ importers:
         specifier: 3.0.8
         version: 3.0.8
       typia:
-        specifier: 14.0.4
-        version: 14.0.4(ttsc@0.28.3)
+        specifier: 15.1.0
+        version: 15.1.0(ttsc@0.33.0)
     devDependencies:
       '@anthropic-ai/sdk':
         specifier: 0.104.1
         version: 0.104.1(zod@4.4.3)
       '@ttsc/unplugin':
-        specifier: 0.28.3
-        version: 0.28.3(ttsc@0.28.3)
+        specifier: 0.33.0
+        version: 0.33.0(ttsc@0.33.0)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -1721,8 +1721,8 @@ importers:
         specifier: 6.49.0
         version: 6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
       ttsc:
-        specifier: 0.28.3
-        version: 0.28.3
+        specifier: 0.33.0
+        version: 0.33.0
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -7146,12 +7146,14 @@ packages:
   '@opentelemetry/sdk-trace-base@2.10.0':
     resolution: {integrity: sha512-GuYQQT7QD2EeO8lcZLRQzcbOyhqAzL+6WWTKTU9mSUBYBazkEDl+VrQcXQhbB08OWM9anD1aHleVadzulpOaUQ==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': '>=1.3.0 <1.10.0'
 
   '@opentelemetry/sdk-trace-base@2.2.0':
     resolution: {integrity: sha512-xWQgL0Bmctsalg6PaXExmzdedSp3gyKV8mQBwK/j9VGdCDu2fmXIb2gAehBKbkXCpJ4HPkgv3QfoJWRT4dHWbw==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': '>=1.3.0 <1.10.0'
 
@@ -10793,43 +10795,43 @@ packages:
     resolution: {integrity: sha512-w071DSzP94YfN6XiWhOxnLpYT3uqtxJBDYdh6Jdjzt+Ce6DNspJsPQgpC7rbts/B8tEkq0LHoYuIF/O5Jh5rPg==}
     engines: {node: '>=18'}
 
-  '@ttsc/darwin-arm64@0.28.3':
-    resolution: {integrity: sha512-ZdsiVD1OWfecgnBJkF11NX+C5iqLJ6XtEF4pr7nQW806hygSkK8DmMeWuRFerSqID6PQ4AzIhvpPeUKpMFsr0Q==}
+  '@ttsc/darwin-arm64@0.33.0':
+    resolution: {integrity: sha512-M/QnQYCtusU/RK435+zTDlRzihVLBdlav5L2C4C93+b76eoyGbPtHFcHPG4AMCHBf0YjDB8keTEhdpPQahEjWg==}
     cpu: [arm64]
     os: [darwin]
 
-  '@ttsc/darwin-x64@0.28.3':
-    resolution: {integrity: sha512-PubVbhvqJnk028bH9QTjas7u0PU2fMFwMezu96pkKC7zVTLekTVyZPOD1wKqN1/eaLvLagZygsGa98k+OlFQVQ==}
+  '@ttsc/darwin-x64@0.33.0':
+    resolution: {integrity: sha512-Fumypwwg6sRbm1dMdsrO3RL+UF1ZaapZiuhOU9o7RFsD6u9pO+ZxpRHoaCj2HEIFXpr88hAM2rgxG8do2q1VtA==}
     cpu: [x64]
     os: [darwin]
 
-  '@ttsc/linux-arm64@0.28.3':
-    resolution: {integrity: sha512-F4Kfr+xDOD+t+6MdiSi/u6ESsFdn76i/ErCg0nOmDFqG+l2Tm+9tJL66gw83f7/YBo/Ah8GxsyUBDW7/oFN61A==}
+  '@ttsc/linux-arm64@0.33.0':
+    resolution: {integrity: sha512-4zQ5c2X4NfeOkockT5Ucis6hyQkUqDXtEyFUDkK51xvX6/l2b9PFVFyaRF6xUOxGbNcmV8fdj8EwQVlRt/jsAg==}
     cpu: [arm64]
     os: [linux]
 
-  '@ttsc/linux-arm@0.28.3':
-    resolution: {integrity: sha512-46JdDKxBQPSQHeYQlFGPjnhBd96dH1JXhj+fODQGh0NAGcVoVNHr6WvWElL2YkyUbkjwkbdVKsMzprWwR0TeXQ==}
+  '@ttsc/linux-arm@0.33.0':
+    resolution: {integrity: sha512-sB2z7LPi062rwPbiV7RdzVeAeWW9ONHQS/d3SZXVfgVK/cBd7oAoFflUx3+fQKrzv2mcsvIsWZGmMZSLQJhtxA==}
     cpu: [arm]
     os: [linux]
 
-  '@ttsc/linux-x64@0.28.3':
-    resolution: {integrity: sha512-m5VLPOkPWZjrl11/BajN/rD4Np5knVK2Y9nHrt6j0LhIU8m6CAmfPyHGcd7Nw/W26SYvhh9SaHEQ799TjXZBoQ==}
+  '@ttsc/linux-x64@0.33.0':
+    resolution: {integrity: sha512-FRU5dvEyedExeQHbRf7aLCEkU3sPxgEGmSgP+1eWiq2s2lBv2WtDNbeSZRg1TMpcax13JL85xkJvNGd6hZUs1w==}
     cpu: [x64]
     os: [linux]
 
-  '@ttsc/unplugin@0.28.3':
-    resolution: {integrity: sha512-ctXXqshYGKts9Fpbxg1OPZ2ZhVwsBGFixNhX8CVuoFYWjIdmg0sgDVZQe97OvgI0SM3YngmBzQc8cNtM32ZW0Q==}
+  '@ttsc/unplugin@0.33.0':
+    resolution: {integrity: sha512-sJfFjBbcgY6gywHf/3DUYGQh7Y71Yx3GBZsMMzgkmCO9XbG9Pr5nyt+w3EhVDEeArD7NiFSTrfdO6m8rN2mnog==}
     peerDependencies:
-      ttsc: ^0.28.3
+      ttsc: ^0.33.0
 
-  '@ttsc/win32-arm64@0.28.3':
-    resolution: {integrity: sha512-hmXyPEr+JCoO2y4voD2zlhcoL+Ejk3+lp25nnuAN/zuusE959ahcDogFGXT3iEYhB6uVEffg3/wttbvTG7zb/Q==}
+  '@ttsc/win32-arm64@0.33.0':
+    resolution: {integrity: sha512-wsfxvB7a0YKRGVbVFkNxculQuZ/CycfmTjcEqYB6Ke2y4gduLp2HC4cZdUOckjeN3TC8/s+sJyQ9zVojHVdCTg==}
     cpu: [arm64]
     os: [win32]
 
-  '@ttsc/win32-x64@0.28.3':
-    resolution: {integrity: sha512-SpjgxyckQDMXnMkUMHFGTQTvVunOhYQ3iotG+gQfd+hAysWa01Z4UA0SxEQhVDnBsn67NVZ/KaL4fXSRJ1WnsA==}
+  '@ttsc/win32-x64@0.33.0':
+    resolution: {integrity: sha512-kDN76XpViTtuDpZD4q68zPsEHshYTwnl83grXuNIPBAldxPHD+5XfVvND20Xh5sJ2Eow6zTA4kfvtc0elOtOgg==}
     cpu: [x64]
     os: [win32]
 
@@ -11332,11 +11334,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@typia/interface@14.0.6':
-    resolution: {integrity: sha512-Ct4cW8vt1OfZNFlRBrVFeWZZrM/KvNUg4bmeIU4amXgYYp1sZkY71h+6GdrL+ApdF0KNnRxZ92hrrlbDodsjNg==}
+  '@typia/interface@15.1.0':
+    resolution: {integrity: sha512-kiKKWTAmJ8x48eUAkzTwH4AsX3CSe5AcsxGUkzkOqhqwlklxUWIACw93DXTr2F5aDIse3YBExJerWdgURsring==}
 
-  '@typia/utils@14.0.6':
-    resolution: {integrity: sha512-g1LLQiOdPNyFR6dEQKsaa8HQnpZAAW+XAG0tVQ3/fVCARR5n4Yn59jBSI1UcNEv4F9DaM7vzHZi0b4iS+liajw==}
+  '@typia/utils@15.1.0':
+    resolution: {integrity: sha512-9NLCbKI2rQOA4M9EbEx0HwXfKIUIdkvO2J+6mZQttx2CBfiIspgt0VdJSvmD0hqMKa6LvDdmeBKl13wTizVGog==}
 
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
@@ -12523,6 +12525,9 @@ packages:
 
   cjs-module-lexer@2.2.0:
     resolution: {integrity: sha512-4bHTS2YuzUvtoLjdy+98ykbNB5jS0+07EvFNXerqZQJ89F7DI6ET7OQo/HJuW6K0aVsKA9hj9/RVb2kQVOrPDQ==}
+
+  cjs-module-lexer@2.2.1:
+    resolution: {integrity: sha512-Ca8swihM+/4yKecYHY52kgJd300hi2lADU/a1RxNTRe+RJ9jvqQlESpbz9DnG9mowez8qwXHB8qYdIUw9e+F5Q==}
 
   class-variance-authority@0.7.1:
     resolution: {integrity: sha512-Ka+9Trutv7G8M6WT6SeiRWz792K5qEqIGEGzXKhAE6xOWAY6pPH8U+9IY3oCMv6kqTmLsv7Xh/2w2RigkePMsg==}
@@ -19463,8 +19468,8 @@ packages:
     resolution: {integrity: sha512-axr3IdNuVIxnaK5XGEUFTu3YmAQ6lllgrvqfEoR16g/HGnYY/6We4oWENtAnzK6/LpJ2ur9PAb80RBt7/U4ugw==}
     engines: {node: '>= 6.0.0'}
 
-  ttsc@0.28.3:
-    resolution: {integrity: sha512-9+vVmqg08fMhX8mR7/ARYx/Qca+/uOOIQc7CAXVE5ccrXhL4YpXwVBWW3JPISjuAw3Dxwed03e8/rAZzE2uGrQ==}
+  ttsc@0.33.0:
+    resolution: {integrity: sha512-nRLpjB0WVCRk6X6yKzNQs7fKvL3S17AT+dTr7aHCxcY81PtE3WO+lQUlo19XzYv2WOqDtfLICA0ReGK0qcA3Og==}
     engines: {node: '>=22.15.0'}
     hasBin: true
 
@@ -19548,8 +19553,8 @@ packages:
     engines: {node: '>=16.20.0'}
     hasBin: true
 
-  typia@14.0.4:
-    resolution: {integrity: sha512-sUspRau04oH44UVU3YiRcXY5IvVYXq6rMkM73bKAD+Rn4S7MVv+xMRuv/seJXxf5bIPPs7VDMvT92HJJ+nFD3g==}
+  typia@15.1.0:
+    resolution: {integrity: sha512-EW+b8jxKrRU/Q0eJXFry53vL6LFRlAMsSvfhKq3hh4pLTiswBWJMs6g4AtNlCPGCYJ0WMbSEME2qqe8DM7PnHg==}
     peerDependencies:
       ttsc: '>=0.19.2'
     peerDependenciesMeta:
@@ -27566,7 +27571,7 @@ snapshots:
       '@sentry/conventions': 0.16.0
       '@sentry/core': 10.69.0
 
-  '@sentry/react-native@8.29.0(@babel/core@7.29.7)(@expo/config-types@57.0.2)(@expo/config@57.0.9(typescript@7.0.2))(@expo/env@2.4.3)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@57.0.24)(expo@57.0.26)(metro-config@0.84.5)(metro-resolver@0.84.5)(open@11.0.0)(promise@8.3.0)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))':
+  '@sentry/react-native@8.29.0(@babel/core@7.29.7)(@expo/config-types@57.0.2)(@expo/config@57.0.9(typescript@7.0.2))(@expo/env@2.4.3)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@57.0.24)(expo@57.0.26)(metro-config@0.84.5(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.84.5)(open@11.0.0)(promise@8.3.0)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))':
     dependencies:
       '@expo/config-plugins': 57.0.9(typescript@7.0.2)
       '@sentry/browser': 10.75.2
@@ -29058,30 +29063,32 @@ snapshots:
       '@ts-graphviz/ast': 2.0.7
       '@ts-graphviz/common': 2.1.5
 
-  '@ttsc/darwin-arm64@0.28.3':
+  '@ttsc/darwin-arm64@0.33.0':
     optional: true
 
-  '@ttsc/darwin-x64@0.28.3':
+  '@ttsc/darwin-x64@0.33.0':
     optional: true
 
-  '@ttsc/linux-arm64@0.28.3':
+  '@ttsc/linux-arm64@0.33.0':
     optional: true
 
-  '@ttsc/linux-arm@0.28.3':
+  '@ttsc/linux-arm@0.33.0':
     optional: true
 
-  '@ttsc/linux-x64@0.28.3':
+  '@ttsc/linux-x64@0.33.0':
     optional: true
 
-  '@ttsc/unplugin@0.28.3(ttsc@0.28.3)':
+  '@ttsc/unplugin@0.33.0(ttsc@0.33.0)':
     dependencies:
-      ttsc: 0.28.3
+      ttsc: 0.33.0
       unplugin: 2.3.11
+    optionalDependencies:
+      fsevents: 2.3.3
 
-  '@ttsc/win32-arm64@0.28.3':
+  '@ttsc/win32-arm64@0.33.0':
     optional: true
 
-  '@ttsc/win32-x64@0.28.3':
+  '@ttsc/win32-x64@0.33.0':
     optional: true
 
   '@tybys/wasm-util@0.10.1':
@@ -29532,11 +29539,11 @@ snapshots:
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
 
-  '@typia/interface@14.0.6': {}
+  '@typia/interface@15.1.0': {}
 
-  '@typia/utils@14.0.6':
+  '@typia/utils@15.1.0':
     dependencies:
-      '@typia/interface': 14.0.6
+      '@typia/interface': 15.1.0
 
   '@ungap/structured-clone@1.3.0': {}
 
@@ -30909,6 +30916,8 @@ snapshots:
   cjs-module-lexer@1.4.3: {}
 
   cjs-module-lexer@2.2.0: {}
+
+  cjs-module-lexer@2.2.1: {}
 
   class-variance-authority@0.7.1:
     dependencies:
@@ -40064,15 +40073,19 @@ snapshots:
     dependencies:
       tslib: 1.14.1
 
-  ttsc@0.28.3:
+  ttsc@0.33.0:
+    dependencies:
+      acorn: 8.16.0
+      cjs-module-lexer: 2.2.1
     optionalDependencies:
-      '@ttsc/darwin-arm64': 0.28.3
-      '@ttsc/darwin-x64': 0.28.3
-      '@ttsc/linux-arm': 0.28.3
-      '@ttsc/linux-arm64': 0.28.3
-      '@ttsc/linux-x64': 0.28.3
-      '@ttsc/win32-arm64': 0.28.3
-      '@ttsc/win32-x64': 0.28.3
+      '@ttsc/darwin-arm64': 0.33.0
+      '@ttsc/darwin-x64': 0.33.0
+      '@ttsc/linux-arm': 0.33.0
+      '@ttsc/linux-arm64': 0.33.0
+      '@ttsc/linux-x64': 0.33.0
+      '@ttsc/win32-arm64': 0.33.0
+      '@ttsc/win32-x64': 0.33.0
+      fsevents: 2.3.3
 
   tty-browserify@0.0.1: {}
 
@@ -40153,13 +40166,13 @@ snapshots:
       '@typescript/typescript-win32-arm64': 7.0.2
       '@typescript/typescript-win32-x64': 7.0.2
 
-  typia@14.0.4(ttsc@0.28.3):
+  typia@15.1.0(ttsc@0.33.0):
     dependencies:
-      '@typia/interface': 14.0.6
-      '@typia/utils': 14.0.6
+      '@typia/interface': 15.1.0
+      '@typia/utils': 15.1.0
       randexp: 0.5.3
     optionalDependencies:
-      ttsc: 0.28.3
+      ttsc: 0.33.0
 
   ua-parser-js@0.7.41: {}
 

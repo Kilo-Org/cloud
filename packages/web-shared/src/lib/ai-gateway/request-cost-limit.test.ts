@@ -1,6 +1,7 @@
 import type { StoredModel } from '@kilocode/db';
 import {
   enforceRequestCostLimit,
+  SYSTEM_ONE_MAX_OUTPUT_TOKENS,
   systemOneRequestCostBound,
   textRequestPriceCeiling,
 } from './request-cost-limit';
@@ -286,19 +287,44 @@ describe('System One request cost bound', () => {
     expect(boundOf(flat, null, { q: { type: 'noul' } })).toBe(20_000);
   });
 
-  it('keeps a maximum-size request inside a small funded balance at current catalog prices', () => {
-    const maxState = 'x'.repeat(SYSTEM_ONE_MAX_STATE_BYTES);
+  it('reserves the output allowance on a model that bills completion', () => {
+    const completionPriced: StoredModel = {
+      id: 'typesafe/completion-priced',
+      name: 'Completion priced',
+      endpoints: [{ pricing: { prompt: '0', completion: '0.000001' } }],
+    };
+    const zeroCompletion: StoredModel = {
+      ...completionPriced,
+      endpoints: [{ pricing: { prompt: '0', completion: '0' } }],
+    };
+
+    const allowance =
+      boundOf(completionPriced, null, { q: { type: 'noul' } }) -
+      boundOf(zeroCompletion, null, { q: { type: 'noul' } });
+
+    expect(allowance).toBeGreaterThanOrEqual(SYSTEM_ONE_MAX_OUTPUT_TOKENS);
+    expect(allowance).toBeLessThan(SYSTEM_ONE_MAX_OUTPUT_TOKENS + 100);
+  });
+
+  it('bounds a maximum-size request at the fixture input rate', () => {
+    const state = 'x'.repeat(SYSTEM_ONE_MAX_STATE_BYTES - 2);
     const maxQuestions = Object.fromEntries(
       Array.from({ length: SYSTEM_ONE_MAX_QUESTIONS }, (_, index) => [
         `q${index}`,
         { type: 'noul', instructions: 'x'.repeat(1800) },
       ])
     );
+    const inputBytes =
+      Buffer.byteLength(JSON.stringify(state), 'utf8') +
+      Buffer.byteLength(JSON.stringify(maxQuestions), 'utf8');
 
-    expect(boundOf(jev, maxState, maxQuestions)).toBeLessThan(20_000);
+    // 42 nanodollars per input token and no completion price.
+    expect(boundOf(jev, state, maxQuestions)).toBe(
+      Math.ceil((inputBytes + 1024) * 0.000000042 * 1_000_000)
+    );
   });
 
-  it('refuses to bound a model without usable pricing', () => {
+  it('throws for a model without usable pricing', () => {
     expect(() => boundOf({ ...model, endpoints: [] }, null)).toThrow(/pric/);
     expect(() => boundOf({ ...model, endpoints: [{}] }, null)).toThrow(/pric/);
   });

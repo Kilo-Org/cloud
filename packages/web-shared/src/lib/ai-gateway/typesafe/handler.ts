@@ -106,17 +106,20 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return creditsBlockedResponse({ user, balance, organizationId, balanceLimitedByUserAllowance });
   }
 
-  // Admit the request only when the balance covers an upper bound of what it can cost: the
-  // schema bounds the bytes it can carry, and the bound prices those bytes plus the answers they
-  // ask for at the model's current rates.
-  let estimatedMaxCostMicrodollars: number;
-  try {
-    const catalog = await getOpenRouterModelsMetadataFromDatabase();
-    const metadata = catalog[resolvedModel] ?? catalog[requestedModel];
-    if (!metadata) throw new Error(`Model metadata is unavailable for '${resolvedModel}'`);
-    estimatedMaxCostMicrodollars = systemOneRequestCostBound(metadata, parsed.data);
-  } catch (error) {
-    errorExceptInTest('System One request cost estimate unavailable', error);
+  // Admit the request when the balance covers the cost bound: the schema bounds the bytes it can
+  // carry, and the bound prices those bytes plus the answer generation at the model's current
+  // rates.
+  const catalog = await getOpenRouterModelsMetadataFromDatabase();
+  const metadata = catalog[resolvedModel] ?? catalog[requestedModel];
+  let estimatedMaxCostMicrodollars: number | null = null;
+  if (metadata) {
+    try {
+      estimatedMaxCostMicrodollars = systemOneRequestCostBound(metadata, parsed.data);
+    } catch (error) {
+      errorExceptInTest('System One request cost estimate unavailable', error);
+    }
+  }
+  if (estimatedMaxCostMicrodollars === null) {
     return errorResponse('Service temporarily unavailable', 'temporarily_unavailable', 503);
   }
   if (estimatedMaxCostMicrodollars > Math.floor(balance * 1_000_000)) {

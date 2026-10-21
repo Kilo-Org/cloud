@@ -577,7 +577,7 @@ describe('handleSystemOneRequest', () => {
     }
   );
 
-  it('fails closed without catalog pricing instead of forwarding a model OpenRouter might serve', async () => {
+  it('answers 503 when the catalog has no metadata for the model', async () => {
     jest.mocked(getOpenRouterSystemOneModelsFromDatabase).mockResolvedValue(new Set());
 
     const response = await handleSystemOneRequest(
@@ -586,12 +586,24 @@ describe('handleSystemOneRequest', () => {
 
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({ error_type: 'temporarily_unavailable' });
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(deferredUsageCallbacks()).toHaveLength(0);
+  });
+
+  it('answers 503 when the catalog cannot price the model', async () => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      ...pricedSystemOneModels,
+      [TYPESAFE_MODEL]: { id: TYPESAFE_MODEL, name: 'TypeSafe: Jev 1.13', endpoints: [] },
+    });
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(503);
     expect(errorExceptInTest).toHaveBeenCalledWith(
       'System One request cost estimate unavailable',
       expect.anything()
     );
     expect(mockedFetch).not.toHaveBeenCalled();
-    expect(deferredUsageCallbacks()).toHaveLength(0);
   });
 
   it.each([
@@ -604,7 +616,7 @@ describe('handleSystemOneRequest', () => {
       JSON.stringify({ ...requestBody, provider: { data_collection: 'invalid' } }),
     ],
     ['string ZDR', JSON.stringify({ ...requestBody, provider: { zdr: 'false' } })],
-  ])('rejects %s before balance checks or upstream work', async (_name, body) => {
+  ])('rejects %s', async (_name, body) => {
     const response = await handleSystemOneRequest(
       new NextRequest(routeUrl, {
         method: 'POST',
@@ -879,7 +891,7 @@ describe('handleSystemOneRequest', () => {
     );
   });
 
-  it('admits a request when the balance covers its estimated maximum cost', async () => {
+  it('serves a request when the balance covers its cost bound', async () => {
     jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 0.001 });
 
     const response = await handleSystemOneRequest(makeRequest());
@@ -888,7 +900,7 @@ describe('handleSystemOneRequest', () => {
     expect(mockedFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('refuses before upstream when the balance does not cover the estimated maximum cost', async () => {
+  it('answers 402 when the balance is below the cost bound', async () => {
     jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 0.000001 });
 
     const response = await handleSystemOneRequest(makeRequest());
@@ -903,7 +915,7 @@ describe('handleSystemOneRequest', () => {
     expect(deferredUsageCallbacks()).toHaveLength(0);
   });
 
-  it('prices an alias through the target model instead of its own catalog entry', async () => {
+  it('prices an alias through its target model', async () => {
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
       ...pricedSystemOneModels,
       [SYSTEM_ONE_ALIAS]: {
@@ -923,7 +935,7 @@ describe('handleSystemOneRequest', () => {
     expect(mockedFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('refuses an alias when only its own unpriced catalog entry exists', async () => {
+  it('answers 503 for an alias without target pricing', async () => {
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
       [SYSTEM_ONE_ALIAS]: {
         id: SYSTEM_ONE_ALIAS,
@@ -955,7 +967,7 @@ describe('handleSystemOneRequest', () => {
         ),
       },
     ],
-  ])('rejects %s before balance checks or upstream work', async (_name, body) => {
+  ])('rejects %s', async (_name, body) => {
     const response = await handleSystemOneRequest(makeRequest(body));
 
     expect(response.status).toBe(400);

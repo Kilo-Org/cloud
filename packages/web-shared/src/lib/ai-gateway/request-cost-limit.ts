@@ -58,11 +58,15 @@ function requestTextBytes(value: unknown): number {
     return Object.values(value).reduce((sum, item) => sum + requestTextBytes(item), 0);
   return 0;
 }
+/** Output-token allowance for one System One answer, covering its generation and envelope. */
+export const SYSTEM_ONE_MAX_OUTPUT_TOKENS = 16_384;
+
 /**
- * Upper bound, in microdollars, of one System One request against a model's current prices.
+ * Cost bound, in microdollars, of one System One request against a model's current prices.
  *
- * Answers repeat the question criteria keys (and score questions their legend), so only the
- * questions bound the output; `state` is read once and never echoed.
+ * The questions bound the answer envelope: answers repeat the question criteria keys, and score
+ * questions their legend. `state` is read once and never echoed. The output allowance adds room
+ * for the answer generation each model also prices.
  */
 export function systemOneRequestCostBound(
   metadata: StoredModel,
@@ -72,7 +76,7 @@ export function systemOneRequestCostBound(
   const questionBytes = Buffer.byteLength(JSON.stringify(request.questions) ?? '', 'utf8');
   const inputTokenCeiling =
     Buffer.byteLength(JSON.stringify(request.state) ?? '', 'utf8') + questionBytes + 1024;
-  const outputTokenCeiling = questionBytes + 1024;
+  const outputTokenCeiling = questionBytes + SYSTEM_ONE_MAX_OUTPUT_TOKENS;
   return Math.ceil(
     (inputTokenCeiling * price.inputRate +
       outputTokenCeiling * price.outputRate +

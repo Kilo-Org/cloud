@@ -70,18 +70,27 @@ function assertCredentialConfinement(workflow, completeByJob) {
     // Job-level env applies to every step, so the credential is declared on
     // the completion step instead.
     assert.deepEqual(
-      Object.keys(job.env ?? {}).filter(key => key === 'KILO_API_KEY' || key === 'KILO_ORG_ID'),
+      Object.keys(job.env ?? {}).filter(
+        key => key === 'KILO_API_KEY' || key === 'KILO_ORG_ID' || key === 'KILO_CONFIG_CONTENT'
+      ),
       [],
-      `${jobName}: the credential env is declared on the completion step`
+      `${jobName}: the credential env and the completion config are declared on the completion step`
     );
     for (const step of job.steps) {
       const text = `${step.run ?? ''} ${JSON.stringify(step.env ?? {})}`;
       assert.doesNotMatch(
         text,
-        /GITHUB_ENV[\s\S]{0,200}KILO_API_KEY|KILO_API_KEY[\s\S]{0,200}GITHUB_ENV/,
-        `${jobName}/${step.name ?? step.uses}: the credential is declared as step-level env of the completion step`
+        /GITHUB_ENV[\s\S]{0,200}(KILO_API_KEY|KILO_CONFIG_CONTENT)|(KILO_API_KEY|KILO_CONFIG_CONTENT)[\s\S]{0,200}GITHUB_ENV/,
+        `${jobName}/${step.name ?? step.uses}: the completion env is declared on the completion step`
       );
       const envKeys = Object.keys(step.env ?? {});
+      const runConfig = envKeys.filter(key => key === 'KILO_CONFIG_CONTENT');
+      const expectedConfig = completeByJob.get(jobName) === step ? runConfig : [];
+      assert.deepEqual(
+        runConfig.filter(key => !expectedConfig.includes(key)),
+        [],
+        `${jobName}/${step.name ?? step.uses}: only the completion step declares the completion config`
+      );
       const tokenEnv = envKeys.filter(key => key === 'KILO_API_KEY' || key === 'KILO_ORG_ID');
       const expected = completeByJob.get(jobName) === step ? tokenEnv : [];
       assert.deepEqual(
@@ -94,6 +103,13 @@ function assertCredentialConfinement(workflow, completeByJob) {
   for (const [jobName, complete] of completeByJob) {
     assert.equal(complete.env?.KILO_API_KEY, '${{ steps.mint.outputs.token }}');
     assert.equal(complete.env?.KILO_ORG_ID, '${{ steps.mint.outputs.organization }}');
+    // The completion receives rendered prompt text, so it runs with every
+    // tool permission denied and only returns text.
+    assert.equal(
+      complete.env?.KILO_CONFIG_CONTENT,
+      JSON.stringify({ permission: { '*': 'deny' } }),
+      `${jobName}: the completion step runs with every tool permission denied`
+    );
     // Every completion job mints its own token right before completing.
     const mint = findStep(workflow.jobs[jobName], step => step.id === 'mint', 'mint step');
     assert.equal(mint.env?.MCP_CATALOG_TOKEN_SECRET, mintSecretEnv);
@@ -544,6 +560,27 @@ for (const [name, defect] of [
     workflow => {
       const step = workflow.jobs[summariesJobName].steps.find(item => item.run === completeCommand);
       delete step.env.KILO_API_KEY;
+    },
+  ],
+  [
+    'completion step loses the denied tool permissions',
+    workflow => {
+      const step = workflow.jobs[summariesJobName].steps.find(item => item.run === completeCommand);
+      delete step.env.KILO_CONFIG_CONTENT;
+    },
+  ],
+  [
+    'merge completion step allows tools again',
+    workflow => {
+      const step = workflow.jobs[mergeJobName].steps.find(item => item.run === completeCommand);
+      step.env.KILO_CONFIG_CONTENT = JSON.stringify({ permission: { '*': 'allow' } });
+    },
+  ],
+  [
+    'completion config exported through the job environment',
+    workflow => {
+      const step = workflow.jobs[summariesJobName].steps.find(item => item.id === 'mint');
+      step.run += `\n          echo 'KILO_CONFIG_CONTENT={"permission":{"*":"deny"}}' >> "$GITHUB_ENV"`;
     },
   ],
   [

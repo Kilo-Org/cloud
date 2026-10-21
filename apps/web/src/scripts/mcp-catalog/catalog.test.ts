@@ -15,6 +15,7 @@ import {
   CATALOG_JSON_DISPLAY_PATH,
   CATALOG_JSON_PATH,
   SUMMARY_INSTRUCTION,
+  SUMMARY_RUN_CONFIG,
   buildCatalogJson,
   buildCatalogRows,
   collectCatalogLeaves,
@@ -556,6 +557,34 @@ describe('mcp-catalog catalog', () => {
       } finally {
         if (previous === undefined) delete process.env.KILO_BIN;
         else process.env.KILO_BIN = previous;
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('runs the completion with every tool permission denied', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'kilo-summary-'));
+      const bin = join(dir, 'fake-kilo');
+      const envFile = join(dir, 'completion-config.json');
+      writeFileSync(
+        bin,
+        `#!/bin/sh\ncat > /dev/null\nprintf '%s' "$KILO_CONFIG_CONTENT" > '${envFile}'\nprintf '%s\\n' '{"type":"text","part":{"type":"text","text":"{}","time":{"end":1}}}'\n`,
+        { mode: 0o755 }
+      );
+      const previousBin = process.env.KILO_BIN;
+      const previousConfig = process.env.KILO_CONFIG_CONTENT;
+      process.env.KILO_BIN = bin;
+      // An ambient config must not loosen the completion's tool permissions.
+      process.env.KILO_CONFIG_CONTENT = JSON.stringify({ permission: { '*': 'allow' } });
+      try {
+        runKiloCompletion('prompt', 'usage-analytics-router.ts');
+        const observed = readFileSync(envFile, 'utf8');
+        expect(JSON.parse(observed)).toEqual({ permission: { '*': 'deny' } });
+        expect(observed).toBe(SUMMARY_RUN_CONFIG);
+      } finally {
+        if (previousBin === undefined) delete process.env.KILO_BIN;
+        else process.env.KILO_BIN = previousBin;
+        if (previousConfig === undefined) delete process.env.KILO_CONFIG_CONTENT;
+        else process.env.KILO_CONFIG_CONTENT = previousConfig;
         rmSync(dir, { recursive: true, force: true });
       }
     });

@@ -39,7 +39,9 @@ name: Kilo MCP catalog
 # The dump's `kilo run` never uses a maintainer's personal credential: both jobs
 # mint a short-lived benchmarking-service-account token from apps/web
 # (POST /api/internal/mcp-catalog/token) using MCP_CATALOG_TOKEN_SECRET, a
-# shared secret whose only purpose is that mint.
+# shared secret whose only purpose is that mint. Both completion steps run the
+# CLI with every tool permission denied (KILO_CONFIG_CONTENT on the step's own
+# env), so the completion returns summary text and nothing else.
 #
 # The CI wiring of this file is asserted by scripts/kilo-mcp-catalog.test.mjs
 # (same pattern as scripts/stacked-ci.test.mjs in .github/workflows/ci.yml).
@@ -372,6 +374,7 @@ jobs:
         env:
           KILO_API_KEY: ${{ steps.mint.outputs.token }}
           KILO_ORG_ID: ${{ steps.mint.outputs.organization }}
+          KILO_CONFIG_CONTENT: '{"permission":{"*":"deny"}}'
         run: node /tmp/catalog-complete.cjs /tmp/catalog-prompts/summary-prompts.json /tmp/catalog-summaries/summary-summaries.json
 
       # Mint failure, a fork completion failure, or an empty prompt artifact
@@ -859,6 +862,7 @@ jobs:
         env:
           KILO_API_KEY: ${{ steps.mint.outputs.token }}
           KILO_ORG_ID: ${{ steps.mint.outputs.organization }}
+          KILO_CONFIG_CONTENT: '{"permission":{"*":"deny"}}'
         run: node /tmp/catalog-complete.cjs /tmp/catalog-prompts/summary-prompts.json /tmp/catalog-summaries/summary-summaries.json
 
       - name: Write empty summaries fallback

@@ -89,6 +89,13 @@ const FILE_CONTEXT_CHAR_LIMIT = 60_000;
  */
 export const SUMMARY_MODEL = 'kilo/~deepseek/deepseek-flash-latest';
 export const SUMMARY_VARIANT = 'max';
+/**
+ * `KILO_CONFIG_CONTENT` for every summary completion. The prompt carries
+ * procedure and file source, so the completion runs with every tool
+ * permission denied and the model answers with text only. The CLI merges this
+ * content after project config, so a checked-out config cannot loosen it.
+ */
+export const SUMMARY_RUN_CONFIG = JSON.stringify({ permission: { '*': 'deny' } });
 /** `kilo run` invocation timeout: a whole batch (file source included) must fit. */
 const SUMMARY_RUN_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -721,8 +728,9 @@ export function parseKiloCompletion(lines: string[]): string {
  *
  * The prompt arrives on stdin, so batch size is never bounded by `ARGV_MAX`.
  * The CLI runs in the OS temp directory so it does not load this repo's
- * project config or agent instructions. Its JSON event stream is reduced to
- * the concatenated completed assistant text parts.
+ * project config or agent instructions, and receives {@link SUMMARY_RUN_CONFIG}
+ * so the completion has no tool surface and only returns text. Its JSON event
+ * stream is reduced to the concatenated completed assistant text parts.
  *
  * Never logs credentials: stdout is the model reply, stderr is only surfaced
  * (truncated) inside error messages.
@@ -735,6 +743,7 @@ export function runKiloCompletion(prompt: string, batchLabel: string): string {
       input: prompt,
       encoding: 'utf8',
       cwd: tmpdir(),
+      env: { ...process.env, KILO_CONFIG_CONTENT: SUMMARY_RUN_CONFIG },
       timeout: SUMMARY_RUN_TIMEOUT_MS,
       maxBuffer: 16 * 1024 * 1024,
     }

@@ -144,12 +144,10 @@ type CodeFenceProps = { code: string; language: string | null };
 
 /** The fences the app draws itself, in render order. */
 function codeFences(renderer: TestRenderer.ReactTestRenderer): CodeFenceProps[] {
-  return renderer.root
-    .findAllByType(CodeFenceType)
-    .map(({ props }) => ({
-      code: (props as CodeFenceProps).code,
-      language: (props as CodeFenceProps).language,
-    }));
+  return renderer.root.findAllByType(CodeFenceType).map(({ props }) => ({
+    code: (props as CodeFenceProps).code,
+    language: (props as CodeFenceProps).language,
+  }));
 }
 
 type EnrichedHostProps = {

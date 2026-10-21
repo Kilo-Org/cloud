@@ -97,6 +97,20 @@ describe('splitMarkdownFences', () => {
     ]);
   });
 
+  it('closes on a fence indented by up to three spaces', () => {
+    expect(splitMarkdownFences('```ts\nx\n   ```\nafter')).toEqual([
+      { type: 'code', code: 'x', language: 'ts', closed: true },
+      { type: 'text', raw: 'after' },
+    ]);
+  });
+
+  it('reads CRLF source as lines without the carriage return', () => {
+    expect(splitMarkdownFences('```ts\r\nx\r\n```\r\nafter')).toEqual([
+      { type: 'code', code: 'x', language: 'ts', closed: true },
+      { type: 'text', raw: 'after' },
+    ]);
+  });
+
   it('keeps a mermaid fence available to the diagram renderer', () => {
     const runs = splitMarkdownFences('```mermaid\ngraph TD;\nA-->B;\n```');
 

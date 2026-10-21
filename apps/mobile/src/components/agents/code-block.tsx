@@ -246,8 +246,11 @@ function CodeBlockImpl({
               selectable
               uiTextView
               className={CODE_LINE_CLASSNAME}
+              // Direction and ink for the native text view's own paragraph
+              // style: the selectable chunk wraps like the plain one and its
+              // continuations start under the first line in an RTL interface.
               // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
-              style={{ color: textBase }}
+              style={{ color: textBase, ...LTR_TEXT_DIRECTION }}
             >
               {renderSelectableChunkChildren(chunk, effectiveTokenScheme, keepBlankLineBox)}
             </SelectableCodeText>

@@ -1,7 +1,7 @@
 /**
  * A fenced code block's source, taken out of a markdown run.
  */
-export type MarkdownCodeRun = {
+type MarkdownCodeRun = {
   type: 'code';
   code: string;
   /** The first token of the fence's info string, as written; null when empty. */
@@ -10,7 +10,7 @@ export type MarkdownCodeRun = {
   closed: boolean;
 };
 
-export type MarkdownTextRun = { type: 'text'; raw: string };
+type MarkdownTextRun = { type: 'text'; raw: string };
 
 export type MarkdownRun = MarkdownCodeRun | MarkdownTextRun;
 
@@ -21,8 +21,8 @@ type OpeningFence = { fenceChar: string; fenceLength: number; info: string };
 
 /** Three or more backticks or tildes at column 0, then the info string. */
 const OPENING_FENCE = /^(`{3,}|~{3,})(.*)$/;
-/** The same run of fence characters alone on a line. */
-const CLOSING_FENCE = /^(`{3,}|~{3,})[ \t]*$/;
+/** The same run of fence characters alone on a line, indented by up to three spaces. */
+const CLOSING_FENCE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 
 function openingFence(line: string): OpeningFence | null {
   const [, fence = '', info = ''] = OPENING_FENCE.exec(line) ?? [];
@@ -84,7 +84,10 @@ export function splitMarkdownFences(raw: string): MarkdownRun[] {
   const readLine = (): MarkdownLine => {
     const newline = raw.indexOf('\n', cursor);
     const end = newline === -1 ? raw.length : newline;
-    const line = { text: raw.slice(cursor, end), next: newline === -1 ? raw.length : newline + 1 };
+    // A CRLF value keeps its `\r` on every line; drop it so a fence opens and
+    // closes on the same text the renderer would see, and so the code has none.
+    const text = raw.slice(cursor, end).replace(/\r$/, '');
+    const line = { text, next: newline === -1 ? raw.length : newline + 1 };
     cursor = line.next;
     return line;
   };

@@ -47,7 +47,12 @@ export function MarkdownCodeFence({
       style={{ backgroundColor: palette.codeBackground }}
     >
       <View className="mb-1 flex-row items-center justify-between">
-        <Text className="text-[11px] font-medium text-muted-foreground" numberOfLines={1}>
+        <Text
+          className="text-[11px] font-medium"
+          // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- the label tracks the markdown variant's palette
+          style={{ color: palette.mutedTextColor }}
+          numberOfLines={1}
+        >
           {language ?? ''}
         </Text>
         <IconButton

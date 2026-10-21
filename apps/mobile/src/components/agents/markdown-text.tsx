@@ -35,7 +35,10 @@ export type MarkdownTextProps = {
   onPressLink?: MarkdownLinkPressHandler;
   /**
    * Optional handler that hands a rendered code fence's source to the caller.
-   * When omitted, fences render with no copy button.
+   * A fence this renderer draws always offers copy; without a handler the
+   * button copies through the shared clipboard helper. A fence left on the
+   * native renderer's path (indented into a list or a blockquote) shows its
+   * own copy button only when this handler is supplied.
    */
   onCopyCode?: MarkdownCopyCodeHandler;
 };

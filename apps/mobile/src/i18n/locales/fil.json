@@ -2884,6 +2884,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Bago tayo magsimula",
+    "summaryTitle": "Kagustuhan sa pagbabahagi ng datos",
     "introDescription": "Ipinapadala ng Kilo ang mga mensahe mo sa mga tagapagbigay ng serbisyo ng AI para makabuo ng mga tugon. Narito ang ibinabahagi at kung sino ang tumatanggap nito.",
     "required": "Kinakailangan para magamit ang Kilo",
     "promptsTitle": "Ang iyong mga prompt at pag-uusap",
@@ -2892,7 +2893,6 @@
     "accountDescription": "Ang ID ng iyong akawnt sa Kilo at metadata ng kahilingan, na ginagamit para patunayan ang iyong pagkakakilanlan at sukatin ang paggamit.",
     "diagnosticsTitle": "Pagsusuri sa mga problema ng app",
     "diagnosticsDescription": "Mga ulat ng pag-crash at error na ginagamit para panatilihing maayos ang app. Inaalis ang nilalaman ng app sa mga ulat.",
-    "optional": "Opsyonal",
     "helpImprove": "Tumulong na mapabuti ang Kilo",
     "helpImproveDescription": "Ibahagi ang datos sa paggamit ng produkto na walang pagkakakilanlan mo, pati ang pinagmulan ng pag-install. Maaari mo itong baguhin anumang oras sa mga setting.",
     "seeFullDetails": "Tingnan ang lahat ng detalye",

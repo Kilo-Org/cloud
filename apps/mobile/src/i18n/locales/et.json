@@ -2884,6 +2884,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Enne alustamist",
+    "summaryTitle": "Andmete jagamise eelistused",
     "introDescription": "Kilo saadab sinu sõnumid AI-pakkujatele vastuste genereerimiseks. Siin on kirjas, mida ja kellega jagatakse.",
     "required": "Kilo kasutamiseks nõutud",
     "promptsTitle": "Sinu viibad ja vestlused",
@@ -2892,7 +2893,6 @@
     "accountDescription": "Sinu Kilo konto ID ja päringute metaandmed, mida kasutatakse sinu autentimiseks ja kasutuse mõõtmiseks.",
     "diagnosticsTitle": "Rakenduse diagnostika",
     "diagnosticsDescription": "Krahhi- ja veaaruanded, millest on eemaldatud rakenduse sisu. Neid kasutatakse rakenduse stabiilsuse tagamiseks.",
-    "optional": "Valikuline",
     "helpImprove": "Aita Kilot paremaks muuta",
     "helpImproveDescription": "Jaga anonüümseid tooteanalüütika andmeid ja paigaldusallikat. Saad seda igal ajal seadetes muuta.",
     "seeFullDetails": "Vaata kogu teavet",

@@ -2884,6 +2884,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Hasi baino lehen",
+    "summaryTitle": "Datuak partekatzeko hobespenak",
     "introDescription": "Kilo-k zure mezuak AI hornitzaileei bidaltzen dizkie erantzunak sortzeko. Hona hemen zer partekatzen den eta norekin.",
     "required": "Kilo erabiltzeko beharrezkoa",
     "promptsTitle": "Zure eskaerak eta elkarrizketak",
@@ -2892,7 +2893,6 @@
     "accountDescription": "Zure Kilo kontuaren IDa eta eskaeraren metadatuak, zu autentifikatzeko eta erabilera neurtzeko.",
     "diagnosticsTitle": "Aplikazioaren diagnostikoak",
     "diagnosticsDescription": "Ustekabeko itxieren eta erroreen txostenak, aplikazioaren edukia kenduta, aplikazioa egonkor mantentzeko.",
-    "optional": "Aukerakoa",
     "helpImprove": "Lagundu Kilo hobetzen",
     "helpImproveDescription": "Partekatu erabilerari buruzko datu anonimoak eta instalazioaren jatorria. Aukera hau edonoiz alda dezakezu ezarpenetan.",
     "seeFullDetails": "Ikusi xehetasun osoak",

@@ -2964,6 +2964,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Preden začnemo",
+    "summaryTitle": "Nastavitve deljenja podatkov",
     "introDescription": "Kilo pošilja tvoja sporočila ponudnikom umetne inteligence, da ustvarijo odgovore. Spodaj je opisano, katere podatke delimo in s kom.",
     "required": "Obvezno za uporabo aplikacije Kilo",
     "promptsTitle": "Tvoji pozivi in pogovori",
@@ -2972,7 +2973,6 @@
     "accountDescription": "ID tvojega računa Kilo in metapodatki zahtev za preverjanje tvoje pristnosti in merjenje porabe.",
     "diagnosticsTitle": "Diagnostika aplikacije",
     "diagnosticsDescription": "Poročila o sesutjih in napakah brez vsebine aplikacije, ki pomagajo zagotavljati njeno stabilnost.",
-    "optional": "Neobvezno",
     "helpImprove": "Pomagaj izboljšati Kilo",
     "helpImproveDescription": "Deli anonimne podatke o uporabi aplikacije in viru namestitve. To lahko kadar koli spremeniš v nastavitvah.",
     "seeFullDetails": "Prikaži vse podrobnosti",

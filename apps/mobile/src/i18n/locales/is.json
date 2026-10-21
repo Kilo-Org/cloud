@@ -2884,6 +2884,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Áður en við byrjum",
+    "summaryTitle": "Kjörstillingar fyrir deilingu gagna",
     "introDescription": "Kilo sendir skilaboðin þín til veitenda gervigreindarlíkana til að mynda svör. Hér sérðu hvaða gögnum er deilt og með hverjum.",
     "required": "Nauðsynlegt til að nota Kilo",
     "promptsTitle": "Skilaboð þín og samtöl",
@@ -2892,7 +2893,6 @@
     "accountDescription": "Auðkenni Kilo-reikningsins þíns og lýsigögn beiðna, sem eru notuð til að auðkenna þig og mæla notkun.",
     "diagnosticsTitle": "Greiningargögn forritsins",
     "diagnosticsDescription": "Hrun- og villuskýrslur sem eru notaðar til að tryggja stöðugleika forritsins. Efni úr forritinu hefur verið fjarlægt úr þeim.",
-    "optional": "Valfrjálst",
     "helpImprove": "Hjálpa til við að bæta Kilo",
     "helpImproveDescription": "Deildu nafnlausum notkunargögnum og upplýsingum um hvaðan uppsetningin kom. Þú getur breytt þessu hvenær sem er í stillingum.",
     "seeFullDetails": "Sjá allar upplýsingar",

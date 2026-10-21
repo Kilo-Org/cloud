@@ -2372,6 +2372,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Sebelum kita mulai",
+    "summaryTitle": "Preferensi berbagi data",
     "introDescription": "Kilo mengirim pesanmu ke penyedia AI untuk menghasilkan respons. Berikut data yang dibagikan dan pihak yang menerimanya.",
     "required": "Wajib untuk menggunakan Kilo",
     "promptsTitle": "Instruksi dan percakapanmu",
@@ -2380,7 +2381,6 @@
     "accountDescription": "ID akun Kilo dan metadata permintaanmu digunakan untuk memverifikasi identitasmu dan menghitung penggunaan.",
     "diagnosticsTitle": "Diagnostik aplikasi",
     "diagnosticsDescription": "Laporan aplikasi berhenti mendadak dan kesalahan digunakan untuk menjaga kestabilan aplikasi. Konten aplikasi dihapus dari laporan ini.",
-    "optional": "Opsional",
     "helpImprove": "Bantu tingkatkan Kilo",
     "helpImproveDescription": "Bagikan data analitik produk anonim dan sumber pemasangan aplikasi. Kamu dapat mengubahnya kapan saja di Pengaturan.",
     "seeFullDetails": "Lihat detail lengkap",

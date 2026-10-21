@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted case per MCP screen state: loading, error, empty, row toggle, edit, add, validation, failure fallbacks, and delete */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -329,12 +330,12 @@ describe('ProfileMcpScreen', () => {
     );
 
     const { renderer, unmount } = await mountScreen();
-    const { onValueChange } = findOne(renderer.root, 'Switch').props;
-    expect(typeof onValueChange).toBe('function');
+    // The test renderer exposes host props untyped; the screen passes this handler.
+    const toggleProps = findOne(renderer.root, 'Switch').props as {
+      onValueChange: (value: boolean) => void;
+    };
     act(() => {
-      if (typeof onValueChange === 'function') {
-        onValueChange(false);
-      }
+      toggleProps.onValueChange(false);
     });
 
     expect(h.error).toHaveBeenCalledWith("Couldn't update MCP server");

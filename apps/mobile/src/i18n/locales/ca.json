@@ -673,7 +673,8 @@
       "description": "Connecta el teu compte de GitHub per revisar sol·licituds d'integració al mòbil.",
       "gitlabDescription": "Connecta el teu compte de GitLab per revisar sol·licituds de fusió des del mòbil.",
       "bitbucketDescription": "Connecta Bitbucket a aquesta organització per revisar sol·licituds d'integració des del mòbil.",
-      "bitbucketOrgOnlyDescription": "Selecciona una organització al teu perfil per revisar-ne les sol·licituds d'integració de Bitbucket."
+      "bitbucketOrgOnlyDescription": "Canvia el compte de dalt a una organització per revisar-ne les sol·licituds d'integració a Bitbucket.",
+      "contextLine": "Per a {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -785,7 +786,9 @@
       "reviewNotSubmitted": "Aquesta revisió no es pot enviar tal com està. Pot ser que la PR hagi canviat o que estiguis intentant revisar la teva pròpia sol·licitud d'integració.",
       "reviewNotSubmittedTerm": "Aquesta revisió no es pot enviar tal com està. Pot ser que la {{term}} hagi canviat o que no puguis revisar la teva pròpia {{term}}.",
       "couldNotPostComment": "No s'ha pogut publicar el comentari.",
-      "couldNotSubmitReview": "No s'ha pogut enviar la revisió. Comprova la connexió i torna-ho a provar."
+      "couldNotSubmitReview": "No s'ha pogut enviar la revisió. Comprova la connexió i torna-ho a provar.",
+      "rateLimited": "S'han rebut massa sol·licituds. Torna-ho a provar més tard.",
+      "conflict": "Això ha canviat mentre hi treballaves. Torna-ho a carregar i torna-ho a provar."
     },
     "operation": {
       "couldNotReply": "No s'ha pogut respondre.",
@@ -1564,7 +1567,8 @@
       "bugs": "Errors",
       "style": "Estil",
       "testing": "Proves",
-      "documentation": "Documentació"
+      "documentation": "Documentació",
+      "unknown": "Altres ({{area}})"
     },
     "gateThreshold": {
       "warning": "Avís"
@@ -2240,6 +2244,7 @@
       "prefillModelUnavailable": "{{model}} ja no està disponible. S'està utilitzant el teu model predeterminat.",
       "couldNotReadPendingSessions": "No s'han pogut llegir les sessions pendents. Torna-ho a provar.",
       "failedToCreate": "No s'ha pogut crear la sessió.",
+      "checkOrganizationAccess": "Comproveu el vostre accés a aquesta organització i torneu-ho a provar.",
       "couldNotRefreshRepositories": "No s'han pogut actualitzar els repositoris. Torna-ho a provar.",
       "discardDraftTitle": "Vols descartar l'esborrany?",
       "discardDraftMessage": "Es perdrà el teu missatge.",
@@ -2771,6 +2776,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Les teves sessions actives no estaran disponibles fins que s'hagin carregat les dades.",
     "currentDeviceUnidentified": "No s'ha pogut identificar el dispositiu actual.",
+    "kiloApp": "Aplicació de Kilo",
     "noSessions": "No hi ha sessions actives",
     "noSessionsDescription": "Inicia la sessió a l'aplicació de Kilo en un altre dispositiu i apareixerà aquí.",
     "onlyKiloAppSignIns": "Aquí només apareixen els inicis de sessió de l'aplicació de Kilo. No es mostren els de l'editor ni els del CLI.",

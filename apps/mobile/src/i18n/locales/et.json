@@ -661,7 +661,8 @@
       "description": "Ühenda oma GitHubi konto, et tõmbetaotlusi mobiilis üle vaadata.",
       "gitlabDescription": "Ühenda oma GitLab konto, et liitmistaotlusi mobiilis üle vaadata.",
       "bitbucketDescription": "Ühenda Bitbucket selle organisatsiooniga, et tõmbetaotlusi mobiilis üle vaadata.",
-      "bitbucketOrgOnlyDescription": "Vali oma profiilis organisatsioon, et vaadata selle Bitbucketi tõmbetaotlusi."
+      "bitbucketOrgOnlyDescription": "Vaheta ülalolev konto organisatsioonile, et selle Bitbucketi tõmbetaotlusi üle vaadata.",
+      "contextLine": "{{organization}} jaoks"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "Seda ülevaatust ei saa praegusel kujul esitada. PR võib olla muutunud või proovid üle vaadata enda tõmbetaotlust, mis pole lubatud.",
       "reviewNotSubmittedTerm": "Seda ülevaatust ei saa praegusel kujul esitada. {{term}} võib olla muutunud või ei tohi omaenda {{term}} üle vaadata.",
       "couldNotPostComment": "Kommentaari ei õnnestunud postitada.",
-      "couldNotSubmitReview": "Ülevaatuse esitamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti."
+      "couldNotSubmitReview": "Ülevaatuse esitamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.",
+      "rateLimited": "Liiga palju päringuid. Proovi hiljem uuesti.",
+      "conflict": "See muutus, samal ajal kui sa sellega tegelesid. Laadi see uuesti ja proovi uuesti."
     },
     "operation": {
       "couldNotReply": "Vastamine ebaõnnestus.",
@@ -1545,7 +1548,8 @@
       "bugs": "Vead",
       "style": "Stiil",
       "testing": "Testimine",
-      "documentation": "Dokumentatsioon"
+      "documentation": "Dokumentatsioon",
+      "unknown": "Muu ({{area}})"
     },
     "gateThreshold": {
       "warning": "Hoiatus"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} pole enam saadaval. Kasutatakse sinu vaikemudelit.",
       "couldNotReadPendingSessions": "Ootel seansside lugemine ebaõnnestus. Proovi uuesti.",
       "failedToCreate": "Seansi loomine ebaõnnestus.",
+      "checkOrganizationAccess": "Kontrolli oma juurdepääsu sellele organisatsioonile ja proovi uuesti.",
       "couldNotRefreshRepositories": "Hoidlate värskendamine ebaõnnestus. Proovi uuesti.",
       "discardDraftTitle": "Kas loobuda mustandist?",
       "discardDraftMessage": "Sinu viip läheb kaotsi.",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Sinu aktiivsed seansid on saadaval alles pärast andmete laadimist.",
     "currentDeviceUnidentified": "Praegust seadet ei õnnestunud tuvastada.",
+    "kiloApp": "Kilo rakendus",
     "noSessions": "Aktiivseid seansse pole",
     "noSessionsDescription": "Logi teises seadmes Kilo rakendusse sisse ja see seade ilmub siia.",
     "onlyKiloAppSignIns": "Siin kuvatakse ainult Kilo rakendusse sisselogimised. Redaktori ja CLI kaudu sisselogimisi ei kuvata.",

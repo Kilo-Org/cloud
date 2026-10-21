@@ -661,7 +661,8 @@
       "description": "Ikonekta ang GitHub account mo para makapagsuri ng mga pull request sa mobile.",
       "gitlabDescription": "Ikonekta ang iyong GitLab account para suriin ang mga merge request sa mobile.",
       "bitbucketDescription": "Ikonekta ang Bitbucket sa organizasyong ito para suriin ang mga pull request sa mobile.",
-      "bitbucketOrgOnlyDescription": "Pumili ng organisasyon sa iyong profile para suriin ang mga pull request nito sa Bitbucket."
+      "bitbucketOrgOnlyDescription": "Palitan ang account sa itaas ng isang organisasyon para suriin ang mga pull request nito sa Bitbucket.",
+      "contextLine": "Para sa {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "Hindi maisumite ang pagsusuring ito sa kasalukuyang anyo nito. Maaaring nagbago ang PR, o hindi ka puwedeng magsuri ng sarili mong pull request.",
       "reviewNotSubmittedTerm": "Hindi maisumite ang pagsusuring ito sa kasalukuyang anyo. Baka nagbago ang {{term}}, o hindi mo masusuri ang sarili mong {{term}}.",
       "couldNotPostComment": "Hindi ma-post ang komento.",
-      "couldNotSubmitReview": "Hindi maisumite ang pagsusuri. Suriin ang koneksyon mo at subukan muli."
+      "couldNotSubmitReview": "Hindi maisumite ang pagsusuri. Suriin ang koneksyon mo at subukan muli.",
+      "rateLimited": "Masyadong maraming kahilingan. Pakisubukang muli sa ibang pagkakataon.",
+      "conflict": "Nagbago ito habang ginagawa mo ito. I-reload ito at subukang muli."
     },
     "operation": {
       "couldNotReply": "Hindi maipadala ang sagot.",
@@ -1545,7 +1548,8 @@
       "bugs": "Mga bug",
       "style": "Estilo",
       "testing": "Pagsubok",
-      "documentation": "Dokumentasyon"
+      "documentation": "Dokumentasyon",
+      "unknown": "Iba ({{area}})"
     },
     "gateThreshold": {
       "warning": "Babala"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "Hindi na magamit ang {{model}}. Ginagamit ang iyong paunang itinakdang modelo.",
       "couldNotReadPendingSessions": "Hindi mabasa ang mga nakabinbing sesyon. Subukang muli.",
       "failedToCreate": "Hindi makagawa ng sesyon.",
+      "checkOrganizationAccess": "Suriin ang iyong access sa Organisasyon na ito, at subukang muli.",
       "couldNotRefreshRepositories": "Hindi ma-refresh ang mga imbakan ng code. Subukang muli.",
       "discardDraftTitle": "Burahin ang burador?",
       "discardDraftMessage": "Mawawala ang iyong prompt.",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Hindi makikita ang mga aktibo mong sesyon hangga't hindi ito na-load.",
     "currentDeviceUnidentified": "Hindi matukoy ang kasalukuyang device.",
+    "kiloApp": "Kilo app",
     "noSessions": "Walang aktibong sesyon",
     "noSessionsDescription": "Mag-sign in gamit ang Kilo app sa ibang device para makita ito rito.",
     "onlyKiloAppSignIns": "Ang mga sign-in sa Kilo app lang ang lumalabas dito. Hindi nakalista ang mga sign-in sa editor at CLI.",

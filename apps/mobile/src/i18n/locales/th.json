@@ -661,7 +661,8 @@
       "description": "เชื่อมต่อบัญชี GitHub ของคุณเพื่อรีวิว PR บนมือถือ",
       "gitlabDescription": "เชื่อมต่อบัญชี GitLab ของคุณเพื่อรีวิว merge request บนมือถือ",
       "bitbucketDescription": "เชื่อมต่อ Bitbucket กับองค์กรนี้เพื่อรีวิวพูลรีเควสต์บนมือถือ",
-      "bitbucketOrgOnlyDescription": "เลือกองค์กรในโปรไฟล์ของคุณเพื่อรีวิวพูลรีเควสต์ Bitbucket ขององค์กรนั้น"
+      "bitbucketOrgOnlyDescription": "สลับบัญชีด้านบนไปที่องค์กรเพื่อรีวิวพูลรีเควสต์บน Bitbucket ขององค์กรนั้น",
+      "contextLine": "สำหรับ {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "ส่งรีวิวนี้ตามที่เป็นอยู่ไม่ได้ PR อาจเปลี่ยนไปแล้ว หรือคุณรีวิว PR ของตัวเองไม่ได้",
       "reviewNotSubmittedTerm": "ส่งรีวิวนี้ตามที่เป็นอยู่ไม่ได้ {{term}}อาจเปลี่ยนไปแล้ว หรือคุณรีวิว{{term}}ของตัวเองไม่ได้",
       "couldNotPostComment": "ไม่สามารถโพสต์ความคิดเห็นได้",
-      "couldNotSubmitReview": "ไม่สามารถส่งรีวิวได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง"
+      "couldNotSubmitReview": "ไม่สามารถส่งรีวิวได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
+      "rateLimited": "มีคำขอมากเกินไป กรุณาลองอีกครั้งภายหลัง",
+      "conflict": "รายการนี้เปลี่ยนแปลงไประหว่างที่คุณกำลังแก้ไข กรุณาโหลดใหม่แล้วลองอีกครั้ง"
     },
     "operation": {
       "couldNotReply": "ไม่สามารถตอบกลับได้",
@@ -1545,7 +1548,8 @@
       "bugs": "บั๊ก",
       "style": "รูปแบบโค้ด",
       "testing": "การทดสอบ",
-      "documentation": "เอกสารประกอบ"
+      "documentation": "เอกสารประกอบ",
+      "unknown": "อื่นๆ ({{area}})"
     },
     "gateThreshold": {
       "warning": "คำเตือน"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} ใช้ไม่ได้แล้ว กำลังใช้โมเดลเริ่มต้นของคุณแทน",
       "couldNotReadPendingSessions": "ไม่สามารถอ่านเซสชันที่รอดำเนินการได้ ลองอีกครั้ง",
       "failedToCreate": "ไม่สามารถสร้างเซสชันได้",
+      "checkOrganizationAccess": "กรุณาตรวจสอบสิทธิ์การเข้าถึงของคุณในองค์กรนี้ แล้วลองอีกครั้ง",
       "couldNotRefreshRepositories": "ไม่สามารถรีเฟรชรายการคลังโค้ดได้ กรุณาลองอีกครั้ง",
       "discardDraftTitle": "ทิ้งฉบับร่างหรือไม่?",
       "discardDraftMessage": "พรอมต์ที่คุณเขียนไว้จะหายไป",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "ยังไม่สามารถแสดงเซสชันที่ใช้งานอยู่ได้จนกว่าจะโหลดข้อมูลเสร็จ",
     "currentDeviceUnidentified": "ระบุอุปกรณ์ปัจจุบันไม่ได้",
+    "kiloApp": "แอป Kilo",
     "noSessions": "ไม่มีเซสชันที่ใช้งานอยู่",
     "noSessionsDescription": "เข้าสู่ระบบในแอป Kilo บนอุปกรณ์อื่น แล้วอุปกรณ์นั้นจะแสดงที่นี่",
     "onlyKiloAppSignIns": "หน้านี้แสดงเฉพาะการเข้าสู่ระบบผ่านแอป Kilo ไม่รวมการเข้าสู่ระบบผ่านโปรแกรมแก้ไขโค้ดหรือ CLI",

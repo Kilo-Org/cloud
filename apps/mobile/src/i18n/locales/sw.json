@@ -661,7 +661,8 @@
       "description": "Unganisha akaunti yako ya GitHub ili ukague maombi ya kuunganisha kwenye simu.",
       "gitlabDescription": "Unganisha akaunti yako ya GitLab ili kukagua maombi ya kuunganisha kwenye simu.",
       "bitbucketDescription": "Unganisha Bitbucket na shirika hili ili kukagua maombi ya kuunganisha kwenye simu.",
-      "bitbucketOrgOnlyDescription": "Chagua shirika kwenye wasifu wako ili kukagua maombi ya kuunganisha ya Bitbucket yake."
+      "bitbucketOrgOnlyDescription": "Badilisha akaunti iliyo juu kuwa shirika ili kukagua maombi yake ya kuunganisha kwenye Bitbucket.",
+      "contextLine": "Kwa {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "Ukaguzi huu hauwezi kuwasilishwa ulivyo sasa. Huenda PR imebadilika, au huwezi kukagua ombi lako mwenyewe la kuunganisha.",
       "reviewNotSubmittedTerm": "Ukaguzi huu hauwezi kutumwa kama ulivyo. Huenda {{term}} limebadilika, au huwezi kukagua {{term}} wako mwenyewe.",
       "couldNotPostComment": "Imeshindikana kuchapisha maoni.",
-      "couldNotSubmitReview": "Imeshindikana kuwasilisha ukaguzi. Angalia muunganisho wako kisha ujaribu tena."
+      "couldNotSubmitReview": "Imeshindikana kuwasilisha ukaguzi. Angalia muunganisho wako kisha ujaribu tena.",
+      "rateLimited": "Maombi mengi mno. Tafadhali jaribu tena baadaye.",
+      "conflict": "Imebadilika wakati ulikuwa unafanya kazi nayo. Tafadhali ipakie upya na ujaribu tena."
     },
     "operation": {
       "couldNotReply": "Imeshindikana kutuma jibu.",
@@ -1545,7 +1548,8 @@
       "bugs": "Hitilafu",
       "style": "Mtindo",
       "testing": "Upimaji",
-      "documentation": "Nyaraka"
+      "documentation": "Nyaraka",
+      "unknown": "Nyingine ({{area}})"
     },
     "gateThreshold": {
       "warning": "Onyo"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} haipatikani tena. Modeli yako chaguomsingi inatumika.",
       "couldNotReadPendingSessions": "Imeshindikana kusoma vikao vinavyosubiri. Jaribu tena.",
       "failedToCreate": "Imeshindikana kuunda kikao.",
+      "checkOrganizationAccess": "Tafadhali angalia ufikiaji wako wa shirika hili, kisha ujaribu tena.",
       "couldNotRefreshRepositories": "Imeshindikana kupakia upya hazina. Tafadhali jaribu tena.",
       "discardDraftTitle": "Ungependa kufuta rasimu?",
       "discardDraftMessage": "Maagizo yako yatapotea.",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Vikao vyako vinavyoendelea havipatikani hadi taarifa zipakiwe.",
     "currentDeviceUnidentified": "Imeshindikana kutambua kifaa cha sasa.",
+    "kiloApp": "Programu ya Kilo",
     "noSessions": "Hakuna vikao vinavyoendelea",
     "noSessionsDescription": "Ingia kwenye akaunti kwa kutumia programu ya Kilo kwenye kifaa kingine. Kifaa hicho kitaonekana hapa.",
     "onlyKiloAppSignIns": "Ni vikao vya kuingia kupitia programu ya Kilo pekee vinavyoonekana hapa. Vikao vya kihariri na CLI havijaorodheshwa.",

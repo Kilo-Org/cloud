@@ -661,7 +661,8 @@
       "description": "በሞባይል ላይ የማዋሃድ ጥያቄዎችን ለመገምገም የGitHub መለያህን አገናኝ።",
       "gitlabDescription": "በሞባይል ላይ የማዋሃድ ጥያቄዎችን ለመገምገም የGitLab መለያዎን ያገናኙ።",
       "bitbucketDescription": "Bitbucketን ከዚህ ድርጅት ጋር ያገናኙ የማዋሃድ ጥያቄዎችን በሞባይል ለመገምገም።",
-      "bitbucketOrgOnlyDescription": "የBitbucket የማዋሃድ ጥያቄዎቹን ለመገምገም በመገለጫዎ ውስጥ አንድ ድርጅት ይምረጡ።"
+      "bitbucketOrgOnlyDescription": "ከላይ ያለውን መለያ ወደ ድርጅት ይቀይሩ፣ የዚህ ድርጅት የBitbucket የማዋሃድ ጥያቄዎችን ለመገምገም።",
+      "contextLine": "ለ{{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "ይህን ግምገማ ባለበት ሁኔታ መላክ አይቻልም። PR ተለውጦ ሊሆን ይችላል፣ ወይም የራስህን የማዋሃድ ጥያቄ እየገመገምክ ሊሆን ይችላል። የራስህን ጥያቄ መገምገም አይፈቀድም።",
       "reviewNotSubmittedTerm": "ይህ ግምገማ እንዳለ ማስገባት አይቻልም። {{term}} ተቀይሮ ሊሆን ወይም የራስዎን {{term}} መገምገም አይችሉም።",
       "couldNotPostComment": "አስተያየት መለጠፍ አልተቻለም።",
-      "couldNotSubmitReview": "ግምገማውን መላክ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።"
+      "couldNotSubmitReview": "ግምገማውን መላክ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
+      "rateLimited": "ብዙ ጥያቄዎች። እባክዎ ኋላ እንደገና ይሞክሩ።",
+      "conflict": "እርስዎ በሚሰሩበት ጊዜ ይህ ተቀይሯል። እንደገና ይጫኑት እና እባክዎ እንደገና ይሞክሩ።"
     },
     "operation": {
       "couldNotReply": "መልስ መስጠት አልተቻለም።",
@@ -1545,7 +1548,8 @@
       "bugs": "ሳንካዎች",
       "style": "የአጻጻፍ ዘይቤ",
       "testing": "ፍተሻ",
-      "documentation": "ሰነዶች"
+      "documentation": "ሰነዶች",
+      "unknown": "ሌላ ({{area}})"
     },
     "gateThreshold": {
       "warning": "ማስጠንቀቂያ"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} ከእንግዲህ አይገኝም። ነባሪ ሞዴልዎ ጥቅም ላይ እየዋለ ነው።",
       "couldNotReadPendingSessions": "የሚጠባበቁ ክፍለ ጊዜዎችን ማንበብ አልተቻለም። እንደገና ይሞክሩ።",
       "failedToCreate": "ክፍለ ጊዜ መፍጠር አልተሳካም።",
+      "checkOrganizationAccess": "እባክዎ ወደ ይህ ድርጅት ያለዎትን መዳረሻ ያረጋግጡ እና እንደገና ይሞክሩ።",
       "couldNotRefreshRepositories": "ማከማቻዎችን ማደስ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "discardDraftTitle": "ረቂቁን ማስወገድ ይፈልጋሉ?",
       "discardDraftMessage": "ጥያቄዎ ይጠፋል።",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "ይህ እስኪጫን ድረስ ንቁ ክፍለ ጊዜዎችዎ አይገኙም።",
     "currentDeviceUnidentified": "የአሁኑን መሣሪያ መለየት አልተቻለም።",
+    "kiloApp": "የKilo መተግበሪያ",
     "noSessions": "ንቁ ክፍለ ጊዜዎች የሉም",
     "noSessionsDescription": "በሌላ መሣሪያ ላይ በKilo መተግበሪያ ይግቡ፤ እዚህ ይታያል።",
     "onlyKiloAppSignIns": "የKilo መተግበሪያ መግቢያዎች ብቻ እዚህ ይታያሉ። የአርታዒ እና የCLI መግቢያዎች አይዘረዘሩም።",

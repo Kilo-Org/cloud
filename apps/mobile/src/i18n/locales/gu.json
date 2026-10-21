@@ -661,7 +661,8 @@
       "description": "મોબાઇલ પર પુલ રિક્વેસ્ટની સમીક્ષા કરવા તમારું GitHub એકાઉન્ટ કનેક્ટ કરો.",
       "gitlabDescription": "મોબાઇલ પર મર્જ રિક્વેસ્ટની સમીક્ષા કરવા માટે તમારું GitLab ખાતું કનેક્ટ કરો.",
       "bitbucketDescription": "મોબાઇલ પર પુલ રિક્વેસ્ટની સમીક્ષા કરવા માટે આ સંસ્થાને Bitbucket સાથે કનેક્ટ કરો.",
-      "bitbucketOrgOnlyDescription": "તેની Bitbucket પુલ રિક્વેસ્ટની સમીક્ષા કરવા માટે તમારી પ્રોફાઇલમાં એક સંસ્થા પસંદ કરો."
+      "bitbucketOrgOnlyDescription": "તેની Bitbucket પુલ રિક્વેસ્ટની સમીક્ષા કરવા માટે ઉપરનું ખાતું સંસ્થામાં બદલો.",
+      "contextLine": "{{organization}} માટે"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "આ સમીક્ષા હાલની સ્થિતિમાં મોકલી શકાતી નથી. કદાચ PR બદલાઈ છે અથવા આ તમારી પોતાની પુલ રિક્વેસ્ટ છે, જેની તમે સમીક્ષા કરી શકતા નથી.",
       "reviewNotSubmittedTerm": "આ સમીક્ષા એવીની એવી સબમિટ થઈ શકે નહીં. કદાચ {{term}} બદલાઈ ગઈ હોય, અથવા તમે તમારી પોતાની {{term}}ની સમીક્ષા કરી શકો નહીં.",
       "couldNotPostComment": "ટિપ્પણી પોસ્ટ કરી શકાઈ નહીં.",
-      "couldNotSubmitReview": "સમીક્ષા મોકલી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો."
+      "couldNotSubmitReview": "સમીક્ષા મોકલી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
+      "rateLimited": "ઘણી બધી વિનંતીઓ થઈ રહી છે. કૃપા કરીને થોડા સમય પછી ફરી પ્રયાસ કરો.",
+      "conflict": "આ તમે તેના પર કામ કરતી વખતે બદલાઈ ગયું. તેને ફરીથી લોડ કરો અને ફરી પ્રયાસ કરો."
     },
     "operation": {
       "couldNotReply": "જવાબ આપી શકાયો નહીં.",
@@ -1545,7 +1548,8 @@
       "bugs": "બગ્સ",
       "style": "શૈલી",
       "testing": "પરીક્ષણ",
-      "documentation": "દસ્તાવેજીકરણ"
+      "documentation": "દસ્તાવેજીકરણ",
+      "unknown": "અન્ય ({{area}})"
     },
     "gateThreshold": {
       "warning": "ચેતવણી"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} હવે ઉપલબ્ધ નથી. તમારા ડિફોલ્ટ મોડલનો ઉપયોગ થઈ રહ્યો છે.",
       "couldNotReadPendingSessions": "બાકી રહેલાં સત્રો વાંચી શકાયાં નહીં. ફરી પ્રયાસ કરો.",
       "failedToCreate": "સત્ર બનાવી શકાયું નહીં.",
+      "checkOrganizationAccess": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ છે કે નહીં તે તપાસો, પછી ફરી પ્રયાસ કરો.",
       "couldNotRefreshRepositories": "રિપોઝિટરીઓ રિફ્રેશ કરી શકાઈ નહીં. ફરી પ્રયાસ કરો.",
       "discardDraftTitle": "ડ્રાફ્ટ કાઢી નાખવો?",
       "discardDraftMessage": "તમારો પ્રોમ્પ્ટ કાઢી નાખવામાં આવશે.",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "આ લોડ ન થાય ત્યાં સુધી તમારા સક્રિય સત્રો ઉપલબ્ધ નથી.",
     "currentDeviceUnidentified": "વર્તમાન ઉપકરણ ઓળખી શકાયું નહીં.",
+    "kiloApp": "Kilo એપ",
     "noSessions": "કોઈ સક્રિય સત્ર નથી",
     "noSessionsDescription": "અન્ય ઉપકરણ પર Kilo એપમાં સાઇન ઇન કરો. તે ઉપકરણ અહીં દેખાશે.",
     "onlyKiloAppSignIns": "અહીં માત્ર Kilo એપમાં કરેલા સાઇન ઇન દેખાય છે. એડિટર અને CLIમાં કરેલા સાઇન ઇન અહીં દેખાતા નથી.",

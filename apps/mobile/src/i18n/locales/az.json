@@ -661,7 +661,8 @@
       "description": "Mobil cihazda birləşdirmə sorğularını nəzərdən keçirmək üçün GitHub hesabını qoş.",
       "gitlabDescription": "Mobil cihazda merge sorğularına baxış keçirmək üçün GitLab hesabını qoş.",
       "bitbucketDescription": "Mobil cihazda birləşdirmə sorğularına baxış keçirmək üçün Bitbucket-ı bu təşkilata qoş.",
-      "bitbucketOrgOnlyDescription": "Profilində bir təşkilat seç və onun Bitbucket birləşdirmə sorğularına baxış keçir."
+      "bitbucketOrgOnlyDescription": "Yuxarıdakı hesabı təşkilata keçir ki, onun Bitbucket birləşdirmə sorğularına baxış keçirəsən.",
+      "contextLine": "{{organization}} üçün"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "Bu kod baxışını indiki vəziyyətdə göndərmək mümkün deyil. PR dəyişmiş ola bilər və ya öz birləşdirmə sorğuna kod baxışı göndərməyə çalışırsan.",
       "reviewNotSubmittedTerm": "Bu baxış olduğu kimi göndərilə bilmir. {{term}} dəyişmiş ola bilər və ya öz {{term}}na baxış keçirə bilməzsən.",
       "couldNotPostComment": "Şərhi göndərmək mümkün olmadı.",
-      "couldNotSubmitReview": "Kod baxışını göndərmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et."
+      "couldNotSubmitReview": "Kod baxışını göndərmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
+      "rateLimited": "Çoxlu sorğu göndərilib. Bir az sonra yenidən cəhd et.",
+      "conflict": "Bu, siz üzərində işləyərkən dəyişildi. Yenidən yükləyin və yenidən cəhd edin."
     },
     "operation": {
       "couldNotReply": "Cavab vermək mümkün olmadı.",
@@ -1545,7 +1548,8 @@
       "bugs": "Səhvlər",
       "style": "Stil",
       "testing": "Testlər",
-      "documentation": "Sənədləşdirmə"
+      "documentation": "Sənədləşdirmə",
+      "unknown": "Digər ({{area}})"
     },
     "gateThreshold": {
       "warning": "Xəbərdarlıq"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} artıq əlçatan deyil. Standart modelindən istifadə olunur.",
       "couldNotReadPendingSessions": "Gözləyən sessiyaları oxumaq mümkün olmadı. Yenidən cəhd et.",
       "failedToCreate": "Sessiya yaratmaq mümkün olmadı.",
+      "checkOrganizationAccess": "Təşkilata giriş icazəni yoxla və yenidən cəhd et.",
       "couldNotRefreshRepositories": "Repozitoriyaları yeniləmək mümkün olmadı. Yenidən cəhd et.",
       "discardDraftTitle": "Qaralama silinsin?",
       "discardDraftMessage": "Sorğun silinəcək.",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Məlumatlar yüklənənədək aktiv sessiyaların əlçatan deyil.",
     "currentDeviceUnidentified": "Cari cihazı müəyyən etmək mümkün olmadı.",
+    "kiloApp": "Kilo tətbiqi",
     "noSessions": "Aktiv sessiya yoxdur",
     "noSessionsDescription": "Başqa cihazda Kilo tətbiqində hesabına daxil ol. Həmin cihaz burada görünəcək.",
     "onlyKiloAppSignIns": "Burada yalnız Kilo tətbiqində açılan sessiyalar görünür. Redaktor və CLI sessiyaları siyahıda göstərilmir.",

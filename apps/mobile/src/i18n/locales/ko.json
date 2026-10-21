@@ -1033,7 +1033,8 @@
       "bugs": "버그",
       "style": "스타일",
       "testing": "테스트",
-      "documentation": "문서화"
+      "documentation": "문서화",
+      "unknown": "기타 ({{area}})"
     },
     "gateThreshold": {
       "warning": "경고"
@@ -1700,6 +1701,7 @@
       "prefillModelUnavailable": "더 이상 {{model}} 모델을 사용할 수 없습니다. 기본 모델을 사용합니다.",
       "couldNotReadPendingSessions": "대기 중인 세션을 불러올 수 없습니다. 다시 시도하세요.",
       "failedToCreate": "세션을 만들지 못했습니다.",
+      "checkOrganizationAccess": "이 조직에 대한 액세스 권한을 확인한 다음 다시 시도하세요.",
       "couldNotRefreshRepositories": "저장소를 새로고침하지 못했습니다. 다시 시도하세요.",
       "discardDraftTitle": "초안을 삭제할까요?",
       "discardDraftMessage": "프롬프트가 사라집니다.",
@@ -2220,6 +2222,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "정보를 불러올 때까지 로그인 중인 세션을 확인할 수 없습니다.",
     "currentDeviceUnidentified": "현재 기기를 식별할 수 없습니다.",
+    "kiloApp": "Kilo 앱",
     "noSessions": "로그인 중인 세션 없음",
     "noSessionsDescription": "다른 기기에서 Kilo 앱으로 로그인하면 여기에 표시됩니다.",
     "onlyKiloAppSignIns": "Kilo 앱의 로그인 내역만 여기에 표시됩니다. 에디터 및 CLI의 로그인 내역은 표시되지 않습니다.",
@@ -2505,7 +2508,8 @@
       "description": "모바일에서 풀 리퀘스트를 리뷰하려면 GitHub 계정을 연결하세요.",
       "gitlabDescription": "모바일에서 머지 요청을 검토하려면 GitLab 계정을 연결하세요.",
       "bitbucketDescription": "모바일에서 풀 리퀘스트를 검토하려면 이 조직을 Bitbucket에 연결하세요.",
-      "bitbucketOrgOnlyDescription": "프로필에서 조직을 선택하면 해당 조직의 Bitbucket 풀 리퀘스트를 검토할 수 있습니다."
+      "bitbucketOrgOnlyDescription": "Bitbucket 풀 리퀘스트를 검토하려면 위의 계정을 조직으로 전환하세요.",
+      "contextLine": "{{organization}}용"
     },
     "connectionExpired": "GitHub 연결이 만료되었습니다.",
     "couldNotLoadPullRequest": "풀 리퀘스트를 불러오지 못했습니다.",
@@ -2932,7 +2936,9 @@
       "reviewNotSubmitted": "이 리뷰는 현재 상태로 제출할 수 없습니다. PR이 변경되었거나 본인이 작성한 풀 리퀘스트여서 리뷰할 수 없는 경우일 수 있습니다.",
       "reviewNotSubmittedTerm": "이 리뷰는 그대로 제출할 수 없습니다. {{term}}이(가) 변경되었거나, 자신의 {{term}}은(는) 검토할 수 없습니다.",
       "couldNotPostComment": "댓글을 게시하지 못했습니다.",
-      "couldNotSubmitReview": "리뷰를 제출하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요."
+      "couldNotSubmitReview": "리뷰를 제출하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+      "rateLimited": "요청이 너무 많습니다. 나중에 다시 시도하세요.",
+      "conflict": "작업하는 동안 이 항목이 변경되었습니다. 다시 불러온 후 다시 시도하세요."
     },
     "operation": {
       "couldNotReply": "답글을 달 수 없습니다.",

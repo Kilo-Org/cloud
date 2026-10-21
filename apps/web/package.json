@@ -123,6 +123,7 @@
     "ai": "7.0.29",
     "archiver": "7.0.1",
     "asn1js": "3.0.6",
+    "aws4fetch": "catalog:",
     "cbor2": "2.3.0",
     "chat": "4.36.0",
     "class-variance-authority": "0.7.1",

@@ -673,7 +673,8 @@
       "description": "Pievieno savu GitHub kontu, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē.",
       "gitlabDescription": "Pievieno savu GitLab kontu, lai pārskatītu merge requests mobilajā ierīcē.",
       "bitbucketDescription": "Pievieno Bitbucket šai organizācijai, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē.",
-      "bitbucketOrgOnlyDescription": "Profilā izvēlies organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus."
+      "bitbucketOrgOnlyDescription": "Pārslēdz augstāk redzamo kontu uz organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus.",
+      "contextLine": "Priekš {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -785,7 +786,9 @@
       "reviewNotSubmitted": "Šo vērtējumu pašreizējā veidā nevar iesniegt. Iespējams, PR ir mainījies vai arī tu mēģini vērtēt savu izmaiņu pieprasījumu.",
       "reviewNotSubmittedTerm": "Šo vērtējumu pašreizējā veidā nevar iesniegt. Iespējams, {{term}} ir mainījies, vai arī tu nevar vērtēt savu {{term}}.",
       "couldNotPostComment": "Neizdevās publicēt komentāru.",
-      "couldNotSubmitReview": "Neizdevās iesniegt vērtējumu. Pārbaudi savienojumu un mēģini vēlreiz."
+      "couldNotSubmitReview": "Neizdevās iesniegt vērtējumu. Pārbaudi savienojumu un mēģini vēlreiz.",
+      "rateLimited": "Pārāk daudz pieprasījumu. Lūdzu, mēģini vēlāk vēlreiz.",
+      "conflict": "Tas ir mainījies, kamēr tu ar to strādāji. Ielādē to no jauna un mēģini vēlreiz."
     },
     "operation": {
       "couldNotReply": "Neizdevās atbildēt.",
@@ -1564,7 +1567,8 @@
       "bugs": "Kļūdas",
       "style": "Stils",
       "testing": "Testēšana",
-      "documentation": "Dokumentācija"
+      "documentation": "Dokumentācija",
+      "unknown": "Cits ({{area}})"
     },
     "gateThreshold": {
       "warning": "Brīdinājums"
@@ -2240,6 +2244,7 @@
       "prefillModelUnavailable": "{{model}} vairs nav pieejams. Tiek izmantots tavs noklusējuma modelis.",
       "couldNotReadPendingSessions": "Neizdevās nolasīt gaidošās sesijas. Mēģini vēlreiz.",
       "failedToCreate": "Neizdevās izveidot sesiju.",
+      "checkOrganizationAccess": "Pārbaudi savu piekļuvi šai organizācijai un mēģini vēlreiz.",
       "couldNotRefreshRepositories": "Neizdevās atsvaidzināt repozitorijus. Lūdzu, mēģini vēlreiz.",
       "discardDraftTitle": "Atmest melnrakstu?",
       "discardDraftMessage": "Tava uzvedne tiks dzēsta.",
@@ -2771,6 +2776,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Tavas aktīvās sesijas būs pieejamas pēc datu ielādes.",
     "currentDeviceUnidentified": "Neizdevās identificēt pašreizējo ierīci.",
+    "kiloApp": "Kilo lietotne",
     "noSessions": "Nav aktīvu sesiju",
     "noSessionsDescription": "Pieraksties Kilo lietotnē citā ierīcē, un tā būs redzama šeit.",
     "onlyKiloAppSignIns": "Šeit ir redzamas tikai Kilo lietotnes sesijas. Redaktora un CLI sesijas nav iekļautas.",

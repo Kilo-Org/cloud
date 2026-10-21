@@ -1033,7 +1033,8 @@
       "bugs": "程式錯誤",
       "style": "程式碼風格",
       "testing": "測試",
-      "documentation": "文件"
+      "documentation": "文件",
+      "unknown": "其他（{{area}}）"
     },
     "gateThreshold": {
       "warning": "警告"
@@ -1700,6 +1701,7 @@
       "prefillModelUnavailable": "{{model}} 已無法使用。目前使用你的預設模型。",
       "couldNotReadPendingSessions": "無法讀取待處理的工作階段。請再試一次。",
       "failedToCreate": "無法建立工作階段。",
+      "checkOrganizationAccess": "請檢查您對此組織的存取權限，然後再試一次。",
       "couldNotRefreshRepositories": "無法重新整理儲存庫。請再試一次。",
       "discardDraftTitle": "捨棄草稿？",
       "discardDraftMessage": "你輸入的提示詞將不會保留。",
@@ -2220,6 +2222,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "載入完成前，無法查看目前登入的工作階段。",
     "currentDeviceUnidentified": "無法辨識目前的裝置。",
+    "kiloApp": "Kilo 應用程式",
     "noSessions": "沒有已登入的工作階段",
     "noSessionsDescription": "在其他裝置上登入 Kilo 應用程式後，該裝置就會顯示在這裡。",
     "onlyKiloAppSignIns": "這裡只會顯示 Kilo 應用程式的登入工作階段，不會列出編輯器與 CLI 的登入工作階段。",
@@ -2505,7 +2508,8 @@
       "description": "連結你的 GitHub 帳戶，即可在行動裝置上審查提取請求。",
       "gitlabDescription": "連結你的 GitLab 帳戶，以便在行動裝置上審查合併請求。",
       "bitbucketDescription": "將 Bitbucket 連結到此組織，以便在行動裝置上審查提取請求。",
-      "bitbucketOrgOnlyDescription": "在你的個人資料中選取一個組織，以審查其 Bitbucket 提取請求。"
+      "bitbucketOrgOnlyDescription": "將上方的帳戶切換為某個組織，以便審查其 Bitbucket 提取請求。",
+      "contextLine": "適用於 {{organization}}"
     },
     "connectionExpired": "GitHub 連線已過期。",
     "couldNotLoadPullRequest": "無法載入提取請求。",
@@ -2932,7 +2936,9 @@
       "reviewNotSubmitted": "目前無法送出此審查。可能是 PR 已更新，或你正在審查自己的提取請求。",
       "reviewNotSubmittedTerm": "此審查無法依現況提交。{{term}}可能已變更，或者你不能審查自己的{{term}}。",
       "couldNotPostComment": "無法發佈留言。",
-      "couldNotSubmitReview": "無法送出審查。請檢查連線後再試一次。"
+      "couldNotSubmitReview": "無法送出審查。請檢查連線後再試一次。",
+      "rateLimited": "要求過多。請稍後再試一次。",
+      "conflict": "此項目在您編輯時已變更。請重新載入並再試一次。"
     },
     "operation": {
       "couldNotReply": "無法回覆。",

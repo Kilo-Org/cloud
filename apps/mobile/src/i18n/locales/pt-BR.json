@@ -1005,7 +1005,8 @@
       "bugs": "Erros",
       "style": "Estilo",
       "testing": "Testes",
-      "documentation": "Documentação"
+      "documentation": "Documentação",
+      "unknown": "Outro ({{area}})"
     },
     "gateThreshold": {
       "warning": "Aviso"
@@ -1681,6 +1682,7 @@
       "prefillModelUnavailable": "{{model}} não está mais disponível. Seu modelo padrão está em uso.",
       "couldNotReadPendingSessions": "Não foi possível ler as sessões pendentes. Tente novamente.",
       "failedToCreate": "Não foi possível criar a sessão.",
+      "checkOrganizationAccess": "Verifique seu acesso a esta organização e tente novamente.",
       "couldNotRefreshRepositories": "Não foi possível atualizar os repositórios. Tente novamente.",
       "discardDraftTitle": "Descartar rascunho?",
       "discardDraftMessage": "Seu prompt será perdido.",
@@ -2243,6 +2245,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Você só poderá ver suas sessões ativas após o carregamento dos dados.",
     "currentDeviceUnidentified": "Não foi possível identificar o dispositivo atual.",
+    "kiloApp": "App Kilo",
     "noSessions": "Nenhuma sessão ativa",
     "noSessionsDescription": "Entre na sua conta pelo app Kilo em outro dispositivo para que ele apareça aqui.",
     "onlyKiloAppSignIns": "Apenas os acessos pelo app Kilo aparecem aqui. Os acessos pelo editor e pela CLI não são listados.",
@@ -2530,7 +2533,8 @@
       "description": "Conecte sua conta do GitHub para revisar pull requests no celular.",
       "gitlabDescription": "Conecte sua conta do GitLab para revisar merge requests no celular.",
       "bitbucketDescription": "Conecte o Bitbucket a esta organização para revisar pull requests no celular.",
-      "bitbucketOrgOnlyDescription": "Selecione uma organização no seu perfil para revisar os pull requests dela no Bitbucket."
+      "bitbucketOrgOnlyDescription": "Mude a conta acima para uma organização para revisar as pull requests dela no Bitbucket.",
+      "contextLine": "Para {{organization}}"
     },
     "connectionExpired": "A conexão com o GitHub expirou.",
     "couldNotLoadPullRequest": "Não foi possível carregar o pull request.",
@@ -2972,7 +2976,9 @@
       "reviewNotSubmitted": "Não é possível enviar esta revisão no estado atual. O PR pode ter mudado ou você pode estar tentando revisar seu próprio pull request.",
       "reviewNotSubmittedTerm": "Não é possível enviar esta revisão no estado atual. O {{term}} pode ter mudado ou você não pode revisar o seu próprio {{term}}.",
       "couldNotPostComment": "Não foi possível publicar o comentário.",
-      "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifique sua conexão e tente novamente."
+      "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifique sua conexão e tente novamente.",
+      "rateLimited": "Muitas solicitações. Tente novamente mais tarde.",
+      "conflict": "Isso mudou enquanto você trabalhava nele. Recarregue-o e tente novamente."
     },
     "operation": {
       "couldNotReply": "Não foi possível responder.",

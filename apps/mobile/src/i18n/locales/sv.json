@@ -661,7 +661,8 @@
       "description": "Anslut ditt GitHub-konto för att granska PR:er i mobilen.",
       "gitlabDescription": "Anslut ditt GitLab-konto för att granska merge requests i mobilen.",
       "bitbucketDescription": "Anslut Bitbucket till den här organisationen för att granska PR:er i mobilen.",
-      "bitbucketOrgOnlyDescription": "Välj en organisation i din profil för att granska dess Bitbucket-PR:er."
+      "bitbucketOrgOnlyDescription": "Växla kontot ovan till en organisation för att granska dess PR:er i Bitbucket.",
+      "contextLine": "För {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "Den här granskningen kan inte skickas i sitt nuvarande skick. PR:en kan ha ändrats, eller så gäller den din egen PR som du inte får granska.",
       "reviewNotSubmittedTerm": "Den här granskningen kan inte skickas i sitt nuvarande skick. Det kan bero på att {{term}} har ändrats, eller på att du inte kan granska din egen {{term}}.",
       "couldNotPostComment": "Kunde inte publicera kommentaren.",
-      "couldNotSubmitReview": "Kunde inte skicka granskningen. Kontrollera anslutningen och försök igen."
+      "couldNotSubmitReview": "Kunde inte skicka granskningen. Kontrollera anslutningen och försök igen.",
+      "rateLimited": "För många förfrågningar. Försök igen senare.",
+      "conflict": "Det här ändrades medan du arbetade med det. Ladda om det och försök igen."
     },
     "operation": {
       "couldNotReply": "Det gick inte att skicka svaret.",
@@ -1545,7 +1548,8 @@
       "bugs": "Buggar",
       "style": "Stil",
       "testing": "Testning",
-      "documentation": "Dokumentation"
+      "documentation": "Dokumentation",
+      "unknown": "Annat ({{area}})"
     },
     "gateThreshold": {
       "warning": "Varning"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} är inte längre tillgänglig. Din standardmodell används i stället.",
       "couldNotReadPendingSessions": "Det gick inte att läsa in väntande sessioner. Försök igen.",
       "failedToCreate": "Det gick inte att skapa sessionen.",
+      "checkOrganizationAccess": "Kontrollera din åtkomst till den här organisationen och försök igen.",
       "couldNotRefreshRepositories": "Det gick inte att uppdatera kodarkiven. Försök igen.",
       "discardDraftTitle": "Ta bort utkastet?",
       "discardDraftMessage": "Din prompt går förlorad.",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Dina aktiva sessioner kan inte visas förrän inläsningen är klar.",
     "currentDeviceUnidentified": "Det gick inte att identifiera den här enheten.",
+    "kiloApp": "Kilo-app",
     "noSessions": "Inga aktiva sessioner",
     "noSessionsDescription": "Logga in i Kilo-appen på en annan enhet så visas den här.",
     "onlyKiloAppSignIns": "Här visas bara inloggningar i Kilo-appen. Inloggningar i kodredigeraren och CLI visas inte.",

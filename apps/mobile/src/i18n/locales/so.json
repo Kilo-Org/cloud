@@ -661,7 +661,8 @@
       "description": "Ku xir akoonkaaga GitHub si aad taleefanka uga eegto codsiyada isku-darka.",
       "gitlabDescription": "Ku xir xisaabtaada GitLab si aad mobilka ugu eegto merge request-yada.",
       "bitbucketDescription": "Bitbucket ku xir hay'addan si aad mobilka ugu eegto PR-yada.",
-      "bitbucketOrgOnlyDescription": "Ka dooro hay'ad profile-kaaga si aad ugu eegto PR-yada Bitbucket ee hay'addaas."
+      "bitbucketOrgOnlyDescription": "Beddel xisaabta kor ku qoran hay'ad si aad u eegto PR-yadeeda Bitbucket.",
+      "contextLine": "{{organization}} u"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "Dib-u-eegistan lama gudbin karo sida ay tahay. Waxaa laga yaabaa in PR-ka la beddelay ama inaadan dib u eegi karin codsigaaga isku-darka.",
       "reviewNotSubmittedTerm": "Dib-u-eegistan laguma diri karo sida uu yahay. {{term}} waa la yaabaa inuu isbeddelay, ama ma dib-u-eegi kartid {{term}} kaa ah.",
       "couldNotPostComment": "Faallada lama daabici karin.",
-      "couldNotSubmitReview": "Dib-u-eegista lama gudbin karin. Hubi xiriirkaaga oo mar kale isku day."
+      "couldNotSubmitReview": "Dib-u-eegista lama gudbin karin. Hubi xiriirkaaga oo mar kale isku day.",
+      "rateLimited": "Codsiyo aad u badan. Fadlan mar kale isku day.",
+      "conflict": "Tani way isbedhesay markaad ku shaqaynayso. Fadlan mar kale soo shubo oo isku day."
     },
     "operation": {
       "couldNotReply": "Lama jawaabi karin.",
@@ -1545,7 +1548,8 @@
       "bugs": "Cilladaha",
       "style": "Qaabka",
       "testing": "Tijaabinta",
-      "documentation": "Dukumentiyada"
+      "documentation": "Dukumentiyada",
+      "unknown": "Kale ({{area}})"
     },
     "gateThreshold": {
       "warning": "Digniin"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} mar dambe lama heli karo. Waxaa la isticmaalayaa moodeelkaaga caadiga ah.",
       "couldNotReadPendingSessions": "Kalfadhiyada sugaya lama akhrin karin. Mar kale isku day.",
       "failedToCreate": "Kalfadhiga lama abuuri karin.",
+      "checkOrganizationAccess": "Hubi gelitaankaada ururkan, markaa mar kale isku day.",
       "couldNotRefreshRepositories": "Kaydadka lama cusboonaysiin karin. Fadlan mar kale isku day.",
       "discardDraftTitle": "Ma tirtiraysaa qabyada?",
       "discardDraftMessage": "Tilmaantaadu way lumi doontaa.",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Kalfadhiyadaada firfircoon lama heli karo ilaa xogtan la soo shubo.",
     "currentDeviceUnidentified": "Aaladda hadda la isticmaalayo lama aqoonsan karin.",
+    "kiloApp": "Barnaamijka Kilo",
     "noSessions": "Ma jiraan kalfadhiyo firfircoon",
     "noSessionsDescription": "Ka soo gal barnaamijka Kilo aalad kale, waxayna halkan ka soo muuqan doontaa.",
     "onlyKiloAppSignIns": "Halkan waxaa ka muuqda oo keliya gelitaanka barnaamijka Kilo. Gelitaanka tifaftiraha iyo CLI kuma jiraan liiska.",

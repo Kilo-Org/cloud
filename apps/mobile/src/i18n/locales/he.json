@@ -1036,7 +1036,8 @@
       "bugs": "באגים",
       "style": "סגנון",
       "testing": "בדיקות",
-      "documentation": "תיעוד"
+      "documentation": "תיעוד",
+      "unknown": "אחר ({{area}})"
     },
     "gateThreshold": {
       "warning": "אזהרה"
@@ -1712,6 +1713,7 @@
       "prefillModelUnavailable": "{{model}} כבר אינו זמין. במקומו ייעשה שימוש במודל ברירת המחדל שלך.",
       "couldNotReadPendingSessions": "לא ניתן היה לקרוא את הסשנים הממתינים. נסה שוב.",
       "failedToCreate": "לא ניתן היה ליצור סשן.",
+      "checkOrganizationAccess": "בדוק את הגישה שלך לארגון הזה, ואז נסה שוב.",
       "couldNotRefreshRepositories": "לא ניתן היה לרענן מאגרים. נסה שוב.",
       "discardDraftTitle": "למחוק את הטיוטה?",
       "discardDraftMessage": "ההנחיה שלך תימחק.",
@@ -2243,6 +2245,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "לא ניתן להציג את החיבורים הפעילים שלך עד לסיום הטעינה.",
     "currentDeviceUnidentified": "לא ניתן היה לזהות את המכשיר הנוכחי.",
+    "kiloApp": "אפליקציית Kilo",
     "noSessions": "אין חיבורים פעילים",
     "noSessionsDescription": "היכנס לאפליקציית Kilo במכשיר אחר, והמכשיר יופיע כאן.",
     "onlyKiloAppSignIns": "כאן מופיעים רק חיבורים לאפליקציית Kilo. חיבורים דרך העורך או ה-CLI אינם מופיעים ברשימה.",
@@ -2530,7 +2533,8 @@
       "description": "חבר את חשבון ה-GitHub שלך כדי לסקור בקשות משיכה בנייד.",
       "gitlabDescription": "חברו את חשבון GitLab שלכם כדי לסקור בקשות מיזוג בנייד.",
       "bitbucketDescription": "חברו את Bitbucket לארגון הזה כדי לסקור בקשות משיכה בנייד.",
-      "bitbucketOrgOnlyDescription": "בחרו ארגון בפרופיל שלכם כדי לסקור את בקשות המשיכה של Bitbucket שלו."
+      "bitbucketOrgOnlyDescription": "החליפו את החשבון שלמעלה לארגון כדי לסקור את בקשות המשיכה שלו ב-Bitbucket.",
+      "contextLine": "עבור {{organization}}"
     },
     "connectionExpired": "פג תוקף החיבור ל-GitHub.",
     "couldNotLoadPullRequest": "לא ניתן היה לטעון את בקשת המשיכה.",
@@ -2972,7 +2976,9 @@
       "reviewNotSubmitted": "לא ניתן לשלוח את הסקירה הזו כפי שהיא. ייתכן שה-PR השתנה, או שזו בקשת משיכה שלך ואינך יכול לסקור אותה.",
       "reviewNotSubmittedTerm": "לא ניתן לשלוח את הסקירה הזו כמות שהיא. ייתכן שה-{{term}} השתנה, או שלא ניתן לסקור את ה-{{term}} שלך בעצמך.",
       "couldNotPostComment": "לא ניתן היה לפרסם תגובה.",
-      "couldNotSubmitReview": "לא ניתן היה לשלוח את הסקירה. בדוק את החיבור ונסה שוב."
+      "couldNotSubmitReview": "לא ניתן היה לשלוח את הסקירה. בדוק את החיבור ונסה שוב.",
+      "rateLimited": "יותר מדי בקשות. נסה שוב מאוחר יותר.",
+      "conflict": "הפריט הזה השתנה בזמן שעבדת עליו. טען אותו מחדש ונסה שוב."
     },
     "operation": {
       "couldNotReply": "לא הצלחנו לשלוח את התשובה.",

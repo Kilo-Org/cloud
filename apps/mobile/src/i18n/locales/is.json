@@ -661,7 +661,8 @@
       "description": "Tengdu GitHub-reikninginn þinn til að yfirfara sameiningarbeiðnir í símanum.",
       "gitlabDescription": "Tengdu GitLab-reikninginn þinn til að yfirfara merge requests í símanum.",
       "bitbucketDescription": "Tengdu Bitbucket við þessa stofnun til að yfirfara sameiningarbeiðnir í símanum.",
-      "bitbucketOrgOnlyDescription": "Veldu stofnun í notandasniðinu þínu til að yfirfara sameiningarbeiðnir hennar á Bitbucket."
+      "bitbucketOrgOnlyDescription": "Skiptu reikningnum hér að ofan yfir í stofnun til að yfirfara sameiningarbeiðnir hennar á Bitbucket.",
+      "contextLine": "Fyrir {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "Ekki er hægt að senda þessa yfirferð í núverandi mynd. PR-beiðnin gæti hafa breyst eða þú ert að yfirfara eigin sameiningarbeiðni, sem er ekki leyfilegt.",
       "reviewNotSubmittedTerm": "Ekki er hægt að senda þessa yfirferð í núverandi mynd. {{term}} gæti hafa breyst, eða þú mátt ekki yfirfara þína eigin {{term}}.",
       "couldNotPostComment": "Ekki tókst að birta athugasemd.",
-      "couldNotSubmitReview": "Ekki tókst að senda yfirferð. Athugaðu tenginguna og reyndu aftur."
+      "couldNotSubmitReview": "Ekki tókst að senda yfirferð. Athugaðu tenginguna og reyndu aftur.",
+      "rateLimited": "Of margar beiðnir. Reyndu aftur seinna.",
+      "conflict": "Þessu var breytt á meðan þú varst að vinna í því. Hlaðaðu því aftur inn og reyndu aftur."
     },
     "operation": {
       "couldNotReply": "Tókst ekki að svara.",
@@ -1545,7 +1548,8 @@
       "bugs": "Gallar",
       "style": "Stíll",
       "testing": "Prófanir",
-      "documentation": "Skjölun"
+      "documentation": "Skjölun",
+      "unknown": "Annað ({{area}})"
     },
     "gateThreshold": {
       "warning": "Viðvörun"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} er ekki lengur tiltækt. Sjálfgefna líkanið þitt er notað í staðinn.",
       "couldNotReadPendingSessions": "Ekki tókst að lesa lotur í bið. Reyndu aftur.",
       "failedToCreate": "Ekki tókst að búa til lotu.",
+      "checkOrganizationAccess": "Athugaðu aðganginn þinn að þessari stofnun, og reyndu aftur.",
       "couldNotRefreshRepositories": "Ekki tókst að endurnýja kóðasöfnin. Reyndu aftur.",
       "discardDraftTitle": "Farga drögum?",
       "discardDraftMessage": "Skilaboðin þín glatast.",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Virku loturnar þínar eru ekki tiltækar fyrr en upplýsingarnar hafa hlaðist.",
     "currentDeviceUnidentified": "Ekki tókst að bera kennsl á þetta tæki.",
+    "kiloApp": "Kilo-forrit",
     "noSessions": "Engar virkar lotur",
     "noSessionsDescription": "Skráðu þig inn í Kilo-forritið á öðru tæki til að það birtist hér.",
     "onlyKiloAppSignIns": "Aðeins innskráningar í Kilo-forritið birtast hér. Innskráningar í kóðaritil og CLI eru ekki á listanum.",

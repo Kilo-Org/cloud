@@ -685,7 +685,8 @@
       "description": "Prijunk savo GitHub paskyrą, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
       "gitlabDescription": "Prijunk savo GitLab paskyrą, kad galėtum peržiūrėti merge requests mobiliajame įrenginyje.",
       "bitbucketDescription": "Prijunk Bitbucket prie šios organizacijos, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
-      "bitbucketOrgOnlyDescription": "Profilyje pasirink organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas."
+      "bitbucketOrgOnlyDescription": "Perjunk aukščiau esančią paskyrą į organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas.",
+      "contextLine": "Skirta {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -801,7 +802,9 @@
       "reviewNotSubmitted": "Dabartinės peržiūros pateikti negalima. PR galėjo pasikeisti arba bandai peržiūrėti savo paties pakeitimų užklausą.",
       "reviewNotSubmittedTerm": "Šios peržiūros pateikti negalima. {{term}} galėjo pasikeisti arba negali peržiūrėti savo {{term}}.",
       "couldNotPostComment": "Nepavyko paskelbti komentaro.",
-      "couldNotSubmitReview": "Nepavyko pateikti peržiūros. Patikrink ryšį ir bandyk dar kartą."
+      "couldNotSubmitReview": "Nepavyko pateikti peržiūros. Patikrink ryšį ir bandyk dar kartą.",
+      "rateLimited": "Gauta per daug užklausų. Bandykite vėliau dar kartą.",
+      "conflict": "Tai pasikeitė, kol dirbote. Įkelkite iš naujo ir bandykite dar kartą."
     },
     "operation": {
       "couldNotReply": "Nepavyko atsakyti.",
@@ -1583,7 +1586,8 @@
       "bugs": "Klaidos",
       "style": "Stilius",
       "testing": "Testavimas",
-      "documentation": "Dokumentacija"
+      "documentation": "Dokumentacija",
+      "unknown": "Kita ({{area}})"
     },
     "gateThreshold": {
       "warning": "Įspėjimas"
@@ -2268,6 +2272,7 @@
       "prefillModelUnavailable": "Modelis „{{model}}“ nebepasiekiamas. Naudojamas numatytasis modelis.",
       "couldNotReadPendingSessions": "Nepavyko nuskaityti laukiančių sesijų. Bandykite dar kartą.",
       "failedToCreate": "Nepavyko sukurti sesijos.",
+      "checkOrganizationAccess": "Patikrinkite prieigą prie šios organizacijos ir bandykite dar kartą.",
       "couldNotRefreshRepositories": "Nepavyko atnaujinti saugyklų. Bandykite dar kartą.",
       "discardDraftTitle": "Atmesti juodraštį?",
       "discardDraftMessage": "Jūsų užklausa bus prarasta.",
@@ -2810,6 +2815,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Kol duomenys neįkelti, aktyvių sesijų peržiūrėti negalima.",
     "currentDeviceUnidentified": "Nepavyko atpažinti šio įrenginio.",
+    "kiloApp": "Kilo programėlė",
     "noSessions": "Nėra aktyvių sesijų",
     "noSessionsDescription": "Prisijunkite prie Kilo programėlės kitame įrenginyje, ir jis bus rodomas čia.",
     "onlyKiloAppSignIns": "Čia rodomi tik prisijungimai prie Kilo programėlės. Prisijungimai per redaktorių ir CLI nerodomi.",

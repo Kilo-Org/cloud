@@ -661,7 +661,8 @@
       "description": "Koppel jou GitHub-rekening om trekversoeke op jou foon te hersien.",
       "gitlabDescription": "Koppel jou GitLab-rekening om merge requests op jou foon te hersien.",
       "bitbucketDescription": "Koppel Bitbucket aan hierdie organisasie om trekversoeke op jou foon te hersien.",
-      "bitbucketOrgOnlyDescription": "Kies 'n organisasie in jou profiel om sy Bitbucket-trekversoeke te hersien."
+      "bitbucketOrgOnlyDescription": "Skakel die rekening hierbo oor na 'n organisasie om sy Bitbucket-trekversoeke te hersien.",
+      "contextLine": "Vir {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "Hierdie hersiening kan nie in sy huidige vorm ingedien word nie. Die PR het dalk verander, of jy probeer dalk jou eie trekversoek hersien, wat nie toegelaat word nie.",
       "reviewNotSubmittedTerm": "Hierdie hersiening kan nie in sy huidige vorm ingedien word nie. Die {{term}} het dalk verander, of jy kan nie jou eie {{term}} hersien nie.",
       "couldNotPostComment": "Kon nie kommentaar plaas nie.",
-      "couldNotSubmitReview": "Kon nie die hersiening indien nie. Kontroleer jou verbinding en probeer weer."
+      "couldNotSubmitReview": "Kon nie die hersiening indien nie. Kontroleer jou verbinding en probeer weer.",
+      "rateLimited": "Te veel versoeke. Probeer asseblief later weer.",
+      "conflict": "Dit het verander terwyl jy daaraan gewerk het. Laai dit weer en probeer asseblief weer."
     },
     "operation": {
       "couldNotReply": "Die antwoord kon nie gestuur word nie.",
@@ -1545,7 +1548,8 @@
       "bugs": "Foute",
       "style": "Styl",
       "testing": "Toetsing",
-      "documentation": "Dokumentasie"
+      "documentation": "Dokumentasie",
+      "unknown": "Ander ({{area}})"
     },
     "gateThreshold": {
       "warning": "Waarskuwing"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} is nie meer beskikbaar nie. Jou standaardmodel word gebruik.",
       "couldNotReadPendingSessions": "Die hangende sessies kon nie gelees word nie. Probeer weer.",
       "failedToCreate": "Die sessie kon nie geskep word nie.",
+      "checkOrganizationAccess": "Kontroleer jou toegang tot hierdie organisasie en probeer asseblief weer.",
       "couldNotRefreshRepositories": "Die bewaarplekke kon nie verfris word nie. Probeer asseblief weer.",
       "discardDraftTitle": "Konsep weggooi?",
       "discardDraftMessage": "Jou opdrag sal verlore gaan.",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Jou aktiewe sessies is nie beskikbaar voordat die data gelaai is nie.",
     "currentDeviceUnidentified": "Die huidige toestel kon nie geïdentifiseer word nie.",
+    "kiloApp": "Kilo-toep",
     "noSessions": "Geen aktiewe sessies nie",
     "noSessionsDescription": "Teken op 'n ander toestel met die Kilo-toep in en dit sal hier verskyn.",
     "onlyKiloAppSignIns": "Slegs sessies wat met die Kilo-toep begin is, verskyn hier. Redigeerder- en CLI-sessies word nie gelys nie.",

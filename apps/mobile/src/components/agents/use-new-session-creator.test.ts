@@ -689,7 +689,9 @@ describe('useNewSessionCreator onCreated', () => {
 
     expect(onCreated).not.toHaveBeenCalled();
     expect(routerReplace).not.toHaveBeenCalled();
-    expect(toastError).toHaveBeenCalledWith('boom');
+    // The raw rejection text never reaches the toast: the failure shows the
+    // localized generic copy.
+    expect(toastError).toHaveBeenCalledWith('Something went wrong on our end. Please try again.');
   });
 
   it('does not prepare (and never fires onCreated) when the draft is empty', async () => {

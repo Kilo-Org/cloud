@@ -661,7 +661,8 @@
       "description": "Tilslut din GitHub-konto for at gennemgå pull requests på mobilen.",
       "gitlabDescription": "Tilslut din GitLab-konto for at gennemgå merge requests på mobilen.",
       "bitbucketDescription": "Tilslut Bitbucket til denne organisation for at gennemgå pull requests på mobilen.",
-      "bitbucketOrgOnlyDescription": "Vælg en organisation i din profil for at gennemgå dens Bitbucket-pull requests."
+      "bitbucketOrgOnlyDescription": "Skift kontoen ovenfor til en organisation for at gennemgå dens pull requests i Bitbucket.",
+      "contextLine": "Til {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "Denne gennemgang kan ikke sendes, som den er. PR'en kan være ændret, eller fejlen skyldes, at du ikke kan gennemgå din egen pull request.",
       "reviewNotSubmittedTerm": "Denne gennemgang kan ikke sendes, som den er. {{term}} kan være ændret, eller også kan du ikke gennemgå din egen {{term}}.",
       "couldNotPostComment": "Kunne ikke sende kommentaren.",
-      "couldNotSubmitReview": "Gennemgangen kunne ikke sendes. Tjek din forbindelse, og prøv igen."
+      "couldNotSubmitReview": "Gennemgangen kunne ikke sendes. Tjek din forbindelse, og prøv igen.",
+      "rateLimited": "For mange anmodninger. Prøv igen senere.",
+      "conflict": "Dette blev ændret, mens du arbejdede på det. Genindlæs det og prøv igen."
     },
     "operation": {
       "couldNotReply": "Svaret kunne ikke sendes.",
@@ -1545,7 +1548,8 @@
       "bugs": "Fejl",
       "style": "Stil",
       "testing": "Test",
-      "documentation": "Dokumentation"
+      "documentation": "Dokumentation",
+      "unknown": "Andet ({{area}})"
     },
     "gateThreshold": {
       "warning": "Advarsel"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} er ikke længere tilgængelig. Din standardmodel bruges i stedet.",
       "couldNotReadPendingSessions": "Kunne ikke læse de ventende sessioner. Prøv igen.",
       "failedToCreate": "Kunne ikke oprette en session.",
+      "checkOrganizationAccess": "Tjek din adgang til denne organisation, og prøv igen.",
       "couldNotRefreshRepositories": "Kunne ikke opdatere listen over kodelagre. Prøv igen.",
       "discardDraftTitle": "Kassér kladde?",
       "discardDraftMessage": "Din forespørgsel går tabt.",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Du kan ikke se dine aktive sessioner, før indlæsningen er færdig.",
     "currentDeviceUnidentified": "Denne enhed kunne ikke identificeres.",
+    "kiloApp": "Kilo-app",
     "noSessions": "Ingen aktive sessioner",
     "noSessionsDescription": "Log ind med Kilo-appen på en anden enhed, så vises den her.",
     "onlyKiloAppSignIns": "Her vises kun login via Kilo-appen. Login via kodeeditoren og CLI vises ikke.",

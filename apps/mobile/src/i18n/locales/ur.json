@@ -661,7 +661,8 @@
       "description": "موبائل پر پل ریکویسٹ کا جائزہ لینے کے لیے اپنا GitHub اکاؤنٹ منسلک کریں۔",
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لینے کے لیے اپنا GitLab اکاؤنٹ منسلک کریں۔",
       "bitbucketDescription": "موبائل پر پل ریکویسٹس کا جائزہ لینے کے لیے Bitbucket کو اس تنظیم سے منسلک کریں۔",
-      "bitbucketOrgOnlyDescription": "اپنے پروفائل میں ایک تنظیم منتخب کریں تاکہ اس کی Bitbucket پل ریکویسٹس کا جائزہ لیا جا سکے۔"
+      "bitbucketOrgOnlyDescription": "اس کی Bitbucket پل ریکویسٹس کا جائزہ لینے کے لیے اوپر موجود اکاؤنٹ کو ایک تنظیم پر تبدیل کریں۔",
+      "contextLine": "{{organization}} کے لیے"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +770,9 @@
       "reviewNotSubmitted": "یہ جائزہ اپنی موجودہ صورت میں جمع نہیں ہو سکتا۔ ممکن ہے PR بدل گئی ہو یا یہ آپ کی اپنی پل ریکویسٹ ہو، جس کا آپ جائزہ نہیں لے سکتے۔",
       "reviewNotSubmittedTerm": "اس جائزے کو یونہی جمع نہیں کیا جا سکتا۔ ہو سکتا ہے {{term}} بدل گیا ہو، یا آپ اپنا خود {{term}} کا جائزہ نہیں لے سکتے۔",
       "couldNotPostComment": "تبصرہ پوسٹ نہیں ہو سکا۔",
-      "couldNotSubmitReview": "جائزہ جمع نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔"
+      "couldNotSubmitReview": "جائزہ جمع نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+      "rateLimited": "بہت زیادہ درخواستیں۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
+      "conflict": "آپ اس پر کام کر رہے تھے اس دوران یہ تبدیل ہو گیا۔ براہ کرم اسے دوبارہ لوڈ کریں اور دوبارہ کوشش کریں۔"
     },
     "operation": {
       "couldNotReply": "جواب نہیں بھیجا جا سکا۔",
@@ -1545,7 +1548,8 @@
       "bugs": "خرابیاں",
       "style": "انداز",
       "testing": "جانچ",
-      "documentation": "دستاویزات"
+      "documentation": "دستاویزات",
+      "unknown": "دیگر ({{area}})"
     },
     "gateThreshold": {
       "warning": "انتباہ"
@@ -2212,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} اب دستیاب نہیں ہے۔ آپ کا پہلے سے طے شدہ ماڈل استعمال ہو رہا ہے۔",
       "couldNotReadPendingSessions": "زیر التواء سیشنز نہیں پڑھے جا سکے۔ دوبارہ کوشش کریں۔",
       "failedToCreate": "سیشن نہیں بن سکا۔",
+      "checkOrganizationAccess": "اس تنظیم تک اپنی رسائی چیک کریں، پھر دوبارہ کوشش کریں۔",
       "couldNotRefreshRepositories": "ریپوزٹریوں کی فہرست تازہ نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
       "discardDraftTitle": "مسودہ حذف کریں؟",
       "discardDraftMessage": "آپ کا پرامپٹ ضائع ہو جائے گا۔",
@@ -2732,6 +2737,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "آپ کے فعال سیشن اس وقت تک دستیاب نہیں ہیں جب تک یہ لوڈ نہ ہو۔",
     "currentDeviceUnidentified": "موجودہ ڈیوائس کی شناخت نہیں ہو سکی۔",
+    "kiloApp": "Kilo ایپ",
     "noSessions": "کوئی فعال سیشن نہیں",
     "noSessionsDescription": "کسی دوسری ڈیوائس پر Kilo ایپ سے سائن ان کریں۔ اس کا سیشن یہاں نظر آئے گا۔",
     "onlyKiloAppSignIns": "صرف Kilo ایپ کے سائن ان یہاں ظاہر ہوتے ہیں۔ ایڈیٹر اور CLI سائن ان درج نہیں ہیں۔",

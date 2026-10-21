@@ -709,7 +709,8 @@
       "description": "Cysylltwch eich cyfrif GitHub i adolygu ceisiadau tynnu ar eich ffôn.",
       "gitlabDescription": "Cysylltwch eich cyfrif GitLab i adolygu ceisiadau uno ar y dyfais symudol.",
       "bitbucketDescription": "Cysylltwch Bitbucket â'r sefydliad hwn i adolygu ceisiadau tynnu ar y dyfais symudol.",
-      "bitbucketOrgOnlyDescription": "Dewiswch sefydliad yn eich proffil i adolygu ei geisiadau tynnu Bitbucket."
+      "bitbucketOrgOnlyDescription": "Newidiwch y cyfrif uchod i sefydliad i adolygu ei geisiadau tynnu ar Bitbucket.",
+      "contextLine": "Ar gyfer {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -833,7 +834,9 @@
       "reviewNotSubmitted": "Ni ellir cyflwyno'r adolygiad hwn fel y mae. Efallai fod y PR wedi newid, neu mai'ch cais tynnu eich hun ydyw, ac ni allwch ei adolygu.",
       "reviewNotSubmittedTerm": "Ni ellir cyflwyno'r adolygiad hwn fel y mae. Efallai bod y {{term}} wedi newid, neu ni allwch adolygu eich {{term}} eich hun.",
       "couldNotPostComment": "Ni lwyddwyd i bostio'r sylw.",
-      "couldNotSubmitReview": "Ni lwyddwyd i gyflwyno'r adolygiad. Gwiriwch eich cysylltiad a rhowch gynnig eto."
+      "couldNotSubmitReview": "Ni lwyddwyd i gyflwyno'r adolygiad. Gwiriwch eich cysylltiad a rhowch gynnig eto.",
+      "rateLimited": "Gormod o geisiadau. Ceisiwch eto nes ymlaen.",
+      "conflict": "Newidiodd hwn tra roeddech yn gweithio arno. Ail-lwythwch ef a cheisiwch eto."
     },
     "operation": {
       "couldNotReply": "Doedd dim modd ateb.",
@@ -1621,7 +1624,8 @@
       "bugs": "Bygiau",
       "style": "Arddull",
       "testing": "Profi",
-      "documentation": "Dogfennaeth"
+      "documentation": "Dogfennaeth",
+      "unknown": "Arall ({{area}})"
     },
     "gateThreshold": {
       "warning": "Rhybudd"
@@ -2324,6 +2328,7 @@
       "prefillModelUnavailable": "Nid yw {{model}} ar gael mwyach. Mae eich model diofyn yn cael ei ddefnyddio.",
       "couldNotReadPendingSessions": "Methu darllen y sesiynau sy'n aros. Ceisiwch eto.",
       "failedToCreate": "Methu creu'r sesiwn.",
+      "checkOrganizationAccess": "Gwiriwch eich mynediad i'r sefydliad hwn a cheisiwch eto.",
       "couldNotRefreshRepositories": "Methu adnewyddu'r ystorfeydd. Ceisiwch eto.",
       "discardDraftTitle": "Dileu'r drafft?",
       "discardDraftMessage": "Byddwch yn colli'ch anogiad.",
@@ -2888,6 +2893,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Nid yw eich sesiynau gweithredol ar gael nes bod y data hwn wedi llwytho.",
     "currentDeviceUnidentified": "Methu adnabod y ddyfais gyfredol.",
+    "kiloApp": "Ap Kilo",
     "noSessions": "Dim sesiynau gweithredol",
     "noSessionsDescription": "Mewngofnodwch i ap Kilo ar ddyfais arall a bydd y sesiwn yn ymddangos yma.",
     "onlyKiloAppSignIns": "Dim ond sesiynau ap Kilo sy'n ymddangos yma. Nid yw sesiynau'r golygydd na'r CLI wedi'u rhestru.",

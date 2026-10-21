@@ -1033,7 +1033,8 @@
       "bugs": "バグ",
       "style": "スタイル",
       "testing": "テスト",
-      "documentation": "ドキュメント"
+      "documentation": "ドキュメント",
+      "unknown": "その他（{{area}}）"
     },
     "gateThreshold": {
       "warning": "警告"
@@ -1700,6 +1701,7 @@
       "prefillModelUnavailable": "{{model}}は利用できなくなりました。デフォルトモデルを使用します。",
       "couldNotReadPendingSessions": "保留中のセッションを読み取れませんでした。もう一度お試しください。",
       "failedToCreate": "セッションを作成できませんでした。",
+      "checkOrganizationAccess": "この組織へのアクセス権を確認して、もう一度お試しください。",
       "couldNotRefreshRepositories": "リポジトリを更新できませんでした。もう一度お試しください。",
       "discardDraftTitle": "下書きを破棄しますか？",
       "discardDraftMessage": "入力したプロンプトが削除されます。",
@@ -2220,6 +2222,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "読み込みが完了するまで、サインイン中のセッションは表示できません。",
     "currentDeviceUnidentified": "現在のデバイスを特定できませんでした。",
+    "kiloApp": "Kiloアプリ",
     "noSessions": "サインイン中のセッションはありません",
     "noSessionsDescription": "別のデバイスでKiloアプリにサインインすると、ここに表示されます。",
     "onlyKiloAppSignIns": "ここにはKiloアプリのサインインのみ表示されます。エディターとCLIのサインインは表示されません。",
@@ -2505,7 +2508,8 @@
       "description": "モバイルでプルリクエストをレビューするには、GitHubアカウントを接続してください。",
       "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
       "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
-      "bitbucketOrgOnlyDescription": "プロフィールで組織を選択すると、そのBitbucketプルリクエストをレビューできます。"
+      "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
+      "contextLine": "{{organization}}用"
     },
     "connectionExpired": "GitHubとの連携が期限切れになりました。",
     "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした。",
@@ -2932,7 +2936,9 @@
       "reviewNotSubmitted": "このレビューはこのままでは送信できません。PRが更新されていないか、自分が作成したプルリクエストではないか確認してください。",
       "reviewNotSubmittedTerm": "このレビューはそのまま送信できません。{{term}}が変更されたか、自分の{{term}}はレビューできません。",
       "couldNotPostComment": "コメントを投稿できませんでした。",
-      "couldNotSubmitReview": "レビューを送信できませんでした。接続を確認して、もう一度お試しください。"
+      "couldNotSubmitReview": "レビューを送信できませんでした。接続を確認して、もう一度お試しください。",
+      "rateLimited": "リクエストが多すぎます。しばらくしてからもう一度お試しください。",
+      "conflict": "作業中にこれが変更されました。読み込み直してもう一度お試しください。"
     },
     "operation": {
       "couldNotReply": "返信できませんでした。",

@@ -673,7 +673,8 @@
       "description": "Poveži svoj račun za GitHub za pregled zahtjeva za spajanje na mobitelu.",
       "gitlabDescription": "Poveži svoj GitLab račun za pregled merge requesta na mobitelu.",
       "bitbucketDescription": "Poveži Bitbucket s ovom organizacijom za pregled zahtjeva za spajanje na mobitelu.",
-      "bitbucketOrgOnlyDescription": "Odaberi organizaciju u svom profilu za pregled njezinih zahtjeva za spajanje na Bitbucketu."
+      "bitbucketOrgOnlyDescription": "Prebaci račun gore na organizaciju za pregled njenih zahtjeva za spajanje na Bitbucketu.",
+      "contextLine": "Za {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -785,7 +786,9 @@
       "reviewNotSubmitted": "Ovaj pregled koda nije moguće poslati u trenutačnom obliku. PR se možda promijenio ili pokušavaš pregledati vlastiti zahtjev za spajanje.",
       "reviewNotSubmittedTerm": "Ovaj pregled koda nije moguće poslati u trenutačnom obliku. {{term}} se možda promijenio ili ne možeš pregledati vlastiti {{term}}.",
       "couldNotPostComment": "Nije moguće objaviti komentar.",
-      "couldNotSubmitReview": "Nije moguće poslati pregled koda. Provjeri vezu i pokušaj ponovno."
+      "couldNotSubmitReview": "Nije moguće poslati pregled koda. Provjeri vezu i pokušaj ponovno.",
+      "rateLimited": "Previše zahtjeva. Pokušaj ponovno kasnije.",
+      "conflict": "Ovo se promijenilo dok ste radili na tome. Ponovno ga učitajte i pokušajte ponovno."
     },
     "operation": {
       "couldNotReply": "Nije moguće odgovoriti.",
@@ -1564,7 +1567,8 @@
       "bugs": "Pogreške",
       "style": "Stil",
       "testing": "Testiranje",
-      "documentation": "Dokumentacija"
+      "documentation": "Dokumentacija",
+      "unknown": "Ostalo ({{area}})"
     },
     "gateThreshold": {
       "warning": "Upozorenje"
@@ -2240,6 +2244,7 @@
       "prefillModelUnavailable": "Model {{model}} više nije dostupan. Koristi se tvoj zadani model.",
       "couldNotReadPendingSessions": "Nije moguće učitati sesije na čekanju. Pokušaj ponovno.",
       "failedToCreate": "Stvaranje sesije nije uspjelo.",
+      "checkOrganizationAccess": "Provjeri imaš li pristup ovoj organizaciji, pa pokušaj ponovno.",
       "couldNotRefreshRepositories": "Nije moguće osvježiti repozitorije. Pokušaj ponovno.",
       "discardDraftTitle": "Odbaciti nacrt?",
       "discardDraftMessage": "Tvoj će se upit izgubiti.",
@@ -2771,6 +2776,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Tvoje aktivne sesije nisu dostupne dok se podaci ne učitaju.",
     "currentDeviceUnidentified": "Nije moguće prepoznati trenutačni uređaj.",
+    "kiloApp": "Aplikacija Kilo",
     "noSessions": "Nema aktivnih sesija",
     "noSessionsDescription": "Prijavi se u aplikaciju Kilo na drugom uređaju i uređaj će se prikazati ovdje.",
     "onlyKiloAppSignIns": "Ovdje se prikazuju samo prijave u aplikaciju Kilo. Prijave putem uređivača i CLI-ja nisu navedene.",

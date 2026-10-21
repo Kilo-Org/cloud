@@ -697,7 +697,8 @@
       "description": "Ikkonnetta l-kont ta' GitHub tiegħek biex tirrevedi t-talbiet għall-għaqda fuq il-mowbajl.",
       "gitlabDescription": "Ikkonnettja l-kont GitLab tiegħek biex tirrevedi l-merge requests fuq il-mowbajl.",
       "bitbucketDescription": "Ikkonnettja Bitbucket ma' din l-organizzazzjoni biex tirrevedi l-PRs fuq il-mowbajl.",
-      "bitbucketOrgOnlyDescription": "Agħżel organizzazzjoni fil-profil tiegħek biex tirrevedi l-PRs tagħha fuq Bitbucket."
+      "bitbucketOrgOnlyDescription": "Ibdel il-kont ta' fuq għal organizzazzjoni biex tirrevedi l-PRs Bitbucket tagħha.",
+      "contextLine": "Għal {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -817,7 +818,9 @@
       "reviewNotSubmitted": "Din ir-reviżjoni ma tistax tintbagħat kif inhi. Il-PR seta' nbidel, jew ma tistax tirrevedi t-talba għall-għaqda tiegħek stess.",
       "reviewNotSubmittedTerm": "Din ir-reviżjoni ma tistax tintbagħat hekk kif inhi. Il-{{term}} fori nbidel, jew ma tistax tirrevedi l-{{term}} tiegħek stess.",
       "couldNotPostComment": "Ma setax jiġi ppubblikat il-kumment.",
-      "couldNotSubmitReview": "Ma setgħetx tintbagħat ir-reviżjoni. Iċċekkja l-konnessjoni tiegħek u erġa' pprova."
+      "couldNotSubmitReview": "Ma setgħetx tintbagħat ir-reviżjoni. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+      "rateLimited": "Żżejjed talbiet. Jekk jogħġbok erġa' pprova aktar tard.",
+      "conflict": "Din inbidlet waqt li kont taħdem fuqha. Iċċarġja mill-ġdid u erġa' pprova."
     },
     "operation": {
       "couldNotReply": "Ma stajniex nibagħtu t-tweġiba.",
@@ -1602,7 +1605,8 @@
       "bugs": "Żbalji fil-kodiċi",
       "style": "Stil",
       "testing": "Ittestjar",
-      "documentation": "Dokumentazzjoni"
+      "documentation": "Dokumentazzjoni",
+      "unknown": "Ieħor ({{area}})"
     },
     "gateThreshold": {
       "warning": "Twissija"
@@ -2296,6 +2300,7 @@
       "prefillModelUnavailable": "{{model}} m'għadux disponibbli. Qed jintuża l-mudell prestabbilit tiegħek.",
       "couldNotReadPendingSessions": "Ma setgħux jinqraw is-sessjonijiet pendenti. Erġa' pprova.",
       "failedToCreate": "Ma setgħetx tinħoloq is-sessjoni.",
+      "checkOrganizationAccess": "Iċċekkja l-aċċess tiegħek għal din l-organizzazzjoni, imbagħad erġa' pprova.",
       "couldNotRefreshRepositories": "Ma setgħux jiġu aġġornati r-repożitorji. Erġa' pprova.",
       "discardDraftTitle": "Twarrab l-abbozz?",
       "discardDraftMessage": "L-istruzzjoni tiegħek se tintilef.",
@@ -2849,6 +2854,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Is-sessjonijiet attivi tiegħek ma jkunux disponibbli sakemm titgħabba d-dejta.",
     "currentDeviceUnidentified": "L-apparat attwali ma setax jiġi identifikat.",
+    "kiloApp": "Applikazzjoni ta' Kilo",
     "noSessions": "L-ebda sessjoni attiva",
     "noSessionsDescription": "Idħol bl-applikazzjoni ta' Kilo fuq apparat ieħor u s-sessjoni tidher hawn.",
     "onlyKiloAppSignIns": "Hawn jidhru biss is-sessjonijiet tal-applikazzjoni ta' Kilo. Is-sessjonijiet tal-editur u tal-CLI mhumiex elenkati.",

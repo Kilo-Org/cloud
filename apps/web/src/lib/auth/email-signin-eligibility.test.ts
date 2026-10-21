@@ -8,10 +8,53 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   isBlockedTLD: jest.fn(),
 }));
 
-import { isNewAccountEligibleForMagicLink } from './email-signin-eligibility';
+jest.mock('@/lib/user', () => ({
+  findUserByNormalizedEmail: jest.fn(),
+  getWorkOSOrganization: jest.fn(),
+}));
+
+jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy', () => ({
+  resolveSsoAuthorityForDomain: jest.fn(),
+}));
+
+import { findUserByNormalizedEmail } from '@/lib/user';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import {
+  checkDomainSignInEligibility,
+  isNewAccountEligibleForMagicLink,
+} from './email-signin-eligibility';
 
 const mockIsEmailBlacklistedByDomainAsync = jest.mocked(isEmailBlacklistedByDomainAsync);
 const mockIsBlockedTLD = jest.mocked(isBlockedTLD);
+const mockFindUserByNormalizedEmail = jest.mocked(findUserByNormalizedEmail);
+const mockResolveSsoAuthorityForDomain = jest.mocked(resolveSsoAuthorityForDomain);
+
+describe('checkDomainSignInEligibility', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
+    mockIsBlockedTLD.mockReturnValue(false);
+    mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'not_required',
+      domain: 'example.com',
+    });
+  });
+
+  it('does not resolve SSO authority for an address without a domain', async () => {
+    await expect(checkDomainSignInEligibility('no-domain')).resolves.toEqual({
+      ok: true,
+      existingUser: false,
+    });
+    expect(mockResolveSsoAuthorityForDomain).not.toHaveBeenCalled();
+  });
+
+  it('resolves SSO authority for the lowercased domain', async () => {
+    await checkDomainSignInEligibility('new@Acme.Example');
+
+    expect(mockResolveSsoAuthorityForDomain).toHaveBeenCalledWith('acme.example');
+  });
+});
 
 describe('isNewAccountEligibleForMagicLink', () => {
   beforeEach(() => {

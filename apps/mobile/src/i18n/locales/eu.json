@@ -111,7 +111,9 @@
     "online": "Konektatuta",
     "open": "Ireki {{name}}",
     "openPullRequest": "Ireki bateratze-eskaera",
+    "completed": "Amaituta",
     "pending": "Zain",
+    "running": "Martxan",
     "performance": "Errendimendua",
     "preferences": "Hobespenak",
     "privacyPolicy": "Pribatutasun-politika",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Ezin izan da berrikuslea eguneratu.",
     "configSaveFailed": "Ezin izan da berrikuspenaren konfigurazioa gorde.",
     "status": {
-      "running": "Martxan",
-      "completed": "Amaituta",
       "interrupted": "Etenda"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "Komandoaren deskribapena",
       "template": "Txantiloia",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Azaldu $ARGUMENTS",
       "subtask": "Exekutatu azpizeregin gisa",
       "edit": "Editatu barra komandoa",

@@ -111,7 +111,9 @@
     "online": "Prisijungęs",
     "open": "Atidaryti {{name}}",
     "openPullRequest": "Atidaryti pakeitimų užklausą",
+    "completed": "Baigta",
     "pending": "Laukiama",
+    "running": "Vykdoma",
     "performance": "Našumas",
     "preferences": "Nuostatos",
     "privacyPolicy": "Privatumo politika",
@@ -1574,8 +1576,6 @@
     "updateFailed": "Nepavyko atnaujinti kodo peržiūros agento.",
     "configSaveFailed": "Nepavyko išsaugoti peržiūros nustatymų.",
     "status": {
-      "running": "Vykdoma",
-      "completed": "Baigta",
       "interrupted": "Nutraukta"
     },
     "reviewStyle": {
@@ -3797,6 +3797,7 @@
       "description": "Komandos aprašymas",
       "template": "Šablonas",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Paaiškinkite $ARGUMENTS",
       "subtask": "Vykdyti kaip papildomą užduotį",
       "edit": "Redaguoti pasvirojo brūkšnio komandą",

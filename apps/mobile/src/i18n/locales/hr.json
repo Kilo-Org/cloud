@@ -111,7 +111,9 @@
     "online": "Na mreži",
     "open": "Otvori {{name}}",
     "openPullRequest": "Otvori zahtjev za spajanje",
+    "completed": "Dovršeno",
     "pending": "Na čekanju",
+    "running": "U tijeku",
     "performance": "Performanse",
     "preferences": "Postavke",
     "privacyPolicy": "Politika privatnosti",
@@ -1555,8 +1557,6 @@
     "updateFailed": "Nije moguće ažurirati agenta za pregled koda.",
     "configSaveFailed": "Nije moguće spremiti postavke pregleda.",
     "status": {
-      "running": "U tijeku",
-      "completed": "Dovršeno",
       "interrupted": "Prekinuto"
     },
     "reviewStyle": {
@@ -3756,6 +3756,7 @@
       "description": "Opis naredbe",
       "template": "Predložak",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Objasnite $ARGUMENTS",
       "subtask": "Pokreni kao podzadatak",
       "edit": "Naredba za uređivanje kose crte",

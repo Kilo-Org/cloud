@@ -111,7 +111,9 @@
     "online": "Khadka ku jira",
     "open": "Fur {{name}}",
     "openPullRequest": "Codsi isku-darid oo furan",
+    "completed": "La dhammeeyay",
     "pending": "Sugaya",
+    "running": "Socda",
     "performance": "Waxqabadka",
     "preferences": "Dookhyada",
     "privacyPolicy": "Siyaasadda asturnaanta",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Dib-u-eegaha lama cusboonaysiin karin.",
     "configSaveFailed": "Dejinta dib-u-eegista lama kaydin karin.",
     "status": {
-      "running": "Socda",
-      "completed": "La dhammeeyay",
       "interrupted": "Waa la hakiyay"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "Tilmaanta amarka",
       "template": "Tusaale",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Sharax $ARGUMENTS",
       "subtask": "U orda sidii shaqo-hoosaad",
       "edit": "Tafatir amarka slash",

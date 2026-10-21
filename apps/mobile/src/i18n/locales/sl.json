@@ -111,7 +111,9 @@
     "online": "Na spletu",
     "open": "Odpri {{name}}",
     "openPullRequest": "Odprta zahteva za združitev",
+    "completed": "Dokončano",
     "pending": "Na čakanju",
+    "running": "V teku",
     "performance": "Zmogljivost",
     "preferences": "Nastavitve",
     "privacyPolicy": "Politika zasebnosti",
@@ -1574,8 +1576,6 @@
     "updateFailed": "Pregledovalnika kode ni bilo mogoče posodobiti.",
     "configSaveFailed": "Nastavitev pregleda ni bilo mogoče shraniti.",
     "status": {
-      "running": "V teku",
-      "completed": "Dokončano",
       "interrupted": "Prekinjeno"
     },
     "reviewStyle": {
@@ -3797,6 +3797,7 @@
       "description": "Opis ukaza",
       "template": "Predloga",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Pojasnite $ARGUMENTS",
       "subtask": "Zaženi kot podopravilo",
       "edit": "Uredi ukaz za poševnico",

@@ -176,7 +176,9 @@
     "online": "Online",
     "open": "Open {{name}}",
     "openPullRequest": "Open pull request",
+    "completed": "Completed",
     "pending": "Pending",
+    "running": "Running",
     "performance": "Performance",
     "preferences": "Preferences",
     "privacyPolicy": "Privacy Policy",
@@ -1600,8 +1602,6 @@
     "updateFailed": "Failed to update reviewer",
     "configSaveFailed": "Failed to save review config",
     "status": {
-      "running": "Running",
-      "completed": "Completed",
       "interrupted": "Interrupted"
     },
     "reviewStyle": {
@@ -3785,6 +3785,7 @@
       "description": "Command description",
       "template": "Template",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explain $ARGUMENTS",
       "subtask": "Run as subtask",
       "edit": "Edit slash command",

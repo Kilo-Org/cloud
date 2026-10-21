@@ -111,7 +111,9 @@
     "online": "Toora irra",
     "open": "{{name}} bani",
     "openPullRequest": "Gaaffii walitti makuu bani",
+    "completed": "Xumurame",
     "pending": "Eeggachaa jira",
+    "running": "Hojii irra jira",
     "performance": "Raawwii",
     "preferences": "Filannoowwan",
     "privacyPolicy": "Imaammata eegumsa dhuunfaa",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Sakatta'aa haaromsuun hin danda'amne.",
     "configSaveFailed": "Qindaa'ina sakatta'aa olkaa'uun hin danda'amne.",
     "status": {
-      "running": "Hojii irra jira",
-      "completed": "Xumurame",
       "interrupted": "Addaan cite"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "Ibsa ajajaa",
       "template": "Unkaa",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ibsi",
       "subtask": "Akka hojii xiqqaatti fiigi",
       "edit": "Ajaja slash gulaali",

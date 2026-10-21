@@ -111,7 +111,9 @@
     "online": "オンライン",
     "open": "{{name}}を開く",
     "openPullRequest": "プルリクエストを開く",
+    "completed": "完了",
     "pending": "保留中",
+    "running": "実行中",
     "performance": "性能",
     "preferences": "設定",
     "privacyPolicy": "プライバシーポリシー",
@@ -1021,8 +1023,6 @@
     "updateFailed": "レビュアーを更新できませんでした。",
     "configSaveFailed": "レビュー設定を保存できませんでした。",
     "status": {
-      "running": "実行中",
-      "completed": "完了",
       "interrupted": "中断"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "コマンドの説明",
       "template": "テンプレート",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS の説明",
       "subtask": "サブタスクとして実行",
       "edit": "スラッシュコマンドの編集",

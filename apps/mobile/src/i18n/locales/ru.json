@@ -111,7 +111,9 @@
     "online": "В сети",
     "open": "Открыть {{name}}",
     "openPullRequest": "Открыть pull request",
+    "completed": "Завершено",
     "pending": "Ожидание",
+    "running": "В работе",
     "performance": "Производительность",
     "preferences": "Настройки",
     "privacyPolicy": "Политика конфиденциальности",
@@ -1027,8 +1029,6 @@
     "updateFailed": "Не удалось обновить настройки проверки кода.",
     "configSaveFailed": "Не удалось сохранить настройки проверки.",
     "status": {
-      "running": "В работе",
-      "completed": "Завершено",
       "interrupted": "Прервано"
     },
     "reviewStyle": {
@@ -3797,6 +3797,7 @@
       "description": "Описание команды",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Объясните $ARGUMENTS",
       "subtask": "Запустить как подзадачу",
       "edit": "Команда редактирования косой черты",

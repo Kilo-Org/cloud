@@ -111,7 +111,9 @@
     "online": "Онлайн",
     "open": "Отвори {{name}}",
     "openPullRequest": "Отваряне на заявка за сливане",
+    "completed": "Завършено",
     "pending": "В изчакване",
+    "running": "Изпълнява се",
     "performance": "Производителност",
     "preferences": "Предпочитания",
     "privacyPolicy": "Политика за поверителност",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Не успяхме да актуализираме агента за преглед на код.",
     "configSaveFailed": "Не успяхме да запазим настройките за преглед.",
     "status": {
-      "running": "Изпълнява се",
-      "completed": "Завършено",
       "interrupted": "Прекъснато"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "Описание на командата",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Обяснете $ARGUMENTS",
       "subtask": "Изпълнение като подзадача",
       "edit": "Команда за редактиране на наклонена черта",

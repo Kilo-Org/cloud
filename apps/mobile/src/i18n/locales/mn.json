@@ -111,7 +111,9 @@
     "online": "Онлайн",
     "open": "{{name}}-г нээх",
     "openPullRequest": "Нэгтгэх хүсэлт нээх",
+    "completed": "Дууссан",
     "pending": "Хүлээгдэж байна",
+    "running": "Ажиллаж байна",
     "performance": "Гүйцэтгэл",
     "preferences": "Тохиргоо",
     "privacyPolicy": "Нууцлалын бодлого",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Шалгагчийг шинэчилж чадсангүй.",
     "configSaveFailed": "Шалгалтын тохиргоог хадгалж чадсангүй.",
     "status": {
-      "running": "Ажиллаж байна",
-      "completed": "Дууссан",
       "interrupted": "Тасарсан"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "Тушаалын тайлбар",
       "template": "Загвар",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS-г тайлбарла",
       "subtask": "Дэд даалгавар болгон ажиллуул",
       "edit": "Талуу зураасыг засах команд",

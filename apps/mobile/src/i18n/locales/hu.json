@@ -111,7 +111,9 @@
     "online": "Elérhető",
     "open": "{{name}} megnyitása",
     "openPullRequest": "PR megnyitása",
+    "completed": "Befejezve",
     "pending": "Függőben",
+    "running": "Fut",
     "performance": "Teljesítmény",
     "preferences": "Beállítások",
     "privacyPolicy": "Adatvédelmi tájékoztató",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Nem sikerült frissíteni a kódellenőrzőt.",
     "configSaveFailed": "Nem sikerült menteni a kódellenőrzési beállításokat.",
     "status": {
-      "running": "Fut",
-      "completed": "Befejezve",
       "interrupted": "Megszakítva"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "A parancs leírása",
       "template": "Sablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Magyarázza el $ARGUMENTS",
       "subtask": "Futtassa részfeladatként",
       "edit": "Szerkessze a perjel parancsot",

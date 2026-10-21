@@ -111,7 +111,9 @@
     "online": "Trực tuyến",
     "open": "Mở {{name}}",
     "openPullRequest": "Mở yêu cầu hợp nhất",
+    "completed": "Đã hoàn tất",
     "pending": "Đang chờ",
+    "running": "Đang chạy",
     "performance": "Hiệu năng",
     "preferences": "Tùy chọn",
     "privacyPolicy": "Chính sách quyền riêng tư",
@@ -1021,8 +1023,6 @@
     "updateFailed": "Không thể cập nhật Trình rà soát mã.",
     "configSaveFailed": "Không thể lưu cấu hình rà soát.",
     "status": {
-      "running": "Đang chạy",
-      "completed": "Đã hoàn tất",
       "interrupted": "Bị gián đoạn"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "Mô tả lệnh",
       "template": "Bản mẫu",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Giải thích $ARGUMENTS",
       "subtask": "Chạy dưới dạng nhiệm vụ phụ",
       "edit": "Chỉnh sửa lệnh gạch chéo",

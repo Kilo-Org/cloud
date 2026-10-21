@@ -111,7 +111,9 @@
     "online": "在线",
     "open": "打开 {{name}}",
     "openPullRequest": "开启拉取请求",
+    "completed": "已完成",
     "pending": "待处理",
+    "running": "运行中",
     "performance": "性能",
     "preferences": "偏好设置",
     "privacyPolicy": "隐私政策",
@@ -1021,8 +1023,6 @@
     "updateFailed": "更新代码审查器失败。",
     "configSaveFailed": "保存审查配置失败。",
     "status": {
-      "running": "运行中",
-      "completed": "已完成",
       "interrupted": "已中断"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "命令说明",
       "template": "模板",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "解释$ARGUMENTS",
       "subtask": "作为子任务运行",
       "edit": "编辑斜杠命令",

@@ -111,7 +111,9 @@
     "online": "En liña",
     "open": "Abrir {{name}}",
     "openPullRequest": "Apertura da solicitude de cambios",
+    "completed": "Rematado",
     "pending": "Pendente",
+    "running": "En execución",
     "performance": "Rendemento",
     "preferences": "Preferencias",
     "privacyPolicy": "Política de privacidade",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Non se puido actualizar o revisor.",
     "configSaveFailed": "Non se puido gardar a configuración da revisión.",
     "status": {
-      "running": "En execución",
-      "completed": "Rematado",
       "interrupted": "Interrompida"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "Descrición do comando",
       "template": "Modelo",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar como subtarefa",
       "edit": "Comando de edición de barra",

@@ -111,7 +111,9 @@
     "online": "Σε σύνδεση",
     "open": "Άνοιγμα {{name}}",
     "openPullRequest": "Άνοιγμα αιτήματος ενσωμάτωσης",
+    "completed": "Ολοκληρώθηκε",
     "pending": "Σε εκκρεμότητα",
+    "running": "Σε εκτέλεση",
     "performance": "Απόδοση",
     "preferences": "Προτιμήσεις",
     "privacyPolicy": "Πολιτική απορρήτου",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Δεν ήταν δυνατή η ενημέρωση του ελεγκτή κώδικα.",
     "configSaveFailed": "Δεν ήταν δυνατή η αποθήκευση των ρυθμίσεων ελέγχου.",
     "status": {
-      "running": "Σε εκτέλεση",
-      "completed": "Ολοκληρώθηκε",
       "interrupted": "Διακόπηκε"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "Περιγραφή εντολής",
       "template": "Περίγραμμα",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Εξηγήστε τα $ARGUMENTS",
       "subtask": "Εκτέλεση ως δευτερεύουσα εργασία",
       "edit": "Επεξεργασία εντολής κάθετο",

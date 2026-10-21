@@ -111,7 +111,9 @@
     "online": "Lórí ayélujára",
     "open": "Ṣí {{name}}",
     "openPullRequest": "Ṣí ìbéèrè àkópọ̀",
+    "completed": "A ti parí",
     "pending": "Ń dúró",
+    "running": "Ń ṣiṣẹ́",
     "performance": "Agbára ìṣiṣẹ́",
     "preferences": "Àwọn ààyò",
     "privacyPolicy": "Ìlànà àṣírí",
@@ -1536,8 +1538,6 @@
     "updateFailed": "A kò lè sọ olùṣàtúnyẹ̀wò di tuntun.",
     "configSaveFailed": "A kò lè fi ètò àtúnyẹ̀wò pamọ́.",
     "status": {
-      "running": "Ń ṣiṣẹ́",
-      "completed": "A ti parí",
       "interrupted": "Ó dá dúró"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "Apejuwe aṣẹ",
       "template": "Àdàkọ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Ṣe alaye $ARGUMENTS",
       "subtask": "Ṣiṣe bi iṣẹ-ṣiṣe",
       "edit": "Ṣatunkọ pipaṣẹ idinku",

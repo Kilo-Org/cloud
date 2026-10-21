@@ -111,7 +111,9 @@
     "online": "ऑनलाइन",
     "open": "{{name}} खोलें",
     "openPullRequest": "पुल रिक्वेस्ट खोलें",
+    "completed": "पूरा",
     "pending": "लंबित",
+    "running": "चल रहा है",
     "performance": "प्रदर्शन",
     "preferences": "पसंद",
     "privacyPolicy": "गोपनीयता नीति",
@@ -1021,8 +1023,6 @@
     "updateFailed": "समीक्षक अपडेट नहीं हो सका।",
     "configSaveFailed": "समीक्षा की सेटिंग सहेजी नहीं जा सकीं।",
     "status": {
-      "running": "चल रहा है",
-      "completed": "पूरा",
       "interrupted": "बाधित"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "आदेश विवरण",
       "template": "खाका",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS स्पष्ट करें",
       "subtask": "उपकार्य के रूप में चलाएँ",
       "edit": "स्लैश कमांड संपादित करें",

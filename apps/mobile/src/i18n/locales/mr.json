@@ -111,7 +111,9 @@
     "online": "ऑनलाइन",
     "open": "{{name}} उघडा",
     "openPullRequest": "पुल रिक्वेस्ट उघडा",
+    "completed": "पूर्ण",
     "pending": "प्रलंबित",
+    "running": "चालू आहे",
     "performance": "कार्यक्षमता",
     "preferences": "प्राधान्ये",
     "privacyPolicy": "गोपनीयता धोरण",
@@ -1536,8 +1538,6 @@
     "updateFailed": "कोड पुनरावलोकक अद्ययावत करता आला नाही.",
     "configSaveFailed": "पुनरावलोकनाच्या सेटिंग्ज जतन करता आल्या नाहीत.",
     "status": {
-      "running": "चालू आहे",
-      "completed": "पूर्ण",
       "interrupted": "व्यत्यय आला"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "आदेश वर्णन",
       "template": "साचा",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS स्पष्ट करा",
       "subtask": "सबटास्क म्हणून चालवा",
       "edit": "स्लॅश कमांड संपादित करा",

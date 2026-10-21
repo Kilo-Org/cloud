@@ -111,7 +111,9 @@
     "online": "Dalam talian",
     "open": "Buka {{name}}",
     "openPullRequest": "Buka PR",
+    "completed": "Selesai",
     "pending": "Menunggu",
+    "running": "Sedang berjalan",
     "performance": "Prestasi",
     "preferences": "Keutamaan",
     "privacyPolicy": "Dasar privasi",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Gagal mengemas kini penyemak.",
     "configSaveFailed": "Gagal menyimpan konfigurasi semakan.",
     "status": {
-      "running": "Sedang berjalan",
-      "completed": "Selesai",
       "interrupted": "Terganggu"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "Penerangan perintah",
       "template": "templat",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Terangkan $ARGUMENTS",
       "subtask": "Jalankan sebagai subtugas",
       "edit": "Edit arahan slash",

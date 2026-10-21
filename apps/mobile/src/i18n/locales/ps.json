@@ -111,7 +111,9 @@
     "online": "آنلاین",
     "open": "{{name}} پرانیزئ",
     "openPullRequest": "پل ریکویسټ پرانیزئ",
+    "completed": "بشپړ شوی",
     "pending": "په انتظار",
+    "running": "روان",
     "performance": "کارکردګي",
     "preferences": "غوره توبونه",
     "privacyPolicy": "د محرمیت تګلاره",
@@ -1536,8 +1538,6 @@
     "updateFailed": "بیاکتونکی تازه نه شو.",
     "configSaveFailed": "د بیاکتنې ترتیبات خوندي نه شول.",
     "status": {
-      "running": "روان",
-      "completed": "بشپړ شوی",
       "interrupted": "نیمګړی درېدلی"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "د قوماندې توضیحات",
       "template": "کينډۍ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS تشریح کړئ",
       "subtask": "د فرعي دندې په توګه چلول",
       "edit": "د سلیش کمانډ ایډیټ کړئ",

@@ -111,7 +111,9 @@
     "online": "በመስመር ላይ",
     "open": "{{name}}ን ክፈት",
     "openPullRequest": "ክፍት የማዋሃድ ጥያቄ",
+    "completed": "ተጠናቋል",
     "pending": "በመጠበቅ ላይ",
+    "running": "በሥራ ላይ",
     "performance": "አፈጻጸም",
     "preferences": "ምርጫዎች",
     "privacyPolicy": "የግላዊነት ፖሊሲ",
@@ -1536,8 +1538,6 @@
     "updateFailed": "ገምጋሚውን ማዘመን አልተሳካም።",
     "configSaveFailed": "የግምገማ ቅንብሮችን ማስቀመጥ አልተሳካም።",
     "status": {
-      "running": "በሥራ ላይ",
-      "completed": "ተጠናቋል",
       "interrupted": "ተቋርጧል"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "የትዕዛዝ መግለጫ",
       "template": "አብነት",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ያብራሩ",
       "subtask": "እንደ ንዑስ ተግባር ያሂዱ",
       "edit": "የጭረት ትእዛዝን ያርትዑ",

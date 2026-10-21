@@ -111,7 +111,9 @@
     "online": "ઑનલાઇન",
     "open": "{{name}} ખોલો",
     "openPullRequest": "પુલ રિક્વેસ્ટ ખોલો",
+    "completed": "પૂર્ણ",
     "pending": "બાકી",
+    "running": "ચાલી રહ્યું છે",
     "performance": "કાર્યક્ષમતા",
     "preferences": "પસંદગીઓ",
     "privacyPolicy": "ગોપનીયતા નીતિ",
@@ -1536,8 +1538,6 @@
     "updateFailed": "કોડ સમીક્ષક અપડેટ કરી શકાયો નહીં.",
     "configSaveFailed": "સમીક્ષાની ગોઠવણી સાચવી શકાઈ નહીં.",
     "status": {
-      "running": "ચાલી રહ્યું છે",
-      "completed": "પૂર્ણ",
       "interrupted": "અધવચ્ચે અટક્યું"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "આદેશનું વર્ણન",
       "template": "ઢાંચો",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS સમજાવો",
       "subtask": "સબટાસ્ક તરીકે ચલાવો",
       "edit": "સ્લેશ આદેશ સંપાદિત કરો",

@@ -111,7 +111,9 @@
     "online": "ออนไลน์",
     "open": "เปิด {{name}}",
     "openPullRequest": "เปิดพูลรีเควสต์",
+    "completed": "เสร็จสิ้น",
     "pending": "รอดำเนินการ",
+    "running": "กำลังทำงาน",
     "performance": "ประสิทธิภาพ",
     "preferences": "การตั้งค่า",
     "privacyPolicy": "นโยบายความเป็นส่วนตัว",
@@ -1536,8 +1538,6 @@
     "updateFailed": "อัปเดตตัวตรวจสอบโค้ดไม่สำเร็จ",
     "configSaveFailed": "บันทึกการตั้งค่าการตรวจสอบไม่สำเร็จ",
     "status": {
-      "running": "กำลังทำงาน",
-      "completed": "เสร็จสิ้น",
       "interrupted": "ถูกขัดจังหวะ"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "คำอธิบายคำสั่ง",
       "template": "แม่แบบ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "อธิบาย $ARGUMENTS",
       "subtask": "ทำงานเป็นงานย่อย",
       "edit": "แก้ไขคำสั่งสแลช",

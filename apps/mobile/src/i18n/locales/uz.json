@@ -111,7 +111,9 @@
     "online": "Onlayn",
     "open": "{{name}}ni ochish",
     "openPullRequest": "Ochiq PR",
+    "completed": "Yakunlangan",
     "pending": "Kutilmoqda",
+    "running": "Ishlamoqda",
     "performance": "Unumdorlik",
     "preferences": "Shaxsiy sozlamalar",
     "privacyPolicy": "Maxfiylik siyosati",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Kodni ko'rib chiquvchini yangilab bo'lmadi.",
     "configSaveFailed": "Ko'rib chiqish sozlamalarini saqlab bo'lmadi.",
     "status": {
-      "running": "Ishlamoqda",
-      "completed": "Yakunlangan",
       "interrupted": "Uzildi"
     },
     "reviewStyle": {
@@ -3715,6 +3715,7 @@
       "description": "Buyruq tavsifi",
       "template": "Shablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ni tushuntiring",
       "subtask": "Quyi vazifa sifatida ishga tushirish",
       "edit": "Slash buyrug'ini tahrirlash",

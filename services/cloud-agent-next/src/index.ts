@@ -18,5 +18,4 @@ export { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 export { EnvironmentBuild } from './environment-build/environment-build-do.js';
 export { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
 export { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
-export { CloudAgentSession } from './persistence/CloudAgentSession.js';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

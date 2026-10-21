@@ -422,6 +422,10 @@
       "new_sqlite_classes": ["VercelSnapshotBuild"],
       "tag": "v13",
     },
+    {
+      "tag": "v14",
+      "deleted_classes": ["CloudAgentSession"],
+    },
   ],
   /**
    * Hyperdrive Bindings

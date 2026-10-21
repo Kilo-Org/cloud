@@ -35,6 +35,8 @@
     "connectGithub": "GitHub verbinden",
     "cost": "Kosten",
     "discard": "Verwerfen",
+    "discardChangesMessage": "Deine Änderungen gehen verloren.",
+    "discardChangesTitle": "Änderungen verwerfen?",
     "findings": "Befunde",
     "mergeRequest": "Merge-Request",
     "notConnected": "Nicht verbunden",
@@ -943,6 +945,9 @@
       "gateHidden": "Ausgeblendet",
       "gateNone": "Ohne",
       "noFindings": "Es liegen keine Befunde vor.",
+      "findingsUnavailable": "Die Ergebnisse sind nicht verfügbar, weil dieses Review fehlgeschlagen ist.",
+      "serviceUnavailable": "Der Code-Review-Dienst konnte nicht erreicht werden. Führe das Review erneut aus, wenn der Dienst verfügbar ist.",
+      "reviewFailed": "Das Review ist fehlgeschlagen. Bitte versuche es erneut.",
       "retryMessage": "Das Code-Review wird erneut ausgeführt.",
       "retryReview": "Review erneut ausführen",
       "retryNeedsSettings": "Der Code-Prüfer ist ausgeschaltet oder seine Einstellungen erfordern Aufmerksamkeit. Korrigiere die Einstellungen und führe dieses Review dann erneut aus.",
@@ -1030,7 +1035,8 @@
       "bugs": "Fehler",
       "style": "Stil",
       "testing": "Tests",
-      "documentation": "Dokumentation"
+      "documentation": "Dokumentation",
+      "unknown": "Sonstiges ({{area}})"
     },
     "gateThreshold": {
       "warning": "Warnung"
@@ -1109,7 +1115,14 @@
       "triageReasoning": "Begründung der Ersteinschätzung",
       "watchInCloudAgent": "Im Cloud Agent ansehen",
       "whereFound": "Fundstellen ({{displayCount}})",
-      "yes": "Ja"
+      "yes": "Ja",
+      "action": {
+        "analyzeCodebase": "Codebasis analysieren",
+        "dismiss": "Verwerfen",
+        "manualReview": "Manuelle Prüfung",
+        "monitor": "Überwachen",
+        "openPr": "PR öffnen"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Analysemodell",
@@ -1131,7 +1144,24 @@
       "summary": "Zusammenfassung des Berichts",
       "title": "Auditbericht",
       "unavailable": "Auditbericht nicht verfügbar",
-      "unavailableDescription": "Nur Organisationsinhaber und Abrechnungsmanager können Auditberichte ansehen. Bitte einen Inhaber oder Abrechnungsmanager, dir Zugriff zu gewähren."
+      "unavailableDescription": "Nur Organisationsinhaber und Abrechnungsmanager können Auditberichte ansehen. Bitte einen Inhaber oder Abrechnungsmanager, dir Zugriff zu gewähren.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyse abgeschlossen",
+        "findingAnalysisFailed": "Analyse fehlgeschlagen",
+        "findingAutoDismissed": "Automatisch verworfen",
+        "findingCreated": "Importiert",
+        "findingDeleted": "Gelöscht",
+        "findingDismissed": "Verworfen",
+        "findingSeverityChanged": "Schweregrad geändert",
+        "findingStatusChange": "Status geändert",
+        "findingSuperseded": "Ersetzt",
+        "remediationBlocked": "Behebung blockiert",
+        "remediationCancelled": "Abgebrochen",
+        "remediationFailed": "Behebung fehlgeschlagen",
+        "remediationNoChangesNeeded": "Keine Änderungen erforderlich",
+        "remediationPrOpened": "PR geöffnet",
+        "remediationQueued": "Behebung angefordert"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Auditbericht ansehen"
@@ -1697,6 +1727,7 @@
       "prefillModelUnavailable": "{{model}} ist nicht mehr verfügbar. Dein Standardmodell wird verwendet.",
       "couldNotReadPendingSessions": "Die ausstehenden Sitzungen konnten nicht geladen werden. Versuche es erneut.",
       "failedToCreate": "Die Sitzung konnte nicht erstellt werden.",
+      "checkOrganizationAccess": "Prüfe deinen Zugriff auf diese Organisation und versuche es erneut.",
       "couldNotRefreshRepositories": "Die Repositorys konnten nicht aktualisiert werden. Bitte versuche es erneut.",
       "discardDraftTitle": "Entwurf verwerfen?",
       "discardDraftMessage": "Dein Prompt geht verloren.",
@@ -2217,6 +2248,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Deine aktiven Sitzungen können erst angezeigt werden, wenn die Daten geladen wurden.",
     "currentDeviceUnidentified": "Das aktuelle Gerät konnte nicht identifiziert werden.",
+    "kiloApp": "Kilo-App",
     "noSessions": "Keine aktiven Sitzungen",
     "noSessionsDescription": "Melde dich auf einem anderen Gerät in der Kilo-App an. Das Gerät erscheint dann hier.",
     "onlyKiloAppSignIns": "Hier erscheinen nur Kilo-App-Anmeldungen. Editor- und CLI-Anmeldungen werden nicht aufgeführt.",
@@ -2369,6 +2401,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Bevor wir beginnen",
+    "summaryTitle": "Einstellungen zur Datenweitergabe",
     "introDescription": "Kilo sendet deine Nachrichten an KI-Anbieter, um Antworten zu erstellen. Hier erfährst du, welche Daten an wen weitergegeben werden.",
     "required": "Für die Nutzung von Kilo erforderlich",
     "promptsTitle": "Deine Prompts und Unterhaltungen",
@@ -2377,7 +2410,6 @@
     "accountDescription": "Deine Kilo-Konto-ID und die Metadaten deiner Anfragen dienen dazu, dich zu authentifizieren und deine Nutzung zu erfassen.",
     "diagnosticsTitle": "App-Diagnosedaten",
     "diagnosticsDescription": "Absturz- und Fehlerberichte helfen uns, die App stabil zu halten. App-Inhalte werden daraus entfernt.",
-    "optional": "Freiwillig",
     "helpImprove": "Zur Verbesserung von Kilo beitragen",
     "helpImproveDescription": "Teile anonyme Daten zur Produktnutzung und zur Installationsquelle. Du kannst das jederzeit in den Einstellungen ändern.",
     "seeFullDetails": "Vollständige Details ansehen",
@@ -2502,7 +2534,8 @@
       "description": "Verbinde dein GitHub-Konto, um Pull-Requests in der App zu prüfen.",
       "gitlabDescription": "Verbinde dein GitLab-Konto, um Merge-Requests in der App zu prüfen.",
       "bitbucketDescription": "Verbinde Bitbucket mit dieser Organisation, um Pull-Requests in der App zu prüfen.",
-      "bitbucketOrgOnlyDescription": "Wähle in deinem Profil eine Organisation aus, um deren Bitbucket-Pull-Requests in der App zu prüfen."
+      "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
+      "contextLine": "Für {{organization}}"
     },
     "connectionExpired": "Die GitHub-Verbindung ist abgelaufen.",
     "couldNotLoadPullRequest": "Der Pull-Request konnte nicht geladen werden.",
@@ -2929,7 +2962,9 @@
       "reviewNotSubmitted": "Dieses Review kann in seiner aktuellen Form nicht gesendet werden. Möglicherweise hat sich der PR geändert oder du versuchst, deinen eigenen Pull-Request zu prüfen.",
       "reviewNotSubmittedTerm": "Dieses Review kann in seiner aktuellen Form nicht gesendet werden. Möglicherweise hat sich der {{term}} geändert, oder du kannst deinen eigenen {{term}} nicht prüfen.",
       "couldNotPostComment": "Der Kommentar konnte nicht veröffentlicht werden.",
-      "couldNotSubmitReview": "Das Review konnte nicht gesendet werden. Prüfe deine Verbindung und versuche es erneut."
+      "couldNotSubmitReview": "Das Review konnte nicht gesendet werden. Prüfe deine Verbindung und versuche es erneut.",
+      "rateLimited": "Zu viele Anfragen. Bitte versuche es später erneut.",
+      "conflict": "Das hat sich geändert, während du daran gearbeitet hast. Lade es neu und versuche es erneut."
     },
     "operation": {
       "couldNotReply": "Die Antwort konnte nicht gesendet werden.",
@@ -3468,6 +3503,9 @@
     "localModels": {
       "title": "Modelle auf dem Gerät",
       "help": "Modelle auf dem Gerät laufen auf diesem Telefon. Deine Eingaben und Antworten bleiben auf dem Gerät.",
+      "switchTitle": "Zu einem Modell auf dem Gerät wechseln?",
+      "switchMessage": "Beim Wechsel zu {{name}} werden die Prompts und der Kontext dieser Unterhaltung auf diesem Telefon verarbeitet, nicht auf einem entfernten Server.",
+      "switchConfirm": "Modell wechseln",
       "systemPurpose": "Das in das System dieses Geräts integrierte Modell. Es läuft auf dem Gerät.",
       "apple": "Apple Intelligence (auf dem Gerät)",
       "checking": "Verfügbarkeit wird geprüft …",
@@ -3564,7 +3602,6 @@
     "personalDefaultDescription": "Wird automatisch geladen, wenn kein Repository über ein angeheftetes Profil verfügt.",
     "organizationDefaultDescription": "Wird automatisch für Mitglieder geladen, die keinen persönlichen Standard haben.",
     "setAsDefault": "Als Standard festlegen",
-    "removeDefault": "Als Standard entfernen",
     "saveFailed": "Profil konnte nicht gespeichert werden",
     "deleteTitle": "Profil löschen",
     "deleteMessage": "Dadurch werden das Profil und seine Einstellungen dauerhaft entfernt. Dies kann nicht rückgängig gemacht werden.",
@@ -3590,11 +3627,13 @@
     "commandsTitle": "Setup-Befehle",
     "addCommand": "Befehl hinzufügen",
     "commandLabel": "Befehl",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "z. B. pnpm install",
     "commandsEmpty": "Noch keine Setup-Befehle",
     "commandsSaveFailed": "Setup-Befehle konnten nicht gespeichert werden",
     "moveUp": "Bewegen Sie sich nach oben",
     "moveDown": "Bewegen Sie sich nach unten",
+    "moveCommandUp": "Befehl {{position}} nach oben verschieben",
+    "moveCommandDown": "Befehl {{position}} nach unten verschieben",
     "skillsTitle": "Fähigkeiten",
     "addSkill": "Fertigkeit hinzufügen",
     "skillNameLabel": "Fähigkeitsname",
@@ -3664,7 +3703,7 @@
       "nameRequired": "Geben Sie einen Agentennamen ein",
       "slugRequired": "Geben Sie einen Agenten-Slug ein",
       "slugInvalid": "Slug muss mit einem Buchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche verwenden",
-      "slugConflict": "Dieser Slug wird von einem integrierten Agenten reserviert",
+      "slugConflict": "Dieser Slug wird bereits von einem integrierten Agenten oder einem anderen Agenten in diesem Profil verwendet",
       "edit": "Agent bearbeiten"
     },
     "slashCommands": {

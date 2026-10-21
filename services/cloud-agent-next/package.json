@@ -44,7 +44,7 @@
     "test:runtime-ci": "node --test scripts/runtime-ci-admission.test.mjs scripts/runtime-workflow.test.mjs"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.12.9",
+    "@cloudflare/sandbox": "0.12.12",
     "@hono/trpc-server": "0.4.2",
     "@kilocode/cloud-agent-profile": "workspace:*",
     "@kilocode/container-usage": "workspace:*",
@@ -65,7 +65,7 @@
   "devDependencies": {
     "@cloudflare/containers": "0.3.7",
     "@cloudflare/vitest-pool-workers": "0.18.6",
-    "@kilocode/sdk": "7.8.1",
+    "@kilocode/sdk": "7.8.15",
     "@types/jsonwebtoken": "catalog:",
     "@types/node": "catalog:",
     "@types/ws": "^8.5.12",

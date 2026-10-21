@@ -168,6 +168,15 @@ describe('validateAgentForm', () => {
     expect(validateAgentForm(formState({ slug: 'code' }))).toBe('slug-conflict');
   });
 
+  it('refuses a slug another agent in the profile already uses', () => {
+    expect(validateAgentForm(formState({ slug: 'reviewer' }), ['reviewer'])).toBe('slug-conflict');
+  });
+
+  it('allows a slug no other agent uses', () => {
+    expect(validateAgentForm(formState({ slug: 'reviewer' }), ['plan'])).toBeNull();
+    expect(validateAgentForm(formState({ slug: 'reviewer' }), [])).toBeNull();
+  });
+
   it('requires a display name', () => {
     expect(validateAgentForm(formState({ name: ' ' }))).toBe('name-required');
   });

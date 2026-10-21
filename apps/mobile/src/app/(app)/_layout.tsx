@@ -162,7 +162,10 @@ export default function AppLayout() {
             <Stack.Screen name="agent-chat/profile-picker" options={sheetOptions} />
             <Stack.Screen name="todos/[list-id]" />
             <Stack.Screen name="todos/item/[item-id]" />
-            <Stack.Screen name="todos/list-settings" options={sheetOptions} />
+            <Stack.Screen
+              name="todos/list-settings"
+              options={{ ...sheetOptions, gestureEnabled: false }}
+            />
             <Stack.Screen name="agent-briefing/index" />
             <Stack.Screen name="agent-briefing/[report-id]" />
             <Stack.Screen name="agent-briefing/settings" />

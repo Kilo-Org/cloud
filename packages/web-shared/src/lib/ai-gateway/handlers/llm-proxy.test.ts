@@ -353,6 +353,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       kind: 'provider',
       provider,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
@@ -366,6 +367,13 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
   });
 
   it('serves a free model to a client that sends the anonymous sentinel', async () => {
+    mockedGetProvider.mockResolvedValueOnce({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      isFree: true,
+      bypassAccessCheck: false,
+    });
     setSignedTokenAuth('anonymous', {
       user: {
         id: 'user-123',
@@ -395,6 +403,10 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
         organizationId: undefined,
       })
     );
+    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
+      is_free: true,
+      user_byok: false,
+    });
   });
 
   it('rejects an API-only token sent to the gateway endpoint', async () => {
@@ -450,6 +462,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       kind: 'provider',
       provider,
       userByok: [{ decryptedAPIKey: 'byok-key', providerId: 'openai' }],
+      isFree: false,
       bypassAccessCheck: false,
     });
 
@@ -479,6 +492,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
         botId: 'bot-123',
         tokenSource: 'gateway-token',
         user_byok: true,
+        is_free: false,
       }),
       expect.anything()
     );
@@ -596,6 +610,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       kind: 'provider',
       provider,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
       skipBalanceCheck: true,
     });
@@ -654,6 +669,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       kind: 'provider',
       provider,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
     mockedGetOpenRouterModels.mockResolvedValue(new Set(['poolside/laguna-s-2.1:free']));
@@ -769,6 +785,13 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   });
 
   it('asks bouncer to decide for an anonymous caller with the client IP', async () => {
+    mockedGetProvider.mockResolvedValueOnce({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      isFree: true,
+      bypassAccessCheck: false,
+    });
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
       authFailedResponse: new Response('unauthorized', { status: 401 }),
@@ -1007,6 +1030,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       kind: 'provider',
       provider: { ...provider, responseTransforms },
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
     const { handleLlmProxyRequest } = await import('./llm-proxy');
@@ -1086,7 +1110,13 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       let routingProvider: OpenRouterProviderConfig | undefined;
       mockedGetProvider.mockImplementationOnce(async ({ getRoutingProviderConfig }) => {
         routingProvider = await getRoutingProviderConfig?.();
-        return { kind: 'provider', provider, userByok: null, bypassAccessCheck: false };
+        return {
+          kind: 'provider',
+          provider,
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+        };
       });
       const { handleLlmProxyRequest } = await import('./llm-proxy');
       const response = await handleLlmProxyRequest(
@@ -1329,6 +1359,13 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   });
 
   it('serves free models under the free-model rate limit', async () => {
+    mockedGetProvider.mockResolvedValueOnce({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      isFree: true,
+      bypassAccessCheck: false,
+    });
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
       authFailedResponse: new Response('unauthorized', { status: 401 }),
@@ -1427,6 +1464,7 @@ describe.each([
       kind: 'provider',
       provider,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
@@ -1456,7 +1494,13 @@ describe.each([
   it('does not introduce a provider object when privacy is absent', async () => {
     mockedGetProvider.mockImplementationOnce(async ({ request }) => {
       expect(request.body).not.toHaveProperty('provider');
-      return { kind: 'provider', provider, userByok: null, bypassAccessCheck: false };
+      return {
+        kind: 'provider',
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      };
     });
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
@@ -1511,7 +1555,13 @@ describe.each([
       mockedGetProvider.mockImplementationOnce(async ({ request, getRoutingProviderConfig }) => {
         expect(request.body.provider).toEqual({ only: ['azure'], ...expectedPrivacy });
         expect(await getRoutingProviderConfig?.()).toEqual(expectedPrivacy);
-        return { kind: 'provider', provider, userByok: null, bypassAccessCheck: false };
+        return {
+          kind: 'provider',
+          provider,
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+        };
       });
       const { handleLlmProxyRequest } = await import('./llm-proxy');
       const response = await handleLlmProxyRequest(
@@ -1546,7 +1596,13 @@ describe.each([
     });
     mockedGetProvider.mockImplementationOnce(async ({ getRoutingProviderConfig }) => {
       expect(await getRoutingProviderConfig?.()).toEqual({ only: ['openai'], ...privacy });
-      return { kind: 'provider', provider, userByok: null, bypassAccessCheck: false };
+      return {
+        kind: 'provider',
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      };
     });
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
@@ -1573,6 +1629,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       kind: 'provider',
       provider,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
@@ -1955,6 +2012,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       kind: 'provider',
       provider,
       userByok: [{ decryptedAPIKey: 'byok-key', providerId: 'openai' }],
+      isFree: false,
       bypassAccessCheck: false,
     });
     mockedFetchEfficientAutoDecision.mockResolvedValue({
@@ -2010,6 +2068,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       kind: 'provider',
       provider: { ...provider, supportedChatApis: ['responses'] },
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
     mockedFetchEfficientAutoDecision.mockResolvedValue({
@@ -2275,6 +2334,7 @@ describe('auto-routing shadow classifier', () => {
       kind: 'provider',
       provider,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
@@ -2360,6 +2420,7 @@ describe('custom routers and signed auto decisions', () => {
       kind: 'provider',
       provider,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
     mockedGetDirectByokModel.mockResolvedValue({ provider: null, model: null });

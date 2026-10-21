@@ -728,6 +728,7 @@ export async function handleLlmProxyRequest(
             organizationId,
             provider: 'openrouter',
             requested_model: requestedModelLowerCased,
+            is_free: false,
             promptInfo: {
               system_prompt_prefix: '',
               system_prompt_length: 0,
@@ -899,7 +900,7 @@ export async function handleLlmProxyRequest(
 
     if (
       !canSpendPaidUsage(balance) &&
-      !isFreeRequestedModel &&
+      !effectiveProviderContext.isFree &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {
@@ -930,6 +931,7 @@ export async function handleLlmProxyRequest(
     kiloUserId: user.id,
     provider: effectiveProviderContext.provider.id,
     requested_model: effectiveModelIdLowerCased,
+    is_free: effectiveProviderContext.isFree,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),

@@ -48,9 +48,9 @@ describe('classifyOrganizationScopeAccess', () => {
   });
 
   it('keeps a denial whose query still carries cached data', () => {
-    expect(
-      accessFor({ membershipIds: ['org-1'], errors: [undefined, denial('FORBIDDEN')] })
-    ).toBe('denied');
+    expect(accessFor({ membershipIds: ['org-1'], errors: [undefined, denial('FORBIDDEN')] })).toBe(
+      'denied'
+    );
   });
 
   it('prefers a denial over a not-found report', () => {

@@ -284,9 +284,9 @@ describe('ScopeEntryScreen organization access', () => {
     expect(host(root, 'SecurityAgentSetup')).toHaveLength(0);
     expect(host(root, 'DashboardScreen')).toHaveLength(0);
     // No install-state token is minted for a scope the reader cannot use.
-    expect(
-      transport.mock.calls.some(([input]) => procedureFor(input) === 'mintInstallState')
-    ).toBe(false);
+    expect(transport.mock.calls.some(([input]) => procedureFor(input) === 'mintInstallState')).toBe(
+      false
+    );
   });
 
   it('keeps cached organization data out of view when the procedures report a denial', async () => {
@@ -366,22 +366,19 @@ describe.each([
   // A member without a billing role keeps the restricted settings; an account
   // with no membership at all is the no-access state (covered by the
   // organization-access block above), not a settings screen.
-  it(
-    'keeps a member organization role restricted after Retry',
-    async () => {
-      roles = [{ organizationId: 'org_123', role: 'member' }];
-      onlineManager.setOnline(false);
-      const root = await mount('org_123', Screen);
-      await retry(root);
-      expect(host(root, 'Switch')).toHaveLength(0);
-      expect(host(root, 'ConfigureRow')).toHaveLength(0);
-      expect(host(root, 'ScreenHeader')[0]?.props.headerRight).toBeNull();
-      expect(host(root, 'Text').map(node => node.props.children)).toContain(
-        'Security Agent is disabled. Only organization owners and billing managers can turn it on.'
-      );
-      expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
-    }
-  );
+  it('keeps a member organization role restricted after Retry', async () => {
+    roles = [{ organizationId: 'org_123', role: 'member' }];
+    onlineManager.setOnline(false);
+    const root = await mount('org_123', Screen);
+    await retry(root);
+    expect(host(root, 'Switch')).toHaveLength(0);
+    expect(host(root, 'ConfigureRow')).toHaveLength(0);
+    expect(host(root, 'ScreenHeader')[0]?.props.headerRight).toBeNull();
+    expect(host(root, 'Text').map(node => node.props.children)).toContain(
+      'Security Agent is disabled. Only organization owners and billing managers can turn it on.'
+    );
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+  });
 
   it('recovers a paused organization capability without changing other queries or future fetching', async () => {
     onlineManager.setOnline(false);

@@ -90,8 +90,7 @@ function findByType(root: TestRenderer.ReactTestInstance, type: string) {
 
 function button(label: string, root: TestRenderer.ReactTestInstance) {
   return findByType(root, 'ButtonMock').find(
-    node =>
-      findByType(node, 'ButtonLabelMock')[0]?.props.label === label
+    node => findByType(node, 'ButtonLabelMock')[0]?.props.label === label
   );
 }
 

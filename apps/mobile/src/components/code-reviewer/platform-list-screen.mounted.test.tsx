@@ -63,8 +63,12 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 vi.mock('@/components/organization/scope-access-denied-screen', () => ({
-  ScopeAccessDeniedScreen: (props: { title?: string; eyebrow?: string; kind?: string; onRetry?: () => void }) =>
-    createElement('ScopeAccessDeniedScreenMock', props),
+  ScopeAccessDeniedScreen: (props: {
+    title?: string;
+    eyebrow?: string;
+    kind?: string;
+    onRetry?: () => void;
+  }) => createElement('ScopeAccessDeniedScreenMock', props),
 }));
 
 vi.mock('@/components/screen-header', () => ({
@@ -73,7 +77,8 @@ vi.mock('@/components/screen-header', () => ({
 }));
 
 vi.mock('@/components/ui/configure-row', () => ({
-  ConfigureRow: (props: { title?: string }) => createElement('ConfigureRowMock', { title: props.title }),
+  ConfigureRow: (props: { title?: string }) =>
+    createElement('ConfigureRowMock', { title: props.title }),
 }));
 
 vi.mock('@/components/ui/text', () => ({

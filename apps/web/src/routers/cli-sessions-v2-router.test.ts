@@ -1998,6 +1998,57 @@ describe('cli-sessions-v2-router', () => {
     });
   });
 
+  describe('getWithRuntimeState stored runtime identifiers', () => {
+    const sessionId = 'ses_stored_runtime_identifier';
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+      mockGetSession.mockReset();
+      mockGetSession.mockRejectedValue(new Error('not mocked'));
+    });
+
+    it.each(['11111111-1111-4111-8111-111111111111', 'agent_legacy'])(
+      'returns historical metadata for unsupported runtime identifier %s',
+      async cloudAgentSessionId => {
+        await db.insert(cli_sessions_v2).values({
+          session_id: sessionId,
+          kilo_user_id: regularUser.id,
+          title: 'Stored conversation',
+          created_on_platform: 'cloud-agent',
+          cloud_agent_session_id: cloudAgentSessionId,
+        });
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId });
+        expect(result).toMatchObject({
+          session_id: sessionId,
+          title: 'Stored conversation',
+          cloud_agent_session_id: cloudAgentSessionId,
+          runtimeState: null,
+        });
+      }
+    );
+
+    it.each(['agent', 'workspace'])(
+      'preserves runtime failures for current %s identifiers',
+      async prefix => {
+        await db.insert(cli_sessions_v2).values({
+          session_id: sessionId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          cloud_agent_session_id: `${prefix}_11111111-1111-4111-8111-111111111111`,
+        });
+        mockGetSession.mockRejectedValue(new Error('Runtime unavailable'));
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId })
+        ).rejects.toMatchObject({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch session runtime state',
+        });
+      }
+    );
+  });
+
   describe('getWithRuntimeState associatedPr', () => {
     const sessionWithPr = 'ses_assoc_pr_present_1234';
     const sessionWithoutPr = 'ses_assoc_pr_absent_1234';

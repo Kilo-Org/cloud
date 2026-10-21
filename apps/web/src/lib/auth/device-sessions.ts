@@ -380,10 +380,8 @@ export async function createDeviceSessionWithAttestedKey(params: {
   verification: VerifyAdmissionOk;
 }): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }> {
   return await db.transaction(async tx => {
-    // Persist the attested key inside the transaction
     await persistAttestedKeyTx(tx, params.userId, params.verification);
 
-    // Create the device session
     const [session] = await tx
       .insert(device_sessions)
       .values({
@@ -396,7 +394,6 @@ export async function createDeviceSessionWithAttestedKey(params: {
       throw new Error('Failed to create device session');
     }
 
-    // Issue credentials
     const accessToken = generateApiToken(
       params.user,
       { deviceSessionId: session.id },

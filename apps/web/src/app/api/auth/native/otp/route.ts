@@ -32,11 +32,17 @@ async function enforceResponseFloor(startTime: number): Promise<void> {
  * API route to request an email sign-in code for native mobile sign-in.
  * Validates eligibility, issues a 6-digit code, and emails it.
  *
- * The response is identical (200 { success: true, challengeId }) for every
- * syntactically valid email that is not SSO-governed, to avoid leaking
- * account existence. A challengeId returned for a blocked address maps to no
- * row and verifies as INVALID_CODE, identical to an eligible-but-wrong-code
- * attempt.
+ * Enumeration resistance: an address rejected by the signup email rules or by
+ * the domain blacklist gets the same 200 { success: true, challengeId } as an
+ * eligible one. That challengeId maps to no row and verifies as INVALID_CODE,
+ * identical to an eligible-but-wrong-code attempt, so the response never
+ * reveals whether an account exists.
+ *
+ * The response diverges only where the client must act on the outcome: 429
+ * when the address is rate limited, 403 with ssoOrganizationId (or 503 when
+ * the domain's SSO is misconfigured) when the domain requires SSO, and, for an
+ * eligible address whose email cannot be sent, 400 INVALID_EMAIL when
+ * NeverBounce rejects the address or 500 EMAIL_DELIVERY_FAILED otherwise.
  */
 export const POST = withRestTiming('/api/auth/native/otp', async (request: Request) => {
   const startTime = Date.now();

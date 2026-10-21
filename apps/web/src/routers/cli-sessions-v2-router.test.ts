@@ -2142,6 +2142,41 @@ describe('cli-sessions-v2-router', () => {
       expect(typeof result.associatedPr?.lastSyncedAt).toBe('string');
     });
 
+    it('returns compact webhook observations without exposing raw evidence', async () => {
+      const head = 'a'.repeat(40);
+      await db
+        .update(github_branch_pull_requests)
+        .set({
+          pr_head_sha: head,
+          pr_observations: {
+            version: 1,
+            headSha: head,
+            checks: [
+              { key: 'check:1:test', id: '1', attempt: 1, at: null, phase: 2, failed: true },
+            ],
+            threads: [{ rootId: '2', threadId: null, state: 'unresolved' }],
+            threadsObserved: true,
+            threadsUnknown: false,
+            checksTruncated: false,
+            threadsTruncated: false,
+          },
+        })
+        .where(
+          and(
+            eq(github_branch_pull_requests.git_url, CACHE_GIT_URL),
+            eq(github_branch_pull_requests.owned_by_user_id, regularUser.id)
+          )
+        );
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionWithPr });
+      expect(result.associatedPr?.observations).toEqual({
+        checks: { total: 1, failed: 1 },
+        unresolvedThreads: 1,
+        truncated: false,
+      });
+      expect(result).not.toHaveProperty('pr_observations');
+    });
+
     it('returns null associatedPr when the session has no stored link', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.getWithRuntimeState({
@@ -2375,6 +2410,7 @@ describe('cli-sessions-v2-router', () => {
         headSha: null,
         reviewDecision: null,
         reviewDecisionPending: true,
+        observations: null,
         platform: 'github',
       });
     });
@@ -2716,6 +2752,7 @@ describe('cli-sessions-v2-router', () => {
         headSha: null,
         reviewDecision: null,
         reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
       });
     });
@@ -2742,6 +2779,7 @@ describe('cli-sessions-v2-router', () => {
         number: 999,
         state: 'unknown',
         reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
       });
     });
@@ -3101,6 +3139,7 @@ describe('cli-sessions-v2-router', () => {
         headSha: 'abc123',
         reviewDecision: 'approved',
         reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
       });
 

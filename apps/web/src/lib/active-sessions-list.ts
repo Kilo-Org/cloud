@@ -164,6 +164,7 @@ type EnrichmentRow = {
   pr_state: string | null;
   pr_title: string | null;
   pr_head_sha: string | null;
+  pr_observations?: unknown;
   pr_last_synced_at: string | null;
   pr_review_decision: string | null;
   review_decision_pending: boolean | null;
@@ -203,6 +204,7 @@ function associatedPrFromRow(row: EnrichmentRow): z.infer<typeof associatedPrSch
       pr_state: row.pr_state,
       pr_title: row.pr_title,
       pr_head_sha: row.pr_head_sha,
+      pr_observations: row.pr_observations,
       pr_last_synced_at: row.pr_last_synced_at,
       pr_review_decision: row.pr_review_decision,
       review_decision_pending: row.review_decision_pending,
@@ -480,6 +482,7 @@ export async function listActiveSessions({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -590,6 +593,7 @@ export async function listActiveSessions({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,

@@ -1,0 +1,1 @@
+ALTER TABLE "github_branch_pull_requests" ADD COLUMN "pr_observations" jsonb;

@@ -52,6 +52,7 @@ import {
   releaseGitHubInstallationDelivery,
 } from '@/lib/integrations/db/github-installations';
 import { observeWatchPrWebhook } from '@/lib/cloud-agent/watch-pr-webhook';
+import { observePrWebhook } from './pr-observations-webhook';
 
 /**
  * A retained but unhealthy association (locally disconnected, suspended, or
@@ -572,6 +573,8 @@ export async function handleGitHubWebhook(
       logExceptInTest(`Missing installation ID in payload${logSuffix}`);
       return NextResponse.json({ message: 'Missing installation ID' }, { status: 400 });
     }
+
+    await observePrWebhook({ eventType, payload, appType });
 
     const integration = await findIntegrationByInstallationId(
       PLATFORM.GITHUB,

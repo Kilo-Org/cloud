@@ -29,9 +29,13 @@ const mockCompleteSharedGitHubInstallationDelivery = jest.fn();
 const mockReleaseSharedGitHubInstallationDelivery = jest.fn();
 const mockMaterializeGitHubInstallationIdentity = jest.fn();
 const mockObserveWatchPrWebhook = jest.fn();
+const mockObservePrWebhook = jest.fn();
 
 jest.mock('@/lib/cloud-agent/watch-pr-webhook', () => ({
   observeWatchPrWebhook: (input: unknown) => mockObserveWatchPrWebhook(input),
+}));
+jest.mock('./pr-observations-webhook', () => ({
+  observePrWebhook: (input: unknown) => mockObservePrWebhook(input),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
@@ -243,6 +247,7 @@ describe('handleGitHubWebhook', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockObserveWatchPrWebhook.mockResolvedValue(undefined);
+    mockObservePrWebhook.mockResolvedValue(undefined);
     mockGetIntegrationForOrganization.mockResolvedValue(integration);
     mockVerifyGitHubWebhookSignature.mockReturnValue(true);
     mockFindIntegrationByInstallationId.mockResolvedValue(integration);
@@ -302,6 +307,41 @@ describe('handleGitHubWebhook', () => {
     });
     expect(mockLogWebhookEvent).not.toHaveBeenCalled();
     expect(after).not.toHaveBeenCalled();
+  });
+
+  it('persists passive observations before secondary-installation suppression', async () => {
+    const calls: string[] = [];
+    mockObservePrWebhook.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      calls.push('observations');
+    });
+    mockFindIntegrationByInstallationId.mockImplementationOnce(async () => {
+      calls.push('legacy');
+      return integration;
+    });
+    mockGetIntegrationForOrganization.mockResolvedValue({ ...integration, id: 'primary' });
+    const payload = { installation: { id: 98765 } };
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('check_run', payload),
+      'standard'
+    );
+    expect(response.status).toBe(200);
+    expect(calls).toEqual(['observations', 'legacy']);
+    expect(mockObservePrWebhook).toHaveBeenCalledWith({
+      eventType: 'check_run',
+      payload,
+      appType: 'standard',
+    });
+  });
+
+  it('returns a retryable error when passive observation persistence fails', async () => {
+    mockObservePrWebhook.mockRejectedValueOnce(new Error('database unavailable'));
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('check_run', { installation: { id: 98765 } }),
+      'standard'
+    );
+    expect(response.status).toBe(500);
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
   });
 
   it('passes the signed raw PR payload to watch normalization before legacy schema stripping', async () => {
@@ -368,6 +408,7 @@ describe('handleGitHubWebhook', () => {
       ).status
     ).toBe(401);
     expect(mockObserveWatchPrWebhook).not.toHaveBeenCalled();
+    expect(mockObservePrWebhook).not.toHaveBeenCalled();
   });
 
   it('still projects redelivered observations before a legacy duplicate short circuit', async () => {

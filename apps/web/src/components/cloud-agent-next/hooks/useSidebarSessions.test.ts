@@ -190,6 +190,7 @@ const associatedPr = {
   lastSyncedAt: '2026-01-01T00:00:00.000Z',
   reviewDecision: null,
   reviewDecisionPending: false,
+  observations: null,
   platform: 'github',
 } satisfies NonNullable<StoredSession['associatedPr']>;
 
@@ -334,6 +335,7 @@ describe('useSidebarSessions live update helpers', () => {
       lastSyncedAt: '2026-01-01T00:00:00.000Z',
       reviewDecision: 'approved' as const,
       reviewDecisionPending: false,
+      observations: null,
       platform: 'github',
     };
     const cached = {
@@ -400,6 +402,35 @@ describe('useSidebarSessions live update helpers', () => {
     );
   });
 
+  it('updates the session cache key when webhook counts change without session activity', () => {
+    const base = {
+      session_id: 'ses_webhook_counts',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      status: 'idle',
+      status_updated_at: null,
+      associatedPr: {
+        state: 'open',
+        lastSyncedAt: '2026-01-01T00:00:00.000Z',
+        reviewDecision: null,
+        reviewDecisionPending: false,
+        observations: {
+          checks: { total: 2, failed: 0 },
+          unresolvedThreads: null,
+          truncated: false,
+        },
+      },
+    };
+    expect(sessionCacheKey(base)).not.toBe(
+      sessionCacheKey({
+        ...base,
+        associatedPr: {
+          ...base.associatedPr,
+          observations: { ...base.associatedPr.observations, checks: { total: 2, failed: 1 } },
+        },
+      })
+    );
+  });
+
   it('removes deleted rows immediately from the visible list', () => {
     const result = removeSidebarDbSession(
       [
@@ -439,6 +470,7 @@ describe('useSidebarSessions live update helpers', () => {
         lastSyncedAt: '2026-01-01T00:00:00.000Z',
         reviewDecision: 'approved' as const,
         reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
       },
     };

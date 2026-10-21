@@ -6964,6 +6964,7 @@ export const github_branch_pull_requests = pgTable(
     pr_state: text(),
     pr_title: text(),
     pr_head_sha: text(),
+    pr_observations: jsonb().$type<unknown>(),
     pr_review_decision: text(),
     review_decision_pending: boolean().notNull().default(false),
     review_decision_fetching_at: timestamp({ withTimezone: true, mode: 'string' }),

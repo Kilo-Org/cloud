@@ -11363,9 +11363,8 @@ packages:
   '@typia/utils@14.0.6':
     resolution: {integrity: sha512-g1LLQiOdPNyFR6dEQKsaa8HQnpZAAW+XAG0tVQ3/fVCARR5n4Yn59jBSI1UcNEv4F9DaM7vzHZi0b4iS+liajw==}
 
-  '@ungap/structured-clone@1.3.0':
-    resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
-    deprecated: Potential CWE-502 - Update to 1.3.1 or higher
+  '@ungap/structured-clone@1.4.0':
+    resolution: {integrity: sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ==}
 
   '@unrs/resolver-binding-android-arm-eabi@1.11.1':
     resolution: {integrity: sha512-ppLRUgHVaGRWUx0R0Ut06Mjo9gBaBkg3v/8AxusGLhsIotbBLuRk51rAzqLC8gq6NyyAojEXglNjzf6R948DNw==}
@@ -11738,6 +11737,11 @@ packages:
 
   acorn@8.16.0:
     resolution: {integrity: sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw==}
+    engines: {node: '>=0.4.0'}
+    hasBin: true
+
+  acorn@8.19.0:
+    resolution: {integrity: sha512-oJlA3XiRm7Cyk6qFD2Jn8ak9B7jSy0qy00ADO3+8dpT0LSjFihQYv4C02LFCSYJV3Q37xYwwRy5m+IpIiUzqWw==}
     engines: {node: '>=0.4.0'}
     hasBin: true
 
@@ -24808,7 +24812,7 @@ snapshots:
       '@types/estree-jsx': 1.0.5
       '@types/hast': 3.0.4
       '@types/mdx': 2.0.13
-      acorn: 8.16.0
+      acorn: 8.19.0
       collapse-white-space: 2.1.0
       devlop: 1.1.0
       estree-util-is-identifier-name: 3.0.0
@@ -24817,7 +24821,7 @@ snapshots:
       hast-util-to-jsx-runtime: 2.3.6
       markdown-extensions: 2.0.0
       recma-build-jsx: 1.0.0
-      recma-jsx: 1.0.1(acorn@8.16.0)
+      recma-jsx: 1.0.1(acorn@8.19.0)
       recma-stringify: 1.0.0
       rehype-recma: 1.0.0
       remark-mdx: 3.1.1
@@ -29572,7 +29576,7 @@ snapshots:
     dependencies:
       '@typia/interface': 14.0.6
 
-  '@ungap/structured-clone@1.3.0': {}
+  '@ungap/structured-clone@1.4.0': {}
 
   '@unrs/resolver-binding-android-arm-eabi@1.11.1':
     optional: true
@@ -29969,9 +29973,9 @@ snapshots:
       mime-types: 3.0.2
       negotiator: 1.0.0
 
-  acorn-import-phases@1.0.4(acorn@8.16.0):
+  acorn-import-phases@1.0.4(acorn@8.19.0):
     dependencies:
-      acorn: 8.16.0
+      acorn: 8.19.0
 
   acorn-jsx-walk@2.0.0: {}
 
@@ -29979,15 +29983,21 @@ snapshots:
     dependencies:
       acorn: 8.16.0
 
+  acorn-jsx@5.3.2(acorn@8.19.0):
+    dependencies:
+      acorn: 8.19.0
+
   acorn-loose@8.5.2:
     dependencies:
-      acorn: 8.16.0
+      acorn: 8.19.0
 
   acorn-walk@8.3.5:
     dependencies:
-      acorn: 8.16.0
+      acorn: 8.19.0
 
   acorn@8.16.0: {}
+
+  acorn@8.19.0: {}
 
   addons-linter@10.7.0(express@5.2.1)(jiti@2.7.0):
     dependencies:
@@ -31999,7 +32009,7 @@ snapshots:
   esast-util-from-js@2.0.1:
     dependencies:
       '@types/estree-jsx': 1.0.5
-      acorn: 8.16.0
+      acorn: 8.19.0
       esast-util-from-estree: 2.0.0
       vfile-message: 4.0.3
 
@@ -32181,14 +32191,14 @@ snapshots:
 
   espree@10.4.0:
     dependencies:
-      acorn: 8.16.0
-      acorn-jsx: 5.3.2(acorn@8.16.0)
+      acorn: 8.19.0
+      acorn-jsx: 5.3.2(acorn@8.19.0)
       eslint-visitor-keys: 4.2.1
 
   espree@11.2.0:
     dependencies:
-      acorn: 8.16.0
-      acorn-jsx: 5.3.2(acorn@8.16.0)
+      acorn: 8.19.0
+      acorn-jsx: 5.3.2(acorn@8.19.0)
       eslint-visitor-keys: 5.0.1
 
   esprima@4.0.1: {}
@@ -32920,7 +32930,7 @@ snapshots:
       '@expo/log-box': 57.0.4(expo@57.0.26)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
       '@expo/metro': 56.0.2(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@expo/metro-config': 57.0.12(bufferutil@4.1.0)(expo@57.0.26)(typescript@7.0.2)(utf-8-validate@6.0.6)
-      '@ungap/structured-clone': 1.3.0
+      '@ungap/structured-clone': 1.4.0
       babel-preset-expo: 57.0.13(@babel/core@7.29.7)(@babel/runtime@7.29.7)(expo-widgets@57.0.22)(expo@57.0.26)(react-refresh@0.14.2)
       expo-asset: 57.0.18(expo@57.0.26)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(typescript@7.0.2)
       expo-constants: 57.0.20(expo@57.0.26)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))
@@ -32962,7 +32972,7 @@ snapshots:
       '@expo/log-box': 57.0.4(expo@57.0.26)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
       '@expo/metro': 56.0.2(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@expo/metro-config': 57.0.12(bufferutil@4.1.0)(expo@57.0.26)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      '@ungap/structured-clone': 1.3.0
+      '@ungap/structured-clone': 1.4.0
       babel-preset-expo: 57.0.13(@babel/core@7.29.7)(@babel/runtime@7.29.7)(expo-widgets@57.0.22)(expo@57.0.26)(react-refresh@0.14.2)
       expo-asset: 57.0.18(expo@57.0.26)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)(typescript@5.9.3)
       expo-constants: 57.0.20(expo@57.0.26)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))
@@ -34927,7 +34937,7 @@ snapshots:
   jest-worker@30.3.0:
     dependencies:
       '@types/node': 24.12.4
-      '@ungap/structured-clone': 1.3.0
+      '@ungap/structured-clone': 1.4.0
       jest-util: 30.3.0
       merge-stream: 2.0.0
       supports-color: 8.1.1
@@ -35701,7 +35711,7 @@ snapshots:
     dependencies:
       '@types/hast': 3.0.4
       '@types/mdast': 4.0.4
-      '@ungap/structured-clone': 1.3.0
+      '@ungap/structured-clone': 1.4.0
       devlop: 1.1.0
       micromark-util-sanitize-uri: 2.0.1
       trim-lines: 3.0.1
@@ -36258,8 +36268,8 @@ snapshots:
 
   micromark-extension-mdxjs@3.0.0:
     dependencies:
-      acorn: 8.16.0
-      acorn-jsx: 5.3.2(acorn@8.16.0)
+      acorn: 8.19.0
+      acorn-jsx: 5.3.2(acorn@8.19.0)
       micromark-extension-mdx-expression: 3.0.1
       micromark-extension-mdx-jsx: 3.0.2
       micromark-extension-mdx-md: 2.0.0
@@ -36564,7 +36574,7 @@ snapshots:
 
   mlly@1.8.2:
     dependencies:
-      acorn: 8.16.0
+      acorn: 8.19.0
       pathe: 2.0.3
       pkg-types: 1.3.1
       ufo: 1.6.4
@@ -38614,10 +38624,10 @@ snapshots:
       estree-util-build-jsx: 3.0.1
       vfile: 6.0.3
 
-  recma-jsx@1.0.1(acorn@8.16.0):
+  recma-jsx@1.0.1(acorn@8.19.0):
     dependencies:
-      acorn: 8.16.0
-      acorn-jsx: 5.3.2(acorn@8.16.0)
+      acorn: 8.19.0
+      acorn-jsx: 5.3.2(acorn@8.19.0)
       estree-util-to-js: 2.0.0
       recma-parse: 1.0.0
       recma-stringify: 1.0.0
@@ -39871,7 +39881,7 @@ snapshots:
   terser@5.46.0:
     dependencies:
       '@jridgewell/source-map': 0.3.11
-      acorn: 8.16.0
+      acorn: 8.19.0
       commander: 2.20.3
       source-map-support: 0.5.21
 
@@ -40263,7 +40273,7 @@ snapshots:
 
   unimport@6.3.0(oxc-parser@0.150.0)(rolldown@1.1.5):
     dependencies:
-      acorn: 8.16.0
+      acorn: 8.19.0
       escape-string-regexp: 5.0.0
       estree-walker: 3.0.3
       local-pkg: 1.2.1
@@ -40323,13 +40333,13 @@ snapshots:
 
   unplugin@1.16.1:
     dependencies:
-      acorn: 8.16.0
+      acorn: 8.19.0
       webpack-virtual-modules: 0.6.2
 
   unplugin@2.3.11:
     dependencies:
       '@jridgewell/remapping': 2.3.5
-      acorn: 8.16.0
+      acorn: 8.19.0
       picomatch: 4.0.4
       webpack-virtual-modules: 0.6.2
 
@@ -40939,7 +40949,7 @@ snapshots:
   webpack-bundle-analyzer@4.10.1(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@discoveryjs/json-ext': 0.5.7
-      acorn: 8.16.0
+      acorn: 8.19.0
       acorn-walk: 8.3.5
       commander: 7.2.0
       debounce: 1.2.1
@@ -40995,8 +41005,8 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@webassemblyjs/wasm-edit': 1.14.1
       '@webassemblyjs/wasm-parser': 1.14.1
-      acorn: 8.16.0
-      acorn-import-phases: 1.0.4(acorn@8.16.0)
+      acorn: 8.19.0
+      acorn-import-phases: 1.0.4(acorn@8.19.0)
       browserslist: 4.28.7
       chrome-trace-event: 1.0.4
       enhanced-resolve: 5.20.0
@@ -41027,8 +41037,8 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@webassemblyjs/wasm-edit': 1.14.1
       '@webassemblyjs/wasm-parser': 1.14.1
-      acorn: 8.16.0
-      acorn-import-phases: 1.0.4(acorn@8.16.0)
+      acorn: 8.19.0
+      acorn-import-phases: 1.0.4(acorn@8.19.0)
       browserslist: 4.28.7
       chrome-trace-event: 1.0.4
       enhanced-resolve: 5.20.0
@@ -41059,8 +41069,8 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@webassemblyjs/wasm-edit': 1.14.1
       '@webassemblyjs/wasm-parser': 1.14.1
-      acorn: 8.16.0
-      acorn-import-phases: 1.0.4(acorn@8.16.0)
+      acorn: 8.19.0
+      acorn-import-phases: 1.0.4(acorn@8.19.0)
       browserslist: 4.28.7
       chrome-trace-event: 1.0.4
       enhanced-resolve: 5.20.0

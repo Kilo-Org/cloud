@@ -83,7 +83,9 @@ describe('confirmStartAgent', () => {
     expect(native.alert).not.toHaveBeenCalled();
     native.appState.currentState = 'active';
     listeners[0]?.('active');
-    await vi.waitFor(() => expect(native.alert).toHaveBeenCalledOnce());
+    await vi.waitFor(() => {
+      expect(native.alert).toHaveBeenCalledOnce();
+    });
     expect(remove).toHaveBeenCalledOnce();
     lastAlert()
       .buttons.find(button => button.text === i18n.t('common.cancel'))

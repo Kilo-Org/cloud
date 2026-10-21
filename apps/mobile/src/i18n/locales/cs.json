@@ -2850,7 +2850,7 @@
     "webBrowser": "Webový prohlížeč",
     "viewProfile": "Zobrazit profil",
     "signOutThisDevice": "Odhlásit toto zařízení",
-    "signOutSessionLabel": "Odhlásit zařízení {{device}}",
+    "signOutSessionLabel": "Odhlásit zařízení {{device}}, přihlášení: {{signedIn}}",
     "sessionSignedOut": "Relace byla odhlášena.",
     "signOutThisDeviceTitle": "Odhlásit toto zařízení?",
     "signOutThisSessionTitle": "Odhlásit tuto relaci?",

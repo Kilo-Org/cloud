@@ -2810,7 +2810,7 @@
     "thisDevice": "Ovaj uređaj",
     "viewProfile": "Prikaži profil",
     "signOutThisDevice": "Odjavi ovaj uređaj",
-    "signOutSessionLabel": "Odjavi uređaj {{device}}",
+    "signOutSessionLabel": "Odjavi uređaj {{device}}, prijava: {{signedIn}}",
     "sessionSignedOut": "Sesija je odjavljena.",
     "signOutThisDeviceTitle": "Odjaviti ovaj uređaj?",
     "signOutThisSessionTitle": "Odjaviti ovu sesiju?",

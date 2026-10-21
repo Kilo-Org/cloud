@@ -2256,7 +2256,7 @@
     "thisDevice": "Perangkat ini",
     "viewProfile": "Lihat profil",
     "signOutThisDevice": "Keluar dari perangkat ini",
-    "signOutSessionLabel": "Keluar dari {{device}}",
+    "signOutSessionLabel": "Keluar dari {{device}}, masuk {{signedIn}}",
     "sessionSignedOut": "Sesi masuk telah diakhiri.",
     "signOutThisDeviceTitle": "Keluar dari perangkat ini?",
     "signOutThisSessionTitle": "Keluar dari sesi ini?",

@@ -2256,7 +2256,7 @@
     "thisDevice": "このデバイス",
     "viewProfile": "プロフィールを表示",
     "signOutThisDevice": "このデバイスからサインアウト",
-    "signOutSessionLabel": "{{device}}からサインアウト",
+    "signOutSessionLabel": "{{device}}からサインアウト、サインイン：{{signedIn}}",
     "sessionSignedOut": "セッションからサインアウトしました。",
     "signOutThisDeviceTitle": "このデバイスからサインアウトしますか？",
     "signOutThisSessionTitle": "このセッションからサインアウトしますか？",

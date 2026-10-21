@@ -2257,7 +2257,7 @@
     "webBrowser": "Web tarayıcısı",
     "viewProfile": "Profili görüntüle",
     "signOutThisDevice": "Bu cihazın oturumunu kapat",
-    "signOutSessionLabel": "{{device}} cihazındaki oturumu kapat",
+    "signOutSessionLabel": "{{device}} cihazındaki oturumu kapat, giriş: {{signedIn}}",
     "sessionSignedOut": "Oturum kapatıldı.",
     "signOutThisDeviceTitle": "Bu cihazın oturumu kapatılsın mı?",
     "signOutThisSessionTitle": "Bu oturum kapatılsın mı?",

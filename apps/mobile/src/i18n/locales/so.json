@@ -2771,7 +2771,7 @@
     "thisDevice": "Aaladdan",
     "viewProfile": "Eeg bogga shakhsiga",
     "signOutThisDevice": "Akoonka ka saar aaladdan",
-    "signOutSessionLabel": "Akoonka ka saar {{device}}",
+    "signOutSessionLabel": "Akoonka ka saar {{device}}, la soo galay {{signedIn}}",
     "sessionSignedOut": "Kalfadhiga waa laga baxay.",
     "signOutThisDeviceTitle": "Ma ka saaraysaa aaladdan akoonka?",
     "signOutThisSessionTitle": "Ma ka baxaysaa kalfadhigan?",

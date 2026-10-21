@@ -2211,7 +2211,7 @@
     "thisDevice": "Cet appareil",
     "viewProfile": "Voir le profil",
     "signOutThisDevice": "Déconnecter cet appareil",
-    "signOutSessionLabel": "Déconnecter {{device}}",
+    "signOutSessionLabel": "Déconnecter {{device}}, connexion : {{signedIn}}",
     "sessionSignedOut": "Session déconnectée.",
     "signOutThisDeviceTitle": "Déconnecter cet appareil ?",
     "signOutThisSessionTitle": "Déconnecter cette session ?",

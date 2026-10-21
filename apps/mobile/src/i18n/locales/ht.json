@@ -2771,7 +2771,7 @@
     "thisDevice": "Aparèy sa a",
     "viewProfile": "Gade pwofil la",
     "signOutThisDevice": "Dekonekte aparèy sa a",
-    "signOutSessionLabel": "Dekonekte {{device}}",
+    "signOutSessionLabel": "Dekonekte {{device}}, konekte {{signedIn}}",
     "sessionSignedOut": "Sesyon an dekonekte.",
     "signOutThisDeviceTitle": "Dekonekte aparèy sa a?",
     "signOutThisSessionTitle": "Dekonekte sesyon sa a?",

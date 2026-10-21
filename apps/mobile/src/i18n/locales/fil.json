@@ -2771,7 +2771,7 @@
     "thisDevice": "Device na ito",
     "viewProfile": "Tingnan ang profile",
     "signOutThisDevice": "I-sign out ang device na ito",
-    "signOutSessionLabel": "I-sign out ang {{device}}",
+    "signOutSessionLabel": "I-sign out ang {{device}}, nag-sign in: {{signedIn}}",
     "sessionSignedOut": "Na-sign out ang sesyon.",
     "signOutThisDeviceTitle": "I-sign out ang device na ito?",
     "signOutThisSessionTitle": "I-sign out ang sesyong ito?",

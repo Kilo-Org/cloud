@@ -2256,7 +2256,7 @@
     "thisDevice": "यह डिवाइस",
     "viewProfile": "प्रोफ़ाइल देखें",
     "signOutThisDevice": "इस डिवाइस से साइन आउट करें",
-    "signOutSessionLabel": "{{device}} से साइन आउट करें",
+    "signOutSessionLabel": "{{device}} से साइन आउट करें, साइन इन: {{signedIn}}",
     "sessionSignedOut": "इस सत्र से साइन आउट हो गया।",
     "signOutThisDeviceTitle": "इस डिवाइस से साइन आउट करें?",
     "signOutThisSessionTitle": "इस सत्र से साइन आउट करें?",

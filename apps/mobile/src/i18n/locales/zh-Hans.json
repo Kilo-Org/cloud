@@ -2257,7 +2257,7 @@
     "webBrowser": "浏览器",
     "viewProfile": "查看个人资料",
     "signOutThisDevice": "在此设备上退出登录",
-    "signOutSessionLabel": "在{{device}}上退出登录",
+    "signOutSessionLabel": "在{{device}}上退出登录，登录于 {{signedIn}}",
     "sessionSignedOut": "会话已退出登录。",
     "signOutThisDeviceTitle": "在此设备上退出登录？",
     "signOutThisSessionTitle": "退出此登录会话？",

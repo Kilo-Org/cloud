@@ -2772,7 +2772,7 @@
     "viewProfile": "प्रोफाइल पहा",
     "webBrowser": "वेब ब्राउझर",
     "signOutThisDevice": "या डिव्हाइसवरून साइन आउट करा",
-    "signOutSessionLabel": "{{device}} वरून साइन आउट करा",
+    "signOutSessionLabel": "{{device}} वरून साइन आउट करा, साइन इन: {{signedIn}}",
     "sessionSignedOut": "सत्र साइन आउट झाले.",
     "signOutThisDeviceTitle": "या डिव्हाइसवरून साइन आउट करायचे?",
     "signOutThisSessionTitle": "या सत्रातून साइन आउट करायचे?",

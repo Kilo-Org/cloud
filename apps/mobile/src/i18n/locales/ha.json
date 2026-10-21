@@ -2771,7 +2771,7 @@
     "thisDevice": "Wannan na'ura",
     "viewProfile": "Duba bayanan martaba",
     "signOutThisDevice": "Fita daga wannan na'urar",
-    "signOutSessionLabel": "Fita daga {{device}}",
+    "signOutSessionLabel": "Fita daga {{device}}, an shiga {{signedIn}}",
     "sessionSignedOut": "An fita daga zaman.",
     "signOutThisDeviceTitle": "Fita daga wannan na'urar?",
     "signOutThisSessionTitle": "Fita daga wannan zaman?",

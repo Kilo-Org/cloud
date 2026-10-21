@@ -2771,7 +2771,7 @@
     "thisDevice": "Kifaa hiki",
     "viewProfile": "Tazama wasifu",
     "signOutThisDevice": "Toka kwenye akaunti kwenye kifaa hiki",
-    "signOutSessionLabel": "Toka kwenye akaunti kwenye {{device}}",
+    "signOutSessionLabel": "Toka kwenye akaunti kwenye {{device}}, Kuingia: {{signedIn}}",
     "sessionSignedOut": "Kikao kimeondolewa kwenye akaunti.",
     "signOutThisDeviceTitle": "Ungependa kutoka kwenye akaunti kwenye kifaa hiki?",
     "signOutThisSessionTitle": "Ungependa kuondoka kwenye kikao hiki?",

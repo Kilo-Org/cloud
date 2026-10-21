@@ -36,6 +36,8 @@ type SessionRowProps = {
 function SessionRow({ session, disabled, onPress }: SessionRowProps) {
   const colors = useThemeColors();
   const { t, i18n } = useTranslation();
+  const device = deviceSessionLabel(session.user_agent);
+  const signedIn = formatDate(parseTimestamp(session.created_at), i18n.language);
 
   return (
     <View className="flex-row items-start gap-3 rounded-lg bg-secondary p-3">
@@ -43,7 +45,7 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
       <View className="min-w-0 flex-1">
         <View className="flex-row flex-wrap items-center gap-2">
           <Text className="text-sm font-medium" numberOfLines={1}>
-            {deviceSessionLabel(session.user_agent)}
+            {device}
           </Text>
           {session.isCurrent && (
             <View className="rounded-full bg-primary px-2 py-0.5">
@@ -55,7 +57,7 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
         </View>
         <Text variant="muted" className="mt-0.5 text-xs">
           {t('deviceSessions.signedIn', {
-            signedIn: formatDate(parseTimestamp(session.created_at), i18n.language),
+            signedIn,
             lastSeen: formatDate(parseTimestamp(session.last_seen_at), i18n.language),
           })}
         </Text>
@@ -71,7 +73,8 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
           session.isCurrent
             ? t('deviceSessions.signOutThisDevice')
             : t('deviceSessions.signOutSessionLabel', {
-                device: isolateBidiText(deviceSessionLabel(session.user_agent)),
+                device: isolateBidiText(device),
+                signedIn,
               })
         }
         className="min-h-[44px] min-w-[44px] shrink-0 items-center justify-center active:opacity-70"

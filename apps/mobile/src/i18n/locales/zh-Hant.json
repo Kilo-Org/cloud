@@ -2257,7 +2257,7 @@
     "webBrowser": "網頁瀏覽器",
     "viewProfile": "檢視個人資料",
     "signOutThisDevice": "登出此裝置",
-    "signOutSessionLabel": "登出 {{device}}",
+    "signOutSessionLabel": "登出 {{device}}，登入時間：{{signedIn}}",
     "sessionSignedOut": "工作階段已登出。",
     "signOutThisDeviceTitle": "登出此裝置？",
     "signOutThisSessionTitle": "登出此工作階段？",

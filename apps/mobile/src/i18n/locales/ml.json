@@ -2772,7 +2772,7 @@
     "viewProfile": "പ്രൊഫൈൽ കാണുക",
     "webBrowser": "വെബ് ബ്രൗസർ",
     "signOutThisDevice": "ഈ ഉപകരണത്തിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യുക",
-    "signOutSessionLabel": "{{device}}-ൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യുക",
+    "signOutSessionLabel": "{{device}}-ൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യുക, സൈൻ ഇൻ ചെയ്തത് {{signedIn}}",
     "sessionSignedOut": "സെഷൻ സൈൻ ഔട്ട് ചെയ്തു.",
     "signOutThisDeviceTitle": "ഈ ഉപകരണത്തിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യണോ?",
     "signOutThisSessionTitle": "ഈ സെഷനിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യണോ?",

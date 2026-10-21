@@ -2888,7 +2888,7 @@
     "thisDevice": "An gléas seo",
     "viewProfile": "Féach ar phróifíl",
     "signOutThisDevice": "Sínigh amach ón ngléas seo",
-    "signOutSessionLabel": "Sínigh amach ó {{device}}",
+    "signOutSessionLabel": "Sínigh amach ó {{device}}, síniú isteach: {{signedIn}}",
     "sessionSignedOut": "Seisiún sínithe amach.",
     "signOutThisDeviceTitle": "An bhfuil tú ag iarraidh síniú amach ón ngléas seo?",
     "signOutThisSessionTitle": "An bhfuil tú ag iarraidh síniú amach ón seisiún seo?",

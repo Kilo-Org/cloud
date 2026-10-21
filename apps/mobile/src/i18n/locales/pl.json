@@ -2302,7 +2302,7 @@
     "thisDevice": "To urządzenie",
     "viewProfile": "Wyświetl profil",
     "signOutThisDevice": "Wyloguj to urządzenie",
-    "signOutSessionLabel": "Wyloguj {{device}}",
+    "signOutSessionLabel": "Wyloguj {{device}}, logowanie: {{signedIn}}",
     "sessionSignedOut": "Zakończono sesję logowania.",
     "signOutThisDeviceTitle": "Wylogować to urządzenie?",
     "signOutThisSessionTitle": "Zakończyć tę sesję logowania?",

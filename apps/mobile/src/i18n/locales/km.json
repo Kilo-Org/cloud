@@ -2771,7 +2771,7 @@
     "thisDevice": "ឧបករណ៍នេះ",
     "viewProfile": "មើលប្រវត្តិរូប",
     "signOutThisDevice": "ចេញពីគណនីលើឧបករណ៍នេះ",
-    "signOutSessionLabel": "{{device}} ចេញពីគណនី",
+    "signOutSessionLabel": "{{device}} ចេញពីគណនី, ចូលគណនីនៅ {{signedIn}}",
     "sessionSignedOut": "បានចេញពីគណនីក្នុងវគ្គនេះហើយ។",
     "signOutThisDeviceTitle": "ចេញពីគណនីលើឧបករណ៍នេះ?",
     "signOutThisSessionTitle": "ចេញពីគណនីក្នុងវគ្គនេះ?",

@@ -2850,7 +2850,7 @@
     "webBrowser": "Вэб-браўзер",
     "viewProfile": "Праглядзець профіль",
     "signOutThisDevice": "Выйсці з уліковага запісу на гэтай прыладзе",
-    "signOutSessionLabel": "Выйсці з прылады {{device}}",
+    "signOutSessionLabel": "Выйсці з прылады {{device}}, Уваход: {{signedIn}}",
     "sessionSignedOut": "Сеанс завершаны.",
     "signOutThisDeviceTitle": "Выйсці з уліковага запісу на гэтай прыладзе?",
     "signOutThisSessionTitle": "Завяршыць гэты сеанс?",

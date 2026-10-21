@@ -2256,7 +2256,7 @@
     "thisDevice": "이 기기",
     "viewProfile": "프로필 보기",
     "signOutThisDevice": "이 기기 로그아웃",
-    "signOutSessionLabel": "{{device}} 기기 로그아웃",
+    "signOutSessionLabel": "{{device}} 기기 로그아웃, {{signedIn}}에 로그인함",
     "sessionSignedOut": "세션이 로그아웃되었습니다.",
     "signOutThisDeviceTitle": "이 기기에서 로그아웃할까요?",
     "signOutThisSessionTitle": "이 세션에서 로그아웃할까요?",

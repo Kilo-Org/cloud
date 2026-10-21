@@ -2772,7 +2772,7 @@
     "viewProfile": "ကိုယ်ရေးအချက်အလက်ကို ကြည့်ပါ",
     "webBrowser": "ဝဘ်ဘရောက်ဆာ",
     "signOutThisDevice": "ဤစက်မှ အကောင့်ထွက်ပါ",
-    "signOutSessionLabel": "{{device}} မှ အကောင့်ထွက်ပါ",
+    "signOutSessionLabel": "{{device}} မှ အကောင့်ထွက်ပါ၊ အကောင့်ဝင်ချိန် {{signedIn}}",
     "sessionSignedOut": "စက်ရှင်မှ အကောင့်ထွက်ပြီးပါပြီ။",
     "signOutThisDeviceTitle": "ဤစက်မှ အကောင့်ထွက်မလား။",
     "signOutThisSessionTitle": "ဤစက်ရှင်မှ အကောင့်ထွက်မလား။",

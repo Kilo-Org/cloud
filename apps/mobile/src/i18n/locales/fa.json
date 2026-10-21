@@ -2771,7 +2771,7 @@
     "thisDevice": "این دستگاه",
     "viewProfile": "مشاهدهٔ پروفایل",
     "signOutThisDevice": "خروج از این دستگاه",
-    "signOutSessionLabel": "خروج از {{device}}",
+    "signOutSessionLabel": "خروج از {{device}}، ورود در {{signedIn}}",
     "sessionSignedOut": "خروج از نشست انجام شد.",
     "signOutThisDeviceTitle": "از حساب خود در این دستگاه خارج می‌شوید؟",
     "signOutThisSessionTitle": "از این نشست خارج می‌شوید؟",

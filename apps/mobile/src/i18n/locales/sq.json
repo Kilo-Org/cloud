@@ -2771,7 +2771,7 @@
     "thisDevice": "Kjo pajisje",
     "viewProfile": "Shiko profilin",
     "signOutThisDevice": "Dil nga kjo pajisje",
-    "signOutSessionLabel": "Dil nga {{device}}",
+    "signOutSessionLabel": "Dil nga {{device}}, hyrja: {{signedIn}}",
     "sessionSignedOut": "Seanca u mbyll.",
     "signOutThisDeviceTitle": "Do të dalësh nga kjo pajisje?",
     "signOutThisSessionTitle": "Të mbyllet kjo seancë?",

@@ -2772,7 +2772,7 @@
     "webBrowser": "ویب براؤزر",
     "viewProfile": "پروفائل دیکھیں",
     "signOutThisDevice": "اس ڈیوائس سے سائن آؤٹ کریں",
-    "signOutSessionLabel": "{{device}} سے سائن آؤٹ کریں",
+    "signOutSessionLabel": "{{device}} سے سائن آؤٹ کریں، سائن ان: {{signedIn}}",
     "sessionSignedOut": "سیشن سائن آؤٹ ہو گیا۔",
     "signOutThisDeviceTitle": "اس ڈیوائس سے سائن آؤٹ کریں؟",
     "signOutThisSessionTitle": "اس سیشن سے سائن آؤٹ کریں؟",

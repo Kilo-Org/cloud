@@ -2771,7 +2771,7 @@
     "thisDevice": "Ez az eszköz",
     "viewProfile": "Profil megtekintése",
     "signOutThisDevice": "Kijelentkezés erről az eszközről",
-    "signOutSessionLabel": "Kijelentkezés innen: {{device}}",
+    "signOutSessionLabel": "Kijelentkezés innen: {{device}}, bejelentkezés: {{signedIn}}",
     "sessionSignedOut": "Sikeres kijelentkezés a munkamenetből.",
     "signOutThisDeviceTitle": "Kijelentkezel erről az eszközről?",
     "signOutThisSessionTitle": "Kijelentkezel ebből a munkamenetből?",

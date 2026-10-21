@@ -2771,7 +2771,7 @@
     "thisDevice": "Бұл құрылғы",
     "viewProfile": "Профильді қарау",
     "signOutThisDevice": "Бұл құрылғыдан шығу",
-    "signOutSessionLabel": "{{device}} құрылғысынан шығу",
+    "signOutSessionLabel": "{{device}} құрылғысынан шығу, кірген уақыты: {{signedIn}}",
     "sessionSignedOut": "Сессия аяқталды.",
     "signOutThisDeviceTitle": "Бұл құрылғыдан шығасыз ба?",
     "signOutThisSessionTitle": "Бұл сессиядан шығасыз ба?",

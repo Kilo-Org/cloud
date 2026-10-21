@@ -28,9 +28,6 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
   getUserFromSessionForCredentialIssuance: jest.fn(),
 }));
-jest.mock('@/lib/organizations/organization-auth', () => ({
-  getAuthorizedOrgContext: jest.fn(),
-}));
 
 const secret = 'cloud-agent-exchange-test-secret';
 const cleanupUsers: string[] = [];
@@ -80,6 +77,14 @@ function modernSourceToken(claims: Record<string, unknown> = {}) {
     credentialExchange: true,
     exp: Math.floor(Date.now() / 1000) + 1800,
     ...claims,
+  });
+}
+
+function deviceSourceToken(deviceSessionId: string) {
+  return modernSourceToken({
+    tokenPurpose: 'device-access',
+    credentialExchange: false,
+    deviceSessionId,
   });
 }
 
@@ -214,6 +219,41 @@ it('scopes organization issuance to the authenticated member', async () => {
   });
 });
 
+it('uses the organization header when the body omits organizationId', async () => {
+  const organization = await organizationForCurrentUser();
+  // getUserFromAuth resolves and validates the header; this covers the route wiring only.
+  jest.mocked(getUserFromAuth).mockResolvedValue({
+    user,
+    authFailedResponse: null,
+    organizationId: organization.id,
+  });
+  const response = await POST(request());
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(verifyToken(body.token)).toMatchObject({ organizationId: organization.id });
+});
+
+it('rejects a body organization that differs from the organization header', async () => {
+  const organization = await organizationForCurrentUser();
+  jest.mocked(getUserFromAuth).mockResolvedValue({
+    user,
+    authFailedResponse: null,
+    organizationId: organization.id,
+  });
+  const response = await POST(request(sourceToken(), { organizationId: crypto.randomUUID() }));
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({
+    success: false,
+    error: 'organizationId does not match the organization header',
+  });
+});
+
+it('rejects organization issuance for an organization the user does not belong to', async () => {
+  const response = await POST(request(sourceToken(), { organizationId: crypto.randomUUID() }));
+  expect(response.status).toBe(401);
+  expect(await response.json()).not.toHaveProperty('token');
+});
+
 it.each(['removed membership', 'deleted organization'])(
   'rejects organization issuance after %s',
   async state => {
@@ -236,16 +276,7 @@ it.each(['removed membership', 'deleted organization'])(
 
 it('accepts an active modern device credential and preserves its device identity', async () => {
   const [device] = await db.insert(device_sessions).values({ kilo_user_id: user.id }).returning();
-  const response = await POST(
-    request(
-      modernSourceToken({
-        tokenPurpose: 'device-access',
-        credentialExchange: false,
-        deviceSessionId: device.id,
-        deviceAuthRequestCode: undefined,
-      })
-    )
-  );
+  const response = await POST(request(deviceSourceToken(device.id)));
   expect(response.status).toBe(200);
   const body = await response.json();
   expect(verifyToken(body.token)).toMatchObject({
@@ -265,16 +296,7 @@ it.each(['revoked', 'another user'])(
         ...(state === 'revoked' ? { revoked_at: new Date().toISOString() } : {}),
       })
       .returning();
-    const response = await POST(
-      request(
-        modernSourceToken({
-          tokenPurpose: 'device-access',
-          credentialExchange: false,
-          deviceSessionId: device.id,
-          deviceAuthRequestCode: undefined,
-        })
-      )
-    );
+    const response = await POST(request(deviceSourceToken(device.id)));
     expect(response.status).toBe(401);
     expect(await response.json()).not.toHaveProperty('token');
   }
@@ -327,6 +349,7 @@ it('rejects delegated workload credentials', async () => {
     )
   );
   expect(response.status).toBe(403);
+  expect(response.headers.get('cache-control')).toBe('no-store');
   expect(await response.json()).not.toHaveProperty('token');
 });
 
@@ -395,7 +418,7 @@ it('rejects malformed JSON', async () => {
     })
   );
   expect(response.status).toBe(400);
-  expect(await response.json()).not.toHaveProperty('token');
+  expect(await response.json()).toEqual({ success: false, error: 'Invalid JSON body' });
 });
 
 it.each(['legacy', 'modern'])('never falls back to legacy issuance for a %s source', async kind => {
@@ -405,4 +428,18 @@ it.each(['legacy', 'modern'])('never falls back to legacy issuance for a %s sour
   expect(response.status).toBe(503);
   expect(response.headers.get('cache-control')).toBe('no-store');
   expect(await response.json()).not.toHaveProperty('token');
+});
+
+it('keeps bounded issuance for an active modern device credential after rollback', async () => {
+  jest.mocked(isResourceTokenIssuanceEnabled).mockReturnValue(false);
+  const [device] = await db.insert(device_sessions).values({ kilo_user_id: user.id }).returning();
+  const response = await POST(request(deviceSourceToken(device.id)));
+  expect(response.status).toBe(200);
+  const claims = verifyToken((await response.json()).token);
+  expect(claims).toMatchObject({
+    aud: 'cloud-agent-next',
+    tokenPurpose: 'device-access',
+    deviceSessionId: device.id,
+  });
+  expect(claims.exp - claims.iat).toBe(900);
 });

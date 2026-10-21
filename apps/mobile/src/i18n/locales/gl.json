@@ -605,7 +605,7 @@
       "openAccessibility": "Abrir solicitude de integración ou de fusión",
       "clearLink": "Limpar a ligazón",
       "pasteLink": "Pegar a ligazón á solicitude de integración ou de fusión",
-      "open": "Apertura"
+      "open": "Abrir"
     },
     "checks": {
       "title": "Comprobacións",
@@ -2726,7 +2726,7 @@
       "invalidLink": "Non se pode abrir esta ligazón.",
       "hostConfirmTitle": "Abrir a ligazón externa?",
       "hostConfirmMessage": "Esta ligazón abre {{host}} no teu navegador.",
-      "open": "Apertura",
+      "open": "Abrir",
       "trustThisHost": "Confiar neste dominio"
     },
     "folderPicker": {
@@ -3680,11 +3680,11 @@
       "add": "Engadir axente",
       "empty": "Aínda non hai axentes",
       "name": "Nome do axente",
-      "slug": "Axente babosa",
+      "slug": "Slug do axente",
       "description": "Descrición do axente",
       "model": "Anulación do modelo",
       "modelPlaceholder": "Usar sesión predeterminada",
-      "prompt": "Aviso do sistema",
+      "prompt": "Prompt do sistema",
       "steps": "Pasos máximos",
       "stepsPlaceholder": "p. ex. 50",
       "temperature": "Temperatura",

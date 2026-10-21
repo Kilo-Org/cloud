@@ -3651,7 +3651,7 @@
       "empty": "Chưa có máy chủ MCP",
       "name": "Tên máy chủ",
       "type": "Loại máy chủ",
-      "localType": "Địa phương",
+      "localType": "Cục bộ",
       "remoteType": "Xa",
       "command": "Dòng lệnh",
       "url": "URL",

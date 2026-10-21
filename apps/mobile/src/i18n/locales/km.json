@@ -337,7 +337,7 @@
     "floatingActions": {
       "clearSelection": "ដកការជ្រើសរើសចេញ",
       "clear": "ដកចេញ",
-      "commentOnSelectedLines": "បញ្ចេញមតិលើបន្ទាត់ដែលបានជ្រើសរើស",
+      "commentOnSelectedLines": "មតិយោបល់លើបន្ទាត់ដែលបានជ្រើសរើស",
       "comment": "អត្ថាធិប្បាយ",
       "finishReview": "បញ្ចប់ការពិនិត្យ"
     },
@@ -419,8 +419,8 @@
       "confirmMessage": "សកម្មភាពនេះនឹងបញ្ចូលការកែប្រែរបស់អ្នកទៅក្នុងសាខាគោល។",
       "enableAutoMergeConfirmTitle": "បើកការបញ្ចូលដោយស្វ័យប្រវត្តិ?",
       "enableAutoMergeConfirmMessage": "GitHub នឹងបញ្ចូលសំណើបញ្ចូលកូដនេះដោយស្វ័យប្រវត្តិ នៅពេលការត្រួតពិនិត្យចាំបាច់ទាំងអស់ជោគជ័យ។",
-      "enableAutoMergeConfirmMessageTerm": "{{term}} នឹងត្រូវបានបញ្ចូលដោយស្វ័យប្រវត្តិនៅពេលបំពង់ផ្សែងជោគជ័យ។",
-      "enableAutoMergeDescriptionTerm": "GitLab នឹងបញ្ចូល{{term}}នេះដោយស្វ័យប្រវត្តិនៅពេលបំពង់ផ្សែងជោគជ័យ។",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} នឹងត្រូវបានបញ្ចូលដោយស្វ័យប្រវត្តិនៅពេលខ្សែសង្វាក់ CI ជោគជ័យ។",
+      "enableAutoMergeDescriptionTerm": "GitLab នឹងបញ្ចូល{{term}}នេះដោយស្វ័យប្រវត្តិនៅពេលខ្សែសង្វាក់ CI ជោគជ័យ។",
       "forbidden": "អ្នកគ្មានសិទ្ធិបញ្ចូលសំណើបញ្ចូលកូដនេះទេ។",
       "cannotMerge": "មិនអាចបញ្ចូលសំណើបញ្ចូលកូដនេះក្នុងស្ថានភាពបច្ចុប្បន្នបានទេ។",
       "couldNotMerge": "មិនអាចបញ្ចូលសំណើបញ្ចូលកូដបានទេ។",
@@ -462,11 +462,11 @@
         "title": "ការកំណត់បញ្ចូល",
         "approvalsRequired_one": "ត្រូវការការអនុម័ត {{displayCount}}",
         "approvalsRequired_other": "ត្រូវការការអនុម័ត {{displayCount}}",
-        "pipelineMustSucceed": "បំពង់ផ្សែងត្រូវតែជោគជ័យមុនពេលបញ្ចូល។"
+        "pipelineMustSucceed": "ខ្សែសង្វាក់ CI ត្រូវតែជោគជ័យមុនពេលបញ្ចូល។"
       },
       "providerBlocked": {
-        "failingPipeline": "បំពង់ផ្សែងកំពុងបរាជ័យលើកូមីតចុងក្រោយ។",
-        "pendingPipeline": "បំពង់ផ្សែងកំពុងដំណើរការនៅឡើយលើកូមីតចុងក្រោយ។",
+        "failingPipeline": "ខ្សែសង្វាក់ CI កំពុងបរាជ័យលើកូមីតចុងក្រោយ។",
+        "pendingPipeline": "ខ្សែសង្វាក់ CI កំពុងដំណើរការនៅឡើយលើកូមីតចុងក្រោយ។",
         "permission": "អ្នកគ្មានសិទ្ធិបញ្ចូល{{term}}នេះទេ។",
         "draft": "សម្គាល់{{term}}ថារួចរាល់សម្រាប់ការពិនិត្យ មុនពេលបញ្ចូល។"
       },
@@ -570,7 +570,7 @@
         "outdatedOnLines": "លែងទាន់សម័យនៅ {{lines}}",
         "outdatedOnPath": "លែងទាន់សម័យនៅ {{path}}"
       },
-      "deletedUser": "អ្នកប្រើប្រាស់ដែលបានលុបគណនី",
+      "deletedUser": "អ្នកប្រើប្រាស់ដែលរកមិនឃើញ",
       "replyForbiddenTerm": "អ្នកគ្មានសិទ្ធិឆ្លើយតបលើ{{term}}នេះទេ។",
       "moreLinesAbove_one": "… នៅមាន {{displayCount}} បន្ទាត់ទៀតខាងលើ។",
       "moreLinesAbove_other": "… នៅមាន {{displayCount}} បន្ទាត់ទៀតខាងលើ។",
@@ -588,7 +588,7 @@
     "couldNotLoadPullRequest": "មិនអាចផ្ទុកសំណើបញ្ចូលកូដបានទេ។",
     "description": "ការពិពណ៌នា",
     "noDescriptionProvided": "មិនមានការពិពណ៌នាទេ។",
-    "review": "ការពិនិត្យ",
+    "review": "ពិនិត្យ",
     "reviewPullRequest": "ពិនិត្យសំណើបញ្ចូលកូដ",
     "headLine": "{{counts}} · កំណត់ត្រាកែប្រែចុងក្រោយ {{sha}}",
     "entry": {
@@ -670,10 +670,10 @@
     },
     "submit": {
       "loadFailedTitle": "មិនអាចផ្ទុកទម្រង់ដាក់ស្នើការពិនិត្យបានទេ។",
-      "deletePendingTitle": "លុបមតិយោបល់មិនទាន់ផ្ញើ?",
+      "deletePendingTitle": "លុបមតិយោបល់មិនទាន់ដាក់ស្នើ?",
       "deletePendingMessage": "មតិយោបល់នេះនឹងត្រូវដកចេញពីបញ្ជីរង់ចាំដាក់ស្នើការពិនិត្យ។",
       "summaryOptional": "សេចក្តីសង្ខេប (ស្រេចចិត្ត)",
-      "pendingComment_one": "មតិយោបល់មិនទាន់ផ្ញើ",
+      "pendingComment_one": "មតិយោបល់មិនទាន់ដាក់ស្នើ",
       "pendingComment": "មតិយោបល់មិនទាន់ដាក់ស្នើ",
       "pendingComment_other": "មតិយោបល់មិនទាន់ដាក់ស្នើ",
       "submitCountOfTotal": "ដាក់ស្នើមតិយោបល់ {{displayFreshCount}} ក្នុងចំណោម {{displayTotalCount}}",
@@ -717,19 +717,19 @@
       "assignees": "អ្នកទទួលបន្ទុក",
       "linkedIssues": "បញ្ហាដែលបានភ្ជាប់",
       "reviewApproved": "បានអនុម័ត",
-      "reviewChangesRequested": "បានស្នើឱ្យកែប្រែ",
+      "reviewChangesRequested": "បានស្នើសុំការកែប្រែ",
       "reviewCommented": "បានផ្ដល់មតិ",
       "reviewPending": "កំពុងរង់ចាំការត្រួតពិនិត្យ",
       "openIssueA11y": "បើកបញ្ហា #{{number}} នៅលើ GitHub"
     },
     "pendingComment": {
-      "editOutdatedA11y": "កែសម្រួលមតិយោបល់មិនទាន់ផ្ញើដែលលែងទាន់សម័យនៅ {{location}}",
-      "editA11y": "កែសម្រួលមតិយោបល់មិនទាន់ផ្ញើនៅ {{location}}",
-      "staleHint": "pR បានផ្លាស់ប្តូរបន្ទាប់ពីអ្នកសរសេរមតិយោបល់នេះ។",
-      "deleteA11y": "លុបមតិយោបល់មិនទាន់ផ្ញើនៅ {{location}}",
-      "deletedAnnouncement": "បានលុបមតិយោបល់មិនទាន់ផ្ញើ",
+      "editOutdatedA11y": "កែសម្រួលមតិយោបល់មិនទាន់ដាក់ស្នើដែលលែងទាន់សម័យនៅ {{location}}",
+      "editA11y": "កែសម្រួលមតិយោបល់មិនទាន់ដាក់ស្នើនៅ {{location}}",
+      "staleHint": "PR បានផ្លាស់ប្តូរបន្ទាប់ពីអ្នកសរសេរមតិយោបល់នេះ។",
+      "deleteA11y": "លុបមតិយោបល់មិនទាន់ដាក់ស្នើនៅ {{location}}",
+      "deletedAnnouncement": "បានលុបមតិយោបល់មិនទាន់ដាក់ស្នើ",
       "noCommentsQueued": "គ្មានមតិយោបល់ក្នុងបញ្ជីរង់ចាំទេ។ ការពិនិត្យនឹងត្រូវដាក់ស្នើតាមប្រភេទដែលបានជ្រើសរើសខាងលើ ដោយគ្មានមតិយោបល់។",
-      "staleQueueHint": "មតិយោបល់លើកំណត់ត្រាកែប្រែចាស់នឹងមិនត្រូវផ្ញើទេ។ វានៅតែស្ថិតក្នុងបញ្ជីរង់ចាំរបស់អ្នក ដើម្បីឱ្យអ្នកអាចកែសម្រួល ឬលុបបាន។",
+      "staleQueueHint": "មតិយោបល់លើកំណត់ត្រាកែប្រែចាស់នឹងមិនត្រូវបានដាក់ស្នើទេ។ វានៅតែស្ថិតក្នុងបញ្ជីរង់ចាំរបស់អ្នក ដើម្បីឱ្យអ្នកអាចកែសម្រួល ឬលុបបាន។",
       "allQueuedHint": "មតិយោបល់ទាំងអស់នឹងត្រូវផ្ញើរួមគ្នាក្នុងសំណើតែមួយ។",
       "summaryPlaceholder": "សេចក្តីសង្ខេបសម្រាប់ការពិនិត្យ (ស្រេចចិត្ត)",
       "summaryA11y": "សេចក្តីសង្ខេបនៃការពិនិត្យ"
@@ -768,7 +768,7 @@
     "mutationError": {
       "commentNotPosted": "មិនអាចបង្ហោះមតិយោបល់នេះបានទេ។ បន្ទាត់ដែលបានជ្រើសរើសអាចបានផ្លាស់ប្តូរ ឬ PR អាចបានធ្វើបច្ចុប្បន្នភាព។",
       "reviewNotSubmitted": "មិនអាចដាក់ស្នើការពិនិត្យនេះក្នុងស្ថានភាពបច្ចុប្បន្នបានទេ។ PR អាចបានផ្លាស់ប្តូរ ឬអ្នកកំពុងពិនិត្យសំណើបញ្ចូលកូដរបស់ខ្លួនឯង ដែលមិនត្រូវបានអនុញ្ញាត។",
-      "reviewNotSubmittedTerm": "មិនអាចដាក់សំណើការពិនិត្យនេះតាមរូបភាពបច្ចុប្បន្នបានទេ។ {{term}} អាចបានផ្លាស់ប្តូរ ឬអ្នកមិនអាចពិនិត្យ{{term}}របស់ខ្លួនឯងបានទេ។",
+      "reviewNotSubmittedTerm": "មិនអាចដាក់ស្នើការពិនិត្យនេះក្នុងស្ថានភាពបច្ចុប្បន្នបានទេ។ {{term}} អាចបានផ្លាស់ប្តូរ ឬអ្នកកំពុងពិនិត្យ{{term}}របស់ខ្លួនឯង ដែលមិនត្រូវបានអនុញ្ញាត។",
       "couldNotPostComment": "មិនអាចបង្ហោះមតិយោបល់បានទេ។",
       "couldNotSubmitReview": "មិនអាចដាក់ស្នើការពិនិត្យបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
       "rateLimited": "សំណើច្រើនពេក។ សូមព្យាយាមម្តងទៀតនៅពេលក្រោយ។",
@@ -792,14 +792,14 @@
     "terms": {
       "pullRequest": "សំណើបញ្ចូលកូដ",
       "mergeRequest": "សំណើបញ្ចូល",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "សំណើបញ្ចូល !{{number}}",
       "shareMergeRequest": "ចែករំលែកសំណើបញ្ចូល",
       "viewOnProvider": "មើលលើ {{provider}}",
       "mergeRequestUnavailable": "មិនអាចបើកសំណើបញ្ចូលបាន",
       "unavailableDescription": "វាអាចត្រូវបានលុបចោល ឬអ្នកអាចគ្មានសិទ្ធិចូលប្រើទេ។",
       "accessDeniedMergeRequest": "អ្នកគ្មានសិទ្ធិមើលសំណើបញ្ចូលនេះទេ។",
       "couldNotLoadMergeRequest": "មិនអាចផ្ទុកសំណើបញ្ចូលបានទេ។",
-      "discussionAccessDenied": "អ្នកគ្មានសិទ្ធិមើលការពិភាក្សារបស់ សំណើបញ្ចូល នេះទេ។",
+      "discussionAccessDenied": "អ្នកគ្មានសិទ្ធិមើលការពិភាក្សារបស់សំណើបញ្ចូលនេះទេ។",
       "discussionUnavailableMessage": "សំណើបញ្ចូលនេះអាចត្រូវបានដកចេញ។",
       "noDiscussionDescription": "មិនទាន់មានការពិភាក្សាពិនិត្យកូដ ឬមតិយោបល់លើសំណើបញ្ចូលនេះទេ។",
       "noFilesChangedDescription": "សំណើបញ្ចូលនេះមិនមានការកែប្រែឯកសារទេ។"

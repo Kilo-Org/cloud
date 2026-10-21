@@ -101,7 +101,7 @@ describe('briefing model pricing', () => {
     );
   });
 
-  it('quotes a picker-built entry at its own price when the catalog lists the same id', async () => {
+  it('quotes a picker-built entry at its own price, ignoring a same-id catalog row and snapshot route', async () => {
     const exclusive = catalogModel('stealth/qwen3.6-plus', {
       prompt: '0.00001',
       completion: '0.00002',
@@ -113,6 +113,13 @@ describe('briefing model pricing', () => {
     const withCatalogRow = await briefingPriceBound(exclusive.id, 'Overnight activity', 2_000_000);
 
     jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [] });
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      [exclusive.id]: {
+        id: exclusive.id,
+        name: exclusive.name,
+        endpoints: [{ tag: 'alibaba', pricing: { prompt: '0.001', completion: '0.002' } }],
+      } satisfies StoredModel,
+    });
 
     expect(withCatalogRow).toEqual(
       await briefingPriceBound(exclusive.id, 'Overnight activity', 2_000_000)

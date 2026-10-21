@@ -30,6 +30,7 @@ import {
   type GetGitLabTokenResult,
 } from './gitlab-runtime-token-resolver.js';
 import { DEFAULT_GITLAB_INSTANCE_URL } from './gitlab-constants.js';
+import { readBoundedJsonBody } from './lib/bounded-read.js';
 import {
   GitLabSessionCapabilityCodec,
   GitLabSessionCapabilityError,
@@ -370,7 +371,8 @@ async function resolveSecret(secret: SecretsStoreSecret | string): Promise<strin
 
 async function readBoundedInternalJsonRequest(request: Request): Promise<unknown> {
   const contentType = request.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase();
-  if (contentType !== 'application/json' || !request.body) throw new Error('invalid_request');
+  const stream = request.body;
+  if (contentType !== 'application/json' || !stream) throw new Error('invalid_request');
 
   const contentLength = request.headers.get('Content-Length');
   if (contentLength) {
@@ -379,37 +381,8 @@ async function readBoundedInternalJsonRequest(request: Request): Promise<unknown
     }
   }
 
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
   try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      if (!(chunk.value instanceof Uint8Array)) throw new Error('invalid_request');
-      totalBytes += chunk.value.byteLength;
-      if (totalBytes > INTERNAL_REQUEST_MAX_BYTES) {
-        try {
-          await reader.cancel();
-        } catch {
-          // The request remains rejected when cancellation itself fails.
-        }
-        throw new Error('invalid_request');
-      }
-      chunks.push(chunk.value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  const body = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  try {
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body));
+    return await readBoundedJsonBody(stream, INTERNAL_REQUEST_MAX_BYTES);
   } catch {
     throw new Error('invalid_request');
   }

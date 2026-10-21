@@ -1,3 +1,4 @@
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,8 +18,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
 import { useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
-import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
-import { useOrganization } from '@/lib/organization-context';
+import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
 
 /**
@@ -49,15 +49,26 @@ function hasUsableMessage(error: unknown): boolean {
 export function NewProfileScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { organizationId } = useOrganization();
+  const { organizationId, role, isResolving } = useOrgBoundary();
   // No organization context on the hook: the owner choice below decides which
   // `organizationId` each create carries, so a personal create is never
   // rewritten to the selected organization.
   const { create } = useAgentProfileMutations();
-  const canManage = useCanManageOrganizationProfiles(organizationId ?? undefined);
   const nameRef = useRef('');
   const descriptionRef = useRef('');
-  const [owner, setOwner] = useState<ProfileOwnerChoice>('personal');
+  const [ownerSelection, setOwnerSelection] = useState<{
+    organizationId: string | null;
+    owner: ProfileOwnerChoice;
+  }>({ organizationId: null, owner: 'personal' });
+  const canOwnOrganization =
+    !isResolving && hasOrganizationContext(organizationId) && canManageOrganization(role);
+  const owner: ProfileOwnerChoice =
+    canOwnOrganization && ownerSelection.organizationId === organizationId
+      ? ownerSelection.owner
+      : 'personal';
+  const selectOwner = (next: ProfileOwnerChoice) => {
+    setOwnerSelection({ organizationId: organizationId ?? null, owner: next });
+  };
   const [nameError, setNameError] = useState<string | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
@@ -132,7 +143,7 @@ export function NewProfileScreen() {
           }}
         />
 
-        {hasOrganizationContext(organizationId) ? (
+        {canOwnOrganization ? (
           <View className="gap-1">
             <Text className="text-sm font-medium text-foreground">
               {t(OWNER_LABEL_KEY, { defaultValue: t(OWNER_LABEL_FALLBACK_KEY) })}
@@ -140,14 +151,14 @@ export function NewProfileScreen() {
             <SegmentedControl
               // The create carries the organization only when Organization is
               // chosen; the options come from the active context.
-              options={ownerChoices(organizationId, canManage).map(choice => ({
+              options={ownerChoices(organizationId).map(choice => ({
                 value: choice,
                 label: t(OWNER_CHOICE_LABEL_KEYS[choice], {
                   defaultValue: t(OWNER_CHOICE_FALLBACK_KEYS[choice]),
                 }),
               }))}
               value={owner}
-              onChange={setOwner}
+              onChange={selectOwner}
               accessibilityLabel={t(OWNER_LABEL_KEY, { defaultValue: t(OWNER_LABEL_FALLBACK_KEY) })}
             />
           </View>

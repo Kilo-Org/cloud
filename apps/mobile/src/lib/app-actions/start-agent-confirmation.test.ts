@@ -93,6 +93,20 @@ describe('confirmStartAgent', () => {
     await expect(answered).resolves.toBe(false);
   });
 
+  it('answers false and releases the listener when the app never comes forward', async () => {
+    vi.useFakeTimers();
+    native.appState.currentState = 'background';
+    const remove = vi.fn();
+    native.addEventListener.mockImplementation(() => ({ remove }));
+    const answered = confirmStartAgent(REQUEST);
+    expect(native.alert).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(15_000);
+    await expect(answered).resolves.toBe(false);
+    expect(native.alert).not.toHaveBeenCalled();
+    expect(remove).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  });
+
   it('answers false for Cancel and true for the start button', async () => {
     const cancelled = confirmStartAgent(REQUEST);
     await Promise.resolve();

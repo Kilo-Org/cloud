@@ -8,7 +8,16 @@ import { i18n } from '@/i18n';
 import { type StartAgentRequest } from './app-action-contract';
 
 /**
- * Resolves once the app is in front of the user.
+ * How long the question waits for the app to be in front. Once it passes, the
+ * request is answered as not confirmed instead of waiting for a resume that may
+ * never come: the listener is released and the dispatch stays total, so the
+ * request behind it in a boot replay still runs.
+ */
+const ACTIVATION_TIMEOUT_MS = 15_000;
+
+/**
+ * Resolves true once the app is in front of the user, and false when it is not
+ * within [ACTIVATION_TIMEOUT_MS].
  *
  * The native dialog is shown through the running app, and a question asked
  * while the app is paused is queued for a resume instead of appearing. Waiting
@@ -17,18 +26,24 @@ import { type StartAgentRequest } from './app-action-contract';
  * action URL brings the app forward, and one that arrives with the app closed
  * reaches here after it has opened.
  */
-async function whenAppIsActive(): Promise<void> {
+async function whenAppIsActive(): Promise<boolean> {
   if (AppState.currentState === 'active') {
-    return;
+    return true;
   }
-  const { promise, resolve } = Promise.withResolvers<undefined>();
+  const { promise, resolve } = Promise.withResolvers<boolean>();
+  const deadline = Promise.withResolvers<boolean>();
+  const timer = setTimeout(() => {
+    deadline.resolve(false);
+  }, ACTIVATION_TIMEOUT_MS);
   const subscription = AppState.addEventListener('change', state => {
     if (state === 'active') {
-      subscription.remove();
-      resolve(undefined);
+      resolve(true);
     }
   });
-  await promise;
+  const active = await Promise.race([promise, deadline.promise]);
+  clearTimeout(timer);
+  subscription.remove();
+  return active;
 }
 
 /**
@@ -52,7 +67,9 @@ function confirmationMessage(request: StartAgentRequest): string {
  * it.
  */
 export async function confirmStartAgent(request: StartAgentRequest): Promise<boolean> {
-  await whenAppIsActive();
+  if (!(await whenAppIsActive())) {
+    return false;
+  }
   const { promise, resolve } = Promise.withResolvers<boolean>();
   Alert.alert(
     i18n.t('appActions.start.confirmTitle'),

@@ -2606,7 +2606,8 @@
       "description": "اربط حسابك على GitHub لمراجعة طلبات السحب على الجوال.",
       "gitlabDescription": "اربط حسابك في GitLab لمراجعة طلبات الدمج على الجوال.",
       "bitbucketDescription": "اربط Bitbucket بهذه المؤسسة لمراجعة طلبات السحب على الجوال.",
-      "bitbucketOrgOnlyDescription": "اختر مؤسسة في ملفك الشخصي لمراجعة طلبات السحب الخاصة بها على Bitbucket."
+      "bitbucketOrgOnlyDescription": "بدّل الحساب أعلاه إلى مؤسسة لمراجعة طلبات السحب الخاصة بها على Bitbucket.",
+      "contextLine": "لـ{{organization}}"
     },
     "connectionExpired": "انتهت صلاحية الربط مع GitHub.",
     "couldNotLoadPullRequest": "تعذّر تحميل طلب السحب.",

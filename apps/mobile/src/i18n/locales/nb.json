@@ -661,7 +661,8 @@
       "description": "Koble til GitHub-kontoen din for å gå gjennom PR-er på mobilen.",
       "gitlabDescription": "Koble til GitLab-kontoen din for å gå gjennom merge requests på mobilen.",
       "bitbucketDescription": "Koble Bitbucket til denne organisasjonen for å gå gjennom PR-er på mobilen.",
-      "bitbucketOrgOnlyDescription": "Velg en organisasjon i profilen din for å gå gjennom PR-ene deres på Bitbucket."
+      "bitbucketOrgOnlyDescription": "Bytt kontoen over til en organisasjon for å gå gjennom dens PR-er på Bitbucket.",
+      "contextLine": "For {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

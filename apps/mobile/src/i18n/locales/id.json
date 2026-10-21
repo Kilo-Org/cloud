@@ -2506,7 +2506,8 @@
       "description": "Hubungkan akun GitHub kamu untuk meninjau PR di ponsel.",
       "gitlabDescription": "Hubungkan akun GitLab kamu untuk meninjau merge request di ponsel.",
       "bitbucketDescription": "Hubungkan Bitbucket ke organisasi ini untuk meninjau PR di ponsel.",
-      "bitbucketOrgOnlyDescription": "Pilih organisasi di profilmu untuk meninjau PR Bitbucket-nya."
+      "bitbucketOrgOnlyDescription": "Ganti akun di atas ke sebuah organisasi untuk meninjau PR Bitbucket-nya.",
+      "contextLine": "Untuk {{organization}}"
     },
     "connectionExpired": "Koneksi GitHub kedaluwarsa.",
     "couldNotLoadPullRequest": "Tidak dapat memuat PR.",

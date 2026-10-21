@@ -661,7 +661,8 @@
       "description": "Haɗa asusunka na GitHub don yin bitar buƙatun haɗawa a waya.",
       "gitlabDescription": "Haɗa asusun GitLab ɗinka don bita buƙatun haɗawa a wayar hannu.",
       "bitbucketDescription": "Haɗa Bitbucket da wannan ƙungiya don bita buƙatun haɗa canje-canje a wayar hannu.",
-      "bitbucketOrgOnlyDescription": "Zaɓi ƙungiya a cikin bayanan martabarka don bita buƙatun haɗa canje-canje na Bitbucket na ƙungiyar."
+      "bitbucketOrgOnlyDescription": "Canja asusun da ke sama zuwa ƙungiya don bita buƙatun haɗa canje-canje na Bitbucket na ƙungiyar.",
+      "contextLine": "Don {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

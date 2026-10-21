@@ -661,7 +661,8 @@
       "description": "بۆ پێداچوونەوە بە داواکارییەکانی ڕاکێشان لە مۆبایلدا، هەژمارەکەت لە GitHub ببەستەوە.",
       "gitlabDescription": "هەژمارەی GitLabەکەت بچەلەاندن بۆ پێداچوونەوەی داواکارییەکانی تێکەڵکردن لە مۆبایلدا.",
       "bitbucketDescription": "Bitbucket بەم ڕێکخراوە بچەلەێنە بۆ پێداچوونەوەی داواکارییەکانی ڕاکێشان لە مۆبایلدا.",
-      "bitbucketOrgOnlyDescription": "ڕێکخراوێک لە پرۆفایلەکەت هەڵبژێرە بۆ پێداچوونەوەی داواکارییەکانی ڕاکێشانی Bitbucketی."
+      "bitbucketOrgOnlyDescription": "هەژمارەی سەرەوە بگۆڕە بۆ ڕێکخراوێک بۆ پێداچوونەوەی داواکارییەکانی ڕاکێشانی Bitbucketی.",
+      "contextLine": "بۆ {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

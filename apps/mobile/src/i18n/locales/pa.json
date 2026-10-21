@@ -661,7 +661,8 @@
       "description": "ਮੋਬਾਈਲ 'ਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਆਪਣਾ GitHub ਖਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
       "gitlabDescription": "ਮੋਬਾਈਲ ਉੱਤੇ ਮਰਜ਼ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਆਪਣਾ GitLab ਖਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
       "bitbucketDescription": "ਮੋਬਾਈਲ ਉੱਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਇਸ ਸੰਗਠਨ ਨੂੰ Bitbucket ਨਾਲ ਕਨੈਕਟ ਕਰੋ।",
-      "bitbucketOrgOnlyDescription": "ਆਪਣੀ ਪ੍ਰੋਫਾਈਲ ਵਿੱਚ ਕੋਈ ਸੰਗਠਨ ਚੁਣੋ ਤਾਂ ਜੋ ਉਸ ਦੀਆਂ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾ ਸਕੇ।"
+      "bitbucketOrgOnlyDescription": "ਇਸ ਦੇ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਉੱਪਰ ਦਿੱਤੇ ਖਾਤੇ ਨੂੰ ਇੱਕ ਸੰਗਠਨ ਵਿੱਚ ਬਦਲੋ।",
+      "contextLine": "{{organization}} ਲਈ"
     },
     "screen": {
       "title": "#{{number}}",

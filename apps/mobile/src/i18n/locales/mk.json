@@ -661,7 +661,8 @@
       "description": "Поврзи ја твојата сметка на GitHub за да прегледуваш барања за спојување од телефонот.",
       "gitlabDescription": "Поврзете ја вашата GitLab сметка за преглед на merge барања на мобилно.",
       "bitbucketDescription": "Поврзете Bitbucket со оваа организација за преглед на барања за спојување на мобилно.",
-      "bitbucketOrgOnlyDescription": "Изберете организација во вашиот профил за да ги прегледате нејзините Bitbucket барања за спојување."
+      "bitbucketOrgOnlyDescription": "Префрлете ја сметката погоре на организација за преглед на нејзините барања за спојување на Bitbucket.",
+      "contextLine": "За {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

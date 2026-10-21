@@ -2531,7 +2531,8 @@
       "description": "Connetti il tuo account GitHub per revisionare le pull request dall'app.",
       "gitlabDescription": "Connetti il tuo account GitLab per revisionare le merge request dall'app.",
       "bitbucketDescription": "Connetti Bitbucket a questa organizzazione per revisionare le pull request dall'app.",
-      "bitbucketOrgOnlyDescription": "Seleziona un'organizzazione nel tuo profilo per revisionarne le pull request di Bitbucket."
+      "bitbucketOrgOnlyDescription": "Passa l'account qui sopra a un'organizzazione per revisionarne le pull request Bitbucket.",
+      "contextLine": "Per {{organization}}"
     },
     "connectionExpired": "La connessione a GitHub è scaduta.",
     "couldNotLoadPullRequest": "Impossibile caricare la pull request.",

@@ -2506,7 +2506,8 @@
       "description": "Verbinde dein GitHub-Konto, um Pull-Requests in der App zu prüfen.",
       "gitlabDescription": "Verbinde dein GitLab-Konto, um Merge-Requests in der App zu prüfen.",
       "bitbucketDescription": "Verbinde Bitbucket mit dieser Organisation, um Pull-Requests in der App zu prüfen.",
-      "bitbucketOrgOnlyDescription": "Wähle in deinem Profil eine Organisation aus, um deren Bitbucket-Pull-Requests in der App zu prüfen."
+      "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
+      "contextLine": "Für {{organization}}"
     },
     "connectionExpired": "Die GitHub-Verbindung ist abgelaufen.",
     "couldNotLoadPullRequest": "Der Pull-Request konnte nicht geladen werden.",

@@ -661,7 +661,8 @@
       "description": "मोबाइलवर पुल रिक्वेस्टचे पुनरावलोकन करण्यासाठी तुमचे GitHub खाते कनेक्ट करा.",
       "gitlabDescription": "मोबाइलवर मर्ज रिक्वेस्ट तपासण्यासाठी तुमचे GitLab खाते कनेक्ट करा.",
       "bitbucketDescription": "मोबाइलवर पुल रिक्वेस्ट तपासण्यासाठी हे संघटन Bitbucket शी कनेक्ट करा.",
-      "bitbucketOrgOnlyDescription": "तुमच्या प्रोफाइलमध्ये एक संघटन निवडा जेणेकरून त्याची Bitbucket पुल रिक्वेस्ट तपासता येतील."
+      "bitbucketOrgOnlyDescription": "त्याच्या Bitbucket पुल रिक्वेस्ट तपासण्यासाठी वरील खाते एका संघटनेत बदला.",
+      "contextLine": "{{organization}} साठी"
     },
     "screen": {
       "title": "#{{number}}",

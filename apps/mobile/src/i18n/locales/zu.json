@@ -661,7 +661,8 @@
       "description": "Xhuma i-akhawunti yakho ye-GitHub ukuze ubuyekeze izicelo zokuhlanganisa efonini.",
       "gitlabDescription": "Xhuma i-akhawunti yakho ye-GitLab ukuze ubuyekeze izicelo zokuhlanganisa kufoni.",
       "bitbucketDescription": "Xhuma i-Bitbucket kule nhlangano ukuze ubuyekeze ama-PR kufoni.",
-      "bitbucketOrgOnlyDescription": "Khetha inhlangano kuphrofayili yakho ukuze ubuyekeze ama-PR e-Bitbucket ayo."
+      "bitbucketOrgOnlyDescription": "Shintsha i-akhawunti engenhla ibe yinhlangano ukuze ubuyekeze ama-PR ayo e-Bitbucket.",
+      "contextLine": "Ku-{{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

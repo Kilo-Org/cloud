@@ -673,7 +673,8 @@
       "description": "Conectează-ți contul GitHub pentru a revizui PR-uri pe mobil.",
       "gitlabDescription": "Conectează-ți contul GitLab pentru a revizui merge requesturi de pe mobil.",
       "bitbucketDescription": "Conectează Bitbucket la această organizație pentru a revizui PR-uri de pe mobil.",
-      "bitbucketOrgOnlyDescription": "Selectează o organizație în profilul tău pentru a-i revizui PR-urile Bitbucket."
+      "bitbucketOrgOnlyDescription": "Comută contul de mai sus pe o organizație pentru a revizui PR-urile Bitbucket ale acesteia.",
+      "contextLine": "Pentru {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

@@ -685,7 +685,8 @@
       "description": "Pripoj svoj účet GitHub a kontroluj žiadosti o zlúčenie v mobile.",
       "gitlabDescription": "Pripoj svoj účet GitLab a kontroluj merge requesty v mobile.",
       "bitbucketDescription": "Pripoj Bitbucket k tejto organizácii a kontroluj žiadosti o zlúčenie v mobile.",
-      "bitbucketOrgOnlyDescription": "Vyber organizáciu vo svojom profile a kontroluj jej Bitbucket žiadosti o zlúčenie."
+      "bitbucketOrgOnlyDescription": "Prepni účet hore na organizáciu a kontroluj jej žiadosti o zlúčenie na Bitbucku.",
+      "contextLine": "Pre {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",

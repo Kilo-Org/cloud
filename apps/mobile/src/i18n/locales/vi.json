@@ -2506,7 +2506,8 @@
       "description": "Kết nối tài khoản GitHub của bạn để đánh giá PR trên thiết bị di động.",
       "gitlabDescription": "Kết nối tài khoản GitLab để xem merge request trên thiết bị di động.",
       "bitbucketDescription": "Kết nối Bitbucket với tổ chức này để xem PR trên thiết bị di động.",
-      "bitbucketOrgOnlyDescription": "Chọn một tổ chức trong hồ sơ của bạn để xem các PR Bitbucket của tổ chức đó."
+      "bitbucketOrgOnlyDescription": "Chuyển tài khoản ở trên sang một tổ chức để xem các PR Bitbucket của tổ chức đó.",
+      "contextLine": "Cho {{organization}}"
     },
     "connectionExpired": "Kết nối GitHub đã hết hạn.",
     "couldNotLoadPullRequest": "Không thể tải PR.",

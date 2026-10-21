@@ -2506,7 +2506,8 @@
       "description": "모바일에서 풀 리퀘스트를 리뷰하려면 GitHub 계정을 연결하세요.",
       "gitlabDescription": "모바일에서 머지 요청을 검토하려면 GitLab 계정을 연결하세요.",
       "bitbucketDescription": "모바일에서 풀 리퀘스트를 검토하려면 이 조직을 Bitbucket에 연결하세요.",
-      "bitbucketOrgOnlyDescription": "프로필에서 조직을 선택하면 해당 조직의 Bitbucket 풀 리퀘스트를 검토할 수 있습니다."
+      "bitbucketOrgOnlyDescription": "Bitbucket 풀 리퀘스트를 검토하려면 위의 계정을 조직으로 전환하세요.",
+      "contextLine": "{{organization}}용"
     },
     "connectionExpired": "GitHub 연결이 만료되었습니다.",
     "couldNotLoadPullRequest": "풀 리퀘스트를 불러오지 못했습니다.",

@@ -2506,7 +2506,8 @@
       "description": "连接 GitHub 账号，即可在手机上审查拉取请求。",
       "gitlabDescription": "连接你的 GitLab 账户，以便在移动端审查合并请求。",
       "bitbucketDescription": "将 Bitbucket 连接到此组织，以便在移动端审查拉取请求。",
-      "bitbucketOrgOnlyDescription": "在你的个人资料中选择一个组织，以审查其 Bitbucket 拉取请求。"
+      "bitbucketOrgOnlyDescription": "将上方的账户切换为某个组织，以便审查其 Bitbucket 拉取请求。",
+      "contextLine": "适用于 {{organization}}"
     },
     "connectionExpired": "GitHub 连接已过期。",
     "couldNotLoadPullRequest": "无法加载拉取请求。",

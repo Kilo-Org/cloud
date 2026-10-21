@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "ପ୍ରୋଫାଇଲକୁ ଫେରନ୍ତୁ",
       "loadErrorMessage": "ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+
+      "chooseAccount": "ଏକ ଖାତା ବାଛନ୍ତୁ",
       "loadErrorTitle": "ଆପଣଙ୍କ ସଂଗଠନଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "noOrganization": "କୋଣସି ସଂଗଠନ ନାହିଁ",
+
+      "noOrganizationDescription": "ଏହି ଖାତା କୌଣସି ସଂଗଠନର ଅଂଶ ନୁହେଁ। ସଦସ୍ୟ ଆମନ୍ତ୍ରଣ ଏବଂ କମ୍ ବାଲାନ୍ସ ସତର୍କତା ପରି ସଂଗଠନ ସୁବିଧାଗୁଡ଼ିକ ବ୍ୟବହାର କରିବାକୁ ୱେବ୍‌ରେ ଏକ ସଂଗଠନ ସୃଷ୍ଟି କରନ୍ତୁ କିମ୍ବା ଯୋଗ ଦିଅନ୍ତୁ।",
+
+      "openWebOrganizations": "ୱେବ୍‌ରେ ସଂଗଠନଗୁଡ଼ିକ ଖୋଲନ୍ତୁ",
+
       "organizationUnavailable": "ସଂଗଠନ ଉପଲବ୍ଧ ନାହିଁ।",
-      "selectDescription": "ଆଗକୁ ବଢ଼ିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଏକ ସଂଗଠନ ବାଛନ୍ତୁ।",
+      "selectDescriptionWithOrganizations": "ଆପଣ ଏକ କିମ୍ବା ଅଧିକ ସଂଗଠନର ସଦସ୍ୟ। ଏହି ସ୍କ୍ରିନ୍ ବ୍ୟବହାର କରିବା ଉଚିତ ଖାତା ବାଛନ୍ତୁ।",
+
       "selectOrganization": "ଏକ ସଂଗଠନ ବାଛନ୍ତୁ",
       "unavailableDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଆଗକୁ ବଢ଼ିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଅନ୍ୟ ଏକ ସଂଗଠନ ବାଛନ୍ତୁ।",
+
+      "unavailableSessionsDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଏହାର ସେସନ୍ ଲୋଡ୍ କରାଯାଇପାରିବ ନାହିଁ।",
       "accessDeniedDescription": "ଆପଣଙ୍କର ଏହି ସଂଗଠନରେ ପ୍ରବେଶ ଅଧିକାର ନାହିଁ।"
     },
     "creditActivity": {

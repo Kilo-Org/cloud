@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "پروفائل پر واپس جائیں",
       "loadErrorMessage": "اپنا انٹرنیٹ کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+
+      "chooseAccount": "ایک اکاؤنٹ منتخب کریں",
       "loadErrorTitle": "آپ کی تنظیمیں لوڈ نہیں ہو سکیں۔",
+      "noOrganization": "کوئی تنظیم نہیں",
+
+      "noOrganizationDescription": "یہ اکاؤنٹ کسی تنظیم کا حصہ نہیں ہے۔ ممبر دعوتیں اور کم بیلنس انتباہات جیسی تنظیمی خصوصیات استعمال کرنے کے لیے ویب پر ایک تنظیم بنائیں یا اس میں شامل ہوں۔",
+
+      "openWebOrganizations": "ویب پر تنظیمیں کھولیں",
+
       "organizationUnavailable": "تنظیم دستیاب نہیں ہے۔",
-      "selectDescription": "جاری رکھنے کے لیے اپنے پروفائل سے ایک تنظیم منتخب کریں۔",
+      "selectDescriptionWithOrganizations": "آپ ایک یا زیادہ تنظیموں سے تعلق رکھتے ہیں۔ وہ اکاؤنٹ منتخب کریں جو یہ اسکرین استعمال کرے۔",
+
       "selectOrganization": "ایک تنظیم منتخب کریں",
       "unavailableDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ جاری رکھنے کے لیے اپنے پروفائل سے کوئی اور تنظیم منتخب کریں۔",
+
+      "unavailableSessionsDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ اس کے سیشنز لوڈ نہیں ہو سکتے۔",
       "accessDeniedDescription": "آپ کو اس تنظیم تک رسائی حاصل نہیں ہے۔"
     },
     "creditActivity": {

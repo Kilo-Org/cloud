@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "प्रोफाइलमा फर्कनुहोस्",
       "loadErrorMessage": "इन्टरनेट जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+
+      "chooseAccount": "खाता चयन गर्नुहोस्",
       "loadErrorTitle": "तपाईंका संस्थाहरू लोड गर्न सकिएन।",
+      "noOrganization": "कुनै संस्था छैन",
+
+      "noOrganizationDescription": "यो खाता कुनै संस्थाको भाग होइन। सदस्य निमन्त्रणा र कम ब्यालेन्स सतर्कता जस्ता संस्था सुविधाहरू प्रयोग गर्न वेबमा संस्था सिर्जना गर्नुहोस् वा सामेल हुनुहोस्।",
+
+      "openWebOrganizations": "वेबमा संस्थाहरू खोल्नुहोस्",
+
       "organizationUnavailable": "संस्था उपलब्ध छैन।",
-      "selectDescription": "जारी राख्न आफ्नो प्रोफाइलबाट एउटा संस्था छान्नुहोस्।",
+      "selectDescriptionWithOrganizations": "तपाईं एक वा धेरै संस्थासँग सम्बन्धित हुनुहुन्छ। यो स्क्रिनले प्रयोग गर्नुपर्ने खाता छान्नुहोस्।",
+
       "selectOrganization": "संस्था चयन गर्नुहोस्",
       "unavailableDescription": "यो संस्था अब उपलब्ध छैन। जारी राख्न आफ्नो प्रोफाइलबाट अर्को संस्था छान्नुहोस्।",
+
+      "unavailableSessionsDescription": "यो संस्था अब उपलब्ध छैन। यसका सत्रहरू लोड गर्न सकिँदैन।",
       "accessDeniedDescription": "तपाईंसँग यो संस्थामा पहुँच छैन।"
     },
     "creditActivity": {

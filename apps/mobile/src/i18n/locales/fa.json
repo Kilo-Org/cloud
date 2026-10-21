@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "بازگشت به پروفایل",
       "loadErrorMessage": "اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.",
+
+      "chooseAccount": "انتخاب حساب",
       "loadErrorTitle": "بارگذاری سازمان‌های شما ممکن نشد.",
+      "noOrganization": "بدون سازمان",
+
+      "noOrganizationDescription": "این حساب بخشی از هیچ سازمانی نیست. برای استفاده از ویژگی‌های سازمان مانند دعوت اعضا و هشدارهای موجودی کم، در وب یک سازمان ایجاد کنید یا به یکی بپیوندید.",
+
+      "openWebOrganizations": "باز کردن سازمان‌ها در وب",
+
       "organizationUnavailable": "سازمان در دسترس نیست.",
-      "selectDescription": "برای ادامه، در پروفایل خود یک سازمان انتخاب کنید.",
+      "selectDescriptionWithOrganizations": "شما عضو یک یا چند سازمان هستید. حسابی را انتخاب کنید که این صفحه باید استفاده کند.",
+
       "selectOrganization": "انتخاب سازمان",
       "unavailableDescription": "این سازمان دیگر در دسترس نیست. برای ادامه، در پروفایل خود سازمان دیگری انتخاب کنید.",
+
+      "unavailableSessionsDescription": "این سازمان دیگر در دسترس نیست. جلسات آن قابل بارگذاری نیست.",
       "accessDeniedDescription": "شما به این سازمان دسترسی ندارید."
     },
     "creditActivity": {

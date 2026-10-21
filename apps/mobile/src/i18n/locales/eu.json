@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Itzuli profilera",
       "loadErrorMessage": "Egiaztatu konexioa eta saiatu berriro.",
+
+      "chooseAccount": "Hautatu kontu bat",
       "loadErrorTitle": "Ezin izan dira zure erakundeak kargatu.",
+      "noOrganization": "Erakunderik ez",
+
+      "noOrganizationDescription": "Kontu hau ez da erakunde baten parte. Sortu edo batu erakunde bat webgunean, kideen gonbidapenak eta saldo baxuaren abisuak bezalako erakunde-funtzioak erabiltzeko.",
+
+      "openWebOrganizations": "Ireki erakundeak webgunean",
+
       "organizationUnavailable": "Erakundea ez dago erabilgarri.",
-      "selectDescription": "Aukeratu erakunde bat zure profiletik jarraitzeko.",
+      "selectDescriptionWithOrganizations": "Erakunde bateko edo gehiagoko kide zara. Hautatu pantaila honek erabili behar duen kontua.",
+
       "selectOrganization": "Hautatu erakunde bat",
       "unavailableDescription": "Erakunde hau jada ez dago erabilgarri. Aukeratu bat zure profiletik jarraitzeko.",
+
+      "unavailableSessionsDescription": "Erakunde hau jada ez dago erabilgarri. Ezin dira kargatu haren saioak.",
       "accessDeniedDescription": "Ez duzu erakunde honetarako sarbiderik."
     },
     "creditActivity": {

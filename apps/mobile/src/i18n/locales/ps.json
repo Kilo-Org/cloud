@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "بېرته پروفایل ته ورشئ",
       "loadErrorMessage": "خپله انټرنېټي اړیکه وګورئ او بیا هڅه وکړئ.",
+
+      "chooseAccount": "یو حساب غوره کړئ",
       "loadErrorTitle": "ستاسو سازمانونه بار نه شول.",
+      "noOrganization": "هیڅ سازمان نشته",
+
+      "noOrganizationDescription": "دا حساب د یو سازمان برخه نه ده. د غړو بلنې او د ټیټ بیلانس خبرتیاوې په څیر د سازمان ځانګړتیاوې کارولو لپاره په ویب کې سازمان جوړ کړئ یا یو ځای شئ.",
+
+      "openWebOrganizations": "په ویب کې سازمانونه پرانیزئ",
+
       "organizationUnavailable": "سازمان د لاسرسي وړ نه دی.",
-      "selectDescription": "د دوام لپاره له خپل پروفایل څخه یو سازمان غوره کړئ.",
+      "selectDescriptionWithOrganizations": "تاسو د یو یا ډیرو سازمانونو غړی یاست. هغه حساب غوره کړئ چې دا سکرین باید یې وکاروي.",
+
       "selectOrganization": "یو سازمان غوره کړئ",
       "unavailableDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دوام لپاره له خپل پروفایل څخه یو سازمان غوره کړئ.",
+
+      "unavailableSessionsDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دې سازمان نښتې نشي لوډ کېدلی.",
       "accessDeniedDescription": "تاسو دې سازمان ته لاسرسی نه لرئ."
     },
     "creditActivity": {

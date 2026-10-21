@@ -3002,11 +3002,22 @@
     "boundary": {
       "backToProfile": "प्रोफ़ाइल पर वापस जाएँ",
       "loadErrorMessage": "अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
+
+      "chooseAccount": "एक खाता चुनें",
       "loadErrorTitle": "आपके संगठन लोड नहीं हो सके।",
+      "noOrganization": "कोई संगठन नहीं",
+
+      "noOrganizationDescription": "यह खाता किसी संगठन का हिस्सा नहीं है। सदस्य आमंत्रण और कम बैलेंस अलर्ट जैसी संगठन सुविधाओं का उपयोग करने के लिए वेब पर एक संगठन बनाएँ या उसमें शामिल हों।",
+
+      "openWebOrganizations": "वेब पर संगठन खोलें",
+
       "organizationUnavailable": "संगठन उपलब्ध नहीं है।",
-      "selectDescription": "जारी रखने के लिए अपनी प्रोफ़ाइल से एक संगठन चुनें।",
+      "selectDescriptionWithOrganizations": "आप एक या अधिक संगठनों से जुड़े हैं। वह खाता चुनें जिसका इस स्क्रीन को उपयोग करना चाहिए।",
+
       "selectOrganization": "एक संगठन चुनें",
       "unavailableDescription": "यह संगठन अब उपलब्ध नहीं है। जारी रखने के लिए अपनी प्रोफ़ाइल से दूसरा संगठन चुनें।",
+
+      "unavailableSessionsDescription": "यह संगठन अब उपलब्ध नहीं है। इसके सत्र लोड नहीं किए जा सकते।",
       "accessDeniedDescription": "आपको इस संगठन का ऐक्सेस नहीं है।"
     },
     "creditActivity": {

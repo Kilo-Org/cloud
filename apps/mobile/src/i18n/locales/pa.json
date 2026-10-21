@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "ਪ੍ਰੋਫਾਈਲ 'ਤੇ ਵਾਪਸ ਜਾਓ",
       "loadErrorMessage": "ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+
+      "chooseAccount": "ਇੱਕ ਖਾਤਾ ਚੁਣੋ",
       "loadErrorTitle": "ਤੁਹਾਡੀਆਂ ਸੰਸਥਾਵਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
+      "noOrganization": "ਕੋਈ ਸੰਸਥਾ ਨਹੀਂ",
+
+      "noOrganizationDescription": "ਇਹ ਖਾਤਾ ਕਿਸੇ ਸੰਸਥਾ ਦਾ ਹਿੱਸਾ ਨਹੀਂ ਹੈ। ਮੈਂਬਰ ਸੱਦੇ ਅਤੇ ਘੱਟ ਬੈਲੰਸ ਚੇਤਾਵਨੀਆਂ ਵਰਗੀਆਂ ਸੰਸਥਾ ਸੁਵਿਧਾਵਾਂ ਦੀ ਵਰਤੋਂ ਕਰਨ ਲਈ ਵੈੱਬ 'ਤੇ ਸੰਸਥਾ ਬਣਾਓ ਜਾਂ ਇੱਕ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ।",
+
+      "openWebOrganizations": "ਵੈੱਬ 'ਤੇ ਸੰਸਥਾਵਾਂ ਖੋਲ੍ਹੋ",
+
       "organizationUnavailable": "ਸੰਸਥਾ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
-      "selectDescription": "ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣੀ ਪ੍ਰੋਫਾਈਲ ਤੋਂ ਇੱਕ ਸੰਸਥਾ ਚੁਣੋ।",
+      "selectDescriptionWithOrganizations": "ਤੁਸੀਂ ਇੱਕ ਜਾਂ ਵੱਧ ਸੰਸਥਾਵਾਂ ਨਾਲ ਸੰਬੰਧਿਤ ਹੋ। ਉਹ ਖਾਤਾ ਚੁਣੋ ਜੋ ਇਹ ਸਕ੍ਰੀਨ ਵਰਤਣਾ ਚਾਹੀਦਾ ਹੈ।",
+
       "selectOrganization": "ਇੱਕ ਸੰਸਥਾ ਚੁਣੋ",
       "unavailableDescription": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣੀ ਪ੍ਰੋਫਾਈਲ ਤੋਂ ਕੋਈ ਹੋਰ ਸੰਸਥਾ ਚੁਣੋ।",
+
+      "unavailableSessionsDescription": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਇਸ ਦੇ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕਦੇ।",
       "accessDeniedDescription": "ਤੁਹਾਡੀ ਇਸ ਸੰਸਥਾ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੈ।"
     },
     "creditActivity": {

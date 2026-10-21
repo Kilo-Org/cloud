@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Tilbage til profil",
       "loadErrorMessage": "Tjek din forbindelse og prøv igen.",
+
+      "chooseAccount": "Vælg en konto",
       "loadErrorTitle": "Kunne ikke indlæse dine organisationer.",
+      "noOrganization": "Ingen organisation",
+
+      "noOrganizationDescription": "Denne konto er ikke en del af en organisation. Opret eller tilslut dig en organisation på hjemmesiden for at bruge organisationsfunktioner som medlemsinvitationer og advarsler om lav saldo.",
+
+      "openWebOrganizations": "Åbn organisationer på hjemmesiden",
+
       "organizationUnavailable": "Organisationen er ikke tilgængelig.",
-      "selectDescription": "Vælg en organisation på din profil for at fortsætte.",
+      "selectDescriptionWithOrganizations": "Du tilhører en eller flere organisationer. Vælg den konto, som denne skærm skal bruge.",
+
       "selectOrganization": "Vælg en organisation",
       "unavailableDescription": "Denne organisation er ikke længere tilgængelig. Vælg en organisation på din profil for at fortsætte.",
+
+      "unavailableSessionsDescription": "Denne organisation er ikke længere tilgængelig. Dens sessioner kan ikke indlæses.",
       "accessDeniedDescription": "Du har ikke adgang til denne organisation."
     },
     "creditActivity": {

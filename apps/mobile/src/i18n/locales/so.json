@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Ku noqo bogga shakhsiga",
       "loadErrorMessage": "Hubi xiriirkaaga internetka oo mar kale isku day.",
+
+      "chooseAccount": "Dooro akoon",
       "loadErrorTitle": "Ururradaada lama soo shubi karin.",
+      "noOrganization": "Ma jiro urur",
+
+      "noOrganizationDescription": "Akoonkani qayb kama aha urur. Samee ama ku biir urur bogga internetka si aad u isticmaasho sifooyinka ururka sida casumaadka xubnaha iyo digniinaha hadhaaga hooseeya.",
+
+      "openWebOrganizations": "Ka fur ururada bogga internetka",
+
       "organizationUnavailable": "Ururka lama heli karo.",
-      "selectDescription": "Boggaaga shakhsiga ka dooro urur si aad u sii socoto.",
+      "selectDescriptionWithOrganizations": "Waxaad ka tirsan tahay hal urur ama in ka badan. Dooro akoonka ay tahay in shaashaddan isticmaasho.",
+
       "selectOrganization": "Dooro urur",
       "unavailableDescription": "Ururkan mar dambe lama heli karo. Boggaaga shakhsiga ka dooro urur si aad u sii socoto.",
+
+      "unavailableSessionsDescription": "Ururkan mar dambe lama heli karo. Lama soo dejin karo munaasabadahiisa.",
       "accessDeniedDescription": "Ma lihid oggolaansho aad ku gasho ururkan."
     },
     "creditActivity": {

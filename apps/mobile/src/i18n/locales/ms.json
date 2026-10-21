@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Kembali ke profil",
       "loadErrorMessage": "Semak sambungan anda dan cuba lagi.",
+
+      "chooseAccount": "Pilih akaun",
       "loadErrorTitle": "Tidak dapat memuatkan organisasi anda.",
+      "noOrganization": "Tiada organisasi",
+
+      "noOrganizationDescription": "Akaun ini bukan sebahagian daripada organisasi. Cipta atau sertai organisasi di laman web untuk menggunakan ciri organisasi seperti jemputan ahli dan amaran baki rendah.",
+
+      "openWebOrganizations": "Buka organisasi di laman web",
+
       "organizationUnavailable": "Organisasi tidak tersedia.",
-      "selectDescription": "Pilih organisasi daripada profil anda untuk meneruskan.",
+      "selectDescriptionWithOrganizations": "Anda tergolong dalam satu atau lebih organisasi. Pilih akaun yang patut digunakan oleh skrin ini.",
+
       "selectOrganization": "Pilih organisasi",
       "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih satu daripada profil anda untuk meneruskan.",
+
+      "unavailableSessionsDescription": "Organisasi ini tidak lagi tersedia. Sesi untuk organisasi ini tidak dapat dimuatkan.",
       "accessDeniedDescription": "Anda tidak mempunyai akses kepada organisasi ini."
     },
     "creditActivity": {

@@ -3050,11 +3050,22 @@
     "boundary": {
       "backToProfile": "Atpakaļ uz profilu",
       "loadErrorMessage": "Pārbaudi savienojumu un mēģini vēlreiz.",
+
+      "chooseAccount": "Izvēlies kontu",
       "loadErrorTitle": "Neizdevās ielādēt tavas organizācijas.",
+      "noOrganization": "Nav organizācijas",
+
+      "noOrganizationDescription": "Šis konts nav daļa no organizācijas. Lai izmantotu organizācijas funkcijas, piemēram, dalībnieku uzaicinājumus un brīdinājumus par zemu atlikumu, izveido vai pievienojies organizācijai tīmeklī.",
+
+      "openWebOrganizations": "Atvērt organizācijas tīmeklī",
+
       "organizationUnavailable": "Organizācija nav pieejama.",
-      "selectDescription": "Lai turpinātu, izvēlies organizāciju savā profilā.",
+      "selectDescriptionWithOrganizations": "Tu piederi vienai vai vairākām organizācijām. Izvēlies kontu, kuru šim ekrānam vajadzētu izmantot.",
+
       "selectOrganization": "Organizācijas izvēle",
       "unavailableDescription": "Šī organizācija vairs nav pieejama. Lai turpinātu, izvēlies citu organizāciju savā profilā.",
+
+      "unavailableSessionsDescription": "Šī organizācija vairs nav pieejama. Tās sesijas nevar ielādēt.",
       "accessDeniedDescription": "Tev nav piekļuves šai organizācijai."
     },
     "creditActivity": {

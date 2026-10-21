@@ -3162,11 +3162,22 @@
     "boundary": {
       "backToProfile": "العودة إلى الملف الشخصي",
       "loadErrorMessage": "تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
+
+      "chooseAccount": "اختيار حساب",
       "loadErrorTitle": "تعذّر تحميل مؤسساتك.",
+      "noOrganization": "لا توجد مؤسسة",
+
+      "noOrganizationDescription": "هذا الحساب ليس جزءًا من مؤسسة. أنشئ مؤسسة أو انضم إلى واحدة على الموقع لاستخدام ميزات المؤسسة مثل دعوات الأعضاء وتنبيهات الرصيد المنخفض.",
+
+      "openWebOrganizations": "فتح المؤسسات على الموقع",
+
       "organizationUnavailable": "المؤسسة غير متاحة.",
-      "selectDescription": "اختر مؤسسة من ملفك الشخصي للمتابعة.",
+      "selectDescriptionWithOrganizations": "أنت عضو في مؤسسة واحدة أو أكثر. اختر الحساب الذي يجب أن تستخدمه هذه الشاشة.",
+
       "selectOrganization": "اختيار مؤسسة",
       "unavailableDescription": "لم تعد هذه المؤسسة متاحة. اختر واحدة من ملفك الشخصي للمتابعة.",
+
+      "unavailableSessionsDescription": "لم تعد هذه المؤسسة متاحة. لا يمكن تحميل جلساتها.",
       "accessDeniedDescription": "ليس لديك حق الوصول إلى هذه المؤسسة."
     },
     "creditActivity": {

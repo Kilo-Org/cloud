@@ -3050,11 +3050,22 @@
     "boundary": {
       "backToProfile": "Torna al perfil",
       "loadErrorMessage": "Comprova la connexió i torna-ho a provar.",
+
+      "chooseAccount": "Selecciona un compte",
       "loadErrorTitle": "No s'han pogut carregar les teves organitzacions.",
+      "noOrganization": "Sense organització",
+
+      "noOrganizationDescription": "Aquest compte no forma part de cap organització. Crea'n una o uneix-te'n a una al web per utilitzar funcions d'organització com les invitacions de membres i les alertes de saldo baix.",
+
+      "openWebOrganizations": "Obre les organitzacions al web",
+
       "organizationUnavailable": "L'organització no està disponible.",
-      "selectDescription": "Tria una organització des del teu perfil per continuar.",
+      "selectDescriptionWithOrganizations": "Pertanys a una o més organitzacions. Tria el compte que ha d'utilitzar aquesta pantalla.",
+
       "selectOrganization": "Selecciona una organització",
       "unavailableDescription": "Aquesta organització ja no està disponible. Tria'n una des del teu perfil per continuar.",
+
+      "unavailableSessionsDescription": "Aquesta organització ja no està disponible. No es poden carregar les seves sessions.",
       "accessDeniedDescription": "No tens accés a aquesta organització."
     },
     "creditActivity": {

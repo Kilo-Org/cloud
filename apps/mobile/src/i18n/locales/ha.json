@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Koma zuwa bayanan martaba",
       "loadErrorMessage": "Duba haɗin yanar gizonka, sannan ka sake gwadawa.",
+
+      "chooseAccount": "Zaɓi asusu",
       "loadErrorTitle": "An kasa loda ƙungiyoyinka.",
+      "noOrganization": "Babu ƙungiya",
+
+      "noOrganizationDescription": "Wannan asusun ba ya cikin wata ƙungiya. Ƙirƙiri ko shiga wata ƙungiya a yanar gizo don amfani da fasalolin ƙungiya kamar gayyata membobi da faɗakarwar ƙarancin ma'auni.",
+
+      "openWebOrganizations": "Buɗe ƙungiyoyi a yanar gizo",
+
       "organizationUnavailable": "Ba a samun ƙungiyar.",
-      "selectDescription": "Zaɓi ƙungiya daga bayanan martabarka don ci gaba.",
+      "selectDescriptionWithOrganizations": "Kana cikin ƙungiya ɗaya ko fiye. Zaɓi asusun da wannan allon ya kamata ya yi amfani da shi.",
+
       "selectOrganization": "Zaɓi ƙungiya",
       "unavailableDescription": "An daina samun wannan ƙungiyar. Zaɓi wata daga bayanan martabarka don ci gaba.",
+
+      "unavailableSessionsDescription": "An daina samun wannan ƙungiyar. Ba za a iya loda zamanta ba.",
       "accessDeniedDescription": "Ba ka da izinin shiga wannan ƙungiyar."
     },
     "creditActivity": {

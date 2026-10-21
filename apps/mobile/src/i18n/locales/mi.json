@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Hoki ki te kōtaha",
       "loadErrorMessage": "Tirohia tō hononga, ā, whakamātau anō.",
+
+      "chooseAccount": "Kōwhiria tētahi pūkete",
       "loadErrorTitle": "Kāore i taea te uta i ō rōpū.",
+      "noOrganization": "Kāore he rōpū",
+
+      "noOrganizationDescription": "Kāore tēnei pūkete i roto i tētahi rōpū. Waihangatia, uru atu rānei ki tētahi rōpū i runga i te paetukutuku kia whakamahi ai i ngā āhuatanga rōpū pēnei i ngā pōwhiri mema me ngā whakatūpato mō te toenga iti.",
+
+      "openWebOrganizations": "Whakatuwheratia ngā rōpū i runga i te paetukutuku",
+
       "organizationUnavailable": "Kāore e wātea ana te rōpū.",
-      "selectDescription": "Kōwhiria tētahi rōpū mai i tō kōtaha kia haere tonu.",
+      "selectDescriptionWithOrganizations": "Kei roto koe i tētahi rōpū, neke atu rānei. Kōwhiria te pūkete e tika ana mā tēnei mata.",
+
       "selectOrganization": "Kōwhiria tētahi rōpū",
       "unavailableDescription": "Kāore tēnei rōpū e wātea ana ināianei. Kōwhiria tētahi mai i tō kōtaha kia haere tonu.",
+
+      "unavailableSessionsDescription": "Kāore tēnei rōpū e wātea ana ināianei. Kāore e taea ana te uta i ngā sesiona a tēnei rōpū.",
       "accessDeniedDescription": "Kāore ō whakaaetanga uru ki tēnei rōpū."
     },
     "creditActivity": {

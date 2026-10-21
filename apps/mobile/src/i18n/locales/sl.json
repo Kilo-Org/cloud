@@ -3090,11 +3090,22 @@
     "boundary": {
       "backToProfile": "Nazaj na profil",
       "loadErrorMessage": "Preveri povezavo in poskusi znova.",
+
+      "chooseAccount": "Izberi račun",
       "loadErrorTitle": "Tvojih organizacij ni bilo mogoče naložiti.",
+      "noOrganization": "Ni organizacije",
+
+      "noOrganizationDescription": "Ta račun ni del organizacije. Ustvari ali se pridruži organizaciji na spletu, da boš lahko uporabljal funkcije organizacije, kot so povabila za člane in opozorila o nizkem stanju.",
+
+      "openWebOrganizations": "Odpri organizacije na spletu",
+
       "organizationUnavailable": "Organizacija ni na voljo.",
-      "selectDescription": "Za nadaljevanje na svojem profilu izberi organizacijo.",
+      "selectDescriptionWithOrganizations": "Pripadaš eni ali več organizacijam. Izberi račun, ki naj ga ta zaslon uporablja.",
+
       "selectOrganization": "Izberi organizacijo",
       "unavailableDescription": "Ta organizacija ni več na voljo. Za nadaljevanje na svojem profilu izberi drugo.",
+
+      "unavailableSessionsDescription": "Ta organizacija ni več na voljo. Njenih sej ni mogoče naložiti.",
       "accessDeniedDescription": "Nimaš dostopa do te organizacije."
     },
     "creditActivity": {

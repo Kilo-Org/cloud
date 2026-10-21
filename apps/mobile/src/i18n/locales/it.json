@@ -3042,11 +3042,22 @@
     "boundary": {
       "backToProfile": "Torna al profilo",
       "loadErrorMessage": "Controlla la connessione e riprova.",
+
+      "chooseAccount": "Seleziona un account",
       "loadErrorTitle": "Impossibile caricare le tue organizzazioni.",
+      "noOrganization": "Nessuna organizzazione",
+
+      "noOrganizationDescription": "Questo account non fa parte di un'organizzazione. Crea o unisciti a un'organizzazione sul web per usare le funzioni dell'organizzazione come gli inviti dei membri e gli avvisi di saldo basso.",
+
+      "openWebOrganizations": "Apri le organizzazioni sul web",
+
       "organizationUnavailable": "L'organizzazione non è disponibile.",
-      "selectDescription": "Scegli un'organizzazione dal tuo profilo per continuare.",
+      "selectDescriptionWithOrganizations": "Appartieni a una o più organizzazioni. Scegli l'account che questa schermata deve usare.",
+
       "selectOrganization": "Seleziona un'organizzazione",
       "unavailableDescription": "Questa organizzazione non è più disponibile. Scegline una dal tuo profilo per continuare.",
+
+      "unavailableSessionsDescription": "Questa organizzazione non è più disponibile. Non è possibile caricare le sue sessioni.",
       "accessDeniedDescription": "Non hai accesso a questa organizzazione."
     },
     "creditActivity": {

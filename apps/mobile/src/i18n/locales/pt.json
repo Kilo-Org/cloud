@@ -3050,11 +3050,22 @@
     "boundary": {
       "backToProfile": "Voltar ao perfil",
       "loadErrorMessage": "Verifica a tua ligação e tenta novamente.",
+
+      "chooseAccount": "Selecionar uma conta",
       "loadErrorTitle": "Não foi possível carregar as suas organizações.",
+      "noOrganization": "Sem organização",
+
+      "noOrganizationDescription": "Esta conta não faz parte de uma organização. Crie ou ingresse em uma organização na web para usar recursos de organização como convites de membros e alertas de saldo baixo.",
+
+      "openWebOrganizations": "Abrir organizações na web",
+
       "organizationUnavailable": "A organização não está disponível.",
-      "selectDescription": "Escolha uma organização no seu perfil para continuar.",
+      "selectDescriptionWithOrganizations": "Você pertence a uma ou mais organizações. Escolha a conta que esta tela deve usar.",
+
       "selectOrganization": "Selecionar uma organização",
       "unavailableDescription": "Esta organização já não está disponível. Escolha outra no seu perfil para continuar.",
+
+      "unavailableSessionsDescription": "Esta organização já não está disponível. Não é possível carregar as suas sessões.",
       "accessDeniedDescription": "Não tem acesso a esta organização."
     },
     "creditActivity": {

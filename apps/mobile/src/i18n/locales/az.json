@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Profilə qayıt",
       "loadErrorMessage": "Bağlantını yoxla və yenidən cəhd et.",
+
+      "chooseAccount": "Hesab seç",
       "loadErrorTitle": "Təşkilatlarını yükləmək mümkün olmadı.",
+      "noOrganization": "Təşkilat yoxdur",
+
+      "noOrganizationDescription": "Bu hesab heç bir təşkilatın üzvü deyil. Üzv dəvətləri və aşağı balans xəbərdarlıqları kimi təşkilat funksiyalarından istifadə etmək üçün saytda təşkilat yarat və ya ona qoşul.",
+
+      "openWebOrganizations": "Təşkilatları saytda aç",
+
       "organizationUnavailable": "Təşkilat əlçatan deyil.",
-      "selectDescription": "Davam etmək üçün profilindən təşkilat seç.",
+      "selectDescriptionWithOrganizations": "Sən bir və ya bir neçə təşkilatın üzvüsən. Bu ekranın istifadə etməli olduğu hesabı seç.",
+
       "selectOrganization": "Təşkilat seç",
       "unavailableDescription": "Bu təşkilat artıq əlçatan deyil. Davam etmək üçün profilindən başqa təşkilat seç.",
+
+      "unavailableSessionsDescription": "Bu təşkilat artıq əlçatan deyil. Onun sessiyalarını yükləmək mümkün deyil.",
       "accessDeniedDescription": "Bu təşkilata giriş icazən yoxdur."
     },
     "creditActivity": {

@@ -3002,11 +3002,22 @@
     "boundary": {
       "backToProfile": "返回個人資料",
       "loadErrorMessage": "請檢查網路連線後再試一次。",
+
+      "chooseAccount": "選取帳戶",
       "loadErrorTitle": "無法載入你的組織清單。",
+      "noOrganization": "沒有組織",
+
+      "noOrganizationDescription": "此帳戶不屬於任何組織。請在網頁版建立或加入組織，以使用成員邀請和低餘額提醒等組織功能。",
+
+      "openWebOrganizations": "在網頁版開啟組織",
+
       "organizationUnavailable": "無法存取組織。",
-      "selectDescription": "請到個人資料頁面選取組織，即可繼續。",
+      "selectDescriptionWithOrganizations": "您屬於一個或多個組織。請選取此畫面應使用的帳戶。",
+
       "selectOrganization": "選取組織",
       "unavailableDescription": "此組織已無法存取。請到個人資料頁面選取其他組織，即可繼續。",
+
+      "unavailableSessionsDescription": "此組織已無法存取。無法載入其工作階段。",
       "accessDeniedDescription": "你沒有存取此組織的權限。"
     },
     "creditActivity": {

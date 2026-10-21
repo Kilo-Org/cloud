@@ -3002,11 +3002,22 @@
     "boundary": {
       "backToProfile": "返回个人资料",
       "loadErrorMessage": "请检查网络连接后重试。",
+
+      "chooseAccount": "选择账户",
       "loadErrorTitle": "无法加载你的组织列表。",
+      "noOrganization": "无组织",
+
+      "noOrganizationDescription": "此账户不属于任何组织。请在网页版创建或加入组织，以使用成员邀请和低余额提醒等组织功能。",
+
+      "openWebOrganizations": "在网页版打开组织",
+
       "organizationUnavailable": "此组织不可用。",
-      "selectDescription": "请前往个人资料页面，选择一个组织后继续。",
+      "selectDescriptionWithOrganizations": "您属于一个或多个组织。请选择此屏幕应使用的账户。",
+
       "selectOrganization": "选择组织",
       "unavailableDescription": "此组织已不可用。请前往个人资料页面，选择其他组织后继续。",
+
+      "unavailableSessionsDescription": "此组织已不可用。无法加载其会话。",
       "accessDeniedDescription": "你无权访问此组织。"
     },
     "creditActivity": {

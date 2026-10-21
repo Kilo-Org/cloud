@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Buyela kuphrofayili",
       "loadErrorMessage": "Hlola uxhumano lwakho bese uzama futhi.",
+
+      "chooseAccount": "Khetha i-akhawunti",
       "loadErrorTitle": "Asikwazanga ukulayisha izinhlangano zakho.",
+      "noOrganization": "Ayikho inhlangano",
+
+      "noOrganizationDescription": "Le akhawunti ayiyona ingxenye yenhlangano. Dala noma ujoyine inhlangano kuwebhu ukuze usebenzise izici zenhlangano njengezimemo zamalungu nezexwayiso zebhalansi ephansi.",
+
+      "openWebOrganizations": "Vula izinhlangano kuwebhu",
+
       "organizationUnavailable": "Inhlangano ayitholakali.",
-      "selectDescription": "Khetha inhlangano kuphrofayili yakho ukuze uqhubeke.",
+      "selectDescriptionWithOrganizations": "Uyingxenye yenhlangano eyodwa noma ngaphezulu. Khetha i-akhawunti okufanele isikrini sisisebenzise.",
+
       "selectOrganization": "Khetha inhlangano",
       "unavailableDescription": "Le nhlangano ayisatholakali. Khetha enye kuphrofayili yakho ukuze uqhubeke.",
+
+      "unavailableSessionsDescription": "Le nhlangano ayisatholakali. Amaseshini ayo awakwazi ukulayishwa.",
       "accessDeniedDescription": "Awunayo imvume yokufinyelela kule nhlangano."
     },
     "creditActivity": {

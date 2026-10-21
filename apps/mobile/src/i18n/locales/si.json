@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "පැතිකඩට ආපසු යන්න",
       "loadErrorMessage": "ඔබේ අන්තර්ජාල සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+
+      "chooseAccount": "ගිණුමක් තෝරන්න",
       "loadErrorTitle": "ඔබේ සංවිධාන පූරණය කළ නොහැකි විය.",
+      "noOrganization": "සංවිධානයක් නැත",
+
+      "noOrganizationDescription": "මෙම ගිණුම සංවිධානයක කොටසක් නොවේ. සාමාජික ආරාධනා සහ අඩු ශේෂ ඇඟවීම් වැනි සංවිධාන විශේෂාංග භාවිත කිරීමට වෙබ් අඩවියේ සංවිධානයක් සාදන්න හෝ එකකට එකතු වන්න.",
+
+      "openWebOrganizations": "වෙබ් අඩවියේ සංවිධාන විවෘත කරන්න",
+
       "organizationUnavailable": "සංවිධානය ලබා ගත නොහැක.",
-      "selectDescription": "ඉදිරියට යාමට ඔබේ පැතිකඩෙන් සංවිධානයක් තෝරන්න.",
+      "selectDescriptionWithOrganizations": "ඔබ එකක් හෝ වැඩි සංඛ්‍යාවක සංවිධානවලට අයත් වේ. මෙම තිරය භාවිත කළ යුතු ගිණුම තෝරන්න.",
+
       "selectOrganization": "සංවිධානයක් තෝරන්න",
       "unavailableDescription": "මෙම සංවිධානය තවදුරටත් ලබා ගත නොහැක. ඉදිරියට යාමට ඔබේ පැතිකඩෙන් සංවිධානයක් තෝරන්න.",
+
+      "unavailableSessionsDescription": "මෙම සංවිධානය තවදුරටත් ලබා ගත නොහැක. එහි සැසි පූරණය කළ නොහැක.",
       "accessDeniedDescription": "ඔබට මෙම සංවිධානයට ප්‍රවේශ වීමට අවසර නොමැත."
     },
     "creditActivity": {

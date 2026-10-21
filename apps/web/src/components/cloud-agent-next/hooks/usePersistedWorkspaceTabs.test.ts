@@ -3,7 +3,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { createRequire } from 'node:module';
 import {
   addTerminalTab,
+  CHAT_TAB_ID,
   createWorkspaceTabsState,
+  getWorkspaceTabScope,
+  openFileTab,
+  selectWorkspaceTab,
+  setFileTabMode,
   type WorkspaceTabsState,
 } from '../workspace-tabs';
 import type { usePersistedWorkspaceTabs } from './usePersistedWorkspaceTabs';
@@ -152,6 +157,24 @@ describe('usePersistedWorkspaceTabs', () => {
     root = createRoot(dom.container);
     render(STORAGE_KEY, SCOPE_A);
     expect(probe?.tabs.terminals).toHaveLength(1);
+  });
+
+  it('preserves file tabs and modes across sibling chats but isolates other worktrees', () => {
+    render(STORAGE_KEY, getWorkspaceTabScope('wt-a', 'chat-a'));
+    act(() =>
+      probe?.setTabs(state =>
+        setFileTabMode(openFileTab(state, 'src/file.ts'), 'src/file.ts', 'preview')
+      )
+    );
+    render(STORAGE_KEY, getWorkspaceTabScope('wt-a', 'chat-b'));
+    act(() => probe?.setTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID)));
+    expect(probe?.tabs.files).toEqual([{ path: 'src/file.ts', mode: 'preview' }]);
+    expect(stored()?.files).toEqual(probe?.tabs.files);
+
+    render(STORAGE_KEY, getWorkspaceTabScope('wt-b', 'chat-c'));
+    expect(probe?.tabs.files).toEqual([]);
+    render(STORAGE_KEY, getWorkspaceTabScope('wt-a', 'chat-b'));
+    expect(probe?.tabs.files).toEqual([{ path: 'src/file.ts', mode: 'preview' }]);
   });
 
   it('drops the stored entry when the scope returns to the default state', () => {

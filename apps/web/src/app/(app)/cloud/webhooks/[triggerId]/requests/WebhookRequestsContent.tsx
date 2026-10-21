@@ -1,13 +1,12 @@
 'use client';
 
 import React, { use, useState, useCallback } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import Link from 'next/link';
 import { format, formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { getWebhookRoutes } from '@/lib/webhook-routes';
-import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 import { WebhookRequestLogs } from './WebhookRequestLogs';
 
@@ -39,7 +38,7 @@ import {
   RefreshCw,
   ExternalLink,
   Inbox,
-  Share2,
+  ScrollText,
   Webhook,
 } from 'lucide-react';
 
@@ -243,55 +242,6 @@ export function WebhookRequestsContent({
         : `/cloud/chat?sessionId=${kiloSessionId}`;
     },
     [organizationId]
-  );
-
-  // State and mutations for sharing sessions (org context only)
-  const [sharingSessionId, setSharingSessionId] = useState<string | null>(null);
-
-  const { mutate: shareV1Session } = useMutation(
-    trpc.cliSessions.shareForWebhookTrigger.mutationOptions({
-      onSuccess: data => {
-        const shareUrl = `${window.location.origin}/share/${data.share_id}`;
-        window.open(shareUrl, '_blank');
-        toast.success('Session shared successfully');
-        setSharingSessionId(null);
-      },
-      onError: err => {
-        toast.error(`Failed to share session: ${err.message}`);
-        setSharingSessionId(null);
-      },
-    })
-  );
-  const { mutate: shareV2Session } = useMutation(
-    trpc.cliSessionsV2.shareForWebhookTrigger.mutationOptions({
-      onSuccess: data => {
-        const shareUrl = `${window.location.origin}/s/${data.share_token}`;
-        window.open(shareUrl, '_blank');
-        toast.success('Session shared successfully');
-        setSharingSessionId(null);
-      },
-      onError: err => {
-        toast.error(`Failed to share session: ${err.message}`);
-        setSharingSessionId(null);
-      },
-    })
-  );
-
-  const handleShareSession = useCallback(
-    (kiloSessionId: string) => {
-      setSharingSessionId(kiloSessionId);
-      const params = {
-        kilo_session_id: kiloSessionId,
-        trigger_id: triggerId,
-        organization_id: organizationId,
-      };
-      if (isNewSession(kiloSessionId)) {
-        shareV2Session(params);
-      } else {
-        shareV1Session(params);
-      }
-    },
-    [shareV1Session, shareV2Session, triggerId, organizationId]
   );
 
   // Loading state
@@ -561,23 +511,17 @@ export function WebhookRequestsContent({
                             }
 
                             return organizationId ? (
-                              // Org context: show share button (bot sessions aren't directly accessible)
                               <Button
                                 variant="link"
                                 size="sm"
                                 className="h-auto p-0"
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  handleShareSession(sessionId);
+                                onClick={event => {
+                                  event.stopPropagation();
+                                  toggleRow(request.id);
                                 }}
-                                disabled={sharingSessionId === sessionId}
                               >
-                                {sharingSessionId === sessionId ? (
-                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                ) : (
-                                  <Share2 className="mr-1 h-3 w-3" />
-                                )}
-                                {shortId(sessionId)}
+                                <ScrollText className="mr-1 h-3 w-3" />
+                                View logs
                               </Button>
                             ) : (
                               // Personal context: direct link to session

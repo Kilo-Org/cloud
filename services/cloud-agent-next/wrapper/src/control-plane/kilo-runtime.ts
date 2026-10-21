@@ -1,3 +1,4 @@
+import { selectedRuntimeCli } from '../../../src/shared/runtime-distribution.js';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
@@ -232,10 +233,14 @@ async function defaultSpawnKiloProcess(input: KiloProcessSpawnInput): Promise<Ki
   input.onProcessScope?.(processes);
   const credential = createKiloServerCredential();
   // Own process group via the owned-process scope's detached spawn.
-  const proc = processes.spawn('kilo', ['serve', '--hostname=127.0.0.1', '--port=0'], {
-    cwd: input.directory,
-    env: { ...input.env, ...credential.env },
-  });
+  const proc = processes.spawn(
+    selectedRuntimeCli(process.env),
+    ['serve', '--hostname=127.0.0.1', '--port=0'],
+    {
+      cwd: input.directory,
+      env: { ...input.env, ...credential.env },
+    }
+  );
   proc.stderr.resume();
   const exited = new Promise<void>(resolve => {
     proc.once('exit', () => resolve());

@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { setTimeout } from 'node:timers/promises';
 import { createTestHarness } from 'wrangler';
 import { expect, it, vi } from 'vitest';
 import { usage } from './usage.test-fixture';
@@ -11,6 +12,7 @@ it.each([undefined, 'staging'])(
       body: unknown;
       secret: string | string[] | undefined;
       bypass: string | string[] | undefined;
+      source: string | string[] | undefined;
     }[] = [];
     const release = Promise.withResolvers<void>();
     const writer = createServer(async (request, response) => {
@@ -21,6 +23,7 @@ it.each([undefined, 'staging'])(
         body: JSON.parse(body),
         secret: request.headers['x-internal-api-key'],
         bypass: request.headers['x-vercel-protection-bypass'],
+        source: request.headers['x-usage-write-source'],
       });
       await release.promise;
       response.setHeader('content-type', 'application/json');
@@ -77,6 +80,7 @@ it.each([undefined, 'staging'])(
       await vi.waitFor(() => expect(calls).toHaveLength(1), { timeout: 10_000 });
       // The writer has received the event, but has not yet acknowledged it.
       expect(server.getLogs()).toEqual([]);
+      await setTimeout(100);
       release.resolve();
       const processingLogs = () =>
         server
@@ -98,11 +102,26 @@ it.each([undefined, 'staging'])(
           body: event,
           secret: 'local-writer',
           bypass: 'local-bypass',
+          source: 'queue',
         }))
       );
       expect(
         processingLogs().every(log => log.usage_id === usage.core.id && log.delivery_attempts === 1)
       ).toBe(true);
+      for (const log of processingLogs()) {
+        expect(log).toMatchObject({
+          level: 'info',
+          queue_action: 'ack',
+          queue_message_id: expect.any(String),
+          writer_duration_ms: expect.any(Number),
+          queue_wait_ms: expect.any(Number),
+          event_age_ms: expect.any(Number),
+        });
+        expect(log.writer_duration_ms).toBeGreaterThanOrEqual(0);
+        expect(log.queue_wait_ms).toBeGreaterThanOrEqual(0);
+        expect(log.event_age_ms).toBeGreaterThanOrEqual(0);
+      }
+      expect(processingLogs()[0].writer_duration_ms).toBeGreaterThanOrEqual(100);
       for (const sensitive of [
         'local-publisher',
         'local-writer',

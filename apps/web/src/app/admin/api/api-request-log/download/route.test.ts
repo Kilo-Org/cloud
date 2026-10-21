@@ -148,6 +148,7 @@ describe('GET /admin/api/api-request-log/download', () => {
 
   it.each<Record<string, string>>([
     { userId: 'another-user' },
+    { organizationId: 'another-organization' },
     { model: 'another-model' },
     { sessionId: 'another-session' },
     { startTime: '13:00' },
@@ -163,6 +164,72 @@ describe('GET /admin/api/api-request-log/download', () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: 'No records found for the given criteria' });
+  });
+
+  describe('when filtering by organization and model prefix', () => {
+    const rowsByName = {
+      sonnetInOrg: { model: 'anthropic/claude-sonnet-4.5', organization_id: 'org-1' },
+      opusInOtherOrg: { model: 'anthropic/claude-opus-4.1', organization_id: 'org-2' },
+      gptInOrg: { model: 'openai/gpt-5', organization_id: 'org-1' },
+      lookalikeInOrg: { model: 'anthropicx/claude', organization_id: 'org-1' },
+    };
+
+    async function insertRows() {
+      const rows = await db
+        .insert(api_request_log)
+        .values(
+          Object.entries(rowsByName).map(([name, row]) => {
+            const request_r2_key = `2026-08-01/${name}/request.json`;
+            fakeR2.objects.set(`${BUCKET}/${request_r2_key}`, JSON.stringify({ name }));
+            return { ...baseRow, ...row, request_r2_key };
+          })
+        )
+        .returning({ id: api_request_log.id, model: api_request_log.model });
+      return new Map(rows.map(row => [row.model, String(row.id)]));
+    }
+
+    async function exportedIds(overrides: Record<string, string>) {
+      const response = await GET(createRequest(overrides));
+      expect(response.status).toBe(200);
+      const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+      return Object.keys(entries)
+        .map(name => name.match(/_(\d+)_request\.json$/)?.[1])
+        .sort();
+    }
+
+    it('matches models by prefix', async () => {
+      const ids = await insertRows();
+
+      expect(await exportedIds({ model: 'anthropic/' })).toEqual(
+        [ids.get(rowsByName.sonnetInOrg.model), ids.get(rowsByName.opusInOtherOrg.model)].sort()
+      );
+    });
+
+    it('filters by organization ID and names the file after it', async () => {
+      const ids = await insertRows();
+
+      const response = await GET(createRequest({ organizationId: 'org-1', model: 'anthropic/' }));
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Content-Disposition')).toBe(
+        'attachment; filename="api-request-log_api-request-log-download-test-user_org-org-1_2026-08-01_2026-08-01_anthropic-.zip"'
+      );
+      const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+      expect(Object.keys(entries)).toEqual([
+        expect.stringContaining(`_${ids.get(rowsByName.sonnetInOrg.model)}_request.json`),
+      ]);
+    });
+
+    it.each(['anthropic%', 'anthropic_'])(
+      'treats LIKE wildcards in the model prefix %j literally',
+      async model => {
+        await insertRows();
+
+        const response = await GET(createRequest({ model }));
+
+        expect(response.status).toBe(404);
+      }
+    );
   });
 
   it.each([

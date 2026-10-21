@@ -6,7 +6,8 @@ import postcss from 'postcss';
 
 const mobileDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CSS_PATH = join(mobileDir, 'src', 'global.css');
-const OUTPUT_PATH = join(mobileDir, 'src', 'lib', 'hooks', 'theme-colors.generated.ts');
+/** The generated file's one owner: the writer below and the drift check read this. */
+export const OUTPUT_PATH = join(mobileDir, 'src', 'lib', 'hooks', 'theme-colors.generated.ts');
 
 // The runtime JS key names mapped to the CSS custom properties they read.
 // Tile tokens and other CSS-only names are intentionally excluded: these are

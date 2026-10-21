@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Switch, View } from 'react-native';
+import { Pressable, Switch, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -12,6 +12,7 @@ import {
 } from '@/components/profiles/profile-mcp-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Lock, Pencil, Server, Trash2 } from '@/components/ui/icons';
@@ -168,7 +169,7 @@ export function ProfileMcpScreen({
       await deleteMcp.mutateAsync({ profileId, mcpServerId });
     } catch (error) {
       if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.mcp.saveFailed'));
+        toast.error(t('profiles.mcp.deleteFailed'));
       }
     }
   };
@@ -235,7 +236,7 @@ export function ProfileMcpScreen({
                         {
                           onError: error => {
                             if (!hasUsableMessage(error)) {
-                              toast.error(t('profiles.mcp.saveFailed'));
+                              toast.error(t('profiles.mcp.updateFailed'));
                             }
                           },
                         }
@@ -272,7 +273,7 @@ export function ProfileMcpScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profiles.mcp.title')} />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -280,7 +281,7 @@ export function ProfileMcpScreen({
         showsVerticalScrollIndicator={false}
       >
         {content}
-      </ScrollView>
+      </TabScreenScrollView>
 
       {form !== null ? (
         <McpFormSheet

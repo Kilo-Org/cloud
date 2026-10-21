@@ -127,7 +127,6 @@ TMP_CI_commit_msg.txt
 *.csv
 run-milvus-test.sh
 
-.beads/
 .env*.local
 .tests/
 

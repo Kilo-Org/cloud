@@ -35,6 +35,8 @@
     "connectGithub": "Lidhu me GitHub",
     "cost": "Kostoja",
     "discard": "Mos ruaj",
+    "discardChangesMessage": "Ndryshimet tuaja do të humbin.",
+    "discardChangesTitle": "Mos ruaj ndryshimet?",
     "findings": "Gjetjet",
     "mergeRequest": "kërkesë integrimi",
     "notConnected": "Pa lidhje",
@@ -109,7 +111,9 @@
     "online": "Në linjë",
     "open": "Hap {{name}}",
     "openPullRequest": "Hapja e kërkesës së bashkimit",
+    "completed": "Përfunduar",
     "pending": "Në pritje",
+    "running": "Në ekzekutim",
     "performance": "Performanca",
     "preferences": "Preferencat",
     "privacyPolicy": "Politika e privatësisë",
@@ -661,7 +665,8 @@
       "description": "Lidh llogarinë tënde të GitHub për të rishikuar kërkesat për bashkim në telefon.",
       "gitlabDescription": "Lidho llogarinë tënde GitLab për të rishikuar kërkesat e integrimit në celular.",
       "bitbucketDescription": "Lidho Bitbucket me këtë organizatë për të rishikuar kërkesat për bashkim në celular.",
-      "bitbucketOrgOnlyDescription": "Përzgjidh një organizatë në profilin tënd për të rishikuar kërkesat e saj për bashkim në Bitbucket."
+      "bitbucketOrgOnlyDescription": "Ndrysho llogarinë e mësipërme në një organizatë për të rishikuar kërkesat për bashkim në Bitbucket.",
+      "contextLine": "Për {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "Ky rishikim nuk mund të dërgohet në gjendjen aktuale. PR-ja mund të ketë ndryshuar ose nuk lejohet të rishikosh kërkesën tënde për bashkim.",
       "reviewNotSubmittedTerm": "Ky rishikim nuk mund të dërgohet siç është. Mbase {{term}} ka ndryshuar, ose nuk mund të rishikosh {{term}} tënde.",
       "couldNotPostComment": "Nuk u arrit të postohej komenti.",
-      "couldNotSubmitReview": "Nuk u dërgua rishikimi. Kontrollo lidhjen dhe provo përsëri."
+      "couldNotSubmitReview": "Nuk u dërgua rishikimi. Kontrollo lidhjen dhe provo përsëri.",
+      "rateLimited": "Shumë kërkesa. Provo përsëri më vonë.",
+      "conflict": "Kjo ndryshoi ndërkohë që po punonit në të. Ringarkoje dhe provo përsëri."
     },
     "operation": {
       "couldNotReply": "Përgjigjja nuk u dërgua.",
@@ -1531,8 +1538,6 @@
     "updateFailed": "Nuk u përditësua shqyrtuesi.",
     "configSaveFailed": "Nuk u ruajt konfigurimi i shqyrtimit.",
     "status": {
-      "running": "Në ekzekutim",
-      "completed": "Përfunduar",
       "interrupted": "I ndërprerë"
     },
     "reviewStyle": {
@@ -1545,7 +1550,8 @@
       "bugs": "Defektet",
       "style": "Stili",
       "testing": "Testimi",
-      "documentation": "Dokumentacioni"
+      "documentation": "Dokumentacioni",
+      "unknown": "Tjetër ({{area}})"
     },
     "gateThreshold": {
       "warning": "Paralajmërim"
@@ -1657,7 +1663,14 @@
       "whereFound": "Ku u gjet ({{displayCount}})",
       "fullReport": "Raporti i plotë i gjeneruar",
       "yes": "Po",
-      "no": "Jo"
+      "no": "Jo",
+      "action": {
+        "analyzeCodebase": "Analizo bazën e kodit",
+        "dismiss": "Refuzoje",
+        "manualReview": "Rishikim manual",
+        "monitor": "Mbikëqyr",
+        "openPr": "Hap PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} gjetje",
@@ -1859,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Ruaj ndryshimet",
       "unsavedTitle": "Ndryshime të paruajtura",
-      "unsavedMessage": "Dëshiron t'i ruash ndryshimet përpara se të dalësh nga ky ekran?"
+      "unsavedMessage": "Dëshiron t'i ruash ndryshimet përpara se të dalësh nga ky ekran?",
+      "unsavedInvalidMessage": "Këto ndryshime ende nuk mund të ruhen. Rregulloji që t'i ruash, ose mos i ruaj që të dalësh."
     },
     "auditReportButton": {
       "viewA11y": "Shiko raportin e auditimit"
@@ -1876,7 +1890,24 @@
       "title": "Raporti i auditimit",
       "unavailable": "Raporti i auditimit nuk është i disponueshëm",
       "unavailableDescription": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund të shohin raportet e auditimit. Kërkoji një pronari ose menaxheri të faturimit të të japë qasje.",
-      "queryFailed": "Kërkimi për raportin nuk përfundoi. Provo përsëri."
+      "queryFailed": "Kërkimi për raportin nuk përfundoi. Provo përsëri.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiza përfundoi",
+        "findingAnalysisFailed": "Analiza dështoi",
+        "findingAutoDismissed": "U refuzua automatikisht",
+        "findingCreated": "Importuar",
+        "findingDeleted": "U fshi",
+        "findingDismissed": "U refuzua",
+        "findingSeverityChanged": "Rëndësia u ndryshua",
+        "findingStatusChange": "Statusi u ndryshua",
+        "findingSuperseded": "U zëvendësua",
+        "remediationBlocked": "Korrigjimi u bllokua",
+        "remediationCancelled": "U anulua",
+        "remediationFailed": "Korrigjimi dështoi",
+        "remediationNoChangesNeeded": "Nuk nevojiten ndryshime",
+        "remediationPrOpened": "U hap PR",
+        "remediationQueued": "U kërkua korrigjimi"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nuk u ngarkuan cilësimet e njoftimeve.",
@@ -1908,7 +1939,6 @@
       "installApp": "Instalo aplikacionin GitHub",
       "reauthorizeButton": "Riautorizo aplikacionin GitHub",
       "reauthorizeDescription": "Agjenti i sigurisë kërkon lejen vulnerability_alerts për të pasur qasje në njoftimet e Dependabot. Riautorizo aplikacionin GitHub për t'ia dhënë këtë leje.",
-      "reauthorizeFailed": "Nuk u nis riautorizimi. Provo përsëri.",
       "reauthorizeTitle": "Kërkohen leje shtesë",
       "setupFailed": "Nuk u nis konfigurimi i GitHub. Provo përsëri."
     },
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} nuk është më i disponueshëm. Po përdoret modeli yt i parazgjedhur.",
       "couldNotReadPendingSessions": "Nuk u lexuan seancat në pritje. Provo përsëri.",
       "failedToCreate": "Nuk u krijua seanca.",
+      "checkOrganizationAccess": "Kontrollo aksesin tënd në këtë organizatë dhe provo përsëri.",
       "couldNotRefreshRepositories": "Nuk u rifreskuan depot. Provo përsëri.",
       "discardDraftTitle": "Të fshihet drafti?",
       "discardDraftMessage": "Kërkesa jote do të humbasë.",
@@ -2281,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} rreshta",
       "matchesBadge_one": "{{displayCount}} përputhje",
       "matchesBadge_other": "{{displayCount}} përputhje",
-      "noOutput": "Nuk ka dalje."
+      "noOutput": "Nuk ka dalje.",
+      "translationFailed": "Përkthimi dështoi"
     },
     "readToolMarkdown": {
       "linesTruncated": "rreshtat {{start}}–{{end}} (përmbajtje e shkurtuar)",
@@ -2732,6 +2764,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Seancat e tua aktive nuk janë të disponueshme derisa të ngarkohen të dhënat.",
     "currentDeviceUnidentified": "Nuk u identifikua pajisja aktuale.",
+    "kiloApp": "Aplikacioni Kilo",
     "noSessions": "Nuk ka seanca aktive",
     "noSessionsDescription": "Hyr në aplikacionin Kilo në një pajisje tjetër dhe ajo do të shfaqet këtu.",
     "onlyKiloAppSignIns": "Këtu shfaqen vetëm hyrjet nga aplikacioni Kilo. Hyrjet nga redaktori dhe CLI nuk renditen.",
@@ -2884,6 +2917,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Përpara se të fillojmë",
+    "summaryTitle": "Preferencat e ndarjes së të dhënave",
     "introDescription": "Kilo dërgon mesazhet e tua te ofruesit e AI për të gjeneruar përgjigje. Ja cilat të dhëna ndahen dhe me kë.",
     "required": "E nevojshme për të përdorur Kilo",
     "promptsTitle": "Kërkesat dhe bisedat e tua",
@@ -2892,7 +2926,6 @@
     "accountDescription": "ID-ja e llogarisë tënde Kilo dhe metadatat e kërkesave përdoren për të verifikuar identitetin tënd dhe për të matur përdorimin.",
     "diagnosticsTitle": "Diagnostika e aplikacionit",
     "diagnosticsDescription": "Raportet e ndërprerjeve të papritura dhe të gabimeve, pa përmbajtjen e aplikacionit, përdoren për ta mbajtur aplikacionin të qëndrueshëm.",
-    "optional": "Opsionale",
     "helpImprove": "Ndihmo në përmirësimin e Kilo",
     "helpImproveDescription": "Ndaj të dhëna anonime për përdorimin e produktit dhe burimin e instalimit. Mund ta ndryshosh këtë në çdo kohë te cilësimet.",
     "seeFullDetails": "Shiko detajet e plota",
@@ -2977,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Kthehu te profili",
       "loadErrorMessage": "Kontrollo lidhjen dhe provo përsëri.",
+
+      "chooseAccount": "Zgjidh një llogari",
       "loadErrorTitle": "Nuk u ngarkuan organizatat e tua.",
+      "noOrganization": "Asnjë organizatë",
+
+      "noOrganizationDescription": "Kjo llogari nuk është pjesë e një organizate. Krijo ose bashkohu me një organizatë në ueb për të përdorur veçoritë e organizatës si ftesat për anëtarët dhe alarmet për balancë të ulët.",
+
+      "openWebOrganizations": "Hap organizatat në ueb",
+
       "organizationUnavailable": "Organizata nuk është e disponueshme.",
-      "selectDescription": "Zgjidh një organizatë nga profili yt për të vazhduar.",
+      "selectDescriptionWithOrganizations": "Ti i përket një ose më shumë organizatave. Zgjidh llogarinë që duhet të përdorë ky ekran.",
+
       "selectOrganization": "Zgjidh një organizatë",
       "unavailableDescription": "Kjo organizatë nuk është më e disponueshme. Zgjidh një tjetër nga profili yt për të vazhduar.",
+
+      "unavailableSessionsDescription": "Kjo organizatë nuk është më e disponueshme. Sesionet e saj nuk mund të ngarkohen.",
       "accessDeniedDescription": "Nuk ke qasje në këtë organizatë."
     },
     "creditActivity": {
@@ -3641,7 +3685,9 @@
       "jsonTooLarge": "Përdor maksimumi 50 hyrje, çelësa deri në 128 dhe vlera deri në 4096 karaktere",
       "timeoutInvalid": "Kohëzgjatja duhet të jetë një numër i plotë milisekondash",
       "edit": "Ndrysho serverin MCP",
-      "saveFailed": "Serveri MCP nuk mund të ruhej"
+      "saveFailed": "Serveri MCP nuk mund të ruhej",
+      "deleteFailed": "Serveri MCP nuk mund të fshihej",
+      "updateFailed": "Serveri MCP nuk mund të përditësohej"
     },
     "agents": {
       "title": "Agjentët e profilit",
@@ -3668,6 +3714,7 @@
       "visibilitySubagent": "Subagent - i thirrur vetëm nga të tjerët",
       "visibilityAll": "Të gjitha - të dyja",
       "saveFailed": "Agjenti nuk mund të ruhej",
+      "deleteFailed": "Agjenti nuk mund të fshihej",
       "nameRequired": "Futni një emër agjenti",
       "slugRequired": "Fut një slug agjenti",
       "slugInvalid": "Slug duhet të fillojë me një shkronjë dhe të përdorë vetëm shkronja të vogla, shifra dhe viza",
@@ -3682,10 +3729,12 @@
       "description": "Përshkrimi i komandës",
       "template": "shabllon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Shpjegoni $ARGUMENTS",
       "subtask": "Ekzekuto si nëndetyrë",
       "edit": "Redakto komandën e pjerrët",
       "saveFailed": "Komanda nuk mund të ruhej",
+      "deleteFailed": "Komanda nuk mund të fshihej",
       "nameRequired": "Futni një emër komande",
       "nameInvalid": "Emri duhet të fillojë me një shkronjë të vogël dhe të përdorë vetëm shkronja të vogla, shifra dhe viza",
       "templateRequired": "Futni një shabllon komandimi",
@@ -3832,7 +3881,7 @@
     "view": "Lexo përmbledhjen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Shfaq statusin live",
+    "dismiss": "Hidh poshtë përmbledhjen",
     "offline": "Jashtë linje · përmbledhje e ruajtur",
     "cached": "Raport i ruajtur · rifreskimi i padisponueshëm",
     "revised": "Rishikuar · {{revision}}",

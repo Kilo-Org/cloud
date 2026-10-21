@@ -150,7 +150,7 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
             isRetrying={orgWithMembers.isFetching}
           />
         ) : (
-          <CenteredState className="bg-background px-6">
+          <CenteredState className="bg-background" contentContainerClassName="px-6">
             <Text className="text-center text-sm text-muted-foreground">
               {t('organization.memberLimit.memberNotFound')}
             </Text>

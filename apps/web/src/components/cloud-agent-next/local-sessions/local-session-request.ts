@@ -23,6 +23,27 @@ export type LocalSessionRequest =
       input: WithoutAttempt<RouterInputs['organizations']['cloudAgentNext']['prepareSession']>;
     };
 
+export async function releaseLocalSessionUploads(
+  client: TRPCClient<RootRouter>,
+  request: LocalSessionRequest,
+  userId: string
+): Promise<void> {
+  if (request.kind === 'worktree-chat') return;
+  const attachments = request.input.attachments;
+  if (!attachments?.files.length) return;
+  const objectKeys = attachments.files.map(
+    file => `${userId}/cloud-agent/${attachments.path}/${file}`
+  );
+  if (request.kind === 'new-organization-session') {
+    await client.organizations.cloudAgentNext.releasePendingUploads.mutate({
+      organizationId: request.input.organizationId,
+      objectKeys,
+    });
+  } else {
+    await client.cloudAgentNext.releasePendingUploads.mutate({ objectKeys });
+  }
+}
+
 /** Sends one attempt of the request. Returns the id the server created the session under. */
 export async function sendLocalSessionRequest(
   client: TRPCClient<RootRouter>,

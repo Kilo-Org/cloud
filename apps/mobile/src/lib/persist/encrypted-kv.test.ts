@@ -27,6 +27,9 @@ let failEveryPragma = false;
 // node:sqlite's `:memory:` database cannot use WAL, so the fake answers with
 // this seam and the test can force a rejected switch.
 let journalMode = 'wal';
+// Simulates an engine that rejects the pragma outright instead of answering
+// with the mode it kept.
+let failJournalMode = false;
 // Simulates a native handle that will not close. A leaked handle must not be
 // replaced by a second connection to the same file.
 let failClose = false;
@@ -132,6 +135,9 @@ function createFakeDatabase(): FakeDatabase {
         return hasSQLCipher ? { cipher_version: '4.5.5 community' } : null;
       }
       if (source.startsWith('PRAGMA journal_mode')) {
+        if (failJournalMode) {
+          throw new Error('PRAGMA journal_mode failed');
+        }
         return { journal_mode: journalMode };
       }
       return native.prepare(source).get() ?? null;
@@ -181,6 +187,7 @@ vi.mock('expo-sqlite', () => ({
 }));
 
 vi.mock('@sentry/react-native', () => ({
+  addBreadcrumb: vi.fn(),
   captureException: vi.fn(),
 }));
 
@@ -216,6 +223,7 @@ beforeEach(() => {
   failNextPragma = false;
   failEveryPragma = false;
   journalMode = 'wal';
+  failJournalMode = false;
   failClose = false;
   hasSQLCipher = true;
   cipherProbedAtSqlCount = -1;
@@ -469,9 +477,43 @@ describe('connection configuration', () => {
     expect(busy).toBe('PRAGMA busy_timeout = 5000');
   });
 
-  it('fails the open when journal_mode does not switch to WAL', async () => {
+  it('accepts the journal mode the engine reports when WAL is refused', async () => {
     journalMode = 'delete';
-    await expect(setItem('s', 'a', 'x')).rejects.toThrow(/journal_mode did not switch to WAL/);
+    await setItem('s', 'a', 'x');
+
+    // The store opened, kept its file, and serves reads from it.
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    // The refusal is visible in the diagnostic trail without filing an event.
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledTimes(1);
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+      category: 'encrypted-kv',
+      level: 'warning',
+      message: 'journal_mode did not switch to WAL',
+      data: { journal_mode: 'delete' },
+    });
+  });
+
+  it('opens when the engine rejects the journal_mode pragma', async () => {
+    failJournalMode = true;
+    await setItem('s', 'a', 'x');
+
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+      category: 'encrypted-kv',
+      level: 'warning',
+      message: 'PRAGMA journal_mode = WAL was rejected',
+      data: { journal_mode: 'unknown' },
+    });
+  });
+
+  it('records no journal-mode breadcrumb when WAL takes effect', async () => {
+    await setItem('s', 'a', 'x');
+    expect(Sentry.addBreadcrumb).not.toHaveBeenCalled();
   });
 });
 

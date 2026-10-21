@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
   confirm: vi.fn(),
+  connectivity: 'online' as string,
   query: {
     data: undefined as TestProfileDetail | undefined,
     isError: false,
@@ -47,6 +48,10 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfile: () => h.query,
   useAgentProfileMutations: () => h.mutations,
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => h.connectivity,
+  useCommittedConnectivityStatus: () => h.connectivity,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ back: h.back, push: h.push }) }));
@@ -90,20 +95,15 @@ vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/icons', () => ({
-  Bot: 'Bot',
-  CornerDownLeft: 'CornerDownLeft',
-  KeyRound: 'KeyRound',
-  Server: 'Server',
-  Sparkles: 'Sparkles',
-  Star: 'Star',
-  Terminal: 'Terminal',
-  Trash2: 'Trash2',
-}));
+vi.mock('@/components/ui/icons', async () => {
+  const icons = await import('@/components/profiles/profile-overview-icons');
+  return icons;
+});
 
 describe('ProfileOverviewScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    h.connectivity = 'online';
     Object.assign(h.query, {
       data: undefined,
       isError: false,

@@ -15,6 +15,7 @@ import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
 import { NewTaskFromPictureButton } from '@/components/home/new-task-from-picture-button';
 import { ProductChoices } from '@/components/home/product-choices';
+import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { UpNextSection } from '@/components/todos/up-next-section';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -61,6 +62,10 @@ export function HomeScreen() {
         }
         size="large"
         showBackButton={false}
+        // The active account below the greeting: the same switchable control
+        // the profile credits card uses, so the org a new task will start in
+        // is visible (and changeable) before the form opens.
+        context={<ContextControl />}
         // The logo is the header's only visible child, so this is the brand
         // mark's leading edge: it must be the page gutter the sections, cards
         // and actions use (`mx-4`), not a wider header-only gutter.

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted case per MCP screen state: loading, error, empty, row toggle, edit, add, validation, failure fallbacks, and delete */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -67,6 +68,7 @@ vi.mock('@/components/agents/session-page-sheet', () => ({
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -303,6 +305,47 @@ describe('ProfileMcpScreen', () => {
       profileId: 'profile-1',
       mcpServerId: 'mcp-1',
     });
+
+    unmount();
+  });
+
+  it('retryable: a delete with no usable message names the delete operation', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+    h.mutations.deleteMcp.mutateAsync.mockRejectedValue(new Error(' '));
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Delete');
+    await act(async () => {
+      confirmRequest(h.confirm);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => h.error.mock.calls.length > 0);
+    expect(h.error).toHaveBeenCalledWith("Couldn't delete MCP server");
+
+    unmount();
+  });
+
+  it('retryable: a refused toggle names the update, not a save', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+    h.mutations.setMcpEnabled.mutate.mockImplementation(
+      (_input: unknown, options: { onError: (error: Error) => void }) => {
+        options.onError(new Error(' '));
+      }
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    // The test renderer exposes host props untyped; the screen passes this handler.
+    const toggleProps = findOne(renderer.root, 'Switch').props as {
+      onValueChange: (value: boolean) => void;
+    };
+    act(() => {
+      toggleProps.onValueChange(false);
+    });
+
+    expect(h.error).toHaveBeenCalledWith("Couldn't update MCP server");
 
     unmount();
   });

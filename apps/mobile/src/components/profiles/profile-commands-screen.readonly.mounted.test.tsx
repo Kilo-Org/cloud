@@ -42,6 +42,7 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
 }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#000000', destructive: '#FF0000' }),
 }));

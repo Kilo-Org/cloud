@@ -41,6 +41,7 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   getProfileAgentsPath,
   getProfileCommandsPath,
@@ -165,6 +166,8 @@ export function ProfileOverviewScreen({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const colors = useThemeColors();
+  // Reactive: a connectivity commit re-renders the error variant selection.
+  const committedConnectivity = useCommittedConnectivityStatus();
   const profileQuery = useAgentProfile(profileId, organizationId);
   const { update, deleteProfile, setAsDefault, clearDefault } =
     useAgentProfileMutations(organizationId);
@@ -220,9 +223,13 @@ export function ProfileOverviewScreen({
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
+        {/* A stale read keeps the cached profile usable: the error banner sits
+            above the content and only takes over when there is nothing to
+            show. A confirmed-offline device is a connectivity failure, not a
+            server one; `unknown` connectivity keeps the server variant. */}
         {profileQuery.isError ? (
           <QueryError
-            variant="server"
+            variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
             placement="top"
             title={t('profiles.loadFailed')}
             onRetry={() => void profileQuery.refetch()}
@@ -232,7 +239,7 @@ export function ProfileOverviewScreen({
 
         {!profileQuery.isError && profile === undefined ? <ProfileOverviewSkeleton /> : null}
 
-        {!profileQuery.isError && profile !== undefined ? (
+        {profile !== undefined ? (
           <>
             <ProfileMetadataForm
               key={metadataFormKey(profile)}

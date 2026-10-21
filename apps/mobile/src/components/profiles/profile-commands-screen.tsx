@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import {
@@ -18,6 +18,7 @@ import {
 } from '@/components/profiles/profile-commands-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { ChevronDown, ChevronUp, Terminal, Trash2 } from '@/components/ui/icons';
@@ -281,7 +282,7 @@ export function ProfileCommandsScreen({
           void leave();
         }}
       />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -289,7 +290,7 @@ export function ProfileCommandsScreen({
         showsVerticalScrollIndicator={false}
       >
         {content}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

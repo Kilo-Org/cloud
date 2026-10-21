@@ -35,6 +35,8 @@
     "connectGithub": "GitHub koppelen",
     "cost": "Kosten",
     "discard": "Verwerpen",
+    "discardChangesMessage": "Je wijzigingen gaan verloren.",
+    "discardChangesTitle": "Wijzigingen verwerpen?",
     "findings": "Bevindingen",
     "mergeRequest": "merge request",
     "notConnected": "Niet gekoppeld",
@@ -109,7 +111,9 @@
     "online": "Verbonden",
     "open": "{{name}} openen",
     "openPullRequest": "PR openen",
+    "completed": "Voltooid",
     "pending": "In afwachting",
+    "running": "Actief",
     "performance": "Prestaties",
     "preferences": "Voorkeuren",
     "privacyPolicy": "Privacybeleid",
@@ -1019,8 +1023,6 @@
     "updateFailed": "De beoordelaar kon niet worden bijgewerkt.",
     "configSaveFailed": "De reviewinstellingen konden niet worden opgeslagen.",
     "status": {
-      "running": "Actief",
-      "completed": "Voltooid",
       "interrupted": "Onderbroken"
     },
     "reviewStyle": {
@@ -1033,7 +1035,8 @@
       "bugs": "Programmeerfouten",
       "style": "Stijl",
       "testing": "Testen",
-      "documentation": "Documentatie"
+      "documentation": "Documentatie",
+      "unknown": "Overig ({{area}})"
     },
     "gateThreshold": {
       "warning": "Waarschuwing"
@@ -1112,7 +1115,14 @@
       "triageReasoning": "Onderbouwing van de eerste beoordeling",
       "watchInCloudAgent": "Bekijken in Cloud Agent",
       "whereFound": "Gevonden op deze locaties ({{displayCount}})",
-      "yes": "Ja"
+      "yes": "Ja",
+      "action": {
+        "analyzeCodebase": "Codebasis analyseren",
+        "dismiss": "Negeren",
+        "manualReview": "Handmatige beoordeling",
+        "monitor": "Monitoren",
+        "openPr": "Pull request openen"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Analysemodel",
@@ -1134,7 +1144,24 @@
       "summary": "Rapportsamenvatting",
       "title": "Auditrapport",
       "unavailable": "Auditrapport niet beschikbaar",
-      "unavailableDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen auditrapporten bekijken. Vraag een eigenaar of factureringsbeheerder om je toegang te geven."
+      "unavailableDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen auditrapporten bekijken. Vraag een eigenaar of factureringsbeheerder om je toegang te geven.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyse voltooid",
+        "findingAnalysisFailed": "Analyse mislukt",
+        "findingAutoDismissed": "Automatisch genegeerd",
+        "findingCreated": "Geïmporteerd",
+        "findingDeleted": "Verwijderd",
+        "findingDismissed": "Genegeerd",
+        "findingSeverityChanged": "Ernst gewijzigd",
+        "findingStatusChange": "Status gewijzigd",
+        "findingSuperseded": "Vervangen",
+        "remediationBlocked": "Herstel geblokkeerd",
+        "remediationCancelled": "Geannuleerd",
+        "remediationFailed": "Herstel mislukt",
+        "remediationNoChangesNeeded": "Geen wijzigingen nodig",
+        "remediationPrOpened": "Pull request geopend",
+        "remediationQueued": "Herstel aangevraagd"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Auditrapport bekijken"
@@ -1354,7 +1381,6 @@
       "installApp": "GitHub-app installeren",
       "reauthorizeButton": "GitHub-app opnieuw toegang geven",
       "reauthorizeDescription": "Security Agent heeft het recht vulnerability_alerts nodig om Dependabot-waarschuwingen te bekijken. Geef de GitHub-app opnieuw toegang om dit recht te verlenen.",
-      "reauthorizeFailed": "Het opnieuw verlenen van toegang kon niet worden gestart. Probeer het opnieuw.",
       "reauthorizeTitle": "Extra rechten vereist",
       "setupFailed": "Het instellen van GitHub kon niet worden gestart. Probeer het opnieuw."
     },
@@ -1377,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "Wijzigingen opslaan",
       "unsavedMessage": "Je wijzigingen opslaan voordat je dit scherm verlaat?",
+      "unsavedInvalidMessage": "Deze wijzigingen kunnen nog niet worden opgeslagen. Corrigeer ze om op te slaan, of verwerp ze om te vertrekken.",
       "unsavedTitle": "Niet-opgeslagen wijzigingen"
     },
     "setup": {
@@ -1700,6 +1727,7 @@
       "prefillModelUnavailable": "{{model}} is niet meer beschikbaar. Je standaardmodel wordt gebruikt.",
       "couldNotReadPendingSessions": "De wachtende sessies konden niet worden uitgelezen. Probeer het opnieuw.",
       "failedToCreate": "De sessie kon niet worden aangemaakt.",
+      "checkOrganizationAccess": "Controleer je toegang tot deze organisatie en probeer het opnieuw.",
       "couldNotRefreshRepositories": "De repositories konden niet worden vernieuwd. Probeer het opnieuw.",
       "discardDraftTitle": "Concept verwijderen?",
       "discardDraftMessage": "Je prompt gaat verloren.",
@@ -1769,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}} regels",
       "matchesBadge_one": "{{displayCount}} treffer",
       "matchesBadge_other": "{{displayCount}} treffers",
-      "noOutput": "Geen uitvoer."
+      "noOutput": "Geen uitvoer.",
+      "translationFailed": "Vertaling mislukt"
     },
     "readToolMarkdown": {
       "linesTruncated": "regels {{start}}–{{end}} (afgekapt)",
@@ -2220,6 +2249,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Je actieve sessies zijn pas beschikbaar nadat de gegevens zijn geladen.",
     "currentDeviceUnidentified": "Het huidige apparaat kon niet worden herkend.",
+    "kiloApp": "Kilo-app",
     "noSessions": "Geen actieve sessies",
     "noSessionsDescription": "Meld je in de Kilo-app aan op een ander apparaat. Dat apparaat verschijnt dan hier.",
     "onlyKiloAppSignIns": "Alleen aanmeldingen van de Kilo-app verschijnen hier. Editor- en CLI-aanmeldingen worden niet vermeld.",
@@ -2372,6 +2402,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Voordat we beginnen",
+    "summaryTitle": "Voorkeuren voor gegevensdeling",
     "introDescription": "Kilo stuurt je berichten naar AI-aanbieders om antwoorden te genereren. Hieronder zie je welke gegevens we delen en met wie.",
     "required": "Vereist om Kilo te gebruiken",
     "promptsTitle": "Je prompts en gesprekken",
@@ -2380,7 +2411,6 @@
     "accountDescription": "Je Kilo-account-ID en metadata van verzoeken om je identiteit te controleren en het gebruik te meten.",
     "diagnosticsTitle": "Diagnostische appgegevens",
     "diagnosticsDescription": "Crash- en foutrapporten zonder app-inhoud om de app stabiel te houden.",
-    "optional": "Optioneel",
     "helpImprove": "Kilo helpen verbeteren",
     "helpImproveDescription": "Deel anonieme gebruiksstatistieken en de installatiebron. Je kunt dit op elk moment wijzigen in de instellingen.",
     "seeFullDetails": "Volledige details bekijken",
@@ -2505,7 +2535,8 @@
       "description": "Koppel je GitHub-account om PR's op je telefoon te beoordelen.",
       "gitlabDescription": "Koppel je GitLab-account om merge requests op je telefoon te beoordelen.",
       "bitbucketDescription": "Koppel Bitbucket aan deze organisatie om PR's op je telefoon te beoordelen.",
-      "bitbucketOrgOnlyDescription": "Selecteer een organisatie in je profiel om de PR's van die organisatie op Bitbucket te beoordelen."
+      "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
+      "contextLine": "Voor {{organization}}"
     },
     "connectionExpired": "De GitHub-koppeling is verlopen.",
     "couldNotLoadPullRequest": "De PR kon niet worden geladen.",
@@ -2932,7 +2963,9 @@
       "reviewNotSubmitted": "Deze beoordeling kan in de huidige vorm niet worden verzonden. Mogelijk is de PR gewijzigd of probeer je je eigen PR te beoordelen.",
       "reviewNotSubmittedTerm": "Deze beoordeling kan niet in de huidige vorm worden verzonden. Mogelijk is de {{term}} gewijzigd, of kun je je eigen {{term}} niet beoordelen.",
       "couldNotPostComment": "De opmerking kon niet worden geplaatst.",
-      "couldNotSubmitReview": "De beoordeling kon niet worden verzonden. Controleer je verbinding en probeer het opnieuw."
+      "couldNotSubmitReview": "De beoordeling kon niet worden verzonden. Controleer je verbinding en probeer het opnieuw.",
+      "rateLimited": "Te veel verzoeken. Probeer het later opnieuw.",
+      "conflict": "Dit is gewijzigd terwijl je ermee bezig was. Laad het opnieuw en probeer het nog eens."
     },
     "operation": {
       "couldNotReply": "Het antwoord kon niet worden verzonden.",
@@ -2969,11 +3002,22 @@
     "boundary": {
       "backToProfile": "Terug naar profiel",
       "loadErrorMessage": "Controleer je verbinding en probeer het opnieuw.",
+
+      "chooseAccount": "Een account kiezen",
       "loadErrorTitle": "Je organisaties konden niet worden geladen.",
+      "noOrganization": "Geen organisatie",
+
+      "noOrganizationDescription": "Dit account maakt geen deel uit van een organisatie. Maak er een aan of word lid van een organisatie op de website om organisatiefuncties zoals liduitnodigingen en waarschuwingen bij een laag saldo te gebruiken.",
+
+      "openWebOrganizations": "Organisaties op de website openen",
+
       "organizationUnavailable": "De organisatie is niet beschikbaar.",
-      "selectDescription": "Kies een organisatie uit je profiel om door te gaan.",
+      "selectDescriptionWithOrganizations": "Je behoort tot een of meer organisaties. Kies het account dat dit scherm moet gebruiken.",
+
       "selectOrganization": "Een organisatie selecteren",
       "unavailableDescription": "Deze organisatie is niet meer beschikbaar. Kies er een uit je profiel om door te gaan.",
+
+      "unavailableSessionsDescription": "Deze organisatie is niet meer beschikbaar. De sessies ervan kunnen niet worden geladen.",
       "accessDeniedDescription": "Je hebt geen toegang tot deze organisatie."
     },
     "creditActivity": {
@@ -3641,7 +3685,9 @@
       "jsonTooLarge": "Gebruik maximaal 50 vermeldingen, sleutels tot 128 en waarden tot 4096 tekens",
       "timeoutInvalid": "De time-out moet een geheel aantal milliseconden bedragen",
       "edit": "MCP-server bewerken",
-      "saveFailed": "Kan MCP-server niet opslaan"
+      "saveFailed": "Kan MCP-server niet opslaan",
+      "deleteFailed": "Kan MCP-server niet verwijderen",
+      "updateFailed": "Kan MCP-server niet bijwerken"
     },
     "agents": {
       "title": "Profiel agenten",
@@ -3668,6 +3714,7 @@
       "visibilitySubagent": "Subagent — alleen opvraagbaar door anderen",
       "visibilityAll": "Allemaal – allebei",
       "saveFailed": "Kan agent niet opslaan",
+      "deleteFailed": "Kan agent niet verwijderen",
       "nameRequired": "Voer een agentnaam in",
       "slugRequired": "Voer een agentenslak in",
       "slugInvalid": "Slug moet beginnen met een letter en mag alleen kleine letters, cijfers en streepjes gebruiken",
@@ -3682,10 +3729,12 @@
       "description": "Beschrijving van de opdracht",
       "template": "Sjabloon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Leg $ARGUMENTS uit",
       "subtask": "Uitvoeren als subtaak",
       "edit": "Bewerk de slash-opdracht",
       "saveFailed": "Kan opdracht niet opslaan",
+      "deleteFailed": "Kan opdracht niet verwijderen",
       "nameRequired": "Voer een opdrachtnaam in",
       "nameInvalid": "De naam moet beginnen met een kleine letter en mag alleen kleine letters, cijfers en streepjes bevatten",
       "templateRequired": "Voer een opdrachtsjabloon in",
@@ -3832,7 +3881,7 @@
     "view": "Briefing lezen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Live status tonen",
+    "dismiss": "Briefing negeren",
     "offline": "Offline · opgeslagen briefing",
     "cached": "Opgeslagen rapport · vernieuwen niet beschikbaar",
     "revised": "Herzien · {{revision}}",

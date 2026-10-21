@@ -15,6 +15,7 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { statusMeta } from '@/components/code-reviewer/review-list-screen';
 import {
   flattenCouncilFindings,
+  reviewFailureLabel,
   selectRetryAction,
 } from '@/components/code-reviewer/review-detail-helpers';
 import { ReviewSpectatorSheet } from '@/components/code-reviewer/review-spectator-sheet';
@@ -183,15 +184,12 @@ export function ReviewDetailScreen({
         {/* Conclusion: the outcome leads — status first, then the failure reason. */}
         <View className="gap-2">
           <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
-          {review.error_message ? (
+          {review.status === 'failed' || review.error_message ? (
             <View className="rounded-lg bg-danger-tile-bg p-3">
-              {/* Upstream failures can persist a serialized stack dump here;
-                  unclamped it filled the screen and pushed the retry action
-                  below the fold (e1-review-status.png). Bound the block so
-                  the conclusion keeps a fixed footprint and the actions stay
-                  reachable. */}
               <Text className="text-xs text-destructive" numberOfLines={4}>
-                {review.error_message}
+                {review.status === 'failed'
+                  ? reviewFailureLabel(t, review.error_message, review.terminal_reason)
+                  : review.error_message}
               </Text>
             </View>
           ) : null}
@@ -202,7 +200,11 @@ export function ReviewDetailScreen({
           <Text className="text-sm font-medium">{t('common.findings')}</Text>
           {visibleFindings.length === 0 ? (
             <Text variant="muted" className="text-xs">
-              {t('codeReviewer.reviewDetail.noFindings')}
+              {t(
+                review.status === 'failed'
+                  ? 'codeReviewer.reviewDetail.findingsUnavailable'
+                  : 'codeReviewer.reviewDetail.noFindings'
+              )}
             </Text>
           ) : (
             <View className="gap-2">
@@ -253,7 +255,7 @@ export function ReviewDetailScreen({
             ) : null}
             {review.completed_at ? (
               <MetaRow
-                label={t('codeReviewer.status.completed')}
+                label={t('common.completed')}
                 value={timeAgo(parseTimestamp(review.completed_at))}
               />
             ) : null}
@@ -280,10 +282,12 @@ export function ReviewDetailScreen({
           <Button
             variant="secondary"
             onPress={() => {
-              const destination = resolveCodeReviewerOpenPrDestination(review.pr_url);
-              if (destination.kind === 'in-app') {
-                router.push(destination.href);
-                return;
+              if (isPersonal(scope)) {
+                const destination = resolveCodeReviewerOpenPrDestination(review.pr_url);
+                if (destination.kind === 'in-app') {
+                  router.push(destination.href);
+                  return;
+                }
               }
               void openExternalUrl(review.pr_url, {
                 label: t('common.pullRequest'),

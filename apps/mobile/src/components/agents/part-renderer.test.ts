@@ -9,9 +9,10 @@ import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
-import { PartRenderer, patchPartFileLabel } from './part-renderer';
+import { PartRenderer } from './part-renderer';
 import { ReasoningPartRenderer } from './reasoning-part-renderer';
 import { TextPartRenderer } from './text-part-renderer';
 import { PatchToolCardBody } from './tool-cards/patch-tool-card';
@@ -305,7 +306,7 @@ describe('PartRenderer', () => {
 describe('PartRenderer patch part summary', () => {
   // `/workspace/<userId>/sessions/<sessionId>` with the repo cloned at that
   // root (services/cloud-agent-next/src/workspace.ts:202).
-  const WORKSPACE_ROOT = '/workspace/a7e4d40b-c28c-4df1-9a1e-f88e7eb467f1/sessions/W1s2';
+  const WORKSPACE_ROOT = '/workspace/a7e4d40b-c28c-4df1-9a1e-f88e7eb467f1/sessions/ses_W1s2';
   // `/workspace/<userId>/worktrees/<worktreeId>` is the root a worktree-backed
   // session clones into instead (services/cloud-agent-next/src/workspace.ts:211).
   const WORKTREE_ROOT =
@@ -352,7 +353,7 @@ describe('PartRenderer patch part summary', () => {
   });
 
   it('strips an org-scoped workspace prefix', () => {
-    const part = makePatchPart(['/workspace/org-1/user-1/sessions/W1s2/src/a.ts']);
+    const part = makePatchPart(['/workspace/org-1/user-1/sessions/ses_W1s2/src/a.ts']);
     // eslint-disable-next-line new-cap
     const result = PartRenderer({ part });
     expect(findText(result, 'src/a.ts')).toHaveLength(1);
@@ -376,7 +377,7 @@ describe('PartRenderer patch part summary', () => {
 
   it('strips an org-scoped worktree workspace prefix from a nested path', () => {
     expect(
-      patchPartFileLabel('/workspace/org-1/user-1/worktrees/worktree_9b1deb4d/src/nested/a.ts')
+      cloudAgentFileLabel('/workspace/org-1/user-1/worktrees/worktree_9b1deb4d/src/nested/a.ts')
     ).toBe('src/nested/a.ts');
   });
 
@@ -393,11 +394,11 @@ describe('PartRenderer patch part summary', () => {
   });
 
   it('leaves a path without the workspace prefix untouched', () => {
-    expect(patchPartFileLabel('src/a.ts')).toBe('src/a.ts');
+    expect(cloudAgentFileLabel('src/a.ts')).toBe('src/a.ts');
   });
 
   it('strips the absolute workspace prefix from a nested path', () => {
-    expect(patchPartFileLabel(`${WORKSPACE_ROOT}/src/nested/a.ts`)).toBe('src/nested/a.ts');
+    expect(cloudAgentFileLabel(`${WORKSPACE_ROOT}/src/nested/a.ts`)).toBe('src/nested/a.ts');
   });
 
   it('returns null for a patch part with no files', () => {

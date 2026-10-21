@@ -6678,6 +6678,23 @@
                 },
                 "cloneFromKiloSessionId": {},
                 "cloneUpToMessageId": {},
+                "allowSubagentSessions": {
+                  "type": "boolean"
+                },
+                "callbackTarget": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "const": "session:parent"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
+                },
                 "githubRepo": {
                   "type": "string",
                   "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -6716,6 +6733,10 @@
                     "repositoryUuid"
                   ],
                   "additionalProperties": false
+                },
+                "publicRepoUrl": {
+                  "type": "string",
+                  "format": "uri"
                 },
                 "mode": {
                   "type": "string",
@@ -7167,6 +7188,23 @@
                   "format": "uuid",
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                 },
+                "allowSubagentSessions": {
+                  "type": "boolean"
+                },
+                "callbackTarget": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "const": "session:parent"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
+                },
                 "githubRepo": {
                   "type": "string",
                   "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -7205,6 +7243,10 @@
                     "repositoryUuid"
                   ],
                   "additionalProperties": false
+                },
+                "publicRepoUrl": {
+                  "type": "string",
+                  "format": "uri"
                 },
                 "mode": {
                   "type": "string",
@@ -8123,11 +8165,11 @@
       "properties": {
         "cloud_agent_session_id": {
           "type": "string",
-          "maxLength": 500
+          "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         },
         "kilo_session_id": {
           "type": "string",
-          "maxLength": 500
+          "pattern": "^ses_[A-Za-z0-9]{26}$"
         },
         "session_type": {
           "type": "string",
@@ -18270,6 +18312,23 @@
                     },
                     "cloneFromKiloSessionId": {},
                     "cloneUpToMessageId": {},
+                    "allowSubagentSessions": {
+                      "type": "boolean"
+                    },
+                    "callbackTarget": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "const": "session:parent"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
+                    },
                     "githubRepo": {
                       "type": "string",
                       "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -18308,6 +18367,10 @@
                         "repositoryUuid"
                       ],
                       "additionalProperties": false
+                    },
+                    "publicRepoUrl": {
+                      "type": "string",
+                      "format": "uri"
                     },
                     "mode": {
                       "type": "string",
@@ -18759,6 +18822,23 @@
                       "format": "uuid",
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
+                    "allowSubagentSessions": {
+                      "type": "boolean"
+                    },
+                    "callbackTarget": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "const": "session:parent"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
+                    },
                     "githubRepo": {
                       "type": "string",
                       "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -18797,6 +18877,10 @@
                         "repositoryUuid"
                       ],
                       "additionalProperties": false
+                    },
+                    "publicRepoUrl": {
+                      "type": "string",
+                      "format": "uri"
                     },
                     "mode": {
                       "type": "string",

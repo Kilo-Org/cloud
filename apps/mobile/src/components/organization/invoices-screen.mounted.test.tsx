@@ -36,6 +36,14 @@ const queryErrors = vi.hoisted(() => ({
   errors: [] as { variant?: string; onRetry?: () => void }[],
 }));
 
+const connectivity = vi.hoisted(() => ({ value: 'online' as 'online' | 'offline' | 'unknown' }));
+
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => connectivity.value,
+  useCommittedConnectivityStatus: () => connectivity.value,
+  useOfflineBannerState: () => connectivity.value === 'offline',
+}));
+
 const buttons = vi.hoisted(() => ({
   rendered: [] as {
     children?: unknown;

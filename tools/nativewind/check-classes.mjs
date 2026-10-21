@@ -13,6 +13,7 @@
 import { createRequire } from 'node:module';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import ts from 'typescript';
 
 // Resolve from the app: react-native-css is the app's dependency, not the repo root's.
 const require = createRequire(new URL('../../apps/mobile/package.json', import.meta.url));
@@ -87,22 +88,62 @@ const RULES = [
  * nothing catches it until someone reads the app in Arabic, Farsi or Hebrew.
  */
 const SCROLL_CONTAINERS =
-  '(?:Animated\\.)?(?:ScrollView|TabScreenScrollView|FlatList|FlashList|KeyboardAwareScrollView)';
-const SCROLL_TAG = new RegExp(`<(${SCROLL_CONTAINERS})\\b([^>]*?)/?>`, 'gs');
-const OWN_CLASS_NAME = /(?<!contentContainer)className="([^"]*)"/;
+  /^(?:Animated\.)?(?:ScrollView|TabScreenScrollView|FlatList|FlashList|KeyboardAwareScrollView)$/;
+// Parsing is the expensive half of this check, and only a file that names a
+// container can hold one.
+const NAMES_A_CONTAINER =
+  /ScrollView|TabScreenScrollView|FlatList|FlashList|KeyboardAwareScrollView/;
 const HORIZONTAL_PADDING = /^-?(?:px|pl|pr|ps|pe)-/;
 
-function checkScrollPadding(relative, text) {
-  for (const match of text.matchAll(SCROLL_TAG)) {
-    const className = OWN_CLASS_NAME.exec(match[2]);
-    if (!className) {
-      continue;
+/**
+ * Each container element in the file with the classes on its own `className`,
+ * read from the JSX tree so the attribute is found at any position and with any
+ * prop content around it.
+ */
+function scrollContainers(relative, text) {
+  const source = ts.createSourceFile(
+    relative,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX
+  );
+  const containers = [];
+  const visit = node => {
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const tag = node.tagName.getText(source);
+      if (SCROLL_CONTAINERS.test(tag)) {
+        const className = node.attributes.properties.find(
+          attribute =>
+            ts.isJsxAttribute(attribute) && attribute.name.getText(source) === 'className'
+        );
+        // `className={cn(…)}` is not a class list this check can read.
+        if (className?.initializer && ts.isStringLiteral(className.initializer)) {
+          containers.push({
+            tag,
+            classes: className.initializer.text,
+            line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+          });
+        }
+      }
     }
-    const padding = className[1].split(/\s+/).filter(cls => HORIZONTAL_PADDING.test(cls));
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return containers;
+}
+
+function checkScrollPadding(relative, text) {
+  if (!NAMES_A_CONTAINER.test(text)) {
+    return;
+  }
+  // `contentContainerClassName` is a separate attribute, so padding on it stays
+  // the recommended fix.
+  for (const { tag, classes, line } of scrollContainers(relative, text)) {
+    const padding = classes.split(/\s+/).filter(cls => HORIZONTAL_PADDING.test(cls));
     if (padding.length > 0) {
-      const line = text.slice(0, match.index).split('\n').length;
       fail(
-        `${relative}:${line}: <${match[1]}> carries "${padding.join(' ')}" on its own className; move it to contentContainerClassName or the RTL layout offsets by it`
+        `${relative}:${line}: <${tag}> carries "${padding.join(' ')}" on its own className; move it to contentContainerClassName or the RTL layout offsets by it`
       );
     }
   }

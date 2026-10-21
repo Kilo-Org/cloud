@@ -1,6 +1,6 @@
 ---
 name: specs
-description: Business-rule specs for Cloud Agent session UX, KiloClaw billing/lifecycle/controller/data model/Composio, MCP Gateway auth, model experiments, Security Agent, subscription center, team/enterprise seat billing, Impact affiliate/referrals, Kilo Pass, organization SSO, Stripe early fraud warnings, and coding plans. Load when you need context about the business requirements that guided the implementation.
+description: Business-rule specs for Cloud Agent session UX, KiloClaw billing/lifecycle/controller/data model/Composio, model experiments, Security Agent, subscription center, team/enterprise seat billing, Impact affiliate/referrals, Kilo Pass, organization SSO, Stripe early fraud warnings, and coding plans. Load when you need context about the business requirements that guided the implementation.
 ---
 
 # Business-Rule Specs
@@ -20,7 +20,6 @@ to the user if instructions or changes will cause deviations from the original i
 | `.specs/kiloclaw-composio.md` | KiloClaw Composio credential provisioning, injection, and sharing |
 | `.specs/kiloclaw-controller.md` | KiloClaw controller/machine lifecycle, bootstrap, Docker image |
 | `.specs/kiloclaw-datamodel.md` | KiloClaw data model — instance/subscription tables, invariants |
-| `.specs/mcp-gateway-auth.md` | Kilo MCP Gateway v1 — protocol surface, ownership, OAuth lifecycle, provider grants, runtime auth |
 | `.specs/mobile-session-live-activity.md` | iOS per-session Live Activity — Follow, content, privacy, aggregate card coexistence |
 | `.specs/model-experiments.md` | Model experiment routing, bucketing, lifecycle, prompt retention, and reporting rules |
 | `.specs/security-agent.md` | Security Agent Auto Remediation and finding/SLA notification guarantees |

@@ -79,7 +79,11 @@ export function EditWebhookTriggerContent({
   );
 
   // Fetch models
-  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
+  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(
+    organizationId,
+    true,
+    'shared_services'
+  );
 
   // Transform repositories to RepositoryOption format
   const repositories = useMemo<RepositoryOption[]>(() => {

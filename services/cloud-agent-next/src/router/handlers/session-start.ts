@@ -14,7 +14,7 @@ import { protectedProcedure } from '../auth.js';
 import { logger, withLogTags } from '../../logger.js';
 import type * as z from 'zod';
 import { StartSessionInput, StartSessionOutput } from '../schemas.js';
-import { startNewSession } from '../../session/session-registration.js';
+import { createSessionWithLedger, startNewSession } from '../../session/session-registration.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { preflightSessionCreation } from './session-creation-preflight.js';
 
@@ -97,6 +97,35 @@ const startSessionHandler = protectedProcedure
         ctx,
         'start'
       );
+
+      if (input.operationKey !== undefined) {
+        const registration = await createSessionWithLedger(
+          request,
+          {
+            env: ctx.env,
+            userId: ctx.userId,
+            authToken: ctx.authToken,
+            botId: ctx.botId,
+          },
+          {
+            billingOrigin: 'cloud-agent',
+            operationKey: input.operationKey,
+            includeInitialMessage: true,
+            resolveSavedAllocationBeforeAdmission: true,
+            startedAt: Date.now(),
+          }
+        );
+        if (!registration.messageId) {
+          throw new Error('Session create completed without an initial message ID');
+        }
+        return {
+          cloudAgentSessionId: registration.cloudAgentSessionId,
+          kiloSessionId: registration.kiloSessionId,
+          messageId: registration.messageId,
+          replayed: registration.replayed === true,
+          delivery: registration.delivery ?? 'queued',
+        };
+      }
 
       const registration = await startNewSession(
         request,

@@ -324,8 +324,10 @@
   "sv": [
     "{{count}} open",
     "block",
+    "comment",
     "commit",
     "copied",
+    "merge",
     "open",
     "open pull request",
     "review",

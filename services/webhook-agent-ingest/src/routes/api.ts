@@ -555,14 +555,14 @@ async function handleListRequests(c: RouteContext, namespace: string, triggerId:
   const doKey = buildDOKey(namespace, triggerId);
 
   try {
-    // First check if trigger exists
-    const isActive = await withDORetry(
+    // First check if trigger exists, regardless of whether it is paused
+    const exists = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.isActive(),
-      'isActive'
+      stub => stub.exists(),
+      'exists'
     );
 
-    if (!isActive) {
+    if (!exists) {
       return c.json(resError('Trigger not found'), 404);
     }
 
@@ -592,14 +592,14 @@ async function handleGetRequest(
   const doKey = buildDOKey(namespace, triggerId);
 
   try {
-    // First check if trigger exists
-    const isActive = await withDORetry(
+    // First check if trigger exists, regardless of whether it is paused
+    const exists = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.isActive(),
-      'isActive'
+      stub => stub.exists(),
+      'exists'
     );
 
-    if (!isActive) {
+    if (!exists) {
       return c.json(resError('Trigger not found'), 404);
     }
 
@@ -629,14 +629,14 @@ async function handleDeleteTrigger(c: RouteContext, namespace: string, triggerId
   const doKey = buildDOKey(namespace, triggerId);
 
   try {
-    // First check if trigger exists
-    const isActive = await withDORetry(
+    // First check if trigger exists, regardless of whether it is paused
+    const exists = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.isActive(),
-      'isActive'
+      stub => stub.exists(),
+      'exists'
     );
 
-    if (!isActive) {
+    if (!exists) {
       return c.json(resError('Trigger not found'), 404);
     }
 

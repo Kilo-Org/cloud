@@ -1,5 +1,8 @@
 import { describe, expect, test } from '@jest/globals';
-import { injectExtraProviderModels } from '@/lib/providers/openrouter/inject-extra-provider-models';
+import {
+  injectExtraProviderModels,
+  injectVercelOnlyProviders,
+} from '@/lib/providers/openrouter/inject-extra-provider-models';
 import {
   modelRetainsPrompts,
   modelTrains,
@@ -84,7 +87,7 @@ describe('injectExtraProviderModels', () => {
       },
     };
 
-    injectExtraProviderModels(vercelModels, providerModelData);
+    injectExtraProviderModels(vercelModels, providerModelData, new Map());
 
     const injected = providerModelData[1]?.models[0];
     expect(injected?.slug).toBe(MODEL_SLUG);
@@ -131,9 +134,224 @@ describe('injectExtraProviderModels', () => {
       },
     };
 
-    injectExtraProviderModels(vercelModels, providerModelData);
+    injectExtraProviderModels(vercelModels, providerModelData, new Map());
 
     expect(providerModelData[1]?.models[0]?.slug).toBe(MODEL_SLUG);
     expect(providerModelData[1]?.models[0]?.context_length).toBe(128_000);
+  });
+
+  test('looks up the Vercel model through a model ID override', () => {
+    const model = nvidiaModel();
+    const providerModelData = [
+      {
+        provider: provider('nvidia', 'NVIDIA', {
+          training: true,
+          retainsPrompts: true,
+          canPublish: false,
+        }),
+        models: [model],
+      },
+      {
+        provider: provider('future-provider', 'Future Provider', {
+          training: false,
+          retainsPrompts: false,
+          canPublish: false,
+        }),
+        models: [] as OpenRouterModel[],
+      },
+    ];
+    const vercelModelId = 'nvidia/nemotron-3-super';
+    const vercelModels: Record<string, StoredModel> = {
+      [vercelModelId]: {
+        id: vercelModelId,
+        name: model.name,
+        endpoints: [{ provider_name: 'nvidia' }, { provider_name: 'future-provider' }],
+      },
+    };
+
+    injectExtraProviderModels(vercelModels, providerModelData, new Map());
+    expect(providerModelData[1]?.models).toEqual([]);
+
+    injectExtraProviderModels(
+      vercelModels,
+      providerModelData,
+      new Map([[MODEL_SLUG, vercelModelId]])
+    );
+    expect(providerModelData[1]?.models[0]?.slug).toBe(MODEL_SLUG);
+  });
+});
+
+describe('injectVercelOnlyProviders', () => {
+  function nvidiaProviderModelData() {
+    return [
+      {
+        provider: provider('nvidia', 'NVIDIA', {
+          training: true,
+          retainsPrompts: true,
+          canPublish: false,
+        }),
+        models: [nvidiaModel()],
+      },
+      {
+        provider: provider('amazon-bedrock', 'Amazon Bedrock', {
+          training: false,
+          retainsPrompts: false,
+          canPublish: false,
+        }),
+        models: [] as OpenRouterModel[],
+      },
+    ];
+  }
+
+  test('adds providers that only serve snapshot models through Vercel', () => {
+    const providerModelData = nvidiaProviderModelData();
+    const vercelModels: Record<string, StoredModel> = {
+      [MODEL_SLUG]: {
+        id: MODEL_SLUG,
+        name: 'NVIDIA Nemotron 3 Super',
+        endpoints: [
+          { provider_name: 'nvidia', has_zdr: false, has_no_training: false },
+          { provider_name: 'bedrock', has_zdr: true, has_no_training: true },
+          {
+            provider_name: 'runinfra',
+            context_length: 128_000,
+            pricing: { prompt: '0.0000001', completion: '0.0000004' },
+            has_zdr: true,
+            has_no_training: true,
+          },
+        ],
+      },
+    };
+
+    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+
+    expect(providerModelData.map(({ provider }) => provider.slug)).toEqual([
+      'nvidia',
+      'amazon-bedrock',
+      'runinfra',
+    ]);
+    const runinfra = providerModelData[2];
+    expect(runinfra?.provider).toEqual({
+      name: 'RunInfra',
+      displayName: 'RunInfra',
+      slug: 'runinfra',
+      dataPolicy: {
+        training: false,
+        retainsPrompts: false,
+        canPublish: false,
+        termsOfServiceURL: 'https://runinfra.ai/terms-of-service',
+        privacyPolicyURL: 'https://runinfra.ai/privacy-policy',
+      },
+      icon: { url: 'https://placehold.co/100?text=RU&font=roboto', className: 'rounded-sm' },
+    });
+    expect(runinfra?.models).toHaveLength(1);
+    expect(runinfra?.models[0]?.slug).toBe(MODEL_SLUG);
+    expect(runinfra?.models[0]?.context_length).toBe(128_000);
+    expect(runinfra?.models[0]?.endpoint).toEqual({
+      provider_display_name: 'RunInfra',
+      is_free: false,
+      pricing: { prompt: '0.0000001', completion: '0.0000004' },
+      data_policy: { training: false, retainsPrompts: false },
+    });
+  });
+
+  test('derives a display name without policy links for unknown providers', () => {
+    const providerModelData = nvidiaProviderModelData();
+    const vercelModels: Record<string, StoredModel> = {
+      [MODEL_SLUG]: {
+        id: MODEL_SLUG,
+        name: 'NVIDIA Nemotron 3 Super',
+        endpoints: [{ provider_name: 'nvidia' }, { provider_name: 'future-provider' }],
+      },
+    };
+
+    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+
+    const futureProvider = providerModelData.find(
+      ({ provider }) => provider.slug === 'future-provider'
+    )?.provider;
+    expect(futureProvider?.displayName).toBe('Future Provider');
+    expect(futureProvider?.dataPolicy).toEqual({
+      training: true,
+      retainsPrompts: true,
+      canPublish: false,
+    });
+  });
+
+  test('treats missing Vercel data policy guarantees as training and retaining prompts', () => {
+    const providerModelData = nvidiaProviderModelData();
+    const vercelModels: Record<string, StoredModel> = {
+      [MODEL_SLUG]: {
+        id: MODEL_SLUG,
+        name: 'NVIDIA Nemotron 3 Super',
+        endpoints: [
+          { provider_name: 'nvidia' },
+          { provider_name: 'boundless', has_zdr: true, has_no_training: false },
+        ],
+      },
+    };
+
+    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+
+    const boundless = providerModelData.find(({ provider }) => provider.slug === 'boundless');
+    expect(boundless?.provider.dataPolicy).toEqual({
+      training: true,
+      retainsPrompts: false,
+      canPublish: false,
+      termsOfServiceURL: 'https://boundless.network/terms-of-service',
+      privacyPolicyURL: 'https://boundless.network/privacy-policy',
+    });
+    expect(boundless?.models[0]?.endpoint?.data_policy).toEqual({
+      training: true,
+      retainsPrompts: false,
+    });
+  });
+
+  test('does not add providers already known under an OpenRouter slug', () => {
+    const providerModelData = nvidiaProviderModelData();
+    const vercelModels: Record<string, StoredModel> = {
+      [MODEL_SLUG]: {
+        id: MODEL_SLUG,
+        name: 'NVIDIA Nemotron 3 Super',
+        endpoints: [{ provider_name: 'nvidia' }, { provider_name: 'bedrock' }],
+      },
+    };
+
+    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+
+    expect(providerModelData.map(({ provider }) => provider.slug)).toEqual([
+      'nvidia',
+      'amazon-bedrock',
+    ]);
+  });
+
+  test('ignores Vercel models that are not in the snapshot', () => {
+    const providerModelData = nvidiaProviderModelData();
+    const vercelModels: Record<string, StoredModel> = {
+      'vendor/vercel-only-model': {
+        id: 'vendor/vercel-only-model',
+        name: 'Vercel Only Model',
+        endpoints: [{ provider_name: 'boundless' }],
+      },
+    };
+
+    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+
+    expect(providerModelData).toHaveLength(2);
+  });
+
+  test('skips provider ids that routing would lowercase', () => {
+    const providerModelData = nvidiaProviderModelData();
+    const vercelModels: Record<string, StoredModel> = {
+      [MODEL_SLUG]: {
+        id: MODEL_SLUG,
+        name: 'NVIDIA Nemotron 3 Super',
+        endpoints: [{ provider_name: 'nvidia' }, { provider_name: 'futureProvider' }],
+      },
+    };
+
+    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+
+    expect(providerModelData).toHaveLength(2);
   });
 });

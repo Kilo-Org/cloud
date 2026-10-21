@@ -111,7 +111,7 @@
     "notFound": "ไม่พบข้อมูล",
     "online": "ออนไลน์",
     "open": "เปิด {{name}}",
-    "openPullRequest": "เปิดพูลรีเควสต์",
+    "openPullRequest": "เปิด PR",
     "completed": "เสร็จสิ้น",
     "pending": "รอดำเนินการ",
     "running": "กำลังทำงาน",
@@ -142,7 +142,7 @@
     "working": "กำลังทำงาน",
     "yourOwnRepositories": "คลังโค้ดของคุณเอง",
     "dismissed": "ละเว้นแล้ว",
-    "agent": "ตัวแทน",
+    "agent": "เอเจนต์",
     "durationMinuteShort": "น.",
     "durationHourShort": "ชม.",
     "changes": "การเปลี่ยนแปลง"
@@ -989,7 +989,7 @@
       "takePhoto": "ถ่ายภาพ",
       "photoLibrary": "คลังรูปภาพ",
       "files": "ไฟล์",
-      "cameraAccessMessage": "อนุญาตให้ใช้กล้องในการตั้งค่าเพื่อถ่ายรูป"
+      "cameraAccessMessage": "อนุญาตให้ใช้กล้องในการตั้งค่าเพื่อถ่ายภาพ"
     },
     "typingIndicator": {
       "someone": "มีคน",
@@ -1384,7 +1384,7 @@
       "warning": "ไม่ผ่านเมื่อพบข้อค้นพบระดับคำเตือนหรือวิกฤต"
     },
     "instructions": {
-      "title": "คำสั่งที่กำหนดเอง",
+      "title": "คำแนะนำที่กำหนดเอง",
       "deprecation": "คำแนะนำที่กำหนดเองจะเลิกใช้งานในอนาคต ย้ายคำแนะนำเหล่านี้ไปไว้ในไฟล์ REVIEW.md ในคลังโค้ดแทน",
       "placeholder": "เช่น ตรวจให้เป็นไปตามแนวทางการจัดการข้อผิดพลาดของเรา…"
     },
@@ -1426,7 +1426,7 @@
       "showMore": "แสดงเพิ่มเติม",
       "created": "สร้างเมื่อ",
       "started": "เริ่มเมื่อ",
-      "tokens": "โทเค็น",
+      "tokens": "โทเคน",
       "tokensInOut": "ขาเข้า {{input}} / ขาออก {{output}}",
       "council": "คณะผู้ตรวจสอบ",
       "decision": "การตัดสินใจ",
@@ -1438,7 +1438,7 @@
       "transcriptWaiting": "กำลังรอบันทึกการตรวจสอบ",
       "transcriptEmpty": "ไม่มีบันทึกสำหรับการตรวจสอบนี้",
       "transcriptRetry": "ไม่สามารถโหลดบันทึกการตรวจสอบได้",
-      "transcriptLive": "กำลังทำงาน",
+      "transcriptLive": "สด",
       "agentIdle": "เอเจนต์ว่าง",
       "agentWorking": "เอเจนต์กำลังทำงาน...",
       "anErrorOccurred": "เกิดข้อผิดพลาด",
@@ -1474,7 +1474,7 @@
       "pullRequestUrl": "URL ของ PR",
       "instructions": "คำแนะนำ (ไม่บังคับ)",
       "instructionsPlaceholder": "เรื่องที่ต้องการให้ผู้ตรวจสอบเน้นเป็นพิเศษ…",
-      "starting": "กำลังเริ่มการตรวจสอบ...",
+      "starting": "กำลังเริ่มการตรวจสอบ…",
       "start": "เริ่มการตรวจสอบ"
     },
     "notConnectedReadOnly": "{{platform}} ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
@@ -1524,7 +1524,7 @@
       "reviewStyle": "รูปแบบการตรวจสอบ",
       "focusAreas": "ประเด็นที่เน้น",
       "allAreas": "ทุกด้าน",
-      "customInstructions": "คำสั่งที่กำหนดเอง",
+      "customInstructions": "คำแนะนำที่กำหนดเอง",
       "set": "ตั้งค่าแล้ว",
       "nSelected": "เลือกแล้ว {{displayCount}} รายการ",
       "proposedReviewMdGuidance": "คำแนะนำที่เสนอสำหรับ REVIEW.md"
@@ -1532,7 +1532,7 @@
     "decision": {
       "pass": "ผ่าน",
       "block": "บล็อก",
-      "noDecision": "ยังไม่มีข้อสรุป",
+      "noDecision": "ไม่มีข้อสรุป",
       "noResult": "ไม่มีผลลัพธ์"
     },
     "updateFailed": "อัปเดตตัวตรวจสอบโค้ดไม่สำเร็จ",
@@ -2078,7 +2078,7 @@
       "completedWillAppear": "เซสชันที่เสร็จแล้วจะแสดงที่นี่",
       "noPastSessions": "ยังไม่มีเซสชันที่ผ่านมา",
       "pastSessions": "เซสชันที่ผ่านมา",
-      "live": "กำลังทำงาน",
+      "live": "สด",
       "updating": "กำลังอัปเดต"
     },
     "sessionRow": {
@@ -2102,15 +2102,15 @@
       "dollar_other": "ดอลลาร์",
       "costSpoken": "ค่าใช้จ่าย {{cost}}",
       "costSpokenWithTime": "ค่าใช้จ่าย {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "PR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "ไม่สามารถเปิด GitHub ได้",
       "couldNotOpenMessage": "เริ่มตั้งค่า GitHub App ไม่สำเร็จ โปรดลองอีกครั้ง",
       "installedTitle": "ติดตั้ง GitHub App แล้ว",
       "installedMessage": "เชื่อมต่อรีโพซิทอรีของคุณแล้ว",
-      "pendingTitle": "รอการอนุมัติจากผู้ดูแลระบบ",
-      "pendingMessage": "ผู้ดูแลระบบขององค์กรต้องอนุมัติคำขอติดตั้ง",
+      "pendingTitle": "รอการอนุมัติจากผู้ดูแลองค์กร",
+      "pendingMessage": "ผู้ดูแลองค์กรต้องอนุมัติคำขอติดตั้ง",
       "accountMismatchTitle": "บัญชีไม่ตรงกัน",
       "accountMismatchMessage": "การเชื่อมต่อนี้เริ่มจาก Kilo App ที่เข้าสู่ระบบด้วยบัญชีอื่น เข้าสู่ระบบบนเว็บด้วยบัญชีนั้น หรือเริ่มใหม่จากแอป",
       "cannotCompleteTitle": "ไม่สามารถติดตั้งให้เสร็จสมบูรณ์ได้",
@@ -2170,7 +2170,7 @@
       "exitSession": "ออกจากเซสชัน",
       "restartExitFailed": "เริ่มเซสชันใหม่แล้ว แต่เซสชันก่อนหน้ายังเปิดอยู่",
       "exitNotSupported": "เซสชันปัจจุบันไม่รองรับการออกจากเซสชันระยะไกล",
-      "exitUnavailable": "ขณะนี้ไม่สามารถออกจากเซสชันระยะไกลนี้ได้",
+      "exitUnavailable": "ไม่สามารถออกจากเซสชันระยะไกลนี้ได้",
       "exitNeedsNewerCli": "คำสั่งที่ขึ้นต้นด้วย / ในเซสชันระยะไกลต้องใช้ Kilo CLI เวอร์ชันใหม่กว่า อัปเดต Kilo CLI แล้วเชื่อมต่ออีกครั้ง"
     },
     "sessionConnection": {
@@ -2265,7 +2265,7 @@
       "pickProfile": "เลือกโปรไฟล์",
       "noProfile": "ไม่มีโปรไฟล์",
       "manageProfiles": "จัดการโปรไฟล์",
-      "noProfiles": "ยังไม่มีโปรไฟล์ สร้างรายการเพื่อเพิ่มตัวแปรสภาพแวดล้อม เซิร์ฟเวอร์ MCP และทักษะ",
+      "noProfiles": "ยังไม่มีโปรไฟล์ สร้างโปรไฟล์เพื่อเพิ่มตัวแปรสภาพแวดล้อม เซิร์ฟเวอร์ MCP และทักษะ",
       "advancedConfig": "การกำหนดค่าขั้นสูง",
       "advancedConfigDescription": "เลือกโปรไฟล์เพื่อโหลดการกำหนดค่าที่บันทึกไว้ และกำหนดค่าตัวแปรสภาพแวดล้อมเพิ่มเติมและคำสั่งการตั้งค่าด้วยตนเอง",
       "saveAsProfile": "บันทึกเป็นโปรไฟล์",
@@ -2282,7 +2282,7 @@
       "profilesActive": "โปรไฟล์ใช้งานอยู่",
       "customConfigActive": "การกำหนดค่าแบบกำหนดเองทำงานอยู่",
       "configNeedsAttention": "การกำหนดค่าจำเป็นต้องได้รับการดูแล",
-      "repoProfile": "โปรไฟล์ซื้อคืน",
+      "repoProfile": "โปรไฟล์คลังโค้ด",
       "selectedProfile": "โปรไฟล์ที่เลือก",
       "manualOverrides": "การแทนที่ด้วยตนเอง",
       "openSettingsToReview": "เปิดการตั้งค่าเพื่อตรวจสอบ",
@@ -2692,7 +2692,7 @@
       "olderActivity": "กิจกรรมก่อนหน้า",
       "olderActivityDescription": "ค่าใช้จ่ายที่ไม่อยู่ในประวัติที่โหลดมา",
       "ofWindowTokens": "จาก {{window}} โทเคน",
-      "tokens": "โทเค็น",
+      "tokens": "โทเคน",
       "tokensWithPercentage": "โทเคน ({{percentage}})",
       "stepsCount_one": "{{steps}} ขั้นตอน",
       "stepsCount": "{{steps}} ขั้นตอน",
@@ -2704,7 +2704,7 @@
     "sessionChanges": {
       "viewChanges": "ดูการเปลี่ยนแปลง",
       "asOf": "ณ เวลา {{time}}",
-      "tooLarge": "ส่วนต่างนี้มีขนาดใหญ่เกินกว่าจะแสดงบนมือถือได้",
+      "tooLarge": "การเปลี่ยนแปลงนี้มีขนาดใหญ่เกินกว่าจะแสดงบนมือถือได้",
       "empty": "ยังไม่มีการเปลี่ยนแปลงไฟล์ในเซสชันนี้"
     },
     "autoApprove": {
@@ -2713,9 +2713,9 @@
       "unavailable": "เซสชันนี้ไม่สามารถรับคำขออนุญาตได้"
     },
     "prBadge": {
-      "open": "เปิดพูลรีเควสต์",
-      "closed": "pR ที่ปิดแล้ว",
-      "merged": "pR ที่รวมโค้ดแล้ว",
+      "open": "เปิด PR",
+      "closed": "PR ที่ปิดแล้ว",
+      "merged": "PR ที่รวมโค้ดแล้ว",
       "draft": "PR ฉบับร่าง",
       "updating": "กำลังอัปเดต, {{label}} #{{number}}",
       "label": "{{label}} หมายเลข {{number}}"
@@ -2781,7 +2781,7 @@
     "sessionSignedOut": "ออกจากระบบสำหรับเซสชันนี้แล้ว",
     "signOutThisDeviceTitle": "ออกจากระบบบนอุปกรณ์นี้หรือไม่?",
     "signOutThisSessionTitle": "ออกจากระบบสำหรับเซสชันนี้หรือไม่?",
-    "signOutThisSessionMessage": "ระบบจะให้ {{device}} ออกจากระบบ แต่อุปกรณ์นี้ยังเข้าถึง API ได้อีกไม่เกินหนึ่งชั่วโมง",
+    "signOutThisSessionMessage": "ระบบจะให้ {{device}} ออกจากระบบ แต่อุปกรณ์นั้นยังเข้าถึง API ได้อีกไม่เกินหนึ่งชั่วโมง",
     "webBrowser": "เว็บเบราว์เซอร์"
   },
   "forceUpdate": {
@@ -3166,12 +3166,12 @@
     "invalidCode": "รหัสนั้นไม่ถูกต้อง โปรดลองอีกครั้ง",
     "codeInProgress": "กำลังประมวลผลรหัสของคุณ รอสักครู่แล้วลองอีกครั้ง",
     "tooManyAttempts": "ลองหลายครั้งเกินไป โปรดขอรหัสใหม่",
-    "invalidToken": "เข้าสู่ระบบไม่สำเร็จ ลองอีกครั้ง",
+    "invalidToken": "เข้าสู่ระบบไม่สำเร็จ โปรดลองอีกครั้ง",
     "invalidEmail": "ไม่สามารถส่งอีเมลไปยังที่อยู่นี้ได้ โปรดใช้อีเมลอื่น",
     "invalidRequest": "ตรวจสอบที่อยู่อีเมลของคุณแล้วลองอีกครั้ง",
     "emailDeliveryFailed": "ระบบส่งอีเมลใช้งานไม่ได้ชั่วคราว โปรดลองอีกครั้งภายหลัง",
     "admissionRequired": "ไม่สามารถยืนยันอุปกรณ์ของคุณได้ ใช้ '$t(login.moreSignInOptions)' เพื่อเข้าสู่ระบบบนอุปกรณ์อื่นหรือผ่านเว็บ",
-    "default": "เกิดข้อผิดพลาด ลองอีกครั้ง",
+    "default": "เกิดข้อผิดพลาด โปรดลองอีกครั้ง",
     "retryableAdmission": "ไม่สามารถยืนยันอุปกรณ์นี้ได้ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
     "startSignInFailed": "เริ่มเข้าสู่ระบบไม่สำเร็จ โปรดลองอีกครั้ง",
     "couldNotOpenBrowser": "ไม่สามารถเปิดเบราว์เซอร์ได้ โปรดลองอีกครั้ง",
@@ -3561,7 +3561,7 @@
     "start": {
       "promptRequired": "การเริ่มเอเจนต์ต้องมีพรอมต์ เพิ่มพรอมต์แล้วลองอีกครั้ง",
       "repositoryUnknown": "Kilo ไม่รู้จัก {{repository}} ว่าเป็นคลังโค้ด GitHub หรือ GitLab เลือกคลังโค้ดอื่นใน Kilo",
-      "repositoryUnsupported": "{{repository}} เป็นคลังโค้ด Bitbucket — เริ่มเอเจนต์ยังใช้ไม่ได้ เลือกคลังโค้ดอื่นใน Kilo"
+      "repositoryUnsupported": "{{repository}} เป็นคลังโค้ด Bitbucket — เริ่มเอเจนต์ยังใช้คลังโค้ดนี้ไม่ได้ เลือกคลังโค้ดอื่นใน Kilo"
     }
   },
   "launcher": {
@@ -3695,12 +3695,12 @@
       "updateFailed": "ไม่สามารถอัปเดตเซิร์ฟเวอร์ MCP ได้"
     },
     "agents": {
-      "title": "ตัวแทนโปรไฟล์",
-      "add": "เพิ่มตัวแทน",
-      "empty": "ยังไม่มีตัวแทน",
-      "name": "ชื่อตัวแทน",
-      "slug": "Slug ของตัวแทน",
-      "description": "คำอธิบายตัวแทน",
+      "title": "เอเจนต์โปรไฟล์",
+      "add": "เพิ่มเอเจนต์",
+      "empty": "ยังไม่มีเอเจนต์",
+      "name": "ชื่อเอเจนต์",
+      "slug": "ตัวระบุเอเจนต์",
+      "description": "คำอธิบายเอเจนต์",
       "model": "การแทนที่โมเดล",
       "modelPlaceholder": "ใช้ค่าเริ่มต้นของเซสชัน",
       "prompt": "พร้อมท์ระบบ",
@@ -3711,20 +3711,20 @@
       "topP": "top_p",
       "topPPlaceholder": "เช่น 0.95",
       "slugPlaceholder": "my-agent",
-      "namePlaceholder": "ตัวแทนของฉัน",
+      "namePlaceholder": "เอเจนต์ของฉัน",
       "promptPlaceholder": "คุณเป็น...",
       "tools": "เครื่องมือ",
       "visibility": "การมองเห็น",
       "visibilityPrimary": "หลัก — แสดงในเครื่องมือเลือก",
       "visibilitySubagent": "Subagent — สามารถเรียกได้จากผู้อื่นเท่านั้น",
       "visibilityAll": "ทั้งหมด - ทั้งสองอย่าง",
-      "saveFailed": "ไม่สามารถบันทึกตัวแทนได้",
-      "deleteFailed": "ไม่สามารถลบตัวแทนได้",
-      "nameRequired": "ป้อนชื่อตัวแทน",
-      "slugRequired": "ป้อน Slug ของตัวแทน",
+      "saveFailed": "ไม่สามารถบันทึกเอเจนต์ได้",
+      "deleteFailed": "ไม่สามารถลบเอเจนต์ได้",
+      "nameRequired": "ป้อนชื่อเอเจนต์",
+      "slugRequired": "ใส่ตัวระบุเอเจนต์",
       "slugInvalid": "Slug ต้องขึ้นต้นด้วยตัวอักษรและใช้เฉพาะตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น",
-      "slugConflict": "Slug นี้ถูกใช้โดยตัวแทนในตัวหรือตัวแทนอื่นในโปรไฟล์นี้แล้ว",
-      "edit": "แก้ไขตัวแทน"
+      "slugConflict": "ตัวระบุนั้นมีเอเจนต์ในตัวหรือเอเจนต์อื่นในโปรไฟล์นี้ใช้งานอยู่แล้ว",
+      "edit": "แก้ไขเอเจนต์"
     },
     "slashCommands": {
       "title": "คำสั่งสแลช",

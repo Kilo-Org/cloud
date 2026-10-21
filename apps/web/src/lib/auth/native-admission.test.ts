@@ -394,6 +394,45 @@ describe('checkNativeAdmission', () => {
     });
   });
 
+  describe('mode: non-canonical values', () => {
+    test('folds case and whitespace around enforce', () => {
+      setMode(' Enforce ');
+      expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
+        admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' },
+        verifyAsync: false,
+      });
+    });
+
+    test('folds case around off', () => {
+      setMode('OFF');
+      expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
+        admission: { ok: true },
+        verifyAsync: false,
+      });
+    });
+
+    test('treats an unrecognized value as enforce for both the refusal and the verification', () => {
+      setMode('enforce-strict');
+      expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
+        admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' },
+        verifyAsync: false,
+      });
+      expect(
+        checkNativeAdmission({
+          provider: 'google',
+          serverAuthCode: 'auth123',
+          googleClientId: 'client123',
+          admission: {
+            platform: 'android',
+            kind: 'assertion',
+            challenge: 'ch123',
+            payload: 'integrityToken',
+          },
+        })
+      ).toEqual({ admission: { ok: true }, verifyAsync: true });
+    });
+  });
+
   describe('mode: undefined (unset)', () => {
     test('admits everything (off is the default)', () => {
       expect(checkNativeAdmission({})).toEqual({ admission: { ok: true }, verifyAsync: false });
@@ -447,13 +486,16 @@ describe('checkNativeAdmission', () => {
       }
     });
 
-    test('refuses a request when the grace deadline is unparseable', () => {
-      process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = 'not-a-date';
-      expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
-        admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' },
-        verifyAsync: false,
-      });
-    });
+    test.each(['not-a-date', '2026', '11/01/2026', '2026-11-01'])(
+      'refuses a request when the grace deadline is %s rather than a full instant',
+      value => {
+        process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = value;
+        expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
+          admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' },
+          verifyAsync: false,
+        });
+      }
+    );
 
     test('well-formed ios attestation passes sync check', () => {
       const result = checkNativeAdmission({
@@ -1185,6 +1227,11 @@ describe('shouldRefuseAsyncFailure', () => {
   test('returns false when mode is unset', () => {
     delete process.env.NATIVE_ADMISSION_MODE;
     expect(shouldRefuseAsyncFailure()).toBe(false);
+  });
+
+  test('returns true for an unrecognized mode, matching the strict branch', () => {
+    setMode('enforce-strict');
+    expect(shouldRefuseAsyncFailure()).toBe(true);
   });
 });
 

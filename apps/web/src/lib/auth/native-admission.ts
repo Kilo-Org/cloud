@@ -193,6 +193,27 @@ const LEGACY_GRACE_UNTIL_ENV = 'NATIVE_ADMISSION_LEGACY_GRACE_UNTIL';
 type LegacyGraceState = 'active' | 'expired' | 'invalid' | 'unset';
 
 /**
+ * A full ISO-8601 instant with an explicit offset: `2026-11-01T00:00:00Z`.
+ * Date.parse alone accepts many other forms (`2026`, `11/01/2026`), whose
+ * meaning depends on the reader's locale and could close the window on a day
+ * nobody intended.
+ */
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * Normalize the configured mode. The setting is a raw env string, so case and
+ * surrounding whitespace are folded. An unrecognized value takes the strict
+ * branch instead of silently turning the control off, and matches the strict
+ * branch that a malformed payload already gets in every unrecognized mode.
+ */
+function readAdmissionMode(): NativeAdmissionMode {
+  const raw = getEnvVariable('NATIVE_ADMISSION_MODE').trim().toLowerCase();
+  if (raw === '' || raw === 'off') return 'off';
+  if (raw === 'report') return 'report';
+  return 'enforce';
+}
+
+/**
  * State of the native admission compatibility window.
  *
  * The setting is a cutover instant, not a switch: the window is open only
@@ -202,6 +223,7 @@ type LegacyGraceState = 'active' | 'expired' | 'invalid' | 'unset';
 function evaluateLegacyGrace(now: number): LegacyGraceState {
   const raw = getEnvVariable(LEGACY_GRACE_UNTIL_ENV).trim();
   if (!raw) return 'unset';
+  if (!ISO_INSTANT.test(raw)) return 'invalid';
   const until = Date.parse(raw);
   if (Number.isNaN(until)) return 'invalid';
   return now < until ? 'active' : 'expired';
@@ -210,7 +232,8 @@ function evaluateLegacyGrace(now: number): LegacyGraceState {
 /**
  * Evaluate admission for a native auth request body.
  *
- * Mode behaviour:
+ * Mode behaviour (the configured value is trimmed, case-folded, and an
+ * unrecognized value is treated as 'enforce'):
  * - 'off':      admit everything.
  * - 'report':   evaluate and log, always admit.
  * - 'enforce':  require a valid admission payload. Requests inside the
@@ -226,7 +249,7 @@ export function checkNativeAdmission(body: Record<string, unknown>): {
   /** True when async crypto verification is needed (enforce or report). */
   verifyAsync: boolean;
 } {
-  const mode = getEnvVariable('NATIVE_ADMISSION_MODE') as NativeAdmissionMode;
+  const mode = readAdmissionMode();
 
   const now = Date.now();
 
@@ -279,7 +302,7 @@ export function checkNativeAdmission(body: Record<string, unknown>): {
  * Only true under enforce mode; report mode evaluates but always admits.
  */
 export function shouldRefuseAsyncFailure(): boolean {
-  const mode = getEnvVariable('NATIVE_ADMISSION_MODE') as NativeAdmissionMode;
+  const mode = readAdmissionMode();
   return mode === 'enforce';
 }
 

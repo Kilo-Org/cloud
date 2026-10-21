@@ -8384,8 +8384,8 @@ export const agent_environment_profile_skills = pgTable(
     // Skill slug — must match the frontmatter `name` and is used as the directory name
     name: text().notNull(),
     description: text(),
-    source_type: text({ enum: ['marketplace', 'custom'] }).notNull(),
-    // URL the skill was imported from (marketplace entry URL, or null for 'custom')
+    source_type: text({ enum: ['marketplace', 'custom', 'skills-sh'] }).notNull(),
+    // URL the skill was imported from (marketplace entry or skills.sh reference URL, or null for 'custom')
     source_url: text(),
     raw_markdown: text().notNull(),
     // Companion files for a multi-file skill. Map of relative path → file

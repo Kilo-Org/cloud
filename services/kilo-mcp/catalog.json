@@ -1574,6 +1574,48 @@
     ],
     "searchBlob": "agentProfiles.createMcp Add an MCP server to an agent profile so its agents can use that server's tools. Use this to register a new MCP server for a profile. agentprofiles createmcp profileid organizationid server profileId organizationId server"
   },
+  "agentProfiles.createSkillsShSkill": {
+    "path": "agentProfiles.createSkillsShSkill",
+    "kind": "mutation",
+    "summary": "Add a skill from skills.sh to an agent profile, either for the current user or a specified organization. Use this to install or attach a skills.sh skill, with an option to enable it immediately; fails if a skill with the same name already exists in the profile.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "profileId",
+        "source"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "createskillsshskill",
+      "profileid",
+      "organizationid",
+      "source",
+      "enabled"
+    ],
+    "searchBlob": "agentProfiles.createSkillsShSkill Add a skill from skills.sh to an agent profile, either for the current user or a specified organization. Use this to install or attach a skills.sh skill, with an option to enable it immediately; fails if a skill with the same name already exists in the profile. agentprofiles createskillsshskill profileid organizationid source enabled profileId organizationId source enabled"
+  },
   "agentProfiles.delete": {
     "path": "agentProfiles.delete",
     "kind": "mutation",

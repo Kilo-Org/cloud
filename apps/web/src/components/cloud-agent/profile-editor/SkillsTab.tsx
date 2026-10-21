@@ -1,18 +1,26 @@
 /** Skills tab for the profile editor. */
 'use client';
 
-import { useState, type DragEvent } from 'react';
+import { useState, type DragEvent, type FormEvent } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Plus, Sparkles, Upload, FileText, X, Pencil } from 'lucide-react';
+import { Loader2, Plus, Sparkles, Upload, FileText, X, Pencil, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
+import { parseSkillsShSource } from '@kilocode/cloud-agent-profile/skills-sh';
 import { useProfileMutations, type ProfileSkill } from '@/hooks/useCloudAgentProfiles';
 import { cn } from '@/lib/utils';
 import { extractSkillZip, MAX_COMPANION_FILES, parseSkillFrontmatter } from './skill-archive';
 
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+const SKILLS_SH_DIRECTORY_URL = 'https://skills.sh';
+const SKILLS_SH_EXAMPLE = 'anthropics/skills@frontend-design';
+const SKILLS_SH_SOURCE_ERROR =
+  'Enter a skills.sh reference such as owner/repo@skill or https://skills.sh/owner/repo/skill.';
+const SKILLS_SH_SUBMIT_ERROR = 'Could not add skill. Check the skills.sh reference and try again.';
 
 type Props = {
   profileId: string;
@@ -97,7 +105,7 @@ export function SkillsTab({ profileId, organizationId, skills }: Props) {
       onDrop={handleDrop}
     >
       {skills.map(skill =>
-        editingId === skill.id ? (
+        editingId === skill.id && skill.sourceType !== 'skills-sh' ? (
           <SkillForm
             key={skill.id}
             mode="edit"
@@ -119,6 +127,14 @@ export function SkillsTab({ profileId, organizationId, skills }: Props) {
           />
         )
       )}
+
+      {skills.length === 0 && !isAdding && !importing && (
+        <p className="text-muted-foreground py-2 text-center text-sm">
+          No skills yet. Add one from skills.sh below, or drop a skill folder .zip here.
+        </p>
+      )}
+
+      <SkillsShForm profileId={profileId} organizationId={organizationId} />
 
       {isAdding ? (
         <SkillForm
@@ -147,12 +163,6 @@ export function SkillsTab({ profileId, organizationId, skills }: Props) {
         <code className="bg-muted rounded px-1 py-0.5 font-mono">.zip</code> here to add it as a new
         skill. Up to {MAX_COMPANION_FILES} companion files per skill.
       </p>
-
-      {skills.length === 0 && !isAdding && !importing && (
-        <p className="text-muted-foreground py-2 text-center text-sm">
-          No skills yet. Drop a skill folder .zip here to add one.
-        </p>
-      )}
 
       {/* Spacer makes the rest of the tab a drop target too. */}
       <div className="flex-1" />
@@ -207,26 +217,46 @@ function SkillRow({
   organizationId: string | undefined;
   onEdit: () => void;
 }) {
-  const { deleteSkill } = useProfileMutations({ organizationId });
+  const { deleteSkill, setSkillEnabled } = useProfileMutations({ organizationId });
   const [deleting, setDeleting] = useState(false);
+  const isSkillsSh = skill.sourceType === 'skills-sh';
+  const skillsShSource = isSkillsSh ? formatSkillsShSource(skill.sourceUrl) : null;
 
   const fileCount = Object.keys(skill.files ?? {}).length;
   const companionBytes = Object.values(skill.files ?? {}).reduce((sum, c) => sum + c.length, 0);
   const totalBytes = skill.rawMarkdown.length + companionBytes;
   const sizeKb = (totalBytes / 1024).toFixed(1);
 
+  const handleToggleEnabled = async (enabled: boolean) => {
+    try {
+      await setSkillEnabled.mutateAsync({
+        profileId,
+        organizationId,
+        skillId: skill.id,
+        enabled,
+      });
+    } catch (error) {
+      console.error('Failed to update skill:', error);
+      toast.error('Failed to update skill');
+    }
+  };
+
   return (
     <div className="hover:bg-accent/50 rounded-lg border p-3 transition-colors">
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Sparkles className="text-muted-foreground h-4 w-4" />
-            <code className="bg-muted rounded px-2 py-0.5 font-mono text-sm">{skill.name}</code>
+            <code className="bg-muted max-w-full truncate rounded px-2 py-0.5 font-mono text-sm">
+              {skill.name}
+            </code>
             <span className="text-muted-foreground text-xs uppercase tracking-wide">
-              {skill.sourceType}
+              {isSkillsSh ? 'skills.sh' : skill.sourceType}
             </span>
-            <span className="text-muted-foreground text-xs">{sizeKb} KB</span>
-            {fileCount > 0 && (
+            <span className="text-muted-foreground text-xs">
+              {isSkillsSh ? 'Installed during container setup' : `${sizeKb} KB`}
+            </span>
+            {!isSkillsSh && fileCount > 0 && (
               <span className="text-muted-foreground text-xs">
                 +{fileCount} file{fileCount === 1 ? '' : 's'}
               </span>
@@ -235,18 +265,42 @@ function SkillRow({
           {skill.description && (
             <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{skill.description}</p>
           )}
+          {skillsShSource && skill.sourceUrl && (
+            <a
+              href={skill.sourceUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-primary mt-1 inline-flex max-w-full items-center gap-1 text-xs hover:underline"
+            >
+              <ExternalLink className="h-3 w-3 shrink-0" />
+              <span className="min-w-0 truncate">{skillsShSource}</span>
+            </a>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7"
-            onClick={onEdit}
-            disabled={deleting}
-            aria-label="Edit skill"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
+          <label className="text-muted-foreground flex cursor-pointer items-center gap-1.5 text-xs">
+            <span>{skill.enabled ? 'Enabled' : 'Disabled'}</span>
+            <Switch
+              checked={skill.enabled}
+              onCheckedChange={enabled => {
+                void handleToggleEnabled(enabled);
+              }}
+              disabled={deleting || setSkillEnabled.isPending}
+              aria-label={`${skill.enabled ? 'Disable' : 'Enable'} skill ${skill.name}`}
+            />
+          </label>
+          {!isSkillsSh && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7"
+              onClick={onEdit}
+              disabled={deleting || setSkillEnabled.isPending}
+              aria-label={`Edit skill ${skill.name}`}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <InlineDeleteConfirmation
             onDelete={async () => {
               setDeleting(true);
@@ -265,10 +319,118 @@ function SkillRow({
               }
             }}
             isLoading={deleting}
+            disabled={setSkillEnabled.isPending}
           />
         </div>
       </div>
     </div>
+  );
+}
+
+function formatSkillsShSource(sourceUrl: string | null): string | null {
+  if (!sourceUrl) return null;
+  return sourceUrl.replace(/^https?:\/\/(www\.)?/, '');
+}
+
+export function skillsShSourceError(source: string): string | null {
+  const trimmed = source.trim();
+  if (!trimmed) return 'Enter a skills.sh source.';
+  return parseSkillsShSource(trimmed) ? null : SKILLS_SH_SOURCE_ERROR;
+}
+
+export function skillsShSubmitError(error: unknown): string {
+  if (!(error instanceof Error)) return SKILLS_SH_SUBMIT_ERROR;
+  const message = error.message.trim();
+  if (!message || message.startsWith('[') || message.startsWith('{')) {
+    return SKILLS_SH_SUBMIT_ERROR;
+  }
+  return message;
+}
+
+function SkillsShForm({
+  profileId,
+  organizationId,
+}: {
+  profileId: string;
+  organizationId: string | undefined;
+}) {
+  const { createSkillsShSkill } = useProfileMutations({ organizationId });
+  const [source, setSource] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const pending = createSkillsShSkill.isPending;
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = source.trim();
+    const validationError = skillsShSourceError(trimmed);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setError(null);
+    try {
+      await createSkillsShSkill.mutateAsync({
+        profileId,
+        organizationId,
+        source: trimmed,
+      });
+      setSource('');
+      toast.success('Skill added. It will be installed during container setup.');
+    } catch (submitError) {
+      setError(skillsShSubmitError(submitError));
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="grid gap-2 rounded-lg border p-3">
+      <Label htmlFor="skills-sh-source">Add from skills.sh</Label>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Input
+          id="skills-sh-source"
+          value={source}
+          onChange={event => {
+            setSource(event.target.value);
+            if (error) setError(null);
+          }}
+          placeholder={SKILLS_SH_EXAMPLE}
+          aria-describedby={error ? 'skills-sh-help skills-sh-error' : 'skills-sh-help'}
+          aria-invalid={error ? true : undefined}
+          autoComplete="off"
+          spellCheck={false}
+          className="flex-1 font-mono"
+          disabled={pending}
+        />
+        <Button type="submit" variant="outline" disabled={pending}>
+          {pending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Adding skill…
+            </>
+          ) : (
+            'Add skill'
+          )}
+        </Button>
+      </div>
+      <p id="skills-sh-help" className="text-muted-foreground text-xs">
+        Use <code className="bg-muted rounded px-1 py-0.5 font-mono">owner/repo@skill</code> or a
+        skills.sh URL. Example:{' '}
+        <code className="bg-muted rounded px-1 py-0.5 font-mono">{SKILLS_SH_EXAMPLE}</code>.{' '}
+        <a
+          href={SKILLS_SH_DIRECTORY_URL}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="text-primary hover:underline"
+        >
+          Browse skills.sh
+        </a>
+      </p>
+      {error && (
+        <p id="skills-sh-error" role="alert" className="text-destructive text-xs">
+          {error}
+        </p>
+      )}
+    </form>
   );
 }
 

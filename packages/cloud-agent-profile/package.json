@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./import": "./src/import/index.ts",
-    "./import/testing": "./src/import/test-fixtures.ts"
+    "./import/testing": "./src/import/test-fixtures.ts",
+    "./skills-sh": "./src/skills-sh.ts"
   },
   "scripts": {
     "test": "vitest run",

@@ -13,6 +13,7 @@ import {
   verifySandboxLaunchCredential,
 } from '../../src/sandbox-control/credential.js';
 import { CONTROL_PLANE_PROTOCOL_VERSION } from '../../src/shared/control-plane-protocol.js';
+import type { RuntimeSkillInput } from '../../src/shared/runtime-profile.js';
 import type { Env } from '../../src/types.js';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import { eq } from 'drizzle-orm';
@@ -3413,6 +3414,14 @@ describe('SandboxControlV2 prepare frame secrets', () => {
     };
   }
 
+  function skillsPrepareInput(
+    sessionId: string,
+    runtimeSkills: RuntimeSkillInput[]
+  ): Parameters<DurableObjectStub<SandboxControlV2>['prepare']>[0] {
+    const input = secretsPrepareInput(sessionId, {});
+    return { ...input, spec: { ...input.spec, runtimeSkills } };
+  }
+
   async function startSecrets(
     provider: FakeProvider,
     privateKey: string | undefined,
@@ -3435,7 +3444,8 @@ describe('SandboxControlV2 prepare frame secrets', () => {
 
   async function connectHello(
     provider: FakeProvider,
-    redactsNamedSecrets: boolean
+    redactsNamedSecrets: boolean,
+    installsSkillsSh = false
   ): Promise<FakeWrapper> {
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const { credential, allocationId } = launchIdentity(provider);
@@ -3444,6 +3454,7 @@ describe('SandboxControlV2 prepare frame secrets', () => {
       wrapperId: 'wr_secrets',
       allocationId,
       ...(redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
+      ...(installsSkillsSh ? { installsSkillsSh: true } : {}),
     });
     expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     return wrapper;
@@ -3518,6 +3529,70 @@ describe('SandboxControlV2 prepare frame secrets', () => {
         diagnosticEvent: 'route_failed',
         reason: 'workspace_setup_failed',
         stage: 'wrapper_redaction_unsupported',
+      })
+    );
+    expect(await wrapper.next(250)).toBeNull();
+    expect(await readRouteRow(stub, sessionId)).toMatchObject({
+      state: 'failed',
+      reason: 'workspace_setup_failed',
+    });
+  });
+
+  it('sends skills.sh source references to a wrapper that advertises installation', async () => {
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, undefined, peer);
+    const sessionId = 'workspace_77777777-7777-4777-8777-777777777777';
+    await stub.prepare(
+      skillsPrepareInput(sessionId, [{ name: 'find-skills', source: 'vercel-labs/skills' }])
+    );
+
+    const wrapper = await connectHello(provider, true, true);
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.runtimeSkills).toEqual([
+      { name: 'find-skills', source: 'vercel-labs/skills' },
+    ]);
+  });
+
+  it('keeps bundle-only skills compatible with a wrapper that does not advertise installation', async () => {
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, undefined, peer);
+    const sessionId = 'workspace_88888888-8888-4888-8888-888888888888';
+    await stub.prepare(
+      skillsPrepareInput(sessionId, [{ name: 'review', rawMarkdown: '# Review' }])
+    );
+
+    const wrapper = await connectHello(provider, true, false);
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.runtimeSkills).toEqual([{ name: 'review', rawMarkdown: '# Review' }]);
+  });
+
+  it('fails without sending when a wrapper does not advertise skills.sh installation', async () => {
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, undefined, peer);
+    const sessionId = 'workspace_99999999-9999-4999-8999-999999999999';
+    await stub.prepare(
+      skillsPrepareInput(sessionId, [{ name: 'find-skills', source: 'vercel-labs/skills' }])
+    );
+
+    const { result: wrapper, failures } = await captureRouteFailures(async () => {
+      const wrapper = await connectHello(provider, true, false);
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(sessionId)).toContainEqual(
+          expect.objectContaining({ state: 'failed', reason: 'workspace_setup_failed' })
+        )
+      );
+      return wrapper;
+    });
+    expect(failures).toContainEqual(
+      expect.objectContaining({
+        diagnosticEvent: 'route_failed',
+        reason: 'workspace_setup_failed',
+        stage: 'wrapper_skills_sh_unsupported',
       })
     );
     expect(await wrapper.next(250)).toBeNull();

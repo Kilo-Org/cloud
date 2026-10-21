@@ -63,21 +63,31 @@ const RuntimeSkillFilesSchema = z
     }
   });
 
-/**
- * Runtime skill schema. Each entry is materialized to
- * `${SESSION_HOME}/.kilocode/skills/<name>/` at preparation time — `rawMarkdown`
- * is written to `SKILL.md`, and each `files[path]` is written under the same
- * directory.
- */
-export const RuntimeSkillSchema = z.object({
-  name: z
-    .string()
-    .min(1)
-    .max(RuntimeProfileLimits.MAX_RUNTIME_SKILL_NAME_LENGTH)
-    .regex(/^[a-z0-9][a-z0-9-]*$/, 'Skill name must be a slug'),
-  rawMarkdown: z.string().min(1).max(RuntimeProfileLimits.MAX_RUNTIME_SKILL_MARKDOWN),
-  files: RuntimeSkillFilesSchema.optional(),
-});
+const RuntimeSkillNameSchema = z
+  .string()
+  .min(1)
+  .max(RuntimeProfileLimits.MAX_RUNTIME_SKILL_NAME_LENGTH)
+  .regex(/^[a-z0-9][a-z0-9-]*$/, 'Skill name must be a slug');
+
+export const RuntimeSkillSchema = z.union([
+  z.object({
+    name: RuntimeSkillNameSchema,
+    rawMarkdown: z.string().min(1).max(RuntimeProfileLimits.MAX_RUNTIME_SKILL_MARKDOWN),
+    files: RuntimeSkillFilesSchema.optional(),
+    source: z.never().optional(),
+  }),
+  z.strictObject({
+    name: RuntimeSkillNameSchema,
+    source: z
+      .string()
+      .max(140)
+      .regex(
+        /^[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){0,38}\/[a-z0-9._][a-z0-9._-]{0,99}$/,
+        'Skill source must be a GitHub owner/repo'
+      )
+      .refine(source => !source.includes('..') && !source.endsWith('/.')),
+  }),
+]);
 
 export const RuntimeSkillsSchema = z
   .array(RuntimeSkillSchema)

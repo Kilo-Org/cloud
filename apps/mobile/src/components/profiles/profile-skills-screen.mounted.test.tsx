@@ -153,6 +153,22 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
+  it('hides the edit control for skills.sh references but keeps the toggle and delete', async () => {
+    h.query.data = testProfile([testSkill({ sourceType: 'skills-sh', rawMarkdown: '' })]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const pressableLabels = findAll(renderer.root, 'Pressable').map(
+      node => node.props.accessibilityLabel
+    );
+    expect(pressableLabels).not.toContain('Edit skill');
+    expect(pressableLabels).toContain('Delete');
+    expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('code-review');
+
+    unmount();
+  });
+
   it('happy: the edit control opens the sheet seeded with the skill', async () => {
     h.query.data = testProfile([testSkill()]);
     h.query.isPending = false;

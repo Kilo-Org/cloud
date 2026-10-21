@@ -122,7 +122,7 @@ const ProfileSkillResponseSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   description: z.string().nullable(),
-  sourceType: z.enum(['marketplace', 'custom']),
+  sourceType: z.enum(['marketplace', 'custom', 'skills-sh']),
   sourceUrl: z.string().nullable(),
   rawMarkdown: z.string(),
   files: z.record(z.string(), z.string()),
@@ -207,7 +207,7 @@ const PreviewSkillSchema = z.object({
   rawMarkdown: z.string(),
   files: z.record(z.string(), z.string()),
   enabled: z.boolean(),
-  sourceType: z.enum(['marketplace', 'custom']),
+  sourceType: z.enum(['marketplace', 'custom', 'skills-sh']),
   sourceUrl: z.string().nullable(),
 });
 
@@ -715,6 +715,40 @@ export const agentProfilesRouter = createTRPCRouter({
         },
         owner
       );
+    }),
+
+  /**
+   * Add a skills.sh reference by qualified `owner/repo@skill` or URL. The
+   * reference is installed at container setup instead of storing content.
+   */
+  createSkillsShSkill: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+      }).merge(profileSkillsService.skillsShInputSchema)
+    )
+    .output(z.object({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      try {
+        return await profileSkillsService.createSkillsShSkill(
+          db,
+          input.profileId,
+          { source: input.source, enabled: input.enabled },
+          owner
+        );
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: `A skill named '${input.source.skill}' already exists in this profile`,
+          });
+        }
+        throw error;
+      }
     }),
 
   /**

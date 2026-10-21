@@ -58,8 +58,7 @@ export function resolveContainersBillingIdentity(
 export function unavailableContainersBillingAdmission(
   input: unknown
 ): SandboxBillingAdmissionResult {
-  const parsed = parseSandboxBillingInput(input);
-  if (!parsed.enforcementRequested) return { success: true };
+  parseSandboxBillingInput(input);
   return {
     success: false,
     code: 'meter_unavailable',

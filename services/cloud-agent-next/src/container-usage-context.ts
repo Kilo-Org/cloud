@@ -177,7 +177,6 @@ export function vercelBillingIdentity(resources: VercelSandboxResources): Vercel
 
 export type SandboxBillingInput = Omit<UsageContext, 'service' | 'instanceId' | 'sku'> & {
   sandboxId: SandboxId;
-  enforcementRequested?: boolean;
   /** Present for a placed key, whose prefix does not say which pool may bill it. */
   sandboxKind?: SandboxKind;
 };
@@ -209,7 +208,7 @@ export const sandboxBillingInputEnvelopeSchema = z
         message: 'Metadata may contain at most 16 entries',
       })
       .optional(),
-    enforcementRequested: z.boolean().default(false),
+    enforcementRequested: z.boolean().optional(),
     sandboxKind: sandboxKindSchema.optional(),
   })
   .strict();
@@ -237,8 +236,7 @@ function normalizedOrigin(origin: string | undefined): string {
 
 export function buildSandboxBillingInput(
   metadata: SessionMetadata,
-  sandboxId: SandboxId,
-  enforcementRequested = false
+  sandboxId: SandboxId
 ): SandboxBillingInput {
   const subject = metadata.identity.orgId
     ? { type: 'org' as const, id: metadata.identity.orgId }
@@ -251,7 +249,6 @@ export function buildSandboxBillingInput(
 
   return {
     sandboxId,
-    ...(enforcementRequested ? { enforcementRequested: true } : {}),
     ...(sandboxKind ? { sandboxKind } : {}),
     subject,
     actor,
@@ -265,7 +262,8 @@ export function buildSandboxBillingInput(
 
 export function parseSandboxBillingInput(input: unknown): SandboxBillingInput {
   const parsed = sandboxBillingInputEnvelopeSchema.parse(input);
-  const { sandboxId, enforcementRequested, sandboxKind, ...usageInput } = parsed;
+  delete parsed.enforcementRequested;
+  const { sandboxId, sandboxKind, ...usageInput } = parsed;
   const validated = usageContextSchema.parse({
     service: USAGE_SERVICE_ROOT,
     instanceId: 'validation',
@@ -275,7 +273,6 @@ export function parseSandboxBillingInput(input: unknown): SandboxBillingInput {
   const { service: _service, instanceId: _instanceId, sku: _sku, ...billingInput } = validated;
   return {
     sandboxId,
-    enforcementRequested,
     ...(sandboxKind ? { sandboxKind } : {}),
     ...billingInput,
   };

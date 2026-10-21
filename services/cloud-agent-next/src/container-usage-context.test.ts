@@ -353,7 +353,7 @@ describe('container usage context', () => {
       expect(input.sessionId).toBe(sessionScoped ? 'workspace_placed' : undefined);
       expect(() => assertSandboxBillingAllocation(className, input)).not.toThrow();
       // The kind survives the strict envelope without reaching the usage context.
-      expect(parseSandboxBillingInput(input)).toEqual({ ...input, enforcementRequested: false });
+      expect(parseSandboxBillingInput(input)).toEqual(input);
     }
   );
 
@@ -484,5 +484,15 @@ describe('container usage context', () => {
         metadata: { origin: 'cloud-agent' },
       })
     ).toThrow('SandboxSmallContainment billing received an incompatible sandbox ID');
+  });
+  it('drops the retired enforcement flag from persisted billing input', () => {
+    const input = {
+      sandboxId: 'ses-abcdef',
+      subject: { type: 'user', id: 'user_1' },
+      actor: { type: 'user', id: 'user_1' },
+      sessionId: 'agent_1',
+      metadata: { origin: 'cloud-agent' },
+    };
+    expect(parseSandboxBillingInput({ ...input, enforcementRequested: true })).toEqual(input);
   });
 });

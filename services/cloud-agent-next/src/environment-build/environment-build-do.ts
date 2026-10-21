@@ -12,7 +12,6 @@ import {
   assertContainerCapacity,
   getContainerCapacityFailureReason,
 } from '../container-concurrency.js';
-import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import { getPgDb } from '../db/pg.js';
 import { logger } from '../logger.js';
 import { mergeEnvVarsWithSecrets, type EncryptedSecrets } from '../utils/encryption.js';
@@ -165,10 +164,6 @@ export class EnvironmentBuild extends DurableObject<Env> {
       decryptSecrets: encrypted =>
         mergeEnvVarsWithSecrets({}, encrypted as EncryptedSecrets, env.AGENT_ENV_VARS_PRIVATE_KEY),
       billingInput: ({ owner, actorUserId, sandboxId: billingSandboxId, buildId }) => {
-        const enforcementRequested = isCloudAgentContainerBillingEnabled(env, {
-          userId: actorUserId,
-          ...(owner.type === 'organization' ? { orgId: owner.id } : {}),
-        });
         return {
           sandboxId: billingSandboxId as never,
           sandboxKind: 'isolated',
@@ -176,7 +171,6 @@ export class EnvironmentBuild extends DurableObject<Env> {
           actor: { type: 'user', id: actorUserId },
           sessionId: `environment-build:${buildId}`,
           metadata: { origin: 'environment-build' },
-          ...(enforcementRequested ? { enforcementRequested: true } : {}),
         };
       },
       builderSandboxId: sandboxId,

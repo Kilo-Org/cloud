@@ -122,6 +122,7 @@ describe('buildControlPlaneCreateInput', () => {
       credentialId: '22222222-2222-4222-8222-222222222222',
     };
     const input = await buildControlPlaneCreateInput({
+      env: {} as Env,
       command: {
         identity: {
           sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
@@ -140,7 +141,6 @@ describe('buildControlPlaneCreateInput', () => {
           sandboxProviderBinding: { kind: 'vercel', source },
         },
       },
-      env: { CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true' } as Env,
       attachments: [],
       agent: { mode: 'code', model: FULL_MODEL },
     });

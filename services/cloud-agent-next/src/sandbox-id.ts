@@ -10,7 +10,6 @@ import {
 import { providerUsesOutboundCredentialProxy } from './agent-sandbox/capabilities.js';
 import type { AgentSandboxProvider, SandboxId, Env } from './types.js';
 import { CODE_REVIEW_PLATFORM } from './session-identity.js';
-import { isCloudAgentContainerBillingEnabled } from './container-billing-rollout.js';
 import { providerSupportsEnforcedBilling } from './sandbox-provider-eligibility.js';
 
 export const MANAGED_SCM_OUTBOUND_HANDLER = 'managedScm';
@@ -147,12 +146,7 @@ export type SandboxSelection = {
   provider: AgentSandboxProvider;
 };
 
-export type SandboxSelectionEnv = Pick<
-  Env,
-  | 'CLOUD_AGENT_CONTAINER_BILLING_ENABLED'
-  | 'CLOUD_AGENT_CONTAINER_BILLING_USER_IDS'
-  | 'CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS'
->;
+export type SandboxSelectionEnv = Pick<Env, never>;
 
 type SelectSandboxForNewSessionInput = {
   env: SandboxSelectionEnv;
@@ -195,12 +189,8 @@ export function selectDefaultSandboxProvider(input: {
   userId: string;
   isolated: boolean;
 }): AgentSandboxProvider {
-  const enforced = isCloudAgentContainerBillingEnabled(input.env, {
-    userId: input.userId,
-    ...(input.orgId !== undefined ? { orgId: input.orgId } : {}),
-  });
   const eligible = (provider: AgentSandboxProvider): boolean =>
-    !enforced || providerSupportsEnforcedBilling(provider);
+    providerSupportsEnforcedBilling(provider);
 
   const useContainers = eligible('cloudflare-containers') && input.isolated;
 

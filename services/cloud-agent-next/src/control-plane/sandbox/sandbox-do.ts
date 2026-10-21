@@ -1090,7 +1090,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         projection = undefined;
       }
       const context = projection?.context;
-      const enforcementRequested = pin.billing?.enforcementRequested === true;
+      const enforcementRequested = pin.billing !== null;
       return {
         payer: context?.subject ?? pin.billing?.subject ?? null,
         actor: context?.actor ?? pin.billing?.actor ?? null,

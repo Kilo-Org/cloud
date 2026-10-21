@@ -361,6 +361,7 @@ function newSessionReasonInput(overrides: {
   hasRepositories?: boolean;
   hasConnectableProvider?: boolean;
   hasAttachments?: boolean;
+  selectedRepositoryResolved?: boolean;
   isLoadingRepositories?: boolean;
   isRemoteTargetSelected?: boolean;
   selectedRepo?: string;
@@ -371,6 +372,7 @@ function newSessionReasonInput(overrides: {
     hasRepositories: overrides.hasRepositories ?? true,
     hasConnectableProvider: overrides.hasConnectableProvider ?? false,
     hasAttachments: overrides.hasAttachments ?? false,
+    selectedRepositoryResolved: overrides.selectedRepositoryResolved ?? true,
     isLoadingRepositories: overrides.isLoadingRepositories ?? false,
     isRemoteTargetSelected: overrides.isRemoteTargetSelected ?? false,
     selectedRepo: overrides.selectedRepo ?? '',
@@ -382,6 +384,7 @@ function continueReasonInput(overrides: {
   hasRepositories?: boolean;
   hasConnectableProvider?: boolean;
   hasAttachments?: boolean;
+  selectedRepositoryResolved?: boolean;
   isLoadingRepositories?: boolean;
   isRemoteTargetSelected?: boolean;
   selectedRepo?: string;
@@ -392,6 +395,7 @@ function continueReasonInput(overrides: {
     hasRepositories: overrides.hasRepositories ?? true,
     hasConnectableProvider: overrides.hasConnectableProvider ?? false,
     hasAttachments: overrides.hasAttachments ?? false,
+    selectedRepositoryResolved: overrides.selectedRepositoryResolved ?? true,
     isLoadingRepositories: overrides.isLoadingRepositories ?? false,
     isRemoteTargetSelected: overrides.isRemoteTargetSelected ?? false,
     selectedRepo: overrides.selectedRepo ?? '',
@@ -520,6 +524,29 @@ describe('resolveNewSessionStartBlockedReason', () => {
         newSessionReasonInput({
           selectedRepo: 'org/repo',
           gate: newSessionGate({ hasPrompt: false, model: '' }),
+        })
+      )
+    ).toBeNull();
+  });
+
+  it('never blames the prompt for a selected repository that no longer resolves', () => {
+    // A stale picker key blocks Start on its own; the repository section asks
+    // for a new pick, so naming the empty composer would hide the real blocker.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          selectedRepositoryResolved: false,
+          gate: newSessionGate({ hasPrompt: false }),
+        })
+      )
+    ).toBeNull();
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          selectedRepositoryResolved: false,
+          gate: newSessionGate({ hasPrompt: true }),
         })
       )
     ).toBeNull();

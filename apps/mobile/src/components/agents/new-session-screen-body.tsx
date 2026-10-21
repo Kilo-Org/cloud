@@ -1014,6 +1014,7 @@ export function NewSessionScreenBody() {
           isRemoteTargetSelected,
           selectedRepo,
           hasAttachments: attachments.attachments.length > 0,
+          selectedRepositoryResolved: selectedRepository !== null,
           gate: {
             isCreating,
             isSubmitting,
@@ -1034,6 +1035,7 @@ export function NewSessionScreenBody() {
           isRemoteTargetSelected,
           selectedRepo,
           hasAttachments: attachments.attachments.length > 0,
+          selectedRepositoryResolved: selectedRepository !== null,
           gate: {
             attachmentsHasFailed: attachments.hasFailedAttachments,
             attachmentsIsUploading: attachments.isUploading,

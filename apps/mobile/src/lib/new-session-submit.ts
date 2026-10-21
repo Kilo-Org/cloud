@@ -175,6 +175,12 @@ type NewSessionStartBlockedReasonInput = {
    * content, so a file alone unblocks its Start; Cloud Agent still needs text.
    */
   hasAttachments: boolean;
+  /**
+   * True when `selectedRepo` still resolves to a picker row. A selected key
+   * that no longer resolves keeps Start disabled for the stale selection, so
+   * the empty composer is not what blocks it and must not be named.
+   */
+  selectedRepositoryResolved: boolean;
 } & (
   | {
       entry: 'new-session';
@@ -229,6 +235,12 @@ export function resolveNewSessionStartBlockedReason(
   // composer is all that still keeps Start disabled, name it: a prompt is the
   // one precondition Cloud Agent does not accept an attachment for.
   if (input.selectedRepo !== '') {
+    // A key that no longer resolves to a picker row is the blocker (the
+    // repository section asks for a new pick), so the prompt is not the reason:
+    // naming it would leave the real blocker unstated.
+    if (!input.selectedRepositoryResolved) {
+      return null;
+    }
     if (
       input.entry === 'new-session' &&
       !input.gate.hasPrompt &&

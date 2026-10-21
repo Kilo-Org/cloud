@@ -1694,7 +1694,7 @@
       "syncFindings": "Synkronisera fynd",
       "syncNow": "Synkronisera nu",
       "syncQueued": "Synkroniseringen har köats",
-      "syncStatusUnavailable": "Synkroniseringens status är inte tillgänglig.",
+      "syncStatusUnavailable": "Synkroniseringens status är inte tillgänglig",
       "daysOverdue_one": "{{displayCount}} dag efter tidsfristen",
       "daysOverdue_other": "{{displayCount}} dagar efter tidsfristen",
       "findingsCount_one": "{{displayCount}} fynd",
@@ -1867,7 +1867,7 @@
     "auditReport": {
       "couldNotLoad": "Kunde inte läsa in revisionsrapporten",
       "events": "Händelser",
-      "generated": "Rapporten skapades {{generatedAt}}.",
+      "generated": "Rapporten skapades {{generatedAt}}",
       "noActivity": "Ingen registrerad aktivitet",
       "noActivityDescription": "Kilo har ingen aktivitet att rapportera för säkerhetsfynd från {{start}} till {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",

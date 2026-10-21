@@ -3068,23 +3068,26 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       // the session object identity is deliberately not part of that test,
       // because reopening a chat replaces it.
       const stillOnSendingChat = activeSessionId === kiloSessionId;
-      optimisticStorage?.deleteMessage(messageId);
       const mountedStorage = store.get(sessionStorageAtom);
-      if (mountedStorage && mountedStorage !== optimisticStorage) {
-        // Only the unconfirmed row is this send's. A confirmed record under the
-        // same id is server history the reopened transcript got from its page,
-        // and a failed response does not disprove it.
-        const mountedRow = mountedStorage.getMessageInfo(messageId);
-        if (mountedRow?.role === 'user' && mountedRow.synthetic === true) {
-          mountedStorage.deleteMessage(messageId);
-        }
+      const mountedRow = mountedStorage?.getMessageInfo(messageId);
+      // A confirmed record under this id is server history: the server accepted
+      // the prompt and only the response was lost, so the transcript already
+      // shows it and there is nothing to retry. Only the unconfirmed row is this
+      // send's to remove, wherever it is rendered.
+      const delivered =
+        stillOnSendingChat && mountedRow?.role === 'user' && mountedRow.synthetic !== true;
+      if (optimisticStorage && optimisticStorage !== mountedStorage) {
+        optimisticStorage.deleteMessage(messageId);
+      }
+      if (mountedStorage && mountedRow?.role === 'user' && mountedRow.synthetic === true) {
+        mountedStorage.deleteMessage(messageId);
       }
       remoteOptimisticIds.delete(messageId);
-      if (insertedOptimisticRow && kiloSessionId) {
+      if (insertedOptimisticRow && kiloSessionId && !delivered) {
         recordFailedPrompt(kiloSessionId, messageText);
         forgetCachedOptimisticRow(kiloSessionId, messageId);
       }
-      if (!stillOnSendingChat) return false;
+      if (!stillOnSendingChat || delivered) return false;
       store.set(failedPromptAtom, messageText);
       store.set(billingFailureAtom, parseCustomerBillingFailure(err));
       const detail = formatErrorDetail(err);

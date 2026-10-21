@@ -3187,8 +3187,11 @@ describe('createSessionManager', () => {
       rejectSend!(new Error('ECONNRESET'));
       await expect(sendPromise).resolves.toBe(false);
 
-      // Server history stays in the transcript; only an unconfirmed row is dropped.
+      // Server history stays in the transcript, and a delivered prompt is not
+      // also offered as a draft to send twice.
       expect(mountedStorage.getMessageInfo(messageId!)).toBeDefined();
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(1);
     });
 
     it('uses cloud-agent model override on send and clears it on switchSession', async () => {

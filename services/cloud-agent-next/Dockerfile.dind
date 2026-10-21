@@ -1,5 +1,5 @@
 ARG SANDBOX_VERSION="0.12.12"
-ARG NODE_VERSION="24.22.1"
+ARG NODE_VERSION="24"
 
 FROM docker.io/cloudflare/sandbox:${SANDBOX_VERSION}-musl AS cloudflare-sandbox
 

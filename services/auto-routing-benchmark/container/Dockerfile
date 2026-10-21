@@ -6,7 +6,7 @@
 # NOTE: `@kilocode/cli@latest` is resolved at IMAGE BUILD time (i.e. at deploy
 # time), so each deploy pins whatever version was `latest` then. Re-deploy to
 # pick up a newer stable CLI.
-FROM node:22.23.4-bookworm-slim
+FROM node:22-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git python3 g++ make \
   && update-ca-certificates \
   && rm -rf /var/lib/apt/lists/* \

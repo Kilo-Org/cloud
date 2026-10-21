@@ -1,4 +1,4 @@
-FROM node:24.22.1-bookworm-slim AS node-runtime
+FROM node:24-bookworm-slim AS node-runtime
 
 FROM oven/bun:1-slim
 

@@ -1,4 +1,4 @@
-FROM node:22.23.4-bookworm-slim AS node-runtime
+FROM node:22-bookworm-slim AS node-runtime
 
 FROM docker.io/cloudflare/sandbox:0.6.11
 
@@ -35,7 +35,7 @@ ENV PATH="/root/.local/bin:${PATH}"
 # Users can override by providing .tool-versions in their project
 
 # Node 18/20 remain customer targets, but have no supported eMudhra verifier fix.
-RUN mise install node@18 node@20 node@22.23.4 node@24.22.1
+RUN mise install node@18 node@20 node@22 node@24
 
 # Ruby versions (3.2, 3.3)
 RUN mise install ruby@3.2 ruby@3.3
@@ -47,7 +47,7 @@ RUN mise install hugo@0.152.2 hugo@0.120.0
 RUN mise install go@1.25.4
 
 # Set default global versions (can be overridden by .tool-versions)
-RUN mise use -g node@22.23.4 ruby@3.3 hugo@0.152.2 go@1.25.4
+RUN mise use -g node@22 ruby@3.3 hugo@0.152.2 go@1.25.4
 
 # Sandbox exec runs non-interactive shells, so expose mise defaults without relying on .bashrc.
 ENV PATH="/root/.local/share/mise/shims:${PATH}"

@@ -191,15 +191,21 @@ describe('resolveNewSessionStartDisabled', () => {
 
 describe('resolveRemoteStartMissingContent', () => {
   it('reports missing content for an empty composer', () => {
-    expect(resolveRemoteStartMissingContent({ hasPrompt: false, hasAttachments: false })).toBe(true);
+    expect(resolveRemoteStartMissingContent({ hasPrompt: false, hasAttachments: false })).toBe(
+      true
+    );
   });
 
   it('accepts prompt text alone', () => {
-    expect(resolveRemoteStartMissingContent({ hasPrompt: true, hasAttachments: false })).toBe(false);
+    expect(resolveRemoteStartMissingContent({ hasPrompt: true, hasAttachments: false })).toBe(
+      false
+    );
   });
 
   it('accepts a file alone, exactly as the spawn payload builder does', () => {
-    expect(resolveRemoteStartMissingContent({ hasPrompt: false, hasAttachments: true })).toBe(false);
+    expect(resolveRemoteStartMissingContent({ hasPrompt: false, hasAttachments: true })).toBe(
+      false
+    );
   });
 
   it('accepts a prompt with a file', () => {

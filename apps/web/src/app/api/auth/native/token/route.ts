@@ -201,7 +201,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   // A proof bound to a key that already belongs to an account cannot create a
   // second one. Checked before settlement so a collision never leaves a user
   // row or a Stripe customer behind.
-  const verifyNewAccountAdmission = async () => !admissionVerification.existingKeyUserId;
+  const verifyNewAccountAdmission = () => Promise.resolve(!admissionVerification.existingKeyUserId);
 
   // ── Step 3: Provider identity verification ───────────────────────────────
   let args: CreateOrUpdateUserArgs;

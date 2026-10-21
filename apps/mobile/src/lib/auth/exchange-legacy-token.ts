@@ -42,14 +42,7 @@ export async function exchangeLegacyToken(): Promise<{
     // The exchange issues device credentials, so it needs the same attestation
     // the sign-in exchange does. Fetch the proof after the epoch check so a
     // superseded sign-in never spends a challenge.
-    let admission;
-    try {
-      admission = await getAdmission();
-    } catch {
-      // Transient attestation failure: keep the legacy token and retry on the
-      // next launch.
-      return null;
-    }
+    const admission = await getAdmission().catch(() => null);
     if (!admission) {
       // This device cannot attest, so the exchange cannot succeed. It costs
       // nothing to retry next launch — no challenge is requested for a device

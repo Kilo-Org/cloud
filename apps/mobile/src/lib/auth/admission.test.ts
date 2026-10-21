@@ -73,7 +73,11 @@ const originalFetch = globalThis.fetch;
  * call so a test may exercise the sentinel fallback after a failed attempt.
  */
 function setupChallengeFetch(challenge = 'server-challenge') {
-  const fn = vi.fn<typeof fetch>().mockImplementation(async () => Response.json({ challenge }));
+  const fn = vi.fn<typeof fetch>().mockImplementation(async () => {
+    // A fresh Response per call: a body can be read only once.
+    await Promise.resolve();
+    return Response.json({ challenge });
+  });
   globalThis.fetch = fn;
   return fn;
 }

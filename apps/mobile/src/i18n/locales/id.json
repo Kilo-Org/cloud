@@ -35,6 +35,8 @@
     "connectGithub": "Hubungkan GitHub",
     "cost": "Biaya",
     "discard": "Buang",
+    "discardChangesMessage": "Perubahan Anda akan hilang.",
+    "discardChangesTitle": "Buang perubahan?",
     "findings": "Temuan",
     "mergeRequest": "merge request",
     "notConnected": "Tidak terhubung",
@@ -943,6 +945,9 @@
       "gateHidden": "Tersembunyi",
       "gateNone": "Tidak ada",
       "noFindings": "Tidak ada temuan.",
+      "findingsUnavailable": "Hasil tidak tersedia karena tinjauan ini gagal.",
+      "serviceUnavailable": "Tidak dapat terhubung ke layanan tinjauan kode. Coba tinjauan lagi saat layanan tersedia.",
+      "reviewFailed": "Tinjauan gagal. Silakan coba lagi.",
       "retryMessage": "Ini akan menjalankan ulang tinjauan kode.",
       "retryReview": "Coba tinjauan lagi",
       "retryNeedsSettings": "Peninjau kode nonaktif atau pengaturannya perlu diperhatikan. Perbaiki pengaturan, lalu coba tinjauan ini lagi.",
@@ -1030,7 +1035,8 @@
       "bugs": "Kesalahan kode",
       "style": "Gaya",
       "testing": "Pengujian",
-      "documentation": "Dokumentasi"
+      "documentation": "Dokumentasi",
+      "unknown": "Lainnya ({{area}})"
     },
     "gateThreshold": {
       "warning": "Peringatan"
@@ -1109,7 +1115,14 @@
       "triageReasoning": "Dasar penilaian triase",
       "watchInCloudAgent": "Pantau di Agen cloud",
       "whereFound": "Lokasi temuan ({{displayCount}})",
-      "yes": "Ya"
+      "yes": "Ya",
+      "action": {
+        "analyzeCodebase": "Analisis basis kode",
+        "dismiss": "Abaikan",
+        "manualReview": "Tinjauan manual",
+        "monitor": "Pantau",
+        "openPr": "Buka PR"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Model analisis",
@@ -1131,7 +1144,24 @@
       "summary": "Ringkasan laporan",
       "title": "Laporan audit",
       "unavailable": "Laporan audit tidak tersedia",
-      "unavailableDescription": "Hanya pemilik organisasi dan manajer penagihan yang dapat melihat laporan audit. Minta akses kepada pemilik organisasi atau manajer penagihan."
+      "unavailableDescription": "Hanya pemilik organisasi dan manajer penagihan yang dapat melihat laporan audit. Minta akses kepada pemilik organisasi atau manajer penagihan.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analisis selesai",
+        "findingAnalysisFailed": "Analisis gagal",
+        "findingAutoDismissed": "Diabaikan otomatis",
+        "findingCreated": "Diimpor",
+        "findingDeleted": "Dihapus",
+        "findingDismissed": "Diabaikan",
+        "findingSeverityChanged": "Keparahan diubah",
+        "findingStatusChange": "Status diubah",
+        "findingSuperseded": "Digantikan",
+        "remediationBlocked": "Perbaikan diblokir",
+        "remediationCancelled": "Dibatalkan",
+        "remediationFailed": "Perbaikan gagal",
+        "remediationNoChangesNeeded": "Tidak perlu perubahan",
+        "remediationPrOpened": "PR dibuka",
+        "remediationQueued": "Perbaikan diminta"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Lihat laporan audit"
@@ -1697,6 +1727,7 @@
       "prefillModelUnavailable": "{{model}} tidak lagi tersedia. Model bawaanmu digunakan sebagai pengganti.",
       "couldNotReadPendingSessions": "Tidak dapat membaca sesi yang menunggu diproses. Coba lagi.",
       "failedToCreate": "Gagal membuat sesi.",
+      "checkOrganizationAccess": "Periksa aksesmu ke organisasi ini, lalu coba lagi.",
       "couldNotRefreshRepositories": "Tidak dapat memuat ulang repositori. Coba lagi.",
       "discardDraftTitle": "Buang draf?",
       "discardDraftMessage": "Instruksimu akan hilang.",
@@ -2218,6 +2249,7 @@
     "couldNotLoadDescription": "Sesi aktifmu tidak dapat ditampilkan sampai data selesai dimuat.",
     "currentDeviceUnidentified": "Perangkat ini tidak dapat diidentifikasi.",
     "editorCliManageOnWeb": "Sesi masuk melalui editor dan CLI dikelola di situs web Kilo. Atur ulang token API kamu di sana untuk mengeluarkannya.",
+    "kiloApp": "Aplikasi Kilo",
     "manageOnWeb": "Kelola di web",
     "noSessions": "Tidak ada sesi masuk dari aplikasi Kilo",
     "noSessionsDescription": "Masuk ke aplikasi Kilo di perangkat lain agar perangkat tersebut muncul di sini.",
@@ -2370,6 +2402,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Sebelum kita mulai",
+    "summaryTitle": "Preferensi berbagi data",
     "introDescription": "Kilo mengirim pesanmu ke penyedia AI untuk menghasilkan respons. Berikut data yang dibagikan dan pihak yang menerimanya.",
     "required": "Wajib untuk menggunakan Kilo",
     "promptsTitle": "Instruksi dan percakapanmu",
@@ -2378,7 +2411,6 @@
     "accountDescription": "ID akun Kilo dan metadata permintaanmu digunakan untuk memverifikasi identitasmu dan menghitung penggunaan.",
     "diagnosticsTitle": "Diagnostik aplikasi",
     "diagnosticsDescription": "Laporan aplikasi berhenti mendadak dan kesalahan digunakan untuk menjaga kestabilan aplikasi. Konten aplikasi dihapus dari laporan ini.",
-    "optional": "Opsional",
     "helpImprove": "Bantu tingkatkan Kilo",
     "helpImproveDescription": "Bagikan data analitik produk anonim dan sumber pemasangan aplikasi. Kamu dapat mengubahnya kapan saja di Pengaturan.",
     "seeFullDetails": "Lihat detail lengkap",
@@ -2503,7 +2535,8 @@
       "description": "Hubungkan akun GitHub kamu untuk meninjau PR di ponsel.",
       "gitlabDescription": "Hubungkan akun GitLab kamu untuk meninjau merge request di ponsel.",
       "bitbucketDescription": "Hubungkan Bitbucket ke organisasi ini untuk meninjau PR di ponsel.",
-      "bitbucketOrgOnlyDescription": "Pilih organisasi di profilmu untuk meninjau PR Bitbucket-nya."
+      "bitbucketOrgOnlyDescription": "Ganti akun di atas ke sebuah organisasi untuk meninjau PR Bitbucket-nya.",
+      "contextLine": "Untuk {{organization}}"
     },
     "connectionExpired": "Koneksi GitHub kedaluwarsa.",
     "couldNotLoadPullRequest": "Tidak dapat memuat PR.",
@@ -2930,7 +2963,9 @@
       "reviewNotSubmitted": "Tinjauan ini tidak dapat dikirim dalam kondisi saat ini. PR mungkin sudah berubah, atau kamu mencoba meninjau PR milikmu sendiri.",
       "reviewNotSubmittedTerm": "Tinjauan ini tidak dapat dikirim seperti adanya. {{term}} mungkin telah berubah, atau kamu tidak dapat meninjau {{term}} milikmu sendiri.",
       "couldNotPostComment": "Tidak dapat mengirim komentar.",
-      "couldNotSubmitReview": "Tidak dapat mengirim tinjauan. Periksa koneksimu dan coba lagi."
+      "couldNotSubmitReview": "Tidak dapat mengirim tinjauan. Periksa koneksimu dan coba lagi.",
+      "rateLimited": "Terlalu banyak permintaan. Coba lagi nanti.",
+      "conflict": "Ini berubah saat Anda sedang mengerjakannya. Muat ulang dan coba lagi."
     },
     "operation": {
       "couldNotReply": "Tidak dapat membalas.",
@@ -3469,6 +3504,9 @@
     "localModels": {
       "title": "Model di perangkat",
       "help": "Model di perangkat berjalan di ponsel ini. Perintah dan balasan Anda tetap ada di perangkat.",
+      "switchTitle": "Beralih ke model di perangkat?",
+      "switchMessage": "Beralih ke {{name}} akan memproses perintah dan konteks percakapan ini di ponsel ini, bukan di server jarak jauh.",
+      "switchConfirm": "Ganti model",
       "systemPurpose": "Model yang terpasang di sistem perangkat ini. Model ini berjalan di perangkat.",
       "apple": "Apple Intelligence (di perangkat)",
       "checking": "Memeriksa ketersediaan…",
@@ -3565,7 +3603,6 @@
     "personalDefaultDescription": "Dimuat secara otomatis ketika tidak ada repositori yang memiliki profil yang disematkan.",
     "organizationDefaultDescription": "Dimuat otomatis untuk anggota yang tidak memiliki default pribadi.",
     "setAsDefault": "Tetapkan sebagai bawaan",
-    "removeDefault": "Hapus sebagai default",
     "saveFailed": "Tidak dapat menyimpan profil",
     "deleteTitle": "Hapus profil",
     "deleteMessage": "Tindakan ini akan menghapus profil dan pengaturannya secara permanen. Hal ini tidak dapat dibatalkan.",
@@ -3591,11 +3628,13 @@
     "commandsTitle": "Perintah pengaturan",
     "addCommand": "Tambahkan perintah",
     "commandLabel": "Memerintah",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "mis. pnpm install",
     "commandsEmpty": "Belum ada perintah pengaturan",
     "commandsSaveFailed": "Tidak dapat menyimpan perintah penyiapan",
     "moveUp": "Naik",
     "moveDown": "Pindah ke bawah",
+    "moveCommandUp": "Pindahkan perintah {{position}} ke atas",
+    "moveCommandDown": "Pindahkan perintah {{position}} ke bawah",
     "skillsTitle": "Keterampilan",
     "addSkill": "Tambahkan keterampilan",
     "skillNameLabel": "Nama keterampilan",
@@ -3665,7 +3704,7 @@
       "nameRequired": "Masukkan nama agen",
       "slugRequired": "Masukkan siput agen",
       "slugInvalid": "Siput harus dimulai dengan huruf dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
-      "slugConflict": "Siput itu dicadangkan oleh agen bawaan",
+      "slugConflict": "Slug tersebut sudah digunakan oleh agen bawaan atau agen lain di profil ini",
       "edit": "Sunting agen"
     },
     "slashCommands": {

@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   decidePrLinkOpen,
   decidePrLinkPaste,
-  prLinkToastClipboardEmptyCopy,
-  prLinkToastInvalidCopy,
   selectPrLinkClearButtonVisible,
 } from './pr-link-paste';
 
@@ -126,12 +124,5 @@ describe('selectPrLinkClearButtonVisible', () => {
 
   it('is absent when the field is empty', () => {
     expect(selectPrLinkClearButtonVisible({ hasInput: false })).toBe(false);
-  });
-});
-
-describe('PR link toast copy', () => {
-  it('exports the pinned toast copy strings', () => {
-    expect(prLinkToastClipboardEmptyCopy()).toBe('Clipboard is empty');
-    expect(prLinkToastInvalidCopy()).toBe('Not a pull request or merge request link');
   });
 });

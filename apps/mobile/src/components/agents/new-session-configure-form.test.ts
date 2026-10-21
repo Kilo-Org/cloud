@@ -432,6 +432,37 @@ describe('NewSessionConfigureForm', () => {
     });
   });
 
+  it('renders the organization section above the run-target block', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+      organizationSection: 'Organization section',
+    }) as Node;
+
+    // The labeled section renders inside the same scroll body as the other
+    // form sections (the run-target block itself is a string-host mock here).
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(scrollBody).not.toBeNull();
+    expect(findTextContent(scrollBody as Node, text => text === 'Organization section')).toBe(true);
+  });
+
+  it('hides the organization section when the caller omits it', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+    }) as Node;
+
+    expect(findTextContent(element, text => text === 'Organization section')).toBe(false);
+  });
+
   // ── Case 1b: ordered repository array passes through unchanged ──
   it('passes the ordered repository array unchanged into NewSessionRepositorySection', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');

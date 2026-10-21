@@ -110,7 +110,11 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const balancePending = balance === undefined && !balanceFailed;
   const showBalanceSkeleton =
     (balanceLoading || balancePending || !hideBalanceLoaded) && !balanceFailed;
-  const expiringBlocks = creditData?.creditBlocks.filter(b => b.expiry_date !== null) ?? [];
+  const now = Date.now();
+  const expiringBlocks =
+    creditData?.creditBlocks.filter(
+      b => b.expiry_date !== null && parseTimestamp(b.expiry_date).getTime() > now
+    ) ?? [];
   const expiringTotal = fromMicrodollars(
     expiringBlocks.reduce((sum, b) => sum + b.balance_mUsd, 0)
   );

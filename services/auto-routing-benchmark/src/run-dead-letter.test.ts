@@ -10,6 +10,7 @@ vi.mock('./db', async importOriginal => {
     getLiveContainerLanes: vi.fn(),
     getRunWithModels: vi.fn(),
     markProfilesFailedForEntries: vi.fn(),
+    markProfilesFailedForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
     markRunCompleted: vi.fn(),
     markRunFailed: vi.fn(),
@@ -33,6 +34,7 @@ import {
   getLiveContainerLanes,
   getRunWithModels,
   markProfilesFailedForEntries,
+  markProfilesFailedForRun,
   markProfilesReadyForRun,
   markRunCompleted,
   markRunFailed,
@@ -81,7 +83,7 @@ const env = {
   BENCHMARK_SCHEDULER_CONFIG: '{}',
   KILO_WEB_API_BASE_URL: 'https://app.test',
   KILO_CLI_API_URL: 'https://api.test',
-  INTERNAL_API_SECRET_PROD: { get: async () => 'internal-test-secret' },
+  BOT_TOKEN_MINT_SECRET: { get: async () => 'mint-test-secret' },
 } as unknown as Env;
 
 function deadLetterMessage() {
@@ -215,77 +217,92 @@ describe('processDeadLetter — legacy migration', () => {
     } as never);
   }
 
-  it.each(['benchmark-org-snapshot', null])(
-    'materializes legacy work under its persisted execution scope: %s',
-    async organizationId => {
-      mockRun('running', organizationId);
-      const catalogUrl = organizationId
-        ? `https://api.test/api/organizations/${organizationId}/models`
-        : 'https://api.test/api/openrouter/models';
-      const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-        const url = new URL(input instanceof Request ? input.url : input);
-        const headers = new Headers(init?.headers);
-        if (url.href === 'https://app.test/api/internal/auto-routing-benchmark/token') {
-          if (typeof init?.body !== 'string') throw new Error('Expected a JSON token request.');
-          expect(init?.method).toBe('POST');
-          expect(headers.get('authorization')).toBe(`Bearer ${'internal-test-secret'}`);
-          expect(JSON.parse(init.body)).toEqual({
-            userId: 'user-1',
-            ...(organizationId ? { organizationId } : {}),
-          });
-          return Response.json({
-            token: 'dead-letter-test-token',
-            expiresAt: '2026-10-18T13:00:00.000Z',
-          });
-        }
-        if (url.href === catalogUrl) {
-          expect(headers.get('authorization')).toBe(`Bearer ${'dead-letter-test-token'}`);
-          expect(headers.get('X-KiloCode-OrganizationId')).toBe(organizationId);
-          return Response.json({
-            data: [
-              {
-                id: 'b/dead',
-                supported_parameters: ['tools'],
-                opencode: {
-                  variants: {
-                    high: { reasoning: { effort: 'high' } },
-                    low: { reasoning: { effort: 'low' } },
-                  },
+  it('materializes legacy work under its persisted execution scope', async () => {
+    const organizationId = 'benchmark-org-snapshot';
+    mockRun('running', organizationId);
+    const catalogUrl = `https://api.test/api/organizations/${organizationId}/models`;
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      const headers = new Headers(init?.headers);
+      if (url.href === 'https://app.test/api/internal/bot-token') {
+        if (typeof init?.body !== 'string') throw new Error('Expected a JSON token request.');
+        expect(init?.method).toBe('POST');
+        expect(headers.get('authorization')).toBe(`Bearer ${'mint-test-secret'}`);
+        expect(JSON.parse(init.body)).toEqual({ userId: 'user-1', organizationId });
+        return Response.json({
+          token: 'dead-letter-test-token',
+          expiresAt: '2026-10-18T13:00:00.000Z',
+        });
+      }
+      if (url.href === catalogUrl) {
+        expect(headers.get('authorization')).toBe(`Bearer ${'dead-letter-test-token'}`);
+        expect(headers.get('X-KiloCode-OrganizationId')).toBe(organizationId);
+        return Response.json({
+          data: [
+            {
+              id: 'b/dead',
+              supported_parameters: ['tools'],
+              opencode: {
+                variants: {
+                  high: { reasoning: { effort: 'high' } },
+                  low: { reasoning: { effort: 'low' } },
                 },
               },
-            ],
-          });
-        }
-        throw new Error(`Unexpected fixture request: ${url.href}`);
-      });
-      try {
-        await processDeadLetter(env, {
-          runId,
-          kind: 'decider',
-          model: 'b/dead',
-          rep: 99,
-          shard: 8,
-          chunk: 999,
-          caseIds: ['obsolete-case'],
-        });
-        expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
-          runId,
-          entries: [
-            { model: 'b/dead', variant: 'high', providers: [] },
-            { model: 'b/dead', variant: 'low', providers: [] },
+            },
           ],
-          repetitions: 2,
-          caseIds: DECIDER_CASES.map(c => c.id),
-          chunkSize: 1,
         });
-        expect(deferChunk).not.toHaveBeenCalled();
-        expect(claimScheduledChunks).toHaveBeenCalled();
-        expectNoDirectLaneDeath();
-      } finally {
-        fetcher.mockRestore();
       }
+      throw new Error(`Unexpected fixture request: ${url.href}`);
+    });
+    try {
+      await processDeadLetter(env, {
+        runId,
+        kind: 'decider',
+        model: 'b/dead',
+        rep: 99,
+        shard: 8,
+        chunk: 999,
+        caseIds: ['obsolete-case'],
+      });
+      expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+        runId,
+        entries: [
+          { model: 'b/dead', variant: 'high', providers: [] },
+          { model: 'b/dead', variant: 'low', providers: [] },
+        ],
+        repetitions: 2,
+        caseIds: DECIDER_CASES.map(c => c.id),
+        chunkSize: 1,
+      });
+      expect(deferChunk).not.toHaveBeenCalled();
+      expect(claimScheduledChunks).toHaveBeenCalled();
+      expectNoDirectLaneDeath();
+    } finally {
+      fetcher.mockRestore();
     }
-  );
+  });
+
+  it('fails a running legacy run without an org snapshot instead of minting a token', async () => {
+    mockRun('running', null);
+    const fetcher = vi.spyOn(globalThis, 'fetch');
+    try {
+      await processDeadLetter(env, { runId, kind: 'decider', model: 'b/dead' });
+      expect(fetcher).not.toHaveBeenCalled();
+      expect(scheduleRunChunks).not.toHaveBeenCalled();
+      expect(markProfilesFailedForRun).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        runId,
+        'Benchmark run is missing its execution identity.'
+      );
+      expect(markRunFailed).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        runId,
+        'Benchmark run is missing its execution identity.'
+      );
+    } finally {
+      fetcher.mockRestore();
+    }
+  });
 
   it.each(['completed', 'failed'] as const)('does not initialize a %s legacy run', async status => {
     mockRun(status);

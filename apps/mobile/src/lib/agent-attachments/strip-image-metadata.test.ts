@@ -39,7 +39,7 @@ describe('stripImageMetadata', () => {
     mocks.captureException.mockReset();
   });
 
-  it('re-encodes with the matching save format and returns the new URI', async () => {
+  it('re-encodes with the matching save format and returns the new URI and extension', async () => {
     mocks.manipulateAsync.mockResolvedValue({ uri: 'file:///cache/stripped.png' });
 
     const result = await stripImageMetadata('file:///cache/original.png', 'png');
@@ -48,7 +48,11 @@ describe('stripImageMetadata', () => {
       compress: 1,
       format: 'png',
     });
-    expect(result).toBe('file:///cache/stripped.png');
+    expect(result).toEqual({
+      ok: true,
+      uri: 'file:///cache/stripped.png',
+      extension: 'png',
+    });
   });
 
   it('re-encodes heic and heif with the JPEG save format', async () => {
@@ -67,19 +71,61 @@ describe('stripImageMetadata', () => {
     });
   });
 
-  it('falls back to the original URI on failure and reports to Sentry', async () => {
-    mocks.manipulateAsync.mockRejectedValue(new Error('re-encode failed'));
+  it('retries once with a forced JPEG output when the format-matched re-encode fails', async () => {
+    mocks.manipulateAsync
+      .mockRejectedValueOnce(new Error('webp encode failed'))
+      .mockResolvedValueOnce({ uri: 'file:///cache/stripped.jpg' });
+
+    const result = await stripImageMetadata('file:///cache/original.webp', 'webp');
+
+    expect(mocks.manipulateAsync).toHaveBeenCalledTimes(2);
+    expect(mocks.manipulateAsync).toHaveBeenLastCalledWith('file:///cache/original.webp', [], {
+      compress: 1,
+      format: 'jpeg',
+    });
+    expect(result).toEqual({ ok: true, uri: 'file:///cache/stripped.jpg', extension: 'jpg' });
+    expect(mocks.captureException).not.toHaveBeenCalled();
+  });
+
+  it('reports the caught cause, the input extension, and a per-extension fingerprint when the retry also fails', async () => {
+    const firstError = new Error('webp encode failed');
+    const retryError = new Error('jpeg retry failed');
+    mocks.manipulateAsync.mockRejectedValueOnce(firstError).mockRejectedValueOnce(retryError);
+
+    const result = await stripImageMetadata('file:///cache/original.webp', 'webp');
+
+    expect(mocks.manipulateAsync).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ ok: false });
+    expect(mocks.captureException).toHaveBeenCalledTimes(1);
+    const [reported, options] = mocks.captureException.mock.calls[0] as [
+      Error,
+      { extra: { inputExtension: string }; fingerprint: string[] },
+    ];
+    expect(reported).toBeInstanceOf(Error);
+    expect(reported.message).toBe('Attachment image metadata strip failed');
+    expect(reported.cause).toBe(retryError);
+    expect(options.extra).toEqual({ inputExtension: 'webp' });
+    expect(options.fingerprint).toEqual(['agent-attachments-strip-image-metadata', 'webp']);
+  });
+
+  it('skips the retry for JPEG-family inputs whose only format already is JPEG', async () => {
+    mocks.manipulateAsync.mockRejectedValue(new Error('jpeg encode failed'));
+
+    const result = await stripImageMetadata('file:///cache/original.heic', 'heic');
+
+    expect(mocks.manipulateAsync).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ ok: false });
+    const [reported] = mocks.captureException.mock.calls[0] as [Error];
+    expect(reported.cause).toMatchObject({ message: 'jpeg encode failed' });
+  });
+
+  it('treats a re-encode that resolves to the input URI as a failure', async () => {
+    mocks.manipulateAsync.mockResolvedValue({ uri: 'file:///cache/original.png' });
 
     const result = await stripImageMetadata('file:///cache/original.png', 'png');
 
-    expect(result).toBe('file:///cache/original.png');
-    expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
-      tags: {
-        'error.subsystem': 'agent-attachments',
-        'error.operation': 'strip-image-metadata',
-      },
-      extra: { outputExtension: 'png' },
-      fingerprint: ['agent-attachments-strip-image-metadata'],
-    });
+    expect(result).toEqual({ ok: false });
+    const [reported] = mocks.captureException.mock.calls[0] as [Error];
+    expect(reported.cause).toMatchObject({ message: 'Re-encode resolved to the input URI' });
   });
 });

@@ -14,7 +14,10 @@ import {
 } from '@/src/shared/auth';
 import type { DeviceAuthRequest, FetchLike, StoredAuth } from '@/src/shared/auth';
 import { persistApprovedDeviceAuth } from '@/src/shared/device-auth-approval';
-import { getAuthValidationQueryKey } from '@/src/shared/side-panel-query-options';
+import {
+  getAuthValidationQueryKey,
+  removeAccountScopedAgentsQueries,
+} from '@/src/shared/side-panel-query-options';
 import {
   LoadingView,
   PendingView,
@@ -93,9 +96,10 @@ export const App = (): JSX.Element => {
       }
 
       if (result.status === 'invalid') {
-        // Clear all account-scoped state (conversations included) like sign-out so a later account on this profile never loads the expired user's data. Message returned below.
+        // Clear all account-scoped state (conversations and cached agents data included) like sign-out. Message returned below.
         await clearStoredSession(storage);
         clearPerConversationAtoms();
+        removeAccountScopedAgentsQueries(queryClient);
         return { message: 'Your session expired. Sign in again.', status: 'signedOut' };
       }
 
@@ -167,6 +171,8 @@ export const App = (): JSX.Element => {
         }
 
         setSignedOutMessage(undefined);
+        // Agents caches are keyed by identity; clear them for this transition.
+        removeAccountScopedAgentsQueries(queryClient);
         /*
          * Must precede the signed-in cache writes so the identity hook reads
          * device_auth for this transition (ref is sync; useState would race).
@@ -216,6 +222,7 @@ export const App = (): JSX.Element => {
         await clearStoredSession(storage);
       } finally {
         clearPerConversationAtoms();
+        removeAccountScopedAgentsQueries(queryClient);
         queryClient.setQueryData(storedAuthQueryKey, undefined);
         if (storedAuth !== undefined) {
           queryClient.setQueryData(getAuthValidationQueryKey(storedAuth.token), {

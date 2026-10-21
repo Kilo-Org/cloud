@@ -30,12 +30,17 @@ import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { getKiloApiBaseUrl, loadStoredAuth } from '@/src/shared/auth';
 import { fetchModelPreferences } from '@/src/shared/model-preferences-client';
 import { isGatewayModelId } from '@/src/shared/model-picker-rows';
-import { getModelPreferencesQueryKey } from '@/src/shared/side-panel-query-options';
+import {
+  activeSessionsQueryKey,
+  cliInstancesQueryKey,
+  getModelPreferencesQueryKey,
+  sessionHistoryQueryKey,
+  sessionRepositoriesQueryKey,
+} from '@/src/shared/side-panel-query-options';
 import { thinkingEffortLabel } from '@/src/shared/kilo-api-client';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import { useExtensionAgents } from './agents-provider';
-import { activeSessionsQueryKey, sessionHistoryQueryKey } from './agents-session-list';
 import { ModelPicker } from './model-picker';
 import { useGatewayModels } from './use-gateway-models';
 
@@ -222,7 +227,7 @@ export const AgentsNewSession = ({
   onCreated: (kiloSessionId: string, initialPrompt?: string) => void;
   onCancel: () => void;
 }): JSX.Element => {
-  const { organizationId, trpcClient, userWebConnection } = useExtensionAgents();
+  const { organizationId, token, trpcClient, userWebConnection } = useExtensionAgents();
   const queryClient = useQueryClient();
 
   const { auth, isLoading: isAuthLoading } = useStoredAuth();
@@ -287,7 +292,7 @@ export const AgentsNewSession = ({
             forceRefresh: false,
             organizationId,
           } as never),
-    queryKey: ['agents-new-session', 'repos', organizationId],
+    queryKey: sessionRepositoriesQueryKey({ organizationId, token }),
     retry: 2,
   });
 
@@ -305,7 +310,7 @@ export const AgentsNewSession = ({
   const { data: instancesData } = useQuery({
     enabled: auth !== undefined && auth.token !== '',
     queryFn: () => trpcClient.activeSessions.listInstances.query(),
-    queryKey: ['agents-new-session', 'instances'],
+    queryKey: cliInstancesQueryKey({ token }),
     retry: 1,
   });
   const instances = useMemo(() => instancesData?.instances ?? [], [instancesData]);
@@ -498,7 +503,7 @@ export const AgentsNewSession = ({
           return;
         }
         void queryClient.invalidateQueries({
-          queryKey: activeSessionsQueryKey(organizationId),
+          queryKey: activeSessionsQueryKey({ organizationId, token }),
         });
         setIsSubmitting(false);
         onCreated(parsed.kiloSessionId, trimmed);
@@ -542,10 +547,10 @@ export const AgentsNewSession = ({
 
       // Invalidate pinned session list keys
       void queryClient.invalidateQueries({
-        queryKey: activeSessionsQueryKey(organizationId),
+        queryKey: activeSessionsQueryKey({ organizationId, token }),
       });
       void queryClient.invalidateQueries({
-        queryKey: sessionHistoryQueryKey(organizationId),
+        queryKey: sessionHistoryQueryKey({ organizationId, token }),
       });
 
       setIsSubmitting(false);
@@ -568,6 +573,7 @@ export const AgentsNewSession = ({
     selectedVariant,
     selectedRepo,
     organizationId,
+    token,
     trpcClient,
     queryClient,
     onCreated,

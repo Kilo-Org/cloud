@@ -220,6 +220,73 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 worker RPC surface', () => {
+  it('detects native subscription loss after eviction even without a later event', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const nativeId = kiloSessionId();
+    let stub = sessions.getByName(sessionId);
+    await expect(
+      stub.registerSessionFromMetadata({
+        metadata: metadata({
+          sessionId,
+          kiloSessionId: nativeId,
+          sandboxId,
+          sandboxProvider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist: [],
+        }),
+        sandboxSelection: {
+          provider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist: [],
+        },
+      })
+    ).resolves.toEqual({ success: true });
+    const subscription = await stub.subscribeNativeEvents({
+      kiloSessionId: nativeId,
+      attachmentId: 'before-eviction',
+    });
+    expect(subscription.registered).toBe(true);
+    await expect(
+      stub.refreshNativeEvents({
+        kiloSessionId: nativeId,
+        attachmentId: 'before-eviction',
+        generation: subscription.continuity.generation,
+      })
+    ).resolves.toBe(true);
+    await evictAllDurableObjects();
+    stub = sessions.getByName(sessionId);
+    await expect(
+      stub.refreshNativeEvents({
+        kiloSessionId: nativeId,
+        attachmentId: 'before-eviction',
+        generation: subscription.continuity.generation,
+      })
+    ).resolves.toBe(false);
+    const replacement = await stub.subscribeNativeEvents({
+      kiloSessionId: nativeId,
+      attachmentId: 'after-eviction',
+    });
+    expect(replacement.continuity.generation).toBeGreaterThan(subscription.continuity.generation);
+    expect(replacement.continuity.sequence).toBe(0);
+    await stub.releaseNativeEvents({ attachmentId: 'before-eviction' });
+    await expect(
+      stub.refreshNativeEvents({
+        kiloSessionId: nativeId,
+        attachmentId: 'after-eviction',
+        generation: replacement.continuity.generation,
+      })
+    ).resolves.toBe(true);
+    await stub.releaseNativeEvents({ attachmentId: 'after-eviction' });
+    await expect(
+      stub.refreshNativeEvents({
+        kiloSessionId: nativeId,
+        attachmentId: 'after-eviction',
+        generation: replacement.continuity.generation,
+      })
+    ).resolves.toBe(false);
+  });
+
   it.each([undefined, [], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
     'retains registration policy after eviction and rejects changed replays %j',
     async ({ egressAllowlist }) => {

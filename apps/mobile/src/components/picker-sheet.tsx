@@ -5,7 +5,7 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
-import { SheetHeader } from '@/components/sheet-header';
+import { SheetHeader, type SheetHeaderTopInset } from '@/components/sheet-header';
 
 export function PickerSheet({
   title,
@@ -19,6 +19,12 @@ export function PickerSheet({
   scrollable = true,
   disabled = false,
   doneDisabled = false,
+  /**
+   * Half-detent-only shells (mode-picker pins `sheetAllowedDetents: [0.5]`)
+   * can never reach the window top, so their header must not reserve the
+   * status-bar inset — it would only be a dead band above the title.
+   */
+  topInset = 'bottom-form-sheet',
 }: {
   title: string;
   onDone: () => void;
@@ -40,6 +46,7 @@ export function PickerSheet({
   disabled?: boolean;
   /** Disables Done alone, so Cancel stays usable while the choice is invalid. */
   doneDisabled?: boolean;
+  topInset?: SheetHeaderTopInset;
 }) {
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
@@ -68,7 +75,7 @@ export function PickerSheet({
           cancelLabel={cancelLabel}
           disabled={disabled}
           doneDisabled={doneDisabled}
-          topInset="bottom-form-sheet"
+          topInset={topInset}
         />
         {headerContent}
       </View>

@@ -687,7 +687,8 @@
       "description": "Připoj svůj účet GitHub a kontroluj PR na mobilu.",
       "gitlabDescription": "Připoj svůj účet GitLab a kontroluj merge requesty na mobilu.",
       "bitbucketDescription": "Připoj Bitbucket k této organizaci a kontroluj PR na mobilu.",
-      "bitbucketOrgOnlyDescription": "Vyber organizaci ve svém profilu a kontroluj její Bitbucket PR."
+      "bitbucketOrgOnlyDescription": "Přepni účet nahoře na organizaci a kontroluj její PR na Bitbucketu.",
+      "contextLine": "Pro {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -803,7 +804,9 @@
       "reviewNotSubmitted": "Tuto revizi nelze v aktuálním stavu odeslat. PR se možná změnil nebo se pokoušíš o revizi vlastního PR, což není povolené.",
       "reviewNotSubmittedTerm": "Tuto revizi nelze v aktuálním stavu odeslat. {{term}} se možná změnil nebo nemůžeš revidovat vlastní {{term}}.",
       "couldNotPostComment": "Komentář se nepodařilo odeslat.",
-      "couldNotSubmitReview": "Revizi se nepodařilo odeslat. Zkontroluj připojení a zkus to znovu."
+      "couldNotSubmitReview": "Revizi se nepodařilo odeslat. Zkontroluj připojení a zkus to znovu.",
+      "rateLimited": "Příliš mnoho požadavků. Zkuste to prosím později znovu.",
+      "conflict": "Tato položka se změnila, zatímco jste na ní pracovali. Znovu ji načtěte a zkuste to znovu."
     },
     "operation": {
       "couldNotReply": "Odpověď se nepodařilo odeslat.",
@@ -1453,6 +1456,9 @@
       "couldNotGetLatest": "Aktuální stav se nepodařilo načíst.",
       "byline": "{{repo}} #{{number}} · autor: {{author}}",
       "noFindings": "Kontrola neodhalila žádné nálezy.",
+      "findingsUnavailable": "Výsledky nejsou k dispozici, protože tato kontrola selhala.",
+      "serviceUnavailable": "Nepodařilo se připojit ke službě kontroly kódu. Zopakujte kontrolu, až bude služba dostupná.",
+      "reviewFailed": "Kontrola selhala. Zkuste to prosím znovu.",
       "showMore": "Zobrazit více",
       "created": "Vytvořeno",
       "started": "Zahájeno",
@@ -1582,7 +1588,8 @@
       "bugs": "Chyby",
       "style": "Styl",
       "testing": "Testování",
-      "documentation": "Dokumentace"
+      "documentation": "Dokumentace",
+      "unknown": "Jiné ({{area}})"
     },
     "gateThreshold": {
       "warning": "Varování"
@@ -2267,6 +2274,7 @@
       "prefillModelUnavailable": "{{model}} již není k dispozici. Používá se váš výchozí model.",
       "couldNotReadPendingSessions": "Čekající relace se nepodařilo načíst. Zkuste to znovu.",
       "failedToCreate": "Relaci se nepodařilo vytvořit.",
+      "checkOrganizationAccess": "Zkontrolujte svůj přístup k této organizaci a zkuste to znovu.",
       "couldNotRefreshRepositories": "Seznam repozitářů se nepodařilo obnovit. Zkuste to znovu.",
       "discardDraftTitle": "Zahodit koncept?",
       "discardDraftMessage": "Vaše zadání se smaže.",
@@ -2809,6 +2817,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Dokud se seznam nenačte, vaše aktivní relace nejsou dostupné.",
     "currentDeviceUnidentified": "Aktuální zařízení se nepodařilo rozpoznat.",
+    "kiloApp": "Aplikace Kilo",
     "noSessions": "Žádné aktivní relace",
     "noSessionsDescription": "Přihlaste se do aplikace Kilo na jiném zařízení. Pak se zde zobrazí.",
     "onlyKiloAppSignIns": "Zde se zobrazují pouze přihlášení do aplikace Kilo. Přihlášení v editoru a CLI nejsou uvedena.",
@@ -2963,6 +2972,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Než začneme",
+    "summaryTitle": "Předvolby sdílení dat",
     "introDescription": "Kilo odesílá vaše zprávy poskytovatelům AI, aby mohli vytvořit odpovědi. Zde zjistíte, co sdílíme a s kým.",
     "required": "Nezbytné pro používání Kilo",
     "promptsTitle": "Vaše zadání a konverzace",
@@ -2971,7 +2981,6 @@
     "accountDescription": "ID vašeho účtu Kilo a metadata požadavků slouží k ověření vaší identity a měření využití.",
     "diagnosticsTitle": "Diagnostika aplikace",
     "diagnosticsDescription": "Hlášení o pádech a chybách pomáhají udržovat aplikaci stabilní. Obsah aplikace je z hlášení odstraněn.",
-    "optional": "Volitelné",
     "helpImprove": "Pomozte vylepšit Kilo",
     "helpImproveDescription": "Sdílejte anonymní údaje o používání aplikace a zdroji instalace. Tuto volbu můžete kdykoli změnit v nastavení.",
     "seeFullDetails": "Zobrazit podrobnosti",
@@ -3552,6 +3561,9 @@
     "localModels": {
       "title": "Modely v zařízení",
       "help": "Modely v zařízení běží přímo v tomto telefonu. Vaše dotazy a odpovědi zůstávají v zařízení.",
+      "switchTitle": "Přepnout na model v zařízení?",
+      "switchMessage": "Po přepnutí na {{name}} se výzvy a kontext této konverzace budou zpracovávat přímo v tomto telefonu, nikoli na vzdáleném serveru.",
+      "switchConfirm": "Přepnout model",
       "systemPurpose": "Model zabudovaný do systému tohoto zařízení. Běží v zařízení.",
       "apple": "Apple Intelligence (v zařízení)",
       "checking": "Ověřování dostupnosti…",
@@ -3648,7 +3660,6 @@
     "personalDefaultDescription": "Automaticky načteno, když žádné úložiště nemá připnutý profil.",
     "organizationDefaultDescription": "Automaticky načteno pro členy, kteří nemají žádné osobní výchozí nastavení.",
     "setAsDefault": "Nastavit jako výchozí",
-    "removeDefault": "Odebrat jako výchozí",
     "saveFailed": "Profil se nepodařilo uložit",
     "deleteTitle": "Smazat profil",
     "deleteMessage": "Tím se profil a jeho nastavení trvale odstraní. Toto nelze vrátit zpět.",
@@ -3674,11 +3685,13 @@
     "commandsTitle": "Nastavení příkazů",
     "addCommand": "Přidat příkaz",
     "commandLabel": "Příkaz",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "např. pnpm install",
     "commandsEmpty": "Zatím žádné příkazy k nastavení",
     "commandsSaveFailed": "Příkazy nastavení se nepodařilo uložit",
     "moveUp": "Posuňte se nahoru",
     "moveDown": "Posuňte se dolů",
+    "moveCommandUp": "Přesunout příkaz {{position}} nahoru",
+    "moveCommandDown": "Přesunout příkaz {{position}} dolů",
     "skillsTitle": "Dovednosti",
     "addSkill": "Přidejte dovednost",
     "skillNameLabel": "Název dovednosti",
@@ -3748,7 +3761,7 @@
       "nameRequired": "Zadejte jméno agenta",
       "slugRequired": "Zadejte agenta slimáka",
       "slugInvalid": "Slug musí začínat písmenem a používat pouze malá písmena, číslice a pomlčky",
-      "slugConflict": "Ten slimák je rezervován vestavěným agentem",
+      "slugConflict": "Tento slug už používá vestavěný agent nebo jiný agent v tomto profilu",
       "edit": "Upravit agenta"
     },
     "slashCommands": {

@@ -675,7 +675,8 @@
       "description": "Conectează-ți contul GitHub pentru a revizui PR-uri pe mobil.",
       "gitlabDescription": "Conectează-ți contul GitLab pentru a revizui merge requesturi de pe mobil.",
       "bitbucketDescription": "Conectează Bitbucket la această organizație pentru a revizui PR-uri de pe mobil.",
-      "bitbucketOrgOnlyDescription": "Selectează o organizație în profilul tău pentru a-i revizui PR-urile Bitbucket."
+      "bitbucketOrgOnlyDescription": "Comută contul de mai sus pe o organizație pentru a revizui PR-urile Bitbucket ale acesteia.",
+      "contextLine": "Pentru {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -787,7 +788,9 @@
       "reviewNotSubmitted": "Această revizuire nu poate fi trimisă în forma actuală. Este posibil ca PR-ul să se fi modificat sau să fie propriul tău PR, pe care nu îl poți revizui.",
       "reviewNotSubmittedTerm": "Această revizuire nu poate fi trimisă în starea curentă. E posibil ca {{term}} să se fi modificat sau nu îți poți revizui propriul {{term}}.",
       "couldNotPostComment": "Nu s-a putut publica comentariul.",
-      "couldNotSubmitReview": "Nu s-a putut trimite revizuirea. Verifică conexiunea și încearcă din nou."
+      "couldNotSubmitReview": "Nu s-a putut trimite revizuirea. Verifică conexiunea și încearcă din nou.",
+      "rateLimited": "Prea multe cereri. Încearcă din nou mai târziu.",
+      "conflict": "S-a schimbat în timp ce lucrai la el. Reîncarcă-l și încearcă din nou."
     },
     "operation": {
       "couldNotReply": "Nu s-a putut trimite răspunsul.",
@@ -1434,6 +1437,9 @@
       "couldNotGetLatest": "Nu s-au putut obține cele mai recente date.",
       "byline": "{{repo}} #{{number}}, autor: {{author}}",
       "noFindings": "Nu există constatări.",
+      "findingsUnavailable": "Rezultatele nu sunt disponibile deoarece această revizuire a eșuat.",
+      "serviceUnavailable": "Nu s-a putut stabili conexiunea cu serviciul de revizuire a codului. Reîncearcă revizuirea când serviciul este disponibil.",
+      "reviewFailed": "Revizuirea a eșuat. Te rugăm să încerci din nou.",
       "showMore": "Afișează mai mult",
       "created": "Creată",
       "started": "Începută",
@@ -1563,7 +1569,8 @@
       "bugs": "Erori",
       "style": "Stil",
       "testing": "Testare",
-      "documentation": "Documentație"
+      "documentation": "Documentație",
+      "unknown": "Altele ({{area}})"
     },
     "gateThreshold": {
       "warning": "Avertisment"
@@ -2239,6 +2246,7 @@
       "prefillModelUnavailable": "{{model}} nu mai este disponibil. Se folosește modelul tău implicit.",
       "couldNotReadPendingSessions": "Nu s-au putut citi sesiunile în așteptare. Încearcă din nou.",
       "failedToCreate": "Nu s-a putut crea sesiunea.",
+      "checkOrganizationAccess": "Verifică accesul la această organizație și încearcă din nou.",
       "couldNotRefreshRepositories": "Nu s-au putut reîmprospăta depozitele. Încearcă din nou.",
       "discardDraftTitle": "Renunți la ciornă?",
       "discardDraftMessage": "Instrucțiunile tale se vor pierde.",
@@ -2770,6 +2778,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Sesiunile tale active nu pot fi afișate până la încărcarea datelor.",
     "currentDeviceUnidentified": "Nu s-a putut identifica dispozitivul curent.",
+    "kiloApp": "Aplicația Kilo",
     "noSessions": "Nicio sesiune activă",
     "noSessionsDescription": "Autentifică-te în aplicația Kilo pe alt dispozitiv, iar sesiunea va apărea aici.",
     "onlyKiloAppSignIns": "Doar autentificările din aplicația Kilo apar aici. Autentificările din editor și CLI nu sunt listate.",
@@ -2923,6 +2932,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Înainte să începem",
+    "summaryTitle": "Preferințe de partajare a datelor",
     "introDescription": "Kilo trimite mesajele tale furnizorilor de AI pentru a genera răspunsuri. Iată ce date partajăm și cu cine.",
     "required": "Necesar pentru utilizarea Kilo",
     "promptsTitle": "Instrucțiunile și conversațiile tale",
@@ -2931,7 +2941,6 @@
     "accountDescription": "ID-ul contului tău Kilo și metadatele cererilor, folosite pentru a te autentifica și a măsura utilizarea.",
     "diagnosticsTitle": "Date de diagnostic ale aplicației",
     "diagnosticsDescription": "Rapoarte despre închideri neașteptate și erori, din care eliminăm conținutul aplicației, folosite pentru a menține stabilitatea aplicației.",
-    "optional": "Opțional",
     "helpImprove": "Ajută la îmbunătățirea Kilo",
     "helpImproveDescription": "Partajează date anonime despre utilizarea aplicației și sursa instalării. Poți modifica oricând această opțiune în setări.",
     "seeFullDetails": "Vezi toate detaliile",
@@ -3511,6 +3520,9 @@
     "localModels": {
       "title": "Modele pe dispozitiv",
       "help": "Modelele pe dispozitiv rulează pe acest telefon. Solicitările și răspunsurile tale rămân pe dispozitiv.",
+      "switchTitle": "Treci la un model pe dispozitiv?",
+      "switchMessage": "Trecerea la {{name}} face ca prompturile și contextul acestei conversații să fie procesate pe acest telefon, nu pe un server la distanță.",
+      "switchConfirm": "Schimbă modelul",
       "systemPurpose": "Modelul integrat în sistemul acestui dispozitiv. Rulează pe dispozitiv.",
       "apple": "Apple Intelligence (pe dispozitiv)",
       "checking": "Se verifică disponibilitatea…",
@@ -3607,7 +3619,6 @@
     "personalDefaultDescription": "Se încarcă automat când niciun depozit nu are un profil fixat.",
     "organizationDefaultDescription": "Încărcat automat pentru membrii care nu au o valoare implicită personală.",
     "setAsDefault": "Setați ca implicit",
-    "removeDefault": "Eliminați implicit",
     "saveFailed": "Profilul nu a putut fi salvat",
     "deleteTitle": "Ștergeți profilul",
     "deleteMessage": "Acest lucru elimină definitiv profilul și setările acestuia. Acest lucru nu poate fi anulat.",
@@ -3633,11 +3644,13 @@
     "commandsTitle": "Configurați comenzi",
     "addCommand": "Adăugați comanda",
     "commandLabel": "Comanda",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "de ex. pnpm install",
     "commandsEmpty": "Încă nu există comenzi de configurare",
     "commandsSaveFailed": "Comenzile de configurare nu au putut fi salvate",
     "moveUp": "Mișcă-te în sus",
     "moveDown": "Deplasați-vă în jos",
+    "moveCommandUp": "Mută comanda {{position}} în sus",
+    "moveCommandDown": "Mută comanda {{position}} în jos",
     "skillsTitle": "Abilități",
     "addSkill": "Adăugați abilitate",
     "skillNameLabel": "Numele aptitudinii",
@@ -3707,7 +3720,7 @@
       "nameRequired": "Introduceți un nume de agent",
       "slugRequired": "Introduceți un melc de agent",
       "slugInvalid": "Slug trebuie să înceapă cu o literă și să folosească numai litere mici, cifre și liniuțe",
-      "slugConflict": "Acest melc este rezervat de un agent încorporat",
+      "slugConflict": "Acel slug este deja folosit de un agent integrat sau de un alt agent din acest profil",
       "edit": "Editați agentul"
     },
     "slashCommands": {

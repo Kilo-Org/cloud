@@ -34,7 +34,115 @@ function isAbsoluteStructuredPath(value: string): boolean {
 }
 
 function publicPath(path: string, kiloSessionId: string): string {
-  return isAbsoluteStructuredPath(path) ? publicCloudAgentDirectory(kiloSessionId) : path;
+  const directory = publicCloudAgentDirectory(kiloSessionId);
+  if (path === directory || path.startsWith(`${directory}/`)) return path;
+  return isAbsoluteStructuredPath(path) ? directory : path;
+}
+
+export function projectPublicStructuredPaths<T extends object>(value: T, kiloSessionId: string): T {
+  const directory = publicCloudAgentDirectory(kiloSessionId);
+  const metadata: Record<string, unknown>[] = [];
+  const privateDirectories = new Set<string>();
+  function collect(target: unknown): void {
+    if (typeof target !== 'object' || target === null) return;
+    const record: Record<string, unknown> = Object.fromEntries(Object.entries(target));
+    if ('directory' in record || record.role === 'assistant') metadata.push(record);
+    const paths = [record.directory];
+    if (record.role === 'assistant' && typeof record.path === 'object' && record.path !== null) {
+      if ('cwd' in record.path) paths.push(record.path.cwd);
+      if ('root' in record.path) paths.push(record.path.root);
+    }
+    for (const path of paths) {
+      if (typeof path === 'string' && path !== '/' && isAbsoluteStructuredPath(path)) {
+        privateDirectories.add(path.replace(/[\\/]+$/, ''));
+      }
+    }
+    for (const item of Object.values(record)) collect(item);
+  }
+  collect(value);
+  const roots = [...privateDirectories].sort((a, b) => b.length - a.length);
+  function projectPath(path: string): string {
+    if (path === directory || path.startsWith(`${directory}/`)) return path;
+    for (const root of roots) {
+      if (path === root || path.startsWith(`${root}/`)) {
+        const projected = projectPrivateWorktreePaths({ path }, metadata, directory).path;
+        return projected !== path ? projected : directory + path.slice(root.length);
+      }
+    }
+    return publicPath(path, kiloSessionId);
+  }
+  function projectDiffPath(path: string): string {
+    if (path === '/dev/null') return path;
+    if (path.startsWith('"') && path.endsWith('"')) {
+      return `"${projectDiffPath(path.slice(1, -1))}"`;
+    }
+    const prefix = /^(?:a|b)\//.exec(path)?.[0] ?? '';
+    return prefix + projectPath(path.slice(prefix.length));
+  }
+  function projectDiff(diff: string): string {
+    let inHunk = false;
+    return diff
+      .split('\n')
+      .map(line => {
+        if (/^(?:diff --git |Index: )/.test(line)) inHunk = false;
+        if (line.startsWith('@@')) inHunk = true;
+        if (inHunk) return line;
+        return line
+          .replace(
+            /^(diff --git )("[^"]*"|\S+) ("[^"]*"|\S+)(\r?)$/,
+            (_match, prefix: string, before: string, after: string, ending: string) =>
+              `${prefix}${projectDiffPath(before)} ${projectDiffPath(after)}${ending}`
+          )
+          .replace(
+            /^(Index: |--- |\+\+\+ |rename from |rename to |copy from |copy to )("[^"]*"|[^\t\r]+)((?:\t[^\r]*)?\r?)$/,
+            (_match, prefix: string, path: string, suffix: string) =>
+              prefix + projectDiffPath(path) + suffix
+          );
+      })
+      .join('\n');
+  }
+  const pathKeys = new Set([
+    'path',
+    'cwd',
+    'root',
+    'directory',
+    'worktree',
+    'filepath',
+    'filePath',
+    'file',
+    'files',
+    'visibleFiles',
+    'openTabs',
+    'activeFile',
+    'pattern',
+    'patterns',
+    'always',
+  ]);
+  function project(target: object): void {
+    const entries: [string, unknown][] = Object.entries(target);
+    for (const [key, item] of entries) {
+      if (typeof item === 'string' && (key === 'uri' || key === 'url')) {
+        Reflect.set(target, key, publicFilePartUrl(item));
+      } else if (typeof item === 'string' && pathKeys.has(key))
+        Reflect.set(target, key, projectPath(item));
+      else if (typeof item === 'string' && (key === 'diff' || key === 'patch')) {
+        Reflect.set(target, key, projectDiff(item));
+      } else if (Array.isArray(item) && pathKeys.has(key)) {
+        Reflect.set(
+          target,
+          key,
+          item.map((path: unknown) => {
+            if (typeof path === 'string') return projectPath(path);
+            if (typeof path === 'object' && path !== null) project(path);
+            return path;
+          })
+        );
+      } else if (typeof item === 'object' && item !== null) project(item);
+    }
+  }
+  const projected = structuredClone(value);
+  project(projected);
+  return projected;
 }
 
 export function projectPublicSession(
@@ -127,9 +235,10 @@ export function projectPublicMessageInfo(
   message: KiloSdkMessageInfo,
   kiloSessionId: string
 ): KiloSdkMessageInfo {
-  return message.role === 'assistant'
-    ? projectPublicAssistantMessage(message, kiloSessionId)
-    : projectPublicUserMessage(message, kiloSessionId);
+  const projected = projectPublicStructuredPaths(message, kiloSessionId);
+  return projected.role === 'assistant'
+    ? projectPublicAssistantMessage(projected, kiloSessionId)
+    : projectPublicUserMessage(projected, kiloSessionId);
 }
 
 function isLocalFileUri(value: string): boolean {
@@ -158,25 +267,22 @@ function projectPublicToolState(state: KiloSdkToolState, kiloSessionId: string):
 }
 
 export function projectPublicPart(part: KiloSdkPart, kiloSessionId: string): KiloSdkPart {
-  if (part.type === 'file') return projectPublicFilePart(part, kiloSessionId);
-  if (part.type === 'tool') {
-    return { ...part, state: projectPublicToolState(part.state, kiloSessionId) };
+  const projected = projectPublicStructuredPaths(part, kiloSessionId);
+  if (projected.type === 'file') return projectPublicFilePart(projected, kiloSessionId);
+  if (projected.type === 'tool') {
+    return { ...projected, state: projectPublicToolState(projected.state, kiloSessionId) };
   }
-  if (part.type === 'patch') {
-    return { ...part, files: part.files.map(file => publicPath(file, kiloSessionId)) };
+  if (projected.type === 'patch') {
+    return { ...projected, files: projected.files.map(file => publicPath(file, kiloSessionId)) };
   }
-  return part;
+  return projected;
 }
 
 export function projectPublicStoredMessage(
   message: KiloSdkStoredMessage,
   kiloSessionId: string
 ): KiloSdkStoredMessage {
-  const sanitized = projectPrivateWorktreePaths(
-    message,
-    [message.info],
-    publicCloudAgentDirectory(kiloSessionId)
-  );
+  const sanitized = projectPublicStructuredPaths(message, kiloSessionId);
   return {
     info: projectPublicMessageInfo(sanitized.info, kiloSessionId),
     parts: sanitized.parts.map(part => projectPublicPart(part, kiloSessionId)),

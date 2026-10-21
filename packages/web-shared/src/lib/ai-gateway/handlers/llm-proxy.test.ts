@@ -288,6 +288,14 @@ function setUserAuth() {
   });
 }
 
+function setAnonymousAuth() {
+  mockedGetUserFromAuth.mockResolvedValue({
+    user: null,
+    authFailedResponse: new Response('unauthorized', { status: 401 }),
+    organizationId: undefined,
+  } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+}
+
 function upstreamJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -1305,6 +1313,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   it.each([gemma_4_26b_a4b_it_free_model.public_id, 'test/free-model:free', 'openrouter/free'])(
     'applies free-model rate limiting per IP to anonymous callers of the free model %s',
     async modelId => {
+      setAnonymousAuth();
       mockedIsFreeModelRateLimited.mockResolvedValue(true);
 
       const { handleLlmProxyRequest } = await import('./llm-proxy');
@@ -1358,12 +1367,47 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('counts anonymous server-side product requests on Cloudflare IPs per IP', async () => {
+  it('applies free-model rate limiting per account to session-cookie callers', async () => {
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id)) as never
+    );
+
+    expect(response.status).toBe(429);
+    expect(JSON.stringify(await response.json())).not.toContain('PROMOTION_MODEL_LIMIT_REACHED');
+    expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'account',
+      kiloUserId: 'user-123',
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('answers a rejected credential for a free model with the invalid-token response', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
       authFailedResponse: new Response('unauthorized', { status: 401 }),
+      credentialsRejected: true,
       organizationId: undefined,
     } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id), {
+        authorization: 'Bearer not-a-jwt',
+      }) as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ error_type: 'authentication_required' });
+    expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('counts anonymous server-side product requests on Cloudflare IPs per IP', async () => {
+    setAnonymousAuth();
     mockedIsFreeModelRateLimited.mockResolvedValue(true);
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');

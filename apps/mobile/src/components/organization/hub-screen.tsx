@@ -90,10 +90,8 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     : null;
   const kiloPassManagementUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions/kilo-pass`;
   const kiloPassSetupUrl = `${kiloPassManagementUrl}/setup`;
-  // A missing `withMembers` payload is not "off": the query can be paused
-  // offline or have errored with no persisted copy, so an org with the alert
-  // enabled must never read as disabled. Only a loaded payload with no stored
-  // threshold is genuinely off.
+  const lowBalanceUnavailable =
+    orgWithMembers.data == null && (orgWithMembers.isError || orgWithMembers.isPaused);
   const minimumBalance = orgWithMembers.data?.settings.minimum_balance;
   let lowBalanceSubtitle = t('common.loading');
   if (minimumBalance != null) {
@@ -102,8 +100,10 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     });
   } else if (orgWithMembers.data != null) {
     lowBalanceSubtitle = t('common.off');
-  } else if (orgWithMembers.isError) {
-    lowBalanceSubtitle = t('common.unknown');
+  } else if (lowBalanceUnavailable) {
+    lowBalanceSubtitle = t(
+      orgWithMembers.isPaused ? 'queryError.offlineTitle' : 'common.somethingWentWrong'
+    );
   }
 
   return (
@@ -207,7 +207,16 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 icon={Bell}
                 title={t('organization.lowBalanceAlert.title')}
                 subtitle={lowBalanceSubtitle}
+                trailing={
+                  lowBalanceUnavailable ? (
+                    <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>
+                  ) : undefined
+                }
                 onPress={() => {
+                  if (lowBalanceUnavailable) {
+                    void orgWithMembers.refetch();
+                    return;
+                  }
                   router.push('/(app)/(tabs)/(3_profile)/organization/low-balance-alert' as Href);
                 }}
               />

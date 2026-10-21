@@ -120,6 +120,8 @@ export type AdmitOperationInput = {
   taxonomy: OperationTaxonomy;
   /** Lease duration for the `admitted` claim, in seconds. */
   leaseSeconds: number;
+  /** Canonical data written atomically with a newly admitted row. */
+  initialCanonicalResult?: Record<string, unknown> | null;
 };
 
 export type AdmitOperationResult =
@@ -186,16 +188,22 @@ function mergeCanonicalResult(
   patch: Record<string, unknown> | null | undefined
 ): Record<string, unknown> {
   const merged = { ...(row.canonical_result ?? {}), ...(patch ?? {}) };
-  const bytes = new TextEncoder().encode(JSON.stringify(merged)).length;
+  assertCanonicalResultSize(merged);
+  return merged;
+}
+
+function assertCanonicalResultSize(result: Record<string, unknown>): void {
+  const bytes = new TextEncoder().encode(JSON.stringify(result)).length;
   if (bytes > MAX_CANONICAL_RESULT_BYTES) {
     throw new CanonicalResultTooLargeError(bytes);
   }
-  return merged;
 }
 
 // ----- admission ----------------------------------------------------------------
 
 function admissionInsertValues(input: AdmitOperationInput, now: Date): NewOperationLedgerRow {
+  const canonicalResult = input.initialCanonicalResult ?? null;
+  if (canonicalResult !== null) assertCanonicalResultSize(canonicalResult);
   return {
     operation_key: input.operationKey,
     domain: input.domain,
@@ -205,6 +213,7 @@ function admissionInsertValues(input: AdmitOperationInput, now: Date): NewOperat
     resource_key: input.resourceKey ?? null,
     taxonomy: input.taxonomy,
     status: 'admitted',
+    canonical_result: canonicalResult,
     admitted_at: now.toISOString(),
     lease_expires_at: new Date(now.getTime() + input.leaseSeconds * 1000).toISOString(),
     expires_at: new Date(now.getTime() + LEDGER_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString(),

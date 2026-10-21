@@ -6,15 +6,15 @@ const config = BenchmarkConfigSchema.parse({
   classifierModels: ['classifier/model'],
   deciderModels: [{ id: 'candidate/model' }],
   minAccuracy: 0.7,
-  benchmarkUserId: 'benchmark-user',
+  benchmarkUserId: 'bot-internal-benchmark-user',
   benchmarkOrgId: 'benchmark-org',
   switchCostFactor: 3,
   updatedAt: null,
   updatedBy: null,
 });
-const secretGet = vi.fn(async () => 'internal-secret');
+const secretGet = vi.fn(async () => 'mint-secret');
 const env = {
-  INTERNAL_API_SECRET_PROD: { get: secretGet },
+  BOT_TOKEN_MINT_SECRET: { get: secretGet },
   KILO_WEB_API_BASE_URL: 'https://internal.test',
   KILO_CLI_API_URL: 'https://cli.test',
 } as unknown as Env;
@@ -47,12 +47,15 @@ describe('executable benchmark catalog', () => {
     );
     const [tokenCall, modelsCall] = fetch.mock.calls;
     expect(tokenCall[0] instanceof Request ? tokenCall[0].url : tokenCall[0].toString()).toBe(
-      'https://internal.test/api/internal/auto-routing-benchmark/token'
+      'https://internal.test/api/internal/bot-token'
     );
     expect(tokenCall[1]).toMatchObject({
       method: 'POST',
-      headers: { authorization: 'Bearer internal-secret' },
-      body: JSON.stringify({ userId: 'benchmark-user', organizationId: 'benchmark-org' }),
+      headers: { authorization: 'Bearer mint-secret' },
+      body: JSON.stringify({
+        userId: 'bot-internal-benchmark-user',
+        organizationId: 'benchmark-org',
+      }),
     });
     expect(modelsCall[0] instanceof Request ? modelsCall[0].url : modelsCall[0].toString()).toBe(
       'https://cli.test/api/organizations/benchmark-org/models'
@@ -78,21 +81,6 @@ describe('executable benchmark catalog', () => {
     expect(modelsInput instanceof Request ? modelsInput.url : modelsInput.toString()).toBe(
       `https://cli.test/api/organizations/${identity.benchmarkOrgId}/models`
     );
-  });
-
-  it('uses the personal catalog without an organization header when no effective organization exists', async () => {
-    const fetch = catalogFetch();
-    await fetchExecutableBenchmarkModelCatalog(
-      env,
-      { benchmarkUserId: 'benchmark-user', benchmarkOrgId: null },
-      fetch
-    );
-    expect(fetch.mock.calls[0][1]?.body).toBe(JSON.stringify({ userId: 'benchmark-user' }));
-    const modelsInput = fetch.mock.calls[1][0];
-    expect(modelsInput instanceof Request ? modelsInput.url : modelsInput.toString()).toBe(
-      'https://cli.test/api/openrouter/models'
-    );
-    expect(fetch.mock.calls[1][1]?.headers).toEqual({ authorization: 'Bearer candidate-token' });
   });
 
   it('never falls back to a public catalog after authenticated admission fails', async () => {

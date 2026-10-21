@@ -888,6 +888,14 @@ export const AdminActionAuditAction = z.enum([
   'cloud_agent_session.messages.view',
   'cloud_agent_session.api_history.view',
   'webhook_trigger.request_logs.view',
+  'organization.member.invite',
+  'organization.member.role.update',
+  'organization.member.remove',
+  'organization.child_memberships.set',
+  'organization.token.mint',
+  'organization.gitlab_webhook_secret.rotate',
+  'organization.bitbucket.update',
+  'organization.webhook_session.share',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;
@@ -2220,17 +2228,6 @@ export const CustomLlmExtraHeadersSchema = z.record(z.string(), z.string());
 
 export type CustomLlmExtraHeaders = z.infer<typeof CustomLlmExtraHeadersSchema>;
 
-// All price fields are in dollars per token (e.g. "0.000001" = $1 per million tokens),
-// matching the OpenRouter pricing convention.
-export const CustomLlmPricingSchema = z.object({
-  prompt: z.string(),
-  completion: z.string(),
-  input_cache_read: z.string().optional(),
-  input_cache_write: z.string().optional(),
-});
-
-export type CustomLlmPricing = z.infer<typeof CustomLlmPricingSchema>;
-
 export const CustomLlmMetadataSchema = z.object({
   context_length: z.number(),
   max_completion_tokens: z.number(),
@@ -2309,11 +2306,27 @@ export const CustomLlmSecureProxyCredentialsSchema = z.object({
 
 export type CustomLlmSecureProxyCredentials = z.infer<typeof CustomLlmSecureProxyCredentialsSchema>;
 
+/**
+ * Signs requests with AWS Signature Version 4 using IAM access keys, for Amazon
+ * Bedrock's OpenAI-compatible and Anthropic Messages endpoints on
+ * `bedrock-runtime` or `bedrock-mantle`. Bedrock API keys need no signing and
+ * use `api_key` (or `x-api-key` on Anthropic routes).
+ */
+export const CustomLlmAwsBedrockCredentialsSchema = z.object({
+  type: z.literal('aws_bedrock'),
+  region: z.string().min(1),
+  access_key_id: z.string().min(1),
+  secret_access_key: z.string().min(1),
+});
+
+export type CustomLlmAwsBedrockCredentials = z.infer<typeof CustomLlmAwsBedrockCredentialsSchema>;
+
 export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
   CustomLlmApiKeyCredentialsSchema,
   CustomLlmXApiKeyCredentialsSchema,
   GoogleServiceAccountKeySchema,
   CustomLlmSecureProxyCredentialsSchema,
+  CustomLlmAwsBedrockCredentialsSchema,
 ]);
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
@@ -2324,15 +2337,25 @@ export const CustomLlmDefinitionSchema = z.object({
   display_name: z.string(),
   organization_ids: z.array(z.uuid()),
   group_ids: z.array(z.uuid()).optional(),
-  pricing: CustomLlmPricingSchema.optional(),
 });
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
-const GatewayModelIdSchema = z
+export const GatewayModelIdSchema = z
   .string()
   .trim()
   .regex(/^[a-z0-9./:~-]+$/, 'Model IDs may only contain lowercase letters, digits, and . / : ~ -');
+
+/** Kilo-owned model namespaces; mirrors the prefixes in web-shared `model-utils.ts`. */
+const RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES = ['kilo/', 'kilo-auto/', 'kilocode/'];
+
+/** `:` selects a gateway variant and `~` an OpenRouter alias, so neither may appear. */
+export const CustomLlmPublicIdSchema = GatewayModelIdSchema.refine(
+  id => !id.includes(':') && !id.includes('~'),
+  { message: 'public_id must not contain ":" or "~"' }
+).refine(id => !RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.some(prefix => id.startsWith(prefix)), {
+  message: `public_id must not start with ${RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.join(', ')}`,
+});
 
 export const AutoFreeModelSchema = z.object({
   model: GatewayModelIdSchema,
@@ -2626,118 +2649,3 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];
-
-// --- MCP Gateway enums ---
-
-export const MCPGatewayOwnerScope = {
-  Personal: 'personal',
-  Organization: 'organization',
-} as const;
-
-export type MCPGatewayOwnerScope = (typeof MCPGatewayOwnerScope)[keyof typeof MCPGatewayOwnerScope];
-
-export const MCPGatewayAuthMode = {
-  None: 'none',
-  StaticHeaders: 'static_headers',
-  OAuthDynamic: 'oauth_dynamic',
-  OAuthStatic: 'oauth_static',
-} as const;
-
-export type MCPGatewayAuthMode = (typeof MCPGatewayAuthMode)[keyof typeof MCPGatewayAuthMode];
-
-export const MCPGatewaySharingMode = {
-  SingleUser: 'single_user',
-  MultiUser: 'multi_user',
-} as const;
-
-export type MCPGatewaySharingMode =
-  (typeof MCPGatewaySharingMode)[keyof typeof MCPGatewaySharingMode];
-
-export const MCPGatewayProviderScopeSource = {
-  None: 'none',
-  Discovered: 'discovered',
-  Override: 'override',
-} as const;
-
-export type MCPGatewayProviderScopeSource =
-  (typeof MCPGatewayProviderScopeSource)[keyof typeof MCPGatewayProviderScopeSource];
-
-export const MCPGatewayRouteStatus = {
-  Active: 'active',
-  Rotated: 'rotated',
-  Revoked: 'revoked',
-} as const;
-
-export type MCPGatewayRouteStatus =
-  (typeof MCPGatewayRouteStatus)[keyof typeof MCPGatewayRouteStatus];
-
-export const MCPGatewayInstanceStatus = {
-  Active: 'active',
-  NeedsReauth: 'needs_reauth',
-  Revoked: 'revoked',
-  Removed: 'removed',
-} as const;
-
-export type MCPGatewayInstanceStatus =
-  (typeof MCPGatewayInstanceStatus)[keyof typeof MCPGatewayInstanceStatus];
-
-export const MCPGatewayProviderGrantStatus = {
-  Active: 'active',
-  Revoked: 'revoked',
-} as const;
-
-export type MCPGatewayProviderGrantStatus =
-  (typeof MCPGatewayProviderGrantStatus)[keyof typeof MCPGatewayProviderGrantStatus];
-
-export const MCPGatewayOAuthGrantStatus = {
-  Pending: 'pending',
-  Active: 'active',
-  Revoked: 'revoked',
-} as const;
-
-export type MCPGatewayOAuthGrantStatus =
-  (typeof MCPGatewayOAuthGrantStatus)[keyof typeof MCPGatewayOAuthGrantStatus];
-
-export const MCPGatewaySecretKind = {
-  StaticProviderCredentials: 'static_provider_credentials',
-  DynamicRegistration: 'dynamic_registration',
-  StaticHeaders: 'static_headers',
-} as const;
-
-export type MCPGatewaySecretKind = (typeof MCPGatewaySecretKind)[keyof typeof MCPGatewaySecretKind];
-
-export const MCPGatewayOAuthClientAuthMethod = {
-  None: 'none',
-  ClientSecretPost: 'client_secret_post',
-  ClientSecretBasic: 'client_secret_basic',
-} as const;
-
-export type MCPGatewayOAuthClientAuthMethod =
-  (typeof MCPGatewayOAuthClientAuthMethod)[keyof typeof MCPGatewayOAuthClientAuthMethod];
-
-export const MCPGatewayAuthorizationRequestStatus = {
-  Pending: 'pending',
-  Completed: 'completed',
-  Error: 'error',
-} as const;
-
-export type MCPGatewayAuthorizationRequestStatus =
-  (typeof MCPGatewayAuthorizationRequestStatus)[keyof typeof MCPGatewayAuthorizationRequestStatus];
-
-export const MCPGatewayPendingProviderAuthorizationStatus = {
-  Pending: 'pending',
-  Completed: 'completed',
-  Error: 'error',
-} as const;
-
-export type MCPGatewayPendingProviderAuthorizationStatus =
-  (typeof MCPGatewayPendingProviderAuthorizationStatus)[keyof typeof MCPGatewayPendingProviderAuthorizationStatus];
-
-export const MCPGatewayAuditOutcome = {
-  Success: 'success',
-  Failure: 'failure',
-  Blocked: 'blocked',
-} as const;
-
-export type MCPGatewayAuditOutcome =
-  (typeof MCPGatewayAuditOutcome)[keyof typeof MCPGatewayAuditOutcome];

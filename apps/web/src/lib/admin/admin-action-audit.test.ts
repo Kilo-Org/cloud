@@ -1,11 +1,16 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { eq } from 'drizzle-orm';
-import { admin_action_audit_logs } from '@kilocode/db/schema';
+import { admin_action_audit_logs, organizations } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { defineTestUser, insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  addUserToOrganization,
+  createOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   organizationActionTarget,
   recordAdminAction,
+  recordElevatedOrganizationAdminAction,
   recordAdminActions,
   setAdminActionSinkForTest,
   userActionTarget,
@@ -149,5 +154,81 @@ describe('recordAdminAction', () => {
 
     expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('recordElevatedOrganizationAdminAction', () => {
+  beforeEach(() => setAdminActionSinkForTest(() => {}));
+  afterEach(async () => {
+    setAdminActionSinkForTest(null);
+    await cleanupDbForTest();
+  });
+
+  async function adminWithInheritedOwnerRole() {
+    const admin = await insertTestUser({ is_admin: true });
+    const parent = await createOrganization('Parent Org', admin.id);
+    const child = await createOrganization('Child Org', null);
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+    return { admin, childId: child.id };
+  }
+
+  function record(
+    admin: Awaited<ReturnType<typeof insertTestUser>>,
+    organizationId: string,
+    scope?: 'direct'
+  ) {
+    return recordElevatedOrganizationAdminAction(
+      { ...ctxFor(), user: admin },
+      {
+        organizationId,
+        requiredRoles: ['owner'],
+        membershipScope: scope,
+        action: 'organization.gitlab_webhook_secret.rotate',
+        message: 'GitLab webhook secret: rotate',
+      }
+    );
+  }
+
+  test('an inherited owner role satisfies inherited-scope guards but not direct-only guards', async () => {
+    const { admin, childId } = await adminWithInheritedOwnerRole();
+
+    await record(admin, childId);
+    expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
+
+    await record(admin, childId, 'direct');
+    const rows = await db.select().from(admin_action_audit_logs);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.metadata).toEqual({ heldRoles: [] });
+  });
+
+  test('does not record non-admins or admins holding a sufficient direct role', async () => {
+    const owner = await insertTestUser({ is_admin: false });
+    const organization = await createOrganization('Owned Org', owner.id);
+    const adminOwner = await insertTestUser({ is_admin: true });
+    await addUserToOrganization(organization.id, adminOwner.id, 'owner');
+
+    await record(owner, organization.id);
+    await record(adminOwner, organization.id, 'direct');
+
+    expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
+  });
+
+  test('records with unknown held roles instead of throwing when the membership lookup fails', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const select = jest.spyOn(db, 'select').mockImplementationOnce(() => {
+      throw new Error('database unavailable');
+    });
+    try {
+      await expect(record(admin, crypto.randomUUID())).resolves.toBeUndefined();
+    } finally {
+      select.mockRestore();
+    }
+
+    const rows = await db.select().from(admin_action_audit_logs);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.metadata).toEqual({ heldRoles: null });
   });
 });

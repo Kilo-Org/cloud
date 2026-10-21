@@ -7,6 +7,7 @@ import { Share, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 
 import { PrMergePartialSuccessBanner } from '@/components/pr-review/merge/pr-merge-partial-success-banner';
+import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PrReviewDiscussionTab } from '@/components/pr-review/pr-review-discussion-tab';
 import { PrReviewFilesTab } from '@/components/pr-review/pr-review-files-tab';
 import { PrReviewOverview } from '@/components/pr-review/pr-review-overview';
@@ -15,7 +16,6 @@ import {
   type PrReviewTabId,
   PrReviewTabSelector,
 } from '@/components/pr-review/pr-review-tab-selector';
-import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import {
@@ -246,15 +246,10 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   let body: ReactNode = null;
   if (!queries.isReady) {
     // Non-retryable: Bitbucket Cloud review is organization-scoped and no
-    // organization is selected. Nothing on this screen can fix that, so the
-    // state names where the switch lives instead of offering a dead retry.
-    body = (
-      <EmptyState
-        icon={GitPullRequest}
-        title={t('organization.boundary.selectOrganization')}
-        description={t('organization.boundary.selectDescription')}
-      />
-    );
+    // organization is selected. The shared organization boundary owns the
+    // recovery states: it opens the context picker when memberships exist
+    // and sends accounts with no organization to the web organizations page.
+    body = <OrganizationBoundary icon={GitPullRequest} />;
   } else if (tab === 'overview') {
     body = (
       <>

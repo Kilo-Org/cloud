@@ -403,6 +403,60 @@ export async function createControlTokenForRequest(
   resource: ControlResource,
   options?: CreateControlTokenOptions
 ): Promise<{ token: string; expiresAt: string; user: User; tokenSource?: string }> {
+  const requestHeaders = options?.headers ?? (await nextHeaders());
+  const bearer = tokenFromHeaders(requestHeaders);
+  if (bearer) {
+    let verified: Awaited<ReturnType<typeof verifyKiloTokenForPolicy>>;
+    try {
+      verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
+        audience: KILO_API_AUDIENCE,
+        mode: 'allow-legacy',
+      });
+    } catch {
+      unauthorized();
+    }
+    const scope = verified.claims.cloudAgentAuthority;
+    if (scope !== undefined) {
+      if (
+        resource !== 'cloud-agent-next' ||
+        (options?.organizationId ?? null) !== scope.organizationId
+      ) {
+        forbidden('Cloud Agent authority cannot broaden its resource or organization');
+      }
+      const current = await currentUser(user);
+      if (
+        verified.userId !== current.id ||
+        verified.claims.env !== process.env.NODE_ENV ||
+        verified.claims.apiTokenPepper !== current.api_token_pepper
+      ) {
+        unauthorized();
+      }
+      await assertCurrentOrganizationMembership(current.id, scope.organizationId ?? undefined);
+      const now = Math.floor(Date.now() / 1000);
+      if (verified.claims.exp <= now || scope.expiresAt <= now) {
+        unauthorized('Cloud Agent authority has expired');
+      }
+      const payload = buildModernKiloTokenPayload({
+        userId: current.id,
+        pepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        audience: CLOUD_AGENT_NEXT_AUDIENCE,
+        issuedAt: now,
+        expiresAt: verified.claims.exp,
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+        extra: {
+          ...(scope.organizationId === null ? {} : { organizationId: scope.organizationId }),
+          cloudAgentAuthority: { ...scope },
+        },
+      });
+      return {
+        token: jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' }),
+        expiresAt: new Date(verified.claims.exp * 1000).toISOString(),
+        user: current,
+      };
+    }
+  }
   const authority = await getResourceDelegationAuthority(user, options);
   if (authority.organizationId) {
     forbidden('Organization-scoped credentials cannot mint resource control tokens');

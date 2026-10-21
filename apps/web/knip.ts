@@ -84,10 +84,6 @@ const config: KnipConfig = {
       entry: ['src/index.ts'],
       ignoreDependencies: ['cloudflare'],
     },
-    '../../services/auto-triage-infra': {
-      entry: ['src/index.ts'],
-      ignoreDependencies: ['cloudflare'],
-    },
     '../../services/code-review-infra': {
       entry: ['src/index.ts'],
       ignoreDependencies: ['cloudflare'],

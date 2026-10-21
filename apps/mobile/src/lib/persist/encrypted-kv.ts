@@ -25,12 +25,14 @@ import { kv } from './schema';
  * SecureStore. All plaintext lives only inside the encrypted database file;
  * no unencrypted store is created.
  *
- * Every statement runs through Drizzle: the table lives in `./schema.ts`, the
- * `drizzle/` migrations are generated from it, and the pragmas and probes use
- * Drizzle's `sql` template. Only the database lifecycle (open, close, delete)
- * stays on expo-sqlite, which has no Drizzle equivalent. Drizzle's expo driver
- * wraps the *synchronous* handle, so the statements themselves block the JS
- * thread; the exported API stays async because opening and keying do not.
+ * Connection setup stays on the raw synchronous expo-sqlite handle: the
+ * SQLCipher probe, `PRAGMA key`, and the busy-timeout and journal-mode
+ * pragmas must all run before anything reads the schema, and Drizzle would
+ * prepare a statement that itself reads it. Once the connection is keyed, the
+ * table lives in `./schema.ts`, the `drizzle/` migrations are generated from
+ * it, and every query goes through Drizzle. Drizzle's expo driver wraps the
+ * *synchronous* handle, so the statements themselves block the JS thread; the
+ * exported API stays async because opening and keying do not.
  *
  * Opening is single-flight: one module-level open promise, awaited by every
  * caller. A wrong key or a corrupt file fails the `sqlite_master` probe and

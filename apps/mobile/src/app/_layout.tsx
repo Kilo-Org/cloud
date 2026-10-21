@@ -897,8 +897,9 @@ function RootLayoutNav({
       case 'settle-app': {
         // The relaunch repair navigates to the recorded screen in this same
         // flush. Revealing the tree before the root navigator accepts
-        // navigation would paint the restored route first.
-        if (!navigationReady) {
+        // navigation, or before the record's restart read settles, would paint
+        // the restored route first.
+        if (!navigationReady || !isLastRouteHydrated()) {
           return;
         }
         markStartupComplete('app');
@@ -910,7 +911,7 @@ function RootLayoutNav({
       default:
       // Unreachable: BootstrapDecisionTag is a closed union.
     }
-  }, [decision, navigationReady, router, setStartupFinished]);
+  }, [decision, navigationReady, router, setStartupFinished, lastRouteHydratedVersion]);
 
   // Reactive snapshot of the pending deep-link slot so a destination stashed
   // after the gate effect last ran (e.g. a notification tap while signed out,

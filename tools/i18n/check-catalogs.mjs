@@ -64,6 +64,50 @@ const TWO_SENSE_COPY = new Map([
   ['high', 'the severity of a finding, versus the thinking effort of a model'],
   ['medium', 'the severity of a finding, versus the thinking effort of a model'],
   ['low', 'the severity of a finding, versus the thinking effort of a model'],
+  [
+    'manual review',
+    'the suggested action for a security finding, versus the manual-review pull request feature',
+  ],
+  [
+    'cancelled',
+    'a state badge on a cancelled run or cancellation request, versus the audit timeline event that remediation was cancelled',
+  ],
+  [
+    'deleted',
+    'the state of a draft or item after deletion, versus the audit timeline event that a finding was deleted',
+  ],
+  [
+    'dismissed',
+    'the state of a finding or notification, versus the audit timeline event that a finding was dismissed',
+  ],
+  [
+    'remediation requested',
+    'the remediation timeline row on a finding, versus the audit report timeline event',
+  ],
+  [
+    'remediation failed',
+    'the remediation timeline row on a finding, versus the audit report timeline event',
+  ],
+  [
+    'remediation blocked',
+    'the remediation timeline row on a finding, versus the audit report timeline event',
+  ],
+  [
+    'superseded',
+    'the deadline badge naming a replaced finding, versus the audit timeline event that a finding was superseded',
+  ],
+  [
+    'analysis failed',
+    'the analysis state headline on a finding, versus the audit timeline event that an analysis failed',
+  ],
+  [
+    'pr opened',
+    'the remediation status row on a finding, versus the audit timeline event that a remediation PR was opened',
+  ],
+  [
+    'no changes needed',
+    'the remediation status row on a finding, versus the audit timeline event that remediation found no changes',
+  ],
   ['none', 'no review gate, versus the thinking effort of a model'],
   ['files', 'the files in a pull request, versus the iOS Files app in the attachment picker'],
   ['plan', 'a billing plan, versus the agent plan mode'],
@@ -105,7 +149,6 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // slug the field validator accepts, a server name, a JSON snippet, and
   // command lines whose tool and package paths must stay literal. Every
   // catalog keeps them English so the example never contradicts validation.
-  'profiles.commandPlaceholder',
   'profiles.mcp.namePlaceholder',
   'profiles.mcp.commandPlaceholder',
   'profiles.mcp.jsonPlaceholder',
@@ -137,6 +180,10 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // A placeholder-only accessibility label: the list's name and its open
   // counter joined by a comma, so a catalog may keep English punctuation.
   'todos.lists.rowA11y',
+  // Format-only briefing values: a lower-bound marker and a time range built
+  // from localized placeholders, with no translatable words.
+  'agentBriefing.atLeast',
+  'agentBriefing.window',
 ]);
 
 /** The supported tags, read from the one source of truth. */

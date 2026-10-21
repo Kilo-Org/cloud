@@ -1,5 +1,9 @@
+import { preinstalledStartup } from './preinstalled-startup.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ContainerConcurrencyLimitError } from '../container-concurrency.js';
+import {
+  ContainerCapacityUnavailableError,
+  ContainerConcurrencyLimitError,
+} from '../container-concurrency.js';
 import {
   parseSandboxBillingInput,
   type MeteredSandboxInstance,
@@ -98,9 +102,16 @@ describe('native egress policy forwarding', () => {
       const created = await provider.create({ intentId: 'egress-attempt', createdAt: 0 });
       if ('unresolved' in created) throw new Error('Expected provider reference');
       await provider.launch(created.providerRef, {
-        SANDBOX_CONTROL_URL: 'wss://agent.example.com',
+        command: preinstalledStartup(),
+        env: {
+          SANDBOX_CONTROL_URL: 'wss://agent.example.com',
+        },
       });
-      await provider.launch(created.providerRef, {}, { skipRepository: true });
+      await provider.launch(
+        created.providerRef,
+        { command: preinstalledStartup(), env: {} },
+        { skipRepository: true }
+      );
       for (const [input] of launchWrapper.mock.calls) {
         if (egressAllowlist === undefined) expect(input).not.toHaveProperty('egressAllowlist');
         else expect(input.egressAllowlist).toEqual(egressAllowlist);
@@ -181,10 +192,11 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
     }
   );
 
-  it('preserves RPC-wrapped quota denial instead of converting it to a meter outage', async () => {
-    const denial = new Error(
-      `remote RPC: ${new ContainerConcurrencyLimitError('personal', 20).message}`
-    );
+  it.each([
+    new ContainerConcurrencyLimitError('personal', 20),
+    new ContainerCapacityUnavailableError(),
+  ])('preserves RPC-wrapped capacity failure: %s', async failure => {
+    const denial = new Error(`remote RPC: ${failure.message}`);
     const provider = cloudflareProvider(kind, async () => {
       throw denial;
     });
@@ -420,7 +432,9 @@ describe('Vercel runtime metadata', () => {
           expect.objectContaining({ snapshotId: config.snapshotId })
         );
       }
-      expect(await provider.launch(providerRef, {})).toEqual({ startSource: 'image' });
+      expect(
+        await provider.launch(providerRef, { command: preinstalledStartup(), env: {} })
+      ).toEqual({ startSource: 'image' });
       expect(restClient.executeCommand).toHaveBeenCalledOnce();
       expect(await provider.observe(providerRef, intent)).toEqual({ status: 'active' });
       expect(await provider.stop(providerRef, intent)).toBe('terminal');

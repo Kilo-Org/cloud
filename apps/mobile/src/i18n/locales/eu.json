@@ -35,6 +35,8 @@
     "connectGithub": "Konektatu GitHub",
     "cost": "Kostua",
     "discard": "Baztertu",
+    "discardChangesMessage": "Zure aldaketak galduko dira.",
+    "discardChangesTitle": "Baztertu aldaketak?",
     "findings": "Antzemandako arazoak",
     "mergeRequest": "merge-eskaera",
     "notConnected": "Konektatu gabe",
@@ -661,7 +663,8 @@
       "description": "Konektatu zure GitHub kontua bateratze-eskaerak mugikorrean berrikusteko.",
       "gitlabDescription": "Konektatu zure GitLab kontua merge-eskaerak mugikorrean berrikusteko.",
       "bitbucketDescription": "Konektatu Bitbucket erakunde honetara bateratze-eskaerak mugikorrean berrikusteko.",
-      "bitbucketOrgOnlyDescription": "Hautatu erakunde bat zure profilean haren Bitbucket-eko bateratze-eskaerak berrikusteko."
+      "bitbucketOrgOnlyDescription": "Aldatu goiko kontua erakunde batera haren Bitbucket bateratze-eskaerak berrikusteko.",
+      "contextLine": "{{organization}}-rako"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "Berrikuspen hau ezin da dagoen bezala bidali. Baliteke PRa aldatu izana edo zure bateratze-eskaera berrikusten aritzea, eta hori ez dago baimenduta.",
       "reviewNotSubmittedTerm": "Berrikuspen hau ezin da oraingo egoeran bidali. Baliteke {{term}} aldatu izana, edo ezin duzu zure {{term}} propioa berrikusi.",
       "couldNotPostComment": "Ezin izan da iruzkina argitaratu.",
-      "couldNotSubmitReview": "Ezin izan da berrikuspena bidali. Egiaztatu konexioa eta saiatu berriro."
+      "couldNotSubmitReview": "Ezin izan da berrikuspena bidali. Egiaztatu konexioa eta saiatu berriro.",
+      "rateLimited": "Eskari gehiegi. Saiatu geroago berriro.",
+      "conflict": "Hau aldatu egin da lanean ari zinen bitartean. Birkargatu eta saiatu berriro."
     },
     "operation": {
       "couldNotReply": "Ezin izan da erantzun.",
@@ -1413,6 +1418,9 @@
       "couldNotGetLatest": "Ezin izan da azken egoera lortu.",
       "byline": "{{repo}} #{{number}} · Egilea: {{author}}",
       "noFindings": "Ez dago aurkikuntzarik.",
+      "findingsUnavailable": "Emaitzak ez daude erabilgarri, berrikuspen honek huts egin duelako.",
+      "serviceUnavailable": "Ezin izan da kodea berrikusteko zerbitzuarekin konektatu. Egin berrikuspena berriro zerbitzua erabilgarri dagoenean.",
+      "reviewFailed": "Berrikuspenak huts egin du. Saiatu berriro, mesedez.",
       "showMore": "Erakutsi gehiago",
       "created": "Sortuta",
       "started": "Hasita",
@@ -1542,7 +1550,8 @@
       "bugs": "Akatsak",
       "style": "Estiloa",
       "testing": "Probak",
-      "documentation": "Dokumentazioa"
+      "documentation": "Dokumentazioa",
+      "unknown": "Besteak ({{area}})"
     },
     "gateThreshold": {
       "warning": "Abisua"
@@ -1654,7 +1663,14 @@
       "whereFound": "Non aurkitu den ({{displayCount}})",
       "fullReport": "Sortutako txosten osoa",
       "yes": "Bai",
-      "no": "Ez"
+      "no": "Ez",
+      "action": {
+        "analyzeCodebase": "Analizatu kode-oinarria",
+        "dismiss": "Baztertu",
+        "manualReview": "Eskuzko berrikuspena",
+        "monitor": "Monitorizatu",
+        "openPr": "Ireki PRa"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} aurkikuntza",
@@ -1873,7 +1889,24 @@
       "title": "Auditoria-txostena",
       "unavailable": "Auditoria-txostena ez dago erabilgarri",
       "unavailableDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik ikus ditzakete auditoria-txostenak. Eskatu jabe bati edo fakturazio-kudeatzaile bati sarbidea emateko.",
-      "queryFailed": "Txostenaren kontsulta ez da amaitu. Saiatu berriro."
+      "queryFailed": "Txostenaren kontsulta ez da amaitu. Saiatu berriro.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analisia amaitu da",
+        "findingAnalysisFailed": "Analisiak huts egin du",
+        "findingAutoDismissed": "Automatikoki baztertua",
+        "findingCreated": "Inportatuta",
+        "findingDeleted": "Ezabatua",
+        "findingDismissed": "Baztertua",
+        "findingSeverityChanged": "Larritasuna aldatu da",
+        "findingStatusChange": "Egoera aldatu da",
+        "findingSuperseded": "Ordezkatua",
+        "remediationBlocked": "Konponketa blokeatu da",
+        "remediationCancelled": "Baliogabetua",
+        "remediationFailed": "Konponketak huts egin du",
+        "remediationNoChangesNeeded": "Ez da aldaketarik behar",
+        "remediationPrOpened": "PRa ireki da",
+        "remediationQueued": "Konponketa eskatu da"
+      }
     },
     "notifications": {
       "couldNotLoad": "Ezin izan dira jakinarazpen-ezarpenak kargatu.",
@@ -2209,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} jada ez dago erabilgarri. Zure modelo lehenetsia erabiltzen ari da.",
       "couldNotReadPendingSessions": "Ezin izan dira zain dauden saioak irakurri. Saiatu berriro.",
       "failedToCreate": "Ezin izan da saioa sortu.",
+      "checkOrganizationAccess": "Egiaztatu zure sarbidea erakunde honetara eta saiatu berriro.",
       "couldNotRefreshRepositories": "Ezin izan da biltegien zerrenda freskatu. Saiatu berriro.",
       "discardDraftTitle": "Baztertu zirriborroa?",
       "discardDraftMessage": "Zure eskaera galduko da.",
@@ -2729,6 +2763,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Zure saio aktiboak ez daude erabilgarri hau kargatu arte.",
     "currentDeviceUnidentified": "Ezin izan da uneko gailua identifikatu.",
+    "kiloApp": "Kilo aplikazioa",
     "noSessions": "Ez dago saio aktiborik",
     "noSessionsDescription": "Hasi saioa Kilo aplikazioarekin beste gailu batean, eta hemen agertuko da.",
     "onlyKiloAppSignIns": "Kilo aplikazioko saio-hasierak bakarrik agertzen dira hemen. Editoreko eta CLIko saio-hasierak ez daude zerrendatuta.",
@@ -2881,6 +2916,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Hasi baino lehen",
+    "summaryTitle": "Datuak partekatzeko hobespenak",
     "introDescription": "Kilo-k zure mezuak AI hornitzaileei bidaltzen dizkie erantzunak sortzeko. Hona hemen zer partekatzen den eta norekin.",
     "required": "Kilo erabiltzeko beharrezkoa",
     "promptsTitle": "Zure eskaerak eta elkarrizketak",
@@ -2889,7 +2925,6 @@
     "accountDescription": "Zure Kilo kontuaren IDa eta eskaeraren metadatuak, zu autentifikatzeko eta erabilera neurtzeko.",
     "diagnosticsTitle": "Aplikazioaren diagnostikoak",
     "diagnosticsDescription": "Ustekabeko itxieren eta erroreen txostenak, aplikazioaren edukia kenduta, aplikazioa egonkor mantentzeko.",
-    "optional": "Aukerakoa",
     "helpImprove": "Lagundu Kilo hobetzen",
     "helpImproveDescription": "Partekatu erabilerari buruzko datu anonimoak eta instalazioaren jatorria. Aukera hau edonoiz alda dezakezu ezarpenetan.",
     "seeFullDetails": "Ikusi xehetasun osoak",
@@ -3468,6 +3503,9 @@
     "localModels": {
       "title": "Gailuko modeloak",
       "help": "Gailuko modeloak telefono honetan exekutatzen dira. Zure galderak eta erantzunak gailuan geratzen dira.",
+      "switchTitle": "Gailuko modelo batera aldatu?",
+      "switchMessage": "{{name}} modelora aldatzean, elkarrizketa honen gonbitak eta testuingurua telefono honetan prozesatuko dira, ez urruneko zerbitzari batean.",
+      "switchConfirm": "Aldatu modeloa",
       "systemPurpose": "Gailu honen sisteman integratutako modeloa. Gailuan exekutatzen da.",
       "apple": "Apple Intelligence (gailuan)",
       "checking": "Erabilgarritasuna egiaztatzen…",
@@ -3564,7 +3602,6 @@
     "personalDefaultDescription": "Automatikoki kargatzen da biltegirik ez dagoenean ainguratuta dagoen profilik.",
     "organizationDefaultDescription": "Lehenetsi pertsonalik ez duten kideentzat automatikoki kargatu da.",
     "setAsDefault": "Ezarri lehenetsi gisa",
-    "removeDefault": "Kendu lehenespen gisa",
     "saveFailed": "Ezin izan da profila gorde",
     "deleteTitle": "Ezabatu profila",
     "deleteMessage": "Honek profila eta bere ezarpenak betiko kentzen ditu. Hau ezin da desegin.",
@@ -3590,11 +3627,13 @@
     "commandsTitle": "Konfiguratu komandoak",
     "addCommand": "Gehitu komandoa",
     "commandLabel": "Agindua",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "adib. pnpm install",
     "commandsEmpty": "Oraindik ez dago konfigurazio komandorik",
     "commandsSaveFailed": "Ezin izan dira gorde konfigurazio komandoak",
     "moveUp": "Gora",
     "moveDown": "Mugitu behera",
+    "moveCommandUp": "Mugitu {{position}}. komandoa gora",
+    "moveCommandDown": "Mugitu {{position}}. komandoa behera",
     "skillsTitle": "Trebetasunak",
     "addSkill": "Gehitu trebetasuna",
     "skillNameLabel": "Trebetasunaren izena",
@@ -3664,7 +3703,7 @@
       "nameRequired": "Sartu agentearen izena",
       "slugRequired": "Sartu agente bare bat",
       "slugInvalid": "Slug-ek letra batekin hasi behar du eta letra xeheak, zifrak eta marratxoak soilik erabili behar ditu",
-      "slugConflict": "Bare hori integratutako agente batek erreserbatzen du",
+      "slugConflict": "Slug hori dagoeneko erabiltzen du agenta integratu batek edo profil honetako beste agente batek",
       "edit": "Editatu agentea"
     },
     "slashCommands": {
@@ -3806,5 +3845,69 @@
       "title": "Gorde zerrendan",
       "saved": "{{list}} zerrendan gordeta"
     }
+  },
+  "agentBriefing": {
+    "title": "Goizeko laburpena",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Baliteke jarduera historiko batzuk falta izatea. ≥ gutxienez hainbeste da; ezezaguna ez da zero.",
+    "available": "Laburpen erabilgarriak",
+    "history": "Laburpenen historia",
+    "historyHint": "Txostenak 30 egunez gordetzen dira, baztertutakoak barne.",
+    "settings": "Laburpenaren ezarpenak",
+    "empty": "Ez dago gaueko jarduerarik",
+    "emptyHint": "Hodeiko eta CLIko kodetze-saioak hemen agertuko dira gau aktibo baten ondoren.",
+    "loadError": "Ezin izan dira laburpenak kargatu",
+    "sessions": "Gauean aktibo",
+    "pullRequests": "Irekitako PRs",
+    "blockers": "Blokeo berriak",
+    "spend": "Gaueko gastua",
+    "view": "Irakurri laburpena",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Erakutsi zuzeneko egoera",
+    "offline": "Lineaz kanpo · gordetako laburpena",
+    "cached": "Gordetako txostena · ezin da freskatu",
+    "revised": "Berrikusia · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "AI laburpena",
+    "summaryDisabled": "Txosten egituratua · AI desaktibatuta dago testuinguru honetan",
+    "summaryPending": "AI laburpena prestatzen ari da. Prest dagoenean hemen erantsiko da.",
+    "summaryFailed": "AI laburpenak huts egin du. Berriro saiatzeak beste kargu bat eragin dezake.",
+    "summaryUnavailable": "AI laburpena ez dago erabilgarri. Txosten egituratua erabilgarri dago oraindik.",
+    "summaryOutdated": "Laburpen hau txostenaren azken berrikuspena baino lehenagokoa da.",
+    "summaryCharge": "AI kargua: {{cost}}",
+    "summaryChargePending": "AI kargua egiaztatzeko zain",
+    "generate": "Sortu laburpena",
+    "retrySummary": "Saiatu berriro ordainpeko laburpena",
+    "sources": "Ebidentziak eta artefaktuak",
+    "timezone": "Laburpenaren ordu-zona",
+    "deviceTimezone": "Erabili gailuaren ordu-zona",
+    "timezoneHint": "IANA ordu-zona, adibidez Europe/Berlin. Programazio-aldaketak hurrengo gauetan aplikatuko dira.",
+    "nightStart": "Gaua hasten da",
+    "morningStart": "Gaua amaitu / goiza hasi",
+    "morningEnd": "Goiza amaitzen da",
+    "timeHint": "Hasierako txartelak zuzeneko egoera berrezartzen du goiza amaitzean, lineaz kanpo ere bai.",
+    "invalidSchedule": "Aukeratu ordu-zona baliodun bat eta gau eta goizeko tarte ez-hutsak eta gainjarri gabeak.",
+    "notificationsHint": "Jakinarazpen orokor bat goizero, lehen txostena prest dagoenean. Ordainpeko AI laburpenetatik independentea.",
+    "notificationPermission": "Gaitu gailuaren jakinarazpenak hemen: $t(common.notifications), laburpena jasotzeko.",
+    "aiOptIn": "Ordainpeko AI laburpenak",
+    "aiHint": "Aukerakoa, testuinguru honetarako soilik. Hautatutako zati editatuak eta datu egituratuak zure eredura bidaltzen dira aplikazioaren hizkuntzan. Karguak testuinguru honen saldotik ordaintzen dira.",
+    "defaultModel": "Erabili Kiloren eredu lehenetsia",
+    "duration": "Denbora-muga (minutuak)",
+    "spendLimit": "Gastu-muga (USD)",
+    "safeguardHint": "Laburpen bakoitzeko muga finituak, ez eguneko aurrekontua. Lehenetsiak: 10 minutu eta $2. Txostena gehienez bost minuturen buruan argitaratzen da, sorkuntzak muga hauen barruan jarraitzen duen bitartean.",
+    "invalidSafeguards": "Sartu denbora- eta gastu-muga positibo eta finituak.",
+    "estimate": "Estimazioa {{estimate}} · gehienez {{maximum}}",
+    "estimateUnavailable": "Ezarpen hauekin ez dago ordainpeko laburpenik erabilgarri.",
+    "estimatePricingUnavailable": "Eredu honen prezioa ez dago erabilgarri.",
+    "estimateBalanceUnavailable": "Ez dago nahikoa saldoa ordaindutako laburpenerako.",
+    "estimateModelNotAllowed": "Eredu hau ez da onartzen hemen.",
+    "estimateSpendLimitTooLow": "Gehiago utz iezaguzu gutxieneko kontsumoa laburpena baimendu ahal izateko.",
+    "confirmPaid": "Gaitu ordainpeko laburpenak {{context}}-(e)rako?",
+    "confirmGeneration": "Sortu ordainpeko laburpena?",
+    "paidDisclosure": "{{estimate}} estimatuta, gehienez {{maximum}}, {{minutes}} minutuko mugarekin. Karguak aplikatzen dira sorkuntzak huts egin arren.",
+    "enable": "Gaitu ordainpeko laburpenak",
+    "contextSettings": "AI ezarpenak · {{context}}",
+    "allContexts": "Laburpen pertsonalak eta erakundekoak bereizita daude."
   }
 }

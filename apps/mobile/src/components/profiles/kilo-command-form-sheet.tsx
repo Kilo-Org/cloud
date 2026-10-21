@@ -19,6 +19,7 @@ import {
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
 const ERROR_KEYS = {
@@ -67,6 +68,17 @@ export function KiloCommandFormSheet({
   const [subtask, setSubtask] = useState(initial.subtask);
   const [error, setError] = useState<KiloCommandFormError | null>(null);
 
+  const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
+    isDirty: () =>
+      nameRef.current !== initial.name ||
+      descriptionRef.current !== initial.description ||
+      templateRef.current !== initial.template ||
+      agentRef.current !== initial.agent ||
+      modelRef.current !== initial.model ||
+      subtask !== initial.subtask,
+    onDiscard: onClose,
+  });
+
   const submit = () => {
     const state: KiloCommandFormState = {
       name: nameRef.current,
@@ -90,13 +102,13 @@ export function KiloCommandFormSheet({
   };
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
       <SheetHeader
         title={command === null ? t('profiles.slashCommands.add') : command.name}
         onDone={submit}
-        onCancel={onClose}
+        onCancel={requestClose}
         doneLabel={t('common.save')}
-        disabled={isSaving}
+        doneDisabled={isSaving}
         topInset="ios-page-sheet"
       />
       <ScrollView
@@ -188,6 +200,7 @@ export function KiloCommandFormSheet({
         </View>
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
+      {dialog}
     </SessionPageSheet>
   );
 }

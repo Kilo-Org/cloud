@@ -162,6 +162,41 @@
       "when": 1792168659121,
       "tag": "0022_burly_ben_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1792180639453,
+      "tag": "0023_spicy_jasper_sitwell",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1792216595824,
+      "tag": "0024_married_vanisher",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1792408783184,
+      "tag": "0025_black_black_tom",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1792414121558,
+      "tag": "0026_complete_triton",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1792518437510,
+      "tag": "0027_nasty_mauler",
+      "breakpoints": true
     }
   ]
 }

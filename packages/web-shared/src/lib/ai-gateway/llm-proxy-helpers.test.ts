@@ -577,6 +577,48 @@ describe('countAndStoreEmbeddingUsage', () => {
       usageContext
     );
   });
+
+  it('records the cost a response reports, including zero', async () => {
+    const usageContext = makeEmbeddingContext();
+    mockedResolveEmbeddingCatalogCost.mockResolvedValue(20);
+    const response = new Response(
+      JSON.stringify({
+        id: 'embedding-id',
+        model: 'openai/text-embedding-3-small',
+        usage: { prompt_tokens: 1_000, total_tokens: 1_000, cost: 0 },
+      })
+    );
+
+    countAndStoreEmbeddingUsage(response, usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedResolveEmbeddingCatalogCost).not.toHaveBeenCalled();
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 0, market_cost: 0 }),
+      usageContext
+    );
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('records the total cost of a BYOK payload', async () => {
+    const usageContext = makeEmbeddingContext();
+    const response = new Response(
+      JSON.stringify({
+        id: 'embedding-id',
+        model: 'openai/text-embedding-3-small',
+        usage: { prompt_tokens: 1_000, total_tokens: 1_000, is_byok: true, cost_details: {} },
+      })
+    );
+
+    countAndStoreEmbeddingUsage(response, usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedResolveEmbeddingCatalogCost).not.toHaveBeenCalled();
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 0, market_cost: 0 }),
+      usageContext
+    );
+  });
 });
 
 describe('countAndStoreFimUsage', () => {
@@ -868,6 +910,27 @@ describe('parseEmbeddingUsageFromResponse', () => {
     const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.cost_mUsd).toBe(1000);
+  });
+
+  it('should record the cost a response states when it is zero', () => {
+    const response = makeResponse({
+      usage: { prompt_tokens: 100, total_tokens: 100, cost: 0 },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200);
+
+    expect(result.cost_mUsd).toBe(0);
+  });
+
+  it('should record the total cost of a BYOK payload', () => {
+    const response = makeResponse({
+      usage: { prompt_tokens: 100, total_tokens: 100, is_byok: true, cost_details: {} },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200);
+
+    expect(result.cost_mUsd).toBe(0);
+    expect(result.is_byok).toBe(true);
   });
 
   it('should price a BYOK usage payload from its upstream inference cost', () => {

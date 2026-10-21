@@ -48,7 +48,6 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   computeOpenRouterCostFields,
-  computeVercelCostMicrodollars,
   extractVercelIsByok,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import type { VercelProviderMetaData } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
@@ -1317,53 +1316,69 @@ type TranscriptionResponse = {
   usage?: TranscriptionUsage;
 };
 
+type ParsedEmbeddingUsage = {
+  stats: MicrodollarUsageStats;
+  /** The cost the response states, in microdollars; null selects catalog pricing. */
+  reportedCost_mUsd: number | null;
+};
+
 export function parseEmbeddingUsageFromResponse(
   responseText: string,
   statusCode: number
 ): MicrodollarUsageStats {
+  return parseEmbeddingUsage(responseText, statusCode).stats;
+}
+
+function parseEmbeddingUsage(responseText: string, statusCode: number): ParsedEmbeddingUsage {
   const json: EmbeddingResponse = JSON.parse(responseText);
+  const reportedCost_mUsd = embeddingCostMicrodollars(json);
 
   return {
-    messageId: json.id ?? null,
-    model: json.model,
-    responseContent: '',
-    hasError: !json.model || statusCode >= 400,
-    inference_provider: null,
-    inputTokens: json.usage.prompt_tokens,
-    outputTokens: 0,
-    cacheHitTokens: 0,
-    cacheWriteTokens: 0,
-    cost_mUsd: embeddingCostMicrodollars(json),
-    is_byok:
-      json.usage.is_byok ??
-      extractVercelIsByok(json.providerMetadata?.gateway ?? json.provider_metadata?.gateway),
-    upstream_id: null,
-    finish_reason: null,
-    latency: null,
-    moderation_latency: null,
-    generation_time: null,
-    streamed: false,
-    cancelled: false,
-    status_code: statusCode,
+    reportedCost_mUsd,
+    stats: {
+      messageId: json.id ?? null,
+      model: json.model,
+      responseContent: '',
+      hasError: !json.model || statusCode >= 400,
+      inference_provider: null,
+      inputTokens: json.usage.prompt_tokens,
+      outputTokens: 0,
+      cacheHitTokens: 0,
+      cacheWriteTokens: 0,
+      cost_mUsd: reportedCost_mUsd ?? 0,
+      is_byok:
+        json.usage.is_byok ??
+        extractVercelIsByok(json.providerMetadata?.gateway ?? json.provider_metadata?.gateway),
+      upstream_id: null,
+      finish_reason: null,
+      latency: null,
+      moderation_latency: null,
+      generation_time: null,
+      streamed: false,
+      cancelled: false,
+      status_code: statusCode,
+    },
   };
 }
 
 /**
- * The cost an embeddings response reports itself, in microdollars, or 0 when it
- * reports none. OpenRouter puts it in the usage payload, charging BYOK requests
- * only for the upstream inference cost; the Vercel AI Gateway puts it in
- * provider metadata.
+ * The cost an embeddings response states, in microdollars, or null to fall back
+ * to catalog pricing. OpenRouter puts it in the usage payload, charging BYOK
+ * requests only for the upstream inference cost; the Vercel AI Gateway puts it
+ * in provider metadata, where the market cost is preferred.
  */
-function embeddingCostMicrodollars(json: EmbeddingResponse): number {
+function embeddingCostMicrodollars(json: EmbeddingResponse): number | null {
   const usage = json.usage;
   if (usage.is_byok && usage.cost_details) {
-    return toMicrodollars(usage.cost_details.upstream_inference_cost);
+    return toMicrodollars(usage.cost_details.upstream_inference_cost ?? 0);
   }
   if (usage.cost != null) {
     return toMicrodollars(usage.cost);
   }
   const vercelGateway = json.providerMetadata?.gateway ?? json.provider_metadata?.gateway;
-  return vercelGateway ? computeVercelCostMicrodollars(vercelGateway) : 0;
+  if (!vercelGateway) return null;
+  const reported = parseFloat(vercelGateway.marketCost ?? vercelGateway.cost ?? '');
+  return Number.isFinite(reported) ? toMicrodollars(reported) : null;
 }
 
 export function parseTranscriptionUsageFromResponse(
@@ -1421,19 +1436,23 @@ export function extractEmbeddingPromptInfo(body: { input: unknown }): PromptInfo
 }
 
 /**
- * Prices embedding usage: the cost fields the response reports, then the
- * catalogued prompt price of the served embedding model.
+ * Prices embedding usage: the cost the response states, then the catalogued
+ * prompt price of the served embedding model. `costKnown` reports whether
+ * either source priced the request.
  */
 async function withResolvedEmbeddingCost(
-  usageStats: MicrodollarUsageStats,
+  { stats, reportedCost_mUsd }: ParsedEmbeddingUsage,
   usageContext: MicrodollarUsageContext
-): Promise<MicrodollarUsageStats> {
-  if (usageStats.hasError || usageStats.cost_mUsd !== 0 || usageStats.inputTokens <= 0) {
-    return usageStats;
+): Promise<{ stats: MicrodollarUsageStats; costKnown: boolean }> {
+  if (reportedCost_mUsd !== null) {
+    return { stats, costKnown: true };
+  }
+  if (stats.hasError || stats.inputTokens <= 0) {
+    return { stats, costKnown: false };
   }
   const modelIds = [
     ...new Set(
-      [usageStats.model, usageContext.requested_model].filter(
+      [stats.model, usageContext.requested_model].filter(
         (modelId): modelId is string => typeof modelId === 'string' && modelId.length > 0
       )
     ),
@@ -1441,9 +1460,11 @@ async function withResolvedEmbeddingCost(
   const cost_mUsd = await resolveEmbeddingCatalogCost_mUsd({
     provider: usageContext.provider,
     modelIds,
-    promptTokens: usageStats.inputTokens,
+    promptTokens: stats.inputTokens,
   });
-  return cost_mUsd === null ? usageStats : { ...usageStats, cost_mUsd };
+  return cost_mUsd === null
+    ? { stats, costKnown: false }
+    : { stats: { ...stats, cost_mUsd }, costKnown: true };
 }
 
 export function countAndStoreEmbeddingUsage(
@@ -1458,15 +1479,15 @@ export function countAndStoreEmbeddingUsage(
     ? Promise.resolve(null)
     : clonedResponse
         .text()
-        .then(text => parseEmbeddingUsageFromResponse(text, statusCode))
+        .then(text => parseEmbeddingUsage(text, statusCode))
         .catch(() => null);
 
   after(
     usageStatsPromise
-      .then(usageStats => usageStats && withResolvedEmbeddingCost(usageStats, usageContext))
-      .then(usageStats => {
+      .then(parsed => parsed && withResolvedEmbeddingCost(parsed, usageContext))
+      .then(resolved => {
         requestSpan?.end();
-        if (!usageStats) {
+        if (!resolved) {
           captureMessage('SUSPICIOUS: No embedding usage information', {
             level: 'error',
             tags: { source: 'embedding_usage_processing' },
@@ -1474,6 +1495,8 @@ export function countAndStoreEmbeddingUsage(
           });
           return;
         }
+
+        const { stats: usageStats, costKnown } = resolved;
 
         // Preserve the real upstream cost before free-model or BYOK zeroing.
         usageStats.market_cost = usageStats.cost_mUsd;
@@ -1483,9 +1506,9 @@ export function countAndStoreEmbeddingUsage(
         }
 
         if (
+          !costKnown &&
           !usageStats.hasError &&
           usageStats.inputTokens > 0 &&
-          usageStats.market_cost === 0 &&
           !usageContext.is_free &&
           !usageContext.user_byok
         ) {

@@ -5,7 +5,11 @@ import {
   getUserFromSessionForCredentialIssuance,
 } from '@kilocode/web-shared/lib/user/server';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
-import { requireAdmissionPayload, verifyAdmissionAsync } from '@/lib/auth/native-admission';
+import {
+  requireAdmissionPayload,
+  countAdmissionCondition,
+  verifyAdmissionAsync,
+} from '@/lib/auth/native-admission';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
@@ -33,13 +37,14 @@ export const POST = withRestTiming('/api/auth/native/exchange', async (request: 
     body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
   );
   if (!admissionPayload) {
+    countAdmissionCondition('native_admission_missing');
     return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
   }
 
   try {
     const verified = await verifyAdmissionAsync(admissionPayload);
     if (!verified.ok) {
-      captureMessage('native_admission_refused');
+      countAdmissionCondition('native_admission_refused');
       return NextResponse.json({ error: verified.errorCode }, { status: 403 });
     }
   } catch {

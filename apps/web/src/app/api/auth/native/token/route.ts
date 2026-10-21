@@ -27,6 +27,7 @@ import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import {
   requireAdmissionPayload,
+  countAdmissionCondition,
   verifyAdmissionAsync,
   persistAttestedKey,
   KeyCollisionError,
@@ -177,6 +178,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   // consumption, or user settlement, so no side effect precedes the gate.
   const admissionPayload = requireAdmissionPayload(body);
   if (!admissionPayload) {
+    countAdmissionCondition('native_admission_missing');
     return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
   }
 
@@ -187,7 +189,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   try {
     const verified = await verifyAdmissionAsync(admissionPayload);
     if (!verified.ok) {
-      captureMessage('native_admission_refused');
+      countAdmissionCondition('native_admission_refused');
       return NextResponse.json({ error: verified.errorCode }, { status: 403 });
     }
     admissionVerification = verified;

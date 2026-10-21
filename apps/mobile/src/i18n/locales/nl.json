@@ -35,6 +35,8 @@
     "connectGithub": "GitHub koppelen",
     "cost": "Kosten",
     "discard": "Verwerpen",
+    "discardChangesMessage": "Je wijzigingen gaan verloren.",
+    "discardChangesTitle": "Wijzigingen verwerpen?",
     "findings": "Bevindingen",
     "mergeRequest": "merge request",
     "notConnected": "Niet gekoppeld",
@@ -1113,7 +1115,14 @@
       "triageReasoning": "Onderbouwing van de eerste beoordeling",
       "watchInCloudAgent": "Bekijken in Cloud Agent",
       "whereFound": "Gevonden op deze locaties ({{displayCount}})",
-      "yes": "Ja"
+      "yes": "Ja",
+      "action": {
+        "analyzeCodebase": "Codebasis analyseren",
+        "dismiss": "Negeren",
+        "manualReview": "Handmatige beoordeling",
+        "monitor": "Monitoren",
+        "openPr": "Pull request openen"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Analysemodel",
@@ -1135,7 +1144,24 @@
       "summary": "Rapportsamenvatting",
       "title": "Auditrapport",
       "unavailable": "Auditrapport niet beschikbaar",
-      "unavailableDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen auditrapporten bekijken. Vraag een eigenaar of factureringsbeheerder om je toegang te geven."
+      "unavailableDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen auditrapporten bekijken. Vraag een eigenaar of factureringsbeheerder om je toegang te geven.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyse voltooid",
+        "findingAnalysisFailed": "Analyse mislukt",
+        "findingAutoDismissed": "Automatisch genegeerd",
+        "findingCreated": "Geïmporteerd",
+        "findingDeleted": "Verwijderd",
+        "findingDismissed": "Genegeerd",
+        "findingSeverityChanged": "Ernst gewijzigd",
+        "findingStatusChange": "Status gewijzigd",
+        "findingSuperseded": "Vervangen",
+        "remediationBlocked": "Herstel geblokkeerd",
+        "remediationCancelled": "Geannuleerd",
+        "remediationFailed": "Herstel mislukt",
+        "remediationNoChangesNeeded": "Geen wijzigingen nodig",
+        "remediationPrOpened": "Pull request geopend",
+        "remediationQueued": "Herstel aangevraagd"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Auditrapport bekijken"

@@ -35,6 +35,8 @@
     "connectGithub": "Hono ki GitHub",
     "cost": "Utu",
     "discard": "Whakarere",
+    "discardChangesMessage": "Ka ngaro ō huringa.",
+    "discardChangesTitle": "Whakarere ngā huringa?",
     "findings": "Ngā kitenga",
     "mergeRequest": "tono whakakotahi",
     "notConnected": "Kāore anō kia hono",
@@ -1661,7 +1663,14 @@
       "whereFound": "Te wāhi i kitea ai ({{displayCount}})",
       "fullReport": "Te pūrongo katoa i hangaia",
       "yes": "Āe",
-      "no": "Kāo"
+      "no": "Kāo",
+      "action": {
+        "analyzeCodebase": "Tātaritia te kōnae kōwae",
+        "dismiss": "Whakakore",
+        "manualReview": "Arotake a te tangata",
+        "monitor": "Aroturuki",
+        "openPr": "Whakahuakia te PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} kitenga",
@@ -1880,7 +1889,24 @@
       "title": "Te pūrongo arotake",
       "unavailable": "Kāore e wātea ana te pūrongo arotake",
       "unavailableDescription": "Ko ngā rangatira o te rōpū me ngā kaiwhakahaere nama anake ka āhei ki te tiro i ngā pūrongo arotake. Tonoa tētahi rangatira, kaiwhakahaere nama rānei kia tuku whakaaetanga uru ki a koe.",
-      "queryFailed": "Kāore i oti te uiuinga pūrongo. Whakamātau anō."
+      "queryFailed": "Kāore i oti te uiuinga pūrongo. Whakamātau anō.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Kua oti te tātari",
+        "findingAnalysisFailed": "I raru te tātari",
+        "findingAutoDismissed": "Kua whakakorehia aunoa",
+        "findingCreated": "Kua whakaurua",
+        "findingDeleted": "Kua mukua",
+        "findingDismissed": "Kua whakakorehia",
+        "findingSeverityChanged": "Kua huri te taumata",
+        "findingStatusChange": "Kua huri te tūnga",
+        "findingSuperseded": "Kua whakakapia",
+        "remediationBlocked": "Kua herea te whakatika",
+        "remediationCancelled": "Kua whakakorea",
+        "remediationFailed": "I raru te whakatika",
+        "remediationNoChangesNeeded": "Kāore he panonitanga e hiahiatia",
+        "remediationPrOpened": "Kua huakina te PR",
+        "remediationQueued": "Kua tonoa te whakatika"
+      }
     },
     "notifications": {
       "couldNotLoad": "Kāore i taea te uta i ngā tautuhinga whakamōhiotanga.",

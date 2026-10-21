@@ -35,6 +35,8 @@
     "connectGithub": "Միացնել GitHub-ը",
     "cost": "Արժեք",
     "discard": "Հրաժարվել",
+    "discardChangesMessage": "Ձեր փոփոխությունները կկորեն։",
+    "discardChangesTitle": "Հրաժարվե՞լ փոփոխություններից",
     "findings": "Հայտնաբերված խնդիրներ",
     "mergeRequest": "միաձուլման հարցում",
     "notConnected": "Միացված չէ",
@@ -1661,7 +1663,14 @@
       "whereFound": "Հայտնաբերման տեղեր ({{displayCount}})",
       "fullReport": "Ստեղծված ամբողջական հաշվետվություն",
       "yes": "Այո",
-      "no": "Ոչ"
+      "no": "Ոչ",
+      "action": {
+        "analyzeCodebase": "Վերլուծել կոդի բազան",
+        "dismiss": "Մերժել",
+        "manualReview": "Ձեռքով վերանայում",
+        "monitor": "Հետևել",
+        "openPr": "Բացել փուլ ռիքուեսթը"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} խնդիր",
@@ -1880,7 +1889,24 @@
       "title": "Աուդիտի հաշվետվություն",
       "unavailable": "Աուդիտի հաշվետվությունն անհասանելի է",
       "unavailableDescription": "Միայն կազմակերպության սեփականատերերը և վճարումների կառավարիչները կարող են դիտել աուդիտի հաշվետվությունները։ Խնդրիր սեփականատիրոջը կամ վճարումների կառավարչին՝ քեզ հասանելիություն տրամադրել։",
-      "queryFailed": "Հաշվետվության հարցումը չավարտվեց։ Կրկին փորձիր։"
+      "queryFailed": "Հաշվետվության հարցումը չավարտվեց։ Կրկին փորձիր։",
+      "eventActions": {
+        "findingAnalysisCompleted": "Վերլուծությունն ավարտվել է",
+        "findingAnalysisFailed": "Վերլուծությունը ձախողվել է",
+        "findingAutoDismissed": "Ավտոմատ կերպով մերժվել է",
+        "findingCreated": "Ներմուծվել է",
+        "findingDeleted": "Ջնջվել է",
+        "findingDismissed": "Մերժվել է",
+        "findingSeverityChanged": "Փոխվել է ծանրությունը",
+        "findingStatusChange": "Փոխվել է կարգավիճակը",
+        "findingSuperseded": "Փոխարինվել է",
+        "remediationBlocked": "Շտկումը արգելափակվել է",
+        "remediationCancelled": "Չեղարկվել է",
+        "remediationFailed": "Շտկումը ձախողվել է",
+        "remediationNoChangesNeeded": "Փոփոխություններ պետք չեն",
+        "remediationPrOpened": "Բացվել է փուլ ռիքուեսթը",
+        "remediationQueued": "Շտկման հայցումը ուղարկված է"
+      }
     },
     "notifications": {
       "couldNotLoad": "Չհաջողվեց բեռնել ծանուցումների կարգավորումները։",

@@ -35,6 +35,8 @@
     "connectGithub": "Свържи GitHub",
     "cost": "Разход",
     "discard": "Отхвърли",
+    "discardChangesMessage": "Промените ви ще бъдат загубени.",
+    "discardChangesTitle": "Отхвърли промените?",
     "findings": "Открити проблеми",
     "mergeRequest": "merge заявка",
     "notConnected": "Не е свързан",
@@ -1661,7 +1663,14 @@
       "whereFound": "Къде е открито ({{displayCount}})",
       "fullReport": "Пълен генериран доклад",
       "yes": "Да",
-      "no": "Не"
+      "no": "Не",
+      "action": {
+        "analyzeCodebase": "Анализирай кодовата база",
+        "dismiss": "Отхвърли",
+        "manualReview": "Ръчен преглед",
+        "monitor": "Наблюдавай",
+        "openPr": "Отвори заявка за сливане"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} проблема",
@@ -1880,7 +1889,24 @@
       "title": "Одитен доклад",
       "unavailable": "Одитният доклад не е достъпен",
       "unavailableDescription": "Само собствениците на организацията и отговорниците за фактурирането могат да преглеждат одитни доклади. Помоли собственик или отговорник за фактурирането да ти предостави достъп.",
-      "queryFailed": "Заявката за доклада не приключи. Опитай отново."
+      "queryFailed": "Заявката за доклада не приключи. Опитай отново.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Анализът е завършен",
+        "findingAnalysisFailed": "Неуспешен анализ",
+        "findingAutoDismissed": "Автоматично отхвърлено",
+        "findingCreated": "Импортирано",
+        "findingDeleted": "Изтрито",
+        "findingDismissed": "Отхвърлено",
+        "findingSeverityChanged": "Сериозността е променена",
+        "findingStatusChange": "Статусът е променен",
+        "findingSuperseded": "Заменено",
+        "remediationBlocked": "Отстраняването е блокирано",
+        "remediationCancelled": "Отменено",
+        "remediationFailed": "Неуспешно отстраняване",
+        "remediationNoChangesNeeded": "Не са нужни промени",
+        "remediationPrOpened": "Създаден PR",
+        "remediationQueued": "Отстраняването е заявено"
+      }
     },
     "notifications": {
       "couldNotLoad": "Не успяхме да заредим настройките за известия.",

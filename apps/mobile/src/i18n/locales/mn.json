@@ -35,6 +35,8 @@
     "connectGithub": "GitHub холбох",
     "cost": "Зардал",
     "discard": "Хаях",
+    "discardChangesMessage": "Таны өөрчлөлтүүд алдагдах болно.",
+    "discardChangesTitle": "Өөрчлөлтүүдийг хаях уу?",
     "findings": "Илэрсэн асуудлууд",
     "mergeRequest": "нэгтгэх хүсэлт",
     "notConnected": "Холбогдоогүй",
@@ -1661,7 +1663,14 @@
       "whereFound": "Илэрсэн байршлууд ({{displayCount}})",
       "fullReport": "Боловсруулсан бүрэн тайлан",
       "yes": "Тийм",
-      "no": "Үгүй"
+      "no": "Үгүй",
+      "action": {
+        "analyzeCodebase": "Кодын баазыг шинжлэх",
+        "dismiss": "Үгүйсгэх",
+        "manualReview": "Гараар хянан шалгах",
+        "monitor": "Ажиглах",
+        "openPr": "PR нээх"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} илэрсэн асуудал",
@@ -1880,7 +1889,24 @@
       "title": "Аудитын тайлан",
       "unavailable": "Аудитын тайланг үзэх боломжгүй",
       "unavailableDescription": "Зөвхөн байгууллагын эзэмшигч болон төлбөрийн менежер аудитын тайланг үзэх эрхтэй. Тэднээс хандах эрх хүснэ үү.",
-      "queryFailed": "Тайлангийн асуулга дуусаагүй. Дахин оролдоно уу."
+      "queryFailed": "Тайлангийн асуулга дуусаагүй. Дахин оролдоно уу.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Шинжилгээ дууссан",
+        "findingAnalysisFailed": "Шинжилгээ амжилтгүй боллоо",
+        "findingAutoDismissed": "Автомат үгүйсгэсэн",
+        "findingCreated": "Импортолсон",
+        "findingDeleted": "Устгасан",
+        "findingDismissed": "Үгүйсгэсэн",
+        "findingSeverityChanged": "Ноцтой байдал өөрчлөгдсөн",
+        "findingStatusChange": "Төлөв өөрчлөгдсөн",
+        "findingSuperseded": "Солигдсон",
+        "remediationBlocked": "Засвар хаагдсан",
+        "remediationCancelled": "Цуцлагдсан",
+        "remediationFailed": "Засвар амжилтгүй боллоо",
+        "remediationNoChangesNeeded": "Өөрчлөлт шаардлагагүй",
+        "remediationPrOpened": "PR нээгдсэн",
+        "remediationQueued": "Засвар хийх хүсэлт илгээсэн"
+      }
     },
     "notifications": {
       "couldNotLoad": "Мэдэгдлийн тохиргоог ачаалж чадсангүй.",

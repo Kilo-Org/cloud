@@ -35,6 +35,8 @@
     "connectGithub": "ភ្ជាប់ GitHub",
     "cost": "ចំណាយ",
     "discard": "បោះបង់",
+    "discardChangesMessage": "ការផ្លាស់ប្តូររបស់អ្នកនឹងបាត់បង់។",
+    "discardChangesTitle": "បោះបង់ការផ្លាស់ប្តូរ?",
     "findings": "បញ្ហាដែលរកឃើញ",
     "mergeRequest": "សំណើបញ្ចូល",
     "notConnected": "មិនទាន់ភ្ជាប់",
@@ -1661,7 +1663,14 @@
       "whereFound": "ទីតាំងដែលរកឃើញ ({{displayCount}})",
       "fullReport": "របាយការណ៍ពេញលេញដែលបានបង្កើត",
       "yes": "បាទ/ចាស",
-      "no": "ទេ"
+      "no": "ទេ",
+      "action": {
+        "analyzeCodebase": "វិភាគមូលដ្ឋានកូដ",
+        "dismiss": "បដិសេធ",
+        "manualReview": "ការពិនិត្យដោយដៃ",
+        "monitor": "ត្រួតពិនិត្យ",
+        "openPr": "បើកសំណើទាញ"
+      }
     },
     "dashboard": {
       "findingsCount": "បញ្ហាដែលរកឃើញចំនួន {{displayCount}}",
@@ -1880,7 +1889,24 @@
       "title": "របាយការណ៍សវនកម្ម",
       "unavailable": "មិនអាចមើលរបាយការណ៍សវនកម្មបានទេ",
       "unavailableDescription": "មានតែម្ចាស់អង្គការ និងអ្នកគ្រប់គ្រងការទូទាត់ប៉ុណ្ណោះដែលអាចមើលរបាយការណ៍សវនកម្មបាន។ សុំឱ្យម្ចាស់ ឬអ្នកគ្រប់គ្រងការទូទាត់ផ្តល់សិទ្ធិឱ្យអ្នក។",
-      "queryFailed": "ការទាញយកទិន្នន័យរបាយការណ៍មិនបានបញ្ចប់ទេ។ សូមព្យាយាមម្តងទៀត។"
+      "queryFailed": "ការទាញយកទិន្នន័យរបាយការណ៍មិនបានបញ្ចប់ទេ។ សូមព្យាយាមម្តងទៀត។",
+      "eventActions": {
+        "findingAnalysisCompleted": "ការវិភាគបានបញ្ចប់",
+        "findingAnalysisFailed": "ការវិភាគបរាជ័យ",
+        "findingAutoDismissed": "បានបដិសេធ​ដោយស្វ័យប្រវត្តិ",
+        "findingCreated": "បាននាំចូល",
+        "findingDeleted": "បានលុប",
+        "findingDismissed": "បានបដិសេធ",
+        "findingSeverityChanged": "បានផ្លាស់ប្តូរកម្រិតធ្ងន់ធ្ងរ",
+        "findingStatusChange": "បានផ្លាស់ប្តូរស្ថានភាព",
+        "findingSuperseded": "បានជំនួស",
+        "remediationBlocked": "ការជួសជុលត្រូវបានរារាំង",
+        "remediationCancelled": "បានបោះបង់",
+        "remediationFailed": "ការជួសជុលបរាជ័យ",
+        "remediationNoChangesNeeded": "មិនត្រូវការផ្លាស់ប្តូរ",
+        "remediationPrOpened": "បានបើកសំណើទាញ",
+        "remediationQueued": "បានស្នើសុំការជួសជុល"
+      }
     },
     "notifications": {
       "couldNotLoad": "មិនអាចផ្ទុកការកំណត់ការជូនដំណឹងបានទេ។",

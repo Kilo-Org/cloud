@@ -35,6 +35,8 @@
     "connectGithub": "Падключыць GitHub",
     "cost": "Кошт",
     "discard": "Адкінуць",
+    "discardChangesMessage": "Вашы змены будуць страчаны.",
+    "discardChangesTitle": "Адкінуць змены?",
     "findings": "Выяўленыя праблемы",
     "mergeRequest": "merge-запыт",
     "notConnected": "Не падключана",
@@ -1701,7 +1703,14 @@
       "whereFound": "Месцы выяўлення ({{displayCount}})",
       "fullReport": "Поўная згенераваная справаздача",
       "yes": "Так",
-      "no": "Не"
+      "no": "Не",
+      "action": {
+        "analyzeCodebase": "Аналізаваць кодавую базу",
+        "dismiss": "Адхіліць",
+        "manualReview": "Ручная праверка",
+        "monitor": "Назіраць",
+        "openPr": "Адкрыць запыт на зліццё"
+      }
     },
     "dashboard": {
       "findingsCount": "Праблем: {{displayCount}}",
@@ -1926,7 +1935,24 @@
       "title": "Справаздача аўдыту",
       "unavailable": "Справаздача аўдыту недаступная",
       "unavailableDescription": "Толькі ўладальнікі арганізацыі і адміністратары аплаты могуць праглядаць справаздачы аўдыту. Папрасіце ўладальніка або адміністратара аплаты даць вам доступ.",
-      "queryFailed": "Не атрымалася завяршыць запыт справаздачы. Паспрабуйце яшчэ раз."
+      "queryFailed": "Не атрымалася завяршыць запыт справаздачы. Паспрабуйце яшчэ раз.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Аналіз завершаны",
+        "findingAnalysisFailed": "Памылка аналізу",
+        "findingAutoDismissed": "Аўтаматычна адхілена",
+        "findingCreated": "Імпартавана",
+        "findingDeleted": "Выдалена",
+        "findingDismissed": "Адхілена",
+        "findingSeverityChanged": "Сур’ёзнасць зменена",
+        "findingStatusChange": "Статус зменены",
+        "findingSuperseded": "Заменена",
+        "remediationBlocked": "Выпраўленне заблакіравана",
+        "remediationCancelled": "Адменена",
+        "remediationFailed": "Не атрымалася выканаць выпраўленне",
+        "remediationNoChangesNeeded": "Змены не патрэбныя",
+        "remediationPrOpened": "PR адкрыты",
+        "remediationQueued": "Запыт на выпраўленне атрыманы"
+      }
     },
     "notifications": {
       "couldNotLoad": "Не атрымалася загрузіць налады апавяшчэнняў.",

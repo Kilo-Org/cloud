@@ -35,6 +35,8 @@
     "connectGithub": "Conectar GitHub",
     "cost": "Coste",
     "discard": "Descartar",
+    "discardChangesMessage": "Tus cambios se perderán.",
+    "discardChangesTitle": "¿Descartar cambios?",
     "findings": "Hallazgos",
     "mergeRequest": "merge request",
     "notConnected": "Sin conexión",
@@ -1116,7 +1118,14 @@
       "triageReasoning": "Justificación de la evaluación inicial",
       "watchInCloudAgent": "Ver en el agente en la nube",
       "whereFound": "Dónde se encontró ({{displayCount}})",
-      "yes": "Sí"
+      "yes": "Sí",
+      "action": {
+        "analyzeCodebase": "Analizar el código",
+        "dismiss": "Descartar",
+        "manualReview": "Revisión manual",
+        "monitor": "Supervisar",
+        "openPr": "Abrir PR"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Modelo de análisis",
@@ -1138,7 +1147,24 @@
       "summary": "Resumen del informe",
       "title": "Informe de auditoría",
       "unavailable": "Informe de auditoría no disponible",
-      "unavailableDescription": "Solo los propietarios de la organización y los administradores de facturación pueden ver los informes de auditoría. Pide a un propietario o a un administrador de facturación que te dé acceso."
+      "unavailableDescription": "Solo los propietarios de la organización y los administradores de facturación pueden ver los informes de auditoría. Pide a un propietario o a un administrador de facturación que te dé acceso.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Análisis completado",
+        "findingAnalysisFailed": "Error en el análisis",
+        "findingAutoDismissed": "Descartado automáticamente",
+        "findingCreated": "Importado",
+        "findingDeleted": "Eliminado",
+        "findingDismissed": "Descartado",
+        "findingSeverityChanged": "Se ha cambiado la gravedad",
+        "findingStatusChange": "Se ha cambiado el estado",
+        "findingSuperseded": "Sustituido",
+        "remediationBlocked": "Corrección bloqueada",
+        "remediationCancelled": "Cancelado",
+        "remediationFailed": "Error en la corrección",
+        "remediationNoChangesNeeded": "No se necesitan cambios",
+        "remediationPrOpened": "Se ha abierto un PR",
+        "remediationQueued": "Corrección solicitada"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Ver el informe de auditoría"

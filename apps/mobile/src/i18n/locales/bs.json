@@ -35,6 +35,8 @@
     "connectGithub": "Poveži GitHub",
     "cost": "Trošak",
     "discard": "Odbaci",
+    "discardChangesMessage": "Vaše promjene će biti izgubljene.",
+    "discardChangesTitle": "Odbaci promjene?",
     "findings": "Nalazi",
     "mergeRequest": "merge request",
     "notConnected": "Nije povezano",
@@ -1681,7 +1683,14 @@
       "whereFound": "Mjesta pronalaska ({{displayCount}})",
       "fullReport": "Cjelovit generirani izvještaj",
       "yes": "Da",
-      "no": "Ne"
+      "no": "Ne",
+      "action": {
+        "analyzeCodebase": "Analiziraj bazu koda",
+        "dismiss": "Odbaci",
+        "manualReview": "Ručna provjera",
+        "monitor": "Prati",
+        "openPr": "Otvori pull request"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} nalaza",
@@ -1903,7 +1912,24 @@
       "title": "Revizijski izvještaj",
       "unavailable": "Revizijski izvještaj nije dostupan",
       "unavailableDescription": "Samo vlasnici organizacije i upravitelji naplate mogu pregledavati revizijske izvještaje. Zatraži pristup od vlasnika ili upravitelja naplate.",
-      "queryFailed": "Upit za izvještaj nije završen. Pokušaj ponovo."
+      "queryFailed": "Upit za izvještaj nije završen. Pokušaj ponovo.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiza dovršena",
+        "findingAnalysisFailed": "Analiza nije uspjela",
+        "findingAutoDismissed": "Automatski odbačeno",
+        "findingCreated": "Uvezeno",
+        "findingDeleted": "Obrisano",
+        "findingDismissed": "Odbačeno",
+        "findingSeverityChanged": "Ozbiljnost promijenjena",
+        "findingStatusChange": "Status promijenjen",
+        "findingSuperseded": "Zamijenjeno",
+        "remediationBlocked": "Otklanjanje blokirano",
+        "remediationCancelled": "Otkazano",
+        "remediationFailed": "Otklanjanje nije uspjelo",
+        "remediationNoChangesNeeded": "Nisu potrebne izmjene",
+        "remediationPrOpened": "Pull request otvoren",
+        "remediationQueued": "Zatraženo otklanjanje"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nije moguće učitati postavke obavijesti.",

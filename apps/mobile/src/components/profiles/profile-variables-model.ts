@@ -46,11 +46,21 @@ export function variableRows(vars: readonly ProfileVarSource[]): VariableRow[] {
 
 export type VariableInputError = 'empty' | 'too-long' | 'duplicate' | 'value-required';
 
+/** Options the caller's surface adds to the shared key rules. */
+export type VariableInputRules = Readonly<{
+  /**
+   * Refuse a blank value. The profile Variables screen sets it: an empty field
+   * there offers the reader nothing to save. The new-session draft editor
+   * leaves it off, because prepare-session accepts an empty value and the web
+   * editor saves `KEY=` too.
+   */
+  requireValue?: boolean;
+}>;
+
 /**
  * Validate the edited variable before a save. Matches the server's
- * `VarSchema` key bound (`z.string().min(1).max(256)`); the value must be
- * non-blank, because an empty field offers the reader nothing to save and the
- * server would accept it silently. `takenKeys` are the
+ * `VarSchema` key bound (`z.string().min(1).max(256)`) and, when `requireValue`
+ * is set, refuses a blank value. `takenKeys` are the
  * profile's stored keys: the server upserts on `(profile_id, key)` with the
  * cleaned key the form sends, so a new key that normalizes onto an existing one
  * would silently replace that variable. Returns an error code, or `null` when
@@ -58,7 +68,8 @@ export type VariableInputError = 'empty' | 'too-long' | 'duplicate' | 'value-req
  */
 export function validateVariableInput(
   input: Readonly<{ key: string; value: string }>,
-  takenKeys: readonly string[] = []
+  takenKeys: readonly string[] = [],
+  rules: VariableInputRules = {}
 ): VariableInputError | null {
   const key = input.key.trim();
   if (key.length === 0) {
@@ -70,7 +81,7 @@ export function validateVariableInput(
   if (takenKeys.includes(cleanVariableKey(key))) {
     return 'duplicate';
   }
-  if (input.value.trim().length === 0) {
+  if (rules.requireValue === true && input.value.trim().length === 0) {
     return 'value-required';
   }
   return null;

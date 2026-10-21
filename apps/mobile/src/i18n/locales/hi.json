@@ -3577,7 +3577,7 @@
     "keyTooLong": "कुंजी 256 अक्षरों या उससे कम की होनी चाहिए",
     "keyDuplicate": "यह कुंजी पहले से ही प्रोफ़ाइल में मौजूद है",
     "valueLabel": "कीमत",
-    "valueRequired": "एक कीमत दर्ज करें",
+    "valueRequired": "एक मान दर्ज करें",
     "tooLong": "अधिकतम {{max}} अक्षरों का उपयोग करें",
     "secretLabel": "गुप्त",
     "secrets": {

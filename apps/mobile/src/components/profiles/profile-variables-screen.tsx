@@ -140,6 +140,7 @@ export function ProfileVariablesScreen({
       initial={initial}
       existingKeys={vars.map(variable => variable.key)}
       isSaving={setVar.isPending}
+      requireValue
       onCancel={closeForm}
       onSave={saveEdit}
     />

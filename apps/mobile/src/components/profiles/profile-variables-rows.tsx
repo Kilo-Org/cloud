@@ -158,6 +158,12 @@ type VariableEditFormProps = Readonly<{
   existingKeys?: readonly string[];
   isSaving: boolean;
   /**
+   * Refuse a blank value with an inline message. The profile Variables screen
+   * asks for it; the new-session draft editor leaves it off, because
+   * prepare-session accepts an empty value and the web editor saves it too.
+   */
+  requireValue?: boolean;
+  /**
    * The bound the value must satisfy, when the caller's target is stricter
    * than the profile's own 10000-character server cap. The manual session
    * editor passes the prepare-session limit, so an over-long value is not
@@ -169,9 +175,9 @@ type VariableEditFormProps = Readonly<{
 }>;
 
 /**
- * The inline add/edit form. Uncontrolled fields read through refs. Save is
- * refused for a blank value on an add or an edit and says so under the Value
- * field, instead of leaving a disabled button that reports nothing; a stored
+ * The inline add/edit form. Uncontrolled fields read through refs. When
+ * `requireValue` is set, Save refuses a blank value and says so under the Value
+ * field instead of leaving a disabled button that reports nothing; a stored
  * secret's masked `***` is never seeded, so a secret edit needs a new value. A
  * failed save leaves the form mounted with the typed values.
  */
@@ -180,6 +186,7 @@ export function VariableEditForm({
   initial,
   existingKeys = [],
   isSaving,
+  requireValue = false,
   maxValueLength,
   onCancel,
   onSave,
@@ -195,7 +202,7 @@ export function VariableEditForm({
   const valuePlaceholder = valueFieldPlaceholder(t, isSecret, isNew);
   // An edit's key is stored, so only an add can collide with the profile's keys.
   const validate = (key: string, value: string): VariableInputError | null =>
-    validateVariableInput({ key, value }, isNew ? existingKeys : []);
+    validateVariableInput({ key, value }, isNew ? existingKeys : [], { requireValue });
 
   const submit = async () => {
     const key = keyRef.current;

@@ -6,7 +6,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink, GitMerge } from '@/components/ui/icons';
-import { Linking, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -21,6 +21,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
+import { openFindingLink } from '@/lib/security-agent-link';
 import { cn, firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
 type FindingDetailsPanelProps = {
@@ -124,6 +125,7 @@ function DismissalOrSupersessionNote({
 // dismissal/supersession context as plain facts rather than the web's
 // hero + next-step action card (Task 7 owns actions).
 export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsPanelProps>) {
+  const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const severity = getFindingSeverityPresentation(finding.severity);
@@ -264,7 +266,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <Pressable
           className="flex-row items-center justify-center gap-2 rounded-lg bg-secondary p-3 active:opacity-70"
           onPress={() => {
-            void Linking.openURL(advisoryUrl);
+            openFindingLink(router, advisoryUrl, t('securityAgent.findingDetails.viewAdvisory'));
           }}
           accessibilityRole="link"
         >

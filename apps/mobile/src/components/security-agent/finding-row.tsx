@@ -5,7 +5,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink } from '@/components/ui/icons';
-import { Linking, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
@@ -22,6 +22,7 @@ import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
 import { getDeadlineCopy, getSecurityAnalysisLabel } from '@/lib/security-agent-copy';
+import { openFindingLink } from '@/lib/security-agent-link';
 import { cn } from '@/lib/utils';
 
 const SEVERITY_KEYS = {
@@ -103,6 +104,7 @@ function FindingRowQuickAction({
   nextAction,
 }: Readonly<FindingRowQuickActionProps>) {
   const colors = useThemeColors();
+  const router = useRouter();
   const { t } = useTranslation();
   const startAnalysis = useStartSecurityAnalysis(scope);
   const analysisFailed = finding.analysis_status === 'failed';
@@ -114,7 +116,7 @@ function FindingRowQuickAction({
         size="sm"
         className="mt-1 self-start px-3"
         onPress={() => {
-          void Linking.openURL(prUrl);
+          openFindingLink(router, prUrl, t('common.pullRequest'));
         }}
       >
         <ExternalLink size={13} color={colors.foreground} />

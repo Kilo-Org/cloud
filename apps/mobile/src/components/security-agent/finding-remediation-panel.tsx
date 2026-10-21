@@ -19,8 +19,6 @@ import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
-import { openExternalUrl } from '@/lib/external-link';
 import { formatNumber } from '@/lib/format';
 import {
   useCancelSecurityRemediation,
@@ -30,6 +28,7 @@ import {
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
+import { openFindingLink } from '@/lib/security-agent-link';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
 type FindingRemediationPanelProps = {
@@ -177,12 +176,7 @@ export function FindingRemediationPanel({
   const cancelRemediation = useCancelSecurityRemediation(scope);
 
   const openPullRequest = (url: string) => {
-    const destination = resolveCodeReviewerOpenPrDestination(url);
-    if (destination.kind === 'in-app') {
-      router.push(destination.href);
-      return;
-    }
-    void openExternalUrl(url, { label: t('common.pullRequest') });
+    openFindingLink(router, url, t('common.pullRequest'));
   };
 
   if (isLoading && !analysis) {

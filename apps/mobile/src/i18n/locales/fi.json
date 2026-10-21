@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Käytä enintään 50 merkintää, avaimet enintään 128 ja arvot enintään 4096 merkkiä",
       "timeoutInvalid": "Aikakatkaisun on oltava millisekuntien kokonaisluku",
       "edit": "Muokkaa MCP-palvelinta",
-      "saveFailed": "MCP-palvelinta ei voitu tallentaa"
+      "saveFailed": "MCP-palvelinta ei voitu tallentaa",
+      "deleteFailed": "MCP-palvelinta ei voitu poistaa",
+      "updateFailed": "MCP-palvelinta ei voitu päivittää"
     },
     "agents": {
       "title": "Profiiliagentit",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "Subagent - vain soitettavissa muilta",
       "visibilityAll": "Kaikki - molemmat",
       "saveFailed": "Agenttia ei voitu tallentaa",
+      "deleteFailed": "Agenttia ei voitu poistaa",
       "nameRequired": "Anna agentin nimi",
       "slugRequired": "Syötä agentti etana",
       "slugInvalid": "Slugin tulee alkaa kirjaimella ja käyttää vain pieniä kirjaimia, numeroita ja väliviivoja",
@@ -3679,6 +3682,7 @@
       "subtask": "Suorita alitehtävänä",
       "edit": "Muokkaa vinoviivakomentoa",
       "saveFailed": "Komentoa ei voitu tallentaa",
+      "deleteFailed": "Komentoa ei voitu poistaa",
       "nameRequired": "Anna komennon nimi",
       "nameInvalid": "Nimen tulee alkaa pienellä kirjaimella ja käyttää vain pieniä kirjaimia, numeroita ja väliviivoja",
       "templateRequired": "Anna komentomalli",

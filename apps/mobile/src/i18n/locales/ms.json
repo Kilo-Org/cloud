@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Gunakan paling banyak 50 entri, kunci sehingga 128 dan nilai sehingga 4096 aksara",
       "timeoutInvalid": "Tamat masa mestilah bilangan keseluruhan milisaat",
       "edit": "Edit pelayan MCP",
-      "saveFailed": "Tidak dapat menyimpan pelayan MCP"
+      "saveFailed": "Tidak dapat menyimpan pelayan MCP",
+      "deleteFailed": "Tidak dapat memadam pelayan MCP",
+      "updateFailed": "Tidak dapat mengemas kini pelayan MCP"
     },
     "agents": {
       "title": "Ejen profil",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "Subagen — hanya boleh dipanggil daripada orang lain",
       "visibilityAll": "Semua - kedua-duanya",
       "saveFailed": "Tidak dapat menyelamatkan ejen",
+      "deleteFailed": "Tidak dapat memadam ejen",
       "nameRequired": "Masukkan nama ejen",
       "slugRequired": "Masukkan slug ejen",
       "slugInvalid": "Slug mesti bermula dengan huruf dan hanya menggunakan huruf kecil, digit dan sempang",
@@ -3679,6 +3682,7 @@
       "subtask": "Jalankan sebagai subtugas",
       "edit": "Edit arahan slash",
       "saveFailed": "Tidak dapat menyimpan arahan",
+      "deleteFailed": "Tidak dapat memadam arahan",
       "nameRequired": "Masukkan nama arahan",
       "nameInvalid": "Nama mesti bermula dengan huruf kecil dan hanya menggunakan huruf kecil, angka dan sempang",
       "templateRequired": "Masukkan templat arahan",

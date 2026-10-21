@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Ko'pi bilan 50 ta yozuv, kalitlar 128 tagacha va qiymatlar 4096 belgigacha foydalaning",
       "timeoutInvalid": "Vaqt tugashi butun son millisekund bo'lishi kerak",
       "edit": "MCP serverini tahrirlash",
-      "saveFailed": "MCP serverini saqlab boʻlmadi"
+      "saveFailed": "MCP serverini saqlab boʻlmadi",
+      "deleteFailed": "MCP serverini oʻchirib boʻlmadi",
+      "updateFailed": "MCP serverini yangilab boʻlmadi"
     },
     "agents": {
       "title": "Profil agentlari",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "Subagent - faqat boshqalar tomonidan chaqirilishi mumkin",
       "visibilityAll": "Hammasi - ikkalasi ham",
       "saveFailed": "Agentni saqlab boʻlmadi",
+      "deleteFailed": "Agentni oʻchirib boʻlmadi",
       "nameRequired": "Agent nomini kiriting",
       "slugRequired": "Agent slug'ini kiriting",
       "slugInvalid": "Slug harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
@@ -3679,6 +3682,7 @@
       "subtask": "Quyi vazifa sifatida ishga tushirish",
       "edit": "Slash buyrug'ini tahrirlash",
       "saveFailed": "Buyruq saqlanmadi",
+      "deleteFailed": "Buyruq oʻchirilmadi",
       "nameRequired": "Buyruq nomini kiriting",
       "nameInvalid": "Ism kichik harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
       "templateRequired": "Buyruq shablonini kiriting",

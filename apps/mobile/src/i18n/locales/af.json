@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Gebruik hoogstens 50 inskrywings, sleutels tot 128 en waardes tot 4096 karakters",
       "timeoutInvalid": "Uitteltyd moet 'n hele aantal millisekondes wees",
       "edit": "Wysig MCP-bediener",
-      "saveFailed": "Kon nie MCP-bediener stoor nie"
+      "saveFailed": "Kon nie MCP-bediener stoor nie",
+      "deleteFailed": "Kon nie MCP-bediener verwyder nie",
+      "updateFailed": "Kon nie MCP-bediener opdateer nie"
     },
     "agents": {
       "title": "Profiel agente",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "Subagent - slegs oproepbaar vanaf ander",
       "visibilityAll": "Almal - albei",
       "saveFailed": "Kon nie agent stoor nie",
+      "deleteFailed": "Kon nie agent verwyder nie",
       "nameRequired": "Voer 'n agentnaam in",
       "slugRequired": "Voer 'n agentslak in",
       "slugInvalid": "Slak moet met 'n letter begin en slegs kleinletters, syfers en strepe gebruik",
@@ -3679,6 +3682,7 @@
       "subtask": "Hardloop as subtaak",
       "edit": "Wysig skuinsstreep opdrag",
       "saveFailed": "Kon nie opdrag stoor nie",
+      "deleteFailed": "Kon nie opdrag verwyder nie",
       "nameRequired": "Voer 'n opdragnaam in",
       "nameInvalid": "Naam moet met 'n kleinletter begin en slegs kleinletters, syfers en strepe gebruik",
       "templateRequired": "Voer 'n opdragsjabloon in",

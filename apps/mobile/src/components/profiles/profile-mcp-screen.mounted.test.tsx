@@ -301,6 +301,47 @@ describe('ProfileMcpScreen', () => {
     unmount();
   });
 
+  it('retryable: a delete with no usable message names the delete operation', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+    h.mutations.deleteMcp.mutateAsync.mockRejectedValue(new Error(' '));
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Delete');
+    await act(async () => {
+      confirmRequest(h.confirm);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => h.error.mock.calls.length > 0);
+    expect(h.error).toHaveBeenCalledWith("Couldn't delete MCP server");
+
+    unmount();
+  });
+
+  it('retryable: a refused toggle names the update, not a save', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+    h.mutations.setMcpEnabled.mutate.mockImplementation(
+      (_input: unknown, options: { onError: (error: Error) => void }) => {
+        options.onError(new Error(' '));
+      }
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    const { onValueChange } = findOne(renderer.root, 'Switch').props;
+    expect(typeof onValueChange).toBe('function');
+    act(() => {
+      if (typeof onValueChange === 'function') {
+        onValueChange(false);
+      }
+    });
+
+    expect(h.error).toHaveBeenCalledWith("Couldn't update MCP server");
+
+    unmount();
+  });
+
   it('keeps the rows while a refetch is in flight', async () => {
     h.query.data = testProfile([testServer()]);
     h.query.isPending = false;

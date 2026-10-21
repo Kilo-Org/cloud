@@ -3675,7 +3675,9 @@
       "jsonTooLarge": "Izmantojiet ne vairāk kā 50 ierakstus, atslēgas līdz 128 un vērtības līdz 4096 rakstzīmēm",
       "timeoutInvalid": "Taimautai ir jābūt veselam milisekunžu skaitam",
       "edit": "Rediģēt MCP serveri",
-      "saveFailed": "Nevarēja saglabāt MCP serveri"
+      "saveFailed": "Nevarēja saglabāt MCP serveri",
+      "deleteFailed": "Nevarēja izdzēst MCP serveri",
+      "updateFailed": "Nevarēja atjaunināt MCP serveri"
     },
     "agents": {
       "title": "Profila aģenti",
@@ -3702,6 +3704,7 @@
       "visibilitySubagent": "Subaģents — izsaucams tikai no citiem",
       "visibilityAll": "Visi - abi",
       "saveFailed": "Nevarēja saglabāt aģentu",
+      "deleteFailed": "Nevarēja izdzēst aģentu",
       "nameRequired": "Ievadiet aģenta nosaukumu",
       "slugRequired": "Ievadiet aģenta lodes",
       "slugInvalid": "Slug jāsākas ar burtu un jāizmanto tikai mazie burti, cipari un domuzīmes",
@@ -3720,6 +3723,7 @@
       "subtask": "Palaist kā apakšuzdevumu",
       "edit": "Rediģēt slīpsvītras komandu",
       "saveFailed": "Nevarēja saglabāt komandu",
+      "deleteFailed": "Nevarēja izdzēst komandu",
       "nameRequired": "Ievadiet komandas nosaukumu",
       "nameInvalid": "Nosaukumam ir jāsākas ar mazo burtu un jāizmanto tikai mazie burti, cipari un domuzīmes",
       "templateRequired": "Ievadiet komandas veidni",

@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "最多使用 50 个条目，键最多 128 个字符，值最多 4096 个字符",
       "timeoutInvalid": "超时必须是整数毫秒",
       "edit": "编辑 MCP 服务器",
-      "saveFailed": "无法保存 MCP 服务器"
+      "saveFailed": "无法保存 MCP 服务器",
+      "deleteFailed": "无法删除 MCP 服务器",
+      "updateFailed": "无法更新 MCP 服务器"
     },
     "agents": {
       "title": "配置文件代理",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "子代理——只能从其他人调用",
       "visibilityAll": "全部 — 两者",
       "saveFailed": "无法保存代理",
+      "deleteFailed": "无法删除代理",
       "nameRequired": "输入代理名称",
       "slugRequired": "输入代理 slug",
       "slugInvalid": "Slug 必须以字母开头，并且只能使用小写字母、数字和破折号",
@@ -3679,6 +3682,7 @@
       "subtask": "作为子任务运行",
       "edit": "编辑斜杠命令",
       "saveFailed": "无法保存命令",
+      "deleteFailed": "无法删除命令",
       "nameRequired": "输入命令名称",
       "nameInvalid": "名称必须以小写字母开头，并且只能使用小写字母、数字和破折号",
       "templateRequired": "输入命令模板",

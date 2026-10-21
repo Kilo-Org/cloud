@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Legfeljebb 50 bejegyzést használjon, kulcsok 128-ig és értékek 4096 karakterig",
       "timeoutInvalid": "Az időtúllépésnek egész számú ezredmásodpercnek kell lennie",
       "edit": "MCP szerver szerkesztése",
-      "saveFailed": "Nem sikerült menteni az MCP-kiszolgálót"
+      "saveFailed": "Nem sikerült menteni az MCP-kiszolgálót",
+      "deleteFailed": "Nem sikerült törölni az MCP-kiszolgálót",
+      "updateFailed": "Nem sikerült frissíteni az MCP-kiszolgálót"
     },
     "agents": {
       "title": "Profil ügynökök",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "Alügynök – csak másoktól hívható",
       "visibilityAll": "Mind - mindkettő",
       "saveFailed": "Nem sikerült menteni az ügynököt",
+      "deleteFailed": "Nem sikerült törölni az ügynököt",
       "nameRequired": "Adja meg az ügynök nevét",
       "slugRequired": "Adjon meg egy ügynökcsiga",
       "slugInvalid": "A Slug-nak betűvel kell kezdődnie, és csak kisbetűket, számjegyeket és kötőjeleket kell használnia",
@@ -3679,6 +3682,7 @@
       "subtask": "Futtassa részfeladatként",
       "edit": "Szerkessze a perjel parancsot",
       "saveFailed": "Nem sikerült menteni a parancsot",
+      "deleteFailed": "Nem sikerült törölni a parancsot",
       "nameRequired": "Adja meg a parancs nevét",
       "nameInvalid": "A névnek kisbetűvel kell kezdődnie, és csak kisbetűket, számjegyeket és kötőjeleket kell használnia",
       "templateRequired": "Írjon be egy parancssablont",

@@ -3798,7 +3798,9 @@
       "jsonTooLarge": "Defnyddiwch 50 cofnod ar y mwyaf, allweddi hyd at 128 a gwerthoedd hyd at 4096 nod",
       "timeoutInvalid": "Rhaid i'r terfyn amser fod yn nifer gyfan o filieiliadau",
       "edit": "Golygu gweinydd MCP",
-      "saveFailed": "Methu â chadw gweinydd MCP"
+      "saveFailed": "Methu â chadw gweinydd MCP",
+      "deleteFailed": "Methu â dileu gweinydd MCP",
+      "updateFailed": "Methu â ddiweddaru gweinydd MCP"
     },
     "agents": {
       "title": "Asiantau proffil",
@@ -3825,6 +3827,7 @@
       "visibilitySubagent": "Subagent — dim ond ei alw gan eraill",
       "visibilityAll": "Pawb—y ddau",
       "saveFailed": "Ni fu modd cadw'r asiant",
+      "deleteFailed": "Ni fu modd dileu'r asiant",
       "nameRequired": "Rhowch enw asiant",
       "slugRequired": "Rhowch wlithen asiant",
       "slugInvalid": "Rhaid i wlithen ddechrau gyda llythyren a defnyddio llythrennau bach, digidau a llinellau llinellau yn unig",
@@ -3843,6 +3846,7 @@
       "subtask": "Rhedeg fel is-dasg",
       "edit": "Golygu gorchymyn slaes",
       "saveFailed": "Ni fu modd cadw'r gorchymyn",
+      "deleteFailed": "Ni fu modd dileu'r gorchymyn",
       "nameRequired": "Rhowch enw gorchymyn",
       "nameInvalid": "Rhaid i'r enw ddechrau gyda llythyren fach a defnyddio llythrennau bach, digidau a llinellau llinellau yn unig",
       "templateRequired": "Rhowch dempled gorchymyn",

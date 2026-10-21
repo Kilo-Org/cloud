@@ -3675,7 +3675,9 @@
       "jsonTooLarge": "Folosiți cel mult 50 de intrări, chei de până la 128 și valori de până la 4096 de caractere",
       "timeoutInvalid": "Timeout trebuie să fie un număr întreg de milisecunde",
       "edit": "Editați serverul MCP",
-      "saveFailed": "Serverul MCP nu a putut fi salvat"
+      "saveFailed": "Serverul MCP nu a putut fi salvat",
+      "deleteFailed": "Serverul MCP nu a putut fi șters",
+      "updateFailed": "Serverul MCP nu a putut fi actualizat"
     },
     "agents": {
       "title": "Agenți de profil",
@@ -3702,6 +3704,7 @@
       "visibilitySubagent": "Subagent - apelabil numai de la alții",
       "visibilityAll": "Toate — ambele",
       "saveFailed": "Agentul nu a putut fi salvat",
+      "deleteFailed": "Agentul nu a putut fi șters",
       "nameRequired": "Introduceți un nume de agent",
       "slugRequired": "Introduceți un melc de agent",
       "slugInvalid": "Slug trebuie să înceapă cu o literă și să folosească numai litere mici, cifre și liniuțe",
@@ -3720,6 +3723,7 @@
       "subtask": "Rulați ca subsarcină",
       "edit": "Comanda Editați slash",
       "saveFailed": "Comanda nu a putut fi salvată",
+      "deleteFailed": "Comanda nu a putut fi ștearsă",
       "nameRequired": "Introduceți un nume de comandă",
       "nameInvalid": "Numele trebuie să înceapă cu o literă mică și să folosească numai litere mici, cifre și liniuțe",
       "templateRequired": "Introduceți un șablon de comandă",

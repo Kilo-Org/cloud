@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Yi amfani da bai fi shigarwa 50 ba, maɓallai har 128 da ƙimomi har haruffa 4096",
       "timeoutInvalid": "Ƙayyadaddun lokaci dole ne ya zama cikakken adadin millise seconds",
       "edit": "Shirya uwar garken MCP",
-      "saveFailed": "An kasa ajiye uwar garken MCP"
+      "saveFailed": "An kasa ajiye uwar garken MCP",
+      "deleteFailed": "An kasa share uwar garken MCP",
+      "updateFailed": "An kasa sabunta uwar garken MCP"
     },
     "agents": {
       "title": "Wakilan bayanan martaba",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "Subagent - kawai kira daga wasu",
       "visibilityAll": "Duk - duka",
       "saveFailed": "An kasa ajiye wakili",
+      "deleteFailed": "An kasa share wakili",
       "nameRequired": "Shigar da sunan wakili",
       "slugRequired": "Shigar da slug wakili",
       "slugInvalid": "Slug dole ne ya fara da harafi kuma yayi amfani da ƙananan haruffa kawai, lambobi, da dashes",
@@ -3679,6 +3682,7 @@
       "subtask": "Gudu azaman ƙaramin aiki",
       "edit": "Gyara umarnin slash",
       "saveFailed": "An kasa ajiye umarni",
+      "deleteFailed": "An kasa share umarni",
       "nameRequired": "Shigar da sunan umarni",
       "nameInvalid": "Dole ne suna farawa da ƙananan haruffa kuma amfani da ƙananan haruffa kawai, lambobi, da dashes",
       "templateRequired": "Shigar da samfurin umarni",

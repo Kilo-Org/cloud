@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Lo kò ju 50 àkọsílẹ̀ lọ, bọtini tó 128 àti iye tó 4096 àmì",
       "timeoutInvalid": "Akoko ipari gbọdọ jẹ gbogbo nọmba ti milliseconds",
       "edit": "Ṣatunkọ olupin MCP",
-      "saveFailed": "Ko le fi olupin MCP pamọ"
+      "saveFailed": "Ko le fi olupin MCP pamọ",
+      "deleteFailed": "Ko le paarẹ olupin MCP",
+      "updateFailed": "Ko le ṣe imudojuiwọn olupin MCP"
     },
     "agents": {
       "title": "Awọn aṣoju profaili",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "Subagent — nikan callable lati elomiran",
       "visibilityAll": "Gbogbo - mejeeji",
       "saveFailed": "Ko le fipamọ aṣoju",
+      "deleteFailed": "Ko le paarẹ aṣoju",
       "nameRequired": "Tẹ orukọ aṣoju sii",
       "slugRequired": "Tẹ slug oluranlowo",
       "slugInvalid": "Slug gbọdọ bẹrẹ pẹlu lẹta kan ko si lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
@@ -3679,6 +3682,7 @@
       "subtask": "Ṣiṣe bi iṣẹ-ṣiṣe",
       "edit": "Ṣatunkọ pipaṣẹ idinku",
       "saveFailed": "Ko le fi aṣẹ pamọ",
+      "deleteFailed": "Ko le paarẹ aṣẹ",
       "nameRequired": "Tẹ orukọ aṣẹ sii",
       "nameInvalid": "Orukọ gbọdọ bẹrẹ pẹlu lẹta kekere ati lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
       "templateRequired": "Tẹ awoṣe aṣẹ sii",

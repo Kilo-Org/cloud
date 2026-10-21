@@ -106,14 +106,14 @@ describe('SaveProfileSheet', () => {
     expect(renderer.root.findAllByType('Lock' as never)).toHaveLength(0);
   });
 
-  it('refuses an empty name with the required error and creates nothing', async () => {
+  it('refuses an empty name with the profile copy and creates nothing', async () => {
     const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
     const renderer = mount({ onSave });
 
     await submit(renderer);
 
     expect(onSave).not.toHaveBeenCalled();
-    expect(field(renderer, 'Profile name').props.error).toBe('required');
+    expect(field(renderer, 'Profile name').props.error).toBe('Enter a profile name');
   });
 
   it('refuses an over-long name with the matching error', async () => {

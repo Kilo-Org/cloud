@@ -64,7 +64,7 @@ export function SaveProfileSheet({
     const nameIssue = validateProfileName(name);
     if (nameIssue !== null) {
       setNameError(
-        nameIssue === 'empty' ? t('common.required') : t('agentChat.newSession.nameTooLong')
+        nameIssue === 'empty' ? t('profiles.nameRequired') : t('agentChat.newSession.nameTooLong')
       );
       return;
     }

@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Isticmaal ugu badnaan 50 gelin, furaha ilaa 128 iyo qiimaha ilaa 4096 xaraf",
       "timeoutInvalid": "Wakhtiga kama dambaysta ahi waa inuu noqdaa tiro dhan oo millise seconds",
       "edit": "Wax ka beddel serverka MCP",
-      "saveFailed": "Waa la kaydin kari waayay seerfarka MCP"
+      "saveFailed": "Waa la kaydin kari waayay seerfarka MCP",
+      "deleteFailed": "Waa la tirtiri kari waayay seerfarka MCP",
+      "updateFailed": "Waa la cusboonaysii kari waayay seerfarka MCP"
     },
     "agents": {
       "title": "Wakiilada xogta",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "Subagent - kaliya kuwa kale looga yeeri karo",
       "visibilityAll": "Dhammaan - labadaba",
       "saveFailed": "Ma badbaadin karin wakiilka",
+      "deleteFailed": "Ma tirtirin karin wakiilka",
       "nameRequired": "Geli magaca wakiilka",
       "slugRequired": "Geli slug wakiilka",
       "slugInvalid": "Slug waa in uu ku bilaabmaa xaraf oo waa in uu isticmaalo xarfo yaryar, lambar, iyo dashes",
@@ -3679,6 +3682,7 @@
       "subtask": "U orda sidii shaqo-hoosaad",
       "edit": "Tafatir amarka slash",
       "saveFailed": "Way kaydsan kari wayday amarka",
+      "deleteFailed": "Way tirtiran kari wayday amarka",
       "nameRequired": "Geli magaca amarka",
       "nameInvalid": "Magacu waa inuu ku bilowdaa xaraf yar oo uu isticmaalo xarfo yaryar, lambaro, iyo jajab",
       "templateRequired": "Geli qaabka amarka",

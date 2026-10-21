@@ -3698,7 +3698,9 @@
       "jsonTooLarge": "Use at most 50 entries, keys up to 128 and values up to 4096 characters",
       "timeoutInvalid": "Timeout must be a whole number of milliseconds",
       "edit": "Edit MCP server",
-      "saveFailed": "Couldn't save MCP server"
+      "saveFailed": "Couldn't save MCP server",
+      "deleteFailed": "Couldn't delete MCP server",
+      "updateFailed": "Couldn't update MCP server"
     },
     "agents": {
       "title": "Profile agents",
@@ -3725,6 +3727,7 @@
       "visibilitySubagent": "Subagent — only callable from others",
       "visibilityAll": "All — both",
       "saveFailed": "Couldn't save agent",
+      "deleteFailed": "Couldn't delete agent",
       "nameRequired": "Enter an agent name",
       "slugRequired": "Enter an agent slug",
       "slugInvalid": "Slug must start with a letter and use only lowercase letters, digits, and dashes",
@@ -3743,6 +3746,7 @@
       "subtask": "Run as subtask",
       "edit": "Edit slash command",
       "saveFailed": "Couldn't save command",
+      "deleteFailed": "Couldn't delete command",
       "nameRequired": "Enter a command name",
       "nameInvalid": "Name must start with a lowercase letter and use only lowercase letters, digits, and dashes",
       "templateRequired": "Enter a command template",

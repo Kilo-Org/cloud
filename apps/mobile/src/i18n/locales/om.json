@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Galmee 50 ol fayyadami, furtuu hanga 128 fi gatii hanga arfii 4096",
       "timeoutInvalid": "Yeroon xumuraa lakkoofsa milisekondii guutuu ta'uu qaba",
       "edit": "Sarvarii MCP gulaali",
-      "saveFailed": "Sarvarii MCP qusachuu hin dandeenye"
+      "saveFailed": "Sarvarii MCP qusachuu hin dandeenye",
+      "deleteFailed": "Sarvarii MCP haquu hin dandeenye",
+      "updateFailed": "Sarvarii MCP fooyyessuu hin dandeenye"
     },
     "agents": {
       "title": "Ergamtoota piroofaayilii",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "Subagent — kanneen biroo irraa qofa kan waamamu",
       "visibilityAll": "Hundi — lamaan isaanii",
       "saveFailed": "Bakka bu'aa qusachuu hin dandeenye",
+      "deleteFailed": "Bakka bu'aa haquu hin dandeenye",
       "nameRequired": "Maqaa bakka bu'aa galchi",
       "slugRequired": "Slug ergamaa galchi",
       "slugInvalid": "Slug qubee irraa jalqabuu fi qubee xixiqqaa, dijiitota, fi daash qofa fayyadamuu qaba",
@@ -3679,6 +3682,7 @@
       "subtask": "Akka hojii xiqqaatti fiigi",
       "edit": "Ajaja slash gulaali",
       "saveFailed": "Ajaja qusachuu hin dandeenye",
+      "deleteFailed": "Ajaja haquu hin dandeenye",
       "nameRequired": "Maqaa ajaja galchi",
       "nameInvalid": "Maqaan qubee xixiqqaatiin jalqabuu fi qubee xixiqqaa, dijiitii fi daash qofa fayyadamuu qaba",
       "templateRequired": "Unkaa ajaja galchi",

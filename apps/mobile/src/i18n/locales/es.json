@@ -3675,7 +3675,9 @@
       "jsonTooLarge": "Usa como máximo 50 entradas, claves de hasta 128 y valores de hasta 4096 caracteres",
       "timeoutInvalid": "El tiempo de espera debe ser un número entero de milisegundos.",
       "edit": "Editar servidor MCP",
-      "saveFailed": "No se pudo guardar el servidor MCP"
+      "saveFailed": "No se pudo guardar el servidor MCP",
+      "deleteFailed": "No se pudo eliminar el servidor MCP",
+      "updateFailed": "No se pudo actualizar el servidor MCP"
     },
     "agents": {
       "title": "Agentes de perfil",
@@ -3702,6 +3704,7 @@
       "visibilitySubagent": "Subagente: solo puede ser invocado por otros",
       "visibilityAll": "Todos - ambos",
       "saveFailed": "No se pudo guardar al agente",
+      "deleteFailed": "No se pudo eliminar al agente",
       "nameRequired": "Ingrese el nombre de un agente",
       "slugRequired": "Introduzca una babosa de agente",
       "slugInvalid": "Slug debe comenzar con una letra y usar solo letras minúsculas, dígitos y guiones.",
@@ -3720,6 +3723,7 @@
       "subtask": "Ejecutar como subtarea",
       "edit": "Editar comando de barra diagonal",
       "saveFailed": "No se pudo guardar el comando",
+      "deleteFailed": "No se pudo eliminar el comando",
       "nameRequired": "Introduzca un nombre de comando",
       "nameInvalid": "El nombre debe comenzar con una letra minúscula y usar solo letras minúsculas, dígitos y guiones.",
       "templateRequired": "Ingrese una plantilla de comando",

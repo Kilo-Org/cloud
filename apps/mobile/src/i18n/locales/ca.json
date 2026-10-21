@@ -3675,7 +3675,9 @@
       "jsonTooLarge": "Utilitzeu com a màxim 50 entrades, claus de fins a 128 i valors de fins a 4096 caràcters",
       "timeoutInvalid": "El temps d'espera ha de ser un nombre sencer de mil·lisegons",
       "edit": "Edita el servidor MCP",
-      "saveFailed": "No s'ha pogut desar el servidor MCP"
+      "saveFailed": "No s'ha pogut desar el servidor MCP",
+      "deleteFailed": "No s'ha pogut suprimir el servidor MCP",
+      "updateFailed": "No s'ha pogut actualitzar el servidor MCP"
     },
     "agents": {
       "title": "Agents de perfil",
@@ -3702,6 +3704,7 @@
       "visibilitySubagent": "Subagent: només es pot trucar des d'altres",
       "visibilityAll": "Tots, tots dos",
       "saveFailed": "No s'ha pogut desar l'agent",
+      "deleteFailed": "No s'ha pogut suprimir l'agent",
       "nameRequired": "Introduïu un nom d'agent",
       "slugRequired": "Introduïu un llimac d'agent",
       "slugInvalid": "Slug ha de començar amb una lletra i utilitzar només lletres minúscules, dígits i guions",
@@ -3720,6 +3723,7 @@
       "subtask": "Executar com a subtasca",
       "edit": "Edita l'ordre de barra inclinada",
       "saveFailed": "No s'ha pogut desar l'ordre",
+      "deleteFailed": "No s'ha pogut suprimir l'ordre",
       "nameRequired": "Introduïu un nom d'ordre",
       "nameInvalid": "El nom ha de començar amb una lletra minúscula i utilitzar només lletres minúscules, dígits i guions",
       "templateRequired": "Introduïu una plantilla d'ordres",

@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Ən çoxu 50 giriş, 128-ə qədər açar və 4096 simvola qədər dəyər istifadə edin",
       "timeoutInvalid": "Taymout tam sayda millisaniyə olmalıdır",
       "edit": "MCP serverini redaktə edin",
-      "saveFailed": "MCP serverini saxlamaq mümkün olmadı"
+      "saveFailed": "MCP serverini saxlamaq mümkün olmadı",
+      "deleteFailed": "MCP serverini silmək mümkün olmadı",
+      "updateFailed": "MCP serverini yeniləmək mümkün olmadı"
     },
     "agents": {
       "title": "Profil agentləri",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "Subagent — yalnız başqalarından zəng etmək olar",
       "visibilityAll": "Hamısı - hər ikisi",
       "saveFailed": "Agenti saxlamaq mümkün olmadı",
+      "deleteFailed": "Agenti silmək mümkün olmadı",
       "nameRequired": "Agent adını daxil edin",
       "slugRequired": "Agent slug daxil edin",
       "slugInvalid": "Slug hərflə başlamalı və yalnız kiçik hərflərdən, rəqəmlərdən və tirelərdən istifadə etməlidir",
@@ -3679,6 +3682,7 @@
       "subtask": "Alt tapşırıq kimi işləyin",
       "edit": "Slash əmrini redaktə edin",
       "saveFailed": "Komandanı saxlamaq mümkün olmadı",
+      "deleteFailed": "Komandanı silmək mümkün olmadı",
       "nameRequired": "Komanda adını daxil edin",
       "nameInvalid": "Ad kiçik hərflə başlamalı və yalnız kiçik hərflərdən, rəqəmlərdən və tirelərdən istifadə etməlidir",
       "templateRequired": "Komanda şablonu daxil edin",

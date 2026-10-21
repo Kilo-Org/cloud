@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "最大50件のエントリ（キーは128文字、値は4096文字まで）を使用してください",
       "timeoutInvalid": "タイムアウトはミリ秒単位の整数でなければなりません",
       "edit": "MCPサーバーの編集",
-      "saveFailed": "MCP サーバーを保存できませんでした"
+      "saveFailed": "MCP サーバーを保存できませんでした",
+      "deleteFailed": "MCP サーバーを削除できませんでした",
+      "updateFailed": "MCP サーバーを更新できませんでした"
     },
     "agents": {
       "title": "プロファイルエージェント",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "サブエージェント — 他からのみ呼び出し可能",
       "visibilityAll": "すべて — 両方",
       "saveFailed": "エージェントを保存できませんでした",
+      "deleteFailed": "エージェントを削除できませんでした",
       "nameRequired": "エージェント名を入力してください",
       "slugRequired": "エージェントスラッグを入力してください",
       "slugInvalid": "スラグは文字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
@@ -3679,6 +3682,7 @@
       "subtask": "サブタスクとして実行",
       "edit": "スラッシュコマンドの編集",
       "saveFailed": "コマンドを保存できませんでした",
+      "deleteFailed": "コマンドを削除できませんでした",
       "nameRequired": "コマンド名を入力してください",
       "nameInvalid": "名前は小文字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
       "templateRequired": "コマンドテンプレートを入力してください",

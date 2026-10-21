@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Brug højst 50 poster, nøgler op til 128 og værdier op til 4096 tegn",
       "timeoutInvalid": "Timeout skal være et helt antal millisekunder",
       "edit": "Rediger MCP-server",
-      "saveFailed": "MCP-serveren kunne ikke gemmes"
+      "saveFailed": "MCP-serveren kunne ikke gemmes",
+      "deleteFailed": "MCP-serveren kunne ikke slettes",
+      "updateFailed": "MCP-serveren kunne ikke opdateres"
     },
     "agents": {
       "title": "Profilagenter",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "Subagent — kan kun kaldes fra andre",
       "visibilityAll": "Alle - begge",
       "saveFailed": "Agenten kunne ikke gemmes",
+      "deleteFailed": "Agenten kunne ikke slettes",
       "nameRequired": "Indtast et agentnavn",
       "slugRequired": "Indtast en agentsnegl",
       "slugInvalid": "Slug skal starte med et bogstav og kun bruge små bogstaver, cifre og bindestreger",
@@ -3679,6 +3682,7 @@
       "subtask": "Kør som underopgave",
       "edit": "Rediger skråstreg kommando",
       "saveFailed": "Kommandoen kunne ikke gemmes",
+      "deleteFailed": "Kommandoen kunne ikke slettes",
       "nameRequired": "Indtast et kommandonavn",
       "nameInvalid": "Navnet skal starte med et lille bogstav og kun bruge små bogstaver, cifre og bindestreger",
       "templateRequired": "Indtast en kommandoskabelon",

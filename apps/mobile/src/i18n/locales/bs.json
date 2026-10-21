@@ -3675,7 +3675,9 @@
       "jsonTooLarge": "Koristite najviše 50 unosa, ključevi do 128 i vrijednosti do 4096 znakova",
       "timeoutInvalid": "Vremensko ograničenje mora biti cijeli broj milisekundi",
       "edit": "Uredite MCP server",
-      "saveFailed": "Nije moguće sačuvati MCP server"
+      "saveFailed": "Nije moguće sačuvati MCP server",
+      "deleteFailed": "Nije moguće izbrisati MCP server",
+      "updateFailed": "Nije moguće ažurirati MCP server"
     },
     "agents": {
       "title": "Profil agenti",
@@ -3702,6 +3704,7 @@
       "visibilitySubagent": "Subagent — može se pozvati samo od drugih",
       "visibilityAll": "Sve — oboje",
       "saveFailed": "Nije moguće sačuvati agenta",
+      "deleteFailed": "Nije moguće izbrisati agenta",
       "nameRequired": "Unesite ime agenta",
       "slugRequired": "Unesite puž agenta",
       "slugInvalid": "Slug mora početi slovom i koristiti samo mala slova, cifre i crtice",
@@ -3720,6 +3723,7 @@
       "subtask": "Pokreni kao podzadatak",
       "edit": "Uredi naredbu kose crte",
       "saveFailed": "Nije moguće sačuvati naredbu",
+      "deleteFailed": "Nije moguće izbrisati naredbu",
       "nameRequired": "Unesite naziv komande",
       "nameInvalid": "Ime mora početi malim slovom i koristiti samo mala slova, cifre i crtice",
       "templateRequired": "Unesite predložak komande",

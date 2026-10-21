@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Gunakan maksimal 50 entri, kunci hingga 128 dan nilai hingga 4096 karakter",
       "timeoutInvalid": "Batas waktu harus berupa bilangan bulat dalam milidetik",
       "edit": "Sunting server MCP",
-      "saveFailed": "Tidak dapat menyimpan server MCP"
+      "saveFailed": "Tidak dapat menyimpan server MCP",
+      "deleteFailed": "Tidak dapat menghapus server MCP",
+      "updateFailed": "Tidak dapat memperbarui server MCP"
     },
     "agents": {
       "title": "Agen profil",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "Subagen — hanya dapat dihubungi dari orang lain",
       "visibilityAll": "Semua—keduanya",
       "saveFailed": "Tidak dapat menyelamatkan agen",
+      "deleteFailed": "Tidak dapat menghapus agen",
       "nameRequired": "Masukkan nama agen",
       "slugRequired": "Masukkan siput agen",
       "slugInvalid": "Siput harus dimulai dengan huruf dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
@@ -3679,6 +3682,7 @@
       "subtask": "Jalankan sebagai subtugas",
       "edit": "Edit perintah garis miring",
       "saveFailed": "Tidak dapat menyimpan perintah",
+      "deleteFailed": "Tidak dapat menghapus perintah",
       "nameRequired": "Masukkan nama perintah",
       "nameInvalid": "Nama harus dimulai dengan huruf kecil dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
       "templateRequired": "Masukkan templat perintah",

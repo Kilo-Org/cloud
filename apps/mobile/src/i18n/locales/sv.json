@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Använd högst 50 poster, nycklar upp till 128 och värden upp till 4096 tecken",
       "timeoutInvalid": "Timeout måste vara ett helt antal millisekunder",
       "edit": "Redigera MCP-server",
-      "saveFailed": "Det gick inte att spara MCP-servern"
+      "saveFailed": "Det gick inte att spara MCP-servern",
+      "deleteFailed": "Det gick inte att ta bort MCP-servern",
+      "updateFailed": "Det gick inte att uppdatera MCP-servern"
     },
     "agents": {
       "title": "Profilagenter",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "Subagent — endast anropsbar från andra",
       "visibilityAll": "Alla - båda",
       "saveFailed": "Det gick inte att spara agenten",
+      "deleteFailed": "Det gick inte att ta bort agenten",
       "nameRequired": "Ange ett agentnamn",
       "slugRequired": "Ange en agentsnigel",
       "slugInvalid": "Slug måste börja med en bokstav och endast använda små bokstäver, siffror och bindestreck",
@@ -3679,6 +3682,7 @@
       "subtask": "Kör som deluppgift",
       "edit": "Redigera snedstreck kommando",
       "saveFailed": "Det gick inte att spara kommandot",
+      "deleteFailed": "Det gick inte att ta bort kommandot",
       "nameRequired": "Ange ett kommandonamn",
       "nameInvalid": "Namnet måste börja med en liten bokstav och endast använda små bokstäver, siffror och bindestreck",
       "templateRequired": "Ange en kommandomall",

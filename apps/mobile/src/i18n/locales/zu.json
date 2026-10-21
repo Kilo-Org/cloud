@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Sebenzisa okufakiwe okungu-50 noma ngaphansi, okhiye kufika ku-128 kanye namavelu kufika ezinhlamvu ezingu-4096",
       "timeoutInvalid": "Isikhathi sokuvala kufanele sibe inani eliphelele lama-millisecond",
       "edit": "Hlela iseva ye-MCP",
-      "saveFailed": "Ayikwazanga ukulondoloza iseva ye-MCP"
+      "saveFailed": "Ayikwazanga ukulondoloza iseva ye-MCP",
+      "deleteFailed": "Ayikwazanga ukususa iseva ye-MCP",
+      "updateFailed": "Ayikwazanga ukubuyekeza iseva ye-MCP"
     },
     "agents": {
       "title": "Abenzeli bephrofayela",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "I-Subagent - itholakala kuphela kwabanye",
       "visibilityAll": "Konke - kokubili",
       "saveFailed": "Ayikwazanga ukulondoloza umenzeli",
+      "deleteFailed": "Ayikwazanga ukususa umenzeli",
       "nameRequired": "Faka igama lomenzeli",
       "slugRequired": "Faka i-ejenti ye-slug",
       "slugInvalid": "I-slug kufanele siqale ngohlamvu futhi sisebenzise kuphela izinhlamvu ezincane, amadijithi, namadeshi",
@@ -3679,6 +3682,7 @@
       "subtask": "Qalisa njengomsebenzi ongaphansi",
       "edit": "Hlela umyalo we-slash",
       "saveFailed": "Ayikwazanga ukulondoloza umyalo",
+      "deleteFailed": "Ayikwazanga ukususa umyalo",
       "nameRequired": "Faka igama lomyalo",
       "nameInvalid": "Igama kufanele liqale ngohlamvu oluncane futhi lisebenzise kuphela izinhlamvu ezincane, amadijithi, namadeshi",
       "templateRequired": "Faka isifanekiso somyalo",

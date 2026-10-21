@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "ቢበዛ 50 ግቤቶችን ይጠቀሙ፣ ቁልፎች እስከ 128 እና እሴቶች እስከ 4096 ቁምፊ",
       "timeoutInvalid": "ጊዜው ያለፈበት ሙሉ የሚሊሰከንዶች ቁጥር መሆን አለበት።",
       "edit": "የMCP አገልጋይ ያርትዑ",
-      "saveFailed": "የMCP አገልጋይን ማስቀመጥ አልተቻለም"
+      "saveFailed": "የMCP አገልጋይን ማስቀመጥ አልተቻለም",
+      "deleteFailed": "የMCP አገልጋይን ማጥፋት አልተቻለም",
+      "updateFailed": "የMCP አገልጋይን ማዘመን አልተቻለም"
     },
     "agents": {
       "title": "የመገለጫ ወኪሎች",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "ሱባጀንት - ከሌሎች ብቻ የሚጠራ",
       "visibilityAll": "ሁሉም - ሁለቱም",
       "saveFailed": "ወኪል ማስቀመጥ አልተቻለም",
+      "deleteFailed": "ወኪል ማጥፋት አልተቻለም",
       "nameRequired": "የወኪል ስም አስገባ",
       "slugRequired": "የወኪል ማሰሪያ አስገባ",
       "slugInvalid": "ስሉግ በፊደል መጀመር እና ትንንሽ ሆሄያትን፣ አሃዞችን እና ሰረዞችን ብቻ መጠቀም አለበት።",
@@ -3679,6 +3682,7 @@
       "subtask": "እንደ ንዑስ ተግባር ያሂዱ",
       "edit": "የጭረት ትእዛዝን ያርትዑ",
       "saveFailed": "ትዕዛዝ ማስቀመጥ አልተቻለም",
+      "deleteFailed": "ትዕዛዝ ማጥፋት አልተቻለም",
       "nameRequired": "የትእዛዝ ስም ያስገቡ",
       "nameInvalid": "ስም በትንሽ ሆሄ መጀመር እና በትናንሽ ሆሄያት፣ አሃዞች እና ሰረዞች ብቻ መጠቀም አለበት።",
       "templateRequired": "የትእዛዝ አብነት አስገባ",

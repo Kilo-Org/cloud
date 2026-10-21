@@ -3634,7 +3634,9 @@
       "jsonTooLarge": "Dùng tối đa 50 mục, khóa tối đa 128 và giá trị tối đa 4096 ký tự",
       "timeoutInvalid": "Thời gian chờ phải là số nguyên mili giây",
       "edit": "Chỉnh sửa máy chủ MCP",
-      "saveFailed": "Không thể lưu máy chủ MCP"
+      "saveFailed": "Không thể lưu máy chủ MCP",
+      "deleteFailed": "Không thể xóa máy chủ MCP",
+      "updateFailed": "Không thể cập nhật máy chủ MCP"
     },
     "agents": {
       "title": "Hồ sơ đại lý",
@@ -3661,6 +3663,7 @@
       "visibilitySubagent": "Subagent - chỉ có thể gọi được từ người khác",
       "visibilityAll": "Tất cả - cả hai",
       "saveFailed": "Không thể lưu đại lý",
+      "deleteFailed": "Không thể xóa đại lý",
       "nameRequired": "Nhập tên đại lý",
       "slugRequired": "Nhập sên đại lý",
       "slugInvalid": "Slug phải bắt đầu bằng một chữ cái và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
@@ -3679,6 +3682,7 @@
       "subtask": "Chạy dưới dạng nhiệm vụ phụ",
       "edit": "Chỉnh sửa lệnh gạch chéo",
       "saveFailed": "Không thể lưu lệnh",
+      "deleteFailed": "Không thể xóa lệnh",
       "nameRequired": "Nhập tên lệnh",
       "nameInvalid": "Tên phải bắt đầu bằng chữ cái viết thường và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
       "templateRequired": "Nhập mẫu lệnh",

@@ -47,14 +47,6 @@ const groups: ServiceGroup[] = [
   { id: 'app-builder', label: 'App Builder', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'gastown', label: 'Gastown', alwaysOn: false, groupDependsOn: ['git-token-service'] },
   {
-    id: 'auto-triage',
-    label: 'Auto Triage',
-    alwaysOn: false,
-    groupDependsOn: ['cloud-agent'],
-    sectionBreakBefore: true,
-  },
-  { id: 'auto-fix', label: 'Auto Fix', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
-  {
     id: 'security-agent',
     label: 'Security Agent',
     alwaysOn: false,
@@ -224,18 +216,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['cloud-agent-next', 'nextjs'],
     dir: 'services/code-review-infra',
   },
-  // auto-triage
-  'cloudflare-auto-triage-infra': {
-    group: 'auto-triage',
-    dependsOn: ['cloud-agent-next', 'nextjs'],
-    dir: 'services/auto-triage-infra',
-  },
-  // auto-fix
-  'cloudflare-auto-fix-infra': {
-    group: 'auto-fix',
-    dependsOn: ['cloud-agent-next', 'nextjs'],
-    dir: 'services/auto-fix-infra',
-  },
   // security-agent
   'cloudflare-security-sync': {
     group: 'security-agent',
@@ -291,6 +271,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'cloud-agent',
     dependsOn: [],
     dir: 'services/event-service',
+  },
+  'kilo-mcp': {
+    group: 'cloud-agent',
+    dependsOn: [],
+    dir: 'services/kilo-mcp',
   },
   'kilo-chat': {
     group: 'kiloclaw',
@@ -487,7 +472,6 @@ export function resolveDeletionMockSessionEnv(args: {
     PYLON_HOST: origin,
     SUBSTACK_PUBLICATION_URL: origin,
     CUSTOMERIO_TRACK_BASE: origin,
-    CSA_APP_BASE_URL: origin,
   };
   if (!env.PYLON_API_KEY?.trim()) sessionEnv.PYLON_API_KEY = DELETION_MOCK_DUMMY;
   if (!env.POSTHOG_PERSONAL_API_KEY?.trim()) {

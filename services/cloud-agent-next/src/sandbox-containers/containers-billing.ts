@@ -20,6 +20,7 @@ import {
   type ContainerStopParams,
 } from '../metered-billing-lifecycle.js';
 import type { ContainerInstanceSize } from './SandboxContainers.js';
+import { CODE_REVIEW_CONTAINERS_INSTANCE } from './instance-size.js';
 
 export const BILLING_SCHEDULES_STORAGE_KEY = 'containers:billing-schedules:v1';
 
@@ -41,13 +42,16 @@ export type ContainersBillingHost = {
  * The billing identity owner uses a fixed per-SKU service. Any size it does not
  * map is "not billable" rather than a fallback to the default SKU.
  */
+const BILLABLE_CONTAINERS_INSTANCES: ReadonlySet<string> = new Set([
+  ...CLOUDFLARE_CONTAINERS_INSTANCES,
+  CODE_REVIEW_CONTAINERS_INSTANCE,
+]);
+
 export function resolveContainersBillingIdentity(
   instance: ContainerInstanceSize | undefined
 ): ContainersBillingIdentity | undefined {
   if (instance === undefined) return undefined;
-  if (!(CLOUDFLARE_CONTAINERS_INSTANCES as readonly ContainerInstanceSize[]).includes(instance)) {
-    return undefined;
-  }
+  if (!BILLABLE_CONTAINERS_INSTANCES.has(instance)) return undefined;
   return containersBillingIdentity(instance);
 }
 

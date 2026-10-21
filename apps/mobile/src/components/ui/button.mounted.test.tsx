@@ -291,6 +291,14 @@ describe('Button native target contract', () => {
     expect(ready.props.accessibilityState).toMatchObject({ busy: false });
   });
 
+  it('centers the label so a wrapped label stays under its own lines', () => {
+    // Android can paint a wrapped label even when the layout reports one line;
+    // centered text keeps the wrapped lines aligned under each other instead
+    // of hanging from the start edge. Single-line labels are unaffected.
+    const label = renderButton({ variant: 'outline' }).findByType(NativeText);
+    expect((label.props.className as string).split(' ')).toContain('text-center');
+  });
+
   it('keeps the dimmed treatment for a disabled non-primary variant', () => {
     const button = renderButton({ variant: 'outline', disabled: true });
     const classes = (button.props.className as string).split(' ');

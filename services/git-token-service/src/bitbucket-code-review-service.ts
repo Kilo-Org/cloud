@@ -6,6 +6,7 @@ import {
   type BitbucketWorkspaceAccessTokenAuthorizationResult,
 } from './bitbucket-workspace-access-token-authorization-service.js';
 import { normalizeBitbucketUuid } from './bitbucket-url.js';
+import { ResponseTooLargeError, readBoundedJsonBody } from './lib/bounded-read.js';
 
 const BITBUCKET_API_ORIGIN = 'https://api.bitbucket.org';
 const BITBUCKET_API_PREFIX = `${BITBUCKET_API_ORIGIN}/2.0`;
@@ -300,44 +301,12 @@ function callbackMatchesIntegration(callbackUrl: string, integrationId: string):
 async function readBoundedJson(response: Response, maxBytes: number): Promise<unknown> {
   if (!response.body) throw new BitbucketCodeReviewProviderError('invalid_response');
 
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
   try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      if (!(chunk.value instanceof Uint8Array)) {
-        throw new BitbucketCodeReviewProviderError('invalid_response');
-      }
-      totalBytes += chunk.value.byteLength;
-      if (totalBytes > maxBytes) {
-        try {
-          await reader.cancel();
-        } catch {
-          // The bounded read remains failed if cancellation also fails.
-        }
-        throw new BitbucketCodeReviewProviderError('response_too_large');
-      }
-      chunks.push(chunk.value);
-    }
+    return await readBoundedJsonBody(response.body, maxBytes);
   } catch (error) {
-    if (error instanceof BitbucketCodeReviewProviderError) throw error;
-    throw new BitbucketCodeReviewProviderError('invalid_response');
-  } finally {
-    reader.releaseLock();
-  }
-
-  const body = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-
-  try {
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body));
-  } catch {
+    if (error instanceof ResponseTooLargeError) {
+      throw new BitbucketCodeReviewProviderError('response_too_large');
+    }
     throw new BitbucketCodeReviewProviderError('invalid_response');
   }
 }

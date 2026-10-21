@@ -72,7 +72,7 @@ function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): str
   return colors.primaryForeground;
 }
 
-const buttonTextVariants = cva('text-foreground text-sm font-semibold', {
+const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
   variants: {
     variant: {
       default: 'text-primary-foreground',

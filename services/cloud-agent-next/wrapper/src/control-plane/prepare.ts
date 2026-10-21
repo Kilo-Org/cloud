@@ -41,12 +41,16 @@ import {
   buildWorktreeKiloEnvironment,
   type WorktreeKiloAuth,
 } from '../control/worktree-runtime.js';
-import { createOutputRedactor, createSecretRedactor } from '../redact-output.js';
+import { createOutputRedactor, createSecretRedactor, redactSecrets } from '../redact-output.js';
 import {
   KiloWorktreeCredentialClassMismatchError,
   KiloWorktreeMcpMismatchError,
 } from './kilo-runtime.js';
-import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
+import {
+  configureWorkspaceGitAuthor,
+  createGitProgressReporter,
+  isBloblessReviewCloneEligible,
+} from '../session-bootstrap.js';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
 import { reportRestoreIncomplete } from '../restore-incomplete.js';
 import { restoreWorktreeRecovery } from './worktree-recovery.js';
@@ -108,13 +112,19 @@ const MANAGED_GITHUB_PREPARATION_GIT_CONFIG = [
 
 /**
  * The single eligibility decision for the two invocation-scoped options. Both
- * options or neither: the command must be preparation clone/fetch, the platform
+ * options or neither: the command must be preparation clone/fetch (or a review
+ * checkout that can lazily fetch blobs), the platform
  * must be managed GitHub, the token must parse as a `github` control alias, and
  * the URL must be the direct HTTPS default-port github.com URL. Callers judge
  * `spec.git.url`, never the password parsed back out of the authenticated URL.
  */
 function managedGitHubPreparationGitArgs(spec: ControlPlaneRouteSpec, command: string): string[] {
-  if (command !== 'clone' && command !== 'fetch') return [];
+  if (
+    command !== 'clone' &&
+    command !== 'fetch' &&
+    !(command === 'checkout' && spec.createdOnPlatform === 'code-review')
+  )
+    return [];
   const git = spec.git;
   if (!git || git.platform !== 'github') return [];
   if (!git.token || parseControlPlaneCredential(git.token)?.purpose !== 'github') return [];
@@ -137,7 +147,11 @@ export type PrepareRuntimePort = {
     env: Record<string, string>;
     workload?: ControlWorkload;
   }): Promise<WrapperKiloClient>;
-  installCredentials(key: string, env: Record<string, string>): Promise<void>;
+  installCredentials(
+    key: string,
+    env: Record<string, string>,
+    cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp']
+  ): Promise<void>;
   /** True when the runtime is gone or has spent its restart budget. */
   isUnavailable(key: string): boolean;
   /**
@@ -196,6 +210,7 @@ export type PrepareDeps = {
 };
 
 type PreparedRoute = {
+  cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
   key: string;
   spec: ControlPlaneRouteSpec;
   directory: string;
@@ -220,6 +235,12 @@ export type PreparationManager = {
   ): Promise<void>;
   release(sessionId: string): void;
   isPrepared(sessionId: string): boolean;
+  /**
+   * The prepared route's runtime identity, or null while the route is not yet
+   * attached. Live native reads use it to reach the exact runtime and directory
+   * the route was prepared for (spec §10).
+   */
+  preparedRoute(sessionId: string): { runtimeKey: string; directory: string } | null;
   isPreparing(): boolean;
   /** In-flight prepares, for the native status line. */
   preparingCount(): number;
@@ -593,6 +614,44 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     if (!(await hasGit(directory))) {
       const cloneUrl = authenticatedGitUrl(spec.git.url, spec.git.token, spec.git.platform);
       const gitConfigArgs = managedGitHubPreparationGitArgs(spec, 'clone');
+      const useBlobless = isBloblessReviewCloneEligible(
+        spec.createdOnPlatform,
+        spec.git.platform,
+        spec.git.token
+      );
+      const noCheckout =
+        spec.createdOnPlatform === 'code-review' &&
+        spec.branch !== undefined &&
+        isSyntheticReviewRef(spec.branch) &&
+        spec.branchMode !== 'working';
+      const startedAt = Date.now();
+      let cloneAttempts = 0;
+      let filterRejected = false;
+      const runClone = async (): Promise<ExecResult> => {
+        signal.throwIfAborted();
+        cloneAttempts += 1;
+        const cloned = await runGit(
+          [
+            ...gitConfigArgs,
+            'clone',
+            '--progress',
+            ...(useBlobless && !filterRejected ? ['--filter=blob:none'] : []),
+            ...(noCheckout ? ['--no-checkout'] : []),
+            cloneUrl,
+            directory,
+          ],
+          {
+            env,
+            inheritEnv: false,
+            signal,
+            onOutput: createGitProgressReporter(progressText =>
+              emitProgress(spec.sessionId, 'clone', `Cloning repository... ${progressText}`)
+            ),
+          }
+        );
+        signal.throwIfAborted();
+        return cloned;
+      };
       let lastError: WrapperBootstrapError | undefined;
       for (let attempt = 1; attempt <= CLONE_RETRY_ATTEMPTS; attempt += 1) {
         signal.throwIfAborted();
@@ -603,17 +662,22 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             `Retrying clone (attempt ${attempt} of ${CLONE_RETRY_ATTEMPTS})`
           );
         }
-        const cloned = await runGit(
-          [...gitConfigArgs, 'clone', '--progress', cloneUrl, directory],
-          {
-            env,
-            inheritEnv: false,
-            signal,
-            onOutput: createGitProgressReporter(progressText =>
-              emitProgress(spec.sessionId, 'clone', `Cloning repository... ${progressText}`)
-            ),
-          }
-        );
+        let cloned = await runClone();
+        if (
+          useBlobless &&
+          !filterRejected &&
+          cloned.exitCode !== 0 &&
+          !cloned.terminationReason &&
+          /(?:filter(?:ing)?[^\r\n]*(?:not supported|not recognized|rejected)|(?:does not support|unsupported|invalid)[^\r\n]*filter)/i.test(
+            `${cloned.stderr}\n${cloned.stdout}`
+          )
+        ) {
+          filterRejected = true;
+          log(
+            `control-plane blobless clone rejected; retrying full clone session=${spec.sessionId}`
+          );
+          cloned = await runClone();
+        }
         if (cloned.exitCode === 0) {
           lastError = undefined;
           break;
@@ -623,6 +687,20 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         await sleep(CLONE_RETRY_BACKOFF_MS[attempt - 1] ?? 0, signal);
       }
       if (lastError) throw lastError;
+      let filterHonored = false;
+      if (useBlobless && !filterRejected) {
+        const promisor = await runGit(['config', '--get', 'remote.origin.promisor'], {
+          cwd: directory,
+          env,
+          inheritEnv: false,
+          signal,
+        });
+        filterHonored = promisor.exitCode === 0 && promisor.stdout.trim() === 'true';
+      }
+      const mode = filterRejected ? 'blobless_fallback' : filterHonored ? 'blobless' : 'full';
+      log(
+        `control-plane clone complete session=${spec.sessionId} mode=${mode} attempts=${cloneAttempts} durationMs=${Date.now() - startedAt}`
+      );
     }
   }
 
@@ -654,7 +732,13 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     emitProgress(spec.sessionId, 'checkout');
     const gitRoute: GitRouteClass = spec.git?.token ? 'managed' : 'direct';
     const runBranchGit = (args: string[], options?: ProcessOptions): Promise<ExecResult> =>
-      runGit(args, { ...options, cwd: directory, env, inheritEnv: false, signal });
+      runGit([...managedGitHubPreparationGitArgs(spec, args[0]), ...args], {
+        ...options,
+        cwd: directory,
+        env,
+        inheritEnv: false,
+        signal,
+      });
     // Spec §7 "Checkout, branch restore" (legacy apply-attach branch logic):
     // `-B <branch> origin/<branch>` breaks a working branch or a `session/*`
     // branch that has no upstream, so resolve the refs first.
@@ -662,8 +746,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     if (isSyntheticReviewRef(branch) && spec.branchMode !== 'working') {
       await checkoutSyntheticReviewRef({
         runGit: (args, options) => {
-          const gitConfigArgs =
-            args[0] === 'fetch' ? managedGitHubPreparationGitArgs(spec, 'fetch') : [];
+          const gitConfigArgs = managedGitHubPreparationGitArgs(spec, args[0]);
           return runGit([...gitConfigArgs, ...args], {
             ...options,
             cwd: directory,
@@ -840,7 +923,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     } catch (error) {
       log(
         `control-plane capture failed session=${spec.sessionId} error=${
-          error instanceof Error ? error.message : 'unknown'
+          error instanceof Error ? createSecretRedactor(env)(error.message) : 'unknown'
         }`
       );
     } finally {
@@ -1215,7 +1298,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           spec.env ?? {},
           inheritedEnv,
           spec.mcp,
-          spec
+          { ...spec, cloudAgentMcp: credentials?.cloudAgentMcp }
         ),
         spec
       );
@@ -1226,6 +1309,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           {
             ...builtEnv,
             ...(credentials?.git?.token ? { GIT_TOKEN: credentials.git.token } : {}),
+            ...(credentials?.cloudAgentMcp
+              ? { CLOUD_AGENT_MCP_TOKEN: credentials.cloudAgentMcp.token }
+              : {}),
           },
         ],
         spec.secretEnvKeys ?? []
@@ -1325,6 +1411,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         home,
         kilo: kiloAuth,
         env: builtEnv,
+        cloudAgentMcp: credentials?.cloudAgentMcp,
       });
       // A credentials frame that arrived while this route was preparing is
       // applied before the route reports ready; a release during the apply
@@ -1349,9 +1436,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     } catch (error) {
       if (owner.released) return;
       log(
-        `control-plane prepare failed session=${sessionId} step=${currentStep} error=${
-          error instanceof Error ? error.message : String(error)
-        }${
+        `control-plane prepare failed session=${sessionId} step=${currentStep} error=${redactSecrets(
+          error instanceof Error ? error.message : String(error),
+          credentials?.cloudAgentMcp ? [credentials.cloudAgentMcp.token] : []
+        )}${
           error instanceof WrapperBootstrapError && error.gitFailure ? ` ${error.gitFailure}` : ''
         }`
       );
@@ -1368,6 +1456,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       if (preparation && !preparation.released) preparation.pendingCredentials = credentials;
       return;
     }
+    route.cloudAgentMcp = credentials.cloudAgentMcp ?? route.cloudAgentMcp;
     const nextEnv = withRuntimeProfileEnvironment(
       buildWorktreeKiloEnvironment(
         route.directory,
@@ -1380,12 +1469,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         route.spec.env ?? {},
         inheritedEnv,
         route.spec.mcp,
-        route.spec
+        { ...route.spec, cloudAgentMcp: route.cloudAgentMcp }
       ),
       route.spec
     );
     route.env = nextEnv;
-    await deps.runtimes.installCredentials(route.key, nextEnv);
+    await deps.runtimes.installCredentials(route.key, nextEnv, route.cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {
       const url = authenticatedGitUrl(
         route.spec.git.url,
@@ -1490,6 +1579,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       });
     },
     isPrepared: sessionId => prepared.has(sessionId),
+    preparedRoute: sessionId => {
+      const route = prepared.get(sessionId);
+      return route === undefined ? null : { runtimeKey: route.key, directory: route.directory };
+    },
     isPreparing: () => preparing.size > 0,
     preparingCount: () => preparing.size,
     sessionCount: () => prepared.size,

@@ -90,6 +90,10 @@ export function classifyControlPlaneFailure(
   switch (reason) {
     case 'missing_metadata':
       return { stage: 'pre_dispatch', code: 'session_metadata_missing' };
+    case 'runtime_artifact_unauthorized':
+    case 'runtime_artifact_invalid':
+    case 'runtime_cli_probe_failed':
+    case 'runtime_supervisor_missing':
     case 'preparation_timeout':
     case 'attach_exhausted':
       return PRE_DISPATCH;

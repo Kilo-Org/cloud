@@ -35,6 +35,8 @@
     "connectGithub": "GitHub hesabını bağla",
     "cost": "Maliyet",
     "discard": "Vazgeç",
+    "discardChangesMessage": "Değişiklikleriniz kaybedilecek.",
+    "discardChangesTitle": "Değişikliklerden vazgeç?",
     "findings": "Bulgular",
     "mergeRequest": "birleştirme isteği",
     "notConnected": "Bağlı değil",
@@ -943,6 +945,9 @@
       "gateHidden": "Gizli",
       "gateNone": "Yok",
       "noFindings": "Bulgu yok.",
+      "findingsUnavailable": "Bu inceleme başarısız olduğu için sonuçlar kullanılamıyor.",
+      "serviceUnavailable": "Kod inceleme hizmetine ulaşılamadı. Hizmet kullanılabilir olduğunda incelemeyi tekrar dene.",
+      "reviewFailed": "İnceleme başarısız oldu. Lütfen tekrar dene.",
       "retryMessage": "Kod incelemesi yeniden çalıştırılacak.",
       "retryReview": "İncelemeyi tekrar dene",
       "retryNeedsSettings": "Kod inceleyici kapalı veya ayarlarının ilgilenilmesi gerekiyor. Ayarları düzeltin, ardından bu incelemeyi tekrar deneyin.",
@@ -1030,7 +1035,8 @@
       "bugs": "Hatalar",
       "style": "Stil",
       "testing": "Test",
-      "documentation": "Belgeler"
+      "documentation": "Belgeler",
+      "unknown": "Diğer ({{area}})"
     },
     "gateThreshold": {
       "warning": "Uyarı"
@@ -1109,7 +1115,14 @@
       "triageReasoning": "Ön değerlendirme gerekçesi",
       "watchInCloudAgent": "Bulut ajanında izle",
       "whereFound": "Bulunduğu yerler ({{displayCount}})",
-      "yes": "Evet"
+      "yes": "Evet",
+      "action": {
+        "analyzeCodebase": "Kod tabanını analiz et",
+        "dismiss": "Yok say",
+        "manualReview": "El ile inceleme",
+        "monitor": "İzle",
+        "openPr": "Çekme isteği aç"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Analiz modeli",
@@ -1131,7 +1144,24 @@
       "summary": "Rapor özeti",
       "title": "Denetim raporu",
       "unavailable": "Denetim raporu kullanılamıyor",
-      "unavailableDescription": "Denetim raporlarını yalnızca kuruluş sahipleri ve faturalandırma yöneticileri görüntüleyebilir. Bir kuruluş sahibinden veya faturalandırma yöneticisinden sana erişim vermesini iste."
+      "unavailableDescription": "Denetim raporlarını yalnızca kuruluş sahipleri ve faturalandırma yöneticileri görüntüleyebilir. Bir kuruluş sahibinden veya faturalandırma yöneticisinden sana erişim vermesini iste.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiz tamamlandı",
+        "findingAnalysisFailed": "Analiz başarısız oldu",
+        "findingAutoDismissed": "Otomatik yok sayıldı",
+        "findingCreated": "İçe aktarıldı",
+        "findingDeleted": "Silindi",
+        "findingDismissed": "Yok sayıldı",
+        "findingSeverityChanged": "Önem derecesi değişti",
+        "findingStatusChange": "Durum değişti",
+        "findingSuperseded": "Yenisiyle değiştirildi",
+        "remediationBlocked": "Düzeltme engellendi",
+        "remediationCancelled": "İptal edildi",
+        "remediationFailed": "Düzeltme başarısız oldu",
+        "remediationNoChangesNeeded": "Değişiklik gerekmedi",
+        "remediationPrOpened": "Çekme isteği açıldı",
+        "remediationQueued": "Düzeltme istendi"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Denetim raporunu görüntüle"
@@ -1697,6 +1727,7 @@
       "prefillModelUnavailable": "{{model}} artık kullanılamıyor. Varsayılan modelin kullanılıyor.",
       "couldNotReadPendingSessions": "Bekleyen oturumlar okunamadı. Tekrar dene.",
       "failedToCreate": "Oturum oluşturulamadı.",
+      "checkOrganizationAccess": "Bu kuruluşa erişiminizi kontrol edin, ardından tekrar deneyin.",
       "couldNotRefreshRepositories": "Depolar yenilenemedi. Tekrar dene.",
       "discardDraftTitle": "Taslak silinsin mi?",
       "discardDraftMessage": "İstemin silinecek.",
@@ -2217,6 +2248,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Liste yüklenene kadar etkin oturumların görüntülenemez.",
     "currentDeviceUnidentified": "Bu cihaz tanınamadı.",
+    "kiloApp": "Kilo uygulaması",
     "noSessions": "Etkin oturum yok",
     "noSessionsDescription": "Başka bir cihazda Kilo uygulamasıyla oturum açtığında o cihaz burada görünür.",
     "onlyKiloAppSignIns": "Burada yalnızca Kilo uygulaması oturumları görünür. Editör ve CLI oturumları listelenmez.",
@@ -2369,6 +2401,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Başlamadan önce",
+    "summaryTitle": "Veri paylaşımı tercihleri",
     "introDescription": "Kilo, yanıt üretmek için mesajlarını yapay zekâ sağlayıcılarına gönderir. Hangi verilerin kiminle paylaşıldığını aşağıda görebilirsin.",
     "required": "Kilo'yu kullanmak için gerekli",
     "promptsTitle": "İstemlerin ve konuşmaların",
@@ -2377,7 +2410,6 @@
     "accountDescription": "Kimliğini doğrulamak ve kullanımı ölçmek için kullanılan Kilo hesap kimliğin ve istek meta verileri.",
     "diagnosticsTitle": "Uygulama tanılama verileri",
     "diagnosticsDescription": "Uygulamanın kararlı çalışması için kullanılan, uygulama içeriğinden arındırılmış çökme ve hata raporları.",
-    "optional": "İsteğe bağlı",
     "helpImprove": "Kilo'yu iyileştirmeye yardımcı ol",
     "helpImproveDescription": "Anonim ürün analizi verilerini ve uygulamayı yüklediğin kaynağı paylaş. Bu tercihi ayarlardan istediğin zaman değiştirebilirsin.",
     "seeFullDetails": "Tüm ayrıntıları gör",
@@ -2502,7 +2534,8 @@
       "description": "Mobilde çekme isteklerini incelemek için GitHub hesabını bağla.",
       "gitlabDescription": "Mobilde birleştirme isteklerini gözden geçirmek için GitLab hesabını bağla.",
       "bitbucketDescription": "Mobilde çekme isteklerini gözden geçirmek için Bitbucket'ı bu kuruluşla bağla.",
-      "bitbucketOrgOnlyDescription": "Profilində bir kuruluş seç ve onun Bitbucket çekme isteklerini gözden geçir."
+      "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
+      "contextLine": "{{organization}} için"
     },
     "connectionExpired": "GitHub bağlantısının süresi doldu.",
     "couldNotLoadPullRequest": "Çekme isteği yüklenemedi.",
@@ -2929,7 +2962,9 @@
       "reviewNotSubmitted": "Bu inceleme bu hâliyle gönderilemiyor. PR değişmiş olabilir veya kendi çekme isteğini incelemeye çalışıyor olabilirsin.",
       "reviewNotSubmittedTerm": "Bu inceleme olduğu gibi gönderilemez. {{term}} değişmiş olabilir veya kendi {{term}}ni gözden geçiremezsin.",
       "couldNotPostComment": "Yorum gönderilemedi.",
-      "couldNotSubmitReview": "İnceleme gönderilemedi. Bağlantını kontrol et ve tekrar dene."
+      "couldNotSubmitReview": "İnceleme gönderilemedi. Bağlantını kontrol et ve tekrar dene.",
+      "rateLimited": "Çok fazla istek gönderildi. Lütfen daha sonra tekrar dene.",
+      "conflict": "Bu, üzerinde çalıştığın sırada değişti. Yeniden yükle ve tekrar dene."
     },
     "operation": {
       "couldNotReply": "Yanıt verilemedi.",
@@ -3468,6 +3503,9 @@
     "localModels": {
       "title": "Cihazdaki modeller",
       "help": "Cihazdaki modeller bu telefonda çalışır. İstemleriniz ve yanıtlarınız cihazda kalır.",
+      "switchTitle": "Cihazdaki bir modele geçilsin mi?",
+      "switchMessage": "{{name}} modeline geçmek, bu konuşmanın istemlerinin ve bağlamının uzak bir sunucuda değil, bu telefonda işlenmesini sağlar.",
+      "switchConfirm": "Modeli değiştir",
       "systemPurpose": "Bu cihazın sistemine yerleşik model. Cihazda çalışır.",
       "apple": "Apple Intelligence (cihazda)",
       "checking": "Kullanılabilirlik denetleniyor…",
@@ -3564,7 +3602,6 @@
     "personalDefaultDescription": "Hiçbir deponun sabitlenmiş profili olmadığında otomatik olarak yüklenir.",
     "organizationDefaultDescription": "Kişisel varsayılanı olmayan üyeler için otomatik olarak yüklenir.",
     "setAsDefault": "Varsayılan olarak ayarla",
-    "removeDefault": "Varsayılan olarak kaldır",
     "saveFailed": "Profil kaydedilemedi",
     "deleteTitle": "Profili sil",
     "deleteMessage": "Bu, profili ve ayarlarını kalıcı olarak kaldırır. Bu geri alınamaz.",
@@ -3590,11 +3627,13 @@
     "commandsTitle": "Kurulum komutları",
     "addCommand": "Komut ekle",
     "commandLabel": "Emretmek",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "örn. pnpm install",
     "commandsEmpty": "Henüz kurulum komutu yok",
     "commandsSaveFailed": "Kurulum komutları kaydedilemedi",
     "moveUp": "Yukarı taşı",
     "moveDown": "Aşağı taşı",
+    "moveCommandUp": "{{position}}. komutu yukarı taşı",
+    "moveCommandDown": "{{position}}. komutu aşağı taşı",
     "skillsTitle": "Yetenekler",
     "addSkill": "Beceri ekle",
     "skillNameLabel": "Beceri adı",
@@ -3664,7 +3703,7 @@
       "nameRequired": "Bir temsilci adı girin",
       "slugRequired": "Bir temsilci bilgisi girin",
       "slugInvalid": "Bilgi bir harfle başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
-      "slugConflict": "Bu bilgi yerleşik bir aracı tarafından ayrılmıştır",
+      "slugConflict": "Bu slug, yerleşik bir ajan veya bu profildeki başka bir ajan tarafından zaten kullanılıyor",
       "edit": "Temsilciyi düzenle"
     },
     "slashCommands": {
@@ -3806,5 +3845,69 @@
       "title": "Listeye kaydet",
       "saved": "{{list}} listesine kaydedildi"
     }
+  },
+  "agentBriefing": {
+    "title": "Sabah özeti",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Bazı geçmiş etkinlikler eksik olabilir. ≥ en az bu kadar anlamına gelir; bilinmeyen sıfır değildir.",
+    "available": "Mevcut özetler",
+    "history": "Özet geçmişi",
+    "historyHint": "Kapatılanlar dahil raporlar 30 gün saklanır.",
+    "settings": "Özet ayarları",
+    "empty": "Gece etkinliği yok",
+    "emptyHint": "Bulut ve CLI kodlama oturumlarınız etkin bir gecenin ardından burada görünür.",
+    "loadError": "Özetler yüklenemedi",
+    "sessions": "Gece etkin",
+    "pullRequests": "Açılan PRs",
+    "blockers": "Yeni engeller",
+    "spend": "Gece harcaması",
+    "view": "Özeti oku",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Canlı durumu göster",
+    "offline": "Çevrimdışı · kayıtlı özet",
+    "cached": "Kayıtlı rapor · yenileme kullanılamıyor",
+    "revised": "Revize edildi · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "AI özeti",
+    "summaryDisabled": "Yapılandırılmış rapor · Bu bağlamda AI kapalı",
+    "summaryPending": "AI özeti hazırlanıyor. Hazır olduğunda buraya eklenecek.",
+    "summaryFailed": "AI özeti başarısız oldu. Yeniden denemek ek ücrete neden olabilir.",
+    "summaryUnavailable": "AI özeti kullanılamıyor. Yapılandırılmış raporunuz hâlâ mevcut.",
+    "summaryOutdated": "Bu özet, en son rapor revizyonundan daha eski.",
+    "summaryCharge": "AI ücreti: {{cost}}",
+    "summaryChargePending": "AI ücreti mutabakat bekliyor",
+    "generate": "Özet oluştur",
+    "retrySummary": "Ücretli özeti tekrar dene",
+    "sources": "Kanıtlar ve yapıtlar",
+    "timezone": "Özet saat dilimi",
+    "deviceTimezone": "Cihaz saat dilimini kullan",
+    "timezoneHint": "IANA saat dilimi, örneğin Europe/Berlin. Program değişiklikleri sonraki geceler için geçerlidir.",
+    "nightStart": "Gece başlangıcı",
+    "morningStart": "Gece bitişi / sabah başlangıcı",
+    "morningEnd": "Sabah bitişi",
+    "timeHint": "Ana sayfa kartı, sabah bittiğinde çevrimdışı olsa bile canlı duruma döner.",
+    "invalidSchedule": "Geçerli bir saat dilimi ve çakışmayan, boş olmayan gece ve sabah aralıkları seçin.",
+    "notificationsHint": "İlk raporunuz hazır olduğunda her sabah tek bir genel bildirim. Ücretli AI özetlerinden bağımsızdır.",
+    "notificationPermission": "Özetinizi almak için $t(common.notifications) bölümünde cihaz bildirimlerini etkinleştirin.",
+    "aiOptIn": "Ücretli AI özetleri",
+    "aiHint": "Yalnızca bu bağlam için isteğe bağlıdır. Seçilmiş, gizlenmiş alıntılar ve yapılandırılmış bilgiler uygulama dilinizde modelinize gönderilir. Ücretler bu bağlamın bakiyesinden düşülür.",
+    "defaultModel": "Kilo’nun varsayılan modelini kullan",
+    "duration": "Süre sınırı (dakika)",
+    "spendLimit": "Harcama sınırı (USD)",
+    "safeguardHint": "Özet başına sınırlar; günlük bütçe değildir. Varsayılanlar: 10 dakika ve $2. Oluşturma bu sınırlar içinde sürerken rapor en geç beş dakika sonra yayımlanır.",
+    "invalidSafeguards": "Pozitif ve sonlu süre ve harcama sınırları girin.",
+    "estimate": "Tahmini {{estimate}} · en fazla {{maximum}}",
+    "estimateUnavailable": "Bu ayarlar için ücretli özet mevcut değil.",
+    "confirmPaid": "{{context}} için ücretli özetler etkinleştirilsin mi?",
+    "confirmGeneration": "Ücretli özet oluşturulsun mu?",
+    "paidDisclosure": "Tahmini {{estimate}}, en fazla {{maximum}}, {{minutes}} dakika sınırıyla. Oluşturma başarısız olsa bile ücret alınır.",
+    "enable": "Ücretli özetleri etkinleştir",
+    "contextSettings": "AI ayarları · {{context}}",
+    "allContexts": "Kişisel ve kuruluş özetleri ayrı tutulur.",
+    "estimatePricingUnavailable": "Bu model için fiyatlandırma mevcut değil.",
+    "estimateBalanceUnavailable": "Ücretli özet için bakiye yetersiz.",
+    "estimateModelNotAllowed": "Bu model burada kullanılamaz.",
+    "estimateSpendLimitTooLow": "Bu önete izin vermek için harcama limitini yükseltin."
   }
 }

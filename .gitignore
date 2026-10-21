@@ -49,6 +49,7 @@ dev-debug-request-logs/*
 .tmp/
 test-results/
 playwright-report/
+/.e2e-evidence/
 **/playwright/.auth/
 
 # debug logs

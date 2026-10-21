@@ -17,11 +17,15 @@ const config = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
   isFetching: false,
+  fetchStatus: 'idle' as string,
   data: null as unknown,
   refetch: vi.fn(),
 }));
 
 const provider = vi.hoisted(() => ({ status: 'connected' }));
+const connectivity = vi.hoisted(() => ({ known: true }));
+const platformError = vi.hoisted(() => ({ variants: [] as string[] }));
+const skeletonRenders = vi.hoisted(() => ({ count: 0 }));
 const centeredState = vi.hoisted(() => vi.fn());
 const scrollView = vi.hoisted(() => vi.fn());
 
@@ -68,7 +72,10 @@ vi.mock('@/components/code-reviewer/provider-connect-card', () => ({
   ProviderConnectCard: () => null,
 }));
 vi.mock('@/components/platform-error-screen', () => ({
-  PlatformErrorScreen: () => null,
+  PlatformErrorScreen: (props: { variant?: string }) => {
+    platformError.variants.push(props.variant ?? 'server');
+    return null;
+  },
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/security-agent/settings-toggle-row', () => ({
@@ -76,7 +83,12 @@ vi.mock('@/components/security-agent/settings-toggle-row', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: () => null }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: () => null }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
+vi.mock('@/components/ui/skeleton', () => ({
+  Skeleton: () => {
+    skeletonRenders.count += 1;
+    return null;
+  },
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: (props: { children?: unknown }) => {
@@ -91,8 +103,8 @@ vi.mock('@/lib/code-reviewer-config', () => ({
     bitbucket: { label: 'Bitbucket', reviewMd: false },
   },
 }));
-vi.mock('@/lib/hooks/use-available-models', () => ({
-  useAvailableModels: () => ({ models: [], isLoading: false }),
+vi.mock('@/lib/hooks/use-reviewer-models', () => ({
+  useReviewerModels: () => ({ models: [], isLoading: false }),
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   classifyProviderState: () => provider,
@@ -119,6 +131,9 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => (connectivity.known ? 'offline' : 'unknown'),
 }));
 
 function makeActionRequired(reason: string) {
@@ -183,11 +198,15 @@ beforeEach(() => {
   config.isLoading = false;
   config.isError = false;
   config.isFetching = false;
+  config.fetchStatus = 'idle';
   config.data = null;
   config.refetch.mockClear();
   permission.status = 'ready';
   permission.canEdit = true;
   provider.status = 'connected';
+  connectivity.known = true;
+  platformError.variants = [];
+  skeletonRenders.count = 0;
   centeredState.mockClear();
   scrollView.mockClear();
 });
@@ -199,6 +218,56 @@ describe('PlatformOverviewScreen disconnected setup', () => {
     await renderScreen();
     expect(centeredState).toHaveBeenCalledOnce();
     expect(scrollView).not.toHaveBeenCalled();
+  });
+});
+
+describe('PlatformOverviewScreen connected with unavailable config', () => {
+  it('shows the offline error while the config query is paused with no cache', async () => {
+    // The exact blank-body repro: provider status is cached as connected, the
+    // config query is paused by NetInfo before its first success, and
+    // `config.isLoading` (isPending && isFetching) is false while paused.
+    config.fetchStatus = 'paused';
+    config.data = null;
+
+    await renderScreen();
+
+    expect(platformError.variants).toEqual(['offline']);
+    expect(skeletonRenders.count).toBe(0);
+  });
+
+  it('keeps the skeleton while the query is paused and connectivity is unsettled', async () => {
+    config.fetchStatus = 'paused';
+    config.data = null;
+    connectivity.known = false;
+
+    const texts = await renderScreen();
+
+    // Connectivity not yet settled: no confirmed-offline signal, so the
+    // loading skeleton renders while the query waits instead of a blank body.
+    expect(platformError.variants).toEqual([]);
+    expect(skeletonRenders.count).toBeGreaterThan(0);
+    expect(texts).not.toContain('Automatic reviews');
+  });
+
+  it('renders content from cache when the config query is paused with data', async () => {
+    config.fetchStatus = 'paused';
+    config.data = makeConfig();
+
+    const texts = await renderScreen();
+
+    expect(platformError.variants).toEqual([]);
+    expect(skeletonRenders.count).toBe(0);
+    expect(texts).toContain('Automatic reviews');
+  });
+
+  it('shows the server error when the config fetch fails with no cache', async () => {
+    config.isError = true;
+    config.data = null;
+
+    await renderScreen();
+
+    expect(platformError.variants).toEqual(['server']);
+    expect(skeletonRenders.count).toBe(0);
   });
 });
 

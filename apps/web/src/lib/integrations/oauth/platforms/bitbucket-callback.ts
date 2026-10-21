@@ -1,5 +1,4 @@
 import type { NextRequest } from 'next/server';
-import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
@@ -9,6 +8,7 @@ import {
   parseOAuthStateOwner,
 } from '@/lib/integrations/oauth/common';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { oauthStateHash, validOAuthCode } from '@/lib/integrations/oauth/callback-safety';
 import {
   exchangeBitbucketOAuthCode,
   fetchBitbucketUser,
@@ -54,14 +54,9 @@ function safeCallbackContext(searchParams: URLSearchParams) {
   return {
     hasCode: Boolean(searchParams.get('code')),
     hasState: Boolean(state),
-    stateHash: state ? createHash('sha256').update(state).digest('hex').slice(0, 8) : null,
+    stateHash: oauthStateHash(state),
     hasProviderError: Boolean(searchParams.get('error')),
   };
-}
-
-function validOAuthCode(code: string | null): string | null {
-  if (!code || code.length > 2048 || !/^[A-Za-z0-9._~+/-]+$/.test(code)) return null;
-  return code;
 }
 
 async function authorizeOwner(owner: Owner, user: AuthenticatedOAuthUser): Promise<void> {

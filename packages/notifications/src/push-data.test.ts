@@ -2,6 +2,26 @@ import { describe, expect, it } from 'vitest';
 
 import { pushDataSchema } from './push-data';
 
+describe('pushDataSchema agent_briefing', () => {
+  it('accepts only the privacy-minimal available-report list route', () => {
+    expect(
+      pushDataSchema.parse({
+        type: 'agent_briefing',
+        url: '/agent-briefing',
+        reportTitle: 'Private title',
+        organizationId: 'private-org',
+      })
+    ).toEqual({ type: 'agent_briefing', url: '/agent-briefing' });
+  });
+
+  it.each([undefined, '/sessions/private-session', 'https://example.com'])(
+    'rejects a missing or unrelated briefing route: %s',
+    url => {
+      expect(pushDataSchema.safeParse({ type: 'agent_briefing', url }).success).toBe(false);
+    }
+  );
+});
+
 const lifecycleEvents = [
   'analysis_completed',
   'analysis_failed',

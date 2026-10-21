@@ -73,6 +73,7 @@ import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-rev
 import { PrCommentCta } from '@/components/pr-review/discussion/pr-comment-cta';
 import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -435,6 +436,10 @@ export function PrReviewDiscussionTab({
     );
   }
   if (view.kind === 'not-found') {
+    // GitLab folds its connection failures into the same NOT_FOUND a deleted
+    // merge request produces, so provider scopes offer the read retry and the
+    // connection check instead of a dead end (GitHub keeps the terminal copy).
+    const isProviderScope = ref.platform !== 'github';
     return (
       <>
         <QueryError
@@ -444,6 +449,16 @@ export function PrReviewDiscussionTab({
             isMergeRequest
               ? t('prReview.terms.discussionUnavailableMessage')
               : t('prReview.discussion.unavailableMessage')
+          }
+          action={
+            isProviderScope ? (
+              <PrReviewUnavailableActions
+                onRetry={() => {
+                  void query.refetch();
+                }}
+                isRetrying={query.isFetching}
+              />
+            ) : undefined
           }
         />
         {dialog}

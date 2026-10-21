@@ -53,6 +53,12 @@ type NewSessionProfileOverrideProps = {
   onManualCommandsChange: (next: string[]) => void;
   /** Opens the repo default-profile bindings screen from the advanced config. */
   onOpenRepoDefaults?: () => void;
+  /**
+   * The Organization section above Run on: the active account the create is
+   * attributed to. The body renders it for every entry point — switchable on
+   * the ordinary entry, a read-only scope row on the clone entry.
+   */
+  organizationSection?: React.ReactNode;
 };
 
 /**
@@ -94,6 +100,7 @@ export function NewSessionConfigureForm({
   isFetchingInstances,
   onRefreshInstances,
   onChangeRunOnInstance,
+  pendingComputer,
   showInstanceDisconnectedNote,
   folderPath,
   onChangeFolderPath,
@@ -121,6 +128,7 @@ export function NewSessionConfigureForm({
   onManualVarsChange,
   onManualCommandsChange,
   onOpenRepoDefaults,
+  organizationSection,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
@@ -155,8 +163,11 @@ export function NewSessionConfigureForm({
   // `0` against that padding-free wrapper, dropping the content container's
   // `pt-4` gap and overstating the room the frame leaves for the input.
   const [composerTop, setComposerTop] = useState(0);
-  const isRemote = runOnInstance !== null;
-  const isStarting = isRemote ? isSpawningRemote : isCreating;
+  // The remote surface (launch folder, remote hint, no repository section)
+  // covers both a bound computer and the tour's computer target with none
+  // connected yet — the target is the computer either way.
+  const isRemote = runOnInstance !== null || pendingComputer === true;
+  const isStarting = runOnInstance !== null ? isSpawningRemote : isCreating;
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
@@ -214,6 +225,7 @@ export function NewSessionConfigureForm({
         />
       </View>
 
+      {organizationSection}
       <NewSessionRunTarget
         showRunOnSelector={showRunOnSelector}
         runOnInstance={runOnInstance}
@@ -222,6 +234,7 @@ export function NewSessionConfigureForm({
         isFetchingInstances={isFetchingInstances}
         onChangeRunOnInstance={onChangeRunOnInstance}
         onRefreshInstances={onRefreshInstances}
+        pendingComputer={pendingComputer}
         disabled={isStarting}
       />
 

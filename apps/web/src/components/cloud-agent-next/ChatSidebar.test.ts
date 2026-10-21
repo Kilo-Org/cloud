@@ -26,10 +26,32 @@ jest.mock('@/components/ui/tooltip', () => {
   const passthrough = ({ children }: { children?: ReactNode }) =>
     react.createElement(react.Fragment, null, children);
   return {
-    Tooltip: passthrough,
+    Tooltip: jest.fn(passthrough),
     TooltipTrigger: passthrough,
-    TooltipContent: ({ children, className }: { children?: ReactNode; className?: string }) =>
-      react.createElement('div', { role: 'tooltip', className }, children),
+    TooltipContent: ({
+      children,
+      className,
+      side,
+      align,
+      sideOffset,
+    }: {
+      children?: ReactNode;
+      className?: string;
+      side?: string;
+      align?: string;
+      sideOffset?: number;
+    }) =>
+      react.createElement(
+        'div',
+        {
+          role: 'tooltip',
+          className,
+          'data-side': side,
+          'data-align': align,
+          'data-offset': sideOffset,
+        },
+        children
+      ),
     TooltipProvider: passthrough,
   };
 });
@@ -73,11 +95,13 @@ jest.mock('./SessionPrIndicator', () => ({
 
 import { ChatSidebar } from './ChatSidebar';
 import { SessionPrIndicator } from './SessionPrIndicator';
+import { Tooltip } from '@/components/ui/tooltip';
 
 type ChatSidebarProps = React.ComponentProps<typeof ChatSidebar>;
 
 const SESSION_COUNT = 200;
 const indicatorMock = jest.mocked(SessionPrIndicator);
+const tooltipMock = jest.mocked(Tooltip);
 
 jest.setTimeout(30_000);
 
@@ -202,6 +226,7 @@ describe('ChatSidebar row rendering', () => {
     mockPathname = '/cloud';
     mockRouterPush.mockClear();
     indicatorMock.mockClear();
+    tooltipMock.mockClear();
     root = createRoot(dom.container);
   });
 
@@ -237,28 +262,47 @@ describe('ChatSidebar row rendering', () => {
     expect(dom.container.querySelector('[data-worktree-id="worktree_ready"]')).not.toBeNull();
   });
 
-  it('provides the full workspace title in a wrapping tooltip on its open button', () => {
-    const session = makeSession(0, { worktreeId: 'worktree_tooltip' });
+  it('shows the full workspace title above the row, away from the sibling PR badge', () => {
+    const session = makeSession(0, {
+      worktreeId: 'worktree_tooltip',
+      associatedPr: {
+        url: 'https://github.com/kilo/repository/pull/42',
+        number: 42,
+        state: 'open',
+        title: 'Fix sidebar tooltips',
+        headSha: null,
+        lastSyncedAt: new Date().toISOString(),
+        reviewDecision: null,
+        reviewDecisionPending: false,
+        platform: 'github',
+      },
+    });
     const title = 'Cloud Agent sidebar session titles should remain readable when truncated';
     const onOpenSession = jest.fn();
     renderSidebar({
       sessions: [session],
       onOpenSession,
       worktreeDetails: {
-        worktree_tooltip: { name: title, defaultTitle: null, prSession: null, sessions: [] },
+        worktree_tooltip: { name: title, defaultTitle: null, prSession: session, sessions: [] },
       },
     });
 
     const row = dom.container.querySelector('[data-worktree-id="worktree_tooltip"]');
     const tooltip = row?.querySelector('[role="tooltip"]');
+    expect(tooltipMock.mock.calls.map(([props]) => props.delayDuration)).toContain(400);
     expect(tooltip?.textContent).toBe(title);
     expect(tooltip?.className).toContain('max-w-xs');
     expect(tooltip?.className).toContain('break-words');
+    expect(tooltip?.getAttribute('data-side')).toBe('top');
+    expect(tooltip?.getAttribute('data-align')).toBe('start');
+    expect(tooltip?.getAttribute('data-offset')).toBe('8');
 
     const button = row?.querySelector<HTMLButtonElement>(
       `button[aria-label="Open worktree ${title}"]`
     );
     expect(button?.querySelector('.line-clamp-1')?.textContent).toBe(title);
+    expect(row?.querySelector('[data-session-pr="ses_000"]')).not.toBeNull();
+    expect(button?.querySelector('[data-session-pr]')).toBeNull();
     act(() => button?.click());
     expect(onOpenSession).toHaveBeenCalledWith(session.sessionId);
 

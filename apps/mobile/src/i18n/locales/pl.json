@@ -35,6 +35,8 @@
     "connectGithub": "Połącz konto GitHub",
     "cost": "Koszt",
     "discard": "Odrzuć",
+    "discardChangesMessage": "Twoje zmiany zostaną utracone.",
+    "discardChangesTitle": "Odrzuć zmiany?",
     "findings": "Wykryte problemy",
     "mergeRequest": "merge request",
     "notConnected": "Brak połączenia",
@@ -109,7 +111,9 @@
     "online": "W sieci",
     "open": "Otwórz {{name}}",
     "openPullRequest": "Otwórz PR",
+    "completed": "Ukończono",
     "pending": "Oczekuje",
+    "running": "W toku",
     "performance": "Wydajność",
     "preferences": "Preferencje",
     "privacyPolicy": "Polityka prywatności",
@@ -1025,8 +1029,6 @@
     "updateFailed": "Nie udało się zaktualizować recenzenta kodu.",
     "configSaveFailed": "Nie udało się zapisać konfiguracji przeglądu.",
     "status": {
-      "running": "W toku",
-      "completed": "Ukończono",
       "interrupted": "Przerwano"
     },
     "reviewStyle": {
@@ -1039,7 +1041,8 @@
       "bugs": "Błędy",
       "style": "Styl",
       "testing": "Testowanie",
-      "documentation": "Dokumentacja"
+      "documentation": "Dokumentacja",
+      "unknown": "Inne ({{area}})"
     },
     "gateThreshold": {
       "warning": "Ostrzeżenie"
@@ -1118,7 +1121,14 @@
       "triageReasoning": "Uzasadnienie wstępnej oceny",
       "watchInCloudAgent": "Śledź w agencie w chmurze",
       "whereFound": "Miejsca wykrycia ({{displayCount}})",
-      "yes": "Tak"
+      "yes": "Tak",
+      "action": {
+        "analyzeCodebase": "Przeanalizuj bazę kodu",
+        "dismiss": "Odrzuć",
+        "manualReview": "Ręczny przegląd",
+        "monitor": "Monitoruj",
+        "openPr": "Otwórz pull request"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Model analizy",
@@ -1140,7 +1150,24 @@
       "summary": "Podsumowanie raportu",
       "title": "Raport audytu",
       "unavailable": "Raport audytu niedostępny",
-      "unavailableDescription": "Tylko właściciele organizacji i administratorzy rozliczeń mogą przeglądać raporty audytu. Poproś właściciela lub administratora rozliczeń o przyznanie dostępu."
+      "unavailableDescription": "Tylko właściciele organizacji i administratorzy rozliczeń mogą przeglądać raporty audytu. Poproś właściciela lub administratora rozliczeń o przyznanie dostępu.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Ukończono analizę",
+        "findingAnalysisFailed": "Analiza nie powiodła się",
+        "findingAutoDismissed": "Odrzucono automatycznie",
+        "findingCreated": "Zaimportowano",
+        "findingDeleted": "Usunięto",
+        "findingDismissed": "Odrzucono",
+        "findingSeverityChanged": "Zmieniono ważność",
+        "findingStatusChange": "Zmieniono stan",
+        "findingSuperseded": "Zastąpiono",
+        "remediationBlocked": "Zablokowano naprawę",
+        "remediationCancelled": "Anulowano",
+        "remediationFailed": "Naprawa nie powiodła się",
+        "remediationNoChangesNeeded": "Brak wymaganych zmian",
+        "remediationPrOpened": "Otwarto pull request",
+        "remediationQueued": "Zlecono naprawę"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Wyświetl raport audytu"
@@ -1366,7 +1393,6 @@
       "installApp": "Zainstaluj aplikację GitHub",
       "reauthorizeButton": "Autoryzuj ponownie aplikację GitHub",
       "reauthorizeDescription": "Agent bezpieczeństwa wymaga uprawnienia vulnerability_alerts, aby uzyskać dostęp do alertów Dependabot. Autoryzuj ponownie aplikację GitHub, aby przyznać to uprawnienie.",
-      "reauthorizeFailed": "Nie udało się rozpocząć ponownej autoryzacji. Spróbuj ponownie.",
       "reauthorizeTitle": "Wymagane dodatkowe uprawnienia",
       "setupFailed": "Nie udało się rozpocząć konfiguracji GitHub. Spróbuj ponownie."
     },
@@ -1391,6 +1417,7 @@
     "settingsSave": {
       "saveChanges": "Zapisz zmiany",
       "unsavedMessage": "Zapisać zmiany przed opuszczeniem tego ekranu?",
+      "unsavedInvalidMessage": "Tych zmian nie można jeszcze zapisać. Popraw je, aby zapisać, lub odrzuć je, aby wyjść.",
       "unsavedTitle": "Niezapisane zmiany"
     },
     "setup": {
@@ -1724,6 +1751,7 @@
       "prefillModelUnavailable": "Model {{model}} nie jest już dostępny. Używany jest twój domyślny model.",
       "couldNotReadPendingSessions": "Nie udało się odczytać oczekujących sesji. Spróbuj ponownie.",
       "failedToCreate": "Nie udało się utworzyć sesji.",
+      "checkOrganizationAccess": "Sprawdź dostęp do tej organizacji, a następnie spróbuj ponownie.",
       "couldNotRefreshRepositories": "Nie udało się odświeżyć repozytoriów. Spróbuj ponownie.",
       "discardDraftTitle": "Odrzucić szkic?",
       "discardDraftMessage": "Twoje polecenie zostanie usunięte.",
@@ -1801,7 +1829,8 @@
       "matchesBadge_other": "dopasowania: {{displayCount}}",
       "matchesBadge_few": "dopasowania: {{displayCount}}",
       "matchesBadge_many": "dopasowań: {{displayCount}}",
-      "noOutput": "Brak wyjścia."
+      "noOutput": "Brak wyjścia.",
+      "translationFailed": "Tłumaczenie nie powiodło się"
     },
     "readToolMarkdown": {
       "linesTruncated": "wiersze {{start}}–{{end}} (skrócono)",
@@ -2556,7 +2585,8 @@
       "description": "Połącz konto GitHub, aby przeglądać PR na telefonie.",
       "gitlabDescription": "Połącz konto GitLab, aby przeglądać merge requesty na telefonie.",
       "bitbucketDescription": "Połącz Bitbucket z tą organizacją, aby przeglądać PR-y na telefonie.",
-      "bitbucketOrgOnlyDescription": "Wybierz organizację w swoim profilu, aby przeglądać jej PR-y na Bitbucket."
+      "bitbucketOrgOnlyDescription": "Przełącz konto powyżej na organizację, aby przeglądać jej PR-y na Bitbucketu.",
+      "contextLine": "Dla {{organization}}"
     },
     "connectionExpired": "Połączenie z serwisem GitHub wygasło.",
     "couldNotLoadPullRequest": "Nie udało się wczytać PR.",
@@ -3013,7 +3043,9 @@
       "reviewNotSubmitted": "Nie można wysłać tego przeglądu w obecnej postaci. PR mógł się zmienić albo jest to twój własny PR, którego nie możesz przeglądać w ten sposób.",
       "reviewNotSubmittedTerm": "Nie można wysłać tego przeglądu w obecnej postaci. {{term}} mógł się zmienić albo nie możesz przeglądać własnego {{term}}.",
       "couldNotPostComment": "Nie udało się opublikować komentarza.",
-      "couldNotSubmitReview": "Nie udało się wysłać przeglądu. Sprawdź połączenie i spróbuj ponownie."
+      "couldNotSubmitReview": "Nie udało się wysłać przeglądu. Sprawdź połączenie i spróbuj ponownie.",
+      "rateLimited": "Zbyt wiele żądań. Spróbuj ponownie później.",
+      "conflict": "Zmieniło się to, gdy nad tym pracowałeś. Odśwież go i spróbuj ponownie."
     },
     "operation": {
       "couldNotReply": "Nie udało się odpowiedzieć.",
@@ -3050,11 +3082,22 @@
     "boundary": {
       "backToProfile": "Wróć do profilu",
       "loadErrorMessage": "Sprawdź połączenie i spróbuj ponownie.",
+
+      "chooseAccount": "Wybierz konto",
       "loadErrorTitle": "Nie udało się wczytać twoich organizacji.",
+      "noOrganization": "Brak organizacji",
+
+      "noOrganizationDescription": "To konto nie należy do organizacji. Utwórz organizację lub dołącz do niej w przeglądarce, aby korzystać z funkcji organizacji, takich jak zaproszenia dla członków i alerty o niskim saldzie.",
+
+      "openWebOrganizations": "Otwórz organizacje w przeglądarce",
+
       "organizationUnavailable": "Organizacja jest niedostępna.",
-      "selectDescription": "Wybierz organizację w swoim profilu, aby kontynuować.",
+      "selectDescriptionWithOrganizations": "Należysz do jednej lub więcej organizacji. Wybierz konto, którego ma używać ten ekran.",
+
       "selectOrganization": "Wybierz organizację",
       "unavailableDescription": "Ta organizacja nie jest już dostępna. Wybierz inną w swoim profilu, aby kontynuować.",
+
+      "unavailableSessionsDescription": "Ta organizacja nie jest już dostępna. Nie można wczytać jej sesji.",
       "accessDeniedDescription": "Nie masz dostępu do tej organizacji."
     },
     "creditActivity": {
@@ -3724,7 +3767,9 @@
       "jsonTooLarge": "Użyj maksymalnie 50 wpisów, klucze do 128 i wartości do 4096 znaków",
       "timeoutInvalid": "Limit czasu musi być liczbą całkowitą milisekund",
       "edit": "Edytuj serwer MCP",
-      "saveFailed": "Nie można zapisać serwera MCP"
+      "saveFailed": "Nie można zapisać serwera MCP",
+      "deleteFailed": "Nie można usunąć serwera MCP",
+      "updateFailed": "Nie można zaktualizować serwera MCP"
     },
     "agents": {
       "title": "Agenci profilowi",
@@ -3751,6 +3796,7 @@
       "visibilitySubagent": "Subagent — można go wywołać tylko od innych osób",
       "visibilityAll": "Wszyscy – oba",
       "saveFailed": "Nie udało się zapisać agenta",
+      "deleteFailed": "Nie udało się usunąć agenta",
       "nameRequired": "Wprowadź nazwę agenta",
       "slugRequired": "Wprowadź ślimak agenta",
       "slugInvalid": "Ślimak musi zaczynać się od litery i używać tylko małych liter, cyfr i myślników",
@@ -3765,10 +3811,12 @@
       "description": "Opis polecenia",
       "template": "Szablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Wyjaśnij $ARGUMENTS",
       "subtask": "Uruchom jako podzadanie",
       "edit": "Edytuj polecenie ukośnika",
       "saveFailed": "Nie udało się zapisać polecenia",
+      "deleteFailed": "Nie udało się usunąć polecenia",
       "nameRequired": "Wprowadź nazwę polecenia",
       "nameInvalid": "Nazwa musi zaczynać się od małej litery i zawierać wyłącznie małe litery, cyfry i myślniki",
       "templateRequired": "Wprowadź szablon polecenia",
@@ -3923,7 +3971,7 @@
     "view": "Przeczytaj raport",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Pokaż bieżący stan",
+    "dismiss": "Odrzuć raport",
     "offline": "Offline · zapisany raport",
     "cached": "Zapisany raport · odświeżanie niedostępne",
     "revised": "Zaktualizowano · {{revision}}",

@@ -9,7 +9,7 @@ import { createElement, type ElementType, type ReactNode } from 'react';
 import type * as ReactModule from 'react';
 import { Platform, Pressable } from 'react-native';
 import { act, type ReactTestRenderer } from '@/test/renderer';
-import { type QueryClient } from '@tanstack/react-query';
+import { onlineManager, type QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -253,6 +253,8 @@ function headerClasses(renderer: ReactTestRenderer): string[] {
 beforeEach(() => {
   Platform.OS = 'ios';
   windowDims.width = 390;
+  // A test that simulates the app reporting offline must not leak that state.
+  onlineManager.setOnline(true);
   savedMetadata.clear();
   saveCompletion = undefined;
   addCreditsRowProps.latest = undefined;
@@ -587,6 +589,36 @@ describe('CreditsCard add-credits entry point', () => {
       unmount();
     }
   );
+
+  it('settles the balance read while the app reports offline', async () => {
+    // NetInfo can hold the device offline while the backend is reachable. A
+    // read that pauses there is pending without fetching, so the slot never
+    // leaves its skeleton: the card must ask Query to settle regardless.
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 12.5 });
+    onlineManager.setOnline(false);
+
+    const { texts, unmount } = await mountCard();
+    await waitFor(() => texts().includes('$12.50'));
+
+    expect(texts()).not.toContain('SKELETON');
+    unmount();
+    onlineManager.setOnline(true);
+  });
+
+  it('settles an unreachable balance read to the retry surface while offline', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(new Error('Network request failed'));
+    onlineManager.setOnline(false);
+
+    const { texts, unmount } = await mountCard();
+    await waitFor(() => texts().includes('Failed to load balance. Tap to retry.'));
+
+    expect(texts()).not.toContain('SKELETON');
+    expect(texts()).not.toContain('$0.00');
+    unmount();
+    onlineManager.setOnline(true);
+  });
 
   it('keeps personal Buy credits actionable when the balance request fails', async () => {
     currentUser.userId = 'user-1';

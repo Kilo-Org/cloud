@@ -108,17 +108,171 @@ const RULES = [
  */
 const SCROLL_CONTAINERS =
   '(?:Animated\\.)?(?:ScrollView|TabScreenScrollView|FlatList|FlashList|KeyboardAwareScrollView)';
-const SCROLL_TAG = new RegExp(`<(${SCROLL_CONTAINERS})\\b([^>]*?)/?>`, 'gs');
-const OWN_CLASS_NAME = /(?<!contentContainer)className="([^"]*)"/;
+const SCROLL_TAG = new RegExp(`<(${SCROLL_CONTAINERS})\\b`, 'g');
 const HORIZONTAL_PADDING = /^-?(?:p|px|pl|pr|ps|pe)-/;
+
+/** Index just past the JS string or template literal starting at `start`. */
+function endOfQuoted(text, start) {
+  const quote = text[start];
+  let index = start + 1;
+  while (index < text.length && text[index] !== quote) {
+    index += text[index] === '\\' ? 2 : 1;
+  }
+  return index + 1;
+}
+
+/** Index of the `}` matching the `{` at `start`, skipping quoted text. */
+function endOfBraces(text, start) {
+  let depth = 0;
+  for (let index = start; index < text.length; index++) {
+    const char = text[index];
+    if (char === '"' || char === "'" || char === '`') {
+      index = endOfQuoted(text, index) - 1;
+    } else if (char === '{') {
+      depth++;
+    } else if (char === '}' && --depth === 0) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Index of the `>` closing the tag whose attributes start at `start`. A nested
+ * JSX value or an arrow function keeps its braces open, so `=>` inside an
+ * attribute cannot end the tag early.
+ */
+function endOfTag(text, start) {
+  let depth = 0;
+  for (let index = start; index < text.length; index++) {
+    const char = text[index];
+    if (char === '"' || char === "'" || char === '`') {
+      index = endOfQuoted(text, index) - 1;
+    } else if (char === '{') {
+      depth++;
+    } else if (char === '}') {
+      depth--;
+    } else if (char === '>' && depth === 0) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The class strings in a `className` expression: every string literal and
+ * template-literal chunk, including the ones inside `${...}` and object
+ * branches, so `cn('flex-1', compact && 'p-2')` reports `p-2`.
+ */
+function classStrings(expression) {
+  const strings = [];
+  let index = 0;
+  while (index < expression.length) {
+    const char = expression[index];
+    if (char === '"' || char === "'") {
+      const end = endOfQuoted(expression, index);
+      strings.push(expression.slice(index + 1, end - 1));
+      index = end;
+    } else if (char === '`') {
+      let end = index + 1;
+      let chunk = '';
+      while (end < expression.length && expression[end] !== '`') {
+        if (expression[end] === '\\') {
+          chunk += expression[end + 1] ?? '';
+          end += 2;
+        } else if (expression[end] === '$' && expression[end + 1] === '{') {
+          const interpolation = endOfBraces(expression, end + 1);
+          if (interpolation === -1) {
+            end = expression.length;
+            break;
+          }
+          strings.push(...classStrings(expression.slice(end + 2, interpolation)));
+          chunk += ' ';
+          end = interpolation + 1;
+        } else {
+          chunk += expression[end++];
+        }
+      }
+      strings.push(chunk);
+      index = end + 1;
+    } else if (char === '/' && expression[index + 1] === '/') {
+      const end = expression.indexOf('\n', index);
+      index = end === -1 ? expression.length : end;
+    } else if (char === '/' && expression[index + 1] === '*') {
+      const end = expression.indexOf('*/', index + 2);
+      index = end === -1 ? expression.length : end + 2;
+    } else if (char === '{') {
+      const end = endOfBraces(expression, index);
+      if (end === -1) {
+        break;
+      }
+      strings.push(...classStrings(expression.slice(index + 1, end)));
+      index = end + 1;
+    } else {
+      index++;
+    }
+  }
+  return strings;
+}
+
+/**
+ * The class strings on the element's own `className`. Attributes such as
+ * `renderItem` and `ListHeaderComponent` hold nested JSX at brace depth > 0,
+ * so the container's own classes are the only ones read.
+ */
+function ownClassStrings(attributes) {
+  const strings = [];
+  let depth = 0;
+  for (let index = 0; index < attributes.length; index++) {
+    const char = attributes[index];
+    if (char === '"' || char === "'" || char === '`') {
+      index = endOfQuoted(attributes, index) - 1;
+    } else if (char === '{') {
+      depth++;
+    } else if (char === '}') {
+      depth--;
+    } else if (depth === 0 && attributes.startsWith('className', index)) {
+      if (index > 0 && /[\w$.-]/.test(attributes[index - 1])) {
+        continue;
+      }
+      let value = index + 'className'.length;
+      while (/\s/.test(attributes[value])) {
+        value++;
+      }
+      if (attributes[value] !== '=') {
+        continue;
+      }
+      value++;
+      while (/\s/.test(attributes[value])) {
+        value++;
+      }
+      const quote = attributes[value];
+      if (quote === '"' || quote === "'") {
+        const end = endOfQuoted(attributes, value);
+        strings.push(attributes.slice(value + 1, end - 1));
+        index = end - 1;
+      } else if (quote === '{') {
+        const end = endOfBraces(attributes, value);
+        if (end === -1) {
+          break;
+        }
+        strings.push(...classStrings(attributes.slice(value + 1, end)));
+        index = end;
+      }
+    }
+  }
+  return strings;
+}
 
 function checkScrollPadding(relative, text) {
   for (const match of text.matchAll(SCROLL_TAG)) {
-    const className = OWN_CLASS_NAME.exec(match[2]);
-    if (!className) {
+    const tagEnd = endOfTag(text, match.index + match[0].length);
+    if (tagEnd === -1) {
       continue;
     }
-    const padding = className[1].split(/\s+/).filter(cls => HORIZONTAL_PADDING.test(cls));
+    const padding = ownClassStrings(text.slice(match.index + match[0].length, tagEnd))
+      .flatMap(classes => classes.split(/\s+/))
+      .filter(classes => HORIZONTAL_PADDING.test(classes));
     if (padding.length > 0) {
       const line = text.slice(0, match.index).split('\n').length;
       fail(
@@ -169,8 +323,17 @@ function checkRawText(relative, text) {
  * Latin copy beside a Cyrillic month name — and pins or ignores the locale.
  * Scoped to the app: `packages/app-shared` is web's too, and its hardcoded
  * `en-US` calls are a separate decision.
+ *
+ * ECMA-402 lets the constructors run without `new`, so the names match both
+ * forms. The call parenthesis is required so a type reference such as
+ * `Intl.DateTimeFormatOptions` or a `Intl.NumberFormat` annotation stays out.
  */
-const DIRECT_INTL = /new Intl\.\w+|\.toLocale(?:Date|Time|)String\s*\(/g;
+const INTL_CONSTRUCTORS =
+  'Collator|DateTimeFormat|DisplayNames|DurationFormat|ListFormat|Locale|NumberFormat|PluralRules|RelativeTimeFormat|Segmenter';
+const DIRECT_INTL = new RegExp(
+  `(?:new\\s+)?Intl\\.(?:${INTL_CONSTRUCTORS})\\s*\\(|\\.toLocale(?:Date|Time|)String\\s*\\(`,
+  'g'
+);
 const DIRECT_INTL_DIR = join(ROOT, 'apps/mobile/src');
 // These layouts are stringified and run in the iOS widget extension, which
 // cannot import @/lib/intl-cache; they normalise the locale tag themselves.

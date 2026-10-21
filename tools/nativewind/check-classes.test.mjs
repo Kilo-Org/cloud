@@ -71,6 +71,61 @@ test('accepts all-side padding moved to contentContainerClassName', context => {
   assert.equal(result.status, 0);
 });
 
+test('reads padding from a cn() className expression on a scroll container', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/screen.tsx':
+      'export const a = (\n' +
+      '  <FlashList\n' +
+      '    data={data}\n' +
+      '    renderItem={({ item }) => <View className="px-4" />}\n' +
+      "    className={cn('flex-1', selected && 'p-2')}\n" +
+      '  />\n' +
+      ');\n',
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /<FlashList> carries "p-2" on its own className/);
+  assert.doesNotMatch(result.stderr, /px-4/);
+});
+
+test('reads padding from a template-literal className on a scroll container', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/screen.tsx':
+      "export const a = <ScrollView className={`flex-1 px-4 ${wide ? 'p-6' : ''}`} />;\n",
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /<ScrollView> carries "p-6 px-4" on its own className/);
+});
+
+test('accepts padding on a contentContainerClassName expression', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/screen.tsx':
+      "export const a = <ScrollView className=\"flex-1\" contentContainerClassName={cn('px-6', 'pt-4')} />;\n",
+  });
+  assert.equal(result.status, 0);
+});
+
+test('flags Intl formatters built with or without new', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/format.ts':
+      "export const a = Intl.DateTimeFormat('en-US');\n" +
+      "export const b = Intl.NumberFormat('en-US');\n" +
+      "export const c = new Intl.DateTimeFormat('en-US');\n",
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /"Intl\.DateTimeFormat\(" builds its own formatter/);
+  assert.match(result.stderr, /"Intl\.NumberFormat\(" builds its own formatter/);
+  assert.match(result.stderr, /"new Intl\.DateTimeFormat\(" builds its own formatter/);
+});
+
+test('accepts Intl type references', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/format.ts':
+      'export const options: Intl.DateTimeFormatOptions = {};\n' +
+      'export let format: Intl.NumberFormat;\n',
+  });
+  assert.equal(result.status, 0);
+});
+
 test('flags an opacity modifier on primary-disabled and hair-soft', context => {
   const result = runChecker(context, {
     'apps/mobile/src/panel.ts': 'export const a = "bg-primary-disabled/50 border-hair-soft/50";\n',

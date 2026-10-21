@@ -4,10 +4,6 @@ import { HomeScreen } from '@/components/home/home-screen';
 
 vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'pr-review',
-  useFeatureFlag: () => true,
-}));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   RefreshControl: 'RefreshControl',
@@ -22,8 +18,16 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 vi.mock('@/components/home/agent-sessions-section', () => ({
-  AgentSessionsSection: () => null,
   LiveSessionFeedback: () => null,
+}));
+vi.mock('@/components/home/home-agent-sessions-section', () => ({
+  AgentSessionsSection: () => null,
+}));
+// The briefing card renders the paid-summary surfaces and reaches the native
+// SQLCipher store through the dismissal journal; this suite asserts Home copy.
+vi.mock('@/components/agent-briefing/briefing-card', () => ({
+  BriefingCard: () => null,
+  useHomeBriefing: () => ({ briefing: undefined, frameReport: undefined }),
 }));
 vi.mock('@/components/home/live-session-state', () => ({
   useLiveSessionContext: () => ({
@@ -51,6 +55,9 @@ vi.mock('@/components/home/new-task-from-picture-button', () => ({
 }));
 vi.mock('@/components/home/product-choices', () => ({
   ProductChoices: () => null,
+}));
+vi.mock('@/components/todos/up-next-section', () => ({
+  UpNextSection: () => null,
 }));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: () => null,

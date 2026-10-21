@@ -1,13 +1,9 @@
-import { timingSafeEqual } from '@kilocode/encryption';
+import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { saveUsageRelatedDataLocally } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
-import {
-  UsageRecordRequestSchema,
-  type UsageRecordResponse,
-} from '@kilocode/web-shared/lib/ai-gateway/usage-record-contract';
+import { UsageRecordRequestSchema, type UsageRecordResponse } from '@kilocode/usage-contracts';
 import {
   createPhaseTimer,
   emitUsageRecordTiming,
@@ -18,7 +14,7 @@ import {
 /**
  * Frankfurt-local sink for AI-gateway usage writes.
  *
- * Callers are SFO instances of `kilocode-global-app`, which are a transatlantic
+ * Callers are SFO instances of `kilocode-ai-gateway`, which are a transatlantic
  * round trip away from the PostgreSQL primary. Executing the write here collapses
  * the row-lock hold on `kilocode_users` / `organizations` /
  * `organization_user_usage` from hundreds of milliseconds to single-digit
@@ -35,10 +31,8 @@ import {
 export const maxDuration = 150;
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const secret = request.headers.get('x-internal-api-key');
-  if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const unauthorized = authorizeInternalApiRequest(request);
+  if (unauthorized) return unauthorized;
 
   // Phase timings, paired with the in-process pool gauges, are what identified that
   // pool acquisition rather than PostgreSQL or the event loop dominates this
@@ -80,6 +74,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const { core, metadata, prior_microdollar_usage, posthog_distinct_id, bouncer_usage_event } =
     parsed.data;
+  const source = request.headers.get('x-usage-write-source');
 
   // Redelivery is handled inside the write, not by a lookup here.
   const result = await saveUsageRelatedDataLocally(
@@ -87,7 +82,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     metadata,
     prior_microdollar_usage,
     posthog_distinct_id,
-    bouncer_usage_event ?? null
+    bouncer_usage_event ?? null,
+    {
+      entrypoint: 'writer_endpoint',
+      writer_caller: source === 'queue' || source === 'region_handoff' ? source : 'unknown',
+    }
   );
   timer.mark('write');
 

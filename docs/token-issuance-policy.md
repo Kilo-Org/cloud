@@ -91,8 +91,6 @@ This is a concrete, selective map from the shared Kilo token entry points. It do
 | Cloud Agent control and downstream Kilo access | `packages/web-shared/src/lib/tokens.ts` (`generateCloudAgentToken`) and Cloud Agent routers | `services/cloud-agent-next/src/validate-kilo-token.ts`; backend balance call; raw runtime bearer or contained capability in `services/cloud-agent-next/src/session-service.ts` | None | `cloud-agent-next`, `kilo-api`, `kilo-gateway`, `session-ingest` | The raw user token can reach multiple downstream routes; contained Kilo capability has separate routing controls. |
 | App Builder | `apps/web/src/routers/app-builder-router.ts`; `apps/web/src/routers/organizations/organization-app-builder-router.ts` | `apps/web/src/lib/app-builder/app-builder-service.ts` forwards to `services/cloud-agent-next/src/middleware/auth.ts` | None; default five-year token, often unmarked | Cloud Agent control and downstream API/gateway boundaries | Unmarked tokens can match the legacy exchange class; separate control assertions from runtime credentials. |
 | Code Review | `apps/web/src/lib/code-reviews/triggers/prepare-review-payload.ts` | `services/code-review-infra/src/code-review-orchestrator.ts` forwards to Cloud Agent Next | None; default five-year token with `botId: 'reviewer'` | Cloud Agent control and downstream API/gateway boundaries | Preserve delegated workload purpose through forwarding and renewal. |
-| Auto Fix | `apps/web/src/lib/auto-fix/triggers/prepare-fix-payload.ts` | `services/auto-fix-infra/src/services/cloud-agent-next-client.ts` forwards to Cloud Agent Next | None; default five-year token with `botId: 'auto-fix'` | Cloud Agent control and downstream API/gateway boundaries | Do not bind only to the infrastructure service when the token reaches the runtime. |
-| Auto Triage | `apps/web/src/lib/auto-triage/triggers/prepare-triage-payload.ts` | `services/auto-triage-infra/src/triage-orchestrator.ts` forwards to Cloud Agent Next | None; default five-year token with `botId: 'auto-triage'` | Cloud Agent control and downstream API/gateway boundaries | Same control/runtime separation as other Cloud Agent workflows. |
 | Security Auto Analysis | `services/security-auto-analysis/src/token.ts` | `services/security-auto-analysis/src/launch.ts`, `remediation.ts`, and `manual-analysis.ts` forward user credentials to Cloud Agent Next | None; one-hour marked user tokens and separate minimal internal assertions | Cloud Agent control and downstream API/gateway boundaries for user tokens; identify each internal assertion consumer separately | Keep internal assertions distinct from runtime user credentials. |
 | Webhook Agent Ingest | `services/webhook-agent-ingest/src/services/token-minting-service.ts` | `services/webhook-agent-ingest/src/queue-consumer.ts` forwards to Cloud Agent Next | None; one-hour personal/bot-user token branches | Cloud Agent control and downstream API/gateway boundaries | Preserve non-exchangeable classification for both personal and bot-user branches. |
 | Gastown and Wasteland control | `apps/web/src/app/api/gastown/token/route.ts`; `apps/web/src/app/api/wasteland/token/route.ts` | `services/gastown/src/middleware/kilo-auth.middleware.ts`; `services/wasteland/src/middleware/kilo-auth.middleware.ts` | None | `gastown`; `wasteland` | Keep the two control planes separate. |
@@ -103,15 +101,15 @@ This is a concrete, selective map from the shared Kilo token entry points. It do
 | Git operations | `apps/web/src/lib/integrations/platforms/{bitbucket,github,gitlab}/`; generic GitHub disconnect in `apps/web/src/lib/integrations/platforms/github/user-authorization-client.ts` | `services/git-token-service/src/index.ts` | Operation-specific values listed above; disconnect has none | Preserve existing values; potential later `git-token-service:github-user-authorizations:disconnect` | Do not replace mandatory operation-specific audiences with broad `git-token-service`. |
 | User-data export | `apps/web/src/lib/user-data-export-worker-client.ts` | `services/user-data-export/src/index.ts` | `user-data-export` | Preserve `user-data-export` | Requires its additional internal API key and five-minute assertion limit. |
 | Organization and attribution | `apps/web/src/app/api/organizations/[id]/user-tokens/route.ts` | `services/ai-attribution/src/util/auth.ts` | None | `ai-attribution` | Organization-bearing tokens have other valid uses; attribution consumer transport was not fully traced. |
-| Auto-routing benchmark | `apps/web/src/app/api/internal/auto-routing-benchmark/token/route.ts` | `services/auto-routing-benchmark/src/run.ts` decider CLI | None | `kilo-api` / `kilo-gateway` based on actual downstream call | `tokenSource: 'auto-routing-benchmark'` identifies issuance, not an authorization audience; full CLI call graph is unresolved. |
 | MCP catalog dump | `apps/web/src/app/api/internal/mcp-catalog/token/route.ts` | `.github/workflows/kilo-mcp-catalog.yml` `kilo run` (benchmarking service account) | None | `kilo-api` / `kilo-gateway` based on actual downstream call | `tokenSource: 'mcp-catalog'` identifies issuance; the `MCP_CATALOG_TOKEN_SECRET` shared secret only authenticates the mint and is never a Kilo credential. |
+| Internal bot users | `apps/web/src/app/api/internal/bot-token/route.ts` | `services/auto-routing-benchmark/src/benchmark-token.ts` (decider CLI and executable model catalog); other internal workloads running as `bot-internal-*` users | None (legacy); `kilo-api` + `kilo-gateway` (modern) | `kilo-api` / `kilo-gateway`, one hour | `tokenSource: 'internal-bot'`; minting requires a `bot-internal-*` bot user with a pepper and no block, plus an owner or member role in the requested organization; `BOT_TOKEN_MINT_SECRET` only authenticates the mint and is never a Kilo credential. Modern shape gated by `INTERNAL_BOT_RESOURCE_TOKENS_ENABLED`. |
 
 ## Existing markers and excluded families
 
 Core optional markers accepted by the shared schema are documented in `packages/worker-utils/src/kilo-token.ts`: `tokenSource`, `botId`, `internalApiUse`, `createdOnPlatform`, `deviceAuthRequestCode`, `deviceSessionId`, admin/Gastown flags, and organization claims.
 
-- Confirmed `tokenSource` values: `cloud-agent`, `kilo-chat`, `auto-routing-benchmark`, `mcp-catalog`.
-- Confirmed `botId` values: `reviewer`, `auto-fix`, `auto-triage`, `discord-bot`, `webhook-bot`.
+- Confirmed `tokenSource` values: `cloud-agent`, `kilo-chat`, `mcp-catalog`, `internal-bot`.
+- Confirmed `botId` values: `reviewer`, `discord-bot`, `webhook-bot`.
 - `internalApiUse` and `createdOnPlatform` are additional automation markers; `services/security-auto-analysis/src/token.ts` emits `internalApiUse: true` and `createdOnPlatform: 'security-agent'`.
 - No universal signed system marker or reliable system-user-ID convention was confirmed.
 
@@ -124,7 +122,7 @@ Excluded from the credential-exchange compatibility class or treated as separate
 - encrypted Git/Kilo session capabilities, which have their own `purpose` field (for example `kilo_api_session`) in `services/git-token-service/src/kilo-session-capability.ts`;
 - container, share, repository, and MCP credentials, which require separate family-specific analysis rather than automatic migration as core Kilo API tokens.
 
-KiloClaw's five-minute control tokens (one-hour setup token), 24-hour access cookies, and 30-day runtime keys are distinct. Gastown runtime credentials also last 30 days; organization tokens last 15 minutes and benchmark tokens six hours. None qualifies for the five-year exchange compatibility class.
+KiloClaw's five-minute control tokens (one-hour setup token), 24-hour access cookies, and 30-day runtime keys are distinct. Gastown runtime credentials also last 30 days; organization tokens last 15 minutes and internal bot tokens, including the decider benchmark's, one hour. None qualifies for the five-year exchange compatibility class.
 
 ## Phase 4: web and HTML-deployment readers
 
@@ -186,3 +184,53 @@ Gastown/Wasteland control issuers are deferred with their delegation adapters: c
 This PR does not retire legacy native exchange, shorten user credentials, change global pepper/session semantics, or remove ordinary legacy resource access.
 
 Workflow issuance reads the existing primary user pepper, including explicit `null`, without initializing or rotating it. Modern workflow tokens retain their audience, purpose, exchange restrictions, and bounded lifetime. This requires no migration and must not reset already initialized peppers; genuine pepper rotation continues to revoke previously issued credentials.
+
+## Dedicated Home widget credential
+
+`activeSessions.widgetCredential({ organizationId })` issues a 30-day,
+HS256-signed `kilo-home-widget` audience credential and returns
+`{ token, expiresAt }`, where `expiresAt` is epoch milliseconds. Issuance uses
+`getResourceDelegationAuthority` and requires a verified native device session.
+Browser sessions and human API credentials cannot mint it. Every read rechecks
+that device session, its live refresh credential, the account pepper, and exact
+organization membership.
+
+This credential is not a general mobile access or refresh token. It cannot
+authenticate ordinary tRPC or mutate agent/session state. Only
+`GET /api/mobile/widgets` reads Home widget data, and
+`POST /api/mobile/widgets/push-token` accepts `{ token, enabled }` to register or
+remove an `ios_widget` APNs reload-hint token. A device token moves to the account
+that currently holds that device's widget credential; Live Activity rows are never
+changed by this route. Both dedicated routes authenticate
+the widget audience and derive the exact user/organization scope from signed
+claims, rather than client body/query values. Responses use `Cache-Control:
+no-store, private`; auth, reads, and registration have a ten-second request bound.
+
+Home widget data may carry `approvalKey`: SHA-256 (lowercase hex) of
+`JSON.stringify([kiloSessionId, permissionId])` for the one oldest approvable
+cloud permission. The web backend obtains it from the Cloud Agent Worker's
+`POST /internal/widgets/approval-key`, gated by `x-internal-api-key` and never
+reachable with the widget credential. The Worker re-checks user, exact
+organization scope with live membership, and the Kilo/cloud session pairing,
+then reads only the control-plane Session DO's stored pending set (no sandbox
+wake) and returns the binding, never the raw permission. The key grants no
+authority: the app approves only after re-reading the live pending permission
+through its ordinary authenticated routes and matching the same key.
+
+Every dedicated request verifies signature, algorithm, audience, environment,
+purpose, issuance/expiry/lifetime, the current user and pepper, account blocking,
+and actual organization membership (including organization deletion). A
+device-bound credential additionally requires its owned unrevoked device session
+and a live unconsumed refresh credential. Device sessions have no independent
+expiry column, so the refresh credential's expiry defines their usable lifetime.
+Widget code never reads, consumes, or rotates the app refresh token itself.
+Pepper rotation, account blocking/deletion, organization access loss, session
+revocation, or refresh expiry immediately invalidates subsequent reads.
+
+Native storage must protect the credential and clear it with account/scope
+changes. Unregister the widget push token before clearing a still-valid
+credential where possible. Reload pushes contain no private Home data and are
+not authority to restore a cleared account. The native renderer retains its
+last-confirmed Home data on transient failures, ages using shared/server-derived
+presentation timeline boundaries, and clears private data on explicit auth or
+privacy failure.

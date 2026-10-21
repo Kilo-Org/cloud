@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import { type LayoutChangeEvent, Text, type TextStyle, View, type ViewStyle } from 'react-native';
 
 import { alignComposerInputHeightToLines } from '@/components/agents/chat-composer-input-height';
@@ -17,21 +17,23 @@ type UseTextHeightOptions = {
    * and native scaling applies (the kilo-chat message input path).
    */
   fontScale?: number;
-  /**
-   * Content height the caller's real `TextInput` reported for the same text,
-   * in dp (`onContentSizeChange`), including the input's own vertical padding.
-   * It is the only faithful measure of the pitch that input lays lines out at:
-   * the mirror `Text` honors `lineHeight`, while the native input uses the
-   * platform's own line box. Without it the cap stays raw, which is the
-   * behavior of every caller that does not report one.
-   */
-  nativeContentHeight?: number | null;
   initialText?: string;
 };
 
 /** Plausible band for the native pitch around the requested line height. */
 const NATIVE_PITCH_MIN_RATIO = 0.6;
 const NATIVE_PITCH_MAX_RATIO = 1.4;
+
+/**
+ * How far, in dp, the line pitch a native content-height report implies may
+ * move before it is worth a state update. The report exists only to estimate
+ * the pitch the real input lays lines out at, and that pitch does not move when
+ * the draft grows a line — its content height and its line count grow together.
+ * Half a point is well below the pitch change that can move the snapped cap to
+ * another whole line (`floor(cap / pitch)` needs about half a point at this
+ * line height), so dropping a smaller move loses nothing.
+ */
+const NATIVE_PITCH_STABLE_STEP = 0.5;
 
 /**
  * Mirrors uncontrolled TextInput contents into a hidden Text node so we can
@@ -48,6 +50,13 @@ const NATIVE_PITCH_MAX_RATIO = 1.4;
  * the real input's reported content height over the mirror's line count, not
  * the requested line height. The floor is snapped to that same pitch, so a cap
  * that lands on the minimum stays a whole number of native lines too.
+ *
+ * The caller pushes that report in with `setNativeContentHeight`, which keeps
+ * the height out of the caller's own state: the report is recorded only when
+ * the pitch the snap uses moves, or when it is measured over a new line count,
+ * so a burst of reports at one line count — every native content-size event
+ * while the draft and the transcript stream — never re-renders the caller, and
+ * re-renders only this leaf once when the draft grows a line.
  */
 export function useTextHeight({
   minHeight,
@@ -57,15 +66,25 @@ export function useTextHeight({
   fontSize,
   lineHeight,
   fontScale,
-  nativeContentHeight,
   initialText = '',
 }: UseTextHeightOptions) {
   const [text, setMeasuredText] = useState(initialText);
   // The padded, unclamped mirror height, measured by the hidden Text node.
   const [contentHeight, setContentHeight] = useState(minHeight);
-  // The clamped height published to the caller, re-clamped whenever the
-  // content, the minimum, or the remaining-space cap changes.
-  const [height, setHeight] = useState(minHeight);
+  // The content height the caller's real `TextInput` last reported through
+  // `setNativeContentHeight`, in dp, including the input's own vertical
+  // padding. It is the only faithful measure of the pitch that input lays lines
+  // out at: the mirror `Text` honors `lineHeight`, while the native input uses
+  // the platform's own line box.
+  const [nativeContentHeight, setNativeContentHeightInState] = useState<number | null>(null);
+  // The pitch the last recorded report implied and the line count it was
+  // measured over. A report that keeps that pitch within
+  // `NATIVE_PITCH_STABLE_STEP`, at that same line count, is dropped without a
+  // state update: the report arrives on every native content-size event, and
+  // scheduling one per report re-rendered the caller's whole composer and its
+  // input on each one.
+  const acceptedPitchRef = useRef<number | null>(null);
+  const acceptedLineCountRef = useRef<number | null>(null);
   const measuredText = text.length === 0 || text.endsWith('\n') ? `${text} ` : text;
   const measurementWidth = Math.max(textContentWidth, 0);
   // Pre-scale only when the caller opted in (the agent composers). The
@@ -89,6 +108,37 @@ export function useTextHeight({
     nativeContentHeight != null && nativeContentHeight > verticalPadding
       ? (nativeContentHeight - verticalPadding) / mirrorLineCount
       : null;
+  /**
+   * The caller's `onContentSizeChange` report. Records the height only when the
+   * pitch it implies (at the mirror's current line count) has moved by at least
+   * `NATIVE_PITCH_STABLE_STEP`, or when the report is measured over a different
+   * line count than the last recorded one; a report that keeps the pitch where
+   * it was, at the count it was measured over, does not schedule an update at
+   * all, so the caller does not re-render its input on every native
+   * content-size event. The line count is part of the key because the snap
+   * divides the recorded height by the *current* count: a height left behind at
+   * an earlier count would decay the estimated pitch and unsnap the cap as the
+   * draft grows, so a report that follows a line growth must be recorded even
+   * when the pitch it implies is unchanged.
+   */
+  function setNativeContentHeight(nextContentHeight: number): void {
+    const nextPitch =
+      nextContentHeight > verticalPadding && mirrorLineCount > 0
+        ? (nextContentHeight - verticalPadding) / mirrorLineCount
+        : null;
+    const acceptedPitch = acceptedPitchRef.current;
+    if (
+      nextPitch !== null &&
+      acceptedPitch !== null &&
+      acceptedLineCountRef.current === mirrorLineCount &&
+      Math.abs(nextPitch - acceptedPitch) < NATIVE_PITCH_STABLE_STEP
+    ) {
+      return;
+    }
+    acceptedPitchRef.current = nextPitch;
+    acceptedLineCountRef.current = mirrorLineCount;
+    setNativeContentHeightInState(nextContentHeight);
+  }
   // `minHeight` is the caller's one-line floor in the requested line box
   // (`scaledLineHeight + padding`), while the snap floors to the pitch the
   // native input really renders. A cap that lands on the minimum would publish
@@ -121,10 +171,12 @@ export function useTextHeight({
     setContentHeight(paddedHeight);
   }
 
-  useEffect(() => {
-    const nextHeight = Math.min(Math.max(contentHeight, minHeight), effectiveMaxHeight);
-    setHeight(current => (current === nextHeight ? current : nextHeight));
-  }, [contentHeight, minHeight, effectiveMaxHeight]);
+  // The clamped height this hook publishes: a pure function of the measured
+  // content, the caller's floor, and the remaining-space cap. It is derived in
+  // render instead of held in state: a state copy re-clamped in an effect
+  // published the previous height together with the new cap — two notifications
+  // of the caller, and so two commits, for one change.
+  const height = Math.min(Math.max(contentHeight, minHeight), effectiveMaxHeight);
 
   function setText(nextText: string) {
     setMeasuredText(nextText);
@@ -158,7 +210,14 @@ export function useTextHeight({
       </View>
     ) : null;
 
-  return { height, maxHeight: effectiveMaxHeight, measureElement, reset, setText };
+  return {
+    height,
+    maxHeight: effectiveMaxHeight,
+    measureElement,
+    reset,
+    setNativeContentHeight,
+    setText,
+  };
 }
 
 const hiddenContainer: ViewStyle = {

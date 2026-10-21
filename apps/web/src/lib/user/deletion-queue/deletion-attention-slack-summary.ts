@@ -2,7 +2,11 @@ import 'server-only';
 
 import { sql } from 'drizzle-orm';
 import { user_deletion_requests, user_deletion_steps } from '@kilocode/db/schema';
-import { UserDeletionRequestStatus, UserDeletionStepStatus } from '@kilocode/db/schema-types';
+import {
+  UserDeletionRequestStatus,
+  UserDeletionStepKey,
+  UserDeletionStepStatus,
+} from '@kilocode/db/schema-types';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -125,6 +129,7 @@ export async function getUserDeletionAttentionSnapshot(): Promise<UserDeletionAt
           SELECT 1
           FROM ${user_deletion_steps}
           WHERE ${user_deletion_steps.request_id} = ${user_deletion_requests.id}
+            AND ${user_deletion_steps.step_key} <> ${UserDeletionStepKey.CsaSupportDb}
             AND ${user_deletion_steps.status} IN (${attentionStepStatuses})
         ) AS has_step_attention
       FROM ${user_deletion_requests}

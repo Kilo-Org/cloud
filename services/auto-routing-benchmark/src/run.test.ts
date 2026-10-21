@@ -3,15 +3,15 @@ import type { CaseResultRow } from './db';
 import {
   BenchmarkJobMessageSchema,
   buildClassifierMessages,
-  buildDeciderMessages,
   chunkArray,
-  computeDeciderShardCount,
   computeEngineIdentity,
+  deciderCasesForRouter,
   getDeciderContainerInstanceName,
   runCasesWithConcurrency,
   summarize,
 } from './run';
 import { pickClassifierWinner } from './winner';
+import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 
 function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
   return {
@@ -33,6 +33,7 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
     last_event_types: null,
     rep: 0,
     timed_out: 0,
+    prompt_revision: 2,
     ...overrides,
   };
 }
@@ -315,7 +316,33 @@ describe('computeEngineIdentity', () => {
   });
 
   it('is versioned (carries the engine version prefix)', () => {
-    expect(computeEngineIdentity('decider')).toMatch(/^v\d+:[0-9a-f]{8}$/);
+    expect(computeEngineIdentity('decider')).toMatch(/^efficient:v\d+:[0-9a-f]{8}$/);
+    expect(computeEngineIdentity('classifier')).toMatch(/^efficient:v1:[0-9a-f]{8}$/);
+  });
+
+  it('defaults to efficient and keeps the classifier shared', () => {
+    expect(computeEngineIdentity('decider')).toBe(computeEngineIdentity('decider', 'efficient'));
+    expect(computeEngineIdentity('classifier', 'frontier')).toBe(
+      computeEngineIdentity('classifier')
+    );
+  });
+
+  it('selects the frontier dataset and hashes every selected input', () => {
+    expect(deciderCasesForRouter()).toBe(DECIDER_CASES);
+    expect(deciderCasesForRouter('frontier')).toBe(FRONTIER_CASES);
+    expect(FRONTIER_CASES.every(c => c.tier === 'frontier')).toBe(true);
+    expect(computeEngineIdentity('decider', 'frontier')).not.toBe(computeEngineIdentity('decider'));
+    for (const router of ['efficient', 'frontier'] as const) {
+      let hash = 0x811c9dc5;
+      const signature = JSON.stringify(deciderCasesForRouter(router));
+      for (let i = 0; i < signature.length; i++) {
+        hash ^= signature.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193);
+      }
+      expect(computeEngineIdentity('decider', router)).toBe(
+        `${router}:v1:${(hash >>> 0).toString(16).padStart(8, '0')}`
+      );
+    }
   });
 });
 
@@ -500,179 +527,54 @@ describe('summarize — p95 and timeouts', () => {
   });
 });
 
-describe('decider message fan-out', () => {
-  it('DECIDER_CHUNK_SIZE is 5', () => {
-    const chunks = chunkArray(
-      Array.from({ length: 76 }, (_, i) => String(i)),
-      5
-    );
-    expect(chunks).toHaveLength(16);
-  });
-
-  it('message schema accepts and defaults rep', () => {
-    const msg = BenchmarkJobMessageSchema.parse({ runId: 'r1', kind: 'classifier', model: 'm1' });
-    expect(msg.rep).toBeUndefined();
-    const withRep = BenchmarkJobMessageSchema.parse({
+describe('decider scheduler message compatibility', () => {
+  it('accepts token-owned claims without legacy chunk ownership', () => {
+    const message = {
       runId: 'r1',
       kind: 'decider',
       model: 'm1',
+      claimId: 'chunk-1',
+      claimToken: 'lease-1',
+    };
+    expect(BenchmarkJobMessageSchema.parse(message)).toEqual(message);
+  });
+
+  it('accepts scheduler wakeups without a claim', () => {
+    const message = { runId: 'r1', kind: 'decider', model: 'm1', schedulerWake: true };
+    expect(BenchmarkJobMessageSchema.parse(message)).toEqual(message);
+  });
+
+  it.each(['claimId', 'claimToken'])('rejects empty %s values', field => {
+    expect(
+      BenchmarkJobMessageSchema.safeParse({
+        runId: 'r1',
+        kind: 'decider',
+        model: 'm1',
+        claimId: 'chunk-1',
+        claimToken: 'lease-1',
+        [field]: '',
+      }).success
+    ).toBe(false);
+  });
+
+  it('retains pre-scheduler payloads for whole-run migration', () => {
+    const legacy = {
+      runId: 'r1',
+      kind: 'decider',
+      model: 'm1',
+      variant: 'max',
       rep: 2,
       shard: 1,
       shardCount: 4,
       caseIds: ['a'],
       chunk: 0,
-    });
-    expect(withRep.rep).toBe(2);
-    expect(withRep.shard).toBe(1);
-    expect(withRep.shardCount).toBe(4);
-  });
-
-  it('computeDeciderShardCount maximizes shard lanes under the live container cap', () => {
-    // No explicit budget → the full container cap.
-    expect(computeDeciderShardCount({ modelCount: 2, repetitions: 3, chunkCount: 36 })).toBe(33);
-    expect(
-      computeDeciderShardCount({
-        modelCount: 2,
-        repetitions: 3,
-        chunkCount: 36,
-        maxLiveContainers: 100,
-      })
-    ).toBe(16);
-    expect(
-      computeDeciderShardCount({
-        modelCount: 7,
-        repetitions: 1,
-        chunkCount: 36,
-        maxLiveContainers: 100,
-      })
-    ).toBe(14);
-    expect(
-      computeDeciderShardCount({
-        modelCount: 25,
-        repetitions: 1,
-        chunkCount: 36,
-        maxLiveContainers: 100,
-      })
-    ).toBe(4);
-    expect(
-      computeDeciderShardCount({
-        modelCount: 10,
-        repetitions: 3,
-        chunkCount: 36,
-        maxLiveContainers: 100,
-      })
-    ).toBe(3);
-    expect(
-      computeDeciderShardCount({
-        modelCount: 101,
-        repetitions: 1,
-        chunkCount: 36,
-        maxLiveContainers: 100,
-      })
-    ).toBe(0);
-  });
-
-  it('buildDeciderMessages: seeds sharded chunk lanes under the container cap', () => {
-    const cases180 = Array.from({ length: 180 }, (_, i) => ({ id: `case-${i}` }));
-    const chunks = chunkArray(cases180, 5);
-    expect(chunks).toHaveLength(36);
-
-    const models = ['model/a', 'model/b'];
-    const repetitions = 3;
-    const maxLiveContainers = 100;
-    const messages = buildDeciderMessages(
-      'run-test',
-      'decider',
-      models,
-      repetitions,
-      chunks,
-      maxLiveContainers
-    );
-    const expectedShardCount = 16;
-
-    // Initial fan-out is bounded by the queue's container budget while running
-    // multiple independent chunk lanes per model/repetition.
-    expect(messages).toHaveLength(models.length * repetitions * expectedShardCount);
-    expect(messages.length).toBeLessThanOrEqual(maxLiveContainers);
-
-    for (let rep = 0; rep < repetitions; rep++) {
-      const forRep = messages.filter(m => m.body.rep === rep);
-      expect(forRep).toHaveLength(models.length * expectedShardCount);
-    }
-
-    for (const { body } of messages) {
-      expect(typeof body.rep).toBe('number');
-      expect(body.rep).toBeGreaterThanOrEqual(0);
-      expect(body.rep).toBeLessThan(repetitions);
-      expect(body.shardCount).toBe(expectedShardCount);
-      expect(body.shard).toBeGreaterThanOrEqual(0);
-      expect(body.shard).toBeLessThan(expectedShardCount);
-      expect(body.chunk).toBe(body.shard);
-      expect(body.caseIds).toEqual(chunks[body.shard!]?.map(c => c.id));
-    }
-  });
-
-  it('getDeciderContainerInstanceName reuses one container per model repetition shard', () => {
-    const base = {
-      runId: 'run-test',
-      kind: 'decider' as const,
-      model: 'model/a',
-      variant: null as string | null,
-      rep: 2,
+      chunkSize: 1,
+      importedChunks: [0],
     };
-    expect(getDeciderContainerInstanceName({ ...base, chunk: 0, shard: 0 })).toBe(
-      'run-test:model/a::2:0'
-    );
-    expect(getDeciderContainerInstanceName({ ...base, chunk: 16, shard: 0 })).toBe(
-      'run-test:model/a::2:0'
-    );
-    expect(getDeciderContainerInstanceName({ ...base, chunk: 1, shard: 1 })).toBe(
-      'run-test:model/a::2:1'
-    );
+    expect(BenchmarkJobMessageSchema.parse(legacy)).toEqual(legacy);
   });
 
-  it('two variants of one model get distinct queue messages and container lanes', () => {
-    const chunks = chunkArray(
-      Array.from({ length: 10 }, (_, i) => ({ id: `c${i}` })),
-      5
-    );
-    const entries = [
-      { model: 'model/a', variant: 'xhigh' as string | null },
-      { model: 'model/a', variant: 'max' as string | null },
-    ];
-    const messages = buildDeciderMessages('run-v', 'decider', entries, 1, chunks, 100);
-    const models = messages.map(m => m.body.model);
-    const variants = messages.map(m => m.body.variant);
-    expect(new Set(models)).toEqual(new Set(['model/a']));
-    expect(new Set(variants)).toEqual(new Set(['xhigh', 'max']));
-    expect(
-      getDeciderContainerInstanceName({
-        runId: 'run-v',
-        model: 'model/a',
-        variant: 'xhigh',
-        rep: 0,
-        shard: 0,
-      })
-    ).not.toBe(
-      getDeciderContainerInstanceName({
-        runId: 'run-v',
-        model: 'model/a',
-        variant: 'max',
-        rep: 0,
-        shard: 0,
-      })
-    );
-  });
-
-  it('message schema accepts optional nullable variant', () => {
-    expect(
-      BenchmarkJobMessageSchema.parse({
-        runId: 'r1',
-        kind: 'decider',
-        model: 'm1',
-        variant: 'xhigh',
-      }).variant
-    ).toBe('xhigh');
+  it('keeps nullable variants and optional classifier repetition compatible', () => {
     expect(
       BenchmarkJobMessageSchema.parse({
         runId: 'r1',
@@ -681,6 +583,21 @@ describe('decider message fan-out', () => {
         variant: null,
       }).variant
     ).toBeNull();
+    expect(
+      BenchmarkJobMessageSchema.parse({ runId: 'r1', kind: 'classifier', model: 'm1' }).rep
+    ).toBeUndefined();
+  });
+
+  it('retains run-scoped container identity only for legacy cleanup', () => {
+    expect(
+      getDeciderContainerInstanceName({
+        runId: 'legacy',
+        model: 'm1',
+        variant: 'max',
+        rep: 2,
+        shard: 3,
+      })
+    ).toBe('legacy:m1:max:2:3');
   });
 });
 

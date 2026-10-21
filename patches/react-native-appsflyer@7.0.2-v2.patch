@@ -1,0 +1,43 @@
+diff --git a/android/build.gradle b/android/build.gradle
+index 72eb7862a2530439bd7227adc0649fcfa33fcb80..7f673a4731cdb427fc5da2fb120a58c90d01686b 100755
+--- a/android/build.gradle
++++ b/android/build.gradle
+@@ -85,7 +85,7 @@ repositories {
+ }
+ 
+ dependencies {
+-    implementation "org.jetbrains.kotlin:kotlin-stdlib:${safeExtGet('kotlin_stdlib_version', '2.4.10')}"
++    implementation "org.jetbrains.kotlin:kotlin-stdlib:${safeExtGet('kotlin_stdlib_version', safeExtGet('kotlinVersion', '2.4.10'))}"
+     implementation "com.facebook.react:react-native:${safeExtGet('reactNativeVersion', '+')}"
+     implementation "com.android.installreferrer:installreferrer:${safeExtGet('installReferrerVersion', '2.2')}"
+     if (includeConnector){
+diff --git a/index.ts b/index.ts
+index 8500ac7746987997d16be5f47c2b1ea77cdef4b1..95d31de8620298062e12b879c68cb4cdbe7a9040 100644
+--- a/index.ts
++++ b/index.ts
+@@ -16,6 +16,7 @@ import {
+ export * from "@appsflyer-sdk/js-core-plugin";
+ 
+ // 7.0.0+ has no legacy-bridge fallback — fail fast on Old Architecture instead of a confusing native crash later; skipped under Jest (no RN globals).
++// @ts-ignore -- consumers type-check this source; a jest type namespace without a value makes `typeof jest` TS2708.
+ if (typeof jest === "undefined") {
+   const isNewArchitectureEnabled =
+     (globalThis as any).RN$Bridgeless === true ||
+@@ -54,7 +55,7 @@ export type SubscriptionPurchaseEventDataSource = PurchaseEventDataSourceBase;
+ export type InAppPurchaseEventDataSource = PurchaseEventDataSourceBase;
+ 
+ export interface PurchaseConnector {
+-  create(config: PurchaseConnectorConfig): void;
++  create(config: PurchaseConnectorConfig): Promise<void>;
+   startObservingTransactions(): void;
+   stopObservingTransactions(): void;
+ 
+@@ -257,7 +258,7 @@ AppsFlyerPurchaseConnector.create = (config: PurchaseConnectorConfig) => {
+   if (!config) {
+     throw new MissingConfigurationException();
+   }
+-  PCAppsFlyer.create(config);
++  return PCAppsFlyer.create(config);
+ };
+ 
+ export { AppsFlyerPurchaseConnector };

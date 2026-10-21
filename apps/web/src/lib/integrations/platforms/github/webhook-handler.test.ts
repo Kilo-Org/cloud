@@ -1,4 +1,4 @@
-import type { NextRequest } from 'next/server';
+import { after, type NextRequest } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 
 jest.mock('@sentry/nextjs', () => ({
@@ -15,7 +15,6 @@ const mockGetIntegrationForOrganization = jest.fn();
 const mockLogWebhookEvent = jest.fn();
 const mockUpdateWebhookEvent = jest.fn();
 const mockHandlePullRequest = jest.fn();
-const mockHandlePRReviewComment = jest.fn();
 const mockHandleGitHubReviewCommentReply = jest.fn();
 const mockHandleInstallationTargetRenamed = jest.fn();
 const mockRevokeStoredGitHubUserAuthorization = jest.fn();
@@ -87,12 +86,8 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
     mockHandleInstallationUnsuspend(payload, appType),
   handleInstallationTargetRenamed: (payload: unknown, appType: string) =>
     mockHandleInstallationTargetRenamed(payload, appType),
-  handleIssue: jest.fn(),
-  handlePRReviewComment: (payload: unknown, platformIntegration: unknown) =>
-    mockHandlePRReviewComment(payload, platformIntegration),
   handlePullRequest: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePullRequest(payload, platformIntegration),
-  handlePushEvent: jest.fn(),
   upsertCliSessionPullRequestsFromWebhook: jest.fn(),
   upsertCliSessionPullRequestReviewFromWebhook: jest.fn(),
 }));
@@ -118,7 +113,7 @@ jest.mock('next/server', () => {
   const actual = jest.requireActual('next/server');
   return {
     ...actual,
-    after: (fn: () => unknown) => fn(),
+    after: jest.fn((fn: () => unknown) => fn()),
   };
 });
 
@@ -253,7 +248,6 @@ describe('handleGitHubWebhook', () => {
     mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: false });
     mockUpdateWebhookEvent.mockResolvedValue(undefined);
     mockHandlePullRequest.mockResolvedValue(Response.json({ message: 'review queued' }));
-    mockHandlePRReviewComment.mockResolvedValue(undefined);
     mockHandleGitHubReviewCommentReply.mockResolvedValue({
       recorded: false,
       reason: 'not-review-comment-reply',
@@ -445,14 +439,62 @@ describe('handleGitHubWebhook', () => {
       expect.objectContaining(payload),
       integration
     );
-    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
       expect.objectContaining({ handlers_triggered: ['code_review', 'cli_session_pr_upsert'] })
     );
   });
 
-  it('keeps pull_request_review_comment created events on the legacy auto-fix path', async () => {
+  it.each([
+    { ref: 'refs/heads/main', deleted: false },
+    { ref: 'refs/heads/feature', deleted: false },
+    { ref: 'refs/tags/v1', deleted: false },
+    { ref: 'refs/heads/main', deleted: true },
+  ])('acknowledges push $ref (deleted=$deleted) without scheduling builds', async push => {
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('push', {
+        ...push,
+        installation: { id: 98765 },
+        repository: { full_name: 'acme/widgets' },
+      }),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Event received' });
+    expect(after).not.toHaveBeenCalled();
+    expect(mockHandlePullRequest).not.toHaveBeenCalled();
+  });
+
+  it('still rejects malformed push payloads without scheduling work', async () => {
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('push', { installation: { id: 98765 }, ref: 'refs/heads/main' }),
+      'standard'
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Invalid push event payload' });
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  it('still rejects unauthenticated pushes without scheduling work', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue(false);
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('push', {
+        installation: { id: 98765 },
+        ref: 'refs/heads/main',
+        repository: { full_name: 'acme/widgets' },
+      }),
+      'standard'
+    );
+
+    expect(response.status).toBe(401);
+    expect(after).not.toHaveBeenCalled();
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+  });
+
+  it('routes pull_request_review_comment created events to review memory feedback', async () => {
     const response = await handleGitHubWebhook(
       signedGitHubRequest('pull_request_review_comment', reviewCommentPayload()),
       'standard'
@@ -461,13 +503,15 @@ describe('handleGitHubWebhook', () => {
     expect(response.status).toBe(200);
     await waitForAfterTask();
     expect(mockHandlePullRequest).not.toHaveBeenCalled();
-    expect(mockHandlePRReviewComment).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'created' }),
-      integration
+    expect(mockHandleGitHubReviewCommentReply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ action: 'created' }),
+        integration,
+      })
     );
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
-      expect.objectContaining({ handlers_triggered: ['pr_review_comment_fix'] })
+      expect.objectContaining({ handlers_triggered: [] })
     );
   });
 
@@ -483,7 +527,6 @@ describe('handleGitHubWebhook', () => {
 
     expect(response.status).toBe(200);
     await waitForAfterTask();
-    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
   });
 
   it('returns 500 when the runtime availability query fails unexpectedly', async () => {
@@ -495,7 +538,6 @@ describe('handleGitHubWebhook', () => {
       'standard'
     );
     expect(response.status).toBe(500);
-    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
   });
 
   it('captures the 500 path with safe delivery tags and no payload or secret', async () => {
@@ -549,7 +591,7 @@ describe('handleGitHubWebhook', () => {
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
       expect.objectContaining({
-        handlers_triggered: ['pr_review_comment_fix', 'review_memory_feedback'],
+        handlers_triggered: ['review_memory_feedback'],
       })
     );
   });
@@ -563,7 +605,6 @@ describe('handleGitHubWebhook', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ message: 'Event received' });
     expect(mockHandlePullRequest).not.toHaveBeenCalled();
-    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
   });
 
   it('acknowledges non-created issue_comment events without invoking the bot', async () => {
@@ -575,7 +616,6 @@ describe('handleGitHubWebhook', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ message: 'Event received' });
     expect(mockHandlePullRequest).not.toHaveBeenCalled();
-    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
   });
 
   it.each(['standard', 'lite'] as const)(

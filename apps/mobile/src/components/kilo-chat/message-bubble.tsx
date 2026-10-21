@@ -102,8 +102,6 @@ function MessageBubbleComponent({
     longPressHighlight.value = withTiming(feedback.highlightOpacity, { duration: 180 });
   }
 
-  // Stable identity so forwarding it into the markdown code fences' copy
-  // trigger does not rebuild the markdown renderer on every bubble render.
   const handleLongPress = useCallback(() => {
     const feedback = resolveLongPressFeedback({ pressed: true, longPressed: true });
     pressScale.value = withSequence(
@@ -250,9 +248,6 @@ function MessageBubbleComponent({
               pendingActionGroupId={pendingActionGroupId}
               replyToMessage={replyToMessage}
               onExecuteAction={onExecuteAction}
-              // The copy trigger is a nested Pressable that would otherwise
-              // swallow the bubble's long-press, so forward it into code fences.
-              onLongPressCode={onLongPress ? handleLongPress : undefined}
             />
 
             {!showAuthor && timestamp !== null && (

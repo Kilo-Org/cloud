@@ -1,9 +1,8 @@
 /* eslint-disable max-lines -- the spectator describe adds a transcript-state suite on top of the existing outcome-first contract; they share one mock harness */
 
-// Outcome-first detail-screen contract: the screen leads with the conclusion
-// (status + error), then findings, council, gate, and metadata. A null council
-// result renders "No findings" (not a success checkmark). A permanent error
-// (NOT_FOUND/FORBIDDEN/UNAUTHORIZED) shows no Retry; a transient error does.
+// Outcome-first detail-screen contract: conclusion, findings, council, gate,
+// then metadata. Failed reviews must not imply a clean result or expose raw
+// failures. Permanent query errors have no Retry; transient errors do.
 
 import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -11,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MetaRow } from '@/components/code-reviewer/review-detail-sections';
 import { i18n } from '@/i18n';
+import { openExternalUrl } from '@/lib/external-link';
 import { ReviewDetailScreen } from './review-detail-screen';
 
 const detail = vi.hoisted(() => ({
@@ -38,7 +38,6 @@ const buttons = vi.hoisted(() => ({
 const viewRenders = vi.hoisted(() => ({
   list: [] as { style?: unknown; className?: string; children?: unknown }[],
 }));
-const modalRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
 const nativePlatform = vi.hoisted(() => ({ OS: 'ios' }));
 const sessionListRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
 const composerRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
@@ -64,6 +63,11 @@ const statusHelpers = vi.hoisted(() => ({
   cancellable: false,
   retriggerable: false,
 }));
+const reviewConfig = vi.hoisted(() => ({
+  query: { isPending: false, data: undefined as unknown },
+  calls: [] as { scope: string; platform: string; enabled: boolean | undefined }[],
+}));
+const routerMock = vi.hoisted(() => ({ push: vi.fn() }));
 const spectatorStream = vi.hoisted(() => ({
   createReviewSpectatorStream: vi.fn(),
 }));
@@ -72,10 +76,6 @@ vi.mock('react-native', () => ({
   View: (props: { style?: unknown; className?: string; children?: ReactNode }) => {
     viewRenders.list.push(props);
     return createElement('View', props, props.children);
-  },
-  Modal: (props: { visible?: boolean; children?: ReactNode }) => {
-    modalRenders.list.push(props);
-    return props.visible ? createElement('Modal', props, props.children) : null;
   },
   Pressable: 'Pressable',
   Platform: nativePlatform,
@@ -96,7 +96,7 @@ vi.mock('react-native-reanimated', () => ({
   FadeOut: { duration: vi.fn() },
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => routerMock,
 }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
@@ -142,13 +142,6 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: ({ children }: { children?: unknown }) => children,
 }));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'pr-review',
-  useFeatureFlag: () => true,
-}));
-vi.mock('@/lib/code-reviewer-open-pr-destination', () => ({
-  resolveCodeReviewerOpenPrDestination: () => ({ kind: 'browser' }),
-}));
 vi.mock('@/lib/code-reviewer-config', () => ({
   reviewerPlatformLabel: () => 'GitHub',
 }));
@@ -157,6 +150,13 @@ vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useReviewDetail: () => detail,
   useCancelReview: () => ({ isPending: false, mutate: vi.fn() }),
   useRetriggerReview: () => ({ isPending: false, mutate: vi.fn() }),
+}));
+vi.mock('@/lib/hooks/use-code-reviewer', () => ({
+  isPersonal: (scope: string) => scope === 'personal',
+  useReviewConfig: (scope: string, platform: string, options?: { enabled?: boolean }) => {
+    reviewConfig.calls.push({ scope, platform, enabled: options?.enabled });
+    return reviewConfig.query;
+  },
 }));
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
@@ -221,6 +221,11 @@ function collectText(node: unknown): string[] {
   return [];
 }
 
+/** The native transcript sheet host, absent until the sheet is opened. */
+function transcriptSheets(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(node => (node.type as string) === 'BottomSheet');
+}
+
 function makeReview(over: Record<string, unknown> = {}) {
   return {
     pr_title: 'Fix login',
@@ -256,11 +261,11 @@ function openTranscriptSheet() {
   act(open.onPress);
 }
 
-function mountScreen(openTranscript = false) {
+function mountScreen(openTranscript = false, scope = 'personal') {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
-      createElement(ReviewDetailScreen, { scope: 'personal', reviewId: 'rev-1' })
+      createElement(ReviewDetailScreen, { scope, reviewId: 'rev-1' })
     );
   });
   const renderer = ref.current;
@@ -296,7 +301,10 @@ beforeEach(() => {
   queryErrors.errors = [];
   buttons.rendered = [];
   viewRenders.list = [];
-  modalRenders.list = [];
+  reviewConfig.query = { isPending: false, data: undefined };
+  reviewConfig.calls = [];
+  routerMock.push.mockClear();
+  vi.mocked(openExternalUrl).mockClear();
   nativePlatform.OS = 'ios';
   sessionListRenders.list = [];
   composerRenders.list = [];
@@ -359,24 +367,28 @@ describe('ReviewDetailScreen outcome-first order', () => {
     expect(texts).toContain('$123.00');
   });
 
-  it('shows the error message inside the conclusion', () => {
+  it.each([
+    ['unrecognized internal failure', 'codeReviewer.reviewDetail.reviewFailed'],
+    [
+      'Dispatch failed: could not reach the code review service. ' +
+        'It may be offline — retry the review once it is running.',
+      'codeReviewer.reviewDetail.serviceUnavailable',
+    ],
+  ] as const)('localizes persisted failure %s inside the conclusion', (errorMessage, key) => {
     detail.data = {
       success: true,
-      review: makeReview({ error_message: 'review crashed' }),
+      review: makeReview({ status: 'failed', error_message: errorMessage }),
       tokenUsage: { input: 0, output: 0 },
     };
 
     const texts = renderScreen();
-
-    expect(texts).toContain('review crashed');
-    expect(texts.indexOf('Completed')).toBeLessThan(texts.indexOf('review crashed'));
+    expect(texts).toContain(i18n.t(key));
+    expect(texts).not.toContain(errorMessage);
+    expect(texts).toContain('failed');
+    expect(texts.indexOf('failed')).toBeLessThan(texts.indexOf(i18n.t(key)));
   });
 
-  it('clamps a multi-kilobyte failure dump so the retry action stays mounted', () => {
-    // A failed admission stores the raw upstream error (a serialized TRPC
-    // stack) in `error_message`. Rendered unclamped it filled the screen and
-    // pushed "Retry review" below the fold (e1-review-status.png), leaving no
-    // visible way out. The failure block must keep a bounded height.
+  it('replaces a failure dump while keeping retry mounted', () => {
     statusHelpers.retriggerable = true;
     const dump = `Dispatch failed: ${'at Object.<anonymous> (worker.js:1:1234)\n'.repeat(60)}`;
     detail.data = {
@@ -385,18 +397,49 @@ describe('ReviewDetailScreen outcome-first order', () => {
       tokenUsage: { input: 0, output: 0 },
     };
 
-    const renderer = mountScreen();
-    const texts = collectText(renderer.toJSON());
+    const texts = renderScreen();
     expect(texts).toContain('Retry review');
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+    expect(texts.join(' ')).not.toContain('worker.js');
+  });
 
-    const errorNode = renderer.root.findAll(
-      node =>
-        (node.type as string) === 'Text' &&
-        collectText([node.props.children]).some(text => text.includes('Dispatch failed:'))
-    )[0];
-    expect(errorNode).toBeDefined();
-    expect(typeof errorNode?.props.numberOfLines).toBe('number');
-    expect(errorNode?.props.numberOfLines).toBeLessThanOrEqual(4);
+  it('shows generic failure copy when a failed review has no persisted message', () => {
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    expect(renderScreen()).toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+  });
+
+  it.each(['cancelled', 'interrupted'])('preserves the reason for a %s review', status => {
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status,
+        terminal_reason: 'superseded',
+        error_message: 'Superseded by new push',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    const texts = renderScreen();
+    expect(texts).toContain('Superseded by new push');
+    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+  });
+
+  it('uses existing localized copy for a typed action-required failure', () => {
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'failed',
+        terminal_reason: 'byok_invalid_key',
+        error_message: 'Raw diagnostic',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    const texts = renderScreen();
+    expect(texts).toContain(i18n.t('codeReviewer.actionRequired.byokInvalidKey.description'));
+    expect(texts).not.toContain('Raw diagnostic');
   });
 });
 
@@ -491,6 +534,49 @@ describe('ReviewDetailScreen empty council', () => {
 
     expect(texts).toContain('No findings');
   });
+
+  it.each([
+    null,
+    {
+      decision: null,
+      specialists: [{ findings: [], name: 'Security', id: 'sec', vote: null }],
+    },
+  ])('shows unavailable results for an empty failed review', councilResult => {
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed', council_result: councilResult }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    const texts = renderScreen();
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.findingsUnavailable'));
+    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.noFindings'));
+  });
+
+  it.each(['failed', 'completed'])('preserves findings from a %s review', status => {
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status,
+        council_result: {
+          decision: null,
+          specialists: [
+            {
+              id: 'sec',
+              name: 'Security',
+              vote: null,
+              findings: [{ path: 'a.ts', severity: 'warning', rationale: 'Preserved finding' }],
+            },
+            { id: 'other', name: 'Other', vote: null, findings: [] },
+          ],
+        },
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    const texts = renderScreen();
+    expect(texts).toContain('Preserved finding');
+    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.findingsUnavailable'));
+    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.noFindings'));
+  });
 });
 
 describe('ReviewDetailScreen redacted check run', () => {
@@ -505,6 +591,83 @@ describe('ReviewDetailScreen redacted check run', () => {
 
     expect(texts).toContain('Hidden');
     expect(texts).not.toContain('None');
+  });
+});
+
+describe('ReviewDetailScreen gate threshold', () => {
+  it.each([
+    ['off', 'codeReviewer.gate.off'],
+    ['all', 'codeReviewer.gate.all'],
+    ['critical', 'codeReviewer.gate.critical'],
+    ['warning', 'codeReviewer.gate.warning'],
+    ['future-threshold', 'common.unknown'],
+  ] as const)('localizes %s', (threshold, key) => {
+    detail.data = {
+      success: true,
+      review: makeReview({ manual_config: { agentConfig: { gate_threshold: threshold } } }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    const renderer = mountScreen();
+    const row = renderer.root.findAll(
+      node =>
+        node.type === MetaRow && node.props.label === i18n.t('codeReviewer.reviewDetail.threshold')
+    );
+    expect(row).toHaveLength(1);
+    expect(collectText(row[0]?.children ?? [])).toEqual([
+      i18n.t('codeReviewer.reviewDetail.threshold'),
+      i18n.t(key),
+    ]);
+  });
+});
+
+describe('ReviewDetailScreen pull request destination', () => {
+  it.each([
+    ['github', 'https://github.com/org/repo/pull/42'],
+    ['gitlab', 'https://gitlab.com/org/repo/-/merge_requests/42'],
+    ['bitbucket', 'https://bitbucket.org/org/repo/pull-requests/42'],
+  ])('opens organization %s reviews at their persisted URL', (platform, prUrl) => {
+    detail.data = {
+      success: true,
+      review: makeReview({ platform, pr_url: prUrl }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    mountScreen(false, 'org-1');
+    const button = buttons.rendered.find(
+      candidate => buttonText(candidate) === i18n.t('common.openPullRequest')
+    );
+    expect(button?.onPress).toBeDefined();
+    act(() => button?.onPress?.());
+    expect(openExternalUrl).toHaveBeenCalledWith(prUrl, { label: i18n.t('common.pullRequest') });
+    expect(routerMock.push).not.toHaveBeenCalled();
+  });
+
+  it('keeps personal GitHub reviews in app', () => {
+    detail.data = { success: true, review: makeReview(), tokenUsage: { input: 0, output: 0 } };
+    mountScreen();
+    const button = buttons.rendered.find(
+      candidate => buttonText(candidate) === i18n.t('common.openPullRequest')
+    );
+    expect(button?.onPress).toBeDefined();
+    act(() => button?.onPress?.());
+    expect(routerMock.push).toHaveBeenCalledWith('/(app)/pr-review/org/repo/42');
+    expect(openExternalUrl).not.toHaveBeenCalled();
+  });
+
+  it('keeps the personal browser fallback for unrecognized URLs', () => {
+    const prUrl = 'https://github.example.com/org/repo/pull/42';
+    detail.data = {
+      success: true,
+      review: makeReview({ pr_url: prUrl }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    mountScreen();
+    const button = buttons.rendered.find(
+      candidate => buttonText(candidate) === i18n.t('common.openPullRequest')
+    );
+    expect(button?.onPress).toBeDefined();
+    act(() => button?.onPress?.());
+    expect(openExternalUrl).toHaveBeenCalledWith(prUrl, { label: i18n.t('common.pullRequest') });
+    expect(routerMock.push).not.toHaveBeenCalled();
   });
 });
 
@@ -606,12 +769,13 @@ describe('ReviewDetailScreen transcript sheet', () => {
   });
 
   it('shows a transcript button without mounting the transcript inline', () => {
-    const texts = renderScreen();
+    const renderer = mountScreen();
+    const texts = collectText(renderer.toJSON());
 
     expect(texts).toContain('Session transcript');
     expect(texts).not.toContain('Waiting for the review transcript.');
     expect(texts).not.toContain('Done');
-    expect(modalRenders.list.at(-1)?.visible).toBe(false);
+    expect(transcriptSheets(renderer)).toHaveLength(0);
     expect(sessionListRenders.list).toHaveLength(0);
     expect(spectatorStream.createReviewSpectatorStream).not.toHaveBeenCalled();
   });
@@ -629,18 +793,30 @@ describe('ReviewDetailScreen transcript sheet', () => {
         await Promise.resolve();
       });
 
-      const modal = modalRenders.list.at(-1);
-      expect(modal?.visible).toBe(true);
-      expect(modal?.animationType).toBe('slide');
-      expect(modal?.presentationStyle).toBe(platform === 'ios' ? 'pageSheet' : undefined);
+      const sheet = transcriptSheets(renderer)[0];
+      expect(sheet?.props.index).toBe(0);
+      expect(sheet?.props.snapPoints).toEqual(['100%']);
       expect(collectText(renderer.toJSON())).toContain('Done');
       expect(connection.connect).toHaveBeenCalledTimes(1);
       expect(composerRenders.list).toHaveLength(0);
 
+      // Android expands the sheet over the status bar, so the surface pads the
+      // top inset; iOS presents below it and pads nothing.
+      const surface = renderer.root.findAll(
+        node => node.props.testID === 'session-page-sheet-surface'
+      )[0];
+      expect(surface?.props.style).toEqual({ paddingTop: platform === 'ios' ? 0 : 24 });
+
       act(() => {
-        (modal?.onRequestClose as (() => void) | undefined)?.();
+        (sheet?.props.onClose as (() => void) | undefined)?.();
       });
-      expect(modalRenders.list.at(-1)?.visible).toBe(false);
+      // The surface stays mounted through the dismiss animation: onClose starts
+      // it (index -1) and the native dismiss event ends it.
+      expect(transcriptSheets(renderer)[0]?.props.index).toBe(-1);
+      act(() => {
+        (transcriptSheets(renderer)[0]?.props.onDismiss as (() => void) | undefined)?.();
+      });
+      expect(transcriptSheets(renderer)).toHaveLength(0);
       expect(connection.destroy).toHaveBeenCalledTimes(1);
 
       openTranscriptSheet();
@@ -655,7 +831,11 @@ describe('ReviewDetailScreen transcript sheet', () => {
       act(() => {
         (done?.props.onPress as (() => void) | undefined)?.();
       });
-      expect(modalRenders.list.at(-1)?.visible).toBe(false);
+      expect(transcriptSheets(renderer)[0]?.props.index).toBe(-1);
+      act(() => {
+        (transcriptSheets(renderer)[0]?.props.onDismiss as (() => void) | undefined)?.();
+      });
+      expect(transcriptSheets(renderer)).toHaveLength(0);
       expect(connection.destroy).toHaveBeenCalledTimes(2);
     }
   );
@@ -667,10 +847,13 @@ describe('ReviewDetailScreen transcript sheet', () => {
       resolveConnection = resolve;
     });
     spectatorStream.createReviewSpectatorStream.mockReturnValue(pendingConnection);
-    mountScreen(true);
+    const renderer = mountScreen(true);
 
     act(() => {
-      (modalRenders.list.at(-1)?.onRequestClose as (() => void) | undefined)?.();
+      (transcriptSheets(renderer)[0]?.props.onClose as (() => void) | undefined)?.();
+    });
+    act(() => {
+      (transcriptSheets(renderer)[0]?.props.onDismiss as (() => void) | undefined)?.();
     });
     await act(async () => {
       resolveConnection?.(connection);
@@ -693,7 +876,7 @@ describe('ReviewDetailScreen transcript sheet', () => {
       renderer.update(createElement(ReviewDetailScreen, { scope: 'personal', reviewId: 'rev-2' }));
     });
 
-    expect(modalRenders.list.at(-1)?.visible).toBe(false);
+    expect(transcriptSheets(renderer)).toHaveLength(0);
     expect(connection.destroy).toHaveBeenCalledTimes(1);
     expect(spectatorStream.createReviewSpectatorStream).toHaveBeenCalledTimes(1);
   });
@@ -1139,5 +1322,91 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(liveErrorState).toBeDefined();
     expect(liveErrorState?.placement).toBeUndefined();
     expect(liveErrorState?.onRetry).toBeDefined();
+  });
+});
+
+describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
+  function renderFailedReview(over: Record<string, unknown> = {}) {
+    statusHelpers.retriggerable = true;
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed', manual_config: null, ...over }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    renderScreen();
+    return buttons.rendered.map(button => buttonText(button));
+  }
+
+  it('links to the settings instead of Retry when Code Reviewer is off', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+
+    const labels = renderFailedReview();
+
+    expect(labels).not.toContain('Retry review');
+    expect(labels).toContain('Fix settings');
+    expect(reviewConfig.calls.at(-1)).toEqual({
+      scope: 'personal',
+      platform: 'github',
+      enabled: true,
+    });
+    const fixSettings = buttons.rendered.findLast(button => buttonText(button) === 'Fix settings');
+    act(() => {
+      fixSettings?.onPress?.();
+    });
+    expect(routerMock.push).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/github'
+    );
+  });
+
+  it('links to the settings when the configuration needs attention', () => {
+    reviewConfig.query = {
+      isPending: false,
+      data: { isEnabled: false, actionRequired: { reason: 'byok_invalid_key' } },
+    };
+
+    const labels = renderFailedReview();
+
+    expect(labels).not.toContain('Retry review');
+    expect(labels).toContain('Fix settings');
+  });
+
+  it('keeps Retry when Code Reviewer is on', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+
+    const labels = renderFailedReview();
+
+    expect(labels).toContain('Retry review');
+    expect(labels).not.toContain('Fix settings');
+  });
+
+  it('shows neither control while the config loads', () => {
+    reviewConfig.query = { isPending: true, data: undefined };
+
+    const labels = renderFailedReview();
+
+    expect(labels).not.toContain('Retry review');
+    expect(labels).not.toContain('Fix settings');
+  });
+
+  it('keeps Retry for a manual review and does not read the config', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+
+    const labels = renderFailedReview({ manual_config: { agentConfig: {} } });
+
+    expect(labels).toContain('Retry review');
+    expect(reviewConfig.calls.at(-1)?.enabled).toBe(false);
+  });
+
+  it('never queries a personal Bitbucket config and keeps Retry', () => {
+    reviewConfig.query = { isPending: true, data: { isEnabled: false, actionRequired: null } };
+
+    const labels = renderFailedReview({ platform: 'bitbucket' });
+
+    expect(labels).toContain('Retry review');
+    expect(reviewConfig.calls.at(-1)).toEqual({
+      scope: 'personal',
+      platform: 'bitbucket',
+      enabled: false,
+    });
   });
 });

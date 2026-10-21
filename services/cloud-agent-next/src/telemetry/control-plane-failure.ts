@@ -90,6 +90,10 @@ export function classifyControlPlaneFailure(
   switch (reason) {
     case 'missing_metadata':
       return { stage: 'pre_dispatch', code: 'session_metadata_missing' };
+    case 'runtime_artifact_unauthorized':
+    case 'runtime_artifact_invalid':
+    case 'runtime_cli_probe_failed':
+    case 'runtime_supervisor_missing':
     case 'preparation_timeout':
     case 'attach_exhausted':
       return PRE_DISPATCH;
@@ -98,6 +102,8 @@ export function classifyControlPlaneFailure(
       return { stage: 'pre_dispatch', code: 'workspace_setup_failed' };
     case 'billing_blocked':
       return { stage: 'pre_dispatch', code: 'payment_required' };
+    case 'container_limit_reached':
+      return { stage: 'pre_dispatch', code: 'container_limit_reached' };
     case 'billing_unavailable':
       return { stage: 'pre_dispatch', code: 'admission_billing_unavailable' };
     case 'invalid_configuration':
@@ -106,9 +112,13 @@ export function classifyControlPlaneFailure(
       return dispatchState === 'accepted'
         ? POST_DISPATCH_WRAPPER_DISCONNECTED
         : PRE_DISPATCH_KILO_SERVER;
+    // `sandbox_out_of_memory` is a hang restart after an expired memory hold:
+    // still a post-dispatch wrapper-path failure, but with a reason triage can name.
     case 'connection_lost':
     case 'sandbox_lost':
     case 'agent_restarted':
+    case 'sandbox_out_of_memory':
+    case 'agent_unresponsive':
       return POST_DISPATCH_WRAPPER_DISCONNECTED;
     case 'no_progress':
     case 'no_outcome':

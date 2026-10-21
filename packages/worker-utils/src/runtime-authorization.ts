@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 import { signModernKiloToken, verifyKiloTokenForPolicy } from './kilo-token-policy.js';
+import { sha256Hex } from './sha256.js';
 import type { RuntimeAuthorization } from './runtime-authorization-contract.js';
 import {
   RuntimeAuthorizationSchema,
@@ -81,10 +82,7 @@ function currentDate(now?: Date): Date {
 
 async function digest(value: string | null): Promise<string> {
   if (value === null) return 'null';
-  const bytes = new Uint8Array(
-    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
-  );
-  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  return sha256Hex(value);
 }
 
 function isBlocked(principal: RuntimeAuthorizationPrincipal): boolean {

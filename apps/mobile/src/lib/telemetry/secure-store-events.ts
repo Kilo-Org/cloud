@@ -7,6 +7,7 @@
  * graph. The sink adapter itself stays in `error-sink.ts`.
  */
 
+import { isProtectedDataAvailable, ProtectedDataUnavailableError } from '@/lib/protected-data';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 
 /**
@@ -34,8 +35,16 @@ function secureStoreFailureFingerprint(operation: SecureStoreOperation): readonl
  * The key and the stored value are never attached: a stored value can be a
  * credential and the native error is built from the operation name, so the
  * event carries no key material, no credential and no token.
+ *
+ * A refusal from a locked device is not reported: iOS rejects every
+ * `WHEN_UNLOCKED*` item with `errSecInteractionNotAllowed` until unlock, by
+ * design. The state is read after the call failed, so a call that started
+ * just before the lock is not reported either.
  */
 export function reportSecureStoreFailure(operation: SecureStoreOperation, error: unknown): void {
+  if (error instanceof ProtectedDataUnavailableError || !isProtectedDataAvailable()) {
+    return;
+  }
   captureTelemetry({
     error,
     level: 'warning',

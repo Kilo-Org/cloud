@@ -93,9 +93,11 @@ rounding to whole cents uses round-half-up (ties round toward positive infinity)
 ## Overview
 
 Kilo Pass exchanges a recurring payment for monthly base credits and a usage-triggered bonus. Stripe supports monthly
-and yearly subscriptions. The exposed mobile store flow supports App Store monthly subscriptions, including purchase
-completion and App Store notification handling. Google Play identifiers, state handling, and generic persistence
-branches exist, but the repository does not expose a verified Google Play purchase completion or notification flow.
+and yearly subscriptions. The mobile app does not expose native Kilo Pass purchases, restores, or store management.
+Its Profile card and `/kilo-pass` route render the backend purchase presentation: `unavailable` has no purchase controls,
+while `web_management` exposes Manage, which opens the returned `webUrl`. Native credit-pack purchases are unchanged.
+Backend store verification, purchase completion, provider notifications, and expiry reconciliation remain available
+for existing Kilo Pass store subscriptions independently of the mobile presentation.
 
 A successful base-credit grant writes one threshold on the user row. When cumulative user usage reaches the effective
 threshold, bonus logic acts on the selected effective active subscription. Monthly subscriptions use the tenure ramp
@@ -107,7 +109,7 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 |---|---|---|---|
 | Persisted provider representation | Yes | Yes | Yes |
 | Web state reads | Yes | Yes | Existing rows only |
-| Monthly subscription entrypoint | Yes | Yes | Not exposed |
+| Monthly subscription entrypoint | Yes | No native mobile UI | No native mobile UI |
 | Yearly subscription entrypoint | Yes | Not exposed | Not exposed |
 | Verified purchase completion ingress | Invoice-paid webhook | Signed transaction completion | Not exposed |
 | Provider notification handling | Stripe events | App Store server notifications | Not exposed |
@@ -157,12 +159,17 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
     Bonus-decision paths MUST clamp streak to at least `1` before applying the ramp.
 14. Yearly cadence MUST use a flat monthly bonus of 50% of the monthly price and MUST NOT use the monthly ramp or
     welcome-promo branch.
-15. An eligible first-time monthly subscriber MUST receive a 50% bonus in streak month 1 instead of the monthly ramp
-    value.
-16. An eligible first-time monthly subscriber whose subscription start is strictly before `2026-05-07T00:00:00Z` MUST
-    receive a 50% bonus in streak month 2 instead of the monthly ramp value.
-17. From streak month 3 onward, and in any month where the welcome promo does not apply, monthly cadence MUST use the
-    monthly ramp value.
+15. For eligible first-time monthly subscribers started strictly before `2026-10-09T00:00:00Z`, streak month 1 MUST use
+    the 50% welcome bonus, month 2 MUST use the normal 10% ramp, and month 3 MUST use the normal 15% ramp.
+    This includes subscriptions started before May 7, 2026; no two-month welcome-promo grandfathering remains.
+16. Eligible first-time monthly subscriptions started at or after `2026-10-09T00:00:00Z` MUST receive 10% in month 1,
+    the 50% welcome bonus in month 2, and the normal 15% ramp in month 3.
+    The existing welcome cutoff MUST select this schedule without a persisted marker or a new activation date.
+    Missing or invalid starts MUST retain the legacy month-1 welcome schedule.
+    Non-first-time subscribers MUST always use the normal monthly ramp, regardless of subscription start.
+17. From streak month 3 onward, and in any month where neither the welcome promo nor the eligible first-month
+    10% override applies, monthly cadence MUST use the monthly ramp value.
+    The first-month 10% override MUST use the same first-time and payment eligibility as the welcome promo.
 18. New welcome-promo grants MUST use the `bonus` issuance-item kind with a 50% applied percent.
     `promo_first_month_50pct` remains a recognized legacy kind only.
 
@@ -241,6 +248,10 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
    rules.
 
 ### Projections and UI
+
+Credit-expiration summaries MUST group positive remaining balances by expiration instant.
+They MUST exclude non-expiring and exhausted blocks and show each group in chronological order.
+Summaries MUST NOT label all dated credits as bonus credits.
 
 38. The Kilo Pass state read path MUST keep actual issuance amounts and projected amounts separate. It MUST compute
     current-period and next-period projections from tier, cadence, streak, first-time-subscriber status, provider, and
@@ -414,9 +425,8 @@ The following behavior or stronger guarantees are not implemented by current cod
 8. Explicit ended-state streak reset for reactivated store subscriptions.
 9. Guaranteed expiry for every granted bonus credit.
 10. Independent durable audit recording for every failed provider or issuance operation.
-11. Retirement of the grandfathered streak-month-2 promo branch after no eligible pre-cutoff subscriptions remain.
-12. Store-provider welcome-promo anti-abuse signals equivalent to Stripe fingerprint claims.
-13. Atomic prevention of concurrent or repeated active Kilo Pass purchases by the same user. Duplicate-card Rules 51-55
+11. Store-provider welcome-promo anti-abuse signals equivalent to Stripe fingerprint claims.
+12. Atomic prevention of concurrent or repeated active Kilo Pass purchases by the same user. Duplicate-card Rules 51-55
     intentionally exclude same-user purchases.
 
 ## Adjacent Spec Compatibility
@@ -430,6 +440,26 @@ Passing the cancellation cooldown after 24 hours does not make a previously clai
 promo or Kilo Pass referral conversion.
 
 ## Changelog
+
+### 2026-10-13 -- First-month bonus increase
+
+- Reused the existing October 9 welcome cutoff for the first-month increase.
+- Eligible first-time starts at or after the cutoff receive 10%, 50%, then 15%.
+- Earlier starts, returning-subscriber bonuses, yearly bonuses, payment eligibility, and usage unlock remain unchanged.
+- Removed the proposed schedule marker, migration, and new activation date.
+
+### 2026-10-08 -- Timestamp-based monthly welcome bonus cutoff
+
+- Eligible first-time monthly starts strictly before October 9, 2026 at midnight UTC receive 50%, 10%, then 15%.
+- Starts at or after the cutoff receive 5%, 50%, then 15%; returning subscribers always use the normal ramp.
+- Removed the stored schedule flag and its unshipped migration; subscription start is the only schedule authority.
+- Removed the former pre-May-7 two-month welcome bonus, while keeping missing/invalid starts on the month-1 schedule.
+- Kept the regular monthly ramp, yearly bonuses, payment eligibility, and usage unlock unchanged.
+- Updated subscription offers, ramp previews, and KiloClaw upsells to show the new schedule.
+- Kept yearly upsell text at 50% every month and limited welcome callouts to the applicable promo window.
+- Kept the selected welcome month in ramp totals after the welcome callout disappears.
+- Pending referral rewards skip the welcome-month issuance and apply to the next eligible issuance
+  (`.specs/impact-referrals.md` Rule 123).
 
 ### 2026-06-08 -- Yearly duplicate-card enforcement
 

@@ -10,12 +10,10 @@ import {
   baseEnvVarSchema,
   markAsPlaintext,
 } from '@/lib/user-deployments/env-vars-validation';
-import { hasUserEverPaid } from '@kilocode/web-shared/lib/creditTransactions';
 
 export const deploymentsRouter = createTRPCRouter({
-  checkDeploymentEligibility: baseProcedure.query(async ({ ctx }) => {
-    const canCreateDeployment = await hasUserEverPaid(ctx.user.id);
-    return { canCreateDeployment };
+  checkDeploymentEligibility: baseProcedure.query(() => {
+    return { canCreateDeployment: false };
   }),
 
   listDeployments: baseProcedure.query(async ({ ctx }) => {

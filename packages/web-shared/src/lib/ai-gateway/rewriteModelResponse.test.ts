@@ -9,11 +9,15 @@ import {
   redactApiRequestLogRequest,
   type RequestLoggingParams,
 } from './rewriteModelResponse';
-import { isDynamicallyOptedIntoRequestLogging } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
+import {
+  getDynamicRequestLoggingMode,
+  type RequestLoggingMode,
+} from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { UpstreamTimeoutError } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { api_request_log } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -35,7 +39,7 @@ jest.mock('next/server', () => ({
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins', () => ({
-  isDynamicallyOptedIntoRequestLogging: jest.fn(async () => false),
+  getDynamicRequestLoggingMode: jest.fn(async (): Promise<RequestLoggingMode | null> => null),
 }));
 
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
@@ -43,7 +47,7 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   logExceptInTest: jest.fn(),
 }));
 
-const mockedOptIn = jest.mocked(isDynamicallyOptedIntoRequestLogging);
+const mockedOptIn = jest.mocked(getDynamicRequestLoggingMode);
 const mockedLog = jest.mocked(logExceptInTest);
 const mockedAfter = jest.mocked(after);
 
@@ -83,7 +87,11 @@ function hangingSseResponse(body: string): { response: Response; cancel: jest.Mo
   };
 }
 
-function failingResponse(contentType: string, errorName: string, initialBody?: string): Response {
+function failingResponse(
+  contentType: string,
+  failure: string | Error,
+  initialBody?: string
+): Response {
   const encoder = new TextEncoder();
   let pullCount = 0;
   const body = new ReadableStream<Uint8Array>({
@@ -93,8 +101,8 @@ function failingResponse(contentType: string, errorName: string, initialBody?: s
         return;
       }
 
-      const error = new Error(errorName);
-      error.name = errorName;
+      const error = typeof failure === 'string' ? new Error(failure) : failure;
+      if (typeof failure === 'string') error.name = failure;
       controller.error(error);
     },
   });
@@ -144,6 +152,22 @@ const rewriters = [
   ['Messages', rewriteModelResponse_Messages],
   ['Responses', rewriteModelResponse_Responses],
 ] as const;
+
+describe.each(rewriters)('%s SSE proxy headers', (_name, rewrite) => {
+  test('keeps event streams uncompressed through external rewrites', async () => {
+    const result = await rewrite({
+      response: sseResponse(''),
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(result.headers.get('cache-control')).toBe('no-cache, no-transform');
+    expect(result.headers.get('content-encoding')).toBe('identity');
+    expect(await readOutputStream(result)).toBe('');
+  });
+});
 
 describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
   test.each([
@@ -239,6 +263,32 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.'
     );
   });
+
+  test.each(['application/json', 'text/event-stream'])(
+    'reports the gateway duration limit for a %s body that outlives the upstream budget',
+    async contentType => {
+      const result = await rewrite({
+        response: failingResponse(contentType, new UpstreamTimeoutError(600_000, 5_000)),
+        removeCost: true,
+        capture: null,
+        vercelRequestId: 'iad1::iad1::request-id',
+        reasoningEffort: null,
+      });
+      const message =
+        "The response reached the gateway's 600-second duration limit and was stopped before it finished. (request id: iad1::iad1::request-id)";
+
+      if (contentType === 'application/json') {
+        expect(result.status).toBe(503);
+        expect(await result.json()).toEqual({ error: message, error_type: 'timeout', message });
+      } else {
+        const events = dataObjects(await readOutputStream(result)) as {
+          error: { message: string };
+        }[];
+        expect(events).toHaveLength(1);
+        expect(events[0].error.message).toBe(message);
+      }
+    }
+  );
 });
 
 const timeoutEffortRequests = [
@@ -495,6 +545,66 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(json.choices[0].message.reasoning_content).toBe('full thought');
       expect(json.choices[0].message.reasoning_details).toBeUndefined();
     });
+
+    test('drops null message tool_calls', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'It is cloudy in Paris.', tool_calls: null },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message).toEqual({
+        role: 'assistant',
+        content: 'It is cloudy in Paris.',
+      });
+    });
+
+    test('preserves message tool_calls arrays', async () => {
+      const toolCalls = [
+        {
+          id: 'call-1',
+          type: 'function',
+          function: { name: 'get_weather', arguments: '{"city":"Paris"}' },
+        },
+      ];
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: null, tool_calls: toolCalls },
+            finish_reason: 'tool_calls',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.tool_calls).toEqual(toolCalls);
+    });
   });
 
   describe('streaming responses', () => {
@@ -528,7 +638,10 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         });
         const reader = result.body?.getReader();
         expect(reader).toBeDefined();
-        await reader?.read();
+        expect(result.headers.get('cache-control')).toBe('no-cache, no-transform');
+        const first = await reader?.read();
+        expect(first?.done).toBe(false);
+        expect(first?.value).toContain('"id":"gen-chat"');
         expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
 
         upstreamController.current?.close();
@@ -591,6 +704,27 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect('role' in chunk.choices[0].delta).toBe(false);
       expect(chunk.choices[0].delta.content).toBe('hi');
       expect(dataPayloads(sse)).toContain('[DONE]');
+    });
+
+    test('drops null delta tool_calls', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"hi","tool_calls":null}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: Record<string, unknown> }>;
+      }>;
+
+      expect(chunk.choices[0].delta).toEqual({ content: 'hi' });
     });
 
     test('maps Gemini thought content and signatures to reasoning_details', async () => {
@@ -1362,6 +1496,19 @@ describe('rewriteModelResponse', () => {
     });
   });
 
+  test('strips upstream cost for custom LLMs, which are always free', async () => {
+    const result = await rewriteModelResponse({
+      response: jsonResponse({ model: 'upstream', usage: { cost: 0.5, is_byok: false } }),
+      model: 'kilo-internal/custom-model',
+      providerId: 'custom',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(await result.json()).toEqual({ model: 'upstream', usage: {} });
+  });
+
   test('strips cost for models with custom pricing', async () => {
     const result = await rewriteModelResponse({
       response: jsonResponse({
@@ -1384,7 +1531,7 @@ describe('rewriteModelResponse', () => {
   });
 
   test('processes paid-model responses when request logging is enabled', async () => {
-    mockedOptIn.mockResolvedValueOnce(true);
+    mockedOptIn.mockResolvedValueOnce('all');
     const result = await rewriteModelResponse({
       response: jsonResponse({ model: 'openai/gpt-5' }),
       model: 'openai/gpt-5',
@@ -1446,7 +1593,7 @@ describe('rewriteModelResponse', () => {
   });
 
   test('logs custom models with opt-in', async () => {
-    mockedOptIn.mockResolvedValueOnce(true);
+    mockedOptIn.mockResolvedValueOnce('all');
     await rewriteModelResponse({
       response: jsonResponse({ model: 'kilo-internal/my-model' }),
       model: 'kilo-internal/my-model',
@@ -1494,10 +1641,10 @@ describe('api_request_log storage', () => {
     return rows[0];
   }
 
-  async function logUpstreamError() {
-    mockedOptIn.mockResolvedValueOnce(true);
+  async function logUpstreamResponse(response: Response, mode: RequestLoggingMode) {
+    mockedOptIn.mockResolvedValueOnce(mode);
     await logUnrewrittenResponse({
-      response: jsonResponse({ error: 'upstream error' }, 400),
+      response,
       model: 'kilo-internal/my-model',
       providerId: 'custom',
       logging: makeLogging({
@@ -1513,6 +1660,17 @@ describe('api_request_log storage', () => {
       }),
     });
     await runScheduledLogInsert();
+  }
+
+  async function logUpstreamError() {
+    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'all');
+  }
+
+  async function selectLoggedRows() {
+    return db
+      .select()
+      .from(api_request_log)
+      .where(eq(api_request_log.vercel_request_id, vercelRequestId));
   }
 
   beforeEach(() => {
@@ -1584,6 +1742,42 @@ describe('api_request_log storage', () => {
       error: { r2_upload_error: 'response: Error: R2 unavailable' },
     });
     expect(fakeR2.objects.has(`${bucket}/${row.request_r2_key}`)).toBe(true);
+  });
+
+  test('logs upstream error statuses for errors-only opt-ins', async () => {
+    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'errors_only');
+
+    const row = await selectLoggedRow();
+    expect(row).toMatchObject({ status_code: 400, error: null });
+    expect(fakeR2.objects.get(`${bucket}/${row.response_r2_key}`)).toBe(
+      JSON.stringify({ error: 'upstream error' })
+    );
+  });
+
+  test('skips successful responses for errors-only opt-ins', async () => {
+    await logUpstreamResponse(jsonResponse({ model: 'kilo-internal/my-model' }), 'errors_only');
+
+    expect(await selectLoggedRows()).toHaveLength(0);
+    expect(fakeR2.objects.size).toBe(0);
+  });
+
+  test('logs successful statuses with a response read error for errors-only opt-ins', async () => {
+    await logUpstreamResponse(
+      failingResponse('application/json', 'upstream disconnected'),
+      'errors_only'
+    );
+
+    const row = await selectLoggedRow();
+    expect(row).toMatchObject({
+      status_code: 200,
+      error: { response_body_read_error: expect.stringContaining('upstream disconnected') },
+    });
+  });
+
+  test('logs successful responses for opt-ins that log all requests', async () => {
+    await logUpstreamResponse(jsonResponse({ model: 'kilo-internal/my-model' }), 'all');
+
+    expect(await selectLoggedRow()).toMatchObject({ status_code: 200, error: null });
   });
 });
 

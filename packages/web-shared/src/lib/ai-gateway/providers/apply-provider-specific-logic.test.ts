@@ -1,12 +1,11 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { CLAUDE_OPUS_FALLBACK_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import {
-  applyGatewayModelsFallback,
   applyPreferredProvider,
   applyProviderSpecificLogic,
   applyReasoningDetailsTransform,
   getIgnoredProviders,
+  removeModelsFallback,
   removeUnsupportedRequestServiceTier,
   withIgnoredProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
@@ -16,7 +15,6 @@ import {
   ReasoningDetailsTransform,
   type BYOKResult,
   type Provider,
-  type ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
@@ -26,13 +24,12 @@ const nonFlexExclusiveModel: KiloExclusiveModel = {
   internal_id: 'test/non-flex',
   display_name: 'Non-Flex test model',
   description: 'Test model',
-  status: 'public',
   context_length: 8_192,
   max_completion_tokens: 4_096,
   provider: OPENROUTER,
   flags: [],
   pricing: null,
-  inference_provider_restriction: [],
+  inference_providers: [],
 };
 
 const flexExclusiveModel: KiloExclusiveModel = {
@@ -182,6 +179,125 @@ describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
   });
 });
 
+describe('applyProviderSpecificLogic recursive tool schemas', () => {
+  async function applyToToolParameters(model: string) {
+    const request: Extract<GatewayRequest, { kind: 'responses' }> = {
+      kind: 'responses',
+      body: {
+        model,
+        input: 'hello',
+        tools: [
+          {
+            type: 'function',
+            name: 'filter',
+            strict: false,
+            parameters: {
+              type: 'object',
+              properties: { filters: { $ref: '#/$defs/filters' } },
+              $defs: {
+                filters: { type: 'array', items: { $ref: '#/$defs/filters' } },
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+
+    const tool = request.body.tools?.[0];
+    return tool?.type === 'function' ? tool.parameters : undefined;
+  }
+
+  it('removes recursive refs for Muse models', async () => {
+    const parameters = await applyToToolParameters('meta/muse-spark-1.3');
+
+    expect(parameters?.$defs).toEqual({ filters: { type: 'array', items: { type: 'array' } } });
+  });
+
+  it('preserves recursive refs for other models', async () => {
+    const parameters = await applyToToolParameters('vendor/model');
+
+    expect(parameters?.$defs).toEqual({
+      filters: { type: 'array', items: { $ref: '#/$defs/filters' } },
+    });
+  });
+});
+
+describe('applyProviderSpecificLogic top-level tool schema combinators', () => {
+  async function applyToTool(model: string) {
+    const request = makeMessagesRequest(model);
+    request.body.tools = [
+      {
+        name: 'nteract_create_cell',
+        description: 'Create a cell.',
+        input_schema: {
+          type: 'object',
+          properties: { notebook_id: { type: ['string', 'null'] } },
+          oneOf: [{ required: ['notebook_id'] }],
+        },
+      },
+    ];
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+
+    return request.body.tools[0];
+  }
+
+  it('removes top-level combinators for Claude models', async () => {
+    const tool = await applyToTool('anthropic/claude-opus-5.5');
+
+    expect(tool).toEqual({
+      name: 'nteract_create_cell',
+      description:
+        'Create a cell.\n\nThe input must also match exactly one of these JSON schemas: [{"required":["notebook_id"]}]',
+      input_schema: {
+        type: 'object',
+        properties: { notebook_id: { type: ['string', 'null'] } },
+        required: ['notebook_id'],
+      },
+    });
+  });
+
+  it('preserves top-level combinators for other models', async () => {
+    const tool = await applyToTool('vendor/model');
+
+    expect(tool).toEqual({
+      name: 'nteract_create_cell',
+      description: 'Create a cell.',
+      input_schema: {
+        type: 'object',
+        properties: { notebook_id: { type: ['string', 'null'] } },
+        oneOf: [{ required: ['notebook_id'] }],
+      },
+    });
+  });
+});
+
 describe('applyReasoningDetailsTransform', () => {
   function makeReasoningRequest(): Extract<GatewayRequest, { kind: 'chat_completions' }> {
     return {
@@ -215,6 +331,62 @@ describe('applyReasoningDetailsTransform', () => {
     const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
     expect('reasoning_details' in assistant).toBe(false);
     expect(assistant.reasoning_content).toBe('thinking hard');
+  });
+
+  it('drops the legacy reasoning string next to reasoning_details', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning = 'thinking hard';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('thinking hard');
+  });
+
+  it('folds a legacy reasoning string into reasoning_content without reasoning_details', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    delete assistant.reasoning_details;
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps existing reasoning_content over a legacy reasoning string', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    delete assistant.reasoning_details;
+    assistant.reasoning = 'legacy thinking';
+    assistant.reasoning_content = 'upstream thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('upstream thinking');
+  });
+
+  it('drops the legacy reasoning string for Gemini', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning = 'thinking hard';
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant).not.toHaveProperty('reasoning_details');
   });
 
   it('leaves reasoning_details untouched without a transform', () => {
@@ -335,44 +507,101 @@ describe('applyReasoningDetailsTransform', () => {
   });
 });
 
-describe('applyGatewayModelsFallback', () => {
+describe('removeModelsFallback', () => {
+  it.each(['anthropic/claude-fable-5', 'anthropic/claude-opus-5', 'openai/gpt-4o'])(
+    'removes and logs caller-provided fallbacks for %s',
+    requestedModel => {
+      const request = makeRequest(requestedModel, ['caller/fallback']);
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      removeModelsFallback(requestedModel, request, 'user-1');
+
+      expect(request.body.models).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        '[applyProviderSpecificLogic] Removed caller-provided fallback models',
+        {
+          userId: 'user-1',
+          model: requestedModel,
+          requestKind: 'chat_completions',
+          models: ['caller/fallback'],
+          fallbacks: undefined,
+        }
+      );
+      warn.mockRestore();
+    }
+  );
+
+  it.each([[[{ model: 'anthropic/claude-opus-4.6' }]], ['default']])(
+    'removes and logs caller-provided Messages API fallbacks %j',
+    fallbacks => {
+      const model = 'thinkingmachines/inkling-small:free';
+      const request = makeMessagesRequest(model);
+      request.body.fallbacks = fallbacks;
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      removeModelsFallback(model, request, 'user-1');
+
+      expect(request.body).not.toHaveProperty('fallbacks');
+      expect(warn).toHaveBeenCalledWith(
+        '[applyProviderSpecificLogic] Removed caller-provided fallback models',
+        {
+          userId: 'user-1',
+          model,
+          requestKind: 'messages',
+          models: undefined,
+          fallbacks,
+        }
+      );
+      warn.mockRestore();
+    }
+  );
+
   it.each([
-    ['openrouter', 'anthropic/claude-fable-5'],
-    ['vercel', 'anthropic/claude-fable-5'],
-    ['openrouter', 'anthropic/claude-opus-5'],
-    ['vercel', 'anthropic/claude-opus-5'],
-  ] satisfies [ProviderId, string][])(
-    'sets Opus 4.8 as the fallback for %s requests to %s',
-    async (providerId, requestedModel) => {
-      const request = makeRequest(requestedModel, ['caller/fallback']);
+    ['no fallback fields', {}],
+    ['empty models', { models: [] }],
+    ['null fallbacks', { fallbacks: null }],
+    ['empty fallbacks', { fallbacks: [] }],
+  ])('does not log when there is nothing to remove (%s)', (_, fields) => {
+    const model = 'anthropic/claude-opus-5';
+    const request = makeMessagesRequest(model);
+    Object.assign(request.body, fields);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      await applyGatewayModelsFallback(providerId, requestedModel, request);
+    removeModelsFallback(model, request, 'user-1');
 
-      expect(request.body.models).toEqual([requestedModel, CLAUDE_OPUS_FALLBACK_MODEL_ID]);
-    }
-  );
+    expect(request.body).not.toHaveProperty('models');
+    expect(request.body).not.toHaveProperty('fallbacks');
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
 
-  it.each(['anthropic/claude-fable-5', 'anthropic/claude-opus-5'])(
-    'removes caller-provided fallbacks for %s on other providers',
-    async requestedModel => {
-      const request = makeRequest(requestedModel, ['caller/fallback']);
+  it('removes Messages API fallbacks before a free model request is sent upstream', async () => {
+    const model = 'thinkingmachines/inkling-small:free';
+    const request = makeMessagesRequest(model);
+    request.body.fallbacks = [{ model: 'anthropic/claude-opus-4.6' }];
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      await applyGatewayModelsFallback('martian', requestedModel, request);
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
 
-      expect(request.body.models).toBeUndefined();
-    }
-  );
-
-  it.each(['anthropic/claude-opus-4.8', 'anthropic/claude-opus-6', 'openai/gpt-4o'])(
-    'removes caller-provided fallbacks for other model %s',
-    async requestedModel => {
-      const request = makeRequest(requestedModel, ['caller/fallback']);
-
-      await applyGatewayModelsFallback('openrouter', requestedModel, request);
-
-      expect(request.body.models).toBeUndefined();
-    }
-  );
+    expect(request.body).not.toHaveProperty('fallbacks');
+    expect(warn).toHaveBeenCalledWith(
+      '[applyProviderSpecificLogic] Removed caller-provided fallback models',
+      expect.objectContaining({ userId: 'user-1', model, requestKind: 'messages' })
+    );
+    warn.mockRestore();
+  });
 });
 
 describe('applyPreferredProvider', () => {

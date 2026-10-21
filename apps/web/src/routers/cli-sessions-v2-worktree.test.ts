@@ -94,10 +94,6 @@ jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({
   UNSCOPED_TARGET: 'unscoped',
 }));
 
-jest.mock('@/lib/webhook-trigger-ownership', () => ({
-  verifyWebhookTriggerAccess: jest.fn(),
-}));
-
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchPullRequestByNumber: jest.fn(),
   fetchPullRequestReviewDecision: jest.fn(),
@@ -150,8 +146,10 @@ const ownershipRow = {
   pr_link_verified_at: null,
   status: null,
   status_updated_at: null,
+  status_transition_id: null,
   last_activity_at: null,
   total_cost_microdollars: null,
+  live_summary: null,
   created_at: INITIAL_TIME,
   updated_at: INITIAL_TIME,
 } satisfies CliSessionV2;
@@ -325,6 +323,60 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
     expect(mockGetRuntimeSession).not.toHaveBeenCalled();
   });
 
+  it.each(['kilo/assigned', 'feature/selected'])(
+    'returns assigned branch %s before preparation or CLI metadata arrives',
+    async branchName => {
+      mockGetRuntimeSession.mockResolvedValueOnce({
+        sessionId: WORKSPACE_ID,
+        userId: USER_ID,
+        branchName,
+        execution: null,
+        timestamp: 1,
+        version: 1,
+      });
+
+      const result = await createCaller({ user }).getWithRuntimeState({ session_id: SESSION_ID });
+
+      expect(result.git_branch).toBe(branchName);
+      expect(result.runtimeState?.branchName).toBe(branchName);
+      expect(result.runtimeState?.preparedAt).toBeUndefined();
+    }
+  );
+
+  it('preserves a reported branch switch instead of replacing it with the assignment', async () => {
+    await db
+      .update(cli_sessions_v2)
+      .set({ git_branch: 'feature/switched' })
+      .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+    mockGetRuntimeSession.mockResolvedValueOnce({
+      sessionId: WORKSPACE_ID,
+      userId: USER_ID,
+      branchName: 'kilo/assigned',
+      execution: null,
+      timestamp: 1,
+      version: 1,
+    });
+
+    const result = await createCaller({ user }).getWithRuntimeState({ session_id: SESSION_ID });
+
+    expect(result.git_branch).toBe('feature/switched');
+  });
+
+  it('does not mistake a legacy upstream branch for a known assignment', async () => {
+    mockGetRuntimeSession.mockResolvedValueOnce({
+      sessionId: WORKSPACE_ID,
+      userId: USER_ID,
+      upstreamBranch: 'main',
+      execution: null,
+      timestamp: 1,
+      version: 1,
+    });
+
+    const result = await createCaller({ user }).getWithRuntimeState({ session_id: SESSION_ID });
+
+    expect(result.git_branch).toBeNull();
+  });
+
   it.each([
     ['reports success false', () => mockRuntimeDelete.mockResolvedValueOnce({ success: false })],
     ['throws', () => mockRuntimeDelete.mockRejectedValueOnce(new Error('Worker unavailable'))],
@@ -368,7 +420,14 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
           name: null,
           defaultTitle: ownershipRow.title,
           prSession: null,
-          sessions: [{ sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null }],
+          sessions: [
+            {
+              sessionId: SESSION_ID,
+              sessionStatus: null,
+              sessionStatusUpdatedAt: null,
+              updatedAt: new Date(ownershipRow.updated_at).toISOString(),
+            },
+          ],
         },
       },
     });
@@ -379,6 +438,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
     const sibling = await insertSession({
       status: 'busy',
       status_updated_at: '2026-04-29 01:16:12.945+00',
+      updated_at: '2026-04-29 01:17:12.945+00',
     });
     await insertSession({ kilo_user_id: OTHER_USER_ID, status: 'question' });
     await insertSession({ organization_id: ORGANIZATION_ID, status: 'permission' });
@@ -397,11 +457,17 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
 
     expect(details.worktrees[WORKTREE_ID].sessions).toEqual(
       [
-        { sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null },
+        {
+          sessionId: SESSION_ID,
+          sessionStatus: null,
+          sessionStatusUpdatedAt: null,
+          updatedAt: new Date(ownershipRow.updated_at).toISOString(),
+        },
         {
           sessionId: sibling.session_id,
           sessionStatus: 'busy',
           sessionStatusUpdatedAt: '2026-04-29T01:16:12.945Z',
+          updatedAt: '2026-04-29T01:17:12.945Z',
         },
       ].sort((a, b) => a.sessionId.localeCompare(b.sessionId))
     );
@@ -410,6 +476,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         sessionId: otherWorktreeSession.session_id,
         sessionStatus: 'retry',
         sessionStatusUpdatedAt: null,
+        updatedAt: new Date(otherWorktreeSession.updated_at).toISOString(),
       },
     ]);
     expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
@@ -465,6 +532,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
       sessionId: SESSION_ID,
       sessionStatus: 'question',
       sessionStatusUpdatedAt: '2020-01-01T00:00:00.000Z',
+      updatedAt: '2020-01-01T00:00:00.000Z',
     });
     expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
   });
@@ -742,7 +810,14 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         name: null,
         defaultTitle: ownershipRow.title,
         prSession: null,
-        sessions: [{ sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null }],
+        sessions: [
+          {
+            sessionId: SESSION_ID,
+            sessionStatus: null,
+            sessionStatusUpdatedAt: null,
+            updatedAt: new Date(ownershipRow.updated_at).toISOString(),
+          },
+        ],
       },
     });
     expect(

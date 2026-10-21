@@ -45,7 +45,7 @@ export function CommentBodyField({
       // Compact min-height so half-detent + keyboard-open both keep footer
       // CTAs on-screen at scroll offset 0; multiline still grows on type.
       className={cn(
-        'rounded-md border border-input bg-background px-3 py-1.5 text-sm leading-5 text-foreground',
+        'rounded-md border border-input bg-background pl-3 pr-3 py-1.5 text-sm leading-5 text-foreground',
         'focus:border-ring',
         keyboardVisible ? 'max-h-16 min-h-12' : 'min-h-14 max-h-28'
       )}

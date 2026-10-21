@@ -2,8 +2,10 @@ import { randomUUID } from 'crypto';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
   gatewayRateLimitKey,
@@ -96,8 +98,8 @@ export async function handleSystemOneRequest(request: NextRequest) {
   }
 
   const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-    await getBalanceAndOrgSettings(organizationId, user);
-  if (balance <= 0) {
+    await getBalanceAndOrgSettings(organizationId, user, readDb);
+  if (!canSpendPaidUsage(balance)) {
     return creditsBlockedResponse({ user, balance, organizationId, balanceLimitedByUserAllowance });
   }
 
@@ -116,6 +118,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
       kiloUserId: user.id,
       modelId: await resolveOpenRouterModelAlias(requestedModel),
       providerLookup: getProviderSlugsForModel,
+      fromDb: readDb,
     });
     if (!decision.allowed) return modelNotAllowedResponse();
     if (decision.eligibleProviderRoutes) {
@@ -141,6 +144,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
     account: {
       accountId: bouncerAccountId(user.id, organizationId),
+      userId: user.id,
       tier: bouncerDecideTier(organizationId, plan, balance),
       payer,
     },

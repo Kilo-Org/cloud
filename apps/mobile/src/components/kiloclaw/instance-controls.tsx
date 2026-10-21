@@ -3,6 +3,7 @@ import { Alert, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { ActionButton } from '@/components/ui/action-button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { captureEvent, INSTANCE_ACTION_EVENT } from '@/lib/analytics/posthog';
 import { type InstanceStatus, type useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
 
@@ -30,6 +31,7 @@ const START_BLOCKING_STATUSES = new Set([
 
 export function InstanceControls({ status, mutations }: Readonly<InstanceControlsProps>) {
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const canStart = status == null || !START_BLOCKING_STATUSES.has(status);
   const canStop = status === 'running';
   const canRestartOpenClaw = status === 'running';
@@ -59,17 +61,15 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
   };
 
   const handleStop = () => {
-    Alert.alert(t('kiloclaw.controls.stopTitle'), t('kiloclaw.controls.stopMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('kiloclaw.controls.stop'),
-        style: 'destructive',
-        onPress: () => {
-          captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'stop' });
-          mutations.stop.mutate(undefined);
-        },
+    confirm({
+      title: t('kiloclaw.controls.stopTitle'),
+      message: t('kiloclaw.controls.stopMessage'),
+      confirmLabel: t('kiloclaw.controls.stop'),
+      onConfirm: () => {
+        captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'stop' });
+        mutations.stop.mutate(undefined);
       },
-    ]);
+    });
   };
 
   const handleRestartOpenClaw = () => {
@@ -150,6 +150,8 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
           onPress={handleRedeploy}
         />
       </View>
+
+      {dialog}
     </View>
   );
 }

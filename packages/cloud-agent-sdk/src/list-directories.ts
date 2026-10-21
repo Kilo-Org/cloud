@@ -38,7 +38,8 @@ const UNSUPPORTED_DELIVERED_ERRORS = new Set([
 
 export type ListDirectoriesResult =
   | { ok: true; path: string; directories: ListDirectoriesV1['directories'] }
-  | { ok: false; reason: 'unsupported' | 'invalid' | 'transport' };
+  | { ok: false; reason: 'unsupported' | 'invalid' }
+  | { ok: false; reason: 'transport'; cause?: unknown };
 
 /**
  * Request one directory level of a specific CLI connection.
@@ -58,6 +59,9 @@ export type ListDirectoriesResult =
  *   directories` and `invalid list_directories path`), a retryable relay
  *   code, or a transport-level failure → `{ ok: false, reason: 'transport' }`.
  *
+ * A `transport` outcome carries the caught failure as `cause`, so a caller
+ * that reports it can attach what actually went wrong.
+ *
  * Never throws and never logs.
  */
 export async function listDirectoriesOnConnection(
@@ -76,21 +80,21 @@ export async function listDirectoriesOnConnection(
     if (error instanceof CommandDeliveredError) {
       return UNSUPPORTED_DELIVERED_ERRORS.has(error.message)
         ? { ok: false, reason: 'unsupported' }
-        : { ok: false, reason: 'transport' };
+        : { ok: false, reason: 'transport', cause: error };
     }
     if (error instanceof UserWebCommandError) {
       return RETRYABLE_RELAY_CODES.has(error.code)
-        ? { ok: false, reason: 'transport' }
+        ? { ok: false, reason: 'transport', cause: error }
         : { ok: false, reason: 'unsupported' };
     }
-    return { ok: false, reason: 'transport' };
+    return { ok: false, reason: 'transport', cause: error };
   }
 
   try {
     const parsed = listDirectoriesV1Schema.safeParse(raw);
     if (!parsed.success) return { ok: false, reason: 'invalid' };
     return { ok: true, path: parsed.data.path, directories: parsed.data.directories };
-  } catch {
-    return { ok: false, reason: 'transport' };
+  } catch (error) {
+    return { ok: false, reason: 'transport', cause: error };
   }
 }

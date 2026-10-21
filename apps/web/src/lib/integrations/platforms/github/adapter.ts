@@ -417,28 +417,6 @@ export async function hasPRCommentWithMarker(
 }
 
 /**
- * Used to acknowledge @kilo fix mentions on inline review comments.
- */
-export async function addReactionToPRReviewComment(
-  installationId: string,
-  owner: string,
-  repo: string,
-  commentId: number,
-  reaction: 'eyes' | '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket',
-  appType: GitHubAppType = 'standard'
-): Promise<void> {
-  const tokenData = await generateGitHubInstallationToken(installationId, appType);
-  const octokit = new Octokit({ auth: tokenData.token });
-
-  await octokit.reactions.createForPullRequestReviewComment({
-    owner,
-    repo,
-    comment_id: commentId,
-    content: reaction,
-  });
-}
-
-/**
  * Returns the permission string ('admin' | 'write' | 'read' | 'none') or null
  * if the lookup fails (e.g. the App lacks permission to query collaborators).
  */
@@ -1008,6 +986,7 @@ export type AssociatedPullRequest = {
   title: string;
   headSha: string;
   updatedAt: string; // ISO
+  createdAt?: string;
   /**
    * `owner/name` of the PR's base repository, as reported by GitHub. Used to
    * verify that a session's stored link actually names this repository rather
@@ -1082,7 +1061,12 @@ function getErrorMessage(error: unknown): string {
   return typeof message === 'string' ? message : '';
 }
 
-function isRateLimitError(error: unknown): boolean {
+/**
+ * Is this GitHub failure a rate limit (primary, secondary, or abuse) rather
+ * than a permission refusal? 403 carries both meanings, so callers that map
+ * 403 to a permanent error must ask this first.
+ */
+export function isGitHubRateLimitError(error: unknown): boolean {
   if (!isHttpError(error)) return false;
   // 429 is unambiguously rate limiting.
   if (error.status === 429) return true;
@@ -1198,13 +1182,14 @@ export async function fetchPullRequestByNumber(params: {
       title: pr.title,
       headSha: pr.head.sha,
       updatedAt: pr.updated_at,
+      createdAt: pr.created_at,
       baseRepoFullName: pr.base.repo?.full_name ?? `${owner}/${repo}`,
       headRepoFullName: pr.head.repo?.full_name ?? '',
       headRef: pr.head.ref,
       ...(commitShas ? { commitShas } : {}),
     };
   } catch (error) {
-    if (isRateLimitError(error)) {
+    if (isGitHubRateLimitError(error)) {
       throw new GitHubRateLimitError(parseRateLimitResetAt(error));
     }
     if (isHttpError(error) && error.status === 404) {
@@ -1281,7 +1266,7 @@ export async function fetchBatchedReviewDecisions(args: {
     }
     return result;
   } catch (error) {
-    if (isRateLimitError(error)) {
+    if (isGitHubRateLimitError(error)) {
       throw new GitHubRateLimitError(parseRateLimitResetAt(error));
     }
     throw error;

@@ -11,6 +11,7 @@ import {
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
+import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 
 type Db = typeof defaultDb;
 
@@ -101,6 +102,10 @@ export async function reconcileStoreSubscriptionExpiry(
         .returning({ id: kilo_pass_subscriptions.id });
 
       if (updated.length === 0) return;
+      await closePauseEvent(tx, {
+        kiloPassSubscriptionId: candidate.subscriptionId,
+        resumedAt: nowIso,
+      });
 
       expiredSubscriptionCount += 1;
 

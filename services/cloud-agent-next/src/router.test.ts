@@ -92,6 +92,7 @@ import { getSandbox } from '@cloudflare/sandbox';
 import { generateSessionId, fetchSessionMetadata } from './session-service.js';
 import { sessionIdSchema, envVarsSchema } from './types.js';
 import { appRouter } from './router.js';
+import { buildSessionMetadataFromRegistration } from './session/session-registration-metadata.js';
 import type { Env, TRPCContext, SessionId } from './types.js';
 import type { CloudAgentSessionState } from './persistence/types.js';
 import { parseSessionMetadata } from './persistence/session-metadata.js';
@@ -272,14 +273,14 @@ describe('router sessionId validation', () => {
 
   describe('sandboxId generation with hash format', () => {
     describe('format validation', () => {
-      it('should generate sandboxId with org prefix for organization accounts', async () => {
+      it('defaults organization accounts to an isolated sandbox without an allowlist', async () => {
         const { generateSandboxId } = await import('./sandbox-id.js');
         const sandboxId = await generateSandboxId(undefined, 'org-123', 'user-456', 's');
-        expect(sandboxId).toMatch(/^org-[0-9a-f]{48}$/);
+        expect(sandboxId).toMatch(/^ses-[0-9a-f]{48}$/);
         expect(sandboxId.length).toBe(52);
       });
 
-      it('should generate sandboxId with bot prefix when botId is provided', async () => {
+      it('defaults organization bot accounts to an isolated sandbox without an allowlist', async () => {
         const { generateSandboxId } = await import('./sandbox-id.js');
         const sandboxId = await generateSandboxId(
           undefined,
@@ -288,34 +289,45 @@ describe('router sessionId validation', () => {
           's',
           'reviewer'
         );
-        expect(sandboxId).toMatch(/^bot-[0-9a-f]{48}$/);
+        expect(sandboxId).toMatch(/^ses-[0-9a-f]{48}$/);
         expect(sandboxId.length).toBe(52);
       });
     });
 
     describe('personal accounts', () => {
-      it('should generate sandboxId with usr prefix for personal accounts', async () => {
+      it('defaults personal accounts to an isolated sandbox without an allowlist', async () => {
         const { generateSandboxId } = await import('./sandbox-id.js');
         const sandboxId = await generateSandboxId(undefined, undefined, 'abc-123', 's');
-        expect(sandboxId).toMatch(/^usr-[0-9a-f]{48}$/);
+        expect(sandboxId).toMatch(/^ses-[0-9a-f]{48}$/);
         expect(sandboxId.length).toBe(52);
       });
 
-      it('should generate sandboxId with ubt prefix for personal bot accounts', async () => {
+      it('defaults personal bot accounts to an isolated sandbox without an allowlist', async () => {
         const { generateSandboxId } = await import('./sandbox-id.js');
         const sandboxId = await generateSandboxId(undefined, undefined, 'abc-123', 's', 'reviewer');
-        expect(sandboxId).toMatch(/^ubt-[0-9a-f]{48}$/);
+        expect(sandboxId).toMatch(/^ses-[0-9a-f]{48}$/);
         expect(sandboxId.length).toBe(52);
       });
     });
 
     describe('collision prevention', () => {
-      it('should prevent collision between org and personal accounts', async () => {
+      it('prevents collision between explicit shared org and personal accounts', async () => {
         const { generateSandboxId } = await import('./sandbox-id.js');
         const userId = 'same-user-id';
 
-        const orgSandboxId = await generateSandboxId(undefined, 'org-123', userId, 's');
-        const personalSandboxId = await generateSandboxId(undefined, undefined, userId, 's');
+        const orgSandboxId = await generateSandboxId(undefined, 'org-123', userId, 's', undefined, {
+          sandboxAllocation: 'cloudflare-shared',
+        });
+        const personalSandboxId = await generateSandboxId(
+          undefined,
+          undefined,
+          userId,
+          's',
+          undefined,
+          {
+            sandboxAllocation: 'cloudflare-shared',
+          }
+        );
 
         expect(orgSandboxId).not.toBe(personalSandboxId);
         expect(orgSandboxId).toMatch(/^org-[0-9a-f]{48}$/);
@@ -777,14 +789,18 @@ describe('router sessionId validation', () => {
         });
       });
 
-      it('should prevent collision between user and bot sessions', async () => {
+      it('prevents collision between explicit shared user and bot sessions', async () => {
         const { generateSandboxId } = await import('./sandbox-id.js');
         const orgId = 'org-123';
         const userId = 'user-456';
         const botId = 'reviewer';
 
-        const userSandboxId = await generateSandboxId(undefined, orgId, userId, 's');
-        const botSandboxId = await generateSandboxId(undefined, orgId, userId, 's', botId);
+        const userSandboxId = await generateSandboxId(undefined, orgId, userId, 's', undefined, {
+          sandboxAllocation: 'cloudflare-shared',
+        });
+        const botSandboxId = await generateSandboxId(undefined, orgId, userId, 's', botId, {
+          sandboxAllocation: 'cloudflare-shared',
+        });
 
         expect(userSandboxId).not.toBe(botSandboxId);
         expect(userSandboxId).toMatch(/^org-[0-9a-f]{48}$/);
@@ -1011,6 +1027,71 @@ describe('router sessionId validation', () => {
       });
 
       describe('successful retrieval', () => {
+        describe.each(['agent', 'workspace'] as const)('%s assigned branch', plane => {
+          it.each([undefined, 'feature/explicit-branch'])(
+            'returns the registered branch before preparation with repository branch %s',
+            async branch => {
+              const sessionId: SessionId = `${plane}_12345678-1234-1234-1234-123456789abc`;
+              const registration = await buildSessionMetadataFromRegistration({
+                identity: { sessionId, userId: mockContext.userId },
+                auth: {},
+                agent: { mode: 'code', model: 'kilo/test-model' },
+                repository: { type: 'github', repo: 'acme/repo', branch },
+              });
+              expect(registration.ok).toBe(true);
+              if (!registration.ok) throw new Error(registration.error);
+              const assignedBranch = registration.metadata.workspace?.branchName;
+              expect(assignedBranch).toEqual(branch ?? expect.stringMatching(/^kilo\/.+/));
+              mockGetMetadata.mockResolvedValue(registration.metadata);
+              if (plane === 'workspace') {
+                mockContext.env.SANDBOX_SESSION = {
+                  idFromName: vi.fn((id: string) => ({ id })),
+                  get: vi.fn(() => ({
+                    getMetadata: mockGetMetadata,
+                    getSession: vi.fn().mockResolvedValue({
+                      type: 'found',
+                      messages: [],
+                      latestEventId: null,
+                    }),
+                  })),
+                } as unknown as TRPCContext['env']['SANDBOX_SESSION'];
+              }
+
+              const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+              expect(result.branchName).toBe(assignedBranch);
+              expect(result.preparedAt).toBeUndefined();
+              expect(result.initiatedAt).toBeUndefined();
+              expect(result.routeReady).toBe(false);
+              expect(getOrCreateSessionMock).not.toHaveBeenCalled();
+              expect(getSandbox).not.toHaveBeenCalled();
+            }
+          );
+        });
+
+        it.each(['kilo/legacy-assigned-branch', undefined])(
+          'uses only the existing assigned branch from legacy metadata: %s',
+          async branchName => {
+            const sessionId: SessionId = 'agent_12345678-1234-1234-1234-123456789abc';
+            mockGetMetadata.mockResolvedValue(
+              legacySessionMetadata({
+                sessionId,
+                userId: mockContext.userId,
+                version: 1,
+                timestamp: 1,
+                githubRepo: 'acme/repo',
+                upstreamBranch: 'main',
+                branchName,
+              })
+            );
+
+            const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+            expect(result.branchName).toBe(branchName);
+            expect(result.upstreamBranch).toBe('main');
+          }
+        );
+
         it('should return sanitized session metadata for owner', async () => {
           const sessionId: SessionId = 'agent_12345678-1234-1234-1234-123456789abc';
           const metadata = legacySessionMetadata({
@@ -2711,6 +2792,10 @@ describe('router terminal procedures', () => {
     },
     {
       error: 'Terminal is only available after the workspace is prepared',
+      code: 'PRECONDITION_FAILED',
+    },
+    {
+      error: 'The sandbox is sleeping. Send a message to resume.',
       code: 'PRECONDITION_FAILED',
     },
     {

@@ -690,17 +690,14 @@ describe('useSidebarSessions live update helpers', () => {
 
   describe('sidebar worktree grouping', () => {
     it('groups siblings before date bucketing so a worktree appears only once', () => {
+      const local = (day: number, hour: number) => new Date(2026, 0, day, hour).toISOString();
       const sessions = [
-        makeStoredSession('ses_today', '2026-01-03T12:00:00.000Z', {
-          worktreeId: 'worktree_shared',
-        }),
-        makeStoredSession('ses_yesterday', '2026-01-02T12:00:00.000Z', {
-          worktreeId: 'worktree_shared',
-        }),
-        makeStoredSession('ses_ungrouped', '2026-01-02T11:00:00.000Z'),
+        makeStoredSession('ses_today', local(3, 12), { worktreeId: 'worktree_shared' }),
+        makeStoredSession('ses_yesterday', local(2, 12), { worktreeId: 'worktree_shared' }),
+        makeStoredSession('ses_ungrouped', local(2, 11)),
       ];
 
-      const result = groupSidebarSessionsByDate(sessions, new Date('2026-01-03T18:00:00.000Z'));
+      const result = groupSidebarSessionsByDate(sessions, new Date(2026, 0, 3, 18));
 
       expect(result.map(group => ({ label: group.label, size: group.items.length }))).toEqual([
         { label: 'Today', size: 1 },
@@ -760,7 +757,7 @@ describe('useSidebarSessions live update helpers', () => {
         defaultTitle: 'Authoritative first chat title',
         expected: 'Authoritative first chat title',
       },
-      { name: null, defaultTitle: null, expected: 'kilo/repo · main' },
+      { name: null, defaultTitle: null, expected: 'New chat' },
     ])('keeps $expected independent of visible chat titles and activity', details => {
       const first = makeStoredSession('ses_first', '2026-01-01T10:00:00.000Z', {
         worktreeId: 'worktree_shared',
@@ -937,6 +934,108 @@ describe('useSidebarSessions live update helpers', () => {
       });
     });
 
+    it.each(['busy', 'retry'])(
+      'expires stored %s at twenty minutes for visible and hidden sessions',
+      status => {
+        const now = new Date('2026-01-03T12:20:00.000Z').getTime();
+        const stale = makeStoredSession('ses_stale', '2026-01-03T12:00:00.000Z', {
+          sessionStatus: status,
+          sessionStatusUpdatedAt: '2026-01-03T12:19:00.000Z',
+        });
+        expect(getSidebarWorktreeActivity([stale], new Map(), [stale], null, now)).toEqual({
+          status: null,
+          statusUpdatedAt: null,
+          isLive: false,
+        });
+        expect(getSidebarWorktreeActivity([], new Map(), [stale], null, now).status).toBeNull();
+        expect(getSidebarWorktreeActivity([stale], new Map(), [stale], null, now - 1).status).toBe(
+          status
+        );
+        expect(
+          getSidebarWorktreeActivity([], new Map([['ses_stale', status]]), [stale], null, now)
+            .status
+        ).toBe(status);
+        expect(
+          getSidebarWorktreeActivity(
+            [],
+            new Map(),
+            [stale],
+            { sessionId: 'ses_stale', status },
+            now
+          ).status
+        ).toBe(status);
+      }
+    );
+
+    it('keeps recently updated sessions running even when the status timestamp is old', () => {
+      const session = makeStoredSession('ses_running', '2026-01-03T12:19:00.000Z', {
+        sessionStatus: 'busy',
+        sessionStatusUpdatedAt: '2026-01-03T10:00:00.000Z',
+      });
+      expect(
+        getSidebarWorktreeActivity(
+          [session],
+          new Map(),
+          [session],
+          null,
+          new Date('2026-01-03T12:20:00.000Z').getTime()
+        ).status
+      ).toBe('busy');
+    });
+
+    it.each(['question', 'permission'])('preserves stale stored %s attention', status => {
+      const session = makeStoredSession('ses_attention', '2026-01-03T10:00:00.000Z', {
+        sessionStatus: status,
+      });
+      expect(
+        getSidebarWorktreeActivity(
+          [],
+          new Map(),
+          [session],
+          null,
+          new Date('2026-01-03T12:20:00.000Z').getTime()
+        ).status
+      ).toBe(status);
+    });
+
+    it.each([false, true])(
+      'uses the freshest session update when status timestamps match (fresh visible=%s)',
+      freshVisible => {
+        const stale = makeStoredSession('ses_same', '2026-01-03T10:00:00.000Z', {
+          sessionStatus: 'busy',
+          sessionStatusUpdatedAt: '2026-01-03T10:00:00.000Z',
+        });
+        const fresh = { ...stale, updatedAt: '2026-01-03T12:19:00.000Z' };
+        expect(
+          getSidebarWorktreeActivity(
+            [freshVisible ? fresh : stale],
+            new Map(),
+            [freshVisible ? stale : fresh],
+            null,
+            new Date('2026-01-03T12:20:00.000Z').getTime()
+          ).status
+        ).toBe('busy');
+      }
+    );
+
+    it('ignores an expired sibling without hiding another recently running sibling', () => {
+      const stale = makeStoredSession('ses_stale', '2026-01-03T10:00:00.000Z', {
+        sessionStatus: 'busy',
+      });
+      const fresh = makeStoredSession('ses_fresh', '2026-01-03T12:19:00.000Z', {
+        sessionStatus: 'retry',
+      });
+      expect(
+        getSidebarWorktreeActivity(
+          [stale, fresh],
+          new Map(),
+          [stale, fresh],
+          null,
+          new Date('2026-01-03T12:20:00.000Z').getTime()
+        ).status
+      ).toBe('retry');
+    });
+
     it('reflects live running status even before a stored status update arrives', () => {
       const sessions = [makeStoredSession('ses_live', '2026-01-03T12:00:00.000Z')];
 
@@ -951,12 +1050,20 @@ describe('useSidebarSessions live update helpers', () => {
       'includes a hidden sibling with %s status outside the displayed slice',
       status => {
         const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z');
-        const hidden = makeStoredSession('ses_hidden', '2025-01-03T12:00:00.000Z', {
+        const hidden = makeStoredSession('ses_hidden', '2026-01-03T12:00:00.000Z', {
           sessionStatus: status,
           sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
         });
 
-        expect(getSidebarWorktreeActivity([visible], new Map(), [visible, hidden])).toEqual({
+        expect(
+          getSidebarWorktreeActivity(
+            [visible],
+            new Map(),
+            [visible, hidden],
+            null,
+            new Date('2026-01-03T12:01:00.000Z').getTime()
+          )
+        ).toEqual({
           status,
           statusUpdatedAt: hidden.sessionStatusUpdatedAt,
           isLive: false,
@@ -1034,7 +1141,13 @@ describe('useSidebarSessions live update helpers', () => {
 
       expect(getSidebarWorktreeActivity([], active, [foreground], completed).status).toBeNull();
       expect(
-        getSidebarWorktreeActivity([background], active, [foreground, background], completed).status
+        getSidebarWorktreeActivity(
+          [background],
+          active,
+          [foreground, background],
+          completed,
+          new Date('2026-01-03T12:01:00.000Z').getTime()
+        ).status
       ).toBe('busy');
       expect(
         getSidebarWorktreeActivity([], active, [foreground], {
@@ -1124,24 +1237,21 @@ describe('useSidebarSessions live update helpers', () => {
     });
 
     it('buckets a running session by its pinned sort time, not its raw update time', () => {
-      const running = makeStoredSession('ses_running', '2026-01-04T00:00:10.000Z', {
-        createdAt: '2026-01-03T23:58:30.000Z',
-      });
-      const pins = new Map([[running.sessionId, getRunningSessionSortTime(running, true)]]);
-
-      const result = groupSidebarSessionsByDate(
-        [running],
-        new Date('2026-01-04T00:10:00.000Z'),
-        {},
-        pins
+      // Day buckets follow the viewer's local midnight, so build the instants locally.
+      const running = makeStoredSession(
+        'ses_running',
+        new Date(2026, 0, 4, 0, 0, 10).toISOString(),
+        { createdAt: new Date(2026, 0, 3, 23, 58, 30).toISOString() }
       );
+      const pins = new Map([[running.sessionId, getRunningSessionSortTime(running, true)]]);
+      const now = new Date(2026, 0, 4, 0, 10);
+
+      const result = groupSidebarSessionsByDate([running], now, {}, pins);
 
       expect(result.map(group => group.label)).toEqual(['Yesterday']);
-      expect(
-        groupSidebarSessionsByDate([running], new Date('2026-01-04T00:10:00.000Z')).map(
-          group => group.label
-        )
-      ).toEqual(['Today']);
+      expect(groupSidebarSessionsByDate([running], now).map(group => group.label)).toEqual([
+        'Today',
+      ]);
     });
   });
 
@@ -1157,11 +1267,28 @@ describe('useSidebarSessions live update helpers', () => {
               sessionId: 'ses_hidden',
               sessionStatus: 'busy',
               sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
+              updatedAt: '2026-01-03T12:00:00.000Z',
             },
           ],
         },
       },
     } satisfies Parameters<typeof patchSidebarWorktreeSessionStatus>[0];
+
+    it('refreshes activity recency even when the stored status has not changed', () => {
+      const updated = patchSidebarWorktreeSessionStatus(initial, {
+        ...initial.worktrees.worktree_shared.sessions[0],
+        updatedAt: '2026-01-03T12:19:00.000Z',
+      });
+      expect(
+        getSidebarWorktreeActivity(
+          [],
+          new Map(),
+          updated.worktrees.worktree_shared.sessions,
+          null,
+          new Date('2026-01-03T12:20:00.000Z').getTime()
+        ).status
+      ).toBe('busy');
+    });
 
     it('updates a hidden member through attention and completion without changing membership', () => {
       const waiting = patchSidebarWorktreeSessionStatus(initial, {
@@ -1417,9 +1544,8 @@ describe('ChatSidebar worktree controls', () => {
             worktreeId: 'worktree_shared',
           }),
         ],
-        onCreateWorktreeChat: async sessionId => {
+        onCreateWorktreeChat: sessionId => {
           createdFrom.push(sessionId);
-          return true;
         },
         onDeleteWorktree: worktreeId => deletedWorktrees.push(worktreeId),
         onDeleteSession: sessionId => deletedSessions.push(sessionId),
@@ -1517,29 +1643,6 @@ describe('ChatSidebar worktree controls', () => {
     expect(jest.mocked(SessionPrIndicator).mock.calls).toHaveLength(0);
   });
 
-  it.each(['ses_latest', 'ses_other'])(
-    'keeps unrelated actions available during creation from %s',
-    sourceId => {
-      const html = renderChatSidebar(
-        {
-          onCreateWorktreeChat: async () => true,
-          onRenameWorktree: async () => undefined,
-          onDeleteWorktree: () => undefined,
-          creatingWorktreeSourceSessionId: sourceId,
-        },
-        true
-      );
-
-      expect(getSidebarButtonMarkup(html, 'Worktree actions for kilo/repo · main')).not.toContain(
-        'disabled=""'
-      );
-      expect(getSidebarMenuItemProps('New chat').disabled).toBe(true);
-      expect(getSidebarMenuItemProps('Rename worktree').disabled).not.toBe(true);
-      expect(getSidebarMenuItemProps('Delete worktree').disabled).toBe(sourceId === 'ses_latest');
-      expect(html.includes('aria-label="Creating chat"')).toBe(sourceId === 'ses_latest');
-    }
-  );
-
   it('disables navigation and mutation controls only for the deleting worktree', () => {
     const deleting = makeStoredSession('ses_deleting', '2026-01-03T10:00:00.000Z', {
       worktreeId: 'worktree_deleting',
@@ -1555,8 +1658,8 @@ describe('ChatSidebar worktree controls', () => {
     const html = renderChatSidebar(
       {
         sessions: [deleting, available],
-        deletingWorktreeId: deleting.worktreeId ?? undefined,
-        onCreateWorktreeChat: async () => true,
+        deletingWorktreeIds: deleting.worktreeId ? [deleting.worktreeId] : undefined,
+        onCreateWorktreeChat: () => undefined,
         onRenameWorktree: async () => undefined,
         onDeleteWorktree: () => undefined,
       },
@@ -1574,9 +1677,9 @@ describe('ChatSidebar worktree controls', () => {
     expect(
       getSidebarButtonMarkup(html, 'Worktree actions for kilo/repo · available')
     ).not.toContain('disabled=""');
-    expect(getSidebarMenuItemProps('New chat').disabled).toBe(false);
+    expect(getSidebarMenuItemProps('New chat').disabled).not.toBe(true);
     expect(getSidebarMenuItemProps('Rename worktree').disabled).not.toBe(true);
-    expect(getSidebarMenuItemProps('Delete worktree').disabled).toBe(false);
+    expect(getSidebarMenuItemProps('Delete worktree').disabled).not.toBe(true);
   });
 
   it('preserves standalone session permissions and deletion callbacks', () => {
@@ -1586,7 +1689,7 @@ describe('ChatSidebar worktree controls', () => {
     });
     const deletedSessions: string[] = [];
     const worktreeCallbacks: Partial<ChatSidebarProps> = {
-      onCreateWorktreeChat: async () => true,
+      onCreateWorktreeChat: () => undefined,
       onRenameWorktree: async () => undefined,
       onDeleteWorktree: () => undefined,
     };

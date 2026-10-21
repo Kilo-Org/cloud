@@ -41,6 +41,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+
+import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
@@ -71,6 +73,8 @@ import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate'
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useRestoredAccountId } from '@/lib/hooks/use-restored-account-id';
+import { getAuthenticatedOwner, subscribeAuthenticatedOwner } from '@/lib/context-scope';
 import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useSystemSearchOpenListener } from '@/lib/hooks/use-system-search-open-listener';
@@ -218,6 +222,14 @@ function RootLayoutNav({
   const pathname = usePathname();
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
   const router = useRouter();
+  // The root navigation container's readiness. `store.assertIsReady()` throws
+  // when `navigationRef.isReady()` is false — the exact crash
+  // "Attempted to navigate before mounting the Root Layout component" — and
+  // that bit is the container's focus adapter, true only after the root
+  // navigator's mount effects. The navigation *state* exists earlier (it is
+  // assigned during render), so every router call below gates on this hook
+  // instead: none lands in the mount window.
+  const navigationReady = useRootNavigationReady();
   // The gated pending-deep-link consumer below switches to the tapped
   // notification's organization through this provider before it navigates.
   const { setOrganizationId } = useOrganization();
@@ -232,8 +244,27 @@ function RootLayoutNav({
     email,
     isLoading: userIdLoading,
     isError: userIdError,
+    isUnreachable: userIdUnreachable,
     refetch: refetchUserId,
   } = useCurrentUserId({ enabled: token != null });
+  // A cold start that cannot reach the API has no confirmed account once the
+  // read cache holding the last confirmation has expired. The identity hint
+  // names the account the restored credentials belong to (see
+  // `useRestoredAccountId`), so the app opens on it and what runs on the device
+  // — a chat with an on-device model — works with no connection. An answer
+  // that refuses the credentials is not covered and still settles on the error.
+  const authenticatedOwner = useSyncExternalStore(
+    subscribeAuthenticatedOwner,
+    getAuthenticatedOwner
+  );
+  const restoredUserId = useRestoredAccountId(
+    authenticatedOwner.authEpoch,
+    authenticatedOwner.restored
+  );
+  const offlineUserId = userId === undefined && userIdUnreachable ? restoredUserId : null;
+  const accountUserId = userId ?? offlineUserId ?? undefined;
+  const identityLoading = userIdLoading && offlineUserId === null;
+  const identityError = userIdError && offlineUserId === null;
   const [consentChecked, setConsentChecked] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);
   const [optionalConsent, setOptionalConsentState] = useState(false);
@@ -318,7 +349,7 @@ function RootLayoutNav({
     authLoading || !fontsReady || !themeHasLoaded || !languageHasLoaded || !languageReady;
 
   // Startup phase timings (lib/startup-timing). Idempotent per mark, so this
-  // effect re-runs freely as gates settle. `userIdLoading` is false while the
+  // effect re-runs freely as gates settle. `identityLoading` is false while the
   // query is disabled, so it only counts once there is a token.
   useEffect(() => {
     if (!authLoading) {
@@ -330,19 +361,54 @@ function RootLayoutNav({
     if (themeHasLoaded) {
       markStartup('theme_ready');
     }
-    if (token != null && !userIdLoading) {
+    if (token != null && !identityLoading) {
       markStartup('user_ready');
     }
     if (consentChecked) {
       markStartup('consent_ready');
     }
-  }, [authLoading, fontsReady, themeHasLoaded, token, userIdLoading, consentChecked]);
+  }, [authLoading, fontsReady, themeHasLoaded, token, identityLoading, consentChecked]);
 
   useEffect(() => {
     if (themeHasLoaded) {
       applyThemePreference(themePreference);
     }
   }, [themeHasLoaded, themePreference]);
+
+  // Reopen the screen the user was on before an RTL reload: the target rides
+  // in a ref (the SecureStore read is one-shot), and the navigation runs only
+  // after the root navigator's mount effects. The stash bumps a state epoch,
+  // so the deferred effect re-runs after the target lands — the effect cannot
+  // observe a bare ref.
+  const languageReturnTargetRef = useRef<LanguageReturnTarget | null>(null);
+  const [languageReturnEpoch, setLanguageReturnEpoch] = useState(0);
+  const routerRef = useRef(router);
+  routerRef.current = router;
+  const runLanguageReturnNavigationRef = useRef<(() => void) | null>(null);
+  runLanguageReturnNavigationRef.current = () => {
+    const target = languageReturnTargetRef.current;
+    if (target === null) {
+      return;
+    }
+    languageReturnTargetRef.current = null;
+    if (target === 'login') {
+      routerRef.current.replace('/(auth)/login');
+    } else if (target === 'profile') {
+      routerRef.current.replace('/(app)/(tabs)/(3_profile)' as Href);
+    } else {
+      // Two steps, not one `replace`: the relaunched stack has no entry
+      // below the reopened screen, so a lone `replace` leaves the header's
+      // back control with nothing to pop.
+      routerRef.current.replace('/(app)/(tabs)/(3_profile)' as Href);
+      routerRef.current.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+    }
+  };
+  const runLanguageReturnNavigation = () => {
+    const run = runLanguageReturnNavigationRef.current;
+    if (run) {
+      run();
+    }
+  };
 
   // Resolve the active language once the stored preference has loaded, then
   // prepare the direction and catalog before first paint. A direction change
@@ -374,6 +440,9 @@ function RootLayoutNav({
       // after the reload path, so the helper's one-shot delete is the only read.
       // On a failed reload the key stays in SecureStore, so Retry's successful
       // reloadAppAsync() still reopens the right screen on the relaunch.
+      // The target rides in a ref: the read is one-shot, so the navigation
+      // cannot re-read it — the deferred effect below navigates once the root
+      // navigator's mount effects have run (navigationReady).
       let returnTarget: LanguageReturnTarget | null = null;
       if (!reloadFailed) {
         try {
@@ -382,16 +451,12 @@ function RootLayoutNav({
           // Failed read: fall through so the splash still hides.
         }
       }
-      if (returnTarget === 'login') {
-        router.replace('/(auth)/login');
-      } else if (returnTarget === 'profile') {
-        router.replace('/(app)/(tabs)/(3_profile)' as Href);
-      } else if (returnTarget === 'preferences') {
-        // Two steps, not one `replace`: the relaunched stack has no entry
-        // below the reopened screen, so a lone `replace` leaves the header's
-        // back control with nothing to pop.
-        router.replace('/(app)/(tabs)/(3_profile)' as Href);
-        router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+      if (returnTarget !== null) {
+        languageReturnTargetRef.current = returnTarget;
+        setLanguageReturnEpoch(epoch => epoch + 1);
+        if (navigationReady) {
+          runLanguageReturnNavigation();
+        }
       }
       try {
         // The plural-rules polyfill must be in place before the first render in the new language.
@@ -420,7 +485,18 @@ function RootLayoutNav({
     return () => {
       cancelled = true;
     };
-  }, [languageHasLoaded, router, setLanguageReady]);
+  }, [languageHasLoaded, navigationReady, router, setLanguageReady]);
+
+  // Deferred half of the language return: fires when the navigator finishes
+  // mounting after prepareLanguage stashed the target (the epoch bump makes
+  // this effect re-run after the stash, so a stash landing after the ready
+  // flip is still consumed).
+  useEffect(() => {
+    if (!navigationReady || languageReturnTargetRef.current === null) {
+      return;
+    }
+    runLanguageReturnNavigation();
+  }, [navigationReady, languageReturnEpoch, router]);
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
@@ -513,8 +589,8 @@ function RootLayoutNav({
     updateRequired,
     inAuthGroup,
     inForceUpdate,
-    userIdLoading,
-    userIdError,
+    userIdLoading: identityLoading,
+    userIdError: identityError,
     consentCheckError: consentCheckError != null,
     consentChecked,
     needsConsent,
@@ -526,7 +602,7 @@ function RootLayoutNav({
     let cancelled = false;
 
     async function checkConsent() {
-      if (!token || !userId) {
+      if (!token || !accountUserId) {
         setConsentChecked(false);
         setNeedsConsent(false);
         setOptionalConsentState(false);
@@ -534,7 +610,7 @@ function RootLayoutNav({
         return;
       }
 
-      const result = await checkConsentGate(userId);
+      const result = await checkConsentGate(accountUserId);
       if (cancelled) {
         return;
       }
@@ -565,15 +641,15 @@ function RootLayoutNav({
     return () => {
       cancelled = true;
     };
-  }, [token, userId, consentCheckRetryKey]);
+  }, [token, accountUserId, consentCheckRetryKey]);
 
   useEffect(() => {
-    if (!token || !userId) {
+    if (!token || !accountUserId) {
       return undefined;
     }
 
     const unsubscribe = subscribeToConsentChanges(change => {
-      if (change.userId !== userId) {
+      if (change.userId !== accountUserId) {
         return;
       }
 
@@ -583,15 +659,18 @@ function RootLayoutNav({
     });
 
     return unsubscribe;
-  }, [token, userId]);
+  }, [token, accountUserId]);
 
   useTrackingPermissionPrompt(
     optionalConsent &&
       shouldStartAnalytics({ hasToken: token != null, consentChecked, needsConsent })
   );
   useAnalyticsConsentGate({
+    authLoading,
     hasToken: token != null,
+    userIdLoading,
     consentChecked,
+    consentCheckFailed: consentCheckError != null,
     needsConsent,
     email,
     accountId: userId,
@@ -680,8 +759,8 @@ function RootLayoutNav({
       inForceUpdate,
       inAuthGroup,
       hasToken: token != null,
-      userIdLoading,
-      userIdError,
+      userIdLoading: identityLoading,
+      userIdError: identityError,
       consentCheckError: consentCheckError != null,
       consentChecked,
       needsConsent,
@@ -710,6 +789,9 @@ function RootLayoutNav({
         return;
       }
       case 'redirect-force-update': {
+        if (!navigationReady) {
+          return;
+        }
         router.replace('/force-update');
         return;
       }
@@ -719,6 +801,9 @@ function RootLayoutNav({
         return;
       }
       case 'exit-force-update': {
+        if (!navigationReady) {
+          return;
+        }
         router.replace('/(app)');
         return;
       }
@@ -728,6 +813,9 @@ function RootLayoutNav({
         return;
       }
       case 'redirect-login': {
+        if (!navigationReady) {
+          return;
+        }
         router.replace('/(auth)/login');
         return;
       }
@@ -747,10 +835,16 @@ function RootLayoutNav({
         return;
       }
       case 'redirect-consent': {
+        if (!navigationReady) {
+          return;
+        }
         router.replace('/(app)/consent' as Href);
         return;
       }
       case 'redirect-app': {
+        if (!navigationReady) {
+          return;
+        }
         router.replace('/(app)');
         return;
       }
@@ -771,8 +865,9 @@ function RootLayoutNav({
     inAuthGroup,
     inForceUpdate,
     router,
-    userIdLoading,
-    userIdError,
+    navigationReady,
+    identityLoading,
+    identityError,
     consentCheckError,
     consentChecked,
     needsConsent,
@@ -794,7 +889,7 @@ function RootLayoutNav({
   // Declared after the auth effect so that on the same flush a pending
   // deep-link navigate runs first and the share gate opens on top.
   useEffect(() => {
-    if (pendingDeepLink === null || !isShellReady) {
+    if (pendingDeepLink === null || !isShellReady || !navigationReady) {
       return;
     }
     const pending = consumePendingDeepLink();
@@ -813,10 +908,10 @@ function RootLayoutNav({
     if (navigation) {
       router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
     }
-  }, [pendingDeepLink, isShellReady, router, setOrganizationId]);
+  }, [pendingDeepLink, isShellReady, navigationReady, router, setOrganizationId]);
 
   useEffect(() => {
-    if (pendingShareId === null || !isShellReady) {
+    if (pendingShareId === null || !isShellReady || !navigationReady) {
       return;
     }
 
@@ -835,7 +930,7 @@ function RootLayoutNav({
     }
     pendingShareIdEpochRef.current += 1;
     setPendingShareId(null);
-  }, [pendingShareId, isShellReady, onGateRoute, router]);
+  }, [pendingShareId, isShellReady, navigationReady, onGateRoute, router]);
 
   // One `app_startup` event per launch, delegated to a drain helper so
   // tests can drive the real guard logic without mounting the full layout.
@@ -874,8 +969,8 @@ function RootLayoutNav({
     inForceUpdate,
     inAuthGroup,
     hasToken: token != null,
-    userIdLoading,
-    userIdError,
+    userIdLoading: identityLoading,
+    userIdError: identityError,
     consentCheckError: consentCheckError != null,
     consentChecked,
     needsConsent,

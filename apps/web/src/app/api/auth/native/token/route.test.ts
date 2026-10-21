@@ -187,7 +187,8 @@ describe('POST /api/auth/native/token', () => {
         expect.any(Headers),
         undefined,
         undefined,
-        true
+        true,
+        expect.any(Function)
       );
       expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser);
     });
@@ -207,7 +208,8 @@ describe('POST /api/auth/native/token', () => {
         expect.any(Headers),
         undefined,
         undefined,
-        true
+        true,
+        expect.any(Function)
       );
     });
 
@@ -337,7 +339,8 @@ describe('POST /api/auth/native/token', () => {
         expect.any(Headers),
         undefined,
         undefined,
-        true
+        true,
+        expect.any(Function)
       );
     });
 
@@ -356,7 +359,8 @@ describe('POST /api/auth/native/token', () => {
         expect.any(Headers),
         undefined,
         undefined,
-        true
+        true,
+        expect.any(Function)
       );
     });
 
@@ -568,7 +572,8 @@ describe('POST /api/auth/native/token', () => {
         expect.any(Headers),
         undefined,
         undefined,
-        true
+        true,
+        expect.any(Function)
       );
       expect(mockCheckDomainSignInEligibility).toHaveBeenCalledWith('emailuser@example.com');
       expect(mockReleaseSignInCode).not.toHaveBeenCalled();
@@ -639,7 +644,8 @@ describe('POST /api/auth/native/token', () => {
         expect.any(Headers),
         undefined,
         undefined,
-        true
+        true,
+        expect.any(Function)
       );
     });
 
@@ -712,6 +718,27 @@ describe('POST /api/auth/native/token', () => {
       expect(mockReleaseSignInCode).toHaveBeenCalled();
     });
 
+    it('returns 403 SIGNUP-STEP-UP with the methods and releases the reservation', async () => {
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: false,
+        error: 'SIGNUP-STEP-UP',
+        methods: ['google', 'apple'],
+      });
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'SIGNUP-STEP-UP',
+        methods: ['google', 'apple'],
+      });
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+
     it('releases the code on DIFFERENT-OAUTH settlement failure so retry succeeds', async () => {
       mockCreateOrUpdateUser.mockResolvedValue({
         success: false,
@@ -734,13 +761,14 @@ describe('POST /api/auth/native/token', () => {
       expect(mockConsumeSignInCode).not.toHaveBeenCalled();
     });
 
-    it('retry after DIFFERENT-OAUTH release reserves and settles the same code', async () => {
-      // First call: DIFFERENT-OAUTH triggers release. The second call must
-      // re-reserve the same code and settle successfully, proving the release.
+    it.each([
+      { error: 'DIFFERENT-OAUTH' as const, status: 403 },
+      { error: 'SIGNUP-UNAVAILABLE' as const, status: 503 },
+    ])('retry after $error reserves and settles the same code', async ({ error, status }) => {
       mockCreateOrUpdateUser
         .mockResolvedValueOnce({
           success: false,
-          error: 'DIFFERENT-OAUTH',
+          error,
         } as never)
         // Second call falls back to the beforeEach success default.
         .mockResolvedValueOnce({
@@ -752,10 +780,9 @@ describe('POST /api/auth/native/token', () => {
       const email = 'retry-oauth@example.com';
       const code = '654321';
 
-      // First attempt: DIFFERENT-OAUTH → release.
       const first = await POST(createRequest({ provider: 'email', email, code }));
-      expect(first.status).toBe(403);
-      expect(await first.json()).toEqual({ error: 'DIFFERENT-OAUTH' });
+      expect(first.status).toBe(status);
+      expect(await first.json()).toEqual({ error });
       expect(mockReleaseSignInCode).toHaveBeenCalledWith(email, code, undefined);
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockConsumeSignInCode).not.toHaveBeenCalled();
@@ -875,19 +902,41 @@ describe('POST /api/auth/native/token', () => {
     });
   });
 
-  it('returns 403 with the AuthErrorType when createOrUpdateUser fails', async () => {
+  it.each([
+    { error: 'BLOCKED' as const, status: 403 },
+    { error: 'SIGNUP-UNAVAILABLE' as const, status: 503 },
+  ])('returns $status for $error without credentials', async ({ error, status }) => {
     mockVerifyNativeGoogleIdToken.mockResolvedValue({
       sub: 'google-sub-1',
       email: 'googleuser@example.com',
     });
-    mockCreateOrUpdateUser.mockResolvedValue({ success: false, error: 'BLOCKED' } as never);
+    mockCreateOrUpdateUser.mockResolvedValue({ success: false, error });
 
     const response = await POST(createRequest({ provider: 'google', idToken: 'google-id-token' }));
     const data = await response.json();
 
-    expect(response.status).toBe(403);
-    expect(data).toEqual({ error: 'BLOCKED' });
+    expect(response.status).toBe(status);
+    expect(data).toEqual({ error });
     expect(mockGenerateApiToken).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 SIGNUP-STEP-UP with the methods for a Google signup without credentials', async () => {
+    mockVerifyNativeGoogleIdToken.mockResolvedValue({
+      sub: 'google-sub-1',
+      email: 'googleuser@example.com',
+    });
+    mockCreateOrUpdateUser.mockResolvedValue({
+      success: false,
+      error: 'SIGNUP-STEP-UP',
+      methods: ['apple'],
+    });
+
+    const response = await POST(createRequest({ provider: 'google', idToken: 'google-id-token' }));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'SIGNUP-STEP-UP', methods: ['apple'] });
+    expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
   });
 
   it('does not mint a token for an individually blocked user', async () => {
@@ -1032,6 +1081,168 @@ describe('POST /api/auth/native/token', () => {
   });
 
   describe('admission', () => {
+    it.each([
+      { provider: 'email', email: 'new@example.com', code: '123456' },
+      { provider: 'apple', idToken: 'apple-id-token' },
+      { provider: 'google', idToken: 'google-id-token' },
+    ])('rejects new $provider signups missing admission before issuing credentials', async body => {
+      mockCheckNativeAdmission.mockReturnValue({ admission: { ok: true }, verifyAsync: false });
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub',
+        email: 'new@example.com',
+      });
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub',
+        email: 'new@example.com',
+      });
+      mockCreateOrUpdateUser.mockImplementation(async (...args) =>
+        (await args[7]?.())
+          ? ({ success: true, user: fakeUser, isNew: true } as never)
+          : ({ success: false, error: 'ADMISSION_REQUIRED' } as never)
+      );
+
+      const response = await POST(createRequest(body));
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledTimes(1);
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      if (body.provider === 'email') expect(mockReleaseSignInCode).toHaveBeenCalledTimes(1);
+    });
+
+    it('verifies admission for a new signup even when the general mode skips verification', async () => {
+      mockCheckNativeAdmission.mockReturnValue({ admission: { ok: true }, verifyAsync: false });
+      mockValidateAdmissionPayload.mockReturnValue({
+        platform: 'android',
+        kind: 'assertion',
+        challenge: 'challenge',
+        payload: 'integrity-token',
+      });
+      mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'android', keyId: '' });
+      mockCreateOrUpdateUser.mockImplementation(async (...args) =>
+        (await args[7]?.())
+          ? ({ success: true, user: fakeUser, isNew: true } as never)
+          : ({ success: false, error: 'ADMISSION_REQUIRED' } as never)
+      );
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'new@example.com',
+          code: '123456',
+          admission: { platform: 'android' },
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: true });
+      expect(mockVerifyAdmissionAsync).toHaveBeenCalledTimes(1);
+      expect(mockCommitSignInCode).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects a failed admission verdict for a new signup even in report mode', async () => {
+      mockCheckNativeAdmission.mockReturnValue({ admission: { ok: true }, verifyAsync: true });
+      mockValidateAdmissionPayload.mockReturnValue({
+        platform: 'android',
+        kind: 'assertion',
+        challenge: 'challenge',
+        payload: 'integrity-token',
+      });
+      mockVerifyAdmissionAsync.mockResolvedValue({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+      mockCreateOrUpdateUser.mockImplementation(async (...args) =>
+        (await args[7]?.())
+          ? ({ success: true, user: fakeUser, isNew: true } as never)
+          : ({ success: false, error: 'ADMISSION_REQUIRED' } as never)
+      );
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'new@example.com',
+          code: '123456',
+          admission: { platform: 'android' },
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      expect(mockVerifyAdmissionAsync).toHaveBeenCalledTimes(1);
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects an existing iOS key before creating a new account', async () => {
+      mockCheckNativeAdmission.mockReturnValue({ admission: { ok: true }, verifyAsync: true });
+      mockValidateAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'assertion',
+        challenge: 'challenge',
+        payload: 'assertion',
+        keyId: 'existing-key',
+      });
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'existing-key',
+        signCount: 1,
+        existingKeyUserId: 'other-user',
+      });
+      mockCreateOrUpdateUser.mockImplementation(async (...args) =>
+        (await args[7]?.())
+          ? ({ success: true, user: fakeUser, isNew: true } as never)
+          : ({ success: false, error: 'ADMISSION_REQUIRED' } as never)
+      );
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'new@example.com',
+          code: '123456',
+          admission: { platform: 'ios' },
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      expect(mockVerifyAdmissionAsync).toHaveBeenCalledTimes(1);
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      { provider: 'email', email: 'new@example.com', code: '123456' },
+      { provider: 'google', idToken: 'google-id-token' },
+    ])(
+      'returns a retryable 500 when new $provider signup verification is unavailable',
+      async body => {
+        mockCheckNativeAdmission.mockReturnValue({ admission: { ok: true }, verifyAsync: false });
+        mockValidateAdmissionPayload.mockReturnValue({
+          platform: 'android',
+          kind: 'assertion',
+          challenge: 'challenge',
+          payload: 'integrity-token',
+        });
+        mockVerifyNativeGoogleIdToken.mockResolvedValue({
+          sub: 'google-sub',
+          email: 'new@example.com',
+        });
+        mockVerifyAdmissionAsync.mockRejectedValue(new Error('provider unavailable'));
+        mockCreateOrUpdateUser.mockImplementation(async (...args) => {
+          await args[7]?.();
+          return { success: true, user: fakeUser, isNew: true } as never;
+        });
+
+        const response = await POST(createRequest({ ...body, admission: { platform: 'android' } }));
+
+        expect(response.status).toBe(500);
+        expect(await response.json()).toEqual({ error: 'INTERNAL_ERROR' });
+        expect(mockGenerateApiToken).not.toHaveBeenCalled();
+        expect(mockCommitSignInCode).not.toHaveBeenCalled();
+        if (body.provider === 'email') expect(mockReleaseSignInCode).toHaveBeenCalledTimes(1);
+      }
+    );
+
     it('returns 403 ADMISSION_REQUIRED when admission check fails', async () => {
       mockCheckNativeAdmission.mockReturnValue({
         admission: {

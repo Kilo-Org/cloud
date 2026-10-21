@@ -2,6 +2,26 @@ import { describe, expect, it } from 'vitest';
 
 import { pushDataSchema } from './push-data';
 
+describe('pushDataSchema agent_briefing', () => {
+  it('accepts only the privacy-minimal available-report list route', () => {
+    expect(
+      pushDataSchema.parse({
+        type: 'agent_briefing',
+        url: '/agent-briefing',
+        reportTitle: 'Private title',
+        organizationId: 'private-org',
+      })
+    ).toEqual({ type: 'agent_briefing', url: '/agent-briefing' });
+  });
+
+  it.each([undefined, '/sessions/private-session', 'https://example.com'])(
+    'rejects a missing or unrelated briefing route: %s',
+    url => {
+      expect(pushDataSchema.safeParse({ type: 'agent_briefing', url }).success).toBe(false);
+    }
+  );
+});
+
 const lifecycleEvents = [
   'analysis_completed',
   'analysis_failed',
@@ -104,6 +124,31 @@ describe('pushDataSchema active_agents_glanceable', () => {
     expiresAt: '2026-01-01T08:00:00.000Z',
     needsInputSince: null,
   } as const;
+
+  it('retains bounded Home details beside the generic snapshot', () => {
+    const homeWidgetDetails = {
+      primaryTitle: 'Private Home title',
+      waitingAgents: [{ title: 'Awaiting approval', kind: 'permission' }],
+      scheduledAgents: [],
+    };
+    const parsed = pushDataSchema.parse({ ...payload, homeWidgetDetails });
+    expect(parsed).toMatchObject({ homeWidgetDetails });
+    expect(
+      pushDataSchema.safeParse({
+        ...payload,
+        homeWidgetDetails: { ...homeWidgetDetails, primaryTitle: 'x'.repeat(161) },
+      }).success
+    ).toBe(false);
+    expect(
+      pushDataSchema.safeParse({
+        ...payload,
+        homeWidgetDetails: {
+          ...homeWidgetDetails,
+          waitingAgents: Array(4).fill(homeWidgetDetails.waitingAgents[0]),
+        },
+      }).success
+    ).toBe(false);
+  });
 
   it('parses a payload from a server without the newest-result keys as null', () => {
     const parsed = pushDataSchema.parse(payload);

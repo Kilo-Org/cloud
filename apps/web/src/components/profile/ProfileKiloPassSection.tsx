@@ -12,14 +12,6 @@ import { KiloPassSubscribeCard } from '@/components/profile/kilo-pass/KiloPassSu
 import { KiloPassReferralButton } from '@/components/referrals/KiloPassReferralButton';
 import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
 import { recommendKiloPassTierFromAverageMonthlyUsageUsd } from '@/lib/kilo-pass/recommend-tier';
-import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@kilocode/web-shared/lib/kilo-pass/constants';
-import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
-
-function getShowKiloPassTwoMonthPromo(showFirstMonthPromo: boolean): boolean {
-  return (
-    showFirstMonthPromo && dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF)
-  );
-}
 
 export function ProfileKiloPassSection() {
   const trpc = useTRPC();
@@ -66,7 +58,6 @@ export function ProfileKiloPassSection() {
   if (!activeSubscription) {
     const pending = checkoutMutation.isPending;
     const showFirstMonthPromo = query.data.isEligibleForFirstMonthPromo;
-    const showSecondMonthPromo = getShowKiloPassTwoMonthPromo(showFirstMonthPromo);
     const averageMonthlyUsageUsd = averageMonthlyUsageQuery.data?.averageMonthlyUsageUsd;
     const recommendedTier =
       typeof averageMonthlyUsageUsd === 'number'
@@ -79,7 +70,6 @@ export function ProfileKiloPassSection() {
         setCadence={setCadence}
         pending={pending}
         showFirstMonthPromo={showFirstMonthPromo}
-        showSecondMonthPromo={showSecondMonthPromo}
         headerAction={
           <KiloPassReferralButton className="w-full sm:w-auto" source="profile_kilo_pass_section" />
         }

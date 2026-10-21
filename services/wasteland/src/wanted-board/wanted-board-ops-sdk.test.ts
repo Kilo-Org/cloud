@@ -29,8 +29,6 @@ import {
   type SdkContext,
 } from './wanted-board-ops-sdk-inner';
 
-// ── Test-only fetch helpers ─────────────────────────────────────────────
-
 type MockResponse = { status: number; body?: unknown; text?: string };
 
 type FetchCall = { url: string; method: string; body: string | null };
@@ -119,8 +117,6 @@ const baseCtx: SdkContext = {
   token: 'tok',
   isUpstreamAdmin: false,
 };
-
-// ── browseViaSdk ────────────────────────────────────────────────────────
 
 describe('browseViaSdk', () => {
   it('reads upstream main, lists fork branches, returns flat rows', async () => {
@@ -312,8 +308,6 @@ describe('browseViaSdk', () => {
   });
 });
 
-// ── claimViaSdk ─────────────────────────────────────────────────────────
-
 describe('claimViaSdk', () => {
   it('writes claim DML then publishes a PR; returns pr_url', async () => {
     // SDK claim sequence:
@@ -368,8 +362,6 @@ describe('claimViaSdk', () => {
   });
 });
 
-// ── unclaimViaSdk ───────────────────────────────────────────────────────
-
 describe('unclaimViaSdk', () => {
   it('writes unclaim DML and returns success', async () => {
     const { fetch } = makeFetch([
@@ -386,8 +378,6 @@ describe('unclaimViaSdk', () => {
     expect(result).toEqual({ success: true });
   });
 });
-
-// ── postViaSdk ──────────────────────────────────────────────────────────
 
 describe('postViaSdk', () => {
   it('inserts a new wanted row with synthesized id', async () => {
@@ -415,8 +405,6 @@ describe('postViaSdk', () => {
     expect(writeCall?.url).toContain('2');
   });
 });
-
-// ── doneViaSdk ──────────────────────────────────────────────────────────
 
 describe('doneViaSdk', () => {
   it('writes done DMLs and auto-publishes a PR; returns pr_url', async () => {
@@ -486,8 +474,6 @@ describe('doneViaSdk', () => {
     expect(writes).toHaveLength(2);
   });
 });
-
-// ── acceptViaSdk ────────────────────────────────────────────────────────
 
 describe('acceptViaSdk', () => {
   it('writes the 5-statement accept-upstream DML stack and auto-publishes the admin PR', async () => {
@@ -641,8 +627,6 @@ describe('acceptViaSdk', () => {
   });
 });
 
-// ── rejectViaSdk ────────────────────────────────────────────────────────
-
 describe('rejectViaSdk', () => {
   it('runs reject DMLs and returns success', async () => {
     const { fetch, calls } = makeFetch([
@@ -663,8 +647,6 @@ describe('rejectViaSdk', () => {
     expect(writes.some(w => w.url.includes('try%20again'))).toBe(true);
   });
 });
-
-// ── closeViaSdk ─────────────────────────────────────────────────────────
 
 describe('closeViaSdk', () => {
   it('runs close DML and returns success', async () => {

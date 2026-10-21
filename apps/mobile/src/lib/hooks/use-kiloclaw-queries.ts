@@ -134,14 +134,12 @@ export function useKiloClawGatewayReady(organizationId?: string | null, enabled 
     trpc.kiloclaw.gatewayReady.queryOptions(undefined, {
       enabled: personalEnabled,
       refetchInterval: personalEnabled ? 5000 : false,
-      refetchIntervalInBackground: true,
     })
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.gatewayReady.queryOptions(orgInput, {
       enabled: orgEnabled,
       refetchInterval: orgEnabled ? 5000 : false,
-      refetchIntervalInBackground: true,
     })
   );
   return isOrg ? org : personal;

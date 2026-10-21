@@ -26,6 +26,7 @@ import { buildSandboxBillingInput } from '../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import { buildSignedPromptAttachments } from '../execution/attachment-prompt-parts.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
+import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../sandbox-containers/instance-size.js';
 import { createMessageId } from './message-id.js';
 import {
   buildSessionMetadataFromRegistration,
@@ -166,28 +167,49 @@ export function buildControlPlaneSandboxSelection(
 ): ControlPlaneSandboxSelection {
   const provider = metadata.workspace?.sandboxProvider ?? 'cloudflare';
   const allocation = metadata.workspace?.sandboxAllocation;
+  const sandboxKind = metadata.workspace?.sandboxKind;
   const enforcementRequested = isCloudAgentContainerBillingEnabled(env, metadata.identity);
   const billing = {
     ...buildSandboxBillingInput(metadata, sandboxId, enforcementRequested),
     enforcementRequested,
   };
-  if (provider === 'vercel') {
-    const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');
-    return {
-      provider,
-      configuration: resources === undefined ? { provider } : { provider, resources },
-      billing,
-    };
+  const pinned = {
+    billing,
+    ...(sandboxKind ? { sandboxKind } : {}),
+    ...(metadata.workspace?.egressMode === undefined
+      ? {}
+      : { egressMode: metadata.workspace.egressMode }),
+    ...(metadata.workspace?.egressAllowlist === undefined
+      ? {}
+      : { egressAllowlist: metadata.workspace.egressAllowlist }),
+  };
+  switch (provider) {
+    case 'vercel': {
+      const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');
+      return {
+        provider,
+        configuration: resources === undefined ? { provider } : { provider, resources },
+        ...pinned,
+      };
+    }
+    case 'cloudflare-containers': {
+      const instance =
+        sandboxKind === 'code-review'
+          ? CODE_REVIEW_CONTAINERS_INSTANCE
+          : getSandboxAllocationInstance(allocation);
+      return {
+        provider,
+        configuration: instance === undefined ? { provider } : { provider, instance },
+        ...pinned,
+      };
+    }
+    case 'cloudflare':
+      return { provider, configuration: { provider }, ...pinned };
+    default: {
+      const exhaustive: never = provider;
+      throw new ControlPlaneRegistrationError(`Unsupported sandbox provider ${String(exhaustive)}`);
+    }
   }
-  if (provider === 'cloudflare-containers') {
-    const instance = getSandboxAllocationInstance(allocation);
-    return {
-      provider,
-      configuration: instance === undefined ? { provider } : { provider, instance },
-      billing,
-    };
-  }
-  return { provider, configuration: { provider }, billing };
 }
 
 async function buildMetadata(

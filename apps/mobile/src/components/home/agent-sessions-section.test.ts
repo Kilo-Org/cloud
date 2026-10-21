@@ -5,7 +5,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
+import { AgentSessionsSection } from '@/components/home/home-agent-sessions-section';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
@@ -67,9 +67,13 @@ vi.mock('@/components/agents/session-platform-icon', () => ({
 }));
 vi.mock('@/components/agents/session-row-actions', () => ({
   buildSessionActionMenuItems: vi.fn(),
+  useSessionDeleteConfirm: () => ({ confirmDelete: vi.fn(), deleteDialog: null }),
 }));
 vi.mock('@/components/agents/remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn(),
+  useRemoteSessionExitConfirmation: () => ({
+    confirmExit: vi.fn().mockResolvedValue(true),
+    exitDialog: null,
+  }),
 }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: vi.fn(), success: vi.fn() },
@@ -77,6 +81,12 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+// The briefing card reaches the native SQLCipher dismissal journal; these
+// assertions cover the live card and the section header only.
+vi.mock('@/components/agent-briefing/briefing-card', () => ({
+  BriefingCard: 'BriefingCard',
+  useHomeBriefing: () => ({ briefing: undefined, frameReport: undefined }),
+}));
 // A host element that still renders the header notice. The factory is hoisted
 // above the static imports, so it loads React itself.
 vi.mock('@/components/home/section-header', async () => {
@@ -169,9 +179,6 @@ function text() {
     .map(textNode => textNode.children.filter(child => typeof child === 'string').join(''))
     .join('\n');
 }
-function classes(type: string) {
-  return nodes(type).map(candidate => String(candidate.props.className ?? ''));
-}
 async function render(sessions = settled, contextOverride = context) {
   await act(async () => {
     const tree = createElement(AgentSessionsSection, { context: contextOverride, sessions });
@@ -195,10 +202,6 @@ afterEach(() => {
   renderer = undefined;
   queryClient.clear();
 });
-
-const CARD_FRAME = 'overflow-hidden rounded-2xl border border-border bg-card';
-const COUNT_ROW = 'h-6 flex-row items-center gap-2';
-const NEWEST_BLOCK = 'h-[68px] justify-center gap-1 px-4';
 
 function newestButton() {
   const button = nodes('Pressable').find(
@@ -231,8 +234,6 @@ describe('Home live section', () => {
     }
     // The soonest scheduled wake rides the scheduled row.
     expect(text()).toContain(formatScheduledWake('2026-10-03T09:00:00.000Z') ?? '');
-    // A card, not a row per session.
-    expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
   });
 
   it('shows the newest session with its state and relative age and opens it', async () => {
@@ -278,26 +279,18 @@ describe('Home live section', () => {
     );
   });
 
-  it('reserves the card frame in the pending state with a matching skeleton', async () => {
+  it('shows a skeleton until the live list resolves', async () => {
     await render({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
     expect(nodes('Skeleton').length).toBeGreaterThan(0);
-    expect(classes('View')).toContain(CARD_FRAME);
-    expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
-    expect(classes('View')).toContain(NEWEST_BLOCK);
     expect(text()).not.toContain(i18n.t('home.noLiveSessions'));
 
-    // The loaded card occupies the same frame and row heights.
     await render({ ...settled, activeSessions: [session('a1')] });
-    expect(classes('View')).toContain(CARD_FRAME);
-    expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
-    expect(classes('View')).toContain(NEWEST_BLOCK);
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(text()).toContain('a1');
   });
 
   it('draws the zero state in the loaded card frame when the accepted live list is empty', async () => {
     await render();
-    expect(classes('View')).toContain(CARD_FRAME);
-    expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
-    expect(classes('View')).toContain(`${NEWEST_BLOCK} items-center`);
     for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
       expect(text()).toContain(`0\n${label}`);
     }

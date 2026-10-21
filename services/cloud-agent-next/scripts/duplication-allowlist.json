@@ -4,12 +4,12 @@
   "exceptions": [
     {
       "files": ["src/control-plane/session/session-do.ts", "src/persistence/CloudAgentSession.ts"],
-      "fingerprint": "c8c8b96d3ab5d15d",
+      "fingerprint": "026e1925da1195c9",
       "owner": "session runtime authorization adapters",
       "reason": "Control-plane and legacy Session DOs call the same renewal owner through storage adapters with different metadata serialization and lifecycle rules.",
       "kind": "intentional",
       "maxMatches": 1,
-      "maxTokens": 105
+      "maxTokens": 104
     },
     {
       "files": ["src/session-service.ts", "src/session-service.ts"],
@@ -46,15 +46,6 @@
       "kind": "legacy",
       "maxMatches": 1,
       "maxTokens": 201
-    },
-    {
-      "files": ["wrapper/src/control-plane/prepare.ts", "wrapper/src/control/apply-attach.ts"],
-      "fingerprint": "1d796ba34bafa83b",
-      "owner": "pre-rewrite workspace attachment cleanup",
-      "reason": "The orphaned pre-rewrite attachment module retains a Kilo session probe also used by current preparation. Bound this existing copy until that module and its remaining type and test consumers are removed; the agent_* wrapper does not use it.",
-      "kind": "legacy",
-      "maxMatches": 1,
-      "maxTokens": 102
     }
   ]
 }

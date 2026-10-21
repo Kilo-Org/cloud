@@ -1,8 +1,11 @@
 import 'server-only';
 import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
+import { getHTTPStatusCodeFromError } from '@trpc/server/http';
+import { TRPC_ERROR_CODES_BY_KEY, type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import {
   sandboxSelectionCapabilitiesSchema,
   type SandboxAllocationInput,
@@ -14,7 +17,7 @@ import type { Images } from '@/lib/images-schema';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
+import { parseCustomerBillingFailure, type PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import {
   getWorktreeChangesOutputSchema,
@@ -26,23 +29,17 @@ import {
   type WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SendMessagePayload } from './types.js';
-import { baseGetMessageResultNextOutputSchema } from '@/routers/cloud-agent-next-schemas';
+import {
+  baseGetMessageResultNextOutputSchema,
+  workerPreviewOptionsSchema,
+} from '@/routers/cloud-agent-next-schemas';
 import {
   SandboxStatusSnapshotSchema,
   type SandboxStatusSnapshot,
 } from '../../../../../services/cloud-agent-next/src/shared/sandbox-status';
+import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 export type { SendMessagePayload } from './types.js';
 
-/**
- * Cloud Agent Next Client
- *
- * Client for the new cloud-agent-next worker that uses the V2 WebSocket-based API
- * with the new message format (Message + Part[]).
- *
- * PLACEHOLDER: Update CLOUD_AGENT_NEXT_API_URL when the new worker is ready.
- */
-
-// TODO: Update this URL when the new cloud-agent-next worker is deployed
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL') || '';
 
 function isConnectionResetError(error: unknown): boolean {
@@ -130,19 +127,16 @@ type PrepareSessionSharedFields = {
   mode: AgentMode;
   model: string;
   variant?: string;
-  // GitHub-specific params
   githubRepo?: string;
   githubIntegrationId?: string;
   /** GitHub Personal Access Token for private repositories */
   githubToken?: string;
-  // Generic git params for GitLab and other providers
   gitUrl?: string;
   gitToken?: string;
   /** Explicit platform type for correct env var setup (avoids URL-based detection) */
   platform?: 'github' | 'gitlab' | 'bitbucket';
   bitbucketWorkspaceUuid?: string;
   bitbucketRepositoryUuid?: string;
-  // Common params
   kilocodeOrganizationId?: string;
   /** Profile ID forwarded to cloud-agent-next for server-side merge. */
   profileId?: string;
@@ -177,6 +171,8 @@ type PrepareSessionSharedFields = {
   /** Deprecated: true is rejected because devcontainer support is retired. */
   devcontainer?: boolean;
   sandboxAllocation?: SandboxAllocationInput;
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
 };
 
 /** Non-clone prepare input: required `prompt` and the current optional initial fields. */
@@ -188,12 +184,17 @@ export type PrepareSessionNonCloneInput = PrepareSessionSharedFields & {
   autoInitiate?: boolean;
   /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
   operationKey?: string;
+  /** Client-proposed Kilo session ID, so the client can show the session before prepare returns. */
+  kiloSessionId?: string;
   cloneFromKiloSessionId?: undefined;
+  cloneUpToMessageId?: undefined;
 };
 
 /** Clone-only prepare input: copies the source session and forbids a synthetic initial turn. */
 export type PrepareSessionCloneInput = PrepareSessionSharedFields & {
   cloneFromKiloSessionId: string;
+  /** Inclusive cut: copy source messages up to and including this ID. */
+  cloneUpToMessageId?: string;
   autoInitiate: true;
   operationKey: string;
 };
@@ -204,6 +205,9 @@ export type PrepareSessionInput = PrepareSessionNonCloneInput | PrepareSessionCl
 export type GetSandboxSelectionOptionsInput = {
   kilocodeOrganizationId?: string;
   devcontainer?: boolean;
+  repositoryType?: 'github' | 'gitlab' | 'bitbucket' | 'git';
+  /** With `repositoryType`, resolves saved repository overrides into `effectiveDestination`. */
+  repositoryFullName?: string;
 };
 
 /** Output from prepareSession procedure */
@@ -219,6 +223,7 @@ export type CreateWorktreeChatInput = {
   sourceKiloSessionId: string;
   sourceCloudAgentSessionId: string;
   operationKey: string;
+  kiloSessionId?: string;
   kilocodeOrganizationId?: string;
   clientProvenance: 'browser';
 };
@@ -348,7 +353,6 @@ export type ExecutionStatus = {
 
 /** Output from getSession procedure (sanitized, no secrets) */
 export type GetSessionOutput = {
-  // Session identifiers
   sessionId: string;
   kiloSessionId?: string;
   userId: string;
@@ -361,17 +365,16 @@ export type GetSessionOutput = {
   parentSessionId?: string | null;
   cloudAgentSessionScopeId?: string | null;
 
-  // Repository info (no tokens)
   githubRepo?: string;
   gitUrl?: string;
   platform?: 'github' | 'gitlab' | 'bitbucket';
 
-  // Execution params
   prompt?: string;
   mode?: AgentMode;
   model?: string;
   autoCommit?: boolean;
   upstreamBranch?: string;
+  branchName?: string;
 
   /** Custom agents stored on this session (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{
@@ -381,7 +384,6 @@ export type GetSessionOutput = {
     variant?: string;
   }>;
 
-  // Execution status (grouped for cleaner API)
   execution: ExecutionStatus;
 
   // Lifecycle timestamps (critical for idempotency)
@@ -393,10 +395,8 @@ export type GetSessionOutput = {
   // by Worker callback ingresses), and getSession is reachable by the
   // session's owning user.
 
-  // Initial message ID for correlation
   initialMessageId?: string;
 
-  // Versioning
   timestamp: number;
   version: number;
 
@@ -416,7 +416,6 @@ export type GetSessionOutput = {
  */
 export type UpdateSessionInput = {
   cloudAgentSessionId: string;
-  // Scalar fields - null to clear, value to set, undefined to skip
   mode?: AgentMode | null;
   model?: string | null;
   variant?: string | null;
@@ -426,7 +425,6 @@ export type UpdateSessionInput = {
   autoCommit?: boolean | null;
   condenseOnComplete?: boolean | null;
   appendSystemPrompt?: string | null;
-  // Collection fields - empty to clear, value to set, undefined to skip
   envVars?: Record<string, string>;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   setupCommands?: string[];
@@ -518,10 +516,16 @@ export class CloudAgentBillingError extends Error {
   }
 }
 
+function isTRPCErrorCode(code: unknown): code is TRPC_ERROR_CODE_KEY {
+  return typeof code === 'string' && Object.hasOwn(TRPC_ERROR_CODES_BY_KEY, code);
+}
+
 /**
- * Helper to re-throw InsufficientCreditsError as TRPCError with PAYMENT_REQUIRED code.
+ * Re-throws a Cloud Agent error as a TRPCError for the web tRPC response.
+ * Billing errors keep their billing status. A worker 4xx error keeps its tRPC
+ * code and message; tRPC reports any other error as a 500.
  */
-export function rethrowAsPaymentRequired(error: unknown): never {
+export function rethrowCloudAgentError(error: unknown): never {
   if (error instanceof CloudAgentBillingError) {
     throw new TRPCError({
       code:
@@ -539,6 +543,15 @@ export function rethrowAsPaymentRequired(error: unknown): never {
       code: 'PAYMENT_REQUIRED',
       message: error.message,
     });
+  }
+  if (error instanceof TRPCClientError) {
+    const code: unknown = error.data?.code ?? error.shape?.data?.code;
+    if (isTRPCErrorCode(code)) {
+      const workerError = new TRPCError({ code, message: error.message, cause: error });
+      if (getHTTPStatusCodeFromError(workerError) < 500) {
+        throw workerError;
+      }
+    }
   }
   throw error;
 }
@@ -620,6 +633,9 @@ type CloudAgentNextTRPCClient = {
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
   };
+  getPreparationAttempts: {
+    query: (input: GetSessionInput) => Promise<PreparationAttempt[]>;
+  };
   getPendingInteractions: {
     query: (input: GetSessionInput) => Promise<GetPendingInteractionsOutput>;
   };
@@ -638,6 +654,9 @@ type CloudAgentNextTRPCClient = {
   getSandboxSelectionOptions: {
     query: (input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>;
   };
+  getPreviewOptions: {
+    query: (input: { cloudAgentSessionId: string; organizationId?: string }) => Promise<unknown>;
+  };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
   };
@@ -647,7 +666,6 @@ type CloudAgentNextTRPCClient = {
   updateSession: {
     mutate: (input: UpdateSessionInput) => Promise<UpdateSessionOutput>;
   };
-  // V2 mutation-based procedures (WebSocket streaming)
   initiateFromKilocodeSessionV2: {
     mutate: (input: InitiateFromPreparedSessionInput) => Promise<InitiateSessionOutput>;
   };
@@ -702,7 +720,6 @@ export class CloudAgentNextClient {
     this.authToken = authToken;
     this.options = options;
 
-    // Build common headers
     const baseHeaders: Record<string, string> = {
       Authorization: `Bearer ${this.authToken}`,
     };
@@ -857,6 +874,19 @@ export class CloudAgentNextClient {
     }
   }
 
+  /** The session's preparation attempts, as its stream replays them. */
+  async getPreparationAttempts(cloudAgentSessionId: string): Promise<PreparationAttempt[]> {
+    try {
+      return await this.client.getPreparationAttempts.query({ cloudAgentSessionId });
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'getPreparationAttempts' },
+        extra: { cloudAgentSessionId },
+      });
+      throw error;
+    }
+  }
+
   async getSandboxStatus(cloudAgentSessionId: string): Promise<SandboxStatusSnapshot> {
     try {
       return SandboxStatusSnapshotSchema.parse(
@@ -961,6 +991,13 @@ export class CloudAgentNextClient {
     );
   }
 
+  async getPreviewOptions(input: {
+    cloudAgentSessionId: string;
+    organizationId?: string;
+  }): Promise<z.infer<typeof workerPreviewOptionsSchema>> {
+    return workerPreviewOptionsSchema.parse(await this.client.getPreviewOptions.query(input));
+  }
+
   /**
    * Prepare a new cloud agent session.
    */
@@ -990,7 +1027,6 @@ export class CloudAgentNextClient {
         error: normalizedError instanceof Error ? normalizedError.message : String(normalizedError),
       });
 
-      // Check for insufficient credits error
       if (isInsufficientCreditsError(normalizedError)) {
         throw new InsufficientCreditsError();
       }
@@ -1046,7 +1082,6 @@ export class CloudAgentNextClient {
       const normalizedError = normalizeCloudAgentProtocolError(error);
       preserveBillingFailure(normalizedError);
 
-      // Check for insufficient credits error
       if (isInsufficientCreditsError(normalizedError)) {
         throw new InsufficientCreditsError();
       }
@@ -1075,7 +1110,6 @@ export class CloudAgentNextClient {
       const normalizedError = normalizeCloudAgentProtocolError(error);
       preserveBillingFailure(normalizedError);
 
-      // Check for insufficient credits error
       if (isInsufficientCreditsError(normalizedError)) {
         throw new InsufficientCreditsError();
       }
@@ -1286,4 +1320,59 @@ export async function closeCloudAgentOrgStreams(
       `Cloud Agent stream close failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`
     );
   }
+}
+
+// Optional enrichment that runs after the active-session read inside the native
+// widget route's ten-second deadline: a slow identity read drops only the key.
+const WIDGET_APPROVAL_KEY_BUDGET_MS = 1_500;
+
+const widgetApprovalKeyResponseSchema = z.object({
+  approvalKey: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable(),
+  // Absent when an older Worker answers; the session card then shows no command.
+  command: z.string().max(60).nullable().optional(),
+});
+
+/** The approval binding and the pending request's command, both null when none waits. */
+export type CloudAgentWidgetApproval = { approvalKey: string | null; command: string | null };
+
+/**
+ * The binding of the oldest pending permission on one owned control-plane
+ * session: SHA-256 of `JSON.stringify([kiloSessionId, permissionId])`, computed
+ * in the Worker so the raw permission never reaches this process, plus that
+ * request's command (one trimmed line, at most 60 characters) for the session
+ * card. The Worker re-checks user, organization scope and the Kilo/cloud
+ * session pairing; the key grants no authority. Bounded, and throws on any
+ * non-OK answer so the caller can drop the identity while keeping counts.
+ */
+export async function readCloudAgentWidgetApprovalKey(
+  input: {
+    userId: string;
+    organizationId: string | null;
+    kiloSessionId: string;
+    cloudAgentSessionId: string;
+  },
+  signal?: AbortSignal
+): Promise<CloudAgentWidgetApproval> {
+  const budget = AbortSignal.timeout(WIDGET_APPROVAL_KEY_BUDGET_MS);
+  const response = await fetchWithinBudget(
+    `${CLOUD_AGENT_NEXT_API_URL}/internal/widgets/approval-key`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-internal-api-key': INTERNAL_API_SECRET,
+      },
+      body: JSON.stringify(input),
+      cache: 'no-store',
+      signal: signal ? AbortSignal.any([budget, signal]) : budget,
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Cloud Agent widget approval key failed: ${response.status}`);
+  }
+  const parsed = widgetApprovalKeyResponseSchema.parse(await response.json());
+  return { approvalKey: parsed.approvalKey, command: parsed.command ?? null };
 }

@@ -30,8 +30,6 @@ const { getCloudAgentWsUrl } = await import('./cloud-agent-config');
 const SESSION_ID = 'ses_test_session_id_0000000001' as KiloSessionId;
 const CLOUD_AGENT_ID = 'agent_12345678-1234-1234-1234-123456789abc';
 
-// ---- tRPC mock helpers ----
-
 function mockQuery(result: unknown) {
   return vi.fn(async () => result);
 }
@@ -144,10 +142,6 @@ function withFakeFetch(response: Response) {
   };
 }
 
-// ===========================================================================
-// ReadFetchSessionErrorCode
-// ===========================================================================
-
 describe('readFetchSessionErrorCode', () => {
   it('reads data.code', () => {
     expect(readFetchSessionErrorCode({ data: { code: 'NOT_FOUND' } })).toBe('NOT_FOUND');
@@ -166,10 +160,6 @@ describe('readFetchSessionErrorCode', () => {
     expect(readFetchSessionErrorCode('nope')).toBeUndefined();
   });
 });
-
-// ===========================================================================
-// FetchSessionWithNotFoundRetry
-// ===========================================================================
 
 describe('fetchSessionWithNotFoundRetry', () => {
   type QueryFn = NonNullable<Parameters<typeof fetchSessionWithNotFoundRetry>[1]>['query'];
@@ -268,10 +258,6 @@ describe('fetchSessionWithNotFoundRetry', () => {
   });
 });
 
-// ===========================================================================
-// CreateExtensionAgentSessionManager
-// ===========================================================================
-
 describe('createExtensionAgentSessionManager', () => {
   beforeEach(() => {
     capturedConfig = null;
@@ -286,8 +272,6 @@ describe('createExtensionAgentSessionManager', () => {
     expect(capturedConfig!.lifecycleHooks).toBeTruthy();
     expect(capturedConfig!.websocketBaseUrl).toBe(getCloudAgentWsUrl());
   });
-
-  // ---- resolveSession ----
 
   describe('resolveSession', () => {
     it('returns cloud-agent when cloud_agent_session_id is present', async () => {
@@ -412,8 +396,6 @@ describe('createExtensionAgentSessionManager', () => {
       expect(listQuery).toHaveBeenCalledWith({ organizationId: null });
     });
   });
-
-  // ---- getTicket ----
 
   describe('getTicket', () => {
     it('builds correct ticket URL and returns ticket', async () => {
@@ -544,8 +526,6 @@ describe('createExtensionAgentSessionManager', () => {
     });
   });
 
-  // ---- fetchSnapshot ----
-
   describe('fetchSnapshot', () => {
     it('fetches session data and messages in parallel', async () => {
       const trpc = makeTrpcMock();
@@ -569,8 +549,6 @@ describe('createExtensionAgentSessionManager', () => {
       expect(snapshot.messages).toStrictEqual([{ info: { role: 'user', time: {} }, parts: [] }]);
     });
   });
-
-  // ---- fetchSnapshotPage ----
 
   describe('fetchSnapshotPage', () => {
     it('returns empty success when history is null', async () => {
@@ -1246,8 +1224,6 @@ describe('createExtensionAgentSessionManager', () => {
     });
   });
 
-  // ---- API (personal) ----
-
   describe('api (personal — organizationId = null)', () => {
     function setup() {
       const trpc = makeTrpcMock();
@@ -1333,8 +1309,6 @@ describe('createExtensionAgentSessionManager', () => {
       );
     });
   });
-
-  // ---- API (org) ----
 
   describe('api (organization)', () => {
     function setup() {
@@ -1422,8 +1396,6 @@ describe('createExtensionAgentSessionManager', () => {
       );
     });
   });
-
-  // ---- prepare / initiate ----
 
   describe('prepare', () => {
     it('calls personal prepareSession when organizationId is null', async () => {
@@ -1525,8 +1497,6 @@ describe('createExtensionAgentSessionManager', () => {
       );
     });
   });
-
-  // ---- fetchSession ----
 
   describe('fetchSession', () => {
     it('maps getWithRuntimeState result to FetchedSessionData with runtimeState', async () => {

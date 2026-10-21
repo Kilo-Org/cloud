@@ -474,8 +474,8 @@ export const personalReviewAgentRouter = createTRPCRouter({
    * and `review_analytics_enabled` on the row even when the patch supplies
    * neither, matching the full-save contract.
    *
-   * Throws `NOT_FOUND` if no stored config exists — a PATCH cannot
-   * bootstrap a row (use `saveReviewConfig` for that).
+   * With no stored config, the patch applies to the defaults that
+   * `getReviewConfig` returns and creates the row (disabled).
    */
   patchReviewConfig: baseProcedure
     .input(PatchReviewConfigInputSchema)
@@ -495,17 +495,10 @@ export const personalReviewAgentRouter = createTRPCRouter({
         }
 
         const previousConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
-        if (!previousConfig) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message:
-              'No existing review agent configuration to patch. Save one with saveReviewConfig first.',
-          });
-        }
-        const previousRepoIds =
-          ((previousConfig.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids as
-            | Array<number | string>
-            | undefined) || [];
+        const prevCfg: Partial<CodeReviewAgentConfig> = previousConfig
+          ? (previousConfig.config as CodeReviewAgentConfig)
+          : {};
+        const previousRepoIds = prevCfg.selected_repository_ids ?? [];
 
         // Delta repository selection: `selectedRepositoryDelta` computes
         // next = (stored ∪ add) \ remove, with remove winning on overlap.
@@ -523,7 +516,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
         // the merge helper. Mirrors the field mapping used in
         // `getReviewConfig` so a round-trip PATCH is a no-op on the read
         // shape.
-        const prevCfg = previousConfig.config as CodeReviewAgentConfig;
         const stored: CodeReviewStoredConfig = {
           reviewStyle: prevCfg.review_style || 'balanced',
           focusAreas: prevCfg.focus_areas || [],

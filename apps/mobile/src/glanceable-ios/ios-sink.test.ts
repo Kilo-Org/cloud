@@ -7,6 +7,11 @@ import {
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
+import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
+import {
+  _resetHomeWidgetDataForTests,
+  _setHomeWidgetStoreForTests,
+} from '@/lib/glanceable/home-widget-data';
 
 import {
   _resetLiveActivitySwitchForTests,
@@ -20,6 +25,10 @@ import {
   _setSecureStoreForTests,
   restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
+import {
+  rememberSnapshotRows,
+  setFollowedSessionsSource,
+} from '@/lib/glanceable/followed-sessions';
 import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { GlanceablePublisher } from '@/lib/glanceable/publisher';
@@ -238,6 +247,8 @@ beforeEach(() => {
   setNotificationPermissionGrantedValue(true);
   _resetIosSinkForTests();
   _resetGlanceablePersistForTests();
+  _resetHomeWidgetDataForTests();
+  _setHomeWidgetStoreForTests(secureStoreMock);
   _resetWaitingAskForTests();
   _resetGlanceablePersistForTests();
   secureStore.clear();
@@ -847,7 +858,7 @@ describe('iosSink end', () => {
 
 describe('iosSink widget publish', () => {
   it.each(['happy', 'stale'] as const)(
-    'writes a %s snapshot plus one expired frame at expiresAt with zero counts',
+    'expires %s accessory counts while retaining last-known Home work',
     status => {
       vi.useFakeTimers();
       vi.setSystemTime(NOW);
@@ -869,6 +880,13 @@ describe('iosSink widget publish', () => {
       expect(expiredProps.statusLine).toBe('Status expired');
       // Omitted, not null: UserDefaults rejects a null value. See toWidgetProps.
       expect(expiredProps.primaryKind).toBeUndefined();
+      expect(expiredProps.home).toMatchObject({
+        primaryKind: 'running',
+        primaryCount: 1,
+        stale: true,
+        checkedAt: snapshot.updatedAt,
+        canCreate: true,
+      });
     }
   );
 
@@ -893,13 +911,20 @@ describe('iosSink widget publish', () => {
     });
   });
 
-  it('retracts nothing on a surface that asserts no counts', () => {
+  it('keeps Home empty rather than replacing it with an activity-expired message', () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
 
     iosSink.publish(snapshotFor([]));
 
-    expect(mockState.timeline).toHaveLength(2);
+    expect(
+      mockState.timeline.every(
+        entry => (entry.props as GlanceableViewProps).home?.primaryCount === 0
+      )
+    ).toBe(true);
+    expect(
+      (mockState.timeline.at(-1)?.props as GlanceableViewProps | undefined)?.home?.status
+    ).toBe('empty');
     expect(mockState.timeline[0]?.props).toMatchObject({ statusLine: 'No agents waiting' });
   });
 
@@ -968,36 +993,57 @@ describe('iosSink widget publish', () => {
       expect(props.primaryKind === undefined).toBe(!hasPrimary);
     }
   });
+});
 
-  it('writes the newest-result fields for the large card and drops them on locked frames', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(NOW);
-    const newestAt = new Date(NOW - 180_000).toISOString();
-    iosSink.publish(snapshotFor([{ status: 'question', statusUpdatedAt: newestAt }]));
+describe('iosSink followed sessions', () => {
+  afterEach(() => {
+    setFollowedSessionsSource(null);
+  });
 
-    // Every publish replaces the snapshot and the timeline, so a state change
-    // repaints the card at once; no timer carries the newest result.
-    const happy = mockState.snapshots.at(-1) as Partial<GlanceableViewProps>;
-    expect(happy).toMatchObject({
-      newestResultKind: 'needsInput',
-      newestResultLabel: 'Needs input',
-      newestResultAt: newestAt,
+  it('draws the wait and wake times of the sessions it still counts, not the followed ones', () => {
+    const rows = [
+      {
+        id: 'followed',
+        status: 'permission',
+        statusUpdatedAt: new Date(NOW - 60 * 60_000).toISOString(),
+      },
+      {
+        id: 'other',
+        status: 'question',
+        statusUpdatedAt: new Date(NOW - 5 * 60_000).toISOString(),
+      },
+      {
+        id: 'followed-wake',
+        status: 'scheduled',
+        scheduledAt: new Date(NOW + 30 * 60_000).toISOString(),
+      },
+      {
+        id: 'other-wake',
+        status: 'scheduled',
+        scheduledAt: new Date(NOW + 90 * 60_000).toISOString(),
+      },
+    ];
+    setFollowedSessionsSource({
+      ids: () => ['followed', 'followed-wake'],
+      counts: () => ({ running: 0, needsInput: 1, needsApproval: 1, idle: 0, scheduled: 1 }),
     });
-
-    // The stale frame keeps the counts and the delayed copy; the layout prefers
-    // that copy over a relative time claiming freshness the snapshot lost.
-    const stale = mockState.timeline[1]?.props as Partial<GlanceableViewProps>;
-    expect(stale).toMatchObject({
-      statusLine: "Can't update now",
-      newestResultKind: 'needsInput',
-      newestResultAt: newestAt,
+    const snapshot = buildGlanceableSnapshot({
+      sessions: rows,
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
     });
+    rememberSnapshotRows(snapshot.scopeKey, rows);
 
-    iosSink.publish(snapshotFor([], 1, 'empty'));
-    const empty = mockState.snapshots.at(-1) as Partial<GlanceableViewProps>;
-    expect(empty.newestResultKind).toBeUndefined();
-    expect(empty.newestResultLabel).toBeUndefined();
-    expect(empty.newestResultAt).toBeUndefined();
+    iosSink.startOrUpdate(snapshot, CTX);
+
+    expect(mockState.started[0]?.props).toMatchObject({
+      needsInput: 1,
+      needsApproval: 0,
+      scheduled: 1,
+      needsInputSince: rows[1]?.statusUpdatedAt,
+      scheduledAt: rows[3]?.scheduledAt,
+    });
   });
 });
 
@@ -1365,26 +1411,10 @@ describe('buildGlanceableViewProps', () => {
     const props = buildGlanceableViewProps(snapshot, {}, key => key);
     const json = JSON.stringify(props);
 
-    expect(Object.keys(props).toSorted()).toEqual([
-      'accessibilityLabel',
-      'actionLine',
-      'actions',
-      'countLines',
-      'needsInputSince',
-      'newestResultAt',
-      'newestResultKind',
-      'newestResultLabel',
-      'newestTitle',
-      'primaryCount',
-      'primaryKind',
-      'primaryLabel',
-      'scheduledAt',
-      'statusLine',
-    ]);
     expect(json).not.toContain('user-9f3a-leak');
     expect(json).not.toContain('org-acme-7-leak');
     expect(json).not.toContain(snapshot.scopeKey);
-    expect(json).not.toContain(snapshot.updatedAt);
+    expect(props.home?.checkedAt).toBe(snapshot.updatedAt);
     expect(json).not.toContain('revision');
     // The newest session's title is the one exception the owner granted, and
     // it never rides in the snapshot: without the surface extra there is no
@@ -1450,13 +1480,13 @@ describe('buildGlanceableViewProps', () => {
     );
   });
 
-  it('offers Approve for a permission wait and nothing else', () => {
-    const props = buildGlanceableViewProps(
-      snapshotFor([{ status: 'permission' }], 0),
-      {},
-      key => key
-    );
-    expect(props.actions).toEqual({ approve: true, newAgent: false });
+  it('offers Approve and New agent for a permission wait', () => {
+    const snapshot = snapshotFor([{ status: 'permission' }], 0);
+    const props = buildGlanceableViewProps(snapshot, {}, key => key, {
+      snapshot,
+      details: { ...EMPTY_HOME_WIDGET_DETAILS, approvalKey: 'a'.repeat(64) },
+    });
+    expect(props.actions).toEqual({ approve: true, newAgent: true });
     expect(props.statusLine).toBeNull();
   });
 
@@ -1464,13 +1494,13 @@ describe('buildGlanceableViewProps', () => {
     'offers no Approve for a %s wait the action cannot answer',
     status => {
       const props = buildGlanceableViewProps(snapshotFor([{ status }], 0), {}, key => key);
-      expect(props.actions).toEqual({ approve: false, newAgent: false });
+      expect(props.actions).toEqual({ approve: false, newAgent: true });
     }
   );
 
-  it('offers no action for a tray that is working and needs nothing', () => {
+  it('keeps New agent available while another agent works', () => {
     const props = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
-    expect(props.actions).toEqual({ approve: false, newAgent: false });
+    expect(props.actions).toEqual({ approve: false, newAgent: true });
   });
 
   it('offers New agent and none of the others for the empty state', () => {
@@ -1479,7 +1509,7 @@ describe('buildGlanceableViewProps', () => {
     expect(props.statusLine).toBe('glanceable.noneWaiting');
   });
 
-  it.each(['waiting', 'expired', 'signed_out', 'privacy'] as const)(
+  it.each(['waiting', 'signed_out', 'privacy'] as const)(
     'offers no action and no title for a locked %s surface',
     status => {
       const props = buildGlanceableViewProps(snapshotFor([], 1, status), {}, key => key);
@@ -1494,13 +1524,13 @@ describe('buildGlanceableViewProps', () => {
       newestSessionTitle: 'Fix the flaky test',
       actionFeedback: 'couldNotApprove',
     });
-    const props = buildGlanceableViewProps(
-      snapshotFor([{ status: 'permission' }], 0),
-      {},
-      key => key
-    );
+    const snapshot = snapshotFor([{ status: 'permission' }], 0);
+    const props = buildGlanceableViewProps(snapshot, {}, key => key, {
+      snapshot,
+      details: { ...EMPTY_HOME_WIDGET_DETAILS, approvalKey: 'a'.repeat(64) },
+    });
     expect(props.newestTitle).toBe('glanceable.couldNotApprove');
-    expect(props.actions).toEqual({ approve: true, newAgent: false });
+    expect(props.actions).toEqual({ approve: true, newAgent: true });
   });
 
   it('holds the in-flight action in the reserved slot', () => {

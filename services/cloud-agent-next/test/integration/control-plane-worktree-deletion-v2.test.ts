@@ -119,14 +119,11 @@ function createFakeProvider(): FakeProvider {
     observeStatus: 'active',
   };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(_ref, launchEnv) {
+    async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
       return { startSource: 'image' as const };
     },
@@ -260,7 +257,9 @@ async function startSharedConnectedSandbox(): Promise<{
   kiloA: string;
   kiloB: string;
 }> {
-  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, newSessionId());
+  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, newSessionId(), undefined, {
+    sandboxAllocation: 'cloudflare-shared',
+  });
   const provider = createFakeProvider();
   const sandbox = await injectProvider(sandboxId, provider);
   const worktreeA = worktreeId();
@@ -352,6 +351,16 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
       kiloSessionId: kilo,
     } = await startConnectedSandbox();
 
+    await runInDurableObject(sandbox, (_instance, state) => {
+      state.storage.kv.put(`worktree_changes/${worktree}/worktree_changes`, { sentinel: true });
+      state.storage.kv.put(`worktree_changes/${worktree}/worktree_file:changed.txt`, {
+        sentinel: true,
+      });
+      state.storage.kv.put('worktree_changes/another-worktree/worktree_changes', {
+        sentinel: true,
+      });
+    });
+
     const result = await sandbox.deleteWorktreeResources(
       deletionInput({ sandboxId, worktreeId: worktree, sessionIds: [kilo] })
     );
@@ -359,6 +368,14 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
     expect(result).toEqual({ deleted: true, sessionIds: [kilo] });
     expect(provider.stopCalls).toHaveLength(1);
     expect((await sandbox.getAllocationState()).kind).toBe('stopped');
+    await runInDurableObject(sandbox, (_instance, state) => {
+      expect(
+        Array.from(state.storage.kv.list({ prefix: `worktree_changes/${worktree}/` }))
+      ).toEqual([]);
+      expect(state.storage.kv.get('worktree_changes/another-worktree/worktree_changes')).toEqual({
+        sentinel: true,
+      });
+    });
     await expect(sandbox.status({ sessionId })).resolves.toMatchObject({
       view: { state: 'unknown' },
     });

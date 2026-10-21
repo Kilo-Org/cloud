@@ -119,6 +119,8 @@ describe('failure responsibility summary', () => {
     ['provider_ownership_unknown', 'Unknown provider ownership'],
     ['user_interrupt', 'User interrupt'],
     ['container_shutdown', 'Container shutdown'],
+    ['container_limit_reached', 'Container limit reached'],
+    ['admission_capacity', 'Admission queue full'],
     ['system_interrupt', 'System interrupt'],
     ['wrapper_disconnected', 'Wrapper disconnected'],
     ['wrapper_startup', 'Wrapper startup failure'],

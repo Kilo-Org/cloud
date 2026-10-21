@@ -21,7 +21,12 @@ import { enqueueChargeAttempted } from '@kilocode/web-shared/lib/bouncer/credit-
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type * as CheckoutSession from '@/lib/kilo-pass/checkout-session';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { bouncer_credit_event_outbox } from '@kilocode/db/schema';
+import {
+  bouncer_credit_event_outbox,
+  kilo_pass_pause_events,
+  kilo_pass_subscriptions,
+} from '@kilocode/db/schema';
+import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
@@ -233,5 +238,88 @@ describe('createOrReuseKiloPassCheckoutSession durable reporting', () => {
     const rows = await outboxRowsFor(user.id);
     expect(rows).toHaveLength(1);
     expect(rows[0].event_id).toBe('kilo-pass-checkout:cs_retry');
+  });
+});
+
+describe('createOrReuseKiloPassCheckoutSession existing subscription guard', () => {
+  const guardUserIds: string[] = [];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockListSessions.mockResolvedValue({ data: [], has_more: false });
+    mockListSubscriptions.mockResolvedValue({ data: [], has_more: false });
+  });
+
+  afterEach(async () => {
+    if (guardUserIds.length === 0) return;
+    const subscriptionIds = db
+      .select({ id: kilo_pass_subscriptions.id })
+      .from(kilo_pass_subscriptions)
+      .where(inArray(kilo_pass_subscriptions.kilo_user_id, guardUserIds));
+    await db
+      .delete(kilo_pass_pause_events)
+      .where(inArray(kilo_pass_pause_events.kilo_pass_subscription_id, subscriptionIds));
+    await db
+      .delete(kilo_pass_subscriptions)
+      .where(inArray(kilo_pass_subscriptions.kilo_user_id, guardUserIds));
+    guardUserIds.length = 0;
+  });
+
+  async function insertSubscriptionWithOpenPause(status: 'active' | 'canceled') {
+    const user = await insertTestUser();
+    guardUserIds.push(user.id);
+    const stripeSubscriptionId = `sub_guard_${crypto.randomUUID()}`;
+    const [subscription] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        provider_subscription_id: stripeSubscriptionId,
+        stripe_subscription_id: stripeSubscriptionId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status,
+        started_at: '2026-01-01T00:00:00.000Z',
+        ended_at: status === 'canceled' ? '2026-03-01T00:00:00.000Z' : null,
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    await db.insert(kilo_pass_pause_events).values({
+      kilo_pass_subscription_id: subscription.id,
+      paused_at: '2026-02-01T00:00:00.000Z',
+      resumes_at: null,
+    });
+    return user;
+  }
+
+  it('allows checkout when the canceled subscription still has an open pause event', async () => {
+    const user = await insertSubscriptionWithOpenPause('canceled');
+    const createSession = jest.fn<CreateSessionMock>(async () =>
+      stripeSession('cs_after_canceled_pause', { metadata: { ...METADATA, kiloUserId: user.id } })
+    );
+
+    const result = await createOrReuseKiloPassCheckoutSession({
+      userId: user.id,
+      stripeCustomerId: 'cus_test',
+      metadata: { ...METADATA, kiloUserId: user.id },
+      createSession,
+    });
+
+    expect(result.url).toBe('https://checkout.stripe.test/cs_after_canceled_pause');
+    expect(createSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks checkout when an active subscription has an open pause event', async () => {
+    const user = await insertSubscriptionWithOpenPause('active');
+    const createSession = jest.fn<CreateSessionMock>();
+
+    await expect(
+      createOrReuseKiloPassCheckoutSession({
+        userId: user.id,
+        stripeCustomerId: 'cus_test',
+        metadata: { ...METADATA, kiloUserId: user.id },
+        createSession,
+      })
+    ).rejects.toThrow('You already have an active Kilo Pass subscription.');
+    expect(createSession).not.toHaveBeenCalled();
+    expect(mockListSessions).not.toHaveBeenCalled();
   });
 });

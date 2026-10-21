@@ -7,8 +7,6 @@
  */
 import { writeEvent } from './analytics.util';
 
-// ── Billable event names ──────────────────────────────────────────────
-
 export type BillableEvent =
   | 'billing.wasteland_created'
   | 'billing.wasteland_deleted'

@@ -281,6 +281,21 @@ describe('code review alert detectors', () => {
     await expect(evaluateErrorSpike(db)).resolves.toEqual({ tripped: false });
   });
 
+  it.each([
+    ['assistant_invalid_request_byok', false],
+    ['assistant_invalid_request', true],
+  ] as const)(
+    'classifies invalid-request reason %s for error-spike alerts',
+    async (terminalReason, tripped) => {
+      await insertReviews([
+        reviewValues({ status: 'failed', terminal_reason: terminalReason }),
+        ...Array.from({ length: 3 }, () => reviewValues()),
+      ]);
+
+      await expect(evaluateErrorSpike(db)).resolves.toMatchObject({ tripped });
+    }
+  );
+
   it('excludes legacy model-not-found failed rows from error-spike counts', async () => {
     await insertReviews([
       reviewValues({

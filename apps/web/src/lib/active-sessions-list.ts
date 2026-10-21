@@ -12,6 +12,7 @@ import {
   github_branch_pull_requests,
 } from '@kilocode/db/schema';
 import { and, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
 import {
   associatedPrSchema,
   formatAssociatedPr,
@@ -138,6 +139,13 @@ type EnrichmentRow = {
   status: string | null;
   title: string | null;
   organization_id: string | null;
+  /**
+   * Whether the caller may still read this row's organization. Personal rows
+   * are always accessible. Selected as a column so enrichment can drop
+   * former-organization heartbeat rows even when the worker's live feed does
+   * not know about organizations.
+   */
+  organization_is_accessible?: boolean;
   git_url: string | null;
   last_activity_at: string | null;
   status_updated_at: string | null;
@@ -354,6 +362,10 @@ export type ListActiveSessionsInput = {
   organizationId: string | null | undefined;
   /** When true, also merge live cloud-agent root sessions from Postgres. */
   includeCloudAgentSessions: boolean;
+  /** Snapshot refreshes must fail rather than confirm partial/empty work on an upstream outage. */
+  requireCompleteSnapshot?: boolean;
+  /** Caller deadline; aborts the session-ingest fetch. Postgres reads cannot be cancelled. */
+  signal?: AbortSignal;
 };
 
 /**
@@ -366,15 +378,20 @@ export async function listActiveSessions({
   userId,
   organizationId,
   includeCloudAgentSessions,
+  requireCompleteSnapshot = false,
+  signal,
 }: ListActiveSessionsInput): Promise<{ sessions: ActiveSession[] }> {
-  // Phase 1: fetch + parse the worker response. Any failure here
-  // (HTTP error, malformed JSON, schema mismatch) degrades to an empty
-  // list exactly as before — these are "no data" outcomes from the
-  // mobile client's point of view. With includeCloudAgentSessions, all
-  // three early exits fall through to the cloud-candidates query (D11).
+  // Normal list callers retain best-effort behavior. Background snapshots
+  // require an authoritative read so outages never erase last-known work.
   let parsed: { sessions: ActiveSession[] } = { sessions: [] };
 
   if (!SESSION_INGEST_WORKER_URL) {
+    if (requireCompleteSnapshot) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Session ingest is not configured',
+      });
+    }
     if (!includeCloudAgentSessions) {
       return { sessions: [] as ActiveSession[] };
     }
@@ -392,9 +409,16 @@ export async function listActiveSessions({
       // exactly as any other upstream failure does.
       const response = await fetchWithinBudget(url, {
         headers: { Authorization: `Bearer ${token}` },
+        signal,
       });
 
       if (!response.ok) {
+        if (requireCompleteSnapshot) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to fetch active sessions',
+          });
+        }
         console.warn(
           `[active-sessions] fetch failed: ${response.status} ${response.statusText}`,
           await response.text().catch(() => '')
@@ -407,6 +431,13 @@ export async function listActiveSessions({
         parsed = activeSessionsResponseSchema.parse(raw);
       }
     } catch (error) {
+      if (requireCompleteSnapshot) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch active sessions',
+          cause: error,
+        });
+      }
       console.warn('[active-sessions] error:', error);
       if (!includeCloudAgentSessions) {
         return { sessions: [] as ActiveSession[] };
@@ -432,6 +463,10 @@ export async function listActiveSessions({
           status: cli_sessions_v2.status,
           title: cli_sessions_v2.title,
           organization_id: cli_sessions_v2.organization_id,
+          organization_is_accessible: activeOrganizationAccessSql(
+            cli_sessions_v2.organization_id,
+            userId
+          ),
           git_url: cli_sessions_v2.git_url,
           last_activity_at: cli_sessions_v2.last_activity_at,
           status_updated_at: cli_sessions_v2.status_updated_at,
@@ -486,10 +521,15 @@ export async function listActiveSessions({
     sessions = [];
     for (const session of parsed.sessions) {
       const row = byId.get(session.id);
-      // No `cli_sessions_v2` row → unattributable → personal. An SQL-side filter
-      // could not tell this case apart from "belongs to another organization".
+      // No `cli_sessions_v2` row → unattributable → personal. Filtering in SQL
+      // cannot tell that case apart from "belongs to an organization the caller
+      // can no longer access", so the access decision is made after enrichment:
+      // a former-organization row must be dropped, not relabelled personal.
       const rowOrganizationId = row?.organization_id ?? null;
       if (organizationId !== undefined && rowOrganizationId !== organizationId) {
+        continue;
+      }
+      if (organizationId === undefined && row && !row.organization_is_accessible) {
         continue;
       }
       sessions.push(mapEnrichedHeartbeatSession(session, row));
@@ -562,6 +602,9 @@ export async function listActiveSessions({
             isNull(cli_sessions_v2.parent_session_id),
             isNotNull(cli_sessions_v2.cloud_agent_session_id),
             orgPredicate,
+            organizationId === undefined
+              ? activeOrganizationAccessSql(cli_sessions_v2.organization_id, userId)
+              : undefined,
             livePredicate
           )
         )

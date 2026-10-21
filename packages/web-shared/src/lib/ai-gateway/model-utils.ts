@@ -3,18 +3,19 @@
  * Keep this file free of server-only dependencies.
  */
 
+import type { OpenRouterModel } from '@kilocode/db/schema-types';
+
 /**
  * Public-id namespace prefixes for Kilo-owned models. These are reserved and
  * must not be claimed by custom upstreams.
  *
  * The names look swapped but are intentional: Kilo Code (the extension) selects
  * Kilo-hosted models under `kilo/`, while KiloClaw selects them under
- * `kilocode/`. `kilo-internal/` is the custom LLM (`custom_llm2`) namespace,
- * while `kilo-auto/` contains virtual routing models.
+ * `kilocode/`. `kilo-auto/` contains virtual routing models. Custom LLM ids may
+ * not use these prefixes (`CustomLlmPublicIdSchema` in `@kilocode/db` mirrors them).
  */
 export const KILOCODE_KILO_PROVIDER_PREFIX = 'kilo/';
 export const KILOCLAW_KILO_PROVIDER_PREFIX = 'kilocode/';
-export const CUSTOM_LLM_PREFIX = 'kilo-internal/';
 export const KILO_AUTO_MODEL_PREFIX = 'kilo-auto/';
 
 /**
@@ -23,4 +24,14 @@ export const KILO_AUTO_MODEL_PREFIX = 'kilo-auto/';
 export function normalizeModelId(modelId: string): string {
   const colonIndex = modelId.indexOf(':');
   return colonIndex >= 0 ? modelId.substring(0, colonIndex) : modelId;
+}
+
+/**
+ * The exact gateway model id a snapshot entry is served as. Snapshot slugs are
+ * unsuffixed; the provider's endpoint carries the variant (`standard`, `free`),
+ * which the gateway exposes as `<slug>:<variant>` for anything but `standard`.
+ */
+export function getSnapshotModelVariantId(model: OpenRouterModel): string {
+  const variant = model.endpoint?.variant;
+  return variant && variant !== 'standard' ? `${model.slug}:${variant}` : model.slug;
 }

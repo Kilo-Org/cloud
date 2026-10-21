@@ -170,8 +170,11 @@ function runHook(args: {
   onSpawnAdmitted?: () => void;
   onSpawnFailed?: () => void;
   cloneFromKiloSessionId?: string | null;
+  cloneUpToMessageId?: string | null;
+  forkPrefillText?: string | null;
   onCloneImportFailure?: (key: string) => void;
   onSpawnReady?: () => void;
+  onSpawnSucceeded?: (sessionId: string) => void;
   runOnInstance?: InstancePickerInstance | null;
   setRunOnInstance?: (next: InstancePickerInstance | null) => void;
   refetchInstances?: () => Promise<{ data: { instances: InstancePickerInstance[] } | undefined }>;
@@ -257,8 +260,11 @@ function runHook(args: {
         onSpawnAdmitted: args.onSpawnAdmitted,
         onSpawnFailed: args.onSpawnFailed,
         cloneFromKiloSessionId: args.cloneFromKiloSessionId,
+        cloneUpToMessageId: args.cloneUpToMessageId,
+        forkPrefillText: args.forkPrefillText,
         onCloneImportFailure: args.onCloneImportFailure,
         onSpawnReady: args.onSpawnReady,
+        onSpawnSucceeded: args.onSpawnSucceeded,
       });
     } finally {
       reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
@@ -654,7 +660,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
 
     const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
     expect(typeof calledWith).toBe('string');
-    expect(calledWith).toContain('spawned=1');
+    expect(calledWith).toContain('spawned=1&cloned=1');
     expect(calledWith).toContain('ses_12345678901234567890123456');
     expect(calledWith).not.toContain('shareId=');
     expect(calledWith).not.toContain('autoSend=');
@@ -712,6 +718,140 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     // to Cloud Agent, so Start stays enabled for the retry.
     expect(onCloneImportFailure).not.toHaveBeenCalled();
     expect(setRunOnInstance).not.toHaveBeenCalled();
+  });
+
+  describe('fork cut', () => {
+    const CUT = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
+    const FORK_CAPABLE: InstancePickerInstance = {
+      ...INSTANCE,
+      capabilities: { sessionClone: true, sessionCloneAtMessage: true },
+    };
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    const refetchCapable = () => Promise.resolve({ data: { instances: [FORK_CAPABLE] } });
+
+    it('sends the cut on create_session when the CLI advertises sessionCloneAtMessage', async () => {
+      const { onStart } = runHook({
+        organizationId: 'org-xyz',
+        cloneFromKiloSessionId: 'ses_source',
+        cloneUpToMessageId: CUT,
+        runOnInstance: FORK_CAPABLE,
+        refetchInstances: refetchCapable,
+      });
+
+      expect(await captureSpawnCall(onStart)).toEqual([
+        'conn-abc',
+        { orgId: 'org-xyz', cloneFromKiloSessionId: 'ses_source', cloneUpToMessageId: CUT },
+        { operationKey: expect.any(String) },
+      ]);
+    });
+
+    it.each([
+      { name: 'unknown', capabilities: undefined },
+      { name: 'clone-only', capabilities: { sessionClone: true } },
+      {
+        name: 'explicitly refused',
+        capabilities: { sessionClone: true, sessionCloneAtMessage: false },
+      },
+    ])('fails closed on a $name cut capability without spawning', ({ capabilities }) => {
+      const onCloneImportFailure = vi.fn();
+      const onSpawnAdmitted = vi.fn();
+      const { onStart } = runHook({
+        organizationId: 'org-xyz',
+        cloneFromKiloSessionId: 'ses_source',
+        cloneUpToMessageId: CUT,
+        runOnInstance: { ...INSTANCE, ...(capabilities ? { capabilities } : {}) },
+        onSpawnAdmitted: () => {
+          onSpawnAdmitted();
+        },
+        onCloneImportFailure: key => {
+          onCloneImportFailure(key);
+        },
+      });
+
+      onStart();
+      expect(onCloneImportFailure).toHaveBeenCalledWith('agentChat.newSession.cliCannotFork');
+      expect(onSpawnAdmitted).not.toHaveBeenCalled();
+      expect(spawnMock).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when the refreshed instance no longer advertises the cut capability', async () => {
+      const onCloneImportFailure = vi.fn();
+      const onSpawnFailed = vi.fn();
+      const { onStart } = runHook({
+        organizationId: 'org-xyz',
+        cloneFromKiloSessionId: 'ses_source',
+        cloneUpToMessageId: CUT,
+        runOnInstance: FORK_CAPABLE,
+        onCloneImportFailure: key => {
+          onCloneImportFailure(key);
+        },
+        onSpawnFailed: () => {
+          onSpawnFailed();
+        },
+      });
+
+      onStart();
+      await vi.waitFor(() => {
+        expect(onCloneImportFailure).toHaveBeenCalledWith('agentChat.newSession.cliCannotFork');
+      });
+      expect(onSpawnFailed).toHaveBeenCalledTimes(1);
+      expect(spawnMock).not.toHaveBeenCalled();
+    });
+
+    it('prefills the forked user message in the new composer without auto-send', async () => {
+      const onSpawnSucceeded = vi.fn(() => {
+        expect(routerReplace).not.toHaveBeenCalled();
+      });
+      const { onStart } = runHook({
+        organizationId: 'org-xyz',
+        mode: 'code',
+        cloneFromKiloSessionId: 'ses_source',
+        cloneUpToMessageId: CUT,
+        forkPrefillText: 'Second question',
+        runOnInstance: FORK_CAPABLE,
+        refetchInstances: refetchCapable,
+        getSubmitPayload: () => null,
+        onSpawnSucceeded,
+      });
+
+      await runStartAndWaitForReplace(onStart);
+      expect(onSpawnSucceeded).toHaveBeenCalledExactlyOnceWith('ses_12345678901234567890123456');
+
+      const calledWith = routerReplace.mock.calls[0]?.[0] as string;
+      expect(calledWith).toContain('spawned=1');
+      expect(calledWith).toContain('shareId=share-id-fixed');
+      expect(calledWith).not.toContain('autoSend=');
+      expect(peekSharePayload('share-id-fixed')).toEqual({
+        text: 'Second question',
+        files: [],
+        failedFiles: [],
+      });
+    });
+
+    it('maps a delivered cut-not-found to the retryable not-saved-yet reason', async () => {
+      spawnMock.mockResolvedValueOnce({
+        status: 'nonRetryable',
+        reason: 'cloud session cut not found',
+        cause: new CommandDeliveredError('cloud session cut not found'),
+      });
+      const onCloneImportFailure = vi.fn();
+      const { onStart } = runHook({
+        organizationId: 'org-xyz',
+        cloneFromKiloSessionId: 'ses_source',
+        cloneUpToMessageId: CUT,
+        runOnInstance: FORK_CAPABLE,
+        refetchInstances: refetchCapable,
+        onCloneImportFailure: key => {
+          onCloneImportFailure(key);
+        },
+      });
+
+      onStart();
+      await vi.waitFor(() => {
+        expect(onCloneImportFailure).toHaveBeenCalledWith('agentChat.newSession.forkCutNotSynced');
+      });
+      expect(toastErrorMock).not.toHaveBeenCalled();
+    });
   });
 });
 

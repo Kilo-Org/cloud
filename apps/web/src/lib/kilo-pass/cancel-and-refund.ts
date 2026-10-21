@@ -11,10 +11,10 @@ import {
 } from '@kilocode/db/schema';
 import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
+import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
-import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 import { blockUser } from '@/lib/user/block';
 
 type Db = typeof defaultDb;
@@ -183,15 +183,20 @@ export async function cancelAndRefundKiloPassForUser({
   // not get misreported as our own block.
   let didBlock = false;
   const balanceResetAmountUsd = await db.transaction(async tx => {
+    const endedAt = new Date().toISOString();
     await tx
       .update(kilo_pass_subscriptions)
       .set({
         status: 'canceled',
         cancel_at_period_end: false,
-        ended_at: new Date().toISOString(),
+        ended_at: endedAt,
         current_streak_months: 0,
       })
       .where(eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId));
+    await closePauseEvent(tx, {
+      kiloPassSubscriptionId: subscription.subscriptionId,
+      resumedAt: endedAt,
+    });
 
     didBlock = await blockUser({
       kiloUserId: userId,
@@ -262,8 +267,6 @@ export async function cancelAndRefundKiloPassForUser({
 
     return balanceReset;
   });
-
-  await revokeGatewayGrantsForBlockedUser(userId);
 
   return {
     status: refundLatestPayment ? 'cancelled_and_refunded' : 'cancelled',

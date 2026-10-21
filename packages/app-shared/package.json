@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./utils": "./src/utils.ts",
+    "./support": "./src/support.ts",
     "./security-agent": "./src/security-agent/index.ts",
     "./code-review": "./src/code-review/index.ts",
     "./code-reviews": "./src/code-reviews/index.ts",
@@ -22,6 +23,9 @@
     "./commerce": "./src/commerce/index.ts",
     "./moderation": "./src/moderation/index.ts",
     "./glanceable-agents-snapshot": "./src/glanceable-agents-snapshot.ts",
+    "./model-data-disclosure": "./src/model-data-disclosure.ts",
+    "./agent-briefing": "./src/agent-briefing.ts",
+    "./home-widget": "./src/home-widget.ts",
     "./tool-detail": "./src/tool-detail/index.ts"
   },
   "scripts": {

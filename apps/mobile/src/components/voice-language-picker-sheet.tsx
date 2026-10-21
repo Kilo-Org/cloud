@@ -1,8 +1,9 @@
+import { FlashList } from '@shopify/flash-list';
 import { type TFunction } from 'i18next';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { FlatList, View } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -28,6 +29,14 @@ import {
 } from '@/lib/voice-input/voice-input-language-preference';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { useVoiceRecognitionLanguages } from '@/lib/voice-input/use-voice-recognition-languages';
+
+// The picker sheet renders its own scroll container (`scrollable={false}`), so
+// the list fills the sheet's body.
+const listStyle = { flex: 1 } satisfies ViewStyle;
+const listContentContainerStyle = {
+  paddingHorizontal: 16,
+  paddingBottom: 16,
+} satisfies ViewStyle;
 
 // Static skeleton rows: count and shape match the real ChoiceRow rows (name
 // line + caption; the trailing check is transparent unless selected, so the
@@ -95,6 +104,7 @@ function VoiceLanguageList({
 }>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   // `matchesQuery` folds the label, the description and every search term of
   // every option, so the filter only reruns when the option array or the query
   // changes. An unrelated parent re-render then hands the list the same `data`
@@ -115,13 +125,13 @@ function VoiceLanguageList({
   }
 
   return (
-    <FlatList
-      className="flex-1 bg-background"
+    <FlashList
+      style={[listStyle, { backgroundColor: colors.background }]}
+      contentContainerStyle={listContentContainerStyle}
       data={filtered}
       keyExtractor={option => option.tag ?? 'automatic'}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
-      contentContainerClassName="px-4 pb-4"
       ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
       renderItem={({ item, index }) => (
         <ChoiceRow
@@ -296,10 +306,9 @@ export function VoiceLanguagePickerSheet() {
           <Search size={18} color={colors.mutedForeground} />
           <Input
             accessibilityLabel={t('language.search')}
-            // The pill supplies the horizontal inset, so the field zeroes the
-            // shared box's `px-3` — the same `flex-1 px-0` the share and model
-            // pickers give the field in this pill.
-            className="flex-1 px-0 text-base text-foreground"
+            // The pill supplies the horizontal inset, so the field zeroes both
+            // physical sides of the shared box.
+            className="flex-1 pl-0 pr-0 text-base text-foreground"
             placeholder={t('language.search')}
             placeholderTextColor={colors.mutedForeground}
             // Uncontrolled: iOS drops keystrokes when state drives `value`;

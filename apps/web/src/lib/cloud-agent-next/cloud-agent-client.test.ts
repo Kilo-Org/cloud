@@ -69,7 +69,7 @@ jest.mock('./cloud-agent-client', () => {
           ? createAppBuilderCloudAgentNextClient(token)
           : createCloudAgentNextClient(token)
     ),
-    rethrowAsPaymentRequired: jest.fn(),
+    rethrowCloudAgentError: jest.fn(),
   };
 });
 
@@ -104,8 +104,12 @@ beforeEach(() => {
 // expose it) so the test exercises the actual fetch call, not a stub.
 const realCloudAgentClientModule =
   jest.requireActual<typeof CloudAgentClientModule>('./cloud-agent-client');
-const { closeCloudAgentOrgStreams, CloudAgentNextClient, createAppBuilderCloudAgentNextClient } =
-  realCloudAgentClientModule;
+const {
+  closeCloudAgentOrgStreams,
+  CloudAgentNextClient,
+  createAppBuilderCloudAgentNextClient,
+  readCloudAgentWidgetApprovalKey,
+} = realCloudAgentClientModule;
 
 describe('CloudAgentNextClient review message results', () => {
   const input = {
@@ -626,6 +630,31 @@ describe('CloudAgentNextClient sandbox selection', () => {
       expect(mutate).toHaveBeenCalledWith(input);
     }
   );
+  it.each([
+    {},
+    { egressMode: 'unrestricted' as const },
+    { egressMode: 'allowlist' as const },
+    { egressMode: 'allowlist' as const, egressAllowlist: [] },
+    { egressMode: 'allowlist' as const, egressAllowlist: ['example.com'] },
+  ])('forwards prepare egress policy unchanged: %j', async policy => {
+    const input: PrepareSessionInput = {
+      githubRepo: 'acme/repo',
+      prompt: 'Build',
+      mode: 'code',
+      model: 'kilo/test-model',
+      ...policy,
+    };
+    const output = {
+      kiloSessionId: 'ses_12345678901234567890123456',
+      cloudAgentSessionId: 'workspace_test',
+    };
+    const mutate = jest
+      .fn<CloudAgentClientModule.CloudAgentNextClient['prepareSession']>()
+      .mockResolvedValue(output);
+    mockCreateTRPCClient.mockReturnValueOnce({ prepareSession: { mutate } });
+    await new CloudAgentNextClient('auth-token').prepareSession(input);
+    expect(mutate).toHaveBeenCalledWith(input);
+  });
 });
 
 describe('CloudAgentNextClient sensitive error reporting', () => {
@@ -1243,6 +1272,70 @@ describe('closeCloudAgentOrgStreams', () => {
 
     await expect(closeCloudAgentOrgStreams('usr_1', 'org_1')).rejects.toThrow(
       'Cloud Agent stream close failed: 500 Internal Server Error - boom'
+    );
+  });
+});
+
+describe('readCloudAgentWidgetApprovalKey', () => {
+  const originalFetch = global.fetch;
+  const input = {
+    userId: 'usr_1',
+    organizationId: null,
+    kiloSessionId: 'ses_0123456789abcdefghijklmnop',
+    cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+  };
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  function respond(response: Response) {
+    const fetchMock = jest
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValue(response);
+    global.fetch = fetchMock as unknown as typeof fetch;
+    return fetchMock;
+  }
+
+  it('POSTs the exact owned scope with the internal key and returns the binding and command', async () => {
+    const key = 'b'.repeat(64);
+    const fetchMock = respond(
+      new Response(JSON.stringify({ approvalKey: key, command: 'pnpm test' }))
+    );
+
+    await expect(readCloudAgentWidgetApprovalKey(input)).resolves.toEqual({
+      approvalKey: key,
+      command: 'pnpm test',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://cloud-agent-next/internal/widgets/approval-key',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-internal-api-key': 'test-secret' },
+        body: JSON.stringify(input),
+      })
+    );
+  });
+
+  it('reads a newer Worker answer without a command as no command', async () => {
+    const key = 'b'.repeat(64);
+    respond(new Response(JSON.stringify({ approvalKey: key })));
+
+    await expect(readCloudAgentWidgetApprovalKey(input)).resolves.toEqual({
+      approvalKey: key,
+      command: null,
+    });
+  });
+
+  it('rejects a response that is not a lowercase SHA-256 binding', async () => {
+    respond(new Response(JSON.stringify({ approvalKey: 'per_raw_permission' })));
+    await expect(readCloudAgentWidgetApprovalKey(input)).rejects.toThrow();
+  });
+
+  it('throws on a refused read without echoing the body', async () => {
+    respond(new Response('Session access denied ses_private', { status: 403 }));
+    await expect(readCloudAgentWidgetApprovalKey(input)).rejects.toThrow(
+      /^Cloud Agent widget approval key failed: 403$/
     );
   });
 });

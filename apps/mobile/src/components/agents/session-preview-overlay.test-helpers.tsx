@@ -16,7 +16,7 @@ import {
 type TestMessage = { info: { id: string }; parts: readonly never[] };
 
 type TranscriptState = {
-  data: { messages: readonly TestMessage[] } | undefined;
+  data: readonly TestMessage[] | undefined;
   isLoading: boolean;
   isError: boolean;
   error: { data: { code: string } } | null;
@@ -33,13 +33,12 @@ type LiveRowState = {
     | undefined;
 };
 
-/** Controllable query results plus the spies the Alert-backed paths use. */
+/** Controllable query results plus the spy the native rename prompt uses. */
 const holder = vi.hoisted(
   (): {
     transcript: TranscriptState;
     row: LiveRowState;
     platformOS: 'ios' | 'android';
-    alert: ReturnType<typeof vi.fn>;
     prompt: ReturnType<typeof vi.fn>;
     announceForA11y: ReturnType<typeof vi.fn>;
     moveA11yFocus: ReturnType<typeof vi.fn>;
@@ -61,7 +60,6 @@ const holder = vi.hoisted(
       },
       row: { data: undefined },
       platformOS: 'ios',
-      alert: vi.fn(),
       prompt: vi.fn(),
       announceForA11y: vi.fn(),
       focusMoveHadNode,
@@ -88,11 +86,6 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     cliSessionsV2: {
-      getSessionMessages: {
-        queryOptions: (input: { session_id: string }) => ({
-          queryKey: ['transcript', input.session_id],
-        }),
-      },
       get: {
         queryOptions: (input: { session_id: string }) => ({
           queryKey: ['session-row', input.session_id],
@@ -110,7 +103,7 @@ vi.mock('react-i18next', async importOriginal => {
 });
 
 vi.mock('react-native', () => ({
-  Alert: { alert: holder.alert, prompt: holder.prompt },
+  Alert: { prompt: holder.prompt },
   BackHandler: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: {
     get OS() {
@@ -210,6 +203,12 @@ vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionSkeletonMessages: 'SessionSkeletonMessages',
 }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
+// The delete confirm renders through this surface; the stub keeps the
+// destructive variant out of this suite's react-native stub while still
+// letting the tests read the request it carries.
+vi.mock('@/components/destructive-confirm-dialog', () => ({
+  DestructiveConfirmDialog: 'DestructiveConfirmDialog',
+}));
 // The clipboard/haptics stubs need no promise: nothing in this suite awaits
 // them; the clipboard stub only needs to resolve truthy.
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn(() => true) }));
@@ -310,7 +309,6 @@ export function resetPreviewHolder(): void {
   holder.transcript.refetch.mockClear();
   holder.row.data = undefined;
   holder.platformOS = 'ios';
-  holder.alert.mockClear();
   holder.prompt.mockClear();
   holder.announceForA11y.mockClear();
   holder.moveA11yFocus.mockClear();

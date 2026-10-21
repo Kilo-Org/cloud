@@ -96,7 +96,7 @@ function OutputTicker({ lines }: { lines: string[] }) {
   return (
     <span
       aria-hidden="true"
-      className="pointer-events-none mb-1.5 ml-5 flex h-[3.75rem] w-full flex-col justify-end overflow-hidden pr-5 font-mono text-[11px] leading-5 text-foreground-subtle [mask-image:linear-gradient(to_bottom,transparent,black_45%)]"
+      className="pointer-events-none mb-1.5 ml-5 flex h-[3.75rem] min-w-0 flex-col justify-end self-stretch overflow-hidden font-mono text-[11px] leading-5 text-foreground-subtle [mask-image:linear-gradient(to_bottom,transparent,black_45%)]"
     >
       {lines.map((line, index) => (
         <span key={index} className="w-full truncate">

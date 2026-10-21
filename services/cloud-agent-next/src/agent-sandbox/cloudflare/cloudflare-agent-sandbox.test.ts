@@ -191,19 +191,80 @@ describe('CloudflareAgentSandbox', () => {
     expect(renewActivityTimeout).toHaveBeenCalledOnce();
   });
 
-  it('does not await shadow configuration before using an injected sandbox', async () => {
-    const configureBilling = vi.fn(() => new Promise<void>(() => undefined));
+  it('awaits trusted attribution configuration before using an injected sandbox', async () => {
+    let finishConfiguration = () => {};
+    const configureBilling = vi.fn(
+      () =>
+        new Promise<void>(resolve => {
+          finishConfiguration = resolve;
+        })
+    );
     const renewActivityTimeout = vi.fn();
     const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
       resolveSandbox: () => ({ renewActivityTimeout }) as unknown as SandboxInstance,
       configureBilling,
     });
 
-    await expect(sandbox.keepAlive()).resolves.toBeUndefined();
+    const keepAlive = sandbox.keepAlive();
+    await vi.waitFor(() => expect(configureBilling).toHaveBeenCalledOnce());
+    expect(renewActivityTimeout).not.toHaveBeenCalled();
+    finishConfiguration();
+    await expect(keepAlive).resolves.toBeUndefined();
 
     expect(configureBilling).toHaveBeenCalledOnce();
     expect(renewActivityTimeout).toHaveBeenCalledOnce();
   });
+
+  it('retries billing configuration on a fresh sandbox and uses the recovered handle', async () => {
+    const error = Object.assign(new Error('Durable Object reset'), { retryable: true });
+    const failed = {
+      configureBilling: vi.fn().mockRejectedValue(error),
+      renewActivityTimeout: vi.fn(),
+    };
+    const recovered = {
+      configureBilling: vi.fn().mockResolvedValue(undefined),
+      renewActivityTimeout: vi.fn(),
+    };
+    const resolveSandbox = vi
+      .fn()
+      .mockReturnValueOnce(failed)
+      .mockReturnValueOnce(failed)
+      .mockReturnValue(recovered);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), { resolveSandbox });
+
+    await sandbox.keepAlive();
+
+    expect(resolveSandbox).toHaveBeenCalledTimes(3);
+    expect(failed.configureBilling).toHaveBeenCalledOnce();
+    expect(recovered.configureBilling).toHaveBeenCalledWith(
+      failed.configureBilling.mock.calls[0][0]
+    );
+    expect(failed.renewActivityTimeout).not.toHaveBeenCalled();
+    expect(recovered.renewActivityTimeout).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { flags: { retryable: true }, attempts: 3 },
+    { flags: { retryable: false }, attempts: 1 },
+    { flags: { overloaded: true }, attempts: 1 },
+  ])(
+    'propagates billing configuration failure after $attempts attempts: $flags',
+    async ({ flags, attempts }) => {
+      const error = Object.assign(new Error('Billing configuration failed'), flags);
+      const configureBilling = vi.fn().mockRejectedValue(error);
+      const renewActivityTimeout = vi.fn();
+      const resolveSandbox = vi.fn(
+        () => ({ configureBilling, renewActivityTimeout }) as unknown as SandboxInstance
+      );
+      const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), { resolveSandbox });
+
+      await expect(sandbox.keepAlive()).rejects.toBe(error);
+
+      expect(configureBilling).toHaveBeenCalledTimes(attempts);
+      expect(resolveSandbox).toHaveBeenCalledTimes(attempts + 1);
+      expect(renewActivityTimeout).not.toHaveBeenCalled();
+    }
+  );
 
   it('starts an ordinary bootstrap wrapper through the adapter', async () => {
     const bootstrapSession = {};
@@ -885,6 +946,124 @@ describe('CloudflareAgentSandbox', () => {
 
     expect(deleteSession).toHaveBeenCalledWith('agent_cloudflare');
     expect(destroy).not.toHaveBeenCalled();
+  });
+
+  it('does not wake a stopped container to clean up session resources', async () => {
+    const getSession = vi.fn();
+    const deleteSession = vi.fn();
+    const isContainerRunning = vi.fn().mockResolvedValue(false);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          isContainerRunning,
+          getSession,
+          deleteSession,
+        }) as unknown as SandboxInstance,
+    });
+
+    await expect(sandbox.delete('retention-expired')).resolves.toBeUndefined();
+
+    expect(isContainerRunning).toHaveBeenCalledOnce();
+    expect(getSession).not.toHaveBeenCalled();
+    expect(deleteSession).not.toHaveBeenCalled();
+  });
+
+  it('still cleans up session resources on an explicit delete of a stopped container', async () => {
+    const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
+    const getSession = vi.fn().mockResolvedValue({ exec });
+    const deleteSession = vi.fn().mockResolvedValue(undefined);
+    const isContainerRunning = vi.fn().mockResolvedValue(false);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          isContainerRunning,
+          getSession,
+          deleteSession,
+        }) as unknown as SandboxInstance,
+    });
+
+    await sandbox.delete('explicit');
+
+    expect(isContainerRunning).not.toHaveBeenCalled();
+    expect(getSession).toHaveBeenCalledWith('agent_cloudflare');
+    expect(exec).toHaveBeenCalled();
+    expect(deleteSession).toHaveBeenCalledWith('agent_cloudflare');
+  });
+
+  it('cleans up session resources when the container is running', async () => {
+    const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
+    const getSession = vi.fn().mockResolvedValue({ exec });
+    const deleteSession = vi.fn().mockResolvedValue(undefined);
+    const isContainerRunning = vi.fn().mockResolvedValue(true);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          isContainerRunning,
+          getSession,
+          deleteSession,
+        }) as unknown as SandboxInstance,
+    });
+
+    await sandbox.delete('retention-expired');
+
+    expect(isContainerRunning).toHaveBeenCalledOnce();
+    expect(getSession).toHaveBeenCalledWith('agent_cloudflare');
+    expect(exec).toHaveBeenCalled();
+    expect(deleteSession).toHaveBeenCalledWith('agent_cloudflare');
+  });
+
+  it('cleans up session resources when the container state is unknown', async () => {
+    const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
+    const getSession = vi.fn().mockResolvedValue({ exec });
+    const deleteSession = vi.fn().mockResolvedValue(undefined);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          getSession,
+          deleteSession,
+        }) as unknown as SandboxInstance,
+    });
+
+    await sandbox.delete('retention-expired');
+
+    expect(getSession).toHaveBeenCalledWith('agent_cloudflare');
+    expect(exec).toHaveBeenCalled();
+    expect(deleteSession).toHaveBeenCalledWith('agent_cloudflare');
+  });
+
+  it('treats a missing exec session in a replaced container as deleted', async () => {
+    const deleteSession = vi
+      .fn()
+      .mockRejectedValue(new Error("Session 'agent_cloudflare' not found"));
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          getSession: vi.fn().mockResolvedValue({
+            exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
+          }),
+          deleteSession,
+        }) as unknown as SandboxInstance,
+    });
+
+    await expect(sandbox.delete('explicit')).resolves.toBeUndefined();
+    expect(deleteSession).toHaveBeenCalledWith('agent_cloudflare');
+  });
+
+  it.each([
+    ['another session', "Session 'agent_other' not found"],
+    ['another error', 'container unavailable'],
+  ])('rethrows session deletion failures for %s', async (_case, message) => {
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          getSession: vi.fn().mockResolvedValue({
+            exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
+          }),
+          deleteSession: vi.fn().mockRejectedValue(new Error(message)),
+        }) as unknown as SandboxInstance,
+    });
+
+    await expect(sandbox.delete('explicit')).rejects.toThrow(message);
   });
 
   it('maps infrastructure recovery to destructive Cloudflare sandbox replacement', async () => {

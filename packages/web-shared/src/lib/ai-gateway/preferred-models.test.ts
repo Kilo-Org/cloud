@@ -1,50 +1,78 @@
-import { describe, expect, it } from '@jest/globals';
-import { getConfiguredAutoFreeModels } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
-import type * as AutoFreeConfigModule from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
-import {
-  KILO_AUTO_EFFICIENT_MODEL,
-  KILO_AUTO_FREE_MODEL,
-} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import {
-  buildMonitoredModels,
-  buildPreferredModels,
-} from '@kilocode/web-shared/lib/ai-gateway/models';
-import { getMonitoredModels, getPreferredModels } from './preferred-models';
+import { beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { ai_gateway_config } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
+import { getMonitoredModels, getPreferredModels, readPreferredModels } from './preferred-models';
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () => ({
-  ...jest.requireActual<typeof AutoFreeConfigModule>(
-    '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config'
-  ),
-  getConfiguredAutoFreeModels: jest.fn(),
-}));
+const storedModels = [
+  'kilo-auto/efficient',
+  'provider/a:free',
+  'kilo-auto/free',
+  'provider/b:free',
+  'anthropic/claude-opus-5.5',
+];
+
+beforeAll(async () => {
+  await cleanupDbForTest();
+  await db.insert(ai_gateway_config).values({ preferred_models: { models: storedModels } });
+});
 
 describe('getPreferredModels', () => {
-  it('places configured auto-free models after the auto models, excluding openrouter/free', async () => {
-    jest.mocked(getConfiguredAutoFreeModels).mockResolvedValue([
-      { model: 'provider/b:free', weight: 1, reasoning: { enabled: true } },
-      { model: 'openrouter/free', weight: 1, reasoning: { enabled: true } },
-      { model: 'provider/a:free', weight: 5, reasoning: { enabled: true } },
-    ]);
+  it('returns the stored list in order', async () => {
+    expect(await getPreferredModels()).toEqual(storedModels);
+  });
+});
 
-    const preferredModels = await getPreferredModels();
-
-    expect(preferredModels.slice(0, 4)).toEqual([
-      KILO_AUTO_EFFICIENT_MODEL.id,
-      KILO_AUTO_FREE_MODEL.id,
-      'provider/b:free',
+describe('getMonitoredModels', () => {
+  it('returns the stored list without auto models', async () => {
+    expect(await getMonitoredModels()).toEqual([
       'provider/a:free',
+      'provider/b:free',
+      'anthropic/claude-opus-5.5',
     ]);
-    expect(preferredModels).not.toContain('openrouter/free');
-    expect(preferredModels).toEqual(buildPreferredModels(['provider/b:free', 'provider/a:free']));
-    expect(await getMonitoredModels()).toEqual(
-      buildMonitoredModels(['provider/b:free', 'provider/a:free'])
-    );
-    expect(await getMonitoredModels()).toEqual(preferredModels.slice(2));
   });
 
-  it('has no free section when no auto-free config is stored', async () => {
-    jest.mocked(getConfiguredAutoFreeModels).mockResolvedValue(null);
+  it.each([
+    ['only auto models are stored', { models: ['kilo-auto/efficient', 'kilo-auto/free'] }],
+    ['no list is stored', null],
+  ])('throws when %s', async (_case, preferredModels) => {
+    await db
+      .update(ai_gateway_config)
+      .set({ preferred_models: preferredModels })
+      .where(eq(ai_gateway_config.id, 1));
+    await jest.isolateModulesAsync(async () => {
+      const isolated = await import('./preferred-models');
+      await expect(isolated.getMonitoredModels()).rejects.toThrow('No monitored models');
+    });
+  });
+});
 
-    expect(await getPreferredModels()).toEqual(buildPreferredModels([]));
+describe('readPreferredModels', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+  });
+
+  it('returns an empty list when no config row exists', async () => {
+    expect(await readPreferredModels()).toEqual([]);
+  });
+
+  it('returns an empty list when the column is not set', async () => {
+    await db.insert(ai_gateway_config).values({ unavailable_models: { models: ['provider/a'] } });
+    expect(await readPreferredModels()).toEqual([]);
+  });
+
+  it('reads only the preferred_models column', async () => {
+    await db.insert(ai_gateway_config).values({
+      preferred_models: { models: ['provider/b', 'provider/a'] },
+      unavailable_models: { models: ['provider/c:free'] },
+    });
+    expect(await readPreferredModels()).toEqual(['provider/b', 'provider/a']);
+  });
+
+  it('throws on an invalid stored list', async () => {
+    await db
+      .insert(ai_gateway_config)
+      .values({ preferred_models: { models: ['provider/a', 'provider/a'] } });
+    await expect(readPreferredModels()).rejects.toThrow('Duplicate model');
   });
 });

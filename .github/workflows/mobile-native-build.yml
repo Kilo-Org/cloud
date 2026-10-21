@@ -129,6 +129,9 @@ jobs:
       - name: Build trpc types
         run: pnpm --filter @kilocode/trpc run build
 
+      - name: Build harness SDK
+        run: pnpm --filter @kilocode/harness-sdk run build
+
       # A consumer computes the hash on macOS; the gate computed it on
       # Linux. A mismatch would publish an artifact nobody can ever find,
       # so fail loudly instead. Android is checked here too: it builds on
@@ -162,11 +165,9 @@ jobs:
             build
 
       # A tarball keeps the executable bit that upload-artifact's zip drops.
-      # The artifact name keys only on nativeHash, but the local cache key
-      # also keys on the Xcode and simulator SDK. Record them so a consumer
-      # on a different toolchain refuses the binary (see
-      # dev/local/mobile-remote-native.ts) instead of caching an app its
-      # simulator runtime cannot launch.
+      # The artifact name keys only on nativeHash. Record the Xcode and
+      # simulator SDK so a consumer refuses a binary its target simulator
+      # runtime cannot launch (see dev/local/mobile-remote-native.ts).
       - name: Package
         run: |
           set -euo pipefail
@@ -216,6 +217,9 @@ jobs:
 
       - name: Build trpc types
         run: pnpm --filter @kilocode/trpc run build
+
+      - name: Build harness SDK
+        run: pnpm --filter @kilocode/harness-sdk run build
 
       - name: Expo prebuild
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform android

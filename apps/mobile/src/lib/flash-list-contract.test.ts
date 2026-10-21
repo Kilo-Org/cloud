@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 // removeClippedSubviews against the Android Fabric reattachment crash, and
 // stable scroll position when prepending older pages), so a silent downgrade
 // back to the Expo SDK 57 recommended 2.0.2 must fail here before any build.
-const EXPECTED_FLASH_LIST_VERSION = '2.3.2';
+const EXPECTED_FLASH_LIST_VERSION = '2.3.3';
 
 const packageJsonPath = fileURLToPath(new URL('../../package.json', import.meta.url));
 const packageJson: {

@@ -10,6 +10,7 @@ import { deploymentsRouter } from '@/routers/deployments-router';
 import { cliSessionsRouter } from '@/routers/cli-sessions-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
 import { workspaceFoldersRouter } from '@/routers/workspace-folders-router';
+import { todosRouter } from '@/routers/todos-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { gitlabRouter } from '@/routers/gitlab-router';
@@ -26,14 +27,11 @@ import { openAiChatGptRouter } from '@/routers/openai-chatgpt-router';
 import { appBuilderRouter } from '@/routers/app-builder-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
 import { securityAuditLogRouter } from '@/routers/security-audit-log-router';
-import { autoTriageRouter } from '@/routers/auto-triage/auto-triage-router';
-import { personalAutoTriageRouter } from '@/routers/personal-auto-triage-router';
-import { autoFixRouter } from '@/routers/auto-fix/auto-fix-router';
-import { personalAutoFixRouter } from '@/routers/personal-auto-fix-router';
 import { appReportedMessagesRouter } from '@/routers/app-reported-messages-router';
 import { kiloPassRouter } from '@/routers/kilo-pass-router';
 import { creditsRouter } from '@/routers/credits-router';
 import { agentProfilesRouter } from '@/routers/agent-profiles-router';
+import { cloudAgentSettingsRouter } from '@/routers/cloud-agent-settings-router';
 import { webhookTriggersRouter } from '@/routers/webhook-triggers-router';
 import { userFeedbackRouter } from '@/routers/user-feedback-router';
 import { feedbackRouter } from '@/routers/feedback-router';
@@ -46,15 +44,13 @@ import { codingPlansRouter } from '@/routers/coding-plans-router';
 import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
 import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
-import { mcpGatewayRouter } from '@/routers/mcp-gateway-router';
-import { mcpGatewayAuthorizationsRouter } from '@/routers/mcp-gateway-authorizations-router';
 import { modelPreferencesRouter } from '@/routers/model-preferences-router';
 import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
 import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
-import { quickChatRouter } from '@/routers/quick-chat-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
+import { agentBriefingRouter } from '@/routers/agent-briefing-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -66,6 +62,7 @@ export const rootRouter = createTRPCRouter({
   cliSessions: cliSessionsRouter,
   cliSessionsV2: cliSessionsV2Router,
   workspaceFolders: workspaceFoldersRouter,
+  todos: todosRouter,
   githubApps: githubAppsRouter,
   gitlab: gitlabRouter,
   platformIntegrations: platformIntegrationsRouter,
@@ -82,14 +79,11 @@ export const rootRouter = createTRPCRouter({
   appBuilder: appBuilderRouter,
   securityAgent: securityAgentRouter,
   securityAuditLog: securityAuditLogRouter,
-  autoTriage: autoTriageRouter,
-  personalAutoTriage: personalAutoTriageRouter,
-  autoFix: autoFixRouter,
-  personalAutoFix: personalAutoFixRouter,
   appReportedMessages: appReportedMessagesRouter,
   kiloPass: kiloPassRouter,
   credits: creditsRouter,
   agentProfiles: agentProfilesRouter,
+  cloudAgentSettings: cloudAgentSettingsRouter,
   webhookTriggers: webhookTriggersRouter,
   userFeedback: userFeedbackRouter,
   feedback: feedbackRouter,
@@ -102,15 +96,13 @@ export const rootRouter = createTRPCRouter({
   unifiedSessions: unifiedSessionsRouter,
   activeSessions: activeSessionsRouter,
   usageAnalytics: usageAnalyticsRouter,
-  mcpGateway: mcpGatewayRouter,
-  mcpGatewayAuthorizations: mcpGatewayAuthorizationsRouter,
   modelPreferences: modelPreferencesRouter,
   githubPrReview: githubPrReviewRouter,
   providerReview: providerReviewRouter,
   moderation: moderationRouter,
   userExports: userExportsRouter,
-  quickChat: quickChatRouter,
   spendAlerts: spendAlertRouter,
+  agentBriefing: agentBriefingRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

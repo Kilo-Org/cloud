@@ -87,10 +87,7 @@ import {
   KILO_PASS_BONUS_LIKE_ITEM_KINDS,
   appendKiloPassAuditLog,
 } from '@kilocode/web-shared/lib/kilo-pass/issuance';
-import {
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
-  KILO_PASS_TIER_CONFIG,
-} from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
@@ -102,15 +99,8 @@ import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { computeChurnkeyAuthHash } from '@/lib/churnkey/auth';
 import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { abandonCollectibleInvoicesForStripeSubscription } from '@/lib/kilo-pass/abandon-collectible-invoices';
-import {
-  getAllMobileStoreKiloPassProducts,
-  getMobileStoreKiloPassProductByAppleProductId,
-  getMobileStoreKiloPassProductByGoogleProductId,
-} from '@/lib/kilo-pass/mobile-store-products';
-import {
-  buildPurchasePresentation,
-  getPurchasePresentationForUser,
-} from '@/lib/kilo-pass/purchase-presentation';
+import { getAllMobileStoreKiloPassProducts } from '@/lib/kilo-pass/mobile-store-products';
+import { getPurchasePresentationForUser } from '@/lib/kilo-pass/purchase-presentation';
 import {
   PURCHASE_PLATFORMS,
   PURCHASE_PRESENTATION_KINDS,
@@ -403,10 +393,6 @@ function mapPlayCompletionError(error: unknown, userId: string): TRPCError {
     code: 'INTERNAL_SERVER_ERROR',
     message: 'We could not finish this Google Play purchase. Please try again.',
   });
-}
-
-function isTwoMonthPromoOfferActive(): boolean {
-  return dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
 }
 
 function roundToCents(usd: number): number {
@@ -1090,31 +1076,6 @@ const GetPurchasePresentationInputSchema = z.object({
   storefront: PurchaseStorefrontSchema.nullable().optional(),
   product: PurchaseProductSchema,
   program: z.string().max(64).nullable().optional(),
-  /**
-   * Old clients omit it. Omit or false keeps today's Android presentation.
-   * Remove when every Android client mounts Play IAP.
-   */
-  supportsNativePlayKiloPass: z.boolean().optional(),
-});
-
-const PreflightPurchaseInputSchema = z.object({
-  platform: PurchasePlatformSchema,
-  storefront: PurchaseStorefrontSchema,
-  product: PurchaseProductSchema,
-  program: z.string().max(64).nullable().optional(),
-  supportsNativePlayKiloPass: z.boolean().optional(),
-  googleProductId: z.string().min(1).optional(),
-  /**
-   * Play purchase token this device already owns. Untrusted: it can only deny
-   * a purchase. Old clients omit it.
-   */
-  googlePurchaseToken: z.string().min(1).max(256).nullable().optional(),
-  appleProductId: z.string().min(1),
-  /**
-   * Original transaction ID of a Kilo Pass this device already owns, when StoreKit
-   * reports one. Untrusted: it can only deny a purchase, never grant one.
-   */
-  appleOriginalTransactionId: z.string().min(1).max(64).nullable().optional(),
 });
 
 const PurchasePresentationCtaOutputSchema = z.object({
@@ -1126,30 +1087,11 @@ const GetPurchasePresentationOutputSchema = z.object({
   kind: z.enum(PURCHASE_PRESENTATION_KINDS),
   statusClass: z.enum(PURCHASE_STATUS_CLASSES),
   reason: z
-    .enum([
-      'credits_not_sold_on_ios',
-      'kilo_pass_not_available_on_android',
-      'unsupported_combination',
-    ])
+    .enum(['credits_not_sold_on_ios', 'kilo_pass_not_sold_in_app', 'unsupported_combination'])
     .nullable(),
   cta: PurchasePresentationCtaOutputSchema,
   webUrl: z.string().nullable(),
   program: z.string().nullable(),
-});
-
-const PreflightPurchaseOutputSchema = z.object({
-  allowed: z.boolean(),
-  statusClass: z.enum(PURCHASE_STATUS_CLASSES),
-  reason: z
-    .enum([
-      'credits_not_sold_on_ios',
-      'kilo_pass_not_available_on_android',
-      'unsupported_combination',
-      'unknown_product',
-      'already_subscribed',
-      'owned_by_another_account',
-    ])
-    .nullable(),
 });
 
 const CreateCheckoutSessionInputSchema = z.object({
@@ -1393,93 +1335,7 @@ export const kiloPassRouter = createTRPCRouter({
         storefront: input.storefront,
         product: input.product,
         program: input.program,
-        supportsNativePlayKiloPass: input.supportsNativePlayKiloPass,
       });
-    }),
-
-  preflightPurchase: baseProcedure
-    .input(PreflightPurchaseInputSchema)
-    .output(PreflightPurchaseOutputSchema)
-    .mutation(async ({ ctx, input }) => {
-      const subscription = await getKiloPassStateForUser(db, ctx.user.id);
-      const presentation = buildPurchasePresentation({
-        subscription,
-        input: {
-          platform: input.platform,
-          storefront: input.storefront,
-          product: input.product,
-          program: input.program,
-          supportsNativePlayKiloPass: input.supportsNativePlayKiloPass,
-        },
-      });
-
-      if (presentation.kind !== 'native_iap') {
-        return {
-          allowed: false,
-          statusClass: presentation.statusClass,
-          reason: presentation.reason,
-        };
-      }
-
-      if (input.storefront === 'play') {
-        if (
-          !input.googleProductId ||
-          !getMobileStoreKiloPassProductByGoogleProductId(input.googleProductId)
-        ) {
-          return { allowed: false, statusClass: 'terminal', reason: 'unknown_product' };
-        }
-      } else if (!getMobileStoreKiloPassProductByAppleProductId(input.appleProductId)) {
-        return { allowed: false, statusClass: 'terminal', reason: 'unknown_product' };
-      }
-
-      // Refuse before StoreKit is invoked when this device's subscription belongs to
-      // another Kilo account. The client-side check races the StoreKit purchase list,
-      // and losing that race charges the user for a purchase the server then rejects.
-      if (input.appleOriginalTransactionId) {
-        const devicePurchase = await readDb.query.kilo_pass_store_purchases.findFirst({
-          columns: { kilo_user_id: true },
-          where: and(
-            eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.AppStore),
-            eq(kilo_pass_store_purchases.provider_subscription_id, input.appleOriginalTransactionId)
-          ),
-        });
-        if (devicePurchase && devicePurchase.kilo_user_id !== ctx.user.id) {
-          return { allowed: false, statusClass: 'terminal', reason: 'owned_by_another_account' };
-        }
-      }
-
-      // Same ownership guard for a Play purchase this device already owns.
-      if (input.googlePurchaseToken) {
-        const devicePurchase = await readDb.query.kilo_pass_store_purchases.findFirst({
-          columns: { kilo_user_id: true },
-          where: and(
-            eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.GooglePlay),
-            eq(kilo_pass_store_purchases.provider_subscription_id, input.googlePurchaseToken)
-          ),
-        });
-        if (devicePurchase && devicePurchase.kilo_user_id !== ctx.user.id) {
-          return { allowed: false, statusClass: 'terminal', reason: 'owned_by_another_account' };
-        }
-      }
-
-      // Exclude the native provider for this storefront. Old iOS excluded App Store
-      // only. Play storefront excludes GooglePlay so a Play-owned pass is not treated
-      // as another provider. A live Stripe sub still returns `already_subscribed`.
-      const nativeStoreProvider =
-        input.storefront === 'play'
-          ? KiloPassPaymentProvider.GooglePlay
-          : KiloPassPaymentProvider.AppStore;
-
-      const hasLiveOtherProviderSub =
-        subscription != null &&
-        !isStripeSubscriptionEnded(subscription.status) &&
-        subscription.paymentProvider !== nativeStoreProvider;
-
-      if (hasLiveOtherProviderSub) {
-        return { allowed: false, statusClass: 'terminal', reason: 'already_subscribed' };
-      }
-
-      return { allowed: true, statusClass: 'healthy', reason: null };
     }),
 
   completeAppStorePurchase: baseProcedure
@@ -1737,7 +1593,7 @@ export const kiloPassRouter = createTRPCRouter({
     if (!subscriptionBase) {
       return {
         subscription: null,
-        isEligibleForFirstMonthPromo: isTwoMonthPromoOfferActive(),
+        isEligibleForFirstMonthPromo: true,
       };
     }
 

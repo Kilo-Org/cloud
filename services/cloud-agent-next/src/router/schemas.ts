@@ -1,9 +1,13 @@
 import * as z from 'zod';
+import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
   getKiloSandboxAllocation,
   sandboxAllocationInputSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
-import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  clientKiloSessionIdSchema,
+  sessionIdSchema as kiloSessionIdSchema,
+} from '@kilocode/session-ingest-contracts';
 import { worktreeFileQuerySchema } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import {
   sessionIdSchema,
@@ -602,6 +606,11 @@ const PrepareSessionSharedFields = {
 
 const PrepareSessionNonCloneVariant = z.object({
   prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH).describe('The task prompt for Kilo Code'),
+  kiloSessionId: clientKiloSessionIdSchema
+    .optional()
+    .describe(
+      'Client-proposed Kilo session ID, so the client can show the session before prepare returns'
+    ),
   initialMessageId: MessageIdSchema.optional().describe(
     'Initial message ID for correlation with external systems'
   ),
@@ -610,6 +619,7 @@ const PrepareSessionNonCloneVariant = z.object({
    * the fallback only after old clients and prepared sessions expire.
    */
   cloneFromKiloSessionId: z.undefined().optional(),
+  cloneUpToMessageId: z.undefined().optional(),
   /**
    * When `true`, `prepareSession` also enqueues the initial user message
    * (mirroring the unified `start` endpoint) so callers that navigate
@@ -651,6 +661,9 @@ const PrepareSessionCloneVariant = z.object({
   cloneFromKiloSessionId: kiloSessionIdSchema.describe(
     'Source Kilo session ID to clone into this Cloud Agent session'
   ),
+  cloneUpToMessageId: MessageIdSchema.optional().describe(
+    'Inclusive cut: copy source messages up to and including this message ID; omit to copy the whole session'
+  ),
   autoInitiate: z.literal(true),
   operationKey: z
     .string()
@@ -663,6 +676,7 @@ const PrepareSessionCloneVariant = z.object({
 
 export const PrepareSessionInput = z
   .union([PrepareSessionNonCloneVariant, PrepareSessionCloneVariant])
+  .and(egressPolicySchema)
   .refine(validateGitSource, {
     message: 'Must provide either githubRepo or gitUrl, but not both',
     path: ['githubRepo'],
@@ -896,6 +910,7 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
  */
 export const StartSessionInput = z
   .object({
+    operationKey: z.string().uuid().optional(),
     message: z
       .object({
         prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
@@ -921,8 +936,10 @@ export const StartSessionInput = z
       .optional(),
     repository: RepositoryInputSchema,
     profile: ProfileInputSchema,
-    runtime: z
-      .object({ sandboxAllocation: ManagedSandboxAllocationInput.optional() })
+    runtime: egressPolicySchema
+      .safeExtend({
+        sandboxAllocation: ManagedSandboxAllocationInput.optional(),
+      })
       .strict()
       .optional(),
     options: z
@@ -945,6 +962,7 @@ export const StartSessionOutput = z.object({
   kiloSessionId: z.string(),
   messageId: MessageIdSchema,
   delivery: z.enum(['sent', 'queued']),
+  replayed: z.boolean().optional(),
   wrapperRunId: z.string().optional(),
 });
 
@@ -1155,6 +1173,7 @@ export const GetSessionOutput = z.object({
   variant: z.string().optional().describe('Thinking effort variant'),
   autoCommit: z.boolean().optional().describe('Auto-commit setting'),
   upstreamBranch: z.string().optional().describe('Upstream branch name'),
+  branchName: z.string().optional().describe('Assigned workspace branch name'),
 
   runtimeAgents: z
     .array(
@@ -1177,6 +1196,15 @@ export const GetSessionOutput = z.object({
   // Lifecycle timestamps (critical for idempotency)
   preparedAt: z.number().optional().describe('Timestamp when session was prepared'),
   initiatedAt: z.number().optional().describe('Timestamp when session was initiated'),
+
+  // Route readiness for terminal ownership: control-plane sessions report
+  // whether their route view is `ready`; legacy sessions report whether they
+  // have been prepared. Consumers must not infer readiness from `preparedAt` or
+  // `initiatedAt`, which persist across route loss.
+  routeReady: z
+    .boolean()
+    .optional()
+    .describe('Whether the session currently has a ready route that can own a terminal'),
 
   // Callback configuration is intentionally NOT exposed here. The stored
   // `callbackTarget` may carry service-to-service auth headers (e.g. an

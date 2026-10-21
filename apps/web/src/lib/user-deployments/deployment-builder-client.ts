@@ -4,8 +4,7 @@ import {
   USER_DEPLOYMENTS_API_BASE_URL,
   USER_DEPLOYMENTS_API_AUTH_KEY,
 } from '@kilocode/web-shared/lib/config.server';
-import type { BuildStatus, Provider, CancelBuildResult } from '@/lib/user-deployments/types';
-import type { EncryptedEnvVar } from '@/lib/user-deployments/env-vars-validation';
+import type { BuildStatus, CancelBuildResult } from '@/lib/user-deployments/types';
 import { fetchWithTimeout } from '@/lib/user-deployments/fetch-utils';
 
 // Types for API responses
@@ -22,21 +21,6 @@ export type BuilderStatusResponse = {
 export type BuilderEventsResponse = {
   buildId: string;
   events: BuilderEvent[];
-};
-
-export type CreateDeploymentRequest = {
-  provider: Provider;
-  repoSource: string;
-  branch: string;
-  slug: string;
-  accessToken?: string;
-  cancelBuildIds?: string[];
-  envVars?: EncryptedEnvVar[];
-};
-
-export type CreateDeploymentResponse = {
-  buildId: string;
-  status: BuildStatus;
 };
 
 /**
@@ -89,43 +73,6 @@ class DeploymentBuilderClient {
 
     const data: BuilderEventsResponse = await response.json();
     return data.events;
-  }
-
-  /**
-   * Create a new deployment
-   */
-  async createDeployment(
-    provider: Provider,
-    repoSource: string,
-    slug: string,
-    branch: string,
-    accessToken?: string,
-    cancelBuildIds?: string[],
-    envVars?: EncryptedEnvVar[]
-  ): Promise<CreateDeploymentResponse> {
-    const response = await fetchWithTimeout(`${this.baseUrl}/deploy`, {
-      method: 'POST',
-      headers: this.getHeaders({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify({
-        provider,
-        repoSource,
-        slug,
-        branch,
-        accessToken,
-        cancelBuildIds,
-        envVars,
-      } satisfies CreateDeploymentRequest),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to create deployment: ${errorText}`);
-    }
-
-    const data: CreateDeploymentResponse = await response.json();
-    return data;
   }
 
   /**

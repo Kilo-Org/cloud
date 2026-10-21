@@ -1,7 +1,4 @@
-import { type Purchase } from 'expo-iap';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { act } from '@/test/renderer';
 
 import {
   completionsNamed,
@@ -9,8 +6,6 @@ import {
   CREDIT_PRODUCT_ID,
   creditCatalog,
   flushPromises,
-  KILO_PASS_PRODUCT_ID,
-  kiloPassCatalog,
   mockedAuth,
   mockedIap,
   mockedLifecycle,
@@ -32,7 +27,6 @@ beforeEach(() => {
   mockedIap.initConnection.mockResolvedValue(undefined);
   mockedQuery.catalogs = {
     'credits.getMobileStoreProducts': creditCatalog,
-    'kiloPass.getMobileStoreProducts': kiloPassCatalog,
   };
   mockedQuery.completions = [];
   mockedQuery.invalidateQueries.mockResolvedValue(undefined);
@@ -65,45 +59,10 @@ describe('StorePurchaseRecoveryMount', () => {
     expect(mockedQuery.invalidateQueries).toHaveBeenCalled();
   });
 
-  it('grants and finishes an unfinished Kilo Pass subscription', async () => {
-    mockedIap.getPendingTransactionsIOS.mockResolvedValue([
-      createPurchase({ productId: KILO_PASS_PRODUCT_ID, transactionId: 'tx-pass' }),
-    ]);
-
-    await mountRecovery();
-    await flushPromises();
-
-    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(1);
-    expect(completionsNamed('credits.completeAppStorePurchase')).toHaveLength(0);
-    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
-      purchase: expect.objectContaining({ productId: KILO_PASS_PRODUCT_ID }),
-      isConsumable: false,
-    });
-  });
-
-  it('never posts an expired Pass transaction, and leaves it unfinished', async () => {
+  it('skips unrelated transactions and still grants the fresh credit pack', async () => {
     mockedIap.getPendingTransactionsIOS.mockResolvedValue([
       createPurchase({
-        productId: KILO_PASS_PRODUCT_ID,
-        transactionId: 'tx-expired',
-        expirationDateIOS: Date.now() - 60_000,
-      }),
-    ]);
-
-    await mountRecovery();
-    await flushPromises();
-
-    // The completion path rejects an expired transaction on purpose, so the pass must
-    // not ask: the store keeps the transaction, and the next pass would ask again.
-    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(0);
-    expect(completionsNamed('credits.completeAppStorePurchase')).toHaveLength(0);
-    expect(mockedIap.finishTransaction).not.toHaveBeenCalled();
-  });
-
-  it('skips only the expired Pass transaction, and still grants the fresh credit pack', async () => {
-    mockedIap.getPendingTransactionsIOS.mockResolvedValue([
-      createPurchase({
-        productId: KILO_PASS_PRODUCT_ID,
+        productId: 'some.other.product',
         transactionId: 'tx-expired',
         expirationDateIOS: Date.now() - 60_000,
       }),
@@ -113,7 +72,6 @@ describe('StorePurchaseRecoveryMount', () => {
     await mountRecovery();
     await flushPromises();
 
-    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(0);
     expect(completionsNamed('credits.completeAppStorePurchase')).toEqual([
       {
         procedure: 'credits.completeAppStorePurchase',
@@ -124,120 +82,6 @@ describe('StorePurchaseRecoveryMount', () => {
       purchase: expect.objectContaining({ productId: CREDIT_PRODUCT_ID }),
       isConsumable: true,
     });
-  });
-
-  it('recovers a Pass purchase when its catalog loads after the credit catalog', async () => {
-    const passPurchase = createPurchase({
-      productId: KILO_PASS_PRODUCT_ID,
-      transactionId: 'tx-pass',
-    });
-    delete mockedQuery.catalogs['kiloPass.getMobileStoreProducts'];
-    mockedIap.getPendingTransactionsIOS.mockResolvedValue([passPurchase]);
-
-    const renderer = await mountRecovery();
-    await flushPromises();
-    expect(mockedIap.getPendingTransactionsIOS).toHaveBeenCalledTimes(1);
-    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(0);
-
-    mockedQuery.catalogs['kiloPass.getMobileStoreProducts'] = kiloPassCatalog;
-    await rerender(renderer);
-    await flushPromises();
-
-    expect(mockedIap.getPendingTransactionsIOS).toHaveBeenCalledTimes(2);
-    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(1);
-    expect(mockedIap.finishTransaction).toHaveBeenCalledTimes(1);
-    expect(mockedQuery.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['balance'] });
-    expect(mockedQuery.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['credits'] });
-    expect(mockedQuery.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['kilo-pass-state'],
-    });
-    expect(mockedQuery.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['kilo-pass-history'],
-    });
-    expect(mockedQuery.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['kilo-pass-presentation'],
-    });
-
-    await rerender(renderer);
-    await flushPromises();
-    expect(mockedIap.getPendingTransactionsIOS).toHaveBeenCalledTimes(2);
-    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(1);
-  });
-
-  it('queues the newly loaded Pass catalog behind an in-flight recovery pass', async () => {
-    const pendingLookup = Promise.withResolvers<Purchase[]>();
-    const passPurchase = createPurchase({
-      productId: KILO_PASS_PRODUCT_ID,
-      transactionId: 'tx-pass',
-    });
-    delete mockedQuery.catalogs['kiloPass.getMobileStoreProducts'];
-    mockedIap.getPendingTransactionsIOS
-      .mockReturnValueOnce(pendingLookup.promise)
-      .mockResolvedValue([passPurchase]);
-
-    const renderer = await mountRecovery();
-    expect(mockedIap.getPendingTransactionsIOS).toHaveBeenCalledTimes(1);
-
-    mockedQuery.catalogs['kiloPass.getMobileStoreProducts'] = kiloPassCatalog;
-    await rerender(renderer);
-    expect(mockedIap.getPendingTransactionsIOS).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      pendingLookup.resolve([createPurchase(), passPurchase]);
-    });
-    await flushPromises();
-
-    expect(mockedIap.getPendingTransactionsIOS).toHaveBeenCalledTimes(2);
-    expect(completionsNamed('credits.completeAppStorePurchase')).toHaveLength(1);
-    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(1);
-    expect(mockedIap.finishTransaction).toHaveBeenCalledTimes(2);
-    expect(mockedQuery.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['balance'] });
-    expect(mockedQuery.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['credits'] });
-  });
-
-  it('does not retry a queued catalog pass after sign-out', async () => {
-    const pendingLookup = Promise.withResolvers<Purchase[]>();
-    delete mockedQuery.catalogs['kiloPass.getMobileStoreProducts'];
-    mockedIap.getPendingTransactionsIOS
-      .mockReturnValueOnce(pendingLookup.promise)
-      .mockResolvedValue([createPurchase({ productId: KILO_PASS_PRODUCT_ID })]);
-
-    const renderer = await mountRecovery();
-    expect(mockedIap.getPendingTransactionsIOS).toHaveBeenCalledTimes(1);
-
-    mockedQuery.catalogs['kiloPass.getMobileStoreProducts'] = kiloPassCatalog;
-    await rerender(renderer);
-    mockedAuth.token = null;
-    await rerender(renderer);
-    act(() => {
-      pendingLookup.resolve([]);
-    });
-    await flushPromises();
-
-    expect(mockedIap.getPendingTransactionsIOS).toHaveBeenCalledTimes(1);
-    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(0);
-  });
-
-  it('drops a queued catalog pass after unmount', async () => {
-    const pendingLookup = Promise.withResolvers<Purchase[]>();
-    delete mockedQuery.catalogs['kiloPass.getMobileStoreProducts'];
-    mockedIap.getPendingTransactionsIOS
-      .mockReturnValueOnce(pendingLookup.promise)
-      .mockResolvedValue([createPurchase({ productId: KILO_PASS_PRODUCT_ID })]);
-
-    const renderer = await mountRecovery();
-    mockedQuery.catalogs['kiloPass.getMobileStoreProducts'] = kiloPassCatalog;
-    await rerender(renderer);
-    act(() => {
-      renderer.unmount();
-    });
-    act(() => {
-      pendingLookup.resolve([]);
-    });
-    await flushPromises();
-
-    expect(mockedIap.getPendingTransactionsIOS).toHaveBeenCalledTimes(1);
-    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(0);
   });
 
   it('leaves a pending transaction no catalog sells untouched', async () => {

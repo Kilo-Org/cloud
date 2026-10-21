@@ -1,7 +1,13 @@
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import type { LedgerDatabase } from '@kilocode/db/operation-ledger';
 
 /** Owner type for agent environment profiles - exactly one of organizationId or userId must be set. */
 export type ProfileOwner = { type: 'organization'; id: string } | { type: 'user'; id: string };
+
+/** Accepts a pool-backed database or an open transaction so callers can compose writes. */
+export type ProfileDatabase = LedgerDatabase;
+
+export type RepositoryPlatform = 'github' | 'gitlab';
 
 /** Owner type discriminator for UI display. */
 export type ProfileOwnerType = ProfileOwner['type'];
@@ -97,6 +103,19 @@ export type ProfileKiloCommandResponse = {
   updatedAt: string;
 };
 
+/**
+ * Instruction response (as returned from the API). The name is the rules
+ * filename slug; the file is materialized as `.kilocode/rules/<name>.md`.
+ */
+export type ProfileInstructionResponse = {
+  id: string;
+  name: string;
+  content: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** Profile response type for list/get operations. */
 export type ProfileResponse = {
   id: string;
@@ -111,6 +130,7 @@ export type ProfileResponse = {
   skills: ProfileSkillResponse[];
   agents: ProfileAgentResponse[];
   kiloCommands: ProfileKiloCommandResponse[];
+  instructions: ProfileInstructionResponse[];
 };
 
 /** Profile response with owner type for combined listings. */
@@ -132,6 +152,7 @@ export type ProfileSummary = {
   skillCount: number;
   agentCount: number;
   kiloCommandCount: number;
+  instructionCount: number;
 };
 
 /** Profile summary with owner type for combined listings. */

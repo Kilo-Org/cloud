@@ -54,17 +54,20 @@ describe('summarizeTerminalBench', () => {
       ...benchmarks(),
       artificialAnalysis: { liveCodeBench: null },
     };
-    const summaries = summarizeTerminalBench([
-      row(),
-      stealth,
-      row({ openrouterId: 'nullable/model', benchmarks: nullable }),
-      row({ openrouterId: 'kilo-internal/custom', benchmarks: benchmarks() }),
-      row({ isActive: false }),
-      row({ benchmarks: benchmarks({ nAttempts: 4 }) }),
-      row({ benchmarks: benchmarks({ avgAttemptCostUsd: null }) }),
-      row({ benchmarks: { kiloBench: { overallScore: 0.4, evals: {} } } }),
-      row({ benchmarks: { kiloBench: { overallScore: 'invalid' } } }),
-    ]);
+    const summaries = summarizeTerminalBench(
+      [
+        row(),
+        stealth,
+        row({ openrouterId: 'nullable/model', benchmarks: nullable }),
+        row({ openrouterId: 'Acme/Custom', benchmarks: benchmarks() }),
+        row({ isActive: false }),
+        row({ benchmarks: benchmarks({ nAttempts: 4 }) }),
+        row({ benchmarks: benchmarks({ avgAttemptCostUsd: null }) }),
+        row({ benchmarks: { kiloBench: { overallScore: 0.4, evals: {} } } }),
+        row({ benchmarks: { kiloBench: { overallScore: 'invalid' } } }),
+      ],
+      new Set(['acme/custom'])
+    );
 
     expect(summaries).toEqual(
       new Map([
@@ -89,22 +92,25 @@ describe('summarizeTerminalBenchLatest', () => {
       overallScore,
       nAttempts,
     });
-    const summaries = summarizeTerminalBenchLatest([
-      row({
-        benchmarks: {
-          kiloBench: {
-            overallScore: 0.4,
-            evals: {
-              'terminal-bench': legacy,
-              'terminal-bench/terminal-bench@3': revisioned('3', 0.3),
-              'terminal-bench/terminal-bench@4': revisioned('4', 0.6),
-              'terminal-bench/terminal-bench@5': revisioned('5', 0.9, 4),
+    const summaries = summarizeTerminalBenchLatest(
+      [
+        row({
+          benchmarks: {
+            kiloBench: {
+              overallScore: 0.4,
+              evals: {
+                'terminal-bench': legacy,
+                'terminal-bench/terminal-bench@3': revisioned('3', 0.3),
+                'terminal-bench/terminal-bench@4': revisioned('4', 0.6),
+                'terminal-bench/terminal-bench@5': revisioned('5', 0.9, 4),
+              },
             },
           },
-        },
-      }),
-      row({ openrouterId: 'legacy/model' }),
-    ]);
+        }),
+        row({ openrouterId: 'legacy/model' }),
+      ],
+      new Set()
+    );
 
     expect(summaries).toEqual(
       new Map([

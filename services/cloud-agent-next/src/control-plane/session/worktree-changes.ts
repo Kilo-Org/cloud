@@ -2,7 +2,6 @@ import type {
   GetWorktreeChangesOutput,
   GetWorktreeFileOutput,
   RefreshWorktreeChangesOutput,
-  WorktreeChangesSnapshot,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { EventQueries } from '../../session/queries/index.js';
 import { ingestKiloSessionId } from '../../sandbox-session/control-plane-ingest.js';
@@ -18,6 +17,15 @@ import type {
 import { WORKTREE_CHANGES_READY_EVENT } from '../../shared/worktree-changes-wire.js';
 import type { SessionId } from '../../types/ids.js';
 import type { StoredEvent } from '../../websocket/types.js';
+import type { SandboxControlV2 } from '../sandbox/sandbox-do.js';
+import type { SharedWorktreeChangesInput } from '../sandbox/worktree-changes.js';
+import { withDORetry } from '../../utils/do-retry.js';
+import type { WorktreeRecovery } from '../../shared/worktree-changes-wire.js';
+
+export type SharedWorktreeChangesPeer = Pick<
+  SandboxControlV2,
+  'getWorktreeChanges' | 'getWorktreeFile' | 'refreshWorktreeChanges' | 'getWorktreeRecovery'
+>;
 
 export type ControlPlaneWorktreeChangesDeps = {
   storage: DurableObjectStorage;
@@ -27,6 +35,7 @@ export type ControlPlaneWorktreeChangesDeps = {
   getMetadata: () => SessionMetadata | null;
   /** The registered route directory, set at registration (spec §3). */
   getDirectory: () => string | undefined;
+  getSharedPeer: (sandboxId: string) => SharedWorktreeChangesPeer | null;
   /** Forwards one capture request to the Sandbox DO (spec §10). */
   capture: (
     sandboxId: string,
@@ -41,6 +50,7 @@ export type ControlPlaneWorktreeChangesDeps = {
  * control-plane request path plus the shared event log (spec §10, plan B10).
  */
 export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChangesDeps) {
+  let seededWorktree: string | undefined;
   function context() {
     const metadata = deps.getMetadata();
     if (metadata === null) return null;
@@ -49,8 +59,8 @@ export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChan
     return worktreeChangesContext(metadata, directory);
   }
 
-  function saveSnapshotEvent(snapshot: WorktreeChangesSnapshot): (() => void) | undefined {
-    const payload = JSON.stringify({ revision: snapshot.revision });
+  function saveReadyEvent(revision: number): (() => void) | undefined {
+    const payload = JSON.stringify({ revision });
     const timestamp = Date.now();
     const id = deps.eventQueries.insertUnique({
       executionId: '',
@@ -58,7 +68,7 @@ export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChan
       streamEventType: WORKTREE_CHANGES_READY_EVENT,
       payload,
       timestamp,
-      entityId: `worktree-changes/${snapshot.revision}`,
+      entityId: `worktree-changes/${revision}`,
     });
     if (id === null) return undefined;
     return () => {
@@ -80,7 +90,11 @@ export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChan
   const manager = createWorktreeChanges({
     storage: deps.storage,
     readContext: async () => context(),
-    saveSnapshotEvent,
+    saveSnapshotEvent: snapshot => saveReadyEvent(snapshot.revision),
+    refreshSnapshot: async current => {
+      if (!current.worktreeId) return undefined;
+      return shared(current, (peer, input) => peer.refreshWorktreeChanges(input));
+    },
     requestCapture: async (worktreeContext, payload, operation) => {
       const sandboxId = worktreeContext.sandboxId;
       try {
@@ -111,15 +125,57 @@ export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChan
     waitUntil: deps.waitUntil,
   });
 
+  async function shared<T>(
+    current: NonNullable<ReturnType<typeof context>>,
+    operation: (peer: SharedWorktreeChangesPeer, input: SharedWorktreeChangesInput) => Promise<T>
+  ): Promise<T> {
+    const result = await withDORetry(
+      () => {
+        const peer = deps.getSharedPeer(current.sandboxId);
+        if (!peer) throw new Error('Sandbox is not available');
+        return peer;
+      },
+      peer =>
+        operation(peer, {
+          context: current,
+          saved: seededWorktree === current.worktreeId ? undefined : manager.saved(),
+        }),
+      'sharedWorktreeChanges'
+    );
+    seededWorktree = current.worktreeId;
+    return result;
+  }
+
   return {
+    ready(revision: number): void {
+      saveReadyEvent(revision)?.();
+    },
+    async recovery(): Promise<WorktreeRecovery | undefined> {
+      const current = context();
+      if (current?.worktreeId)
+        return shared(current, (peer, input) => peer.getWorktreeRecovery(input));
+      return manager.recovery();
+    },
     get(): Promise<GetWorktreeChangesOutput> {
+      const current = context();
+      if (current?.worktreeId)
+        return shared(current, (peer, input) => peer.getWorktreeChanges(input));
       return manager.get();
     },
-    getFile(input: unknown): GetWorktreeFileOutput {
-      return manager.getFile(input);
+    async getFile(query: unknown): Promise<GetWorktreeFileOutput> {
+      const current = context();
+      if (current?.worktreeId)
+        return shared(current, (peer, input) => peer.getWorktreeFile(input, query));
+      return manager.getFile(query);
     },
-    refresh(): Promise<RefreshWorktreeChangesOutput> {
-      return manager.refresh();
+    async refresh(): Promise<RefreshWorktreeChangesOutput> {
+      const result = await manager.refresh();
+      const current = context();
+      if (current?.worktreeId && result.status !== 'refreshed') {
+        const saved = await shared(current, (peer, input) => peer.getWorktreeChanges(input));
+        return { ...result, snapshot: saved.snapshot };
+      }
+      return result;
     },
     /**
      * A `session.*` event carries its own kilo session id; child-session events

@@ -46,10 +46,15 @@ import {
   resolveSessionStub,
 } from './sandbox-session/session-stub.js';
 import { isControlSession, isLegacySession, sessionFor } from './session-plane.js';
+import { PREVIEW_OPEN_PATH, handlePreviewOpen, handlePreviewRequest } from './preview/route.js';
+import { matchPreviewHost } from './preview/host.js';
+import { withoutPreviewMarkers } from './shared/preview-headers.js';
 import { withDORetry } from './utils/do-retry.js';
 import { parseBearerCredential } from './sandbox-control/credential.js';
 import { admitSandboxWrapperUpgrade } from './sandbox-control/socket-admission.js';
 import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
+import { registerRuntimeArtifactRoutes } from './sandbox-control/runtime-artifact-routes.js';
+import { registerStartupFailureRoute } from './sandbox-control/startup-failure.js';
 import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
 import {
   runtimeCredentialProxyFacadeBaseUrl,
@@ -61,15 +66,27 @@ import { logRuntimeProxyRequestFailed } from './runtime-credential-proxy-diagnos
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
 import {
   inferRuntimeCredentialProxyRoute,
+  resolveRuntimeCredentialProxyScopeIngestRoute,
   resolveRuntimeCredentialProxyScopedIngestRoute,
   type RuntimeCredentialProxyRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
-import { forwardCloudAgentSessionScopeRequest } from './cloud-agent-session-scope-proxy.js';
+import {
+  encodeCloudAgentSessionScopeV2ViewHeaders,
+  forwardCloudAgentSessionScopeRequest,
+  forwardCloudAgentSessionScopeV2Request,
+} from './cloud-agent-session-scope-proxy.js';
+import type { ScopeGrantView } from './control-plane/sandbox/scope-view.js';
 import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
   type RuntimeProxyAttestationAudience,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
+import { TRPCError } from '@trpc/server';
+import {
+  readWidgetApprovalKey,
+  widgetApprovalKeyRequestSchema,
+  type WidgetApproval,
+} from './widget-approval-key.js';
 
 const app = new Hono<HonoContext>();
 
@@ -287,6 +304,8 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
 }
 
 registerControlLogRoutes(app);
+registerRuntimeArtifactRoutes(app);
+registerStartupFailureRoute(app);
 
 app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
   return admitSandboxWrapperUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');
@@ -478,6 +497,7 @@ async function forwardRuntimeCredentialProxy(
     token: string;
     organizationId?: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+    scopeView?: ScopeGrantView;
   } | null;
   try {
     credential = await withDORetry(
@@ -491,30 +511,58 @@ async function forwardRuntimeCredentialProxy(
   if (!credential) return c.text('Unauthorized', 401);
   const targets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
   if (!targets.success) return c.text('Not found', 404);
-  const scopedUpstream = resolveRuntimeCredentialProxyScopedIngestRoute({
-    targets: targets.targets,
-    route,
-    method: c.req.method,
-    pathname: path,
-    search: new URL(c.req.url).search,
-    kiloSessionId: claims.kiloSessionId,
-    organizationId: credential.organizationId,
-    contentType: c.req.header('content-type'),
-    bodyText,
-  });
-  const upstream =
-    scopedUpstream ??
-    runtimeCredentialProxyUpstream(
-      targets.targets,
+
+  const search = new URL(c.req.url).search;
+  const scopeView = route === 'ingest' ? credential.scopeView : undefined;
+  let scopedV1 = false;
+  let scopedV2Headers: Record<string, string> | null = null;
+  let upstream: URL | null;
+  if (scopeView !== undefined) {
+    const adopted = resolveRuntimeCredentialProxyScopeIngestRoute({
+      targets: targets.targets,
       route,
-      c.req.method,
-      path,
-      new URL(c.req.url).search,
-      claims.kiloSessionId,
-      credential.organizationId,
-      c.req.header('content-type'),
-      bodyText
-    );
+      method: c.req.method,
+      pathname: path,
+      search,
+      memberRootKiloSessionIds: scopeView.memberRootKiloSessionIds,
+      organizationId: credential.organizationId,
+      contentType: c.req.header('content-type'),
+      bodyText,
+    });
+    if (adopted === null) return c.text('Not found', 404);
+    upstream = adopted.upstream;
+    if (adopted.kind === 'scoped') {
+      const v2Headers = encodeCloudAgentSessionScopeV2ViewHeaders(scopeView);
+      if (v2Headers === null) return c.text('Credential unavailable', 503);
+      scopedV2Headers = v2Headers;
+    }
+  } else {
+    const scopedUpstream = resolveRuntimeCredentialProxyScopedIngestRoute({
+      targets: targets.targets,
+      route,
+      method: c.req.method,
+      pathname: path,
+      search,
+      kiloSessionId: claims.kiloSessionId,
+      organizationId: credential.organizationId,
+      contentType: c.req.header('content-type'),
+      bodyText,
+    });
+    scopedV1 = scopedUpstream !== null;
+    upstream =
+      scopedUpstream ??
+      runtimeCredentialProxyUpstream(
+        targets.targets,
+        route,
+        c.req.method,
+        path,
+        search,
+        claims.kiloSessionId,
+        credential.organizationId,
+        c.req.header('content-type'),
+        bodyText
+      );
+  }
   if (!upstream) return c.text('Not found', 404);
   try {
     // The route allowlist is resolved above before a proof is issued.
@@ -532,16 +580,23 @@ async function forwardRuntimeCredentialProxy(
     const headers = runtimeProxyHeaders(c.req.raw, credential.token, credential.organizationId);
     headers.set(RUNTIME_PROXY_ATTESTATION_HEADER, proof);
     const request = createSanitizedForwardRequest(c.req.raw, upstream, headers, bodyText);
-    const response = scopedUpstream
-      ? await forwardCloudAgentSessionScopeRequest(request, c.env, {
-          authorization: `Bearer ${credential.token}`,
-          sessionIngestScope: {
-            cloudAgentSessionId: claims.sessionId,
-            rootKiloSessionId: claims.kiloSessionId,
-          },
-          runtimeProxyAttestation: proof,
-        })
-      : await fetch(request, { redirect: 'manual' });
+    const response =
+      scopedV2Headers !== null
+        ? await forwardCloudAgentSessionScopeV2Request(request, c.env, {
+            authorization: `Bearer ${credential.token}`,
+            scopeHeaders: scopedV2Headers,
+            runtimeProxyAttestation: proof,
+          })
+        : scopedV1
+          ? await forwardCloudAgentSessionScopeRequest(request, c.env, {
+              authorization: `Bearer ${credential.token}`,
+              sessionIngestScope: {
+                cloudAgentSessionId: claims.sessionId,
+                rootKiloSessionId: claims.kiloSessionId,
+              },
+              runtimeProxyAttestation: proof,
+            })
+          : await fetch(request, { redirect: 'manual' });
     if (!response.ok) {
       logRuntimeProxyRequestFailed({
         upstreamAttempted: true,
@@ -1085,6 +1140,32 @@ app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
   return c.body(null, 204);
 });
 
+// Home widget identity read for the trusted web backend only: the internal key
+// gates the route, the body names the exact owned session, and the response
+// carries a one-way binding plus the pending request's command as one trimmed
+// line, never the raw permission or any mutation authority.
+app.post('/internal/widgets/approval-key', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const parsed = widgetApprovalKeyRequestSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.text('Invalid request', 400);
+  }
+
+  let approval: WidgetApproval;
+  try {
+    approval = await readWidgetApprovalKey(c.env, parsed.data);
+  } catch (error) {
+    // Ownership refusals (403) and an unavailable access read (503) come from
+    // `requireCurrentSessionAccess`; anything else is a DO failure (500).
+    if (error instanceof TRPCError) return projectSessionAccessHttpError(error);
+    throw error;
+  }
+  c.header('Cache-Control', 'no-store');
+  return c.json({ approvalKey: approval.approvalKey, command: approval.command });
+});
+
 app.use('/trpc/*', authMiddleware);
 app.use('/trpc/*', balanceMiddleware);
 
@@ -1124,8 +1205,17 @@ export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';
 export const OUTCOME_AGGREGATE_CRONS = new Set([OUTCOME_AGGREGATE_CRON, '*/3 * * * *']);
 
 export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
+  fetch(incoming: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
+    // The preview marker selects the physical sandbox DO's port path, so a client
+    // copy never passes ingress, whichever route later forwards the request.
+    const request = withoutPreviewMarkers(incoming);
     const url = new URL(request.url);
+    if (matchPreviewHost(url.hostname, env.PREVIEW_HOST_SUFFIX) !== null) {
+      return handlePreviewRequest(request, env);
+    }
+    if (url.pathname === PREVIEW_OPEN_PATH) {
+      return handlePreviewOpen(request, env);
+    }
     if (
       url.pathname === '/terminal' &&
       request.headers.get('Upgrade')?.toLowerCase() === 'websocket'

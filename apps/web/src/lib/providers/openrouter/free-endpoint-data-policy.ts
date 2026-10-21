@@ -1,8 +1,5 @@
 import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
-import {
-  familyHasUnavailableFreeModel,
-  isUnavailableModel,
-} from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { familyHasUnavailableFreeModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
@@ -18,13 +15,17 @@ export type OpenRouterFreeEndpoint = {
 };
 
 export function getOpenRouterFreeEndpoints(
-  providerModelData: ProviderModels
+  providerModelData: ProviderModels,
+  unavailableModelIds: ReadonlySet<string>
 ): OpenRouterFreeEndpoint[] {
   const endpoints: OpenRouterFreeEndpoint[] = [];
   for (const { provider, models } of providerModelData) {
     const providerId = normalizeInferenceProviderId(provider.slug);
     for (const model of models) {
-      if (model.endpoint?.is_free && !familyHasUnavailableFreeModel(model.slug)) {
+      if (
+        model.endpoint?.is_free &&
+        !familyHasUnavailableFreeModel(unavailableModelIds, model.slug)
+      ) {
         endpoints.push({ modelId: normalizeModelId(model.slug), providerId });
       }
     }
@@ -33,14 +34,17 @@ export function getOpenRouterFreeEndpoints(
 }
 
 function dataCollectingKiloExclusiveModels(
-  kiloExclusiveModels: ReadonlyArray<KiloExclusiveModel>
+  kiloExclusiveModels: ReadonlyArray<KiloExclusiveModel>,
+  unavailableModelIds: ReadonlySet<string>
 ): Map<string, ReadonlySet<string> | null> {
   const models = new Map<string, ReadonlySet<string> | null>();
   for (const model of kiloExclusiveModels) {
     const collectsData = model.pricing === null || model.flags.includes('requires-data-collection');
-    if (model.status !== 'public' || !collectsData || isUnavailableModel(model.public_id)) continue;
+    if (!collectsData || unavailableModelIds.has(model.public_id)) {
+      continue;
+    }
     const modelId = normalizeModelId(model.public_id);
-    if (model.inference_provider_restriction.length === 0) {
+    if (model.inference_providers.length === 0) {
       models.set(modelId, null);
       continue;
     }
@@ -50,9 +54,7 @@ function dataCollectingKiloExclusiveModels(
       modelId,
       new Set([
         ...(existing ?? []),
-        ...model.inference_provider_restriction.map(providerId =>
-          normalizeInferenceProviderId(providerId)
-        ),
+        ...model.inference_providers.map(providerId => normalizeInferenceProviderId(providerId)),
       ])
     );
   }
@@ -63,12 +65,17 @@ export function applyFreeEndpointDataPolicy({
   providerModelData,
   openRouterFreeEndpoints,
   kiloExclusiveModels,
+  unavailableModelIds,
 }: {
   providerModelData: ProviderModels;
   openRouterFreeEndpoints: ReadonlyArray<OpenRouterFreeEndpoint>;
   kiloExclusiveModels: ReadonlyArray<KiloExclusiveModel>;
+  unavailableModelIds: ReadonlySet<string>;
 }): void {
-  const exclusiveModels = dataCollectingKiloExclusiveModels(kiloExclusiveModels);
+  const exclusiveModels = dataCollectingKiloExclusiveModels(
+    kiloExclusiveModels,
+    unavailableModelIds
+  );
 
   for (const { provider, models } of providerModelData) {
     const providerId = normalizeInferenceProviderId(provider.slug);

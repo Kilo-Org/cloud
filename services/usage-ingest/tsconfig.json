@@ -7,7 +7,7 @@
     "skipLibCheck": true,
     "noEmit": true,
     "lib": ["ESNext"],
-    "types": ["@cloudflare/workers-types", "./worker-configuration.d.ts"]
+    "types": ["@cloudflare/workers-types", "./worker-configuration.d.ts", "node"]
   },
-  "include": ["src/**/*.ts", "worker-configuration.d.ts"]
+  "include": ["src/**/*.ts", "worker-configuration.d.ts", "vitest.config.ts"]
 }

@@ -1,7 +1,9 @@
 'use client';
 
+import { cn } from '@/lib/utils';
+
 import React, { useCallback } from 'react';
-import { Scissors, Image, FileText, AlertCircle, Clock } from 'lucide-react';
+import { Scissors, Image, FileText, AlertCircle, Clock, LoaderCircle } from 'lucide-react';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import type { AssistantMessage } from '@/types/opencode.gen';
 import type { MessageDeliveryState } from '@kilocode/cloud-agent-sdk';
@@ -198,8 +200,10 @@ function DeliveryStatusIcon({ badge }: { badge: DeliveryBadge }) {
           role="img"
           tabIndex={0}
         >
-          {badge.tone === 'error' ? (
+          {badge.label === 'Failed to deliver' ? (
             <AlertCircle className="size-3.5" />
+          ) : badge.spinner ? (
+            <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" />
           ) : (
             <Clock className="size-3.5" />
           )}
@@ -218,6 +222,8 @@ type MessageBubbleProps = {
   isStreaming?: boolean;
   /** Delivery state for this message, if any (surfaced via cloud.message.* events). */
   deliveryState?: MessageDeliveryState;
+  /** True while this message's send request has not settled. */
+  isSending?: boolean;
   /** Function to get messages for a child session ID */
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
@@ -234,12 +240,13 @@ export function MessageBubble({
   displayTimestamp,
   isStreaming: isStreamingProp,
   deliveryState,
+  isSending,
   getChildMessages,
   onOpenChildSession,
 }: MessageBubbleProps) {
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
   const timestamp = displayTimestamp ?? message.info.time.created;
-  const deliveryBadge = getDeliveryBadge(deliveryState);
+  const deliveryBadge = getDeliveryBadge(deliveryState, { sending: isSending });
 
   const getTextForCopy = useCallback(
     () =>
@@ -251,12 +258,10 @@ export function MessageBubble({
 
   // User message
   if (isUserMessage(message.info)) {
-    // Check if this is a compaction trigger message
     const compactionPart = message.parts.find(isCompactionPart);
     const hasOnlyCompactionParts =
       message.parts.length > 0 && message.parts.every(isCompactionPart);
 
-    // Render compaction separator for compaction-only messages
     if (hasOnlyCompactionParts && compactionPart) {
       return (
         <CompactionSeparator
@@ -345,8 +350,13 @@ export function MessageBubble({
             {interrupted ? 'Interrupted' : 'Failed'}
           </span>
         )}
-        {!isStreaming && hasText && (
-          <div className="mt-1 flex items-center gap-2 opacity-0 transition-opacity group-focus-within/msg:opacity-100 group-hover/msg:opacity-100">
+        {hasText && (
+          <div
+            className={cn(
+              'mt-1 flex items-center gap-2 opacity-0 transition-opacity motion-reduce:transition-none group-focus-within/msg:opacity-100 group-hover/msg:opacity-100',
+              isStreaming && 'invisible'
+            )}
+          >
             <CopyMessageButton getText={getTextForCopy} />
             <TimeAgo timestamp={timestamp} className="text-muted-foreground/70 text-xs" />
           </div>

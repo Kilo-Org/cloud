@@ -24,14 +24,11 @@ import { loadSdkContext } from './wanted-board/wanted-board-ops-sdk';
 import { WantedBoardOpError } from './wanted-board/errors';
 import { readBranchHead } from '@kilocode/wl-sdk';
 
-// ── DO Exports ──────────────────────────────────────────────────────────
 // Wrangler requires these exports to match the class_name bindings in wrangler.jsonc.
 
 export { WastelandDO } from './dos/Wasteland.do';
 export { WastelandRegistryDO } from './dos/WastelandRegistry.do';
 export { WastelandRPCEntrypoint } from './wasteland-rpc.entrypoint';
-
-// ── Types ───────────────────────────────────────────────────────────────
 
 export type WastelandEnv = {
   Bindings: Env;
@@ -75,17 +72,13 @@ async function cfAccessDebugMiddleware(c: Context<WastelandEnv>, next: () => Pro
   return next();
 }
 
-// ── Timing ──────────────────────────────────────────────────────────────
 // Capture high-resolution start timestamp before any other middleware.
 
 app.use('*', timingMiddleware);
 
-// ── Structured logging context ──────────────────────────────────────────
 // Establishes AsyncLocalStorage context so all downstream logs are tagged.
 // Cast needed: workers-tagged-logger@1.0.0 was built against an older Hono.
 app.use('*', useWorkersLogger('wasteland-worker') as unknown as MiddlewareHandler);
-
-// ── Request logging ─────────────────────────────────────────────────────
 
 app.use('*', async (c, next) => {
   const method = c.req.method;
@@ -96,7 +89,6 @@ app.use('*', async (c, next) => {
   logger.info(`<-- ${method} ${path} ${c.res.status}`, { durationMs: elapsed });
 });
 
-// ── CORS ────────────────────────────────────────────────────────────────
 // Allow browser requests from the main Kilo app. In development, allow
 // localhost and LAN origins for the Next.js dev server.
 
@@ -121,14 +113,11 @@ const corsMiddleware = cors({
 app.use('/api/*', corsMiddleware);
 app.use('/trpc/*', corsMiddleware);
 
-// ── Health ──────────────────────────────────────────────────────────────
-
 app.get('/', c => c.json({ service: 'wasteland', status: 'ok' }));
 
 app.get('/health', async (c: Context<WastelandEnv>) => {
   const env = c.env;
 
-  // Query active wasteland count from the registry (best-effort)
   let activeWastelands: number | null = null;
   try {
     const registry = getWastelandRegistryStub(env);
@@ -148,8 +137,6 @@ app.get('/health', async (c: Context<WastelandEnv>) => {
 });
 
 app.use('/debug/*', cfAccessDebugMiddleware);
-
-// ── DEBUG: CF Access-protected wasteland introspection ─────────────────
 
 app.get('/debug/wastelands/:wastelandId/status', async c => {
   const wastelandId = c.req.param('wastelandId');
@@ -181,7 +168,6 @@ app.post('/debug/registry/backfill-upstreams', async c => {
   return c.json(result);
 });
 
-// ── DEBUG: lifecycle ops (browse/post/claim/done) ─────────────────────
 // These proxy to the real wanted-board-ops functions, bypassing tRPC auth.
 // The userId is passed as a query param (?userId=...) or body field.
 // Used by E2E tests to exercise the real production code path.
@@ -1103,7 +1089,6 @@ app.post('/debug/wastelands/:wastelandId/close', async c => {
   }
 });
 
-// ── DEBUG: DoltHub API passthrough — for maintainer-side ops ──────────
 // These use a token provided in the Authorization header (not the stored
 // credential) so the maintainer can merge PRs even if their DoltHub
 // account is different from the town owner.
@@ -1273,13 +1258,11 @@ app.post('/debug/dolthub/:owner/:db/pulls', async c => {
   return c.json(data, res.status as 200);
 });
 
-// ── Kilo User Auth ──────────────────────────────────────────────────────
 // Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for all /api/*
 // routes. Skipped in development mode for easier local testing.
 
 app.use('/api/*', kiloAuthMiddleware);
 
-// ── tRPC ────────────────────────────────────────────────────────────────
 // Serve the wasteland tRPC router directly. The frontend tRPC client
 // connects here instead of going through the Next.js proxy layer.
 
@@ -1330,8 +1313,6 @@ app.use(
   })
 );
 
-// ── Error handling ──────────────────────────────────────────────────────
-
 app.notFound(c => c.json(resError('Not found'), 404));
 
 app.onError((err, c) => {
@@ -1339,8 +1320,6 @@ app.onError((err, c) => {
   Sentry.captureException(err);
   return c.json(resError('Internal server error'), 500);
 });
-
-// ── Export with Sentry wrapping ─────────────────────────────────────────
 
 export default withSentry(
   (env: Env) => ({

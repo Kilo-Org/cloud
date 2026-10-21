@@ -23,9 +23,12 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ORG_AUTO_TOP_UP_AMOUNTS_CENTS,
-  ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
+  ORG_AUTO_TOP_UP_THRESHOLDS_CENTS,
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
+  DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
+  isValidOrgAutoTopUpSettings,
   type OrgAutoTopUpAmountCents,
+  type OrgAutoTopUpThresholdCents,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { formatCents, formatPaymentMethodDescription } from '@/lib/utils';
 
@@ -48,17 +51,21 @@ export function OrganizationAutoTopUpConfigureDialog({
   );
 
   const currentAmount = configData?.amountCents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
+  const currentThreshold = configData?.thresholdCents ?? DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS;
   const paymentMethodInfo = configData?.paymentMethod ?? null;
   const hasExistingPaymentMethod = paymentMethodInfo && paymentMethodInfo.stripePaymentMethodId;
 
   const [selectedAmount, setSelectedAmount] = useState<OrgAutoTopUpAmountCents>(currentAmount);
+  const [selectedThreshold, setSelectedThreshold] =
+    useState<OrgAutoTopUpThresholdCents>(currentThreshold);
+  const selectedThresholdLabel = formatCents(selectedThreshold);
 
-  // Sync selectedAmount when modal opens
   useEffect(() => {
     if (open) {
       setSelectedAmount(currentAmount);
+      setSelectedThreshold(currentThreshold);
     }
-  }, [open, currentAmount]);
+  }, [open, currentAmount, currentThreshold]);
 
   const toggleMutation = useMutation(
     trpc.organizations.autoTopUp.toggle.mutationOptions({
@@ -97,10 +104,16 @@ export function OrganizationAutoTopUpConfigureDialog({
 
   const handleEnableAutoTopUp = () => {
     onOpenChange(false);
-    toggleMutation.mutate({ organizationId, currentEnabled: false, amountCents: selectedAmount });
+    toggleMutation.mutate({
+      organizationId,
+      currentEnabled: false,
+      amountCents: selectedAmount,
+      thresholdCents: selectedThreshold,
+    });
   };
 
   const isPending = toggleMutation.isPending || removePaymentMethodMutation.isPending;
+  const isValidSelection = isValidOrgAutoTopUpSettings(selectedAmount, selectedThreshold);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -124,40 +137,66 @@ export function OrganizationAutoTopUpConfigureDialog({
                   </li>
                 )}
                 <li>
-                  When your organization balance falls below ${ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS},
-                  we&apos;ll automatically charge your payment method.
+                  When your organization balance falls below the threshold you choose, we&apos;ll
+                  automatically charge your payment method.
                 </li>
                 <li>
                   If a payment ever fails, we'll email you and pause auto top ups to prevent repeat
                   charges; you can resume automatic top ups at any time.
                 </li>
                 <li>You can disable automatic top up at any time.</li>
-                <li>As always, purchased credits never expire.</li>
               </ul>
             </div>
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center gap-3 py-2">
-          <Label htmlFor="topup-amount-dialog">Top up amount:</Label>
-          <Select
-            value={String(selectedAmount)}
-            onValueChange={value =>
-              setSelectedAmount(parseInt(value, 10) as OrgAutoTopUpAmountCents)
-            }
-          >
-            <SelectTrigger className="w-24" id="topup-amount-dialog">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ORG_AUTO_TOP_UP_AMOUNTS_CENTS.map(option => (
-                <SelectItem key={option} value={String(option)}>
-                  {formatCents(option)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col gap-3 py-2 sm:flex-row sm:items-center sm:gap-6">
+          <div className="flex items-center gap-3">
+            <Label htmlFor="topup-threshold-dialog">When balance falls below:</Label>
+            <Select
+              value={String(selectedThreshold)}
+              onValueChange={value =>
+                setSelectedThreshold(parseInt(value, 10) as OrgAutoTopUpThresholdCents)
+              }
+            >
+              <SelectTrigger className="w-32" id="topup-threshold-dialog">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ORG_AUTO_TOP_UP_THRESHOLDS_CENTS.map(option => (
+                  <SelectItem key={option} value={String(option)}>
+                    {formatCents(option)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-3">
+            <Label htmlFor="topup-amount-dialog">Top up amount:</Label>
+            <Select
+              value={String(selectedAmount)}
+              onValueChange={value =>
+                setSelectedAmount(parseInt(value, 10) as OrgAutoTopUpAmountCents)
+              }
+            >
+              <SelectTrigger className="w-32" id="topup-amount-dialog">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ORG_AUTO_TOP_UP_AMOUNTS_CENTS.map(option => (
+                  <SelectItem key={option} value={String(option)}>
+                    {formatCents(option)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+        {!isValidSelection && (
+          <p className="text-destructive text-sm" role="alert">
+            Top up amount must be at least the {selectedThresholdLabel} balance threshold.
+          </p>
+        )}
 
         <DialogFooter className="flex-col gap-4 sm:flex-col">
           {hasExistingPaymentMethod ? (
@@ -166,12 +205,12 @@ export function OrganizationAutoTopUpConfigureDialog({
                 <h4 className="font-medium">Use existing payment method</h4>
                 <span className="text-muted-foreground text-sm">
                   Your existing payment method ({formatPaymentMethodDescription(paymentMethodInfo)})
-                  will be used for automatic top ups when your balance falls below $
-                  {ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS}.
+                  will be used for automatic top ups when your balance falls below{' '}
+                  {selectedThresholdLabel}.
                 </span>
                 <Button
                   onClick={handleEnableAutoTopUp}
-                  disabled={isPending}
+                  disabled={isPending || !isValidSelection}
                   data-ph-action="enable-org-autotopup"
                 >
                   Enable automatic top up
@@ -198,11 +237,11 @@ export function OrganizationAutoTopUpConfigureDialog({
             <div className="flex flex-col gap-2">
               <span className="text-muted-foreground text-sm">
                 Top up once now to verify your payment method, then automatically whenever your
-                balance falls below ${ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS}.
+                balance falls below {selectedThresholdLabel}.
               </span>
               <Button
                 onClick={handleEnableAutoTopUp}
-                disabled={isPending}
+                disabled={isPending || !isValidSelection}
                 data-ph-action="enable-org-autotopup"
               >
                 Enable automatic top up

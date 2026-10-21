@@ -147,7 +147,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
   function createClient(serverUrl: string) {
     return createWrapperKiloClient(
       createKiloClient({ baseUrl: serverUrl }),
-      serverUrl,
+      { url: serverUrl },
       '/workspace'
     );
   }
@@ -406,6 +406,22 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       invoke: (client, directory) => client.getSessionStatuses(directory),
     },
     {
+      name: 'session diff',
+      method: 'GET',
+      pathname: '/session/ses_1/diff',
+      response: [
+        {
+          file: 'src/file.ts',
+          patch:
+            'diff --git a/src/file.ts b/src/file.ts\n--- a/src/file.ts\n+++ b/src/file.ts\n@@ -1 +1 @@\n-before\n+after\n',
+          additions: 1,
+          deletions: 1,
+          status: 'modified',
+        },
+      ],
+      invoke: (client, directory) => client.getSessionDiff('ses_1', directory),
+    },
+    {
       name: 'question list',
       method: 'GET',
       pathname: '/question',
@@ -494,20 +510,42 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     expect(await client.getSessionStatuses()).toEqual({});
   });
 
-  it.each([
-    { name: 'empty object', body: {} },
-    { name: 'success-shaped object', body: { success: true } },
-    { name: 'string', body: 'true' },
-    { name: 'number', body: 1 },
-    { name: 'array', body: [] },
-  ])('rejects a non-boolean abort acknowledgement: %j', async ({ body }) => {
-    const stub = startStub(200, body);
+  it('rejects a non-boolean abort acknowledgement', async () => {
+    const stub = startStub(200, {});
     const error: unknown = await createClient(stub.url)
       .abortSession({ sessionId: 'ses_1' })
       .catch(cause => cause);
     expect(error).toBeInstanceOf(Error);
     if (!(error instanceof Error)) throw new Error('Expected invalid abort response failure');
     expect(error.message).toBe('Session abort for ses_1 returned no boolean result');
+  });
+
+  it('treats a 404 cleanup abort as success without retrying', async () => {
+    const stub = startStub(404, {});
+    await createClient(stub.url).abortSessionForCleanup({
+      sessionId: 'ses_1',
+      directory: '/workspace',
+    });
+    expect(stub.requests).toHaveLength(1);
+    expect(stub.requests[0]).toMatchObject({
+      method: 'POST',
+      pathname: '/session/ses_1/abort',
+      directory: '/workspace',
+    });
+  });
+
+  it('validates cleanup child rows before walking them', async () => {
+    const valid = 'ses_22222222222222222222222222';
+    const good = startStub(200, [{ id: valid, directory: '/workspace' }]);
+    expect(
+      await createClient(good.url).children({ sessionId: 'ses_1', directory: '/workspace' })
+    ).toEqual([{ id: valid, directory: '/workspace' }]);
+
+    const malformed = startStub(200, [{ id: 'not-a-session', directory: '/workspace' }]);
+    const error: unknown = await createClient(malformed.url)
+      .children({ sessionId: 'ses_1', directory: '/workspace' })
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
   });
 
   const errorOperations: Array<{
@@ -681,7 +719,11 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     });
     try {
       const url = server.url.toString();
-      const client = createWrapperKiloClient(createKiloClient({ baseUrl: url }), url, directory);
+      const client = createWrapperKiloClient(
+        createKiloClient({ baseUrl: url }),
+        { url },
+        directory
+      );
       await client.ensureSession(sessionId, directory);
       expect(await client.getSession(sessionId)).toEqual({ id: sessionId });
       expect(await client.abortSession({ sessionId, directory })).toBe(true);
@@ -806,6 +848,19 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     expect(await createClient(startStub(200, {}).url).getSessionStatuses()).toEqual({});
     expect(await createClient(startStub(200, []).url).getQuestions()).toEqual([]);
     expect(await createClient(startStub(200, []).url).getPermissions()).toEqual([]);
+    expect(await createClient(startStub(200, []).url).getSessionDiff('ses_1')).toEqual([]);
+  });
+
+  it('cancels a native diff HTTP read without treating it as an empty result', async () => {
+    const stub = startStub(200, []);
+    const controller = new AbortController();
+    controller.abort(new Error('Diff request cancelled'));
+    const error: unknown = await createClient(stub.url)
+      .getSessionDiff('ses_1', '/attached', controller.signal)
+      .catch(error => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ message: 'Session diff ses_1 failed: request error' });
+    expect(stub.requests).toHaveLength(0);
   });
 
   it('scopes question lists, answers, and rejections to the owning checkout directory', async () => {

@@ -1,26 +1,41 @@
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
-import { sql, eq, and, inArray, isNull, or, isNotNull } from 'drizzle-orm';
+import { sql, eq, and, inArray, isNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
 import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   getSessionMessagesSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  messageIdSchema,
   persistedKiloSdkMessageHistorySchema,
+  sessionDiffReadSchema,
   sessionIdSchema,
+  type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
 import type { Env } from '../env';
-import { zodJsonValidator, withDORetry } from '@kilocode/worker-utils';
+import {
+  activeOrganizationJoinCondition,
+  organizationMembershipJoinCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationMembershipJoinCondition,
+  parentOrganizationsTable,
+  parentOrganizationMembershipsTable,
+  personalOrInheritedOrganizationCondition,
+  zodJsonValidator,
+  withDORetry,
+} from '@kilocode/worker-utils';
+import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
+import { createConnectionTicket } from '../dos/connection-ticket';
 import { getSessionExport } from '../services/session-export';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { handleDirectIngestRequest } from '../ingest/direct-ingest';
-import { isDefaultSessionTitle } from '../ingest/default-session-title';
 import { resolveAccessibleKiloSession } from '../services/session-access';
+import { applyReportedSessionTitle, reportSessionTitleSchema } from '../services/session-title';
 import { signSessionShareToken } from '../services/session-share-token';
 import { canCreateCliSessionForUser } from '../services/user-session-admission';
 import { isWorktreeSessionDeleting } from '../services/worktree-deletion';
@@ -90,6 +105,11 @@ async function clearSessionLocalState(
     () => getSessionIngestDO(env, { kiloUserId, sessionId }),
     stub => stub.clear(),
     'SessionIngestDO.clear'
+  );
+  await withDORetry(
+    () => getUserConnectionDO(env, { kiloUserId }),
+    stub => stub.clearSession(sessionId),
+    'UserConnectionDO.clearSession'
   );
 }
 
@@ -351,7 +371,8 @@ api.delete('/session/:sessionId', async c => {
     )
     SELECT
       tree.session_id,
-      tree.organization_id IS NULL OR EXISTS (
+      tree.organization_id IS NULL
+      OR EXISTS (
         SELECT 1
         FROM ${organization_memberships}
         INNER JOIN ${organizations}
@@ -359,6 +380,22 @@ api.delete('/session/:sessionId', async c => {
           AND ${organizations.deleted_at} IS NULL
         WHERE ${organization_memberships.organization_id} = tree.organization_id
           AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM ${organizations} AS active_target_organization
+        INNER JOIN ${organizations} AS active_parent_organization
+          ON active_parent_organization.id = active_target_organization.parent_organization_id
+          AND active_parent_organization.deleted_at IS NULL
+        INNER JOIN ${organization_memberships} AS active_parent_membership
+          ON active_parent_membership.organization_id = active_target_organization.parent_organization_id
+          AND active_parent_membership.kilo_user_id = ${kiloUserId}
+          AND active_parent_membership.role IN (${sql.join(
+            ORGANIZATION_PARENT_ACCESS_ROLES.map((role: string) => sql`${role}`),
+            sql`, `
+          )})
+        WHERE active_target_organization.id = tree.organization_id
+          AND active_target_organization.deleted_at IS NULL
       ) AS has_access
     FROM tree
     ORDER BY depth DESC
@@ -475,16 +512,66 @@ api.get('/session/:sessionId/export', async c => {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
 
-  const kiloUserId = c.get('user_id');
-  const stream = await getSessionExport(c.env, parsed.data, kiloUserId);
+  // Optional inclusive cut: export only the transcript up to this message.
+  const rawUpToMessageId = c.req.query('upToMessageId');
+  let upToMessageId: string | undefined;
+  if (rawUpToMessageId !== undefined) {
+    const parsedCut = messageIdSchema.safeParse(rawUpToMessageId);
+    if (!parsedCut.success) {
+      return c.json(
+        { success: false, error: 'Invalid upToMessageId', issues: parsedCut.error.issues },
+        400
+      );
+    }
+    upToMessageId = parsedCut.data;
+  }
 
-  if (stream === null) {
+  const kiloUserId = c.get('user_id');
+  const result = await getSessionExport(c.env, parsed.data, kiloUserId, upToMessageId);
+
+  if (result.status !== 'ok') {
+    return c.json({ success: false, error: result.status }, 404);
+  }
+
+  return c.body(result.stream, 200, {
+    'content-type': 'application/json; charset=utf-8',
+  });
+});
+
+/**
+ * The stored cumulative session diff (`session_diff` item) for one Kilo
+ * session the user can read. Reads only that row, never the transcript.
+ */
+api.get('/session/:sessionId/diff', async c => {
+  const parsed = sessionIdSchema.safeParse(c.req.param('sessionId'));
+  if (!parsed.success) {
+    return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
+  }
+
+  const kiloUserId = c.get('user_id');
+  const session = await resolveAccessibleKiloSession(c.env, {
+    kiloUserId,
+    kiloSessionId: parsed.data,
+  });
+  if (!session) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  return c.body(stream, 200, {
-    'content-type': 'application/json; charset=utf-8',
+  const rawDiff = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+    () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+    stub => stub.readSessionDiff(),
+    'SessionIngestDO.readSessionDiff'
+  );
+  const read = sessionDiffReadSchema.safeParse(rawDiff);
+  const diff: SessionDiffRead = read.success ? read.data : { kind: 'invalid_data' };
+  console.log({
+    event: 'session_diff_read',
+    sessionId: parsed.data,
+    outcome: diff.kind,
+    fileCount: diff.kind === 'value' ? diff.files.length : 0,
   });
+
+  return c.json({ success: true, kiloSessionId: parsed.data, diff }, 200);
 });
 
 /**
@@ -555,16 +642,19 @@ api.get('/session/:sessionId/messages', async c => {
     .from(cli_sessions_v2)
     .leftJoin(
       organization_memberships,
-      and(
-        eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
-        eq(organization_memberships.kilo_user_id, kiloUserId)
-      )
+      organizationMembershipJoinCondition(kiloUserId, cli_sessions_v2.organization_id)
+    )
+    .leftJoin(organizations, activeOrganizationJoinCondition(cli_sessions_v2.organization_id))
+    .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+    .leftJoin(
+      parentOrganizationMembershipsTable,
+      parentOrganizationMembershipJoinCondition(kiloUserId)
     )
     .where(
       and(
         eq(cli_sessions_v2.session_id, inputParse.data.kiloSessionId),
         eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-        or(isNull(cli_sessions_v2.organization_id), isNotNull(organization_memberships.id))
+        personalOrInheritedOrganizationCondition(cli_sessions_v2.organization_id)
       )
     )
     .limit(1);
@@ -704,6 +794,22 @@ api.post('/session/:sessionId/share', async c => {
           WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
             AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
         )
+        OR EXISTS (
+          SELECT 1
+          FROM ${organizations} AS active_target_organization
+          INNER JOIN ${organizations} AS active_parent_organization
+            ON active_parent_organization.id = active_target_organization.parent_organization_id
+            AND active_parent_organization.deleted_at IS NULL
+          INNER JOIN ${organization_memberships} AS active_parent_membership
+            ON active_parent_membership.organization_id = active_target_organization.parent_organization_id
+            AND active_parent_membership.kilo_user_id = ${kiloUserId}
+            AND active_parent_membership.role IN (${sql.join(
+              ORGANIZATION_PARENT_ACCESS_ROLES.map((role: string) => sql`${role}`),
+              sql`, `
+            )})
+          WHERE active_target_organization.id = ${cli_sessions_v2.organization_id}
+            AND active_target_organization.deleted_at IS NULL
+        )
       )
     RETURNING ${cli_sessions_v2.public_id}
   `);
@@ -761,11 +867,6 @@ api.post('/session/:sessionId/unshare', async c => {
   return c.json({ success: true }, 200);
 });
 
-const reportSessionTitleSchema = z.object({
-  title: z.string().trim().min(1).max(200),
-  generated: z.boolean(),
-});
-
 api.post('/session/:sessionId/rename-notify', async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
@@ -808,66 +909,26 @@ api.post('/session/:sessionId/title', async c => {
 
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
-  const { title, generated } = bodyParse.data;
 
-  const existingRows = await db
-    .select()
-    .from(cli_sessions_v2)
-    .where(
-      and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    )
-    .limit(1);
-
-  const existing = existingRows[0];
-  if (!existing) {
+  const result = await applyReportedSessionTitle(db, {
+    sessionId: parsed.data,
+    kiloUserId,
+    input: bodyParse.data,
+  });
+  if (result.kind === 'not_found') {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
-
-  // generated: true applies only over NULL or default-pattern titles (Decision 8).
-  // generated: false is last-write-wins.
-  if (generated && !isDefaultSessionTitle(existing.title)) {
+  if (result.kind === 'refused') {
     return c.json({ applied: false }, 200);
   }
 
-  // Ownership filter shared by both paths. For generated writes, also CAS on the
-  // title observed at read time so a concurrent rename (or other non-default write)
-  // between select and update cannot be clobbered — Decision 8 must hold at write time.
-  const ownership = and(
-    eq(cli_sessions_v2.session_id, parsed.data),
-    eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-  );
-  const writeWhere = generated
-    ? and(
-        ownership,
-        existing.title == null
-          ? isNull(cli_sessions_v2.title)
-          : eq(cli_sessions_v2.title, existing.title)
-      )
-    : ownership;
-
-  // Preserve updated_at so title-only writes do not reorder activity lists
-  // (same as the web rename path).
-  const [updatedRow] = await db
-    .update(cli_sessions_v2)
-    .set({ title, updated_at: existing.updated_at })
-    .where(writeWhere)
-    .returning();
-
-  if (!updatedRow) {
-    // Generated CAS miss (intervening rename / non-default write) → refused, not 404.
-    if (generated) {
-      return c.json({ applied: false }, 200);
-    }
-    return c.json({ success: false, error: 'session_not_found' }, 404);
-  }
-
-  const session = mapSessionEventRow(updatedRow);
+  const session = mapSessionEventRow(result.row);
   notifyUserSessionEventFromContext(c, kiloUserId, {
     type: 'session.updated',
     data: { source: 'v2', session, changedAt: session.updatedAt },
   });
 
-  return c.json({ title: session.title ?? title, applied: true }, 200);
+  return c.json({ title: session.title ?? bodyParse.data.title, applied: true }, 200);
 });
 
 api.get('/sessions/active', async c => {
@@ -971,18 +1032,18 @@ api.get('/user/web', async c => {
 });
 
 // Web UI mints a one-use ticket before opening /api/user/web. The ticket is
-// opaque (UUID); the DO stores { userId, expiresAt } keyed by the ticket and
-// the websocket upgrade consumes it exactly once.
+// opaque; its object stores { userId, expiresAt, secret } and the websocket
+// upgrade consumes it exactly once.
 api.post('/user/web-ticket', async c => {
   const kiloUserId = c.get('user_id');
-  const ticket = crypto.randomUUID();
+  const { ticket, secret, getStub } = createConnectionTicket(c.env.CONNECTION_TICKET_DO);
   const doExpiresAt = Date.now() + 60_000;
 
-  const stub = c.env.CONNECTION_TICKET_DO.get(c.env.CONNECTION_TICKET_DO.idFromName(ticket));
-  await stub.mint({
-    userId: kiloUserId,
-    expiresAt: doExpiresAt,
-  });
+  await withDORetry(
+    getStub,
+    stub => stub.mint({ userId: kiloUserId, expiresAt: doExpiresAt, secret }),
+    'ConnectionTicketDO.mint'
+  );
 
   return c.json({ ticket, expiresAt: Math.floor(doExpiresAt / 1000) }, 200);
 });

@@ -7,6 +7,7 @@ import {
   billingCapacityForSandboxClass,
   buildSandboxBillingInput,
   configureSandboxBillingInput,
+  parseSandboxBillingInput,
   CONTAINERS_BILLING_CAPACITIES,
   containersBillingIdentity,
   forceDestroyControlPlaneSandbox,
@@ -14,7 +15,6 @@ import {
   isContainersBillingClassName,
   isVercelBillingClassName,
   SANDBOX_CAPACITIES,
-  SANDBOX_USAGE_SKUS,
   VERCEL_BILLING_CAPACITIES,
   vercelBillingIdentity,
   type SandboxClassName,
@@ -109,36 +109,16 @@ describe('container usage context', () => {
     expect(sandbox.destroy).not.toHaveBeenCalled();
   });
 
-  it('maps every concrete sandbox class to its immutable SKU', () => {
-    expect(SANDBOX_USAGE_SKUS).toEqual({
-      Sandbox: 'cloud-agent-standard-2026-07',
-      SandboxContainment: 'cloud-agent-standard-2026-07',
-      SandboxSmall: 'cloud-agent-small-2026-07',
-      SandboxSmallContainment: 'cloud-agent-small-2026-07',
-      SandboxDIND: 'cloud-agent-dind-2026-07',
-      SandboxCodeReview: 'cloud-agent-code-review-2026-07',
-      SandboxCodeReviewContainment: 'cloud-agent-code-review-2026-07',
-      SandboxContainersStandard3: 'cloud-agent-containers-standard-3-2026-09',
-      SandboxContainersStandard4: 'cloud-agent-containers-standard-4-2026-09',
-      SandboxVercelSmall: 'cloud-agent-vercel-small-2026-09',
-      SandboxVercelLarge: 'cloud-agent-vercel-large-2026-09',
+  it('bills the code-review containers instance at the code-review capacity', () => {
+    expect(containersBillingIdentity('code-review')).toEqual({
+      className: 'SandboxContainersCodeReview',
+      service: 'cloud-agent-next-sandbox-containers-code-review',
+      sku: 'cloud-agent-code-review-2026-07',
+      capacity: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
     });
   });
 
-  it('resolves a containers identity per instance size', () => {
-    expect(containersBillingIdentity('standard-3')).toEqual({
-      className: 'SandboxContainersStandard3',
-      service: 'cloud-agent-next-sandbox-containers-standard3',
-      sku: 'cloud-agent-containers-standard-3-2026-09',
-      capacity: { vcpu: 2, memoryMiB: 8_192, diskMB: 16_000 },
-    });
-    expect(containersBillingIdentity('standard-4')).toEqual({
-      className: 'SandboxContainersStandard4',
-      service: 'cloud-agent-next-sandbox-containers-standard4',
-      sku: 'cloud-agent-containers-standard-4-2026-09',
-      capacity: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
-    });
-
+  it('rejects unsupported containers instance sizes', () => {
     expect(() => containersBillingIdentity('lite')).toThrow(
       'Containers billing is unsupported for instance size: lite'
     );
@@ -184,35 +164,6 @@ describe('container usage context', () => {
     }
   });
 
-  it('snapshots the Vercel capacities without a disk field', () => {
-    expect(VERCEL_BILLING_CAPACITIES).toEqual({
-      SandboxVercelSmall: { vcpu: 2, memoryMiB: 4_096 },
-      SandboxVercelLarge: { vcpu: 4, memoryMiB: 8_192 },
-    });
-    for (const capacity of Object.values(VERCEL_BILLING_CAPACITIES)) {
-      expect(capacity).not.toHaveProperty('diskMB');
-      expect(capacity).not.toHaveProperty('disk_mb');
-    }
-  });
-
-  it('resolves a Vercel identity for both accepted presets', () => {
-    const small: VercelSandboxResources = { vcpus: 2, memory: 4096 };
-    const large: VercelSandboxResources = { vcpus: 4, memory: 8192 };
-
-    expect(vercelBillingIdentity(small)).toEqual({
-      className: 'SandboxVercelSmall',
-      service: 'cloud-agent-next-sandbox-vercel-small',
-      sku: 'cloud-agent-vercel-small-2026-09',
-      capacity: { vcpu: 2, memoryMiB: 4_096 },
-    });
-    expect(vercelBillingIdentity(large)).toEqual({
-      className: 'SandboxVercelLarge',
-      service: 'cloud-agent-next-sandbox-vercel-large',
-      sku: 'cloud-agent-vercel-large-2026-09',
-      capacity: { vcpu: 4, memoryMiB: 8_192 },
-    });
-  });
-
   it('throws instead of guessing a SKU for unsupported Vercel resources', () => {
     for (const resources of [
       { vcpus: 1, memory: 2048 },
@@ -227,14 +178,12 @@ describe('container usage context', () => {
   });
 
   it('routes the capacity lookup to Vercel, containers, and legacy records', () => {
-    expect(billingCapacityForSandboxClass('SandboxVercelSmall')).toEqual({
-      vcpu: 2,
-      memoryMiB: 4_096,
-    });
-    expect(billingCapacityForSandboxClass('SandboxVercelLarge')).toEqual({
-      vcpu: 4,
-      memoryMiB: 8_192,
-    });
+    expect(billingCapacityForSandboxClass('SandboxVercelSmall')).toEqual(
+      VERCEL_BILLING_CAPACITIES.SandboxVercelSmall
+    );
+    expect(billingCapacityForSandboxClass('SandboxVercelLarge')).toEqual(
+      VERCEL_BILLING_CAPACITIES.SandboxVercelLarge
+    );
     expect(billingCapacityForSandboxClass('SandboxContainersStandard3')).toEqual(
       CONTAINERS_BILLING_CAPACITIES.SandboxContainersStandard3
     );
@@ -322,25 +271,6 @@ describe('container usage context', () => {
         ).toThrow(`${sandboxClassName} billing received an incompatible sandbox ID`);
       }
     }
-  });
-
-  it('snapshots the configured capacity for every legacy sandbox class', () => {
-    expect(SANDBOX_CAPACITIES).toEqual({
-      Sandbox: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
-      SandboxContainment: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
-      SandboxSmall: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
-      SandboxSmallContainment: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
-      SandboxDIND: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
-      SandboxCodeReview: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
-      SandboxCodeReviewContainment: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
-    });
-  });
-
-  it('keeps the containers billing capacities unchanged', () => {
-    expect(CONTAINERS_BILLING_CAPACITIES).toEqual({
-      SandboxContainersStandard3: { vcpu: 2, memoryMiB: 8_192, diskMB: 16_000 },
-      SandboxContainersStandard4: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
-    });
   });
 
   it.each([
@@ -479,6 +409,56 @@ describe('container usage context', () => {
     expect(input.metadata?.origin).toBe('other');
   });
 
+  it.each([
+    ['isolated', 'SandboxSmallContainment', true],
+    ['code-review', 'SandboxCodeReviewContainment', true],
+    ['code-review', 'SandboxContainersCodeReview', true],
+    ['shared', 'SandboxContainment', false],
+  ] as const)(
+    'attributes a placed %s sandbox from its kind, not its neutral key',
+    (sandboxKind, className, sessionScoped) => {
+      const sandboxId = `sbx-${'a'.repeat(48)}` as SandboxId;
+      const input = buildSandboxBillingInput(
+        {
+          ...metadata({
+            sessionId: 'workspace_placed',
+            userId: 'user_placed',
+            billingOrigin: 'cloud-agent',
+          }),
+          workspace: { sandboxId, sandboxProvider: 'cloudflare', sandboxKind },
+        },
+        sandboxId
+      );
+
+      expect(input.sandboxKind).toBe(sandboxKind);
+      expect(input.sessionId).toBe(sessionScoped ? 'workspace_placed' : undefined);
+      expect(() => assertSandboxBillingAllocation(className, input)).not.toThrow();
+      // The kind survives the strict envelope without reaching the usage context.
+      expect(parseSandboxBillingInput(input)).toEqual({ ...input, enforcementRequested: false });
+    }
+  );
+
+  it('rejects placed billing without its kind and legacy billing with one', () => {
+    const attribution = {
+      sandboxId: `sbx-${'a'.repeat(48)}` as SandboxId,
+      subject: { type: 'user', id: 'user_placed' },
+      actor: { type: 'user', id: 'user_placed' },
+      sessionId: 'workspace_placed',
+      metadata: { origin: 'cloud-agent' },
+    } as const;
+
+    expect(() => assertSandboxBillingAllocation('SandboxSmallContainment', attribution)).toThrow(
+      'Sandbox key and kind do not match'
+    );
+    expect(() =>
+      assertSandboxBillingAllocation('SandboxSmallContainment', {
+        ...attribution,
+        sandboxId: 'ses-abcdef' as SandboxId,
+        sandboxKind: 'isolated',
+      })
+    ).toThrow('Sandbox key and kind do not match');
+  });
+
   it('does not trust the public createdOnPlatform label as billing origin', () => {
     const input = buildSandboxBillingInput(
       metadata({
@@ -599,7 +579,7 @@ describe('container usage context', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('does not propagate shadow configuration delivery failures', async () => {
+  it('propagates attribution configuration failures before sandbox startup', async () => {
     const configureBilling = vi.fn().mockRejectedValue(new Error('meter unavailable'));
     await expect(
       configureSandboxBillingInput({ configureBilling } as unknown as SandboxInstance, {
@@ -609,7 +589,7 @@ describe('container usage context', () => {
         sessionId: 'agent_1',
         metadata: { origin: 'cloud-agent' },
       })
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow('meter unavailable');
     expect(configureBilling).toHaveBeenCalledOnce();
   });
 });

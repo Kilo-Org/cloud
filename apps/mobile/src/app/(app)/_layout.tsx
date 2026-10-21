@@ -1,8 +1,10 @@
 import { Stack } from 'expo-router';
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
+import { BriefingSyncMount } from '@/components/agent-briefing/briefing-sync-mount';
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { LauncherSurfacesMount } from '@/components/launcher-surfaces-mount';
@@ -104,6 +106,12 @@ function AppWideFreshnessMount() {
 export default function AppLayout() {
   const colors = useThemeColors();
   const sheetOptions = useFormSheetScreenOptions();
+  // Android's half-height search sheets leave their results behind the IME.
+  // Keep searchable sheets at the existing safe-area-capped full detent.
+  const searchSheetOptions =
+    Platform.OS === 'android'
+      ? { ...sheetOptions, sheetAllowedDetents: [sheetOptions.sheetAllowedDetents[1]] }
+      : sheetOptions;
   useSecurityLifecycleInvalidation();
   useGlanceableOrgFence();
 
@@ -115,6 +123,7 @@ export default function AppLayout() {
       <GlanceablePublisherMount />
       <LauncherSurfacesMount />
       <CachePersistenceMount />
+      <BriefingSyncMount />
       <ToolSummaryTranslationRetryMount />
       <StorePurchaseRecoveryMount />
       <ForegroundReconciliationMount />
@@ -140,8 +149,9 @@ export default function AppLayout() {
             />
             <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
             <Stack.Screen name="agent-chat/[session-id]" />
-            <Stack.Screen name="agent-chat/model-picker" options={sheetOptions} />
-            <Stack.Screen name="agent-chat/repo-picker" options={sheetOptions} />
+            <Stack.Screen name="session-changes/[session-id]" options={{ headerShown: false }} />
+            <Stack.Screen name="agent-chat/model-picker" options={searchSheetOptions} />
+            <Stack.Screen name="agent-chat/repo-picker" options={searchSheetOptions} />
             <Stack.Screen name="agent-chat/branch-picker" options={sheetOptions} />
             <Stack.Screen
               name="agent-chat/mode-picker"
@@ -150,10 +160,16 @@ export default function AppLayout() {
             <Stack.Screen name="agent-chat/instance-picker" options={sheetOptions} />
             <Stack.Screen name="agent-chat/folder-picker" options={sheetOptions} />
             <Stack.Screen name="agent-chat/profile-picker" options={sheetOptions} />
+            <Stack.Screen name="todos/[list-id]" />
+            <Stack.Screen name="todos/item/[item-id]" />
+            <Stack.Screen name="todos/list-settings" options={sheetOptions} />
+            <Stack.Screen name="agent-briefing/index" />
+            <Stack.Screen name="agent-briefing/[report-id]" />
+            <Stack.Screen name="agent-briefing/settings" />
             <Stack.Screen name="share-gate" options={sheetOptions} />
-            <Stack.Screen name="language-picker" options={sheetOptions} />
+            <Stack.Screen name="language-picker" options={searchSheetOptions} />
             <Stack.Screen name="transcription-model-picker" options={sheetOptions} />
-            <Stack.Screen name="voice-language-picker" options={sheetOptions} />
+            <Stack.Screen name="voice-language-picker" options={searchSheetOptions} />
             <Stack.Screen
               name="kilo-pass"
               options={{

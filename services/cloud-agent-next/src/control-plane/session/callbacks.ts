@@ -3,14 +3,12 @@ import {
   type CallbackJobQueueFitResult,
 } from '../../callbacks/queue-payload.js';
 import type { CallbackJob, CallbackTarget } from '../../callbacks/types.js';
+import { renderRecentActivity } from '../../callbacks/recent-activity.js';
 import { logger } from '../../logger.js';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { projectTerminalClientError } from '../../session/terminal-error-projector.js';
 import type { LatestAssistantMessage } from '../../session/types.js';
-import {
-  CONTROL_PLANE_FAILURE_REASON_VALUES,
-  type ControlPlaneFailureReason,
-} from '../../shared/control-plane-protocol.js';
+import { messageFailureText } from './failure-messages.js';
 import type { SessionMessage } from './messages.js';
 import { projectSettledMessageFailure, type ControlPlaneReportFacts } from './reports.js';
 
@@ -42,6 +40,11 @@ export type MessageCallbacksDependencies = {
     kiloSessionId: string,
     parentMessageId: string
   ) => LatestAssistantMessage | null;
+  getRecentAssistantMessagesForUserMessage: (
+    sessionId: string,
+    kiloSessionId: string,
+    parentMessageId: string
+  ) => LatestAssistantMessage[];
 };
 
 export type MessageCallbacks = {
@@ -55,27 +58,6 @@ export type MessageCallbacks = {
   nextCallbackDueAt(): number | undefined;
   repair(now?: number): Promise<void>;
 };
-
-const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
-  preparation_timeout: 'Environment preparation timed out',
-  workspace_setup_failed: 'Workspace setup failed',
-  agent_unavailable: 'The agent became unavailable',
-  billing_blocked: 'Sandbox billing requires additional credits',
-  billing_unavailable: 'Sandbox billing is unavailable',
-  invalid_configuration: 'Sandbox configuration is invalid or unsupported',
-  connection_lost: 'The sandbox connection was lost',
-  sandbox_lost: 'The sandbox was lost',
-  agent_restarted: 'The agent restarted',
-  no_progress: 'The turn made no progress',
-  no_outcome: 'The turn did not complete',
-  prompt_failed: 'Prompt delivery failed',
-  sandbox_stopped: 'The sandbox stopped while waiting for an answer',
-  execution_limit: 'The turn exceeded its time limit',
-};
-
-function isControlPlaneFailureReason(value: string): value is ControlPlaneFailureReason {
-  return (CONTROL_PLANE_FAILURE_REASON_VALUES as readonly string[]).includes(value);
-}
 
 const callbackTargetSchema = {
   url: (value: unknown): value is string => typeof value === 'string' && value.length > 0,
@@ -164,10 +146,7 @@ function callbackStatus(message: SessionMessage): CallbackJob['payload']['status
 function callbackErrorMessage(message: SessionMessage): string | undefined {
   if (message.state === 'completed') return undefined;
   if (message.state === 'cancelled') return 'The message was interrupted';
-  const reason = message.reason;
-  if (reason !== null && isControlPlaneFailureReason(reason))
-    return CONTROL_REASON_MESSAGES[reason];
-  return reason ?? 'Environment failed';
+  return message.reason === null ? 'Environment failed' : messageFailureText(message.reason);
 }
 
 function redactCallbackTargetUrl(callbackUrl: string): string {
@@ -182,8 +161,13 @@ function redactCallbackTargetUrl(callbackUrl: string): string {
 export function createMessageCallbacks(
   dependencies: MessageCallbacksDependencies
 ): MessageCallbacks {
-  const { storage, getMetadata, getCallbackQueue, getAssistantMessageForUserMessage } =
-    dependencies;
+  const {
+    storage,
+    getMetadata,
+    getCallbackQueue,
+    getAssistantMessageForUserMessage,
+    getRecentAssistantMessagesForUserMessage,
+  } = dependencies;
   let repairInFlight: Promise<void> | undefined;
 
   function buildJob(
@@ -198,6 +182,7 @@ export function createMessageCallbacks(
     const sessionId = metadata.identity.sessionId;
     const kiloSessionId = metadata.auth.kiloSessionId;
     let lastAssistantMessageText: string | undefined;
+    let recentActivity: string | undefined;
     if (status === 'completed' && kiloSessionId) {
       try {
         const assistantMessage = getAssistantMessageForUserMessage(
@@ -213,6 +198,15 @@ export function createMessageCallbacks(
         logger
           .withFields({ sessionId, messageId: message.messageId })
           .warn('Unable to include the assistant answer in the callback snapshot');
+      }
+      try {
+        recentActivity = renderRecentActivity(
+          getRecentAssistantMessagesForUserMessage(sessionId, kiloSessionId, message.messageId)
+        );
+      } catch {
+        logger
+          .withFields({ sessionId, messageId: message.messageId })
+          .warn('Unable to include recent activity in the callback snapshot');
       }
     }
     // The classification is derived from the message alone; settlement facts
@@ -241,11 +235,20 @@ export function createMessageCallbacks(
         ...(status === 'completed'
           ? {}
           : {
-              clientError: projectTerminalClientError({ status, error: errorMessage }),
+              clientError: projectTerminalClientError({
+                status,
+                error: errorMessage,
+                failureCode: failure?.code,
+                failureStage: failure?.stage,
+              }),
             }),
         lastSeenBranch: metadata.repository?.upstreamBranch ?? metadata.workspace?.branchName,
         kiloSessionId,
         lastAssistantMessageText,
+        recentActivity,
+        ...(status === 'completed' && facts?.gateResult !== undefined
+          ? { gateResult: facts.gateResult }
+          : {}),
         idempotencyKey: message.messageId,
       },
     };

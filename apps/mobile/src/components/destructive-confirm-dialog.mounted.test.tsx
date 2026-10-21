@@ -9,7 +9,7 @@ import { DestructiveConfirmDialog } from './destructive-confirm-dialog';
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
-  Modal: 'Modal',
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',
@@ -73,6 +73,21 @@ function pressableWith(root: TestRenderer.ReactTestInstance, token: string) {
   return root.find(node => isType(node, 'Pressable') && classNameOf(node).includes(token));
 }
 
+/**
+ * Calls one of a mounted element's own props inside `act`. The test renderer
+ * leaves `props` untyped, and this suite only ever calls the handlers it would
+ * otherwise press by hand, so the signature is stated here.
+ */
+function callProp(node: TestRenderer.ReactTestInstance, name: string): void {
+  const prop = node.props[name] as (() => void) | undefined;
+  if (typeof prop !== 'function') {
+    throw new TypeError(`The element has no callable ${name}`);
+  }
+  act(() => {
+    prop();
+  });
+}
+
 beforeEach(() => {
   onConfirm.mockReset();
   onCancel.mockReset();
@@ -118,29 +133,68 @@ describe('DestructiveConfirmDialog', () => {
     ).toHaveLength(1);
   });
 
-  it('runs the destructive action only when the destructive control is pressed', () => {
+  it('keeps the request on screen through dismissal, then runs the action', () => {
     const root = mount();
 
-    act(() => {
-      (pressableWith(root, 'bg-destructive').props as { onPress?: () => void }).onPress?.();
-    });
-    expect(onConfirm).toHaveBeenCalledTimes(1);
+    callProp(pressableWith(root, 'bg-destructive'), 'onPress');
 
-    act(() => {
-      (pressableWith(root, 'border-border').props as { onPress?: () => void }).onPress?.();
-    });
-    expect(onCancel).toHaveBeenCalledTimes(1);
+    // The sheet is dismissing, not empty: the title and the message are still
+    // drawn while the native dismissal runs, and the destructive action has not
+    // fired yet — it runs only once the sheet has gone.
+    const sheet = root.find(node => isType(node, 'BottomSheet'));
+    expect(sheet.props.index).toBe(-1);
+    expect(
+      root.findAll(node => isType(node, 'Text') && node.children.includes('Sign out?'))
+    ).toHaveLength(1);
+    expect(
+      root.findAll(
+        node =>
+          isType(node, 'Text') &&
+          node.children.includes('You will need to sign in again to access your workspace.')
+      )
+    ).toHaveLength(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    callProp(sheet, 'onDismiss');
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it('dismisses without confirming on the Android back request', () => {
+  it('runs the destructive action only when the destructive control is pressed', () => {
     const root = mount();
 
-    act(() => {
-      (
-        root.find(node => isType(node, 'Modal')).props as { onRequestClose?: () => void }
-      ).onRequestClose?.();
-    });
+    callProp(pressableWith(root, 'border-border'), 'onPress');
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    callProp(
+      root.find(node => isType(node, 'BottomSheet')),
+      'onDismiss'
+    );
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  // The confirm is a native sheet, not a portal dialog, so it stacks above the
+  // formSheet routes it is reached from. The sheet hands a dismissal — Android
+  // Back, a backdrop tap and a swipe all route through it — to `onCancel`.
+  it('presents the content-sized sheet without a drag handle', () => {
+    const root = mount();
+
+    const sheet = root.find(node => isType(node, 'BottomSheet'));
+    expect(sheet.props.index).toBe(0);
+    expect(sheet.props.handleComponent).toBeNull();
+    expect(sheet.props.snapPoints).toBeUndefined();
+  });
+
+  it('cancels when the native sheet is closed by its own dismissal', () => {
+    const root = mount();
+
+    // A backdrop tap, a swipe and Android Back all reach the sheet's own
+    // `onClose`; the cancel action runs once the sheet has finished dismissing.
+    const sheet = root.find(node => isType(node, 'BottomSheet'));
+    callProp(sheet, 'onClose');
+    expect(onCancel).not.toHaveBeenCalled();
+
+    callProp(sheet, 'onDismiss');
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onConfirm).not.toHaveBeenCalled();
   });

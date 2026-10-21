@@ -17,7 +17,9 @@ import '@/i18n';
 
 const harnessMocks = vi.hoisted(() => ({
   push: vi.fn(),
-  alert: vi.fn(),
+  // The screen renders `{dialog}` from `useConfirmDialog`; the stub below
+  // records the request the screen hands it (cleared by `vi.clearAllMocks`).
+  confirm: vi.fn(),
   toastError: vi.fn(),
   clipboard: { current: '' as string },
 }));
@@ -81,11 +83,17 @@ vi.mock('@/lib/auth/account-metadata-write', () => ({
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  Alert: { alert: harnessMocks.alert },
   Platform: { OS: 'android' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
+}));
+
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: harnessMocks.confirm,
+    dialog: null,
+  }),
 }));
 
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
@@ -97,6 +105,7 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 // the field now uses is the one `@/components/ui/input` owns and s3 covers.
 vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/icons', () => ({
   Clipboard: 'ClipboardIcon',

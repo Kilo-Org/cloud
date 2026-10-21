@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import {
+  ContainerCapacityUnavailableError,
+  ContainerConcurrencyLimitError,
+} from '../container-concurrency.js';
 import { AgentSandboxUnavailableError, type AgentSandbox } from '../agent-sandbox/protocol.js';
 import type { Env } from '../types.js';
 import type {
@@ -105,6 +109,54 @@ function createWorkspaceReady(): WorkspaceReady {
 }
 
 describe('AgentRuntime', () => {
+  it.each([
+    new ContainerConcurrencyLimitError('personal', 20),
+    new ContainerCapacityUnavailableError(),
+  ])(
+    'does not schedule cleanup or sandbox recovery for capacity-denied discovery: %s',
+    async failure => {
+      const storage = createMemoryStorage();
+      const denial = `remote RPC: ${failure.message}`;
+      const requestAlarmAtOrBefore = vi.fn();
+      const runtime = createAgentRuntime({
+        storage,
+        env: {} as Env,
+        getMetadata: async () => createMetadata(),
+        getSessionIdForLogs: () => 'agent_runtime',
+        sendToWrapper: () => false,
+        discoverSessionWrappers: async () => ({ status: 'inspection-failed', error: denial }),
+        requestAlarmAtOrBefore,
+      });
+      await expect(runtime.send(createPlan())).rejects.toThrow(denial);
+      expect((await getWrapperLease(storage)).state).toBe('none');
+      expect(await getSandboxRecoveryState(storage)).toBeUndefined();
+      expect(requestAlarmAtOrBefore).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    new ContainerConcurrencyLimitError('organization', 50),
+    new ContainerCapacityUnavailableError(),
+  ])('releases an unstarted wrapper lease after capacity denial: %s', async denial => {
+    const storage = createMemoryStorage();
+    const runtime = createAgentRuntime({
+      storage,
+      env: {} as Env,
+      getMetadata: async () => createMetadata(),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+      discoverSessionWrappers: async () => ({ status: 'absent' }),
+      getOrchestratorOverride: () => ({
+        execute: async () => {
+          throw denial;
+        },
+      }),
+    });
+    await expect(runtime.send(createPlan())).rejects.toBe(denial);
+    expect((await getWrapperLease(storage)).state).toBe('none');
+    expect((await getWrapperRuntimeState(storage)).wrapperRunId).toBeUndefined();
+    expect(await getSandboxRecoveryState(storage)).toBeUndefined();
+  });
   it('rechecks billing immediately before physical delivery', async () => {
     const createSandbox = vi.fn();
     const runtime = createAgentRuntime({

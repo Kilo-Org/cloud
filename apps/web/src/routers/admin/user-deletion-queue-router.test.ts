@@ -1,8 +1,9 @@
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   kilocode_users,
   kiloclaw_subscriptions,
   user_deletion_audit_events,
+  user_deletion_provider_credentials,
   user_deletion_requests,
   user_deletion_steps,
   type User,
@@ -10,6 +11,7 @@ import {
 import {
   UserDeletionAuditEventType,
   UserDeletionCloudSubjectResolution,
+  UserDeletionProviderScope,
   UserDeletionRequestStatus,
   UserDeletionStepKey,
   UserDeletionStepStatus,
@@ -267,6 +269,58 @@ describe('adminUserDeletionQueueRouter', () => {
     expect(afterComplete.needsAttention).toBe(before.needsAttention);
     expect(afterComplete.completedLast7Days).toBe(before.completedLast7Days + 1);
     expect(afterComplete.completedWindowDays).toBe(7);
+  });
+
+  it.each([
+    {
+      tab: 'needs_attention',
+      state: { status: UserDeletionStepStatus.NeedsAttention },
+    },
+    {
+      tab: 'needs_attention',
+      state: { status: UserDeletionStepStatus.ManualActionRequired },
+    },
+    {
+      tab: 'rate_limited',
+      state: {
+        status: UserDeletionStepStatus.Pending,
+        rate_limited_since: '2026-01-01T00:00:00.000Z',
+      },
+    },
+    {
+      tab: 'rate_limited',
+      state: { status: UserDeletionStepStatus.RetryWait, last_error_code: 'rate_limited' },
+    },
+  ] as const)('ignores legacy CSA for $tab with $state', async ({ tab, state }) => {
+    const caller = await createCallerForUser(admin.id);
+    const [enqueued] = await caller.admin.userDeletionQueue.submit({
+      entries: [{ email: targetUser.google_user_email }],
+    });
+    if (enqueued?.status !== 'enqueued') throw new Error('expected enqueued');
+    requestIds.push(enqueued.requestId);
+
+    await db.insert(user_deletion_steps).values({
+      request_id: enqueued.requestId,
+      step_key: UserDeletionStepKey.CsaSupportDb,
+      ...state,
+    });
+
+    const input = { tab, searchEmail: targetUser.google_user_email };
+    expect((await caller.admin.userDeletionQueue.list(input)).rows).toEqual([]);
+
+    await db
+      .update(user_deletion_steps)
+      .set(state)
+      .where(
+        and(
+          eq(user_deletion_steps.request_id, enqueued.requestId),
+          eq(user_deletion_steps.step_key, UserDeletionStepKey.Customerio)
+        )
+      );
+
+    expect((await caller.admin.userDeletionQueue.list(input)).rows.map(row => row.id)).toEqual([
+      enqueued.requestId,
+    ]);
   });
 
   it('does not expose pause on the serialized request or router', async () => {
@@ -561,6 +615,48 @@ describe('adminUserDeletionQueueRouter', () => {
       expect(order).toEqual(['first_completed', 'second_failed']);
       expect(errorSpy).not.toHaveBeenCalled();
       expect(fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('substack credential', () => {
+    const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+
+    afterEach(async () => {
+      await db
+        .delete(user_deletion_provider_credentials)
+        .where(
+          eq(user_deletion_provider_credentials.provider_scope, UserDeletionProviderScope.Substack)
+        );
+    });
+
+    it('stores TOTP alongside the cookie and reports it in meta', async () => {
+      const caller = await createCallerForUser(admin.id);
+      await caller.admin.userDeletionQueue.replaceSubstackCredential({
+        material: 'connect.sid=abc',
+        totpSecret: secret,
+      });
+      await expect(caller.admin.userDeletionQueue.substackCredential()).resolves.toMatchObject({
+        configured: true,
+        totpConfigured: true,
+      });
+
+      await caller.admin.userDeletionQueue.replaceSubstackCredential({
+        material: 'connect.sid=abc',
+        totpSecret: '',
+      });
+      await expect(caller.admin.userDeletionQueue.substackCredential()).resolves.toMatchObject({
+        configured: true,
+        totpConfigured: false,
+      });
+    });
+
+    it('rejects an invalid TOTP secret without echoing it', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const error = await caller.admin.userDeletionQueue
+        .replaceSubstackCredential({ material: 'connect.sid=abc', totpSecret: 'super-secret-bad!' })
+        .catch(caught => caught);
+      expect(error?.code).toBe('BAD_REQUEST');
+      expect(String(error?.message)).not.toContain('super-secret-bad');
     });
   });
 });

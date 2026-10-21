@@ -212,6 +212,26 @@ function omitExpensiveMessageInfo(info: Record<string, unknown>): Record<string,
   return out;
 }
 
+/**
+ * Cheap tool-state metadata that must survive persist so stream catch-up can
+ * still link a task part to its subagent. `sessionId` drives the inline
+ * progress rows and the drawer; `model` is the routed model shown on the
+ * drawer. Every other metadata field (diffs, patches, snapshots) can be large,
+ * so it is dropped.
+ */
+function slimPersistedPartMetadata(metadata: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(metadata)) return undefined;
+  const out: Record<string, unknown> = {};
+  if (typeof metadata.sessionId === 'string') out.sessionId = metadata.sessionId;
+  if (isRecord(metadata.model)) {
+    const { providerID, modelID } = metadata.model;
+    if (typeof providerID === 'string' && typeof modelID === 'string') {
+      out.model = { providerID, modelID };
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 function omitExpensivePart(part: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...part };
   delete out.snapshot;
@@ -234,8 +254,10 @@ function omitExpensivePart(part: Record<string, unknown>): Record<string, unknow
   }
 
   if (isRecord(out.state)) {
-    const { metadata: _metadata, ...stateRest } = out.state;
+    const { metadata, ...stateRest } = out.state;
     const state: Record<string, unknown> = { ...stateRest };
+    const slimMetadata = slimPersistedPartMetadata(metadata);
+    if (slimMetadata !== undefined) state.metadata = slimMetadata;
     if (Array.isArray(state.attachments)) {
       state.attachments = state.attachments.map((attachment): unknown =>
         isRecord(attachment) ? omitExpensivePart(attachment) : attachment
@@ -260,10 +282,10 @@ function persistedKilocodeEnvelope(
 /**
  * Drops expensive blobs from entity-upserted message events before SQLite
  * persist. Client stream replay uses this payload, so cheap fields (model,
- * variant, time, text, tool status) stay. Live broadcasts still use the
- * unspecialized public payload. Oversized ingest compaction is separate.
- * Persist keeps only event, type, and sanitized properties so wrapper
- * top-level info/part aliases are not stored.
+ * variant, time, text, tool status, task child-session linkage) stay. Live
+ * broadcasts still use the unspecialized public payload. Oversized ingest
+ * compaction is separate. Persist keeps only event, type, and sanitized
+ * properties so wrapper top-level info/part aliases are not stored.
  */
 export function slimPersistedKilocodeEvent(data: unknown): unknown {
   if (!isRecord(data)) return data;

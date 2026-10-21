@@ -232,6 +232,42 @@ describe('getKiloPassStateForUser', () => {
     );
   });
 
+  test('returns canceled status when a canceled subscription still has an open pause event', async () => {
+    const user = await insertTestUser();
+    const stripeSubId = `test-stripe-sub-canceled-paused-${crypto.randomUUID()}`;
+
+    const [sub] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
+        stripe_subscription_id: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'canceled',
+        cancel_at_period_end: false,
+        started_at: '2025-06-01T00:00:00.000Z',
+        ended_at: '2025-09-10T00:00:00.000Z',
+        current_streak_months: 0,
+        next_yearly_issue_at: null,
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+
+    await db.insert(kilo_pass_pause_events).values({
+      kilo_pass_subscription_id: sub!.id,
+      paused_at: '2025-09-01T00:00:00.000Z',
+      resumes_at: '2025-10-01T00:00:00.000Z',
+    });
+
+    const state = await getKiloPassStateForUser(db, user.id);
+    expect(state).toEqual(
+      expect.objectContaining({
+        status: 'canceled',
+        resumesAt: null,
+      })
+    );
+  });
+
   test('returns active status when pause event is closed (resumed)', async () => {
     const user = await insertTestUser();
     const stripeSubId = `test-stripe-sub-resumed-${crypto.randomUUID()}`;

@@ -1,5 +1,6 @@
 export const DEADLINE_MS = {
   startup: 2 * 60_000,
+  repositoryStartup: 5 * 60_000,
   socketHandshake: 10_000,
   wrapperReadiness: 90_000,
   heartbeatExpiry: 90_000,

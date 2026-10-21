@@ -13,6 +13,7 @@ import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { captureEvent, INSTANCE_ACTION_EVENT } from '@/lib/analytics/posthog';
@@ -33,6 +34,7 @@ export default function GoogleScreen() {
   const mutations = useKiloClawMutations(organizationId);
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
 
   const [copied, setCopied] = useState(false);
   const [showRedeployPrompt, setShowRedeployPrompt] = useState(false);
@@ -43,7 +45,12 @@ export default function GoogleScreen() {
   const setupQuery = useKiloClawGoogleSetup(organizationId, !statusQuery.isPending && !isConnected);
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title={t('kiloclaw.google.title')} context={instanceContext} />;
+    return (
+      <>
+        <InstanceContextBoundary title={t('kiloclaw.google.title')} context={instanceContext} />
+        {dialog}
+      </>
+    );
   }
 
   if (statusQuery.isPending) {
@@ -55,6 +62,7 @@ export default function GoogleScreen() {
             <Skeleton className="h-16 w-full rounded-lg" />
           </Animated.View>
         </Animated.View>
+        {dialog}
       </View>
     );
   }
@@ -69,6 +77,7 @@ export default function GoogleScreen() {
             void statusQuery.refetch();
           }}
         />
+        {dialog}
       </View>
     );
   }
@@ -90,20 +99,18 @@ export default function GoogleScreen() {
   }
 
   function handleDisconnect() {
-    Alert.alert(t('kiloclaw.google.disconnectTitle'), t('kiloclaw.google.disconnectMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('kiloclaw.google.disconnectConfirm'),
-        style: 'destructive',
-        onPress: () => {
-          mutations.disconnectGoogle.mutate(undefined, {
-            onSuccess: () => {
-              setShowRedeployPrompt(true);
-            },
-          });
-        },
+    confirm({
+      title: t('kiloclaw.google.disconnectTitle'),
+      message: t('kiloclaw.google.disconnectMessage'),
+      confirmLabel: t('kiloclaw.google.disconnectConfirm'),
+      onConfirm: () => {
+        mutations.disconnectGoogle.mutate(undefined, {
+          onSuccess: () => {
+            setShowRedeployPrompt(true);
+          },
+        });
       },
-    ]);
+    });
   }
 
   function handleRedeploy() {
@@ -251,6 +258,8 @@ export default function GoogleScreen() {
       ) : (
         <CenteredState>{body}</CenteredState>
       )}
+
+      {dialog}
     </Animated.View>
   );
 }

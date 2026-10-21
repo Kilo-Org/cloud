@@ -21,7 +21,8 @@ const hoisted = vi.hoisted(() => {
   };
 
   const appsFlyer = {
-    initSdk: vi.fn(),
+    init: vi.fn(),
+    setConsentData: vi.fn(),
     logEvent: vi.fn(),
     stop: vi.fn(),
     create: vi.fn(),
@@ -105,17 +106,22 @@ vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 
 vi.mock('react-native-appsflyer', () => ({
   default: {
-    initSdk: hoisted.appsFlyer.initSdk,
+    init: hoisted.appsFlyer.init,
+    setConsentData: hoisted.appsFlyer.setConsentData,
     logEvent: hoisted.appsFlyer.logEvent,
     stop: hoisted.appsFlyer.stop,
   },
-  AppsFlyerConsent: { NON_ANONYMIZED: 'nonAnonymized' },
   AppsFlyerPurchaseConnector: {
     create: hoisted.appsFlyer.create,
     startObservingTransactions: hoisted.appsFlyer.startObservingTransactions,
     stopObservingTransactions: hoisted.appsFlyer.stopObservingTransactions,
   },
   StoreKitVersion: { SK1: 'SK1', SK2: 'SK2' },
+}));
+
+vi.mock('expo-tracking-transparency', () => ({
+  getTrackingPermissionsAsync: vi.fn(),
+  PermissionStatus: { UNDETERMINED: 'undetermined' },
 }));
 
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
@@ -156,14 +162,15 @@ describe('no SDK starts before a telemetry decision', () => {
     expect(PostHogModule.default).not.toHaveBeenCalled();
   });
 
-  it('importing appsflyer does not call initSdk', async () => {
+  it('importing appsflyer does not call the SDK', async () => {
     hoisted.controller.allowsOptional.mockReturnValue(false);
     hoisted.controller.currentGeneration.mockReturnValue(0);
     vi.clearAllMocks();
 
     await loadAppsFlyerModule();
 
-    expect(hoisted.appsFlyer.initSdk).not.toHaveBeenCalled();
+    expect(hoisted.appsFlyer.setConsentData).not.toHaveBeenCalled();
+    expect(hoisted.appsFlyer.init).not.toHaveBeenCalled();
   });
 
   it('initPostHog with a fresh controller does not construct PostHog', async () => {
@@ -178,7 +185,7 @@ describe('no SDK starts before a telemetry decision', () => {
     expect(PostHogModule.default).not.toHaveBeenCalled();
   });
 
-  it('initAppsFlyer with a fresh controller does not call initSdk', async () => {
+  it('initAppsFlyer with a fresh controller does not call the SDK', async () => {
     hoisted.controller.allowsOptional.mockReturnValue(false);
     hoisted.controller.currentGeneration.mockReturnValue(0);
     vi.clearAllMocks();
@@ -186,7 +193,10 @@ describe('no SDK starts before a telemetry decision', () => {
     const appsflyer = await loadAppsFlyerModule();
     appsflyer.initAppsFlyer();
 
-    expect(hoisted.appsFlyer.initSdk).not.toHaveBeenCalled();
+    // The gate returns before the connector is created or startup is queued.
+    expect(hoisted.appsFlyer.create).not.toHaveBeenCalled();
+    expect(hoisted.appsFlyer.setConsentData).not.toHaveBeenCalled();
+    expect(hoisted.appsFlyer.init).not.toHaveBeenCalled();
   });
 
   it('trackEvent with a fresh controller does not call logEvent', async () => {

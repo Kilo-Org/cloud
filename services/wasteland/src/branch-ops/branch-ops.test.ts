@@ -31,8 +31,6 @@ import {
   type BranchOpsInnerContext,
 } from './branch-ops-inner';
 
-// ── Test-only fetch helpers ─────────────────────────────────────────────
-
 type MockResponse = { status: number; body?: unknown; text?: string };
 type FetchCall = { url: string; method: string; body: string | null };
 
@@ -61,8 +59,6 @@ const baseCtx: BranchOpsInnerContext = {
 function readRows(rows: Array<Record<string, unknown>>): MockResponse {
   return { status: 200, body: { query_execution_status: 'Success', rows } };
 }
-
-// ── listMyForkBranchesViaSdk ────────────────────────────────────────────
 
 describe('listMyForkBranchesViaSdk', () => {
   it('returns one entry per wl/<rig>/* branch with status pair + divergence', async () => {
@@ -112,7 +108,6 @@ describe('listMyForkBranchesViaSdk', () => {
 
   it('returns empty list when the fork has no wl/<rig>/* branches', async () => {
     const { fetch } = makeFetch([
-      // listBranches with no matching branches
       { status: 200, body: { branches: [{ branch_name: 'main' }] } },
       // No open-PR list call expected when no matching branches; SDK
       // skips the pull list. (See workshop.ts:54.)
@@ -122,8 +117,6 @@ describe('listMyForkBranchesViaSdk', () => {
     expect(result).toEqual([]);
   });
 });
-
-// ── publishBranchViaSdk ────────────────────────────────────────────────
 
 describe('publishBranchViaSdk', () => {
   it('opens a PR and returns { prUrl, prId }', async () => {
@@ -146,13 +139,10 @@ describe('publishBranchViaSdk', () => {
     expect(result.prId).toBe('pr-42');
     expect(result.prUrl).toContain('pr-42');
 
-    // Sanity: somewhere in the call chain we POSTed to /hop/wl/pulls.
     const createCall = calls.find(c => c.method === 'POST' && c.url.includes('/hop/wl/pulls'));
     expect(createCall).toBeDefined();
   });
 });
-
-// ── discardBranchViaSdk ────────────────────────────────────────────────
 
 describe('discardBranchViaSdk', () => {
   it('issues a DELETE on the branch and returns success', async () => {
@@ -182,8 +172,6 @@ describe('discardBranchViaSdk', () => {
     expect(result).toEqual({ success: true });
   });
 });
-
-// ── listMyPullsViaSdk ───────────────────────────────────────────────────
 
 describe('listMyPullsViaSdk', () => {
   it('keeps pulls whose from_branch_owner_name matches the fork org', async () => {

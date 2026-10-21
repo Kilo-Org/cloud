@@ -1,6 +1,9 @@
-import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
+import { describe, expect, it, jest, beforeAll, beforeEach, afterAll } from '@jest/globals';
+import jwt from 'jsonwebtoken';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { cli_sessions_v2, organizations, type User } from '@kilocode/db/schema';
 import type { createWorktreeChat as CreateWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
+import type * as CloudAgentClientModule from '@/lib/cloud-agent-next/cloud-agent-client';
 import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type * as MinimumVersionModule from '@kilocode/web-shared/lib/trpc/min-version';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -27,8 +30,11 @@ import {
   type SelectableSandboxAllocationRequest,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import type { GetSandboxSelectionOptionsInput } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
+import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import type { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
+import type * as StreamTicketModule from '@/lib/cloud-agent/stream-ticket';
 
 type AttachmentReference = { path: string; files: string[] };
 
@@ -61,6 +67,8 @@ const mockSendMessage = jest.fn<
     delivery: 'sent',
   })
 );
+const mockInitiateFromPreparedSession =
+  jest.fn<(input: { cloudAgentSessionId: string }) => Promise<unknown>>();
 const mockGenerateCloudAgentAttachmentUploadUrl = jest.fn<
   (input: {
     userId: string;
@@ -98,10 +106,19 @@ const mockGetWorktreeFile =
 
 const mockGetSandboxSelectionOptions =
   jest.fn<(input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>>();
+const mockGetPreviewOptions =
+  jest.fn<
+    (input: {
+      cloudAgentSessionId: string;
+      organizationId?: string;
+    }) => Promise<{ enabled: false } | { enabled: true; hostTemplate: string }>
+  >();
 
 const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   getSandboxSelectionOptions: mockGetSandboxSelectionOptions,
+  getPreviewOptions: mockGetPreviewOptions,
   prepareSession: mockPrepareSession,
+  initiateFromPreparedSession: mockInitiateFromPreparedSession,
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
   getMessageResult: mockGetMessageResult,
@@ -130,6 +147,7 @@ const mockIsFeatureFlagEnabledOrDevelopment =
   jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
 const mockVerifyUserOwnsSessionV2ByCloudAgentId =
   jest.fn<typeof verifyUserOwnsSessionV2ByCloudAgentId>();
+const mockSignPreviewTicket = jest.fn<typeof StreamTicketModule.signPreviewTicket>();
 const mockGetBalanceForUser = jest.fn<(user: User) => Promise<{ balance: number }>>();
 const mockFetchGitHubRepositoriesForUser = jest.fn<
   (
@@ -170,7 +188,9 @@ jest.mock('@/lib/auth/resource-delegation', () => ({
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: mockCreateCloudAgentNextClient,
   createCloudAgentNextClientForModel: mockCreateCloudAgentNextClientForModel,
-  rethrowAsPaymentRequired: jest.fn(),
+  rethrowCloudAgentError: jest.requireActual<typeof CloudAgentClientModule>(
+    '@/lib/cloud-agent-next/cloud-agent-client'
+  ).rethrowCloudAgentError,
 }));
 
 jest.mock('@/lib/cloud-agent-next/worktree-chat', () => ({
@@ -219,6 +239,12 @@ jest.mock('@/lib/cloud-agent/session-ownership', () => ({
   verifyUserOwnsSessionV2ByCloudAgentId: mockVerifyUserOwnsSessionV2ByCloudAgentId,
 }));
 
+jest.mock('@/lib/cloud-agent/stream-ticket', () => {
+  const actual = jest.requireActual<typeof StreamTicketModule>('@/lib/cloud-agent/stream-ticket');
+  mockSignPreviewTicket.mockImplementation(actual.signPreviewTicket);
+  return { ...actual, signPreviewTicket: mockSignPreviewTicket };
+});
+
 let createCaller: (ctx: { user: User; headersList?: Headers }) => {
   getSandboxSelectionOptions: (input: {
     devcontainer?: boolean;
@@ -227,6 +253,7 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     cloudAgentSessionId: string;
     kiloSessionId: string;
   }>;
+  initiateFromPreparedSession: (input: { cloudAgentSessionId: string }) => Promise<unknown>;
   createWorktreeChat: (input: { sourceKiloSessionId: string; operationKey: string }) => Promise<{
     kiloSessionId: string;
     cloudAgentSessionId: string;
@@ -264,6 +291,18 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
   refreshWorktreeChanges: (input: {
     cloudAgentSessionId: string;
   }) => Promise<RefreshWorktreeChangesOutput>;
+  createPreview: (input: {
+    cloudAgentSessionId: `workspace_${string}`;
+    port: number;
+    path?: string;
+  }) => Promise<{
+    url: string;
+    expiresAt: number;
+  }>;
+  getPreviewOptions: (input: {
+    cloudAgentSessionId: `workspace_${string}`;
+    organizationId?: string;
+  }) => Promise<{ enabled: false } | { enabled: true; urlTemplate: string }>;
   checkEligibility: () => Promise<{
     balance: number;
     minBalance: number;
@@ -1366,6 +1405,102 @@ describe('cloudAgentNextRouter.prepareSession', () => {
       expect.objectContaining({ cloneFromKiloSessionId })
     );
   });
+
+  it('forwards cloneUpToMessageId to the Worker', async () => {
+    const caller = createCaller({
+      user: { id: 'user-1', is_admin: false } as User,
+    });
+    const cloneUpToMessageId = 'msg_12345678901212345678901234';
+
+    await caller.prepareSession({
+      cloneFromKiloSessionId: 'ses_12345678901234567890123456',
+      cloneUpToMessageId,
+      autoInitiate: true,
+      operationKey: '12345678-1234-4234-9234-123456789abc',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      devcontainer: false,
+    });
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ cloneUpToMessageId })
+    );
+  });
+});
+
+describe('cloudAgentNextRouter Worker error codes', () => {
+  const procedures = ['prepareSession', 'initiateFromPreparedSession', 'sendMessage'] as const;
+
+  function workerError(code: string, httpStatus: number, message: string) {
+    return new TRPCClientError(message, {
+      result: { error: { code: -32000, message, data: { code, httpStatus } } },
+    });
+  }
+
+  async function callWithWorkerError(
+    procedure: (typeof procedures)[number],
+    error: Error
+  ): Promise<unknown> {
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+    switch (procedure) {
+      case 'prepareSession':
+        mockPrepareSession.mockRejectedValueOnce(error);
+        return caller.prepareSession({
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'kilo/test-model',
+          githubRepo: 'acme/repo',
+          autoInitiate: true,
+        });
+      case 'initiateFromPreparedSession':
+        mockInitiateFromPreparedSession.mockRejectedValueOnce(error);
+        return caller.initiateFromPreparedSession({ cloudAgentSessionId: 'agent_123' });
+      case 'sendMessage':
+        mockSendMessage.mockRejectedValueOnce(error);
+        return caller.sendMessage({
+          cloudAgentSessionId: 'agent_123',
+          payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'kilo/test-model' },
+        });
+    }
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValue({
+      isFree: false,
+      hasUserByokAvailable: false,
+    });
+  });
+
+  describe.each(procedures)('%s', procedure => {
+    it.each([
+      ['BAD_REQUEST', 400, 'Session sandbox cleanup is scheduled'],
+      ['NOT_FOUND', 404, 'Session not found'],
+      ['CONFLICT', 409, 'creation_in_progress'],
+    ])('keeps Worker %s as HTTP %i', async (code, httpStatus, message) => {
+      const error = workerError(code, httpStatus, message);
+
+      const thrown = await callWithWorkerError(procedure, error).catch((e: unknown) => e);
+
+      expect(thrown).toBeInstanceOf(TRPCError);
+      expect(thrown).toMatchObject({ code, message, cause: error });
+      expect(getHTTPStatusCodeFromError(thrown as TRPCError)).toBe(httpStatus);
+    });
+
+    it('keeps a Worker INTERNAL_SERVER_ERROR as HTTP 500', async () => {
+      const error = workerError('INTERNAL_SERVER_ERROR', 500, 'Worker failed');
+
+      const thrown = await callWithWorkerError(procedure, error).catch((e: unknown) => e);
+
+      expect(thrown).toBeInstanceOf(TRPCError);
+      expect(thrown).toMatchObject({ code: 'INTERNAL_SERVER_ERROR', cause: error });
+      expect(getHTTPStatusCodeFromError(thrown as TRPCError)).toBe(500);
+    });
+  });
 });
 
 describe('cloudAgentNextRouter.createWorktreeChat', () => {
@@ -1409,5 +1544,210 @@ describe('cloudAgentNextRouter.createWorktreeChat', () => {
 
     await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(mockCreateWorktreeChat).not.toHaveBeenCalled();
+  });
+});
+
+describe('cloudAgentNextRouter.createPreview', () => {
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const user = { id: 'oauth/preview-owner', is_admin: false } as User;
+  const previousWsUrl = process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL = 'wss://worker.example.com';
+  });
+
+  afterAll(() => {
+    if (previousWsUrl === undefined) delete process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL;
+    else process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL = previousWsUrl;
+  });
+
+  it('mints a 60s entry ticket for an owned session and links to the Worker open hop', async () => {
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    const caller = createCaller({ user });
+
+    const result = await caller.createPreview({ cloudAgentSessionId, port: 5173 });
+
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).toHaveBeenCalledWith(
+      expect.anything(),
+      user.id,
+      cloudAgentSessionId
+    );
+    expect(mockSignPreviewTicket).toHaveBeenCalledWith({
+      userId: user.id,
+      cloudAgentSessionId,
+      port: 5173,
+    });
+
+    const url = new URL(result.url);
+    expect(url.origin).toBe('https://worker.example.com');
+    expect(url.pathname).toBe('/preview/open');
+
+    const ticket = url.searchParams.get('ticket') ?? '';
+    const decoded = jwt.verify(ticket, NEXTAUTH_SECRET, {
+      algorithms: ['HS256'],
+      audience: 'cloud-agent-preview',
+    }) as jwt.JwtPayload & {
+      purpose?: string;
+      userId?: string;
+      cloudAgentSessionId?: string;
+      organizationId?: string;
+      port?: number;
+    };
+    expect(decoded.purpose).toBe('preview');
+    expect(decoded.userId).toBe(user.id);
+    expect(decoded.cloudAgentSessionId).toBe(cloudAgentSessionId);
+    expect(decoded.port).toBe(5173);
+    expect(decoded.organizationId).toBeUndefined();
+    expect(decoded.exp! - decoded.iat!).toBe(60);
+    expect(result.expiresAt).toBe(decoded.exp);
+  });
+
+  it('keeps a local ws worker origin and its port', async () => {
+    process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL = 'ws://localhost:8794';
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    const caller = createCaller({ user });
+
+    const result = await caller.createPreview({ cloudAgentSessionId, port: 5173 });
+
+    expect(new URL(result.url).origin).toBe('http://localhost:8794');
+  });
+
+  it('passes the requested path to the Worker open hop', async () => {
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    const caller = createCaller({ user });
+
+    const result = await caller.createPreview({
+      cloudAgentSessionId,
+      port: 5173,
+      path: '/app page?q=a&b=c#top',
+    });
+
+    expect(new URL(result.url).searchParams.get('path')).toBe('/app page?q=a&b=c#top');
+  });
+
+  it('rejects a path that does not start with /', async () => {
+    const caller = createCaller({ user });
+
+    await expect(
+      caller.createPreview({ cloudAgentSessionId, port: 5173, path: 'https://evil.example/' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockSignPreviewTicket).not.toHaveBeenCalled();
+  });
+
+  it('does not mint a ticket for a session the caller does not own', async () => {
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValue(null);
+    const caller = createCaller({ user });
+
+    await expect(caller.createPreview({ cloudAgentSessionId, port: 5173 })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(mockSignPreviewTicket).not.toHaveBeenCalled();
+  });
+
+  it('fails specifically when the Worker URL is unset', async () => {
+    process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL = '';
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    const caller = createCaller({ user });
+
+    await expect(caller.createPreview({ cloudAgentSessionId, port: 5173 })).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Preview is not configured',
+    });
+  });
+
+  it('rejects an out-of-range port before ownership or ticket minting', async () => {
+    const caller = createCaller({ user });
+
+    await expect(caller.createPreview({ cloudAgentSessionId, port: 80 })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+    expect(mockSignPreviewTicket).not.toHaveBeenCalled();
+  });
+});
+
+describe('cloudAgentNextRouter.getPreviewOptions', () => {
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const previousWsUrl = process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL = 'wss://worker.example.com';
+  });
+
+  afterAll(() => {
+    if (previousWsUrl === undefined) delete process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL;
+    else process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL = previousWsUrl;
+  });
+
+  it('returns disabled when the Worker does not serve preview', async () => {
+    mockGetPreviewOptions.mockResolvedValueOnce({ enabled: false });
+    const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
+
+    await expect(caller.getPreviewOptions({ cloudAgentSessionId })).resolves.toEqual({
+      enabled: false,
+    });
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
+    expect(mockGetPreviewOptions).toHaveBeenCalledWith({
+      cloudAgentSessionId,
+      organizationId: undefined,
+    });
+  });
+
+  it('returns disabled when the Worker call fails', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockGetPreviewOptions.mockRejectedValueOnce(new Error('No procedure found on path'));
+    const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
+
+    await expect(caller.getPreviewOptions({ cloudAgentSessionId })).resolves.toEqual({
+      enabled: false,
+    });
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it('passes the route organization to the Worker gate', async () => {
+    const organizationId = '11111111-1111-4111-8111-111111111111';
+    mockGetPreviewOptions.mockResolvedValueOnce({ enabled: false });
+    const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
+
+    await caller.getPreviewOptions({ cloudAgentSessionId, organizationId });
+    expect(mockGetPreviewOptions).toHaveBeenCalledWith({ cloudAgentSessionId, organizationId });
+  });
+
+  it('puts the Worker host template on the browser-facing Worker scheme', async () => {
+    mockGetPreviewOptions.mockResolvedValueOnce({
+      enabled: true,
+      hostTemplate: 'p{port}-abc.preview.example.com',
+    });
+    const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
+
+    await expect(caller.getPreviewOptions({ cloudAgentSessionId })).resolves.toEqual({
+      enabled: true,
+      urlTemplate: 'https://p{port}-abc.preview.example.com',
+    });
+  });
+
+  it('keeps a local ws worker port in the template', async () => {
+    process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL = 'ws://localhost:8794';
+    mockGetPreviewOptions.mockResolvedValueOnce({
+      enabled: true,
+      hostTemplate: 'p{port}-abc.localhost',
+    });
+    const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
+
+    await expect(caller.getPreviewOptions({ cloudAgentSessionId })).resolves.toEqual({
+      enabled: true,
+      urlTemplate: 'http://p{port}-abc.localhost:8794',
+    });
   });
 });

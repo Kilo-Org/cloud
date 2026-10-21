@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- token-color, truncation, and copy/long-press suites share the direct-invocation CodeBlock harness. */
+/* eslint-disable max-lines -- rendering, truncation, accessibility, and pass-through suites share the CodeBlock harness. */
 import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 
@@ -16,11 +16,12 @@ import { type MonoScrollTextMode } from './mono-scroll-block-model';
 import { tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
 import '@/i18n';
 
-const { useMonoScrollSheetMock, useColorSchemeMock } = vi.hoisted(() => ({
+const { useMonoScrollSheetMock, useColorSchemeMock, platform } = vi.hoisted(() => ({
   useMonoScrollSheetMock: vi.fn<() => { mode: MonoScrollTextMode; track: () => () => void } | null>(
     () => null
   ),
   useColorSchemeMock: vi.fn<() => 'dark' | 'light'>(() => 'light'),
+  platform: { OS: 'android' as 'android' | 'ios' },
 }));
 
 // RNGH ships Flow source that the node project cannot parse, so the horizontal
@@ -29,6 +30,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
   Text: 'RNText',
+  Platform: platform,
   useColorScheme: useColorSchemeMock,
 }));
 vi.mock('react-native-gesture-handler', () => ({
@@ -147,54 +149,6 @@ function truncatedMarkers(root: TestRenderer.ReactTestInstance): TestRenderer.Re
       (node.type as string) === 'Text' &&
       propOf(node, 'accessibilityLabel') === 'Content truncated'
   );
-}
-
-function byTestId(
-  root: TestRenderer.ReactTestInstance,
-  testID: string
-): TestRenderer.ReactTestInstance[] {
-  return root.findAll(node => propOf(node, 'testID') === testID);
-}
-
-function firstByTestId(
-  root: TestRenderer.ReactTestInstance,
-  testID: string
-): TestRenderer.ReactTestInstance {
-  const first = byTestId(root, testID)[0];
-  if (!first) {
-    throw new TypeError(`expected a node with testID ${testID}`);
-  }
-  return first;
-}
-
-function press(instance: TestRenderer.ReactTestInstance): void {
-  const onPress = propOf(instance, 'onPress');
-  if (typeof onPress !== 'function') {
-    throw new TypeError('expected an onPress handler');
-  }
-  (onPress as () => void)();
-}
-
-function longPress(instance: TestRenderer.ReactTestInstance): void {
-  const onLongPress = propOf(instance, 'onLongPress');
-  if (typeof onLongPress !== 'function') {
-    throw new TypeError('expected an onLongPress handler');
-  }
-  (onLongPress as () => void)();
-}
-
-function layout(instance: TestRenderer.ReactTestInstance, width: number, height: number): void {
-  const onLayout = propOf(instance, 'onLayout');
-  if (typeof onLayout !== 'function') {
-    throw new TypeError('expected an onLayout handler');
-  }
-  (
-    onLayout as (event: {
-      nativeEvent: { layout: { x: number; y: number; width: number; height: number } };
-    }) => void
-  )({
-    nativeEvent: { layout: { x: 0, y: 0, width, height } },
-  });
 }
 
 function pressables(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
@@ -323,6 +277,7 @@ function withSheet(
 // colors; the theme suite overrides it per test.
 beforeEach(() => {
   useColorSchemeMock.mockReturnValue('light');
+  platform.OS = 'android';
 });
 
 describe('CodeBlock', () => {
@@ -674,6 +629,35 @@ describe('CodeBlock', () => {
     expect(propOf(parent, 'selectable')).toBe(false);
     await unmount(renderer);
   });
+
+  it('renders an iOS selectable fence as UITextView chunks with colored token spans', async () => {
+    platform.OS = 'ios';
+    const renderer = await mount(blockElement({ code: 'const x = 1;', language: 'typescript' }));
+    const chunks = renderer.root.findAll(
+      node => isMockedStringElement(node, 'UITextView') && propOf(node, 'uiTextView') === true
+    );
+    expect(chunks).toHaveLength(1);
+    expect(propOf(chunks[0], 'selectable')).toBe(true);
+    expect(codeLines(renderer.root)).toHaveLength(0);
+    const spans = renderer.root.findAll(
+      node => isMockedStringElement(node, 'UITextView') && propOf(node, 'uiTextView') !== true
+    );
+    expect(spans.length).toBeGreaterThan(0);
+    expect(spans.map(span => span.props.children as unknown)).toContain('const');
+    await unmount(renderer);
+  });
+
+  it('keeps an iOS non-selectable fence on plain Text', async () => {
+    platform.OS = 'ios';
+    const renderer = await mount(
+      blockElement({ code: 'const x = 1;', language: 'typescript', selectable: false })
+    );
+    expect(renderer.root.findAll(node => isMockedStringElement(node, 'UITextView'))).toHaveLength(
+      0
+    );
+    expect(codeLines(renderer.root)).toHaveLength(1);
+    await unmount(renderer);
+  });
 });
 
 describe('CodeBlock syntax palette follows the color scheme', () => {
@@ -717,167 +701,12 @@ describe('CodeBlock syntax palette follows the color scheme', () => {
   });
 });
 
-describe('CodeBlock copy action', () => {
-  it('renders no copy affordance without an onCopyCode handler', async () => {
-    const renderer = await mount(blockElement());
-    expect(byTestId(renderer.root, 'code-block-copy-trigger')).toHaveLength(0);
-    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(0);
-    await unmount(renderer);
-  });
-
-  it('reveals the copy action on a single tap and hands back the full source', async () => {
-    const onCopyCode = vi.fn<(code: string) => void>();
-    const renderer = await mount(blockElement({ code: 'const x = 1;', onCopyCode }));
-
-    expect(byTestId(renderer.root, 'code-block-copy-trigger')).toHaveLength(1);
-    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(0);
-
-    act(() => {
-      press(firstByTestId(renderer.root, 'code-block-copy-trigger'));
-    });
-    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(1);
-
-    act(() => {
-      press(firstByTestId(renderer.root, 'code-block-copy-action'));
-    });
-    expect(onCopyCode).toHaveBeenCalledWith('const x = 1;');
-    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(0);
-    await unmount(renderer);
-  });
-
-  it('anchors the revealed action to the tap, so a tall fence shows it in view', async () => {
-    const onCopyCode = vi.fn<(code: string) => void>();
-    const renderer = await mount(blockElement({ code: 'x'.repeat(5000), onCopyCode }));
-    const trigger = firstByTestId(renderer.root, 'code-block-copy-trigger');
-    const onPress = propOf(trigger, 'onPress') as (event: {
-      nativeEvent: { locationY: number };
-    }) => void;
-
-    act(() => {
-      onPress({ nativeEvent: { locationY: 1234 } });
-    });
-
-    const action = firstByTestId(renderer.root, 'code-block-copy-action');
-    expect(propOf(action, 'style')).toEqual({ top: 1234 });
-    await unmount(renderer);
-  });
-
-  it('falls back to the block top for a synthetic press with no coordinates', async () => {
-    const onCopyCode = vi.fn<(code: string) => void>();
-    const renderer = await mount(blockElement({ onCopyCode }));
-
-    act(() => {
-      press(firstByTestId(renderer.root, 'code-block-copy-trigger'));
-    });
-
-    const action = firstByTestId(renderer.root, 'code-block-copy-action');
-    expect(propOf(action, 'style')).toEqual({ top: 0 });
-    await unmount(renderer);
-  });
-
-  it('reserves the measured action width as a right gutter on the copy trigger', async () => {
-    const onCopyCode = vi.fn<(code: string) => void>();
-    const renderer = await mount(blockElement({ onCopyCode }));
-    const trigger = firstByTestId(renderer.root, 'code-block-copy-trigger');
-    expect(propOf(trigger, 'style')).toBeUndefined();
-
-    act(() => {
-      layout(firstByTestId(renderer.root, 'code-block-copy-measure'), 96, 28);
-    });
-
-    expect(propOf(firstByTestId(renderer.root, 'code-block-copy-trigger'), 'style')).toEqual({
-      paddingRight: 104,
-    });
-    await unmount(renderer);
-  });
-
-  it('measures the label without leaking a hidden copy button to assistive tech', async () => {
-    const onCopyCode = vi.fn<(code: string) => void>();
-    const renderer = await mount(blockElement({ onCopyCode }));
-    const measure = firstByTestId(renderer.root, 'code-block-copy-measure');
-    expect(propOf(measure, 'accessibilityElementsHidden')).toBe(true);
-    expect(propOf(measure, 'importantForAccessibility')).toBe('no-hide-descendants');
-    expect(propOf(measure, 'pointerEvents')).toBe('none');
-    await unmount(renderer);
-  });
-
-  it('leaves the code at full width without a copy handler', async () => {
-    const renderer = await mount(blockElement());
-    expect(byTestId(renderer.root, 'code-block-copy-measure')).toHaveLength(0);
-    expect(byTestId(renderer.root, 'code-block-copy-trigger')).toHaveLength(0);
-    await unmount(renderer);
-  });
-
-  it('reserves the measured gutter on the scroll-mode trigger so the action clears the glyphs', async () => {
-    const track = vi.fn(() => () => undefined);
-    const onCopyCode = vi.fn<(code: string) => void>();
-    const renderer = await mount(withSheet('scroll', track, blockElement({ onCopyCode })));
-
-    act(() => {
-      layout(firstByTestId(renderer.root, 'code-block-copy-measure'), 72, 28);
-    });
-
-    expect(propOf(firstByTestId(renderer.root, 'code-block-copy-trigger'), 'style')).toEqual({
-      paddingRight: 80,
-    });
-    await unmount(renderer);
-  });
-
-  it('right-aligns the revealed action inside the reserved gutter', async () => {
-    const onCopyCode = vi.fn<(code: string) => void>();
-    const renderer = await mount(blockElement({ onCopyCode }));
-
-    act(() => {
-      press(firstByTestId(renderer.root, 'code-block-copy-trigger'));
-    });
-
-    const action = firstByTestId(renderer.root, 'code-block-copy-action');
-    expect(propOf(action, 'className')).toContain('right-0');
-    await unmount(renderer);
-  });
-
-  it('copies the source before the display cap, not the truncated slice', async () => {
-    const onCopyCode = vi.fn<(code: string) => void>();
-    const full = 'x'.repeat(300);
-    const renderer = await mount(blockElement({ code: full, maxLength: 50, onCopyCode }));
-
-    act(() => {
-      press(firstByTestId(renderer.root, 'code-block-copy-trigger'));
-    });
-    act(() => {
-      press(firstByTestId(renderer.root, 'code-block-copy-action'));
-    });
-    expect(onCopyCode).toHaveBeenCalledWith(full);
-    await unmount(renderer);
-  });
-
-  it('exposes a copy accessibility action on the fence host, selectable or not', async () => {
-    const onCopyCode = vi.fn<(code: string) => void>();
-    const renderer = await mount(blockElement({ onCopyCode }));
-    const hosts = accessibilityHosts(renderer.root);
-    expect(hosts).toHaveLength(1);
-    const onAccessibilityAction = propOf(hosts[0], 'onAccessibilityAction');
-    expect(typeof onAccessibilityAction).toBe('function');
-
-    act(() => {
-      (onAccessibilityAction as (event: { nativeEvent: { actionName: string } }) => void)({
-        nativeEvent: { actionName: 'copyCode' },
-      });
-    });
-    expect(onCopyCode).toHaveBeenCalledWith('const x = 1;');
-    await unmount(renderer);
-  });
-
-  it('carries the copy action on one accessible host, not on every chunk Text', async () => {
-    // Regression: a `Text` per line was one accessibility element per line on
-    // iOS, so screen-reader navigation went from one element per fence to N.
-    // The chunks stay non-accessible and the fence exposes a single host that
-    // reads the code and offers the action once.
-    const onCopyCode = vi.fn<(code: string) => void>();
+describe('CodeBlock accessibility', () => {
+  it('keeps one accessible host, not one per chunk Text', async () => {
     const code = Array.from({ length: 40 }, (_, index) => `const value${index} = ${index};`).join(
       '\n'
     );
-    const renderer = await mount(blockElement({ code, selectable: false, onCopyCode }));
+    const renderer = await mount(blockElement({ code, selectable: false }));
     const chunks = codeLines(renderer.root);
     expect(chunks.length).toBeGreaterThan(1);
     for (const chunk of chunks) {
@@ -887,113 +716,30 @@ describe('CodeBlock copy action', () => {
 
     const hosts = accessibilityHosts(renderer.root);
     expect(hosts).toHaveLength(1);
-    const onAccessibilityAction = propOf(hosts[0], 'onAccessibilityAction');
-    expect(typeof onAccessibilityAction).toBe('function');
-    act(() => {
-      (onAccessibilityAction as (event: { nativeEvent: { actionName: string } }) => void)({
-        nativeEvent: { actionName: 'copyCode' },
-      });
-    });
-    expect(onCopyCode).toHaveBeenCalledWith(code);
+    expect(propOf(hosts[0], 'onAccessibilityAction')).toBeUndefined();
     await unmount(renderer);
   });
 
-  it('keeps a non-selectable fence one accessibility element without a copy handler', async () => {
+  it('keeps a non-selectable fence one accessibility element', async () => {
     const renderer = await mount(blockElement({ selectable: false }));
     const hosts = accessibilityHosts(renderer.root);
     expect(hosts).toHaveLength(1);
     expect(propOf(hosts[0], 'accessibilityActions')).toBeUndefined();
     await unmount(renderer);
   });
-
-  it('offers no copy action for an empty fence', async () => {
-    const onCopyCode = vi.fn<(code: string) => void>();
-    const renderer = await mount(blockElement({ code: '', onCopyCode }));
-    expect(byTestId(renderer.root, 'code-block-copy-trigger')).toHaveLength(0);
-    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(0);
-    await unmount(renderer);
-  });
-
-  it('hides a revealed action when the code changes', async () => {
-    const onCopyCode = vi.fn<(code: string) => void>();
-    const renderer = await mount(blockElement({ code: 'first', onCopyCode }));
-    act(() => {
-      press(firstByTestId(renderer.root, 'code-block-copy-trigger'));
-    });
-    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(1);
-
-    act(() => {
-      renderer.update(blockElement({ code: 'second', onCopyCode }));
-    });
-    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(0);
-    await unmount(renderer);
-  });
 });
 
-describe('CodeBlock copy trigger long-press forwarding', () => {
-  it('forwards a long press on the trigger instead of revealing the action', async () => {
-    const onCopyCode = vi.fn<(code: string) => void>();
-    const onLongPressCode = vi.fn<() => void>();
-    const renderer = await mount(blockElement({ onCopyCode, onLongPressCode }));
-    const trigger = firstByTestId(renderer.root, 'code-block-copy-trigger');
-
-    act(() => {
-      longPress(trigger);
-    });
-
-    expect(onLongPressCode).toHaveBeenCalledTimes(1);
-    expect(onCopyCode).not.toHaveBeenCalled();
-    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(0);
-    await unmount(renderer);
-  });
-
-  it('hides a revealed action when a long press opens message details', async () => {
-    const onCopyCode = vi.fn<(code: string) => void>();
-    const onLongPressCode = vi.fn<() => void>();
-    const renderer = await mount(blockElement({ onCopyCode, onLongPressCode }));
-    const trigger = firstByTestId(renderer.root, 'code-block-copy-trigger');
-
-    act(() => {
-      press(trigger);
-    });
-    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(1);
-
-    act(() => {
-      longPress(trigger);
-    });
-
-    expect(onLongPressCode).toHaveBeenCalledTimes(1);
-    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(0);
-    await unmount(renderer);
-  });
-
-  it('mounts no responder wrapper without a copy handler', async () => {
+describe('CodeBlock long-press pass-through', () => {
+  it('mounts no responder wrapper in wrap mode', async () => {
     const renderer = await mount(blockElement());
     expect(pressables(renderer.root)).toHaveLength(0);
     await unmount(renderer);
   });
 
-  it('mounts no responder wrapper without a copy handler in sheet scroll mode', async () => {
+  it('mounts no responder wrapper in sheet scroll mode', async () => {
     const track = vi.fn(() => () => undefined);
     const renderer = await mount(withSheet('scroll', track, blockElement()));
     expect(pressables(renderer.root)).toHaveLength(0);
-    await unmount(renderer);
-  });
-
-  it('forwards a long press on the scroll-mode trigger', async () => {
-    const track = vi.fn(() => () => undefined);
-    const onCopyCode = vi.fn<(code: string) => void>();
-    const onLongPressCode = vi.fn<() => void>();
-    const renderer = await mount(
-      withSheet('scroll', track, blockElement({ onCopyCode, onLongPressCode }))
-    );
-    const trigger = firstByTestId(renderer.root, 'code-block-copy-trigger');
-
-    act(() => {
-      longPress(trigger);
-    });
-
-    expect(onLongPressCode).toHaveBeenCalledTimes(1);
     await unmount(renderer);
   });
 });

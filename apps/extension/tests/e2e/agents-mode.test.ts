@@ -19,10 +19,6 @@ import {
 } from './agents-fixture';
 import type { AgentsFixtureOptions } from './agents-fixture';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const setupAgentsTest = async (mockOptions?: AgentsFixtureOptions) => {
   const fixture = await startFixtureServer();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -55,21 +51,15 @@ const setupAgentsTest = async (mockOptions?: AgentsFixtureOptions) => {
   };
 };
 
-// ---------------------------------------------------------------------------
-// 1. Mode switch is visible, Agents persists through reload, Browser usable
-// ---------------------------------------------------------------------------
-
 test('Agents mode tab is visible and can switch between modes', async () => {
   const { cleanup, getSidePanel } = await setupAgentsTest();
   try {
     const sidePanel = await getSidePanel();
 
-    // Default is Browser mode
     await expect(sidePanel.getByRole('tab', { name: 'Browser', selected: true })).toBeVisible();
     await expect(sidePanel.getByRole('tab', { name: 'Agents' })).toBeVisible();
     await expect(sidePanel.getByLabel('Message agent')).toBeVisible();
 
-    // Switch to Agents mode
     await navigateToAgentsMode(sidePanel);
     await expect(sidePanel.getByRole('button', { exact: true, name: 'New session' })).toBeVisible();
     await expect(sidePanel.getByLabel('Message agent')).toBeHidden();
@@ -103,10 +93,6 @@ test('Agents mode persists active state through side panel reload', async () => 
   }
 });
 
-// ---------------------------------------------------------------------------
-// 2. List: empty, populated, and retryable error
-// ---------------------------------------------------------------------------
-
 test('Agents list shows empty state when no sessions exist', async () => {
   const { cleanup, getSidePanel } = await setupAgentsTest({
     activeSessions: [],
@@ -133,7 +119,6 @@ test('Agents list shows populated active and history sessions', async () => {
     const sidePanel = await getSidePanel();
     await navigateToAgentsMode(sidePanel);
 
-    // Active section
     await expect(sidePanel.getByText('Fix login bug')).toBeVisible();
     await expect(sidePanel.getByText('Running')).toBeVisible();
     // Platform markers: cloud icon on the cloud row, terminal icon on the CLI row.
@@ -175,10 +160,6 @@ test('Agents active list shows retryable error and recovers', async () => {
     await cleanup();
   }
 });
-
-// ---------------------------------------------------------------------------
-// 3. Open cloud session: transcript/stream; send; interrupt; permission & question
-// ---------------------------------------------------------------------------
 
 test('Agents opens a cloud session and streams the transcript', async () => {
   const { cleanup, getSidePanel } = await setupAgentsTest();
@@ -379,10 +360,6 @@ test('Agents cloud session shows permission card and can respond', async () => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// 4. Open remote CLI session (interactive) and history session (read-only)
-// ---------------------------------------------------------------------------
-
 test('Agents opens an active remote CLI session and shows interactive controls', async () => {
   const { cleanup, getSidePanel } = await setupAgentsTest({
     activeSessions: [DEFAULT_REMOTE_SESSION],
@@ -393,7 +370,6 @@ test('Agents opens an active remote CLI session and shows interactive controls',
     const sidePanel = await getSidePanel();
     await navigateToAgentsMode(sidePanel);
 
-    // Active section shows the remote session
     await expect(sidePanel.getByText('Deploy to staging')).toBeVisible();
 
     // Open the remote session
@@ -425,10 +401,6 @@ test('Agents opens a historical-only session and shows read-only state', async (
     await cleanup();
   }
 });
-
-// ---------------------------------------------------------------------------
-// 5. Create session: happy path and 402/insufficient credits
-// ---------------------------------------------------------------------------
 
 test('Agents new session shows the create form and navigates to the new session on success', async () => {
   const { cleanup, getSidePanel } = await setupAgentsTest();
@@ -522,12 +494,6 @@ test('Agents new session shows credits error (402) with Add credits CTA', async 
     await cleanup();
   }
 });
-
-// ---------------------------------------------------------------------------
-// 6. Feature matrix — history errors, session-load retry, prepare retry, CLI
-//    Spawn, PR link, working indicator, queued send, auto-scroll, offline
-//    Grace, GitHub not connected
-// ---------------------------------------------------------------------------
 
 test('Agents history list shows retryable error and recovers', async () => {
   const { cleanup, getSidePanel } = await setupAgentsTest({

@@ -161,8 +161,7 @@ function renderToolbar(
   TestRenderer.act(() => {
     ref.current = TestRenderer.create(
       createElement(ChatToolbar, {
-        mode: 'code',
-        onModeChange: vi.fn<(mode: string) => void>(),
+        modeControl: { mode: 'code', onModeChange: vi.fn<(mode: string) => void>() },
         model,
         variant: 'low',
         modelOptions,
@@ -230,6 +229,17 @@ describe('ChatToolbar long model name', () => {
     expect(toolbarRow).toBeDefined();
     expect(toolbarRow?.props.className).toContain('flex-row');
     expect(toolbarRow?.props.className).not.toContain('flex-wrap');
+  });
+
+  it('draws no mode chip without a mode control and keeps the paste button on the model line', () => {
+    const renderer = renderToolbar(undefined, undefined, { modeControl: undefined });
+    const modelChip = findPressable(renderer, label => label.startsWith(LONG_MODEL_NAME));
+    const pasteButton = findPressable(renderer, label => label === 'Paste from clipboard');
+
+    expect(findPressable(renderer, label => label.startsWith('Mode: '))).toBeUndefined();
+    expect(modelChip).toBeDefined();
+    expect(pasteButton).toBeDefined();
+    expect(nearestSharedAncestor(modelChip, pasteButton)?.props.className).toContain('flex-row');
   });
 
   it('hands the full model name to the chip label, never a pre-shortened string', () => {

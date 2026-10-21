@@ -1,4 +1,9 @@
+import { preinstalledStartup } from './preinstalled-startup.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  ContainerCapacityUnavailableError,
+  ContainerConcurrencyLimitError,
+} from '../container-concurrency.js';
 import {
   parseSandboxBillingInput,
   type MeteredSandboxInstance,
@@ -6,10 +11,20 @@ import {
 } from '../container-usage-context.js';
 import type { SandboxContainers } from '../sandbox-containers/SandboxContainers.js';
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
-import { VercelSandboxRestError } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import {
+  VercelSandboxRestError,
+  type VercelSandboxCreateEnvelope,
+} from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { createCloudflareProviderAdapter } from './cloudflare-provider.js';
 import { createCloudflareContainersProviderAdapter } from './cloudflare-containers-provider.js';
-import { createVercelProviderAdapter } from './vercel-provider.js';
+import { createControlPlaneCredential } from './managed-credential.js';
+import { buildControlNetworkPolicy, type SessionCredentialGrant } from './session-credentials.js';
+import {
+  createVercelProviderAdapter,
+  decodeVercelProviderRef,
+  encodeVercelProviderRef,
+  type VercelControlRestClient,
+} from './vercel-provider.js';
 import {
   ProviderCreationError,
   type ProviderAdapter,
@@ -65,7 +80,128 @@ function cloudflareProvider(
 
 afterEach(() => vi.unstubAllGlobals());
 
+describe('native egress policy forwarding', () => {
+  it.each([
+    { egressAllowlist: undefined },
+    { egressAllowlist: [] },
+    { egressAllowlist: ['agent.example.com', 'github.com'] },
+  ])(
+    'preserves policy across initial and fallback launch: $egressAllowlist',
+    async ({ egressAllowlist }) => {
+      const launchWrapper = vi.fn().mockResolvedValue({ started: true, startSource: 'image' });
+      const container = {
+        launchWrapper,
+        ensureLeaseAtLeast: vi.fn().mockResolvedValue(undefined),
+      };
+      const provider = createCloudflareContainersProviderAdapter({
+        logicalSandboxId: SANDBOX_ID,
+        allocationName: SANDBOX_ID,
+        egressAllowlist,
+        getContainer: () => container as unknown as DurableObjectStub<SandboxContainers>,
+      });
+      const created = await provider.create({ intentId: 'egress-attempt', createdAt: 0 });
+      if ('unresolved' in created) throw new Error('Expected provider reference');
+      await provider.launch(created.providerRef, {
+        command: preinstalledStartup(),
+        env: {
+          SANDBOX_CONTROL_URL: 'wss://agent.example.com',
+        },
+      });
+      await provider.launch(
+        created.providerRef,
+        { command: preinstalledStartup(), env: {} },
+        { skipRepository: true }
+      );
+      for (const [input] of launchWrapper.mock.calls) {
+        if (egressAllowlist === undefined) expect(input).not.toHaveProperty('egressAllowlist');
+        else expect(input.egressAllowlist).toEqual(egressAllowlist);
+      }
+    }
+  );
+});
+
 describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation causes', kind => {
+  it('retries shadow billing configuration with a fresh handle and unchanged attribution', async () => {
+    const error = Object.assign(new Error('Durable Object reset'), { retryable: true });
+    const failed = {
+      isBillingBlocked: vi.fn().mockResolvedValue(false),
+      configureBilling: vi.fn().mockRejectedValue(error),
+    };
+    const recovered = { configureBilling: vi.fn().mockResolvedValue(undefined) };
+    const resolveHandle = vi
+      .fn()
+      .mockReturnValueOnce(failed)
+      .mockReturnValueOnce(failed)
+      .mockReturnValue(recovered);
+    const provider =
+      kind === 'cloudflare'
+        ? createCloudflareProviderAdapter({
+            sandboxId: SANDBOX_ID,
+            getSandbox: resolveHandle,
+            destroy: async () => {},
+          })
+        : createCloudflareContainersProviderAdapter({
+            logicalSandboxId: SANDBOX_ID,
+            allocationName: SANDBOX_ID,
+            getContainer: resolveHandle,
+          });
+
+    await expect(
+      provider.create({ ...intent, billing: { ...billing, enforcementRequested: false } })
+    ).resolves.toMatchObject({ providerRef: expect.any(String) });
+
+    expect(resolveHandle).toHaveBeenCalledTimes(3);
+    expect(failed.configureBilling).toHaveBeenCalledOnce();
+    expect(recovered.configureBilling).toHaveBeenCalledOnce();
+    expect(recovered.configureBilling.mock.calls[0]).toEqual(failed.configureBilling.mock.calls[0]);
+  });
+
+  it.each([
+    { flags: { retryable: true }, attempts: 3 },
+    { flags: { retryable: false }, attempts: 1 },
+    { flags: { overloaded: true }, attempts: 1 },
+  ])(
+    'propagates shadow configuration failure after $attempts attempts: $flags',
+    async ({ flags, attempts }) => {
+      const error = Object.assign(new Error('Billing configuration failed'), flags);
+      const configureBilling = vi.fn().mockRejectedValue(error);
+      const resolveHandle = vi.fn(() => ({
+        isBillingBlocked: async () => false,
+        configureBilling,
+      }));
+      const provider =
+        kind === 'cloudflare'
+          ? createCloudflareProviderAdapter({
+              sandboxId: SANDBOX_ID,
+              getSandbox: () => resolveHandle() as unknown as MeteredSandboxInstance,
+              destroy: async () => {},
+            })
+          : createCloudflareContainersProviderAdapter({
+              logicalSandboxId: SANDBOX_ID,
+              allocationName: SANDBOX_ID,
+              getContainer: () =>
+                resolveHandle() as unknown as DurableObjectStub<SandboxContainers>,
+            });
+
+      await expect(
+        provider.create({ ...intent, billing: { ...billing, enforcementRequested: false } })
+      ).rejects.toBe(error);
+
+      expect(configureBilling).toHaveBeenCalledTimes(attempts);
+      expect(resolveHandle).toHaveBeenCalledTimes(attempts + 1);
+    }
+  );
+
+  it.each([
+    new ContainerConcurrencyLimitError('personal', 20),
+    new ContainerCapacityUnavailableError(),
+  ])('preserves RPC-wrapped capacity failure: %s', async failure => {
+    const denial = new Error(`remote RPC: ${failure.message}`);
+    const provider = cloudflareProvider(kind, async () => {
+      throw denial;
+    });
+    await expect(provider.create(intent)).rejects.toBe(denial);
+  });
   it.each(['insufficient_credits', 'stopping', 'meter_unavailable'] as const)(
     'preserves %s independently of unsafe provider text',
     async code => {
@@ -123,7 +259,10 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
 
 describe('Vercel creation causes', () => {
   it('classifies missing local configuration without a provider request', async () => {
-    const provider = createVercelProviderAdapter({ sandboxName: SANDBOX_ID });
+    const provider = createVercelProviderAdapter({
+      sandboxName: SANDBOX_ID,
+      readContainedGrants: async () => [],
+    });
     await expect(provider.create(intent)).rejects.toMatchObject({
       code: 'invalid_configuration',
       permanentReason: 'invalid_configuration',
@@ -140,6 +279,7 @@ describe('Vercel creation causes', () => {
     const provider = createVercelProviderAdapter({
       sandboxName: SANDBOX_ID,
       config: invalidConfig,
+      readContainedGrants: async () => [],
     });
     await expect(provider.create(intent)).rejects.toMatchObject({
       code: 'invalid_configuration',
@@ -157,7 +297,11 @@ describe('Vercel creation causes', () => {
           new Response('insufficient credits invalid configuration raw-detail', { status })
         );
       vi.stubGlobal('fetch', request);
-      const provider = createVercelProviderAdapter({ sandboxName: SANDBOX_ID, config });
+      const provider = createVercelProviderAdapter({
+        sandboxName: SANDBOX_ID,
+        config,
+        readContainedGrants: async () => [],
+      });
       const error = await provider.create(intent).catch((error: unknown) => error);
       expect(error).toBeInstanceOf(VercelSandboxRestError);
       expect(error).toMatchObject({ kind: 'request_failed', status });
@@ -172,7 +316,239 @@ describe('Vercel creation causes', () => {
         .fn<typeof fetch>()
         .mockRejectedValue(new Error('insufficient credits invalid configuration'))
     );
-    const provider = createVercelProviderAdapter({ sandboxName: SANDBOX_ID, config });
+    const provider = createVercelProviderAdapter({
+      sandboxName: SANDBOX_ID,
+      config,
+      readContainedGrants: async () => [],
+    });
     await expect(provider.create(intent)).rejects.toMatchObject({ kind: 'request_failed' });
+  });
+});
+
+describe('Vercel runtime metadata', () => {
+  it.each(
+    ['create', 'recover'].flatMap(operation =>
+      [
+        { region: 'iad1', sourceSnapshotId: 'observed-snapshot', validMetadata: true },
+        { region: 'iad1', sourceSnapshotId: undefined, validMetadata: true },
+        { region: '', sourceSnapshotId: 'observed-snapshot', validMetadata: false },
+        { region: 'x'.repeat(129), sourceSnapshotId: undefined, validMetadata: false },
+        { region: 'iad1', sourceSnapshotId: 'x'.repeat(129), validMetadata: false },
+      ].map(metadata => ({ operation, ...metadata }))
+    )
+  )(
+    'keeps runtime identity usable on $operation with validMetadata=$validMetadata, region=$region, snapshot=$sourceSnapshotId',
+    async ({ operation, sourceSnapshotId, region, validMetadata }) => {
+      const envelope: VercelSandboxCreateEnvelope = {
+        sandbox: {} as never,
+        session: {
+          id: 'physical-session',
+          sourceSandboxName: SANDBOX_ID,
+          projectId: config.projectId,
+          ...(sourceSnapshotId === undefined ? {} : { sourceSnapshotId }),
+          runtime: config.runtime,
+          status: 'running',
+          memory: 4096,
+          vcpus: 2,
+          region,
+          timeout: config.initialTimeoutMs,
+          requestedAt: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          cwd: '/',
+        },
+        runtime: { sandboxName: SANDBOX_ID, sessionId: 'physical-session' },
+        routes: [],
+      };
+      const restClient = {
+        createSandbox: vi
+          .fn<VercelControlRestClient['createSandbox']>()
+          .mockResolvedValue(envelope),
+        inspectByName: vi
+          .fn<VercelControlRestClient['inspectByName']>()
+          .mockResolvedValue(envelope),
+        getSession: vi.fn<VercelControlRestClient['getSession']>().mockResolvedValue({
+          session: { ...envelope.session, region: 'sfo1', sourceSnapshotId: 'later-snapshot' },
+          routes: [],
+        }),
+        stopSession: vi.fn<VercelControlRestClient['stopSession']>().mockResolvedValue({
+          ...envelope.session,
+          status: 'stopped',
+        }),
+        executeCommand: vi.fn<VercelControlRestClient['executeCommand']>(),
+        extendSessionTimeout: vi.fn<VercelControlRestClient['extendSessionTimeout']>(),
+        readFile: vi.fn<VercelControlRestClient['readFile']>(),
+        updateNetworkPolicy: vi.fn<VercelControlRestClient['updateNetworkPolicy']>(),
+      };
+      const billingLifetimeSink = vi.fn();
+      const provider = createVercelProviderAdapter({
+        sandboxName: SANDBOX_ID,
+        config,
+        restClient,
+        billingLifetimeSink,
+        readContainedGrants: async () => [],
+      });
+      const result =
+        operation === 'create'
+          ? await provider.create(intent)
+          : await provider.observe(null, intent);
+      if (!('providerRef' in result) || result.providerRef === undefined) {
+        throw new Error('Provider did not resolve the physical session');
+      }
+      const { providerRef } = result;
+      const expectedSnapshot = validMetadata
+        ? (sourceSnapshotId ?? config.snapshotId)
+        : config.snapshotId;
+      expect(decodeVercelProviderRef(providerRef)).toEqual({
+        ...envelope.runtime,
+        ...(validMetadata
+          ? {
+              metadata: {
+                region,
+                instanceType: 'small',
+                ...(sourceSnapshotId === undefined ? {} : { sourceSnapshotId }),
+              },
+            }
+          : {}),
+      });
+      expect(provider.describeRuntime?.(providerRef)).toEqual({
+        provider: 'vercel',
+        sandboxId: SANDBOX_ID,
+        instanceId: 'physical-session',
+        ...(validMetadata ? { region, instanceType: 'small' } : {}),
+        snapshotId: expectedSnapshot,
+        runtimeBuildId: config.runtimeBuildId,
+        startSource: 'snapshot',
+      });
+      expect(restClient.createSandbox).toHaveBeenCalledTimes(operation === 'create' ? 1 : 0);
+      expect(restClient.inspectByName).toHaveBeenCalledTimes(operation === 'recover' ? 1 : 0);
+      expect(restClient.getSession).not.toHaveBeenCalled();
+      if (operation === 'create') {
+        expect(restClient.createSandbox).toHaveBeenCalledWith(
+          expect.objectContaining({ snapshotId: config.snapshotId })
+        );
+      } else {
+        expect(restClient.inspectByName).toHaveBeenCalledWith(
+          expect.objectContaining({ snapshotId: config.snapshotId })
+        );
+      }
+      expect(
+        await provider.launch(providerRef, { command: preinstalledStartup(), env: {} })
+      ).toEqual({ startSource: 'image' });
+      expect(restClient.executeCommand).toHaveBeenCalledOnce();
+      expect(await provider.observe(providerRef, intent)).toEqual({ status: 'active' });
+      expect(await provider.stop(providerRef, intent)).toBe('terminal');
+      expect(restClient.stopSession).toHaveBeenCalledOnce();
+      expect(billingLifetimeSink.mock.calls.map(([evidence]) => evidence.providerRef)).toEqual([
+        providerRef,
+        providerRef,
+        providerRef,
+      ]);
+      expect(provider.describeRuntime?.(providerRef)?.region).toBe(
+        validMetadata ? region : undefined
+      );
+      expect(provider.describeRuntime?.(providerRef)?.snapshotId).toBe(expectedSnapshot);
+    }
+  );
+
+  it('reads old refs without metadata using the configured snapshot and no region', () => {
+    const provider = createVercelProviderAdapter({
+      sandboxName: SANDBOX_ID,
+      config,
+      readContainedGrants: async () => [],
+    });
+    const oldRef = { sandboxName: SANDBOX_ID, sessionId: 'physical-session' };
+    expect(decodeVercelProviderRef(encodeVercelProviderRef(oldRef))).toEqual(oldRef);
+    expect(provider.describeRuntime?.(encodeVercelProviderRef(oldRef))).toEqual({
+      provider: 'vercel',
+      sandboxId: SANDBOX_ID,
+      instanceId: 'physical-session',
+      snapshotId: config.snapshotId,
+      runtimeBuildId: config.runtimeBuildId,
+      startSource: 'snapshot',
+    });
+  });
+});
+
+// A minimal but schema-valid contained Vercel grant with a bound runtime-proxy
+// handle. The builder validates it, so this also guards the adapter wiring
+// against a policy shape drift.
+function containedGrantWithProxy(): SessionCredentialGrant {
+  const sessionId = 'workspace_11111111-1111-4111-8111-111111111111';
+  const kiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const targets = {
+    backendBaseUrl: 'https://worker.example.com',
+    providerBaseUrl: 'https://worker.example.com',
+    sessionIngestBaseUrl: 'https://worker.example.com',
+  };
+  return {
+    version: 1,
+    containmentEnabled: true,
+    scopeId: 'scope-1',
+    sandboxId: SANDBOX_ID,
+    directory: '/workspace/test',
+    userId: 'user-1',
+    provider: 'vercel',
+    outboundContainerId: 'outbound-1',
+    members: [{ sessionId, kiloSessionId }],
+    kilo: {
+      alias: createControlPlaneCredential(SANDBOX_ID, 'kilo'),
+      token: 'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln',
+      targets,
+      runtimeProxy: { targets, members: [{ sessionId, kiloSessionId, handle: 'handle_test' }] },
+      capabilities: {},
+    },
+    preparedAt: 1_000,
+    expiresAt: 1_000 + 60_000,
+  };
+}
+
+describe('Vercel contained-credential policy wiring', () => {
+  async function createBodyFor(grants: readonly SessionCredentialGrant[]): Promise<unknown> {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('provider error', { status: 500 }));
+    vi.stubGlobal('fetch', request);
+    const provider = createVercelProviderAdapter({
+      sandboxName: SANDBOX_ID,
+      config,
+      readContainedGrants: async () => grants,
+    });
+    await provider.create(intent).catch(() => undefined);
+    const call = request.mock.calls[0];
+    if (call === undefined) throw new Error('provider create did not issue a request');
+    const body = call[1]?.body;
+    if (typeof body !== 'string') throw new Error('provider create body was not a string');
+    return JSON.parse(body);
+  }
+
+  it('builds the create policy from the reader grants, including a runtime-proxy handle', async () => {
+    const grant = containedGrantWithProxy();
+    const body = (await createBodyFor([grant])) as { networkPolicy: unknown };
+    expect(body.networkPolicy).toEqual(buildControlNetworkPolicy([grant]));
+    expect(JSON.stringify(body.networkPolicy)).toContain('handle_test');
+  });
+
+  it('creates with unrestricted egress and no credential injections for an empty grant set', async () => {
+    const body = (await createBodyFor([])) as {
+      networkPolicy: { allowedDomains: string[]; injectionRules: unknown[] };
+    };
+    expect(body.networkPolicy).toEqual(buildControlNetworkPolicy([]));
+    expect(body.networkPolicy.allowedDomains).toEqual(['*']);
+    expect(body.networkPolicy.injectionRules).toEqual([]);
+  });
+
+  it('never calls the provider when the grants reader fails', async () => {
+    const request = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', request);
+    const provider = createVercelProviderAdapter({
+      sandboxName: SANDBOX_ID,
+      config,
+      readContainedGrants: async () => {
+        throw new Error('grants unavailable');
+      },
+    });
+    await expect(provider.create(intent)).rejects.toThrow('grants unavailable');
+    expect(request).not.toHaveBeenCalled();
   });
 });

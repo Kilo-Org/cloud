@@ -122,9 +122,21 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       variant: input.variant,
     },
     repository,
-    runtime: input.sandboxAllocation ? { sandboxAllocation: input.sandboxAllocation } : undefined,
+    runtime:
+      input.sandboxAllocation !== undefined ||
+      input.egressMode !== undefined ||
+      input.egressAllowlist !== undefined
+        ? {
+            sandboxAllocation: input.sandboxAllocation,
+            egressMode: input.egressMode,
+            egressAllowlist: input.egressAllowlist,
+          }
+        : undefined,
     clone: input.cloneFromKiloSessionId
-      ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
+      ? {
+          cloneFromKiloSessionId: input.cloneFromKiloSessionId,
+          ...(input.cloneUpToMessageId ? { cloneUpToMessageId: input.cloneUpToMessageId } : {}),
+        }
       : undefined,
     profile: {
       id: input.profileId,
@@ -151,6 +163,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       clientProvenance: input.clientProvenance,
       shallow: input.shallow,
       operationKey: input.operationKey,
+      kiloSessionId: 'kiloSessionId' in input ? input.kiloSessionId : undefined,
     },
   };
 }

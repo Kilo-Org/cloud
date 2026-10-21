@@ -50,13 +50,7 @@ vi.mock('@/lib/trpc', () => {
         queryKey: (input: unknown) => [['activeSessions', 'list'], { input, type: 'query' }],
       },
     },
-    cliSessionsV2: {
-      getSessionMessages: {
-        queryOptions: (input: { session_id: string }) => ({
-          queryKey: ['transcript', input.session_id],
-        }),
-      },
-    },
+    cliSessionsV2: {},
   };
   return { useTRPC: () => trpc };
 });
@@ -83,7 +77,10 @@ vi.mock('@/components/agents/session-platform-icon', () => ({
   SessionPlatformIcon: () => null,
 }));
 vi.mock('@/components/agents/remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn().mockResolvedValue(true),
+  useRemoteSessionExitConfirmation: () => ({
+    confirmExit: vi.fn().mockResolvedValue(true),
+    exitDialog: null,
+  }),
 }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: vi.fn(), success: vi.fn() },
@@ -392,7 +389,8 @@ describe('RemoteSessionRow long-press preview', () => {
       pressableProps().onPressIn?.();
     });
     expect(prefetchSessionTranscript).toHaveBeenCalledWith(client, {
-      queryKey: ['transcript', 'a1'],
+      queryKey: ['session-transcript-page', 'a1'],
+      queryFn: expect.any(Function),
     });
   });
 

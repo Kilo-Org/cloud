@@ -7,11 +7,19 @@
     "dev": "wrangler dev --env staging",
     "types": "wrangler types --include-runtime=false --env-interface CloudflareEnv worker-configuration.d.ts",
     "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/usage-ingest/src"
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/usage-ingest/src",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "wrangler": "catalog:"
+    "wrangler": "catalog:",
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dependencies": {
+    "@kilocode/encryption": "workspace:*",
+    "@kilocode/usage-contracts": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*"
   }
 }

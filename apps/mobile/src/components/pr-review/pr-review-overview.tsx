@@ -14,6 +14,7 @@ import { MarkdownText } from '@/components/agents/markdown-text';
 import { PrOverviewMeta } from '@/components/pr-review/pr-review-meta-parts';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { PrMergeSection } from '@/components/pr-review/merge/pr-merge-section';
 import { PrMergeSectionProvider } from '@/components/pr-review/merge/pr-merge-section-provider';
 import {
@@ -136,7 +137,16 @@ export function PrReviewOverview({
               <Button className="mt-3 w-full" onPress={handleInstallApp}>
                 <Text>{t('prReview.installKiloGitHubApp')}</Text>
               </Button>
-            ) : null
+            ) : (
+              // GitLab folds its connection failures (no integration, inactive
+              // integration) into the same NOT_FOUND a deleted merge request
+              // produces, so this state cannot be terminal: retry the read and
+              // offer the provider connection check alongside it.
+              <PrReviewUnavailableActions
+                onRetry={() => void pr.refetch()}
+                isRetrying={pr.isFetching}
+              />
+            )
           }
         />
       );
@@ -248,12 +258,7 @@ export function PrReviewOverview({
           headRepoFullName={data.headRepoFullName}
           isCrossRepo={data.isCrossRepo}
         />
-        <PrCountsLine
-          commits={data.counts.commits}
-          changedFiles={data.counts.changedFiles}
-          additions={data.counts.additions}
-          deletions={data.counts.deletions}
-        />
+        <PrCountsLine commits={data.counts.commits} changedFiles={data.counts.changedFiles} />
       </View>
 
       <PrOverviewMeta overview={data} />

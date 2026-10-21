@@ -17,7 +17,6 @@ import { getNewAgentSessionPath } from '@/components/agents/session-list-routes'
 import { DestinationOptionRow } from '@/components/destination-option-row';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -185,15 +184,13 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     ]
   );
 
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const reviewPr = useMemo(
     () =>
       selectShareReviewPr({
         text: payload?.text ?? '',
-        prReviewEnabled,
         showNewSession: state.showNewSession,
       }),
-    [payload?.text, prReviewEnabled, state.showNewSession]
+    [payload?.text, state.showNewSession]
   );
 
   const instanceRows = useMemo(

@@ -47,6 +47,12 @@ System One model (default `typesafe/jev-1.13`) served by OpenRouter `/systemone`
 it returns typed answers, so there is no output parsing or heuristic fallback.
 A failed classification yields a null decision.
 
+Ordinary requests prepare classifier metadata and cache reads while loading owner settings, model capabilities, and the routing table.
+On a cache miss, inference overlaps those independent reads.
+Active coding plans resolve constrained eligibility before any paid classification.
+The six-question payload, cache identity, analytics, billing, and sticky decisions remain unchanged.
+
+
 ## Invariants (what not to change without revisiting this ADR)
 
 1. **The benchmark worker is the only writer of routing tables and the classifier
@@ -63,16 +69,19 @@ A failed classification yields a null decision.
    fallback; publish
    with any empty tier → skipped, previous table stays live. An
    `efficient` request must never degrade *below* balanced.
-4. **Results are reproducible.** Grading is mechanical only (`exact` /
-   `contains_all` / `regex` / `json_equal`), never LLM-judged. Each run snapshots
-   its config (`min_accuracy`, `switch_cost_factor`, `max_concurrency`,
-   `benchmark_user_id`, per-model `reasoning_effort`); all processing and
-   publishing reads the snapshot, not live config.
-5. **Carried results are identity-gated.** A prior model's summaries are reused on
-   a new run only when the engine identity (dataset + grading/CLI version),
-   repetition count, and the model's `reasoning_effort` all match. Any change
-   re-benchmarks the affected model rather than silently mixing incomparable
-   numbers.
+4. **Grading is explicit.** Use mechanical checks (`exact` / `contains_all` /
+   `regex` / `json_equal`) wherever possible. Answers that require semantic
+   evaluation use `judged` checks graded by a System One model with a probability
+   score, calibrated with `judge:calibrate`.
+   Grader outages retry the chunk against persisted model output; they are not
+   wrong-answer scores. Retry exhaustion uses the lane-failure path.
+   Each run snapshots its policy, container budget, benchmark identity, and exact `(model, variant)` entries.
+   Measurements use that snapshot.
+   Platform publication selects current catalog pairs from the ready registry.
+5. **Registry reuse requires exact identity.** Reuse requires the same engine identity, repetition count, model, and canonical variant.
+   The engine identity includes the dataset and grading/CLI version.
+   Platform selectors choose models; the catalog supplies all supported reasoning efforts.
+   A new effort gets its own measurement, not another effort's score.
 6. **One active run per kind.** A partial unique index plus a server-side check
    admit at most one `running` classifier and one `running` decider run; a second
    start returns 409, not 500. Stale runs are swept to `failed` on run listing.
@@ -123,9 +132,10 @@ one-time penalty. Stickiness trusts only real classifier output.
   publishes into the void. The smallest *shippable* unit is the full loop behind a
   hidden model — which is why it ships hidden rather than as smaller live
   increments.
-- **LLM-judged grading.** Rejected for reproducibility: re-running a benchmark
-  must yield comparable numbers. Mechanical checks are deterministic; golden
-  answers were hand-derived and mechanically re-verified.
+- **Free-form LLM-judged grading.** Rejected for comparable measurements:
+  mechanical checks remain preferred, with golden answers hand-derived and
+  mechanically re-verified. Rubric checks that cannot be graded mechanically
+  use calibrated System One probability grading instead of free-form verdicts.
 
 ## Rollout / cutover
 

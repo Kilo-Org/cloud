@@ -9,6 +9,9 @@ import {
   ensureOrganizationAccess,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
+import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
 import {
   getIntegrationForOrganization,
   updateIntegrationMetadata,
@@ -360,6 +363,17 @@ async function ensureBitbucketWorkspaceWebhook(input: {
       message: bitbucketWebhookSetupFailureMessage(result.reason),
     });
   }
+}
+
+// The rotated secret is returned to the caller, so an elevated admin rotation
+// is recorded durably. The secret itself is never logged.
+async function recordGitLabSecretRotation(ctx: TRPCContext, organizationId: string) {
+  await recordElevatedOrganizationAdminAction(ctx, {
+    organizationId,
+    requiredRoles: ORGANIZATION_BILLING_ROLES,
+    action: 'organization.gitlab_webhook_secret.rotate',
+    message: 'Rotated GitLab webhook secret (new secret returned to the caller)',
+  });
 }
 
 export const organizationReviewAgentRouter = createTRPCRouter({
@@ -836,8 +850,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
    * `council ?? undefined` behavior — a non-entitled org can keep its
    * existing council config untouched.
    *
-   * Throws `NOT_FOUND` if no stored config exists — a PATCH cannot
-   * bootstrap a row (use `saveReviewConfig` for that).
+   * With no stored config, the patch applies to the defaults that
+   * `getReviewConfig` returns and creates the row (disabled).
    */
   patchReviewConfig: organizationBillingMutationProcedure
     .input(PatchReviewConfigInputSchema)
@@ -858,17 +872,10 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         }
 
         const previousConfig = await getAgentConfig(input.organizationId, 'code_review', platform);
-        if (!previousConfig) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message:
-              'No existing review agent configuration to patch. Save one with saveReviewConfig first.',
-          });
-        }
-        const previousRepoIds =
-          ((previousConfig.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids as
-            | Array<number | string>
-            | undefined) || [];
+        const prevCfg: Partial<CodeReviewAgentConfig> = previousConfig
+          ? (previousConfig.config as CodeReviewAgentConfig)
+          : {};
+        const previousRepoIds = prevCfg.selected_repository_ids ?? [];
 
         // Delta repository selection: `selectedRepositoryDelta` computes
         // next = (stored ∪ add) \ remove, with remove winning on overlap.
@@ -882,7 +889,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           ].filter(repositoryId => !remove.has(repositoryId));
         }
 
-        const prevCfg = previousConfig.config as CodeReviewAgentConfig;
         const stored: CodeReviewStoredConfig = {
           reviewStyle: prevCfg.review_style || 'balanced',
           focusAreas: prevCfg.focus_areas || [],
@@ -1372,6 +1378,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           actor_name: ctx.user.google_user_name,
           message: 'Rotated GitLab webhook secret (no Kilo-managed webhooks to re-sync)',
         });
+        await recordGitLabSecretRotation(ctx, organizationId);
         return {
           webhookSecret: newSecret,
           webhookSync: {
@@ -1460,6 +1467,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         message: `Rotated GitLab webhook secret (webhooks: ${webhookSyncResult.updated} updated, ${webhookSyncResult.errors.length} errors)`,
       });
 
+      await recordGitLabSecretRotation(ctx, organizationId);
       return {
         webhookSecret: newSecret,
         webhookSync: webhookSyncResult,

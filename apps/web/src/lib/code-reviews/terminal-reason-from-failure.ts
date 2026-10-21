@@ -68,6 +68,7 @@ const FAILURE_CODE_REASONS = {
   missing_assistant_reply: 'assistant_no_reply',
   payment_required: 'billing',
   admission_billing_unavailable: 'sandbox_connection',
+  container_limit_reached: 'delivery_failed',
   user_interrupt: 'user_cancelled',
   container_shutdown: 'container_shutdown',
   system_interrupt: 'interrupted',
@@ -177,6 +178,9 @@ export function terminalReasonFromCloudAgentFailure(
       }
       if (failure.assistantReason === 'provider_authentication') {
         return PROVIDER_AUTHENTICATION_BY_OWNERSHIP[failure.providerOwnership ?? 'unknown'];
+      }
+      if (failure.assistantReason === 'invalid_request' && failure.providerOwnership === 'byok') {
+        return 'assistant_invalid_request_byok';
       }
       return ASSISTANT_REASON_REASONS[failure.assistantReason];
     }

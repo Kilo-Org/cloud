@@ -1,4 +1,5 @@
 import type * as DrizzleOrm from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('cloudflare:workers', () => ({
@@ -27,6 +28,7 @@ vi.mock('drizzle-orm', async importOriginal => {
     desc: vi.fn(actual.desc),
     gte: vi.fn(actual.gte),
     isNotNull: vi.fn(actual.isNotNull),
+    lt: vi.fn(actual.lt),
     or: vi.fn(actual.or),
   };
 });
@@ -54,10 +56,13 @@ import {
   cli_sessions_v2,
   cloud_agent_worktrees,
   organization_memberships,
+  organizations,
 } from '@kilocode/db/schema';
 import {
+  decodeCloudAgentRootSessionsCursor,
   decodeKiloSdkMessagesCursor,
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
+  encodeCloudAgentRootSessionsCursor,
   encodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   cloudAgentWorktreeIdSchema,
@@ -65,7 +70,7 @@ import {
   partIdSchema,
   validateKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
-import { desc, gte, isNotNull, or } from 'drizzle-orm';
+import { desc, gte, isNotNull, lt, or, SQL } from 'drizzle-orm';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { SessionIngestRPC } from './session-ingest-rpc';
@@ -104,17 +109,27 @@ const sdkStoredMessageFixture = { info: sdkUserMessageFixture, parts: [sdkTextPa
 type MappingRow = {
   kiloSessionId?: string;
   cloudAgentSessionId?: string | null;
+  userId?: string;
+  organizationId?: string | null;
   title?: string | null;
+  gitUrl?: string | null;
+  gitBranch?: string | null;
+  profileId?: string | null;
+  createdOnPlatform?: string;
   createdAt?: string;
   updatedAt?: string;
 };
 
 function makeDbFakes(rows: MappingRow[]) {
   const selectResult = vi.fn(async () => rows);
+  let whereCondition: SQL | undefined;
   const select = {
     from: vi.fn(() => select),
-    leftJoin: vi.fn(() => select),
-    where: vi.fn(() => select),
+    leftJoin: vi.fn((_table: unknown, _condition?: unknown) => select),
+    where: vi.fn((condition: SQL) => {
+      whereCondition = condition;
+      return select;
+    }),
     orderBy: vi.fn(() => select),
     limit: vi.fn(() => select),
     then: vi.fn((resolve: (value: unknown) => unknown) => resolve(selectResult())),
@@ -122,7 +137,7 @@ function makeDbFakes(rows: MappingRow[]) {
   const db = {
     select: vi.fn(() => select),
   };
-  return { db, select, selectResult };
+  return { db, select, selectResult, whereCondition: () => whereCondition };
 }
 
 function makeRpc(db: ReturnType<typeof makeDbFakes>['db']) {
@@ -674,17 +689,19 @@ describe('createSessionForCloudAgent clone path', () => {
       kind: 'empty' as 'empty' | 'in_progress' | 'complete',
       sourceSessionId: null as string | null,
       destinationSessionId: null as string | null,
+      upToMessageId: null as string | null,
       nextCursor: null as { ingestedAt: number | null; id: number } | null,
       rollingDigest: '',
       copiedItemCount: 0,
       stagedRows: [] as CloneItem[],
     };
 
-    const inspectCloneStage = vi.fn(() => {
+    const inspectCloneStage = vi.fn((params?: { upToMessageId?: string }) => {
       if (state.kind === 'empty') return { status: 'empty' };
       const sameIdentity =
         state.sourceSessionId === sourceSessionId &&
-        state.destinationSessionId === destinationSessionId;
+        state.destinationSessionId === destinationSessionId &&
+        state.upToMessageId === (params?.upToMessageId ?? null);
       if (!sameIdentity) {
         return {
           status: 'mismatch',
@@ -714,6 +731,7 @@ describe('createSessionForCloudAgent clone path', () => {
       (params: {
         sourceSessionId: string;
         destinationSessionId: string;
+        upToMessageId?: string;
         rows: CloneItem[];
         nextCursor: { ingestedAt: number | null; id: number } | null;
         rollingDigest: string;
@@ -739,7 +757,8 @@ describe('createSessionForCloudAgent clone path', () => {
         if (
           state.kind === 'in_progress' &&
           (state.sourceSessionId !== params.sourceSessionId ||
-            state.destinationSessionId !== params.destinationSessionId)
+            state.destinationSessionId !== params.destinationSessionId ||
+            state.upToMessageId !== (params.upToMessageId ?? null))
         ) {
           return {
             status: 'mismatch',
@@ -750,6 +769,7 @@ describe('createSessionForCloudAgent clone path', () => {
         state.kind = 'in_progress';
         state.sourceSessionId = params.sourceSessionId;
         state.destinationSessionId = params.destinationSessionId;
+        state.upToMessageId = params.upToMessageId ?? null;
         state.nextCursor = params.nextCursor;
         state.rollingDigest = params.rollingDigest;
         state.copiedItemCount = params.copiedItemCount;
@@ -815,6 +835,7 @@ describe('createSessionForCloudAgent clone path', () => {
       state.kind = 'empty';
       state.sourceSessionId = null;
       state.destinationSessionId = null;
+      state.upToMessageId = null;
       state.nextCursor = null;
       state.rollingDigest = '';
       state.copiedItemCount = 0;
@@ -1531,6 +1552,256 @@ describe('createSessionForCloudAgent clone path', () => {
       expect.anything()
     );
   });
+
+  describe('with cloneUpToMessageId', () => {
+    const cutMessage = (id: string, ingestedAt: number, role = 'user'): CloneItem => ({
+      itemId: `message/${id}`,
+      itemType: 'message',
+      itemData: JSON.stringify({
+        id,
+        sessionID: sourceSessionId,
+        role,
+        time: { created: ingestedAt },
+        agent: 'build',
+        model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+      }),
+      itemDataR2Key: null,
+      ingestedAt,
+    });
+
+    const cutPart = (messageId: string, partId: string, ingestedAt: number): CloneItem => ({
+      itemId: `${messageId}/${partId}`,
+      itemType: 'part',
+      itemData: JSON.stringify({
+        id: partId,
+        sessionID: sourceSessionId,
+        messageID: messageId,
+        type: 'text',
+        text: `text of ${partId}`,
+      }),
+      itemDataR2Key: null,
+      ingestedAt,
+    });
+
+    const sessionDiffItem = (ingestedAt: number): CloneItem => ({
+      itemId: 'session_diff',
+      itemType: 'session_diff',
+      itemData: JSON.stringify([{ file: 'src/a.ts', additions: 1, deletions: 0 }]),
+      itemDataR2Key: null,
+      ingestedAt,
+    });
+
+    // Ingest order is not message order: a late part of msg_02 lands after msg_03.
+    const interleavedSource = (): CloneItem[] => [
+      sourceSessionItem(),
+      cutMessage('msg_01', 2),
+      cutPart('msg_01', 'prt_01', 3),
+      cutMessage('msg_02', 4, 'assistant'),
+      cutMessage('msg_03', 5),
+      cutPart('msg_02', 'prt_02', 6),
+      cutPart('msg_03', 'prt_03', 7),
+      sessionDiffItem(8),
+    ];
+
+    function makeCutRpc(items: CloneItem[], pageSize: number) {
+      const sourceStub = {
+        ...makePagedSourceStub(items, pageSize),
+        hasMessageItem: vi.fn(async (messageId: string) =>
+          items.some(item => item.itemType === 'message' && item.itemId === `message/${messageId}`)
+        ),
+      };
+      const dest = makeDestinationStub();
+      const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+      const { db, values } = makeCloneDb({
+        sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+        created: createdRow,
+      });
+      const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+      return { rpc, sourceStub, dest, r2, values };
+    }
+
+    it('copies messages up to the inclusive cut with their parts and drops the session diff', async () => {
+      const { rpc, sourceStub, dest, r2 } = makeCutRpc(interleavedSource(), 100);
+
+      await expect(
+        rpc.createSessionForCloudAgent(cloneParams({ cloneUpToMessageId: 'msg_02' }))
+      ).resolves.toEqual({
+        status: 'ready',
+        clone: { sessionId: destinationSessionId, copiedItemCount: 5 },
+      });
+
+      expect(dest.state.stagedRows.map(row => row.itemId)).toEqual([
+        'session',
+        'message/msg_01',
+        'msg_01/prt_01',
+        'message/msg_02',
+        'msg_02/prt_02',
+      ]);
+      expect(dest.state.kind).toBe('complete');
+      expect(dest.state.upToMessageId).toBe('msg_02');
+      expect(dest.stub.inspectCloneStage).toHaveBeenCalledWith({
+        sourceSessionId,
+        destinationSessionId,
+        upToMessageId: 'msg_02',
+      });
+      expect(dest.stub.finalizeCloneStage).toHaveBeenCalledWith(
+        expect.objectContaining({ upToMessageId: 'msg_02', finalItemCount: 5 })
+      );
+      expect(sourceStub.hasMessageItem).toHaveBeenCalledWith('msg_02');
+      expect(r2.get).not.toHaveBeenCalled();
+    });
+
+    it('keeps the full clone, including the session diff, when no cut is given', async () => {
+      const { rpc, sourceStub, dest } = makeCutRpc(interleavedSource(), 100);
+
+      await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+        status: 'ready',
+        clone: { sessionId: destinationSessionId, copiedItemCount: 8 },
+      });
+
+      expect(dest.state.stagedRows.map(row => row.itemId)).toEqual(
+        interleavedSource().map(item => item.itemId)
+      );
+      expect(dest.state.upToMessageId).toBeNull();
+      expect(dest.stub.inspectCloneStage.mock.calls[0]?.[0]).toStrictEqual({
+        sourceSessionId,
+        destinationSessionId,
+      });
+      expect(sourceStub.hasMessageItem).not.toHaveBeenCalled();
+    });
+
+    it('rejects clone_cut_not_found before touching the destination when the cut message is absent', async () => {
+      // A part may reference the ID, but only a message row satisfies the cut.
+      const { rpc, sourceStub, dest, values } = makeCutRpc(
+        [...interleavedSource(), cutPart('msg_99', 'prt_99', 9)],
+        100
+      );
+
+      await expect(
+        rpc.createSessionForCloudAgent(cloneParams({ cloneUpToMessageId: 'msg_99' }))
+      ).resolves.toEqual({ status: 'rejected', code: 'clone_cut_not_found' });
+
+      expect(dest.stub.inspectCloneStage).not.toHaveBeenCalled();
+      expect(dest.stub.stageCloneBatch).not.toHaveBeenCalled();
+      expect(dest.stub.resetCloneStage).not.toHaveBeenCalled();
+      expect(sourceStub.exportCloneBatch).not.toHaveBeenCalled();
+      expect(values).not.toHaveBeenCalled();
+    });
+
+    it('resets an unpublished stage built for another cut and restarts from scratch', async () => {
+      const { rpc, dest } = makeCutRpc(interleavedSource(), 100);
+      Object.assign(dest.state, {
+        kind: 'in_progress',
+        sourceSessionId,
+        destinationSessionId,
+        upToMessageId: 'msg_01',
+        nextCursor: { ingestedAt: 3, id: 3 },
+        rollingDigest: 'digest-for-msg_01',
+        copiedItemCount: 3,
+        stagedRows: interleavedSource().slice(0, 3),
+      });
+
+      await expect(
+        rpc.createSessionForCloudAgent(cloneParams({ cloneUpToMessageId: 'msg_02' }))
+      ).resolves.toEqual({
+        status: 'ready',
+        clone: { sessionId: destinationSessionId, copiedItemCount: 5 },
+      });
+
+      expect(dest.stub.resetCloneStage).toHaveBeenCalledTimes(1);
+      expect(dest.state.upToMessageId).toBe('msg_02');
+      expect(dest.state.stagedRows.map(row => row.itemId)).toEqual([
+        'session',
+        'message/msg_01',
+        'msg_01/prt_01',
+        'message/msg_02',
+        'msg_02/prt_02',
+      ]);
+    });
+
+    it('rejects destination_conflict for a published stage built for another cut', async () => {
+      const { rpc, dest } = makeCutRpc(interleavedSource(), 100);
+      Object.assign(dest.state, {
+        kind: 'complete',
+        sourceSessionId,
+        destinationSessionId,
+        upToMessageId: 'msg_01',
+      });
+
+      await expect(
+        rpc.createSessionForCloudAgent(cloneParams({ cloneUpToMessageId: 'msg_02' }))
+      ).resolves.toEqual({ status: 'rejected', code: 'destination_conflict' });
+
+      expect(dest.stub.resetCloneStage).not.toHaveBeenCalled();
+      expect(dest.stub.stageCloneBatch).not.toHaveBeenCalled();
+    });
+
+    it('resumes a cut clone across requests with a digest over the kept rows only', async () => {
+      // A dropped row first, then 20 messages; one row per page so the first
+      // request stops after 16 batches with 15 kept rows staged.
+      const items = [
+        cutPart('msg_19', 'prt_19', 0),
+        ...Array.from({ length: 20 }, (_, index) =>
+          cutMessage(`msg_${String(index).padStart(2, '0')}`, index + 1)
+        ),
+      ];
+      const { rpc, dest } = makeCutRpc(items, 1);
+      const params = cloneParams({ cloneUpToMessageId: 'msg_14' });
+
+      await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+        status: 'in_progress',
+      });
+      expect(dest.state.copiedItemCount).toBe(15);
+
+      await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+        status: 'ready',
+        clone: { sessionId: destinationSessionId, copiedItemCount: 15 },
+      });
+      expect(dest.state.kind).toBe('complete');
+      expect(dest.stub.resetCloneStage).not.toHaveBeenCalled();
+    });
+
+    it('resumes after a byte-budget overflow at the right source row when the cut skips rows', async () => {
+      const hugeBody = JSON.stringify({
+        id: 'msg_02',
+        sessionID: sourceSessionId,
+        role: 'assistant',
+        time: { created: 4 },
+        agent: 'build',
+        model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+        text: 'x'.repeat(5 * 1024 * 1024),
+      });
+      const items: CloneItem[] = [
+        sourceSessionItem(),
+        cutPart('msg_09', 'prt_09', 1),
+        sessionDiffItem(2),
+        cutMessage('msg_01', 3),
+        { ...cutMessage('msg_02', 4, 'assistant'), itemData: '{}', itemDataR2Key: 'items/huge' },
+        cutMessage('msg_09', 5),
+        cutPart('msg_02', 'prt_02', 6),
+      ];
+      const { rpc, sourceStub, dest, r2 } = makeCutRpc(items, 100);
+      r2.get.mockImplementation((async (key: string) =>
+        key === 'items/huge' ? { text: async () => hugeBody } : null) as never);
+
+      await expect(
+        rpc.createSessionForCloudAgent(cloneParams({ cloneUpToMessageId: 'msg_02' }))
+      ).resolves.toEqual({
+        status: 'ready',
+        clone: { sessionId: destinationSessionId, copiedItemCount: 4 },
+      });
+
+      // The overflow at the huge row re-exports the 4 source rows before it,
+      // including the two skipped rows, so no kept row is staged twice.
+      expect(sourceStub.exportCloneBatch).toHaveBeenCalledWith(null, 4);
+      expect(dest.state.stagedRows.map(row => row.itemId)).toEqual([
+        'session',
+        'message/msg_01',
+        'message/msg_02',
+        'msg_02/prt_02',
+      ]);
+    });
+  });
 });
 
 describe('deleteSessionForCloudAgent clone rollback', () => {
@@ -1600,6 +1871,32 @@ describe('deleteSessionForCloudAgent clone rollback', () => {
       sourceSessionId,
       destinationSessionId,
     });
+    expect(resetCloneStage).toHaveBeenCalled();
+    expect(deleteFn).toHaveBeenCalled();
+  });
+
+  it('rolls back a clone stage built with a message cut for the same source', async () => {
+    // The cut is part of the stage identity, so a cut-less inspect reports
+    // mismatch with the same stored source and destination.
+    const inspectCloneStage = vi.fn(() => ({
+      status: 'mismatch',
+      storedSourceSessionId: sourceSessionId,
+      storedDestinationSessionId: destinationSessionId,
+      storedStage: 'complete',
+    }));
+    const resetCloneStage = vi.fn(async () => {});
+    const { db, deleteFn } = makeDeleteDb({
+      session_id: destinationSessionId,
+      kilo_user_id: kiloUserId,
+    });
+    const rpc = makeDeleteRpc({ db, destStub: { inspectCloneStage, resetCloneStage } });
+
+    await rpc.deleteSessionForCloudAgent({
+      sessionId: destinationSessionId,
+      kiloUserId,
+      cloneSourceSessionId: sourceSessionId,
+    });
+
     expect(resetCloneStage).toHaveBeenCalled();
     expect(deleteFn).toHaveBeenCalled();
   });
@@ -2416,93 +2713,200 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
     vi.resetAllMocks();
   });
 
-  it('returns mapped root summaries in database order without opening session DOs', async () => {
+  it('returns a stable page for equal timestamps without opening session DOs', async () => {
     const secondSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
     const createdAt = '2026-05-27 20:53:24.190157+00';
     const updatedAt = '2026-05-28 09:13:37.651263+00';
+    const thirdSessionId = 'ses_00000000000000000000000000';
     const { db, select } = makeDbFakes([
       {
         kiloSessionId: secondSessionId,
         cloudAgentSessionId: 'agent_same_time_b',
+        userId: 'usr_owner',
+        organizationId: null,
         title: 'Second',
+        gitUrl: 'https://token:secret@github.com/acme/repo.git?token=secret#readme',
+        gitBranch: 'feature/equal-timestamps',
+        profileId: '11111111-1111-4111-8111-111111111111',
+        createdOnPlatform: 'cloud-agent-web',
         createdAt,
         updatedAt,
       },
       {
         kiloSessionId: sdkSessionInfoFixture.id,
         cloudAgentSessionId: 'agent_same_time_a',
+        userId: 'usr_owner',
+        organizationId: '22222222-2222-4222-8222-222222222222',
         title: 'First',
+        gitUrl: null,
+        gitBranch: null,
+        profileId: null,
+        createdOnPlatform: 'cloud-agent-desktop',
+        createdAt,
+        updatedAt,
+      },
+      {
+        kiloSessionId: thirdSessionId,
+        cloudAgentSessionId: 'agent_same_time_0',
+        userId: 'usr_owner',
+        organizationId: null,
+        title: 'Overflow sentinel',
+        gitUrl: null,
+        gitBranch: null,
+        profileId: null,
+        createdOnPlatform: 'cloud-agent-web',
         createdAt,
         updatedAt,
       },
     ]);
     const rpc = makeRpc(db);
 
-    await expect(
-      rpc.listCloudAgentRootSessions({
-        kiloUserId: 'usr_owner',
-        start: 1761000000000,
-        limit: 2,
-      })
-    ).resolves.toEqual([
+    const page = await rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner', limit: 2 });
+
+    expect(page.items).toEqual([
       {
         kiloSessionId: secondSessionId,
         cloudAgentSessionId: 'agent_same_time_b',
+        userId: 'usr_owner',
+        organizationId: null,
         title: 'Second',
+        gitUrl: 'https://github.com/acme/repo.git',
+        gitBranch: 'feature/equal-timestamps',
+        profileId: '11111111-1111-4111-8111-111111111111',
+        createdOnPlatform: 'cloud-agent-web',
         created: new Date(createdAt).getTime(),
         updated: new Date(updatedAt).getTime(),
       },
       {
         kiloSessionId: sdkSessionInfoFixture.id,
         cloudAgentSessionId: 'agent_same_time_a',
+        userId: 'usr_owner',
+        organizationId: '22222222-2222-4222-8222-222222222222',
         title: 'First',
+        gitUrl: null,
+        gitBranch: null,
+        profileId: null,
+        createdOnPlatform: 'cloud-agent-desktop',
         created: new Date(createdAt).getTime(),
         updated: new Date(updatedAt).getTime(),
       },
     ]);
+    expect(page.nextCursor).not.toBeNull();
+    expect(decodeCloudAgentRootSessionsCursor(page.nextCursor!)).toEqual({
+      version: 1,
+      updatedAt,
+      sessionId: sdkSessionInfoFixture.id,
+    });
     expect(getSessionIngestDO).not.toHaveBeenCalled();
     expect(select.leftJoin).toHaveBeenCalledWith(organization_memberships, expect.anything());
+    expect(select.leftJoin).toHaveBeenCalledWith(organizations, expect.anything());
     expect(or).toHaveBeenCalled();
     expect(isNotNull).toHaveBeenCalledWith(cli_sessions_v2.cloud_agent_session_id);
-    expect(gte).toHaveBeenCalledWith(
-      cli_sessions_v2.updated_at,
-      new Date(1761000000000).toISOString()
-    );
     expect(desc).toHaveBeenNthCalledWith(1, cli_sessions_v2.updated_at);
     expect(desc).toHaveBeenNthCalledWith(2, cli_sessions_v2.session_id);
     expect(select.orderBy).toHaveBeenCalled();
-    expect(select.limit).toHaveBeenCalledWith(2);
+    expect(select.limit).toHaveBeenCalledWith(3);
   });
 
-  it('returns mapped roots without requiring a materialized SDK snapshot and bounds titles', async () => {
+  it('uses the descending timestamp and session ID continuation predicate', async () => {
+    const updatedAt = '2026-05-28 09:13:37.651263+00';
+    const cursor = encodeCloudAgentRootSessionsCursor({
+      updatedAt,
+      sessionId: sdkSessionInfoFixture.id,
+    });
+    const { db, whereCondition } = makeDbFakes([]);
+    const rpc = makeRpc(db);
+
+    await rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner', cursor, limit: 10 });
+
+    expect(lt).toHaveBeenCalledWith(cli_sessions_v2.updated_at, updatedAt);
+    expect(lt).toHaveBeenCalledWith(cli_sessions_v2.session_id, sdkSessionInfoFixture.id);
+    const condition = whereCondition();
+    expect(condition).toBeDefined();
+    const query = new PgDialect().sqlToQuery(condition!);
+    expect(query.sql).toContain('"cli_sessions_v2"."updated_at" < $');
+    expect(query.sql).toContain('"cli_sessions_v2"."updated_at" = $');
+    expect(query.sql).toContain('"cli_sessions_v2"."session_id" < $');
+    expect(query.params).toEqual(
+      expect.arrayContaining(['usr_owner', updatedAt, sdkSessionInfoFixture.id])
+    );
+  });
+
+  it('includes personal and current organizations while excluding revoked and deleted organizations', async () => {
+    const { db, whereCondition } = makeDbFakes([]);
+    const rpc = makeRpc(db);
+
+    await rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner' });
+
+    const condition = whereCondition();
+    expect(condition).toBeDefined();
+    const query = new PgDialect().sqlToQuery(condition!);
+    expect(query.sql).toContain('"cli_sessions_v2"."organization_id" is null');
+    expect(query.sql).toContain('"organization_memberships"."id" is not null');
+    expect(query.sql).toContain('"organizations"."deleted_at" is null');
+    expect(query.params).toContain('usr_owner');
+  });
+
+  it('returns mapped roots without requiring a materialized SDK snapshot and bounds fields', async () => {
     const timestamp = '2026-05-28 09:13:37.651263+00';
     const longTitle = 'x'.repeat(600);
     const { db } = makeDbFakes([
       {
         kiloSessionId: sdkSessionInfoFixture.id,
         cloudAgentSessionId: 'agent_org_root',
+        userId: 'usr_owner',
+        organizationId: null,
         title: longTitle,
+        gitUrl: 'not a repository URL with token=secret',
+        gitBranch: 'bad\nbranch',
+        profileId: null,
+        createdOnPlatform: 'cloud-agent-web',
         createdAt: timestamp,
         updatedAt: timestamp,
       },
     ]);
     const rpc = makeRpc(db);
 
-    await expect(rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner' })).resolves.toEqual([
-      {
-        kiloSessionId: sdkSessionInfoFixture.id,
-        cloudAgentSessionId: 'agent_org_root',
-        title: longTitle.slice(0, 512),
-        created: new Date(timestamp).getTime(),
-        updated: new Date(timestamp).getTime(),
-      },
-    ]);
+    await expect(rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner' })).resolves.toEqual({
+      items: [
+        {
+          kiloSessionId: sdkSessionInfoFixture.id,
+          cloudAgentSessionId: 'agent_org_root',
+          userId: 'usr_owner',
+          organizationId: null,
+          title: longTitle.slice(0, 512),
+          gitUrl: null,
+          gitBranch: null,
+          profileId: null,
+          createdOnPlatform: 'cloud-agent-web',
+          created: new Date(timestamp).getTime(),
+          updated: new Date(timestamp).getTime(),
+        },
+      ],
+      nextCursor: null,
+    });
     expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
 
-  it('rejects unsafe list bounds before querying root mappings', async () => {
+  it('keeps the legacy start lower bound for compatible callers', async () => {
     const { db } = makeDbFakes([]);
     const rpc = makeRpc(db);
+
+    await rpc.listCloudAgentRootSessions({
+      kiloUserId: 'usr_owner',
+      start: 1761000000000,
+    });
+
+    expect(gte).toHaveBeenCalledWith(
+      cli_sessions_v2.updated_at,
+      new Date(1761000000000).toISOString()
+    );
+  });
+
+  it('rejects unsafe list bounds and cursors before querying root mappings', async () => {
+    const { db } = makeDbFakes([]);
+    const rpc = makeRpc(db);
+    vi.mocked(getWorkerDb).mockClear();
 
     await expect(
       rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner', limit: 0 })
@@ -2510,7 +2914,24 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
     await expect(
       rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner', limit: 101 })
     ).rejects.toThrow();
+    await expect(
+      rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner', cursor: 'eyJzcWwiOiJkcm9wIn0' })
+    ).rejects.toThrow();
+    await expect(
+      rpc.listCloudAgentRootSessions({
+        kiloUserId: 'usr_owner',
+        cursor: btoa(
+          JSON.stringify({
+            version: 1,
+            updatedAt: '2026-05-28T09:13:37.651Z',
+            sessionId: sdkSessionInfoFixture.id,
+            sql: 'arbitrary content',
+          })
+        ).replace(/=+$/g, ''),
+      })
+    ).rejects.toThrow();
     expect(db.select).not.toHaveBeenCalled();
+    expect(getWorkerDb).not.toHaveBeenCalled();
   });
 });
 
@@ -2543,6 +2964,28 @@ describe('SessionIngestRPC.getSessionMessages (authorized generic history)', () 
       limit: DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
       before: undefined,
     });
+  });
+
+  it('requires the session organization to be live before reading messages', async () => {
+    const { db, select } = makeDbFakes([{ kiloSessionId: sdkSessionInfoFixture.id }]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => null),
+    } as never);
+    const rpc = makeRpc(db);
+
+    await rpc.getSessionMessages({
+      kiloUserId: 'usr_owner',
+      kiloSessionId: sdkSessionInfoFixture.id,
+    });
+
+    expect(select.leftJoin).toHaveBeenCalledWith(organization_memberships, expect.anything());
+    expect(select.leftJoin).toHaveBeenCalledWith(organizations, expect.anything());
+    const condition = select.where.mock.calls[0]?.[0];
+    if (!(condition instanceof SQL)) {
+      throw new Error('Expected where condition');
+    }
+    const generated = new PgDialect().sqlToQuery(condition);
+    expect(generated.sql).toMatch(/"organizations"\."deleted_at" is null/i);
   });
 
   it('defaults omitted limit to the shared page size and pairs it with a continuation cursor', async () => {

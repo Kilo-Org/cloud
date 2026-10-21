@@ -206,6 +206,7 @@ export async function upsertSecurityFinding(
         LEFT JOIN existing_match ON true
         ON CONFLICT ${ownerConflictTarget(owner)} DO UPDATE
         SET
+          ${sql.identifier(security_findings.platform_integration_id.name)} = COALESCE(EXCLUDED.${sql.identifier(security_findings.platform_integration_id.name)}, ${security_findings.platform_integration_id}),
           ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
           ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
           ${sql.identifier(security_findings.cve_id.name)} = EXCLUDED.${sql.identifier(security_findings.cve_id.name)},
@@ -507,7 +508,7 @@ export async function listSecurityFindings(
           // finding triaged as "dismiss" but sandbox-confirmed as exploitable
           // would appear under "Safe to Dismiss" yet display as "Exploitable".
           conditions.push(
-            sql`(${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown'`
+            sql`((${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown')`
           );
           break;
         case 'needs_review':
@@ -518,7 +519,7 @@ export async function listSecurityFindings(
           );
           // Same as safe_to_dismiss: exclude findings where sandbox overrides triage.
           conditions.push(
-            sql`(${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown'`
+            sql`((${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown')`
           );
           break;
         case 'triage_complete':

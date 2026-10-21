@@ -5,7 +5,7 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
-import { ImageViewerModal } from '@/components/image-viewer-modal';
+import { ImageViewer } from '@/components/ui/image-viewer';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -98,7 +98,7 @@ function ToolCardImageAttachment({
         />
       </Pressable>
       {viewerVisible ? (
-        <ImageViewerModal
+        <ImageViewer
           visible={viewerVisible}
           uri={uri}
           filename={label}

@@ -240,6 +240,8 @@ export type PreparationStepSnapshot = {
   label: string;
   status: PreparationStepStatus;
   startedAt: number;
+  startedRevision?: number | undefined;
+  parentStepId?: string | undefined;
   completedAt?: number | undefined;
   revision: number;
   latestDetail?: string | undefined;
@@ -324,6 +326,36 @@ export type SessionSnapshotPage = {
   nextCursor: string | null;
   omittedItemCount: number;
   watermarkEventId?: number | null;
+  /** The preparation rows the stream replays first, so the first page can show them. */
+  preparationAttempts?: readonly PreparationAttempt[];
+};
+
+/**
+ * A caller-cached transcript page plus the rows the transcript draws from
+ * service state, so a cached repaint matches the live transcript's layout.
+ */
+export type SessionConfig = {
+  sessionId: CloudAgentSessionId | KiloSessionId;
+  repository: string;
+  mode: string;
+  model: string;
+  providerID?: string | null | undefined;
+  variant?: string | null | undefined;
+  /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
+  runtimeAgents?:
+    | Array<{
+        slug: string;
+        name: string;
+        model?: string | undefined;
+        variant?: string | undefined;
+      }>
+    | undefined;
+};
+
+export type CachedSessionSnapshotPage = SessionSnapshotPage & {
+  commits?: readonly SessionCommit[];
+  /** A Cloud Agent session's last settings, shown on reopen until its metadata loads. */
+  sessionConfig?: SessionConfig;
 };
 
 /**

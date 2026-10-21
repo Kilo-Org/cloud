@@ -1649,7 +1649,10 @@ describe('OAuthProvider transport (library auth)', () => {
       const captures: Record<string, unknown>[] = [];
       vi.stubGlobal(
         'fetch',
-        vi.fn(async (_url: string, init: RequestInit) => {
+        vi.fn(async (input: string | URL, init: RequestInit = {}) => {
+          // The provider resolves the bearer as a Kilo session token via
+          // apps/web first; a 401 keeps it an invalid token without a capture.
+          if (String(input).includes('/api/user')) return new Response(null, { status: 401 });
           captures.push(
             JSON.parse(typeof init.body === 'string' ? init.body : '{}') as Record<string, unknown>
           );
@@ -1682,7 +1685,8 @@ describe('OAuthProvider transport (library auth)', () => {
     const captures: Record<string, unknown>[] = [];
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (_url: string, init: RequestInit) => {
+      vi.fn(async (input: string | URL, init: RequestInit = {}) => {
+        if (String(input).includes('/api/user')) return new Response(null, { status: 401 });
         captures.push(
           JSON.parse(typeof init.body === 'string' ? init.body : '{}') as Record<string, unknown>
         );
@@ -1737,6 +1741,37 @@ describe('OAuthProvider transport (library auth)', () => {
     );
     expect(response.status).toBe(401);
     expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('accepts the signed-in app session token as the MCP credential', async () => {
+    const upstream = vi.fn(async (input: string | URL, _init?: RequestInit) => {
+      if (String(input).includes('/api/user')) return Response.json({ id: 'user-session' });
+      return new Response('unexpected', { status: 500 });
+    });
+    vi.stubGlobal('fetch', upstream);
+    const response = await worker.fetch(
+      new Request('https://kilo-mcp.test/mcp', {
+        method: 'POST',
+        headers: { ...JSON_HEADERS, Authorization: 'Bearer kilo-session-token' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      }),
+      {
+        WEB_BASE_URL: 'https://app.kilo.ai',
+        OAUTH_KV: { get: async () => null },
+      } as unknown as Env,
+      { ...TEST_CTX }
+    );
+
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as { result: { tools: Array<{ name: string }> } };
+    expect(json.result.tools.map(tool => tool.name)).toEqual(['search', 'call']);
+
+    // apps/web is the trust anchor: the verification request carried the bearer.
+    const verification = upstream.mock.calls.find(call => String(call[0]).includes('/api/user'));
+    expect(verification).toBeDefined();
+    expect(new Headers(verification?.[1]?.headers).get('Authorization')).toBe(
+      'Bearer kilo-session-token'
+    );
   });
 
   it('OPTIONS /mcp preflight is answered by the library with CORS headers', async () => {
@@ -1844,7 +1879,7 @@ describe('api handler (props-based auth)', () => {
    * publishes admin-guarded procedures only under non-internal paths), so an
    * actual catalog row is used to exercise the guard end to end.
    */
-  const REAL_ADMIN_PATH = 'mcpGateway.listPersonal';
+  const REAL_ADMIN_PATH = 'debug.handledTrpcError';
 
   it('refuses a bundled admin path for a grant without the admin opt-in, before any upstream request', async () => {
     const upstream = vi.fn();
@@ -1913,7 +1948,7 @@ describe('api handler (props-based auth)', () => {
     expect(created[0]).toMatchObject({
       sessionId: 'sess-1',
       path: REAL_ADMIN_PATH,
-      kind: 'admin',
+      kind: 'debug',
     });
     expect(upstream).not.toHaveBeenCalled();
   });

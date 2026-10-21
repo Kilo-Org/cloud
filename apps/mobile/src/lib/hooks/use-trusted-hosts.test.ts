@@ -157,4 +157,23 @@ describe('trusted host store', () => {
       JSON.stringify(['existing.com', 'new.com'])
     );
   });
+
+  it('replaces persisted hosts instead of merging them when disk load is pending', async () => {
+    const read = Promise.withResolvers<string | null>();
+    getItemAsync.mockImplementation(
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- keep read pending during replacement
+      () => read.promise
+    );
+    const mod = await freshTrustedHosts();
+    const replacing = mod.setTrustedHosts(['new.com']);
+
+    expect(setItemAsync).not.toHaveBeenCalled();
+    read.resolve('["old.com"]');
+    await replacing;
+    await flushMicrotasks();
+
+    expect(mod.getTrustedHosts()).toEqual(['new.com']);
+    expect(mod.isTrustedHost('old.com')).toBe(false);
+    expect(setItemAsync).toHaveBeenLastCalledWith('trusted-hosts', '["new.com"]');
+  });
 });

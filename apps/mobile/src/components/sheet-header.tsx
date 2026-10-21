@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, StatusBar, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import { useScreenInsets } from '@/lib/screen-insets';
 
 /**
  * How much top clearance the header reserves:
@@ -60,7 +60,7 @@ export function SheetHeader({
 }) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
+  const insets = useScreenInsets();
   const resolvedDoneLabel = doneLabel ?? t('common.done');
   const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
   // Reserve top clearance as well as landscape cutout clearance inside the

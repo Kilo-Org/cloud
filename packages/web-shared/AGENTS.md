@@ -1,6 +1,8 @@
 # web-shared
 
 Server code shared by `apps/web` and `apps/ai-gateway`, moved out of `apps/web/src`.
+The usage wire contract lives in `@kilocode/usage-contracts`. Import it directly;
+`usage-record-contract-alignment.ts` checks alignment with DB types.
 
 ## Module resolution
 
@@ -20,6 +22,26 @@ Server code shared by `apps/web` and `apps/ai-gateway`, moved out of `apps/web/s
   `apps/web`, including the optional peers that make pnpm resolve the same
   `next` and `@sentry/nextjs` instances as `apps/web`. Two instances of `next`
   break request-scoped APIs such as `headers()`.
+
+## AI gateway database access
+
+AI gateway handlers (`src/lib/ai-gateway/**` and everything they call) also run
+in `sfo1`, but `db` from `lib/drizzle` always connects to the Frankfurt primary.
+Each primary query from `sfo1` is a transatlantic round trip; a transaction is
+several. Before the upstream inference request is sent:
+
+- Read through `readDb`, which uses the US replica in `sfo1`. Many helpers
+  default to `fromDb = db`; pass `readDb` explicitly. Omitting the argument
+  silently selects the primary.
+- Do not open `db` transactions, take row locks, or write. Defer writes with
+  `after()`, or forward them to `fra1` like `recordUsageInPrimaryRegion` does.
+- Keep primary access only where correctness needs it (read-after-write, a row
+  lock, or an optimistic write such as lazy credit expiry), on a rare path, with
+  a comment saying why.
+- Shared helpers that the web app also calls keep their primary default and take
+  a `fromDb` argument; gateway callers pass `readDb`.
+- `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so
+  that variable must stay set on the `kilocode-ai-gateway` Vercel project.
 
 ## Runtime files
 

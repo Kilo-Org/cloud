@@ -64,12 +64,12 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#888888' }),
+  useThemeColors: () => ({ background: '#ffffff', mutedForeground: '#888888' }),
 }));
 
-// FlatList renders through a callback, so a host-string mock would drop every
+// FlashList renders through a callback, so a host-string mock would drop every
 // row. This mock calls the render props so the row assertions still see rows.
-const flatListMock = vi.hoisted(
+const flashListMock = vi.hoisted(
   () =>
     ({
       data,
@@ -85,11 +85,11 @@ const flatListMock = vi.hoisted(
       const rows = data.map((item, index) =>
         createElement(Fragment, { key: keyExtractor(item, index) }, renderItem({ item, index }))
       );
-      return createElement('FlatList', null, ...rows, ListFooterComponent);
+      return createElement('FlashList', null, ...rows, ListFooterComponent);
     }
 );
+vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('react-native', () => ({
-  FlatList: flatListMock,
   View: 'View',
   TextInput: 'TextInput',
   I18nManager: { isRTL: false },

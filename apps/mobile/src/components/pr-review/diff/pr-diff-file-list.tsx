@@ -36,6 +36,7 @@ import {
   useBoundedDiffFontMetrics,
 } from '@/components/pr-review/diff/diff-font-metrics';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import {
   PrDiffFileListHeader,
   useDiffViewMode,
@@ -159,22 +160,17 @@ export function PrReviewFileList({
       buildFileItems({
         files,
         expanded,
-        expandedContext,
-        viewed: viewed.isViewed,
-        headSha,
-        owner,
-        repo,
-        number,
         changedFiles,
         viewMode: effectiveViewMode,
-        // Pagination fields — required by BuildItemsArgs but unused by buildFileItems.
-        isLoading: false,
-        isFetchingNextPage: false,
-        hasNextPage: false,
-        laterPageError: false,
-        fetchToCompletionRunning: false,
-        fetchToCompletionLoaded: 0,
-        totalFiles: null,
+        source: {
+          kind: 'pr',
+          owner,
+          repo,
+          number,
+          headSha,
+          expandedContext,
+          viewed: viewed.isViewed,
+        },
       }),
     [
       files,
@@ -262,6 +258,7 @@ export function PrReviewFileList({
   }, [fetchToCompletion.run]);
 
   const renderItem = useDiffRenderItem({
+    source: 'pr',
     viewed,
     onRetryPage: useCallback(() => {
       void query.fetchNextPage();
@@ -278,7 +275,27 @@ export function PrReviewFileList({
 
   if (files.length === 0) {
     if (firstPageErrorState?.kind === 'not-found') {
-      return <TabStateMessage title={copy.unavailableTitle} message={copy.unavailableMessage} />;
+      // GitLab folds its connection failures into the same NOT_FOUND a deleted
+      // merge request produces, so provider scopes offer the read retry and
+      // the connection check instead of a dead end (GitHub keeps the terminal
+      // copy — its recovery is the install CTA on the Overview).
+      const isProviderScope = scope.ref.platform !== 'github';
+      return (
+        <TabStateMessage
+          title={copy.unavailableTitle}
+          message={copy.unavailableMessage}
+          action={
+            isProviderScope ? (
+              <PrReviewUnavailableActions
+                onRetry={() => {
+                  void query.refetch();
+                }}
+                isRetrying={query.isFetching}
+              />
+            ) : undefined
+          }
+        />
+      );
     }
     if (firstPageErrorState?.kind === 'permission') {
       return (

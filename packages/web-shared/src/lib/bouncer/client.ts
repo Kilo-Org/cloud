@@ -9,10 +9,10 @@ import { BOUNCER_URL, INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/confi
 /**
  * Client for the bouncer worker (https://bouncer.kiloapps.io, repo Kilo-Org/bouncer).
  *
- * A bouncer failure must never fail the caller: every best-effort function here resolves, and it
- * logs on failure. The request contracts mirror the typia types in the bouncer repo
- * (`src/credit-event.ts`, `src/usage-event.ts`, `src/decide.ts`). Bouncer rejects an invalid body
- * with 400.
+ * Best-effort event reports resolve and log on failure. Admission callers apply their own failure
+ * policy. The request contracts mirror the typia types in the bouncer repo
+ * (`src/credit-event.ts`, `src/usage-event.ts`, `src/decide.ts`, `src/signup.ts`).
+ * Bouncer rejects an invalid body with 400.
  *
  * `decide` returns bouncer's verdict, or null on a timeout, transport error, non-2xx, or a body that
  * is not a `DecideResponse`; the gateway rejects a request only when the verdict says
@@ -21,6 +21,8 @@ import { BOUNCER_URL, INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/confi
  * delivery result instead of swallowing it: the durable outbox drainers are their callers, and they
  * must distinguish a real HTTP success from a failure so a transport error can never mark an event
  * delivered. Webhooks and store notifications never call them: they only enqueue to the outbox.
+ * Signup admission returns null on an unavailable or invalid verdict. The caller rejects signup
+ * with a retryable error before creating a Stripe customer or account.
  */
 
 /** Bouncer keeps ids to 128 characters. */
@@ -42,6 +44,8 @@ const USAGE_OUTBOX_TIMEOUT_MS = 5_000;
 /** A lease release runs in `after()` once the request has ended. */
 const RELEASE_TIMEOUT_MS = 5_000;
 
+/** Signup runs on the auth critical path, before Stripe or the user insert. */
+const SIGNUP_TIMEOUT_MS = 3_000;
 export type CreditFlow = 'auto_topup' | 'kilo_pass' | 'kiloclaw' | 'seats' | 'topup';
 
 type CreditSubject = {
@@ -177,7 +181,11 @@ type UsageEventFields = {
  * `accountId`, so it can never be joined to a payer.
  */
 export type UsageEvent =
-  | (UsageEventFields & { accountId: string })
+  | (UsageEventFields & {
+      accountId: string;
+      /** The request ran on the person's own ChatGPT subscription through Sign in with ChatGPT. */
+      siwc?: boolean;
+    })
   | (UsageEventFields & { tier: 'anonymous'; ip: string });
 
 export type DecideTier = 'anonymous' | 'free' | 'paid' | 'team';
@@ -188,6 +196,8 @@ export type DecideRequest =
       requestId: string;
       tier: Exclude<DecideTier, 'anonymous'>;
       accountId: string;
+      /** The authenticated actor, independently of the paying account. */
+      userId?: string;
       /** The request's client IP as a bare IPv4/IPv6 literal, when one resolved. */
       ip?: string | null;
       /**
@@ -229,6 +239,87 @@ const decideResponseSchema = z.object({
 
 export type DecideResponse = z.infer<typeof decideResponseSchema>;
 export type DecideFlag = DecideResponse['flags'][number];
+
+/** Bouncer's shape for a signup method (a Cloud `AuthProviderId`) and a step-up method. */
+const SIGNUP_METHOD = /^[a-z0-9-]{1,32}$/;
+/** Bouncer's shape for the lowercase domain part of a normalized email. */
+const SIGNUP_EMAIL_DOMAIN = /^[a-z0-9.-]{1,253}$/;
+/** Bouncer emits at most 8 signup flags: IP ≤4, domain ≤2, JA4 ≤2, or one ban flag. */
+const MAX_SIGNUP_FLAGS = 8;
+
+/**
+ * The optional step-up facts are dropped whole when invalid, like JA4. Without `method`, Bouncer
+ * applies its method-less policy, which an old Cloud build also gets.
+ */
+const signupRequestSchema = z.strictObject({
+  operationId: z.string().min(1).max(MAX_ID_LENGTH),
+  ip: z.union([z.ipv4(), z.ipv6()]),
+  ja4: z.string().nullable().optional().transform(normalizeJa4),
+  method: z
+    .string()
+    .nullable()
+    .optional()
+    .transform(value => (value && SIGNUP_METHOD.test(value) ? value : undefined)),
+  emailDomain: z
+    .string()
+    .nullable()
+    .optional()
+    .transform(value => {
+      const domain = value?.trim().toLowerCase();
+      return domain && SIGNUP_EMAIL_DOMAIN.test(domain) ? domain : undefined;
+    }),
+});
+
+export type SignupDecideRequest = z.input<typeof signupRequestSchema>;
+
+const signupFlagSchema = z.strictObject({
+  name: z.enum([
+    'signup:burst',
+    'signup:sustained',
+    'signup:busy',
+    'signup:domain',
+    'signup:ja4',
+    'signup:saturated',
+    'signup:banned',
+  ]),
+  decision: z.enum(['review', 'throttle', 'block']),
+  enforced: z.boolean(),
+  until: z.number().nonnegative().nullable(),
+  source: z.string().max(MAX_ID_LENGTH).optional(),
+});
+
+const signupFlagsSchema = z.array(signupFlagSchema).max(MAX_SIGNUP_FLAGS);
+
+/**
+ * Signup requires a validated verdict; an unavailable verdict prevents account creation. A
+ * `signup_step_up` verdict lists the sign-in methods that would be admitted now; callers render
+ * only the ones they know.
+ */
+const signupResponseSchema = z.union([
+  z.strictObject({
+    enforced: z.literal(false),
+    flags: signupFlagsSchema,
+  }),
+  z.strictObject({
+    enforced: z.literal(true),
+    code: z.literal('signup_rate_limited'),
+    retryAfterMs: z
+      .number()
+      .int()
+      .nonnegative()
+      // Allow clock and request-order skew beyond the longest supported window.
+      .max(31 * 24 * 60 * 60 * 1000),
+    flags: signupFlagsSchema,
+  }),
+  z.strictObject({
+    enforced: z.literal(true),
+    code: z.literal('signup_step_up'),
+    methods: z.array(z.string().regex(SIGNUP_METHOD)).min(1).max(8),
+    flags: signupFlagsSchema,
+  }),
+]);
+
+export type SignupDecideResponse = z.infer<typeof signupResponseSchema>;
 
 /** The explicit outcome of delivering one outbox event, for a durable outbox drainer. */
 export type BouncerDeliveryResult =
@@ -381,6 +472,7 @@ async function post(
 const CREDIT_EVENT_PATH = '/api/v2/credit-event';
 const USAGE_EVENT_PATH = '/api/v1/usage-event';
 const DECIDE_PATH = '/api/v1/decide';
+const SIGNUP_DECIDE_PATH = '/api/v1/signup-decide';
 const RELEASE_PATH = '/api/v1/release';
 
 const STORE_EVENT_TYPES: Record<StoreCreditEvent['type'], true> = {
@@ -543,7 +635,7 @@ export function usageEventWireBody(event: UsageEvent): Record<string, unknown> {
   // An anonymous request carries only the tier and its required ip; a signed-in one adds accountId.
   return 'tier' in event
     ? compact({ ...common, tier: event.tier })
-    : compact({ ...common, accountId: event.accountId });
+    : compact({ ...common, accountId: event.accountId, siwc: event.siwc === true || undefined });
 }
 
 /** Reports one inference request after its upstream response. Resolves on any failure. */
@@ -588,6 +680,7 @@ export async function decide(
           requestId: id(request.requestId),
           tier: request.tier,
           accountId: request.accountId,
+          userId: request.userId,
           ip: request.ip ?? undefined,
           ja4: normalizeJa4(request.ja4),
           accountCreatedAt: isoTime(request.accountCreatedAt ?? undefined),
@@ -599,6 +692,26 @@ export async function decide(
   const parsed = decideResponseSchema.safeParse(response);
   if (!parsed.success) {
     console.error('[bouncer] decide returned an unknown verdict shape', {
+      issues: parsed.error.issues.map(issue => ({ path: issue.path.join('.'), code: issue.code })),
+    });
+    return null;
+  }
+  return parsed.data;
+}
+
+/** Signup admission returns null on failure so the caller can reject it with a retryable error. */
+export async function signupDecide(
+  request: SignupDecideRequest,
+  { timeoutMs = SIGNUP_TIMEOUT_MS, signal }: { timeoutMs?: number; signal?: AbortSignal } = {}
+): Promise<SignupDecideResponse | null> {
+  const parsedRequest = signupRequestSchema.safeParse(request);
+  if (!parsedRequest.success) return null;
+  const response = await post(SIGNUP_DECIDE_PATH, parsedRequest.data, timeoutMs, signal);
+  if (response === null) return null;
+  const parsed = signupResponseSchema.safeParse(response);
+  if (!parsed.success) {
+    console.error('[bouncer] signup-decide returned an unknown verdict shape', {
+      operationId: request.operationId,
       issues: parsed.error.issues.map(issue => ({ path: issue.path.join('.'), code: issue.code })),
     });
     return null;

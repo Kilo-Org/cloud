@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   releaseGate: vi.fn(),
   waitForGateEngaged: vi.fn(),
   gateEngagementDetail: vi.fn(),
+  updateSessionCallbackTarget: vi.fn(async () => ({ success: true })),
 }));
 
 // Only the network functions are faked. `collectUntilTerminal`,
@@ -38,6 +39,7 @@ vi.mock('../../e2e/client.js', async importOriginal => {
     releaseGate: mocks.releaseGate,
     waitForGateEngaged: mocks.waitForGateEngaged,
     gateEngagementDetail: mocks.gateEngagementDetail,
+    updateSessionCallbackTarget: mocks.updateSessionCallbackTarget,
   };
 });
 
@@ -264,14 +266,14 @@ function installPacedHold(
 }
 
 type FakeStream = StreamConnection & {
-  close: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn<() => void>>;
   waitForTerminal: ReturnType<typeof vi.fn>;
 };
 
 function fakeStream(events: StreamEvent[], terminal: StreamEvent): FakeStream {
   return {
     events,
-    close: vi.fn(),
+    close: vi.fn<() => void>(),
     waitFor: predicate => Promise.resolve(events.find(predicate) ?? null),
     waitForTerminal: vi.fn().mockResolvedValue(terminal),
     get receivedCount() {
@@ -1470,13 +1472,13 @@ describe('moved callback scenarios', () => {
   const names = ['callback-completion', 'callback-batch-followup', 'callback-interrupt'];
 
   it.each(names)(
-    '%s is admitted through callbacks + sessionSandbox and pins the legacy flow',
+    '%s is admitted through callbacks + sessionSandbox and runs on the control plane',
     async name => {
       const { SHARED_SCENARIOS } = await import('../../e2e/scenarios-shared.js');
       const definition = SHARED_SCENARIOS[name];
       expect(definition).toBeDefined();
       expect(definition.requires).toEqual(['callbacks', 'sessionSandbox']);
-      expect(definition.defaultApi).toBe('legacy');
+      expect(definition.defaultApi).toBe('unified');
       expect(definition.defaultConversation.length).toBeGreaterThan(0);
       expect(typeof definition.run).toBe('function');
     }
@@ -1541,7 +1543,7 @@ describe('shared dispatch API resolution', () => {
     };
   }
 
-  it('injects the callback definition pin when the API argument is omitted', async () => {
+  it('injects the callback definition surface when the API argument is omitted', async () => {
     const run = vi.fn(async (a: LifecycleArgs) =>
       passingScenarioResult('callback-completion', a.conversation)
     );
@@ -1552,23 +1554,26 @@ describe('shared dispatch API resolution', () => {
     );
 
     expect(result.ok).toBe(true);
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({ api: 'legacy' }), expect.anything());
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({ api: 'unified' }),
+      expect.anything()
+    );
   });
 
-  it('fails clearly and runs nothing when an explicit API conflicts with the callback pin', async () => {
+  it('fails clearly and runs nothing when an explicit API conflicts with the callback surface', async () => {
     const run = vi.fn(async () => {
       throw new Error('run must not be called');
     });
 
     const result = await runSharedScenario(
       { ...SHARED_SCENARIOS['callback-completion'], run },
-      { config, conversation: 'echo:done', api: 'unified', env: dispatchEnv() }
+      { config, conversation: 'echo:done', api: 'legacy', env: dispatchEnv() }
     );
 
     expect(result.ok).toBe(false);
     expect(result.unsupported).toBeUndefined();
-    expect(result.message).toContain('requires the legacy API');
-    expect(result.message).toContain('--api=unified conflicts with it');
+    expect(result.message).toContain('requires the unified API');
+    expect(result.message).toContain('--api=legacy conflicts with it');
     expect(run).not.toHaveBeenCalled();
   });
 
@@ -1595,6 +1600,8 @@ describe('callback scenario behaviour under both profiles', () => {
     mocks.fetchFakeRequests.mockImplementation(async () => ({ chatCompletions: ++requests }));
     mocks.getMessageResult.mockResolvedValue({ status: 'running' });
     mocks.openConnectedStream.mockReset();
+    mocks.updateSessionCallbackTarget.mockReset();
+    mocks.updateSessionCallbackTarget.mockResolvedValue({ success: true });
   });
 
   function fakeSessionSandbox(): SessionSandboxObservation {
@@ -1651,13 +1658,29 @@ describe('callback scenario behaviour under both profiles', () => {
     };
   }
 
-  function startCallbackSession(messageId: string): void {
+  /**
+   * Arm the callback-completion mocks: a boot turn (no callback target) that
+   * completes, then a `sendMessage` for the asserted turn. The single stream
+   * completes whichever message the scenario asks about, so the boot terminal,
+   * the asserted terminal, and the sink callback all line up.
+   */
+  function installCallbackCompletion(bootMessageId: string, completionMessageId: string): void {
+    mocks.fetchFakeRequests.mockImplementation(async () => ({ chatCompletions: 1 }));
+    mocks.getMessageResult.mockResolvedValue({ status: 'running' });
     mocks.startSession.mockResolvedValue({
       cloudAgentSessionId: SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
-      messageId,
+      messageId: bootMessageId,
       delivery: 'sent',
     });
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({ messageId: completionMessageId, delivery: 'sent' });
+    const stream = fakeStream([], completedEvent(bootMessageId));
+    stream.waitForTerminal.mockImplementation(async (_budget: number, messageId: string) =>
+      completedEvent(messageId)
+    );
+    mocks.openConnectedStream.mockReset();
+    mocks.openConnectedStream.mockResolvedValue(stream);
   }
 
   /**
@@ -1691,19 +1714,9 @@ describe('callback scenario behaviour under both profiles', () => {
     return stream;
   }
 
-  function bootCallback(bootMessageId: string): CallbackPayload {
-    return {
-      cloudAgentSessionId: SESSION_ID,
-      messageId: bootMessageId,
-      status: 'completed',
-      lastAssistantMessageText: 'warmup',
-    };
-  }
-
   it.each(profiles)('callback-completion passes in the %s profile', async profile => {
     const sink = fakeCallbackSink();
-    startCallbackSession('message_completion');
-    mocks.openStream.mockReturnValue(fakeStream([], completedEvent('message_completion')));
+    installCallbackCompletion('message_boot', 'message_completion');
     sink.push({
       cloudAgentSessionId: SESSION_ID,
       messageId: 'message_completion',
@@ -1714,21 +1727,24 @@ describe('callback scenario behaviour under both profiles', () => {
     const result = await runSharedScenario(SHARED_SCENARIOS['callback-completion'], {
       config,
       conversation: 'echo:done',
-      api: 'legacy',
       env: callbackEnvironment(profile, sink.observation, fakeSessionSandbox()),
     });
 
     expect(result.ok).toBe(true);
     expect(result.message).toContain('status=completed');
-    // The scenario forwards every config field and adds its own tracking hook so
-    // a prepare/initiation failure can still reach the prepared session.
+    // The public grouped start rejects callbackTarget, so the sink is registered
+    // after the boot turn through the internal updateSession endpoint.
     expect(mocks.startSession).toHaveBeenCalledWith(
       expect.objectContaining(config),
-      expect.objectContaining({ callbackTarget: { url: 'https://sink.example.test/cb' } }),
-      'legacy'
+      expect.objectContaining({ prompt: expect.any(String) }),
+      'unified'
     );
-    const startConfig = mocks.startSession.mock.calls[0]?.[0];
-    expect(startConfig?.onSessionCreated).toBeInstanceOf(Function);
+    expect(mocks.updateSessionCallbackTarget).toHaveBeenCalledWith(
+      expect.objectContaining(config),
+      SESSION_ID,
+      { url: 'https://sink.example.test/cb' },
+      expect.anything()
+    );
     // Finished work is not interrupted on the success path.
     expect(mocks.interruptSession).not.toHaveBeenCalled();
     expect(sink.closed).toHaveBeenCalledTimes(1);
@@ -1736,8 +1752,7 @@ describe('callback scenario behaviour under both profiles', () => {
 
   it('callback-completion interrupts unfinished work on a mismatch', async () => {
     const sink = fakeCallbackSink();
-    startCallbackSession('message_completion');
-    mocks.openStream.mockReturnValue(fakeStream([], completedEvent('message_completion')));
+    installCallbackCompletion('message_boot', 'message_completion');
     sink.push({
       cloudAgentSessionId: SESSION_ID,
       messageId: 'message_completion',
@@ -1748,7 +1763,6 @@ describe('callback scenario behaviour under both profiles', () => {
     const result = await runSharedScenario(SHARED_SCENARIOS['callback-completion'], {
       config,
       conversation: 'echo:done',
-      api: 'legacy',
       env: callbackEnvironment('local-http', sink.observation, fakeSessionSandbox()),
     });
 
@@ -1759,21 +1773,20 @@ describe('callback scenario behaviour under both profiles', () => {
     );
   });
 
-  it('interrupts the prepared session when a two-step start fails between prepare and initiation', async () => {
+  it('interrupts the created session when the boot start fails after reporting its session id', async () => {
     const sink = fakeCallbackSink();
     const preparedId = 'workspace_prepared_partial';
-    // The legacy prepare path reports the session id through onSessionCreated
-    // before initiation; the scenario must reach that id for its failure-path
+    // The grouped start reports the session id through onSessionCreated before
+    // its task fails; the scenario must reach that id for its failure-path
     // interrupt even though `startSession` never returns.
     mocks.startSession.mockImplementation(async (startConfig: DriverConfig) => {
-      startConfig.onSessionCreated?.(preparedId);
+      startConfig.onSessionCreated?.(preparedId, KILO_SESSION_ID);
       throw new Error('initiateFromKilocodeSessionV2 failed');
     });
 
     const result = await runSharedScenario(SHARED_SCENARIOS['callback-completion'], {
       config,
       conversation: 'echo:done',
-      api: 'legacy',
       env: callbackEnvironment('local-http', sink.observation, fakeSessionSandbox()),
     });
 
@@ -1788,7 +1801,6 @@ describe('callback scenario behaviour under both profiles', () => {
   it.each(profiles)('callback-interrupt passes in the %s profile', async profile => {
     const sink = fakeCallbackSink();
     installCallbackPacedHold('message_boot', 'message_interrupt');
-    sink.push(bootCallback('message_boot'));
     sink.push({
       cloudAgentSessionId: SESSION_ID,
       messageId: 'message_interrupt',
@@ -1798,7 +1810,6 @@ describe('callback scenario behaviour under both profiles', () => {
     const result = await runSharedScenario(SHARED_SCENARIOS['callback-interrupt'], {
       config,
       conversation: '_',
-      api: 'legacy',
       env: callbackEnvironment(profile, sink.observation, fakeSessionSandbox()),
     });
 
@@ -1815,7 +1826,6 @@ describe('callback scenario behaviour under both profiles', () => {
   it('callback-interrupt interrupts the created session when paced readiness never holds', async () => {
     const sink = fakeCallbackSink();
     installCallbackPacedHold('message_boot', 'message_interrupt');
-    sink.push(bootCallback('message_boot'));
     // Correlated progress is present, but the fake request counter never
     // increases, so the bounded paced-progress wait must time out.
     mocks.fetchFakeRequests.mockResolvedValue({ chatCompletions: 3 });
@@ -1823,7 +1833,6 @@ describe('callback scenario behaviour under both profiles', () => {
     const result = await runSharedScenario(SHARED_SCENARIOS['callback-interrupt'], {
       config,
       conversation: '_',
-      api: 'legacy',
       timeoutMs: 2_000,
       env: callbackEnvironment('local-http', sink.observation, fakeSessionSandbox()),
     });
@@ -1846,9 +1855,8 @@ describe('callback scenario behaviour under both profiles', () => {
         completedEvent('message_third'),
         completedEvent('message_after'),
       ]);
-      sink.push(bootCallback('message_boot'));
-      // The batch callbacks appear only when their turns are sent, so the
-      // helper's post-warm-up baseline cannot include them.
+      // The batch callbacks appear only when their turns are sent; the boot turn
+      // carries no callback target, so the post-registration baseline is empty.
       mocks.sendMessage
         .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'queued' })
         .mockImplementationOnce(async () => {
@@ -1873,7 +1881,6 @@ describe('callback scenario behaviour under both profiles', () => {
       const result = await runSharedScenario(SHARED_SCENARIOS['callback-batch-followup'], {
         config,
         conversation: '_',
-        api: 'legacy',
         env: callbackEnvironment(profile, sink.observation, fakeSessionSandbox()),
       });
 
@@ -1886,7 +1893,6 @@ describe('callback scenario behaviour under both profiles', () => {
   );
 
   it('callback-batch-followup rejects a callback that arrives during the quiet window', async () => {
-    const boot = bootCallback('message_boot');
     const third: CallbackPayload = {
       cloudAgentSessionId: SESSION_ID,
       messageId: 'message_third',
@@ -1905,8 +1911,8 @@ describe('callback scenario behaviour under both profiles', () => {
       status: 'completed',
       lastAssistantMessageText: 'extra',
     };
-    // Call 1 is the post-warm-up baseline, call 2 validates the queued batch,
-    // call 3 the sequential pair, call 4 is the quiet probe. The old body
+    // Call 1 is the post-registration baseline, call 2 validates the queued
+    // batch, call 3 the sequential pair, call 4 is the quiet probe. The old body
     // re-read the count at the quiet probe as its baseline, so the extra record
     // hid itself; the validated baseline of baseline+2 must reject it.
     let recordsCalls = 0;
@@ -1915,12 +1921,12 @@ describe('callback scenario behaviour under both profiles', () => {
         callbackUrl: 'https://sink.example.test/cb',
         records: async () => {
           recordsCalls += 1;
-          if (recordsCalls === 1) return [boot];
-          if (recordsCalls === 2) return [boot, third];
-          if (recordsCalls === 3) return [boot, third, after];
-          return [boot, third, after, extra];
+          if (recordsCalls === 1) return [];
+          if (recordsCalls === 2) return [third];
+          if (recordsCalls === 3) return [third, after];
+          return [third, after, extra];
         },
-        waitFor: async predicate => [boot, third, after].find(predicate) ?? null,
+        waitFor: async predicate => [third, after].find(predicate) ?? null,
         close: async () => {},
       }),
     };
@@ -1936,7 +1942,6 @@ describe('callback scenario behaviour under both profiles', () => {
     const result = await runSharedScenario(SHARED_SCENARIOS['callback-batch-followup'], {
       config,
       conversation: '_',
-      api: 'legacy',
       env: callbackEnvironment('local-http', observation, fakeSessionSandbox()),
     });
 
@@ -1977,7 +1982,6 @@ describe('converted load and fault scenarios', () => {
   it('large-stream and concurrent-chats require only sessionSandbox', () => {
     for (const name of ['large-stream', 'concurrent-chats']) {
       expect(SHARED_SCENARIOS[name]?.requires).toEqual(['sessionSandbox']);
-      expect(SHARED_SCENARIOS[name]?.requiresWorktreeCreation).toBe(true);
     }
   });
 
@@ -2004,7 +2008,6 @@ describe('converted load and fault scenarios', () => {
         'controlPlaneRuntime',
         'controlPlaneV2',
       ]);
-      expect(SHARED_SCENARIOS[name]?.requiresWorktreeCreation).toBe(true);
     }
   });
 
@@ -2209,6 +2212,71 @@ describe('moved queue scenario run isolation', () => {
 });
 
 describe('queue-while-busy settlement contract', () => {
+  it.each(['queue-while-busy', 'queue-interrupt-clears'])(
+    'retains queued-only hot follow-up expectations for legacy sessions in %s',
+    async scenario => {
+      installPacedHold('message_boot', 'message_held');
+      mocks.startSession.mockResolvedValue({
+        cloudAgentSessionId: 'agent_legacy',
+        kiloSessionId: KILO_SESSION_ID,
+        messageId: 'message_boot',
+        delivery: 'sent',
+      });
+      mocks.sendMessage
+        .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'sent' })
+        .mockResolvedValueOnce({ messageId: 'message_third', delivery: 'sent' });
+      const result = await runSharedScenario(SHARED_SCENARIOS[scenario], {
+        config,
+        conversation: '_',
+        timeoutMs: 5_000,
+        env: { ...queueHttpEnvironment(), requireControlPlaneSession: false },
+      });
+      expect(result.ok).toBe(false);
+      expect(result.message).toContain('expected delivery=queued');
+    }
+  );
+
+  it('accepts sent hot control-plane follow-ups while requiring FIFO sent evidence', async () => {
+    installPacedHold('message_boot', 'message_held', [
+      sentEvent('message_held'),
+      sentEvent('message_second'),
+      sentEvent('message_third'),
+      completedEvent('message_held'),
+      completedEvent('message_second'),
+      completedEvent('message_third'),
+    ]);
+    mocks.sendMessage
+      .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'sent' })
+      .mockResolvedValueOnce({ messageId: 'message_third', delivery: 'sent' });
+    const result = await runSharedScenario(SHARED_SCENARIOS['queue-while-busy'], {
+      config,
+      conversation: '_',
+      timeoutMs: 5_000,
+      env: queueHttpEnvironment(),
+    });
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('successful FIFO');
+  });
+
+  it('rejects completed control-plane follow-ups whose sent evidence is missing', async () => {
+    installPacedHold('message_boot', 'message_held', [
+      completedEvent('message_held'),
+      completedEvent('message_second'),
+      completedEvent('message_third'),
+    ]);
+    mocks.sendMessage
+      .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'sent' })
+      .mockResolvedValueOnce({ messageId: 'message_third', delivery: 'sent' });
+    const result = await runSharedScenario(SHARED_SCENARIOS['queue-while-busy'], {
+      config,
+      conversation: '_',
+      timeoutMs: 5_000,
+      env: queueHttpEnvironment(),
+    });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('delivery order');
+  });
+
   /**
    * #6660 settles each batched follow-up through its own delivery, so completion
    * frames can reach the client out of order. The scenario waits for every
@@ -2268,6 +2336,36 @@ describe('queue-while-busy settlement contract', () => {
 });
 
 describe('queue-interrupt-clears settlement contract', () => {
+  it('accepts sent control-plane acknowledgements with ordered sent interruption evidence', async () => {
+    installPacedHold('message_boot', 'message_held', [
+      sentEvent('message_second'),
+      sentEvent('message_third'),
+      interruptedDeliveryEvent('message_second', 'sent'),
+      interruptedDeliveryEvent('message_third', 'sent'),
+    ]);
+    mocks.sendMessage
+      .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'sent' })
+      .mockResolvedValueOnce({ messageId: 'message_third', delivery: 'sent' });
+    const result = await runSharedScenario(SHARED_SCENARIOS['queue-interrupt-clears'], {
+      config,
+      conversation: '_',
+      timeoutMs: 5_000,
+      env: queueHttpEnvironment(),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects out-of-order follow-up sent frames even when interruption deliveries agree', async () => {
+    const result = await runInterruptClearsWith([
+      sentEvent('message_third'),
+      sentEvent('message_second'),
+      interruptedDeliveryEvent('message_second', 'sent'),
+      interruptedDeliveryEvent('message_third', 'sent'),
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('delivery order');
+  });
+
   it('accepts an observed sent frame whose failure reports sent', async () => {
     const result = await runInterruptClearsWith([
       sentEvent('message_second'),

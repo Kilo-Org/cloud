@@ -8,6 +8,7 @@ import { createMessageId, MESSAGE_ID_PATTERN } from '../../src/session/message-i
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlaneAnswerReply,
   type ControlPlanePromptPayload,
 } from '../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneWrapperFrame } from '../../src/shared/control-plane-protocol.js';
@@ -93,14 +94,11 @@ function createFakeProvider(): FakeProvider {
     launchEnvs: [] as Record<string, string>[],
   };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(_ref, launchEnv) {
+    async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
       return { startSource: 'image' as const };
     },
@@ -189,6 +187,7 @@ function startWrapperPump(wrapper: FakeWrapper, recording: Recording): () => voi
   };
 }
 
+/** Two sessions on one sandbox: only a shared sandbox hosts more than one workspace. */
 async function setupSiblingPair(): Promise<{
   sandboxStub: DurableObjectStub<SandboxControlV2>;
   sessionA: string;
@@ -202,7 +201,9 @@ async function setupSiblingPair(): Promise<{
 }> {
   const sessionA = newSessionId();
   const sessionB = newSessionId();
-  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, sessionA);
+  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, sessionA, undefined, {
+    sandboxAllocation: 'cloudflare-shared',
+  });
   const provider = createFakeProvider();
   const sandboxStub = await installSandbox(sandboxId, provider.adapter);
 
@@ -267,18 +268,20 @@ async function messageStatus(
 async function registerOnlySession(): Promise<{
   sessionId: string;
   stub: DurableObjectStub<SandboxSessionV2>;
+  peer: FakeSandboxPeer;
 }> {
   const sessionId = newSessionId();
   const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
   const stub = sessions.getByName(sessionId);
+  const peer = new FakeSandboxPeer();
   await runInDurableObject(stub, instance => {
-    instance.sandboxPeerFor = () => new FakeSandboxPeer();
+    instance.sandboxPeerFor = () => peer;
   });
   await stub.registerSessionFromMetadata({
     metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
     sandboxSelection: { provider: 'cloudflare' },
   });
-  return { sessionId, stub };
+  return { sessionId, stub, peer };
 }
 
 afterEach(async () => {
@@ -359,6 +362,9 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
   it('forwards a live answer under this session, ignoring the caller session id', async () => {
     const pair = await setupSiblingPair();
     try {
+      await pair.stubA.onEvents({
+        events: [{ type: 'question.asked', properties: { id: 'q_1' } }],
+      });
       // The reply names the sibling B, but the RPC runs on A: the frame the
       // wrapper receives must carry A, so a wrong id cannot reach B's route.
       await expect(
@@ -377,6 +383,181 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
     } finally {
       pair.stopPump();
     }
+  });
+
+  it('refuses unknown, wrong-kind and sibling interaction ids while both sessions have accepted turns', async () => {
+    const pair = await setupSiblingPair();
+    try {
+      await pair.stubA.onEvents({
+        events: [
+          { type: 'question.asked', properties: { id: 'q_1' } },
+          { type: 'permission.asked', properties: { id: 'p_1' } },
+        ],
+      });
+      await pair.stubB.onEvents({
+        events: [
+          { type: 'question.asked', properties: { id: 'q_sibling' } },
+          { type: 'permission.asked', properties: { id: 'p_sibling' } },
+        ],
+      });
+      const before = await pair.stubA.getSession();
+      const replies: ControlPlaneAnswerReply[] = [
+        { action: 'answer', questionId: 'q_unknown', answers: [['yes']] },
+        { action: 'reject', questionId: 'q_unknown' },
+        { action: 'permission', permissionId: 'p_unknown', response: 'once' },
+        { action: 'answer', questionId: 'q_sibling', answers: [['yes']] },
+        { action: 'permission', permissionId: 'p_sibling', response: 'always' },
+        { action: 'answer', questionId: 'p_1', answers: [['yes']] },
+        { action: 'permission', permissionId: 'q_1', response: 'once' },
+      ];
+      for (const reply of replies) {
+        await expect(pair.stubA.answer({ sessionId: pair.sessionB, reply })).resolves.toBe(
+          'not_connected'
+        );
+      }
+      for (const reply of [
+        { action: 'answer', questionId: 'q_1', answers: [['yes']] },
+        { action: 'permission', permissionId: 'p_1', response: 'once' },
+      ] satisfies ControlPlaneAnswerReply[]) {
+        await expect(pair.stubB.answer({ sessionId: pair.sessionA, reply })).resolves.toBe(
+          'not_connected'
+        );
+      }
+      expect(pair.recording.answers).toEqual([]);
+      const after = await pair.stubA.getSession();
+      expect(before.type).toBe('found');
+      expect(after.type).toBe('found');
+      if (before.type !== 'found' || after.type !== 'found') throw new Error('Session disappeared');
+      expect(after.messages).toEqual(before.messages);
+      await expect(pair.stubA.getPendingInteractions()).resolves.toEqual({
+        questions: [{ id: 'q_1' }],
+        permissions: [{ id: 'p_1' }],
+      });
+      await expect(pair.stubB.getPendingInteractions()).resolves.toEqual({
+        questions: [{ id: 'q_sibling' }],
+        permissions: [{ id: 'p_sibling' }],
+      });
+    } finally {
+      pair.stopPump();
+    }
+  });
+
+  it.each([
+    { action: 'answer', questionId: 'q_1', answers: [['yes']] },
+    { action: 'reject', questionId: 'q_1' },
+    { action: 'permission', permissionId: 'p_1', response: 'once' },
+    { action: 'permission', permissionId: 'p_1', response: 'always' },
+    { action: 'permission', permissionId: 'p_1', response: 'reject' },
+  ] satisfies ControlPlaneAnswerReply[])(
+    'durably resolves a delivered live $action reply once and refuses retries after settlement: $response',
+    async reply => {
+      const { sessionId, stub, peer } = await registerOnlySession();
+      peer.prepareView = peer.view('ready');
+      const initialMessageId = messageId();
+      await stub.send(promptPayload(initialMessageId));
+      expect(await messageStatus(stub, initialMessageId)).toBe('running');
+      const permission = reply.action === 'permission';
+      await stub.onEvents({
+        events: [
+          {
+            type: permission ? 'permission.asked' : 'question.asked',
+            properties: { id: permission ? reply.permissionId : reply.questionId },
+          },
+        ],
+      });
+      const payload = { sessionId, reply };
+      expect(await Promise.all([stub.answer(payload), stub.answer(payload)])).toEqual([
+        'sent',
+        'not_connected',
+      ]);
+      expect(peer.answerCalls).toEqual([payload]);
+      await expect(stub.getPendingInteractions()).resolves.toEqual({
+        questions: [],
+        permissions: [],
+      });
+      const persisted = await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get('session_pending_interactions')
+      );
+      expect(persisted).toEqual({ revision: 2, questions: [], permissions: [] });
+
+      await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: initialMessageId });
+      const before = await stub.getSession();
+      await expect(stub.answer(payload)).resolves.toBe('not_connected');
+      const after = await stub.getSession();
+      expect(before.type).toBe('found');
+      expect(after.type).toBe('found');
+      if (before.type !== 'found' || after.type !== 'found') throw new Error('Session disappeared');
+      expect(after.messages).toEqual(before.messages);
+      expect(peer.deliverCalls).toHaveLength(1);
+      expect(peer.answerCalls).toEqual([payload]);
+    }
+  );
+
+  it('retains a live pending interaction when delivery fails, then resolves only the successful retry', async () => {
+    const { sessionId, stub, peer } = await registerOnlySession();
+    peer.prepareView = peer.view('ready');
+    await stub.send(promptPayload(messageId()));
+    await stub.onEvents({
+      events: [{ type: 'permission.asked', properties: { id: 'p_1' } }],
+    });
+    const payload = {
+      sessionId,
+      reply: { action: 'permission', permissionId: 'p_1', response: 'once' },
+    } as const;
+    const answer = peer.answer.bind(peer);
+    await runInDurableObject(stub, () => {
+      Object.assign(peer, { answer: async () => 'not_connected' });
+    });
+    await expect(stub.answer(payload)).resolves.toBe('not_connected');
+    await runInDurableObject(stub, () => {
+      Object.assign(peer, {
+        answer: async () => {
+          throw new Error('answer transport failed');
+        },
+      });
+    });
+    await expect(stub.answer(payload)).resolves.toBe('not_connected');
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get('session_pending_interactions')
+      )
+    ).toEqual({ revision: 1, questions: [], permissions: [{ id: 'p_1' }] });
+    await runInDurableObject(stub, () => {
+      peer.answer = answer;
+    });
+    await expect(stub.answer(payload)).resolves.toBe('sent');
+    await expect(stub.answer(payload)).resolves.toBe('not_connected');
+    expect(peer.answerCalls).toEqual([payload]);
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get('session_pending_interactions')
+      )
+    ).toEqual({ revision: 2, questions: [], permissions: [] });
+  });
+
+  it('refuses replies to interactions already resolved by runtime events while a turn is accepted', async () => {
+    const { sessionId, stub, peer } = await registerOnlySession();
+    peer.prepareView = peer.view('ready');
+    await stub.send(promptPayload(messageId()));
+    await stub.onEvents({
+      events: [
+        { type: 'question.asked', properties: { id: 'q_1' } },
+        { type: 'permission.asked', properties: { id: 'p_1' } },
+        { type: 'question.replied', properties: { requestID: 'q_1' } },
+        { type: 'permission.replied', properties: { requestID: 'p_1' } },
+      ],
+    });
+    await expect(
+      stub.answer({ sessionId, reply: { action: 'answer', questionId: 'q_1', answers: [['yes']] } })
+    ).resolves.toBe('not_connected');
+    await expect(
+      stub.answer({
+        sessionId,
+        reply: { action: 'permission', permissionId: 'p_1', response: 'once' },
+      })
+    ).resolves.toBe('not_connected');
+    expect(peer.answerCalls).toEqual([]);
+    expect(peer.deliverCalls).toHaveLength(1);
   });
 
   it('admits a settled answer as a time-sortable new message', async () => {
@@ -450,6 +631,12 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
         reply: { action: 'answer', questionId: 'q_unknown', answers: [['x']] },
       })
     ).resolves.toBe('not_connected');
+    await expect(
+      stub.answer({
+        sessionId,
+        reply: { action: 'permission', permissionId: 'p_unknown', response: 'once' },
+      })
+    ).resolves.toBe('not_connected');
 
     // Ask, answer once (admitted), then repeat with the resolved id.
     await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: 'q_1' } }] });
@@ -468,7 +655,6 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
 
     const after = await stub.getSession();
     const afterCount = after.type === 'found' ? after.messages.length : -1;
-    // Exactly one turn was admitted across the three attempts.
     expect(afterCount).toBe(beforeCount + 1);
     await expect(stub.getPendingInteractions()).resolves.toEqual({
       questions: [],
@@ -477,7 +663,7 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
   });
 
   it('projects questions and permissions and resolves each through getPendingInteractions', async () => {
-    const { sessionId, stub } = await registerOnlySession();
+    const { stub } = await registerOnlySession();
     await stub.onEvents({
       events: [
         { type: 'question.asked', properties: { id: 'q_1' } },

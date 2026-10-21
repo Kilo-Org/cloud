@@ -205,6 +205,7 @@ export function NewSessionPrompt({
   }, []);
 
   const promptInputStyle = {
+    color: colors.foreground,
     includeFontPadding: false,
     fontSize: PROMPT_INPUT_FONT_SIZE * fontScale,
     lineHeight: promptLineHeight,
@@ -417,15 +418,13 @@ export function NewSessionPrompt({
         />
       ) : (
         <ChatToolbar
-          mode={mode}
-          onModeChange={onModeChange}
+          modeControl={{ mode, onModeChange, customOptions }}
           model={model}
           variant={variant}
           modelOptions={modelOptions}
           onModelSelect={onModelSelect}
           disabled={isCreating}
           isLoadingModels={isLoadingModels}
-          customOptions={customOptions}
           modelLocked={modelLocked}
           modelLockLabel={modelLockLabel}
           className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
@@ -479,6 +478,9 @@ export function NewSessionPrompt({
           // A shared payload prefills this input, so raising the keyboard on
           // arrival hides the attachment strip and the Start button.
           autoFocus={shareId === undefined || shareId === ''}
+          // Android's IME swaps the app for its full-screen extract editor in a
+          // landscape window; IME_FLAG_NO_FULLSCREEN keeps the field in place.
+          disableFullscreenUI
         />
         {showsCounter ? (
           <View className="flex-row justify-end px-1 pb-1">

@@ -41,7 +41,8 @@ export const RETRYABLE_RELAY_CODES = new Set([
 
 export type InstanceModelCatalogResult =
   | { ok: true; catalog: RemoteModelCatalogV1 }
-  | { ok: false; reason: 'unsupported' | 'invalid' | 'transport' };
+  | { ok: false; reason: 'unsupported' | 'invalid' }
+  | { ok: false; reason: 'transport'; cause?: unknown };
 
 /**
  * Request the model catalog of a specific CLI connection before a session
@@ -60,6 +61,9 @@ export type InstanceModelCatalogResult =
  * - Rejected with a retryable relay code or a transport-level failure →
  *   `{ ok: false, reason: 'transport' }`.
  *
+ * A `transport` outcome carries the caught failure as `cause`, so a caller
+ * that reports it can attach what actually went wrong.
+ *
  * Never throws and never logs.
  */
 export async function listInstanceModels(
@@ -77,21 +81,21 @@ export async function listInstanceModels(
     if (error instanceof CommandDeliveredError) {
       return error.message === INVALID_LIST_MODELS_COMMAND
         ? { ok: false, reason: 'unsupported' }
-        : { ok: false, reason: 'transport' };
+        : { ok: false, reason: 'transport', cause: error };
     }
     if (error instanceof UserWebCommandError) {
       return RETRYABLE_RELAY_CODES.has(error.code)
-        ? { ok: false, reason: 'transport' }
+        ? { ok: false, reason: 'transport', cause: error }
         : { ok: false, reason: 'unsupported' };
     }
-    return { ok: false, reason: 'transport' };
+    return { ok: false, reason: 'transport', cause: error };
   }
 
   try {
     const parsed = remoteModelCatalogV1Schema.safeParse(raw);
     if (!parsed.success) return { ok: false, reason: 'invalid' };
     return { ok: true, catalog: parsed.data };
-  } catch {
-    return { ok: false, reason: 'transport' };
+  } catch (error) {
+    return { ok: false, reason: 'transport', cause: error };
   }
 }

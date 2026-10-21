@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AUTH_REQUEST_TIMEOUT_MS, postAuth } from '@/lib/auth/auth-fetch';
 import { resetAuthTerminalReports } from '@/lib/auth/auth-response-class';
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
+import { createNetworkErrorFetch } from '@/lib/telemetry/network-errors';
 
 // Mock @/lib/config to avoid pulling in react-native at module import time.
 vi.mock('@/lib/config', () => ({
@@ -168,4 +170,29 @@ describe('postAuth', () => {
       terminal: false,
     });
   });
+
+  // KILO-APP-2N2 duplicated KILO-APP-2VV: the global fetch wrapper filed the
+  // same terminal refusal the auth layer already reports. One event remains.
+  it.each([400, 403])(
+    'reports a terminal %i once, through the auth layer, behind the fetch wrapper',
+    async status => {
+      const events: TelemetryEvent[] = [];
+      setTelemetrySink(event => {
+        events.push(event);
+      });
+      const baseFetch = vi.fn();
+      baseFetch.mockResolvedValue(Response.json({ error: 'BLOCKED' }, { status }));
+      vi.stubGlobal('fetch', createNetworkErrorFetch(baseFetch as unknown as typeof fetch));
+      try {
+        await postAuth('/api/auth/native/token', { provider: 'email' });
+      } finally {
+        vi.unstubAllGlobals();
+        setTelemetrySink(null);
+      }
+
+      expect(events.map(event => event.fingerprint)).toEqual([
+        ['auth-terminal', '/api/auth/native/token', String(status)],
+      ]);
+    }
+  );
 });

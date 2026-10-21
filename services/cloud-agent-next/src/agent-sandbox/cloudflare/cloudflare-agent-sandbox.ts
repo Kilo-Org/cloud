@@ -21,9 +21,9 @@ import { SANDBOX_SLEEP_AFTER_SECONDS } from '../../core/lease.js';
 import {
   generateSandboxId,
   deriveRetiredDindSandboxId,
-  getSandboxNamespace,
   MANAGED_SCM_OUTBOUND_HANDLER,
 } from '../../sandbox-id.js';
+import { resolveSandboxNamespace } from '../../sandbox-placement.js';
 import { SessionService } from '../../session-service.js';
 import { logger } from '../../logger.js';
 import { WrapperClient, WrapperContainerClient } from '../../kilo/wrapper-client.js';
@@ -63,6 +63,7 @@ import {
   type SandboxBillingInput,
 } from '../../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
+import { withDORetry } from '../../utils/do-retry.js';
 
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
@@ -157,8 +158,10 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     this.resolveSandbox =
       dependencies.resolveSandbox ??
       ((sandboxId, options) => {
-        const namespace = getSandboxNamespace(this.env, sandboxId, {
-          managedScmContainment: requiresContainmentSandbox(this.metadata),
+        const namespace = resolveSandboxNamespace(this.env, {
+          sandboxId,
+          sandboxKind: this.metadata.workspace?.sandboxKind,
+          contained: requiresContainmentSandbox(this.metadata),
         });
         return options
           ? getSandbox(namespace, sandboxId, options)
@@ -188,6 +191,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
               this.metadata.identity.botId,
               {
                 createdOnPlatform: this.metadata.identity.billingOrigin,
+                legacyFallback: true,
               }
             );
     }
@@ -229,10 +233,12 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     bypassBilling?: boolean;
   }): Promise<SandboxInstance> {
     const sandboxId = await this.resolveSandboxId();
-    const sandbox = this.resolveSandbox(
-      sandboxId,
-      options?.sleepAfter === undefined ? undefined : { sleepAfter: options.sleepAfter }
-    );
+    const resolveSandbox = () =>
+      this.resolveSandbox(
+        sandboxId,
+        options?.sleepAfter === undefined ? undefined : { sleepAfter: options.sleepAfter }
+      );
+    let sandbox = resolveSandbox();
     const input = this.billingInput(sandboxId);
     if (!options?.bypassBilling) {
       const blocked = await this.sandboxBillingBlocked(sandbox);
@@ -247,11 +253,14 @@ export class CloudflareAgentSandbox implements AgentSandbox {
           );
         }
       } else {
-        void this.configureBilling(sandbox, input).catch(error => {
-          logger
-            .withFields({ error: error instanceof Error ? error.message : String(error) })
-            .warn('Container usage shadow configuration deferred');
-        });
+        sandbox = await withDORetry(
+          resolveSandbox,
+          async sandbox => {
+            await this.configureBilling(sandbox, input);
+            return sandbox;
+          },
+          'configureSandboxBilling'
+        );
       }
     }
     return sandbox;
@@ -549,6 +558,24 @@ export class CloudflareAgentSandbox implements AgentSandbox {
       await sandbox.destroy();
       return;
     }
+
+    // Retention cleanup and session deletion are container fetches, so they boot a
+    // sleeping container. A stopped container has no exec session and an ephemeral
+    // workspace, so retention cleanup for an already-stopped shared sandbox must not
+    // wake it. Explicit deletion is rare and still removes session data, including
+    // credentials, so it keeps the wake. Unknown state stays fail-safe too.
+    if (reason === 'retention-expired' && (await isSandboxContainerRunning(sandbox)) === false) {
+      logger
+        .withTags({
+          logTag: 'sandbox_delete_cleanup_skipped',
+          sessionId: this.metadata.identity.sessionId,
+          sandboxId: await this.resolveSandboxId(),
+        })
+        .withFields({ reason })
+        .info('Sandbox container is stopped; skipping delete cleanup');
+      return;
+    }
+
     try {
       const session = await sandbox.getSession(this.metadata.identity.sessionId);
       await cleanupWorkspace(
@@ -563,6 +590,14 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     } catch {
       // Cleanup remains best effort before session resource deletion.
     }
-    await sandbox.deleteSession(this.metadata.identity.sessionId);
+    const sessionId = this.metadata.identity.sessionId;
+    try {
+      await sandbox.deleteSession(sessionId);
+    } catch (error) {
+      // A replaced container has no exec session for this id, so the session is already gone.
+      // The container reports this as INTERNAL_ERROR, so match its exact message.
+      if (error instanceof Error && error.message === `Session '${sessionId}' not found`) return;
+      throw error;
+    }
   }
 }

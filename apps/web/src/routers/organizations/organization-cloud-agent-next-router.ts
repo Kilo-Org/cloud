@@ -4,9 +4,10 @@ import { sandboxSelectionCapabilitiesSchema } from '@kilocode/worker-utils/sandb
 import {
   createCloudAgentNextClient,
   createCloudAgentNextClientForModel,
-  rethrowAsPaymentRequired,
+  rethrowCloudAgentError,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
+import { isPublicRepoUrlEnabled } from '@/lib/cloud-agent-next/public-repo-url';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
@@ -64,6 +65,8 @@ import {
   baseResizeTerminalNextOutputSchema,
   baseCloseTerminalNextSchema,
   baseCloseTerminalNextOutputSchema,
+  baseCreatePreviewNextSchema,
+  baseCreatePreviewNextOutputSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
   cloudAgentLinkPendingUploadsSchema,
@@ -90,7 +93,8 @@ async function createCloudAgentControlToken(
     })
   ).token;
 }
-import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
+import { signPreviewTicket, signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
+import { buildPreviewOpenUrl } from '@/lib/cloud-agent/preview-open-url';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
@@ -231,6 +235,10 @@ const CreateTerminalInput = baseCreateTerminalNextSchema.extend({
   organizationId: z.uuid(),
 });
 
+const CreatePreviewInput = baseCreatePreviewNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
 const RefreshTerminalTicketInput = baseRefreshTerminalTicketNextSchema.extend({
   organizationId: z.uuid(),
 });
@@ -283,7 +291,13 @@ const ListBitbucketRepositoriesInput = z.object({
  */
 export const organizationCloudAgentNextRouter = createTRPCRouter({
   getSandboxSelectionOptions: organizationMemberProcedure
-    .input(z.object({ devcontainer: z.boolean().optional() }))
+    .input(
+      z.object({
+        devcontainer: z.boolean().optional(),
+        repositoryType: z.enum(['github', 'gitlab', 'bitbucket', 'git']).optional(),
+        repositoryFullName: z.string().min(1).max(500).optional(),
+      })
+    )
     .output(sandboxSelectionCapabilitiesSchema)
     .query(async ({ ctx, input }) => {
       const authToken = await createCloudAgentControlToken(
@@ -293,6 +307,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       );
       return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({
         kilocodeOrganizationId: input.organizationId,
+        ...(input.repositoryType ? { repositoryType: input.repositoryType } : {}),
+        ...(input.repositoryFullName ? { repositoryFullName: input.repositoryFullName } : {}),
       });
     }),
 
@@ -325,6 +341,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         githubRepo,
         githubIntegrationId,
         bitbucketRepo,
+        publicRepoUrl,
         organizationId,
         attachments,
         images,
@@ -354,6 +371,14 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           bitbucketWorkspaceUuid: bitbucketRepo.workspaceUuid,
           bitbucketRepositoryUuid: bitbucketRepo.repositoryUuid,
         };
+      } else if (publicRepoUrl) {
+        if (!isPublicRepoUrlEnabled()) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Public repository URLs are only available in local development',
+          });
+        }
+        gitParams = { gitUrl: publicRepoUrl };
       } else {
         gitParams = { githubRepo, githubIntegrationId, platform: PLATFORM.GITHUB };
       }
@@ -384,8 +409,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
 
         return result;
       } catch (error) {
-        rethrowAsPaymentRequired(error);
-        throw error;
+        rethrowCloudAgentError(error);
       }
     }),
 
@@ -398,6 +422,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         headersList: ctx.headersList,
         sourceKiloSessionId: input.sourceKiloSessionId,
         operationKey: input.operationKey,
+        kiloSessionId: input.kiloSessionId,
         organizationId: input.organizationId,
       })
     ),
@@ -432,8 +457,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           cloudAgentSessionId: input.cloudAgentSessionId,
         });
       } catch (error) {
-        rethrowAsPaymentRequired(error);
-        throw error;
+        rethrowCloudAgentError(error);
       }
     }),
 
@@ -517,8 +541,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
 
         return result;
       } catch (error) {
-        rethrowAsPaymentRequired(error);
-        throw error;
+        rethrowCloudAgentError(error);
       }
     }),
 
@@ -636,6 +659,25 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       } catch (error) {
         rethrowAsTerminalError(error);
       }
+    }),
+
+  createPreview: organizationMemberMutationProcedure
+    .input(CreatePreviewInput)
+    .output(baseCreatePreviewNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+
+      const { ticket, expiresAt } = signPreviewTicket({
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        port: input.port,
+        organizationId: input.organizationId,
+      });
+      return { url: buildPreviewOpenUrl(ticket, input.path), expiresAt };
     }),
 
   refreshTerminalTicket: organizationMemberMutationProcedure

@@ -215,6 +215,56 @@ describe('ChatSidebar row rendering', () => {
     });
   }
 
+  it('does not flash an empty state while the session list loads', () => {
+    renderSidebar({ isLoading: true });
+    expect(dom.container.querySelector('[role="status"]')?.getAttribute('aria-label')).toBe(
+      'Loading sessions'
+    );
+    expect(dom.container.textContent).not.toContain('No sessions yet');
+    renderSidebar({ isLoading: false });
+    expect(dom.container.textContent).toContain('No sessions yet');
+  });
+
+  it('keeps one skeleton until sessions, names and folders are ready together', () => {
+    const session = makeSession(0, { worktreeId: 'worktree_ready' });
+    renderSidebar({ sessions: [session], isLoading: true });
+    expect(dom.container.querySelector('[aria-label="Loading sessions"]')).not.toBeNull();
+    expect(dom.container.querySelector('[data-worktree-id="worktree_ready"]')).toBeNull();
+
+    renderSidebar({ sessions: [session] });
+    expect(dom.container.querySelector('[aria-label="Loading sessions"]')).toBeNull();
+    expect(dom.container.querySelector('[data-worktree-id="worktree_ready"]')).not.toBeNull();
+  });
+
+  it('waits for the worktree name instead of flashing a repository label', () => {
+    const session = makeSession(0, { worktreeId: 'worktree_loading' });
+    renderSidebar({ sessions: [session], loadingWorktreeIds: ['worktree_loading'] });
+    const row = dom.container.querySelector('[data-worktree-id="worktree_loading"]');
+    expect(row?.textContent).not.toContain(session.repository);
+    expect(
+      row?.querySelector('button[aria-label="Open worktree Loading worktree…"]')
+    ).not.toBeNull();
+    renderSidebar({
+      sessions: [session],
+      worktreeDetails: {
+        worktree_loading: {
+          name: 'Stable workspace title',
+          defaultTitle: null,
+          prSession: null,
+          sessions: [],
+        },
+      },
+    });
+    expect(
+      dom.container.querySelector('[data-worktree-id="worktree_loading"]')?.textContent
+    ).toContain('Stable workspace title');
+    // A metadata failure must leave the row usable with its repository fallback.
+    renderSidebar({ sessions: [session] });
+    expect(
+      dom.container.querySelector('[data-worktree-id="worktree_loading"]')?.textContent
+    ).toContain(session.repository);
+  });
+
   function rowElement(sessionId: string): HTMLElement {
     let node: Element | null = dom.container.querySelector(`[data-session-pr="${sessionId}"]`);
     while (node) {
@@ -263,6 +313,113 @@ describe('ChatSidebar row rendering', () => {
       props.onChange({ target: { value } });
     });
   }
+
+  function folderDragFixture() {
+    const ids = [
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    ];
+    const sessions = ids.map((id, index) =>
+      makeSession(index, {
+        worktreeId: `worktree_${id}`,
+        cloudAgentSessionId: `workspace_${id}`,
+      })
+    );
+    const workspaceFolders = {
+      folders: [
+        { id: ids[0], name: 'Product', color: 'blue' as const, worktreeIds: [] as string[] },
+      ],
+      isLoading: false,
+      isFirstLoadPending: false,
+      isError: false,
+      isSaving: false,
+      collapsedFolderIds: [],
+      toggleFolder: jest.fn(),
+      saveFolder: jest.fn(async () => true),
+      setFolderColor: jest.fn(async () => true),
+      deleteFolder: jest.fn(async () => true),
+      moveWorktree: jest.fn(async () => false),
+      reorderFolders: jest.fn(async () => true),
+      refresh: jest.fn(async () => undefined),
+    } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
+    const dataTransfer = {
+      setData: jest.fn(),
+      setDragImage: jest.fn(),
+      effectAllowed: '',
+      dropEffect: '',
+    };
+    const dragEvent = (target: Element, type: string) => {
+      const event = new window.Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperties(event, {
+        dataTransfer: { value: dataTransfer },
+        clientX: { value: 30 },
+        clientY: { value: 45 },
+      });
+      act(() => {
+        target.dispatchEvent(event);
+      });
+    };
+    return { sessions, workspaceFolders, dataTransfer, dragEvent };
+  }
+
+  it.each([0, 1])('drags only ungrouped workspace row %i from its title into a folder', index => {
+    const { sessions, workspaceFolders, dataTransfer, dragEvent } = folderDragFixture();
+    const onOpenSession = jest.fn();
+    renderSidebar({ sessions, workspaceFolders, onOpenSession });
+    const session = sessions[index];
+    const row = dom.container.querySelector<HTMLElement>(
+      `[data-worktree-id="${session.worktreeId}"]`
+    );
+    const title = row?.querySelector('button span');
+    const folder = dom.container.querySelector('[data-folder-id]');
+    if (!row || !title || !folder) throw new Error('Drag source or target missing');
+    row.getBoundingClientRect = () => ({ left: 10, top: 20, width: 200, height: 36 }) as DOMRect;
+
+    expect(row.getAttribute('draggable')).toBe('true');
+    expect(dom.container.querySelector('.overflow-y-auto')?.classList.contains('select-none')).toBe(
+      true
+    );
+    dragEvent(title, 'dragstart');
+
+    expect(dataTransfer.effectAllowed).toBe('move');
+    expect(dataTransfer.setData).toHaveBeenCalledTimes(1);
+    expect(dataTransfer.setData).toHaveBeenCalledWith(
+      'application/x-kilo-workspace-folder',
+      JSON.stringify({ type: 'worktree', id: session.worktreeId })
+    );
+    expect(dataTransfer.setDragImage).toHaveBeenCalledWith(row, 20, 25);
+    expect(dom.container.querySelectorAll('[data-worktree-id].opacity-50')).toHaveLength(1);
+
+    dragEvent(folder, 'dragover');
+    expect(dataTransfer.dropEffect).toBe('move');
+    dragEvent(folder, 'drop');
+
+    expect(workspaceFolders.moveWorktree).toHaveBeenCalledTimes(1);
+    expect(workspaceFolders.moveWorktree).toHaveBeenCalledWith(
+      session.worktreeId,
+      workspaceFolders.folders[0].id
+    );
+    expect(onOpenSession).not.toHaveBeenCalled();
+    expect(dom.container.querySelectorAll('[data-worktree-id].opacity-50')).toHaveLength(0);
+  });
+
+  it('uses only the folder header as its drag image and clears cancelled drags', () => {
+    const { sessions, workspaceFolders, dataTransfer, dragEvent } = folderDragFixture();
+    workspaceFolders.folders[0].worktreeIds.push(sessions[0].worktreeId!);
+    renderSidebar({ sessions, workspaceFolders });
+    const header = dom.container.querySelector<HTMLElement>('[data-folder-id] > div');
+    if (!header) throw new Error('Folder header missing');
+    header.getBoundingClientRect = () => ({ left: 10, top: 20, width: 200, height: 36 }) as DOMRect;
+
+    dragEvent(header, 'dragstart');
+    expect(dataTransfer.setDragImage).toHaveBeenCalledWith(header, 20, 25);
+    expect(header.querySelector('[data-worktree-id]')).toBeNull();
+    dragEvent(header, 'dragend');
+    expect(dom.container.querySelector('[data-folder-id].opacity-50')).toBeNull();
+    expect(workspaceFolders.moveWorktree).not.toHaveBeenCalled();
+    expect(workspaceFolders.reorderFolders).not.toHaveBeenCalled();
+  });
 
   it('keeps immutable standalone rows flat when live inputs churn with stable callbacks', () => {
     const sessions = makeSessions(SESSION_COUNT);

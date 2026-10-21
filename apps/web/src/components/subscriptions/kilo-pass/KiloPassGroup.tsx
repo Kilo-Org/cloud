@@ -5,8 +5,6 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { useTRPC } from '@/lib/trpc/utils';
-import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@kilocode/web-shared/lib/kilo-pass/constants';
-import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { recommendKiloPassTierFromAverageMonthlyUsageUsd } from '@/lib/kilo-pass/recommend-tier';
@@ -27,12 +25,6 @@ import {
   getKiloPassProviderManagementModel,
   getKiloPassSubscriptionDisplayModel,
 } from './KiloPassDetail.logic';
-
-function getShowKiloPassTwoMonthPromo(showFirstMonthPromo: boolean): boolean {
-  return (
-    showFirstMonthPromo && dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF)
-  );
-}
 
 export function KiloPassGroup({
   showTerminal,
@@ -76,7 +68,6 @@ export function KiloPassGroup({
   }
 
   const showFirstMonthPromo = query.data?.isEligibleForFirstMonthPromo ?? false;
-  const showSecondMonthPromo = getShowKiloPassTwoMonthPromo(showFirstMonthPromo);
   const averageMonthlyUsageUsd = averageMonthlyUsageQuery.data?.averageMonthlyUsageUsd;
   const recommendedTier =
     typeof averageMonthlyUsageUsd === 'number'
@@ -153,7 +144,6 @@ export function KiloPassGroup({
             setCadence={setCadence}
             pending={checkout.isPending}
             showFirstMonthPromo={showFirstMonthPromo}
-            showSecondMonthPromo={showSecondMonthPromo}
             recommendedTier={recommendedTier}
             onSelectTier={tier => void startCheckout(tier)}
             showHeader={false}

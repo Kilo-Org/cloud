@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import type { Organization } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
 import {
@@ -73,6 +74,7 @@ export const subjects = {
   kiloPassOrgBlocked: 'Action required: Update Kilo Pass assignments',
   userDataExportReady: 'Your Kilo data export is ready',
   dataExportDownloadCode: 'Your Kilo data export download code',
+  autoRoutingPoolNotice: 'Kilo: Your custom Auto pool is ready',
 } as const;
 
 export type TemplateName = keyof typeof subjects;
@@ -101,20 +103,12 @@ export function renderNonAutolinkedText(str: string): RawHtml {
 // Both Next.js apps live at apps/<name> and run with their app directory as the
 // working directory, locally and on Vercel. Each app's next.config.mjs traces
 // these templates into its functions with outputFileTracingIncludes.
-const EMAIL_TEMPLATES_DIR = path.join(
-  process.cwd(),
-  '..',
-  '..',
-  'packages',
-  'web-shared',
-  'src',
-  'emails'
-);
+const EMAIL_TEMPLATES_DIR = path.join(process.cwd(), '..', '..', 'packages', 'web-shared', 'src');
 
 // Report an unreadable template before any caller can swallow the error; the
 // low-balance alert, for one, only logs send failures from after().
-function readTemplate(name: string): string {
-  const templatePath = path.join(EMAIL_TEMPLATES_DIR, `${name}.html`);
+function readTemplate(name: string, directory: 'emails' | 'marketing-emails'): string {
+  const templatePath = path.join(EMAIL_TEMPLATES_DIR, directory, `${name}.html`);
   try {
     return fs.readFileSync(templatePath, 'utf-8');
   } catch (error) {
@@ -126,13 +120,18 @@ function readTemplate(name: string): string {
   }
 }
 
-export function renderTemplate(name: string, vars: TemplateVars): string {
-  const html = readTemplate(name);
+export function renderTemplate(
+  name: string,
+  vars: TemplateVars,
+  directory: 'emails' | 'marketing-emails' = 'emails'
+): string {
+  const html = readTemplate(name, directory);
+  const templateVars: TemplateVars = { ...vars, support_email: SUPPORT_EMAIL };
   return html.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => {
-    if (!(key in vars)) {
+    if (!(key in templateVars)) {
       throw new Error(`Missing template variable '${key}' in email template '${name}'`);
     }
-    const value = vars[key];
+    const value = templateVars[key];
     return value instanceof RawHtml ? value.html : escapeHtml(value);
   });
 }
@@ -630,7 +629,7 @@ export async function sendAccountDeletionSupportNotification(
   userId: string
 ): Promise<void> {
   await sendViaMailgun({
-    to: 'hi@kilocode.ai',
+    to: SUPPORT_EMAIL,
     subject: `Account Deletion Request — ${userEmail}`,
     html: `<p>User <strong>${userEmail}</strong> (ID: <code>${userId}</code>) has requested account deletion from the mobile app.</p>`,
     replyTo: userEmail,
@@ -825,7 +824,7 @@ export async function sendKiloPassDuplicateCardCanceledEmail(
   to: string,
   props: { supportUrl?: string }
 ): Promise<SendResult> {
-  const support_url = props.supportUrl ?? `mailto:hi@kilocode.ai`;
+  const support_url = props.supportUrl ?? `mailto:${SUPPORT_EMAIL}`;
   return send({
     to,
     templateName: 'kiloPassDuplicateCardCanceled',

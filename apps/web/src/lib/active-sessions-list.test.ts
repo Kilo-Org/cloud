@@ -57,6 +57,8 @@ jest.mock('@/routers/cli-sessions-v2-router', () => {
 });
 
 import { CLOUD_AGENT_CANDIDATE_LIMIT, listActiveSessions } from './active-sessions-list';
+import { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 beforeEach(() => {
   for (const method of ['from', 'leftJoin', 'where', 'orderBy']) {
@@ -68,6 +70,17 @@ beforeEach(() => {
 });
 
 describe('listActiveSessions cloud candidates', () => {
+  it('rejects an unconfigured source instead of confirming empty Home work', async () => {
+    await expect(
+      listActiveSessions({
+        userId: 'user-1',
+        organizationId: null,
+        includeCloudAgentSessions: true,
+        requireCompleteSnapshot: true,
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    expect(selectMock).not.toHaveBeenCalled();
+  });
   it('applies a hard ceiling far above the live-agent target', async () => {
     const result = await listActiveSessions({
       userId: 'user-1',
@@ -85,6 +98,22 @@ describe('listActiveSessions cloud candidates', () => {
     // The owner's target is 100 live agents; the ceiling sits far above it (a
     // backstop, not a guarantee — see its doc comment).
     expect(CLOUD_AGENT_CANDIDATE_LIMIT).toBeGreaterThan(100);
+  });
+
+  it('scopes unfiltered cloud candidates to active organization access', async () => {
+    await listActiveSessions({
+      userId: 'user-1',
+      organizationId: undefined,
+      includeCloudAgentSessions: true,
+    });
+
+    const condition = chain.where.mock.calls[0]?.[0];
+    if (!(condition instanceof SQL)) {
+      throw new Error('Expected where condition');
+    }
+    const generated = new PgDialect().sqlToQuery(condition);
+    expect(generated.sql).toContain('active_member_organization.deleted_at IS NULL');
+    expect(generated.sql).toContain('active_member_membership.kilo_user_id');
   });
 
   it('does not cap the query below the 60 live candidates the tray must show', async () => {

@@ -51,13 +51,10 @@ final class KiloAppActionBridge: @unchecked Sendable {
   static let registrationTimeout: TimeInterval = 25
 
   private let lock = NSLock()
-  private var dispatcher: JavaScriptValue?
-  private var runtime: JavaScriptRuntime?
+  private var registration: DispatcherRegistration?
   /// Runs already waiting for `register(dispatcher:runtime:)`, keyed so that
   /// registration and the deadline each take exactly the waiter they own.
-  private var waiters: [
-    UUID: CheckedContinuation<(dispatcher: JavaScriptValue, runtime: JavaScriptRuntime), Error>
-  ] = [:]
+  private var waiters: [UUID: CheckedContinuation<DispatcherRegistration, Error>] = [:]
   /// Payloads that arrived before the dispatcher registered. iOS never parks
   /// one — `perform` waits for registration instead — but the module's
   /// registration contract returns this buffer to the JS side, which is the
@@ -66,45 +63,49 @@ final class KiloAppActionBridge: @unchecked Sendable {
 
   private init() {}
 
-  /// Stores the JS dispatcher and the runtime it belongs to and hands the pair
-  /// to every run already waiting. A late registration resumes its callers
-  /// directly instead of them re-checking on a timer.
+  /// Stores the JS dispatcher of `runtime` and hands it to every run already
+  /// waiting. A late registration resumes its callers directly instead of them
+  /// re-checking on a timer.
+  ///
+  /// Runs on the JS thread of `runtime` (the module's synchronous `Function`),
+  /// because it adds the registration to `runtime.longLivedObjects` and can
+  /// release a replaced dispatcher of the same runtime. A replaced registration
+  /// of an earlier runtime is not released here: that runtime's teardown sweep
+  /// owns it, and on reload it already ran, before this runtime started.
+  @JavaScriptActor
   func register(dispatcher: JavaScriptValue, runtime: JavaScriptRuntime) {
+    let next = DispatcherRegistration(dispatcher: dispatcher, runtime: runtime)
+    runtime.longLivedObjects.add(next)
     lock.lock()
-    self.dispatcher = dispatcher
-    self.runtime = runtime
+    let previous = registration
+    registration = next
     let waiting = waiters
     waiters = [:]
     lock.unlock()
+    if let previous, previous.runtime === runtime {
+      runtime.longLivedObjects.remove(previous)
+      previous.allowRelease()
+    }
     for waiter in waiting.values {
-      waiter.resume(returning: (dispatcher, runtime))
+      waiter.resume(returning: next)
     }
   }
 
-  /// Drops the registered dispatcher and runtime when the JS runtime goes away.
+  /// Forgets `released` when its runtime's teardown sweep releases it.
   ///
-  /// The mirror of the Android module's `OnDestroy` clear: a singleton that kept
-  /// a torn-down runtime would let a later App Intent execute on it. Clearing
+  /// A registration of an earlier runtime does not clear a later one. Clearing
   /// makes the next run wait for the replacement registration, which
   /// `waitUntilRegistered` already bounds. The parked buffer goes with it — a
   /// payload delivered to a dead runtime is not replayed against the next one.
-  /// A run parked here fails now rather than at its deadline: the registration
-  /// it waited for went away with the runtime.
-  func unregister() {
+  /// This only drops the bridge's reference; it never destroys a JSI value.
+  fileprivate func unregister(_ released: DispatcherRegistration) {
     lock.lock()
-    dispatcher = nil
-    runtime = nil
-    parkedPayloads = []
-    let waiting = waiters
-    waiters = [:]
-    lock.unlock()
-    for waiter in waiting.values {
-      waiter.resume(
-        throwing: KiloAppActionError.dispatcherUnavailable(
-          seconds: Int(KiloAppActionBridge.registrationTimeout)
-        )
-      )
+    defer { lock.unlock() }
+    guard registration === released else {
+      return
     }
+    registration = nil
+    parkedPayloads = []
   }
 
   /// Hands back the parked payloads and clears the buffer.
@@ -125,12 +126,12 @@ final class KiloAppActionBridge: @unchecked Sendable {
 
   /// Waits, bounded, for the JS dispatcher.
   ///
-  /// Returns the registered pair at once when there is one; otherwise parks a
+  /// Returns the registration at once when there is one; otherwise parks a
   /// `CheckedContinuation` that `register(dispatcher:runtime:)` resumes, and
   /// starts the one deadline task that fails it with
   /// `KiloAppActionError.dispatcherUnavailable`. A waiter removed from the
-  /// store is the only one resumed, so registration, teardown and the deadline
-  /// cannot resume the same continuation twice.
+  /// store is the only one resumed, so registration and the deadline cannot
+  /// resume the same continuation twice.
   ///
   /// Waiting is the capability iOS has and Android does not: an App Intent's
   /// `perform` answers its caller, so the bridge has to hold the run until JS
@@ -138,14 +139,14 @@ final class KiloAppActionBridge: @unchecked Sendable {
   /// `AppActionDispatcher`) never waits at all — it buffers a payload that
   /// arrives before registration and hands it back at `register`, and its
   /// `KiloActionActivity` answers through `setResult`.
-  func waitUntilRegistered(
+  private func waitUntilRegistered(
     timeout: TimeInterval = KiloAppActionBridge.registrationTimeout
-  ) async throws -> (dispatcher: JavaScriptValue, runtime: JavaScriptRuntime) {
+  ) async throws -> DispatcherRegistration {
     try await withCheckedThrowingContinuation { continuation in
       lock.lock()
-      if let dispatcher, let runtime {
+      if let registration {
         lock.unlock()
-        continuation.resume(returning: (dispatcher, runtime))
+        continuation.resume(returning: registration)
         return
       }
       let id = UUID()
@@ -181,14 +182,12 @@ final class KiloAppActionBridge: @unchecked Sendable {
   /// session id it created, and a refused one throws with the pipeline's own
   /// message, so Shortcuts shows a real result instead of a silent success.
   func perform(payload: [String: String]) async throws -> String {
-    let registered = try await waitUntilRegistered()
+    let registration = try await waitUntilRegistered()
     do {
       // All JSI access happens on the JS thread; the answer crosses back as a
       // plain `String`.
-      return try await registered.runtime.execute {
-        // `JavaScriptValue` only holds the reference; the callable form is its
-        // function view. Same idiom as ExpoModulesJSI's own promise resolvers.
-        let answer = try registered.dispatcher.getFunction().call(arguments: payload)
+      return try await registration.runtime.execute {
+        let answer = try registration.call(payload: payload)
         let resolved = try await KiloAppActionBridge.resolved(answer)
         return try KiloAppActionBridge.result(from: resolved)
       }
@@ -277,5 +276,44 @@ final class KiloAppActionBridge: @unchecked Sendable {
     }
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
+  }
+}
+
+/// The JS dispatcher one runtime registered, and that runtime.
+///
+/// The runtime's `longLivedObjects` owns this object. When the runtime tears
+/// down (a reload, such as the RTL language switch), the sweep calls
+/// `allowRelease()` on the JS thread while the runtime is still valid. That is
+/// the same contract `JavaScriptPromise` uses for the JSI values it holds.
+/// The dispatcher's JSI value is only destroyed there, or when the same
+/// runtime registers again: both on the JS thread of its own runtime. The
+/// bridge only borrows the object, so the bridge can drop it on any thread.
+@JavaScriptActor
+private final class DispatcherRegistration: LongLivedObject {
+  nonisolated let runtime: JavaScriptRuntime
+  private var dispatcher: JavaScriptValue?
+
+  init(dispatcher: JavaScriptValue, runtime: JavaScriptRuntime) {
+    self.dispatcher = dispatcher
+    self.runtime = runtime
+  }
+
+  /// Calls the dispatcher with one payload. The dispatcher reference is not
+  /// kept past this call, so a teardown while the answer is pending still
+  /// releases the dispatcher on time.
+  func call(payload: [String: String]) throws -> JavaScriptValue {
+    guard let dispatcher else {
+      throw KiloAppActionError.dispatcherUnavailable(
+        seconds: Int(KiloAppActionBridge.registrationTimeout)
+      )
+    }
+    // `JavaScriptValue` only holds the reference; the callable form is its
+    // function view. Same idiom as ExpoModulesJSI's own promise resolvers.
+    return try dispatcher.getFunction().call(arguments: payload)
+  }
+
+  func allowRelease() {
+    dispatcher = nil
+    KiloAppActionBridge.shared.unregister(self)
   }
 }

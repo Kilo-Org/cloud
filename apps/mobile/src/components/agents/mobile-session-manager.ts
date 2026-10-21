@@ -5,16 +5,19 @@ import {
   type FetchedSessionData,
   type JotaiStore,
   type KiloSessionId,
-  projectSessionGoal,
   type ResolvedSession,
   type SessionManager,
-  type SessionSnapshot,
+  type SessionSnapshotPageOutcome,
   type UserWebConnection,
 } from '@kilocode/cloud-agent-sdk';
 import { normalizeTransportPayload } from '@/components/agents/mobile-session-transport-payload';
 import { withCloudAgentDiagnostics } from '@/components/agents/mobile-session-diagnostics';
 import { RequestDeadlineError } from '@kilocode/event-service';
-import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-session-page-adapter';
+import {
+  fetchMobileSessionSnapshotPage,
+  SESSION_HISTORY_FAILURES,
+  SessionHistoryFailureError,
+} from '@/components/agents/mobile-session-page-adapter';
 import { type AgentMode } from '@/components/agents/mode-normalize';
 import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import {
@@ -163,6 +166,34 @@ export async function fetchSessionWithNotFoundRetry(
   }
 }
 
+/**
+ * The first page of a session just cloned onto a remote CLI, re-read while it
+ * is empty. The CLI answers `create_session` once the clone is in its own
+ * database; the transcript reaches session ingest only after the share
+ * bootstrap and the debounced full sync that follow. A read in between finds
+ * the session row with no history, and the transport reads the first page only
+ * once, so that empty page would stay on screen until the session is reopened.
+ * A clone always has messages, so an empty page here is never the final state.
+ */
+async function fetchClonedSessionFirstPage(
+  kiloSessionId: KiloSessionId
+): Promise<SessionSnapshotPageOutcome> {
+  let page = await fetchMobileSessionSnapshotPage(kiloSessionId, {});
+  for (
+    let attempt = 0;
+    attempt < SPAWNED_NOT_FOUND_MAX_ATTEMPTS &&
+    page.kind === 'success' &&
+    page.messages.length === 0;
+    attempt += 1
+  ) {
+    // eslint-disable-next-line no-await-in-loop -- flat 1s delay between re-reads
+    await defaultFetchSessionSleep(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS);
+    // eslint-disable-next-line no-await-in-loop -- each re-read waits for the previous one
+    page = await fetchMobileSessionSnapshotPage(kiloSessionId, {});
+  }
+  return page;
+}
+
 type CreateMobileAgentSessionManagerOptions = {
   store: JotaiStore;
   userWebConnection: UserWebConnection;
@@ -174,6 +205,8 @@ type CreateMobileAgentSessionManagerOptions = {
    * shared anonymous scope.
    */
   userId?: string;
+  /** A session just cloned onto a remote CLI: its first page waits for the synced transcript. */
+  clonedSessionId?: KiloSessionId;
 };
 
 const skipBatchOptions = { context: { skipBatch: true } };
@@ -183,7 +216,10 @@ export function createMobileAgentSessionManager({
   userWebConnection,
   organizationId: initialOrganizationId,
   userId,
+  clonedSessionId,
 }: Readonly<CreateMobileAgentSessionManagerOptions>): SessionManager {
+  // Cleared by the first successful read, so reconnect replays never wait.
+  let awaitingClonedHistory = clonedSessionId ?? null;
   // The route resolves the session's organization from its metadata read, but
   // that read can be paused (offline) or stalled when the route mounts the
   // session on its persisted transcript, so the scope handed in may still be
@@ -287,28 +323,36 @@ export function createMobileAgentSessionManager({
       return result;
     },
     fetchSnapshot: async (id: KiloSessionId) => {
-      const [sessionData, messagesResult] = await Promise.all([
+      // Bounded fallback: the transports prefer `fetchSnapshotPage`, and this
+      // legacy seam now reads the same newest page instead of exporting the
+      // whole session (`getSessionMessages`), which timed out on long sessions.
+      const [sessionData, page] = await Promise.all([
         trpcClient.cliSessionsV2.get.query({ session_id: id }),
-        trpcClient.cliSessionsV2.getSessionMessages.query({ session_id: id }),
+        fetchMobileSessionSnapshotPage(id, {}),
       ]);
-      const snapshotInfo = messagesResult.info as Partial<SessionSnapshot['info']> & {
-        metadata?: unknown;
-      };
-      // The goal lives in the session metadata; project it into `info` so the
-      // fixed goal section survives a snapshot replay (which would otherwise
-      // clobber the goal carried by the live session state).
-      const goal = projectSessionGoal(snapshotInfo.metadata);
+      if (page.kind !== 'success') {
+        throw new SessionHistoryFailureError(SESSION_HISTORY_FAILURES[page.kind]);
+      }
+      // The paged read already projects the goal from the session metadata, so
+      // the fixed goal section survives a snapshot replay.
       return {
         info: {
-          id: snapshotInfo.id ?? sessionData.session_id,
-          parentID: snapshotInfo.parentID ?? sessionData.parent_session_id ?? undefined,
-          ...(snapshotInfo.model ? { model: snapshotInfo.model } : {}),
-          ...(goal === undefined ? {} : { goal }),
+          id: page.info.id,
+          parentID: page.info.parentID ?? sessionData.parent_session_id ?? undefined,
+          ...(page.info.model ? { model: page.info.model } : {}),
+          ...(page.info.goal === undefined ? {} : { goal: page.info.goal }),
         },
-        messages: messagesResult.messages as SessionSnapshot['messages'],
+        messages: page.messages,
       };
     },
     fetchSnapshotPage: async (id: KiloSessionId, options: { cursor?: string }) => {
+      if (!options.cursor && id === awaitingClonedHistory) {
+        const firstPage = await fetchClonedSessionFirstPage(id);
+        if (firstPage.kind === 'success') {
+          awaitingClonedHistory = null;
+        }
+        return firstPage;
+      }
       const outcome = await fetchMobileSessionSnapshotPage(id, options);
       return outcome;
     },

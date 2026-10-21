@@ -1,11 +1,12 @@
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Shield, X } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -86,6 +87,7 @@ function TrustedImageHostList({
 export function TrustedHostsScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const { trustedHosts, hasLoaded } = useTrustedHosts();
   const { trustedImageHosts, hasLoaded: imageHostsLoaded } = useTrustedImageHosts();
 
@@ -95,16 +97,14 @@ export function TrustedHostsScreen() {
   // first, the way the passkey and device-session removal rows do
   // (apps/mobile/AGENTS.md).
   const confirmRevoke = (host: string, revoke: (host: string) => void, message: string) => {
-    Alert.alert(t('trustedHosts.revoke', { host }), message, [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('organization.members.revokeConfirm'),
-        style: 'destructive',
-        onPress: () => {
-          revoke(host);
-        },
+    confirm({
+      title: t('trustedHosts.revoke', { host }),
+      message,
+      confirmLabel: t('organization.members.revokeConfirm'),
+      onConfirm: () => {
+        revoke(host);
       },
-    ]);
+    });
   };
 
   return (
@@ -170,6 +170,8 @@ export function TrustedHostsScreen() {
           )}
         </TabScreenScrollView>
       )}
+
+      {dialog}
     </View>
   );
 }

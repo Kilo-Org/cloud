@@ -5,7 +5,7 @@
  * for reactive updates across the UI. Supports search and platform filtering.
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import {
   useMutation,
@@ -19,10 +19,7 @@ import pLimit from 'p-limit';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { RootRouter } from '@/routers/root-router';
-import {
-  cloudAgentWorktreeIdSchema,
-  type CloudAgentWorktreeId,
-} from '@kilocode/session-ingest-contracts';
+import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { useUserWebConnection } from '../CloudAgentProvider';
 import type {
   CloudStatus,
@@ -41,6 +38,14 @@ import {
 import { differenceInCalendarDays, format, isSameDay, startOfDay, subDays } from 'date-fns';
 import { extractRepoFromGitUrl } from '../utils/git-utils';
 import type { StoredSession } from '../types';
+import { getChatDisplayTitle } from '../utils/session-title';
+import { getCachedWorktreeDetails, getLoadingWorktreeIds } from './worktree-details-placeholder';
+import {
+  sidebarFolderListInput,
+  sidebarListInput,
+  sidebarUpdatedSince,
+  worktreeDetailsBatches,
+} from './sidebar-queries';
 
 /**
  * Extract "owner/repo" from a git URL for display.
@@ -51,7 +56,7 @@ function extractRepoDisplay(gitUrl: string | null | undefined): string {
 }
 
 export function dbSessionToStoredSession(session: DbSession | DbSessionV2): StoredSession {
-  const title = session.title || `Session ${session.session_id.substring(0, 8)}`;
+  const title = getChatDisplayTitle(session.title);
 
   const dbSession = session;
 
@@ -153,6 +158,8 @@ export function mergeWorktreeChatSessions(
       sessionsById.set(cachedSession.sessionId, cachedSession);
       continue;
     }
+    // A chat this client created gives way to the server's row as soon as it exists.
+    if (cachedSession.localSync) continue;
 
     const cachedSessionIsCurrent =
       new Date(cachedSession.updatedAt).getTime() >=
@@ -196,7 +203,7 @@ type WorktreeDetailsQueryData = inferRouterOutputs<RootRouter>['cliSessionsV2'][
 
 type SidebarSessionActivity = Pick<
   StoredSession,
-  'sessionId' | 'sessionStatus' | 'sessionStatusUpdatedAt'
+  'sessionId' | 'sessionStatus' | 'sessionStatusUpdatedAt' | 'updatedAt'
 >;
 
 export type SidebarForegroundSessionStatus = {
@@ -383,6 +390,8 @@ export function getSidebarWorktreePrSession(group: SidebarWorktreeGroup): Stored
 export function getSidebarWorktreeLabel(group: SidebarWorktreeGroup): string {
   const name = group.details?.name || group.details?.defaultTitle;
   if (name) return name;
+  // Known untitled: named like its chats until Kilo titles it. Unknown details keep the repository.
+  if (group.details) return getChatDisplayTitle(null);
 
   const repository =
     group.latestSession.repository ||
@@ -396,15 +405,18 @@ export function getSidebarWorktreeActivity(
   sessions: readonly SidebarSessionActivity[],
   activeSessionStatuses: ReadonlyMap<string, string>,
   authoritativeSessions: readonly SidebarSessionActivity[] = sessions,
-  foregroundSession?: SidebarForegroundSessionStatus | null
+  foregroundSession?: SidebarForegroundSessionStatus | null,
+  now = Date.now()
 ): SidebarWorktreeActivity {
   const sessionsById = new Map(authoritativeSessions.map(session => [session.sessionId, session]));
   for (const session of sessions) {
     const existing = sessionsById.get(session.sessionId);
     if (
       !existing ||
-      new Date(session.sessionStatusUpdatedAt ?? 0).getTime() >=
-        new Date(existing.sessionStatusUpdatedAt ?? 0).getTime()
+      new Date(session.sessionStatusUpdatedAt ?? 0).getTime() >
+        new Date(existing.sessionStatusUpdatedAt ?? 0).getTime() ||
+      (session.sessionStatusUpdatedAt === existing.sessionStatusUpdatedAt &&
+        new Date(session.updatedAt).getTime() >= new Date(existing.updatedAt).getTime())
     ) {
       sessionsById.set(session.sessionId, session);
     }
@@ -420,12 +432,17 @@ export function getSidebarWorktreeActivity(
     if (activeStatus !== undefined) isLive = true;
     const foregroundStatus =
       foregroundSession?.sessionId === session.sessionId ? foregroundSession.status : undefined;
+    const storedStatus =
+      (session.sessionStatus === 'busy' || session.sessionStatus === 'retry') &&
+      now - new Date(session.updatedAt).getTime() >= 20 * 60_000
+        ? null
+        : (session.sessionStatus ?? null);
     const statuses =
       foregroundStatus !== undefined
         ? [foregroundStatus]
         : activeStatus === 'idle'
           ? [activeStatus]
-          : [session.sessionStatus ?? null, activeStatus ?? null];
+          : [storedStatus, activeStatus ?? null];
     for (const status of statuses) {
       const priority =
         status === 'question' || status === 'permission'
@@ -448,7 +465,7 @@ export function getSidebarWorktreeActivity(
 
 export function patchSidebarWorktreeSessionStatus(
   data: WorktreeDetailsQueryData,
-  update: SidebarSessionActivity
+  update: Omit<SidebarSessionActivity, 'updatedAt'> & { updatedAt?: string }
 ): WorktreeDetailsQueryData {
   const worktrees = { ...data.worktrees };
   let changed = false;
@@ -459,7 +476,8 @@ export function patchSidebarWorktreeSessionStatus(
       new Date(update.sessionStatusUpdatedAt ?? 0).getTime() <
         new Date(existing.sessionStatusUpdatedAt ?? 0).getTime() ||
       (existing.sessionStatus === update.sessionStatus &&
-        existing.sessionStatusUpdatedAt === update.sessionStatusUpdatedAt)
+        existing.sessionStatusUpdatedAt === update.sessionStatusUpdatedAt &&
+        (update.updatedAt === undefined || existing.updatedAt === update.updatedAt))
     ) {
       continue;
     }
@@ -472,6 +490,7 @@ export function patchSidebarWorktreeSessionStatus(
               ...session,
               sessionStatus: update.sessionStatus ?? null,
               sessionStatusUpdatedAt: update.sessionStatusUpdatedAt ?? null,
+              updatedAt: update.updatedAt ?? session.updatedAt,
             }
           : session
       ),
@@ -479,8 +498,6 @@ export function patchSidebarWorktreeSessionStatus(
   }
   return changed ? { ...data, worktrees } : data;
 }
-
-const SIDEBAR_LIST_LIMIT = 200;
 
 /**
  * Stable string key for a single session list entry.
@@ -665,6 +682,8 @@ export function createSidebarQueryReconciler(reconcile: () => void): SidebarQuer
 
 type UseSidebarSessionsOptions = {
   organizationId?: string | null;
+  /** From the server, so the list's key matches its server prefetch. */
+  updatedSince?: string;
   searchQuery?: string;
   createdOnPlatform?: string | string[];
   gitUrl?: string | string[];
@@ -675,6 +694,7 @@ type UseSidebarSessionsReturn = {
   sessions: StoredSession[];
   cachedSessions: StoredSession[];
   worktreeDetails: Record<string, SidebarWorktreeDetails>;
+  loadingWorktreeIds: readonly string[];
   isLoading: boolean;
   refetchSessions: () => void;
   renameSessionLocally: (sessionId: string, newTitle: string) => void;
@@ -722,6 +742,7 @@ export function nextPrLinkVerification(
 export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSidebarSessionsReturn {
   const {
     organizationId,
+    updatedSince: serverUpdatedSince,
     searchQuery = '',
     createdOnPlatform,
     gitUrl,
@@ -748,18 +769,9 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
 
   const isSearchActive = searchQuery.length > 0;
 
-  // --- List query (default, non-search) ---
-  const updatedSince = useMemo(() => startOfDay(subDays(new Date(), 5)).toISOString(), []);
+  const [updatedSince] = useState(() => serverUpdatedSince ?? sidebarUpdatedSince(new Date()));
   const listInput = useMemo(
-    () => ({
-      updatedSince,
-      limit: SIDEBAR_LIST_LIMIT,
-      orderBy: 'updated_at' as const,
-      organizationId,
-      createdOnPlatform,
-      gitUrl,
-      fetchReviewDecision: true,
-    }),
+    () => sidebarListInput({ updatedSince, organizationId, createdOnPlatform, gitUrl }),
     [updatedSince, organizationId, createdOnPlatform, gitUrl]
   );
   const { data: listData, isLoading: isListLoading } = useQuery({
@@ -777,7 +789,6 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     },
   });
 
-  // --- Search query ---
   const searchInput = useMemo(
     () => ({ search_string: searchQuery, createdOnPlatform, organizationId, gitUrl }),
     [searchQuery, createdOnPlatform, organizationId, gitUrl]
@@ -820,15 +831,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       const parsed = cloudAgentWorktreeIdSchema.safeParse(id);
       if (!parsed.success) return [];
       const queryOptions = trpc.cliSessionsV2.list.queryOptions(
-        {
-          worktreeId: parsed.data,
-          limit: 1,
-          orderBy: 'updated_at',
-          organizationId,
-          createdOnPlatform,
-          gitUrl,
-          fetchReviewDecision: true,
-        },
+        sidebarFolderListInput(parsed.data, { organizationId, createdOnPlatform, gitUrl }),
         {
           enabled: !isSearchActive,
           staleTime: 5000,
@@ -879,12 +882,15 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     }
   }, [listData?.cliSessions, setDbSessions, isSearchActive]);
 
-  // Atom-derived sessions for list mode
   const cachedSessions = useMemo<StoredSession[]>(() => {
-    return recentSessions
+    const rows =
+      recentSessions.length === 0 && listData?.cliSessions && !isSearchActive
+        ? listData.cliSessions.map(apiSessionToDbSession)
+        : recentSessions;
+    return rows
       .filter(session => organizationId === undefined || session.organization_id === organizationId)
       .map(dbSessionToStoredSession);
-  }, [organizationId, recentSessions]);
+  }, [isSearchActive, listData?.cliSessions, organizationId, recentSessions]);
 
   // Convert search results directly to StoredSession[] (no Jotai atoms)
   const searchSessions = useMemo<StoredSession[]>(() => {
@@ -894,7 +900,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       repository: extractRepoDisplay(row.git_url),
       branch: row.git_branch,
       worktreeId: row.cloud_agent_worktree_id ?? null,
-      prompt: row.title || `Session ${row.session_id.substring(0, 8)}`,
+      prompt: getChatDisplayTitle(row.title),
       mode: 'code',
       model: '',
       status: row.cloud_agent_session_id ? ('active' as const) : ('completed' as const),
@@ -945,7 +951,9 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     if (!sharedConnection) return;
 
     const filters = { organizationId, createdOnPlatform, gitUrl } satisfies SidebarSessionFilters;
-    const patchWorktreeStatus = (update: SidebarSessionActivity) => {
+    const patchWorktreeStatus = (
+      update: Parameters<typeof patchSidebarWorktreeSessionStatus>[1]
+    ) => {
       const queries = queryClient.getQueriesData<WorktreeDetailsQueryData>(
         trpc.cliSessionsV2.worktreeDetails.pathFilter()
       );
@@ -1038,6 +1046,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
         sessionId: payload.session.sessionId,
         sessionStatus: payload.session.status,
         sessionStatusUpdatedAt: payload.session.statusUpdatedAt,
+        updatedAt: payload.session.updatedAt,
       });
       const next = eventRowToDbSession(payload.session);
       const filterResult = eventRowMatchesSidebarFilters(payload.session, filters);
@@ -1070,6 +1079,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
           sessionId: payload.sessionId,
           sessionStatus: payload.status,
           sessionStatusUpdatedAt: payload.statusUpdatedAt,
+          updatedAt: payload.updatedAt ?? undefined,
         });
         setDbSessions(prev =>
           sortSidebarDbSessions(
@@ -1128,28 +1138,24 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
           ),
     [isSearchActive, searchSessions, cachedSessions, folderQueries.sessions]
   );
-  const isLoading = isSearchActive ? isSearchLoading : isListLoading;
-  const worktreeIdBatches = useMemo(() => {
-    const ids = [
-      ...new Set(
-        sessions.flatMap(session => {
-          const parsed = cloudAgentWorktreeIdSchema.safeParse(session.worktreeId);
-          return parsed.success ? [parsed.data] : [];
-        })
-      ),
-    ].sort();
-    const batches: CloudAgentWorktreeId[][] = [];
-    for (let index = 0; index < ids.length; index += 200) {
-      batches.push(ids.slice(index, index + 200));
-    }
-    return batches;
-  }, [sessions]);
-  const worktreeDetails = useQueries({
+  const worktreeIdBatches = useMemo(
+    () => worktreeDetailsBatches(sessions.map(session => session.worktreeId)),
+    [sessions]
+  );
+  const worktreeDetailsQueries = useQueries({
     queries: worktreeIdBatches.map(worktreeIds =>
       trpc.cliSessionsV2.worktreeDetails.queryOptions(
         { worktreeIds, organizationId: organizationId ?? null },
         {
           staleTime: 5000,
+          placeholderData: () =>
+            getCachedWorktreeDetails(
+              queryClient.getQueriesData<WorktreeDetailsQueryData>(
+                trpc.cliSessionsV2.worktreeDetails.pathFilter()
+              ),
+              worktreeIds,
+              organizationId ?? null
+            ),
           refetchInterval: query =>
             Object.values(query.state.data?.worktrees ?? {}).some(
               details => details.prSession?.associatedPr?.reviewDecisionPending === true
@@ -1173,11 +1179,16 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
           };
         }
       }
-      return details;
+      return {
+        details,
+        loadingWorktreeIds: getLoadingWorktreeIds(queries, worktreeIdBatches),
+      };
     },
   });
+  const isLoading = isSearchActive
+    ? isSearchLoading
+    : isListLoading || Boolean(listData?.cliSessions.length && cachedSessions.length === 0);
 
-  // Refetch sessions by invalidating the query cache
   const refetchSessions = useCallback(() => {
     void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
     void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter());
@@ -1197,7 +1208,8 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
   return {
     sessions,
     cachedSessions,
-    worktreeDetails,
+    worktreeDetails: worktreeDetailsQueries.details,
+    loadingWorktreeIds: worktreeDetailsQueries.loadingWorktreeIds,
     isLoading,
     refetchSessions,
     renameSessionLocally,

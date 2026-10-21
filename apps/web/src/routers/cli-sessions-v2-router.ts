@@ -24,6 +24,7 @@ import { captureException } from '@sentry/nextjs';
 import { TRPCClientError } from '@trpc/client';
 import {
   cli_sessions_v2,
+  agent_briefing_events,
   cloud_agent_worktrees,
   github_branch_pull_requests,
   organization_memberships,
@@ -32,8 +33,13 @@ import {
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import {
+  readFirstPageStreamState,
+  type FirstPageStreamState,
+} from '@/lib/cloud-agent-next/first-page-stream-state';
+import {
   fetchSessionSnapshot,
   fetchSessionMessagesPage,
+  fetchSessionDiff,
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
   unshareSession as unshareSessionIngest,
@@ -45,12 +51,13 @@ import {
   isDefaultSessionTitle,
   projectPrivateWorktreePaths,
   validateKiloSdkMessagesCursor,
+  type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
-import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
 import {
   recordKiloAdminElevation,
   UNSCOPED_TARGET,
@@ -104,8 +111,8 @@ const privateTranscriptPathFields = new Set([
 ]);
 const privateTranscriptPathArrays = new Set(['files', 'visibleFiles', 'openTabs']);
 
-function isAbsoluteTranscriptPath(value: string): boolean {
-  return /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value);
+function isPrivateTranscriptPath(value: string, directory: string): boolean {
+  return /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value) && !value.startsWith(`${directory}/`);
 }
 
 function projectGroupedTranscriptPaths(value: unknown, directory: string): void {
@@ -126,7 +133,7 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
         key === 'directory' ||
         key === 'cwd' ||
         key === 'root' ||
-        (privateTranscriptPathFields.has(key) && isAbsoluteTranscriptPath(current))
+        (privateTranscriptPathFields.has(key) && isPrivateTranscriptPath(current, directory))
       ) {
         Reflect.set(value, key, directory);
       } else if ((key === 'url' || key === 'uri') && /^file:/i.test(current)) {
@@ -138,7 +145,7 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
     if (Array.isArray(current) && privateTranscriptPathArrays.has(key)) {
       for (let index = 0; index < current.length; index += 1) {
         const path = current[index];
-        if (typeof path === 'string' && isAbsoluteTranscriptPath(path)) {
+        if (typeof path === 'string' && isPrivateTranscriptPath(path, directory)) {
           current[index] = directory;
         } else {
           projectGroupedTranscriptPaths(path, directory);
@@ -663,6 +670,7 @@ type WorktreeDetail = {
     sessionId: string;
     sessionStatus: string | null;
     sessionStatusUpdatedAt: string | null;
+    updatedAt: string;
   }[];
   prSession:
     | (Pick<CliSessionV2, keyof typeof commonSessionFields | 'total_cost_microdollars'> & {
@@ -886,15 +894,9 @@ async function addOrganizationCondition(
         target: UNSCOPED_TARGET,
       });
     } else {
-      whereConditions.push(sql`(
-        ${cli_sessions_v2.organization_id} IS NULL
-        OR EXISTS (
-          SELECT 1
-          FROM ${organization_memberships}
-          WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
-            AND ${organization_memberships.kilo_user_id} = ${ctx.user.id}
-        )
-      )`);
+      whereConditions.push(
+        activeOrganizationAccessSql(cli_sessions_v2.organization_id, ctx.user.id)
+      );
     }
     return;
   }
@@ -1022,7 +1024,8 @@ export const cliSessionsV2Router = createTRPCRouter({
           sessions: sql<WorktreeDetail['sessions']>`json_agg(json_build_object(
             'sessionId', ${cli_sessions_v2.session_id},
             'sessionStatus', ${cli_sessions_v2.status},
-            'sessionStatusUpdatedAt', ${cli_sessions_v2.status_updated_at}
+            'sessionStatusUpdatedAt', ${cli_sessions_v2.status_updated_at},
+            'updatedAt', ${cli_sessions_v2.updated_at}
           ) ORDER BY ${cli_sessions_v2.session_id})`,
         })
         .from(cli_sessions_v2)
@@ -1036,6 +1039,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         row.worktreeId,
         row.sessions.map(session => ({
           ...session,
+          updatedAt: new Date(session.updatedAt).toISOString(),
           sessionStatusUpdatedAt: session.sessionStatusUpdatedAt
             ? new Date(session.sessionStatusUpdatedAt).toISOString()
             : null,
@@ -1554,40 +1558,20 @@ export const cliSessionsV2Router = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const session = await getSessionWithAccessCheck(input.session_id, ctx);
 
-      // Read the event-log watermark from the existing getSession response
-      // for the initial history page, so the transport can use `fromId` on
-      // its first WebSocket connect instead of `replay=false`. Cursor pages
-      // skip the Cloud Agent read — the watermark is only seeded once.
-      // Failures are swallowed and return null so the page endpoint is
-      // never blocked on an optional watermark read. The page response does
-      // not depend on the watermark, so the read runs concurrently with the
-      // worker page fetch rather than serially ahead of it.
+      // The first page also carries what the stream would replay first: the
+      // event-log watermark, so the transport can use `fromId` on its first
+      // WebSocket connect instead of `replay=false`, and the preparation
+      // attempts, so the transcript shows those rows before the stream does.
+      // Cursor pages skip the Cloud Agent reads. Each read fails open to an
+      // empty value, so these optional reads never block the page, and they
+      // run concurrently with the worker page fetch rather than serially.
       const cloudAgentSessionId = !input.cursor ? session.cloud_agent_session_id : null;
-      const watermarkPromise: Promise<number | null> = cloudAgentSessionId
-        ? (async () => {
-            try {
-              const authToken = (
-                await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
-                  headers: ctx.headersList,
-                  organizationId: session.organization_id ?? undefined,
-                  tokenSource: 'cloud-agent',
-                })
-              ).token;
-              const client = createCloudAgentNextClient(authToken);
-              const sessionState = await client.getSession(cloudAgentSessionId);
-              return sessionState.latestEventId ?? null;
-            } catch (error) {
-              console.warn(
-                `Failed to fetch watermark for session ${input.session_id}:`,
-                error instanceof Error ? error.message : error
-              );
-              return null;
-            }
-          })()
-        : Promise.resolve(null);
+      const streamStatePromise: Promise<FirstPageStreamState> = cloudAgentSessionId
+        ? readFirstPageStreamState(ctx, session.organization_id, cloudAgentSessionId)
+        : Promise.resolve({ watermarkEventId: null, preparationAttempts: [] });
 
       // Start the page fetch first so it is in flight before the optional
-      // watermark read above resolves.
+      // stream-state reads above resolve.
       const pagePromise = (async () => {
         try {
           return await fetchSessionMessagesPage(input.session_id, ctx.user.id, {
@@ -1612,9 +1596,13 @@ export const cliSessionsV2Router = createTRPCRouter({
         }
       })();
 
-      // The watermark promise never rejects (it resolves to null on failure),
-      // so a rejecting page promise cannot leave it as an unhandled rejection.
-      const [result, watermarkEventId] = await Promise.all([pagePromise, watermarkPromise]);
+      // The stream-state promise never rejects (each read resolves to an empty
+      // value on failure), so a rejecting page promise cannot leave it as an
+      // unhandled rejection.
+      const [result, { watermarkEventId, preparationAttempts }] = await Promise.all([
+        pagePromise,
+        streamStatePromise,
+      ]);
 
       // The worker returns `null` only for sessions the user cannot read; the
       // router's own access check above already enforces this, so the only
@@ -1646,8 +1634,45 @@ export const cliSessionsV2Router = createTRPCRouter({
             )
           : pageResult),
         watermarkEventId,
+        preparationAttempts,
         ...(sessionGoal === undefined ? {} : { sessionGoal }),
       };
+    }),
+
+  /**
+   * The cumulative file diff for a V2 Kilo session, from session start to its
+   * latest step, as stored by session ingest. File paths are workspace
+   * relative. Read failures surface as INTERNAL_SERVER_ERROR (retryable on the
+   * client); an oversized diff is a typed `too_large` result.
+   */
+  getSessionDiff: baseProcedure
+    .input(z.object({ session_id: sessionIdField }))
+    .query(async ({ ctx, input }) => {
+      await getSessionWithAccessCheck(input.session_id, ctx);
+
+      let diff: SessionDiffRead | null;
+      try {
+        diff = await fetchSessionDiff(input.session_id, ctx.user.id);
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch session diff',
+          cause: error,
+        });
+      }
+      if (diff === null) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+      }
+      if (diff.kind === 'value') {
+        return { kind: 'files' as const, files: diff.files };
+      }
+      if (diff.kind === 'too_large') {
+        return { kind: 'too_large' as const };
+      }
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: `Session diff read failed: ${diff.kind}`,
+      });
     }),
 
   /**
@@ -1777,7 +1802,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         organization_id: session.organization_id ?? null,
         profile_id: session.profile_id ?? null,
         git_url: session.git_url ?? null,
-        git_branch: session.git_branch ?? null,
+        git_branch: session.git_branch ?? runtimeState?.branchName ?? null,
         created_on_platform: session.created_on_platform,
         created_at: session.created_at,
         updated_at: session.updated_at,
@@ -2148,15 +2173,41 @@ export const cliSessionsV2Router = createTRPCRouter({
       }
 
       // The link passed verification; record it so the read path can show it.
-      await db
-        .update(cli_sessions_v2)
-        .set({ pr_link_verified_at: sql`now()` })
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, sessionId),
-            eq(cli_sessions_v2.kilo_user_id, ctx.user.id)
+      await db.transaction(async tx => {
+        const verified = await tx
+          .update(cli_sessions_v2)
+          .set({ pr_link_verified_at: sql`now()` })
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+              eq(cli_sessions_v2.pr_url, sessionPrUrl),
+              eq(cli_sessions_v2.git_url, gitUrl),
+              sql`${cli_sessions_v2.pr_head_sha} IS NOT DISTINCT FROM ${session.pr_head_sha}`,
+              sql`${cli_sessions_v2.pr_head_ref} IS NOT DISTINCT FROM ${session.pr_head_ref}`,
+              sql`${cli_sessions_v2.git_branch} IS NOT DISTINCT FROM ${session.git_branch}`
+            )
           )
-        );
+          .returning({ organizationId: cli_sessions_v2.organization_id });
+        const matched = verified[0];
+        if (matched && fetched.createdAt && Number.isFinite(Date.parse(fetched.createdAt))) {
+          const openedAt = new Date(fetched.createdAt).toISOString();
+          await tx
+            .insert(agent_briefing_events)
+            .values({
+              id: JSON.stringify([ctx.user.id, sessionId, 'pull_request', sessionPrUrl]),
+              kilo_user_id: ctx.user.id,
+              session_id: sessionId,
+              organization_id: matched.organizationId,
+              kind: 'pull_request',
+              occurred_at: openedAt,
+              title: `Opened pull request #${fetched.number}`,
+              url: fetched.htmlUrl,
+              payload: { openedAt },
+            })
+            .onConflictDoNothing();
+        }
+      });
 
       const verifiedSessionPr: SessionPrFields = {
         ...sessionPr,
@@ -2317,51 +2368,4 @@ export const cliSessionsV2Router = createTRPCRouter({
       });
     }
   }),
-
-  /**
-   * Share a v2 CLI session from a webhook trigger request.
-   * Creates a read-only public snapshot via the session-ingest worker.
-   *
-   * For org triggers, any org member can share; for personal triggers, only the owner.
-   */
-  shareForWebhookTrigger: baseProcedure
-    .input(
-      z.object({
-        kilo_session_id: z.string().startsWith('ses_'),
-        trigger_id: z.string().min(1),
-        organization_id: z.string().uuid().optional(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      await verifyWebhookTriggerAccess(ctx, input.trigger_id, input.organization_id);
-
-      // For org triggers, verify the session belongs to the same org.
-      // For personal triggers, verify the session belongs to the requesting user.
-      const ownerCondition = input.organization_id
-        ? eq(cli_sessions_v2.organization_id, input.organization_id)
-        : eq(cli_sessions_v2.kilo_user_id, ctx.user.id);
-
-      const [session] = await db
-        .select({ kilo_user_id: cli_sessions_v2.kilo_user_id })
-        .from(cli_sessions_v2)
-        .where(and(eq(cli_sessions_v2.session_id, input.kilo_session_id), ownerCondition))
-        .limit(1);
-
-      if (!session) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Session not found',
-        });
-      }
-
-      try {
-        const result = await shareSessionIngest(input.kilo_session_id, session.kilo_user_id);
-        return { share_token: result.share_token, session_id: input.kilo_session_id };
-      } catch (error) {
-        if (error instanceof Error && error.message === 'Session not found') {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
-        }
-        throw error;
-      }
-    }),
 });

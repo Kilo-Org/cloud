@@ -1,6 +1,55 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type * as DbModule from './db';
 import type * as CliRunnerModule from './cli-runner';
+import type * as SchedulerModule from './scheduler';
+import type * as SubscriptionsModule from './subscriptions';
+import { TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
+import type {
+  PolicySettingComputedMap,
+  PolicySettingOverrides,
+} from '@kilocode/auto-routing-contracts';
+import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
+import type { BenchmarkJobMessage } from './run';
+import {
+  claimScheduledChunks,
+  finishChunk,
+  getChunk,
+  recoverChunks,
+  scheduleRunChunks,
+  startChunk,
+} from './scheduler';
+
+vi.mock('./subscriptions', () => ({
+  PLATFORM_SUBSCRIPTION_OWNER: { ownerType: 'platform', ownerId: '' },
+  snapshotPairs: (snapshot: SubscriptionsModule.SubscriptionSnapshot, serving = false) => [
+    ...new Map(
+      snapshot
+        .flatMap(entry => (serving ? entry.servingPairs : entry.pairs))
+        .map(pair => [JSON.stringify(pair), pair])
+    ).values(),
+  ],
+  syncSubscriptionSnapshot: vi.fn(),
+  servingSubscriptionSnapshot: vi.fn(),
+}));
+vi.mock('./executable-models', () => ({
+  fetchExecutableBenchmarkModelCatalog: vi.fn(),
+}));
+import {
+  PLATFORM_SUBSCRIPTION_OWNER,
+  servingSubscriptionSnapshot,
+  syncSubscriptionSnapshot,
+} from './subscriptions';
+import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
+
+vi.mock('./scheduler', async importOriginal => ({
+  ...(await importOriginal<typeof SchedulerModule>()),
+  claimScheduledChunks: vi.fn(),
+  finishChunk: vi.fn(),
+  getChunk: vi.fn(),
+  recoverChunks: vi.fn(),
+  scheduleRunChunks: vi.fn(),
+  startChunk: vi.fn(),
+}));
 
 vi.mock('./cli-runner', async importOriginal => {
   const actual = await importOriginal<typeof CliRunnerModule>();
@@ -19,6 +68,7 @@ vi.mock('./db', async importOriginal => {
     getConfigRows: vi.fn(),
     getLatestSummariesByModel: vi.fn(),
     getRunningRun: vi.fn(),
+    getLiveContainerLanes: vi.fn(),
     insertRun: vi.fn(),
     markStaleRunsFailed: vi.fn(),
     listStaleRunningDeciderRuns: vi.fn(),
@@ -33,6 +83,7 @@ vi.mock('./db', async importOriginal => {
     listLaneFailures: vi.fn(),
     getCaseResults: vi.fn(),
     getExistingCaseResultIds: vi.fn(),
+    reuseDeciderCaseResults: vi.fn(),
     getSummaries: vi.fn(),
     replaceModelSummaries: vi.fn(),
     saveRoutingTable: vi.fn(),
@@ -40,12 +91,16 @@ vi.mock('./db', async importOriginal => {
     getRunWithModels: vi.fn(),
     listReadyCurrentProfilesForEntries: vi.fn(),
     getSummariesForRuns: vi.fn(),
+    getRoutingCaseResultsForEntries: vi.fn(),
     countCurrentProfilesByStatus: vi.fn(),
     getLatestRoutingTable: vi.fn(),
     syncPlatformRegistryRows: vi.fn(),
     recordLaneFailure: vi.fn(),
     failOrphanedRunningProfiles: vi.fn(),
     releaseProfileClaims: vi.fn(),
+    listQueuedRemeasures: vi.fn().mockResolvedValue([]),
+    copyRemeasureBaselines: vi.fn().mockResolvedValue(0),
+    settleRemeasuresForRun: vi.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -55,17 +110,21 @@ import {
   getCaseResults,
   getConfigRows,
   getExistingCaseResultIds,
+  reuseDeciderCaseResults,
   getLatestSummariesByModel,
   getRunningRun,
+  getLiveContainerLanes,
   getRunWithModels,
   getSummaries,
   getSummariesForRuns,
+  getRoutingCaseResultsForEntries,
   insertRun,
   listLaneFailures,
   listPendingCurrentProfiles,
   countCurrentProfilesByStatus,
   getLatestRoutingTable,
   listReadyCurrentProfilesForEntries,
+  listQueuedRemeasures,
   listStaleRunningDeciderRuns,
   failOrphanedRunningProfiles,
   recordLaneFailure,
@@ -84,39 +143,59 @@ import {
 import {
   NoEntriesClaimedError,
   drainQueue,
-  platformRegistryEntries,
   drainQueues,
   failRunAndDrain,
   processJob,
+  publishPlatformRoutingTable,
   startRun,
   sweepStaleRunsAndDrain,
 } from './run';
-import { getBenchmarkConfig } from './config';
 
-const queueSendBatch = vi.fn();
+const queueSendBatch = vi.fn<(messages: { body: BenchmarkJobMessage }[]) => Promise<void>>();
+const queueSend = vi.fn();
+
+function schedulerDatabase(): D1Database {
+  const statement = {
+    bind: vi.fn().mockReturnThis(),
+    first: vi.fn().mockResolvedValue(null),
+    all: vi.fn().mockResolvedValue({ results: [] }),
+    run: vi.fn().mockResolvedValue({ meta: { changes: 0 } }),
+  };
+  return {
+    prepare: vi.fn(() => statement),
+    batch: vi.fn().mockResolvedValue([]),
+  } as unknown as D1Database;
+}
 const kvDelete = vi.fn();
 
 const configRow = {
   id: 1 as const,
+  router: 'efficient' as 'efficient' | 'frontier',
+  accuracy_noise_band: 0.05,
+  frontier_min_accuracy_delta: 0,
   min_accuracy: 0.7,
   switch_cost_factor: 3,
   best_accuracy_switch_threshold: 0.05,
+  production_token_profile: null,
+  switch_horizon_turns: null,
+  low_confidence_threshold: null,
   max_concurrency: 4,
-  benchmark_user_id: 'user-1',
+  benchmark_user_id: 'bot-internal-user-1',
   benchmark_org_id: null,
   classifier_repetitions: 1,
   decider_repetitions: 1,
   classifier_max_p95_latency_ms: 1000,
-  auto_decider_min_cost_usd: 15,
-  auto_decider_max_cost_usd: 25,
   user_max_concurrency: 100,
+  policy_overrides: null as PolicySettingOverrides | null,
+  policy_computed: null as PolicySettingComputedMap | null,
   updated_at: '2026-06-01T00:00:00.000Z',
   updated_by: null,
 };
 
 const env = {
-  BENCH_DB: {} as D1Database,
-  BENCH_QUEUE: { sendBatch: queueSendBatch },
+  BENCH_DB: schedulerDatabase(),
+  BENCH_QUEUE: { sendBatch: queueSendBatch, send: queueSend },
+  BENCHMARK_SCHEDULER_CONFIG: '{}',
   AUTO_ROUTING_CONFIG: { delete: kvDelete },
   INTERNAL_API_SECRET_PROD: { get: async () => 'secret' },
   KILO_WEB_API_BASE_URL: 'https://app.test',
@@ -124,28 +203,129 @@ const env = {
 } as unknown as Env;
 
 function mockConfig(overrides: Partial<typeof configRow> = {}) {
-  vi.mocked(getConfigRows).mockResolvedValue({
-    config: { ...configRow, ...overrides },
-    // mapConfigRows requires non-empty classifier + decider lists.
+  const row = { ...configRow, ...overrides };
+  vi.mocked(getConfigRows).mockImplementation(async (_db, router = 'efficient') => ({
+    config: router === row.router ? row : null,
     classifierModels: ['classifier/a'],
     deciderModels: [
       { model: 'platform/a', variant: null, reasoning_effort: null },
       { model: 'platform/b', variant: null, reasoning_effort: 'high' },
     ],
-    autoDeciderModels: [],
-    excludedAutoDeciderModels: [],
-  });
+  }));
 }
+
+const catalogFetch = vi.fn<typeof fetch>();
+
+afterEach(() => vi.unstubAllGlobals());
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockConfig();
+  vi.stubGlobal('fetch', catalogFetch);
+  catalogFetch.mockImplementation(async () =>
+    Response.json({
+      data: [
+        { id: 'platform/a' },
+        { id: 'platform/b', opencode: { variants: { high: { reasoning: { effort: 'high' } } } } },
+      ],
+    })
+  );
+  vi.mocked(syncSubscriptionSnapshot)
+    .mockReset()
+    .mockResolvedValue([
+      {
+        model: 'platform/a',
+        pairs: [{ model: 'platform/a', variant: null }],
+        servingPairs: [{ model: 'platform/a', variant: null }],
+        resolutionError: null,
+      },
+      {
+        model: 'platform/b',
+        pairs: [{ model: 'platform/b', variant: 'high' }],
+        servingPairs: [{ model: 'platform/b', variant: 'high' }],
+        resolutionError: null,
+      },
+    ]);
+  vi.mocked(servingSubscriptionSnapshot)
+    .mockReset()
+    .mockResolvedValue([
+      {
+        model: 'platform/a',
+        pairs: [{ model: 'platform/a', variant: null }],
+        servingPairs: [{ model: 'platform/a', variant: null }],
+        resolutionError: null,
+      },
+      {
+        model: 'platform/b',
+        pairs: [{ model: 'platform/b', variant: 'high' }],
+        servingPairs: [{ model: 'platform/b', variant: 'high' }],
+        resolutionError: null,
+      },
+    ]);
+  vi.mocked(fetchExecutableBenchmarkModelCatalog)
+    .mockReset()
+    .mockImplementation(async () => {
+      const response = await catalogFetch('https://api.test/models');
+      const catalog = (await response.json()) as { data: { id: string }[] };
+      return {
+        data: [
+          ...catalog.data,
+          ...Array.from({ length: 100 }, (_, i) => ({ id: `m/${i}` })),
+          ...Array.from({ length: 100 }, (_, i) => ({ id: `m/${String(i).padStart(3, '0')}` })),
+          ...['m/old', 'm/new'].map(id => ({
+            id,
+            opencode: {
+              variants: {
+                a: { reasoning: { effort: 'low' as const } },
+                b: { reasoning: { effort: 'high' as const } },
+              },
+            },
+          })),
+          ...['m/pending', 'm/x', 'm/p'].map(id => ({ id })),
+          {
+            id: 'vendor/next',
+            opencode: { variants: { high: { reasoning: { effort: 'high' as const } } } },
+          },
+        ],
+      };
+    });
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
+  vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
-  vi.mocked(insertRun).mockResolvedValue(undefined);
+  vi.mocked(insertRun).mockReset().mockResolvedValue(undefined);
+  vi.mocked(getRunWithModels)
+    .mockReset()
+    .mockImplementation(async (_db, id) => {
+      const inserted = vi.mocked(insertRun).mock.calls.find(([, run]) => run.id === id);
+      if (!inserted) return null;
+      const [, run, models] = inserted;
+      return {
+        run: {
+          ...run,
+          started_at: run.startedAt,
+          router: run.router ?? 'efficient',
+          purpose: run.purpose ?? 'platform',
+          accuracy_noise_band: run.accuracy_noise_band ?? 0.05,
+          frontier_min_accuracy_delta: run.frontier_min_accuracy_delta ?? 0,
+          status: 'running',
+          completed_at: null,
+          error: null,
+        },
+        models,
+      };
+    });
+  vi.mocked(scheduleRunChunks).mockReset().mockResolvedValue(true);
+  vi.mocked(claimScheduledChunks).mockReset().mockResolvedValue([]);
+  vi.mocked(recoverChunks).mockReset().mockResolvedValue([]);
+  vi.mocked(startChunk).mockReset().mockResolvedValue(true);
+  vi.mocked(getChunk).mockReset().mockResolvedValue(null);
+  vi.mocked(finishChunk).mockReset().mockResolvedValue(undefined);
+  queueSend.mockReset().mockResolvedValue(undefined);
+  vi.mocked(reuseDeciderCaseResults).mockReset().mockResolvedValue(0);
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
   vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
+  vi.mocked(listQueuedRemeasures).mockResolvedValue([]);
   vi.mocked(markProfilesRunningForRun).mockImplementation(async (_db, _runId, entries) => [
     ...entries,
   ]);
@@ -165,6 +345,7 @@ beforeEach(() => {
   vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([]);
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(getSummariesForRuns).mockResolvedValue([]);
+  vi.mocked(getRoutingCaseResultsForEntries).mockResolvedValue([]);
   vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
   vi.mocked(recordLaneFailure).mockResolvedValue(undefined);
   vi.mocked(failOrphanedRunningProfiles).mockResolvedValue(0);
@@ -176,6 +357,9 @@ beforeEach(() => {
 });
 
 const RUN_ROW_BASE = {
+  router: 'efficient' as const,
+  accuracy_noise_band: 0.05,
+  frontier_min_accuracy_delta: 0,
   kind: 'decider' as const,
   status: 'running' as const,
   started_at: '2026-06-01T00:00:00.000Z',
@@ -185,8 +369,8 @@ const RUN_ROW_BASE = {
   switch_cost_factor: 3,
   best_accuracy_switch_threshold: 0.05,
   max_concurrency: 4,
-  benchmark_user_id: 'user-1',
-  benchmark_org_id: null,
+  benchmark_user_id: 'bot-internal-user-1',
+  benchmark_org_id: 'org-1',
   repetitions: 1,
   classifier_max_p95_latency_ms: null,
   engine_identity: 'v1:test',
@@ -195,6 +379,61 @@ const RUN_ROW_BASE = {
 function runningRun(id: string, purpose: 'platform' | 'user') {
   return { ...RUN_ROW_BASE, id, purpose };
 }
+
+describe('all-effort platform scheduling', () => {
+  it('admits every exact effort together even when live slots are nearly full', async () => {
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(246);
+    const variants = ['none', 'low', 'medium', 'high', 'max'];
+    catalogFetch.mockImplementation(async () =>
+      Response.json({
+        data: [
+          {
+            id: 'platform/a',
+            opencode: {
+              variants: Object.fromEntries(
+                variants.map(variant => [variant, { reasoning: { effort: variant } }])
+              ),
+            },
+          },
+          { id: 'platform/b' },
+        ],
+      })
+    );
+    let pending = variants.map(variant => ({
+      model: 'platform/a',
+      variant,
+      requested_at: configRow.updated_at,
+    }));
+    vi.mocked(listPendingCurrentProfiles).mockImplementation(async () => pending);
+    vi.mocked(markProfilesRunningForRun).mockImplementation(async (_db, _runId, entries) => {
+      pending = pending.filter(
+        row => !entries.some(entry => entry.model === row.model && entry.variant === row.variant)
+      );
+      return [...entries];
+    });
+    await drainQueue(env, 'platform');
+    expect(pending).toEqual([]);
+    const batches = vi.mocked(insertRun).mock.calls.map(call => call[2]);
+    expect(batches.map(batch => batch.length)).toEqual([5]);
+    expect(batches.flat().map(row => row.variant)).toEqual(variants);
+    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId: expect.any(String),
+      entries: variants.map(variant => ({ model: 'platform/a', variant, providers: [] })),
+      repetitions: 1,
+      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+      chunkSize: 1,
+    });
+  });
+
+  it('does not claim pending platform pairs when the executable catalog lookup fails', async () => {
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'platform/a', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockRejectedValue(new Error('catalog failed'));
+    await expect(drainQueue(env, 'platform')).rejects.toThrow(/catalog failed/);
+    expect(markProfilesRunningForRun).not.toHaveBeenCalled();
+  });
+});
 
 describe('startRun — registry-backed decider runs', () => {
   it('starts a user-queue run from an explicit two-variants-of-one-model snapshot', async () => {
@@ -222,7 +461,14 @@ describe('startRun — registry-backed decider runs', () => {
       entries,
       expect.objectContaining({ repetitions: 1 })
     );
-    expect(queueSendBatch).toHaveBeenCalled();
+    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId: result.runId,
+      entries: entries.map(entry => ({ ...entry, providers: [] })),
+      repetitions: 1,
+      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+      chunkSize: 1,
+    });
+    expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
   it('claims registry rows for platform-queue runs too, and never carries prior summaries', async () => {
@@ -244,19 +490,38 @@ describe('startRun — registry-backed decider runs', () => {
     expect(getLatestSummariesByModel).not.toHaveBeenCalled();
   });
 
-  it('uses each queue its own container budget', async () => {
-    // Platform budget 4, user budget 9, repetitions 1 → the run row snapshots
-    // the budget of the queue it belongs to.
-    mockConfig({ max_concurrency: 4, user_max_concurrency: 9 });
-    await startRun(env, 'decider', {
+  it.each(['platform', 'user'] as const)(
+    'snapshots zero reserved concurrency for a %s run',
+    async purpose => {
+      await startRun(env, 'decider', {
+        purpose,
+        entries: [{ model: 'p/a', variant: null }],
+      });
+      expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(0);
+    }
+  );
+
+  it('admits a decider run even when all live slots are occupied', async () => {
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(250);
+    const result = await startRun(env, 'decider', {
       purpose: 'platform',
       entries: [{ model: 'p/a', variant: null }],
     });
-    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(4);
+    expect(result.enqueuedModels).toBe(1);
+    expect(scheduleRunChunks).toHaveBeenCalledOnce();
+    expect(claimScheduledChunks).toHaveBeenCalled();
+    expect(queueSend).not.toHaveBeenCalled();
+  });
 
-    vi.mocked(insertRun).mockClear();
-    await startRun(env, 'decider', { purpose: 'user', entries: [{ model: 'u/a', variant: null }] });
-    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(9);
+  it('plans every admitted entry without dividing free lanes between runs', async () => {
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(240);
+    const entries = Array.from({ length: 6 }, (_, i) => ({ model: `p/${i}`, variant: null }));
+    const result = await startRun(env, 'decider', { purpose: 'platform', entries });
+    expect(result.enqueuedModels).toBe(6);
+    expect(scheduleRunChunks).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ entries: entries.map(entry => ({ ...entry, providers: [] })) })
+    );
   });
 
   it('rejects decider runs without a registry entry snapshot', async () => {
@@ -264,28 +529,6 @@ describe('startRun — registry-backed decider runs', () => {
     await expect(startRun(env, 'decider', { entries: [] })).rejects.toThrow(
       /non-empty registry entry snapshot/
     );
-  });
-
-  it('maps a saved canonical variant from the decider list into the registry entry', async () => {
-    vi.mocked(getConfigRows).mockResolvedValue({
-      config: configRow,
-      classifierModels: ['classifier/a'],
-      deciderModels: [{ model: 'platform/a', variant: 'max', reasoning_effort: null }],
-      autoDeciderModels: [],
-      excludedAutoDeciderModels: [],
-    });
-
-    const config = await getBenchmarkConfig(env.BENCH_DB);
-    expect(platformRegistryEntries(config!)).toEqual([{ model: 'platform/a', variant: 'max' }]);
-  });
-
-  it("keeps a legacy enum effort as today's exact pair", async () => {
-    // mockConfig() default: platform/b holds reasoning_effort 'high' (legacy shape).
-    const config = await getBenchmarkConfig(env.BENCH_DB);
-    expect(platformRegistryEntries(config!)).toEqual([
-      { model: 'platform/a', variant: null },
-      { model: 'platform/b', variant: 'high' },
-    ]);
   });
 
   it('carries the entry variant into the run_models row', async () => {
@@ -388,27 +631,33 @@ describe('decider run completion', () => {
       last_event_types: 'x',
       rep: 0,
       timed_out: 0,
+      prompt_revision: 2,
     }));
   }
 
-  /**
-   * Drive finalization through a chunk that has no follow-up work. `variant` is
-   * the application form here (null = default), not the '' storage form.
-   */
   async function finalizeVia(runId: string, model: string, variant: string | null) {
-    const { DECIDER_CASES } = await import('./datasets/decider-cases');
     vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set([DECIDER_CASES[0].id]));
+    vi.mocked(getChunk).mockResolvedValue({
+      id: 'completion-claim',
+      run_id: runId,
+      model,
+      variant: variant ?? '',
+      providers: '[]',
+      rep: 0,
+      chunk: 0,
+      case_ids: JSON.stringify([DECIDER_CASES[0].id]),
+      slot: 0,
+      token: 'completion-token',
+      attempts: 1,
+    });
     await processJob(env, {
       runId,
       kind: 'decider',
       model,
-      variant,
-      caseIds: [DECIDER_CASES[0].id],
-      chunk: 9999,
-      shard: 0,
-      shardCount: 1,
-      rep: 0,
+      claimId: 'completion-claim',
+      claimToken: 'completion-token',
     });
+    expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'completion-claim', 'completion-token');
   }
 
   it('marks registry rows ready and republishes the platform table from the registry', async () => {
@@ -516,52 +765,76 @@ describe('decider run completion', () => {
     expect(markRunFailed).not.toHaveBeenCalled();
   });
 
-  it('publishes the platform table from ready registry rows', async () => {
-    const runId = 'decider-publish-1';
-    const { DECIDER_CASES } = await import('./datasets/decider-cases');
-    const { TAXONOMY_ROUTE_KEYS } = await import('@kilocode/auto-routing-contracts');
-    mockRunState(runId, 'platform', [{ model: 'platform/a', variant: '' }]);
-    vi.mocked(countCaseResultsByLane).mockResolvedValue([
-      { model: 'platform/a', variant: '', rep: 0, n: DECIDER_CASES.length },
-    ]);
-    vi.mocked(getCaseResults).mockResolvedValue(await caseRowsFor(runId, 'platform/a', ''));
-    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
-      { model: 'platform/a', variant: '', run_id: runId },
-      { model: 'platform/b', variant: 'high', run_id: runId },
-    ]);
-    // Every route needs at least one graded candidate or publishing is skipped.
-    vi.mocked(getSummariesForRuns).mockResolvedValue(
-      TAXONOMY_ROUTE_KEYS.flatMap(routeKey =>
-        [
-          { model: 'platform/a', variant: null },
-          { model: 'platform/b', variant: 'high' },
-        ].map(pair => ({
-          ...pair,
-          runId,
-          routeKey,
-          accuracy: 0.9,
-          avgCostUsd: 0.002,
-          avgLatencyMs: 100,
-          p50LatencyMs: 100,
-          p95LatencyMs: 150,
-          cases: 10,
-          errors: 0,
-          timeouts: 0,
-          routeAccuracy: null,
-        }))
-      )
-    );
+  it.each(['ready', 'pending', 'running', 'failed'] as const)(
+    'publishes ready exact pairs only when the platform queue is settled (%s)',
+    async status => {
+      const runId = 'decider-publish-1';
+      const { DECIDER_CASES } = await import('./datasets/decider-cases');
+      const { TAXONOMY_ROUTE_KEYS } = await import('@kilocode/auto-routing-contracts');
+      mockRunState(runId, 'platform', [{ model: 'platform/a', variant: '' }]);
+      vi.mocked(countCaseResultsByLane).mockResolvedValue([
+        { model: 'platform/a', variant: '', rep: 0, n: DECIDER_CASES.length },
+      ]);
+      vi.mocked(getCaseResults).mockResolvedValue(await caseRowsFor(runId, 'platform/a', ''));
+      vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+        { model: 'platform/a', variant: '', run_id: runId },
+        { model: 'platform/b', variant: 'high', run_id: runId },
+      ]);
+      // Every route needs at least one graded candidate or publishing is skipped.
+      vi.mocked(getSummariesForRuns).mockResolvedValue(
+        TAXONOMY_ROUTE_KEYS.flatMap(routeKey =>
+          [
+            { model: 'platform/a', variant: null },
+            { model: 'platform/b', variant: 'high' },
+          ].map(pair => ({
+            ...pair,
+            runId,
+            routeKey,
+            accuracy: 0.9,
+            avgCostUsd: 0.002,
+            avgLatencyMs: 100,
+            p50LatencyMs: 100,
+            p95LatencyMs: 150,
+            cases: 10,
+            errors: 0,
+            timeouts: 0,
+            routeAccuracy: null,
+          }))
+        )
+      );
+      vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([{ status, count: 1 }]);
 
-    await finalizeVia(runId, 'platform/a', null);
+      await finalizeVia(runId, 'platform/a', null);
+      if (status === 'pending' || status === 'running') {
+        expect(saveRoutingTable).not.toHaveBeenCalled();
+        return;
+      }
 
-    expect(saveRoutingTable).toHaveBeenCalledOnce();
-    const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
-    expect(table.source).toBe('benchmark');
-    // Version identifies the contributing registry rows, not a single run.
-    expect(table.version).toMatch(/^registry-/);
-    expect(Object.keys(table.routes)).toHaveLength(TAXONOMY_ROUTE_KEYS.length);
-    expect(kvDelete).toHaveBeenCalled();
-  });
+      expect(saveRoutingTable).toHaveBeenCalledOnce();
+      const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
+      expect(table.source).toBe('benchmark');
+      expect(getRoutingCaseResultsForEntries).toHaveBeenCalledWith(env.BENCH_DB, [
+        { entry: { model: 'platform/a', variant: null }, runId },
+        { entry: { model: 'platform/b', variant: 'high' }, runId },
+      ]);
+      expect(table.effortByComplexity?.['implementation/code_generation']).toEqual({
+        'platform/a': { low: null, medium: null, high: null },
+        'platform/b': { low: 'high', medium: 'high', high: 'high' },
+      });
+      // Version identifies the contributing registry rows, not a single run.
+      expect(table.version).toMatch(/^registry-/);
+      expect(Object.keys(table.routes)).toHaveLength(TAXONOMY_ROUTE_KEYS.length);
+      expect(
+        table.routes['implementation/code_generation'].map(candidate => candidate.variant)
+      ).toEqual([null, 'high']);
+      expect(
+        table.routes['implementation/code_generation'].every(
+          candidate => candidate.reasoningEffort == null
+        )
+      ).toBe(true);
+      expect(kvDelete).toHaveBeenCalled();
+    }
+  );
 
   it('failRunAndDrain fails the claimed registry rows and drains both queues', async () => {
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
@@ -603,9 +876,78 @@ describe('drainQueue', () => {
     expect(modelRows[1].model).toBe('m/new');
   });
 
+  it('fails unavailable owner aliases without retargeting unrelated concrete entries', async () => {
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue({
+      data: [
+        { id: 'platform/a' },
+        { id: '~platform/a-latest', alias_target: 'platform/replacement' },
+        { id: 'platform/replacement' },
+      ],
+    });
+    const requestedAt = '2026-06-01T00:00:00.000Z';
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: '~platform/gone-latest', variant: '', requested_at: requestedAt },
+      { model: 'platform/a', variant: '', requested_at: requestedAt },
+    ]);
+
+    const result = await drainQueue(env, 'user');
+
+    expect(result!.entryCount).toBe(1);
+    expect(vi.mocked(insertRun).mock.calls[0][2].map(row => row.model)).toEqual(['platform/a']);
+    expect(syncSubscriptionSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('fails a model with an explicit empty capability list instead of scheduling it', async () => {
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue({
+      data: [{ id: 'platform/a' }, { id: 'platform/no-parameters', supported_parameters: [] }],
+    });
+    const requestedAt = '2026-06-01T00:00:00.000Z';
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'platform/no-parameters', variant: '', requested_at: requestedAt },
+      { model: 'platform/a', variant: '', requested_at: requestedAt },
+    ]);
+
+    const result = await drainQueue(env, 'user');
+
+    expect(result!.entryCount).toBe(1);
+    expect(vi.mocked(insertRun).mock.calls[0][2].map(row => row.model)).toEqual(['platform/a']);
+    const db = env.BENCH_DB as unknown as { prepare: Mock<() => { bind: Mock }> };
+    const statement = db.prepare.mock.results.at(-1)?.value;
+    expect(statement?.bind).toHaveBeenCalledWith(
+      expect.stringContaining('unavailable'),
+      expect.any(String),
+      'efficient',
+      'platform/no-parameters',
+      '',
+      expect.any(String),
+      expect.any(Number)
+    );
+  });
+
+  it('fails an unresolved alias without inserting a run or dispatching CLI work', async () => {
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue({
+      data: [{ id: '~platform/latest', alias_target: 'platform/missing' }],
+    });
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      {
+        model: '~platform/latest',
+        variant: '',
+        requested_at: '2026-06-01T00:00:00.000Z',
+      },
+    ]);
+
+    await expect(drainQueue(env, 'user')).resolves.toBeNull();
+
+    expect(markProfilesRunningForRun).not.toHaveBeenCalled();
+    expect(insertRun).not.toHaveBeenCalled();
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
+    expect(queueSend).not.toHaveBeenCalled();
+    expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
   it('skips only the queue whose own slot is occupied', async () => {
     // A running user-queue run must not block the platform queue: the two hold
-    // independent slots and independent container budgets.
+    // independent slots.
     vi.mocked(getRunningRun).mockImplementation(async (_db, _kind, purpose) =>
       purpose === 'user' ? runningRun('user-busy', 'user') : undefined
     );
@@ -619,19 +961,59 @@ describe('drainQueue', () => {
     expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('platform');
   });
 
-  it('caps the batch by the queue container budget', async () => {
-    // user budget 4, repetitions 2 → max entries = floor(4/2) = 2
-    mockConfig({ max_concurrency: 100, user_max_concurrency: 4, decider_repetitions: 2 });
-    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
-      { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
-      { model: 'm/2', variant: '', requested_at: '2026-06-01T00:00:01.000Z' },
-      { model: 'm/3', variant: '', requested_at: '2026-06-01T00:00:02.000Z' },
-      { model: 'm/4', variant: '', requested_at: '2026-06-01T00:00:03.000Z' },
-    ]);
+  it('plans all entries and repetitions in a large owner batch without fixed shards', async () => {
+    mockConfig({ decider_repetitions: 5 });
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue(
+      Array.from({ length: 100 }, (_, i) => ({
+        model: `m/${i}`,
+        variant: '',
+        requested_at: `2026-06-01T00:00:${String(i % 60).padStart(2, '0')}.000Z`,
+      }))
+    );
     const result = await drainQueue(env, 'user');
-    expect(result!.entryCount).toBe(2);
+    expect(result!.entryCount).toBe(100);
     const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
-    expect(modelRows.map(m => m.model)).toEqual(['m/1', 'm/2']);
+    expect(modelRows).toHaveLength(100);
+    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId: result!.runId,
+      entries: modelRows.map(row => ({ model: row.model, variant: null, providers: [] })),
+      repetitions: 5,
+      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+      chunkSize: 1,
+    });
+    expect(queueSendBatch).not.toHaveBeenCalled();
+    expect(modelRows[0].model).toBe('m/0');
+  });
+
+  it('admits pending profiles while the shared scheduler has no free slots', async () => {
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(250);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'm/pending', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    await expect(drainQueue(env, 'platform')).resolves.toMatchObject({ entryCount: 1 });
+    expect(insertRun).toHaveBeenCalledOnce();
+    expect(scheduleRunChunks).toHaveBeenCalledOnce();
+    expect(queueSend).not.toHaveBeenCalled();
+  });
+
+  it('reserves batch space for a queued re-measure ahead of a full pending backlog', async () => {
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue(
+      Array.from({ length: 100 }, (_, i) => ({
+        model: `m/${String(i).padStart(3, '0')}`,
+        variant: '',
+        requested_at: '2026-06-01T00:00:00.000Z',
+      }))
+    );
+    vi.mocked(listQueuedRemeasures).mockResolvedValue([
+      { model: 'm/repair', variant: '', requested_at: '2026-06-05T00:00:00.000Z' },
+    ]);
+    const result = await drainQueue(env, 'platform');
+    expect(result!.entryCount).toBe(100);
+    const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
+    expect(modelRows).toHaveLength(100);
+    expect(modelRows[0].model).toBe('m/repair');
+    expect(modelRows.at(-1)?.model).toBe('m/098');
   });
 
   it("drainQueues('both') starts one run per queue", async () => {
@@ -715,9 +1097,502 @@ describe('sweepStaleRunsAndDrain', () => {
     // pending row as settled and publishes a table missing it.
     await sweepStaleRunsAndDrain(env);
 
-    expect(syncPlatformRegistryRows).toHaveBeenCalled();
+    expect(syncSubscriptionSnapshot).toHaveBeenCalledWith(
+      env,
+      expect.anything(),
+      PLATFORM_SUBSCRIPTION_OWNER,
+      [{ model: 'platform/a' }, { model: 'platform/b' }],
+      { fetchImpl: fetch }
+    );
+    expect(syncPlatformRegistryRows).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), [
+      { model: 'platform/a', variant: null },
+      { model: 'platform/b', variant: 'high' },
+    ]);
     expect(vi.mocked(syncPlatformRegistryRows).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(listPendingCurrentProfiles).mock.invocationCallOrder[0]
     );
   });
+});
+
+describe('alias-resolved platform publication', () => {
+  it('keeps the existing table while a daily replacement is not ready', async () => {
+    vi.mocked(servingSubscriptionSnapshot).mockResolvedValue([
+      {
+        model: '~vendor/latest',
+        pairs: [{ model: 'vendor/next', variant: null }],
+        servingPairs: [{ model: 'vendor/current', variant: null }],
+        resolutionError: null,
+      },
+    ]);
+
+    await expect(publishPlatformRoutingTable(env, catalogFetch)).resolves.toBeNull();
+
+    expect(saveRoutingTable).not.toHaveBeenCalled();
+    expect(listReadyCurrentProfilesForEntries).not.toHaveBeenCalled();
+    expect(syncSubscriptionSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('publishes the ready subset of an initial alias snapshot after the queue settles', async () => {
+    catalogFetch.mockResolvedValue(Response.json({ data: [{ id: 'vendor/current' }] }));
+    vi.mocked(servingSubscriptionSnapshot).mockResolvedValue([
+      {
+        model: '~vendor/latest',
+        pairs: [
+          { model: 'vendor/current', variant: 'low' },
+          { model: 'vendor/current', variant: 'high' },
+        ],
+        servingPairs: [{ model: 'vendor/current', variant: 'low' }],
+        resolutionError: null,
+      },
+    ]);
+    vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([
+      { status: 'ready', count: 1 },
+      { status: 'failed', count: 1 },
+    ]);
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: 'vendor/current', variant: 'low', run_id: 'partial-run' },
+    ]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        model: 'vendor/current',
+        variant: 'low',
+        runId: 'partial-run',
+        routeKey,
+        cases: 10,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+        accuracy: 0.9,
+        avgCostUsd: 0.001,
+        avgLatencyMs: 100,
+        p50LatencyMs: 100,
+        p95LatencyMs: 150,
+        p50TtftMs: null,
+      }))
+    );
+
+    await expect(publishPlatformRoutingTable(env, catalogFetch)).resolves.not.toBeNull();
+    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      [{ model: 'vendor/current', variant: 'low' }]
+    );
+    expect(saveRoutingTable).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({
+        routes: expect.objectContaining({
+          [TAXONOMY_ROUTE_KEYS[0]]: [
+            expect.objectContaining({ model: 'vendor/current', variant: 'low' }),
+          ],
+        }),
+      }),
+      expect.any(String),
+      'efficient'
+    );
+  });
+
+  it('publishes concrete pairs with their concrete catalog prices', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      config: configRow,
+      classifierModels: ['classifier/a'],
+      deciderModels: [
+        { model: '~vendor/latest', variant: null, reasoning_effort: null },
+        { model: 'vendor/current', variant: null, reasoning_effort: null },
+      ],
+    });
+    catalogFetch.mockImplementation(async () =>
+      Response.json({
+        data: [
+          {
+            id: '~vendor/latest',
+            alias_target: 'vendor/new',
+            pricing: { prompt: '0.01', completion: '0.02' },
+          },
+          { id: 'vendor/current', pricing: { prompt: '0.001', completion: '0.002' } },
+          { id: 'vendor/new', pricing: { prompt: '0.004', completion: '0.008' } },
+        ],
+      })
+    );
+    vi.mocked(servingSubscriptionSnapshot).mockResolvedValue([
+      {
+        model: '~vendor/latest',
+        pairs: [{ model: 'vendor/current', variant: null }],
+        servingPairs: [{ model: 'vendor/current', variant: null }],
+        resolutionError: null,
+      },
+    ]);
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: 'vendor/current', variant: '', run_id: 'concrete-run' },
+    ]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        model: 'vendor/current',
+        variant: null,
+        runId: 'concrete-run',
+        routeKey,
+        cases: 10,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+        accuracy: 0.9,
+        avgCostUsd: 0.001,
+        avgLatencyMs: 100,
+        p50LatencyMs: 100,
+        p95LatencyMs: 150,
+        p50TtftMs: null,
+      }))
+    );
+
+    await publishPlatformRoutingTable(env, catalogFetch);
+
+    expect(servingSubscriptionSnapshot).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      PLATFORM_SUBSCRIPTION_OWNER
+    );
+    expect(syncSubscriptionSnapshot).not.toHaveBeenCalled();
+    expect(getSummariesForRuns).toHaveBeenCalledWith(env.BENCH_DB, ['concrete-run']);
+    expect(getRoutingCaseResultsForEntries).toHaveBeenCalledWith(env.BENCH_DB, [
+      { entry: { model: 'vendor/current', variant: null }, runId: 'concrete-run' },
+    ]);
+    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      [{ model: 'vendor/current', variant: null }]
+    );
+    expect(saveRoutingTable).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({
+        routes: expect.objectContaining({
+          [TAXONOMY_ROUTE_KEYS[0]]: [
+            expect.objectContaining({
+              model: 'vendor/current',
+              variant: null,
+              pricing: {
+                promptUsdPerToken: 0.001,
+                completionUsdPerToken: 0.002,
+                cacheReadUsdPerToken: null,
+              },
+            }),
+          ],
+        }),
+      }),
+      expect.any(String),
+      'efficient'
+    );
+  });
+});
+
+describe('frontier router runs', () => {
+  it('snapshots the router and plans only frontier cases without reserving slots', async () => {
+    mockConfig({ router: 'frontier', frontier_min_accuracy_delta: 0.1 });
+    const entries = [{ model: 'platform/a', variant: null }];
+    const result = await startRun(env, 'decider', { router: 'frontier', entries });
+    expect(result.runId).toMatch(/^frontier-decider-/);
+    expect(insertRun).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({
+        router: 'frontier',
+        max_concurrency: 0,
+        frontier_min_accuracy_delta: 0.1,
+        engine_identity: expect.stringMatching(/^frontier:v1:/),
+      }),
+      expect.anything(),
+      []
+    );
+    expect(markProfilesRunningForRun).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      result.runId,
+      entries,
+      expect.objectContaining({ router: 'frontier' })
+    );
+    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+      runId: result.runId,
+      entries: [{ model: 'platform/a', variant: null, providers: [] }],
+      repetitions: 1,
+      caseIds: FRONTIER_CASES.map(benchCase => benchCase.id),
+      chunkSize: 1,
+    });
+    expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
+  it('starts a frontier owner run under the frontier/user share', async () => {
+    mockConfig({ router: 'frontier' });
+    const entries = [{ model: 'owner/a', variant: null }];
+    const result = await startRun(env, 'decider', {
+      router: 'frontier',
+      purpose: 'user',
+      entries,
+    });
+    expect(result.runId).toMatch(/^frontier-user-/);
+    expect(insertRun).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier', purpose: 'user' }),
+      expect.anything(),
+      []
+    );
+    expect(markProfilesRunningForRun).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      result.runId,
+      entries,
+      expect.objectContaining({ router: 'frontier' })
+    );
+  });
+
+  it('drains both frontier registry queues', async () => {
+    mockConfig({ router: 'frontier' });
+    await drainQueues(env, 'both', undefined, 'frontier');
+    expect(listPendingCurrentProfiles).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier' }),
+      'platform'
+    );
+    expect(listPendingCurrentProfiles).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier' }),
+      'user'
+    );
+  });
+
+  it('starts a frontier platform run without consulting the efficient lane budgets', async () => {
+    vi.mocked(getConfigRows).mockImplementation(async (_db, router = 'efficient') => ({
+      config: { ...configRow, router },
+      classifierModels: ['classifier/a'],
+      deciderModels: [{ model: 'platform/a', variant: null, reasoning_effort: null }],
+    }));
+    vi.mocked(getLiveContainerLanes).mockResolvedValue(150);
+
+    const result = await startRun(env, 'decider', {
+      router: 'frontier',
+      entries: [{ model: 'platform/a', variant: null }],
+    });
+
+    expect(result.runId).toMatch(/^frontier-decider-/);
+    expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(0);
+  });
+
+  it('publishes the frontier router threshold from its effective policy values', async () => {
+    mockConfig({ router: 'frontier', min_accuracy: 0.8, frontier_min_accuracy_delta: 0.1 });
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: 'platform/a', variant: '', run_id: 'frontier-measured' },
+    ]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        model: 'platform/a',
+        variant: null,
+        runId: 'frontier-measured',
+        routeKey,
+        accuracy: 0.95,
+        avgCostUsd: 0.002,
+        avgLatencyMs: 100,
+        p50LatencyMs: 100,
+        p95LatencyMs: 150,
+        cases: 10,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+      }))
+    );
+    await publishPlatformRoutingTable(env, catalogFetch, 'frontier');
+    // frontierMinAccuracyDelta is fixed at 0, so the stored threshold applies.
+    expect(saveRoutingTable).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ minAccuracy: 0.8 }),
+      expect.any(String),
+      'frontier'
+    );
+    expect(getLatestRoutingTable).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
+    expect(kvDelete).toHaveBeenCalledWith('routing_table_frontier_v1');
+    expect(kvDelete).not.toHaveBeenCalledWith('routing_table_v1');
+  });
+
+  it('publishes an admin override in place of the stored threshold', async () => {
+    mockConfig({
+      min_accuracy: 0.7,
+      policy_overrides: { minAccuracy: 0.9 },
+      policy_computed: {
+        minAccuracy: {
+          value: 0.6,
+          computedAt: '2026-06-01T00:00:00.000Z',
+          source: 'held-out-grid',
+          evidence: 'fixture',
+        },
+      },
+    });
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: 'platform/a', variant: '', run_id: 'efficient-measured' },
+    ]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        model: 'platform/a',
+        variant: null,
+        runId: 'efficient-measured',
+        routeKey,
+        accuracy: 0.95,
+        avgCostUsd: 0.002,
+        avgLatencyMs: 100,
+        p50LatencyMs: 100,
+        p95LatencyMs: 150,
+        cases: 10,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+      }))
+    );
+    await publishPlatformRoutingTable(env, catalogFetch, 'efficient');
+    expect(saveRoutingTable).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ minAccuracy: 0.9 }),
+      expect.any(String),
+      'efficient'
+    );
+  });
+
+  it('publishes the daily computed threshold when no override is set', async () => {
+    mockConfig({
+      min_accuracy: 0.7,
+      policy_computed: {
+        minAccuracy: {
+          value: 0.6,
+          computedAt: '2026-06-01T00:00:00.000Z',
+          source: 'held-out-grid',
+          evidence: 'fixture',
+        },
+      },
+    });
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: 'platform/a', variant: '', run_id: 'efficient-measured' },
+    ]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        model: 'platform/a',
+        variant: null,
+        runId: 'efficient-measured',
+        routeKey,
+        accuracy: 0.95,
+        avgCostUsd: 0.002,
+        avgLatencyMs: 100,
+        p50LatencyMs: 100,
+        p95LatencyMs: 150,
+        cases: 10,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+      }))
+    );
+    await publishPlatformRoutingTable(env, catalogFetch, 'efficient');
+    expect(saveRoutingTable).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ minAccuracy: 0.6 }),
+      expect.any(String),
+      'efficient'
+    );
+  });
+});
+
+describe('run insert failures', () => {
+  it('releases registry claims and preserves the database error when inserting a run fails', async () => {
+    mockConfig({ router: 'frontier' });
+    const error = new Error('D1 write unavailable');
+    vi.mocked(insertRun).mockRejectedValue(error);
+    await expect(
+      startRun(env, 'decider', {
+        router: 'frontier',
+        entries: [{ model: 'platform/a', variant: null }],
+      })
+    ).rejects.toBe(error);
+    expect(releaseProfileClaims).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.stringMatching(/^frontier-/)
+    );
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
+    expect(queueSend).not.toHaveBeenCalled();
+  });
+
+  it('propagates registry run insert failures rather than hiding them as capacity waits', async () => {
+    vi.mocked(insertRun).mockRejectedValue(new Error('D1 write unavailable'));
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+    await expect(drainQueue(env, 'platform')).rejects.toThrow('D1 write unavailable');
+    expect(releaseProfileClaims).toHaveBeenCalled();
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
+  });
+});
+
+it('reuses prior cases before delegating the complete durable chunk plan', async () => {
+  vi.mocked(reuseDeciderCaseResults).mockResolvedValue(4);
+  const result = await startRun(env, 'decider', {
+    entries: [{ model: 'platform/a', variant: null }],
+  });
+  expect(reuseDeciderCaseResults).toHaveBeenCalledWith(
+    env.BENCH_DB,
+    expect.objectContaining({
+      runId: result.runId,
+      entries: [{ model: 'platform/a', variant: null }],
+    })
+  );
+  expect(vi.mocked(reuseDeciderCaseResults).mock.invocationCallOrder[0]).toBeLessThan(
+    vi.mocked(scheduleRunChunks).mock.invocationCallOrder[0]
+  );
+  expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
+    runId: result.runId,
+    entries: [{ model: 'platform/a', variant: null, providers: [] }],
+    repetitions: 1,
+    caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+    chunkSize: 1,
+  });
+  expect(queueSendBatch).not.toHaveBeenCalled();
+});
+
+it('settles a failed resume plan without dispatching or stranding registry claims', async () => {
+  vi.mocked(reuseDeciderCaseResults).mockResolvedValue(1);
+  vi.mocked(scheduleRunChunks).mockRejectedValueOnce(new Error('D1 read unavailable'));
+  await expect(
+    startRun(env, 'decider', { entries: [{ model: 'platform/a', variant: null }] })
+  ).rejects.toThrow('D1 read unavailable');
+  expect(queueSendBatch).not.toHaveBeenCalled();
+  expect(markRunFailed).toHaveBeenCalled();
+  expect(markProfilesFailedForRun).toHaveBeenCalled();
+});
+
+it('dispatches every claim of one scheduler pass and stops when a pass claims nothing', async () => {
+  const claim = {
+    id: 'claim-1',
+    run_id: 'user-existing',
+    model: 'platform/a',
+    variant: 'high',
+    providers: '[]',
+    rep: 2,
+    chunk: 10,
+    case_ids: JSON.stringify([DECIDER_CASES[10].id]),
+    slot: 1,
+    token: 'claim-token',
+    attempts: 1,
+  };
+  vi.mocked(claimScheduledChunks)
+    .mockResolvedValueOnce([claim, { ...claim, id: 'claim-2', token: 'claim-token-2' }])
+    .mockResolvedValue([]);
+  const result = await startRun({ ...env, BENCHMARK_SCHEDULER_CONFIG: '{"slots":2}' }, 'decider', {
+    purpose: 'user',
+    entries: [{ model: 'platform/a', variant: 'high' }],
+  });
+  expect(result.enqueuedModels).toBe(1);
+  expect(recoverChunks).toHaveBeenCalledWith(env.BENCH_DB, expect.any(Number));
+  expect(claimScheduledChunks).toHaveBeenCalledTimes(1);
+  expect(claimScheduledChunks).toHaveBeenCalledWith(
+    env.BENCH_DB,
+    expect.objectContaining({ slots: 2 }),
+    expect.any(Number),
+    expect.any(String)
+  );
+  expect(queueSend).toHaveBeenCalledTimes(2);
+  expect(queueSend).toHaveBeenCalledWith({
+    runId: 'user-existing',
+    kind: 'decider',
+    model: 'platform/a',
+    claimId: 'claim-1',
+    claimToken: 'claim-token',
+  });
+  expect(queueSendBatch).not.toHaveBeenCalled();
 });

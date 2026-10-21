@@ -67,6 +67,7 @@ const FAILURE_REASON_LABELS = {
   session_import_timeout: 'Session import timed out',
   session_import_failed: 'Session import failed',
   setup_command_timeout: 'Setup command timed out',
+  container_limit_reached: 'Container limit reached',
   admission_capacity: 'Admission queue full',
   admission_not_found: 'Session not found at admission',
   admission_internal: 'Internal admission error',

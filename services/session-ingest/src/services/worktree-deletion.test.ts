@@ -111,6 +111,9 @@ function database(rootCount = 1, descendantCount = 0) {
   const sqlQueries: { sql: string; params: unknown[] }[] = [];
   const candidateQueries: { sql: string; params: unknown[] }[] = [];
   let membershipAllowed = true;
+  let inTransaction = false;
+  let transactionWrote = false;
+  let frozenWorktreeReads: CloudAgentWorktree[] | undefined;
   const valuesOf = (condition: SQL | undefined) =>
     condition ? new PgDialect().sqlToQuery(condition).params : [];
   const select = (columns?: Record<string, unknown>) => {
@@ -121,10 +124,11 @@ function database(rootCount = 1, descendantCount = 0) {
     const rows = () => {
       const bound = valuesOf(condition);
       if (table === cloud_agent_worktrees) {
+        const source = !inTransaction && frozenWorktreeReads ? frozenWorktreeReads : worktrees;
         const id = bound.find(value => typeof value === 'string' && value.startsWith('worktree_'));
         return id
-          ? worktrees.filter(row => row.worktree_id === id)
-          : worktrees.filter(row => row.deletion_completed_at === null);
+          ? source.filter(row => row.worktree_id === id)
+          : source.filter(row => row.deletion_completed_at === null);
       }
       if (table === organization_memberships)
         return membershipAllowed ? [{ id: 'membership' }] : [];
@@ -233,6 +237,7 @@ function database(rootCount = 1, descendantCount = 0) {
     ) => {
       const query = {
         where: (condition: SQL) => {
+          transactionWrote = true;
           if (table === cli_sessions_v2) {
             for (const row of members.filter(
               member => member.userId === userId && valuesOf(condition).includes(member.sessionId)
@@ -258,6 +263,7 @@ function database(rootCount = 1, descendantCount = 0) {
   const remove = () => ({
     where: (condition: SQL) => ({
       returning: async () => {
+        transactionWrote = true;
         const ids = valuesOf(condition);
         const deleted = members.filter(row => row.userId === userId && ids.includes(row.sessionId));
         events.push('deleteRows');
@@ -329,15 +335,19 @@ function database(rootCount = 1, descendantCount = 0) {
     transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => {
       const previousWorktrees = structuredClone(worktrees);
       const previousMembers = structuredClone(members);
+      inTransaction = true;
+      transactionWrote = false;
       try {
         const result = await callback(tx);
-        if (commitError) throw commitError;
+        if (commitError && transactionWrote) throw commitError;
         events.push('commit');
         return result;
       } catch (error) {
         worktrees.splice(0, worktrees.length, ...previousWorktrees);
         members.splice(0, members.length, ...previousMembers);
         throw error;
+      } finally {
+        inTransaction = false;
       }
     },
   };
@@ -412,12 +422,71 @@ function database(rootCount = 1, descendantCount = 0) {
     fail: (id?: string) => {
       failure = id;
     },
+    freezeWorktreeReads: () => {
+      frozenWorktreeReads = structuredClone(worktrees);
+    },
   };
 }
 
 beforeEach(() => vi.resetAllMocks());
 
 describe('durable worktree deletion journal', () => {
+  it.each(['none', 'ingest', 'transaction'] as const)(
+    'reports bounded SQL and DO timing summaries on failure=%s',
+    async failure => {
+      const fail = failure !== 'none';
+      const f = database(2, 1);
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        await beginWorktreeDeletion(env, params);
+        await recordWorktreeCleanup(env, params);
+        if (failure === 'ingest') f.fail(kiloId(1));
+        if (failure === 'transaction') f.failCommit(new Error('commit unavailable'));
+        if (fail) await expect(completeWorktreeDeletion(env, params)).rejects.toThrow();
+        else await completeWorktreeDeletion(env, params);
+        expect(log.mock.calls[0][0]).toMatchObject({
+          operation: 'begin',
+          sqlTransactionMs: expect.any(Number),
+        });
+        expect(log.mock.calls[1][0]).toMatchObject({
+          operation: 'record_cleanup',
+          lineageInferenceMs: expect.any(Number),
+          sqlTransactionMs: expect.any(Number),
+        });
+        const summaries = [...log.mock.calls, ...warn.mock.calls]
+          .map(([fields]) => fields)
+          .filter(fields => typeof fields === 'object' && fields.event === 'worktree_deletion');
+        const summary = summaries.find(fields => fields.operation === 'complete');
+        expect(summary).toMatchObject({
+          event: 'worktree_deletion',
+          operation: 'complete',
+          worktreeId,
+          sessionCount: 3,
+          ok: !fail,
+          durationMs: expect.any(Number),
+          readStateMs: expect.any(Number),
+          ingestCleanupMs: expect.any(Number),
+          accessCacheCleanupMs: expect.any(Number),
+          connectionCleanupMs: expect.any(Number),
+        });
+        if (failure === 'ingest') {
+          expect(summary).toMatchObject({ stage: 'ingestCleanup' });
+          expect(summary).not.toHaveProperty('sqlTransactionMs');
+        } else {
+          expect(summary).toHaveProperty('sqlTransactionMs', expect.any(Number));
+          if (failure === 'transaction') expect(summary).toMatchObject({ stage: 'sqlTransaction' });
+        }
+        expect(summaries).toHaveLength(3);
+        expect(JSON.stringify(summary)).not.toContain(userId);
+        expect(JSON.stringify(summary)).not.toContain(kiloId(0));
+      } finally {
+        log.mockRestore();
+        warn.mockRestore();
+      }
+    }
+  );
+
   it.each([null, organizationId])(
     'publishes only committed root and descendant deletions in scope %s, once per deleted row',
     async scope => {
@@ -536,6 +605,33 @@ describe('durable worktree deletion journal', () => {
       completed: true,
       manifest: { sessions: [{ sessionId: kiloId(0) }, { sessionId: kiloId(1) }] },
     });
+  });
+
+  it('reads the cleanup manifest inside a transaction so a cached pre-cleanup row cannot fail completion', async () => {
+    const f = database();
+    await beginWorktreeDeletion(env, params);
+    f.members.push({
+      sessionId: kiloId(1),
+      cloudAgentSessionId: null,
+      cloudAgentSessionScopeId: null,
+      organizationId: null,
+      worktreeId: null,
+      userId,
+      parentSessionId: kiloId(0),
+    });
+    f.freezeWorktreeReads();
+    await recordWorktreeCleanup(env, {
+      ...params,
+      childSessions: [
+        { sessionId: kiloId(1), parentSessionId: kiloId(0), cloudAgentSessionId: cloudId(0) },
+      ],
+    });
+
+    await expect(completeWorktreeDeletion(env, params)).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0), kiloId(1)],
+    });
+    expect(f.members).toEqual([]);
   });
 
   it('recovers an older never-run orphan snapshot after the runtime and creation event are gone', async () => {

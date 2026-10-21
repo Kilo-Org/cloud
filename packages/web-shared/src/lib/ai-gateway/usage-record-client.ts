@@ -4,15 +4,15 @@ import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type { UsageRecordInsertResult } from './processUsage.types';
-import { UsageRecordResponseSchema, type UsageRecordRequest } from './usage-record-contract';
+import { UsageRecordResponseSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 
 /**
  * Client for handing the AI-gateway usage write to a Frankfurt-local endpoint.
  *
  * `APP_URL` resolves to the Frankfurt-only `kilocode-app` deployment in
- * production. Its `next.config.mjs` rewrites divert only the six listed gateway
- * paths to `global-api.kilo.ai`, so `/api/internal/*` executes locally there,
- * next to the PostgreSQL primary.
+ * production. Its `next.config.mjs` rewrites divert only the legacy gateway
+ * paths to `apps/ai-gateway`, so `/api/internal/*` executes locally there, next
+ * to the PostgreSQL primary.
  */
 
 const USAGE_RECORD_PATH = '/api/internal/usage/record';
@@ -90,6 +90,7 @@ export async function recordUsageInPrimaryRegion(
         headers: {
           'content-type': 'application/json',
           'x-internal-api-key': INTERNAL_API_SECRET,
+          'x-usage-write-source': 'region_handoff',
         },
         body,
         signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),

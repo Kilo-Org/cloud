@@ -25,7 +25,6 @@ import {
   type CheckoutSessionLike,
   isKiloOwnedAutoTopUpInvoice,
   isWithinServiceFeeActivationBoundaryWindow,
-  mergeServiceFeeCommercialMetadata,
   prepareAutoTopUpInvoiceFee,
   prepareTopUpCheckoutFee,
   resolveFixedUsdPriceUnitAmount,
@@ -1105,28 +1104,5 @@ describe('trusted principal settlement', () => {
       })
     ).rejects.toThrow(/principal mismatch/);
     expect(ServiceFeeAssessmentConflictError).toBeDefined();
-  });
-});
-
-describe('mergeServiceFeeCommercialMetadata', () => {
-  test('preserves existing metadata', () => {
-    expect(
-      mergeServiceFeeCommercialMetadata(
-        { type: 'stripe-checkout-topup', kiloUserId: 'user_1' },
-        {
-          serviceFeeAssessmentKey: 'checkout:1',
-          serviceFeeVersion: SERVICE_FEE_VERSION,
-          serviceFeeFlow: 'personal_top_up',
-          serviceFeePrincipalMinor: '10000',
-        }
-      )
-    ).toEqual({
-      type: 'stripe-checkout-topup',
-      kiloUserId: 'user_1',
-      serviceFeeAssessmentKey: 'checkout:1',
-      serviceFeeVersion: SERVICE_FEE_VERSION,
-      serviceFeeFlow: 'personal_top_up',
-      serviceFeePrincipalMinor: '10000',
-    });
   });
 });

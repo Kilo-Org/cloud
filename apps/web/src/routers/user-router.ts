@@ -44,6 +44,7 @@ import {
   user_activity_tokens,
   agent_configs,
   passkey_credentials,
+  cli_sessions_v2,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -307,6 +308,11 @@ function capitalizeFirst(s: string): string {
 // in `UQ_user_activity_tokens_live_ios_activity`.
 function activityTokenScopeLockKey(userId: string, organizationId: string | null): string {
   return `user-activity-token-scope:${userId}:${organizationId ?? ''}`;
+}
+
+/** The token kinds that follow one session and carry its `session_id`. */
+function isSessionTokenKind(kind: string): boolean {
+  return kind === 'ios_session_activity' || kind === 'android_session_ongoing';
 }
 
 function getDeductionKind(
@@ -1379,21 +1385,67 @@ export const userRouter = createTRPCRouter({
     }),
 
   // Activity tokens for glanceable surfaces (Live Activity / push-to-start /
-  // Android ongoing). Upsert on `token` so a re-registration of the same
-  // device token replaces the row instead of failing the unique index, and
+  // Android ongoing / followed session cards). Upsert on (token, session) so a
+  // re-registration replaces the row instead of failing the unique key, and
   // retire the scope's previous live `ios_activity` row in the same
-  // transaction so one scope never has two live cards.
+  // transaction so one scope never has two live cards. An Android device
+  // registers its one Expo push token once per followed session.
 
   registerActivityToken: baseProcedure
     .input(
-      z.object({
-        token: z.string().min(1),
-        kind: z.enum(['ios_push_to_start', 'ios_activity', 'android_ongoing']),
-        platform: z.enum(['ios', 'android']),
-        organizationId: z.string().min(1).nullable(),
-      })
+      z
+        .object({
+          token: z.string().min(1),
+          kind: z.enum([
+            'ios_push_to_start',
+            'ios_activity',
+            'ios_session_activity',
+            'android_ongoing',
+            'android_session_ongoing',
+          ]),
+          platform: z.enum(['ios', 'android']),
+          organizationId: z.string().min(1).nullable(),
+          /** The followed session; required for a session kind, rejected for every other kind. */
+          sessionId: z.string().min(1).optional(),
+        })
+        .refine(input => isSessionTokenKind(input.kind) === (input.sessionId !== undefined), {
+          message: 'sessionId is required for a session card and rejected for every other kind',
+          path: ['sessionId'],
+        })
     )
     .mutation(async ({ ctx, input }) => {
+      const sessionId = isSessionTokenKind(input.kind) ? (input.sessionId ?? null) : null;
+      if (sessionId !== null) {
+        const platform = input.kind === 'ios_session_activity' ? 'ios' : 'android';
+        if (input.platform !== platform) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `A ${input.kind} token is ${platform} only`,
+          });
+        }
+        // A session card shows the session title on the Lock Screen, so the
+        // caller must own the session in the scope the card counts against.
+        if (input.organizationId !== null) {
+          await ensureOrganizationAccess(ctx, input.organizationId);
+        }
+        const [session] = await db
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+              input.organizationId === null
+                ? isNull(cli_sessions_v2.organization_id)
+                : eq(cli_sessions_v2.organization_id, input.organizationId)
+            )
+          )
+          .limit(1);
+        if (!session) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+        }
+      }
+
       const retiredTokens = await db.transaction(async tx => {
         // Registration is a replace. An `ios_activity` token is the app adopting
         // its Lock Screen card, and only one card may be live per (user,
@@ -1441,14 +1493,16 @@ export const userRouter = createTRPCRouter({
             kind: input.kind,
             platform: input.platform,
             organization_id: input.organizationId,
+            session_id: sessionId,
           })
           .onConflictDoUpdate({
-            target: [user_activity_tokens.token],
+            target: [user_activity_tokens.token, user_activity_tokens.session_id],
             set: {
               user_id: ctx.user.id,
               kind: input.kind,
               platform: input.platform,
               organization_id: input.organizationId,
+              session_id: sessionId,
               // The app re-adopting its own card must not leave its row marked
               // dead: a re-registration of the same token un-supersedes it.
               superseded_at: null,
@@ -1467,7 +1521,10 @@ export const userRouter = createTRPCRouter({
       // row is already retired and the DB holds the one-live-card invariant, so
       // this is best-effort: a failure only leaves the end to the next
       // scheduled refresh and must never fail the registration.
-      if (retiredTokens.length > 0) {
+      // A new session card leaves the aggregate count and needs its first
+      // server content (the approval key the app cannot mint), so it asks for
+      // the same scope refresh.
+      if (retiredTokens.length > 0 || sessionId !== null) {
         await refreshGlanceableScope({
           userId: ctx.user.id,
           organizationId: input.organizationId,
@@ -1483,17 +1540,40 @@ export const userRouter = createTRPCRouter({
     .input(
       z.object({
         token: z.string().min(1),
+        /**
+         * Delete only this session's row. An Android device shares one token
+         * across its followed sessions, so an unfollow names the session.
+         * Without it, every row of the token goes: the device left the scope.
+         */
+        sessionId: z.string().min(1).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await db
+      const removed = await db
         .delete(user_activity_tokens)
         .where(
           and(
             eq(user_activity_tokens.user_id, ctx.user.id),
-            eq(user_activity_tokens.token, input.token)
+            eq(user_activity_tokens.token, input.token),
+            input.sessionId === undefined
+              ? undefined
+              : eq(user_activity_tokens.session_id, input.sessionId)
           )
-        );
+        )
+        .returning({
+          kind: user_activity_tokens.kind,
+          organizationId: user_activity_tokens.organization_id,
+        });
+      // An unfollowed session counts on the aggregate card again. Best-effort,
+      // as for registration: the next session change carries it otherwise.
+      const scopes = new Set(
+        removed.filter(row => isSessionTokenKind(row.kind)).map(row => row.organizationId)
+      );
+      for (const organizationId of scopes) {
+        await refreshGlanceableScope({ userId: ctx.user.id, organizationId }).catch(error => {
+          console.error('[unregisterActivityToken] Failed to request glanceable refresh:', error);
+        });
+      }
       return { success: true };
     }),
 

@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { i18n } from '@/i18n';
 
 import {
   councilDecisionLabel,
   councilVoteLabel,
   flattenCouncilFindings,
+  gateThresholdLabel,
+  reviewFailureLabel,
+  selectRetryAction,
 } from './review-detail-helpers';
 
 type Finding = { path: string; severity: string };
@@ -62,5 +66,102 @@ describe('councilVoteLabel', () => {
   it('labels a null vote as no result', () => {
     expect(councilVoteLabel(null)).toBe('No result');
     expect(councilVoteLabel(undefined)).toBe('No result');
+  });
+});
+
+describe('reviewFailureLabel', () => {
+  it.each([
+    ['github_installation_required', 'githubInstallationRequired'],
+    ['github_ip_allow_list', 'githubIpAllowList'],
+    ['gitlab_project_access_required', 'gitlabProjectAccessRequired'],
+    ['byok_invalid_key', 'byokInvalidKey'],
+    ['selected_model_unavailable', 'selectedModelUnavailable'],
+    ['repeated_repository_clone_timeout', 'repeatedRepositoryCloneTimeout'],
+  ] as const)('uses localized action-required copy for %s', (reason, copyKey) => {
+    expect(reviewFailureLabel(i18n.t, 'Internal diagnostic', reason)).toBe(
+      i18n.t(`codeReviewer.actionRequired.${copyKey}.description`)
+    );
+  });
+
+  it.each([null, 'upstream_error', 'future-reason'])(
+    'does not expose unknown diagnostics for %s',
+    reason => {
+      expect(reviewFailureLabel(i18n.t, 'Internal diagnostic', reason)).toBe(
+        i18n.t('codeReviewer.reviewDetail.reviewFailed')
+      );
+    }
+  );
+
+  it('localizes the known service-unreachable dispatch message', () => {
+    expect(
+      reviewFailureLabel(
+        i18n.t,
+        'Dispatch failed: could not reach the code review service. ' +
+          'It may be offline — retry the review once it is running.',
+        'upstream_error'
+      )
+    ).toBe(i18n.t('codeReviewer.reviewDetail.serviceUnavailable'));
+  });
+});
+
+describe('gateThresholdLabel', () => {
+  it.each(['off', 'all', 'critical', 'warning'] as const)('localizes %s', threshold => {
+    expect(gateThresholdLabel(threshold)).toBe(i18n.t(`codeReviewer.gate.${threshold}`));
+  });
+
+  it.each(['future-threshold', 'constructor', ''])('labels unknown %s', threshold => {
+    expect(gateThresholdLabel(threshold)).toBe(i18n.t('common.unknown'));
+  });
+});
+
+describe('selectRetryAction', () => {
+  const enabled = { isEnabled: true, actionRequired: null };
+
+  it('keeps Retry for a manual review whatever the config says', () => {
+    expect(
+      selectRetryAction({
+        hasManualConfig: true,
+        configPending: false,
+        config: { isEnabled: false, actionRequired: { reason: 'byok_invalid_key' } },
+      })
+    ).toBe('retry');
+  });
+
+  it('shows nothing while the config loads', () => {
+    expect(
+      selectRetryAction({ hasManualConfig: false, configPending: true, config: undefined })
+    ).toBeNull();
+  });
+
+  it('keeps Retry when the config is unknown', () => {
+    expect(
+      selectRetryAction({ hasManualConfig: false, configPending: false, config: undefined })
+    ).toBe('retry');
+  });
+
+  it('keeps Retry when Code Reviewer is on and needs no attention', () => {
+    expect(
+      selectRetryAction({ hasManualConfig: false, configPending: false, config: enabled })
+    ).toBe('retry');
+  });
+
+  it('links to the settings when Code Reviewer is off', () => {
+    expect(
+      selectRetryAction({
+        hasManualConfig: false,
+        configPending: false,
+        config: { isEnabled: false, actionRequired: null },
+      })
+    ).toBe('fix-settings');
+  });
+
+  it('links to the settings when the configuration needs attention', () => {
+    expect(
+      selectRetryAction({
+        hasManualConfig: false,
+        configPending: false,
+        config: { ...enabled, actionRequired: { reason: 'byok_invalid_key' } },
+      })
+    ).toBe('fix-settings');
   });
 });

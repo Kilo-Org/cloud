@@ -2,13 +2,66 @@ import { describe, expect, it } from '@jest/globals';
 import {
   getClosedWorktreeChatTabsStorageKey,
   getClosedWorktreeChatSessionIds,
+  getLoadingChatControlSession,
   getNextOpenChatSessionId,
   getOpenWorktreeChatSessionIds,
+  getWorkspaceControlSession,
   parseWorktreeChatTabs,
   reduceWorktreeChatTabs,
   type WorktreeChatTabsAction,
   type WorktreeChatTabsState,
 } from './worktree-chat-tabs';
+import type { StoredSession } from './types';
+
+describe('getWorkspaceControlSession', () => {
+  const chat: StoredSession = {
+    sessionId: 'session-a',
+    cloudAgentSessionId: 'agent_a',
+    worktreeId: 'worktree-a',
+    repository: 'org/repo',
+    prompt: '',
+    mode: 'code',
+    model: 'model',
+    status: 'completed',
+    createdAt: '',
+    updatedAt: '',
+    messages: [],
+  };
+
+  it('uses a saved cloud session even when all chat tabs are closed', () => {
+    const state = reduceWorktreeChatTabs(createState(), {
+      type: 'close',
+      sessionId: chat.sessionId,
+    });
+    expect(getOpenWorktreeChatSessionIds([chat.sessionId], state.closedSessionIds)).toEqual([]);
+    expect(getWorkspaceControlSession('worktree-a', [chat], [])).toBe(chat);
+  });
+
+  it('drives loading controls only from the requested chat itself', () => {
+    const requested = { ...chat, sessionId: 'requested', cloudAgentSessionId: 'workspace_b' };
+    expect(getLoadingChatControlSession('requested', [chat, requested], [])).toBe(requested);
+    // A listed chat without a cloud session never borrows a sibling's controls.
+    const unlinked = { ...requested, cloudAgentSessionId: null };
+    expect(getLoadingChatControlSession('requested', [chat, unlinked], [])).toBeNull();
+    expect(getLoadingChatControlSession('unlisted', [chat], [])).toBeNull();
+    expect(getLoadingChatControlSession('requested', [requested], ['requested'])).toBeNull();
+  });
+
+  it('skips unprepared and deleting chats', () => {
+    const unprepared = { ...chat, sessionId: 'unprepared', cloudAgentSessionId: null };
+    const deleting = { ...chat, sessionId: 'deleting' };
+    expect(
+      getWorkspaceControlSession('worktree-a', [unprepared, deleting, chat], ['deleting'])
+    ).toBe(chat);
+  });
+
+  it('does not reuse another workspace or a missing workspace', () => {
+    expect(getWorkspaceControlSession('worktree-b', [chat], [])).toBeNull();
+    expect(getWorkspaceControlSession(null, [chat], [])).toBeNull();
+    expect(getWorkspaceControlSession('worktree-a', [], [])).toBeNull();
+    expect(getWorkspaceControlSession('worktree-a', [chat], [chat.sessionId])).toBeNull();
+  });
+});
 
 const openSessionIds = Object.freeze(['session-a', 'session-b', 'session-c']);
 const worktreeId = 'worktree-a';

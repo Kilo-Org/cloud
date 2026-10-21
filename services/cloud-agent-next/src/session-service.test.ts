@@ -2,6 +2,11 @@ import { generateKeyPairSync } from 'node:crypto';
 import { relative } from 'node:path';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type * as GitTokenServiceClientModule from './services/git-token-service-client.js';
+import type { WorkerDb } from '@kilocode/db';
+import {
+  agent_environment_profile_instructions,
+  agent_environment_profiles,
+} from '@kilocode/db/schema';
 import { validateWrapperDispatchTicket } from './auth.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
 import jwt from 'jsonwebtoken';
@@ -81,6 +86,7 @@ import {
   getCommandGuardPolicy,
   resolveCommandGuardBashPermission,
   writeGlobalRules,
+  writeRuntimeInstructions,
 } from './session-service.js';
 import type { CloudAgentSessionState, PersistenceEnv } from './persistence/types.js';
 import type { CreateSessionForCloudAgentResult } from '@kilocode/session-ingest-contracts';
@@ -90,6 +96,8 @@ import {
 } from './persistence/session-metadata.js';
 import type { ExecutionSession, SandboxId, SandboxInstance, SessionId } from './types.js';
 import type { FencedWrapperDispatchRequest } from './execution/types.js';
+import type { SessionCreateRequest } from './session/session-requests.js';
+import { resolveEffectiveSessionConfiguration } from './router/handlers/session-creation-preflight.js';
 import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from './shared/runtime-environment.js';
 
@@ -701,6 +709,44 @@ function createBitbucketMetadata(
 
 const BITBUCKET_SANDBOX_ID = 'ses-bitbucket' as SandboxId;
 
+const INSTRUCTION_PROFILE_ID = '11111111-1111-4111-8111-111111111111';
+
+/**
+ * Minimal profile-storage stand-in for the real `mergeProfileConfiguration`:
+ * `.from(table)` resolves the registered rows for that table, so the real
+ * merge runs against faked storage instead of a PostgreSQL connection.
+ */
+function createProfileMergeDb(instructions: Array<{ name: string; content: string }>): WorkerDb {
+  const rowsByTable = new Map<unknown, unknown[]>([
+    [agent_environment_profiles, [{ id: INSTRUCTION_PROFILE_ID }]],
+    [agent_environment_profile_instructions, instructions],
+  ]);
+
+  const select = () => ({
+    from: (table: unknown) => {
+      const rows = () => rowsByTable.get(table) ?? [];
+      const builder = {
+        where: () => builder,
+        orderBy: () => builder,
+        limit: () => builder,
+        then: (
+          onFulfilled?: (value: unknown[]) => unknown,
+          onRejected?: (error: unknown) => unknown
+        ) => Promise.resolve(rows()).then(onFulfilled, onRejected),
+      };
+      return builder;
+    },
+  });
+
+  // mergeProfileConfiguration reads every category inside one read-only
+  // repeatable-read transaction, so the fake must run the callback against the
+  // same read builders for the real merge path to execute.
+  const transaction = async (callback: (tx: { select: typeof select }) => Promise<unknown>) =>
+    callback({ select });
+
+  return { select, transaction } as unknown as WorkerDb;
+}
+
 function createCloneMetadata(): CloudAgentSessionState {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
@@ -1111,17 +1157,78 @@ describe('writeGlobalRules', () => {
 
     expect(writeFile).toHaveBeenCalledWith(
       '/home/agent_test/.kilocode/rules/cloud-agent.md',
-      buildCloudAgentRules('900000')
+      buildCloudAgentRules({ bashDefaultTimeoutMs: '900000', sandboxProvider: 'cloudflare' })
     );
+    const rules = writeFile.mock.calls[0]?.[1];
+    expect(rules).toContain('Port 3000 is used by the sandbox itself.');
   });
 });
 
 describe('buildCloudAgentRules', () => {
   it('bounds commands and sleeps to the shell-tool timeout', () => {
-    const rules = buildCloudAgentRules(240_000);
+    const rules = buildCloudAgentRules({ bashDefaultTimeoutMs: 240_000 });
 
     expect(rules).toContain('no more than 3 minutes 30 seconds');
     expect(rules).toContain('never sleep longer than this limit');
+  });
+
+  it.each([
+    ['cloudflare', 'Port 3000 is used by the sandbox itself.'],
+    ['vercel', 'Port 23456 is used by the sandbox itself.'],
+  ] as const)('names the reserved port of %s', (sandboxProvider, sentence) => {
+    expect(buildCloudAgentRules({ sandboxProvider })).toContain(sentence);
+  });
+
+  it.each([
+    ['cloudflare-containers', 'cloudflare-containers' as const],
+    ['an unknown provider', undefined],
+  ])('names no reserved port for %s', (_name, sandboxProvider) => {
+    const rules = buildCloudAgentRules({ sandboxProvider });
+    expect(rules).not.toContain('used by the sandbox itself');
+    expect(rules).toContain('read its output to find the port that it uses');
+    expect(rules).toContain('give its exact URL as plain text, for example http://localhost:5173.');
+  });
+});
+
+describe('writeRuntimeInstructions', () => {
+  it('writes each instruction to .kilocode/rules/<name>.md', async () => {
+    const writeFile = vi.fn().mockResolvedValue(undefined);
+    const sandbox = createSandbox(createSession(), false, writeFile);
+
+    await writeRuntimeInstructions(sandbox, '/home/agent_test', [
+      { name: 'repo-rules', content: 'Follow the repo policy' },
+      { name: 'style', content: 'Use tabs' },
+    ]);
+
+    expect(writeFile).toHaveBeenCalledWith(
+      '/home/agent_test/.kilocode/rules/repo-rules.md',
+      'Follow the repo policy'
+    );
+    expect(writeFile).toHaveBeenCalledWith('/home/agent_test/.kilocode/rules/style.md', 'Use tabs');
+  });
+
+  it('never overwrites cloud-agent.md and skips unsafe names', async () => {
+    const writeFile = vi.fn().mockResolvedValue(undefined);
+    const sandbox = createSandbox(createSession(), false, writeFile);
+
+    await writeRuntimeInstructions(sandbox, '/home/agent_test', [
+      { name: 'cloud-agent', content: 'hijack the reserved rules file' },
+      { name: '../escape', content: 'escape the rules directory' },
+      { name: 'safe', content: 'ok' },
+    ]);
+
+    expect(writeFile).toHaveBeenCalledTimes(1);
+    expect(writeFile).toHaveBeenCalledWith('/home/agent_test/.kilocode/rules/safe.md', 'ok');
+  });
+
+  it('does nothing when there are no runtime instructions', async () => {
+    const writeFile = vi.fn().mockResolvedValue(undefined);
+    const sandbox = createSandbox(createSession(), false, writeFile);
+
+    await writeRuntimeInstructions(sandbox, '/home/agent_test', undefined);
+    await writeRuntimeInstructions(sandbox, '/home/agent_test', []);
+
+    expect(writeFile).not.toHaveBeenCalled();
   });
 });
 
@@ -2194,6 +2301,32 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.context.workspacePath).toBe(workspacePath);
     expect(result.ready.workspacePath).toBe(workspacePath);
     expect(result.readyRequest.workspace.workspacePath).toBe(workspacePath);
+  });
+
+  it('carries instructions from profile resolution through registration metadata into the wrapper handoff', async () => {
+    const request = {
+      agent: { mode: 'code', model: 'test-model' },
+      repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+      profile: { id: INSTRUCTION_PROFILE_ID },
+    } satisfies SessionCreateRequest;
+
+    // Real chain with faked profile storage: mergeProfileConfiguration reads
+    // the instructions, applyProfileResolution writes them to
+    // `profile.resolved.runtimeInstructions`, and session registration persists
+    // that resolved profile verbatim as the session's `profile`.
+    const resolvedRequest = await resolveEffectiveSessionConfiguration(
+      { env: {} as never, userId: 'user_test' },
+      request,
+      { defaultProfileResolution: 'explicit-profile-only' },
+      createProfileMergeDb([{ name: 'repo-rules', content: 'Follow the repository policy' }])
+    );
+    const metadata = createMetadata({ profile: resolvedRequest.profile?.resolved });
+
+    const result = await buildPromptWrapperRequests(metadata);
+
+    expect(result.readyRequest.materialized.runtimeInstructions).toEqual([
+      { name: 'repo-rules', content: 'Follow the repository policy' },
+    ]);
   });
 
   it('uses a fenced Worker proxy handle for modern authorization without exposing its backing token', async () => {
@@ -3937,7 +4070,7 @@ describe('SessionService session-ingest compatibility', () => {
       'cloud-agent',
       undefined,
       undefined,
-      'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'
+      { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' }
     );
 
     expect(result).toEqual(readyResult);
@@ -3953,6 +4086,35 @@ describe('SessionService session-ingest compatibility', () => {
       gitUrl: undefined,
       cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
+  });
+
+  it('forwards the clone cut to session-ingest', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+
+    await service.createCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      'user_test',
+      env,
+      undefined,
+      undefined,
+      'cloud-agent',
+      undefined,
+      undefined,
+      {
+        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+        cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      }
+    );
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(env.SESSION_INGEST.createSessionForCloudAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+        cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      })
+    );
   });
 
   it('returns undefined when the old worker sends no clone acknowledgement', async () => {

@@ -33,12 +33,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
     description: 'stub for unit tests',
     context_length: 8192,
     max_completion_tokens: 4096,
-    status: 'public',
     flags: [],
     provider: { ...OPENROUTER, id: 'dev-tools', supportedChatApis: ['chat_completions'] },
     internal_id: 'stub-internal',
     pricing: null,
-    inference_provider_restriction: [],
+    inference_providers: [],
   };
   return {
     ...actual,
@@ -47,7 +46,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
   };
 });
 
-import { PUT } from './route';
+import { GET, PUT } from './route';
 
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockGetBenchmarkConfig = jest.mocked(getBenchmarkConfig);
@@ -67,20 +66,22 @@ function putRequest(body: unknown) {
 }
 
 const validConfig = {
+  router: 'efficient' as const,
+  accuracyNoiseBand: 0.05,
+  frontierMinAccuracyDelta: 0,
   classifierModels: ['google/gemini-2.5-flash-lite'],
-  deciderModels: [{ id: 'openai/gpt-5-mini', reasoningEffort: null }],
+  deciderModels: [{ id: 'openai/gpt-5-mini' }],
   minAccuracy: 0.7,
   switchCostFactor: 3,
   bestAccuracySwitchThreshold: 0.05,
-  maxConcurrency: 4,
-  userMaxConcurrency: 100,
+  productionTokenProfile: null,
+  switchHorizonTurns: null,
+  lowConfidenceThreshold: null,
   benchmarkUserId: null,
   benchmarkOrgId: null,
   classifierRepetitions: 1,
   deciderRepetitions: 1,
   classifierMaxP95LatencyMs: 1000,
-  autoDeciderMinCostUsd: 15,
-  autoDeciderMaxCostUsd: 25,
   updatedAt: null,
   updatedBy: null,
 };
@@ -99,20 +100,54 @@ describe('PUT /admin/api/auto-routing/benchmark-config', () => {
     mockGetBenchmarkConfig.mockResolvedValue({ status: 200, body: { config: null } });
   });
 
-  it('forwards a config whose decider models all serve every gateway chat API', async () => {
-    const response = await PUT(putRequest(validConfig));
-    expect(response.status).toBe(200);
-    expect(mockUpdateBenchmarkConfig).toHaveBeenCalledWith(validConfig, 'admin@kilocode.ai');
+  it('defaults config reads to efficient', async () => {
+    await GET();
+    expect(mockGetBenchmarkConfig).toHaveBeenCalledWith('efficient');
+  });
+
+  it('forwards frontier config reads', async () => {
+    await GET(
+      new NextRequest(
+        'http://localhost:3000/admin/api/auto-routing/benchmark-config?router=frontier'
+      )
+    );
+    expect(mockGetBenchmarkConfig).toHaveBeenCalledWith('frontier');
+  });
+
+  it('rejects an unknown router before proxying', async () => {
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/admin/api/auto-routing/benchmark-config?router=unknown'
+      )
+    );
+    expect(response.status).toBe(400);
+    expect(mockGetBenchmarkConfig).not.toHaveBeenCalled();
+  });
+
+  it('forwards frontier config updates and accuracy settings', async () => {
+    await PUT(
+      putRequest({
+        ...validConfig,
+        router: 'frontier',
+        accuracyNoiseBand: 0.02,
+        frontierMinAccuracyDelta: 0,
+      })
+    );
+    expect(mockUpdateBenchmarkConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        router: 'frontier',
+        accuracyNoiseBand: 0.02,
+        frontierMinAccuracyDelta: 0,
+      }),
+      'admin@kilocode.ai'
+    );
   });
 
   it('rejects with 400 listing decider models not servable on all gateway chat APIs', async () => {
     const response = await PUT(
       putRequest({
         ...validConfig,
-        deciderModels: [
-          { id: 'openai/gpt-5-mini', reasoningEffort: null },
-          { id: 'test-exclusive/chat-only', reasoningEffort: null },
-        ],
+        deciderModels: [{ id: 'openai/gpt-5-mini' }, { id: 'test-exclusive/chat-only' }],
       })
     );
 

@@ -31,6 +31,9 @@ import { hasModernRuntimeAuthorization } from '../../session/runtime-authorizati
 import { getWorktreeCredentialContainment } from '../../sandbox-control/credential-containment.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../../runtime-credential-proxy.js';
 import { getControlPlaneSessionDirectory } from '../../workspace.js';
+import { getCommandGuardPolicy, getCommandGuardPermissions } from '../../session-service.js';
+import { codeReviewIdFromCallbackTarget } from '../../router/schemas.js';
+import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import type { ControlPlaneSessionRegistration } from './session-do.js';
 
 /**
@@ -89,8 +92,8 @@ function withoutRawKiloToken(
  * Sandbox DO's grant issuance supplies the `git`/`kilo` aliases in the projected
  * spec (B3 N3).
  *
- * `payload.mcp` is materialized only to prove it decrypts and to force
- * per-session isolation; the plaintext is deliberately not copied into the
+ * `payload.mcp` is materialized to prove it decrypts and preserve compatibility
+ * isolation. The plaintext is deliberately not copied into the
  * persisted spec. The Sandbox DO materializes the encrypted credential-source
  * `mcpServers` immediately before the authenticated `session.prepare` frame.
  */
@@ -109,9 +112,7 @@ export function controlPlaneRouteSpecFromAttachPayload(
           ...(payload.git.platform ? { platform: payload.git.platform } : {}),
         };
   const env = withoutRawKiloToken(payload.env);
-  // Materialized MCP servers are per-session user config: sharing a runtime
-  // would let one session's servers leak into another, so they force isolation
-  // (legacy `adaptSessionAttachPayloadForWrapper`).
+  // Preserve the original MCP runtime layout until the Sandbox negotiates sharing.
   const runtimeIsolation = payload.mcp ? 'per-session' : options?.runtimeIsolation;
   return {
     sessionId: ids.sessionId,
@@ -140,6 +141,7 @@ function materializeAttachPayload(
       directory: getControlPlaneSessionDirectory({
         workspacePath: metadata.workspace?.workspacePath,
         sandboxId: metadata.workspace?.sandboxId,
+        sandboxKind: metadata.workspace?.sandboxKind,
         orgId: metadata.identity.orgId,
         userId: metadata.identity.userId,
         sessionId: metadata.identity.sessionId,
@@ -158,8 +160,8 @@ function materializeAttachPayload(
 /**
  * Builds the DO registration from grouped metadata and the Worker's selection.
  * One owner: the DO records the given selection rather than re-deriving it (H2).
- * `runtimeIsolation` follows modern runtime authorization (M1) or materialized
- * MCP servers. `mcpPrivateKey` decrypts `profile.mcpServers` transiently to fail
+ * `runtimeIsolation` retains the original layout for existing allocations.
+ * The Sandbox omits it on frames for negotiated worktree runtimes. `mcpPrivateKey` decrypts `profile.mcpServers` transiently to fail
  * closed before any route is prepared; the encrypted snapshot rides the
  * DO-private credential source and only the Sandbox DO decrypts it before a
  * frame.
@@ -168,7 +170,10 @@ export function buildControlPlaneSessionRegistration(
   metadata: SessionMetadata,
   sandboxSelection: ControlPlaneSandboxSelection,
   mcpPrivateKey?: string,
-  runtimeConfiguration?: { containmentEnabled: boolean; workerUrl: string | undefined }
+  runtimeConfiguration?: {
+    containmentEnabled: boolean;
+    workerUrl: string | undefined;
+  }
 ): ControlPlaneSessionRegistration {
   const kiloSessionId = metadata.auth.kiloSessionId;
   if (kiloSessionId === undefined || kiloSessionId.length === 0) {
@@ -189,6 +194,18 @@ export function buildControlPlaneSessionRegistration(
     throw new Error('Sandbox selection provider does not match session metadata');
   }
   if (
+    (sandboxSelection.egressMode ?? 'unrestricted') !==
+    (metadata.workspace?.egressMode ?? 'unrestricted')
+  ) {
+    throw new Error('Sandbox selection egress mode does not match session metadata');
+  }
+  if (
+    JSON.stringify(sandboxSelection.egressAllowlist ?? []) !==
+    JSON.stringify(metadata.workspace?.egressAllowlist ?? [])
+  ) {
+    throw new Error('Sandbox selection egress allowlist does not match session metadata');
+  }
+  if (
     sandboxSelection.configuration !== undefined &&
     sandboxSelection.configuration.provider !== sandboxSelection.provider
   ) {
@@ -196,6 +213,13 @@ export function buildControlPlaneSessionRegistration(
   }
   if (sandboxSelection.billing !== undefined && sandboxSelection.billing.sandboxId !== sandboxId) {
     throw new Error('Sandbox selection billing does not match the session sandbox');
+  }
+  const sandboxKind = metadata.workspace?.sandboxKind;
+  if (
+    sandboxSelection.sandboxKind !== sandboxKind ||
+    (sandboxSelection.billing !== undefined && sandboxSelection.billing.sandboxKind !== sandboxKind)
+  ) {
+    throw new Error('Sandbox selection kind does not match session metadata');
   }
   const containment =
     sandboxSelection.containment ??
@@ -217,31 +241,67 @@ export function buildControlPlaneSessionRegistration(
     if (!validated.success) throw new McpAttachValidationError(validated.reason);
   }
   // A read-only Bitbucket review runs with worker-owned env only, so its
-  // encrypted profile secrets are withheld, mirroring the legacy plane and the
-  // withheld MCP snapshot.
-  const encryptedSecrets = isReadOnlyBitbucketReview(metadata)
-    ? undefined
-    : metadata.profile?.encryptedSecrets;
+  // encrypted profile secrets, agents and commands are withheld, mirroring the
+  // legacy plane and the withheld MCP snapshot. Its runtime skills stay: they
+  // carry the trusted review skill that the Code Reviewer attaches.
+  const readOnlyBitbucketReview = isReadOnlyBitbucketReview(metadata);
+  const encryptedSecrets = readOnlyBitbucketReview ? undefined : metadata.profile?.encryptedSecrets;
   const hasEncryptedSecrets =
     encryptedSecrets !== undefined && Object.keys(encryptedSecrets).length > 0;
-  const profile = isReadOnlyBitbucketReview(metadata) ? {} : readProfileBundle(metadata);
+  const profile = readProfileBundle(metadata);
   const runtimeProfile = {
     ...(profile.runtimeSkills?.length ? { runtimeSkills: profile.runtimeSkills } : {}),
-    ...(profile.runtimeAgents?.length ? { runtimeAgents: profile.runtimeAgents } : {}),
-    ...(profile.kiloCommands?.length ? { kiloCommands: profile.kiloCommands } : {}),
+    ...(!readOnlyBitbucketReview && profile.runtimeAgents?.length
+      ? { runtimeAgents: profile.runtimeAgents }
+      : {}),
+    ...(!readOnlyBitbucketReview && profile.kiloCommands?.length
+      ? { kiloCommands: profile.kiloCommands }
+      : {}),
+  };
+  const createdOnPlatform = metadata.identity.createdOnPlatform;
+  const bitbucketReviewId = readOnlyBitbucketReview
+    ? (codeReviewIdFromCallbackTarget(metadata.callback?.target) ?? undefined)
+    : undefined;
+  const commandGuard = getCommandGuardPolicy(
+    createdOnPlatform,
+    payload.git?.platform,
+    bitbucketReviewId
+  );
+  if (payload.directory === undefined)
+    throw new Error('Session attach payload requires a directory');
+  const permission = {
+    ...(!isInteractiveSessionOrigin(createdOnPlatform) ? { question: 'deny' } : {}),
+    ...(commandGuard
+      ? getCommandGuardPermissions(commandGuard, payload.directory, bitbucketReviewId)
+      : {}),
   };
   const spec = controlPlaneRouteSpecSchema.parse({
     ...runtimeProfile,
+    ...(Object.keys(permission).length > 0 ? { permission } : {}),
     ...controlPlaneRouteSpecFromAttachPayload(
       payload,
       { sessionId: metadata.identity.sessionId, kiloSessionId },
-      hasModernRuntimeAuthorization(metadata) ||
+      Object.keys(permission).length > 0 ||
+        hasModernRuntimeAuthorization(metadata) ||
         hasEncryptedSecrets ||
         Object.keys(payload.env ?? {}).some(key => key !== 'KILOCODE_TOKEN') ||
         Object.keys(runtimeProfile).length > 0
         ? { runtimeIsolation: 'per-session' }
         : undefined
     ),
+    ...(commandGuard
+      ? {
+          env: {
+            ...withoutRawKiloToken(payload.env),
+            CI: 'true',
+            GIT_TERMINAL_PROMPT: '0',
+            GH_PROMPT_DISABLED: '1',
+            PAGER: 'cat',
+            GIT_PAGER: 'cat',
+            TERM: 'dumb',
+          },
+        }
+      : {}),
   });
   // `payload.mcp` is present only when materialization was not omitted for a
   // read-only Bitbucket review, so the encrypted snapshot is gated on it too.

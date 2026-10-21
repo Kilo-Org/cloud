@@ -2,6 +2,8 @@
 export type {
   ProfileOwner,
   ProfileOwnerType,
+  ProfileDatabase,
+  RepositoryPlatform,
   ProfileVarResponse,
   ProfileCommandResponse,
   ProfileMcpServerResponse,
@@ -9,6 +11,7 @@ export type {
   ProfileSkillResponse,
   ProfileAgentResponse,
   ProfileKiloCommandResponse,
+  ProfileInstructionResponse,
   ProfileResponse,
   ProfileResponseWithOwner,
   ProfileSummary,
@@ -36,6 +39,7 @@ export {
   type MergedSkillForSession,
   type MergedAgentForSession,
   type MergedKiloCommandForSession,
+  type MergedInstructionForSession,
   type ClientMcpServerValue,
   type InlineSkillInput,
   type InlineAgentInput,
@@ -158,10 +162,62 @@ export {
   type KiloCommandForSession,
 } from './profile-kilo-commands-service';
 
+// Instruction CRUD + session helpers
+export {
+  MAX_PROFILE_INSTRUCTIONS,
+  instructionCreateInputSchema,
+  instructionUpdateInputSchema,
+  listInstructionsForProfile,
+  createInstruction,
+  updateInstruction,
+  deleteInstruction,
+  setInstructionEnabled,
+  getInstructionsForSession,
+  type InstructionCreateInput,
+  type InstructionUpdateInput,
+  type InstructionForSession,
+} from './profile-instructions-service';
+
 // Repo binding CRUD
 export {
   bindProfileToRepo,
   unbindRepo,
+  removeRepoBinding,
   getBindingForRepo,
   listBindings,
 } from './repo-binding-service';
+export { canonicalRepoFullName } from './repo-binding-db';
+
+// Combined repository settings (profile binding + allocation override)
+export {
+  setRepositorySettings,
+  removeRepositorySettings,
+  type RepositorySettingsInput,
+} from './repository-settings-service';
+
+// Sandbox allocation settings (context default + per-repository overrides)
+export {
+  getSandboxAllocationSettings,
+  getSandboxAllocationCandidates,
+  setContextSandboxAllocation,
+  clearContextSandboxAllocation,
+  setRepoSandboxAllocation,
+  clearRepoSandboxAllocation,
+  type SandboxAllocationSettings,
+  type SandboxAllocationCandidates,
+  type RepositoryAllocationSetting,
+} from './sandbox-allocation-settings-service';
+
+// Local config import (preview diff + selective upsert)
+export {
+  buildImportPreview,
+  applyImport,
+  type ConfigImportPreview,
+  type ImportCategoryPreview,
+  type ImportChangedItem,
+  type ImportFieldChange,
+  type PostImportAgent,
+  type PostImportInstruction,
+  type PostImportKiloCommand,
+  type PostImportSkill,
+} from './profile-import-service';

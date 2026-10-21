@@ -1,7 +1,8 @@
 /**
  * Bootstrap wiring for the telemetry pipeline: installs the Sentry adapter as
- * the active sink and wraps the global fetch so every failed http(s) request
- * reports once at warning level.
+ * the active event and breadcrumb sink and wraps the global fetch so every
+ * error-status http(s) response reports once at warning level and every
+ * transport failure leaves a breadcrumb.
  *
  * Imported only by the root layout — never by a node test — because
  * `@sentry/react-native` does not parse under vitest/rolldown. The tRPC links
@@ -14,7 +15,7 @@
 import * as Sentry from '@sentry/react-native';
 
 import { LATENCY_INGEST_URL } from '@/lib/config';
-import { setTelemetrySink } from '@/lib/telemetry/error-sink';
+import { setBreadcrumbSink, setTelemetrySink } from '@/lib/telemetry/error-sink';
 import { createNetworkErrorFetch } from '@/lib/telemetry/network-errors';
 import { LATENCY_INGEST_URL_DEFAULT } from '@/lib/url-contract';
 
@@ -110,6 +111,9 @@ function installSentrySink(): void {
     } else {
       Sentry.captureMessage(event.message ?? 'Telemetry event', options);
     }
+  });
+  setBreadcrumbSink(breadcrumb => {
+    Sentry.addBreadcrumb(breadcrumb);
   });
 }
 

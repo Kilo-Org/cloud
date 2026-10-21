@@ -1,9 +1,28 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  selectGitHubReviewEvents,
   selectPartialSubmitMessage,
   selectSubmitCtaLabel,
 } from '@/components/pr-review/pr-review-submit-view';
+
+describe('selectGitHubReviewEvents', () => {
+  it('offers only comment on the viewer’s own pull request, ignoring login case', () => {
+    expect(selectGitHubReviewEvents({ authorLogin: 'OctoCat', viewerLogin: 'octocat' })).toEqual([
+      'comment',
+    ]);
+  });
+
+  it('keeps the three default events for another author or an unknown identity', () => {
+    expect(
+      selectGitHubReviewEvents({ authorLogin: 'someone-else', viewerLogin: 'octocat' })
+    ).toBeUndefined();
+    expect(
+      selectGitHubReviewEvents({ authorLogin: undefined, viewerLogin: 'octocat' })
+    ).toBeUndefined();
+    expect(selectGitHubReviewEvents({ authorLogin: 'octocat', viewerLogin: null })).toBeUndefined();
+  });
+});
 
 describe('selectSubmitCtaLabel', () => {
   it('uses the plain label when nothing is stale', () => {

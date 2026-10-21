@@ -5,18 +5,52 @@
   "main": "src/index.ts",
   // Matches the workerd runtime pinned by the repository's Wrangler version.
   "compatibility_date": "2026-09-18",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": true },
+  "vars": { "USAGE_INGEST_MODE": "receipt" },
   "queues": {
-    "producers": [{ "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing" }],
+    "producers": [
+      { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing" },
+      // Unused by the Worker: ensures Wrangler provisions the DLQ on deployment.
+      { "binding": "USAGE_INGEST_DLQ", "queue": "usage-ingest-processing-dlq" },
+    ],
+    "consumers": [
+      {
+        "queue": "usage-ingest-processing",
+        "max_batch_size": 1,
+        "max_batch_timeout": 0,
+        "max_retries": 3,
+        "retry_delay": 60,
+        "max_concurrency": 1,
+        "dead_letter_queue": "usage-ingest-processing-dlq",
+      },
+    ],
   },
   "env": {
     "staging": {
       "name": "usage-ingest-staging",
+      "workers_dev": true,
+      "vars": {
+        "USAGE_INGEST_MODE": "processing",
+        "USAGE_WRITER_URL": "https://staging-app.kilo.ai/api/internal/usage/record",
+      },
       "queues": {
         "producers": [
           { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-staging" },
+          { "binding": "USAGE_INGEST_DLQ", "queue": "usage-ingest-processing-dlq-staging" },
+        ],
+        "consumers": [
+          {
+            "queue": "usage-ingest-processing-staging",
+            "max_batch_size": 1,
+            "max_batch_timeout": 0,
+            "max_retries": 3,
+            "retry_delay": 60,
+            "max_concurrency": 100,
+            "dead_letter_queue": "usage-ingest-processing-dlq-staging",
+          },
         ],
       },
     },

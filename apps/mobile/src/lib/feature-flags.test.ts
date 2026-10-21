@@ -1,14 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  compareAppVersions,
-  currentAppVersion,
-  FEATURE_FLAG_DEFINITIONS,
-  FEATURE_FLAG_PR_REVIEW,
-  FEATURE_FLAG_QUICK_CHAT,
-  getFeatureFlagDefinition,
-  isAppVersionAtLeast,
-} from './feature-flags';
+import { compareAppVersions, currentAppVersion, isAppVersionAtLeast } from './feature-flags';
 
 // expo-application is a native module whose source pulls in react-native
 // (Flow-typed), which the pure vitest pipeline cannot parse. Mock it with a
@@ -58,19 +50,7 @@ describe('isAppVersionAtLeast', () => {
   });
 });
 
-describe('registry', () => {
-  it('registers both shipped flags with their first release', () => {
-    expect(FEATURE_FLAG_DEFINITIONS).toEqual([
-      { key: FEATURE_FLAG_PR_REVIEW, minAppVersion: '1.0.4', defaultValue: true },
-      { key: FEATURE_FLAG_QUICK_CHAT, minAppVersion: '1.0.6', defaultValue: false },
-    ]);
-  });
-
-  it('looks a definition up by key', () => {
-    expect(getFeatureFlagDefinition(FEATURE_FLAG_QUICK_CHAT)?.minAppVersion).toBe('1.0.6');
-    expect(getFeatureFlagDefinition('mobile-unknown')).toBeUndefined();
-  });
-
+describe('currentAppVersion', () => {
   it('reads the running build version, null when absent', () => {
     hoisted.nativeApplicationVersion = '1.0.8';
     expect(currentAppVersion()).toBe('1.0.8');

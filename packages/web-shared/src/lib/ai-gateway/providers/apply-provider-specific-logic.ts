@@ -11,17 +11,13 @@ import {
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   applyKiloExclusiveModelSettings,
   type KiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic';
-import {
-  CLAUDE_OPUS_FALLBACK_MODEL_ID,
-  isClaudeModel,
-  isFableModel,
-  isOpus5Model,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   applyMoonshotModelSettings,
@@ -33,7 +29,6 @@ import {
   ReasoningDetailsTransform,
   type BYOKResult,
   type Provider,
-  type ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { isStepModel } from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
@@ -56,13 +51,19 @@ import {
   isQwenExplicitCacheModel,
   isQwenModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
 import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
-import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
+import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
+import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
+import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
+import {
+  addReflectionReasoningPlaceholders,
+  isReflectionModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/reflection';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -87,6 +88,7 @@ function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
     }
 
     delete message.thoughtSignature;
+    delete message.reasoning;
 
     const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls.filter(isRecord) : [];
     for (const toolCall of toolCalls) {
@@ -230,21 +232,34 @@ export function applyPreferredProvider(
   requestToMutate.provider = withIgnoredProviders(provider, ignoredProviders);
 }
 
-export async function applyGatewayModelsFallback(
-  providerId: ProviderId,
+/**
+ * Fallback models are not supported: a request for a free model could fall
+ * back to a paid model and be served without being charged. OpenRouter accepts
+ * them as `models` on every API and as `fallbacks` on the Messages API.
+ */
+export function removeModelsFallback(
   requestedModel: string,
-  requestToMutate: GatewayRequest
+  requestToMutate: GatewayRequest,
+  userId: string
 ) {
-  if (
-    !isFreeModel(requestedModel) &&
-    (isFableModel(requestedModel) || isOpus5Model(requestedModel)) &&
-    (providerId === 'openrouter' || providerId === 'vercel')
-  ) {
-    requestToMutate.body.models = [requestedModel, CLAUDE_OPUS_FALLBACK_MODEL_ID];
+  const { models, fallbacks } = requestToMutate.body;
+  delete requestToMutate.body.models;
+  delete requestToMutate.body.fallbacks;
+
+  if (!hasFallbackModels(models) && !hasFallbackModels(fallbacks)) {
     return;
   }
+  console.warn('[applyProviderSpecificLogic] Removed caller-provided fallback models', {
+    userId,
+    model: requestedModel,
+    requestKind: requestToMutate.kind,
+    models,
+    fallbacks,
+  });
+}
 
-  delete requestToMutate.body.models;
+function hasFallbackModels(value: unknown) {
+  return value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0);
 }
 
 export function removeUnsupportedRequestServiceTier(
@@ -311,13 +326,23 @@ export async function applyProviderSpecificLogic(
   taskId: string | null,
   isNonTrialEnterprise: boolean
 ) {
-  await applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
+  removeModelsFallback(requestedModel, requestToMutate, userId);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);
 
   if (isGeminiModel(requestedModel)) {
     sanitizeJsonRefToolResults(requestToMutate);
+  }
+
+  if (isMuseModel(requestedModel)) {
+    // Meta rejects tools with "Recursive JSON schemas are not currently supported"
+    removeRecursiveToolSchemaRefs(requestToMutate);
+  }
+
+  if (isClaudeModel(requestedModel)) {
+    // Anthropic rejects tools with "input_schema does not support oneOf, allOf, or anyOf at the top level"
+    removeTopLevelToolSchemaCombinators(requestToMutate);
   }
 
   if (requestToMutate.kind === 'chat_completions') {
@@ -371,6 +396,14 @@ export async function applyProviderSpecificLogic(
 
   if (isQwenExplicitCacheModel(requestedModel)) {
     addCacheBreakpoints(requestToMutate);
+  }
+
+  if (isReflectionModel(requestedModel)) {
+    addReflectionReasoningPlaceholders(requestedModel, requestToMutate);
+  }
+
+  if (provider.id === 'vercel') {
+    await applyVercelSettings(requestedModel, requestToMutate, userByok);
   }
 
   await provider.transformRequest({

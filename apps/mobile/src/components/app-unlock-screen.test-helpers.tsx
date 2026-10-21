@@ -31,7 +31,12 @@ export function rerender(ui: ReactElement) {
   );
 }
 export function retry() {
-  return unlockRoot().findAllByType('Pressable' as ElementType)[0];
+  /* The unlock overlay is not the only Pressable in the tree: a scene can hold
+     settings rows whose label is pressable too. The overlay's Retry is the one
+     that names itself, so the label is what tells them apart. */
+  return unlockRoot()
+    .findAllByType('Pressable' as ElementType)
+    .find(node => node.props.accessibilityLabel === i18n.t('common.retry'));
 }
 export async function unmountUnlock() {
   view?.unmount();
@@ -115,7 +120,7 @@ const keyboard = vi.hoisted(() => {
     },
   };
 });
-export { announcements, catalogs, keyboard, lifecycle, native, platform, route, storage };
+export { announcements, catalogs, lifecycle, native, platform, route, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
@@ -227,6 +232,12 @@ vi.mock('@/lib/glanceable/mount', () => ({ GlanceablePublisherMount: () => null 
 // like the glanceable mount — and the stub keeps its `expo` root import (which
 // needs `__DEV__` and a native binding) out of this DOM-free harness.
 vi.mock('@/components/launcher-surfaces-mount', () => ({ LauncherSurfacesMount: () => null }));
+// The briefing mount reads tRPC and the native SQLCipher dismissal journal
+// (expo-crypto needs `__DEV__` and a native binding), so it is a null mount in
+// this DOM-free harness.
+vi.mock('@/components/agent-briefing/briefing-sync-mount', () => ({
+  BriefingSyncMount: () => null,
+}));
 vi.mock('@/lib/organization-context', () => ({ OrganizationProvider: 'OrganizationProvider' }));
 vi.mock('@/components/offline-banner', () => ({ OfflineBanner: 'OfflineBanner' }));
 vi.mock('@/lib/query-client-lifecycle', () => ({

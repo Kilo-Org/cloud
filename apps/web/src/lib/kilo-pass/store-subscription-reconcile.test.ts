@@ -3,6 +3,7 @@ import { describe, test, expect, afterEach } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilo_pass_audit_log,
+  kilo_pass_pause_events,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   kilocode_users,
@@ -48,6 +49,22 @@ async function insertStoreSubscription(params: InsertSubscriptionParams): Promis
     .returning({ id: kilo_pass_subscriptions.id });
   if (!row) throw new Error('Failed to insert subscription');
   return row;
+}
+
+async function insertOpenPause(subscriptionId: string): Promise<void> {
+  await db.insert(kilo_pass_pause_events).values({
+    kilo_pass_subscription_id: subscriptionId,
+    paused_at: '2026-01-15T00:00:00.000Z',
+    resumes_at: null,
+  });
+}
+
+async function getPauseResumedAt(subscriptionId: string): Promise<Array<string | null>> {
+  const rows = await db
+    .select({ resumedAt: kilo_pass_pause_events.resumed_at })
+    .from(kilo_pass_pause_events)
+    .where(eq(kilo_pass_pause_events.kilo_pass_subscription_id, subscriptionId));
+  return rows.map(row => (row.resumedAt ? new Date(row.resumedAt).toISOString() : null));
 }
 
 async function insertStorePurchase(params: {
@@ -185,6 +202,7 @@ describe('reconcileStoreSubscriptionExpiry', () => {
       purchasedAt: '2026-01-31T00:00:00.000Z',
       expiresAt: '2026-02-28T00:00:00.000Z',
     });
+    await insertOpenPause(subscriptionId);
 
     const summary = await reconcileStoreSubscriptionExpiry(db, { now });
 
@@ -202,6 +220,7 @@ describe('reconcileStoreSubscriptionExpiry', () => {
       })
     );
     expect(new Date(row!.ended_at!).toISOString()).toBe('2026-03-01T00:00:00.000Z');
+    expect(await getPauseResumedAt(subscriptionId)).toEqual(['2026-03-01T00:00:00.000Z']);
 
     const auditRows = await db
       .select({ id: kilo_pass_audit_log.id })
@@ -236,6 +255,7 @@ describe('reconcileStoreSubscriptionExpiry', () => {
       purchasedAt: '2026-02-01T00:00:00.000Z',
       expiresAt: '2026-03-01T00:00:00.000Z',
     });
+    await insertOpenPause(subscriptionId);
 
     const summary = await reconcileStoreSubscriptionExpiry(db, { now });
 
@@ -250,6 +270,7 @@ describe('reconcileStoreSubscriptionExpiry', () => {
         ended_at: null,
       })
     );
+    expect(await getPauseResumedAt(subscriptionId)).toEqual([null]);
   });
 
   test('skips subscriptions that are already canceled', async () => {

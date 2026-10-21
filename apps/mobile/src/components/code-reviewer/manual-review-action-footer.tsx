@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 
-import { useAppAwareKeyboardPadding } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 
 /**
@@ -22,7 +22,7 @@ import { useTabBarBottomPadding } from '@/components/tab-screen';
  */
 export function ManualReviewActionFooter({ children }: Readonly<{ children: ReactNode }>) {
   const tabBarBottomPadding = useTabBarBottomPadding();
-  const keyboardLift = useAppAwareKeyboardPadding();
+  const keyboardLift = useKeyboardState(state => state.height);
   const bottomPadding = Math.max(0, tabBarBottomPadding - keyboardLift);
   return (
     <View className="bg-background px-6 pt-3" style={{ paddingBottom: bottomPadding }}>

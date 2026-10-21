@@ -4,10 +4,10 @@
  * Enumerates every procedure from the live `rootRouter` (never a hand-written
  * list), shapes deterministic catalog rows, preserves author-edited summaries
  * from the committed `services/kilo-mcp/catalog.json`, and generates missing
- * summaries with the Kilo CLI (`kilo run`, pinned model + variant). Summaries
- * are never generated at MCP runtime: the committed catalog is the only runtime
- * artifact, and authors edit its summaries by hand. See dump.ts for the CLI
- * entry point.
+ * summaries with the Kilo CLI (`kilo run`, one summarizer model + variant for
+ * every run). Summaries are never generated at MCP runtime: the committed
+ * catalog is the only runtime artifact, and authors edit its summaries by hand.
+ * See dump.ts for the CLI entry point.
  *
  * Queries and mutations are published wholesale; paths with an internal-only
  * segment (`admin`, `dev`, `test`) and subscriptions stay internal. `debug`
@@ -38,16 +38,32 @@ export const CATALOG_JSON_DISPLAY_PATH = relative(REPO_ROOT, CATALOG_JSON_PATH);
 export const ROOT_ROUTER_PATH = join(__dirname, '..', '..', 'routers', 'root-router.ts');
 
 /**
- * Whether a procedure path is internal-only. A path is internal when any
- * segment is `test` or starts with `admin` or `dev` — the routers name admin
- * and dev-only procedures `adminX` and `devX` (for example
- * `organizations.admin.grantCredit` and `slack.devRemoveDbRowOnly`). `test`
- * stays exact-only so user-facing calls such as `slack.testConnection` remain
- * published, and `debug` stays published too: its rows carry a `debug: true`
- * marker and are guarded wherever they are offered or called. Subscriptions
- * are never exported regardless of this check.
+ * Exact procedure paths withheld from MCP even though no segment is internal.
+ * `activeSessions.widgetCredential` mints a 30-day Home widget bearer and only
+ * native device sessions may call it, so no MCP credential can use it. The
+ * `agentBriefing` generation and consent mutations spend the context's balance
+ * behind a cost disclosure that only a person in the app can acknowledge; an MCP
+ * agent could otherwise mint the estimate token itself and bypass that consent.
+ */
+const NATIVE_ONLY_PATHS: Record<string, true> = {
+  'activeSessions.widgetCredential': true,
+  'agentBriefing.generateSummary': true,
+  'agentBriefing.retrySummary': true,
+  'agentBriefing.updateContextPreferences': true,
+};
+
+/**
+ * Whether a procedure path is internal-only. A path is internal when it is in
+ * {@link NATIVE_ONLY_PATHS} or any segment is `test` or starts with `admin` or
+ * `dev` — the routers name admin and dev-only procedures `adminX` and `devX`
+ * (for example `organizations.admin.grantCredit` and `slack.devRemoveDbRowOnly`).
+ * `test` stays exact-only so user-facing calls such as `slack.testConnection`
+ * remain published, and `debug` stays published too: its rows carry a
+ * `debug: true` marker and are guarded wherever they are offered or called.
+ * Subscriptions are never exported regardless of this check.
  */
 export function isDenylistedPath(path: string): boolean {
+  if (Object.hasOwn(NATIVE_ONLY_PATHS, path)) return true;
   return path.split('.').some(segment => {
     const lower = segment.toLowerCase();
     return lower === 'test' || lower.startsWith('admin') || lower.startsWith('dev');
@@ -75,10 +91,11 @@ const CONTEXT_CHAR_LIMIT = 4_000;
 const FILE_CONTEXT_CHAR_LIMIT = 60_000;
 
 /**
- * Pinned summarizer: the same model and reasoning effort for every generated
- * summary, so catalog text stays consistent across runs and authors.
+ * One summarizer for every generated summary: the same model family and reasoning
+ * effort across runs and authors. The `-latest` alias follows each new DeepSeek
+ * Flash build, so catalog wording can shift when a new build ships.
  */
-export const SUMMARY_MODEL = 'kilo/deepseek/deepseek-v4.1-flash';
+export const SUMMARY_MODEL = 'kilo/~deepseek/deepseek-flash-latest';
 export const SUMMARY_VARIANT = 'max';
 /** `kilo run` invocation timeout: a whole batch (file source included) must fit. */
 const SUMMARY_RUN_TIMEOUT_MS = 10 * 60 * 1000;

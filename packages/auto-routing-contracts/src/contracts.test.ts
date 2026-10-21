@@ -18,9 +18,11 @@ import {
   BenchmarkDeciderModelSchema,
   BenchmarkModelSummarySchema,
   BenchmarkProfileStatusesRequestSchema,
+  CustomRoutingTableRequestSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
   RegisterBenchmarkProfilesRequestSchema,
+  SyncBenchmarkSubscriptionsRequestSchema,
   resolveBenchmarkIdentity,
 } from './benchmark';
 
@@ -79,29 +81,6 @@ describe('auto routing contracts', () => {
         classifierResult: null,
       })
     ).toEqual({ cost: 0, decision: null, classifierResult: null });
-
-    expect(
-      AutoRoutingDecisionResponseSchema.parse({
-        cost: 0,
-        decision: {
-          model: 'minimax/minimax-m3',
-          taskType: null,
-          subtaskType: null,
-          source: 'coding_plan_default',
-          tableVersion: 'coding-plan:v1',
-          reasoningEffort: null,
-          sticky: false,
-        },
-        classifierResult: null,
-      })
-    ).toMatchObject({
-      decision: {
-        model: 'minimax/minimax-m3',
-        taskType: null,
-        subtaskType: null,
-        source: 'coding_plan_default',
-      },
-    });
 
     expect(
       AutoRoutingDecisionResponseSchema.parse({
@@ -177,91 +156,125 @@ describe('auto routing contracts', () => {
 });
 
 describe('BenchmarkConfigSchema defaults', () => {
-  it('applies config defaults for repetitions, classifier latency, switch threshold, and auto decider cost bounds', () => {
+  it.each([
+    ['efficient', '~deepseek/deepseek-flash-latest'],
+    ['frontier', '~openai/gpt-sol-latest'],
+  ] as const)('uses the %s preset only when the pool is omitted', (router, alias) => {
+    const input = {
+      router,
+      classifierModels: ['classifier/model'],
+      minAccuracy: 0.7,
+      benchmarkUserId: null,
+      switchCostFactor: 3,
+      updatedAt: null,
+      updatedBy: null,
+    };
+    expect(BenchmarkConfigSchema.parse(input).deciderModels).toEqual([{ id: alias }]);
+    expect(
+      BenchmarkConfigSchema.parse({
+        ...input,
+        deciderModels: [{ id: 'vendor/explicit-selection' }],
+      }).deciderModels
+    ).toEqual([{ id: 'vendor/explicit-selection' }]);
+    expect(BenchmarkConfigSchema.safeParse({ ...input, deciderModels: [] }).success).toBe(false);
+  });
+
+  it('applies config defaults for repetitions, classifier latency, and switch threshold', () => {
     const result = BenchmarkConfigSchema.parse({
       classifierModels: ['model/a'],
       deciderModels: [{ id: 'model/b' }],
       minAccuracy: 0.8,
-      maxConcurrency: 4,
-      userMaxConcurrency: 100,
       benchmarkUserId: null,
       benchmarkOrgId: null,
       switchCostFactor: 2,
       updatedAt: null,
       updatedBy: null,
-      // classifierRepetitions, deciderRepetitions, classifierMaxP95LatencyMs intentionally omitted
     });
     expect(result.classifierRepetitions).toBe(1);
     expect(result.deciderRepetitions).toBe(1);
     expect(result.classifierMaxP95LatencyMs).toBe(1000);
     expect(result.bestAccuracySwitchThreshold).toBe(0.05);
-    expect(result.autoDeciderMinCostUsd).toBe(15);
-    expect(result.autoDeciderMaxCostUsd).toBe(25);
+    expect(result.productionTokenProfile).toBeNull();
+    expect(result.switchHorizonTurns).toBeNull();
+    expect(result.lowConfidenceThreshold).toBeNull();
   });
 
-  it('accepts the benchmark maximum concurrency cap of 100', () => {
-    const result = BenchmarkConfigSchema.safeParse({
+  it('accepts only null or probability-range confidence thresholds', () => {
+    const config = {
       classifierModels: ['model/a'],
       deciderModels: [{ id: 'model/b' }],
       minAccuracy: 0.8,
-      maxConcurrency: 100,
-      userMaxConcurrency: 100,
       benchmarkUserId: null,
-      benchmarkOrgId: null,
       switchCostFactor: 2,
       updatedAt: null,
       updatedBy: null,
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('accepts explicit manual and excluded auto decider model lists', () => {
-    const result = BenchmarkConfigSchema.parse({
-      classifierModels: ['model/a'],
-      deciderModels: [{ id: 'model/b' }],
-      manualDeciderModels: [{ id: 'model/c', reasoningEffort: 'high' }],
-      autoDeciderModels: [{ id: 'model/b', reasoningEffort: null, avgAttemptCostUsd: 21.1 }],
-      excludedAutoDeciderModels: ['model/d'],
-      minAccuracy: 0.7,
-      switchCostFactor: 3,
-      maxConcurrency: 10,
-      userMaxConcurrency: 100,
-      benchmarkUserId: null,
-      benchmarkOrgId: null,
-      updatedAt: null,
-      updatedBy: null,
-    });
-
-    expect(result.manualDeciderModels).toEqual([{ id: 'model/c', reasoningEffort: 'high' }]);
-    expect(result.autoDeciderModels).toEqual([
-      { id: 'model/b', reasoningEffort: null, avgAttemptCostUsd: 21.1 },
-    ]);
-    expect(result.excludedAutoDeciderModels).toEqual(['model/d']);
-  });
-
-  it('rejects auto decider cost bounds where min is greater than max', () => {
-    const result = BenchmarkConfigSchema.safeParse({
-      classifierModels: ['model/a'],
-      deciderModels: [{ id: 'model/b' }],
-      minAccuracy: 0.7,
-      switchCostFactor: 3,
-      maxConcurrency: 10,
-      userMaxConcurrency: 100,
-      benchmarkUserId: null,
-      benchmarkOrgId: null,
-      autoDeciderMinCostUsd: 30,
-      autoDeciderMaxCostUsd: 20,
-      updatedAt: null,
-      updatedBy: null,
-    });
-
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues.some(issue => issue.path[0] === 'autoDeciderMaxCostUsd')).toBe(
-        true
+    };
+    for (const lowConfidenceThreshold of [null, 0, 0.8, 1]) {
+      expect(
+        BenchmarkConfigSchema.parse({ ...config, lowConfidenceThreshold }).lowConfidenceThreshold
+      ).toBe(lowConfidenceThreshold);
+    }
+    for (const lowConfidenceThreshold of [-0.1, 1.1]) {
+      expect(BenchmarkConfigSchema.safeParse({ ...config, lowConfidenceThreshold }).success).toBe(
+        false
       );
     }
   });
+
+  it.each(['efficient', 'frontier'])(
+    'strips retired auto decider fields for %s clients',
+    router => {
+      const result = BenchmarkConfigSchema.parse({
+        router,
+        classifierModels: ['model/a'],
+        deciderModels: [{ id: 'model/b', variant: 'retired', reasoningEffort: 'high' }],
+        manualDeciderModels: [{ id: 'model/c', reasoningEffort: 'high' }],
+        autoDeciderModels: [{ id: 'model/b', reasoningEffort: null, avgAttemptCostUsd: 21.1 }],
+        excludedAutoDeciderModels: ['model/d'],
+        autoDeciderMinCostUsd: 30,
+        autoDeciderMaxCostUsd: 20,
+        minAccuracy: 0.7,
+        switchCostFactor: 3,
+        benchmarkUserId: null,
+        benchmarkOrgId: null,
+        updatedAt: null,
+        updatedBy: null,
+      });
+
+      expect(result.deciderModels).toEqual([{ id: 'model/b' }]);
+      for (const field of [
+        'manualDeciderModels',
+        'autoDeciderModels',
+        'excludedAutoDeciderModels',
+        'autoDeciderMinCostUsd',
+        'autoDeciderMaxCostUsd',
+      ]) {
+        expect(result).not.toHaveProperty(field);
+      }
+    }
+  );
+
+  it.each(['efficient', 'frontier'])(
+    'strips the retired concurrency knobs from %s payloads',
+    router => {
+      const result = BenchmarkConfigSchema.parse({
+        router,
+        classifierModels: ['model/a'],
+        deciderModels: [{ id: 'model/b' }],
+        minAccuracy: 0.7,
+        switchCostFactor: 3,
+        maxConcurrency: 100,
+        userMaxConcurrency: 100,
+        benchmarkUserId: null,
+        benchmarkOrgId: null,
+        updatedAt: null,
+        updatedBy: null,
+      });
+
+      expect(result).not.toHaveProperty('maxConcurrency');
+      expect(result).not.toHaveProperty('userMaxConcurrency');
+    }
+  );
 });
 
 describe('resolveBenchmarkIdentity', () => {
@@ -272,24 +285,31 @@ describe('resolveBenchmarkIdentity', () => {
     });
   });
 
-  it('preserves configured benchmark identity overrides', () => {
+  it('preserves configured internal bot identity overrides', () => {
     expect(
       resolveBenchmarkIdentity({
-        benchmarkUserId: 'override-user',
+        benchmarkUserId: 'bot-internal-override',
         benchmarkOrgId: 'override-org',
       })
     ).toEqual({
-      benchmarkUserId: 'override-user',
+      benchmarkUserId: 'bot-internal-override',
       benchmarkOrgId: 'override-org',
     });
   });
+
+  it.each(['override-user', 'bot-code-review-org-1', 'xbot-internal-x'])(
+    'rejects a %s override instead of falling back to the default user',
+    benchmarkUserId => {
+      expect(() => resolveBenchmarkIdentity({ benchmarkUserId, benchmarkOrgId: null })).toThrow(
+        /is not an internal bot user/
+      );
+    }
+  );
 });
 
 describe('BenchmarkConfigSchema duplicate model ids', () => {
   const base = {
     minAccuracy: 0.8,
-    maxConcurrency: 4,
-    userMaxConcurrency: 100,
     benchmarkUserId: null,
     benchmarkOrgId: null,
     switchCostFactor: 2,
@@ -571,6 +591,22 @@ describe('AutoRoutingDecisionSchema variant compatibility', () => {
       }).success
     ).toBe(false);
   });
+
+  it('allows null classification and table fields only on a fallback decision', () => {
+    const unclassified = {
+      ...baseBenchmark,
+      taskType: null,
+      subtaskType: null,
+      tableVersion: null,
+    };
+    expect(AutoRoutingDecisionSchema.safeParse({ ...unclassified, fallback: true }).success).toBe(
+      true
+    );
+    expect(AutoRoutingDecisionSchema.safeParse(unclassified).success).toBe(false);
+    expect(AutoRoutingDecisionSchema.safeParse({ ...unclassified, fallback: false }).success).toBe(
+      false
+    );
+  });
 });
 
 describe('owner pool settings wire contracts', () => {
@@ -591,25 +627,22 @@ describe('owner pool settings wire contracts', () => {
       mode: 'cost_per_accuracy',
       configuredMode: null,
       defaultMode: 'cost_per_accuracy',
-      configuredPool: [{ model: 'a/b', variant: null }],
+      configuredPool: [{ model: 'a/b' }],
       poolStatuses: [{ entry: { model: 'a/b', variant: null }, status: 'pending' }],
     });
     expect(parsed.poolStatuses).toHaveLength(1);
   });
 
   it('accepts optional retryEntries that are a subset of pool by poolEntryKey', () => {
-    const pool = [
-      { model: 'a/b', variant: null as string | null },
-      { model: 'c/d', variant: 'xhigh' as string | null },
-    ];
+    const pool = [{ model: 'a/b' }, { model: 'c/d' }];
     const parsed = UpdateAutoRoutingSettingsRequestSchema.parse({
       ownerType: 'user',
       ownerId: 'user-1',
       mode: 'cost_per_accuracy',
       pool,
-      retryEntries: [{ model: 'c/d', variant: 'xhigh' }],
+      retryEntries: [{ model: 'c/d' }],
     });
-    expect(parsed.retryEntries).toEqual([{ model: 'c/d', variant: 'xhigh' }]);
+    expect(parsed.retryEntries).toEqual([{ model: 'c/d' }]);
   });
 
   it('rejects retryEntries that are not in pool', () => {
@@ -617,8 +650,8 @@ describe('owner pool settings wire contracts', () => {
       ownerType: 'user',
       ownerId: 'user-1',
       mode: null,
-      pool: [{ model: 'a/b', variant: null }],
-      retryEntries: [{ model: 'other/model', variant: 'max' }],
+      pool: [{ model: 'a/b' }],
+      retryEntries: [{ model: 'other/model' }],
     });
     expect(result.success).toBe(false);
   });
@@ -629,7 +662,7 @@ describe('owner pool settings wire contracts', () => {
       ownerId: 'user-1',
       mode: null,
       pool: null,
-      retryEntries: [{ model: 'a/b', variant: null }],
+      retryEntries: [{ model: 'a/b' }],
     });
     expect(result.success).toBe(false);
   });
@@ -638,7 +671,6 @@ describe('owner pool settings wire contracts', () => {
 describe('benchmark profile request entry bounds', () => {
   const eleven = Array.from({ length: 11 }, (_, i) => ({
     model: `model/${i}`,
-    variant: null as string | null,
   }));
 
   it('bounds RegisterBenchmarkProfilesRequestSchema entries at 10', () => {
@@ -668,10 +700,7 @@ describe('benchmark profile request entry bounds', () => {
   });
 
   it('accepts optional retryEntries that are a subset of entries', () => {
-    const entries = [
-      { model: 'a/b', variant: null as string | null },
-      { model: 'c/d', variant: 'xhigh' as string | null },
-    ];
+    const entries = [{ model: 'a/b' }, { model: 'c/d' }];
     expect(
       RegisterBenchmarkProfilesRequestSchema.safeParse({
         ownerType: 'user',
@@ -684,7 +713,7 @@ describe('benchmark profile request entry bounds', () => {
         ownerType: 'user',
         ownerId: 'u1',
         entries,
-        retryEntries: [{ model: 'a/b', variant: null }],
+        retryEntries: [{ model: 'a/b' }],
       }).success
     ).toBe(true);
   });
@@ -693,9 +722,105 @@ describe('benchmark profile request entry bounds', () => {
     const result = RegisterBenchmarkProfilesRequestSchema.safeParse({
       ownerType: 'org',
       ownerId: 'o1',
-      entries: [{ model: 'a/b', variant: null }],
-      retryEntries: [{ model: 'other/model', variant: 'max' }],
+      entries: [{ model: 'a/b' }],
+      retryEntries: [{ model: 'other/model' }],
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('benchmark subscription request contracts', () => {
+  const entries = [{ model: 'provider/model' }];
+
+  it.each(['user', 'org'])('accepts %s subscription replacement and null removal', ownerType => {
+    expect(
+      SyncBenchmarkSubscriptionsRequestSchema.parse({ ownerType, ownerId: 'owner-1', entries })
+    ).toEqual({ ownerType, ownerId: 'owner-1', entries });
+    expect(
+      SyncBenchmarkSubscriptionsRequestSchema.parse({
+        ownerType,
+        ownerId: 'owner-1',
+        entries: null,
+      })
+    ).toEqual({ ownerType, ownerId: 'owner-1', entries: null });
+  });
+
+  it('preserves explicit compensation without enabling it for ordinary replacement', () => {
+    const request = { ownerType: 'user', ownerId: 'owner-1', entries };
+    expect(SyncBenchmarkSubscriptionsRequestSchema.parse(request)).not.toHaveProperty(
+      'restorePrevious'
+    );
+    expect(
+      SyncBenchmarkSubscriptionsRequestSchema.parse({ ...request, restorePrevious: true })
+    ).toEqual({ ...request, restorePrevious: true });
+    expect(
+      SyncBenchmarkSubscriptionsRequestSchema.safeParse({ ...request, restorePrevious: 'true' })
+        .success
+    ).toBe(false);
+  });
+
+  it.each([
+    { ownerType: 'user' },
+    { ownerId: 'owner-1' },
+    { ownerType: 'team', ownerId: 'owner-1' },
+    { ownerType: 'user', ownerId: '   ' },
+  ])('rejects invalid subscription owner identity %j', owner => {
+    expect(
+      SyncBenchmarkSubscriptionsRequestSchema.safeParse({ ...owner, entries: null }).success
+    ).toBe(false);
+  });
+
+  it('requires an explicit replacement or removal', () => {
+    expect(
+      SyncBenchmarkSubscriptionsRequestSchema.safeParse({
+        ownerType: 'user',
+        ownerId: 'owner-1',
+      }).success
+    ).toBe(false);
+    expect(
+      SyncBenchmarkSubscriptionsRequestSchema.safeParse({
+        ownerType: 'user',
+        ownerId: 'owner-1',
+        entries: [],
+      }).success
+    ).toBe(false);
+  });
+
+  describe.each([
+    ['status', BenchmarkProfileStatusesRequestSchema],
+    ['custom table', CustomRoutingTableRequestSchema],
+  ] as const)('%s owner identity', (_name, schema) => {
+    it('accepts requests without owner identity', () => {
+      expect(schema.safeParse({ entries }).success).toBe(true);
+    });
+
+    it.each(['user', 'org'])('preserves paired %s owner identity', ownerType => {
+      expect(schema.parse({ entries, ownerType, ownerId: ' owner-1 ' })).toMatchObject({
+        ownerType,
+        ownerId: 'owner-1',
+      });
+    });
+
+    it.each([
+      [{ ownerType: 'user' }, 'ownerId'],
+      [{ ownerId: 'owner-1' }, 'ownerType'],
+    ])('rejects unpaired identity %j', (owner, missingField) => {
+      const result = schema.safeParse({ entries, ...owner });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues).toContainEqual(
+          expect.objectContaining({ path: [missingField] })
+        );
+      }
+    });
+
+    it.each([
+      { ownerType: 'team', ownerId: 'owner-1' },
+      { ownerType: 'user', ownerId: '   ' },
+      { ownerType: null, ownerId: 'owner-1' },
+      { ownerType: 'user', ownerId: null },
+    ])('rejects invalid paired identity %j', owner => {
+      expect(schema.safeParse({ entries, ...owner }).success).toBe(false);
+    });
   });
 });

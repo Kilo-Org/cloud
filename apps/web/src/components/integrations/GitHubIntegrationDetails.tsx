@@ -126,6 +126,15 @@ export function buildAppReturnOutcomeView(input: {
   };
 }
 
+/** Targets the displayed installation so management actions cannot drift to another association. */
+export function buildGitHubManagementInput(
+  organizationId: string | undefined,
+  integrationId: string | undefined
+) {
+  if (organizationId) return { organizationId, integrationId };
+  return integrationId ? { integrationId } : undefined;
+}
+
 export function getGitHubUserConnectionErrorMessage(
   error: string | undefined,
   flow: string | null
@@ -646,9 +655,7 @@ function GitHubIntegrationDetailsContent({
   }
 
   const installation = installationData?.installation;
-  const managementInput = organizationId
-    ? { organizationId, integrationId: installation?.id }
-    : undefined;
+  const managementInput = buildGitHubManagementInput(organizationId, installation?.id);
   const status = installation?.status;
   const isPendingApproval = status === 'awaiting_installation';
 

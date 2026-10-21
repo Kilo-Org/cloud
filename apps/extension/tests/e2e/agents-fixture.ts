@@ -2,10 +2,6 @@
 import type { BrowserContext, Page } from '@playwright/test';
 import type { inferRouterOutputs, RootRouter } from '@kilocode/trpc';
 
-// ---------------------------------------------------------------------------
-// Default fixture data
-// ---------------------------------------------------------------------------
-
 const DEFAULT_ORG_ID = '11111111-1111-4111-8111-111111111111';
 
 export const DEFAULT_CLOUD_SESSION: CloudAgentSessionSeed = {
@@ -38,10 +34,6 @@ export const DEFAULT_HISTORY_SESSION_2: HistorySessionSeed = {
   title: null,
   updatedAt: new Date(Date.now() - 86_400_000).toISOString(),
 };
-
-// ---------------------------------------------------------------------------
-// Seed types
-// ---------------------------------------------------------------------------
 
 export interface CloudAgentSessionSeed {
   cloudAgentSessionId: string;
@@ -128,10 +120,6 @@ export interface AgentsFixtureResult {
   ingestClientMessages: unknown[];
 }
 
-// ---------------------------------------------------------------------------
-// Type guards
-// ---------------------------------------------------------------------------
-
 const isCloudAgentSessionSeed = (
   session: CloudAgentSessionSeed | RemoteSessionSeed
 ): session is CloudAgentSessionSeed => 'cloudAgentSessionId' in session;
@@ -140,10 +128,6 @@ const isRecordObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 const hasStringOptional = (record: Record<string, unknown>, key: string): string | undefined =>
   typeof record[key] === 'string' ? record[key] : undefined;
-
-// ---------------------------------------------------------------------------
-// URL helpers
-// ---------------------------------------------------------------------------
 
 const proceduresFromUrl = (url: string): string | null => {
   try {
@@ -190,10 +174,6 @@ const unwrapTrpcBatchInputs = (raw: unknown, count: number): unknown[] => {
   return [raw];
 };
 
-// ---------------------------------------------------------------------------
-// Mock builders
-// ---------------------------------------------------------------------------
-
 const activeSessionFromCloudAgent = (session: CloudAgentSessionSeed) => ({
   connectionId: 'cloud-agent',
   gitBranch: session.gitBranch,
@@ -217,10 +197,6 @@ interface TrpcResultItem {
   result?: { data: unknown };
 }
 
-// ---------------------------------------------------------------------------
-// JSON parse helper for WebSocket messages
-// ---------------------------------------------------------------------------
-
 const parseJsonMessage = (message: unknown): unknown => {
   const text = typeof message === 'string' ? message : String(message);
   try {
@@ -229,10 +205,6 @@ const parseJsonMessage = (message: unknown): unknown => {
     return message;
   }
 };
-
-// ---------------------------------------------------------------------------
-// Main mock setup
-// ---------------------------------------------------------------------------
 
 export const mockAgentsApi = async (
   context: BrowserContext,
@@ -254,12 +226,10 @@ export const mockAgentsApi = async (
   /** Set when a `create_session` command spawns a session on a CLI instance. */
   let spawnedKiloSessionId: string | null = null;
 
-  // ---- /api/user ----
   await context.route('https://app.kilo.ai/api/user', route =>
     route.fulfill({ json: { google_user_email: 'user@kilo.ai' }, status: 200 })
   );
 
-  // ---- /api/organizations ----
   await context.route('https://app.kilo.ai/api/organizations', route =>
     route.fulfill({
       json: { organizations: [{ id: DEFAULT_ORG_ID, name: 'Test Org' }] },
@@ -267,7 +237,6 @@ export const mockAgentsApi = async (
     })
   );
 
-  // ---- /api/gateway/models ----
   await context.route('https://app.kilo.ai/api/gateway/models', route =>
     route.fulfill({
       json: {
@@ -283,7 +252,6 @@ export const mockAgentsApi = async (
     })
   );
 
-  // ---- /api/cloud-agent-next/sessions/stream-ticket ----
   await context.route('https://app.kilo.ai/api/cloud-agent-next/sessions/stream-ticket', route =>
     route.fulfill({
       json: { expiresAt: Math.floor(Date.now() / 1000) + 3600, ticket: 'mock-stream-ticket' },
@@ -291,7 +259,6 @@ export const mockAgentsApi = async (
     })
   );
 
-  // ---- tRPC batch dispatcher ----
   const dispatchBatchProcedures = (procList: string[], inputs: unknown[]): TrpcResultItem[] =>
     procList.map((proc, index) => {
       const input = inputs[index];
@@ -561,7 +528,6 @@ export const mockAgentsApi = async (
       return { result: { data: {} } };
     });
 
-  // ---- tRPC route ----
   await context.route(
     url => {
       try {
@@ -677,7 +643,6 @@ export const mockAgentsApi = async (
     }
   );
 
-  // ---- WebSocket: cloud-agent-next ----
   await context.routeWebSocket('wss://cloud-agent-next.kilosessions.ai/*', ws => {
     ws.onMessage(message => {
       const parsed = parseJsonMessage(message);
@@ -690,7 +655,6 @@ export const mockAgentsApi = async (
     }
   });
 
-  // ---- WebSocket: session ingest ----
   // Glob with a wildcard — the client appends ?token=…&connectionId=… and a
   // Bare-string pattern silently never matches (auth then fails).
   await context.routeWebSocket('wss://ingest.kilosessions.ai/api/user/web**', ws => {
@@ -736,10 +700,6 @@ export const mockAgentsApi = async (
 
   return { calledProcedures, cloudAgentClientMessages, ingestClientMessages };
 };
-
-// ---------------------------------------------------------------------------
-// Cloud Agent WebSocket event builders
-// ---------------------------------------------------------------------------
 
 let _eventCounter = 0;
 
@@ -1079,10 +1039,6 @@ export const buildPermissionCloudAgentStream = (
     ev('session.status', { sessionID: sessionId, status: { type: 'permission' } }),
   ];
 };
-
-// ---------------------------------------------------------------------------
-// Live-test helpers
-// ---------------------------------------------------------------------------
 
 export const navigateToAgentsMode = async (sidePanel: Page): Promise<void> => {
   const agentsTab = sidePanel.getByRole('tab', { name: 'Agents' });

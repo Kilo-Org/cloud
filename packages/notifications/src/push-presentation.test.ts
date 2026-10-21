@@ -42,6 +42,7 @@ const channelCases = [
   ],
   [{ type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'status' }, 'agent-progress'],
   [{ type: 'cloud_agent_session', cliSessionId: 'cli1' }, 'agent-progress'],
+  [{ type: 'agent_briefing', url: '/agent-briefing' }, 'agent-progress'],
   [{ type: 'low_balance', organizationId: 'org1' }, 'balance'],
   [{ type: 'spend_alert', scope: 'organization', organizationId: 'org1' }, 'balance'],
   [{ type: 'security_finding', findingId: 'f1', scope: 'org' }, 'security'],
@@ -65,6 +66,24 @@ const channelCases = [
       needsInputSince: '2026-01-01T00:00:00.000Z',
     },
     'agent-progress',
+  ],
+  [
+    {
+      type: 'session_live_update',
+      schemaVersion: 1,
+      event: 'end',
+      content: {
+        sessionId: 'ses-1',
+        title: 'Fix the login bug',
+        statusKind: 'running',
+        statusSince: '2026-01-01T00:00:00.000Z',
+        scheduledAt: null,
+        awaitingPermission: false,
+        approvalKey: null,
+        updatedAt: '2026-01-01T00:00:01.000Z',
+      },
+    },
+    'followed-sessions-lock-screen',
   ],
 ] as const;
 
@@ -93,6 +112,12 @@ describe('ANDROID_NOTIFICATION_CHANNELS', () => {
       { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
       { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
       { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
+      {
+        id: 'followed-sessions-lock-screen',
+        name: 'Followed sessions',
+        importance: 'default',
+        bypassDnd: false,
+      },
     ]);
   });
 

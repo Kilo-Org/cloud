@@ -50,6 +50,7 @@ import { cloud_billing_sku, cli_sessions_v2, container_usage_interval } from '@k
 import { and, desc, eq, like } from 'drizzle-orm';
 import { SANDBOX_USAGE_SKUS } from '../../container-usage-context.js';
 import type { SandboxLifecycleStatus } from '../../shared/sandbox-status.js';
+import type { PreparationAttempt } from '../../shared/protocol.js';
 
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
@@ -404,7 +405,7 @@ export function createSessionManagementHandlers() {
 
           // Current work and the durability watermark come from the control-plane
           // snapshot for `workspace_*` sessions and the legacy reads otherwise.
-          const { currentWork, latestEventId } = await sessionFor(
+          const { currentWork, latestEventId, routeReady } = await sessionFor(
             sessionId,
             async (): Promise<{
               currentWork: {
@@ -413,6 +414,7 @@ export function createSessionManagementHandlers() {
                 health: 'healthy' | 'stale';
               } | null;
               latestEventId: number | null;
+              routeReady: boolean | undefined;
             }> => {
               const snapshot = await withDORetry<
                 DurableObjectStub<SandboxSessionV2>,
@@ -422,7 +424,9 @@ export function createSessionManagementHandlers() {
                 s => s.getSession(),
                 'getSession'
               );
-              if (snapshot.type !== 'found') return { currentWork: null, latestEventId: null };
+              if (snapshot.type !== 'found') {
+                return { currentWork: null, latestEventId: null, routeReady: undefined };
+              }
               const accepted = snapshot.messages.find(message => message.state === 'accepted');
               const queued = snapshot.messages.find(message => message.state === 'queued');
               return {
@@ -432,6 +436,9 @@ export function createSessionManagementHandlers() {
                     ? { messageId: queued.messageId, status: 'pending', health: 'healthy' }
                     : null,
                 latestEventId: snapshot.latestEventId,
+                // Route readiness is the control-plane owner of "can this
+                // session own a terminal": a terminal requires a ready route.
+                routeReady: snapshot.route?.state === 'ready',
               };
             },
             async (): Promise<{
@@ -441,6 +448,7 @@ export function createSessionManagementHandlers() {
                 health: 'healthy' | 'stale';
               } | null;
               latestEventId: number | null;
+              routeReady: boolean | undefined;
             }> => {
               const legacyStub = () => resolveLegacySessionStub(env, userId, sessionId);
               const currentWork = await withDORetry(
@@ -465,7 +473,11 @@ export function createSessionManagementHandlers() {
                   })
                   .warn('Failed to fetch latest event ID for getSession');
               }
-              return { currentWork, latestEventId };
+              return {
+                currentWork,
+                latestEventId,
+                routeReady: Boolean(metadata.lifecycle.preparedAt),
+              };
             }
           );
 
@@ -482,6 +494,7 @@ export function createSessionManagementHandlers() {
               sessionMetadata.identity.botId,
               {
                 createdOnPlatform: sessionMetadata.identity.createdOnPlatform,
+                legacyFallback: true,
               }
             ));
 
@@ -532,6 +545,7 @@ export function createSessionManagementHandlers() {
             variant: sessionMetadata.agent?.variant,
             autoCommit: sessionMetadata.finalization?.autoCommit,
             upstreamBranch: sessionMetadata.repository?.upstreamBranch,
+            branchName: sessionMetadata.workspace?.branchName,
             runtimeAgents: metadataProfile.runtimeAgents?.map(agent => ({
               slug: agent.slug,
               name: agent.name,
@@ -556,6 +570,11 @@ export function createSessionManagementHandlers() {
             // Lifecycle timestamps (critical for idempotency)
             preparedAt: sessionMetadata.lifecycle.preparedAt,
             initiatedAt: sessionMetadata.lifecycle.initiatedAt,
+
+            // Whether this session's route is ready to accept a terminal.
+            // Control-plane sessions answer from their route view; legacy
+            // sessions fall back to having been prepared at least once.
+            routeReady: routeReady ?? Boolean(sessionMetadata.lifecycle.preparedAt),
 
             // callbackTarget is intentionally NOT returned: it may carry
             // service-to-service auth headers and is reachable by the
@@ -688,10 +707,11 @@ export function createSessionManagementHandlers() {
             ? interval.rate
             : catalogRate
           : catalogRate;
-        const attribution =
-          sandboxId && isGeneratedSharedSandboxId(sandboxId)
-            ? ('payer_shared' as const)
-            : ('session' as const);
+        const sandboxKind = metadata.workspace?.sandboxKind;
+        const ownerScoped = sandboxKind
+          ? sandboxKind === 'shared'
+          : sandboxId !== undefined && isGeneratedSharedSandboxId(sandboxId);
+        const attribution = ownerScoped ? ('payer_shared' as const) : ('session' as const);
         const phase = !runtime
           ? ('unavailable' as const)
           : runtime.context || hasCurrentInterval
@@ -782,6 +802,7 @@ export function createSessionManagementHandlers() {
               metadata.identity.botId,
               {
                 createdOnPlatform: metadata.identity.createdOnPlatform,
+                legacyFallback: true,
               }
             ));
 
@@ -916,6 +937,26 @@ export function createSessionManagementHandlers() {
           }
 
           return response.result;
+        });
+      }),
+
+    /** The preparation attempts a stream replay builds, so the first page can show them. */
+    getPreparationAttempts: protectedProcedure
+      .input(GetSessionInput)
+      .query(async ({ input, ctx }) => {
+        return withLogTags({ source: 'getPreparationAttempts' }, async () => {
+          const sessionId = input.cloudAgentSessionId as SessionId;
+          const { userId, env } = ctx;
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
+          return withDORetry<SessionStub, PreparationAttempt[]>(
+            () => resolveSessionStub(env, userId, sessionId),
+            stub => stub.getPreparationAttempts(),
+            'getPreparationAttempts'
+          );
         });
       }),
 

@@ -1,12 +1,12 @@
 import { createStore } from 'jotai';
-import { assistantMsg, toolPart } from './__fixtures__/helpers';
+import { assistantMsg, createEventHelpers, toolPart } from './__fixtures__/helpers';
 import { createSessionManager } from './session-manager';
 import { createCloudAgentSession, REMOTE_SESSION_CREATION_NOT_SUPPORTED } from './session';
 import type { CloudAgentSession } from './session';
 import type { CloudAgentApi } from './transport';
-import type { KiloSessionId } from './types';
+import type { KiloSessionId, SessionSnapshotPage, SessionSnapshotPageOutcome } from './types';
 import type { UserWebSystemEvent } from './user-web-connection';
-import { kiloId, cloudAgentId, makeSnapshot } from './test-helpers';
+import { kiloId, cloudAgentId, makeSnapshot, stubTextPart, stubUserMessage } from './test-helpers';
 
 // WebSocket mock — needed because connect() → resolveSession → transport → WS
 
@@ -144,6 +144,164 @@ function emitHeartbeatOwner(
     },
   });
 }
+
+describe('cached transcript refresh event pipeline', () => {
+  it('retains omitted cached messages and parts throughout delayed stale REST and WebSocket replay until explicit removal', async () => {
+    jest.useFakeTimers();
+    const store = createStore();
+    const omittedMessage = {
+      info: stubUserMessage({ id: 'msg-omitted', sessionID: kiloSessionId }),
+      parts: [
+        stubTextPart({
+          id: 'part-omitted-message',
+          messageID: 'msg-omitted',
+          sessionID: kiloSessionId,
+          text: 'Cached message missing from REST',
+        }),
+      ],
+    };
+    const retainedMessage = {
+      info: stubUserMessage({ id: 'msg-retained', sessionID: kiloSessionId }),
+      parts: [
+        stubTextPart({
+          id: 'part-0-retained',
+          messageID: 'msg-retained',
+          sessionID: kiloSessionId,
+          text: 'Cached text',
+        }),
+        stubTextPart({
+          id: 'part-1-omitted',
+          messageID: 'msg-retained',
+          sessionID: kiloSessionId,
+          text: 'Cached part missing from REST',
+        }),
+      ],
+    };
+    const cached: SessionSnapshotPage = {
+      info: { id: kiloSessionId },
+      messages: [omittedMessage, retainedMessage],
+      nextCursor: null,
+      omittedItemCount: 0,
+    };
+    const stale: SessionSnapshotPageOutcome = {
+      ...cached,
+      kind: 'success',
+      messages: [{ ...retainedMessage, parts: retainedMessage.parts.slice(0, 1) }],
+      nextCursor: 'older-cursor',
+      watermarkEventId: 12,
+    };
+    const fetchSnapshotPage = jest.fn(
+      async (id: KiloSessionId): Promise<SessionSnapshotPageOutcome> => {
+        if (id !== kiloSessionId) {
+          return { ...cached, kind: 'success', info: { id }, messages: [] };
+        }
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        return stale;
+      }
+    );
+    const manager = createSessionManager({
+      store,
+      resolveSession: async id => ({ type: 'cloud-agent', kiloSessionId: id, cloudAgentSessionId }),
+      getTicket: () => 'ticket',
+      fetchSnapshot: async id => makeSnapshot({ id }),
+      fetchSnapshotPage,
+      readCachedSnapshotPage: async id => (id === kiloSessionId ? cached : null),
+      websocketBaseUrl: 'ws://localhost:9999',
+      userWebConnection: createUserWebConnection(),
+      api: createMockApi(),
+      prepare: jest.fn(),
+      initiate: jest.fn(),
+      fetchSession: async id => ({
+        kiloSessionId: id,
+        cloudAgentSessionId,
+        title: null,
+        organizationId: null,
+        gitUrl: null,
+        gitBranch: null,
+        mode: null,
+        model: null,
+        variant: null,
+        repository: null,
+        isInitiated: true,
+        needsLegacyPrepare: false,
+        isPreparingAsync: false,
+        prompt: null,
+        initialMessageId: null,
+        associatedPr: null,
+      }),
+    });
+    let unsubscribe = () => {};
+    try {
+      await manager.switchSession(kiloId('ses-other'));
+      await jest.advanceTimersByTimeAsync(0);
+      await manager.switchSession(kiloSessionId);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(store.get(manager.atoms.messagesList)).toEqual(cached.messages);
+      expect(store.get(manager.atoms.isLoading)).toBe(false);
+      expect(store.get(manager.atoms.isRefreshingCachedTranscript)).toBe(true);
+      expect(fetchSnapshotPage).toHaveBeenLastCalledWith(kiloSessionId, {});
+      expect(global.WebSocket).toHaveBeenCalledTimes(1);
+
+      const transcripts = [store.get(manager.atoms.messagesList)];
+      unsubscribe = store.sub(manager.atoms.messagesList, () => {
+        transcripts.push(store.get(manager.atoms.messagesList));
+      });
+      await jest.advanceTimersByTimeAsync(1499);
+      expect(store.get(manager.atoms.messagesList)).toEqual(cached.messages);
+      expect(store.get(manager.atoms.isRefreshingCachedTranscript)).toBe(true);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(store.get(manager.atoms.messagesList)).toEqual(cached.messages);
+      expect(store.get(manager.atoms.isRefreshingCachedTranscript)).toBe(false);
+      expect(store.get(manager.atoms.hasOlderMessages)).toBe(true);
+      expect(global.WebSocket).toHaveBeenCalledTimes(2);
+      expect(String(jest.mocked(global.WebSocket).mock.calls.at(-1)?.[0])).toContain('fromId=0');
+
+      const events = createEventHelpers(cloudAgentSessionId);
+      const deliver = (event: ReturnType<typeof events.createEvent>) => {
+        mockWs.onmessage?.({ data: JSON.stringify(event) } as MessageEvent);
+      };
+      mockWs.onopen?.(new Event('open'));
+      deliver(events.createEvent('connected', { bootstrapPending: true }));
+      for (const message of cached.messages) {
+        deliver(events.kilocode('message.updated', { info: message.info }));
+        for (const part of message.parts) {
+          deliver(events.kilocode('message.part.updated', { part }));
+        }
+      }
+      deliver(events.createEvent('bootstrap.complete', {}));
+      expect(store.get(manager.atoms.messagesList)).toEqual(cached.messages);
+      for (const transcript of transcripts) {
+        expect(transcript).toEqual(cached.messages);
+      }
+      unsubscribe();
+
+      deliver(
+        events.kilocode('message.part.removed', {
+          sessionID: kiloSessionId,
+          messageID: retainedMessage.info.id,
+          partID: retainedMessage.parts[1].id,
+        })
+      );
+      expect(store.get(manager.atoms.messagesList)).toEqual([
+        omittedMessage,
+        { ...retainedMessage, parts: retainedMessage.parts.slice(0, 1) },
+      ]);
+      deliver(
+        events.kilocode('message.removed', {
+          sessionID: kiloSessionId,
+          messageID: omittedMessage.info.id,
+        })
+      );
+      expect(store.get(manager.atoms.messagesList)).toEqual([
+        { ...retainedMessage, parts: retainedMessage.parts.slice(0, 1) },
+      ]);
+    } finally {
+      unsubscribe();
+      manager.destroy();
+      jest.useRealTimers();
+    }
+  });
+});
 
 describe('Cloud Agent worktree refresh event pipeline', () => {
   it.each([false, true])(
@@ -787,6 +945,70 @@ describe('delivery callback plumbing', () => {
 });
 
 describe('queued message cancellation replay', () => {
+  it('materializes only final delivery rows and publishes service state at bootstrap completion', async () => {
+    const session = createCloudAgentResolvedSession(createMockApi());
+    await connectSession(session);
+    const notifications = jest.fn();
+    session.state.subscribe(notifications);
+    const deliver = (streamEventType: string, data: unknown) => {
+      mockWs.onmessage?.({
+        data: JSON.stringify({
+          eventId: 0,
+          sessionId: cloudAgentSessionId,
+          streamEventType,
+          timestamp: new Date().toISOString(),
+          data,
+        }),
+      } as MessageEvent);
+    };
+    deliver('kilocode', {
+      type: 'session.error',
+      properties: { sessionID: kiloSessionId, error: 'Old overload' },
+    });
+    deliver('kilocode', {
+      type: 'session.status',
+      properties: { sessionID: kiloSessionId, status: { type: 'busy' } },
+    });
+    deliver('kilocode', {
+      type: 'session.status',
+      properties: { sessionID: kiloSessionId, status: { type: 'idle' } },
+    });
+    deliver('cloud.message.queued', { messageId: 'canceled', content: 'Old prompt' });
+    deliver('cloud.message.canceled', { messageId: 'canceled' });
+    deliver('connected', { bootstrapPending: true, cloudStatus: { type: 'ready' } });
+    deliver('cloud.message.queued', { messageId: 'queued', content: 'Queued prompt' });
+    deliver('cloud.message.queued', { messageId: 'accepted', content: 'Accepted prompt' });
+    deliver('cloud.message.sent', { messageId: 'accepted' });
+    deliver('cloud.message.queued', { messageId: 'failed', content: 'Failed prompt' });
+    deliver('cloud.message.failed', {
+      messageId: 'failed',
+      reason: 'exhausted',
+      error: 'Old delivery failure',
+    });
+    deliver('kilocode', {
+      type: 'question.asked',
+      properties: { id: 'current-question', sessionID: kiloSessionId, questions: [] },
+    });
+    expect(notifications).not.toHaveBeenCalled();
+    expect(session.storage.getMessageIds()).toEqual([]);
+
+    deliver('bootstrap.complete', {});
+    expect(notifications).toHaveBeenCalledTimes(1);
+    expect(session.state.getStatus()).toEqual({ type: 'idle' });
+    expect(session.storage.getMessageIds()).toHaveLength(3);
+    expect(session.storage.getMessageIds()).toEqual(
+      expect.arrayContaining(['queued', 'accepted', 'failed'])
+    );
+    expect(session.state.getPendingMessages().get('failed')).toMatchObject({ status: 'failed' });
+    expect(session.state.getQuestion()?.requestId).toBe('current-question');
+    deliver('kilocode', {
+      type: 'session.error',
+      properties: { sessionID: kiloSessionId, error: 'Live failure' },
+    });
+    expect(session.state.getStatus()).toEqual({ type: 'error', message: 'Live failure' });
+    session.destroy();
+  });
+
   it('replays cloud.message.queued then cloud.message.canceled to a net-empty transcript', async () => {
     const api = createMockApi();
     const session = createCloudAgentResolvedSession(api);
@@ -806,6 +1028,7 @@ describe('queued message cancellation replay', () => {
       } as MessageEvent);
     };
 
+    deliver('connected', {});
     deliver('cloud.message.queued', { messageId, content: 'hello' });
     expect(session.state.getPendingMessages().has(messageId)).toBe(true);
     expect(session.storage.getMessageIds()).toContain(messageId);

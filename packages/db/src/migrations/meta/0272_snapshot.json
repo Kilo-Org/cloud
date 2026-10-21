@@ -1,5 +1,5 @@
 {
-  "id": "140c45fc-94ac-4538-bd32-30272ff07d06",
+  "id": "24b8a835-b72b-4346-8ec8-0ce91c4c24bf",
   "prevId": "4310989a-94fd-4cd0-814c-e50815652819",
   "version": "7",
   "dialect": "postgresql",
@@ -9532,6 +9532,28 @@
           ],
           "isUnique": false,
           "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_container_usage_interval_open_subject": {
+          "name": "IDX_container_usage_interval_open_subject",
+          "columns": [
+            {
+              "expression": "subject_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "subject_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"container_usage_interval\".\"status\" = 'open'",
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -27124,42 +27146,6 @@
         },
         "promotion_note": {
           "name": "promotion_note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "benchmark_release": {
-          "name": "benchmark_release",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "benchmark_revision": {
-          "name": "benchmark_revision",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "benchmark_scope": {
-          "name": "benchmark_scope",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "included_task_count": {
-          "name": "included_task_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "suite_task_count": {
-          "name": "suite_task_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "dataset_digest": {
-          "name": "dataset_digest",
           "type": "text",
           "primaryKey": false,
           "notNull": false

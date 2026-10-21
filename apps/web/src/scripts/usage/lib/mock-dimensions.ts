@@ -6,7 +6,7 @@
  * those dimensions that every breakdown chart has multiple slices.
  */
 import { FEATURE_VALUES } from '@kilocode/web-shared/lib/feature-detection';
-import { GatewayApiKindSchema } from '@kilocode/db';
+import { GatewayApiKindSchema } from '@kilocode/usage-contracts';
 
 export type ModelSpec = {
   id: string;
@@ -125,8 +125,6 @@ export const FEATURE_WEIGHTS: ReadonlyArray<{ value: string; weight: number }> =
   { value: 'jetbrains-extension', weight: 4 },
   { value: 'app-builder', weight: 2 },
   { value: 'agent-manager', weight: 1 },
-  { value: 'auto-triage', weight: 1 },
-  { value: 'autofix', weight: 1 },
   { value: 'managed-indexing', weight: 1 },
 ];
 

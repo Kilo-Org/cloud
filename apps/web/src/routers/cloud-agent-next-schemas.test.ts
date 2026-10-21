@@ -21,6 +21,7 @@ import {
   cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentRelaxedAttachmentFilenameSchema,
+  baseSendMessageNextSchema,
 } from './cloud-agent-next-schemas';
 
 const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
@@ -245,6 +246,16 @@ describe('baseGetSessionNextOutputSchema', () => {
     };
 
     expect(baseGetSessionNextOutputSchema.parse(response)).toEqual(response);
+  });
+
+  it('preserves the assigned branch before runtime preparation', () => {
+    const response = baseGetSessionNextOutputSchema.parse({
+      ...baseSession,
+      branchName: 'kilo/assigned',
+    });
+
+    expect(response.branchName).toBe('kilo/assigned');
+    expect(response.preparedAt).toBeUndefined();
   });
 
   it('preserves explicit null ownership fields when no ownership row exists', () => {
@@ -515,6 +526,19 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
     }
   });
 
+  it('enforces explicit egress mode on clone-only inputs', () => {
+    for (const schema of [personalPrepareSessionNextSchema, organizationPrepareSessionNextSchema]) {
+      const input = { ...cloneOnlyInput, organizationId: MESSAGE_UUID };
+      const parsed = schema.parse({ ...input, egressMode: 'allowlist' });
+      expect(parsed.egressMode).toBe('allowlist');
+      expect(parsed.egressAllowlist).toBeUndefined();
+      expect(schema.safeParse({ ...input, egressAllowlist: [] }).success).toBe(false);
+      expect(
+        schema.safeParse({ ...input, egressMode: 'unrestricted', egressAllowlist: [] }).success
+      ).toBe(false);
+    }
+  });
+
   it('rejects a clone-only input that also carries a prompt', () => {
     expect(
       basePrepareSessionNextSchema.safeParse({ ...cloneOnlyInput, prompt: 'Continue the clone' })
@@ -560,6 +584,36 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
     ).toBe(false);
   });
 
+  it('accepts a clone-only input with a cut message ID', () => {
+    const result = basePrepareSessionNextSchema.safeParse({
+      ...cloneOnlyInput,
+      cloneUpToMessageId: 'msg_12345678901212345678901234',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.cloneUpToMessageId).toBe('msg_12345678901212345678901234');
+    }
+  });
+
+  it('rejects a malformed cut message ID', () => {
+    expect(
+      basePrepareSessionNextSchema.safeParse({ ...cloneOnlyInput, cloneUpToMessageId: 'msg_bad' })
+        .success
+    ).toBe(false);
+  });
+
+  it('rejects a cut without a clone source', () => {
+    expect(
+      basePrepareSessionNextSchema.safeParse({
+        githubRepo: 'acme/repo',
+        prompt: 'Continue',
+        mode: 'code',
+        model: 'kilo/test-model',
+        cloneUpToMessageId: 'msg_12345678901212345678901234',
+      }).success
+    ).toBe(false);
+  });
+
   it('accepts a non-clone input with required prompt and no cloneFromKiloSessionId', () => {
     const result = basePrepareSessionNextSchema.safeParse({
       githubRepo: 'acme/repo',
@@ -594,6 +648,42 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
     });
 
     expect(result).not.toHaveProperty('clientProvenance');
+  });
+});
+
+describe('send-time attachment filenames', () => {
+  const prepareInput = {
+    githubRepo: 'acme/repo',
+    prompt: 'Read the attachment',
+    mode: 'code',
+    model: 'kilo/test-model',
+  };
+  const sendInput = {
+    cloudAgentSessionId: 'agent_12345678-1234-4234-9234-123456789abc',
+    payload: { type: 'prompt', prompt: '', mode: 'code', model: 'kilo/test-model' },
+  };
+  const attachmentsWith = (extension: string) => ({
+    path: MESSAGE_UUID,
+    files: [`${ATTACHMENT_ID}.${extension}`],
+  });
+
+  it.each(['zip', 'heic', 'json', 'png'])(
+    'accepts a relaxed "%s" upload in prepareSession and sendMessage',
+    extension => {
+      const attachments = attachmentsWith(extension);
+      expect(basePrepareSessionNextSchema.safeParse({ ...prepareInput, attachments }).success).toBe(
+        true
+      );
+      expect(baseSendMessageNextSchema.safeParse({ ...sendInput, attachments }).success).toBe(true);
+    }
+  );
+
+  it('rejects a deny-listed extension in prepareSession and sendMessage', () => {
+    const attachments = attachmentsWith('exe');
+    expect(basePrepareSessionNextSchema.safeParse({ ...prepareInput, attachments }).success).toBe(
+      false
+    );
+    expect(baseSendMessageNextSchema.safeParse({ ...sendInput, attachments }).success).toBe(false);
   });
 });
 
@@ -667,6 +757,74 @@ describe('prepare session sandbox selection', () => {
     model: 'kilo/test-model',
   };
   const organizationInput = { ...baseInput, organizationId: MESSAGE_UUID };
+  it.each([[], ['Z.Example.COM.', 'example.com']].map(egressAllowlist => ({ egressAllowlist })))(
+    'preserves canonical API-only policy %j',
+    ({ egressAllowlist }) => {
+      const expected = egressAllowlist.length === 0 ? [] : ['example.com', 'z.example.com'];
+      expect(
+        personalPrepareSessionNextSchema.parse({
+          ...baseInput,
+          egressMode: 'allowlist',
+          egressAllowlist,
+        }).egressAllowlist
+      ).toEqual(expected);
+      expect(
+        organizationPrepareSessionNextSchema.parse({
+          ...organizationInput,
+          egressMode: 'allowlist',
+          egressAllowlist,
+        }).egressAllowlist
+      ).toEqual(expected);
+    }
+  );
+
+  it.each([{}, { egressMode: 'unrestricted' }, { egressMode: 'allowlist' }])(
+    'preserves omitted lists without inferring modes: %j',
+    policy => {
+      for (const parsed of [
+        personalPrepareSessionNextSchema.parse({ ...baseInput, ...policy }),
+        organizationPrepareSessionNextSchema.parse({ ...organizationInput, ...policy }),
+      ]) {
+        expect(parsed.egressMode).toBe('egressMode' in policy ? policy.egressMode : undefined);
+        expect(parsed.egressAllowlist).toBeUndefined();
+      }
+    }
+  );
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted', egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
+    { egressMode: 'deny-all' },
+    { egressMode: null },
+  ])('rejects ambiguous or unsupported egress policies: %j', policy => {
+    expect(personalPrepareSessionNextSchema.safeParse({ ...baseInput, ...policy }).success).toBe(
+      false
+    );
+    expect(
+      organizationPrepareSessionNextSchema.safeParse({ ...organizationInput, ...policy }).success
+    ).toBe(false);
+  });
+
+  it('rejects non-domain API policies', () => {
+    for (const egressAllowlist of [['*'], ['127.1'], ['https://example.com'], null]) {
+      expect(
+        personalPrepareSessionNextSchema.safeParse({
+          ...baseInput,
+          egressMode: 'allowlist',
+          egressAllowlist,
+        }).success
+      ).toBe(false);
+      expect(
+        organizationPrepareSessionNextSchema.safeParse({
+          ...organizationInput,
+          egressMode: 'allowlist',
+          egressAllowlist,
+        }).success
+      ).toBe(false);
+    }
+  });
   const allocations = SELECTABLE_SANDBOX_ALLOCATIONS;
   const requests: SelectableSandboxAllocationRequest[] = [
     ...allocations.map(allocation => getSandboxAllocationRequest(allocation)),

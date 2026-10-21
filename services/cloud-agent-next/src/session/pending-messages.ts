@@ -97,6 +97,7 @@ const PendingFlushFailureCodeSchema = z.enum([
   'WRAPPER_FINALIZING',
   'WRAPPER_CLEANUP_EXHAUSTED',
   'SANDBOX_CAPABILITY_UNAVAILABLE',
+  'CONTAINER_LIMIT_REACHED',
   'NOT_FOUND',
   'BAD_REQUEST',
   'PAYMENT_REQUIRED',
@@ -540,6 +541,7 @@ export async function recordPendingFlushFailure(
     code?:
       | RetryableResultCode
       | PermanentDeliveryResultCode
+      | 'CONTAINER_LIMIT_REACHED'
       | 'WRAPPER_CLEANUP_EXHAUSTED'
       | 'NOT_FOUND'
       | 'BAD_REQUEST'
@@ -641,6 +643,7 @@ function isRetryableFlushCode(
   code:
     | RetryableResultCode
     | PermanentDeliveryResultCode
+    | 'CONTAINER_LIMIT_REACHED'
     | 'WRAPPER_CLEANUP_EXHAUSTED'
     | 'NOT_FOUND'
     | 'BAD_REQUEST'

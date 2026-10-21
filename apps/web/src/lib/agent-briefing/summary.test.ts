@@ -101,6 +101,25 @@ describe('briefing model pricing', () => {
     );
   });
 
+  it('quotes a picker-built entry at its own price when the catalog lists the same id', async () => {
+    const exclusive = catalogModel('stealth/qwen3.6-plus', {
+      prompt: '0.00001',
+      completion: '0.00002',
+    });
+    jest
+      .mocked(getRawOpenRouterModels)
+      .mockResolvedValue({ data: [exclusive] } satisfies OpenRouterModelsResponse);
+
+    const withCatalogRow = await briefingPriceBound(exclusive.id, 'Overnight activity', 2_000_000);
+
+    jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [] });
+
+    expect(withCatalogRow).toEqual(
+      await briefingPriceBound(exclusive.id, 'Overnight activity', 2_000_000)
+    );
+    expect(withCatalogRow.inputRate).toBeLessThan(Number(exclusive.pricing.prompt));
+  });
+
   it('rejects a picker price with unknown rates', async () => {
     await expect(
       briefingPriceBound('kilo-auto/frontier', 'Overnight activity', 2_000_000)

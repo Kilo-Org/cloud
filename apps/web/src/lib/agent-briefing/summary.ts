@@ -117,7 +117,9 @@ export function briefingPrompt(row: BriefingReportRow, language: string): string
  * resolves to, so the quoted ceiling never undercuts the route the gateway
  * picks. A model the picker hides - one the gateway marks unavailable, a batch
  * variant, or one missing from a populated model snapshot - is refused as not
- * allowed, so a quote is never issued for a model the picker never offers.
+ * allowed, so a quote is never issued for a model the picker never offers. The
+ * entries the picker builds from code win over a catalog row with the same id
+ * and keep their own price, as the picker does.
  */
 async function briefingPriceRates(model: string): Promise<TextPricingRates> {
   const extra = pickerExtraModel(model);
@@ -138,7 +140,7 @@ async function briefingPriceRates(model: string): Promise<TextPricingRates> {
   } catch {
     throw new Error('model_pricing_unavailable');
   }
-  const entry = catalog.data.find(item => item.id === model) ?? extra;
+  const entry = extra ?? catalog.data.find(item => item.id === model);
   if (!entry) throw new Error('model_pricing_unavailable');
   const aliasTarget = endpointsMetadata[model]?.alias_target?.slug;
   const target = aliasTarget ? catalog.data.find(item => item.id === aliasTarget) : undefined;
@@ -146,7 +148,10 @@ async function briefingPriceRates(model: string): Promise<TextPricingRates> {
   try {
     rates = [entry, ...(target ? [target] : [])].map(item =>
       textPricingRates(
-        applyCustomPricingToPricing(item.id, pickerModelPricing(item, endpointsMetadata))
+        applyCustomPricingToPricing(
+          item.id,
+          item === extra ? item.pricing : pickerModelPricing(item, endpointsMetadata)
+        )
       )
     );
   } catch {

@@ -795,6 +795,40 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     }
   );
 
+  it('defers an unbilled gateway model rejection instead of scoring it', async () => {
+    const claim = mockClaim({ variant: 'high', rep: 0 });
+    mockRunSnapshot([{ model, variant: 'high' }]);
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+      ...successfulCliResult,
+      text: '',
+      exitCode: 1,
+      costUsd: 0,
+      stderrTail: `\u001b[91mError: \u001b[0mUnsupported model ${model}\n`,
+    });
+
+    await processJob(env, deciderMessage());
+
+    expect(clearUnbilledCase).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ runId, model, variant: 'high', rep: 0, caseId: benchCase.id })
+    );
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(markProfilesFailedForEntries).not.toHaveBeenCalled();
+    expect(failScheduledEntry).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(finishChunk).not.toHaveBeenCalled();
+    expect(deferChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      claim.id,
+      claim.token,
+      expect.any(Number)
+    );
+    expect(queueSend).toHaveBeenCalledWith(
+      { runId, kind: 'decider', model, schedulerWake: true },
+      { delaySeconds: 15 }
+    );
+  });
+
   it.each([
     { text: 'A partial measured answer', costUsd: null, timedOut: false },
     { text: '', costUsd: 0.01, timedOut: false },

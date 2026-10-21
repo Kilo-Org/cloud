@@ -44,6 +44,75 @@ diff --git a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt b/and
      ForwardKeyEventsToActivity(appContext.currentActivity)
      Children(UIComposableScope(), filter = { !isSlotView(it) })
    }
+diff --git a/build/community/bottom-sheet/BottomSheet.android.js b/build/community/bottom-sheet/BottomSheet.android.js
+--- a/build/community/bottom-sheet/BottomSheet.android.js
++++ b/build/community/bottom-sheet/BottomSheet.android.js
+@@ -37,7 +37,7 @@
+  * @remarks Supports two snap states: partially expanded (~50%) and fully expanded.
+  * `snapToIndex(0)` maps to partial, `snapToIndex(lastIndex)` maps to expanded.
+  */ export function BottomSheet(props) {
+-    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
++    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, dismissGestures = enablePanDownToClose, onRequestDismiss, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
+     const { width } = useWindowDimensions();
+     const hasMultipleSnapPoints = snapPointsProp != null && snapPointsProp.length > 1;
+     const fitToContents = enableDynamicSizing && (!snapPointsProp || snapPointsProp.length === 0);
+@@ -69,6 +69,8 @@
+     onCloseRef.current = onClose;
+     const onDismissRef = useRef(onDismiss);
+     onDismissRef.current = onDismiss;
++    const onRequestDismissRef = useRef(onRequestDismiss);
++    onRequestDismissRef.current = onRequestDismiss;
+     const fireCloseCallbacks = useCallback(()=>{
+         if (closedRef.current) return;
+         closedRef.current = true;
+@@ -93,6 +95,9 @@
+         fireCloseCallbacks
+     ]);
+     const handleDismiss = useCallback(()=>{
++        // A back press or scrim tap asks; it does not have to be obeyed. Keeping the
++        // native sheet mounted leaves the dialog up, so the caller can confirm first.
++        if (onRequestDismissRef.current?.() === false) return;
+         setIsOpen(false);
+         fireCloseCallbacks();
+     }, [
+@@ -177,7 +182,7 @@
+                     skipPartiallyExpanded: skipPartially,
+                     initialFullyExpanded: hasMultipleSnapPoints && pendingIndexRef.current === maxIndex,
+                     showDragHandle: handleComponent !== null,
+-                    sheetGesturesEnabled: enablePanDownToClose,
++                    sheetGesturesEnabled: dismissGestures,
+                     containerColor: containerColor,
+                     properties: {
+                         shouldDismissOnBackPress: enablePanDownToClose,
+diff --git a/build/community/bottom-sheet/BottomSheet.ios.js b/build/community/bottom-sheet/BottomSheet.ios.js
+--- a/build/community/bottom-sheet/BottomSheet.ios.js
++++ b/build/community/bottom-sheet/BottomSheet.ios.js
+@@ -71,7 +71,7 @@
+  *
+  * @remarks Uses SwiftUI's `.sheet()` presentation (modal overlay).
+  */ export function BottomSheet(props) {
+-    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
++    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, dismissGestures = enablePanDownToClose, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
+     const { width } = useWindowDimensions();
+     const [isPresented, setIsPresented] = useState(indexProp >= 0);
+     const [currentIndex, setCurrentIndex] = useState(Math.max(indexProp, 0));
+@@ -192,7 +192,7 @@
+                 })
+             ],
+             presentationDragIndicator(handleComponent === null ? 'hidden' : 'visible'),
+-            interactiveDismissDisabled(!enablePanDownToClose),
++            interactiveDismissDisabled(!dismissGestures),
+             ...bg ? [
+                 presentationBackground(bg)
+             ] : []
+@@ -204,6 +204,7 @@
+         handleDetentChange,
+         handleComponent,
+         enablePanDownToClose,
++        dismissGestures,
+         backgroundStyle
+     ]);
+     return /*#__PURE__*/ _jsx(BottomSheetInternalContext.Provider, {
 diff --git a/build/community/bottom-sheet/types.d.ts b/build/community/bottom-sheet/types.d.ts
 --- a/build/community/bottom-sheet/types.d.ts
 +++ b/build/community/bottom-sheet/types.d.ts

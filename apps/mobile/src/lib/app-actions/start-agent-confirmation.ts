@@ -1,12 +1,35 @@
-/* eslint-disable @typescript-eslint/promise-function-async -- This module wraps Alert.alert in a Promise-returning helper, so promise-function-async applies; marking it async only to satisfy that rule would need `return await`, which this config forbids. */
 // Shows the prompt a request names and asks the user to confirm it before a
 // session starts.
 
-import { Alert } from 'react-native';
+import { Alert, AppState } from 'react-native';
 
 import { i18n } from '@/i18n';
 
 import { type StartAgentRequest } from './app-action-contract';
+
+/**
+ * Resolves once the app is in front of the user.
+ *
+ * The native dialog is shown through the running app, and a question asked
+ * while the app is paused is queued for a resume instead of appearing. Waiting
+ * for the active state makes the question appear exactly when the user can
+ * answer it; a request answered from a launcher shortcut, the Assistant or an
+ * action URL brings the app forward, and one that arrives with the app closed
+ * reaches here after it has opened.
+ */
+async function whenAppIsActive(): Promise<void> {
+  if (AppState.currentState === 'active') {
+    return;
+  }
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  const subscription = AppState.addEventListener('change', state => {
+    if (state === 'active') {
+      subscription.remove();
+      resolve(undefined);
+    }
+  });
+  await promise;
+}
 
 /**
  * The dialog message: what starts, plus the target the request names, so the
@@ -28,7 +51,8 @@ function confirmationMessage(request: StartAgentRequest): string {
  * Ask the user to confirm `request`, resolving true when they chose to start
  * it.
  */
-export function confirmStartAgent(request: StartAgentRequest): Promise<boolean> {
+export async function confirmStartAgent(request: StartAgentRequest): Promise<boolean> {
+  await whenAppIsActive();
   const { promise, resolve } = Promise.withResolvers<boolean>();
   Alert.alert(
     i18n.t('appActions.start.confirmTitle'),

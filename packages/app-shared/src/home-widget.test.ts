@@ -31,6 +31,33 @@ describe('Home-only widget policy', () => {
     expect(details.scheduledAgents[0]?.scheduledAt).toBe('2026-10-09T11:00:00.000Z');
   });
 
+  it('parses PostgreSQL session times for the wait order, scheduled rows, and the wake', () => {
+    const details = buildHomeWidgetDetails([
+      { status: 'question', title: 'Later', statusUpdatedAt: '2026-10-09 09:30:00.957+00' },
+      { status: 'permission', title: 'Oldest', statusUpdatedAt: '2026-10-09 08:00:00+00' },
+      { status: 'scheduled', title: 'Wake', scheduledAt: '2026-10-09 09:55:00+00' },
+    ]);
+    expect(details.primaryTitle).toBe('Oldest');
+    expect(details.waitingAgents.map(row => row.title)).toEqual(['Oldest', 'Later']);
+    expect(details.scheduledAgents).toEqual([
+      { title: 'Wake', scheduledAt: '2026-10-09T09:55:00.000Z' },
+    ]);
+
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'scheduled', title: 'Wake', scheduledAt: '2026-10-09 09:55:00+00' }],
+    });
+    expect(buildHomeWidgetPresentation(data, now)).toMatchObject({
+      primaryKind: 'scheduled',
+      scheduledAt: '2026-10-09T09:55:00.000Z',
+      awaitingUpdate: true,
+    });
+    // A snapshot restored from an older producer may still carry the raw form.
+    data.snapshot.scheduledAt = '2026-10-09 09:55:00+00';
+    expect(buildHomeWidgetPresentation(data, now).awaitingUpdate).toBe(true);
+    expect(homeWidgetRefreshAt(data, now)).toBe(now + 30 * 60 * 1000);
+  });
+
   it('keeps missing titles empty for local fallback and never leaks extra row fields', () => {
     const row = {
       status: 'busy',
@@ -61,7 +88,7 @@ describe('Home-only widget policy', () => {
     expect(home.primaryKind).toBe('scheduled');
     expect(home.primaryTitle).toBe('Soon');
     expect(home.secondaryCounts).toEqual([{ kind: 'idle', count: 1 }]);
-    expect(home.scheduledAt).toBe('2026-10-09T11:00:00Z');
+    expect(home.scheduledAt).toBe('2026-10-09T11:00:00.000Z');
     const running = buildHomeWidgetData({
       ...scope,
       sessions: [

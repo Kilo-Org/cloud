@@ -13,6 +13,7 @@ import {
   newestGlanceableResult,
   oldestNeedsInputSince,
   shouldDiscardGlanceableRevision,
+  soonestScheduledAt,
 } from './glanceable-agents-snapshot';
 
 const NOW = 1_750_000_000_000;
@@ -606,5 +607,66 @@ describe('newestGlanceableResult', () => {
 
   it('returns null for an empty session list', () => {
     expect(newestGlanceableResult([])).toBeNull();
+  });
+});
+
+describe('session timestamp parsing', () => {
+  // A producer can hand the rows a PostgreSQL timestamp rather than ISO 8601,
+  // and Hermes cannot parse that form, so every helper reads the instant
+  // through the shared parser and reports it as ISO 8601.
+  const postgres = '2026-03-16 15:21:40.957+00';
+
+  it('orders the oldest wait by a PostgreSQL timestamp and reports it as ISO', () => {
+    expect(
+      oldestNeedsInputSince([
+        { status: 'permission', statusUpdatedAt: '2026-03-16 15:00:00+00' },
+        { status: 'question', statusUpdatedAt: postgres },
+      ])
+    ).toBe('2026-03-16T15:00:00.000Z');
+  });
+
+  it('picks the soonest wake from PostgreSQL timestamps and reports it as ISO', () => {
+    expect(
+      soonestScheduledAt([
+        { status: 'scheduled', scheduledAt: '2026-03-16 18:00:00.5+00' },
+        { status: 'scheduled', scheduledAt: postgres },
+      ])
+    ).toBe('2026-03-16T15:21:40.957Z');
+    expect(
+      soonestScheduledAt([
+        { status: 'busy', scheduledAt: '2026-03-16 09:00:00+00' },
+        { status: 'scheduled', scheduledAt: 'garbage' },
+      ])
+    ).toBeNull();
+  });
+
+  it('reports the newest change from a PostgreSQL timestamp as ISO', () => {
+    expect(
+      newestGlanceableResult([
+        { status: 'busy', statusUpdatedAt: '2026-03-16 15:00:00+00' },
+        { status: 'retry', statusUpdatedAt: postgres },
+      ])
+    ).toEqual({ kind: 'needsInput', at: '2026-03-16T15:21:40.957Z' });
+  });
+
+  it('keeps a date-only wake instead of dropping it', () => {
+    expect(soonestScheduledAt([{ status: 'scheduled', scheduledAt: '2026-03-16' }])).not.toBeNull();
+  });
+
+  it('carries PostgreSQL timestamps into the snapshot as ISO 8601', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [
+        { status: 'permission', statusUpdatedAt: postgres },
+        { status: 'scheduled', scheduledAt: '2026-03-16 18:00:00+00' },
+      ],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(snapshot.needsInputSince).toBe('2026-03-16T15:21:40.957Z');
+    expect(snapshot.scheduledAt).toBe('2026-03-16T18:00:00.000Z');
+    expect(snapshot.newestResultKind).toBe('needsInput');
+    expect(snapshot.newestResultAt).toBe('2026-03-16T15:21:40.957Z');
+    expect(glanceableAgentsSnapshotSchema.safeParse(snapshot).success).toBe(true);
   });
 });

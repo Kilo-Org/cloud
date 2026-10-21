@@ -200,33 +200,30 @@ describe('scrubEvent', () => {
     expect(JSON.stringify(result.contexts)).not.toContain('abcdefghijklmnopqrst');
   });
 
-  it('drops a payload field whose value is not the allow-listed type', () => {
-    const event = {
-      exception: { values: [{ type: 'NetworkError' }] },
-      contexts: {
-        [NETWORK_BODY_CONTEXT]: {
-          code: { text: 'UNAUTHORIZED' },
-          httpStatus: '401 alice@example.com',
-          path: ['session.list'],
-        },
-      },
-    };
+  it('keeps declared payload fields of the declared type only', () => {
+    const scrub = (payload: Record<string, unknown>) =>
+      scrubEvent({
+        exception: { values: [{ type: 'NetworkError' }] },
+        contexts: { [NETWORK_BODY_CONTEXT]: payload },
+      }).contexts[NETWORK_BODY_CONTEXT];
 
-    const result = scrubEvent(event);
-
-    expect(result.contexts[NETWORK_BODY_CONTEXT]).toEqual({});
-    expect(JSON.stringify(result.contexts)).not.toContain('alice@example.com');
-  });
-
-  it('redacts a token-shaped run inside a kept payload field', () => {
-    const event = {
-      exception: { values: [{ type: 'NetworkError' }] },
-      contexts: { [NETWORK_BODY_CONTEXT]: { code: 'abcdefghijklmnopqrst', path: 'a.b' } },
-    };
-
-    const result = scrubEvent(event);
-
-    expect(result.contexts[NETWORK_BODY_CONTEXT]).toEqual({
+    expect(
+      scrub({ code: { text: 'UNAUTHORIZED' }, httpStatus: '401 a@b.example', path: ['a.b'] })
+    ).toEqual({});
+    // Word-chain codes and procedure paths stay readable, like the `trpc.*`
+    // tags; a token-shaped run is redacted at any depth.
+    expect(
+      scrub({
+        code: 'INTERNAL_SERVER_ERROR',
+        httpStatus: 500,
+        path: 'cliSessionsV2.getSessionMessagesPage',
+      })
+    ).toEqual({
+      code: 'INTERNAL_SERVER_ERROR',
+      httpStatus: 500,
+      path: 'cliSessionsV2.getSessionMessagesPage',
+    });
+    expect(scrub({ code: 'abcdefghijklmnopqrst', path: 'a.b' })).toEqual({
       code: '[redacted]',
       path: 'a.b',
     });

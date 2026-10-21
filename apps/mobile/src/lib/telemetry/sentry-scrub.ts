@@ -209,11 +209,11 @@ function redactTokens(
 /**
  * The context key the network reporter stores parsed tRPC error metadata under
  * (see `network-errors.ts`). The value is app-attached, so {@link scrubEvent}
- * keeps only its allow-listed fields ({@link PAYLOAD_FIELDS}) and token-scrubs
- * every string it keeps. It must not be the synthesized exception's class name:
- * `extraErrorDataIntegration` writes a thrown error's own properties under
- * `contexts[error.name]`, so a payload under `NetworkError` is replaced with
- * `{}` before `beforeSend` ever runs.
+ * keeps only its allow-listed fields ({@link scrubPayloadField}) and
+ * token-scrubs every string it keeps. It must not be the synthesized
+ * exception's class name: `extraErrorDataIntegration` writes a thrown error's
+ * own properties under `contexts[error.name]`, so a payload under `NetworkError`
+ * is replaced with `{}` before `beforeSend` ever runs.
  */
 export const NETWORK_BODY_CONTEXT = 'network.body';
 
@@ -226,12 +226,16 @@ const PAYLOAD_CONTEXT_NAMES: readonly string[] = [NETWORK_BODY_CONTEXT];
  * `network-errors.ts`): `code` and `path` are strings, `httpStatus` a number,
  * and everything else a response body offers is untrusted text the event does
  * not need, so it is dropped rather than scrubbed.
+ *
+ * `code` and `path` are identifier-shaped like the `trpc.code` and
+ * `trpc.procedure` tags ({@link IDENTIFIER_PATHS}), so their word chains stay
+ * readable; a token-shaped or `Bearer ` value is redacted either way.
  */
 function scrubPayloadField(field: string, value: unknown): unknown {
   switch (field) {
     case 'code':
     case 'path': {
-      return typeof value === 'string' ? redactString(value, false) : undefined;
+      return typeof value === 'string' ? redactString(value, true) : undefined;
     }
     case 'httpStatus': {
       return typeof value === 'number' ? value : undefined;

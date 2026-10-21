@@ -2229,7 +2229,7 @@ export const cliSessionsV2Router = createTRPCRouter({
     const { session_id } = input;
     const session = await getSessionWithAccessCheck(session_id, ctx);
 
-    if (session.cloud_agent_session_id) {
+    if (session.cloud_agent_session_id && SESSION_ID_RE.test(session.cloud_agent_session_id)) {
       const authToken = (
         await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
           headers: ctx.headersList,

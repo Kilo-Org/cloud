@@ -71,7 +71,7 @@ describe('terminal refresh failure against a real database', () => {
     await expect(resolveOpenAiChatGptAccessToken(owner)).resolves.toEqual({ kind: 'terminal' });
 
     const request = fetchMock.mock.calls[0][1] as RequestInit;
-    expect(String(request.body)).toContain('stale-refresh-token');
+    expect(typeof request.body === 'string' ? request.body : '').toContain('stale-refresh-token');
 
     const stored = await getOpenAiChatGptStoredConnection(owner);
     expect(stored?.isEnabled).toBe(false);

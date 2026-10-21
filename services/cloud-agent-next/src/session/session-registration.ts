@@ -15,6 +15,7 @@
  * metadata; generic git repositories may still carry an explicit token.
  */
 import { TRPCError } from '@trpc/server';
+import { assertCloudAgentIsolatedAllocation } from '../cloud-agent-authority.js';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
@@ -45,6 +46,7 @@ import {
   type CloudAgentWorktreeId,
 } from '@kilocode/session-ingest-contracts';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
+import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   createRuntimeAuthorization,
   sealRuntimeAuthorization,
@@ -143,6 +145,7 @@ function sessionPlaneForCreate(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): SessionPlane {
+  if (ctx.cloudAgentAuthority) return 'control';
   return sandboxAllocationRequiresControlPlane(requestedSandboxAllocation(input))
     ? 'control'
     : sessionPlaneForNewOwner(
@@ -207,6 +210,7 @@ function assertEgressPolicyAllocation(
 }
 
 export type SessionRegistrationContext = {
+  cloudAgentAuthority?: CloudAgentAuthority;
   env: Env;
   userId: string;
   authToken: string;
@@ -621,6 +625,38 @@ async function issueSessionRuntimeAuthorization(
   initialTurn: AcceptedExecutionTurn | undefined
 ): Promise<NewSessionAllocation['runtimeAuthorization']> {
   const orgId = input.options?.kilocodeOrganizationId;
+  if (
+    (input.allowSubagentSessions === true || input.parentCloudAgentSessionId !== undefined) &&
+    (!cloudAgentSessionId.startsWith('workspace_') || !isPolicyBearingAuthToken(ctx.authToken))
+  ) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Cloud Agent spawn requires modern workspace authorization',
+    });
+  }
+  if (ctx.cloudAgentAuthority) {
+    assertRuntimeIsolationAdmission(ctx.env);
+    const authority = ctx.cloudAgentAuthority;
+    const runtimeAuthorization = await withDORetry(
+      () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId),
+      stub => stub.authorizeCloudAgentChild({ authority, childSessionId: cloudAgentSessionId }),
+      'authorizeCloudAgentChild'
+    ).catch(() => {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Cloud Agent parent authorization unavailable',
+      });
+    });
+    await assertKiloModelAvailable({
+      env: ctx.env,
+      submittedModel: input.agent.model,
+      originalToken: runtimeAuthorization.token,
+      originalOrganizationId: orgId,
+      createdOnPlatform: input.options?.createdOnPlatform,
+      procedure: 'scoped_child_session_create',
+    });
+    return runtimeAuthorization;
+  }
   let runtimeAuthorization: NewSessionAllocation['runtimeAuthorization'];
   if (isPolicyBearingAuthToken(ctx.authToken)) {
     if (cloudAgentSessionId.startsWith('workspace_')) assertRuntimeIsolationAdmission(ctx.env);
@@ -771,6 +807,10 @@ async function allocateNewSession(
     createdOnPlatform: input.options?.createdOnPlatform,
     billingOrigin: options?.billingOrigin,
   });
+  assertCloudAgentIsolatedAllocation(
+    input.allowSubagentSessions === true || input.parentCloudAgentSessionId !== undefined,
+    sandboxAllocation
+  );
   const kiloSessionId = input.options?.kiloSessionId ?? generateKiloSessionId();
   const reportingCreatedAt =
     input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')
@@ -1197,7 +1237,18 @@ function buildSessionRegistrationCommand(
   allocation: NewSessionAllocation,
   options?: { billingOrigin?: string }
 ) {
+  const scoped =
+    input.allowSubagentSessions === true || input.parentCloudAgentSessionId !== undefined;
+  assertCloudAgentIsolatedAllocation(scoped, allocation.sandboxAllocation);
+  if (scoped && allocation.sandboxKind === 'shared') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Cloud Agent spawn authority requires an isolated sandbox',
+    });
+  }
   return {
+    allowSubagentSessions: input.allowSubagentSessions ?? false,
+    parentCloudAgentSessionId: input.parentCloudAgentSessionId,
     identity: {
       sessionId: allocation.cloudAgentSessionId,
       userId: ctx.userId,
@@ -1810,6 +1861,8 @@ export async function sessionCreateIntentFingerprint(
           };
   return sha256Hex(
     canonicalJson({
+      allowSubagentSessions: input.allowSubagentSessions === true ? true : undefined,
+      parentCloudAgentSessionId: input.parentCloudAgentSessionId,
       initialTurn,
       // Undefined for creates without a proposed ID, so their fingerprint is unchanged.
       kiloSessionId: input.options?.kiloSessionId,

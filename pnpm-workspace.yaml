@@ -230,7 +230,9 @@ packageExtensions:
       '@expo/config-plugins': '*'
 patchedDependencies:
   # Text date styles for the glanceable widgets and Live Activity: `elapsed`
-  # ("31 minutes", no seconds) and `ago` ("3 minutes ago").
+  # ("31 minutes", no seconds) and `ago` ("3 minutes ago"). Also separates a
+  # bottom sheet's drag gesture from its back/scrim dismissal and lets a caller
+  # veto a requested dismissal, so a scrolling form can keep its values.
   '@expo/ui@57.0.21': patches/@expo+ui@57.0.21.patch
   # query-string 7 requires this dependency as CommonJS. Keep the 0.5.0 security fix.
   decode-uri-component@0.5.0: patches/decode-uri-component@0.5.0.patch
@@ -251,7 +253,11 @@ patchedDependencies:
   # `(tabs)` route vanishes from the generated `Href` union and typecheck
   # rejects valid navigations.
   '@expo/router-server@57.0.11': patches/@expo+router-server@57.0.11.patch
-  expo-server-sdk: patches/expo-server-sdk.patch
+  # workerd has no undici ALPN support and the bundle must not read package.json
+  # at runtime: use globalThis.fetch and inline the SDK version the push request
+  # headers report. The patch hard-codes 6.1.0, so it is pinned to that release
+  # instead of widening to every later one.
+  expo-server-sdk@6.1.0: patches/expo-server-sdk@6.1.0.patch
   # Android: keep the React host after a headless expo-task-manager run. The
   # loader destroyed the host after each background task, and a destroyed host
   # keeps its native memory, so each background push or refresh added a new

@@ -5,20 +5,23 @@ export const MAX_MESSAGE_TEXT_LENGTH = 400;
 
 const PLATFORM_CONTEXT_TAG = 'platform_conversation_context';
 
+/** Escape every closing sequence for `tag` in `text`. Case-insensitive. */
+export function escapeClosingTag(tag: string, text: string): string {
+  const replacement = `<\\/${tag}`;
+  return text.replace(new RegExp(`</${tag}`, 'gi'), () => replacement);
+}
+
 /**
- * Wrap platform conversation context in a named block. The block body is data:
- * any closing sequence for the block tag is defused so the content cannot end
- * the block early, and an empty body produces no block at all.
+ * Wrap platform conversation context in a named block. The block body is data,
+ * and an empty body produces no block at all.
  */
 export function formatPlatformConversationContext(platform: Platform, body: string): string {
   const trimmed = body.trim();
   if (!trimmed) return '';
-  const closingTag = `</${PLATFORM_CONTEXT_TAG}`;
-  const escaped = trimmed.replace(
-    new RegExp(closingTag, 'gi'),
-    () => `<\\/${PLATFORM_CONTEXT_TAG}`
-  );
-  return `<${PLATFORM_CONTEXT_TAG} platform="${platform}">\n${escaped}\n</${PLATFORM_CONTEXT_TAG}>`;
+  return `<${PLATFORM_CONTEXT_TAG} platform="${platform}">\n${escapeClosingTag(
+    PLATFORM_CONTEXT_TAG,
+    trimmed
+  )}\n</${PLATFORM_CONTEXT_TAG}>`;
 }
 
 export type ContextTriggerMessage = Pick<Message, 'author' | 'id' | 'text'> & {

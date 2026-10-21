@@ -4,9 +4,13 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
+  getInstallationByTeamId,
+  revokeSlackToken,
   SlackWorkspaceAlreadyConnectedError,
   upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
+import type { SlackAdapter, SlackInstallation } from '@chat-adapter/slack';
+import type { PlatformIntegration } from '@kilocode/db/schema';
 import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { bot } from '@/lib/bot';
@@ -22,6 +26,66 @@ import {
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 
 const SLACK_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.SLACK);
+
+/**
+ * Build the Chat SDK installation for a workspace from its recorded
+ * integration.
+ */
+function buildStoredSlackInstallation(integration: PlatformIntegration): SlackInstallation | null {
+  const metadata = integration.metadata as
+    | { access_token?: unknown; bot_user_id?: unknown }
+    | null
+    | undefined;
+  const botToken = typeof metadata?.access_token === 'string' ? metadata.access_token : null;
+
+  if (!botToken) return null;
+
+  return {
+    botToken,
+    ...(typeof metadata?.bot_user_id === 'string' ? { botUserId: metadata.bot_user_id } : {}),
+    ...(integration.platform_account_login ? { teamName: integration.platform_account_login } : {}),
+  };
+}
+
+/**
+ * Keep a workspace's Chat SDK installation attached to the owner recorded for
+ * it. The workspace installation is rebuilt from the recorded integration and
+ * written back; without a recorded integration the installation is removed.
+ * A token that no installation is attached to is revoked. Workspace identity
+ * links are left as they are.
+ */
+async function restoreRecordedSlackInstallation({
+  slackAdapter,
+  teamId,
+  incomingInstallation,
+}: {
+  slackAdapter: SlackAdapter;
+  teamId: string;
+  incomingInstallation: SlackInstallation;
+}): Promise<void> {
+  const recordedIntegration = await getInstallationByTeamId(teamId);
+  const recordedInstallation = recordedIntegration
+    ? buildStoredSlackInstallation(recordedIntegration)
+    : null;
+
+  if (recordedInstallation) {
+    try {
+      await slackAdapter.setInstallation(teamId, recordedInstallation);
+    } catch (error) {
+      captureException(error, {
+        tags: { endpoint: 'slack/callback', source: 'slack_oauth', op: 'restore-installation' },
+        extra: { teamId },
+      });
+      await slackAdapter.deleteInstallation(teamId);
+    }
+  } else {
+    await slackAdapter.deleteInstallation(teamId);
+  }
+
+  if (incomingInstallation.botToken !== recordedInstallation?.botToken) {
+    await revokeSlackToken(incomingInstallation.botToken);
+  }
+}
 
 /**
  * Slack OAuth Callback
@@ -153,6 +217,23 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       await upsertSlackInstallation({ owner, teamId, installation });
     } catch (error) {
       if (error instanceof SlackWorkspaceAlreadyConnectedError) {
+        try {
+          await restoreRecordedSlackInstallation({
+            slackAdapter,
+            teamId,
+            incomingInstallation: installation,
+          });
+        } catch (rollbackError) {
+          captureException(rollbackError, {
+            tags: {
+              endpoint: 'slack/callback',
+              source: 'slack_oauth',
+              op: 'install-conflict-rollback',
+            },
+            extra: { teamId },
+          });
+        }
+
         return NextResponse.redirect(
           new URL(
             buildIntegrationOAuthRedirectPathFromState(

@@ -311,7 +311,6 @@ export async function listGitLabRepositories(
   }
 
   const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-  // If forceRefresh, no cached repos, or never synced before, fetch from GitLab and update cache
   if (forceRefresh || !cachedRepositories?.length || !integration.repositories_synced_at) {
     const accessToken = await getValidGitLabToken(integration, actor);
     const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
@@ -326,7 +325,6 @@ export async function listGitLabRepositories(
     };
   }
 
-  // Return cached repos
   return {
     repositories: cachedRepositories,
     syncedAt: integration.repositories_synced_at,
@@ -395,7 +393,6 @@ export async function disconnectGitLabIntegration(owner: Owner) {
       ? eq(platform_integrations.owned_by_user_id, owner.id)
       : eq(platform_integrations.owned_by_organization_id, owner.id);
 
-  // Get the integration
   const [integration] = await db
     .select()
     .from(platform_integrations)
@@ -471,7 +468,6 @@ export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSe
       ? eq(platform_integrations.owned_by_user_id, owner.id)
       : eq(platform_integrations.owned_by_organization_id, owner.id);
 
-  // Get the integration
   const [integration] = await db
     .select()
     .from(platform_integrations)
@@ -491,7 +487,6 @@ export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSe
     });
   }
 
-  // Generate new webhook secret
   const newWebhookSecret = randomBytes(32).toString('hex');
 
   const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
@@ -722,7 +717,6 @@ export async function getOrCreateProjectAccessToken(
       });
     }
 
-    // Store the new token
     await updateStoredProjectAccessToken(integration, projectIdStr, newToken);
 
     logExceptInTest('[getOrCreateProjectAccessToken] Token created successfully', {
@@ -960,7 +954,6 @@ export async function importExistingProjectAccessToken(
   const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
   const userToken = await getValidGitLabToken(integration, actor);
 
-  // Find existing Kilo token on GitLab
   const existingToken = await findKiloProjectAccessToken(
     userToken,
     projectId,

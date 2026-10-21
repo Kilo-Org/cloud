@@ -99,7 +99,6 @@ describe('permission-denied query removal', () => {
       })
     ).rejects.toBe(error);
 
-    // The forbidden org's query is dropped; the sibling org's query survives.
     expect(queryClient.getQueryData(org1Key)).toBeUndefined();
     expect(queryClient.getQueryData(org2Key)).toEqual({ members: ['b'] });
     // Permission loss never signs the user out.

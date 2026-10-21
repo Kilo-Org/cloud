@@ -16,6 +16,10 @@ import { getVercelModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 
+// A BYOK key belongs to exactly one owner, either a user or an organization.
+type ByokOwnerColumn = typeof byok_api_keys.kilo_user_id | typeof byok_api_keys.organization_id;
+type ByokSourceDb = typeof db | DrizzleTransaction;
+
 export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
   const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
   if (Object.keys(vercelModelMetadata).length === 0) {
@@ -39,30 +43,31 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
   return providers;
 }
 
-export async function getUserByokProviderIds(
-  fromDb: typeof db,
-  userId: string
+async function getEnabledByokProviderIds(
+  fromDb: ByokSourceDb,
+  ownerColumn: ByokOwnerColumn,
+  ownerId: string
 ): Promise<UserByokProviderId[]> {
   const rows = await fromDb
     .select({ provider_id: byok_api_keys.provider_id })
     .from(byok_api_keys)
-    .where(and(eq(byok_api_keys.kilo_user_id, userId), eq(byok_api_keys.is_enabled, true)));
+    .where(and(eq(ownerColumn, ownerId), eq(byok_api_keys.is_enabled, true)));
 
   return parseUserByokProviderIds(rows);
+}
+
+export async function getUserByokProviderIds(
+  fromDb: typeof db,
+  userId: string
+): Promise<UserByokProviderId[]> {
+  return getEnabledByokProviderIds(fromDb, byok_api_keys.kilo_user_id, userId);
 }
 
 export async function getOrganizationByokProviderIds(
   fromDb: typeof db,
   organizationId: string
 ): Promise<UserByokProviderId[]> {
-  const rows = await fromDb
-    .select({ provider_id: byok_api_keys.provider_id })
-    .from(byok_api_keys)
-    .where(
-      and(eq(byok_api_keys.organization_id, organizationId), eq(byok_api_keys.is_enabled, true))
-    );
-
-  return parseUserByokProviderIds(rows);
+  return getEnabledByokProviderIds(fromDb, byok_api_keys.organization_id, organizationId);
 }
 
 function parseUserByokProviderIds(rows: { provider_id: string }[]): UserByokProviderId[] {
@@ -102,9 +107,10 @@ export function decryptByokRow({
   };
 }
 
-export async function getBYOKforUser(
-  fromDb: typeof db,
-  userId: string,
+async function getByokRowsForOwner(
+  fromDb: ByokSourceDb,
+  ownerColumn: ByokOwnerColumn,
+  ownerId: string,
   providerIds: UserByokProviderId[]
 ): Promise<BYOKResult[] | null> {
   if (providerIds.length === 0) {
@@ -118,7 +124,7 @@ export async function getBYOKforUser(
     .from(byok_api_keys)
     .where(
       and(
-        eq(byok_api_keys.kilo_user_id, userId),
+        eq(ownerColumn, ownerId),
         eq(byok_api_keys.is_enabled, true),
         inArray(byok_api_keys.provider_id, providerIds)
       )
@@ -128,28 +134,18 @@ export async function getBYOKforUser(
   return rows.length === 0 ? null : rows.map(row => decryptByokRow(row));
 }
 
+export async function getBYOKforUser(
+  fromDb: typeof db,
+  userId: string,
+  providerIds: UserByokProviderId[]
+): Promise<BYOKResult[] | null> {
+  return getByokRowsForOwner(fromDb, byok_api_keys.kilo_user_id, userId, providerIds);
+}
+
 export async function getBYOKforOrganization(
   fromDb: typeof db | DrizzleTransaction,
   organizationId: string,
   providerIds: UserByokProviderId[]
 ): Promise<BYOKResult[] | null> {
-  if (providerIds.length === 0) {
-    return null;
-  }
-  const rows = await fromDb
-    .select({
-      encrypted_api_key: byok_api_keys.encrypted_api_key,
-      provider_id: byok_api_keys.provider_id,
-    })
-    .from(byok_api_keys)
-    .where(
-      and(
-        eq(byok_api_keys.organization_id, organizationId),
-        eq(byok_api_keys.is_enabled, true),
-        inArray(byok_api_keys.provider_id, providerIds)
-      )
-    )
-    .orderBy(byok_api_keys.created_at);
-
-  return rows.length === 0 ? null : rows.map(row => decryptByokRow(row));
+  return getByokRowsForOwner(fromDb, byok_api_keys.organization_id, organizationId, providerIds);
 }

@@ -17,7 +17,7 @@
     "view": "Read briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Show live status",
+    "dismiss": "Dismiss briefing",
     "offline": "Offline · saved briefing",
     "cached": "Saved report · refresh unavailable",
     "revised": "Revised · {{revision}}",
@@ -89,6 +89,7 @@
     "error": "error: {{error}}",
     "back": "Back",
     "somethingWentWrong": "Something went wrong",
+    "actionNotRecorded": "We could not record this action. Please try again later.",
     "couldNotOpen": "Could not open {{label}}",
     "link": "link",
     "takingLonger": "This is taking longer than expected. You can close this and check again.",
@@ -99,6 +100,8 @@
     "connectGithub": "Connect GitHub",
     "cost": "Cost",
     "discard": "Discard",
+    "discardChangesMessage": "Your changes will be lost.",
+    "discardChangesTitle": "Discard changes?",
     "findings": "Findings",
     "mergeRequest": "merge request",
     "notConnected": "Not connected",
@@ -174,7 +177,9 @@
     "online": "Online",
     "open": "Open {{name}}",
     "openPullRequest": "Open pull request",
+    "completed": "Completed",
     "pending": "Pending",
+    "running": "Running",
     "performance": "Performance",
     "preferences": "Preferences",
     "privacyPolicy": "Privacy Policy",
@@ -725,7 +730,8 @@
       "description": "Connect your GitHub account to review pull requests on mobile.",
       "gitlabDescription": "Connect your GitLab account to review merge requests on mobile.",
       "bitbucketDescription": "Connect Bitbucket to this organization to review pull requests on mobile.",
-      "bitbucketOrgOnlyDescription": "Select an organization in your profile to review its Bitbucket pull requests."
+      "bitbucketOrgOnlyDescription": "Switch the account above to an organization to review its Bitbucket pull requests.",
+      "contextLine": "For {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -833,7 +839,9 @@
       "reviewNotSubmitted": "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request.",
       "reviewNotSubmittedTerm": "This review can't be submitted as is. The {{term}} may have changed, or you can't review your own {{term}}.",
       "couldNotPostComment": "Could not post comment.",
-      "couldNotSubmitReview": "Could not submit review. Check your connection and try again."
+      "couldNotSubmitReview": "Could not submit review. Check your connection and try again.",
+      "rateLimited": "Too many requests. Please try again later.",
+      "conflict": "This changed while you were working on it. Reload it and try again."
     },
     "operation": {
       "couldNotReply": "Could not reply.",
@@ -841,7 +849,6 @@
       "mergeResultDefaultError": "GitHub did not complete the merge.",
       "mergeResultNotCompleted": "The {{term}} was not merged. Check its state and try again.",
       "ambiguous": "Couldn't confirm — check the PR before retrying.",
-      "persistenceFailed": "We could not record this action. Please try again later.",
       "forbidden": "Forbidden"
     },
     "capabilities": {
@@ -1513,8 +1520,9 @@
       "loading": "Loading review memory",
       "couldNotLoad": "Could not load review memory",
       "off": "Review memory is off",
+      "on": "Review memory is on",
       "offDescription": "Turn it on to let Kilo learn from maintainer replies and propose REVIEW.md guidance.",
-      "readOnlyDescription": "Only organization owners and billing managers can enable review memory.",
+      "readOnlyDescription": "Only organization owners and billing managers can change review memory.",
       "enable": "Enable review memory",
       "loadingProposals": "Loading proposals",
       "couldNotLoadProposals": "Could not load proposals",
@@ -1595,8 +1603,6 @@
     "updateFailed": "Failed to update reviewer",
     "configSaveFailed": "Failed to save review config",
     "status": {
-      "running": "Running",
-      "completed": "Completed",
       "interrupted": "Interrupted"
     },
     "reviewStyle": {
@@ -1609,7 +1615,8 @@
       "bugs": "Bugs",
       "style": "Style",
       "testing": "Testing",
-      "documentation": "Documentation"
+      "documentation": "Documentation",
+      "unknown": "Other ({{area}})"
     },
     "gateThreshold": {
       "warning": "Warning"
@@ -1712,6 +1719,13 @@
       "watchInCloudAgent": "Watch in Cloud Agent",
       "triageConfidence": "Triage confidence",
       "suggestedAction": "Suggested action",
+      "action": {
+        "dismiss": "Dismiss",
+        "analyzeCodebase": "Analyze codebase",
+        "manualReview": "Manual review",
+        "openPr": "Open PR",
+        "monitor": "Monitor"
+      },
       "triageReasoning": "Triage reasoning",
       "exploitable": "Exploitable",
       "notRecorded": "Not recorded",
@@ -1923,14 +1937,35 @@
     "settingsSave": {
       "saveChanges": "Save changes",
       "unsavedTitle": "Unsaved changes",
-      "unsavedMessage": "Save your changes before leaving this screen?"
+      "unsavedMessage": "Save your changes before leaving this screen?",
+      "unsavedInvalidMessage": "These changes can't be saved yet. Fix them to save, or discard them to leave."
     },
     "auditReportButton": {
       "viewA11y": "View audit report"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo Admin",
+      "actorMaskedUser": "Masked user",
+      "actorSystem": "Kilo system",
       "couldNotLoad": "Could not load the audit report",
       "events": "Events",
+      "eventActions": {
+        "findingCreated": "Imported",
+        "findingSeverityChanged": "Severity changed",
+        "findingStatusChange": "Status changed",
+        "findingDismissed": "Dismissed",
+        "findingAutoDismissed": "Auto dismissed",
+        "findingSuperseded": "Superseded",
+        "findingAnalysisCompleted": "Analysis completed",
+        "findingAnalysisFailed": "Analysis failed",
+        "remediationQueued": "Remediation requested",
+        "remediationPrOpened": "PR opened",
+        "remediationFailed": "Remediation failed",
+        "remediationBlocked": "Remediation blocked",
+        "remediationNoChangesNeeded": "No changes needed",
+        "remediationCancelled": "Cancelled",
+        "findingDeleted": "Deleted"
+      },
       "generated": "Generated {{generatedAt}}",
       "noActivity": "No recorded activity",
       "noActivityDescription": "Kilo has no reportable Security Finding activity from {{start}} to {{end}}.",
@@ -1972,7 +2007,6 @@
       "installApp": "Install GitHub App",
       "reauthorizeButton": "Re-authorize GitHub App",
       "reauthorizeDescription": "Security Agent needs permission to read Dependabot alerts. Re-authorize the GitHub App to grant this permission.",
-      "reauthorizeFailed": "Could not start re-authorization. Please try again.",
       "reauthorizeTitle": "Additional permissions required",
       "setupFailed": "Could not start GitHub setup. Please try again."
     },
@@ -1991,7 +2025,12 @@
       "syncMayNotHaveCompleted": "A sync may not have completed. Retry to reconcile it, or discard.",
       "syncInProgress": "A security sync is already in progress. Please try again.",
       "dismissalInProgress": "This dismissal is already in progress. Please try again.",
-      "couldNotReadPendingSyncs": "Could not read pending syncs. Try again."
+      "couldNotReadPendingSyncs": "Could not read pending syncs. Try again.",
+      "ambiguous": "Couldn't confirm — check the security review before retrying.",
+      "settleFailed": "The action completed, but we could not record the result. Please try again.",
+      "replayFailed": "This action did not complete. Please try again.",
+      "actionFailed": "Could not complete this action. Please try again.",
+      "actionBlocked": "Could not complete this action. The problem needs fixing before you can retry."
     },
     "analysisState": {
       "queued": "Analysis queued",
@@ -2276,6 +2315,7 @@
       "prefillModelUnavailable": "{{model}} is no longer available. Using your default model.",
       "couldNotReadPendingSessions": "Could not read pending sessions. Try again.",
       "failedToCreate": "Failed to create session",
+      "checkOrganizationAccess": "Check your access to this organization, then try again.",
       "couldNotRefreshRepositories": "Could not refresh repositories. Please try again.",
       "discardDraftTitle": "Discard draft?",
       "discardDraftMessage": "Your prompt will be lost.",
@@ -2345,7 +2385,8 @@
       "matchesBadge_one": "{{displayCount}} match",
       "matchesBadge": "{{displayCount}} matches",
       "matchesBadge_other": "{{displayCount}} matches",
-      "noOutput": "No output."
+      "noOutput": "No output.",
+      "translationFailed": "Translation failed"
     },
     "readToolMarkdown": {
       "linesTruncated": "lines {{start}}–{{end}} (truncated)",
@@ -2708,7 +2749,7 @@
       "exitSession": "Exit the session",
       "clearSession": "End this session and start a new one",
       "compactDescription": "compact the current session context",
-      "goalDescription": "Keep working toward a session goal. /goal <objective> or pause, resume, clear. A goal may wait on a scheduled wakeup, a cron task, or a background process: the wait suspends the goal until it fires and the goal resumes itself; /goal pause and /goal clear cancel its armed timers. If the objective is to wait for a deploy, build, or CI job, schedule that wait immediately; do not explore the repository first.",
+      "goalDescription": "Keep working toward a session goal. /goal <objective> or pause, resume, clear",
       "initDescription": "guided AGENTS.md setup",
       "resumeClaudeDescription": "import a Claude Code session transcript",
       "resumeCodexDescription": "import an OpenAI Codex session transcript",
@@ -2804,7 +2845,7 @@
     "thisDevice": "This device",
     "viewProfile": "View profile",
     "signOutThisDevice": "Sign out this device",
-    "signOutThisSession": "Sign out this session",
+    "signOutSessionLabel": "Sign out {{device}}, signed in {{signedIn}}",
     "sessionSignedOut": "Session signed out.",
     "signOutThisDeviceTitle": "Sign out this device?",
     "signOutThisSessionTitle": "Sign out this session?",
@@ -3055,12 +3096,17 @@
     "boundary": {
       "accessDeniedDescription": "You do not have access to this organization.",
       "backToProfile": "Back to profile",
+      "chooseAccount": "Choose an account",
       "loadErrorMessage": "Check your connection and try again.",
       "loadErrorTitle": "Couldn't load your organizations",
+      "noOrganization": "No organization",
+      "noOrganizationDescription": "This account is not part of an organization. Create or join one on the web to use organization features like member invites and low-balance alerts.",
+      "openWebOrganizations": "Open organizations on web",
       "organizationUnavailable": "Organization unavailable",
-      "selectDescription": "Choose an organization from your profile to continue.",
+      "selectDescriptionWithOrganizations": "You belong to one or more organizations. Choose the account this screen should use.",
       "selectOrganization": "Select an organization",
-      "unavailableDescription": "This organization is no longer available. Choose one from your profile to continue."
+      "unavailableDescription": "This organization is no longer available. Choose another account from the account picker to continue.",
+      "unavailableSessionsDescription": "This organization is no longer available. Sessions for it cannot be loaded."
     },
     "creditActivity": {
       "emptyDescription": "Purchases, usage, and credit adjustments for this organization will appear here as they happen.",
@@ -3105,13 +3151,17 @@
       }
     },
     "lowBalanceAlert": {
+      "emailsInvalid": "One or more email addresses are not valid.",
+      "emailsRequired": "Enter at least one email address.",
       "enableA11y": "Enable low balance alert",
       "notifyEmailsLabel": "Notify emails",
       "permissionDenied": "You don't have permission to manage billing alerts.",
+      "saveEmailsError": "Some email addresses were not accepted. Check them and try again.",
+      "saveError": "Couldn't save the low balance alert.",
       "separateEmailsHint": "Separate multiple emails with commas.",
       "thresholdLabel": "Alert below (USD)",
+      "thresholdPlaceholder": "Enter an amount",
       "title": "Low balance alert",
-      "emailsError": "Enter at least one valid email, separated by commas",
       "thresholdError": "Enter an amount greater than 0"
     },
     "memberLimit": {
@@ -3122,6 +3172,7 @@
       "removeLimit": "Remove limit",
       "title": "Daily usage limit",
       "blankError": "Enter an amount, or use Remove limit below",
+      "blankWithoutLimitError": "Enter a daily limit between 0 and {{max}}",
       "rangeError": "Enter an amount between 0 and {{max}}"
     },
     "members": {
@@ -3614,9 +3665,15 @@
     "loadFailed": "Couldn't load profiles",
     "counts": {
       "vars": "{{count}} vars",
+      "vars_one": "{{count}} var",
+      "vars_other": "{{count}} vars",
       "mcp": "{{count}} MCP",
       "skills": "{{count}} skills",
+      "skills_one": "{{count}} skill",
+      "skills_other": "{{count}} skills",
       "commands": "{{count}} cmds",
+      "commands_one": "{{count}} cmd",
+      "commands_other": "{{count}} cmds",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}s",
       "commandsShort": "{{count}}c"
@@ -3647,7 +3704,6 @@
     "keyTooLong": "Key must be 256 characters or fewer",
     "keyDuplicate": "This key already exists in the profile",
     "valueLabel": "Value",
-    "secretLabel": "Secret",
     "secrets": {
       "markSecret": "Mark as secret",
       "masked": "Hidden value",
@@ -3706,7 +3762,9 @@
       "jsonTooLarge": "Use at most 50 entries, keys up to 128 and values up to 4096 characters",
       "timeoutInvalid": "Timeout must be a whole number of milliseconds",
       "edit": "Edit MCP server",
-      "saveFailed": "Couldn't save MCP server"
+      "saveFailed": "Couldn't save MCP server",
+      "deleteFailed": "Couldn't delete MCP server",
+      "updateFailed": "Couldn't update MCP server"
     },
     "agents": {
       "title": "Profile agents",
@@ -3733,6 +3791,7 @@
       "visibilitySubagent": "Subagent — only callable from others",
       "visibilityAll": "All — both",
       "saveFailed": "Couldn't save agent",
+      "deleteFailed": "Couldn't delete agent",
       "nameRequired": "Enter an agent name",
       "slugRequired": "Enter an agent slug",
       "slugInvalid": "Slug must start with a letter and use only lowercase letters, digits, and dashes",
@@ -3747,11 +3806,12 @@
       "description": "Command description",
       "template": "Template",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explain $ARGUMENTS",
-      "agentPlaceholder": "e.g. code, architect",
       "subtask": "Run as subtask",
       "edit": "Edit slash command",
       "saveFailed": "Couldn't save command",
+      "deleteFailed": "Couldn't delete command",
       "nameRequired": "Enter a command name",
       "nameInvalid": "Name must start with a lowercase letter and use only lowercase letters, digits, and dashes",
       "templateRequired": "Enter a command template",

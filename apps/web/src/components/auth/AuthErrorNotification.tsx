@@ -146,6 +146,25 @@ export function AuthErrorNotification({
       </div>
     );
 
+  if (error === 'EMAIL-SIGNUP-DISABLED')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Email Sign-up Is Paused">
+          New accounts can&apos;t be created with email right now. Please choose one of the other
+          sign-in options. Already have an account? You can still sign in with email.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === 'EMAIL-INVALID-FORMAT')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Invalid Email">
+          Please enter a valid email address.
+        </ErrorNotificationBox>
+      </div>
+    );
+
   if (error === 'EMAIL-MUST-BE-LOWERCASE')
     return (
       <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">

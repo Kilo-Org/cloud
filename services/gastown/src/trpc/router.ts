@@ -8,7 +8,7 @@
 /* eslint-disable @typescript-eslint/await-thenable -- DO RPC stubs return Rpc.Promisified which is thenable at runtime */
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { router, gastownProcedure, adminProcedure } from './init';
+import { router, gastownProcedure, gastownFlaggedProcedure, adminProcedure } from './init';
 import { getTownDOStub } from '../dos/Town.do';
 import { getTownContainerStub } from '../dos/TownContainer.do';
 import { getGastownUserStub } from '../dos/GastownUser.do';
@@ -343,7 +343,7 @@ async function mintKilocodeToken(env: Env, user: { id: string; api_token_pepper:
 }
 
 export const gastownRouter = router({
-  createTown: gastownProcedure
+  createTown: gastownFlaggedProcedure
     .input(z.object({ name: z.string().min(1).max(64) }))
     .output(RpcTownOutput)
     .mutation(async ({ ctx, input }) => {
@@ -1554,13 +1554,14 @@ export const gastownRouter = router({
       return stub.listTowns();
     }),
 
-  createOrgTown: gastownProcedure
+  createOrgTown: gastownFlaggedProcedure
     .input(z.object({ organizationId: z.string().uuid(), name: z.string().min(1).max(64) }))
     .output(RpcOrgTownOutput)
     .mutation(async ({ input, ctx }) => {
       const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
       if (!membership || membership.role === 'billing_manager')
         throw new TRPCError({ code: 'FORBIDDEN' });
+
       const stub = getGastownOrgStub(ctx.env, input.organizationId);
       const town = await stub.createTown({
         name: input.name,

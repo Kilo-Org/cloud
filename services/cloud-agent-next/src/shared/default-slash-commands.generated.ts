@@ -18,7 +18,7 @@ export type SlashCommandInfo = {
  *
  * Regenerate with `pnpm --filter cloud-agent-next update-default-slash-commands`.
  */
-export const DEFAULT_SLASH_COMMANDS_SOURCE = 'kilo@7.8.1';
+export const DEFAULT_SLASH_COMMANDS_SOURCE = 'kilo@7.8.15';
 
 /**
  * Default slash command catalog used when no live wrapper-reported catalog is
@@ -27,7 +27,8 @@ export const DEFAULT_SLASH_COMMANDS_SOURCE = 'kilo@7.8.1';
 export const DEFAULT_SLASH_COMMANDS = [
   {
     name: 'goal',
-    description: 'Keep working toward a session goal. /goal <objective> or pause, resume, clear',
+    description:
+      'Keep working toward a session goal. /goal <objective> or pause, resume, clear. A goal may wait on a scheduled wakeup, a cron task, or a background process: the wait suspends the goal until it fires and the goal resumes itself; /goal pause and /goal clear cancel its armed timers. If the objective is to wait for a deploy, build, or CI job, schedule that wait immediately; do not explore the repository first.',
     source: 'command',
     hints: ['$ARGUMENTS'],
   },

@@ -14,12 +14,6 @@ type PreferenceRowProps = Readonly<{
   disabled: boolean;
   busy?: boolean;
   onValueChange: (next: boolean) => void;
-  /**
-   * Accessibility label for the switch. Defaults to the row title; pass an
-   * action label when the title names the setting and the action differs
-   * (e.g. "Default profile" row whose switch says "Remove as default").
-   */
-  switchAccessibilityLabel?: string;
 }>;
 
 /** Switch row shaped like the Notifications category row. */
@@ -31,18 +25,10 @@ export function PreferenceRow({
   disabled,
   busy = false,
   onValueChange,
-  switchAccessibilityLabel,
 }: PreferenceRowProps) {
   const colors = useThemeColors();
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      {/* One named control per row. The native Switch is the single accessible
-          switch: it carries the label, role, and state, and its own
-          onValueChange drives the value, so a tap on the thumb works for both
-          AssistTech and touch. The title Pressable toggles for pointer taps
-          but is not itself a switch node: with the label moved onto the
-          Switch, a second switch-role node would double-announce the row.
-          The row keeps one behavior regardless of where it is tapped. */}
       <Pressable
         className="min-h-11 min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70"
         disabled={disabled}
@@ -50,7 +36,7 @@ export function PreferenceRow({
           onValueChange(!value);
         }}
         accessible={false}
-        importantForAccessibility="no"
+        importantForAccessibility="no-hide-descendants"
       >
         {busy ? (
           <ActivityIndicator size="small" color={colors.mutedForeground} />
@@ -80,8 +66,7 @@ export function PreferenceRow({
       <Switch
         value={value}
         disabled={disabled}
-        accessibilityRole="switch"
-        accessibilityLabel={switchAccessibilityLabel ?? title}
+        accessibilityLabel={title}
         accessibilityHint={subtitle}
         accessibilityState={{ disabled, busy, checked: value }}
         onValueChange={onValueChange}

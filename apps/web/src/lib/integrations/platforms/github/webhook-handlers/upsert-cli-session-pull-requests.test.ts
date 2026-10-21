@@ -1246,37 +1246,83 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
     });
 
-    it.each([
-      ['stored head ref', { pr_head_ref: 'feature/other-branch' }],
-      ['session branch', { git_branch: 'feature/other-branch' }],
-    ])(
-      'does not verify a matching head SHA when the %s names another branch',
-      async (_label, contradiction) => {
-        const branch = 'feature/contradicting-ref';
-        const headSha = 'sha-711';
-        // The head SHA matches, but refresh would reject this link because a
-        // stored ref names another branch, so the webhook must not verify it.
-        const sessionId = await seedSession({
-          branch,
-          owner: testOwner,
-          prNumber: 711,
-          prHeadSha: headSha,
-        });
-        await db
-          .update(cli_sessions_v2)
-          .set(contradiction)
-          .where(eq(cli_sessions_v2.session_id, sessionId));
+    it('does not verify a matching head SHA when the stored head ref names another branch', async () => {
+      const branch = 'feature/contradicting-ref';
+      const headSha = 'sha-711';
+      // The head SHA matches, but the head ref the session reported names
+      // another branch, so refresh would reject this link and the webhook must
+      // not verify it either.
+      const sessionId = await seedSession({
+        branch,
+        owner: testOwner,
+        prNumber: 711,
+        prHeadSha: headSha,
+      });
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_head_ref: 'feature/other-branch' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
 
-        const written = await upsertCliSessionPullRequestsFromWebhook(
-          makePayload({ action: 'opened', prNumber: 711, state: 'open', headRef: branch, headSha }),
-          testOwner
-        );
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'opened', prNumber: 711, state: 'open', headRef: branch, headSha }),
+        testOwner
+      );
 
-        expect(written).toBe(0);
-        expect(await sessionVerifiedAt(sessionId)).toBeNull();
-        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
-      }
-    );
+      expect(written).toBe(0);
+      expect(await sessionVerifiedAt(sessionId)).toBeNull();
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('verifies when the reported head ref names the payload head ref and the stored branch differs', async () => {
+      // The session recorded another branch but pushed the PR from the payload
+      // head ref, which is exactly what refresh accepts.
+      const branch = 'feature/reported-ref';
+      const headSha = 'sha-reported-ref';
+      const sessionId = await seedSession({
+        branch: 'feature/recorded-branch',
+        owner: testOwner,
+        prNumber: 712,
+        prHeadSha: headSha,
+        prHeadRef: branch,
+      });
+
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'opened', prNumber: 712, state: 'open', headRef: branch, headSha }),
+        testOwner
+      );
+
+      expect(written).toBe(1);
+      expect(await sessionVerifiedAt(sessionId)).not.toBeNull();
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('does not verify a link without a reported head ref when the stored branch differs', async () => {
+      // With no stored head ref, the branch evidence is the stored branch, and
+      // a matching head SHA does not excuse it, exactly as refresh decides.
+      const headSha = 'sha-713';
+      const sessionId = await seedSession({
+        branch: 'feature/other-branch',
+        owner: testOwner,
+        prNumber: 713,
+        prHeadRef: null,
+        prHeadSha: headSha,
+      });
+
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({
+          action: 'opened',
+          prNumber: 713,
+          state: 'open',
+          headRef: 'feature/payload',
+          headSha,
+        }),
+        testOwner
+      );
+
+      expect(written).toBe(0);
+      expect(await sessionVerifiedAt(sessionId)).toBeNull();
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
 
     it('verifies a session on a platform outside the old review-decision set', async () => {
       const branch = 'feature/platform-agnostic-gate';

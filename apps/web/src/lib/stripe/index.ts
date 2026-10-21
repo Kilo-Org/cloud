@@ -313,6 +313,37 @@ async function bouncerCardFingerprintForChargeId(chargeId: string): Promise<stri
   }
 }
 
+/** The card fingerprint of a payment method, or null when it cannot be read. */
+async function bouncerCardFingerprintForPaymentMethodId(
+  paymentMethodId: string
+): Promise<string | null> {
+  try {
+    const paymentMethod = await client.paymentMethods.retrieve(paymentMethodId);
+    return paymentMethod.card?.fingerprint ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decline codes that mean the customer did not finish authentication. A retried 3DS challenge is
+ * not a declined card, and counting it would reach bouncer's `card_testing` threshold of three
+ * failures per payer in an hour and block a paying customer once that reason is enforced.
+ */
+const AUTHENTICATION_FAILURE_CODES: Record<string, true> = {
+  authentication_required: true,
+  payment_intent_authentication_failure: true,
+};
+
+/** True when a failed payment intent records an authentication failure rather than a decline. */
+function isAuthenticationFailure(paymentIntent: Stripe.PaymentIntent): boolean {
+  const error = paymentIntent.last_payment_error;
+  return (
+    AUTHENTICATION_FAILURE_CODES[error?.code ?? ''] === true ||
+    AUTHENTICATION_FAILURE_CODES[error?.decline_code ?? ''] === true
+  );
+}
+
 /**
  * Reports one declined charge attempt to bouncer as `charge.failed`.
  *
@@ -321,6 +352,11 @@ async function bouncerCardFingerprintForChargeId(chargeId: string): Promise<stri
  * so the event id is derived from that charge and a second event for the same attempt counts once.
  * An attempt with no charge keeps its payment intent id. An attempt with neither id is skipped
  * with a visible log, so an enqueue is never keyed on an empty string.
+ *
+ * `cardFingerprint` is what the event itself carries. `fingerprintSource` names where to read a
+ * fingerprint the event lacks; a `charge.failed` payload is the charge, so a second read of it
+ * returns the same answer and it passes none. Without a fingerprint bouncer cannot count the card
+ * ledger and files a `missing_card` review instead.
  */
 async function reportDeclinedCharge(params: {
   owner: Parameters<typeof resolveBouncerCreditOwner>[0];
@@ -328,6 +364,10 @@ async function reportDeclinedCharge(params: {
   paymentIntentId: string | null | undefined;
   occurredAt: Date;
   cardFingerprint: string | null;
+  fingerprintSource?: {
+    chargeId: string | null | undefined;
+    paymentMethodId: string | null | undefined;
+  };
 }): Promise<void> {
   const chargeId = params.chargeId ?? null;
   const eventId = chargeId
@@ -339,16 +379,19 @@ async function reportDeclinedCharge(params: {
     warnExceptInTest('Bouncer declined charge has no charge or payment intent id; skipping');
     return;
   }
-  await reportWebhookCreditEvent(
-    params.owner,
-    {
-      type: 'charge.failed',
-      eventId,
-      occurredAt: params.occurredAt,
-      cardFingerprint: params.cardFingerprint,
-    },
-    params.cardFingerprint ? null : chargeId
-  );
+  const lookupChargeId = params.fingerprintSource?.chargeId ?? null;
+  const cardFingerprint =
+    params.cardFingerprint ??
+    (lookupChargeId ? await bouncerCardFingerprintForChargeId(lookupChargeId) : null) ??
+    (params.fingerprintSource?.paymentMethodId
+      ? await bouncerCardFingerprintForPaymentMethodId(params.fingerprintSource.paymentMethodId)
+      : null);
+  await reportWebhookCreditEvent(params.owner, {
+    type: 'charge.failed',
+    eventId,
+    occurredAt: params.occurredAt,
+    cardFingerprint,
+  });
 }
 
 /**
@@ -1897,6 +1940,9 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
     // bouncer's `card_testing` rule fed; without it the rule never sees a failure.
     case 'payment_intent.payment_failed': {
       const paymentIntent = event.data.object;
+      if (isAuthenticationFailure(paymentIntent)) {
+        break;
+      }
       await reportDeclinedCharge({
         owner: {
           kiloUserId: paymentIntent.metadata?.kiloUserId,
@@ -1907,6 +1953,10 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         paymentIntentId: paymentIntent.id,
         occurredAt: new Date(event.created * 1000),
         cardFingerprint: null,
+        fingerprintSource: {
+          chargeId: stripeReferenceId(paymentIntent.latest_charge),
+          paymentMethodId: stripeReferenceId(paymentIntent.payment_method),
+        },
       });
       break;
     }

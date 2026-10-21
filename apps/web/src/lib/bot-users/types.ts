@@ -1,11 +1,4 @@
-export type BotType =
-  | 'code-review'
-  | 'security-scan'
-  | 'auto-triage'
-  | 'auto-fix'
-  | 'slack-bot'
-  | 'discord-bot'
-  | 'webhook-bot';
+export type BotType = 'code-review' | 'security-scan' | 'slack-bot' | 'discord-bot' | 'webhook-bot';
 
 /**
  * Bot user naming patterns
@@ -20,16 +13,6 @@ const BOT_USER_PATTERNS = {
     idPrefix: 'bot-security-scan',
     emailSuffix: 'security-scan-bot',
     displayName: 'Security Scan Bot',
-  },
-  'auto-triage': {
-    idPrefix: 'bot-auto-triage',
-    emailSuffix: 'auto-triage-bot',
-    displayName: 'Auto Triage Bot',
-  },
-  'auto-fix': {
-    idPrefix: 'bot-auto-fix',
-    emailSuffix: 'auto-fix-bot',
-    displayName: 'Auto Fix Bot',
   },
   'slack-bot': {
     idPrefix: 'bot-slack',
@@ -60,4 +43,17 @@ export function generateBotUserEmail(organizationId: string, botType: BotType): 
 
 export function getBotDisplayName(botType: BotType): string {
   return BOT_USER_PATTERNS[botType].displayName;
+}
+
+/** Internal bots are platform-owned workload users, not per-org product bots. */
+export const INTERNAL_BOT_USER_ID_PREFIX = 'bot-internal-';
+const INTERNAL_BOT_EMAIL_DOMAIN = 'kilocode.internal';
+export const INTERNAL_BOT_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,40}$/;
+
+export function internalBotUserId(slug: string): string {
+  return `${INTERNAL_BOT_USER_ID_PREFIX}${slug}`;
+}
+
+export function internalBotUserEmail(slug: string): string {
+  return `${slug}-internal-bot@${INTERNAL_BOT_EMAIL_DOMAIN}`;
 }

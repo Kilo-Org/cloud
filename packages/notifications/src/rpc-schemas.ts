@@ -36,6 +36,8 @@ export const perRecipientOutcomeSchema = z.enum([
   'suppressed_presence',
   'suppressed_preference',
   'no_tokens',
+  'suppressed_expired',
+  'suppressed_access',
   'duplicate',
   'failed',
 ]);
@@ -159,7 +161,7 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   // Needs-input raise detail: which answer the waiting agent wants, and the PR
   // that can be opened from the notification. Absent on status pushes.
   attentionKind: z.enum(['question', 'permission']).optional(),
-  prUrl: z.string().optional(),
+  prUrl: z.string().min(1).optional(),
   // Old producers omit these; remove the optionals when every producer sends keys.
   i18nKey: z.string().min(1).optional(),
   i18nParams: z.record(z.string(), z.string()).optional(),
@@ -274,10 +276,16 @@ export type SendAgentSessionNotificationResult = z.infer<
 
 // ── dispatchPush (internal DO RPC) ──────────────────────────────────
 
+export const agentBriefingDispatchWindowSchema = z.object({
+  localDate: z.string().date(),
+  expiresAt: z.string().datetime(),
+});
+
 export const dispatchPushInputSchema = z.object({
   userId: z.string().min(1),
   presenceContext: z.string().min(1).nullable(),
   idempotencyKey: z.string().min(1),
+  agentBriefing: agentBriefingDispatchWindowSchema.optional(),
   badge: z
     .object({
       badgeBucket: z.string().min(1),
@@ -312,6 +320,9 @@ export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('delivered'), tokenCount: z.number().int().nonnegative() }),
   z.object({ kind: z.literal('suppressed_presence') }),
   z.object({ kind: z.literal('suppressed_rate_limit') }),
+  z.object({ kind: z.literal('suppressed_preference') }),
+  z.object({ kind: z.literal('suppressed_expired') }),
+  z.object({ kind: z.literal('suppressed_access') }),
   z.object({ kind: z.literal('no_tokens') }),
   z.object({ kind: z.literal('duplicate') }),
   z.object({ kind: z.literal('failed'), error: z.string() }),
@@ -334,22 +345,42 @@ export type InternalDispatchLowBalanceRequest = z.infer<
 /**
  * Spend-alert dispatch. `organizationId` is present only for an
  * `organization` scope; a `personal` scope carries the user's own spend and
- * nothing else. `dedupeKey` is the outbox row's identity, which carries the
- * firing episode: it joins the idempotency key alongside the alert kind and
- * threshold, so a condition that clears and crosses again inside the channel's
- * idempotency window is a new alert rather than a collapsed duplicate.
+ * nothing else. The dispatcher builds the push destination from these two
+ * fields, so a scope and an id that disagree would route the tap to the wrong
+ * spend view; the refinement refuses that before a push exists. `dedupeKey` is
+ * the outbox row's identity, which carries the firing episode: it joins the
+ * idempotency key alongside the alert kind and threshold, so a condition that
+ * clears and crosses again inside the channel's idempotency window is a new
+ * alert rather than a collapsed duplicate.
  */
-export const internalDispatchSpendAlertRequestSchema = z.object({
-  kind: z.literal('spend_alert'),
-  recipientUserIds: z.array(z.string().min(1)).min(1),
-  scope: z.enum(['personal', 'organization']),
-  organizationId: z.string().min(1).optional(),
-  alertKind: z.enum(['threshold', 'anomaly']),
-  scopeName: z.string().min(1),
-  amountUsd: z.number().nonnegative(),
-  thresholdUsd: z.number().nonnegative(),
-  dedupeKey: z.string().min(1),
-});
+export const internalDispatchSpendAlertRequestSchema = z
+  .object({
+    kind: z.literal('spend_alert'),
+    recipientUserIds: z.array(z.string().min(1)).min(1),
+    scope: z.enum(['personal', 'organization']),
+    organizationId: z.string().min(1).optional(),
+    alertKind: z.enum(['threshold', 'anomaly']),
+    scopeName: z.string().min(1),
+    amountUsd: z.number().nonnegative(),
+    thresholdUsd: z.number().nonnegative(),
+    dedupeKey: z.string().min(1),
+  })
+  .superRefine((data, ctx) => {
+    if (data.scope === 'organization' && data.organizationId === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['organizationId'],
+        message: 'an organization-scope alert names its organization',
+      });
+    }
+    if (data.scope === 'personal' && data.organizationId !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['organizationId'],
+        message: 'a personal-scope alert carries no organization id',
+      });
+    }
+  });
 export type InternalDispatchSpendAlertRequest = z.infer<
   typeof internalDispatchSpendAlertRequestSchema
 >;
@@ -399,10 +430,19 @@ export type InternalDispatchSecurityLifecycleRequest = z.infer<
   typeof internalDispatchSecurityLifecycleRequestSchema
 >;
 
+export const internalDispatchAgentBriefingRequestSchema = agentBriefingDispatchWindowSchema.extend({
+  kind: z.literal('agent_briefing'),
+  userId: z.string().min(1),
+});
+export type InternalDispatchAgentBriefingRequest = z.infer<
+  typeof internalDispatchAgentBriefingRequestSchema
+>;
+
 export const internalDispatchRequestSchema = z.discriminatedUnion('kind', [
   internalDispatchLowBalanceRequestSchema,
   internalDispatchSpendAlertRequestSchema,
   internalDispatchSecurityFindingRequestSchema,
   internalDispatchSecurityLifecycleRequestSchema,
+  internalDispatchAgentBriefingRequestSchema,
 ]);
 export type InternalDispatchRequest = z.infer<typeof internalDispatchRequestSchema>;

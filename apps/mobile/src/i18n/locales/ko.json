@@ -35,6 +35,8 @@
     "connectGithub": "GitHub 연결",
     "cost": "비용",
     "discard": "버리기",
+    "discardChangesMessage": "변경사항이 사라집니다.",
+    "discardChangesTitle": "변경사항을 버리시겠습니까?",
     "findings": "진단 결과",
     "mergeRequest": "머지 요청",
     "notConnected": "연결 안 됨",
@@ -109,7 +111,9 @@
     "online": "온라인",
     "open": "{{name}} 열기",
     "openPullRequest": "풀 리퀘스트 오픈",
+    "completed": "완료",
     "pending": "대기 중",
+    "running": "실행 중",
     "performance": "성능",
     "preferences": "환경설정",
     "privacyPolicy": "개인정보 처리방침",
@@ -943,6 +947,9 @@
       "gateHidden": "숨김",
       "gateNone": "없음",
       "noFindings": "발견된 문제가 없습니다.",
+      "findingsUnavailable": "이 리뷰가 실패하여 결과를 확인할 수 없습니다.",
+      "serviceUnavailable": "코드 리뷰 서비스에 연결할 수 없습니다. 서비스를 사용할 수 있게 되면 리뷰를 다시 시도해 주세요.",
+      "reviewFailed": "리뷰에 실패했습니다. 다시 시도해 주세요.",
       "retryMessage": "코드 리뷰가 다시 실행됩니다.",
       "retryReview": "리뷰 다시 시도",
       "retryNeedsSettings": "코드 리뷰어가 꺼져 있거나 설정을 확인해야 합니다. 설정을 수정한 다음 이 리뷰를 다시 시도하세요.",
@@ -1016,8 +1023,6 @@
     "updateFailed": "리뷰어를 업데이트하지 못했습니다.",
     "configSaveFailed": "리뷰 설정을 저장하지 못했습니다.",
     "status": {
-      "running": "실행 중",
-      "completed": "완료",
       "interrupted": "중단됨"
     },
     "reviewStyle": {
@@ -1030,7 +1035,8 @@
       "bugs": "버그",
       "style": "스타일",
       "testing": "테스트",
-      "documentation": "문서화"
+      "documentation": "문서화",
+      "unknown": "기타 ({{area}})"
     },
     "gateThreshold": {
       "warning": "경고"
@@ -1109,7 +1115,14 @@
       "triageReasoning": "분류 근거",
       "watchInCloudAgent": "클라우드 에이전트에서 보기",
       "whereFound": "발견 위치({{displayCount}})",
-      "yes": "예"
+      "yes": "예",
+      "action": {
+        "analyzeCodebase": "코드베이스 분석",
+        "dismiss": "기각",
+        "manualReview": "수동 검토",
+        "monitor": "모니터링",
+        "openPr": "풀 리퀘스트 열기"
+      }
     },
     "analysisSettings": {
       "analysisModel": "분석 모델",
@@ -1131,7 +1144,24 @@
       "summary": "보고서 요약",
       "title": "감사 보고서",
       "unavailable": "감사 보고서 열람 불가",
-      "unavailableDescription": "조직 소유자와 결제 관리자만 감사 보고서를 볼 수 있습니다. 소유자나 결제 관리자에게 접근 권한을 요청하세요."
+      "unavailableDescription": "조직 소유자와 결제 관리자만 감사 보고서를 볼 수 있습니다. 소유자나 결제 관리자에게 접근 권한을 요청하세요.",
+      "eventActions": {
+        "findingAnalysisCompleted": "분석 완료됨",
+        "findingAnalysisFailed": "분석 실패함",
+        "findingAutoDismissed": "자동 기각됨",
+        "findingCreated": "가져옴",
+        "findingDeleted": "삭제됨",
+        "findingDismissed": "기각됨",
+        "findingSeverityChanged": "심각도 변경됨",
+        "findingStatusChange": "상태 변경됨",
+        "findingSuperseded": "대체됨",
+        "remediationBlocked": "수정 차단됨",
+        "remediationCancelled": "취소됨",
+        "remediationFailed": "수정 실패함",
+        "remediationNoChangesNeeded": "변경 필요 없음",
+        "remediationPrOpened": "풀 리퀘스트 열림",
+        "remediationQueued": "수정 요청됨"
+      }
     },
     "auditReportButton": {
       "viewA11y": "감사 보고서 보기"
@@ -1351,7 +1381,6 @@
       "installApp": "GitHub 앱 설치",
       "reauthorizeButton": "GitHub 앱 재승인",
       "reauthorizeDescription": "보안 에이전트가 Dependabot 알림에 접근하려면 vulnerability_alerts 권한이 필요합니다. 이 권한을 부여하려면 GitHub 앱을 다시 승인하세요.",
-      "reauthorizeFailed": "재승인을 시작할 수 없습니다. 다시 시도하세요.",
       "reauthorizeTitle": "추가 권한 필요",
       "setupFailed": "GitHub 설정을 시작할 수 없습니다. 다시 시도하세요."
     },
@@ -1374,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "변경 사항 저장",
       "unsavedMessage": "이 화면을 떠나기 전에 변경 사항을 저장할까요?",
+      "unsavedInvalidMessage": "이 변경 사항은 아직 저장할 수 없습니다. 저장하려면 수정하고, 떠나려면 버리세요.",
       "unsavedTitle": "저장되지 않은 변경 사항"
     },
     "setup": {
@@ -1697,6 +1727,7 @@
       "prefillModelUnavailable": "더 이상 {{model}} 모델을 사용할 수 없습니다. 기본 모델을 사용합니다.",
       "couldNotReadPendingSessions": "대기 중인 세션을 불러올 수 없습니다. 다시 시도하세요.",
       "failedToCreate": "세션을 만들지 못했습니다.",
+      "checkOrganizationAccess": "이 조직에 대한 액세스 권한을 확인한 다음 다시 시도하세요.",
       "couldNotRefreshRepositories": "저장소를 새로고침하지 못했습니다. 다시 시도하세요.",
       "discardDraftTitle": "초안을 삭제할까요?",
       "discardDraftMessage": "프롬프트가 사라집니다.",
@@ -1766,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}}줄",
       "matchesBadge_one": "{{displayCount}}건 일치",
       "matchesBadge_other": "{{displayCount}}건 일치",
-      "noOutput": "출력이 없습니다."
+      "noOutput": "출력이 없습니다.",
+      "translationFailed": "번역 실패"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}줄 (일부 생략)",
@@ -2217,6 +2249,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "정보를 불러올 때까지 로그인 중인 세션을 확인할 수 없습니다.",
     "currentDeviceUnidentified": "현재 기기를 식별할 수 없습니다.",
+    "kiloApp": "Kilo 앱",
     "noSessions": "로그인 중인 세션 없음",
     "noSessionsDescription": "다른 기기에서 Kilo 앱으로 로그인하면 여기에 표시됩니다.",
     "onlyKiloAppSignIns": "Kilo 앱의 로그인 내역만 여기에 표시됩니다. 에디터 및 CLI의 로그인 내역은 표시되지 않습니다.",
@@ -2369,6 +2402,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "시작하기 전에",
+    "summaryTitle": "데이터 공유 환경설정",
     "introDescription": "Kilo는 응답을 생성하기 위해 메시지를 AI 제공업체에 보냅니다. 공유하는 데이터와 공유 대상을 확인하세요.",
     "required": "Kilo 사용에 필요한 필수 항목",
     "promptsTitle": "프롬프트와 대화",
@@ -2377,7 +2411,6 @@
     "accountDescription": "인증 및 사용량 측정에 사용되는 Kilo 계정 ID와 요청 메타데이터입니다.",
     "diagnosticsTitle": "앱 진단",
     "diagnosticsDescription": "앱 안정성을 유지하기 위한 비정상 종료 및 오류 보고서입니다. 앱 콘텐츠는 제외됩니다.",
-    "optional": "선택 사항",
     "helpImprove": "Kilo 개선 돕기",
     "helpImproveDescription": "익명 사용 분석 데이터와 설치 경로를 공유합니다. 설정에서 언제든지 변경할 수 있습니다.",
     "seeFullDetails": "자세히 보기",
@@ -2502,7 +2535,8 @@
       "description": "모바일에서 풀 리퀘스트를 리뷰하려면 GitHub 계정을 연결하세요.",
       "gitlabDescription": "모바일에서 머지 요청을 검토하려면 GitLab 계정을 연결하세요.",
       "bitbucketDescription": "모바일에서 풀 리퀘스트를 검토하려면 이 조직을 Bitbucket에 연결하세요.",
-      "bitbucketOrgOnlyDescription": "프로필에서 조직을 선택하면 해당 조직의 Bitbucket 풀 리퀘스트를 검토할 수 있습니다."
+      "bitbucketOrgOnlyDescription": "Bitbucket 풀 리퀘스트를 검토하려면 위의 계정을 조직으로 전환하세요.",
+      "contextLine": "{{organization}}용"
     },
     "connectionExpired": "GitHub 연결이 만료되었습니다.",
     "couldNotLoadPullRequest": "풀 리퀘스트를 불러오지 못했습니다.",
@@ -2929,7 +2963,9 @@
       "reviewNotSubmitted": "이 리뷰는 현재 상태로 제출할 수 없습니다. PR이 변경되었거나 본인이 작성한 풀 리퀘스트여서 리뷰할 수 없는 경우일 수 있습니다.",
       "reviewNotSubmittedTerm": "이 리뷰는 그대로 제출할 수 없습니다. {{term}}이(가) 변경되었거나, 자신의 {{term}}은(는) 검토할 수 없습니다.",
       "couldNotPostComment": "댓글을 게시하지 못했습니다.",
-      "couldNotSubmitReview": "리뷰를 제출하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요."
+      "couldNotSubmitReview": "리뷰를 제출하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+      "rateLimited": "요청이 너무 많습니다. 나중에 다시 시도하세요.",
+      "conflict": "작업하는 동안 이 항목이 변경되었습니다. 다시 불러온 후 다시 시도하세요."
     },
     "operation": {
       "couldNotReply": "답글을 달 수 없습니다.",
@@ -2966,11 +3002,22 @@
     "boundary": {
       "backToProfile": "프로필로 돌아가기",
       "loadErrorMessage": "인터넷 연결을 확인하고 다시 시도하세요.",
+
+      "chooseAccount": "계정 선택",
       "loadErrorTitle": "조직 목록을 불러올 수 없습니다.",
+      "noOrganization": "조직 없음",
+
+      "noOrganizationDescription": "이 계정은 조직에 속해 있지 않습니다. 멤버 초대 및 잔액 부족 알림과 같은 조직 기능을 사용하려면 웹에서 조직을 만들거나 참여하세요.",
+
+      "openWebOrganizations": "웹에서 조직 열기",
+
       "organizationUnavailable": "조직을 사용할 수 없습니다.",
-      "selectDescription": "계속하려면 프로필에서 조직을 선택하세요.",
+      "selectDescriptionWithOrganizations": "귀하는 하나 이상의 조직에 속해 있습니다. 이 화면에서 사용할 계정을 선택하세요.",
+
       "selectOrganization": "조직 선택",
       "unavailableDescription": "이 조직은 더 이상 사용할 수 없습니다. 계속하려면 프로필에서 다른 조직을 선택하세요.",
+
+      "unavailableSessionsDescription": "이 조직은 더 이상 사용할 수 없습니다. 세션을 불러올 수 없습니다.",
       "accessDeniedDescription": "이 조직에 접근할 권한이 없습니다."
     },
     "creditActivity": {
@@ -3468,6 +3515,9 @@
     "localModels": {
       "title": "기기 내 모델",
       "help": "기기 내 모델은 이 휴대폰에서 실행됩니다. 프롬프트와 답변은 기기에만 저장됩니다.",
+      "switchTitle": "기기 내 모델로 전환할까요?",
+      "switchMessage": "{{name}}(으)로 전환하면 이 대화의 프롬프트와 컨텍스트가 원격 서버가 아닌 이 휴대폰에서 처리됩니다.",
+      "switchConfirm": "모델 전환",
       "systemPurpose": "이 기기의 시스템에 내장된 모델입니다. 기기에서 실행됩니다.",
       "apple": "Apple Intelligence(기기 내)",
       "checking": "사용 가능 여부 확인 중…",
@@ -3564,7 +3614,6 @@
     "personalDefaultDescription": "고정된 프로필이 있는 저장소가 없으면 자동으로 로드됩니다.",
     "organizationDefaultDescription": "개인 불이행이 없는 회원을 위해 자동으로 로드됩니다.",
     "setAsDefault": "기본값으로 설정",
-    "removeDefault": "기본값으로 제거",
     "saveFailed": "프로필을 저장할 수 없습니다.",
     "deleteTitle": "프로필 삭제",
     "deleteMessage": "이렇게 하면 프로필과 해당 설정이 영구적으로 제거됩니다. 이 작업은 취소할 수 없습니다.",
@@ -3590,11 +3639,13 @@
     "commandsTitle": "설정 명령",
     "addCommand": "명령 추가",
     "commandLabel": "명령",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "예: pnpm install",
     "commandsEmpty": "아직 설정 명령이 없습니다.",
     "commandsSaveFailed": "설정 명령을 저장할 수 없습니다.",
     "moveUp": "위로 이동",
     "moveDown": "아래로 이동",
+    "moveCommandUp": "명령 {{position}}을(를) 위로 이동",
+    "moveCommandDown": "명령 {{position}}을(를) 아래로 이동",
     "skillsTitle": "기술",
     "addSkill": "스킬 추가",
     "skillNameLabel": "스킬명",
@@ -3612,7 +3663,7 @@
       "empty": "아직 MCP 서버가 없습니다.",
       "name": "서버 이름",
       "type": "서버 유형",
-      "localType": "현지의",
+      "localType": "로컬",
       "remoteType": "원격",
       "command": "명령줄",
       "url": "URL",
@@ -3634,7 +3685,9 @@
       "jsonTooLarge": "최대 50개의 항목(키는 128자, 값은 4096자까지)을 사용하세요.",
       "timeoutInvalid": "제한시간은 정수 밀리초여야 합니다.",
       "edit": "MCP 서버 편집",
-      "saveFailed": "MCP 서버를 저장할 수 없습니다."
+      "saveFailed": "MCP 서버를 저장할 수 없습니다.",
+      "deleteFailed": "MCP 서버를 삭제할 수 없습니다.",
+      "updateFailed": "MCP 서버를 업데이트할 수 없습니다."
     },
     "agents": {
       "title": "프로필 에이전트",
@@ -3661,10 +3714,11 @@
       "visibilitySubagent": "하위 에이전트 — 다른 사람에게서만 호출 가능",
       "visibilityAll": "모두 — 둘 다",
       "saveFailed": "에이전트를 저장할 수 없습니다.",
+      "deleteFailed": "에이전트를 삭제할 수 없습니다.",
       "nameRequired": "상담사 이름을 입력하세요.",
       "slugRequired": "에이전트 슬러그를 입력하세요",
       "slugInvalid": "슬러그는 문자로 시작해야 하며 소문자, 숫자, 대시만 사용해야 합니다.",
-      "slugConflict": "해당 슬러그는 내장 에이전트에 의해 예약되어 있습니다.",
+      "slugConflict": "해당 슬러그는 내장 에이전트 또는 이 프로필의 다른 에이전트가 이미 사용 중입니다",
       "edit": "에이전트 편집"
     },
     "slashCommands": {
@@ -3675,10 +3729,12 @@
       "description": "명령 설명",
       "template": "주형",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS 설명",
       "subtask": "하위 작업으로 실행",
       "edit": "슬래시 명령 편집",
       "saveFailed": "명령을 저장할 수 없습니다",
+      "deleteFailed": "명령을 삭제할 수 없습니다",
       "nameRequired": "명령 이름을 입력하세요.",
       "nameInvalid": "이름은 소문자로 시작해야 하며 소문자, 숫자, 대시만 사용할 수 있습니다.",
       "templateRequired": "명령 템플릿을 입력하세요.",
@@ -3806,5 +3862,69 @@
       "title": "목록에 저장",
       "saved": "{{list}}에 저장됨"
     }
+  },
+  "agentBriefing": {
+    "title": "아침 브리핑",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "일부 과거 활동이 누락되었을 수 있습니다. ≥는 최소값을 의미하며, 알 수 없음은 0이 아닙니다.",
+    "available": "사용 가능한 브리핑",
+    "history": "브리핑 기록",
+    "historyHint": "닫은 보고서를 포함해 보고서는 30일간 보관됩니다.",
+    "settings": "브리핑 설정",
+    "empty": "야간 활동 없음",
+    "emptyHint": "활동이 있었던 밤이 지나면 클라우드 및 CLI 코딩 세션이 여기에 표시됩니다.",
+    "loadError": "브리핑을 불러올 수 없습니다",
+    "sessions": "야간 활동",
+    "pullRequests": "생성된 PRs",
+    "blockers": "새 차단 요소",
+    "spend": "야간 지출",
+    "view": "브리핑 읽기",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "브리핑 무시",
+    "offline": "오프라인 · 저장된 브리핑",
+    "cached": "저장된 보고서 · 새로고침 불가",
+    "revised": "수정됨 · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "AI 요약",
+    "summaryDisabled": "구조화된 보고서 · 이 컨텍스트에서 AI가 꺼져 있음",
+    "summaryPending": "AI 요약을 생성 중입니다. 준비되면 여기에 첨부됩니다.",
+    "summaryFailed": "AI 요약에 실패했습니다. 다시 시도하면 추가 요금이 부과될 수 있습니다.",
+    "summaryUnavailable": "AI 요약을 사용할 수 없습니다. 구조화된 보고서는 계속 확인할 수 있습니다.",
+    "summaryOutdated": "이 요약은 최신 보고서 수정 이전에 작성되었습니다.",
+    "summaryCharge": "AI 요금 {{cost}}",
+    "summaryChargePending": "AI 요금 정산 대기 중",
+    "generate": "요약 생성",
+    "retrySummary": "유료 요약 다시 시도",
+    "sources": "근거 및 아티팩트",
+    "timezone": "브리핑 시간대",
+    "deviceTimezone": "기기 시간대 사용",
+    "timezoneHint": "IANA 시간대(예: Europe/Berlin). 일정 변경은 다음 밤부터 적용됩니다.",
+    "nightStart": "밤 시작",
+    "morningStart": "밤 종료 / 아침 시작",
+    "morningEnd": "아침 종료",
+    "timeHint": "아침이 끝나면 오프라인 상태에서도 홈 카드가 실시간 상태로 돌아갑니다.",
+    "invalidSchedule": "유효한 시간대를 선택하고, 겹치지 않으며 비어 있지 않은 밤과 아침 시간을 설정하세요.",
+    "notificationsHint": "첫 보고서가 준비되면 아침마다 일반 알림을 한 번 보냅니다. 유료 AI 요약과는 별개입니다.",
+    "notificationPermission": "브리핑을 받으려면 $t(common.notifications)에서 기기 알림을 켜세요.",
+    "aiOptIn": "유료 AI 요약",
+    "aiHint": "이 컨텍스트에만 적용되는 선택 사항입니다. 선택 및 비식별 처리된 발췌문과 구조화된 정보가 앱 언어로 모델에 전송됩니다. 요금은 이 컨텍스트의 잔액에서 차감됩니다.",
+    "defaultModel": "Kilo 기본 모델 사용",
+    "duration": "시간 안전 한도(분)",
+    "spendLimit": "지출 안전 한도(USD)",
+    "safeguardHint": "일일 예산이 아닌 요약별 고정 안전 한도입니다. 기본값: 10분 및 $2. 보고서는 최대 5분 후 게시되며, 생성은 이 한도 내에서 계속됩니다.",
+    "invalidSafeguards": "유한한 양수로 시간 및 지출 한도를 입력하세요.",
+    "estimate": "예상 비용 {{estimate}} · 최대 {{maximum}}",
+    "estimateUnavailable": "이 설정에는 유료 요약을 사용할 수 없습니다.",
+    "confirmPaid": "{{context}}에 유료 요약을 사용하시겠습니까?",
+    "confirmGeneration": "유료 요약을 생성하시겠습니까?",
+    "paidDisclosure": "예상 {{estimate}}, 최대 {{maximum}}, 제한 시간 {{minutes}}분. 생성에 실패해도 요금이 부과됩니다.",
+    "enable": "유료 요약 사용",
+    "contextSettings": "AI 설정 · {{context}}",
+    "allContexts": "개인 및 조직 브리핑은 별도로 관리됩니다.",
+    "estimatePricingUnavailable": "이 모델의 가격 정보를 사용할 수 없습니다.",
+    "estimateBalanceUnavailable": "유료 요약을 위한 잔액이 부족합니다.",
+    "estimateModelNotAllowed": "이 모델은 여기서 사용할 수 없습니다.",
+    "estimateSpendLimitTooLow": "이 요약을 허용하려면 지출 안전장치를 높이세요."
   }
 }

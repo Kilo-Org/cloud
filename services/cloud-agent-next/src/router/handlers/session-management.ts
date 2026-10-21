@@ -50,6 +50,7 @@ import { cloud_billing_sku, cli_sessions_v2, container_usage_interval } from '@k
 import { and, desc, eq, like } from 'drizzle-orm';
 import { SANDBOX_USAGE_SKUS } from '../../container-usage-context.js';
 import type { SandboxLifecycleStatus } from '../../shared/sandbox-status.js';
+import type { PreparationAttempt } from '../../shared/protocol.js';
 
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
@@ -936,6 +937,26 @@ export function createSessionManagementHandlers() {
           }
 
           return response.result;
+        });
+      }),
+
+    /** The preparation attempts a stream replay builds, so the first page can show them. */
+    getPreparationAttempts: protectedProcedure
+      .input(GetSessionInput)
+      .query(async ({ input, ctx }) => {
+        return withLogTags({ source: 'getPreparationAttempts' }, async () => {
+          const sessionId = input.cloudAgentSessionId as SessionId;
+          const { userId, env } = ctx;
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
+          return withDORetry<SessionStub, PreparationAttempt[]>(
+            () => resolveSessionStub(env, userId, sessionId),
+            stub => stub.getPreparationAttempts(),
+            'getPreparationAttempts'
+          );
         });
       }),
 

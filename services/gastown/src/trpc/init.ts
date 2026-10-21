@@ -71,6 +71,18 @@ export const gastownProcedure = procedure.use(async ({ ctx, next }) => {
 });
 
 /**
+ * Feature-flag procedure — requires the `gastownAccess` claim even for
+ * admins. Use for actions that must stay limited to users enabled by the
+ * `gastown-access` PostHog flag.
+ */
+export const gastownFlaggedProcedure = procedure.use(async ({ ctx, next }) => {
+  if (!ctx.gastownAccess) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Gastown access required' });
+  }
+  return next({ ctx });
+});
+
+/**
  * Admin-only procedure — requires `isAdmin` on the JWT. Used for admin
  * panel endpoints that bypass per-user ownership checks (e.g. town-wide
  * bead/agent listing for support diagnostics).

@@ -11,6 +11,8 @@ import {
   cooldownProviders,
   deferChunk,
   finishChunk,
+  failScheduledEntry,
+  getPaidCasePromptRevision,
   getPaidCaseStartedAt,
   hasUnsettledChunks,
   recoverChunks,
@@ -26,6 +28,7 @@ import {
   SCHEDULER_MATERIALIZED_LANES_SQL,
   SCHEDULER_MAX_ATTEMPTS,
   SCHEDULER_QUEUE_LEASE_MS,
+  SCHEDULER_SETTLED_RUNS_SQL,
   SCHEDULER_UNSETTLED_SQL,
 } from './scheduler';
 import type { SchedulerClaim, SchedulerConfig } from './scheduler';
@@ -166,7 +169,12 @@ describe('scheduler (production migrations and real SQLite)', () => {
       unknownProviderConcurrency: 2,
       modelLimits: {},
       providerLimits: {},
-      shares: { 'efficient/platform': 2, 'frontier/platform': 2, 'efficient/user': 1 },
+      shares: {
+        'efficient/platform': 2,
+        'frontier/platform': 2,
+        'efficient/user': 1,
+        'frontier/user': 1,
+      },
     });
     expect(() => schedulerConfig('{"slots":251}')).toThrow();
     expect(() => schedulerConfig('{"slots":0}')).toThrow();
@@ -212,6 +220,122 @@ describe('scheduler (production migrations and real SQLite)', () => {
     );
     await scheduleRunChunks(db, { ...input, caseIds: ['different-case'] });
     expect(storedChunks(sqlite)).toEqual(rows);
+  });
+
+  it('terminates every repetition of one unavailable exact pair without releasing its paid ledger or other work', async () => {
+    for (const runId of ['run', 'other-run']) {
+      insertRun(sqlite, runId, { purpose: runId === 'other-run' ? 'user' : 'platform' });
+      await scheduleRunChunks(db, {
+        runId,
+        entries: [
+          { model: 'shared/model', variant: 'low', providers: ['deepinfra'] },
+          { model: 'shared/model', variant: 'high', providers: ['deepinfra'] },
+          { model: 'other/model', variant: null, providers: ['deepinfra'] },
+        ],
+        repetitions: 2,
+        caseIds: ['case-a', 'case-b', 'case-c'],
+        chunkSize: 1,
+      });
+    }
+    const claims = await claimMany(
+      db,
+      schedulerConfig('{"slots":40,"modelConcurrency":40,"providerConcurrency":40}'),
+      40,
+      'unavailable'
+    );
+    const unavailable = claims.find(
+      claim =>
+        claim.run_id === 'run' &&
+        claim.model === 'shared/model' &&
+        claim.variant === 'low' &&
+        claim.rep === 0 &&
+        claim.chunk === 0
+    );
+    if (!unavailable) throw new Error('Missing unavailable claim');
+    expect(await startChunk(db, unavailable.id, unavailable.token, NOW)).toBe(true);
+    const inFlight = claims.find(
+      claim =>
+        claim.run_id === 'run' &&
+        claim.model === unavailable.model &&
+        claim.variant === unavailable.variant &&
+        claim.rep === 1 &&
+        claim.chunk === 0
+    );
+    const notStarted = claims.find(
+      claim =>
+        claim.run_id === 'run' &&
+        claim.model === unavailable.model &&
+        claim.variant === unavailable.variant &&
+        claim.rep === 0 &&
+        claim.chunk === 2
+    );
+    if (!inFlight || !notStarted) throw new Error('Missing concurrent exact-pair claims');
+    await startChunk(db, inFlight.id, inFlight.token, NOW);
+    await startChunk(db, notStarted.id, notStarted.token, NOW);
+    expect(await beginPaidCase(db, paidCase(inFlight, 'case-a'), NOW)).toBe(true);
+    const deferred = claims.find(
+      claim =>
+        claim.run_id === 'run' &&
+        claim.model === unavailable.model &&
+        claim.variant === unavailable.variant &&
+        claim.chunk === 1
+    );
+    if (!deferred) throw new Error('Missing queued exact-pair claim');
+    await deferChunk(db, deferred.id, deferred.token, NOW + 30_000);
+    expect(await beginPaidCase(db, paidCase(unavailable, 'case-a'), NOW)).toBe(true);
+    const unrelated = storedChunks(sqlite).filter(
+      row => row.run_id !== 'run' || row.model !== 'shared/model' || row.variant !== 'low'
+    );
+
+    await failScheduledEntry(db, unavailable);
+    const stopped = storedChunks(sqlite).filter(
+      row => row.run_id === 'run' && row.model === 'shared/model' && row.variant === 'low'
+    );
+    expect(stopped).toHaveLength(6);
+    expect(stopped.filter(row => row.status === 'failed' && row.slot === null)).toHaveLength(4);
+    expect(storedChunk(sqlite, inFlight.id)).toMatchObject({
+      status: 'active',
+      slot: inFlight.slot,
+    });
+    expect(storedChunk(sqlite, notStarted.id)).toMatchObject({
+      status: 'active',
+      slot: notStarted.slot,
+    });
+    expect(await getPaidCaseStartedAt(db, paidCase(inFlight, 'case-a'))).toBe(NOW);
+    expect(await restartPaidCase(db, paidCase(inFlight, 'case-a'), NOW + 1)).toBe(false);
+    expect(await beginPaidCase(db, paidCase(notStarted, 'case-c'), NOW)).toBe(false);
+    expect(
+      storedChunks(sqlite).filter(
+        row => row.run_id !== 'run' || row.model !== 'shared/model' || row.variant !== 'low'
+      )
+    ).toEqual(unrelated);
+    expect(
+      sqlite.prepare('SELECT run_id, model, variant, rep FROM run_lane_failures ORDER BY rep').all()
+    ).toEqual([
+      { run_id: 'run', model: 'shared/model', variant: 'low', rep: 0 },
+      { run_id: 'run', model: 'shared/model', variant: 'low', rep: 1 },
+    ]);
+    expect(await getPaidCaseStartedAt(db, paidCase(unavailable, 'case-a'))).toBe(NOW);
+    expect(await startChunk(db, unavailable.id, unavailable.token, NOW)).toBe(false);
+    expect(await beginPaidCase(db, paidCase(unavailable, 'case-b'), NOW)).toBe(false);
+  });
+
+  it('ignores an unavailable-entry cancellation from a stale claim token', async () => {
+    insertRun(sqlite, 'run');
+    await scheduleRunChunks(db, {
+      runId: 'run',
+      entries: [{ model: 'shared/model', variant: 'low', providers: ['deepinfra'] }],
+      repetitions: 2,
+      caseIds: ['case-a', 'case-b'],
+      chunkSize: 1,
+    });
+    const [claim] = await claimMany(db, schedulerConfig('{"slots":4}'), 4, 'stale');
+    if (!claim) throw new Error('Missing active claim');
+    await startChunk(db, claim.id, claim.token, NOW);
+    const before = storedChunks(sqlite);
+    await failScheduledEntry(db, { ...claim, token: 'replaced-token' });
+    expect(storedChunks(sqlite)).toEqual(before);
+    expect(sqlite.prepare('SELECT * FROM run_lane_failures').all()).toEqual([]);
   });
 
   it('caps concurrent queued plus active reservations against persisted slots', async () => {
@@ -792,6 +916,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
         case_id: 'paid-case',
         token: claim.token,
         started_at: NOW,
+        prompt_revision: 2,
       },
     ]);
     sqlite.close();
@@ -834,10 +959,46 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
     const key = paidCase(claim, 'case');
     expect(await beginPaidCase(db, key, NOW)).toBe(true);
-    await restartPaidCase(db, { ...key, token: 'another-token' }, NOW + 1_000);
+    expect(await restartPaidCase(db, { ...key, token: 'another-token' }, NOW + 1_000)).toBe(false);
     expect(await getPaidCaseStartedAt(db, key)).toBe(NOW);
-    await restartPaidCase(db, key, NOW + 2_000);
+    expect(await restartPaidCase(db, key, NOW + 2_000)).toBe(true);
     expect(await getPaidCaseStartedAt(db, key)).toBe(NOW + 2_000);
+    await finishChunk(db, claim.id, claim.token);
+    expect(await restartPaidCase(db, key, NOW + 3_000)).toBe(false);
+    expect(await getPaidCaseStartedAt(db, key)).toBe(NOW + 2_000);
+  });
+
+  it('ledgers the prompt transport that opened a paid case, defaulting to the old one', async () => {
+    insertRun(sqlite, 'revision');
+    await scheduleRunChunks(db, {
+      runId: 'revision',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case', 'legacy'],
+      chunkSize: 2,
+    });
+    const [claim] = await claimMany(db, schedulerConfig(), 1, 'revision');
+    if (!claim) throw new Error('Expected a claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    const key = paidCase(claim, 'case');
+    const legacy = paidCase(claim, 'legacy');
+    expect(await getPaidCasePromptRevision(db, key)).toBeNull();
+    expect(await beginPaidCase(db, key, NOW)).toBe(true);
+    expect(await getPaidCasePromptRevision(db, key)).toBe(2);
+    // A worker deployed before the column existed leaves the default.
+    sqlite
+      .prepare(`INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token, started_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(
+        legacy.runId,
+        legacy.model,
+        legacy.variant,
+        legacy.rep,
+        legacy.caseId,
+        legacy.token,
+        NOW
+      );
+    expect(await getPaidCasePromptRevision(db, legacy)).toBe(1);
   });
 
   it('keys paid-case admission separately by exact variant and repetition', async () => {
@@ -1394,6 +1555,8 @@ describe('scheduler (production migrations and real SQLite)', () => {
 
     expect(explainPlan(sqlite, SCHEDULER_UNSETTLED_SQL)).toContain('IX_scheduler_chunks_lane');
     expect(explainPlan(sqlite, SCHEDULER_UNSETTLED_SQL)).not.toContain('SCAN scheduler_chunks');
+    expect(explainPlan(sqlite, SCHEDULER_SETTLED_RUNS_SQL)).not.toContain('SCAN scheduler_chunks');
+    expect(explainPlan(sqlite, SCHEDULER_SETTLED_RUNS_SQL)).not.toContain('SCAN run_lane_failures');
 
     const recorded: string[] = [];
     const wrapped = recordingD1(db, recorded);
@@ -1436,5 +1599,15 @@ describe('scheduler (production migrations and real SQLite)', () => {
         .filter(row => row.model === 'dead/model')
         .map(row => row.status)
     ).toEqual(['pending', 'pending']);
+    sqlite
+      .prepare(
+        "UPDATE scheduler_chunks SET status = 'active', slot = 0, lease_until = ? WHERE model = 'dead/model' AND chunk = 0"
+      )
+      .run(NOW + SCHEDULER_ACTIVE_LEASE_MS);
+    expect(await hasUnsettledChunks(db, 'dead-lane-settle')).toBe(true);
+    sqlite
+      .prepare("UPDATE scheduler_chunks SET status = 'failed', slot = NULL WHERE status = 'active'")
+      .run();
+    expect(await hasUnsettledChunks(db, 'dead-lane-settle')).toBe(false);
   });
 });

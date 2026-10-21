@@ -5,6 +5,7 @@ import {
   type DashboardStats,
   getAnalysisIncompleteCount,
   getSecurityRepositoriesInScope,
+  isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -46,6 +47,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
+import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 
 const METRIC_TONE_CLASS = {
   danger: 'text-destructive',
@@ -180,6 +182,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     }, [refreshDismissFailures, refreshOutbox])
   );
 
+  // A failed repositories fetch disables the filter controls until a refetch
+  // succeeds; the same focus/foreground invalidation the findings list mounts
+  // also retries it here, matching the org/personal key split below.
+  useRouteForegroundRefresh(
+    isPersonalSecurityScope(scope) ? [[['securityAgent']]] : [[['organizations', 'securityAgent']]]
+  );
+
   const slaEnabled = config.data?.slaEnabled ?? true;
   const data = dashboardStats.data;
   const metrics = data ? buildLocalizedMetrics(data, slaEnabled) : [];
@@ -204,6 +213,9 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         const [statsResult, syncResult] = await Promise.all([
           dashboardStats.refetch(),
           lastSync.refetch(),
+          // The repositories fetch failure disables the filter controls until
+          // a refetch succeeds, so every dashboard refresh also retries it.
+          repositories.refetch(),
         ]);
         setRefreshFailed(statsResult.isError || syncResult.isError);
       } finally {
@@ -214,7 +226,8 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
   // Repos aren't known yet (still loading or the fetch failed) — the filter
   // stays disabled instead of silently offering a shrunken "All repositories
-  // only" option list.
+  // only" option list. A failed fetch is recoverable: the retry card below and
+  // pull-to-refresh both refetch the repositories query.
   const repoFilterUnavailable = repositories.isLoading || repositories.isError;
 
   // A non-retryable sync outcome ended the intent, so both sync controls
@@ -324,6 +337,16 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             />
           </Pressable>
         </View>
+
+        {repositories.isError ? (
+          <SecurityCommandRetryCard
+            lastError={t('common.couldNotLoadRepositories')}
+            retryable
+            onRetry={() => {
+              void repositories.refetch();
+            }}
+          />
+        ) : null}
 
         {refreshFailed ? (
           <Text className="text-xs text-warn">{t('securityAgent.dashboard.refreshFailed')}</Text>

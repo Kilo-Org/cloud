@@ -35,7 +35,10 @@ describe('checkDomainSignInEligibility', () => {
     mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
     mockIsBlockedTLD.mockReturnValue(false);
     mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
-    mockResolveSsoAuthorityForDomain.mockResolvedValue({ status: 'not_required' });
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'not_required',
+      domain: 'example.com',
+    });
   });
 
   it('does not resolve SSO authority for an address without a domain', async () => {

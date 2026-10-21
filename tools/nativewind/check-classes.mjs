@@ -87,12 +87,17 @@ const RULES = [
  * been 21 / 21, with cards running off the trailing edge. Correct in LTR, so
  * nothing catches it until someone reads the app in Arabic, Farsi or Hebrew.
  */
-const SCROLL_CONTAINERS =
-  /^(?:Animated\.)?(?:ScrollView|TabScreenScrollView|FlatList|FlashList|KeyboardAwareScrollView)$/;
+const SCROLL_CONTAINER_NAMES = [
+  'ScrollView',
+  'TabScreenScrollView',
+  'FlatList',
+  'FlashList',
+  'KeyboardAwareScrollView',
+];
+const SCROLL_CONTAINERS = new RegExp(`^(?:Animated\\.)?(?:${SCROLL_CONTAINER_NAMES.join('|')})$`);
 // Parsing is the expensive half of this check, and only a file that names a
 // container can hold one.
-const NAMES_A_CONTAINER =
-  /ScrollView|TabScreenScrollView|FlatList|FlashList|KeyboardAwareScrollView/;
+const NAMES_A_CONTAINER = new RegExp(SCROLL_CONTAINER_NAMES.join('|'));
 const HORIZONTAL_PADDING = /^-?(?:px|pl|pr|ps|pe)-/;
 
 /**

@@ -129,6 +129,14 @@ test('reads a single-quoted className', context => {
   );
 });
 
+test('reads the container classes on an Animated container', context => {
+  expectProblem(
+    context,
+    screen('<Animated.ScrollView onScroll={() => onScroll()} className="px-2" />'),
+    /screen\.tsx:3: <Animated\.ScrollView> carries "px-2" on its own className/
+  );
+});
+
 test('ignores the classes of an element nested in a prop', context => {
   const result = runChecker(
     context,

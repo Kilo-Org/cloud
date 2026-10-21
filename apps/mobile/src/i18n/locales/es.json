@@ -1036,7 +1036,8 @@
       "bugs": "Errores",
       "style": "Estilo",
       "testing": "Pruebas",
-      "documentation": "Documentación"
+      "documentation": "Documentación",
+      "unknown": "Otro ({{area}})"
     },
     "gateThreshold": {
       "warning": "Advertencia"
@@ -1712,6 +1713,7 @@
       "prefillModelUnavailable": "{{model}} ya no está disponible. Se está usando tu modelo predeterminado.",
       "couldNotReadPendingSessions": "No se pudieron leer las sesiones pendientes. Inténtalo de nuevo.",
       "failedToCreate": "No se pudo crear la sesión.",
+      "checkOrganizationAccess": "Comprueba tu acceso a esta organización e inténtalo de nuevo.",
       "couldNotRefreshRepositories": "No se pudieron actualizar los repositorios. Inténtalo de nuevo.",
       "discardDraftTitle": "¿Descartar borrador?",
       "discardDraftMessage": "Se perderán tus instrucciones.",
@@ -2243,6 +2245,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "No puedes consultar tus sesiones activas hasta que se carguen los datos.",
     "currentDeviceUnidentified": "No se pudo identificar el dispositivo actual.",
+    "kiloApp": "Aplicación de Kilo",
     "noSessions": "No hay sesiones activas",
     "noSessionsDescription": "Inicia sesión en la aplicación de Kilo desde otro dispositivo y aparecerá aquí.",
     "onlyKiloAppSignIns": "Aquí solo aparecen las sesiones iniciadas en la aplicación de Kilo, no las iniciadas en el editor ni en la CLI.",
@@ -2396,6 +2399,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Antes de empezar",
+    "summaryTitle": "Preferencias de uso compartido de datos",
     "introDescription": "Kilo envía tus mensajes a proveedores de IA para generar respuestas. Esto es lo que se comparte y con quién.",
     "required": "Necesario para usar Kilo",
     "promptsTitle": "Tus instrucciones y conversaciones",
@@ -2404,7 +2408,6 @@
     "accountDescription": "El identificador de tu cuenta de Kilo y los metadatos de las solicitudes se usan para verificar tu identidad y medir el uso.",
     "diagnosticsTitle": "Diagnóstico de la aplicación",
     "diagnosticsDescription": "Los informes de fallos y errores, sin contenido de la aplicación, se usan para mantenerla estable.",
-    "optional": "Opcional",
     "helpImprove": "Ayudar a mejorar Kilo",
     "helpImproveDescription": "Comparte datos anónimos sobre el uso de la aplicación y el origen de la instalación. Puedes cambiarlo cuando quieras en los ajustes.",
     "seeFullDetails": "Ver todos los detalles",
@@ -2530,7 +2533,8 @@
       "description": "Conecta tu cuenta de GitHub para revisar PR en el móvil.",
       "gitlabDescription": "Conecta tu cuenta de GitLab para revisar merge requests en el móvil.",
       "bitbucketDescription": "Conecta Bitbucket a esta organización para revisar PR en el móvil.",
-      "bitbucketOrgOnlyDescription": "Selecciona una organización en tu perfil para revisar sus PR de Bitbucket."
+      "bitbucketOrgOnlyDescription": "Cambia la cuenta de arriba a una organización para revisar sus PR en Bitbucket.",
+      "contextLine": "Para {{organization}}"
     },
     "connectionExpired": "La conexión con GitHub ha caducado.",
     "couldNotLoadPullRequest": "No se pudo cargar la PR.",
@@ -2972,7 +2976,9 @@
       "reviewNotSubmitted": "Esta revisión no se puede enviar en su estado actual. Puede que la PR haya cambiado o que no tengas permiso para revisar tu propia PR.",
       "reviewNotSubmittedTerm": "Esta revisión no se puede enviar en su estado actual. Puede que {{term}} haya cambiado o que no tengas permiso para revisar tu propio {{term}}.",
       "couldNotPostComment": "No se pudo publicar el comentario.",
-      "couldNotSubmitReview": "No se pudo enviar la revisión. Comprueba tu conexión e inténtalo de nuevo."
+      "couldNotSubmitReview": "No se pudo enviar la revisión. Comprueba tu conexión e inténtalo de nuevo.",
+      "rateLimited": "Demasiadas solicitudes. Inténtalo de nuevo más tarde.",
+      "conflict": "Esto cambió mientras trabajabas en ello. Vuelve a cargarlo e inténtalo de nuevo."
     },
     "operation": {
       "couldNotReply": "No se pudo responder.",
@@ -3512,6 +3518,9 @@
     "localModels": {
       "title": "Modelos en el dispositivo",
       "help": "Los modelos en el dispositivo se ejecutan en este teléfono. Tus peticiones y respuestas no salen del dispositivo.",
+      "switchTitle": "¿Cambiar a un modelo en el dispositivo?",
+      "switchMessage": "Al cambiar a {{name}}, los mensajes y el contexto de esta conversación se procesarán en este teléfono, no en un servidor remoto.",
+      "switchConfirm": "Cambiar de modelo",
       "systemPurpose": "El modelo integrado en el sistema de este dispositivo. Se ejecuta en el dispositivo.",
       "apple": "Apple Intelligence (en el dispositivo)",
       "checking": "Comprobando disponibilidad…",
@@ -3608,7 +3617,6 @@
     "personalDefaultDescription": "Se carga automáticamente cuando ningún repositorio tiene un perfil fijado.",
     "organizationDefaultDescription": "Cargado automáticamente para miembros que no tienen valores predeterminados personales.",
     "setAsDefault": "Establecer como predeterminado",
-    "removeDefault": "Eliminar por defecto",
     "saveFailed": "No se pudo guardar el perfil",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Esto elimina permanentemente el perfil y su configuración. Esto no se puede deshacer.",
@@ -3634,11 +3642,13 @@
     "commandsTitle": "Comandos de configuración",
     "addCommand": "Agregar comando",
     "commandLabel": "Dominio",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "p. ej. pnpm install",
     "commandsEmpty": "Aún no hay comandos de configuración",
     "commandsSaveFailed": "No se pudieron guardar los comandos de configuración",
     "moveUp": "Subir",
     "moveDown": "Bajar",
+    "moveCommandUp": "Mover el comando {{position}} hacia arriba",
+    "moveCommandDown": "Mover el comando {{position}} hacia abajo",
     "skillsTitle": "Habilidades",
     "addSkill": "Agregar habilidad",
     "skillNameLabel": "Nombre de la habilidad",

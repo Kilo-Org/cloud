@@ -24,6 +24,8 @@ export const SESSION_FILTERS_KEY = 'agent-session-filters';
 /** Filter record for the live sessions page. Separate: the pages filter separate lists. */
 export const LIVE_SESSION_FILTERS_KEY = 'live-session-filters';
 export const NOTIFICATION_PROMPT_SEEN_KEY = 'notification-prompt-seen';
+/** The user chose Not now on the iOS install-attribution pre-prompt; do not ask again. */
+export const TRACKING_PROMPT_DISMISSED_KEY = 'tracking-prompt-dismissed';
 export const LAST_ACTIVE_INSTANCE_KEY = 'last-active-chat-instance';
 /** Last "Run on" destination on the new-agent screen. Empty means Cloud Agent. */
 export const LAST_RUN_ON_DESTINATION_KEY = 'last-run-on-destination';

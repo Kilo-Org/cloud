@@ -41,6 +41,29 @@ const COLOR_UTILITIES = [
   'to',
 ].join('|');
 
+/**
+ * Theme colour tokens come from the same `@theme inline` block in the app's
+ * global.css that makes `bg-<token>` a class at all. Parsing it keeps the
+ * rule in step with the generated theme map and global.css variables: a new
+ * token such as `--color-primary-disabled` is covered the moment it lands,
+ * instead of waiting for this list to be edited by hand.
+ *
+ * Tile tokens are kept on purpose: they pre-bake an alpha, and an `/opacity`
+ * modifier on top of one is still a color-mix over a variable that NativeWind
+ * drops.
+ */
+const THEME_TOKENS = (() => {
+  const css = readFileSync(join(ROOT, 'apps/mobile/src/global.css'), 'utf8');
+  const block = css.match(/@theme inline \{([\s\S]*?)\n\}/)?.[1];
+  if (!block) {
+    throw new Error('check-classes: no @theme inline block in apps/mobile/src/global.css');
+  }
+  const tokens = [...block.matchAll(/--color-([a-z0-9-]+):\s*var\(--/g)].map(m => m[1]);
+  // Longest first so the alternation is unambiguous (`muted-soft` before `muted`).
+  tokens.sort((a, b) => b.length - a.length || a.localeCompare(b));
+  return tokens;
+})();
+
 const RULES = [
   {
     // `bg-black/40` compiles to `#NaNNaNNaN66`: Tailwind emits
@@ -58,10 +81,7 @@ const RULES = [
     // cannot decompose the variable, so the runtime drops the declaration and
     // the element paints nothing, with no build error. The `*-tile-bg` /
     // `*-tile-border` pairs pre-bake the alpha instead.
-    pattern: new RegExp(
-      `\\b(?:${COLOR_UTILITIES})-(?:background|foreground|card|popover|primary|secondary|muted-soft|muted|accent-soft|accent|destructive|border|input|ring|ink2|good|warn|info|danger|agent-[a-z]+)(?:-foreground)?/\\d+\\b`,
-      'g'
-    ),
+    pattern: new RegExp(`\\b(?:${COLOR_UTILITIES})-(?:${THEME_TOKENS.join('|')})/\\d+\\b`, 'g'),
     advice:
       'the /opacity modifier is dropped on CSS-variable theme colours; use the paired *-tile-bg / *-tile-border token or a concrete colour',
   },
@@ -98,7 +118,7 @@ const SCROLL_CONTAINERS = new RegExp(`^(?:Animated\\.)?(?:${SCROLL_CONTAINER_NAM
 // Parsing is the expensive half of this check, and only a file that names a
 // container can hold one.
 const NAMES_A_CONTAINER = new RegExp(SCROLL_CONTAINER_NAMES.join('|'));
-const HORIZONTAL_PADDING = /^-?(?:px|pl|pr|ps|pe)-/;
+const HORIZONTAL_PADDING = /^-?(?:p|px|pl|pr|ps|pe)-/;
 
 /**
  * Each container element in the file with the classes on its own `className`,
@@ -159,10 +179,6 @@ function checkScrollPadding(relative, text) {
  * paragraph direction, so its copy stays left-aligned in Arabic, Farsi and
  * Hebrew while everything beside it mirrors. Importing it under an alias is
  * fine: `type Text as RNText` is how callers type a ref.
- *
- * The exemption is a hidden node measured for height. It must not inherit the
- * shared component's base font classes, or the measurement stops matching the
- * input it mirrors.
  */
 const RAW_TEXT_IMPORT = /import\s*\{([^}]*)\}\s*from\s*'react-native'/gs;
 const RAW_TEXT_EXEMPT = new Set([

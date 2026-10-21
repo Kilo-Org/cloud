@@ -59,6 +59,24 @@ export function isCatalogLoadFailureResult(
   );
 }
 
+/**
+ * The gateway rejected the requested model on one unbilled call. The same model has
+ * answered other cases, so this is a transient resolution failure, not retirement.
+ * The diagnostic names the model without its vendor prefix.
+ */
+export function isUnsupportedModelResult(
+  result: Pick<CliRunResult, 'text' | 'stderrTail' | 'costUsd' | 'timedOut'>,
+  requestedModel: string
+): boolean {
+  if (result.text.length > 0 || (result.costUsd ?? 0) !== 0 || result.timedOut) return false;
+  const diagnostic = stripVTControlCharacters(result.stderrTail);
+  const model = /(?:^|\n)\s*(?:Error:\s*)?Unsupported model:?\s*(\S+?)\s*(?:\n|$)/i.exec(
+    diagnostic
+  )?.[1];
+  const bare = requestedModel.slice(requestedModel.lastIndexOf('/') + 1);
+  return model === requestedModel || model === `kilo/${requestedModel}` || model === bare;
+}
+
 export function isExactModelUnavailableResult(
   result: Pick<CliRunResult, 'text' | 'stderrTail' | 'unavailableModelId' | 'costUsd' | 'timedOut'>,
   requestedModel: string

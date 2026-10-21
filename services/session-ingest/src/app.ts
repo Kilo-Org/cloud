@@ -3,6 +3,10 @@ import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { verifySessionAccessInvalidationCredential } from '@kilocode/worker-utils/session-access-invalidation-credential';
+import {
+  isLegacyInternalSessionAuthEnabled,
+  type InternalSessionAuthMethod,
+} from '@kilocode/worker-utils/internal-session-auth';
 import type { Env } from './env';
 import { z } from 'zod';
 
@@ -25,7 +29,8 @@ const invalidateSessionAccessSchema = z.object({
 function logInvalidationAudit(
   outcome: 'ok' | 'unauthorized' | 'forbidden' | 'invalid_request' | 'unavailable' | 'failed',
   status: number,
-  startedAt: number
+  startedAt: number,
+  authMethod?: InternalSessionAuthMethod
 ): void {
   console.log(
     JSON.stringify({
@@ -33,6 +38,7 @@ function logInvalidationAudit(
       outcome,
       status,
       durationMs: Date.now() - startedAt,
+      authMethod,
     })
   );
 }
@@ -137,37 +143,61 @@ app.get('/session/:shareToken/metadata', async c => {
 
 app.post('/internal/session-access/invalidate', async c => {
   const startedAt = Date.now();
-  const token = extractBearerToken(c.req.header('Authorization'));
-  if (!token) {
-    logInvalidationAudit('unauthorized', 401, startedAt);
-    return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
-  }
-
-  let expectedSecret: string;
-  try {
-    const secret = await c.env.SESSION_INGEST_INVALIDATION_SIGNING_SECRET_PROD.get();
-    if (!secret) {
+  const authMethod = c.req.raw.headers.has('authorization') ? 'bearer' : 'legacy';
+  let bearerAuthority: { userId: string; organizationId: string | undefined } | undefined;
+  if (authMethod === 'bearer') {
+    const token = extractBearerToken(c.req.header('Authorization'));
+    if (!token) {
+      logInvalidationAudit('unauthorized', 401, startedAt);
+      return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
+    }
+    let expectedSecret: string;
+    try {
+      const secret = await c.env.SESSION_INGEST_INVALIDATION_SIGNING_SECRET_PROD.get();
+      if (!secret) {
+        logInvalidationAudit('unavailable', 503, startedAt);
+        return c.json({ success: false, error: 'Service temporarily unavailable' }, 503, NO_STORE);
+      }
+      expectedSecret = secret;
+    } catch (error) {
+      console.error('Auth infrastructure failure', {
+        operation: 'session-access-invalidation-secret-get',
+        errorClass: error instanceof Error ? error.name : typeof error,
+      });
       logInvalidationAudit('unavailable', 503, startedAt);
       return c.json({ success: false, error: 'Service temporarily unavailable' }, 503, NO_STORE);
     }
-    expectedSecret = secret;
-  } catch (error) {
-    console.error('Auth infrastructure failure', {
-      operation: 'session-access-invalidation-secret-get',
-      errorClass: error instanceof Error ? error.name : typeof error,
-      errorMessage: error instanceof Error ? error.message : String(error),
-    });
-    logInvalidationAudit('unavailable', 503, startedAt);
-    return c.json({ success: false, error: 'Service temporarily unavailable' }, 503, NO_STORE);
-  }
 
-  const credential = await verifySessionAccessInvalidationCredential({
-    token,
-    secret: expectedSecret,
-  });
-  if (!credential.ok) {
-    logInvalidationAudit('unauthorized', 401, startedAt);
-    return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
+    const credential = await verifySessionAccessInvalidationCredential({
+      token,
+      secret: expectedSecret,
+    });
+    if (!credential.ok) {
+      logInvalidationAudit('unauthorized', 401, startedAt);
+      return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
+    }
+    bearerAuthority = credential;
+  } else {
+    if (
+      !isLegacyInternalSessionAuthEnabled(c.env.INTERNAL_SESSION_AUTH_LEGACY_ENABLED) ||
+      !c.req.header('X-Internal-Secret')
+    ) {
+      logInvalidationAudit('unauthorized', 401, startedAt);
+      return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
+    }
+    try {
+      if (!(await hasValidInternalSecret(c))) {
+        logInvalidationAudit('unauthorized', 401, startedAt);
+        return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
+      }
+    } catch (error) {
+      console.error('Auth infrastructure failure', {
+        operation: 'session-access-legacy-secret-get',
+        errorClass: error instanceof Error ? error.name : typeof error,
+      });
+      logInvalidationAudit('unavailable', 503, startedAt);
+      return c.json({ success: false, error: 'Service temporarily unavailable' }, 503, NO_STORE);
+    }
   }
 
   const parsed = invalidateSessionAccessSchema.safeParse(await c.req.json().catch(() => null));
@@ -181,8 +211,9 @@ app.post('/internal/session-access/invalidate', async c => {
   }
 
   if (
-    credential.userId !== parsed.data.kiloUserId ||
-    credential.organizationId !== parsed.data.organizationId
+    bearerAuthority &&
+    (bearerAuthority.userId !== parsed.data.kiloUserId ||
+      bearerAuthority.organizationId !== parsed.data.organizationId)
   ) {
     logInvalidationAudit('forbidden', 403, startedAt);
     return c.json({ success: false, error: 'Forbidden' }, 403, NO_STORE);
@@ -201,6 +232,6 @@ app.post('/internal/session-access/invalidate', async c => {
     throw error;
   }
 
-  logInvalidationAudit('ok', 204, startedAt);
+  logInvalidationAudit('ok', 204, startedAt, authMethod);
   return c.body(null, 204, NO_STORE);
 });

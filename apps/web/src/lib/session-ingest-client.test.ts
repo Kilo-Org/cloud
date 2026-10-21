@@ -31,6 +31,8 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  INTERNAL_API_SECRET: 'internal-secret',
+  INTERNAL_SESSION_AUTH_LEGACY_ENABLED: 'false',
   SESSION_INGEST_WORKER_URL: 'https://ingest.test.example.com',
   SESSION_INGEST_INVALIDATION_SIGNING_SECRET: 'invalidation-signing-secret',
 }));
@@ -663,6 +665,9 @@ describe('invalidateOrganizationSessionAccess', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockCaptureException.mockReset();
+    jest.requireMock(
+      '@kilocode/web-shared/lib/config.server'
+    ).INTERNAL_SESSION_AUTH_LEGACY_ENABLED = 'false';
   });
 
   it('reports and throws invalidation failures', async () => {
@@ -726,6 +731,45 @@ describe('invalidateOrganizationSessionAccess', () => {
       aud: SESSION_INGEST_INVALIDATION_AUDIENCE,
     });
     expect(claims.exp! - claims.iat!).toBe(60);
+  });
+
+  it.each([undefined, '', 'true'])(
+    'supports a legacy receiver during compatibility %s',
+    async flag => {
+      const config = jest.requireMock('@kilocode/web-shared/lib/config.server');
+      config.INTERNAL_SESSION_AUTH_LEGACY_ENABLED = flag;
+      mockFetch.mockImplementation(async (_url, init) => {
+        const headers = new Headers(init.headers);
+        const accepted = headers.get('X-Internal-Secret') === 'internal-secret';
+        return { ok: accepted, status: accepted ? 204 : 401, text: async () => '' };
+      });
+      await expect(
+        invalidateOrganizationSessionAccess('usr_removed', '11111111-1111-4111-8111-111111111111')
+      ).resolves.toBeUndefined();
+      const headers = new Headers(mockFetch.mock.calls[0][1].headers);
+      const token = headers.get('authorization')?.slice('Bearer '.length);
+      if (!token) throw new Error('Expected a scoped invalidation credential');
+      expect(jwt.verify(token, 'invalidation-signing-secret')).toMatchObject({
+        kiloUserId: 'usr_removed',
+        organizationId: '11111111-1111-4111-8111-111111111111',
+        aud: SESSION_INGEST_INVALIDATION_AUDIENCE,
+      });
+    }
+  );
+
+  it('still requires its signing key during compatibility', async () => {
+    const config = jest.requireMock('@kilocode/web-shared/lib/config.server');
+    const original = config.SESSION_INGEST_INVALIDATION_SIGNING_SECRET;
+    config.INTERNAL_SESSION_AUTH_LEGACY_ENABLED = 'true';
+    config.SESSION_INGEST_INVALIDATION_SIGNING_SECRET = '';
+    try {
+      await expect(
+        invalidateOrganizationSessionAccess('usr_removed', '11111111-1111-4111-8111-111111111111')
+      ).rejects.toThrow('SESSION_INGEST_INVALIDATION_SIGNING_SECRET is not configured');
+      expect(mockFetch).not.toHaveBeenCalled();
+    } finally {
+      config.SESSION_INGEST_INVALIDATION_SIGNING_SECRET = original;
+    }
   });
 
   it('fails closed without the dedicated invalidation secret', async () => {

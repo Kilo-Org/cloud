@@ -8,13 +8,19 @@ import { signGlanceableSnapshotCredential } from '@kilocode/worker-utils/glancea
 import { GLANCEABLE_SNAPSHOT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 const TEST_SECRET = 'glanceable-snapshot-signing-secret';
-const mockConfig: { signingSecret: string } = { signingSecret: TEST_SECRET };
+const mockConfig: { signingSecret: string; legacyEnabled: string | undefined } = {
+  signingSecret: TEST_SECRET,
+  legacyEnabled: 'false',
+};
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get GLANCEABLE_SNAPSHOT_SIGNING_SECRET() {
     return mockConfig.signingSecret;
   },
   INTERNAL_API_SECRET: 'internal-secret',
+  get INTERNAL_SESSION_AUTH_LEGACY_ENABLED() {
+    return mockConfig.legacyEnabled;
+  },
 }));
 jest.mock('@/lib/glanceable-agents-snapshot-server', () => ({
   buildGlanceableDeliveryForUser: jest.fn(),
@@ -103,6 +109,7 @@ async function request(
 describe('POST /api/internal/glanceable-agents-snapshot', () => {
   beforeEach(() => {
     mockConfig.signingSecret = TEST_SECRET;
+    mockConfig.legacyEnabled = 'false';
     mockedAccess.mockReset();
     mockedAccess.mockResolvedValue('member' as never);
     mockedBuild.mockReset();
@@ -130,7 +137,7 @@ describe('POST /api/internal/glanceable-agents-snapshot', () => {
     });
   });
 
-  it('rejects the general internal secret alone before any data read', async () => {
+  it('rejects the general internal secret when compatibility is disabled', async () => {
     const response = await POST(
       await request({
         token: null,
@@ -142,6 +149,95 @@ describe('POST /api/internal/glanceable-agents-snapshot', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(mockedAccess).not.toHaveBeenCalled();
     expect(mockedBuild).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, '', 'true'])(
+    'accepts a legacy caller while compatibility is %s',
+    async value => {
+      mockConfig.legacyEnabled = value;
+      mockConfig.signingSecret = '';
+      const response = await POST(
+        await request({ token: null, headers: { 'X-Internal-Secret': 'internal-secret' } })
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(mockedAccess).toHaveBeenCalledWith(expect.anything(), ORG_ID);
+      expect(mockedBuild).toHaveBeenCalledWith({ userId: USER_ID, organizationId: ORG_ID });
+    }
+  );
+
+  it.each(['false', 'FALSE', 'invalid'])('rejects legacy auth with flag %s', async value => {
+    mockConfig.legacyEnabled = value;
+    const response = await POST(
+      await request({ token: null, headers: { 'X-Internal-Secret': 'internal-secret' } })
+    );
+    expect(response.status).toBe(401);
+    expect(mockedBuild).not.toHaveBeenCalled();
+  });
+
+  it('rejects an incorrect legacy secret during compatibility', async () => {
+    mockConfig.legacyEnabled = 'true';
+    const response = await POST(
+      await request({ token: null, headers: { 'X-Internal-Secret': 'incorrect-secret' } })
+    );
+    expect(response.status).toBe(401);
+    expect(mockedBuild).not.toHaveBeenCalled();
+  });
+
+  it.each(['', 'Basic malformed', 'Bearer ', 'Bearer not-a-jwt'])(
+    'does not replace Authorization %j with a valid legacy credential',
+    async authorization => {
+      mockConfig.legacyEnabled = 'true';
+      const response = await POST(
+        await request({
+          token: null,
+          headers: { authorization, 'X-Internal-Secret': 'internal-secret' },
+        })
+      );
+      expect(response.status).toBe(401);
+      expect(mockedBuild).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { claims: { expiresIn: -1 }, status: 401 },
+    { claims: { audience: 'another-service' }, status: 401 },
+    { claims: { secret: 'internal-secret' }, status: 401 },
+    { claims: { userId: 'oauth/another-user' }, status: 403 },
+  ])('preserves bearer checks with a legacy header: %j', async ({ claims, status }) => {
+    mockConfig.legacyEnabled = 'true';
+    const response = await POST(
+      await request({
+        token: abnormalToken(claims),
+        headers: { 'X-Internal-Secret': 'internal-secret' },
+      })
+    );
+    expect(response.status).toBe(status);
+    expect(mockedBuild).not.toHaveBeenCalled();
+  });
+
+  it('still checks organization access for legacy callers', async () => {
+    mockConfig.legacyEnabled = 'true';
+    mockedAccess.mockRejectedValue(new TRPCError({ code: 'FORBIDDEN' }));
+    const response = await POST(
+      await request({ token: null, headers: { 'X-Internal-Secret': 'internal-secret' } })
+    );
+    expect(response.status).toBe(403);
+    expect(mockedBuild).not.toHaveBeenCalled();
+  });
+
+  it('uses the bearer when both credentials are present', async () => {
+    mockConfig.legacyEnabled = 'true';
+    const audit = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    try {
+      const response = await POST(
+        await request({ headers: { 'X-Internal-Secret': 'incorrect-secret' } })
+      );
+      expect(response.status).toBe(200);
+      expect(audit).toHaveBeenCalledWith(expect.stringContaining('"authMethod":"bearer"'));
+    } finally {
+      audit.mockRestore();
+    }
   });
 
   it('rejects a credential signed with the general internal secret', async () => {

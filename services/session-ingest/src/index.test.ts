@@ -49,6 +49,7 @@ const INVALIDATION_USER_ID = 'usr_removed';
 const INVALIDATION_ORG_ID = '11111111-1111-4111-8111-111111111111';
 
 type TestBindings = {
+  INTERNAL_SESSION_AUTH_LEGACY_ENABLED?: string;
   HYPERDRIVE: { connectionString: string };
   SESSION_INGEST_DO: unknown;
   SESSION_ACCESS_CACHE_DO: unknown;
@@ -78,6 +79,7 @@ function makeDbFakes() {
 }
 
 const defaultEnv: TestBindings = {
+  INTERNAL_SESSION_AUTH_LEGACY_ENABLED: 'false',
   HYPERDRIVE: { connectionString: 'postgres://test' },
   SESSION_INGEST_DO: {},
   SESSION_ACCESS_CACHE_DO: {},
@@ -108,6 +110,7 @@ function invalidationRequest(
     token?: string;
     headers?: Record<string, string>;
     body?: unknown;
+    env?: TestBindings;
   } = {}
 ) {
   return app.request(
@@ -126,7 +129,7 @@ function invalidationRequest(
         }
       ),
     },
-    defaultEnv
+    options.env ?? defaultEnv
   );
 }
 
@@ -153,7 +156,7 @@ describe('session access invalidation route', () => {
     vi.resetAllMocks();
   });
 
-  it('rejects the general internal secret alone', async () => {
+  it('rejects the general internal secret when compatibility is disabled', async () => {
     const { cache, closeViewerSockets } = setInvalidationDos();
 
     const res = await invalidationRequest({
@@ -168,6 +171,109 @@ describe('session access invalidation route', () => {
     expect(cache.invalidateOrganization).not.toHaveBeenCalled();
     expect(getUserConnectionDO).not.toHaveBeenCalled();
     expect(closeViewerSockets).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, '', 'true'])(
+    'accepts legacy callers while compatibility is %s',
+    async value => {
+      const { cache, closeViewerSockets } = setInvalidationDos();
+      const res = await invalidationRequest({
+        headers: { 'X-Internal-Secret': 'internal-secret' },
+        env: {
+          ...defaultEnv,
+          INTERNAL_SESSION_AUTH_LEGACY_ENABLED: value,
+          SESSION_INGEST_INVALIDATION_SIGNING_SECRET_PROD: { get: async () => '' },
+        },
+      });
+      expect(res.status).toBe(204);
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      expect(cache.invalidateOrganization).toHaveBeenCalledWith(INVALIDATION_ORG_ID);
+      expect(closeViewerSockets).toHaveBeenCalled();
+    }
+  );
+
+  it.each(['false', 'FALSE', 'invalid'])('rejects legacy auth with flag %s', async value => {
+    const { cache } = setInvalidationDos();
+    const res = await invalidationRequest({
+      headers: { 'X-Internal-Secret': 'internal-secret' },
+      env: { ...defaultEnv, INTERNAL_SESSION_AUTH_LEGACY_ENABLED: value },
+    });
+    expect(res.status).toBe(401);
+    expect(cache.invalidateOrganization).not.toHaveBeenCalled();
+  });
+
+  it('rejects an incorrect legacy secret during compatibility', async () => {
+    const { cache } = setInvalidationDos();
+    const res = await invalidationRequest({
+      headers: { 'X-Internal-Secret': 'incorrect-secret' },
+      env: { ...defaultEnv, INTERNAL_SESSION_AUTH_LEGACY_ENABLED: 'true' },
+    });
+    expect(res.status).toBe(401);
+    expect(cache.invalidateOrganization).not.toHaveBeenCalled();
+  });
+
+  it.each(['', 'Basic malformed', 'Bearer ', 'Bearer not-a-jwt'])(
+    'does not replace Authorization %j with a valid legacy credential',
+    async authorization => {
+      const { cache } = setInvalidationDos();
+      const res = await invalidationRequest({
+        headers: { authorization, 'X-Internal-Secret': 'internal-secret' },
+        env: { ...defaultEnv, INTERNAL_SESSION_AUTH_LEGACY_ENABLED: 'true' },
+      });
+      expect(res.status).toBe(401);
+      expect(cache.invalidateOrganization).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { claims: { expiresInSeconds: -1 }, status: 401 },
+    { claims: { audience: 'another-service' }, status: 401 },
+    { claims: { userId: 'another-user' }, status: 403 },
+    { claims: { organizationId: '22222222-2222-4222-8222-222222222222' }, status: 403 },
+  ])('preserves bearer checks with a legacy header: %j', async ({ claims, status }) => {
+    const { cache } = setInvalidationDos();
+    const res = await invalidationRequest({
+      token: await signedInvalidationToken(claims),
+      headers: { 'X-Internal-Secret': 'internal-secret' },
+      env: { ...defaultEnv, INTERNAL_SESSION_AUTH_LEGACY_ENABLED: 'true' },
+    });
+    expect(res.status).toBe(status);
+    expect(cache.invalidateOrganization).not.toHaveBeenCalled();
+  });
+
+  it('uses the bearer when both credentials are present', async () => {
+    const { cache } = setInvalidationDos();
+    const audit = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    try {
+      const res = await invalidationRequest({
+        token: await signedInvalidationToken(),
+        headers: { 'X-Internal-Secret': 'incorrect-secret' },
+        env: { ...defaultEnv, INTERNAL_SESSION_AUTH_LEGACY_ENABLED: 'true' },
+      });
+      expect(res.status).toBe(204);
+      expect(cache.invalidateOrganization).toHaveBeenCalledWith(INVALIDATION_ORG_ID);
+      expect(audit).toHaveBeenCalledWith(expect.stringContaining('"authMethod":"bearer"'));
+    } finally {
+      audit.mockRestore();
+    }
+  });
+
+  it('returns a retryable failure when the legacy secret store is unavailable', async () => {
+    const { cache } = setInvalidationDos();
+    const res = await invalidationRequest({
+      headers: { 'X-Internal-Secret': 'internal-secret' },
+      env: {
+        ...defaultEnv,
+        INTERNAL_SESSION_AUTH_LEGACY_ENABLED: 'true',
+        INTERNAL_API_SECRET_PROD: {
+          get: async () => {
+            throw new Error('unavailable');
+          },
+        },
+      },
+    });
+    expect(res.status).toBe(503);
+    expect(cache.invalidateOrganization).not.toHaveBeenCalled();
   });
 
   it('rejects a credential signed with the general internal secret', async () => {

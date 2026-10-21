@@ -9,6 +9,7 @@
   "placement": { "mode": "smart" },
   "observability": { "enabled": true },
   "vars": {
+    "INTERNAL_SESSION_AUTH_LEGACY_ENABLED": "true",
     "WORKER_ENV": "production",
     "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
     // APNs auth for Live Activity push. The topic is the iOS bundle id; the

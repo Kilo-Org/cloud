@@ -5,6 +5,7 @@ import {
   redactSensitiveBase64Body,
   redactSensitiveBody,
   redactSensitiveHeaders,
+  renderResponseBody,
 } from './browser-tool-redaction';
 
 const encode = (text: string): string => btoa(text);
@@ -301,5 +302,32 @@ describe('base64 body redaction', () => {
 
   it('returns undefined for text that is not a JSON or form body', () => {
     expect(redactSensitiveBase64Body(encode('plain text body'))).toBeUndefined();
+  });
+
+  it('returns undefined for a payload above the decode bound', () => {
+    const payload = encode(`{"token":"${'a'.repeat(100_000)}"}`);
+
+    expect(payload.length).toBeGreaterThan(100_000);
+    expect(redactSensitiveBase64Body(payload)).toBeUndefined();
+  });
+});
+
+describe('response body rendering', () => {
+  it('replaces fields in a plain body', () => {
+    expect(renderResponseBody('{"token":"t-1"}', false)).toBe(
+      JSON.stringify({ token: '[REDACTED]' }, null, 2)
+    );
+  });
+
+  it('keeps the marker for a body that decodes to nothing to replace', () => {
+    expect(renderResponseBody(encode('{"ok":true}'), true)).toBe(
+      `(base64) ${encode('{"ok":true}')}`
+    );
+  });
+
+  it('marks a decoded body', () => {
+    expect(renderResponseBody(encode('{"token":"t-1"}'), true)).toBe(
+      `(base64, decoded) ${JSON.stringify({ token: '[REDACTED]' }, null, 2)}`
+    );
   });
 });

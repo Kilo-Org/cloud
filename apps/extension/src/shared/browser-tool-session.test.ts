@@ -649,6 +649,7 @@ describe('browser tool session', () => {
 
     const text = JSON.stringify(result);
 
+    expect(text).toContain('(base64, decoded)');
     expect(text).toContain(String.raw`\"sessionId\": \"[REDACTED]\"`);
     expect(text).not.toContain('s-fixture-1');
   });

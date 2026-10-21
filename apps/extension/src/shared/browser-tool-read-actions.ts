@@ -15,9 +15,9 @@ import type { BrowserAriaSnapshotLine, BrowserToolPageSession } from './browser-
 import type { EvalTabResult } from './tab-debugger';
 import type { BrowserConsoleMessage, BrowserNetworkRequest } from './browser-tool-session';
 import {
-  redactSensitiveBase64Body,
   redactSensitiveBody,
   redactSensitiveHeaders,
+  renderResponseBody,
 } from './browser-tool-redaction';
 
 /**
@@ -427,9 +427,7 @@ const requestPartText = async (
     throw new Error(`The response body for request #${String(position)} is not available.`);
   }
 
-  const base64Body = parsed.success && parsed.data.base64Encoded === true;
-  const redacted = base64Body ? redactSensitiveBase64Body(body) : redactSensitiveBody(body);
-  const text = redacted ?? (base64Body ? `(base64) ${body}` : body);
+  const text = renderResponseBody(body, parsed.success && parsed.data.base64Encoded === true);
 
   return text.length > MAX_BROWSER_TOOL_RESPONSE_BODY_LENGTH
     ? `${text.slice(0, MAX_BROWSER_TOOL_RESPONSE_BODY_LENGTH)}... (body truncated)`

@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
 import { KILO_BROWSER_TOOL_PREFIX, toKiloBrowserToolName } from './browser-tool-contract';
 import {
-  redactSensitiveBase64Body,
   redactSensitiveBody,
   redactSensitiveHeaders,
+  renderResponseBody,
 } from './browser-tool-redaction';
 import {
   DEBUGGER_PROTOCOL_VERSION,
@@ -2014,16 +2014,12 @@ export const createBrowserToolSession = ({
           const body = await send('Network.getResponseBody', { requestId: request.requestId });
           const parsedBody = networkBodySchema.safeParse(body);
 
-          if (parsedBody.success) {
-            const text = parsedBody.data.body;
-
-            detail +=
-              parsedBody.data.base64Encoded === true
-                ? `\nresponse body: ${redactSensitiveBase64Body(text) ?? text}`
-                : `\nresponse body: ${redactSensitiveBody(text) ?? text}`;
-          } else {
-            detail += '\nresponse body: unavailable.';
-          }
+          detail += parsedBody.success
+            ? `\nresponse body: ${renderResponseBody(
+                parsedBody.data.body,
+                parsedBody.data.base64Encoded === true
+              )}`
+            : '\nresponse body: unavailable.';
         } catch (error) {
           detail += `\nresponse body: ${error instanceof Error ? error.message : 'unavailable'}`;
         }

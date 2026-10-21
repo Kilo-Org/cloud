@@ -188,14 +188,9 @@ const redactBodyText = (text: string): RedactedBody | undefined => {
 export const redactSensitiveBody = (text: string): string | undefined => redactBodyText(text)?.text;
 
 const decodeBase64Text = (payload: string): string | undefined => {
-  const compact = payload.replaceAll(/\s+/gu, '');
-
-  if (compact === '') {
-    return undefined;
-  }
-
   try {
-    const bytes = Uint8Array.from(atob(compact), character => character.codePointAt(0) ?? 0);
+    // The atob helper strips ASCII whitespace itself, so wrapped payloads need no normalization.
+    const bytes = Uint8Array.from(atob(payload), character => character.codePointAt(0) ?? 0);
 
     // Fatal decoding rejects binary payloads instead of returning replacement glyphs.
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
@@ -205,15 +200,40 @@ const decodeBase64Text = (payload: string): string | undefined => {
 };
 
 /**
+ * Longest base64 payload decoded for replacement, several times the rendered
+ * body cap, so a page-controlled binary payload is never materialized again
+ * just to be truncated afterwards.
+ */
+const MAX_BASE64_PAYLOAD_LENGTH = 100_000;
+
+/**
  * Returns the decoded text of a base64 payload whose structured form has a
- * value replaced, or `undefined` when the payload is binary, not base64, or
- * has nothing to replace, so callers keep the original rendering.
+ * value replaced, or `undefined` when the payload is oversized, binary, not
+ * base64, or has nothing to replace, so callers keep the original rendering.
  */
 export const redactSensitiveBase64Body = (payload: string): string | undefined => {
+  if (payload === '' || payload.length > MAX_BASE64_PAYLOAD_LENGTH) {
+    return undefined;
+  }
+
   const decoded = decodeBase64Text(payload);
   const redacted = decoded === undefined ? undefined : redactBodyText(decoded);
 
   return redacted !== undefined && redacted.changed ? redacted.text : undefined;
+};
+
+/**
+ * Response body text for a CDP body, with the shared replacement applied. A
+ * base64 body keeps a marker; a decoded body states that it was decoded.
+ */
+export const renderResponseBody = (body: string, base64Encoded: boolean | undefined): string => {
+  if (base64Encoded !== true) {
+    return redactSensitiveBody(body) ?? body;
+  }
+
+  const decoded = redactSensitiveBase64Body(body);
+
+  return decoded === undefined ? `(base64) ${body}` : `(base64, decoded) ${decoded}`;
 };
 
 /**

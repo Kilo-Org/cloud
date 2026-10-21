@@ -740,6 +740,7 @@ describe('browser_network_request', () => {
     );
     const text = String(result.ok ? result.value : '');
 
+    expect(text).toContain('(base64, decoded)');
     expect(text).toContain('"refreshToken": "[REDACTED]"');
     expect(text).not.toContain('rt-base64-1');
   });

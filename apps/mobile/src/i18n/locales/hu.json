@@ -41,7 +41,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Nincs csatlakoztatva",
     "notifications": "Értesítések",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Adattárak",
     "securityAgent": "Biztonsági ügynök",
     "unknown": "Ismeretlen",
@@ -293,7 +293,7 @@
     "toolSummaryTranslationModelUnavailableNotice": "Ez a modell már nem elérhető. Koppints a $t(common.model) elemre egy másik kiválasztásához."
   },
   "prReview": {
-    "pullRequestUnavailable": "A módosítási kérelem nem érhető el",
+    "pullRequestUnavailable": "A PR nem érhető el",
     "pullRequestUnavailableDescription": "Ez a PR nem nyitható meg. Lehet, hogy törölték, a tároló privát, vagy nincs hozzá telepítve a Kilo GitHub-alkalmazása.",
     "accessDeniedDescription": "Nincs jogosultságod a módosítási kérelem megtekintéséhez.",
     "noFilesChanged": "Nincs módosított fájl",
@@ -323,7 +323,7 @@
       "diffTooLarge": "túl nagy a különbségnézet",
       "openFile": "{{path}} megnyitása",
       "openFileViewed": "{{path}} megnyitása (megtekintve)",
-      "title": "Fájl"
+      "title": "Fájlok"
     },
     "fileRows": {
       "markViewed": "{{path}} megjelölése megtekintettként",
@@ -397,8 +397,8 @@
     "merge": {
       "merge": "Összevonás",
       "mergeNow": "Összevonás most",
-      "mergePullRequest": "Módosítási kérelem összevonása",
-      "mergeTermTitle": "{{term}} összevonása",
+      "mergePullRequest": "PR összevonása",
+      "mergeTermTitle": "A {{term}} összevonása",
       "enableAutoMerge": "Automatikus összevonás engedélyezése",
       "disableAutoMerge": "Automatikus összevonás letiltása",
       "autoMergeOn": "Automatikus összevonás bekapcsolva",
@@ -417,13 +417,13 @@
       "deleteBranchAfterMerge": "Ág törlése az összevonás után",
       "noEnabledMethods": "Ebben a tárolóban nincs engedélyezett összevonási módszer. Kérd meg a tároló egyik adminisztrátorát, hogy engedélyezze az összevonást, az egyesítést vagy az újraalapozást.",
       "confirmTitle": "Összevonod a módosítási kérelmet?",
-      "confirmTitleTerm": "{{term}} összevonása?",
+      "confirmTitleTerm": "Összevonod a {{term}}?",
       "confirmMessage": "Ezzel a módosításaid bekerülnek az alapágba.",
       "enableAutoMergeConfirmTitle": "Engedélyezed az automatikus összevonást?",
       "enableAutoMergeConfirmMessage": "A GitHub automatikusan összevonja ezt a módosítási kérelmet, amint minden kötelező ellenőrzés sikeres.",
       "enableAutoMergeConfirmMessageTerm": "A pipeline sikeres lefutása után a {{term}} automatikusan összevonásra kerül.",
       "enableAutoMergeDescriptionTerm": "A GitLab automatikusan elvégzi a {{term}} összevonását, amint a pipeline sikeres.",
-      "forbidden": "Nincs jogosultságod a módosítási kérelem összevonásához.",
+      "forbidden": "Nincs jogosultságod a PR összevonásához.",
       "cannotMerge": "Ez a módosítási kérelem a jelenlegi formájában nem vonható össze.",
       "couldNotMerge": "Nem sikerült összevonni a módosítási kérelmet.",
       "methods": {
@@ -440,14 +440,14 @@
         "body": "Nem sikerült törölni az ágat. Az ok: {{reason}}.",
         "accessibility": "Összevonva. Nem sikerült törölni az ágat: {{reason}}"
       },
-      "loadFailedTitle": "Nem sikerült betölteni az összevonási lehetőségeket.",
+      "loadFailedTitle": "Nem sikerült betölteni az összevonási lehetőségeket",
       "blocked": {
         "unknownStateTitle": "A GitHub még nem jelezte, hogy elvégezhető az összevonás",
         "unknownStateDetail": "Kis idő múlva próbáld frissíteni az áttekintést.",
         "conflictsTitle": "Összevonási konfliktusok",
         "conflictsDetail": "Az összevonás előtt oldd fel az ág összevonási konfliktusait.",
         "requiredReviewsTitle": "Hiányoznak a kötelező kódellenőrzések",
-        "requiredReviewsDetail": "A kijelölt kódellenőrök jóváhagyásai hiányoznak vagy még függőben vannak.",
+        "requiredReviewsDetail": "A kötelező kódellenőrök jóváhagyásai hiányoznak vagy még függőben vannak.",
         "failingChecksTitle": "Sikertelen kötelező ellenőrzések",
         "failingChecksDetail": "A kötelező állapotellenőrzések sikertelenek.",
         "unstableTitle": "Egyes ellenőrzések sikertelenek",
@@ -461,14 +461,14 @@
         "notMergeableDetail": "A GitHub által jelzett összevonhatósági állapot: {{state}}."
       },
       "restrictions": {
-        "title": "Egyesítési korlátozások",
+        "title": "Összevonási korlátozások",
         "approvalsRequired_one": "{{displayCount}} jóváhagyás szükséges",
         "approvalsRequired_other": "{{displayCount}} jóváhagyás szükséges",
-        "pipelineMustSucceed": "A pipeline-nak sikeresnek kell lennie az egyesítés előtt."
+        "pipelineMustSucceed": "A pipeline-nak sikeresnek kell lennie az összevonás előtt."
       },
       "providerBlocked": {
         "failingPipeline": "A pipeline hibázik a legutóbbi commiton.",
-        "pendingPipeline": "A pipeline még fut a legutóbbi committal.",
+        "pendingPipeline": "A pipeline még fut a legutóbbi commiton.",
         "permission": "Nincs jogosultságod a {{term}} összevonásához.",
         "draft": "Az összevonás előtt jelöld a {{term}} kódellenőrzésre késznek."
       },
@@ -672,10 +672,10 @@
     },
     "submit": {
       "loadFailedTitle": "Nem sikerült betölteni a kódellenőrzés elküldési felületét.",
-      "deletePendingTitle": "Törlöd a függőben lévő hozzászólást?",
+      "deletePendingTitle": "Törlöd az elküldésre váró hozzászólást?",
       "deletePendingMessage": "Ez a hozzászólás eltűnik a kódellenőrzés küldésre váró hozzászólásai közül.",
       "summaryOptional": "Összefoglaló (nem kötelező)",
-      "pendingComment_one": "függőben lévő hozzászólás",
+      "pendingComment_one": "elküldésre váró hozzászólás",
       "pendingComment": "elküldésre váró hozzászólás",
       "pendingComment_other": "elküldésre váró hozzászólás",
       "submitCountOfTotal": "{{displayFreshCount}} / {{displayTotalCount}} hozzászólás elküldése",
@@ -701,7 +701,7 @@
       "stateOpenApproved": "Nyitva · Jóváhagyva",
       "stateOpenChangesRequested": "Nyitva · Módosítások kérve",
       "stateOpenReviewRequired": "Nyitva · Kódellenőrzés szükséges",
-      "stateOpen": "Megnyitás",
+      "stateOpen": "Nyitva",
       "unknownAuthor": "Ismeretlen szerző",
       "commit_one": "commit",
       "commit": "commit",
@@ -738,14 +738,14 @@
     },
     "tabs": {
       "overview": "Áttekintés",
-      "files": "Fájl",
+      "files": "Fájlok",
       "discussion": "Beszélgetés"
     },
     "fileStatus": {
       "modified": "Módosítva",
       "renamed": "Átnevezve",
       "copied": "Másolva",
-      "changed": "Módosítva"
+      "changed": "Változott"
     },
     "diff": {
       "selectedTapToChange": "Kijelölve: {{label}}, koppints a kijelölés módosításához",
@@ -794,7 +794,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Merge request megosztása",
       "viewOnProvider": "Megtekintés itt: {{provider}}",
       "mergeRequestUnavailable": "A merge request nem érhető el",

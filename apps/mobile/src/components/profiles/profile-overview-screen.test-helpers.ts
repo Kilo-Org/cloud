@@ -49,6 +49,26 @@ export function testProfile(overrides: Partial<TestProfileDetail> = {}): TestPro
   };
 }
 
+/** Return the state the overview reads to its idle values before each test. */
+export function resetOverviewState(state: {
+  query: {
+    data: TestProfileDetail | undefined;
+    isError: boolean;
+    isPending: boolean;
+    isRefetching: boolean;
+  };
+  mutations: { update: { isPending: boolean }; deleteProfile: { isPending: boolean } };
+}): void {
+  Object.assign(state.query, {
+    data: undefined,
+    isError: false,
+    isPending: true,
+    isRefetching: false,
+  });
+  Object.assign(state.mutations.update, { isPending: false });
+  Object.assign(state.mutations.deleteProfile, { isPending: false });
+}
+
 export function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
 }

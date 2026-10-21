@@ -75,10 +75,16 @@ vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/icons', async () => {
-  const icons = await import('@/components/profiles/profile-overview-icons');
-  return icons;
-});
+vi.mock('@/components/ui/icons', () => ({
+  Bot: 'Bot',
+  CornerDownLeft: 'CornerDownLeft',
+  KeyRound: 'KeyRound',
+  Server: 'Server',
+  Sparkles: 'Sparkles',
+  Star: 'Star',
+  Terminal: 'Terminal',
+  Trash2: 'Trash2',
+}));
 
 /**
  * A failed refetch must not make a cached profile unopenable: the overview

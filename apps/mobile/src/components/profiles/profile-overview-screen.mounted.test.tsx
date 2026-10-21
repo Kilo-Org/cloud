@@ -11,6 +11,7 @@ import {
   pressDelete,
   pressSave,
   rerenderScreen,
+  resetOverviewState,
   testProfile,
   type TestProfileDetail,
 } from '@/components/profiles/profile-overview-screen.test-helpers';
@@ -95,23 +96,22 @@ vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/icons', async () => {
-  const icons = await import('@/components/profiles/profile-overview-icons');
-  return icons;
-});
+vi.mock('@/components/ui/icons', () => ({
+  Bot: 'Bot',
+  CornerDownLeft: 'CornerDownLeft',
+  KeyRound: 'KeyRound',
+  Server: 'Server',
+  Sparkles: 'Sparkles',
+  Star: 'Star',
+  Terminal: 'Terminal',
+  Trash2: 'Trash2',
+}));
 
 describe('ProfileOverviewScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.connectivity = 'online';
-    Object.assign(h.query, {
-      data: undefined,
-      isError: false,
-      isPending: true,
-      isRefetching: false,
-    });
-    Object.assign(h.mutations.update, { isPending: false });
-    Object.assign(h.mutations.deleteProfile, { isPending: false });
+    resetOverviewState(h);
   });
 
   it('loading: renders skeleton rows and no content rows', async () => {

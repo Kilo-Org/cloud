@@ -322,7 +322,7 @@
       "retryLoadingAllFiles": "Az összes fájl betöltésének megismétlése",
       "retryLoadingMoreFiles": "További fájlok betöltésének megismétlése",
       "noMatches": "Nincs a keresésnek megfelelő fájl: „{{query}}”.",
-      "diffTooLarge": "túl nagy a különbségnézet",
+      "diffTooLarge": "túl nagy a különbség",
       "openFile": "{{path}} megnyitása",
       "openFileViewed": "{{path}} megnyitása (megtekintve)",
       "title": "Fájlok"
@@ -589,7 +589,7 @@
     "couldNotOpenGitHubAppSettings": "Nem sikerült megnyitni a GitHub-alkalmazás beállításait.",
     "installKiloGitHubApp": "A Kilo GitHub-alkalmazásának telepítése",
     "checkConnection": "Kapcsolat ellenőrzése",
-    "couldNotLoadPullRequest": "Nem sikerült betölteni a módosítási kérelmet.",
+    "couldNotLoadPullRequest": "Nem sikerült betölteni a módosítási kérelmet",
     "description": "Leírás",
     "noDescriptionProvided": "Nincs megadva leírás.",
     "review": "Ellenőrzés",
@@ -602,11 +602,11 @@
       "removeFromRecentsTitle": "Eltávolítod az előzményekből?",
       "removeFromRecentsMessage": "Ez a kódellenőrzés eltűnik az előzményeidből.",
       "removeRecentAccessibility": "{{repo}} eltávolítása az előzményekből",
-      "urlAccessibility": "Add meg egy PR vagy merge request URL-címét",
+      "urlAccessibility": "Add meg egy módosítási kérelem vagy merge request URL-címét",
       "urlPlaceholder": "Módosítási kérelem vagy merge request URL",
       "openAccessibility": "Módosítási kérelem vagy merge request megnyitása",
       "clearLink": "Hivatkozás törlése",
-      "pasteLink": "PR- vagy merge request-hivatkozás beillesztése",
+      "pasteLink": "Módosítási kérelem vagy merge request-hivatkozás beillesztése",
       "open": "Megnyitás"
     },
     "checks": {
@@ -635,7 +635,7 @@
       "couldNotLoad": "Nem sikerült betölteni a beérkezett kérelmeket."
     },
     "composer": {
-      "commentBodyPlaceholder": "Hozzászólás szövege",
+      "commentBodyPlaceholder": "Írj hozzászólást",
       "commentBody": "Hozzászólás szövege",
       "commentNow": "Hozzászólás küldése most",
       "addToReview": "Hozzáadás a kódellenőrzéshez",
@@ -643,7 +643,7 @@
       "addTitle": "Hozzászólás hozzáadása",
       "unavailableTitle": "A hozzászólás nem érhető el",
       "unavailableMessage": "Ezt a függőben lévő hozzászólást már törölték vagy elküldték.",
-      "ok": "RENDBEN",
+      "ok": "Rendben",
       "loadFailedTitle": "Nem sikerült betölteni a hozzászólásszerkesztőt.",
       "discardTitle": "Elveted a hozzászólást?",
       "discardMessage": "A piszkozatod elvész.",
@@ -655,15 +655,15 @@
       "tapDiffLineToSuggest": "Javaslat írásához koppints a különbségnézet egyik sorára."
     },
     "connect": {
-      "checkFailedTitle": "Nem sikerült ellenőrizni a GitHub-kapcsolatot.",
+      "checkFailedTitle": "Nem sikerült ellenőrizni a GitHub-kapcsolatot",
       "checkFailedMessage": "A bejelentkezési állapot csak a betöltés után érhető el.",
-      "checkFailedTitleGitLab": "Nem sikerült ellenőrizni a GitLab-kapcsolatot.",
-      "checkFailedTitleBitbucket": "Nem sikerült ellenőrizni a Bitbucket-kapcsolatot.",
+      "checkFailedTitleGitLab": "Nem sikerült ellenőrizni a GitLab-kapcsolatot",
+      "checkFailedTitleBitbucket": "Nem sikerült ellenőrizni a Bitbucket-kapcsolatot",
       "providerCheckFailedMessage": "A kapcsolódási állapot csak a betöltés után érhető el.",
       "reconnectTitle": "Újracsatlakozás a GitHubhoz",
       "reconnectDescription": "Visszavonták a GitHub-kapcsolatod engedélyét. Csatlakozz újra, hogy mobilon is folytathasd a módosítási kérelmek kódellenőrzését.",
       "description": "Csatlakoztasd a GitHub-fiókodat a módosítási kérelmek mobilos kódellenőrzéséhez.",
-      "gitlabDescription": "Csatlakoztasd a GitLab-fiókodat a merge requests kódellenőrzéséhez mobilon.",
+      "gitlabDescription": "Csatlakoztasd a GitLab-fiókodat a merge requestek kódellenőrzéséhez mobilon.",
       "bitbucketDescription": "Csatlakoztasd a Bitbucketot ehhez a szervezethez a módosítási kérelmek mobilos kódellenőrzéséhez.",
       "bitbucketOrgOnlyDescription": "Váltsd a fenti fiókot egy szervezetre a Bitbucket-módosítási kérelmek kódellenőrzéséhez.",
       "contextLine": "{{organization}} számára"
@@ -696,7 +696,7 @@
     "eventChips": {
       "comment": "Hozzászólás",
       "requestChanges": "Módosítások kérése",
-      "label": "Kódellenőrzés eredménye"
+      "label": "Kódellenőrzési művelet"
     },
     "overview": {
       "stateMerged": "Összevonva",
@@ -753,7 +753,7 @@
       "selectedTapToChange": "Kijelölve: {{label}}, koppints a kijelölés módosításához",
       "tapToComment": "{{label}}, koppints a hozzászóláshoz",
       "truncationBanner": "A GitHub API korlátja miatt a {{total}} módosított fájl közül csak az első {{limit}} látható.",
-      "statusContext": "Környező sorok",
+      "statusContext": "Kontextus",
       "lineLabel": "{{line}}. sor, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(üres)",

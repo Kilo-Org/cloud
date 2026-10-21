@@ -7,6 +7,8 @@
  * reject invalid input before it reaches the API.
  */
 
+import { foldForSearch } from '@/i18n/fold-for-search';
+
 /** Server bound: `ProfileNameSchema`'s `z.string().min(1).max(100)`. */
 const PROFILE_NAME_MAX_LENGTH = 100;
 
@@ -96,20 +98,19 @@ export type SkillInputError = 'empty' | 'bad-name' | 'no-content';
 
 /**
  * The skill name a pasted SKILL.md offers for the name field: its frontmatter
- * `name`, reduced to the server's pattern. Case is lowered, each run outside
- * `[a-z0-9]` becomes one dash, and edge dashes are dropped, so `My Skill` fills
- * `my-skill`. A name with no ASCII letter or digit left — a name written in
- * another script — fills nothing, because filling it would only produce a value
- * `validateSkillInput` rejects.
+ * `name`, folded and reduced to the server's pattern. Case and diacritics are
+ * folded the way the app's search folds them, each run outside `[a-z0-9]`
+ * becomes one dash, and edge dashes are dropped, so `My Skill` fills `my-skill`
+ * and `Müller` fills `muller`. A name with no ASCII letter or digit left — a
+ * name written in another script — fills nothing, because filling it would only
+ * produce a value `validateSkillInput` rejects.
  */
 export function skillNameFromMarkdown(markdown: string): string | undefined {
   const { name } = parseSkillFrontmatter(markdown);
   if (name === undefined) {
     return undefined;
   }
-  const slug = name
-    .normalize('NFKD')
-    .toLowerCase()
+  const slug = foldForSearch(name)
     .replaceAll(/[^a-z0-9]+/g, '-')
     .replace(/^-+/, '')
     .replace(/-+$/, '')

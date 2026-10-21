@@ -141,6 +141,10 @@ describe('skillNameFromMarkdown', () => {
     expect(skillNameFromMarkdown(skillMarkdown('code-review'))).toBe('code-review');
   });
 
+  it('folds an accented name into one word instead of splitting it', () => {
+    expect(skillNameFromMarkdown(skillMarkdown('naïve café'))).toBe('naive-cafe');
+  });
+
   it('fills nothing for a name written in another script', () => {
     expect(skillNameFromMarkdown(skillMarkdown('مراجعة الجودة'))).toBeUndefined();
   });

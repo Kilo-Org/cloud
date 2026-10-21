@@ -172,6 +172,7 @@ export async function reconcileSandboxReferences(
       }
       let located = false;
       for (const session of owner.sessions) {
+        if (!isControlSession(session.cloudAgentSessionId)) continue;
         let locator: SessionRuntimeLocator | null;
         try {
           locator = await lookupSessionRuntimeLocator(

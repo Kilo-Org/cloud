@@ -724,13 +724,16 @@ describe('server /terminal', () => {
 });
 
 describe('server runtime credential proxy', () => {
-  async function handle(kiloSessionId = 'kilo_proxy'): Promise<string> {
+  async function handle(
+    kiloSessionId = 'kilo_proxy',
+    sessionId = 'workspace_proxy'
+  ): Promise<string> {
     return issueRuntimeCredentialProxyHandle(
       { NEXTAUTH_SECRET: secret } as never,
       createRuntimeProxyGrant({
         plane: 'legacy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        sessionId: 'workspace_proxy',
+        sessionId,
         kiloSessionId,
         userId: 'usr_proxy',
         orgId: 'org_proxy',
@@ -757,6 +760,25 @@ describe('server runtime credential proxy', () => {
     expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
     expect(upstream).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+
+  it('denies retired agent session handles before resolving a session', async () => {
+    const env = createEnv();
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request('https://worker.test/api/runtime-credential-proxy/provider/models', {
+          headers: { Authorization: `Bearer ${await handle('kilo_proxy', 'agent_proxy')}` },
+        }),
+        env
+      );
+      expect(response.status).toBe(401);
+      expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
+      expect(upstream).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('routes verified facade requests and leaves non-handles to ordinary routing', async () => {

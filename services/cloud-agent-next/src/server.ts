@@ -301,9 +301,6 @@ app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoCo
   if (!sessionId || !sessionIdSchema.safeParse(sessionId).success) {
     return c.text('Invalid sessionId', 400);
   }
-  if (!isControlSession(sessionId)) {
-    return c.text('Invalid sessionId', 400);
-  }
   if (!ptyId || !PtyIdSchema.safeParse(ptyId).success) {
     return c.text('Invalid ptyId', 400);
   }
@@ -463,7 +460,7 @@ async function forwardRuntimeCredentialProxy(
   route: RuntimeCredentialProxyRoute,
   path: string
 ): Promise<Response> {
-  if (!claims) return c.text('Unauthorized', 401);
+  if (!claims || !isControlSession(claims.sessionId)) return c.text('Unauthorized', 401);
   let bodyText: string | undefined;
   if (route === 'ingest' && path === '/api/session' && c.req.method === 'POST') {
     bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;

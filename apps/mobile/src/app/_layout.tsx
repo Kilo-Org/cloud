@@ -967,7 +967,7 @@ function RootLayoutNav({
     // `navigate` (not `replace`): replacing the stack root leaves the target
     // screen with no back stack, the same reasoning as resolvePendingNavigation.
     router.navigate(recordedHref as Href, { withAnchor: true });
-  }, [decision, accountUserId, pathname, router, lastRouteHydratedVersion]);
+  }, [decision, accountUserId, pathname, router, navigationReady, lastRouteHydratedVersion]);
 
   // Declared after the auth effect so that on the same flush a pending
   // deep-link navigate runs first and the share gate opens on top.

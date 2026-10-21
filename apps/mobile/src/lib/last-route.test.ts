@@ -205,6 +205,21 @@ describe('subscribeLastRoute (the restart read)', () => {
     expect(getLastRouteSnapshot()).toBeNull();
   });
 
+  it('a mirrored route pattern reads as absent', async () => {
+    // Written before hrefs were concrete: the segment list carried the
+    // `[profileId]` route pattern, and restoring it opens a screen whose data
+    // reads cannot resolve.
+    store.set(
+      KEY,
+      recordFor('/(app)/(tabs)/(3_profile)/profiles/[profileId]/variables', 'u1')
+    );
+    await _hydrateLastRouteForTests();
+
+    expect(getLastRouteSnapshot()).toBeNull();
+    expect(getLastRoute('u1')).toBeNull();
+    expect(consumeLastRouteForRepair('u1')).toBeNull();
+  });
+
   it('a record written during the restart read owns the state', async () => {
     const gate = Promise.withResolvers<undefined>();
     secureStoreMock.getItemAsync.mockImplementationOnce(async () => {

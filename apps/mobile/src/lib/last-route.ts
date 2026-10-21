@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { LAST_ROUTE_KEY } from '@/lib/storage-keys';
+import { isConcreteLastRouteHref } from '@/lib/last-route-recordable';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 /**
@@ -73,11 +74,17 @@ function notify(): void {
   }
 }
 
-/** Parse a stored record; a corrupt or unreadable mirror reads as absent. */
+/** Parse a stored record; a corrupt, unreadable, or placeholder-bearing mirror reads as absent. */
 function parseStoredRecord(raw: string): LastRouteRecord | null {
   try {
     const result = lastRouteSchema.safeParse(JSON.parse(raw));
-    return result.success ? result.data : null;
+    if (!result.success) {
+      return null;
+    }
+    // A record written before hrefs were concrete names a route pattern
+    // (`profiles/[profileId]/variables`); restoring it opens a screen whose
+    // data reads cannot resolve, so it is dropped instead of replayed once.
+    return isConcreteLastRouteHref(result.data.href) ? result.data : null;
   } catch {
     return null;
   }

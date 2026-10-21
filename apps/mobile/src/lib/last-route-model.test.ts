@@ -1,7 +1,55 @@
 import { describe, expect, it } from 'vitest';
 
-import { isRecordableLastRoute } from './last-route-recordable';
+import {
+  isConcreteLastRouteHref,
+  isRecordableLastRoute,
+  lastRouteHrefFrom,
+} from './last-route-recordable';
 import { shouldRepairRestoredRoute } from './last-route-repair';
+
+describe('isConcreteLastRouteHref', () => {
+  it('accepts a resolved route', () => {
+    expect(isConcreteLastRouteHref('/profiles/p1/variables')).toBe(true);
+    expect(isConcreteLastRouteHref('/agent-chat/ses_1?at=msg_1')).toBe(true);
+  });
+
+  it('rejects a route pattern and an empty href', () => {
+    expect(isConcreteLastRouteHref('/profiles/[profileId]/variables')).toBe(false);
+    expect(isConcreteLastRouteHref('')).toBe(false);
+  });
+});
+
+describe('lastRouteHrefFrom', () => {
+  it('prefers the resolved global href over the pathname', () => {
+    expect(lastRouteHrefFrom('/profiles/p1/variables', '/profiles/[profileId]/variables')).toBe(
+      '/profiles/p1/variables'
+    );
+  });
+
+  it('keeps the query the screen was opened with', () => {
+    expect(lastRouteHrefFrom('/profiles/p1/variables?organizationId=o1', '/profiles/p1/variables')).toBe(
+      '/profiles/p1/variables?organizationId=o1'
+    );
+  });
+
+  it("drops expo-router's launch flag and an emptied query", () => {
+    expect(lastRouteHrefFrom('/agent-chat/ses_1?initial=false', '/agent-chat/ses_1')).toBe(
+      '/agent-chat/ses_1'
+    );
+    expect(
+      lastRouteHrefFrom('/profiles/p1/variables?initial=false&organizationId=o1', '/profiles/p1/variables')
+    ).toBe('/profiles/p1/variables?organizationId=o1');
+  });
+
+  it('falls back to the pathname when the global href is empty', () => {
+    expect(lastRouteHrefFrom('', '/agent-chat/ses_1')).toBe('/agent-chat/ses_1');
+  });
+
+  it('returns null when neither names a concrete route', () => {
+    expect(lastRouteHrefFrom('', '')).toBeNull();
+    expect(lastRouteHrefFrom('/profiles/[profileId]/variables', '/profiles/[profileId]/variables')).toBeNull();
+  });
+});
 
 describe('isRecordableLastRoute', () => {
   it('records in-app surfaces', () => {

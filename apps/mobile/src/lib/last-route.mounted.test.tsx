@@ -16,11 +16,13 @@ import { useRecordLastRoute } from './hooks/use-record-last-route';
 const routerState = vi.hoisted(() => ({
   pathname: '/agent-chat/ses_gone',
   segments: ['(app)', 'agent-chat', 'ses_gone'] as readonly string[],
+  globalHref: '/agent-chat/ses_gone',
 }));
 
 vi.mock('expo-router', () => ({
   usePathname: () => routerState.pathname,
   useSegments: () => routerState.segments,
+  useUnstableGlobalHref: () => routerState.globalHref,
 }));
 
 const store = new Map<string, string>();
@@ -68,6 +70,7 @@ beforeEach(() => {
   store.clear();
   routerState.pathname = '/agent-chat/ses_gone';
   routerState.segments = ['(app)', 'agent-chat', 'ses_gone'];
+  routerState.globalHref = '/agent-chat/ses_gone';
   _resetLastRouteForTests();
   _setSecureStoreForTests(secureStoreMock);
 });
@@ -76,8 +79,8 @@ describe('useRecordLastRoute (mounted)', () => {
   it('records the focused in-app route for the account', async () => {
     await mountProbe('u1');
 
-    expect(getLastRouteSnapshot()?.href).toBe('/(app)/agent-chat/ses_gone');
-    expect(getLastRoute('u1')).toBe('/(app)/agent-chat/ses_gone');
+    expect(getLastRouteSnapshot()?.href).toBe('/agent-chat/ses_gone');
+    expect(getLastRoute('u1')).toBe('/agent-chat/ses_gone');
   });
 
   it('records nothing while the account is unknown', async () => {
@@ -96,16 +99,29 @@ describe('useRecordLastRoute (mounted)', () => {
 
   it('a navigation commit replaces the record with the new path', async () => {
     await mountProbe('u1');
-    expect(getLastRouteSnapshot()?.href).toBe('/(app)/agent-chat/ses_gone');
+    expect(getLastRouteSnapshot()?.href).toBe('/agent-chat/ses_gone');
 
-    routerState.pathname = '/(app)/(tabs)/(3_profile)/profiles/p1/variables';
-    routerState.segments = ['(app)', '(tabs)', '(3_profile)', 'profiles', 'p1', 'variables'];
+    routerState.pathname = '/profiles/p1/variables';
+    routerState.segments = ['(app)', '(tabs)', '(3_profile)', 'profiles', '[profileId]', 'variables'];
+    routerState.globalHref = '/profiles/p1/variables?organizationId=o1&initial=false';
     rerenderProbe();
     await act(async () => {
       await Promise.resolve();
     });
 
-    expect(getLastRouteSnapshot()?.href).toBe('/(app)/(tabs)/(3_profile)/profiles/p1/variables');
+    // The concrete values come from the router's global href: the segment
+    // list still carries the `[profileId]` pattern, and the launch flag is not
+    // screen state.
+    expect(getLastRouteSnapshot()?.href).toBe('/profiles/p1/variables?organizationId=o1');
+  });
+
+  it('records nothing for a route that never resolved past its pattern', async () => {
+    routerState.pathname = '/profiles/[profileId]/variables';
+    routerState.segments = ['(app)', '(tabs)', '(3_profile)', 'profiles', '[profileId]', 'variables'];
+    routerState.globalHref = '/profiles/[profileId]/variables?initial=false';
+    await mountProbe('u1');
+
+    expect(getLastRouteSnapshot()).toBeNull();
   });
 
   it('the record reaches the SecureStore mirror', async () => {
@@ -113,7 +129,7 @@ describe('useRecordLastRoute (mounted)', () => {
     await _hydrateLastRouteForTests();
 
     // A fresh read from the mirror reproduces the same route for the account.
-    expect(getLastRoute('u1')).toBe('/(app)/agent-chat/ses_gone');
+    expect(getLastRoute('u1')).toBe('/agent-chat/ses_gone');
   });
 });
 
@@ -122,17 +138,18 @@ describe('useRecordLastRoute (mounted)', () => {
 describe('useRecordLastRoute with an explicit clear (mounted)', () => {
   it('a clear between commits keeps the record dropped until the next commit', async () => {
     await mountProbe('u1');
-    expect(getLastRouteSnapshot()?.href).toBe('/(app)/agent-chat/ses_gone');
+    expect(getLastRouteSnapshot()?.href).toBe('/agent-chat/ses_gone');
 
     clearLastRoute();
     expect(getLastRouteSnapshot()).toBeNull();
 
-    routerState.pathname = '/(app)/(tabs)/(0_home)';
+    routerState.pathname = '/';
     routerState.segments = ['(app)', '(tabs)', '(0_home)'];
+    routerState.globalHref = '/';
     rerenderProbe();
     await act(async () => {
       await Promise.resolve();
     });
-    expect(getLastRouteSnapshot()?.href).toBe('/(app)/(tabs)/(0_home)');
+    expect(getLastRouteSnapshot()?.href).toBe('/');
   });
 });

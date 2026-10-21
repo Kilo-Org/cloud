@@ -625,6 +625,34 @@ describe('browser tool session', () => {
     expect(text).not.toContain('rt-fixture-1');
   });
 
+  it('replaces fields inside a base64 response body', async () => {
+    const { debuggerApi, session } = createSession({
+      responseBodies: {
+        r1: { base64Encoded: true, body: btoa('{"ok":true,"sessionId":"s-fixture-1"}') },
+      },
+    });
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Network.requestWillBeSent', {
+      request: { url: 'https://example.com/api' },
+      requestId: 'r1',
+    });
+    debuggerApi.emitEvent(7, 'Network.responseReceived', {
+      requestId: 'r1',
+      response: { status: 200 },
+    });
+
+    const result = await session.callTool('kilo_browser_network_request', {
+      number: 1,
+      part: 'body',
+    });
+
+    const text = JSON.stringify(result);
+
+    expect(text).toContain(String.raw`\"sessionId\": \"[REDACTED]\"`);
+    expect(text).not.toContain('s-fixture-1');
+  });
+
   it('records the frame id and scopes requests since load to the main-frame document', async () => {
     const { debuggerApi, session } = createSession();
 

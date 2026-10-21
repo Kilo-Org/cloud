@@ -1,6 +1,7 @@
 /**
  * Value redaction for browser network tool output, shared by both renderers.
  */
+/* eslint-disable max-lines -- header, JSON, form, and base64 replacement stay in one module so every renderer shares one rule set */
 import { z } from 'zod';
 
 /** Values of headers whose name matches one of these fragments are replaced. */
@@ -89,13 +90,36 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => jsonValueUnion as z.Z
 const isJsonContainer = (value: JsonValue): value is Exclude<JsonValue, null> =>
   value !== null && (Array.isArray(value) || value instanceof Object);
 
-const redactJsonContainer = (value: Exclude<JsonValue, null>): JsonValue => {
+/** A redacted rendering plus whether the walk replaced any value. */
+interface RedactedBody {
+  readonly changed: boolean;
+  readonly text: string;
+}
+
+interface RedactedJson {
+  readonly changed: boolean;
+  readonly value: JsonValue;
+}
+
+const redactJsonContainer = (value: Exclude<JsonValue, null>): RedactedJson => {
   if (Array.isArray(value)) {
-    return value.map(element =>
-      isJsonContainer(element) ? redactJsonContainer(element) : element
-    );
+    let changed = false;
+
+    const elements = value.map(element => {
+      if (!isJsonContainer(element)) {
+        return element;
+      }
+
+      const nested = redactJsonContainer(element);
+      changed = changed || nested.changed;
+
+      return nested.value;
+    });
+
+    return { changed, value: elements };
   }
 
+  let changed = false;
   const result: JsonObject = {};
 
   for (const [key, rawEntry] of Object.entries(value)) {
@@ -103,17 +127,20 @@ const redactJsonContainer = (value: Exclude<JsonValue, null>): JsonValue => {
 
     if (matchesAnyFragment(key, REPLACED_BODY_KEY_FRAGMENTS)) {
       result[key] = BODY_MASK;
+      changed = true;
     } else if (isJsonContainer(entry)) {
-      result[key] = redactJsonContainer(entry);
+      const nested = redactJsonContainer(entry);
+      changed = changed || nested.changed;
+      result[key] = nested.value;
     } else {
       result[key] = entry;
     }
   }
 
-  return result;
+  return { changed, value: result };
 };
 
-const redactJsonBody = (text: string): string | undefined => {
+const redactJsonBody = (text: string): RedactedBody | undefined => {
   let raw: unknown = undefined;
 
   try {
@@ -128,14 +155,12 @@ const redactJsonBody = (text: string): string | undefined => {
     return undefined;
   }
 
-  return JSON.stringify(redactJsonContainer(parsed.data), null, 2);
+  const redacted = redactJsonContainer(parsed.data);
+
+  return { changed: redacted.changed, text: JSON.stringify(redacted.value, null, 2) };
 };
 
-/**
- * Returns the body text with the value of every field whose key matches a
- * listed fragment replaced, or `undefined` when the text is not structured.
- */
-export const redactSensitiveBody = (text: string): string | undefined => {
+const redactBodyText = (text: string): RedactedBody | undefined => {
   const trimmed = text.trimStart();
 
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
@@ -147,10 +172,48 @@ export const redactSensitiveBody = (text: string): string | undefined => {
   }
 
   if (trimmed.includes('=')) {
-    return redactFormBody(text);
+    // The form passes report a body only when they replaced something.
+    const form = redactFormBody(text);
+
+    return form === undefined ? undefined : { changed: true, text: form };
   }
 
   return undefined;
+};
+
+/**
+ * Returns the body text with the value of every field whose key matches a
+ * listed fragment replaced, or `undefined` when the text is not structured.
+ */
+export const redactSensitiveBody = (text: string): string | undefined => redactBodyText(text)?.text;
+
+const decodeBase64Text = (payload: string): string | undefined => {
+  const compact = payload.replaceAll(/\s+/gu, '');
+
+  if (compact === '') {
+    return undefined;
+  }
+
+  try {
+    const bytes = Uint8Array.from(atob(compact), character => character.codePointAt(0) ?? 0);
+
+    // Fatal decoding rejects binary payloads instead of returning replacement glyphs.
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Returns the decoded text of a base64 payload whose structured form has a
+ * value replaced, or `undefined` when the payload is binary, not base64, or
+ * has nothing to replace, so callers keep the original rendering.
+ */
+export const redactSensitiveBase64Body = (payload: string): string | undefined => {
+  const decoded = decodeBase64Text(payload);
+  const redacted = decoded === undefined ? undefined : redactBodyText(decoded);
+
+  return redacted !== undefined && redacted.changed ? redacted.text : undefined;
 };
 
 /**

@@ -1,6 +1,13 @@
+/* eslint-disable max-lines -- one suite per replacement rule; the expected strings keep the input key order */
 /* eslint-disable sort-keys -- the expected string preserves the input JSON key order */
 import { describe, expect, it } from 'vitest';
-import { redactSensitiveBody, redactSensitiveHeaders } from './browser-tool-redaction';
+import {
+  redactSensitiveBase64Body,
+  redactSensitiveBody,
+  redactSensitiveHeaders,
+} from './browser-tool-redaction';
+
+const encode = (text: string): string => btoa(text);
 
 describe('header redaction', () => {
   it('replaces the values of listed header names', () => {
@@ -260,5 +267,39 @@ describe('body redaction', () => {
 
   it('returns undefined for free-text bodies', () => {
     expect(redactSensitiveBody('plain text body')).toBeUndefined();
+  });
+});
+
+describe('base64 body redaction', () => {
+  it('replaces listed keys in a base64 JSON body', () => {
+    expect(redactSensitiveBase64Body(encode('{"ok":true,"password":"hunter2"}'))).toBe(
+      JSON.stringify({ ok: true, password: '[REDACTED]' }, null, 2)
+    );
+  });
+
+  it('replaces listed pairs in a base64 urlencoded body', () => {
+    expect(redactSensitiveBase64Body(encode('user=ada&password=hunter2'))).toBe(
+      'user=ada&password=[REDACTED]'
+    );
+  });
+
+  it('decodes a wrapped payload', () => {
+    const encoded = encode('{"token":"t-1"}');
+
+    expect(redactSensitiveBase64Body(`${encoded.slice(0, 4)}\n${encoded.slice(4)}`)).toBe(
+      JSON.stringify({ token: '[REDACTED]' }, null, 2)
+    );
+  });
+
+  it('returns undefined when the decoded body has nothing to replace', () => {
+    expect(redactSensitiveBase64Body(encode('{"ok":true}'))).toBeUndefined();
+  });
+
+  it('returns undefined for a binary payload', () => {
+    expect(redactSensitiveBase64Body(encode('\u0089PNG\r\n\u001A\n'))).toBeUndefined();
+  });
+
+  it('returns undefined for text that is not a JSON or form body', () => {
+    expect(redactSensitiveBase64Body(encode('plain text body'))).toBeUndefined();
   });
 });

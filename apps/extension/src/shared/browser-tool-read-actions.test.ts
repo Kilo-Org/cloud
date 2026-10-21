@@ -724,6 +724,26 @@ describe('browser_network_request', () => {
     expect(String(result.ok ? result.value : '')).toContain('(base64) eyJvayI6dHJ1ZX0=');
   });
 
+  it('replaces listed keys inside a base64 response body', async () => {
+    const { session } = createSession({
+      requestsSinceLoad: [networkRequest('blob', { resourceType: 'XHR', status: 200 })],
+      responseBody: {
+        base64Encoded: true,
+        body: btoa('{"ok":true,"refreshToken":"rt-base64-1"}'),
+      },
+    });
+
+    const result = await runReadBrowserTool(
+      'browser_network_request',
+      { index: 1, part: 'response-body' },
+      session
+    );
+    const text = String(result.ok ? result.value : '');
+
+    expect(text).toContain('"refreshToken": "[REDACTED]"');
+    expect(text).not.toContain('rt-base64-1');
+  });
+
   it('replaces listed keys in JSON request bodies returned for the explicit part', async () => {
     const { session } = createSession({
       requestsSinceLoad: [

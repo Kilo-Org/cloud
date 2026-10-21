@@ -14,7 +14,11 @@ import {
 import type { BrowserAriaSnapshotLine, BrowserToolPageSession } from './browser-tool-snapshot';
 import type { EvalTabResult } from './tab-debugger';
 import type { BrowserConsoleMessage, BrowserNetworkRequest } from './browser-tool-session';
-import { redactSensitiveBody, redactSensitiveHeaders } from './browser-tool-redaction';
+import {
+  redactSensitiveBase64Body,
+  redactSensitiveBody,
+  redactSensitiveHeaders,
+} from './browser-tool-redaction';
 
 /**
  * The eight upstream Playwright MCP read-only tools (`readOnlyHint: true`),
@@ -423,8 +427,9 @@ const requestPartText = async (
     throw new Error(`The response body for request #${String(position)} is not available.`);
   }
 
-  const masked = redactSensitiveBody(body) ?? body;
-  const text = parsed.success && parsed.data.base64Encoded === true ? `(base64) ${masked}` : masked;
+  const base64Body = parsed.success && parsed.data.base64Encoded === true;
+  const redacted = base64Body ? redactSensitiveBase64Body(body) : redactSensitiveBody(body);
+  const text = redacted ?? (base64Body ? `(base64) ${body}` : body);
 
   return text.length > MAX_BROWSER_TOOL_RESPONSE_BODY_LENGTH
     ? `${text.slice(0, MAX_BROWSER_TOOL_RESPONSE_BODY_LENGTH)}... (body truncated)`

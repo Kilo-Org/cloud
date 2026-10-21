@@ -244,9 +244,6 @@ export async function applyGlanceablePushData(
 
   const snapshot: GlanceableAgentsSnapshot = {
     ...fields,
-    // The push schema keeps `needsApproval` optional for older servers; the
-    // snapshot it feeds is total and every reader treats absent as 0.
-    needsApproval: fields.needsApproval ?? 0,
     revision: current === null ? fields.revision : current.revision + 1,
     accountEpoch: authEpoch,
   };

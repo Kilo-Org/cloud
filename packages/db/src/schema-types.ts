@@ -2435,6 +2435,72 @@ export const VercelModelIdOverridesConfigSchema = z.object({
 
 export type VercelModelIdOverridesConfig = z.infer<typeof VercelModelIdOverridesConfigSchema>;
 
+export const PREFERRED_PROVIDER_ORDER_MAX_RULES = 200;
+export const PREFERRED_PROVIDER_ORDER_MAX_PROVIDERS = 20;
+
+/** An OpenRouter provider slug, optionally with an endpoint variant such as `minimax/fp8`. */
+export const PreferredProviderSlugSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^[a-z0-9.-]+(\/[a-z0-9.-]+)?$/,
+    'Provider slugs may only contain lowercase letters, digits, . and -, with at most one /'
+  );
+
+export const PreferredProviderOrderRuleSchema = z.object({
+  substring: z
+    .string()
+    .trim()
+    .regex(
+      /^[a-z0-9./:~-]+$/,
+      'Substrings may only contain lowercase letters, digits, and . / : ~ -'
+    ),
+  providers: z
+    .array(PreferredProviderSlugSchema)
+    .max(PREFERRED_PROVIDER_ORDER_MAX_PROVIDERS)
+    .superRefine((providers, ctx) => {
+      const seen = new Set<string>();
+      for (const [index, provider] of providers.entries()) {
+        if (seen.has(provider)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Duplicate provider "${provider}"`,
+            path: [index],
+          });
+        }
+        seen.add(provider);
+      }
+    }),
+});
+
+export type PreferredProviderOrderRule = z.infer<typeof PreferredProviderOrderRuleSchema>;
+
+/**
+ * Ordered rules: the first rule whose `substring` occurs in the requested model
+ * ID decides the provider order, and an empty `providers` list means no
+ * preference. Stored as an array because jsonb does not keep object key order.
+ */
+export const PreferredProviderOrderConfigSchema = z.object({
+  rules: z
+    .array(PreferredProviderOrderRuleSchema)
+    .max(PREFERRED_PROVIDER_ORDER_MAX_RULES)
+    .superRefine((rules, ctx) => {
+      const seen = new Set<string>();
+      for (const [index, { substring }] of rules.entries()) {
+        if (seen.has(substring)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Duplicate substring "${substring}"`,
+            path: [index, 'substring'],
+          });
+        }
+        seen.add(substring);
+      }
+    }),
+});
+
+export type PreferredProviderOrderConfig = z.infer<typeof PreferredProviderOrderConfigSchema>;
+
 // --- StoredModel ---
 
 export const ModelSchema = z.object({

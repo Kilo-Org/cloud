@@ -9,6 +9,7 @@ import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway
 export type VercelModelIdOverrides = ReadonlyMap<string, string>;
 
 const vercelModelPrefixMapping: Record<string, string | undefined> = {
+  'bytedance-seed': 'bytedance',
   mistralai: 'mistral',
   qwen: 'alibaba',
   'x-ai': 'spacexai',

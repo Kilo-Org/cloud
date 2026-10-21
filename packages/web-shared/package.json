@@ -38,6 +38,7 @@
     "@vercel/firewall": "1.2.1",
     "@vercel/functions": "3.4.6",
     "@vercel/otel": "2.1.2",
+    "aws4fetch": "catalog:",
     "date-fns": "4.1.0",
     "dayjs": "1.11.20",
     "drizzle-orm": "catalog:",

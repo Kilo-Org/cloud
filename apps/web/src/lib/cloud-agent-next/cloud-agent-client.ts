@@ -123,6 +123,7 @@ export type AgentMode = string;
 
 /** Shared fields for prepareSession, present on both the non-clone and clone variants. */
 type PrepareSessionSharedFields = {
+  allowSubagentSessions?: boolean;
   githubAccessPurpose?: 'workflow' | 'agent';
   mode: AgentMode;
   model: string;

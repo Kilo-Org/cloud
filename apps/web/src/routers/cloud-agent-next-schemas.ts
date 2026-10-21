@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+import { ParentSessionCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
@@ -390,6 +391,8 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
  * initial turn fields.
  */
 const PrepareSessionSharedFields = {
+  allowSubagentSessions: z.boolean().optional(),
+  callbackTarget: ParentSessionCallbackTargetSchema.optional(),
   // Repository source (mutually exclusive - must provide exactly one)
   githubRepo: z
     .string()
@@ -413,6 +416,17 @@ const PrepareSessionSharedFields = {
       repositoryUuid: z.uuid(),
     })
     .strict()
+    .optional(),
+  /**
+   * Local-development only: clone a public repository by URL when no
+   * source-control integration is configured. Mirrors the E2E harness's
+   * `E2E_GIT_URL` path, which clones anonymously as `type: 'git'`. The
+   * prepareSession handlers reject it outside development.
+   */
+  publicRepoUrl: z
+    .string()
+    .url('Enter a valid repository URL')
+    .refine(value => /^https:\/\//i.test(value), 'Must be an https git URL')
     .optional(),
 
   // Execution params (required)
@@ -485,7 +499,7 @@ export const basePrepareSessionNextSchema = z
   .and(egressPolicySchema)
   .refine(
     data =>
-      [data.githubRepo, data.gitlabProject, data.bitbucketRepo].filter(
+      [data.githubRepo, data.gitlabProject, data.bitbucketRepo, data.publicRepoUrl].filter(
         repository => repository !== undefined
       ).length === 1,
     {

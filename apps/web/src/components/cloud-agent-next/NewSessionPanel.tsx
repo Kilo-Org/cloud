@@ -63,7 +63,12 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Button as UIButton } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import {
+  isPublicRepoUrlEnabled,
+  isValidPublicGitUrl,
+} from '@/lib/cloud-agent-next/public-repo-url';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 import {
@@ -138,6 +143,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const initialComposerFocusedRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
   const creationGuardRef = useRef<FirstChatCreationGuard | null>(null);
@@ -197,6 +203,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   useEffect(() => {
     if (discardedPrompt !== null) clearDiscardedPrompt();
   }, [clearDiscardedPrompt, discardedPrompt]);
+  useEffect(() => {
+    if (initialComposerFocusedRef.current) return;
+    initialComposerFocusedRef.current = true;
+    if (!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
+    textareaRef.current?.focus({ preventScroll: true });
+  }, []);
   const [selectedRepo, setSelectedRepo] = useState('');
   const [selectedGitHubIntegrationId, setSelectedGitHubIntegrationId] = useState<
     string | undefined
@@ -208,6 +220,16 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
   const [showRepositoryRequiredMessage, setShowRepositoryRequiredMessage] = useState(false);
+  // Dev-only: clone a public repository by URL when no source-control
+  // integration is configured. See `public-repo-url`.
+  const [publicRepoUrl, setPublicRepoUrl] = useState('');
+  const isPublicRepoDevEnabled = isPublicRepoUrlEnabled();
+  const trimmedPublicRepoUrl = publicRepoUrl.trim();
+  const publicRepoUrlError =
+    trimmedPublicRepoUrl.length > 0 && !isValidPublicGitUrl(trimmedPublicRepoUrl)
+      ? 'Enter an https git URL'
+      : null;
+  const hasPublicRepo = trimmedPublicRepoUrl.length > 0 && publicRepoUrlError === null;
   const [attachmentMessageUuid, setAttachmentMessageUuid] = useState(() => uuidv4());
   // Repo profile bindings are only keyed by GitHub/GitLab today.
   const profileBindingPlatform: Exclude<RepositoryPlatform, 'bitbucket'> | undefined =
@@ -539,6 +561,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       setSelectedGitHubIntegrationId(
         repo.platform === 'github' ? repo.platformIntegrationId : undefined
       );
+      setPublicRepoUrl('');
       setShowRepositoryRequiredMessage(false);
       if (userInitiated) setIsRepoUserSelected(true);
       if (repo.platform) {
@@ -999,6 +1022,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     organizationId: organizationId ?? null,
     repository: selectedRepo,
     platform: selectedPlatform,
+    publicRepoUrl: hasPublicRepo ? trimmedPublicRepoUrl : null,
     ...(organizationId && selectedPlatform === 'github'
       ? { githubIntegrationId: selectedGitHubIntegrationId }
       : {}),
@@ -1016,6 +1040,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     prompt.trim().length > 0 &&
     !isPromptTooLong &&
     model.length > 0 &&
+    !publicRepoUrlError &&
     !sandboxSelectionError &&
     (!hasInsufficientBalance || limitedAccessModelIsAllowed) &&
     !attachmentUpload.hasUploadingAttachments;
@@ -1038,17 +1063,22 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       guard.end();
       return;
     }
-    if (!selectedRepo) {
+    if (!selectedRepo && !hasPublicRepo) {
       setShowRepositoryRequiredMessage(true);
       guard.end();
       return;
     }
-    if (organizationId && selectedPlatform === 'github' && !selectedGitHubIntegrationId) {
+    if (
+      !hasPublicRepo &&
+      organizationId &&
+      selectedPlatform === 'github' &&
+      !selectedGitHubIntegrationId
+    ) {
       toast.error('Select the GitHub repository again.');
       guard.end();
       return;
     }
-    if (selectedPlatform === 'bitbucket' && !bitbucketRepo) {
+    if (!hasPublicRepo && selectedPlatform === 'bitbucket' && !bitbucketRepo) {
       toast.error('Select the Bitbucket repository again.');
       guard.end();
       return;
@@ -1066,11 +1096,13 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             ...sessionInput,
             ...sandboxInput,
             organizationId,
-            ...(selectedPlatform === 'gitlab'
-              ? { gitlabProject: selectedRepo }
-              : selectedPlatform === 'bitbucket' && bitbucketRepo
-                ? { bitbucketRepo }
-                : { githubRepo: selectedRepo, githubIntegrationId: selectedGitHubIntegrationId }),
+            ...(hasPublicRepo
+              ? { publicRepoUrl: trimmedPublicRepoUrl }
+              : selectedPlatform === 'gitlab'
+                ? { gitlabProject: selectedRepo }
+                : selectedPlatform === 'bitbucket' && bitbucketRepo
+                  ? { bitbucketRepo }
+                  : { githubRepo: selectedRepo, githubIntegrationId: selectedGitHubIntegrationId }),
           },
         }
       : {
@@ -1078,9 +1110,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
           input: {
             ...sessionInput,
             ...sandboxInput,
-            ...(selectedPlatform === 'gitlab'
-              ? { gitlabProject: selectedRepo }
-              : { githubRepo: selectedRepo }),
+            ...(hasPublicRepo
+              ? { publicRepoUrl: trimmedPublicRepoUrl }
+              : selectedPlatform === 'gitlab'
+                ? { gitlabProject: selectedRepo }
+                : { githubRepo: selectedRepo }),
           },
         };
     if (!hasAgentModelOverride) setLastUsedModel(model, organizationId);
@@ -1092,7 +1126,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       organizationId: organizationId ?? null,
       worktreeId: null,
       request,
-      repository: selectedRepo,
+      repository: hasPublicRepo ? trimmedPublicRepoUrl : selectedRepo,
       branch: null,
       composer: {
         mode: creationInput.mode,
@@ -1116,6 +1150,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     createLocalSession,
     creationInput,
     hasAgentModelOverride,
+    hasPublicRepo,
     sandboxAllocation,
     sandboxSelectionError,
     model,
@@ -1126,6 +1161,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     selectedPlatform,
     selectedRepo,
     selectedGitHubIntegrationId,
+    trimmedPublicRepoUrl,
   ]);
 
   const resizeTextarea = useCallback(() => {
@@ -1189,7 +1225,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     setIsGitHubIdentityHintDismissed(true);
   }, []);
 
-  if (isIntegrationMissing) {
+  // ---------------------------------------------------------------------------
+  // Integration missing view
+  // ---------------------------------------------------------------------------
+  // Dev-only: with the public-repo path enabled, render the composer without an
+  // integration so a public repository URL can be used instead.
+  if (isIntegrationMissing && !isPublicRepoDevEnabled) {
     return (
       <div className="relative flex h-full flex-col items-center justify-start overflow-y-auto px-4 py-8">
         <SetPageTitle title="Cloud Agent">
@@ -1500,11 +1541,50 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               >
                 <FolderGit2 className="h-3.5 w-3.5" />
                 <span className="max-w-[min(16rem,50vw)] truncate">
-                  {selectedRepo || 'Repository'}
+                  {(hasPublicRepo ? trimmedPublicRepoUrl : '') || selectedRepo || 'Repository'}
                 </span>
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-[min(20rem,calc(100vw-2rem))] p-0" align="start">
+              {isPublicRepoDevEnabled && (
+                <div className="space-y-2 border-b p-3">
+                  <label
+                    htmlFor="new-session-public-repo-url"
+                    className="text-muted-foreground text-xs font-medium"
+                  >
+                    Public repository URL
+                  </label>
+                  <Input
+                    id="new-session-public-repo-url"
+                    type="url"
+                    inputMode="url"
+                    spellCheck={false}
+                    autoComplete="off"
+                    placeholder="https://github.com/owner/repo.git"
+                    value={publicRepoUrl}
+                    onChange={event => {
+                      setPublicRepoUrl(event.target.value);
+                      setShowRepositoryRequiredMessage(false);
+                    }}
+                    aria-invalid={publicRepoUrlError ? true : undefined}
+                    aria-describedby={
+                      publicRepoUrlError
+                        ? 'new-session-public-repo-error'
+                        : 'new-session-public-repo-help'
+                    }
+                  />
+                  {publicRepoUrlError ? (
+                    <p id="new-session-public-repo-error" className="text-xs text-red-400">
+                      {publicRepoUrlError}
+                    </p>
+                  ) : (
+                    <p id="new-session-public-repo-help" className="text-muted-foreground text-xs">
+                      Local dev only. Clones a public repository without a source-control
+                      integration.
+                    </p>
+                  )}
+                </div>
+              )}
               {isLoadingRepos ? (
                 <div className="text-muted-foreground p-4 text-center text-sm">
                   Loading repositories...

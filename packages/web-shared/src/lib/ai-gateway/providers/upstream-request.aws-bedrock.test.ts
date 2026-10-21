@@ -46,10 +46,11 @@ async function sendToBedrock(base_url: string) {
   expect(result.type).toBe('success');
   expect(fetchMock).toHaveBeenCalledTimes(1);
   const [input, init] = fetchMock.mock.calls[0];
+  const body = init?.body;
+  if (typeof body !== 'string') throw new Error('expected a string request body');
   const url =
     typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-  if (typeof init?.body !== 'string') throw new Error('expected a string request body');
-  return { url, headers: new Headers(init.headers), body: init.body };
+  return { url, headers: new Headers(init?.headers), body };
 }
 
 function parseAuthorization(authorization: string) {

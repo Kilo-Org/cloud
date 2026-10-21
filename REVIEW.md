@@ -4,7 +4,11 @@
 
 **Flag these (high confidence only):**
 
-- Security vulnerabilities (injection, XSS, auth bypass)
+- A security issue in exactly one lens. Name the lens in the comment.
+  - `platform` - harm to Kilo: billing and credit accounting, usage metering, quotas and limits, signup and abuse controls, free-model gating, cost or resource blow-up, availability.
+  - `users` - harm to a Kilo user or organization: cross-user or cross-tenant reads and writes, IDOR, missing ownership or authorization check, sharing and invitation paths, session or account takeover, private-data leaks.
+  - `third-party` - harm to others through Kilo: SSRF and outbound fetch, spam or abuse through agents, provider or integration credential misuse, supply-chain execution, chains that cross the platform and user boundaries.
+  - `auth` - sign-in, recovery, linking, invitations, organization switching, credential refresh, logout, revoke, suspend, delete; ownership, roles, scopes, admin access, service trust, commercial entitlement.
 - Runtime errors (null/undefined access, missing await)
 - Logic bugs (wrong conditions, off-by-one)
 - Typos that cause runtime errors
@@ -26,6 +30,35 @@
 - Dropping columns/tables that may still be read by running application code
 - Large backfills or data transforms without batching
 - Missing partial index opportunities (e.g. `WHERE col IS NOT NULL`)
+
+# SECURITY EVIDENCE
+
+Flag a security issue only when the diff establishes the attack chain: the attacker-controlled input, the boundary it crosses, and the missing protection. State the chain in the comment:
+
+```
+actor -> input -> boundary -> impact -> preconditions
+```
+
+A chain that harms both the platform and its users is `third-party`.
+
+Check each protection that the changed line needs before you call it missing:
+
+- Authentication, authorization, and ownership.
+- Tenant filter on every read and write.
+- Input validation and output encoding.
+- Rate limit, size limit, and time limit.
+- Idempotency, atomicity, and race safety for money, credits, and metering.
+- Secret and private-data redaction in logs, errors, and events.
+- Outbound host allowlist for any fetch or webhook.
+
+A caller, a dependency, or a deployment setting outside the diff is an evidence gap. Report it as `[INFERENCE]` in the summary. Do not state that an exploit succeeded.
+
+Map the severity:
+
+- CRITICAL: the diff proves the full chain.
+- WARNING: a named protection is absent on a path the diff reaches.
+- SUGGESTION: hardening.
+- An unproven concern goes in the summary, not in a comment.
 
 # COMMENT FORMAT
 

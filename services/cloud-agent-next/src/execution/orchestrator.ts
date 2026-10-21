@@ -32,7 +32,7 @@ import {
   type WrapperInstanceLease,
 } from '../agent-sandbox/protocol.js';
 import { isCodeReviewEphemeralSandboxId } from '../code-review-ephemeral-sandbox.js';
-import { isContainerConcurrencyLimitError } from '../container-concurrency.js';
+import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 
 /** Maximum time allowed for complete wrapper readiness, including Kilo startup. */
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -181,7 +181,7 @@ export class ExecutionOrchestrator {
         ...(options?.leasedInstance ? { leasedInstance: options.leasedInstance } : {}),
       });
     } catch (error) {
-      if (isContainerConcurrencyLimitError(error)) throw error;
+      if (getContainerCapacityFailureReason(error)) throw error;
       await this.destroyEphemeralSandboxAfterPreAcceptanceFailure(sandbox, plan, error);
       const knownFailure = translateKnownWrapperFailure(error);
       if (knownFailure) throw knownFailure;
@@ -245,7 +245,7 @@ export class ExecutionOrchestrator {
       logger.info('ExecutionOrchestrator wrapper execution started successfully');
       return { kiloSessionId };
     } catch (error) {
-      if (isContainerConcurrencyLimitError(error)) throw error;
+      if (getContainerCapacityFailureReason(error)) throw error;
       await this.destroyEphemeralSandboxAfterPreAcceptanceFailure(sandbox, plan, error);
       logger
         .withFields({

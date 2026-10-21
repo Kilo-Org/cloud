@@ -17,6 +17,7 @@ permissions:
 
 # Optional repo/org variables for runner migration:
 # - RUNNER_DEFAULT_LABEL=blacksmith-2vcpu-ubuntu-2404
+# - RUNNER_MEDIUM_LABEL=blacksmith-4vcpu-ubuntu-2404
 # - RUNNER_LARGE_LABEL=blacksmith-8vcpu-ubuntu-2404
 jobs:
   changes:
@@ -38,10 +39,11 @@ jobs:
       mobile_diagram_host: ${{ steps.filter_diagram.outputs.mobile_diagram_host || steps.filter_diagram_retry.outputs.mobile_diagram_host }}
       workspace_matrix: ${{ steps.workspaces.outputs.matrix }}
       # JSON from scripts/affected-workspaces.mjs, and the typecheck and lint
-      # groups it needs.
+      # groups and cloud-agent-next parts it needs.
       affected: ${{ steps.affected.outputs.affected }}
       typecheck_groups: ${{ steps.affected.outputs.typecheck_groups }}
       lint_groups: ${{ steps.affected.outputs.lint_groups }}
+      cloud_agent_next_parts: ${{ steps.affected.outputs.cloud_agent_next_parts }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
@@ -49,6 +51,12 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      # scripts/changed-dependencies.mjs parses pnpm-lock.yaml with js-yaml
+      # when a change touches the lockfile, so detection needs the root
+      # dependencies. The warm store keeps that install short.
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -58,8 +66,8 @@ jobs:
       - name: Install root dependencies
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
-      - name: Check stacked CI admission
-        run: node --test scripts/stacked-ci.test.mjs
+      - name: Check runtime publication workflow admission
+        run: pnpm --filter cloud-agent-next test:runtime-ci
 
       # dorny/paths-filter has no built-in retry: one dropped connection to
       # api.github.com ("other side closed" while listing the PR's changed
@@ -223,18 +231,13 @@ jobs:
               - 'apps/web/package.json'
               - '.github/workflows/ci.yml'
               - 'pnpm-lock.yaml'
-      - name: Detect changed workspaces with tests
-        id: workspaces
-        run: |
-          matrix=$(scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web --exclude apps/mobile)
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-
       # Pull requests check only the workspaces a change can affect. Main
       # pushes and the merge queue pass no base, which selects every workspace.
       - name: Detect affected workspaces
         id: affected
         env:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+          CLOUD_AGENT_NEXT_CHANGED: ${{ steps.filter.outputs.cloud_agent_next || steps.filter_retry.outputs.cloud_agent_next }}
         run: |
           affected=$(node scripts/affected-workspaces.mjs "$BASE_SHA")
           jq . <<< "$affected"
@@ -249,11 +252,32 @@ jobs:
               (select($all or ($d | index("apps/extension"))) | "trpc"),
               (select($all or ($d - ["apps/mobile", "apps/extension"] | length > 0)) | "rest")
             ]' <<< "$affected")
+          # Every part when cloud-agent-next is affected. When only its tests
+          # read changed data, the unit part covers a reading test under src/,
+          # scripts/ or test/unit/; any other reading test runs every part.
+          cloud_agent_next_parts=$(jq -c --arg changed "$CLOUD_AGENT_NEXT_CHANGED" '
+            ["unit", "workers", "wrapper-process", "other"] as $all |
+            if $changed == "true" or (.packages | index("cloud-agent-next")) then $all
+            else [.test_only_files[] | select(startswith("services/cloud-agent-next/"))
+              | if test("^services/cloud-agent-next/(src|scripts|test/unit)/.+\\.test\\.ts$") then "unit" else $all[] end
+            ] | unique end' <<< "$affected")
           {
             echo "affected=$(jq -c . <<< "$affected")"
             echo "typecheck_groups=$typecheck_groups"
             echo "lint_groups=$lint_groups"
+            echo "cloud_agent_next_parts=$cloud_agent_next_parts"
           } >> "$GITHUB_OUTPUT"
+
+      # Also test the workspaces whose tests read changed data
+      # (test_only_dirs); their typecheck and lint stay skipped.
+      - name: Detect changed workspaces with tests
+        id: workspaces
+        env:
+          AFFECTED: ${{ steps.affected.outputs.affected }}
+        run: |
+          mapfile -t includes < <(jq -r '.test_only_dirs[] | ("--include", .)' <<< "$AFFECTED")
+          matrix=$(scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web --exclude apps/mobile "${includes[@]}")
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   # The CI wiring and plugin manifest checks. No job waits for this one, so it
   # adds no time before the workspace checks start; the required `test` job
@@ -276,6 +300,12 @@ jobs:
 
       - name: Install root dependencies
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
+
+      # The stacked-CI admission wiring is checked on every PR. It runs here,
+      # off the critical path; the required `test` job needs this job, so a
+      # broken admission still blocks the merge.
+      - name: Check stacked CI admission
+        run: node --test scripts/stacked-ci.test.mjs
 
       - name: Test dependency change detection
         run: node --test scripts/changed-dependencies.test.mjs
@@ -315,7 +345,9 @@ jobs:
       matrix:
         group: ${{ fromJSON(needs.changes.outputs.typecheck_groups) }}
     name: typecheck (${{ matrix.group }})
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    # tsgo loads the whole web program, which outgrows the 8 GB of the default
+    # 2 vCPU runner. The 4 vCPU runner has 16 GB.
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -345,17 +377,6 @@ jobs:
       - name: Restore or build tRPC declarations
         if: matrix.group == 'trpc'
         uses: ./.github/actions/trpc-declarations
-
-      # tsgo checks each file against the hashes in the build info, so a stale
-      # entry is rechecked; the cache only saves work on unchanged files.
-      - name: Cache web typecheck build info
-        if: matrix.group == 'web'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: apps/web/.tsbuildinfo/ci-web.tsbuildinfo
-          key: ${{ runner.os }}-web-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-web-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-
 
       - name: Typecheck
         env:
@@ -388,7 +409,8 @@ jobs:
       matrix:
         group: ${{ fromJSON(needs.changes.outputs.lint_groups) }}
     name: lint (${{ matrix.group }})
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    # Type-aware lint loads the same program as the typecheck groups.
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -506,10 +528,10 @@ jobs:
 
   # The web Jest suite is the slowest suite in CI. Eight shards run it in
   # parallel; the `test` job below reports the combined result under the
-  # required check name.
+  # required check name. It also runs when a web test reads changed data.
   web-test:
     needs: changes
-    if: needs.changes.outputs.kilocode_backend == 'true'
+    if: needs.changes.outputs.kilocode_backend == 'true' || contains(fromJSON(needs.changes.outputs.affected).test_only_packages, 'web')
     name: web-test (${{ matrix.shard }}/8)
     strategy:
       fail-fast: false
@@ -524,6 +546,7 @@ jobs:
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
         options: >-
+          --tmpfs /var/lib/postgresql/data
           --health-cmd pg_isready
           --health-interval 2s
           --health-timeout 5s
@@ -533,6 +556,7 @@ jobs:
       redis:
         image: redis:7
         options: >-
+          --tmpfs /data
           --health-cmd "redis-cli ping"
           --health-interval 2s
           --health-timeout 5s
@@ -595,6 +619,7 @@ jobs:
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
         options: >-
+          --tmpfs /var/lib/postgresql/data
           --health-cmd pg_isready
           --health-interval 2s
           --health-timeout 5s
@@ -604,6 +629,7 @@ jobs:
       redis:
         image: redis:7
         options: >-
+          --tmpfs /data
           --health-cmd "redis-cli ping"
           --health-interval 2s
           --health-timeout 5s
@@ -648,9 +674,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Dependency cycle check
-        run: pnpm run dependency-cycle-check
-
       - name: Run script tests
         run: pnpm run test:scripts
 
@@ -665,16 +688,43 @@ jobs:
       - name: Run Session Ingest Durable Object regressions
         run: pnpm --filter cloudflare-session-ingest run test:integration
 
+  # In its own job, madge runs beside the script tests instead of before them.
+  dependency-cycle-check:
+    needs: changes
+    if: needs.changes.outputs.kilocode_backend == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Dependency cycle check
+        run: pnpm run dependency-cycle-check
+
   # Required check. A skipped job (nothing relevant changed) passes; a failed
   # or cancelled job fails this one. Besides the web tests it covers the
-  # workspace tests, drizzle-check, harness-sdk and the ai-gateway builds,
-  # which have no required check of their own.
+  # workspace tests, the dependency cycle check, drizzle-check, harness-sdk and
+  # the ai-gateway builds, which have no required check of their own.
   test:
     needs:
       - changes
       - ci-wiring
       - web-test
       - test-scripts
+      - dependency-cycle-check
       - workspace-tests
       - drizzle-check
       - harness-sdk
@@ -825,19 +875,21 @@ jobs:
   cloud-agent-next:
     needs: changes
     # On a pull request, also run when a dependency of cloud-agent-next
-    # changed (for example packages/db). Main pushes and the merge queue keep
-    # the path filter alone.
+    # changed (for example packages/db), or only the parts that hold a test
+    # reading changed data (cloud_agent_next_parts). Main pushes and the merge
+    # queue keep the path filter alone.
     if: >-
       needs.changes.outputs.cloud_agent_next == 'true' ||
       (github.event_name == 'pull_request' &&
-      contains(fromJSON(needs.changes.outputs.affected).packages, 'cloud-agent-next'))
+      needs.changes.outputs.cloud_agent_next_parts != '[]')
     # The suite runs as four parallel parts; test:all chains the same suites.
     strategy:
       fail-fast: false
       matrix:
-        # process.test.ts alone takes about as long as the rest of the wrapper
-        # suite, so it runs as its own part.
-        part: [unit, workers, wrapper-process, other]
+        # unit, workers, wrapper-process and other. process.test.ts alone
+        # takes about as long as the rest of the wrapper suite, so it runs as
+        # its own part.
+        part: ${{ fromJSON(needs.changes.outputs.cloud_agent_next_parts) }}
     name: cloud-agent-next (${{ matrix.part }})
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 15

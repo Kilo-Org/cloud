@@ -91,19 +91,22 @@ function findIncumbentCandidate(
 function decisionFieldsFromCandidate(candidate: RankedCandidate): {
   variant?: string | null;
   reasoningEffort?: ReasoningEffort | null;
+  stale?: boolean;
 } {
+  // Only custom router tables flag stale measurements (ADR 0005).
+  const stale = candidate.stale === undefined ? {} : { stale: candidate.stale };
   // New writers emit variant only. Legacy platform candidates keep
   // reasoningEffort. Never both (contract rejects both-set).
   if (candidate.variant !== undefined && candidate.variant !== null) {
-    return { variant: candidate.variant };
+    return { variant: candidate.variant, ...stale };
   }
   if (candidate.variant === null) {
     // Explicit null variant on a new-style candidate: emit variant null,
     // no reasoningEffort.
-    return { variant: null };
+    return { variant: null, ...stale };
   }
   // Absent variant: legacy path.
-  return { reasoningEffort: candidate.reasoningEffort ?? null };
+  return { reasoningEffort: candidate.reasoningEffort ?? null, ...stale };
 }
 
 function pickFreshCandidate(

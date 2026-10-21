@@ -9,9 +9,6 @@ Preferred workflow: capture a real webhook from smee.io, then ask an AI to repla
 - Review flow:
   - `./dev/review/dev-review.sh`
   - `./dev/review/test-review-webhook.sh [payload.json]`
-- Auto-fix flow (`@kilo fix it`):
-  - `./dev/auto-fix/dev-auto-fix.sh`
-  - `./dev/auto-fix/test-auto-fix-webhook.sh [payload.json]`
 
 ## GitHub App Install Prerequisites
 
@@ -23,7 +20,6 @@ Preferred workflow: capture a real webhook from smee.io, then ask an AI to repla
 - Set webhook secret to match your local webhook secret.
 - Subscribe to required events:
 - Review flow: `pull_request`.
-- Auto-fix flow: `pull_request_review_comment`.
 
 ## Forward GitHub Events Locally With smee.io
 
@@ -54,4 +50,3 @@ npx smee-client \
 - Scripts sign payloads using `WEBHOOK_SECRET` (env override supported).
 - Log files are written under:
 - `dev/.dev-logs/review/` for review flow
-- `dev/.dev-logs/auto-fix/` for auto-fix flow

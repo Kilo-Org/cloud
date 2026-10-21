@@ -7,6 +7,11 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuance: jest.fn(),
 }));
 jest.mock('@/lib/auth/device-sessions');
+jest.mock('@/lib/auth/native-admission', () => ({
+  ...jest.requireActual('@/lib/auth/native-admission'),
+  requireAdmissionPayload: jest.fn(),
+  verifyAdmissionAsync: jest.fn(),
+}));
 
 import { POST } from './route';
 import {
@@ -14,12 +19,15 @@ import {
   getUserFromSessionForCredentialIssuance,
 } from '@kilocode/web-shared/lib/user/server';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
+import { requireAdmissionPayload, verifyAdmissionAsync } from '@/lib/auth/native-admission';
 import type { User } from '@kilocode/db/schema';
 
 const mockGetUserFromBearer = jest.mocked(getUserFromBearerForCredentialExchange);
 const mockGetUserFromSession = jest.mocked(getUserFromSessionForCredentialIssuance);
 const mockCreateDeviceSession = jest.mocked(createDeviceSession);
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
+const mockRequireAdmissionPayload = jest.mocked(requireAdmissionPayload);
+const mockVerifyAdmissionAsync = jest.mocked(verifyAdmissionAsync);
 
 const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
 
@@ -28,6 +36,7 @@ describe('POST /api/auth/native/exchange', () => {
     new NextRequest('http://localhost:3000/api/auth/native/exchange', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ admission: { platform: 'android' } }),
     });
 
   const bearerHeaders = { Authorization: 'Bearer old-token' };
@@ -35,6 +44,48 @@ describe('POST /api/auth/native/exchange', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRequireAdmissionPayload.mockReturnValue({
+      platform: 'android',
+      kind: 'assertion',
+      challenge: 'challenge',
+      payload: 'integrity-token',
+    });
+    mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'android', keyId: '' });
+  });
+
+  it('refuses a request with no proof before reading any credential', async () => {
+    mockRequireAdmissionPayload.mockReturnValue(undefined);
+
+    const response = await POST(createRequest(bearerHeaders));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+    expect(mockVerifyAdmissionAsync).not.toHaveBeenCalled();
+    expect(mockGetUserFromBearer).not.toHaveBeenCalled();
+    expect(mockGetUserFromSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+  });
+
+  it('refuses a device the verifier rejects', async () => {
+    mockVerifyAdmissionAsync.mockResolvedValue({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+
+    const response = await POST(createRequest(bearerHeaders));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+    expect(mockGetUserFromBearer).not.toHaveBeenCalled();
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+  });
+
+  it('reports a provider outage as a retryable 500', async () => {
+    mockVerifyAdmissionAsync.mockRejectedValue(new Error('provider unavailable'));
+
+    const response = await POST(createRequest(bearerHeaders));
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'INTERNAL_ERROR' });
+    expect(mockGetUserFromBearer).not.toHaveBeenCalled();
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 
   it('returns 200 with short-lived pair when authenticated', async () => {

@@ -19,6 +19,20 @@ jest.mock('@/lib/auth/device-sessions', () => ({
   issueSessionCredentials: (...args: unknown[]) => mockIssueSessionCredentials(...args),
 }));
 
+// The route refuses a request with no verified proof, and a real proof needs a
+// live App Attest or Play Integrity verdict. This suite covers the credential
+// exchange behind that gate, so the gate is stubbed as passing.
+jest.mock('@/lib/auth/native-admission', () => ({
+  ...jest.requireActual('@/lib/auth/native-admission'),
+  requireAdmissionPayload: () => ({
+    platform: 'android',
+    kind: 'assertion',
+    challenge: 'challenge',
+    payload: 'integrity-token',
+  }),
+  verifyAdmissionAsync: async () => ({ ok: true, platform: 'android', keyId: '' }),
+}));
+
 import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { POST } from './route';
@@ -38,6 +52,7 @@ function createRequest(headers: Record<string, string> = {}) {
   return new NextRequest(`${APP_URL}/api/auth/native/exchange`, {
     method: 'POST',
     headers,
+    body: JSON.stringify({ admission: { platform: 'android' } }),
   });
 }
 

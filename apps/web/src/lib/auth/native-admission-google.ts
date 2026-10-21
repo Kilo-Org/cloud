@@ -7,16 +7,13 @@ import {
   GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER,
   GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY,
 } from '@kilocode/web-shared/lib/config.server';
-import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 /**
  * Google Play Integrity verifier.
  *
  * Calls the Play Integrity API to decode and validate a verdict token.
- * In production without credentials, the provider fails closed — a 5xx is
- * thrown so the admission layer can surface the infrastructure fault.
- *
- * Non-production can use a simulator bypass behind the production guard.
+ * Without credentials or on a provider fault it throws, so the admission layer
+ * surfaces the infrastructure fault as a 5xx instead of refusing the device.
  */
 
 const PLAY_INTEGRITY_API_BASE = 'https://playintegrity.googleapis.com/v1';
@@ -32,13 +29,6 @@ export type PlayIntegrityError =
   | 'NONCE_MISMATCH'
   | 'PACKAGE_MISMATCH'
   | 'CERT_DIGEST_MISMATCH';
-
-function isProduction(): boolean {
-  return process.env.NODE_ENV === 'production';
-}
-
-/** Exported for testing the production guard. */
-export const isProductionInternal = isProduction;
 
 /** Obtain a GCP access token from a service-account key via JWT bearer assertion. */
 async function getAccessToken(
@@ -122,15 +112,6 @@ export async function verifyPlayIntegrity(
   integrityToken: string,
   challenge: string
 ): Promise<{ ok: true; packageName: string } | { ok: false; error: PlayIntegrityError }> {
-  // Production guard: simulator bypass only in non-production.
-  if (!isProduction()) {
-    const bypass = getEnvVariable('NATIVE_ADMISSION_SIMULATOR_BYPASS');
-    if (bypass === 'true') {
-      captureMessage('google_play_integrity_simulator_bypass');
-      return { ok: true, packageName: 'com.example.simulator' };
-    }
-  }
-
   const config = getPlayIntegrityConfig();
 
   if (!config) {

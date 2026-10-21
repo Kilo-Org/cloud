@@ -1,6 +1,7 @@
 import * as SecureStore from '@/lib/auth/secure-store';
 
 import { API_BASE_URL } from '@/lib/config';
+import { getAdmission } from '@/lib/auth/admission';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
 import { parseTokenPair } from '@/lib/auth/native-auth-contract';
@@ -37,12 +38,35 @@ export async function exchangeLegacyToken(): Promise<{
       return null;
     }
 
+    // The exchange issues device credentials, so it needs the same attestation
+    // the sign-in exchange does. Fetch the proof after the epoch check so a
+    // superseded sign-in never spends a challenge.
+    let admission;
+    try {
+      admission = await getAdmission();
+    } catch {
+      // Transient attestation failure: keep the legacy token and retry on the
+      // next launch.
+      return null;
+    }
+    if (!admission) {
+      // This device can never attest, so the exchange can never succeed. Record
+      // the decision instead of requesting a challenge on every launch.
+      await SecureStore.setItemAsync(LEGACY_EXCHANGE_DONE_KEY, '1');
+      return null;
+    }
+
+    if (!isCurrentAuthEpoch(epoch)) {
+      return null;
+    }
+
     const response = await fetch(`${API_BASE_URL}/api/auth/native/exchange`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
+      body: JSON.stringify({ admission }),
     });
 
     if (!response.ok) {

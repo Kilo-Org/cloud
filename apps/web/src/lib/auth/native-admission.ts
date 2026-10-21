@@ -17,13 +17,9 @@ import { verifyPlayIntegrity } from './native-admission-google';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-export type NativeAdmissionMode = 'off' | 'report' | 'enforce';
-
 export type AdmissionPlatform = 'ios' | 'android';
 
 export type AdmissionKind = 'attestation' | 'assertion';
-
-export type NativeAdmissionResult = { ok: true } | { ok: false; errorCode: 'ADMISSION_REQUIRED' };
 
 // ── Wire contract ──────────────────────────────────────────────────────────
 
@@ -127,62 +123,34 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
   };
 }
 
-// ── Admission gate (sync) ──────────────────────────────────────────────────
+// ── Admission gate ─────────────────────────────────────────────────────────
 
 /**
- * Evaluate admission for a native auth request body.
- *
- * Mode behaviour:
- * - 'off':      admit everything.
- * - 'report':   evaluate and log, always admit.
- * - 'enforce':  validate admission. Absent field = legacy admit + count.
- *               Present invalid = refuse. Provider fault = 5xx via throw.
- *
- * Returns whether async verification is needed ('report' and 'enforce' modes
- * with a valid admission payload).
+ * The proof a native request must carry. Token issuance is attested-device
+ * only: a missing or malformed `admission` field is refused, never admitted.
+ * There is no legacy, report, or disabled mode — the only exception is the
+ * non-production sentinel below, which no production request can reach.
  */
-export function checkNativeAdmission(body: Record<string, unknown>): {
-  admission: NativeAdmissionResult;
-  /** True when async crypto verification is needed (enforce or report). */
-  verifyAsync: boolean;
-} {
-  const mode = getEnvVariable('NATIVE_ADMISSION_MODE') as NativeAdmissionMode;
-
-  // off mode (or unset) always admits with no async verification
-  if (!mode || mode === 'off') {
-    return { admission: { ok: true }, verifyAsync: false };
-  }
-
-  const hasAdmission = 'admission' in body && body['admission'] !== undefined;
-
-  if (!hasAdmission) {
-    if (mode === 'enforce') {
-      captureMessage('native_admission_legacy_count: 1');
-    }
-    return { admission: { ok: true }, verifyAsync: false };
-  }
-
-  // Validate the admission payload shape synchronously.
-  const admission = validateAdmissionPayload(body['admission']);
-  if (!admission) {
-    if (mode === 'report') {
-      captureMessage('native_admission_invalid_shape');
-      return { admission: { ok: true }, verifyAsync: false };
-    }
-    return { admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' }, verifyAsync: false };
-  }
-
-  // Valid payload — async verification needed for enforce and report modes.
-  return { admission: { ok: true }, verifyAsync: mode === 'enforce' || mode === 'report' };
+export function requireAdmissionPayload(
+  body: Record<string, unknown>
+): AdmissionPayload | undefined {
+  return validateAdmissionPayload(body['admission']);
 }
 
 /**
- * Whether to refuse admission when the async verify fails.
- * Only true under enforce mode; report mode evaluates but always admits.
+ * Proof a non-production device sends when it cannot attest at all (simulator,
+ * emulator without Play Services). Accepted only when the process is not
+ * production and `NATIVE_ADMISSION_DEV_SENTINEL` is `true`; the branch skips
+ * the platform verifier and persists no key.
  */
-export function shouldRefuseAsyncFailure(): boolean {
-  const mode = getEnvVariable('NATIVE_ADMISSION_MODE') as NativeAdmissionMode;
-  return mode === 'enforce';
+export const DEV_SENTINEL_PAYLOAD = 'native-admission-dev-sentinel';
+
+function isDevSentinel(admission: AdmissionPayload): boolean {
+  return (
+    process.env.NODE_ENV !== 'production' &&
+    getEnvVariable('NATIVE_ADMISSION_DEV_SENTINEL') === 'true' &&
+    admission.payload === DEV_SENTINEL_PAYLOAD
+  );
 }
 
 // ── Async attestation / assertion verification ─────────────────────────────
@@ -233,6 +201,12 @@ export async function verifyAdmissionAsync(
 
   if (!consumed) {
     return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+  }
+
+  if (isDevSentinel(admission)) {
+    // Android shape on purpose: no key id means nothing is persisted and the
+    // device session is created without an attested-key binding.
+    return { ok: true, platform: 'android', keyId: '' };
   }
 
   // Route to platform-specific verifier

@@ -86,6 +86,7 @@ function buildTerminalSnapshot(status: 'signed_out' | 'privacy'): GlanceableAgen
     status,
     running: 0,
     needsInput: 0,
+    needsApproval: 0,
     idle: 0,
     scheduled: 0,
     needsInputSince: null,

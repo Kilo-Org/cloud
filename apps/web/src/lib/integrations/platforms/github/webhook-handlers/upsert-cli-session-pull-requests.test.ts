@@ -1,5 +1,10 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { cli_sessions_v2, github_branch_pull_requests, organizations } from '@kilocode/db/schema';
+import {
+  agent_briefing_events,
+  cli_sessions_v2,
+  github_branch_pull_requests,
+  organizations,
+} from '@kilocode/db/schema';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -33,6 +38,7 @@ function makePayload(overrides: {
   headSha: string;
   title?: string;
   cloneUrl?: string;
+  createdAt?: string;
   htmlUrl?: string;
   /** Base repository full name. */
   repo?: string;
@@ -50,6 +56,7 @@ function makePayload(overrides: {
       merged: overrides.merged,
       draft: overrides.draft,
       html_url: overrides.prUrl ?? `https://github.com/${repo}/pull/${overrides.prNumber}`,
+      created_at: overrides.createdAt,
       user: { id: 1, login: 'octocat', avatar_url: 'https://example.com/a.png', type: 'User' },
       head: {
         sha: overrides.headSha,
@@ -173,6 +180,46 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         .where(inArray(github_branch_pull_requests.owned_by_organization_id, orgIdsToCleanup));
       await db.delete(organizations).where(inArray(organizations.id, orgIdsToCleanup));
     }
+  });
+  it('stores verified PR creation time once across webhook replays and cascades on source deletion', async () => {
+    const sessionId = await seedSession({
+      branch: 'feature/briefing',
+      owner: testOwner,
+      prNumber: 9001,
+    });
+    const openedAt = '2026-10-14T23:15:00.000Z';
+    const payload = makePayload({
+      action: 'opened',
+      prNumber: 9001,
+      headRef: 'feature/briefing',
+      headSha: 'sha-briefing',
+      createdAt: openedAt,
+    });
+    await upsertCliSessionPullRequestsFromWebhook(payload, testOwner);
+    await upsertCliSessionPullRequestsFromWebhook(payload, testOwner);
+    const events = await db
+      .select()
+      .from(agent_briefing_events)
+      .where(
+        and(
+          eq(agent_briefing_events.session_id, sessionId),
+          eq(agent_briefing_events.kilo_user_id, testUserId)
+        )
+      );
+    expect(events).toHaveLength(1);
+    expect(new Date(events[0].occurred_at).toISOString()).toBe(openedAt);
+    expect(events[0].payload).toEqual({ openedAt });
+    await db
+      .delete(cli_sessions_v2)
+      .where(
+        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, testUserId))
+      );
+    expect(
+      await db
+        .select()
+        .from(agent_briefing_events)
+        .where(eq(agent_briefing_events.session_id, sessionId))
+    ).toHaveLength(0);
   });
 
   it('inserts a cache row on opened and marks the linking session verified', async () => {

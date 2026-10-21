@@ -1,6 +1,8 @@
+import { stripVTControlCharacters } from 'node:util';
 import type { PaidExecutionKey } from './scheduler';
 import { parseKiloRunEvents } from './kilo-events';
 import type { DeciderCase } from './datasets/decider-cases';
+import { materializeLongContext } from './datasets/long-context';
 
 export type CliRunResult = {
   text: string;
@@ -11,6 +13,7 @@ export type CliRunResult = {
   eventCount: number;
   lastEventTypes: string[];
   timedOut: boolean;
+  unavailableModelId?: string;
 };
 
 export const DECIDER_CLI_TIMEOUT_MS = 180_000;
@@ -20,6 +23,19 @@ export const DECIDER_CLI_TIMEOUT_MS = 180_000;
 // One uniform instruction across all candidate models keeps grading fair.
 const FINAL_ANSWER_SUFFIX =
   '\n\nIMPORTANT: Your final message must contain ONLY the answer in the exact requested format - no explanations, no preamble, no extra words.';
+
+/**
+ * The exact text `kilo run` sends to the model for a decider case: the container writes it
+ * to the CLI's stdin, which the CLI uses verbatim. Long-context cases carry their generated
+ * workspace snapshot, as the offline sweep and candidate screen send them. The CLI has no
+ * system-prompt flag, so the system prompt is folded in. The platform container and client
+ * evals (ADR 0005) both send this string, so their measurements in one custom router share
+ * byte-identical prompts.
+ */
+export function deciderCliPrompt(benchCase: DeciderCase): string {
+  const prompts = materializeLongContext(benchCase);
+  return `${prompts.systemPrompt}\n\n${prompts.userPrompt}${FINAL_ANSWER_SUFFIX}`;
+}
 
 export function isRetryableContainerAvailabilityError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -34,6 +50,52 @@ export function isRetryableContainerAvailabilityError(error: unknown): boolean {
   );
 }
 
+export function isCatalogLoadFailureResult(
+  result: Pick<CliRunResult, 'text' | 'stderrTail' | 'costUsd' | 'timedOut'>
+): boolean {
+  if (result.text.length > 0 || (result.costUsd ?? 0) !== 0 || result.timedOut) return false;
+  return /\bfailed to load (?:the )?(?:kilo )?model catalog\b/i.test(
+    stripVTControlCharacters(result.stderrTail)
+  );
+}
+
+/**
+ * The gateway rejected the requested model on one unbilled call. The same model has
+ * answered other cases, so this is a transient resolution failure, not retirement.
+ * The diagnostic names the model without its vendor prefix.
+ */
+export function isUnsupportedModelResult(
+  result: Pick<CliRunResult, 'text' | 'stderrTail' | 'costUsd' | 'timedOut'>,
+  requestedModel: string
+): boolean {
+  if (result.text.length > 0 || (result.costUsd ?? 0) !== 0 || result.timedOut) return false;
+  const diagnostic = stripVTControlCharacters(result.stderrTail);
+  const model = /(?:^|\n)\s*(?:Error:\s*)?Unsupported model:?\s*(\S+)/i
+    .exec(diagnostic)?.[1]
+    ?.replace(/[.,;:!?)\]]+$/, '');
+  const bare = requestedModel.slice(requestedModel.lastIndexOf('/') + 1);
+  return model === requestedModel || model === `kilo/${requestedModel}` || model === bare;
+}
+
+export function isExactModelUnavailableResult(
+  result: Pick<CliRunResult, 'text' | 'stderrTail' | 'unavailableModelId' | 'costUsd' | 'timedOut'>,
+  requestedModel: string
+): boolean {
+  if (result.text.length > 0 || (result.costUsd ?? 0) !== 0 || result.timedOut) return false;
+  if (isCatalogLoadFailureResult(result)) return false;
+  if (
+    result.unavailableModelId === requestedModel ||
+    result.unavailableModelId === `kilo/${requestedModel}`
+  ) {
+    return true;
+  }
+  const diagnostic = stripVTControlCharacters(result.stderrTail);
+  const model = /(?:^|\n)\s*(?:Error:\s*)?Model not found:\s*(\S+?)(?:\.(?=\s|$)|(?=\s|$))/i.exec(
+    diagnostic
+  )?.[1];
+  return model === requestedModel || model === `kilo/${requestedModel}`;
+}
+
 export type ContainerRunResponse = {
   exitCode: number;
   durationMs: number;
@@ -46,9 +108,7 @@ export type ContainerRunResponse = {
  * Run one decider case through the `kilo` CLI inside a Cloudflare Container.
  *
  * `instanceName` is the precomputed DO instance name; the caller owns the
- * keying so chunks for the same model/repetition share a stable instance. The
- * CLI has no system-prompt flag, so we fold the system prompt into the user
- * prompt.
+ * keying so chunks for the same model/repetition share a stable instance.
  */
 export async function runDeciderCaseViaCli(
   env: Env,
@@ -67,14 +127,16 @@ export async function runDeciderCaseViaCli(
     variant?: string | null;
     /** @deprecated Prefer `variant`. Same value; kept for call-site compatibility. */
     reasoningEffort?: string | null;
-    /** Where the container posts the outcome if this request's connection is lost. */
-    resultCallback?: { url: string; execution: PaidExecutionKey };
+    resultCallback?: {
+      url: string;
+      execution: PaidExecutionKey & { retried?: boolean; priorCostUsd?: number | null };
+    };
   }
 ): Promise<CliRunResult> {
   const { instanceName, model, benchCase, kiloToken, kiloApiUrl, orgId } = params;
   const variant = params.variant !== undefined ? params.variant : (params.reasoningEffort ?? null);
   const stub = env.BENCH_RUNNER.get(env.BENCH_RUNNER.idFromName(instanceName));
-  const prompt = `${benchCase.systemPrompt}\n\n${benchCase.userPrompt}${FINAL_ANSWER_SUFFIX}`;
+  const prompt = deciderCliPrompt(benchCase);
 
   const startedAt = Date.now();
   const response = await stub.fetch(
@@ -99,12 +161,13 @@ export async function runDeciderCaseViaCli(
     throw new Error(`container /run failed: HTTP ${response.status} ${detail}`);
   }
 
-  return parseContainerRunResponse(await response.json(), startedAt);
+  return parseContainerRunResponse(await response.json(), startedAt, model);
 }
 
 export function parseContainerRunResponse(
   body: ContainerRunResponse,
-  startedAt: number
+  startedAt: number,
+  requestedModel: string
 ): CliRunResult {
   const { text, costUsd, eventCount, lastEventTypes } = parseKiloRunEvents(body.stdoutLines ?? []);
   const providerThrottled = (body.stdoutLines ?? []).some(line => {
@@ -121,8 +184,59 @@ export function parseContainerRunResponse(
       return false;
     }
   });
+  let unavailableModelId: string | undefined;
+  if (
+    text.length === 0 &&
+    (costUsd ?? 0) === 0 &&
+    !body.timedOut &&
+    !isCatalogLoadFailureResult({
+      text,
+      costUsd,
+      stderrTail: body.stderrTail ?? '',
+      timedOut: body.timedOut ?? false,
+    })
+  ) {
+    for (const line of body.stdoutLines ?? []) {
+      try {
+        const event: unknown = JSON.parse(line);
+        if (
+          typeof event !== 'object' ||
+          event === null ||
+          !('type' in event) ||
+          event.type !== 'error'
+        ) {
+          continue;
+        }
+        if (!('error' in event) || typeof event.error !== 'object' || event.error === null)
+          continue;
+        const error = event.error;
+        if (
+          !('name' in error && error.name === 'ProviderModelNotFoundError') &&
+          !('_tag' in error && error._tag === 'ProviderModelNotFoundError')
+        )
+          continue;
+        const data =
+          'data' in error && typeof error.data === 'object' && error.data !== null
+            ? error.data
+            : error;
+        if (
+          !('providerID' in data) ||
+          typeof data.providerID !== 'string' ||
+          !('modelID' in data) ||
+          typeof data.modelID !== 'string'
+        )
+          continue;
+        const model = `${data.providerID}/${data.modelID}`;
+        if (model !== requestedModel && model !== `kilo/${requestedModel}`) continue;
+        unavailableModelId = model;
+        break;
+      } catch {
+        continue;
+      }
+    }
+  }
 
-  return {
+  const result: CliRunResult = {
     text,
     costUsd,
     latencyMs: body.durationMs ?? Date.now() - startedAt,
@@ -133,7 +247,12 @@ export function parseContainerRunResponse(
     eventCount,
     lastEventTypes,
     timedOut: body.timedOut ?? false,
+    ...(unavailableModelId ? { unavailableModelId } : {}),
   };
+  if (!result.unavailableModelId && isExactModelUnavailableResult(result, requestedModel)) {
+    result.unavailableModelId = requestedModel;
+  }
+  return result;
 }
 
 // Ad-hoc CLI run for the /admin/debug-cli endpoint: returns raw (truncated)

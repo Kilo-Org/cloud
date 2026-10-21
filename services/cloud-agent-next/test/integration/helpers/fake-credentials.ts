@@ -6,8 +6,9 @@ export const FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN =
  * Shared fakes for the B3 credential tests. The git-token-service is a service
  * binding the Miniflare Worker test runtime does not provide, so capability
  * issuance is faked here; each call returns a distinct credential so tests can
- * observe fresh selection. `SandboxContainment` is a Durable Object namespace
- * the outbound-container-id derivation needs; the test worker deliberately does
+ * observe fresh selection. `SandboxContainment` (and `SandboxSmallContainment`
+ * for isolated `ses-` sandboxes) are Durable Object namespaces the
+ * outbound-container-id derivation needs; the test worker deliberately does
  * not boot the container-backed Sandbox DO, so a namespace-shaped stand-in that
  * only implements `idFromName` is used.
  */
@@ -67,6 +68,7 @@ export function installFakeCredentialEnv(
   Object.assign(target as object, {
     GIT_TOKEN_SERVICE: broker,
     SandboxContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+    SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
     // The fake harness asserts contained grants unless a test opts out; the
     // local `.dev.vars` value must not decide what a test means.
     CREDENTIAL_CONTAINMENT_ENABLED: 'true',

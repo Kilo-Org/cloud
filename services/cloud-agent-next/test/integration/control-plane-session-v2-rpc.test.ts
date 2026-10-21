@@ -29,6 +29,7 @@ import {
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
+import { installAckingUsageMeter, vercelSandboxSelection } from './helpers/fake-vercel-billing.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
@@ -183,6 +184,7 @@ async function installSandbox(
     });
     installFakeRuntimeProxyPeer(instance);
     Object.assign(instance, { createProviderAdapter: () => provider, provider });
+    installAckingUsageMeter(instance);
   });
   return sandboxStub;
 }
@@ -498,7 +500,15 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         },
       }),
       message: promptPayload(firstMessageId),
-      sandboxSelection: { provider: 'vercel', allocationName: 'alloc_test' },
+      sandboxSelection: {
+        ...vercelSandboxSelection({
+          sandboxId: providedSandboxId,
+          sessionId,
+          userId: USER_ID,
+          orgId: ORG_ID,
+        }),
+        allocationName: 'alloc_test',
+      },
     });
 
     // M2: legacy admission ack shape.

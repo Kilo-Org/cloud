@@ -13,7 +13,6 @@ import {
   assertSandboxBillingAllocation,
   vercelBillingIdentity,
 } from '../../container-usage-context.js';
-import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
 import { MeteredBillingLifecycle, type BillingIdentity } from '../../metered-billing-lifecycle.js';
 import type { BillingScheduleTable } from '../../sandbox-control/billing-schedule.js';
 import {
@@ -84,7 +83,6 @@ export type VercelBillingRuntime = {
   admitCreate: (
     pin: StoredProviderPin
   ) => Promise<'admitted' | 'blocked' | 'unavailable' | 'retry'>;
-  admitShadow: (pin: StoredProviderPin) => Promise<boolean>;
   recordLifetime: (evidence: VercelBillingLifetimeEvidence) => Promise<void>;
   settleStoppedCreatedRef: (ref: string, confirmed: boolean) => Promise<void>;
   afterTransition: (event: AllocationEvent) => Promise<void>;
@@ -250,11 +248,7 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
     }
     const billing = pin.billing;
     const owner = await deps.requireOwner();
-    if (billing === null) {
-      return owner !== null && !isCloudAgentContainerBillingEnabled(deps.env(), { userId: owner })
-        ? 'admitted'
-        : 'unavailable';
-    }
+    if (billing === null) return 'unavailable';
     if (billing.sandboxId !== deps.sandboxId) return 'unavailable';
     if (
       owner === null ||
@@ -262,12 +256,6 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
       (billing.actor.type === 'user' && billing.actor.id !== owner)
     )
       return 'unavailable';
-    const enforced =
-      billing.enforcementRequested === true ||
-      isCloudAgentContainerBillingEnabled(deps.env(), {
-        userId: owner,
-        ...(billing.subject.type === 'org' ? { orgId: billing.subject.id } : {}),
-      });
     const active = await ensureRuntime();
     if (active?.identity === undefined) return 'unavailable';
     try {
@@ -275,10 +263,7 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
     } catch {
       return 'unavailable';
     }
-    const outcome = await active.lifecycle.openIntervalBeforeCreate(active.identity, {
-      ...billing,
-      enforcementRequested: enforced,
-    });
+    const outcome = await active.lifecycle.openIntervalBeforeCreate(active.identity, billing);
     await deps.schedule.ensure(
       VERCEL_BILLING_SETTLEMENT_CALLBACK,
       Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
@@ -289,66 +274,13 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
       await clearBillingContext(deps.storage);
       await deleteVercelBillingBinding(deps.storage, outcome.generation);
       await deps.schedule.remove(VERCEL_BILLING_SETTLEMENT_CALLBACK, outcome.generation);
-      return enforced &&
-        outcome.error instanceof ContainerUsageAdmissionError &&
+      return outcome.error instanceof ContainerUsageAdmissionError &&
         outcome.error.code === 'insufficient_credits'
         ? 'blocked'
-        : enforced
-          ? 'unavailable'
-          : 'admitted';
+        : 'unavailable';
     }
-    if (!enforced) return 'admitted';
     await prepareSettlement(outcome.generation);
     return 'retry';
-  }
-
-  async function admitShadow(pin: StoredProviderPin): Promise<boolean> {
-    const billing = pin.billing;
-    const owner = await deps.requireOwner();
-    const resources =
-      pin.configuration?.provider === 'vercel' ? pin.configuration.resources : undefined;
-    if (
-      billing === null ||
-      owner === null ||
-      resources === undefined ||
-      billing.enforcementRequested ||
-      billing.sandboxId !== deps.sandboxId ||
-      (billing.subject.type === 'user' && billing.subject.id !== owner) ||
-      (billing.actor.type === 'user' && billing.actor.id !== owner) ||
-      isCloudAgentContainerBillingEnabled(deps.env(), {
-        userId: owner,
-        ...(billing.subject.type === 'org' ? { orgId: billing.subject.id } : {}),
-      })
-    )
-      return false;
-    let identity: ReturnType<typeof vercelBillingIdentity>;
-    try {
-      identity = vercelBillingIdentity(resources);
-      assertSandboxBillingAllocation(identity.className, billing);
-    } catch {
-      return false;
-    }
-    const context = await getBillingContext(deps.storage);
-    if (
-      context === undefined ||
-      context.pendingStop !== undefined ||
-      context.measurementStarted ||
-      context.instanceId !== deps.sandboxId ||
-      context.service !== identity.service ||
-      context.sku !== identity.sku ||
-      context.subject.type !== billing.subject.type ||
-      context.subject.id !== billing.subject.id ||
-      context.actor.type !== billing.actor.type ||
-      context.actor.id !== billing.actor.id ||
-      (await loadVercelBillingBinding(deps.storage, context.generation)) !== undefined
-    )
-      return false;
-    await deps.schedule.ensure(
-      VERCEL_BILLING_SETTLEMENT_CALLBACK,
-      Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
-      context.generation
-    );
-    return true;
   }
 
   async function recordLifetime(evidence: VercelBillingLifetimeEvidence): Promise<void> {
@@ -560,7 +492,6 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
   return {
     ensureRuntime,
     admitCreate,
-    admitShadow,
     recordLifetime,
     settleStoppedCreatedRef,
     afterTransition,

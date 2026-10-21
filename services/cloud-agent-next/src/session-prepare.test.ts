@@ -2145,7 +2145,7 @@ describe('start endpoint', () => {
     ).rejects.toThrow('metadata invalid');
   });
 
-  it('forwards Vercel enrollment configuration and persists only the selected identity', async () => {
+  it('selects native containers for a Vercel-enrolled owner and persists only the selected identity', async () => {
     const doStub = createMockDOStub();
     const context = createInternalApiContext({ doStub });
     Object.assign(context.env, {
@@ -2186,7 +2186,7 @@ describe('start endpoint', () => {
         metadata: expect.objectContaining({
           workspace: expect.objectContaining({
             sandboxId: expect.stringMatching(/^sbx-/),
-            sandboxProvider: 'vercel',
+            sandboxProvider: 'cloudflare-containers',
           }),
         }),
       })

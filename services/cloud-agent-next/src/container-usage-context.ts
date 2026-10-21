@@ -14,6 +14,7 @@ import {
   type VercelSandboxResources,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { logger } from './logger.js';
+import { withDORetry } from './utils/do-retry.js';
 import { isIsolatedSandboxId, isValidSandboxId, type SandboxIdClass } from './sandbox-id.js';
 import { resolveSandboxIdClass, sandboxKindSchema, type SandboxKind } from './sandbox-placement.js';
 import {
@@ -41,7 +42,11 @@ export const SANDBOX_USAGE_SKUS = {
 
 export type SandboxClassName = keyof typeof SANDBOX_USAGE_SKUS;
 
-export type SandboxCapacity = { vcpu: number; memoryMiB: number; diskMB: number };
+export type SandboxCapacity = {
+  vcpu: number;
+  memoryMiB: number;
+  diskMB: number;
+};
 
 export type ContainersBillingClassName =
   | 'SandboxContainersStandard3'
@@ -190,7 +195,6 @@ export function vercelBillingIdentity(resources: VercelSandboxResources): Vercel
 
 export type SandboxBillingInput = Omit<UsageContext, 'service' | 'instanceId' | 'sku'> & {
   sandboxId: SandboxId;
-  enforcementRequested?: boolean;
   /** Present for a placed key, whose prefix does not say which pool may bill it. */
   sandboxKind?: SandboxKind;
 };
@@ -240,7 +244,8 @@ export const sandboxBillingInputEnvelopeSchema = z
         message: 'Metadata may contain at most 16 entries',
       })
       .optional(),
-    enforcementRequested: z.boolean().default(false),
+    /** Stored by Workers that ran admission only for rollout payers. Ignored. */
+    enforcementRequested: z.boolean().optional(),
     sandboxKind: sandboxKindSchema.optional(),
   })
   .strict();
@@ -266,8 +271,7 @@ function normalizedOrigin(origin: string | undefined): string {
 
 export function buildSandboxBillingInput(
   metadata: SessionMetadata,
-  sandboxId: SandboxId,
-  enforcementRequested = false
+  sandboxId: SandboxId
 ): SandboxBillingInput {
   const subject = metadata.identity.orgId
     ? { type: 'org' as const, id: metadata.identity.orgId }
@@ -280,21 +284,29 @@ export function buildSandboxBillingInput(
 
   return {
     sandboxId,
-    ...(enforcementRequested ? { enforcementRequested: true } : {}),
     ...(sandboxKind ? { sandboxKind } : {}),
     subject,
     actor,
     ...(actor.type === 'bot' ? { onBehalfOf: subject } : {}),
     ...(isolated ? { sessionId: metadata.identity.sessionId } : {}),
     ...(isolated
-      ? { metadata: { origin: normalizedOrigin(metadata.identity.billingOrigin) } }
+      ? {
+          metadata: {
+            origin: normalizedOrigin(metadata.identity.billingOrigin),
+          },
+        }
       : {}),
   };
 }
 
 export function parseSandboxBillingInput(input: unknown): SandboxBillingInput {
   const parsed = sandboxBillingInputEnvelopeSchema.parse(input);
-  const { sandboxId, enforcementRequested, sandboxKind, ...usageInput } = parsed;
+  const {
+    sandboxId,
+    enforcementRequested: _enforcementRequested,
+    sandboxKind,
+    ...usageInput
+  } = parsed;
   const validated = usageContextSchema.parse({
     service: USAGE_SERVICE_ROOT,
     instanceId: 'validation',
@@ -304,7 +316,6 @@ export function parseSandboxBillingInput(input: unknown): SandboxBillingInput {
   const { service: _service, instanceId: _instanceId, sku: _sku, ...billingInput } = validated;
   return {
     sandboxId,
-    enforcementRequested,
     ...(sandboxKind ? { sandboxKind } : {}),
     ...billingInput,
   };
@@ -375,31 +386,28 @@ export function assertSandboxBillingAllocation(
   }
 }
 
-export async function configureSandboxBilling(
-  sandbox: SandboxInstance,
-  metadata: SessionMetadata,
-  sandboxId: SandboxId
-): Promise<void> {
-  await configureSandboxBillingInput(sandbox, buildSandboxBillingInput(metadata, sandboxId));
-}
-
+/** Retries a Durable Object reset, which every deploy causes, before failing admission. */
 export async function ensureSandboxBillingAdmissionInput(
-  sandbox: SandboxInstance,
+  resolveSandbox: () => SandboxInstance,
   input: SandboxBillingInput
 ): Promise<SandboxBillingAdmissionResult> {
-  const ensureBillingAdmission = (sandbox as Partial<MeteredSandboxInstance>)
-    .ensureBillingAdmission;
-  if (typeof ensureBillingAdmission !== 'function') {
-    return input.enforcementRequested
-      ? {
-          success: false,
-          code: 'meter_unavailable',
-          message: 'Container billing admission is unavailable',
-        }
-      : { success: true };
-  }
   try {
-    return await (sandbox as MeteredSandboxInstance).ensureBillingAdmission(input);
+    return await withDORetry(
+      resolveSandbox,
+      async (sandbox): Promise<SandboxBillingAdmissionResult> => {
+        if (
+          typeof (sandbox as Partial<MeteredSandboxInstance>).ensureBillingAdmission !== 'function'
+        ) {
+          return {
+            success: false,
+            code: 'meter_unavailable',
+            message: 'Container billing admission is unavailable',
+          };
+        }
+        return (sandbox as MeteredSandboxInstance).ensureBillingAdmission(input);
+      },
+      'ensureSandboxBillingAdmission'
+    );
   } catch (error) {
     if (getContainerCapacityFailureReason(error)) throw error;
     return {
@@ -433,19 +441,28 @@ export function billingAdmissionFailureFromError(error: unknown): SandboxBilling
   };
 }
 
+/** Retries a Durable Object reset before failing closed. */
 export async function isSandboxBillingBlocked(
-  sandbox: SandboxInstance,
-  enforcementRequested = false
+  resolveSandbox: () => SandboxInstance
 ): Promise<boolean> {
-  const isBillingBlocked = (sandbox as Partial<MeteredSandboxInstance>).isBillingBlocked;
-  if (typeof isBillingBlocked !== 'function') return false;
   try {
-    return await (sandbox as MeteredSandboxInstance).isBillingBlocked();
+    return await withDORetry(
+      resolveSandbox,
+      async sandbox => {
+        if (typeof (sandbox as Partial<MeteredSandboxInstance>).isBillingBlocked !== 'function') {
+          return false;
+        }
+        return (sandbox as MeteredSandboxInstance).isBillingBlocked();
+      },
+      'isSandboxBillingBlocked'
+    );
   } catch (error) {
     logger
-      .withFields({ error: error instanceof Error ? error.message : String(error) })
+      .withFields({
+        error: error instanceof Error ? error.message : String(error),
+      })
       .warn('Container billing block check failed');
-    return enforcementRequested;
+    return true;
   }
 }
 
@@ -468,7 +485,9 @@ export async function isSandboxContainerRunning(
     return await (sandbox as MeteredSandboxInstance).isContainerRunning();
   } catch (error) {
     logger
-      .withFields({ error: error instanceof Error ? error.message : String(error) })
+      .withFields({
+        error: error instanceof Error ? error.message : String(error),
+      })
       .warn('Container running probe failed');
     return undefined;
   }
@@ -504,16 +523,4 @@ export async function getSandboxBillingRuntimeStatus(sandbox: SandboxInstance): 
   const capability = sandbox as BillingRuntimeStatusCapability;
   if (typeof capability.getBillingRuntimeStatus !== 'function') return undefined;
   return await capability.getBillingRuntimeStatus();
-}
-
-export async function configureSandboxBillingInput(
-  sandbox: SandboxInstance,
-  input: SandboxBillingInput
-): Promise<void> {
-  const configureBilling = (sandbox as Partial<MeteredSandboxInstance>).configureBilling;
-  if (typeof configureBilling !== 'function') {
-    logger.warn('Container usage shadow metering is unavailable for sandbox');
-    return;
-  }
-  await (sandbox as MeteredSandboxInstance).configureBilling(input);
 }

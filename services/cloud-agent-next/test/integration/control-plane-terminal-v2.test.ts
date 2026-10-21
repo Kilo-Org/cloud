@@ -1,5 +1,5 @@
 import { env, reset, runInDurableObject } from 'cloudflare:test';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
@@ -24,6 +24,10 @@ import {
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { waitFor } from './wait-for.js';
+
+// Multi-DO setup and terminal round-trips must fit the suite's bounded polls
+// when Worker test files run in parallel.
+vi.setConfig({ testTimeout: 30_000 });
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;

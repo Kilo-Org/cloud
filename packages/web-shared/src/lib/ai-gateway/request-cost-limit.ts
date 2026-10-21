@@ -10,7 +10,13 @@ import {
 import { getCustomPricing } from './custom-pricing.constants';
 import { findKiloExclusiveModel } from './kilo-exclusive-models';
 
-export function textRequestPriceCeiling(metadata: StoredModel) {
+export type TextRequestPriceCeiling = {
+  inputRate: number;
+  outputRate: number;
+  requestCost: number;
+};
+
+export function textRequestPriceCeiling(metadata: StoredModel): TextRequestPriceCeiling {
   if (metadata.endpoints.length === 0) throw new Error('Model pricing is unavailable');
   let inputRate = 0;
   let outputRate = 0;
@@ -62,7 +68,8 @@ function requestTextBytes(value: unknown): number {
 export const SYSTEM_ONE_MAX_OUTPUT_TOKENS = 16_384;
 
 /**
- * Cost bound, in microdollars, of one System One request against a model's current prices.
+ * Cost bound, in microdollars, of one System One request against a model's current prices, or
+ * `null` when the stored catalog cannot price the model.
  *
  * The questions bound the answer envelope: answers repeat the question criteria keys, and score
  * questions their legend. `state` is read once and never echoed. The output allowance adds room
@@ -71,8 +78,14 @@ export const SYSTEM_ONE_MAX_OUTPUT_TOKENS = 16_384;
 export function systemOneRequestCostBound(
   metadata: StoredModel,
   request: { state: unknown; questions: Record<string, unknown> }
-): number {
-  const price = textRequestPriceCeiling(metadata);
+): number | null {
+  let price: TextRequestPriceCeiling;
+  try {
+    price = textRequestPriceCeiling(metadata);
+  } catch {
+    // A model with no endpoints or no route pricing has no bound to offer this request.
+    return null;
+  }
   const questionBytes = Buffer.byteLength(JSON.stringify(request.questions) ?? '', 'utf8');
   const inputTokenCeiling =
     Buffer.byteLength(JSON.stringify(request.state) ?? '', 'utf8') + questionBytes + 1024;

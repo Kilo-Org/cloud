@@ -111,15 +111,14 @@ export async function handleSystemOneRequest(request: NextRequest) {
   // rates.
   const catalog = await getOpenRouterModelsMetadataFromDatabase();
   const metadata = catalog[resolvedModel] ?? catalog[requestedModel];
-  let estimatedMaxCostMicrodollars: number | null = null;
-  if (metadata) {
-    try {
-      estimatedMaxCostMicrodollars = systemOneRequestCostBound(metadata, parsed.data);
-    } catch (error) {
-      errorExceptInTest('System One request cost estimate unavailable', error);
-    }
-  }
+  const estimatedMaxCostMicrodollars = metadata
+    ? systemOneRequestCostBound(metadata, parsed.data)
+    : null;
   if (estimatedMaxCostMicrodollars === null) {
+    errorExceptInTest(
+      'System One request cost unavailable',
+      metadata ? `unusable pricing for '${resolvedModel}'` : `no metadata for '${resolvedModel}'`
+    );
     return errorResponse('Service temporarily unavailable', 'temporarily_unavailable', 503);
   }
   if (estimatedMaxCostMicrodollars > Math.floor(balance * 1_000_000)) {

@@ -255,8 +255,10 @@ describe('System One request cost bound', () => {
     metadata: StoredModel,
     state: unknown,
     askedQuestions: Record<string, unknown> = questions
-  ) {
-    return systemOneRequestCostBound(metadata, { state, questions: askedQuestions });
+  ): number {
+    const bound = systemOneRequestCostBound(metadata, { state, questions: askedQuestions });
+    if (bound === null) throw new Error('Expected a cost bound');
+    return bound;
   }
 
   it('prices additional state bytes only at the input ceiling', () => {
@@ -324,8 +326,12 @@ describe('System One request cost bound', () => {
     );
   });
 
-  it('throws for a model without usable pricing', () => {
-    expect(() => boundOf({ ...model, endpoints: [] }, null)).toThrow(/pric/);
-    expect(() => boundOf({ ...model, endpoints: [{}] }, null)).toThrow(/pric/);
+  it('returns null for a model without usable pricing', () => {
+    expect(
+      systemOneRequestCostBound({ ...model, endpoints: [] }, { state: null, questions })
+    ).toBeNull();
+    expect(
+      systemOneRequestCostBound({ ...model, endpoints: [{}] }, { state: null, questions })
+    ).toBeNull();
   });
 });

@@ -600,8 +600,8 @@ describe('handleSystemOneRequest', () => {
 
     expect(response.status).toBe(503);
     expect(errorExceptInTest).toHaveBeenCalledWith(
-      'System One request cost estimate unavailable',
-      expect.anything()
+      'System One request cost unavailable',
+      expect.stringContaining('unusable pricing')
     );
     expect(mockedFetch).not.toHaveBeenCalled();
   });

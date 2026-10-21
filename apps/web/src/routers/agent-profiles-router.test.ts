@@ -955,6 +955,286 @@ describe('Agent Profiles Router', () => {
             })
           ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
         });
+
+        test('skills: reject a member and allow an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.createCustomSkill({
+              organizationId: organizationA.id,
+              profileId,
+              name: 'member-skill',
+              rawMarkdown: '# Member skill\n',
+            })
+          );
+
+          const { id: skillId } = await ownerCaller.agentProfiles.createCustomSkill({
+            organizationId: organizationA.id,
+            profileId,
+            name: 'admin-skill',
+            rawMarkdown: '# Admin skill\n',
+          });
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.setSkillEnabled({
+              organizationId: organizationA.id,
+              profileId,
+              skillId,
+              enabled: false,
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.updateSkill({
+              organizationId: organizationA.id,
+              profileId,
+              skillId,
+              name: 'member-renamed-skill',
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.deleteSkill({
+              organizationId: organizationA.id,
+              profileId,
+              skillId,
+            })
+          );
+
+          await ownerCaller.agentProfiles.setSkillEnabled({
+            organizationId: organizationA.id,
+            profileId,
+            skillId,
+            enabled: false,
+          });
+          await ownerCaller.agentProfiles.updateSkill({
+            organizationId: organizationA.id,
+            profileId,
+            skillId,
+            name: 'admin-renamed-skill',
+          });
+          await ownerCaller.agentProfiles.deleteSkill({
+            organizationId: organizationA.id,
+            profileId,
+            skillId,
+          });
+        });
+
+        test('agents: reject a member and allow an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.createAgent({
+              organizationId: organizationA.id,
+              profileId,
+              slug: 'member-agent',
+              name: 'Member Agent',
+              config: {},
+            })
+          );
+
+          const { id: agentId } = await ownerCaller.agentProfiles.createAgent({
+            organizationId: organizationA.id,
+            profileId,
+            slug: 'admin-agent',
+            name: 'Admin Agent',
+            config: {},
+          });
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.updateAgent({
+              organizationId: organizationA.id,
+              profileId,
+              agentId,
+              name: 'Member Renamed Agent',
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.deleteAgent({
+              organizationId: organizationA.id,
+              profileId,
+              agentId,
+            })
+          );
+
+          await ownerCaller.agentProfiles.updateAgent({
+            organizationId: organizationA.id,
+            profileId,
+            agentId,
+            name: 'Admin Renamed Agent',
+          });
+          await ownerCaller.agentProfiles.deleteAgent({
+            organizationId: organizationA.id,
+            profileId,
+            agentId,
+          });
+        });
+
+        test('agents: authority is decided before a duplicate slug is reported', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await ownerCaller.agentProfiles.createAgent({
+            organizationId: organizationA.id,
+            profileId,
+            slug: 'shared-agent',
+            name: 'Shared Agent',
+            config: {},
+          });
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.createAgent({
+              organizationId: organizationA.id,
+              profileId,
+              slug: 'shared-agent',
+              name: 'Duplicate Agent',
+              config: {},
+            })
+          );
+        });
+
+        test('kilo commands: reject a member and allow an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.createKiloCommand({
+              organizationId: organizationA.id,
+              profileId,
+              name: 'member-command',
+              template: 'echo member',
+            })
+          );
+
+          const { id: commandId } = await ownerCaller.agentProfiles.createKiloCommand({
+            organizationId: organizationA.id,
+            profileId,
+            name: 'admin-command',
+            template: 'echo admin',
+          });
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.updateKiloCommand({
+              organizationId: organizationA.id,
+              profileId,
+              commandId,
+              template: 'echo member',
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.setKiloCommandEnabled({
+              organizationId: organizationA.id,
+              profileId,
+              commandId,
+              enabled: false,
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.reorderKiloCommands({
+              organizationId: organizationA.id,
+              profileId,
+              orderedIds: [commandId],
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.deleteKiloCommand({
+              organizationId: organizationA.id,
+              profileId,
+              commandId,
+            })
+          );
+
+          await ownerCaller.agentProfiles.updateKiloCommand({
+            organizationId: organizationA.id,
+            profileId,
+            commandId,
+            template: 'echo admin updated',
+          });
+          await ownerCaller.agentProfiles.setKiloCommandEnabled({
+            organizationId: organizationA.id,
+            profileId,
+            commandId,
+            enabled: false,
+          });
+          await ownerCaller.agentProfiles.reorderKiloCommands({
+            organizationId: organizationA.id,
+            profileId,
+            orderedIds: [commandId],
+          });
+          await ownerCaller.agentProfiles.deleteKiloCommand({
+            organizationId: organizationA.id,
+            profileId,
+            commandId,
+          });
+        });
+
+        test('instructions: reject a member and allow an admin', async () => {
+          const ownerCaller = await createCallerForUser(ownerUser.id);
+          const memberCaller = await createCallerForUser(memberUser.id);
+          const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.createInstruction({
+              organizationId: organizationA.id,
+              profileId,
+              name: 'member-rules',
+              content: 'Follow the member rules.',
+            })
+          );
+
+          const { id: instructionId } = await ownerCaller.agentProfiles.createInstruction({
+            organizationId: organizationA.id,
+            profileId,
+            name: 'admin-rules',
+            content: 'Follow the admin rules.',
+          });
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.updateInstruction({
+              organizationId: organizationA.id,
+              profileId,
+              instructionId,
+              content: 'Follow the member rules.',
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.setInstructionEnabled({
+              organizationId: organizationA.id,
+              profileId,
+              instructionId,
+              enabled: false,
+            })
+          );
+          await expectMemberRejected(
+            memberCaller.agentProfiles.deleteInstruction({
+              organizationId: organizationA.id,
+              profileId,
+              instructionId,
+            })
+          );
+
+          await ownerCaller.agentProfiles.updateInstruction({
+            organizationId: organizationA.id,
+            profileId,
+            instructionId,
+            content: 'Follow the updated admin rules.',
+          });
+          await ownerCaller.agentProfiles.setInstructionEnabled({
+            organizationId: organizationA.id,
+            profileId,
+            instructionId,
+            enabled: false,
+          });
+          await ownerCaller.agentProfiles.deleteInstruction({
+            organizationId: organizationA.id,
+            profileId,
+            instructionId,
+          });
+        });
       });
     });
   });

@@ -21,6 +21,7 @@ type SourceSession = {
 const mockLimit = jest.fn<(limit: number) => Promise<SourceSession[]>>();
 const mockWhere = jest.fn((condition: SQL | undefined) => ({ limit: mockLimit, condition }));
 const mockLeftJoin = jest.fn((_table: unknown, condition: SQL | undefined) => ({
+  leftJoin: mockLeftJoin,
   where: mockWhere,
   condition,
 }));
@@ -107,10 +108,15 @@ describe('createWorktreeChat', () => {
     ).resolves.toEqual(result);
 
     const membership = compileCondition(mockLeftJoin.mock.calls[0]?.[1]);
+    const organization = compileCondition(mockLeftJoin.mock.calls[1]?.[1]);
     const where = compileCondition(mockWhere.mock.calls[0]?.[0]);
+    expect(mockLeftJoin).toHaveBeenCalledTimes(2);
     expect(membership.sql).toContain('"organization_memberships"."organization_id"');
     expect(membership.params).toEqual([user.id]);
+    expect(organization.sql).toContain('"organizations"."deleted_at" is null');
     expect(where.sql).toContain('"organization_memberships"."id" is not null');
+    expect(where.sql).toContain('"organizations"."id" is not null');
+    expect(where.sql).not.toContain('parent_organization');
     expect(where.params).toEqual([SOURCE_KILO_SESSION_ID, user.id, ORGANIZATION_ID]);
     expect(mockWorkerCreateWorktreeChat).toHaveBeenCalledWith({
       sourceKiloSessionId: SOURCE_KILO_SESSION_ID,

@@ -416,7 +416,11 @@ describe('PrCommentEditSheet', () => {
     const after = mountSheet();
 
     const inline = requireByType(after, 'ComposerInlineError');
-    expect((inline.props as InlineErrorProps).inlineError).toBe('Network request failed');
+    // The raw transport text never reaches the inline box: the retryable
+    // fall-through shows the surface's localized copy.
+    expect((inline.props as InlineErrorProps).inlineError).toBe(
+      "Couldn't save your comment. Check your connection and try again."
+    );
     expect((inline.props as InlineErrorProps).inlineErrorKind).toBe('retryable');
     expect(saveDisabled(after)).toBe(false);
 

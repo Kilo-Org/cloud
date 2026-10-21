@@ -71,6 +71,11 @@ export type SharedGatewayRequestProperties = {
   // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
   models?: string[];
 
+  // Messages API fallback models we do not support: OpenRouter tries them when the requested
+  // model fails, not only on Anthropic safety refusals
+  // https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#server-side-fallback
+  fallbacks?: unknown;
+
   // Non-standard reasoning configuration
   enable_thinking?: boolean; // Alibaba
   thinking?: { type?: 'enabled' | 'adaptive' | 'disabled' }; // ByteDance, Z.ai

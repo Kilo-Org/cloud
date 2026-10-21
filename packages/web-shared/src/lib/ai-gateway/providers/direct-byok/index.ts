@@ -103,27 +103,30 @@ async function getDirectByokModels(
   byokProviders: UserByokProviderId[],
   keyOwner: DirectByokKeyOwner
 ) {
-  let nextPreferredId = (await getPreferredModels()).length;
-  return (
-    await Promise.all(
-      DIRECT_BYOK_PROVIDERS.filter(provider => byokProviders.includes(provider.id)).map(
-        async provider => {
-          const supportsGeminiApi = getDirectByokSupportedChatApis(provider, keyOwner).includes(
-            'generate_content'
-          );
-          const models: ReadonlyArray<DirectByokModel> = await provider.models();
-          return models.flatMap(model => {
-            const ai_sdk_provider =
-              model.ai_sdk_provider ??
-              getAiSdkProvider(formatDirectByokModelId(provider, model), provider.id);
-            return ai_sdk_provider === 'google' && !supportsGeminiApi
-              ? []
-              : [convertModel(provider, model, nextPreferredId++, ai_sdk_provider)];
-          });
-        }
-      )
-    )
-  ).flat();
+  const firstPreferredId = (await getPreferredModels()).length;
+  const enabledProviders = DIRECT_BYOK_PROVIDERS.filter(provider =>
+    byokProviders.includes(provider.id)
+  );
+  const modelsByProvider = await Promise.all(
+    enabledProviders.map(async provider => {
+      const models: ReadonlyArray<DirectByokModel> = await provider.models();
+      return { provider, models };
+    })
+  );
+  let nextPreferredId = firstPreferredId;
+  return modelsByProvider.flatMap(({ provider, models }) => {
+    const supportsGeminiApi = getDirectByokSupportedChatApis(provider, keyOwner).includes(
+      'generate_content'
+    );
+    return models.flatMap(model => {
+      const ai_sdk_provider =
+        model.ai_sdk_provider ??
+        getAiSdkProvider(formatDirectByokModelId(provider, model), provider.id);
+      return ai_sdk_provider === 'google' && !supportsGeminiApi
+        ? []
+        : [convertModel(provider, model, nextPreferredId++, ai_sdk_provider)];
+    });
+  });
 }
 
 export async function getDirectByokModel(requestedModel: string): Promise<{

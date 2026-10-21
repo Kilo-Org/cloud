@@ -14,9 +14,10 @@ import { CenteredState } from '@/components/centered-state';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import {
+  formatConfidence,
   formatExploitable,
+  formatSuggestedAction,
   getAgentChatSessionHref,
-  humanize,
 } from '@/components/security-agent/finding-analysis-panel-helpers';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { EmptyState } from '@/components/empty-state';
@@ -252,11 +253,11 @@ export function FindingAnalysisPanel({
           <View className="rounded-lg bg-secondary px-3">
             <KvRow
               label={t('securityAgent.analysis.triageConfidence')}
-              value={humanize(triage.confidence)}
+              value={formatConfidence(triage.confidence)}
             />
             <KvRow
               label={t('securityAgent.analysis.suggestedAction')}
-              value={humanize(triage.suggestedAction)}
+              value={formatSuggestedAction(triage.suggestedAction)}
               last
             />
           </View>
@@ -282,7 +283,7 @@ export function FindingAnalysisPanel({
             />
             <KvRow
               label={t('securityAgent.analysis.suggestedAction')}
-              value={humanize(sandbox.suggestedAction)}
+              value={formatSuggestedAction(sandbox.suggestedAction)}
             />
             <KvRow
               label={t('common.model')}

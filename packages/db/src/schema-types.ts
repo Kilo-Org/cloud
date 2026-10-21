@@ -2309,11 +2309,27 @@ export const CustomLlmSecureProxyCredentialsSchema = z.object({
 
 export type CustomLlmSecureProxyCredentials = z.infer<typeof CustomLlmSecureProxyCredentialsSchema>;
 
+/**
+ * Signs requests with AWS Signature Version 4 using IAM access keys, for Amazon
+ * Bedrock's OpenAI-compatible and Anthropic Messages endpoints on
+ * `bedrock-runtime` or `bedrock-mantle`. Bedrock API keys need no signing and
+ * use `api_key` (or `x-api-key` on Anthropic routes).
+ */
+export const CustomLlmAwsBedrockCredentialsSchema = z.object({
+  type: z.literal('aws_bedrock'),
+  region: z.string().min(1),
+  access_key_id: z.string().min(1),
+  secret_access_key: z.string().min(1),
+});
+
+export type CustomLlmAwsBedrockCredentials = z.infer<typeof CustomLlmAwsBedrockCredentialsSchema>;
+
 export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
   CustomLlmApiKeyCredentialsSchema,
   CustomLlmXApiKeyCredentialsSchema,
   GoogleServiceAccountKeySchema,
   CustomLlmSecureProxyCredentialsSchema,
+  CustomLlmAwsBedrockCredentialsSchema,
 ]);
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;

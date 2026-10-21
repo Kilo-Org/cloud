@@ -155,6 +155,22 @@ const rewriters = [
   ['Gemini API', rewriteModelResponse_GenerateContent],
 ] as const;
 
+describe.each(rewriters)('%s SSE proxy headers', (_name, rewrite) => {
+  test('keeps event streams uncompressed through external rewrites', async () => {
+    const result = await rewrite({
+      response: sseResponse(''),
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(result.headers.get('cache-control')).toBe('no-cache, no-transform');
+    expect(result.headers.get('content-encoding')).toBe('identity');
+    expect(await readOutputStream(result)).toBe('');
+  });
+});
+
 describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
   test.each([
     ['ResponseAborted', 'upstream_disconnect', 'disconnected'],
@@ -174,6 +190,61 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       error_type: errorType,
       message: expect.stringContaining(messageFragment),
     });
+  });
+
+  test.each([
+    ['a closed socket', 'UND_ERR_SOCKET', 'upstream_disconnect', 'interrupted'],
+    ['a reset connection', 'ECONNRESET', 'upstream_disconnect', 'interrupted'],
+    ['an idle body timeout', 'UND_ERR_BODY_TIMEOUT', 'timeout', 'timed out'],
+  ])(
+    'reports an undici body termination after %s',
+    async (_description, causeCode, errorType, messageFragment) => {
+      const terminated = () =>
+        new TypeError('terminated', { cause: Object.assign(new Error(), { code: causeCode }) });
+
+      const jsonResult = await rewrite({
+        response: failingResponse('application/json', terminated()),
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      });
+      expect(jsonResult.status).toBe(503);
+      expect(await jsonResult.json()).toEqual({
+        error: expect.stringContaining(messageFragment),
+        error_type: errorType,
+        message: expect.stringContaining(messageFragment),
+      });
+
+      const sseResult = await rewrite({
+        response: failingResponse(
+          'text/event-stream',
+          terminated(),
+          'data: {"id":"gen-1","type":"ping","choices":[]}\n\n'
+        ),
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      });
+      const events = dataObjects(await readOutputStream(sseResult)) as {
+        error?: { message: string };
+      }[];
+      expect(events).toHaveLength(2);
+      expect(events[1].error?.message).toContain(messageFragment);
+    }
+  );
+
+  test('still fails the response for an unrecognized JSON read error', async () => {
+    await expect(
+      rewrite({
+        response: failingResponse('application/json', new TypeError('unexpected')),
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      })
+    ).rejects.toThrow('unexpected');
   });
 
   test.each(['high', 'medium', 'low', 'none', null])(
@@ -421,6 +492,102 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
     });
 
+    test('defaults reasoning_tokens to 0 when completion_tokens_details omits it', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        usage: {
+          cost: 0.5,
+          is_byok: true,
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15,
+          prompt_tokens_details: { cached_tokens: 3 },
+          completion_tokens_details: { text_tokens: 3 },
+        },
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.usage).toEqual({
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_tokens_details: { cached_tokens: 3 },
+        completion_tokens_details: { text_tokens: 3, reasoning_tokens: 0 },
+      });
+    });
+
+    test.each([0, 7])(
+      'preserves a supplied reasoning_tokens value of %s',
+      async reasoningTokens => {
+        const upstream = jsonResponse({
+          model: 'upstream-model',
+          usage: {
+            prompt_tokens: 10,
+            completion_tokens: 5,
+            total_tokens: 15,
+            prompt_tokens_details: { cached_tokens: 3 },
+            completion_tokens_details: { reasoning_tokens: reasoningTokens },
+          },
+        });
+
+        const result = await rewriteModelResponse_ChatCompletions({
+          response: upstream,
+          removeCost: true,
+          capture: null,
+          vercelRequestId: null,
+          reasoningEffort: null,
+          responseTransforms: null,
+        });
+        const json = await result.json();
+
+        expect(json.usage).toEqual({
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15,
+          prompt_tokens_details: { cached_tokens: 3 },
+          completion_tokens_details: { reasoning_tokens: reasoningTokens },
+        });
+      }
+    );
+
+    test('leaves usage unchanged when completion_tokens_details is absent', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15,
+          prompt_tokens_details: { cached_tokens: 3 },
+        },
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.usage).toEqual({
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_tokens_details: { cached_tokens: 3 },
+      });
+    });
+
     test('passes through invalid JSON bodies unchanged and preserves status', async () => {
       const upstream = new Response('not-json{', {
         status: 502,
@@ -624,7 +791,10 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         });
         const reader = result.body?.getReader();
         expect(reader).toBeDefined();
-        await reader?.read();
+        expect(result.headers.get('cache-control')).toBe('no-cache, no-transform');
+        const first = await reader?.read();
+        expect(first?.done).toBe(false);
+        expect(first?.value).toContain('"id":"gen-chat"');
         expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
 
         upstreamController.current?.close();
@@ -708,6 +878,38 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       }>;
 
       expect(chunk.choices[0].delta).toEqual({ content: 'hi' });
+    });
+
+    test('drops null delta tool call type', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call-1","type":"function","function":{"name":"read","arguments":""}}]}}]}\n\n' +
+          'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":null,"type":null,"function":{"name":null,"arguments":"{}"}}]}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const [first, continuation] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: { tool_calls: Array<Record<string, unknown>> } }>;
+      }>;
+
+      expect(first.choices[0].delta.tool_calls[0]).toEqual({
+        index: 0,
+        id: 'call-1',
+        type: 'function',
+        function: { name: 'read', arguments: '' },
+      });
+      expect(continuation.choices[0].delta.tool_calls[0]).toEqual({
+        index: 0,
+        id: null,
+        function: { name: null, arguments: '{}' },
+      });
     });
 
     test('maps Gemini thought content and signatures to reasoning_details', async () => {
@@ -906,6 +1108,60 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(chunk.usage.cost).toBeUndefined();
       expect(chunk.usage.is_byok).toBeUndefined();
       expect(chunk.usage.prompt_tokens_details.cached_tokens).toBe(0);
+    });
+
+    test('defaults reasoning_tokens in a usage-only chunk and still terminates with [DONE]', async () => {
+      const upstream = sseResponse(
+        'data: {"id":"gen-chat","model":"upstream-model","choices":[],"usage":{"cost":1,"prompt_tokens":4,"completion_tokens":2,"total_tokens":6,"prompt_tokens_details":{"cached_tokens":1},"completion_tokens_details":{"text_tokens":3}}}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const sse = await readOutputStream(result);
+      const [chunk] = dataObjects(sse) as Array<{
+        usage: {
+          prompt_tokens: number;
+          completion_tokens: number;
+          total_tokens: number;
+          prompt_tokens_details: { cached_tokens: number };
+          completion_tokens_details: { text_tokens?: number; reasoning_tokens: number };
+        };
+      }>;
+
+      expect(chunk.usage).toEqual({
+        prompt_tokens: 4,
+        completion_tokens: 2,
+        total_tokens: 6,
+        prompt_tokens_details: { cached_tokens: 1 },
+        completion_tokens_details: { text_tokens: 3, reasoning_tokens: 0 },
+      });
+      expect(dataPayloads(sse)).toContain('[DONE]');
+    });
+
+    test('keeps the pre-rewrite clone for accounting byte-for-byte', async () => {
+      const body =
+        'data: {"id":"gen-chat","model":"upstream-model","choices":[],"usage":{"cost":1,"prompt_tokens":4,"completion_tokens":2,"total_tokens":6,"prompt_tokens_details":{"cached_tokens":1},"completion_tokens_details":{"text_tokens":3}}}\n\n';
+      const upstream = sseResponse(body);
+      const accountingClone = upstream.clone();
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      await readOutputStream(result);
+
+      expect(await accountingClone.text()).toBe(body);
     });
 
     test('forwards SSE comments as a processing keep-alive', async () => {

@@ -32,7 +32,7 @@ describe('cloudAgentNextFeedback.create', () => {
 
     const result = await caller.cloudAgentNextFeedback.create({
       kilo_session_id: SESSION_ID,
-      cloud_agent_session_id: 'workspace_session',
+      cloud_agent_session_id: 'workspace_12345678-1234-1234-1234-123456789abc',
       session_type: 'cloud-agent',
       feedback_text: 'the send button did nothing',
     });
@@ -41,7 +41,7 @@ describe('cloudAgentNextFeedback.create', () => {
     const rows = await rowsFor(user.id);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      cloud_agent_session_id: 'workspace_session',
+      cloud_agent_session_id: 'workspace_12345678-1234-1234-1234-123456789abc',
       session_type: 'cloud-agent',
       feedback_text: 'the send button did nothing',
     });

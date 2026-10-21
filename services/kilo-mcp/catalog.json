@@ -6706,6 +6706,10 @@
                   ],
                   "additionalProperties": false
                 },
+                "publicRepoUrl": {
+                  "type": "string",
+                  "format": "uri"
+                },
                 "mode": {
                   "type": "string",
                   "minLength": 1,
@@ -7194,6 +7198,10 @@
                     "repositoryUuid"
                   ],
                   "additionalProperties": false
+                },
+                "publicRepoUrl": {
+                  "type": "string",
+                  "format": "uri"
                 },
                 "mode": {
                   "type": "string",
@@ -8112,7 +8120,7 @@
       "properties": {
         "cloud_agent_session_id": {
           "type": "string",
-          "maxLength": 500
+          "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         },
         "kilo_session_id": {
           "type": "string"
@@ -18297,6 +18305,10 @@
                       ],
                       "additionalProperties": false
                     },
+                    "publicRepoUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
                     "mode": {
                       "type": "string",
                       "minLength": 1,
@@ -18785,6 +18797,10 @@
                         "repositoryUuid"
                       ],
                       "additionalProperties": false
+                    },
+                    "publicRepoUrl": {
+                      "type": "string",
+                      "format": "uri"
                     },
                     "mode": {
                       "type": "string",

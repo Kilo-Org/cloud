@@ -1477,6 +1477,9 @@
       "couldNotGetLatest": "Couldn't get the latest.",
       "byline": "{{repo}} #{{number}} by {{author}}",
       "noFindings": "No findings",
+      "findingsUnavailable": "Results are unavailable because this review failed.",
+      "serviceUnavailable": "Could not reach the code review service. Retry the review when the service is available.",
+      "reviewFailed": "The review failed. Please try again.",
       "showMore": "Show more",
       "created": "Created",
       "started": "Started",
@@ -3728,7 +3731,7 @@
       "nameRequired": "Enter an agent name",
       "slugRequired": "Enter an agent slug",
       "slugInvalid": "Slug must start with a letter and use only lowercase letters, digits, and dashes",
-      "slugConflict": "That slug is reserved by a built-in agent",
+      "slugConflict": "That slug is already taken by a built-in or another agent in this profile",
       "edit": "Edit agent"
     },
     "slashCommands": {

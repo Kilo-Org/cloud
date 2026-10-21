@@ -763,7 +763,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
           reply.permissionId,
           reply.response,
           reply.message,
-          undefined,
+          true,
           route.directory
         );
       } else if (reply.action === 'reject') {

@@ -1413,6 +1413,9 @@
       "couldNotGetLatest": "Asikwazanga ukuthola imininingwane yakamuva.",
       "byline": "{{repo}} #{{number}} ngu-{{author}}",
       "noFindings": "Akukho okutholakele.",
+      "findingsUnavailable": "Imiphumela ayitholakali ngoba lokhu kuhlolwa kuhlulekile.",
+      "serviceUnavailable": "Asikwazanga ukuxhumana nesevisi yokuhlola ikhodi. Phinda uzame ukuhlola uma isevisi isitholakala.",
+      "reviewFailed": "Ukuhlolwa kuhlulekile. Sicela uzame futhi.",
       "showMore": "Khombisa okunye",
       "created": "Kudaliwe",
       "started": "Kuqalisiwe",
@@ -3664,7 +3667,7 @@
       "nameRequired": "Faka igama lomenzeli",
       "slugRequired": "Faka i-ejenti ye-slug",
       "slugInvalid": "I-slug kufanele siqale ngohlamvu futhi sisebenzise kuphela izinhlamvu ezincane, amadijithi, namadeshi",
-      "slugConflict": "Leso slug sigodlwe i-ejenti eyakhelwe ngaphakathi",
+      "slugConflict": "Le slug isetshenziswa ngumklanyo owakhelwe ngaphakathi noma omunye umklanyo kule phrofayela",
       "edit": "Hlela umenzeli"
     },
     "slashCommands": {

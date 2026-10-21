@@ -10,7 +10,7 @@ import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@kilocode/web-shared/lib/config
 import { desc, eq } from 'drizzle-orm';
 import * as z from 'zod';
 import { enforceFeedbackRateLimit, isFeedbackRateLimitError } from '@/lib/feedback/rate-limit';
-import { buildCloudAgentFeedbackSlackMessage } from '@/lib/feedback/slack-message';
+import { feedbackPlainTextBlocks } from '@/lib/feedback/slack';
 
 const recentMessageSchema = z.object({
   role: z.string().max(50),
@@ -45,7 +45,12 @@ const kiloSessionIdSchema = z
   );
 
 const CreateCloudAgentFeedbackInputSchema = z.object({
-  cloud_agent_session_id: z.string().max(500).optional(),
+  cloud_agent_session_id: z
+    .string()
+    .regex(
+      /^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+    )
+    .optional(),
   kilo_session_id: kiloSessionIdSchema.optional(),
   session_type: feedbackSessionTypeSchema.optional(),
   organization_id: z.string().uuid().optional(),
@@ -108,18 +113,32 @@ async function insertFeedback(userId: string, input: CloudAgentFeedbackInput) {
 function notifySlack(input: CloudAgentFeedbackInput): void {
   if (!SLACK_USER_FEEDBACK_WEBHOOK_URL) return;
 
+  const metadataLines = [
+    `• session: ${input.kilo_session_id ?? 'unknown'}`,
+    `• session type: ${
+      input.session_type ? feedbackSessionTypeLabels[input.session_type] : 'unknown'
+    }`,
+  ];
+
+  const trimmedFeedback = input.feedback_text.trim();
+  const feedbackText = trimmedFeedback.slice(0, 500) + (trimmedFeedback.length > 500 ? '...' : '');
+
   fetch(SLACK_USER_FEEDBACK_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(
-      buildCloudAgentFeedbackSlackMessage({
-        kiloSessionId: input.kilo_session_id,
-        sessionTypeLabel: input.session_type
-          ? feedbackSessionTypeLabels[input.session_type]
-          : undefined,
-        feedbackText: input.feedback_text,
-      })
-    ),
+    body: JSON.stringify({
+      text: 'New Cloud Agent feedback',
+      unfurl_links: false,
+      unfurl_media: false,
+      blocks: feedbackPlainTextBlocks(
+        [
+          'New Cloud Agent feedback:',
+          ...metadataLines,
+          '• feedback:',
+          feedbackText || '<empty>',
+        ].join('\n')
+      ),
+    }),
   }).catch(error => {
     console.error('[CloudAgentFeedback] Failed to post to Slack webhook', error);
   });

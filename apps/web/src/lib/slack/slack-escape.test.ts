@@ -9,7 +9,7 @@ import {
 } from './slack-escape';
 
 describe('escapeSlackText', () => {
-  it('neutralizes mention and link tokens', () => {
+  it('keeps mention and link tokens as literal text', () => {
     expect(escapeSlackText('<!channel> ping <@U12345>')).toBe(
       '&lt;!channel&gt; ping &lt;@U12345&gt;'
     );
@@ -31,11 +31,11 @@ describe('escapeSlackText', () => {
 });
 
 describe('escapeSlackLabel', () => {
-  it('neutralizes backticks so the value cannot close a code span', () => {
+  it('replaces backticks so the value stays inside a code span', () => {
     expect(escapeSlackLabel('a ` b')).toBe("a ' b");
   });
 
-  it('collapses line breaks so a value cannot forge a message line', () => {
+  it('collapses line breaks so a value stays on one line', () => {
     expect(escapeSlackLabel('line one\nline two\r\nline three\rline four')).toBe(
       'line one line two line three line four'
     );

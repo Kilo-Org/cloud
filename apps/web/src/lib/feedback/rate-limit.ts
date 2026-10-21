@@ -5,7 +5,7 @@ import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
  * Shared per-user feedback limit.
  *
  * Every feedback surface posts into Kilo's Slack workspace, so the limit is a
- * content-level abuse control on top of escaping: one submission per user per
+ * content-level control alongside the escaping: one submission per user per
  * rolling window. Each surface passes its own advisory-lock namespace, so the
  * surfaces keep independent windows.
  *

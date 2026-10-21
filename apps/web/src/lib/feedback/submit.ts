@@ -6,7 +6,7 @@ import { user_feedback } from '@kilocode/db/schema';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
 import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@kilocode/web-shared/lib/config.server';
 import { enforceFeedbackRateLimit } from '@/lib/feedback/rate-limit';
-import { buildUserFeedbackSlackMessage } from '@/lib/feedback/slack-message';
+import { feedbackPlainTextBlocks } from '@/lib/feedback/slack';
 
 /**
  * Shared feedback submission service.
@@ -52,10 +52,27 @@ const RATE_LIMIT_NAMESPACE = 'user_feedback_rate_limit';
 function notifySlack(input: SubmitUserFeedbackInput): void {
   if (!SLACK_USER_FEEDBACK_WEBHOOK_URL) return;
 
+  const textLines = [
+    'New user feedback:',
+    `• user: ${input.userId}`,
+    `• for: ${input.feedbackFor ?? FeedbackFor.Unknown}`,
+    `• source: ${input.source ?? FeedbackSource.Unknown}`,
+    input.feedbackBatch ? `• batch: ${input.feedbackBatch}` : null,
+    '• raw feedback:',
+    input.feedbackText || '<empty>',
+  ].filter((line): line is string => !!line);
+
   fetch(SLACK_USER_FEEDBACK_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildUserFeedbackSlackMessage(input)),
+    body: JSON.stringify({
+      text: 'New user feedback',
+      mrkdwn: false,
+      parse: 'none',
+      unfurl_links: false,
+      unfurl_media: false,
+      blocks: feedbackPlainTextBlocks(textLines.join('\n')),
+    }),
   }).catch(error => {
     console.error('[UserFeedback] Failed to post to Slack webhook', error);
   });

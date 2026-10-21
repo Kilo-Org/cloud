@@ -943,6 +943,9 @@
       "gateHidden": "Gizli",
       "gateNone": "Yok",
       "noFindings": "Bulgu yok.",
+      "findingsUnavailable": "Bu inceleme başarısız olduğu için sonuçlar kullanılamıyor.",
+      "serviceUnavailable": "Kod inceleme hizmetine ulaşılamadı. Hizmet kullanılabilir olduğunda incelemeyi tekrar dene.",
+      "reviewFailed": "İnceleme başarısız oldu. Lütfen tekrar dene.",
       "retryMessage": "Kod incelemesi yeniden çalıştırılacak.",
       "retryReview": "İncelemeyi tekrar dene",
       "retryNeedsSettings": "Kod inceleyici kapalı veya ayarlarının ilgilenilmesi gerekiyor. Ayarları düzeltin, ardından bu incelemeyi tekrar deneyin.",
@@ -3664,7 +3667,7 @@
       "nameRequired": "Bir temsilci adı girin",
       "slugRequired": "Bir temsilci bilgisi girin",
       "slugInvalid": "Bilgi bir harfle başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
-      "slugConflict": "Bu bilgi yerleşik bir aracı tarafından ayrılmıştır",
+      "slugConflict": "Bu slug, yerleşik bir ajan veya bu profildeki başka bir ajan tarafından zaten kullanılıyor",
       "edit": "Temsilciyi düzenle"
     },
     "slashCommands": {

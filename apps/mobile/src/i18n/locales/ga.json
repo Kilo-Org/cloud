@@ -1470,6 +1470,9 @@
       "couldNotGetLatest": "Níorbh fhéidir na sonraí is déanaí a fháil.",
       "byline": "{{repo}} #{{number}} le {{author}}",
       "noFindings": "Níor aimsíodh aon toradh.",
+      "findingsUnavailable": "Níl na torthaí ar fáil mar gur theip ar an athbhreithniú seo.",
+      "serviceUnavailable": "Níorbh fhéidir ceangal leis an tseirbhís athbhreithnithe cóid. Bain triail as an athbhreithniú arís nuair a bheidh an tseirbhís ar fáil.",
+      "reviewFailed": "Theip ar an athbhreithniú. Bain triail eile as, le do thoil.",
       "showMore": "Taispeáin níos mó",
       "created": "Cruthaithe",
       "started": "Tosaithe",
@@ -3787,7 +3790,7 @@
       "nameRequired": "Cuir isteach ainm gníomhaire",
       "slugRequired": "Cuir isteach seilide gníomhaire",
       "slugInvalid": "Caithfidh sluga tosú le litir agus gan ach litreacha beaga, digití agus daiseanna a úsáid",
-      "slugConflict": "Tá an seilide sin curtha in áirithe ag gníomhaire ionsuite",
+      "slugConflict": "Tá an slug sin in úsáid cheana ag gníomhaire ionsuite nó ag gníomhaire eile sa phróifíl seo",
       "edit": "Cuir gníomhaire in eagar"
     },
     "slashCommands": {

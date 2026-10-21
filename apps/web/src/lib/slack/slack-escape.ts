@@ -2,10 +2,9 @@
  * Slack message formatting helpers for values that come from outside the server.
  *
  * Slack renders message `text` and `mrkdwn` blocks with its own markup, so a
- * user-supplied value must be escaped before it is interpolated into a message.
- * Otherwise `<@U123>`, `<!channel>` or `<https://example.com|label>` in the value
- * is rendered as an active mention or link, and a backtick in the value can close
- * a code span and return the rest of the line to markup.
+ * value interpolated into one must be escaped first: otherwise the value's own
+ * `<`, `>` and `&` characters are read as Slack markup, and a backtick can end
+ * the code span that holds it and return the rest of the line to markup.
  *
  * Plain-text block content does not need this: Slack does not parse `plain_text`
  * as markup. Use these helpers for `text` and `mrkdwn` fields only.
@@ -14,15 +13,15 @@
 /** Appended to a value cut by {@link truncateSlackText}. */
 export const SLACK_TRUNCATION_MARKER = '… [truncated]';
 
-/** Neutralizes the three characters Slack treats as markup delimiters. */
+/** Escapes the three characters Slack treats as markup delimiters. */
 export function escapeSlackText(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
 /**
  * Escapes a value used inside a single line, including inside a backtick code
- * span: escapes markup delimiters, replaces backticks (which would close the
- * span) and collapses line breaks (which would forge a following message line).
+ * span: escapes markup delimiters, replaces backticks so the value stays inside
+ * its span, and collapses line breaks so the value stays on its own line.
  */
 export function escapeSlackLabel(value: string): string {
   return escapeSlackText(value)

@@ -15,11 +15,17 @@ export async function activityFixture(
   options: {
     subagentPermission?: Record<string, 'allow' | 'ask' | 'deny'>;
     modelBaseUrl?: string;
+    skillMarkdown?: string;
   } = {}
 ) {
   const root = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-activity-781-')));
   const directory = path.join(root, 'workspace');
   await fsp.mkdir(directory);
+  if (options.skillMarkdown) {
+    const skillDirectory = path.join(root, '.kilocode/skills/native-human-permission');
+    await fsp.mkdir(skillDirectory, { recursive: true });
+    await fsp.writeFile(path.join(skillDirectory, 'SKILL.md'), options.skillMarkdown);
+  }
   const env = {
     PATH: process.env.PATH,
     HOME: root,
@@ -105,9 +111,9 @@ export async function activityFixture(
   const events: Array<{ type: string; properties: Record<string, unknown>; directory?: string }> =
     [];
   async function dispose() {
-    lifetime.abort();
     proc.kill();
     await proc.exited;
+    lifetime.abort();
     await fake.stop(true);
     await consume?.catch(() => undefined);
     await fsp.rm(root, { recursive: true, force: true });

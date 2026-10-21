@@ -910,6 +910,7 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
  */
 export const StartSessionInput = z
   .object({
+    operationKey: z.string().uuid().optional(),
     message: z
       .object({
         prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
@@ -961,6 +962,7 @@ export const StartSessionOutput = z.object({
   kiloSessionId: z.string(),
   messageId: MessageIdSchema,
   delivery: z.enum(['sent', 'queued']),
+  replayed: z.boolean().optional(),
   wrapperRunId: z.string().optional(),
 });
 

@@ -77,7 +77,8 @@ describe('gateMarkdownImages', () => {
     }
     const gated = gate(value);
     expect(gated).not.toContain('kilo-image-load:');
-    expect(gated).not.toContain(IMAGE);
+    expect(gated).not.toContain('![');
+    expect(gated).not.toContain('](');
   });
 
   it('rewrites every copy without lexing per copy once the probe budget is spent', () => {

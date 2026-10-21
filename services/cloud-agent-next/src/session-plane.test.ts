@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   generateSessionId,
+  isCodeReviewContainersOwner,
   isCodeReviewControlPlaneOwner,
   isCodeReviewSession,
   isControlPlaneOrigin,
@@ -149,6 +150,47 @@ describe('session plane identity', () => {
     expect(
       sessionPlaneForNewOwner({ CODE_REVIEW_CONTROL_PLANE_IDS: '*' }, { userId: 'user-1' }, web)
     ).toBe('control');
+  });
+
+  it('routes Cloudflare Containers code-review owners to the control plane', () => {
+    const origin = { createdOnPlatform: 'code-review', billingOrigin: 'code-review' };
+    expect(
+      sessionPlaneForNewOwner(
+        { CODE_REVIEW_CONTAINERS_ORG_IDS: 'org-1' },
+        { userId: 'user-2', orgId: 'org-1' },
+        origin
+      )
+    ).toBe('control');
+    expect(
+      sessionPlaneForNewOwner(
+        { CODE_REVIEW_CONTAINERS_ORG_IDS: 'user-1' },
+        { userId: 'user-1' },
+        origin
+      )
+    ).toBe('control');
+    expect(
+      sessionPlaneForNewOwner(
+        { CODE_REVIEW_CONTAINERS_ORG_IDS: 'other' },
+        { userId: 'user-1' },
+        origin
+      )
+    ).toBe('legacy');
+  });
+
+  it('recognizes only enrolled Cloudflare Containers code-review owners', () => {
+    expect(
+      isCodeReviewContainersOwner(
+        { CODE_REVIEW_CONTAINERS_ORG_IDS: 'user-1, org-1' },
+        { userId: 'user-2', orgId: 'org-1' }
+      )
+    ).toBe(true);
+    expect(
+      isCodeReviewContainersOwner(
+        { CODE_REVIEW_CONTAINERS_ORG_IDS: 'user-1' },
+        { userId: 'user-2' }
+      )
+    ).toBe(false);
+    expect(isCodeReviewContainersOwner({}, { userId: 'user-1' })).toBe(false);
   });
 
   it('does not route a spoofed code-review platform string to the control plane', () => {

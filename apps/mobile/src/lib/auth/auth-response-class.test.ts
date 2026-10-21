@@ -110,9 +110,11 @@ describe('terminal failure reporting', () => {
   });
 
   it('uses one stable fingerprint for every repeat of the same failure', () => {
-    expect(authTerminalFingerprint('/api/auth/native/token', 401)).toEqual(
-      authTerminalFingerprint('/api/auth/native/token', 401)
-    );
+    expect(authTerminalFingerprint('/api/auth/native/token', 401)).toEqual([
+      'auth-terminal',
+      '/api/auth/native/token',
+      '401',
+    ]);
     expect(authTerminalFingerprint('/api/auth/native/token', 401)).not.toEqual(
       authTerminalFingerprint('/api/auth/native/refresh', 401)
     );

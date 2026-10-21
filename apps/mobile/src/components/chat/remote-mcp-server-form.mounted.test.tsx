@@ -204,4 +204,101 @@ describe('the remote MCP server form', () => {
 
     expect(saveButton().loading).toBe(true);
   });
+
+  it('reports unsaved edits to the sheet, and clears the report when they are undone', async () => {
+    const dirty: boolean[] = [];
+    await mount({
+      onSave,
+      onDirtyChange: value => {
+        dirty.push(value);
+      },
+    });
+
+    await type(0, 'notes');
+    await type(1, 'https://notes.example/mcp');
+
+    // Undoing the typed name clears the flag again.
+    await type(0, '');
+
+    expect(dirty[0]).toBe(true);
+    expect(dirty.at(-1)).toBe(true);
+
+    await type(1, '');
+    expect(dirty.at(-1)).toBe(false);
+  });
+
+  it('counts a bearer token edit and clears it when the token is restored', async () => {
+    const dirty: boolean[] = [];
+    await mount({
+      server: {
+        id: 'remote',
+        name: 'Remote',
+        url: 'https://remote.example/mcp',
+        auth: { type: 'bearer', token: 'secret' },
+        enabled: true,
+      },
+      onSave,
+      onDirtyChange: value => {
+        dirty.push(value);
+      },
+    });
+
+    await type(2, 'another');
+    expect(dirty.at(-1)).toBe(true);
+
+    await type(2, 'secret');
+    expect(dirty.at(-1)).toBe(false);
+  });
+
+  it('does not report whitespace the saved draft trims away', async () => {
+    const dirty: boolean[] = [];
+    await mount({
+      server: {
+        id: 'remote',
+        name: 'Remote',
+        url: 'https://remote.example/mcp',
+        auth: { type: 'bearer', token: 'secret' },
+        enabled: true,
+      },
+      onSave,
+      onDirtyChange: value => {
+        dirty.push(value);
+      },
+    });
+
+    await type(0, 'Remote ');
+    expect(dirty.at(-1)).toBe(false);
+
+    await type(2, ' secret ');
+    expect(dirty.at(-1)).toBe(false);
+
+    // A real edit still reports.
+    await type(2, 'secret2');
+    expect(dirty.at(-1)).toBe(true);
+  });
+
+  it('drops a bearer token from the dirty check when an OAuth server is left selected', async () => {
+    const dirty: boolean[] = [];
+    await mount({
+      server: {
+        id: 'remote',
+        name: 'Remote',
+        url: 'https://remote.example/mcp',
+        auth: { type: 'oauth' },
+        enabled: true,
+      },
+      onSave,
+      onDirtyChange: value => {
+        dirty.push(value);
+      },
+    });
+
+    // A bearer token typed on the way past must not outlive the bearer method.
+    await choose('bearer');
+    await type(2, 'secret-token');
+    expect(dirty.at(-1)).toBe(true);
+
+    await choose('oauth');
+    expect(dirty.at(-1)).toBe(false);
+  });
 });

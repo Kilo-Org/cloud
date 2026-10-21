@@ -64,20 +64,34 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.presentation.isPending = false;
     mocks.presentation.isError = false;
     mocks.presentation.data = null;
+    mocks.presentation.refetch.mockClear();
   });
 
-  it.each(['web_management', 'unavailable'])(
-    'centers %s outside the purchase scroller',
-    async kind => {
-      mocks.presentation.data = { kind, webUrl: null };
-      const renderer = await renderScreen();
-      expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
-      expect(
-        renderer.root.findAll(node => String(node.type) === 'DetailScreenScrollView')
-      ).toHaveLength(0);
-      renderer.unmount();
-    }
-  );
+  it.each([
+    ['web_management', 'This Kilo Pass is managed on web'],
+    ['unavailable', 'Kilo Pass purchase is not available right now.'],
+  ] as const)('centers %s outside the purchase scroller', async (kind, description) => {
+    mocks.presentation.data = { kind, webUrl: null };
+    const renderer = await renderScreen();
+    expect(allText(renderer)).toContain(description);
+    expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'DetailScreenScrollView')
+    ).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('presentation error: Retry refetches the presentation once', async () => {
+    const renderer = await renderScreen();
+    expect(allText(renderer)).toContain("Couldn't load Kilo Pass.");
+    expect(allText(renderer)).toContain('Kilo Pass could not be loaded. Try again.');
+    const retry = renderer.root.findByProps({ accessibilityLabel: 'Retry loading Kilo Pass' });
+    act(() => {
+      (retry.props.onPress as () => void)();
+    });
+    expect(mocks.presentation.refetch).toHaveBeenCalledTimes(1);
+    renderer.unmount();
+  });
 
   it('keeps a cached presentation after a refetch failure', async () => {
     mocks.presentation.data = { kind: 'web_management', webUrl: null };

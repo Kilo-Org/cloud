@@ -35,6 +35,8 @@
     "connectGithub": "Conectar GitHub",
     "cost": "Custo",
     "discard": "Descartar",
+    "discardChangesMessage": "Perderanse os teus cambios.",
+    "discardChangesTitle": "Descartar os cambios?",
     "findings": "Problemas detectados",
     "mergeRequest": "solicitude de fusión",
     "notConnected": "Sen conexión",
@@ -1661,7 +1663,14 @@
       "whereFound": "Localizacións do achado ({{displayCount}})",
       "fullReport": "Informe xerado completo",
       "yes": "Si",
-      "no": "Non"
+      "no": "Non",
+      "action": {
+        "analyzeCodebase": "Analizar a base de código",
+        "dismiss": "Rexeitar",
+        "manualReview": "Revisión manual",
+        "monitor": "Monitorizar",
+        "openPr": "Abrir PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} achados",
@@ -1880,7 +1889,24 @@
       "title": "Informe de auditoría",
       "unavailable": "Informe de auditoría non dispoñible",
       "unavailableDescription": "Só os propietarios da organización e os xestores de facturación poden ver os informes de auditoría. Pídelle a un propietario ou xestor de facturación que che conceda acceso.",
-      "queryFailed": "A consulta do informe non rematou. Téntao de novo."
+      "queryFailed": "A consulta do informe non rematou. Téntao de novo.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Análise completada",
+        "findingAnalysisFailed": "Produciuse un erro na análise",
+        "findingAutoDismissed": "Rexeitado automaticamente",
+        "findingCreated": "Importado",
+        "findingDeleted": "Eliminado",
+        "findingDismissed": "Rexeitado",
+        "findingSeverityChanged": "Cambiouse a gravidade",
+        "findingStatusChange": "Cambiouse o estado",
+        "findingSuperseded": "Substituído",
+        "remediationBlocked": "Corrección bloqueada",
+        "remediationCancelled": "Cancelada",
+        "remediationFailed": "Produciuse un erro na corrección",
+        "remediationNoChangesNeeded": "Non se precisan cambios",
+        "remediationPrOpened": "PR aberto",
+        "remediationQueued": "Corrección solicitada"
+      }
     },
     "notifications": {
       "couldNotLoad": "Non se puido cargar a configuración das notificacións.",

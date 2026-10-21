@@ -35,6 +35,8 @@
     "connectGithub": "Sopọ̀ mọ́ GitHub",
     "cost": "Iye owó",
     "discard": "Jù sílẹ̀",
+    "discardChangesMessage": "Àwọn àtúnṣe rẹ máa sọ̀nu.",
+    "discardChangesTitle": "Jù àwọn àtúnṣe sílẹ̀?",
     "findings": "Àwọn àwárí",
     "mergeRequest": "ìbéèrè ìṣọ̀kan",
     "notConnected": "Kò sopọ̀",
@@ -1661,7 +1663,14 @@
       "whereFound": "Ibi tí a ti rí èyí ({{displayCount}})",
       "fullReport": "Ẹ̀kúnrẹ́rẹ́ ìròyìn tí a ṣe",
       "yes": "Bẹ́ẹ̀ ni",
-      "no": "Rárá"
+      "no": "Rárá",
+      "action": {
+        "analyzeCodebase": "Ṣàtúpalẹ̀ gbogbo kóòdù",
+        "dismiss": "Kọ̀ rẹ̀",
+        "manualReview": "Ìṣàyẹ̀wò pẹ̀lú ọwọ́",
+        "monitor": "Ṣojú sí",
+        "openPr": "Ṣí pull request"
+      }
     },
     "dashboard": {
       "findingsCount": "àbùkù {{displayCount}}",
@@ -1880,7 +1889,24 @@
       "title": "Ìròyìn àyẹ̀wò",
       "unavailable": "Ìròyìn àyẹ̀wò kò sí",
       "unavailableDescription": "Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè wo àwọn ìròyìn àyẹ̀wò. Béèrè lọ́wọ́ oní àjọ tàbí olùṣàkóso ìsanwó láti fún ọ ní àṣẹ.",
-      "queryFailed": "Ìbéèrè ìròyìn kò parí. Gbìyànjú lẹ́ẹ̀kan sí i."
+      "queryFailed": "Ìbéèrè ìròyìn kò parí. Gbìyànjú lẹ́ẹ̀kan sí i.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Ìtupalẹ̀ ti parí",
+        "findingAnalysisFailed": "Ìtupalẹ̀ kò ṣe àṣeyọrí",
+        "findingAutoDismissed": "A ti kọ̀ rẹ̀ lára",
+        "findingCreated": "A ti gbé e wọ̀",
+        "findingDeleted": "A ti paarẹ̀",
+        "findingDismissed": "A ti kọ̀ rẹ̀",
+        "findingSeverityChanged": "Ìpele ewu ti yí padà",
+        "findingStatusChange": "Ìpò ti yí padà",
+        "findingSuperseded": "A ti rọ́pò rẹ̀",
+        "remediationBlocked": "A ti dè àtúnṣe",
+        "remediationCancelled": "A ti fagilé",
+        "remediationFailed": "Àtúnṣe kò ṣe àṣeyọrí",
+        "remediationNoChangesNeeded": "Kò nílo àyípadà",
+        "remediationPrOpened": "A ti ṣí pull request",
+        "remediationQueued": "A ti bèèrè àtúnṣe"
+      }
     },
     "notifications": {
       "couldNotLoad": "A kò lè gbé àwọn ètò ìfitónilétí wọlé.",

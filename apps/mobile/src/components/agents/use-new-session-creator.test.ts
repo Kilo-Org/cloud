@@ -1623,6 +1623,23 @@ describe('useRemoteSpawnDraftCleanup remote-spawn clear', () => {
     expect(vi.mocked(clearDraft)).not.toHaveBeenCalled();
   });
 
+  it('flushes the draft when the screen unmounts after a failed remote spawn — the failure disarms the attempt marker', async () => {
+    const { renderer, resultRef } = mountRemoteSpawnDraftCleanup('u1');
+    act(() => {
+      resultRef.current?.markRemoteSpawnAttempted();
+    });
+    // The spawn failed: the dispatch's onSpawnFailed disarms the marker so
+    // the draft survives the failure and the leave to Home.
+    act(() => {
+      resultRef.current?.markRemoteSpawnFailed();
+    });
+    act(() => {
+      renderer?.unmount();
+    });
+    expect(vi.mocked(flushDraft)).toHaveBeenCalledWith('u1', 'agent-composer:new');
+    expect(vi.mocked(clearDraft)).not.toHaveBeenCalled();
+  });
+
   it('never clears or flushes when the userId is unknown', async () => {
     const { renderer, resultRef } = mountRemoteSpawnDraftCleanup(undefined);
     act(() => {

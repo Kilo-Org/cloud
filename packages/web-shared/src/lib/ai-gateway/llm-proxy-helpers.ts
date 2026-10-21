@@ -1124,7 +1124,7 @@ export function countAndStoreFimUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      if (usageContext.is_free || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }
@@ -1261,7 +1261,7 @@ export function countAndStoreEditUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      if (usageContext.is_free || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }
@@ -1418,10 +1418,10 @@ export function countAndStoreEmbeddingUsage(
         return;
       }
 
-      // Preserve the real upstream cost for analytics before zeroing for BYOK
+      // Preserve the real upstream cost before free-model or BYOK zeroing.
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      if (usageContext.is_free || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
       }
 

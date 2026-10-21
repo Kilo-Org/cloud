@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 
 import { briefingMoney, BriefingScorecard } from './briefing-card';
 import { BriefingSummary } from './briefing-summary';
+import { formatBriefingTimestamp } from './briefing-window';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -17,16 +18,13 @@ import {
   useBriefingAccess,
   useBriefingDismissals,
   useBriefingInvalidation,
+  useBriefingPreferences,
 } from '@/lib/agent-briefing';
 import { briefingAccessDenied, briefingReportMissing } from '@/lib/agent-briefing-state';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatDate } from '@/lib/format';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
-import { parseTimestamp } from '@/lib/utils';
-
-const BRIEFING_DATE_TIME: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
 
 export function BriefingDetailScreen() {
   const { 'report-id': reportId } = useLocalSearchParams<{ 'report-id': string }>();
@@ -36,8 +34,10 @@ export function BriefingDetailScreen() {
   const { t, i18n } = useTranslation();
   const { setOrganizationId } = useOrganization();
   const access = useBriefingAccess();
+  const preferences = useBriefingPreferences();
   const offline = useOfflineBannerState();
   const dismissals = useBriefingDismissals();
+  const timeZone = briefingAccessDenied(preferences.error) ? undefined : preferences.data?.timezone;
   const [goneReportId, setGoneReportId] = useState<string | null>(null);
   const gone = goneReportId === reportId;
   const query = useQuery({
@@ -115,12 +115,8 @@ export function BriefingDetailScreen() {
             <Text className="text-sm text-muted-foreground">{report.localDate}</Text>
             <Text className="text-xs text-muted-foreground">
               {t('agentBriefing.window', {
-                start: formatDate(
-                  parseTimestamp(report.nightStartAt),
-                  i18n.language,
-                  BRIEFING_DATE_TIME
-                ),
-                end: formatDate(parseTimestamp(report.cutoffAt), i18n.language, BRIEFING_DATE_TIME),
+                start: formatBriefingTimestamp(report.nightStartAt, i18n.language, timeZone),
+                end: formatBriefingTimestamp(report.cutoffAt, i18n.language, timeZone),
               })}
             </Text>
             {report.revised ? (
@@ -199,7 +195,7 @@ export function BriefingDetailScreen() {
               >
                 <Text className="text-sm">{source.title}</Text>
                 <Text className="text-xs text-muted-foreground">
-                  {formatDate(parseTimestamp(source.occurredAt), i18n.language, BRIEFING_DATE_TIME)}
+                  {formatBriefingTimestamp(source.occurredAt, i18n.language, timeZone)}
                 </Text>
               </Pressable>
             ))}

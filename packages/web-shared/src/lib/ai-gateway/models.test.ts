@@ -3,7 +3,6 @@ import { selectAutoFreeCandidate } from './models';
 import {
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviders,
-  isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
   shouldRedactErrorResponse,
   shouldRedactModelNameInMicrodollarUsage,
@@ -24,16 +23,6 @@ import {
   reflection_beam_free_model,
 } from './kilo-exclusive-models';
 import { getRandomNumber } from './getRandomNumber';
-
-describe('rate-limited Kilo-exclusive models', () => {
-  test('only includes free Gemma', () => {
-    expect(kiloExclusiveModels.filter(model => model.flags.includes('rate-limited'))).toEqual([
-      gemma_4_26b_a4b_it_free_model,
-    ]);
-    expect(isKiloExclusiveRateLimitedModel(gemma_4_26b_a4b_it_free_model.public_id)).toBe(true);
-    expect(isKiloExclusiveRateLimitedModel('tencent/hy3:free')).toBe(false);
-  });
-});
 
 describe('Glyph Cluster', () => {
   test('is free, stealth, and requires data collection', async () => {

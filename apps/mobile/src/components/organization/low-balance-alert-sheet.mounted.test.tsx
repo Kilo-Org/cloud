@@ -32,12 +32,10 @@ type SaveMutation = {
   mutate: (input: unknown) => unknown;
   reset: () => unknown;
 };
-const save = vi.hoisted(
-  (): { value: SaveMutation } => ({
-    // The hook's object is replaced per test; every field starts unset.
-    value: { isPending: false, isError: false, error: null, mutate: vi.fn(), reset: vi.fn() },
-  })
-);
+const save = vi.hoisted((): { value: SaveMutation } => ({
+  // The hook's object is replaced per test; every field starts unset.
+  value: { isPending: false, isError: false, error: null, mutate: vi.fn(), reset: vi.fn() },
+}));
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ back: vi.fn() }) }));
 vi.mock('expo-haptics', () => ({

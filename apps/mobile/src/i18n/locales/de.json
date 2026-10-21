@@ -50,6 +50,7 @@
     "connected": "Verbunden",
     "couldNotLoadModels": "Die Modelle konnten nicht geladen werden.",
     "couldNotLoadRepositories": "Die Code-Repositories konnten nicht geladen werden.",
+    "noRepositoriesFound": "Keine Repositories gefunden",
     "critical": "Kritisch",
     "delete": "Löschen",
     "deleted": "Gelöscht",
@@ -84,6 +85,7 @@
     "connect": "Verbinden",
     "connectBitbucket": "Bitbucket verbinden",
     "connectGitlab": "GitLab verbinden",
+    "connectProvider": "Anbieter verbinden",
     "contentTruncated": "Inhalt gekürzt",
     "copyLink": "Link kopieren",
     "couldNotLoadOrganizations": "Die Organisationen konnten nicht geladen werden.",
@@ -877,7 +879,6 @@
       "gitlabNoRepositoriesDescription": "Du musst möglicherweise Zugriff auf weitere Gruppen oder Projekte in GitLab gewähren.",
       "installGithubApp": "GitHub-App auf Repositories installieren",
       "installGithubAppDescription": "Gewähre der Kilo-GitHub-App Zugriff auf die Repositories, die du prüfen lassen möchtest.",
-      "noRepositoriesFound": "Keine Repositories gefunden",
       "repositoryAccess": "repository-Zugriff"
     },
     "style": {
@@ -901,7 +902,6 @@
     "followReviewMd": "REVIEW.md befolgen",
     "followReviewMdSubtitle": "Anweisungen aus der REVIEW.md-Datei des jeweiligen Repositorys beachten",
     "manualReview": {
-      "connectProvider": "Anbieter verbinden",
       "connectProviderDescription": "Verbinde GitHub, um ein manuelles Review eines Pull-Requests zu starten.",
       "couldNotCheckProviderStatus": "Der Anbieterstatus konnte nicht geprüft werden.",
       "couldNotLoadProviders": "Deine verbundenen Anbieter konnten nicht geladen werden. Bitte versuche es erneut.",
@@ -1690,8 +1690,6 @@
       "startSession": "Sitzung starten",
       "selectRepositoryToStart": "Wähle ein Repository aus, um zu starten.",
       "connectProviderToStart": "Verbinde einen Anbieter, um zu starten.",
-      "connectProviderAction": "Anbieter verbinden",
-      "noRepositoriesToStart": "Keine Repositorys gefunden.",
       "promptPlaceholder": "Woran möchtest du arbeiten?",
       "couldNotLoadModels": "Die Modelle konnten nicht geladen werden.",
       "prefillRepoAndModelUnavailable": "Das Repository und das Modell der ursprünglichen Sitzung sind nicht mehr verfügbar. Wähle unten ein anderes Repository und ein anderes Modell aus.",

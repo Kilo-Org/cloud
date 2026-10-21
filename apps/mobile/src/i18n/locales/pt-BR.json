@@ -50,6 +50,7 @@
     "connected": "Conectado",
     "couldNotLoadModels": "Não foi possível carregar os modelos.",
     "couldNotLoadRepositories": "Não foi possível carregar os repositórios.",
+    "noRepositoriesFound": "Nenhum repositório encontrado",
     "critical": "Nível crítico",
     "delete": "Excluir",
     "deleted": "Excluído",
@@ -84,6 +85,7 @@
     "connect": "Conectar",
     "connectBitbucket": "Conectar Bitbucket",
     "connectGitlab": "Conectar GitLab",
+    "connectProvider": "Conectar um provedor",
     "contentTruncated": "Conteúdo exibido parcialmente",
     "copyLink": "Copiar link",
     "couldNotLoadOrganizations": "Não foi possível carregar as organizações.",
@@ -849,7 +851,6 @@
       "gitlabNoRepositoriesDescription": "Talvez você precise conceder acesso a mais grupos ou projetos no GitLab.",
       "installGithubApp": "Instalar o app do GitHub nos repositórios",
       "installGithubAppDescription": "Conceda ao app do Kilo no GitHub acesso aos repositórios que você quer revisar.",
-      "noRepositoriesFound": "Nenhum repositório encontrado",
       "repositoryAccess": "acesso ao repositório"
     },
     "style": {
@@ -873,7 +874,6 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Seguir as instruções do arquivo REVIEW.md de cada repositório",
     "manualReview": {
-      "connectProvider": "Conectar um provedor",
       "connectProviderDescription": "Conecte o GitHub para iniciar a revisão manual de um PR.",
       "couldNotCheckProviderStatus": "Não foi possível verificar o status do provedor.",
       "couldNotLoadProviders": "Não foi possível carregar seus provedores conectados. Tente novamente.",
@@ -1671,8 +1671,6 @@
       "startSession": "Iniciar sessão",
       "selectRepositoryToStart": "Selecione um repositório para começar.",
       "connectProviderToStart": "Conecte um provedor para começar.",
-      "connectProviderAction": "Conecte um provedor",
-      "noRepositoriesToStart": "Nenhum repositório encontrado.",
       "promptPlaceholder": "No que você quer trabalhar?",
       "couldNotLoadModels": "Não foi possível carregar os modelos.",
       "prefillRepoAndModelUnavailable": "O repositório e o modelo da sessão original não estão mais disponíveis. Escolha-os abaixo.",

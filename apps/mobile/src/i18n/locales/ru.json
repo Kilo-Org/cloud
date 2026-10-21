@@ -50,6 +50,7 @@
     "connected": "Подключено",
     "couldNotLoadModels": "Не удалось загрузить модели.",
     "couldNotLoadRepositories": "Не удалось загрузить репозитории.",
+    "noRepositoriesFound": "Репозитории не найдены",
     "critical": "Критический уровень",
     "delete": "Удалить",
     "deleted": "Удалено",
@@ -84,6 +85,7 @@
     "connect": "Подключить",
     "connectBitbucket": "Подключить Bitbucket",
     "connectGitlab": "Подключить GitLab",
+    "connectProvider": "Подключение сервиса",
     "contentTruncated": "Содержимое обрезано",
     "copyLink": "Скопировать ссылку",
     "couldNotLoadOrganizations": "Не удалось загрузить организации.",
@@ -883,7 +885,6 @@
       "gitlabNoRepositoriesDescription": "Возможно, нужно предоставить доступ к дополнительным группам или проектам в GitLab.",
       "installGithubApp": "Установка приложения GitHub для репозиториев",
       "installGithubAppDescription": "Предоставьте приложению Kilo для GitHub доступ к репозиториям, которые нужно проверять.",
-      "noRepositoriesFound": "Репозитории не найдены",
       "repositoryAccess": "доступ к репозиторию"
     },
     "style": {
@@ -907,7 +908,6 @@
     "followReviewMd": "Следовать инструкциям REVIEW.md",
     "followReviewMdSubtitle": "Соблюдать инструкции из файла REVIEW.md в каждом репозитории",
     "manualReview": {
-      "connectProvider": "Подключение сервиса",
       "connectProviderDescription": "Подключите GitHub, чтобы запустить проверку пул-реквеста вручную.",
       "couldNotCheckProviderStatus": "Не удалось проверить статус сервиса.",
       "couldNotLoadProviders": "Не удалось загрузить подключённые сервисы. Попробуйте снова.",
@@ -1714,8 +1714,6 @@
       "startSession": "Начать сеанс",
       "selectRepositoryToStart": "Выберите репозиторий, чтобы начать.",
       "connectProviderToStart": "Подключите сервис, чтобы начать.",
-      "connectProviderAction": "Подключите сервис",
-      "noRepositoriesToStart": "Репозитории не найдены.",
       "promptPlaceholder": "Над чем хотите поработать?",
       "couldNotLoadModels": "Не удалось загрузить модели.",
       "prefillRepoAndModelUnavailable": "Репозиторий и модель исходного сеанса больше недоступны. Выберите другие ниже.",

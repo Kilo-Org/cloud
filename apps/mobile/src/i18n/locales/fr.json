@@ -50,6 +50,7 @@
     "connected": "Connecté",
     "couldNotLoadModels": "Impossible de charger les modèles.",
     "couldNotLoadRepositories": "Impossible de charger les dépôts.",
+    "noRepositoriesFound": "Aucun dépôt trouvé",
     "critical": "Critique",
     "delete": "Supprimer",
     "deleted": "Supprimé",
@@ -84,6 +85,7 @@
     "connect": "Connecter",
     "connectBitbucket": "Connecter Bitbucket",
     "connectGitlab": "Connecter GitLab",
+    "connectProvider": "Connecter un fournisseur",
     "contentTruncated": "Contenu tronqué",
     "copyLink": "Copier le lien",
     "couldNotLoadOrganizations": "Impossible de charger les organisations.",
@@ -849,7 +851,6 @@
       "gitlabNoRepositoriesDescription": "Vous devrez peut-être accorder l'accès à d'autres groupes ou projets sur GitLab.",
       "installGithubApp": "Installer l'application GitHub sur les dépôts",
       "installGithubAppDescription": "Accordez à l'application GitHub de Kilo l'accès aux dépôts dont vous souhaitez faire examiner le code.",
-      "noRepositoriesFound": "Aucun dépôt trouvé",
       "repositoryAccess": "accès au dépôt"
     },
     "style": {
@@ -873,7 +874,6 @@
     "followReviewMd": "Suivre les consignes de REVIEW.md",
     "followReviewMdSubtitle": "Respecter les fichiers d'instructions REVIEW.md de chaque dépôt",
     "manualReview": {
-      "connectProvider": "Connecter un fournisseur",
       "connectProviderDescription": "Connectez GitHub pour lancer une revue manuelle d'une demande de fusion.",
       "couldNotCheckProviderStatus": "Impossible de vérifier l'état du fournisseur.",
       "couldNotLoadProviders": "Impossible de charger les fournisseurs connectés à votre compte. Réessayez.",
@@ -1603,8 +1603,6 @@
       "startSession": "Démarrer la session",
       "selectRepositoryToStart": "Sélectionnez un dépôt pour commencer.",
       "connectProviderToStart": "Connectez un fournisseur pour commencer.",
-      "connectProviderAction": "Connecter un fournisseur",
-      "noRepositoriesToStart": "Aucun dépôt trouvé.",
       "promptPlaceholder": "Sur quoi souhaitez-vous travailler ?",
       "couldNotLoadModels": "Impossible de charger les modèles.",
       "prefillRepoAndModelUnavailable": "Le dépôt et le modèle de la session d'origine ne sont plus disponibles. Choisissez-en d'autres ci-dessous.",

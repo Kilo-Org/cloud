@@ -50,6 +50,7 @@
     "connected": "Collegato",
     "couldNotLoadModels": "Impossibile caricare i modelli.",
     "couldNotLoadRepositories": "Impossibile caricare i repository.",
+    "noRepositoriesFound": "Nessun repository trovato",
     "critical": "Livello critico",
     "delete": "Elimina",
     "deleted": "Eliminato",
@@ -84,6 +85,7 @@
     "connect": "Collega",
     "connectBitbucket": "Collega Bitbucket",
     "connectGitlab": "Collega GitLab",
+    "connectProvider": "Connetti una piattaforma",
     "contentTruncated": "Contenuto troncato",
     "copyLink": "Copia link",
     "couldNotLoadOrganizations": "Impossibile caricare le organizzazioni.",
@@ -849,7 +851,6 @@
       "gitlabNoRepositoriesDescription": "Potresti dover concedere l'accesso a più gruppi o progetti su GitLab.",
       "installGithubApp": "Installa l'app GitHub sui repository",
       "installGithubAppDescription": "Concedi all'app GitHub di Kilo l'accesso ai repository che vuoi far esaminare.",
-      "noRepositoriesFound": "Nessun repository trovato",
       "repositoryAccess": "accesso al repository"
     },
     "style": {
@@ -873,7 +874,6 @@
     "followReviewMd": "Segui REVIEW.md",
     "followReviewMdSubtitle": "Rispetta le istruzioni nel file REVIEW.md di ogni repository",
     "manualReview": {
-      "connectProvider": "Connetti una piattaforma",
       "connectProviderDescription": "Connetti GitHub per avviare una revisione manuale di una pull request.",
       "couldNotCheckProviderStatus": "Impossibile verificare lo stato della piattaforma.",
       "couldNotLoadProviders": "Impossibile caricare le piattaforme connesse. Riprova.",
@@ -1671,8 +1671,6 @@
       "startSession": "Avvia sessione",
       "selectRepositoryToStart": "Seleziona un repository per iniziare.",
       "connectProviderToStart": "Connetti una piattaforma per iniziare.",
-      "connectProviderAction": "Connetti una piattaforma",
-      "noRepositoriesToStart": "Nessun repository trovato.",
       "promptPlaceholder": "Su cosa vuoi lavorare?",
       "couldNotLoadModels": "Impossibile caricare i modelli.",
       "prefillRepoAndModelUnavailable": "Il repository e il modello della sessione originale non sono più disponibili. Selezionali qui sotto.",

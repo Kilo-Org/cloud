@@ -50,6 +50,7 @@
     "connected": "जुड़ा हुआ",
     "couldNotLoadModels": "मॉडल लोड नहीं हो सके।",
     "couldNotLoadRepositories": "रिपॉज़िटरी लोड नहीं हो सकीं।",
+    "noRepositoriesFound": "कोई रिपॉज़िटरी नहीं मिली",
     "critical": "गंभीर",
     "delete": "हटाएँ",
     "deleted": "हटाई गई",
@@ -84,6 +85,7 @@
     "connect": "जोड़ें",
     "connectBitbucket": "Bitbucket जोड़ें",
     "connectGitlab": "GitLab जोड़ें",
+    "connectProvider": "एक प्रदाता कनेक्ट करें",
     "contentTruncated": "सामग्री का कुछ हिस्सा नहीं दिखाया गया",
     "copyLink": "लिंक कॉपी करें",
     "couldNotLoadOrganizations": "संगठन लोड नहीं हो सके।",
@@ -877,7 +879,6 @@
       "gitlabNoRepositoriesDescription": "आपको GitLab पर और समूहों या प्रोजेक्ट तक पहुँच देने की ज़रूरत हो सकती है।",
       "installGithubApp": "रिपॉज़िटरी पर GitHub ऐप इंस्टॉल करें",
       "installGithubAppDescription": "जिन रिपॉज़िटरी की समीक्षा करानी है, उन तक Kilo GitHub ऐप को पहुँच दें।",
-      "noRepositoriesFound": "कोई रिपॉज़िटरी नहीं मिली",
       "repositoryAccess": "रिपॉज़िटरी तक पहुँच"
     },
     "style": {
@@ -901,7 +902,6 @@
     "followReviewMd": "REVIEW.md का पालन करें",
     "followReviewMdSubtitle": "हर रिपॉज़िटरी की REVIEW.md फ़ाइल के निर्देशों का पालन करें",
     "manualReview": {
-      "connectProvider": "एक प्रदाता कनेक्ट करें",
       "connectProviderDescription": "पुल रिक्वेस्ट की मैन्युअल समीक्षा शुरू करने के लिए GitHub कनेक्ट करें।",
       "couldNotCheckProviderStatus": "प्रदाता की स्थिति की जाँच नहीं हो सकी।",
       "couldNotLoadProviders": "आपके कनेक्ट किए गए प्रदाताओं की जानकारी लोड नहीं हो सकी। कृपया फिर से कोशिश करें।",
@@ -1690,8 +1690,6 @@
       "startSession": "सत्र शुरू करें",
       "selectRepositoryToStart": "शुरू करने के लिए रिपॉज़िटरी चुनें।",
       "connectProviderToStart": "शुरू करने के लिए प्रदाता कनेक्ट करें।",
-      "connectProviderAction": "प्रदाता कनेक्ट करें",
-      "noRepositoriesToStart": "कोई रिपॉज़िटरी नहीं मिली।",
       "promptPlaceholder": "आप किस पर काम करना चाहेंगे?",
       "couldNotLoadModels": "मॉडल लोड नहीं हो सके।",
       "prefillRepoAndModelUnavailable": "मूल सत्र की रिपॉज़िटरी और मॉडल अब उपलब्ध नहीं हैं। नीचे दूसरी रिपॉज़िटरी और मॉडल चुनें।",

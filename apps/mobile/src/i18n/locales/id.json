@@ -50,6 +50,7 @@
     "connected": "Terhubung",
     "couldNotLoadModels": "Tidak dapat memuat model.",
     "couldNotLoadRepositories": "Tidak dapat memuat repositori.",
+    "noRepositoriesFound": "Tidak ada repositori yang ditemukan",
     "critical": "Kritis",
     "delete": "Hapus",
     "deleted": "Dihapus",
@@ -84,6 +85,7 @@
     "connect": "Hubungkan",
     "connectBitbucket": "Hubungkan Bitbucket",
     "connectGitlab": "Hubungkan GitLab",
+    "connectProvider": "Hubungkan penyedia",
     "contentTruncated": "Konten dipotong",
     "copyLink": "Salin tautan",
     "couldNotLoadOrganizations": "Tidak dapat memuat organisasi.",
@@ -877,7 +879,6 @@
       "gitlabNoRepositoriesDescription": "Kamu mungkin perlu memberikan akses ke lebih banyak grup atau proyek di GitLab.",
       "installGithubApp": "Pasang aplikasi GitHub di repositori",
       "installGithubAppDescription": "Izinkan aplikasi GitHub Kilo mengakses repositori yang ingin kamu tinjau.",
-      "noRepositoriesFound": "Tidak ada repositori yang ditemukan",
       "repositoryAccess": "akses repositori"
     },
     "style": {
@@ -901,7 +902,6 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Ikuti instruksi dalam berkas REVIEW.md di setiap repositori",
     "manualReview": {
-      "connectProvider": "Hubungkan penyedia",
       "connectProviderDescription": "Hubungkan GitHub untuk memulai tinjauan manual terhadap PR.",
       "couldNotCheckProviderStatus": "Tidak dapat memeriksa status penyedia.",
       "couldNotLoadProviders": "Kami tidak dapat memuat penyedia yang terhubung. Coba lagi.",
@@ -1690,8 +1690,6 @@
       "startSession": "Mulai sesi",
       "selectRepositoryToStart": "Pilih repositori untuk memulai.",
       "connectProviderToStart": "Hubungkan penyedia untuk memulai.",
-      "connectProviderAction": "Hubungkan penyedia",
-      "noRepositoriesToStart": "Tidak ada repositori yang ditemukan.",
       "promptPlaceholder": "Apa yang ingin kamu kerjakan?",
       "couldNotLoadModels": "Tidak dapat memuat model.",
       "prefillRepoAndModelUnavailable": "Repositori dan model dari sesi asal sudah tidak tersedia. Pilih penggantinya di bawah.",

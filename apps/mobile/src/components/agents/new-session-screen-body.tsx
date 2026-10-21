@@ -920,14 +920,14 @@ export function NewSessionScreenBody() {
     const connectPlatform = connectProviderPlatform;
     if (connectPlatform !== null) {
       startBlockedAction = {
-        label: t('agentChat.newSession.connectProviderAction'),
+        label: t('common.connectProvider'),
         onPress: () => {
           openIntegration(connectPlatform);
         },
       };
     }
   } else if (startBlockedReasonKey === 'refresh-repositories') {
-    startBlockedReason = t('agentChat.newSession.noRepositoriesToStart');
+    startBlockedReason = t('common.noRepositoriesFound');
     startBlockedAction = {
       label: t('agentChat.newSession.refreshRepositories'),
       onPress: () => void refreshReposForceFresh(),

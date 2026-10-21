@@ -50,6 +50,7 @@
     "connected": "מחובר",
     "couldNotLoadModels": "לא הצלחנו לטעון את המודלים.",
     "couldNotLoadRepositories": "לא הצלחנו לטעון את המאגרים.",
+    "noRepositoriesFound": "לא נמצאו מאגרים",
     "critical": "קריטית",
     "delete": "מחיקה",
     "deleted": "נמחק",
@@ -84,6 +85,7 @@
     "connect": "חיבור",
     "connectBitbucket": "חיבור ל-Bitbucket",
     "connectGitlab": "חיבור ל-GitLab",
+    "connectProvider": "חיבור ספק",
     "contentTruncated": "התוכן קוצר",
     "copyLink": "העתקת קישור",
     "couldNotLoadOrganizations": "לא הצלחנו לטעון את הארגונים.",
@@ -880,7 +882,6 @@
       "gitlabNoRepositoriesDescription": "ייתכן שתצטרך להעניק גישה לעוד קבוצות או פרויקטים ב-GitLab.",
       "installGithubApp": "התקנת אפליקציית GitHub במאגרים",
       "installGithubAppDescription": "תן לאפליקציית Kilo ב-GitHub גישה למאגרים שברצונך לסקור.",
-      "noRepositoriesFound": "לא נמצאו מאגרים",
       "repositoryAccess": "גישה למאגר"
     },
     "style": {
@@ -904,7 +905,6 @@
     "followReviewMd": "פעולה לפי REVIEW.md",
     "followReviewMdSubtitle": "שימוש בהוראות שבקובץ REVIEW.md בכל מאגר",
     "manualReview": {
-      "connectProvider": "חיבור ספק",
       "connectProviderDescription": "חבר את GitHub כדי להתחיל סקירה ידנית של בקשת משיכה.",
       "couldNotCheckProviderStatus": "לא ניתן לבדוק את מצב הספק.",
       "couldNotLoadProviders": "לא ניתן לטעון את הספקים המחוברים שלך. נסה שוב.",
@@ -1702,8 +1702,6 @@
       "startSession": "התחלת סשן",
       "selectRepositoryToStart": "בחר מאגר כדי להתחיל.",
       "connectProviderToStart": "חבר ספק כדי להתחיל.",
-      "connectProviderAction": "חבר ספק",
-      "noRepositoriesToStart": "לא נמצאו מאגרים.",
       "promptPlaceholder": "על מה תרצה לעבוד?",
       "couldNotLoadModels": "לא ניתן היה לטעון את המודלים.",
       "prefillRepoAndModelUnavailable": "המאגר והמודל מהסשן המקורי כבר אינם זמינים. בחר מאגר ומודל אחרים למטה.",

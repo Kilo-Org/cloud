@@ -220,7 +220,7 @@ describe('NewSessionStartButton', () => {
     const onPress = vi.fn<() => void>();
     const renderer = await mountButton({
       isStartDisabled: true,
-      startBlockedReason: 'No repositories found.',
+      startBlockedReason: 'No repositories found',
       startBlockedAction: { label: 'Refresh repositories', onPress, isBusy: true },
     });
 

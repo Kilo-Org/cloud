@@ -50,6 +50,7 @@
     "connected": "Підключено",
     "couldNotLoadModels": "Не вдалося завантажити моделі.",
     "couldNotLoadRepositories": "Не вдалося завантажити репозиторії.",
+    "noRepositoriesFound": "Репозиторіїв не знайдено",
     "critical": "Критичний",
     "delete": "Видалити",
     "deleted": "Видалено",
@@ -84,6 +85,7 @@
     "connect": "Підключити",
     "connectBitbucket": "Підключити Bitbucket",
     "connectGitlab": "Підключити GitLab",
+    "connectProvider": "Підключіть сервіс",
     "contentTruncated": "Вміст обрізано",
     "copyLink": "Скопіювати посилання",
     "couldNotLoadOrganizations": "Не вдалося завантажити організації.",
@@ -883,7 +885,6 @@
       "gitlabNoRepositoriesDescription": "Можливо, потрібно надати доступ до більшої кількості груп або проєктів у GitLab.",
       "installGithubApp": "Установіть застосунок GitHub для репозиторіїв",
       "installGithubAppDescription": "Надайте застосунку Kilo для GitHub доступ до репозиторіїв, які потрібно перевіряти.",
-      "noRepositoriesFound": "Репозиторіїв не знайдено",
       "repositoryAccess": "доступ до репозиторію"
     },
     "style": {
@@ -907,7 +908,6 @@
     "followReviewMd": "Дотримуватися інструкцій REVIEW.md",
     "followReviewMdSubtitle": "Враховувати файли інструкцій REVIEW.md для кожного репозиторію",
     "manualReview": {
-      "connectProvider": "Підключіть сервіс",
       "connectProviderDescription": "Підключіть GitHub, щоб запустити перевірку запиту на злиття вручну.",
       "couldNotCheckProviderStatus": "Не вдалося перевірити стан сервісу.",
       "couldNotLoadProviders": "Не вдалося завантажити список підключених сервісів. Спробуйте ще раз.",
@@ -1714,8 +1714,6 @@
       "startSession": "Розпочати сеанс",
       "selectRepositoryToStart": "Виберіть репозиторій, щоб почати.",
       "connectProviderToStart": "Підключіть сервіс, щоб почати.",
-      "connectProviderAction": "Підключіть сервіс",
-      "noRepositoriesToStart": "Репозиторіїв не знайдено.",
       "promptPlaceholder": "Над чим хочете попрацювати?",
       "couldNotLoadModels": "Не вдалося завантажити моделі.",
       "prefillRepoAndModelUnavailable": "Репозиторій і модель початкового сеансу більше недоступні. Виберіть інші нижче.",

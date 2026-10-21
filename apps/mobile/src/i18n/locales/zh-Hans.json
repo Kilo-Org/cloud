@@ -50,6 +50,7 @@
     "connected": "已连接",
     "couldNotLoadModels": "无法加载模型。",
     "couldNotLoadRepositories": "无法加载仓库。",
+    "noRepositoriesFound": "未找到仓库",
     "critical": "严重",
     "delete": "删除",
     "deleted": "已删除",
@@ -84,6 +85,7 @@
     "connect": "连接",
     "connectBitbucket": "连接 Bitbucket",
     "connectGitlab": "连接 GitLab",
+    "connectProvider": "连接代码托管平台",
     "contentTruncated": "内容已截断",
     "copyLink": "复制链接",
     "couldNotLoadOrganizations": "无法加载组织。",
@@ -877,7 +879,6 @@
       "gitlabNoRepositoriesDescription": "你可能需要授予对 GitLab 上更多群组或项目的访问权限。",
       "installGithubApp": "为仓库安装 GitHub 应用",
       "installGithubAppDescription": "请授予 Kilo GitHub 应用访问待审查仓库的权限。",
-      "noRepositoriesFound": "未找到仓库",
       "repositoryAccess": "仓库访问权限"
     },
     "style": {
@@ -901,7 +902,6 @@
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循各仓库 REVIEW.md 文件中的说明",
     "manualReview": {
-      "connectProvider": "连接代码托管平台",
       "connectProviderDescription": "连接 GitHub，即可手动发起拉取请求审查。",
       "couldNotCheckProviderStatus": "无法检查代码托管平台的状态。",
       "couldNotLoadProviders": "无法加载已连接的代码托管平台。请重试。",
@@ -1690,8 +1690,6 @@
       "startSession": "开始会话",
       "selectRepositoryToStart": "选择仓库以开始。",
       "connectProviderToStart": "连接代码托管平台以开始。",
-      "connectProviderAction": "连接代码托管平台",
-      "noRepositoriesToStart": "未找到仓库。",
       "promptPlaceholder": "你想完成什么任务？",
       "couldNotLoadModels": "无法加载模型。",
       "prefillRepoAndModelUnavailable": "原会话的仓库和模型已不可用。请在下方重新选择。",

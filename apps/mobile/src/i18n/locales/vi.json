@@ -50,6 +50,7 @@
     "connected": "Đã kết nối",
     "couldNotLoadModels": "Không thể tải danh sách mô hình.",
     "couldNotLoadRepositories": "Không thể tải danh sách kho mã nguồn.",
+    "noRepositoriesFound": "Không tìm thấy kho lưu trữ",
     "critical": "Nghiêm trọng",
     "delete": "Xóa",
     "deleted": "Đã xóa",
@@ -84,6 +85,7 @@
     "connect": "Kết nối",
     "connectBitbucket": "Kết nối Bitbucket",
     "connectGitlab": "Kết nối GitLab",
+    "connectProvider": "Kết nối nhà cung cấp",
     "contentTruncated": "Nội dung bị cắt bớt",
     "copyLink": "Sao chép liên kết",
     "couldNotLoadOrganizations": "Không thể tải danh sách tổ chức.",
@@ -877,7 +879,6 @@
       "gitlabNoRepositoriesDescription": "Bạn có thể cần cấp quyền truy cập thêm nhóm hoặc dự án trên GitLab.",
       "installGithubApp": "Cài đặt ứng dụng GitHub cho các kho lưu trữ",
       "installGithubAppDescription": "Cấp quyền truy cập cho ứng dụng Kilo trên GitHub vào các kho lưu trữ bạn muốn rà soát.",
-      "noRepositoriesFound": "Không tìm thấy kho lưu trữ",
       "repositoryAccess": "quyền truy cập kho lưu trữ"
     },
     "style": {
@@ -901,7 +902,6 @@
     "followReviewMd": "Tuân theo REVIEW.md",
     "followReviewMdSubtitle": "Tuân theo tệp hướng dẫn REVIEW.md của từng kho lưu trữ",
     "manualReview": {
-      "connectProvider": "Kết nối nhà cung cấp",
       "connectProviderDescription": "Kết nối GitHub để bắt đầu rà soát thủ công một yêu cầu hợp nhất.",
       "couldNotCheckProviderStatus": "Không thể kiểm tra trạng thái nhà cung cấp.",
       "couldNotLoadProviders": "Không thể tải danh sách nhà cung cấp bạn đã kết nối. Vui lòng thử lại.",
@@ -1690,8 +1690,6 @@
       "startSession": "Bắt đầu phiên",
       "selectRepositoryToStart": "Chọn một kho mã để bắt đầu.",
       "connectProviderToStart": "Kết nối nhà cung cấp để bắt đầu.",
-      "connectProviderAction": "Kết nối nhà cung cấp",
-      "noRepositoriesToStart": "Không tìm thấy kho mã nào.",
       "promptPlaceholder": "Bạn muốn làm gì?",
       "couldNotLoadModels": "Không thể tải danh sách mô hình.",
       "prefillRepoAndModelUnavailable": "Kho mã và mô hình của phiên gốc không còn dùng được. Hãy chọn kho mã và mô hình khác bên dưới.",

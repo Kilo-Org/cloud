@@ -50,6 +50,7 @@
     "connected": "Bağlı",
     "couldNotLoadModels": "Modeller yüklenemedi.",
     "couldNotLoadRepositories": "Depolar yüklenemedi.",
+    "noRepositoriesFound": "Depo bulunamadı",
     "critical": "Kritik",
     "delete": "Sil",
     "deleted": "Silindi",
@@ -84,6 +85,7 @@
     "connect": "Bağla",
     "connectBitbucket": "Bitbucket hesabını bağla",
     "connectGitlab": "GitLab hesabını bağla",
+    "connectProvider": "Bir sağlayıcı bağla",
     "contentTruncated": "İçerik kısaltıldı",
     "copyLink": "Bağlantıyı kopyala",
     "couldNotLoadOrganizations": "Kuruluşlar yüklenemedi.",
@@ -877,7 +879,6 @@
       "gitlabNoRepositoriesDescription": "GitLab'da daha fazla gruba veya projeye erişim izni vermen gerekebilir.",
       "installGithubApp": "GitHub uygulamasını depolara yükle",
       "installGithubAppDescription": "Kilo GitHub uygulamasına, incelenmesini istediğin depolara erişim izni ver.",
-      "noRepositoriesFound": "Depo bulunamadı",
       "repositoryAccess": "depo erişimi"
     },
     "style": {
@@ -901,7 +902,6 @@
     "followReviewMd": "REVIEW.md yönergelerine uy",
     "followReviewMdSubtitle": "Her deponun REVIEW.md dosyasındaki talimatlara uy",
     "manualReview": {
-      "connectProvider": "Bir sağlayıcı bağla",
       "connectProviderDescription": "Bir çekme isteğinin incelemesini manuel olarak başlatmak için GitHub'ı bağla.",
       "couldNotCheckProviderStatus": "Sağlayıcı durumu kontrol edilemedi.",
       "couldNotLoadProviders": "Bağladığın sağlayıcılar yüklenemedi. Lütfen tekrar dene.",
@@ -1690,8 +1690,6 @@
       "startSession": "Oturumu başlat",
       "selectRepositoryToStart": "Başlamak için bir depo seç.",
       "connectProviderToStart": "Başlamak için bir sağlayıcı bağla.",
-      "connectProviderAction": "Sağlayıcı bağla",
-      "noRepositoriesToStart": "Depo bulunamadı.",
       "promptPlaceholder": "Ne üzerinde çalışmak istersin?",
       "couldNotLoadModels": "Modeller yüklenemedi.",
       "prefillRepoAndModelUnavailable": "Önceki oturumun deposu ve modeli artık kullanılamıyor. Aşağıdan yeni bir depo ve model seç.",

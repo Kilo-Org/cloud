@@ -50,6 +50,7 @@
     "connected": "연결됨",
     "couldNotLoadModels": "모델을 불러오지 못했습니다.",
     "couldNotLoadRepositories": "저장소를 불러오지 못했습니다.",
+    "noRepositoriesFound": "저장소를 찾을 수 없습니다",
     "critical": "치명적",
     "delete": "삭제",
     "deleted": "삭제됨",
@@ -84,6 +85,7 @@
     "connect": "연결",
     "connectBitbucket": "Bitbucket 연결",
     "connectGitlab": "GitLab 연결",
+    "connectProvider": "서비스 연결",
     "contentTruncated": "내용 일부 생략됨",
     "copyLink": "링크 복사",
     "couldNotLoadOrganizations": "조직을 불러오지 못했습니다.",
@@ -877,7 +879,6 @@
       "gitlabNoRepositoriesDescription": "GitLab에서 더 많은 그룹이나 프로젝트에 대한 접근 권한을 부여해야 할 수 있습니다.",
       "installGithubApp": "저장소에 GitHub 앱 설치",
       "installGithubAppDescription": "Kilo GitHub 앱에 리뷰할 저장소의 접근 권한을 부여하세요.",
-      "noRepositoriesFound": "저장소를 찾을 수 없습니다",
       "repositoryAccess": "저장소 접근 권한"
     },
     "style": {
@@ -901,7 +902,6 @@
     "followReviewMd": "REVIEW.md 따르기",
     "followReviewMdSubtitle": "저장소별 REVIEW.md 파일의 지침을 따릅니다.",
     "manualReview": {
-      "connectProvider": "서비스 연결",
       "connectProviderDescription": "풀 리퀘스트 수동 리뷰를 시작하려면 GitHub를 연결하세요.",
       "couldNotCheckProviderStatus": "연결 서비스 상태를 확인할 수 없습니다.",
       "couldNotLoadProviders": "연결된 서비스를 불러올 수 없습니다. 다시 시도하세요.",
@@ -1690,8 +1690,6 @@
       "startSession": "세션 시작",
       "selectRepositoryToStart": "시작하려면 저장소를 선택하세요.",
       "connectProviderToStart": "시작하려면 서비스를 연결하세요.",
-      "connectProviderAction": "서비스 연결",
-      "noRepositoriesToStart": "저장소가 없습니다.",
       "promptPlaceholder": "어떤 작업을 할까요?",
       "couldNotLoadModels": "모델을 불러올 수 없습니다.",
       "prefillRepoAndModelUnavailable": "원래 세션의 저장소와 모델을 더 이상 사용할 수 없습니다. 아래에서 다시 선택하세요.",

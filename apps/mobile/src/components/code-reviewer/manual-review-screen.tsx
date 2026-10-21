@@ -154,7 +154,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         />
         <EmptyState
           icon={GitPullRequest}
-          title={t('codeReviewer.manualReview.connectProvider')}
+          title={t('common.connectProvider')}
           description={t('codeReviewer.manualReview.connectProviderDescription')}
           action={
             // `mt-3 w-full` matches the near-identical PR-review connect gate

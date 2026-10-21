@@ -12,7 +12,6 @@ import {
   Sparkles,
   Cable,
   Rocket,
-  Database,
   Users,
   CreditCard,
   Cloud,
@@ -228,15 +227,6 @@ export default function OrganizationAppSidebar({
             title: 'Deploy',
             icon: Rocket,
             url: `/organizations/${organizationId}/deploy`,
-          },
-        ]
-      : []),
-    ...(organizationData?.settings?.code_indexing_enabled
-      ? [
-          {
-            title: 'Managed Indexing',
-            icon: Database,
-            url: `/organizations/${organizationId}/code-indexing`,
           },
         ]
       : []),

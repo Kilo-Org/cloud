@@ -11,7 +11,6 @@ import {
   Cloud,
   Coins,
   CreditCard,
-  Database,
   Download,
   Factory,
   Key,
@@ -180,11 +179,6 @@ const cloudItems: SidebarStoryItem[] = [
     title: 'Gas Town',
     icon: Factory,
     url: '/gastown',
-  },
-  {
-    title: 'Managed Indexing',
-    icon: Database,
-    url: '/code-indexing',
   },
 ];
 

@@ -12,6 +12,10 @@ import { code_indexing_manifest } from '@kilocode/db/schema';
 import { getCodeIndexOrganizationId } from '@/routers/code-indexing/code-indexing-router';
 import { trackCodeIndexingUpsert } from '@/lib/code-indexing/posthog-tracking';
 import { createFlexibleAIAttributionTracker } from '@/lib/ai-attribution-service';
+import {
+  codeIndexingGoneResponse,
+  isCodeIndexingEnabled,
+} from '@/lib/code-indexing/availability.server';
 
 const MAX_CHUNK_LENGTH = 8192;
 const errorLogger = sentryLogger('code-indexing-upsert-by-file', 'error');
@@ -57,6 +61,10 @@ type SuccessResponse = { success: true; chunksProcessed: number };
 export async function PUT(
   request: NextRequest
 ): Promise<NextResponse<ErrorResponse | SuccessResponse>> {
+  if (!isCodeIndexingEnabled()) {
+    return codeIndexingGoneResponse();
+  }
+
   try {
     const ctx = await createTRPCContext();
 

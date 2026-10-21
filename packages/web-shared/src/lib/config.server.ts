@@ -217,6 +217,9 @@ export const QDRANT_CLUSTER_RAM_GB = Number(getEnvVariable('QDRANT_CLUSTER_RAM_G
 export const MILVUS_ADDRESS = getEnvVariable('MILVUS_ADDRESS');
 export const MILVUS_TOKEN = getEnvVariable('MILVUS_TOKEN');
 
+// Cloud managed code indexing. Disabled unless explicitly enabled.
+export const CODE_INDEXING_ENABLED = getEnvVariable('CODE_INDEXING_ENABLED') === 'true';
+
 // App Builder
 export const APP_BUILDER_URL = getEnvVariable('APP_BUILDER_URL');
 export const APP_BUILDER_AUTH_TOKEN = getEnvVariable('APP_BUILDER_AUTH_TOKEN');

@@ -967,8 +967,9 @@
       "noProposals": "Nenhuma proposta",
       "noProposalsDescription": "As propostas da memória de revisão aparecem aqui depois que o Kilo analisa as respostas dos mantenedores.",
       "off": "A memória de revisão está desativada.",
+      "on": "A memória de revisão está ativada.",
       "offDescription": "Ative-a para que o Kilo aprenda com as respostas dos mantenedores e proponha orientações para o REVIEW.md.",
-      "readOnlyDescription": "Somente proprietários da organização e gerentes de cobrança podem ativar a memória de revisão.",
+      "readOnlyDescription": "Somente proprietários da organização e gerentes de cobrança podem alterar a memória de revisão.",
       "title": "Memória das revisões"
     },
     "scopeList": {

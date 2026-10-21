@@ -995,8 +995,9 @@
       "noProposals": "Öneri yok",
       "noProposalsDescription": "Kilo, proje sorumlularının yanıtlarını analiz ettikten sonra inceleme belleğinin önerileri burada görünür.",
       "off": "İnceleme belleği kapalı.",
+      "on": "İnceleme belleği açık.",
       "offDescription": "Kilo'nun proje sorumlularının yanıtlarından öğrenmesi ve REVIEW.md yönergeleri önermesi için inceleme belleğini aç.",
-      "readOnlyDescription": "İnceleme belleğini yalnızca kuruluş sahipleri ve faturalandırma yöneticileri etkinleştirebilir.",
+      "readOnlyDescription": "İnceleme belleğini yalnızca kuruluş sahipleri ve faturalandırma yöneticileri değiştirebilir.",
       "title": "İnceleme belleği"
     },
     "scopeList": {

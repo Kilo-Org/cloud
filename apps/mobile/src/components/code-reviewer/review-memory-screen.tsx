@@ -2,7 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Pressable, Switch, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { CenteredState } from '@/components/centered-state';
@@ -21,6 +21,8 @@ import { useTRPC } from '@/lib/trpc';
 
 const PAGE_SIZE = 20;
 
+const listStyle = { flex: 1 } satisfies ViewStyle;
+
 // Review memory only exists for GitHub, so the owner input pins the platform
 // and only varies the scope segment (personal vs. an organization id).
 function reviewMemoryOwnerInput(scope: string) {
@@ -38,6 +40,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   const permission = useReviewerPermission(scope);
 
   const summaryQuery = useQuery(trpc.reviewMemory.getDashboardSummary.queryOptions(ownerInput));
+  const setEnabled = useSetReviewMemoryEnabled(scope);
   const enabled = summaryQuery.data?.enabled === true;
 
   const proposalsQuery = useInfiniteQuery(
@@ -50,21 +53,20 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
     )
   );
 
-  const setEnabled = useSetReviewMemoryEnabled(scope);
-
   const proposals = useMemo(
     () => (proposalsQuery.data?.pages ?? []).flatMap(page => page.proposals),
     [proposalsQuery.data?.pages]
   );
 
   const readOnly = permission.status === 'ready' && !permission.canEdit;
+  const canToggle = !readOnly && !setEnabled.isPending;
   const hasLoadedPages = (proposalsQuery.data?.pages.length ?? 0) > 0;
   const firstPageError = proposalsQuery.isError && !hasLoadedPages;
   const laterPageError = proposalsQuery.isError && hasLoadedPages;
 
   const summaryLoading = summaryQuery.isPending;
   const summaryError = summaryQuery.isError && !summaryQuery.data;
-  const disabled = summaryQuery.data != null && !summaryQuery.data.enabled;
+  const disabled = summaryQuery.data?.enabled === false;
   const proposalsLoading = enabled && proposalsQuery.isPending;
   const empty = enabled && !proposalsLoading && !firstPageError && proposals.length === 0;
   const happy = enabled && !proposalsLoading && !firstPageError && proposals.length > 0;
@@ -171,6 +173,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
     body = (
       <FlashList
         data={proposals}
+        style={listStyle}
         keyExtractor={proposal => proposal.id}
         renderItem={({ item }) => (
           <View className="border-b-[0.5px] border-hair-soft px-6 py-3">
@@ -204,6 +207,57 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         title={t('codeReviewer.reviewMemory.title')}
         eyebrow={t('common.codeReviewer')}
       />
+      {enabled ? (
+        <View className="px-6 pt-4">
+          <View className="rounded-lg bg-secondary p-4">
+            <View className="flex-row items-center justify-between gap-3">
+              {/* One named control with a 44pt target: the label is what a tap
+                  names, so it moves the value, and the native Switch stays out
+                  of the accessibility tree the way PreferenceRow does it. */}
+              <Pressable
+                className="min-h-11 min-w-0 flex-1 justify-center active:opacity-70"
+                disabled={!canToggle}
+                onPress={() => {
+                  setEnabled.mutate(!enabled);
+                }}
+                accessibilityRole="switch"
+                accessibilityLabel={t('codeReviewer.reviewMemory.title')}
+                accessibilityHint={
+                  readOnly ? t('codeReviewer.reviewMemory.readOnlyDescription') : undefined
+                }
+                accessibilityState={{
+                  disabled: !canToggle,
+                  busy: setEnabled.isPending,
+                  checked: enabled,
+                }}
+              >
+                <Text
+                  accessible={false}
+                  importantForAccessibility="no"
+                  className="text-sm font-medium"
+                >
+                  {t('codeReviewer.reviewMemory.on')}
+                </Text>
+              </Pressable>
+              <Switch
+                value={enabled}
+                disabled={!canToggle}
+                accessible={false}
+                importantForAccessibility="no"
+                accessibilityElementsHidden
+                onValueChange={value => {
+                  setEnabled.mutate(value);
+                }}
+              />
+            </View>
+            {readOnly ? (
+              <Text variant="muted" className="mt-2 text-xs">
+                {t('codeReviewer.reviewMemory.readOnlyDescription')}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
       {body}
     </View>
   );

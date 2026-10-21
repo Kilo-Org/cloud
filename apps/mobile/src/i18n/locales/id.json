@@ -995,8 +995,9 @@
       "noProposals": "Tidak ada usulan",
       "noProposalsDescription": "Usulan dari memori tinjauan muncul di sini setelah Kilo menganalisis balasan pengelola repositori.",
       "off": "Memori tinjauan nonaktif.",
+      "on": "Memori tinjauan aktif.",
       "offDescription": "Aktifkan agar Kilo dapat belajar dari balasan pengelola repositori dan mengusulkan panduan untuk REVIEW.md.",
-      "readOnlyDescription": "Hanya pemilik organisasi dan manajer penagihan yang dapat mengaktifkan memori tinjauan.",
+      "readOnlyDescription": "Hanya pemilik organisasi dan manajer penagihan yang dapat mengubah memori tinjauan.",
       "title": "Memori tinjauan"
     },
     "scopeList": {

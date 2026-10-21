@@ -397,9 +397,9 @@
     },
     "connectionExpired": "GitHub-yhteys on vanhentunut.",
     "merge": {
-      "merge": "Yhdistäminen",
+      "merge": "Yhdistä",
       "mergeNow": "Yhdistä nyt",
-      "mergePullRequest": "Muutospyynnön yhdistäminen",
+      "mergePullRequest": "Yhdistä muutospyyntö",
       "mergeTermTitle": "Yhdistä {{term}}",
       "enableAutoMerge": "Ota automaattinen yhdistäminen käyttöön",
       "disableAutoMerge": "Poista automaattinen yhdistäminen käytöstä",
@@ -414,7 +414,7 @@
       "methodLabel": "Menetelmä",
       "commitTitle": "Muutostallennuksen otsikko",
       "commitMessage": "Muutostallennuksen viesti",
-      "commitMessagePlaceholder": "Yhdistämistallennuksen kuvaus (valinnainen)",
+      "commitMessagePlaceholder": "Yhdistävän muutostallennuksen kuvaus (valinnainen)",
       "deleteBranch": "Poista haara",
       "deleteBranchAfterMerge": "Poista haara yhdistämisen jälkeen",
       "noEnabledMethods": "Tässä koodivarastossa ei ole käytössä yhtään yhdistämismenetelmää. Pyydä koodivaraston ylläpitäjää sallimaan yhdistäminen yhdistämistallennuksella, tiivistämällä tai uudelleenperustamalla.",
@@ -439,12 +439,12 @@
         "closedMergeRequest": "Yhdistämispyyntö suljettu"
       },
       "partialSuccessBanner": {
-        "body": "Haaraa ei voitu poistaa: {{reason}}.",
+        "body": "Haaraa ei voitu poistaa: {{reason}}",
         "accessibility": "Yhdistetty. Haaraa ei voitu poistaa: {{reason}}"
       },
       "loadFailedTitle": "Yhdistämisasetuksia ei voitu ladata.",
       "blocked": {
-        "unknownStateTitle": "GitHub ei ole vahvistanut, että yhdistäminen onnistuu",
+        "unknownStateTitle": "GitHub ei ole vielä ilmoittanut yhdistettävyyden tilaa",
         "unknownStateDetail": "Yritä päivittää yleiskatsausta hetken kuluttua.",
         "conflictsTitle": "Yhdistämisristiriidat",
         "conflictsDetail": "Ratkaise yhdistämisristiriidat tässä haarassa ennen yhdistämistä.",
@@ -782,7 +782,7 @@
       "couldNotReply": "Vastaaminen epäonnistui.",
       "couldNotCompleteAction": "Tätä toimintoa ei voitu suorittaa loppuun.",
       "mergeResultDefaultError": "GitHub ei saattanut yhdistämistä loppuun.",
-      "mergeResultNotCompleted": "{{term}} ei yhdistynyt. Tarkista sen tila ja yritä uudelleen.",
+      "mergeResultNotCompleted": "Yhdistäminen ei onnistunut: {{term}} jäi yhdistämättä. Tarkista sen tila ja yritä uudelleen.",
       "ambiguous": "Toiminnon onnistumista ei voitu vahvistaa. Tarkista PR ennen kuin yrität uudelleen.",
       "persistenceFailed": "Emme voineet tallentaa tätä toimintoa. Yritä myöhemmin uudelleen.",
       "forbidden": "Toiminto ei ole sallittu."
@@ -796,7 +796,7 @@
     "terms": {
       "pullRequest": "Muutospyyntö",
       "mergeRequest": "Yhdistämispyyntö",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Yhdistämispyyntö !{{number}}",
       "shareMergeRequest": "Jaa yhdistämispyyntö",
       "viewOnProvider": "Näytä palvelussa {{provider}}",
       "mergeRequestUnavailable": "Yhdistämispyyntö ei ole käytettävissä",

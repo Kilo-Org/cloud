@@ -103,7 +103,7 @@ describe('getPendingInteractions', () => {
 
     await expect(
       harness.caller.getPendingInteractions({ cloudAgentSessionId: LEGACY_SESSION_ID })
-    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(harness.sandboxSessions.idFromName).not.toHaveBeenCalled();
     expect(harness.sandboxSessions.get).not.toHaveBeenCalled();
   });
@@ -123,6 +123,10 @@ describe('getPendingInteractions', () => {
 });
 
 describe('answerQuestion', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('resolves a fresh control-plane stub for each retry of the answer RPC', async () => {
     fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
     const firstAnswer = vi.fn().mockRejectedValueOnce(
@@ -178,7 +182,7 @@ describe('answerQuestion', () => {
         questionId: 'q_1',
         answers: [['yes']],
       })
-    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(fetchSessionMetadataMock).not.toHaveBeenCalled();
     expect(harness.sandboxSessions.get).not.toHaveBeenCalled();
   });

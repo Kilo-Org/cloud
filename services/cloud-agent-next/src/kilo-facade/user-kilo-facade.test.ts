@@ -128,14 +128,6 @@ function envStub(): Env {
       listCloudAgentRootSessions: vi.fn(),
       getCloudAgentRootSessionMessages: vi.fn(),
     },
-    CLOUD_AGENT_SESSION: {
-      idFromName: vi.fn(() => 'session-do-id'),
-      get: vi.fn(() => ({
-        hasMessageAdmission: vi.fn().mockResolvedValue(false),
-        admitSubmittedMessage: vi.fn(),
-        interruptExecution: vi.fn(),
-      })),
-    },
     SANDBOX_SESSION: {
       idFromName: vi.fn(() => 'sandbox-session-do-id'),
       get: vi.fn(),
@@ -1979,7 +1971,7 @@ describe('handleKiloFacadeRequest', () => {
   it('rejects unsupported prompt_async semantic fields without admitting work', async () => {
     const env = envStub();
     const admitSubmittedMessage = vi.fn();
-    vi.spyOn(env.CLOUD_AGENT_SESSION, 'get').mockReturnValue({
+    vi.spyOn(env.SANDBOX_SESSION, 'get').mockReturnValue({
       admitSubmittedMessage,
     } as never);
 
@@ -2271,7 +2263,7 @@ describe('handleKiloFacadeRequest', () => {
 describe('UserKiloFacade producer messages', () => {
   it('emits a native-shaped global connection event in the public virtual-server directory', async () => {
     const env = {
-      CLOUD_AGENT_SESSION: { idFromName: vi.fn(), get: vi.fn() },
+      SANDBOX_SESSION: { idFromName: vi.fn(), get: vi.fn() },
     } as unknown as Env;
     const facade = new UserKiloFacade({} as DurableObjectState, env);
     const response = facade.openPublicGlobalEventStream();
@@ -2295,7 +2287,7 @@ describe('UserKiloFacade producer messages', () => {
   it('uses comment frames for public keepalives rather than undeclared heartbeat events', async () => {
     vi.useFakeTimers();
     const env = {
-      CLOUD_AGENT_SESSION: { idFromName: vi.fn(), get: vi.fn() },
+      SANDBOX_SESSION: { idFromName: vi.fn(), get: vi.fn() },
     } as unknown as Env;
     const facade = new UserKiloFacade({} as DurableObjectState, env);
     const body = facade.openPublicSessionEventStream(kiloSessionId).body;
@@ -2315,7 +2307,7 @@ describe('UserKiloFacade producer messages', () => {
 
   it('emits a native-shaped scoped connection event while no producer is live', async () => {
     const env = {
-      CLOUD_AGENT_SESSION: { idFromName: vi.fn(), get: vi.fn() },
+      SANDBOX_SESSION: { idFromName: vi.fn(), get: vi.fn() },
     } as unknown as Env;
     const facade = new UserKiloFacade({} as DurableObjectState, env);
     const response = facade.openPublicSessionEventStream(kiloSessionId);
@@ -2341,7 +2333,7 @@ describe('UserKiloFacade producer messages', () => {
 
   it('fans Cloud Agent extension events out before a native wrapper producer is live', async () => {
     const env = {
-      CLOUD_AGENT_SESSION: { idFromName: vi.fn(), get: vi.fn() },
+      SANDBOX_SESSION: { idFromName: vi.fn(), get: vi.fn() },
     } as unknown as Env;
     const facade = new UserKiloFacade({} as DurableObjectState, env);
     const globalBody = facade.openPublicGlobalEventStream().body;
@@ -2382,7 +2374,7 @@ describe('UserKiloFacade producer messages', () => {
     const resolveCloudAgentRootSessionForKiloSession = vi.fn(async () => null);
     const env = {
       SESSION_INGEST: { resolveCloudAgentRootSessionForKiloSession },
-      CLOUD_AGENT_SESSION: { idFromName: vi.fn(), get: vi.fn() },
+      SANDBOX_SESSION: { idFromName: vi.fn(), get: vi.fn() },
     } as unknown as Env;
     const facade = new UserKiloFacade({} as DurableObjectState, env);
     const body = facade.openPublicGlobalEventStream().body;
@@ -2492,7 +2484,7 @@ describe('hosted global native events', () => {
     const sandboxIdFromName = vi.fn().mockReturnValue('sandbox-session-do-id');
     env.SANDBOX_SESSION.idFromName = sandboxIdFromName;
     const legacyGet = vi.fn();
-    env.CLOUD_AGENT_SESSION.get = legacyGet;
+    env.SANDBOX_SESSION.get = legacyGet;
     env.SANDBOX_SESSION.get = vi.fn().mockReturnValue({
       subscribeNativeEvents,
       releaseNativeEvents,

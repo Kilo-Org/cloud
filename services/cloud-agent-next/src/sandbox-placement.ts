@@ -77,7 +77,6 @@ export async function selectControlPlaneSandbox(input: {
           env: input.env,
           orgId: input.orgId,
           userId: input.userId,
-          plane: 'control',
           isolated: sandboxKind === 'isolated',
         })
       : getSandboxAllocationProvider(input.sandboxAllocation);

@@ -49,7 +49,6 @@ PER_SESSION_SANDBOX_ORG_IDS=
 
 # Code Reviewer sessions run on the control plane for these owners.
 # Comma-separated user or org IDs, or `*` for all including personal accounts.
-CODE_REVIEW_CONTROL_PLANE_IDS=*
 # Comma-separated user or org IDs allowed to pick a sandbox destination, or `*` for all
 SANDBOX_SELECTION_IDS=*
 

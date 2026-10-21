@@ -975,10 +975,7 @@ const controlPlaneWorktreeResultFrameSchema = z.discriminatedUnion('ok', [
 
 /**
  * Worktree-deletion payload (R2, spec §6 "Billing, credentials and deletion").
- * Same contract the legacy plane sends for `worktree.prepareDeletion` and
- * `worktree.delete` (`worktreeDeletePayloadSchema`), so the wrapper can reuse
- * `control/delete-worktree.ts` unchanged. Both requests answer with the shared
- * `worktree.result` frame.
+ * Both deletion requests answer with the shared `worktree.result` frame.
  */
 export const controlPlaneWorktreeDeletionPayloadSchema = z
   .object({

@@ -11,8 +11,8 @@ import {
 } from '@kilocode/session-ingest-contracts';
 import { DEFAULT_DO_RETRY_CONFIG } from '@kilocode/worker-utils';
 import { getSandboxProvider, type SessionMetadata } from '../persistence/session-metadata';
-import { resolveSessionStub } from '../sandbox-session/session-stub';
-import { isControlSession } from '../session-plane';
+import { getSandboxSessionStub } from '../sandbox-session/session-stub';
+import { isControlSession } from '../session-identity';
 import { withDORetry } from '../utils/do-retry';
 import type { Env } from '../types';
 import { logControlDiagnostic } from './diagnostics';
@@ -96,7 +96,7 @@ function lookupSessionRuntimeLocator(
   deadlineAt: number
 ): Promise<SessionRuntimeLocator | null> {
   return withDORetry(
-    () => resolveSessionStub(env, params.kiloUserId, session.cloudAgentSessionId),
+    () => getSandboxSessionStub(env, params.kiloUserId, session.cloudAgentSessionId),
     async stub => {
       const metadata = await stub.getMetadata();
       return metadata === null ? null : sessionRuntimeLocator(metadata);

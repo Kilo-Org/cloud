@@ -16,7 +16,7 @@ import type { Env } from './types.js';
 import { parseSessionMetadata } from './persistence/session-metadata.js';
 
 // Mock the session-service module
-vi.mock('./session-service.js', () => ({
+vi.mock('./session/metadata.js', () => ({
   fetchSessionMetadata: vi.fn(),
 }));
 
@@ -28,7 +28,7 @@ vi.mock('./logger.js', () => ({
   },
 }));
 
-import { fetchSessionMetadata } from './session-service.js';
+import { fetchSessionMetadata } from './session/metadata.js';
 
 describe('balance-validation', () => {
   const originalFetch = global.fetch;

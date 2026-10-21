@@ -883,19 +883,7 @@ export async function recycleControlConnection(
   await executeDocker(['exec', handle.containerId, 'kill', '-USR1', String(handle.processId)]);
 }
 
-/**
- * Legacy control wrapper: `bun run /usr/local/bin/kilocode-control-wrapper.js`
- * (`src/sandbox-control/cloudflare-provider.ts`).
- */
-export const LEGACY_CONTROL_WRAPPER_BASENAME = 'kilocode-control-wrapper.js';
-
-/**
- * New-plane control wrapper: the control-plane supervisor runs
- * `bun run /usr/local/bin/kilocode-control-plane-wrapper.js` (`Dockerfile`).
- * Its basename differs from the legacy wrapper, so a new-plane capture must
- * match this exact basename; the legacy capture finds zero processes in a
- * new-plane container (and vice versa).
- */
+/** Wrapper launched by the container supervisor. */
 export const CONTROL_PLANE_WRAPPER_BASENAME = 'kilocode-control-plane-wrapper.js';
 
 /**
@@ -1046,22 +1034,8 @@ async function captureWrapperProcess(
 }
 
 /**
- * Capture the legacy control-wrapper Bun process for one container in a single
- * `docker exec`. The captured identity is the only safe handle for `STOP`/`CONT`:
- * a frozen process cannot answer a discovery request. Exactly one match is
- * required; zero or several matches is an ambiguous identity and throws.
- */
-export async function captureControlWrapperProcess(
-  containerId: string,
-  executeDocker: DockerCommandExecutor = executeDockerCommand
-): Promise<KiloServerProcessHandle> {
-  return captureWrapperProcess(containerId, LEGACY_CONTROL_WRAPPER_BASENAME, executeDocker);
-}
-
-/**
- * Capture the new-plane control-wrapper Bun process. A unique match is positive
- * evidence the container runs the new plane; zero matches (a legacy container)
- * throws rather than silently falling back.
+ * Capture the wrapper Bun process with one docker exec. Require exactly one
+ * process before returning the handle used for STOP, CONT, and recycling.
  */
 export async function captureControlPlaneWrapperProcess(
   containerId: string,

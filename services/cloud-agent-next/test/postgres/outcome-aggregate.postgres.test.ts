@@ -26,7 +26,7 @@ import {
   type OutcomeWindow,
   type ProductOrigin,
 } from '../../src/telemetry/outcome-aggregate.js';
-import { sessionPlaneFromId } from '../../src/session-plane.js';
+import { isControlSession } from '../../src/session-identity.js';
 
 const { getPgDbMock } = vi.hoisted(() => ({ getPgDbMock: vi.fn() }));
 
@@ -553,7 +553,7 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     expect(headline(result, 'legacy', 'follow_up', 'unknown').completed).toBe(1);
   });
 
-  it('splits generations by the workspace_ prefix in agreement with sessionPlaneFromId', async () => {
+  it('splits generations by the workspace_ prefix in agreement with isControlSession', async () => {
     const window = nextWindow();
     const sessionIds = [
       uniqueSessionId('workspace'),
@@ -575,8 +575,8 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     }
 
     const result = await aggregate(window);
-    const expectedLegacy = sessionIds.filter(id => sessionPlaneFromId(id) === 'legacy').length;
-    const expectedControl = sessionIds.filter(id => sessionPlaneFromId(id) === 'control').length;
+    const expectedLegacy = sessionIds.filter(id => !isControlSession(id)).length;
+    const expectedControl = sessionIds.filter(id => isControlSession(id)).length;
     expect(expectedControl).toBe(1);
     expect(headline(result, 'legacy', 'initial', 'unknown').completed).toBe(expectedLegacy);
     expect(headline(result, 'control', 'initial', 'unknown').completed).toBe(expectedControl);

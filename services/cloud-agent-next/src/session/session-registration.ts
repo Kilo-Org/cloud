@@ -1,12 +1,12 @@
 /**
- * Session creation helpers for the grouped `start` path and retained legacy
+ * Session creation helpers for the grouped `start` path and retained split
  * `prepareSession` path.
  *
  * Both paths allocate canonical IDs and create the session report row before
  * creating the external `cli_sessions_v2` ownership row required
  * by stream-ticket authorization. `start` then asks its Durable Object to
  * register metadata and durably admit the already accepted initial turn through
- * one grouped operation. Legacy
+ * one grouped operation. Split
  * `prepareSession` retains registration-only behavior and can queue later.
  *
  * Managed git-token resolution (GitHub App installation, managed GitLab) is
@@ -60,11 +60,7 @@ import {
 } from '../persistence/session-metadata.js';
 import { logger } from '../logger.js';
 import { withDORetry } from '../utils/do-retry.js';
-import {
-  getSandboxSessionStub,
-  resolveSessionStub,
-  type SessionStub,
-} from '../sandbox-session/session-stub.js';
+import { getSandboxSessionStub, type SessionStub } from '../sandbox-session/session-stub.js';
 import type { SandboxSessionV2 } from '../control-plane/session/session-do.js';
 import { buildSignedPromptAttachments } from '../execution/attachment-prompt-parts.js';
 import {
@@ -74,7 +70,7 @@ import {
 } from './control-plane-session-input.js';
 import type { GroupedRegisterSessionInput } from './session-registration-metadata.js';
 import { getPgDb } from '../db/pg.js';
-import { generateSessionId } from '../session-plane.js';
+import { generateSessionId } from '../session-identity.js';
 import { getWorktreeWorkspacePath } from '../workspace.js';
 import {
   cloudflareSandboxSmallNativeReplacement,
@@ -180,7 +176,7 @@ export type SessionRegistrationResult = {
   worktreeId?: CloudAgentWorktreeId;
   sandboxAllocation?: SandboxAllocation;
   /**
-   * Canonical initial turn reserved for a later legacy initiation request.
+   * Canonical initial turn reserved for a later split initiation request.
    * Omitted for a clone-only create, which has no synthetic initial turn.
    */
   initialTurn?: AcceptedExecutionTurn;
@@ -342,7 +338,7 @@ class SessionAllocationStageError extends Error {
   }
 }
 
-/** Re-throws the original error on the legacy path and the tagged error on the ledger path. */
+/** Re-throws the original error on the split path and the tagged error on the ledger path. */
 function rethrowAllocationFailure(
   ledger: SessionCreationLedgerHooks | undefined,
   stage: SessionLedgerAllocationFailureStage,
@@ -663,7 +659,7 @@ async function allocateNewSession(
     );
   }
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
-  const cloudAgentSessionId = generateSessionId('control');
+  const cloudAgentSessionId = generateSessionId();
   const sandboxAllocation = resolveNewSessionSandboxAllocation({
     env: ctx.env,
     orgId,
@@ -1113,7 +1109,7 @@ function buildSessionRegistrationCommand(
 
 /**
  * Registers a control-plane session without an initial turn through the V2
- * `registerSessionFromMetadata` RPC. A metadata rejection maps to the legacy
+ * `registerSessionFromMetadata` RPC. A metadata rejection maps to the split
  * registration rejection shape so the retry/idempotency handling is unchanged.
  */
 async function registerControlPlaneSession(
@@ -1140,7 +1136,7 @@ async function registerControlPlaneSession(
 }
 
 /**
- * Register a new cloud-agent session for a retained legacy preparation flow.
+ * Register a new cloud-agent session for a retained split preparation flow.
  * No initial turn is admitted until a subsequent initiation request queues it.
  * This non-idempotent RPC is issued once: explicit rejection triggers best-effort
  * empty ownership-row compensation, while thrown/unknown outcomes retain the
@@ -2203,7 +2199,7 @@ async function readSessionMetadata(
   let metadata: SessionMetadata | null;
   try {
     metadata = await withDORetry<SessionStub, SessionMetadata | null>(
-      () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
+      () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
       s => s.getMetadata(),
       'getMetadata'
     );
@@ -2411,7 +2407,7 @@ async function confirmInitialMessageAdmitted(args: {
   let messageResult: MessageResultRPCResponse;
   try {
     messageResult = await withDORetry<SessionStub, MessageResultRPCResponse>(
-      () => resolveSessionStub(ctx.env, ctx.userId, ids.cloudAgentSessionId),
+      () => getSandboxSessionStub(ctx.env, ctx.userId, ids.cloudAgentSessionId),
       stub => stub.getMessageResult(initialMessageId),
       'getMessageResult'
     );

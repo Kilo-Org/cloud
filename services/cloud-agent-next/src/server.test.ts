@@ -159,10 +159,6 @@ type MockEnv = {
   WS_ALLOWED_ORIGINS?: string;
   HYPERDRIVE: { connectionString: string };
   INTERNAL_API_SECRET?: string;
-  CLOUD_AGENT_SESSION: {
-    idFromName: ReturnType<typeof vi.fn>;
-    get: ReturnType<typeof vi.fn>;
-  };
   USER_KILO_FACADE: {
     idFromName: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
@@ -187,10 +183,6 @@ function createEnv(): MockEnv {
     SandboxSmall: {},
     HYPERDRIVE: { connectionString: 'postgres://test' },
     INTERNAL_API_SECRET: 'test-internal-secret',
-    CLOUD_AGENT_SESSION: {
-      idFromName: vi.fn(),
-      get: vi.fn(() => ({ getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('legacy') })),
-    },
     USER_KILO_FACADE: {
       idFromName: vi.fn(),
       get: vi.fn(),
@@ -742,7 +734,7 @@ describe('server runtime credential proxy', () => {
       createRuntimeProxyGrant({
         plane: 'legacy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        sessionId: 'agent_proxy',
+        sessionId: 'workspace_proxy',
         kiloSessionId,
         userId: 'usr_proxy',
         orgId: 'org_proxy',
@@ -779,7 +771,7 @@ describe('server runtime credential proxy', () => {
       runtimeAuthorization: {
         userId: 'usr_proxy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'agent_proxy',
+        resourceId: 'workspace_proxy',
       },
     });
     env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
@@ -862,7 +854,7 @@ describe('server runtime credential proxy', () => {
       createRuntimeProxyGrant({
         plane: 'control',
         authorizationId: '22222222-2222-4222-8222-222222222222',
-        sessionId: 'agent_sibling',
+        sessionId: 'workspace_sibling',
         kiloSessionId: 'kilo_sibling',
         userId: 'usr_proxy',
         mode: 'contained',
@@ -879,7 +871,7 @@ describe('server runtime credential proxy', () => {
       runtimeAuthorization: {
         userId: 'usr_proxy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'agent_proxy',
+        resourceId: 'workspace_proxy',
       },
     });
     const secondResolve = vi.fn().mockResolvedValue({
@@ -887,12 +879,12 @@ describe('server runtime credential proxy', () => {
       runtimeAuthorization: {
         userId: 'usr_proxy',
         authorizationId: '22222222-2222-4222-8222-222222222222',
-        resourceId: 'agent_sibling',
+        resourceId: 'workspace_sibling',
       },
     });
     env.SANDBOX_SESSION.idFromName.mockImplementation((name: string) => name);
     env.SANDBOX_SESSION.get.mockImplementation((id: string) =>
-      id === 'usr_proxy:agent_proxy'
+      id === 'usr_proxy:workspace_proxy'
         ? { resolveRuntimeCredentialProxyGrant: firstResolve }
         : { resolveRuntimeCredentialProxyGrant: secondResolve }
     );
@@ -942,7 +934,7 @@ describe('server runtime credential proxy', () => {
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -984,7 +976,7 @@ describe('server runtime credential proxy', () => {
       runtimeAuthorization: {
         userId: 'usr_proxy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'agent_proxy',
+        resourceId: 'workspace_proxy',
       },
     });
     env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
@@ -1006,7 +998,7 @@ describe('server runtime credential proxy', () => {
           audience: 'kilo-gateway',
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
           bearer: 'https://provider.example.test/api/openrouter:backing-token',
         })
       ).resolves.toBe(true);
@@ -1049,7 +1041,7 @@ describe('server runtime credential proxy', () => {
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1108,7 +1100,7 @@ describe('server runtime credential proxy', () => {
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1162,7 +1154,7 @@ describe('server runtime credential proxy', () => {
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1201,7 +1193,7 @@ describe('server runtime credential proxy', () => {
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1266,7 +1258,7 @@ describe('server runtime credential proxy', () => {
       runtimeAuthorization: {
         userId: 'usr_proxy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'agent_proxy',
+        resourceId: 'workspace_proxy',
       },
     });
     env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
@@ -1300,7 +1292,7 @@ describe('server runtime credential proxy', () => {
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1316,7 +1308,7 @@ describe('server runtime credential proxy', () => {
           audience: 'kilo-gateway',
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
           bearer: backingToken,
         })
       ).resolves.toBe(true);
@@ -1349,7 +1341,7 @@ describe('server runtime credential proxy', () => {
       runtimeAuthorization: {
         userId: 'usr_proxy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'agent_proxy',
+        resourceId: 'workspace_proxy',
       },
     });
     env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
@@ -1378,7 +1370,7 @@ describe('server runtime credential proxy', () => {
       const binding = vi.fn(async (request: Request) => {
         expect(request.headers.get('Authorization')).toBe(`Bearer ${token}`);
         expect(request.headers.get('X-Internal-Secret')).toBe('internal-secret');
-        expect(request.headers.get('X-Kilo-Cloud-Agent-Session')).toBe('agent_proxy');
+        expect(request.headers.get('X-Kilo-Cloud-Agent-Session')).toBe('workspace_proxy');
         expect(request.headers.get('X-Kilo-Root-Session')).toBe(root);
         expect(request.headers.get('X-Kilo-Session-Scope-Protocol')).toBe('1');
         expect(request.headers.get('X-Kilo-Trusted-Session-Lineage')).toBeNull();
@@ -1392,7 +1384,7 @@ describe('server runtime credential proxy', () => {
             audience: 'session-ingest',
             userId: 'usr_proxy',
             authorizationId: '11111111-1111-4111-8111-111111111111',
-            resourceId: 'agent_proxy',
+            resourceId: 'workspace_proxy',
             bearer: token,
           })
         ).toBe(true);
@@ -1409,7 +1401,7 @@ describe('server runtime credential proxy', () => {
           runtimeAuthorization: {
             userId: 'usr_proxy',
             authorizationId: '11111111-1111-4111-8111-111111111111',
-            resourceId: 'agent_proxy',
+            resourceId: 'workspace_proxy',
           },
         }),
       });
@@ -1433,7 +1425,7 @@ describe('server runtime credential proxy', () => {
                 'Content-Type': 'application/json',
                 'X-Internal-Secret': 'forged-secret',
                 'X-Kilo-Root-Session': grandchild,
-                'X-Kilo-Cloud-Agent-Session': 'agent_unrelated',
+                'X-Kilo-Cloud-Agent-Session': 'workspace_unrelated',
                 'X-Kilo-Session-Scope-Protocol': '999',
                 'X-Kilo-Trusted-Session-Lineage': '1',
                 [RUNTIME_PROXY_ATTESTATION_HEADER]: 'forged-proof',
@@ -1477,7 +1469,7 @@ describe('server runtime credential proxy', () => {
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1518,7 +1510,7 @@ describe('server runtime credential proxy', () => {
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1579,7 +1571,7 @@ describe('server runtime credential proxy', () => {
       runtimeAuthorization: {
         userId: 'usr_proxy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'agent_proxy',
+        resourceId: 'workspace_proxy',
       },
     });
     env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
@@ -1608,7 +1600,7 @@ describe('server runtime credential proxy', () => {
         logTag: 'runtime_proxy_request_failed',
         upstreamAttempted: true,
         upstreamStatus: 401,
-        sessionId: 'agent_proxy',
+        sessionId: 'workspace_proxy',
         kiloSessionId: 'kilo_proxy',
       });
     } finally {
@@ -1624,7 +1616,7 @@ describe('server runtime credential proxy', () => {
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -2098,7 +2090,7 @@ describe('server /internal/widgets/approval-key', () => {
     expect(getPendingInteractions).not.toHaveBeenCalled();
   });
 
-  it('never reads a legacy session, whose pending set lives only in its sandbox', async () => {
+  it('rejects a retired session ID before reading session state', async () => {
     const { env, getPendingInteractions } = envWithPending([{ id: 'per_widget_1' }]);
     const response = await fetchWorker(
       approvalKeyRequest({
@@ -2108,7 +2100,7 @@ describe('server /internal/widgets/approval-key', () => {
       env
     );
 
-    await expect(response.json()).resolves.toEqual({ approvalKey: null, command: null });
+    expect(response.status).toBe(400);
     expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
     expect(getPendingInteractions).not.toHaveBeenCalled();
     expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();

@@ -86,7 +86,7 @@ import {
   sandboxKindMatchesKey,
   type SandboxKind,
 } from '../../sandbox-placement.js';
-import { sessionDoName } from '../../session-plane.js';
+import { sessionDoName } from '../../session-identity.js';
 import { logger } from '../../logger.js';
 import {
   diagnosticCause,

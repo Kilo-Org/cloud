@@ -46,7 +46,7 @@ import {
   readPreparationSteps,
 } from '../../src/session/preparation-history.js';
 import { createPreparationProgressRecorder } from '../../src/session/preparation-progress.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import {
   createFakeCredentialBroker,
   installFakeCredentialEnv,

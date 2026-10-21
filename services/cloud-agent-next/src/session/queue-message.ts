@@ -3,7 +3,7 @@
  *
  * Shared by current follow-up admission and the retained split public
  * endpoints. Prepared initial replay is isolated in
- * `legacy-prepared-admission`.
+ * `prepared-session-admission`.
  *
  * Returns the explicitly compatibility-projected public acknowledgment shape.
  */

@@ -36,7 +36,7 @@ import {
   KILO_FACADE_USER_ID_HEADER,
 } from './kilo-facade/user-kilo-facade.js';
 import { getSandboxSessionStub } from './sandbox-session/session-stub.js';
-import { isControlSession } from './session-plane.js';
+import { isControlSession } from './session-identity.js';
 import { PREVIEW_OPEN_PATH, handlePreviewOpen, handlePreviewRequest } from './preview/route.js';
 import { matchPreviewHost } from './preview/host.js';
 import { withoutPreviewMarkers } from './shared/preview-headers.js';
@@ -871,5 +871,4 @@ export default {
 };
 
 export { Sandbox } from '@cloudflare/sandbox';
-export { CloudAgentSession } from './persistence/CloudAgentSession.js';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

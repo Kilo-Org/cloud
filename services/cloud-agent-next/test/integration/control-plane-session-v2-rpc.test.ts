@@ -9,7 +9,7 @@ import type {
   ControlPlaneSessionRegistration,
   SandboxSessionV2,
 } from '../../src/control-plane/session/session-do.js';
-import { events } from '../../src/db/sqlite-schema.js';
+import { events } from '../../src/control-plane/session/sqlite-schema.js';
 import type {
   ProviderAdapter,
   ProviderCreateIntent,

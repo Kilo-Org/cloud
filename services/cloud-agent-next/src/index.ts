@@ -10,7 +10,6 @@ export {
   ContainerProxy,
 } from './sandbox-outbound.js';
 export { ContainersOutbound } from './sandbox-containers/containers-outbound.js';
-export { CloudAgentSession } from './persistence/CloudAgentSession.js';
 // Production `SANDBOX_CONTROL` / `SANDBOX_SESSION` bindings. `wrangler.jsonc`
 // class names stay `SandboxControl` and `SandboxSession`.
 export { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';

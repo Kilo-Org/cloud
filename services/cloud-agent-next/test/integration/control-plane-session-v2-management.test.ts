@@ -7,7 +7,7 @@ import type { CallbackJob } from '../../src/callbacks/types.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import { controlPlaneMessages } from '../../src/control-plane/session/sqlite-schema.js';
-import { events } from '../../src/db/sqlite-schema.js';
+import { events } from '../../src/control-plane/session/sqlite-schema.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import { appRouter } from '../../src/router.js';
 import { sessionRuntimeLocator } from '../../src/sandbox-control/worktree-ownership.js';

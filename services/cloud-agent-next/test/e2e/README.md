@@ -198,8 +198,7 @@ tsx services/cloud-agent-next/test/e2e/run.ts question-idle-resume _
 # proxy. The running Worker must set PREVIEW_HOST_SUFFIX=localhost in its
 # .dev.vars; the scenario fails immediately if dispatch is off. Requests carry an explicit
 # `Host: p<port>-<hex>.localhost` and a manual cookie jar. Needs
-# E2E_CONTROL_PLANE_V2=1 and CONTROL_PLANE_IDS enrollment; it declares
-# `controlPlaneRuntime`, so it is `unsupported` on the HTTP profiles. See
+# Runtime inspection through `controlPlaneRuntime` is required, so it is `unsupported` on the HTTP profiles. See
 # "Preview HTTP (hostname dispatch)" below.
 tsx services/cloud-agent-next/test/e2e/run.ts preview-http _
 
@@ -262,7 +261,7 @@ below): one `run.ts` child per scenario under one pool, each with its own
 sandboxes the Docker VM holds beside the stack (about 1.5 GiB each), at most 4;
 `--parallel` or `E2E_PARALLEL` overrides it and warns when it exceeds that
 number. Pass the offset-prefixed `WORKER_URL`, `FAKE_LLM_URL`, and
-`KILO_SESSION_INGEST_URL`, plus `E2E_CONTROL_PLANE_V2=1` and `E2E_USER_EMAIL`
+`KILO_SESSION_INGEST_URL` and `E2E_USER_EMAIL`
 when the matrix includes worktree scenarios. The local dev container caps in
 `wrangler.jsonc` (6 for the small classes the matrix boots) are sized for a
 12 GiB Docker VM; restart `cloud-agent-next` after changing them.
@@ -318,7 +317,6 @@ for any other offset, compute the real ports from `pnpm dev:status --json`
 | `E2E_USER_EMAIL` | unset (ephemeral `usr_e2e_*`). Set to the cloud-worktree-setup email to reuse that user and its GitHub integration. |
 | `E2E_BRANCH` | unset. Optional checkout ref (`upstreamBranch` / `repository.branch`). |
 | `E2E_MODEL` | `kilo/fake-deterministic` (the only model the fake serves) |
-| `E2E_CONTROL_PLANE_V2` | unset. Set to `1` to advertise the new-plane (`workspace_*`) capability so the C1-gated scenarios run instead of reporting `unsupported`. It does not replace the per-scenario `controlPlaneRuntime` proof that the container runs the new-plane wrapper, so it cannot be used to false-pass against the legacy plane. |
 | `E2E_FAKE_SCOPE` | unset. `[A-Za-z0-9_-]{1,64}` attribution token prepended to every prompt as `__e2e_scope__:<token>`. `fetchFakeRequests` then reads `GET /test/requests?scope=<token>` instead of the global total, so a parallel shard asserts only on its own completions. The fake strips the marker before parsing the directive or echoing, so it never reaches scenario-visible content. A malformed value fails the run. |
 | `E2E_INTERNAL_API_SECRET` | unset. Required in the launcher shell for the local HTTP e2e profile (`cloud-agent-next-http`): the render command writes it into the generated `.wrangler/.dev.vars` as the Worker's `INTERNAL_API_SECRET`. The shared rules (`requireE2eInternalSecret`) reject the development default, values shorter than 16 characters, and whitespace; the renderer additionally rejects values outside `[A-Za-z0-9._~-]`, because only it writes a dotenv line. Must differ from production's `INTERNAL_API_SECRET`. The local-HTTP driver resolves it like the deployed driver — the exported value or the auth file's `e2eInternalApiSecret` — so both ends must agree. |
 | `DATABASE_URL` | Optional direct database URL override for this harness |
@@ -801,22 +799,12 @@ over HTTP, where the Worker self-fetches the minted URL.
 
 ### New-plane (`workspace_*`) scenarios
 
-These scenarios are written against the control-plane V2 (`workspace_*`) sessions
-described in `docs/control-plane.md`. C1 (the routing cutover) is not done yet, so
-they declare `controlPlaneV2`, which the local profiles advertise only when the
-operator sets `E2E_CONTROL_PLANE_V2=1`. Without it they report `unsupported` with
-the missing-capability reason. They are listed in the matrix and are
-expected-unsupported until then.
+Every session uses the control plane (`workspace_*`). Local profiles advertise
+control-plane support automatically. No enrollment flag is required.
 
-The opt-in flag alone is **not** the plane proof: the legacy plane also issues
-`workspace_*` ids. Every new-plane scenario also declares `controlPlaneRuntime`,
-which is a local-Docker capability. After boot it captures the new-plane control
-wrapper (`kilocode-control-plane-wrapper.js`) uniquely in the owned container and
-returns its identity; a legacy container has no such process, so `proveNewPlane`
-throws and an opted-in run against a still-legacy plane fails loudly instead of
-false-passing. `prepareBrowserSession` already sets `createdOnPlatform:
-'cloud-agent-web'`, so once C1 lands, the cutover routes these sessions to the
-new plane; the scenario does not need a separate create path.
+Each scenario also requires `controlPlaneRuntime`. This capability verifies
+`kilocode-control-plane-wrapper.js` in the owned container before the test
+continues. HTTP profiles report `unsupported` when they cannot inspect that runtime.
 
 | Lifecycle | What it does |
 |---|---|
@@ -870,8 +858,7 @@ scenario fails immediately with a message naming this variable. The web app need
 no preview setting: it learns availability from the Worker and opens
 `<worker>/preview/open?ticket=<jwt>`, which the Worker redirects to the preview host.
 
-Run (from the repository root, with a running local stack,
-`E2E_CONTROL_PLANE_V2=1`, and the driver user enrolled in `CONTROL_PLANE_IDS`):
+Run from the repository root with a running local stack:
 
 ```bash
 WORKER_URL=http://localhost:<8794+offset> FAKE_LLM_URL=http://localhost:<8811+offset> \

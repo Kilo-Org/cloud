@@ -1,7 +1,8 @@
 import { TRPCError } from '@trpc/server';
-import { isControlSession } from '../session-plane.js';
+import type { SessionId } from '../types.js';
+import { isControlSession } from '../session-identity.js';
 
-export function assertControlSessionId(sessionId: string): void {
+export function assertControlSessionId(sessionId: string): asserts sessionId is SessionId {
   if (!isControlSession(sessionId)) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
   }

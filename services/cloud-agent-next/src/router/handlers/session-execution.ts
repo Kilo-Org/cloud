@@ -26,9 +26,9 @@ import {
   queueMessage,
 } from '../../session/queue-message.js';
 import {
-  admitLegacyPreparedInitialMessage,
-  replayLegacyPreparedInitialMessageIfAlreadyAdmitted,
-} from '../../session/legacy-prepared-admission.js';
+  admitPreparedInitialMessage,
+  replayPreparedInitialMessageIfAlreadyAdmitted,
+} from '../../session/prepared-session-admission.js';
 import type {
   AgentSelectionOverride,
   ExecutionTurnSubmission,
@@ -70,7 +70,7 @@ export function createSessionExecutionV2Handlers() {
             botId: ctx.botId,
             authToken: ctx.authToken,
           };
-          const replay = await replayLegacyPreparedInitialMessageIfAlreadyAdmitted(
+          const replay = await replayPreparedInitialMessageIfAlreadyAdmitted(
             admissionInput,
             admissionContext
           );
@@ -85,7 +85,7 @@ export function createSessionExecutionV2Handlers() {
             procedure: 'initiateFromKilocodeSessionV2',
           });
 
-          const ack = await admitLegacyPreparedInitialMessage(admissionInput, admissionContext);
+          const ack = await admitPreparedInitialMessage(admissionInput, admissionContext);
           return withLegacyExecutionId(ack);
         });
       }),

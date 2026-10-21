@@ -13,7 +13,7 @@ import {
   WorktreeDeletionIncompleteError,
 } from '../../src/control-plane/sandbox/worktree-deletion.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import type {

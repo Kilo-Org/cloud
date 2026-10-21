@@ -489,6 +489,7 @@ describe('preflightRuntimeAuthorizationRecovery', () => {
 
   it('rejects a non-workspace ID before reading runtime authorization', async () => {
     const env = authEnv({ state: 'active' });
+    const getSession = vi.spyOn(env.SANDBOX_SESSION, 'get');
 
     await expect(
       preflightRuntimeAuthorizationRecovery('agent_existing', {
@@ -498,6 +499,6 @@ describe('preflightRuntimeAuthorizationRecovery', () => {
       })
     ).rejects.toBeInstanceOf(TRPCError);
 
-    expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
+    expect(getSession).not.toHaveBeenCalled();
   });
 });

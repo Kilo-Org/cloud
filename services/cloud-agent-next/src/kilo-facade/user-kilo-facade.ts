@@ -32,7 +32,7 @@ import {
   ControlPlaneMessageInputError,
 } from '../session/control-plane-session-input.js';
 import { fetchSessionMetadata } from '../session/metadata.js';
-import { isControlSession } from '../session-plane.js';
+import { isControlSession } from '../session-identity.js';
 import type { SessionId } from '../types/ids.js';
 import type {
   ControlPlaneSendResult,

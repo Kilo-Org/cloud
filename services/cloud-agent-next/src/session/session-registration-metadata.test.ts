@@ -40,7 +40,6 @@ vi.mock('../logger.js', () => {
 
 vi.mock('drizzle-orm/durable-sqlite', () => ({ drizzle: vi.fn(() => ({})) }));
 vi.mock('drizzle-orm/durable-sqlite/migrator', () => ({ migrate: vi.fn() }));
-vi.mock('../../drizzle/migrations', () => ({ default: { journal: {}, migrations: {} } }));
 vi.mock('./queries/index.js', () => ({
   createExecutionQueries: vi.fn(() => ({})),
   createEventQueries: vi.fn(() => ({})),
@@ -59,8 +58,6 @@ vi.mock('@kilocode/db/client', () => ({
     }),
   }),
 }));
-
-const { isSameRegistrationRepository } = await import('../persistence/CloudAgentSession.js');
 
 const GITHUB_REPOSITORY = {
   type: 'github' as const,
@@ -84,19 +81,5 @@ describe('session registration repository metadata', () => {
       repo: 'acme/widgets',
       pullRequestNumber: 17,
     });
-  });
-
-  it('rejects a replay submission for a different pull request', () => {
-    const metadata = {
-      repository: { ...GITHUB_REPOSITORY, githubAccessPurpose: 'workflow' },
-    } as unknown as Parameters<typeof isSameRegistrationRepository>[0];
-
-    const input = (pullRequestNumber: number) =>
-      ({
-        repository: { ...GITHUB_REPOSITORY, pullRequestNumber },
-      }) as unknown as Parameters<typeof isSameRegistrationRepository>[1];
-
-    expect(isSameRegistrationRepository(metadata, input(17))).toBe(true);
-    expect(isSameRegistrationRepository(metadata, input(18))).toBe(false);
   });
 });

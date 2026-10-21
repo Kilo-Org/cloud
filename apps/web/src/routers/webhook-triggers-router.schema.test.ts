@@ -664,9 +664,14 @@ describe('webhook trigger variant inputs', () => {
     expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
   });
 
-  it.each(['webhook', 'scheduled'] as const)(
-    'allows an enrolled organization member to set Dedicated Standard on %s triggers',
-    async activationMode => {
+  it.each([
+    { activationMode: 'webhook', sandboxAllocation: 'isolated-standard' },
+    { activationMode: 'scheduled', sandboxAllocation: 'isolated-standard' },
+    { activationMode: 'webhook', sandboxAllocation: 'cloudflare-single' },
+    { activationMode: 'scheduled', sandboxAllocation: 'cloudflare-single' },
+  ] as const)(
+    'allows an enrolled organization member to retain $sandboxAllocation on $activationMode triggers without a picker option',
+    async ({ activationMode, sandboxAllocation }) => {
       const organizationId = '00000000-0000-4000-8000-000000000003';
       mockEnsureOrganizationAccess.mockResolvedValue('member');
       mockGetSandboxSelectionOptions.mockResolvedValue({ enabled: true, options: [] });
@@ -675,13 +680,13 @@ describe('webhook trigger variant inputs', () => {
         organizationId,
         activationMode,
         ...(activationMode === 'scheduled' ? { cronExpression: '* * * * *' } : {}),
-        sandboxAllocation: 'isolated-standard',
+        sandboxAllocation,
       });
       expect(mockCreateWorkerTrigger).toHaveBeenCalledWith(
         undefined,
         organizationId,
         'trigger-id',
-        expect.objectContaining({ sandboxAllocation: 'isolated-standard' })
+        expect.objectContaining({ sandboxAllocation })
       );
 
       mockSelectWhere.mockResolvedValueOnce([
@@ -694,13 +699,13 @@ describe('webhook trigger variant inputs', () => {
       await createCaller({ user }).update({
         triggerId: 'trigger-id',
         organizationId,
-        sandboxAllocation: 'isolated-standard',
+        sandboxAllocation,
       });
       expect(mockUpdateWorkerTrigger).toHaveBeenCalledWith(
         undefined,
         organizationId,
         'trigger-id',
-        expect.objectContaining({ sandboxAllocation: 'isolated-standard' })
+        expect.objectContaining({ sandboxAllocation })
       );
     }
   );

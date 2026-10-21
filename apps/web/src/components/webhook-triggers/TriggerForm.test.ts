@@ -743,6 +743,93 @@ describe('TriggerForm sandbox allocation', () => {
     );
   });
 
+  it.each([false, true])(
+    'does not mark a saved sandbox unavailable without capabilities (loading=%s)',
+    async isLoadingCapabilities => {
+      const mounted = render({
+        initialData: { ...initialData(), sandboxAllocation: 'vercel-large' },
+        sandboxSelection: undefined,
+        isLoadingCapabilities,
+      });
+
+      expect(mounted.container.textContent).not.toContain('(unavailable)');
+      expect(mounted.container.textContent).not.toContain('no longer offered');
+      if (isLoadingCapabilities) {
+        expect(mounted.container.textContent).toContain('Loading sandbox options');
+      }
+      submit(mounted.container);
+      await act(async () => Promise.resolve());
+      expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
+
+      act(() =>
+        root?.render(
+          createElement(TriggerForm, {
+            ...mounted.allProps,
+            sandboxSelection: sandboxCapabilities(),
+            isLoadingCapabilities: false,
+          })
+        )
+      );
+      expect(mounted.container.textContent).not.toContain('no longer offered');
+    }
+  );
+
+  it('does not mark a saved sandbox unavailable while capabilities are refreshing', () => {
+    const mounted = render({
+      initialData: { ...initialData(), sandboxAllocation: 'vercel-large' },
+      sandboxSelection: sandboxCapabilities({ options: [] }),
+      isLoadingCapabilities: true,
+    });
+
+    expect(mounted.container.textContent).not.toContain('(unavailable)');
+    expect(mounted.container.textContent).not.toContain('no longer offered');
+  });
+
+  it.each([undefined, 'vercel-large'] as const)(
+    'shows a capability error and retry while preserving saved allocation %s',
+    async sandboxAllocation => {
+      const onRetryCapabilities = jest.fn();
+      const mounted = render({
+        initialData: { ...initialData(), sandboxAllocation },
+        canSetSandboxAllocation: false,
+        sandboxSelection: undefined,
+        hasCapabilitiesError: true,
+        onRetryCapabilities,
+      });
+
+      expect(mounted.container.textContent).toContain('Sandbox options could not be loaded.');
+      expect(mounted.container.textContent).not.toContain('(unavailable)');
+      expect(mounted.container.textContent).not.toContain('no longer offered');
+      click(mounted.container, 'Retry sandbox options');
+      expect(onRetryCapabilities).toHaveBeenCalledTimes(1);
+
+      submit(mounted.container);
+      await act(async () => Promise.resolve());
+      expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
+
+      if (sandboxAllocation) {
+        selectSandbox(mounted.container, 'automatic');
+        submit(mounted.container);
+        await act(async () => Promise.resolve());
+        expect(mounted.onSubmit).toHaveBeenLastCalledWith(
+          expect.objectContaining({ sandboxAllocation: null })
+        );
+      }
+    }
+  );
+
+  it('blocks a changed allocation after a failed capability refresh with cached options', () => {
+    const mounted = render({ mode: 'create' });
+    selectSandbox(mounted.container, 'vercel-large');
+    act(() =>
+      root?.render(createElement(TriggerForm, { ...mounted.allProps, hasCapabilitiesError: true }))
+    );
+
+    submit(mounted.container);
+    expect(mounted.onSubmit).not.toHaveBeenCalled();
+    expect(mounted.container.textContent).toContain('Sandbox options could not be loaded.');
+  });
+
   it('filters choices unavailable for the provider or repository while keeping eligible groups', async () => {
     const mounted = render({
       mode: 'create',

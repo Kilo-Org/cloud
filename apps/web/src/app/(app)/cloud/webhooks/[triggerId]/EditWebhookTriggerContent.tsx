@@ -58,11 +58,19 @@ export function EditWebhookTriggerContent({
     })
   );
 
-  const { data: capabilities, isPending: isLoadingCapabilities } = useQuery(
-    trpc.webhookTriggers.capabilities.queryOptions({
-      organizationId,
-      githubRepo: triggerData?.githubRepo || undefined,
-    })
+  const {
+    data: capabilities,
+    isPending: isLoadingCapabilities,
+    isError: hasCapabilitiesError,
+    refetch: refetchCapabilities,
+  } = useQuery(
+    trpc.webhookTriggers.capabilities.queryOptions(
+      {
+        organizationId,
+        githubRepo: triggerData?.githubRepo || undefined,
+      },
+      { enabled: triggerData !== undefined }
+    )
   );
 
   // Fetch GitHub repositories (use org-scoped query when in org context)
@@ -425,6 +433,8 @@ export function EditWebhookTriggerContent({
           canSetSandboxAllocation={capabilities?.canSetSandboxAllocation ?? false}
           sandboxSelection={capabilities?.sandboxSelection}
           isLoadingCapabilities={isLoadingCapabilities}
+          hasCapabilitiesError={hasCapabilitiesError}
+          onRetryCapabilities={() => void refetchCapabilities()}
           onSubmit={handleSubmit}
           onSaveAndInvoke={!isKiloclawChat && isScheduled ? handleSaveAndInvoke : undefined}
           onCancel={handleCancel}

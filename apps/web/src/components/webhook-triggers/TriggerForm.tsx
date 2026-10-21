@@ -121,6 +121,8 @@ export type TriggerFormProps = {
   sandboxSelection?: SandboxSelectionCapabilities;
   onRepositoryChange?: (repository: string) => void;
   isLoadingCapabilities?: boolean;
+  hasCapabilitiesError?: boolean;
+  onRetryCapabilities?: () => void;
   /** Full inbound webhook URL (only needed in edit mode) */
   inboundUrl?: string;
 };
@@ -153,6 +155,8 @@ export function TriggerForm({
   sandboxSelection,
   onRepositoryChange,
   isLoadingCapabilities = false,
+  hasCapabilitiesError = false,
+  onRetryCapabilities,
   inboundUrl,
 }: TriggerFormProps) {
   const { data: session } = useSession();
@@ -186,12 +190,32 @@ export function TriggerForm({
   const sandboxChoices = getEligibleAllocationChoices(sandboxSelection);
   const sandboxIsAvailable = sandboxChoices.some(choice => choice.allocation === sandboxAllocation);
   const sandboxIsUnchanged = isEditMode && sandboxAllocation === initialSandboxAllocation;
-  const showUnavailableSandbox = sandboxAllocation !== 'automatic' && !sandboxIsAvailable;
+  const showUnavailableSandbox =
+    sandboxSelection !== undefined &&
+    !isLoadingCapabilities &&
+    !hasCapabilitiesError &&
+    sandboxAllocation !== 'automatic' &&
+    !sandboxIsAvailable;
   const defaultSandbox = describeDefaultSandbox(
     sandboxSelection?.effectiveDestination ?? sandboxSelection?.defaultDestination
   );
   const showSandboxAllocation =
-    canSetSandboxAllocation || hasSavedSandboxAllocation || sandboxAllocation !== 'automatic';
+    canSetSandboxAllocation ||
+    hasSavedSandboxAllocation ||
+    sandboxAllocation !== 'automatic' ||
+    hasCapabilitiesError;
+  let sandboxHelpText =
+    'Automatic uses your Cloud Agent repository and organization defaults. Sandbox selection may affect compute charges.';
+  if (isLoadingCapabilities) {
+    sandboxHelpText = 'Loading sandbox options...';
+  } else if (hasCapabilitiesError) {
+    sandboxHelpText =
+      'Sandbox options could not be loaded. Retry to change the sandbox, or choose Automatic.';
+  } else if (showUnavailableSandbox) {
+    sandboxHelpText = sandboxIsUnchanged
+      ? 'The saved sandbox is no longer offered. It is kept unless you choose another sandbox or Automatic.'
+      : 'Selected sandbox is not available. Choose another sandbox or Automatic.';
+  }
   const modelVariants = models.find(option => option.id === model)?.variants ?? [];
   const [showRepoDefaults, setShowRepoDefaults] = useState(false);
 
@@ -376,7 +400,10 @@ export function TriggerForm({
       sandboxAllocation !== 'automatic' && !sandboxIsUnchanged;
     if (
       requiresSandboxAllocationEligibility &&
-      (!canSetSandboxAllocation || isLoadingCapabilities || !sandboxIsAvailable)
+      (!canSetSandboxAllocation ||
+        isLoadingCapabilities ||
+        hasCapabilitiesError ||
+        !sandboxIsAvailable)
     ) {
       errors.push('Selected sandbox is not available. Choose another sandbox or Automatic.');
     }
@@ -400,6 +427,7 @@ export function TriggerForm({
     sandboxIsAvailable,
     canSetSandboxAllocation,
     isLoadingCapabilities,
+    hasCapabilitiesError,
   ]);
 
   const isFormValid = formErrors.length === 0;
@@ -787,6 +815,7 @@ export function TriggerForm({
                           <SelectItem
                             key={choice.allocation}
                             value={choice.allocation}
+                            disabled={hasCapabilitiesError}
                             textValue={choice.instance}
                             className="pointer-coarse:min-h-11"
                           >
@@ -809,13 +838,24 @@ export function TriggerForm({
                     )}
                   </SelectContent>
                 </Select>
-                <p id="sandboxAllocationHelp" className="text-muted-foreground max-w-prose text-xs">
-                  {showUnavailableSandbox
-                    ? sandboxIsUnchanged
-                      ? 'The saved sandbox is no longer offered. It is kept unless you choose another sandbox or Automatic.'
-                      : 'Selected sandbox is not available. Choose another sandbox or Automatic.'
-                    : 'Automatic uses your Cloud Agent repository and organization defaults. Sandbox selection may affect compute charges.'}
+                <p
+                  id="sandboxAllocationHelp"
+                  role={hasCapabilitiesError ? 'alert' : undefined}
+                  className="text-muted-foreground max-w-prose text-xs"
+                >
+                  {sandboxHelpText}
                 </p>
+                {hasCapabilitiesError && onRetryCapabilities && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isLoading || isLoadingCapabilities}
+                    onClick={onRetryCapabilities}
+                  >
+                    Retry sandbox options
+                  </Button>
+                )}
               </div>
             )}
 

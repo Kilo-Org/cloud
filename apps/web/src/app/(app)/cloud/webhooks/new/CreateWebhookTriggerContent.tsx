@@ -35,7 +35,12 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     ? `/organizations/${organizationId}/integrations`
     : '/integrations';
 
-  const { data: capabilities, isPending: isLoadingCapabilities } = useQuery(
+  const {
+    data: capabilities,
+    isPending: isLoadingCapabilities,
+    isError: hasCapabilitiesError,
+    refetch: refetchCapabilities,
+  } = useQuery(
     trpc.webhookTriggers.capabilities.queryOptions({
       organizationId,
       githubRepo: githubRepo || undefined,
@@ -219,6 +224,8 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         sandboxSelection={capabilities?.sandboxSelection}
         onRepositoryChange={setGithubRepo}
         isLoadingCapabilities={isLoadingCapabilities}
+        hasCapabilitiesError={hasCapabilitiesError}
+        onRetryCapabilities={() => void refetchCapabilities()}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         isLoading={isCreatePending}

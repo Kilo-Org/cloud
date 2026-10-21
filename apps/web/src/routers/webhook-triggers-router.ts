@@ -17,6 +17,7 @@ import {
 } from '@kilocode/db/schema';
 import {
   getKiloSandboxAllocation,
+  isSandboxAllocationAvailable,
   sandboxAllocationSchema,
   type SandboxAllocation,
   type SandboxSelectionCapabilities,
@@ -400,21 +401,17 @@ async function assertSandboxAllocationAvailable(
     });
   }
 
-  // Existing triggers predate named choices; an enabled owner may keep using
-  // the legacy allocation even though the picker no longer lists it.
-  if (sandboxAllocation === 'isolated-standard') return;
+  if (isSandboxAllocationAvailable(capabilities, sandboxAllocation)) return;
 
   const option = capabilities.options.find(
     candidate => getKiloSandboxAllocation(candidate.allocation) === sandboxAllocation
   );
   const unavailableReason = option?.unavailableReason ?? option?.repositoryUnavailableReason;
 
-  if (!option || unavailableReason) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: unavailableReason ?? 'Sandbox allocation is not available',
-    });
-  }
+  throw new TRPCError({
+    code: 'BAD_REQUEST',
+    message: unavailableReason ?? 'Sandbox allocation is not available',
+  });
 }
 
 export const webhookTriggersRouter = createTRPCRouter({

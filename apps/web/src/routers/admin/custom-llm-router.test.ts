@@ -605,7 +605,10 @@ describe('adminCustomLlmRouter', () => {
       await expect(
         caller.admin.customLlm.upsert({
           public_id: 'acme/public-model',
-          definition: { ...publicDefinition, public: { inference_providers: ['Acme AI'] } },
+          definition: {
+            ...publicDefinition,
+            public: { inference_providers: ['Acme AI'], description: 'A public custom model' },
+          },
           credentials,
         })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });

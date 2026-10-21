@@ -137,4 +137,28 @@ describe('verifyEmail', () => {
     const fetchOptions = mockFetch.mock.calls[0][1];
     expect(fetchOptions.signal).toBeDefined();
   });
+
+  it.each(['http_error', 'non_success', 'blocked', 'network_error'])(
+    'preserves verification decisions without recipient diagnostics for %s',
+    async failure => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        if (failure === 'http_error') mockFetch.mockResolvedValue({ ok: false, status: 500 });
+        else if (failure === 'non_success') mockNeverBounceResponse('valid', 'auth_failure');
+        else if (failure === 'blocked') mockNeverBounceResponse('invalid');
+        else mockFetch.mockRejectedValue(new Error('private@example.test request failed'));
+
+        expect(await verifyEmail('private@example.test', { suppressDiagnostics: true })).toBe(
+          failure !== 'blocked'
+        );
+        expect(warn).not.toHaveBeenCalled();
+        expect(log).not.toHaveBeenCalled();
+        expect(mockCaptureMessage).not.toHaveBeenCalled();
+      } finally {
+        warn.mockRestore();
+        log.mockRestore();
+      }
+    }
+  );
 });

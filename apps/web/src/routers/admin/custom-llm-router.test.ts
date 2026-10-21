@@ -6,7 +6,17 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { eq } from 'drizzle-orm';
-import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
+import type { CustomLlmDefinition, StoredModel } from '@kilocode/db/schema-types';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  ...jest.requireActual<typeof GatewayModelsCache>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
+  ),
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(),
+}));
 
 let admin: User;
 let nonAdmin: User;
@@ -22,6 +32,9 @@ const validDefinition: CustomLlmDefinition = {
 };
 
 beforeEach(async () => {
+  jest
+    .mocked(getOpenRouterModelsMetadataFromDatabase)
+    .mockResolvedValue({ 'openai/gpt-4o': {} as StoredModel });
   await cleanupDbForTest();
   admin = await insertTestUser({
     google_user_email: `custom-llm-admin-${Math.random()}@admin.example.com`,
@@ -134,6 +147,33 @@ describe('adminCustomLlmRouter', () => {
       expect(decrypted.type).toBe('service_account');
       expect(decrypted.project_id).toBe('test-project');
       expect(decrypted.private_key).toBe('pk-secret');
+    });
+
+    it('creates a new custom LLM with Amazon Bedrock IAM credentials', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const publicId = 'kilo-internal/test-model-bedrock';
+      const credentials = {
+        type: 'aws_bedrock' as const,
+        region: 'us-east-1',
+        access_key_id: 'AKIDEXAMPLE',
+        secret_access_key: 'bedrock-secret',
+      };
+
+      await caller.admin.customLlm.upsert({
+        public_id: publicId,
+        definition: {
+          ...validDefinition,
+          base_url: 'https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1',
+        },
+        credentials,
+      });
+
+      const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+      expect(row?.encrypted_api_key).toBeDefined();
+      expect(JSON.stringify(row?.definition)).not.toContain('bedrock-secret');
+      expect(JSON.parse(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY))).toEqual(
+        credentials
+      );
     });
 
     it('rejects creating new custom LLM when credentials are completely missing', async () => {
@@ -406,6 +446,113 @@ describe('adminCustomLlmRouter', () => {
         .from(custom_llm2)
         .where(eq(custom_llm2.public_id, copiedPublicId));
       expect(copiedRow).toBeUndefined();
+    });
+  });
+
+  describe('public_id rules', () => {
+    const credentials = { type: 'api_key', api_key: 'sk-secret' } as const;
+
+    it('accepts an id without the kilo-internal/ prefix and trims it', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: '  acme/model  ',
+        definition: validDefinition,
+        credentials,
+      });
+
+      expect(result.public_id).toBe('acme/model');
+    });
+
+    it.each([
+      ['Acme/Model', 'lowercase letters'],
+      ['acme/my model', 'lowercase letters'],
+      ['acme/model:free', 'must not contain ":" or "~"'],
+      ['acme/model~latest', 'must not contain ":" or "~"'],
+      ['kilo/model', 'must not start with'],
+      ['kilo-auto/model', 'must not start with'],
+      ['kilocode/model', 'must not start with'],
+      ['kimi-coding/model', 'direct BYOK prefix'],
+      ['openai/gpt-4o', 'OpenRouter model list'],
+    ])('rejects %s', async (publicId, message) => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: publicId,
+          definition: validDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining(message) });
+    });
+
+    it('rejects a Kilo-exclusive model id', async () => {
+      const exclusiveModelId = kiloExclusiveModels.find(
+        model => !model.public_id.includes(':')
+      )?.public_id;
+      if (!exclusiveModelId) throw new Error('Expected a Kilo-exclusive id without a variant');
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: exclusiveModelId,
+          definition: validDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('Kilo-exclusive'),
+      });
+    });
+
+    it('rejects an id that differs only in case from an existing custom LLM', async () => {
+      await db
+        .insert(custom_llm2)
+        .values({ public_id: 'kilo-internal/Legacy-Model', definition: validDefinition });
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'kilo-internal/legacy-model',
+          definition: validDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('differs only in case'),
+      });
+    });
+
+    it('keeps accepting updates to an existing row with a legacy id', async () => {
+      await db
+        .insert(custom_llm2)
+        .values({ public_id: 'kilo-internal/Legacy-Model', definition: validDefinition });
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: 'kilo-internal/Legacy-Model',
+        definition: { ...validDefinition, display_name: 'Renamed' },
+        credentials,
+      });
+
+      expect(result.definition.display_name).toBe('Renamed');
+    });
+
+    it('applies the same rules to the copy target', async () => {
+      const caller = await createCallerForUser(admin.id);
+      await caller.admin.customLlm.upsert({
+        public_id: 'acme/copy-source',
+        definition: validDefinition,
+        credentials,
+      });
+
+      await expect(
+        caller.admin.customLlm.copy({
+          source_public_id: 'acme/copy-source',
+          public_id: 'kilo/copy',
+          display_name: 'Copy',
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
   });
 

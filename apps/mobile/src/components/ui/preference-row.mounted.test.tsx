@@ -70,11 +70,7 @@ describe('PreferenceRow', () => {
         seen.push(next);
       },
     });
-    const label = root.find(
-      node =>
-        Object.is(node.type, 'Pressable') &&
-        node.props.accessibilityLabel === 'Let Kilo change app settings'
-    );
+    const label = root.find(node => Object.is(node.type, 'Pressable'));
 
     act(() => {
       (label.props.onPress as () => void)();
@@ -83,7 +79,7 @@ describe('PreferenceRow', () => {
     expect(seen).toEqual([false]);
   });
 
-  it('leaves the native switch as its own control, so a tap on it does not fire twice', () => {
+  it('moves the switch when the thumb is toggled, exactly once', () => {
     const seen: boolean[] = [];
     const root = renderRow({
       value: true,
@@ -98,28 +94,38 @@ describe('PreferenceRow', () => {
     });
 
     expect(seen).toEqual([false]);
-    expect(toggle.props.accessibilityLabel).toBeUndefined();
-    expect(toggle.props.accessible).toBe(false);
   });
 
-  it('names only the pressable, so a tap on the title is one control not two', () => {
+  it('exposes the row as one switch carrying the title, subtitle and state', () => {
     const root = renderRow({
       value: true,
       onValueChange: () => undefined,
     });
-    const named = root.findAll(
-      node => node.props.accessibilityLabel === 'Let Kilo change app settings'
+
+    const switches = root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Switch' &&
+        node.props.accessibilityLabel === 'Let Kilo change app settings'
     );
 
-    expect(named).toHaveLength(1);
-    expect(named[0]?.props.accessibilityRole).toBe('switch');
-    expect(named[0]?.props.accessibilityHint).toBe(
+    const allSwitches = root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
+    );
+    expect(allSwitches).toHaveLength(1);
+
+    expect(switches).toHaveLength(1);
+    expect(switches[0]?.props.accessibilityHint).toBe(
       'Applies to theme, language, notifications, models and the rest of Preferences.'
     );
-    expect(named[0]?.props.accessibilityState).toEqual({
+    expect(switches[0]?.props.accessibilityState).toEqual({
       disabled: false,
       busy: false,
       checked: true,
     });
+
+    const pressable = root.find(node => Object.is(node.type, 'Pressable'));
+    expect(pressable.props.accessible).toBe(false);
+    expect(pressable.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 });

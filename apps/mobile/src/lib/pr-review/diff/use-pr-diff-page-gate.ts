@@ -1,8 +1,8 @@
 import { useCallback, useRef } from 'react';
 
-import { type usePrReviewFileListQuery } from '@/lib/pr-review/diff/pr-review-file-list-state';
+import { type PrReviewFileListQueryResult } from '@/lib/pr-review/diff/pr-review-file-list-state';
 
-type FileListQuery = ReturnType<typeof usePrReviewFileListQuery>['query'];
+type FileListQuery = PrReviewFileListQueryResult['query'];
 
 type PageGate = { userDragged: boolean; heldEndReach: boolean };
 

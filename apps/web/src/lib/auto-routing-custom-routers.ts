@@ -53,8 +53,10 @@ import { buildEligibleCatalog, type EligibleCatalog } from '@/lib/auto-routing-p
 
 const BENCHMARK_REGISTER_BATCH_SIZE = 10;
 const BENCHMARK_ADMISSION_TIMEOUT_MS = 10_000;
-// A custom router request holds at most 20 bounded entries, so its JSON body stays well under this.
-const MAX_CUSTOM_ROUTER_BODY_BYTES = 64 * 1024;
+// A maximal contract-valid router (20 entries at every entry bound, where the bounds count UTF-16
+// code units but this limit counts UTF-8 bytes) serializes to about 64 KiB, so this leaves 4x
+// headroom for multi-byte names.
+const MAX_CUSTOM_ROUTER_BODY_BYTES = 256 * 1024;
 // 400 bodies from benchmark workers that cannot benchmark the requested base router: a worker
 // that predates frontier owner profiles, or one without a saved config for that router.
 const UNSUPPORTED_BASE_ROUTER_ERRORS = [
@@ -187,7 +189,12 @@ async function readBoundedBody(request: NextRequest): Promise<Uint8Array> {
   let totalBytes = 0;
   try {
     while (true) {
-      const chunk = await reader.read();
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await reader.read();
+      } catch {
+        throw new CustomRouterApiError('invalid_request', 'Could not read the request body');
+      }
       if (chunk.done) break;
       totalBytes += chunk.value.byteLength;
       if (totalBytes > MAX_CUSTOM_ROUTER_BODY_BYTES) {
@@ -608,7 +615,8 @@ export async function ownerRouterSlugs(
 /**
  * Catalog I/O and benchmark admission stay outside the owner lock. The transaction serializes the
  * final validation and the write only, so queued saves never hold a pooled connection across an
- * outbound benchmark request.
+ * outbound benchmark request. The one exception is in `updateCustomRouterResponse`, which admits the
+ * locked definition inside the transaction when a concurrent save changed it after the pre-lock read.
  */
 export async function createCustomRouterResponse(
   context: CustomRouterRequestContext,

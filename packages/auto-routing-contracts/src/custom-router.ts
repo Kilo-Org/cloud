@@ -67,14 +67,13 @@ function addReservedSlugIssue(scope: CustomRouterScope, slug: string, ctx: z.Ref
   }
 }
 
-const ModelIdSchema = z.string().trim().min(1).max(MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH);
+const ModelIdSchema = z.string().trim().min(1);
 export const CLIENT_CANDIDATE_PREFIX = 'client:';
 // Provider IDs must not contain '/': the entry key splits at the first '/'.
 const ClientProviderIdSchema = z
   .string()
   .trim()
   .min(1)
-  .max(MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH)
   .refine(provider => !provider.includes('/'), 'Provider ID must not contain /');
 
 export const GatewayCustomRouterEntrySchema = z.object({
@@ -88,24 +87,17 @@ export const GatewayCustomRouterEntrySchema = z.object({
 export type GatewayCustomRouterEntry = z.infer<typeof GatewayCustomRouterEntrySchema>;
 
 export const ClientModelCapabilitiesSchema = z.object({
-  contextLength: z.number().int().positive().max(MAX_CLIENT_CONTEXT_LENGTH).nullable(),
-  inputModalities: z
-    .array(z.string().trim().min(1).max(MAX_CLIENT_INPUT_MODALITY_LENGTH))
-    .max(MAX_CLIENT_INPUT_MODALITIES),
+  contextLength: z.number().int().positive().nullable(),
+  inputModalities: z.array(z.string().trim().min(1)),
   toolCall: z.boolean(),
   reasoning: z.boolean(),
 });
 export type ClientModelCapabilities = z.infer<typeof ClientModelCapabilitiesSchema>;
 
 export const ClientModelPricingSchema = z.object({
-  inputPerMTokUsd: z.number().finite().nonnegative().max(MAX_CLIENT_PRICE_PER_MTOK_USD),
-  outputPerMTokUsd: z.number().finite().nonnegative().max(MAX_CLIENT_PRICE_PER_MTOK_USD),
-  cacheReadPerMTokUsd: z
-    .number()
-    .finite()
-    .nonnegative()
-    .max(MAX_CLIENT_PRICE_PER_MTOK_USD)
-    .optional(),
+  inputPerMTokUsd: z.number().nonnegative(),
+  outputPerMTokUsd: z.number().nonnegative(),
+  cacheReadPerMTokUsd: z.number().nonnegative().optional(),
 });
 export type ClientModelPricing = z.infer<typeof ClientModelPricingSchema>;
 
@@ -115,8 +107,7 @@ export const ClientCustomRouterEntrySchema = z.object({
   model: ModelIdSchema,
   // Empty means the model has one null variant.
   variants: z
-    .array(z.string().trim().min(1).max(MAX_CLIENT_VARIANT_LENGTH))
-    .max(MAX_CLIENT_VARIANTS)
+    .array(z.string().trim().min(1))
     .refine(variants => new Set(variants).size === variants.length, 'Variants must be unique'),
   capabilities: ClientModelCapabilitiesSchema,
   // Null means the model costs $0.
@@ -191,6 +182,112 @@ export const CustomRouterEntriesSchema = z
     });
   });
 
+function addEntryBudgetIssue(
+  ctx: z.RefinementCtx,
+  path: (string | number)[],
+  message: string
+): void {
+  ctx.addIssue({ code: 'custom', path, message });
+}
+
+/**
+ * Client-supplied entries carry an explicit budget on write. Read schemas stay permissive so rows
+ * stored before the budget existed keep parsing in the worker and in list responses.
+ */
+function addEntryBudgetIssues(
+  entry: CustomRouterEntry,
+  ctx: z.RefinementCtx,
+  prefix: readonly (string | number)[] = []
+): void {
+  const path = (...parts: (string | number)[]) => [...prefix, ...parts];
+  if (entry.kind === 'gateway') {
+    if (entry.model.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH) {
+      addEntryBudgetIssue(
+        ctx,
+        path('model'),
+        `Too big: expected model to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
+      );
+    }
+    return;
+  }
+  if (entry.provider.length > MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH) {
+    addEntryBudgetIssue(
+      ctx,
+      path('provider'),
+      `Too big: expected provider to have <=${MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH} characters`
+    );
+  }
+  if (entry.model.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH) {
+    addEntryBudgetIssue(
+      ctx,
+      path('model'),
+      `Too big: expected model to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
+    );
+  }
+  if (entry.variants.length > MAX_CLIENT_VARIANTS) {
+    addEntryBudgetIssue(
+      ctx,
+      path('variants'),
+      `Too big: expected at most ${MAX_CLIENT_VARIANTS} variants`
+    );
+  }
+  entry.variants.forEach((variant, index) => {
+    if (variant.length > MAX_CLIENT_VARIANT_LENGTH) {
+      addEntryBudgetIssue(
+        ctx,
+        path('variants', index),
+        `Too big: expected a variant to have <=${MAX_CLIENT_VARIANT_LENGTH} characters`
+      );
+    }
+  });
+  const { contextLength, inputModalities } = entry.capabilities;
+  if (contextLength !== null && contextLength > MAX_CLIENT_CONTEXT_LENGTH) {
+    addEntryBudgetIssue(
+      ctx,
+      path('capabilities', 'contextLength'),
+      `Too big: expected contextLength to be <=${MAX_CLIENT_CONTEXT_LENGTH}`
+    );
+  }
+  if (inputModalities.length > MAX_CLIENT_INPUT_MODALITIES) {
+    addEntryBudgetIssue(
+      ctx,
+      path('capabilities', 'inputModalities'),
+      `Too big: expected at most ${MAX_CLIENT_INPUT_MODALITIES} input modalities`
+    );
+  }
+  inputModalities.forEach((modality, index) => {
+    if (modality.length > MAX_CLIENT_INPUT_MODALITY_LENGTH) {
+      addEntryBudgetIssue(
+        ctx,
+        path('capabilities', 'inputModalities', index),
+        `Too big: expected a modality to have <=${MAX_CLIENT_INPUT_MODALITY_LENGTH} characters`
+      );
+    }
+  });
+  if (entry.pricing) {
+    for (const [field, value] of Object.entries(entry.pricing)) {
+      if (value === undefined) continue;
+      if (!Number.isFinite(value) || value > MAX_CLIENT_PRICE_PER_MTOK_USD) {
+        addEntryBudgetIssue(
+          ctx,
+          path('pricing', field),
+          `Expected ${field} to be finite and <=${MAX_CLIENT_PRICE_PER_MTOK_USD}`
+        );
+      }
+    }
+  }
+}
+
+export const CustomRouterWriteEntriesSchema = CustomRouterEntriesSchema.superRefine(
+  (entries, ctx) => {
+    entries.forEach((entry, index) => addEntryBudgetIssues(entry, ctx, [index]));
+  }
+);
+
+const ClientCustomRouterWriteEntrySchema = ClientCustomRouterEntrySchema.superRefine((entry, ctx) =>
+  addEntryBudgetIssues(entry, ctx)
+);
+
 function addDefaultEntryIssue(
   entries: readonly CustomRouterEntryRef[],
   defaultEntryKey: string,
@@ -206,7 +303,10 @@ function addDefaultEntryIssue(
 }
 
 const CustomRouterNameSchema = z.string().trim().min(1).max(MAX_CUSTOM_ROUTER_NAME_LENGTH);
-const EntryKeySchema = z.string().min(1).max(MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGTH);
+const EntryKeySchema = z.string().min(1);
+// Write requests carry the entry budget; stored definitions and responses keep parsing rows that
+// predate it, so the read schemas stay permissive.
+const WriteEntryKeySchema = EntryKeySchema.max(MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGTH);
 
 export const CustomRouterDefinitionSchema = z
   .object({
@@ -572,8 +672,8 @@ export const CreateCustomRouterRequestSchema = z
     name: CustomRouterNameSchema,
     baseRouter: AutoRouterSchema,
     mode: AutoRoutingModeSchema,
-    entries: CustomRouterEntriesSchema,
-    defaultEntryKey: EntryKeySchema,
+    entries: CustomRouterWriteEntriesSchema,
+    defaultEntryKey: WriteEntryKeySchema,
   })
   .superRefine((request, ctx) => {
     addReservedSlugIssue(request.scope, request.slug, ctx);
@@ -587,8 +687,8 @@ export const UpdateCustomRouterRequestSchema = z
     name: CustomRouterNameSchema.optional(),
     baseRouter: AutoRouterSchema.optional(),
     mode: AutoRoutingModeSchema.optional(),
-    entries: CustomRouterEntriesSchema.optional(),
-    defaultEntryKey: EntryKeySchema.optional(),
+    entries: CustomRouterWriteEntriesSchema.optional(),
+    defaultEntryKey: WriteEntryKeySchema.optional(),
   })
   .superRefine((request, ctx) => {
     if (Object.values(request).every(value => value === undefined)) {
@@ -610,7 +710,7 @@ export const UpdateCustomRouterRequestSchema = z
 export type UpdateCustomRouterRequest = z.infer<typeof UpdateCustomRouterRequestSchema>;
 
 export const RegisterClientEntryRequestSchema = z.object({
-  entry: ClientCustomRouterEntrySchema,
+  entry: ClientCustomRouterWriteEntrySchema,
 });
 export type RegisterClientEntryRequest = z.infer<typeof RegisterClientEntryRequestSchema>;
 

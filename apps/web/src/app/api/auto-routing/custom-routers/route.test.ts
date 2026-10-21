@@ -856,7 +856,7 @@ describe('/api/auto-routing/custom-routers', () => {
       async route => {
         if (route === 'update') await create(routerBody());
         mockedRegister.mockClear();
-        const oversizedName = 'x'.repeat(70 * 1024);
+        const oversizedName = 'x'.repeat(300 * 1024);
 
         const result =
           route === 'create'
@@ -878,6 +878,24 @@ describe('/api/auto-routing/custom-routers', () => {
         expect(rows.map(row => row.name)).toEqual(route === 'update' ? ['Coding'] : []);
       }
     );
+
+    test('maps an unreadable request body to invalid_request', async () => {
+      const broken = request('', { method: 'POST', body: {} });
+      Object.defineProperty(broken, 'body', {
+        value: new ReadableStream({
+          pull(controller) {
+            controller.error(new Error('socket hang up'));
+          },
+        }),
+      });
+
+      const result = await errorOf(await createRouter(broken));
+
+      expect(result).toEqual({
+        status: 400,
+        body: { error: expect.objectContaining({ code: 'invalid_request' }) },
+      });
+    });
 
     test('rejects a duplicate slug and an eleventh router for one owner', async () => {
       for (let index = 0; index < 10; index++) {

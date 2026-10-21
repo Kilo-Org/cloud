@@ -80,6 +80,13 @@ The entry key is `gateway:<model>` or `client:<provider>/<model>`. The CLI regis
 entries from its own configuration (`kilo auto router add`). The web editor manages gateway
 entries and can remove client entries.
 
+Write requests carry an explicit entry budget: model IDs up to 200 characters, provider IDs up to
+100, at most 20 variants of up to 100 characters, at most 10 input modalities of up to 50
+characters, context lengths up to 10,000,000, per-million-token prices that are finite and at most
+1,000,000, and default entry keys up to 320 characters. The budget applies to create, update, and
+client-entry registration; stored definitions and responses still parse rows written before it, so
+the worker keeps serving them.
+
 The serving worker reads definitions through its existing Hyperdrive binding with an isolate
 cache. The web app owns create, update, and delete.
 
@@ -95,12 +102,12 @@ The benchmark worker stays the only writer of measurements and routing tables.
 - Platform-paid admission is limited to 20 new models per base router per owner per rolling 24
   hours. Ready and pending models do not count. A save over the limit gets `quota_exceeded`
   (HTTP 429) with `retryAt`, and every other validation runs before admission.
-  Web saves fetch the catalog and admit benchmarks before locking, so the owner's PostgreSQL
-  advisory lock covers only the final validation and the write: a queued save never holds a
-  pooled connection across an outbound benchmark request. Admission runs at most one in-flight
-  request per owner. Updates admit the merged definition computed from a pre-lock read; if a
-  concurrent save changes the base router or pool before the lock is taken, the locked definition
-  is admitted again under the lock. Deletes and client-entry edits use the same lock without
+  Web saves fetch the catalog and admit benchmarks before locking, and the owner's PostgreSQL
+  advisory lock covers the final validation and the write, so queued saves do not hold a pooled
+  connection across an outbound benchmark request. Admission runs at most one in-flight request per
+  owner. Updates admit the merged definition computed from a pre-lock read; if a concurrent save
+  changes the base router or pool before the lock is taken, the locked definition is admitted again
+  while that lock is held, before the write. Deletes and client-entry edits use the same lock without
   admission. All registration batches share a ten-second HTTP deadline, including response-body
   reads. A batch that fails in transit or gets a worker 5xx before the deadline is retried once.
   PostgreSQL and worker D1 do not share a transaction: an ambiguous HTTP failure, a later batch

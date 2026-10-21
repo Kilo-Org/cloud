@@ -81,10 +81,6 @@ vi.mock('./session-access.js', () => ({
     ),
 }));
 
-vi.mock('./persistence/CloudAgentSession.js', () => ({
-  CloudAgentSession: class CloudAgentSession {},
-}));
-
 vi.mock('@kilocode/db/client', () => ({
   getWorkerDb: () => ({
     select: () => ({
@@ -107,10 +103,6 @@ type MockEnv = {
   SandboxSmall: unknown;
   WS_ALLOWED_ORIGINS?: string;
   HYPERDRIVE: { connectionString: string };
-  CLOUD_AGENT_SESSION: {
-    idFromName: ReturnType<typeof vi.fn>;
-    get: ReturnType<typeof vi.fn>;
-  };
   STREAM_TICKET_NONCE_DO: {
     idFromName: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
@@ -130,10 +122,6 @@ function createEnv(): MockEnv {
     Sandbox: {},
     SandboxSmall: {},
     HYPERDRIVE: { connectionString: 'postgres://test' },
-    CLOUD_AGENT_SESSION: {
-      idFromName: vi.fn(),
-      get: vi.fn(),
-    },
     STREAM_TICKET_NONCE_DO: {
       idFromName: vi.fn(),
       get: vi.fn(),

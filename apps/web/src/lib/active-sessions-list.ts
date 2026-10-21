@@ -97,9 +97,7 @@ export type ActiveSession = z.infer<typeof activeSessionSchema> & {
 export const CLOUD_AGENT_CONNECTION_ID = 'cloud-agent';
 
 /**
- * Warm-idle window for live legacy cloud sessions. Mirrors the server's
- * warm-idle cutoff for the legacy `agent_*` plane. Env override drift is
- * accepted (A2).
+ * Keep recently idle cloud sessions visible in the tray for 15 minutes.
  */
 const CLOUD_AGENT_WARM_IDLE_CUTOFF = sql`now() - interval '15 minutes'`;
 

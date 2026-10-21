@@ -123,10 +123,6 @@ vi.mock('./session-access.js', () => ({
     ),
 }));
 
-vi.mock('./persistence/CloudAgentSession.js', () => ({
-  CloudAgentSession: class CloudAgentSession {},
-}));
-
 vi.mock('./db/pg.js', () => ({
   getPgDb: getPgDbMock,
 }));

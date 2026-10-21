@@ -51,7 +51,6 @@ const groups: ServiceGroup[] = [
     alwaysOn: false,
     groupDependsOn: ['cloud-agent'],
   },
-  { id: 'deploy', label: 'Deploy', alwaysOn: false },
   { id: 'observability', label: 'Observability', alwaysOn: false },
   { id: 'auto-routing', label: 'Auto Routing', alwaysOn: false, sectionBreakBefore: true },
   { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },

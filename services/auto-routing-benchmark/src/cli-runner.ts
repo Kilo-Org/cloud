@@ -70,9 +70,9 @@ export function isUnsupportedModelResult(
 ): boolean {
   if (result.text.length > 0 || (result.costUsd ?? 0) !== 0 || result.timedOut) return false;
   const diagnostic = stripVTControlCharacters(result.stderrTail);
-  const model = /(?:^|\n)\s*(?:Error:\s*)?Unsupported model:?\s*(\S+?)\s*(?:\n|$)/i.exec(
-    diagnostic
-  )?.[1];
+  const model = /(?:^|\n)\s*(?:Error:\s*)?Unsupported model:?\s*(\S+)/i
+    .exec(diagnostic)?.[1]
+    ?.replace(/[.,;:!?)\]]+$/, '');
   const bare = requestedModel.slice(requestedModel.lastIndexOf('/') + 1);
   return model === requestedModel || model === `kilo/${requestedModel}` || model === bare;
 }

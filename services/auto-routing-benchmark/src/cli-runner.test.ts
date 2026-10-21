@@ -265,6 +265,24 @@ describe('gateway model resolution failures', () => {
     ).toBe(true);
   });
 
+  it('tolerates trailing punctuation and a suffix after the model name', () => {
+    expect(
+      isUnsupportedModelResult(
+        {
+          ...emptyResult,
+          stderrTail: 'Error: Unsupported model mimo-v2.5. Pick another model to continue.',
+        },
+        'xiaomi/mimo-v2.5'
+      )
+    ).toBe(true);
+    expect(
+      isUnsupportedModelResult(
+        { ...emptyResult, stderrTail: 'Unsupported model mimo-v2.5,' },
+        'xiaomi/mimo-v2.5'
+      )
+    ).toBe(true);
+  });
+
   it.each([
     { text: 'answer', stderrTail: diagnostic },
     { costUsd: 0.01, stderrTail: diagnostic },

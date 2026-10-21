@@ -31,6 +31,7 @@ it.each([undefined, 'staging'])(
         {
           configPath: new URL('../wrangler.jsonc', import.meta.url),
           env,
+          ...(env === 'staging' ? { vars: { USAGE_INGEST_MODE: 'receipt' } } : {}),
           secrets: { USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret' },
         },
       ],
@@ -74,8 +75,10 @@ it.each([undefined, 'staging'])(
       );
       for (const receipt of receipts) {
         expect(receipt).toEqual({
+          level: 'info',
           event: 'usage_ingest_receipt',
           outcome: 'received',
+          queue_action: 'ack',
           usage_id: expect.any(String),
           queue_message_id: expect.any(String),
           delivery_attempts: expect.any(Number),
@@ -104,8 +107,10 @@ it.each([undefined, 'staging'])(
       for (const receipt of server.getLogs().map(log => JSON.parse(log.message))) {
         if (receipt.outcome === 'invalid') {
           expect(receipt).toEqual({
+            level: 'info',
             event: 'usage_ingest_receipt',
             outcome: 'invalid',
+            queue_action: 'ack',
             queue_message_id: expect.any(String),
             delivery_attempts: expect.any(Number),
           });

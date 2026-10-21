@@ -169,10 +169,9 @@ vi.mock('@/components/centered-state-surface', () => ({
   NativeStateSurface: ({ children }: { children: ReactElement }) => children,
   StateSurface: 'StateSurface',
 }));
-// The (app) layout's screenLayout gate reaches `useIsFocused`; the fake Scene
-// the Stack mock below mounts is always the focused screen, so the gate mock
-// passes the scene straight through and the unlock wrapper stays the only
-// hidden/visible surface under test.
+// The (app) layout's screenLayout is the covered-screen gate; the fake Scene
+// the Stack mock below mounts passes the scene straight through, so the unlock
+// wrapper stays the only hidden/visible surface under test.
 vi.mock('@/components/app-screen-layout', () => ({
   // Same call shape as production: the layout receives the scene props object.
   appScreenLayout: (props: { children: ReactElement }) => unlockScene(props.children),
@@ -211,7 +210,7 @@ vi.mock('expo-router', () => ({
     { Screen: 'StackScreen' }
   ),
   useRouter: () => ({ push: vi.fn() }),
-  useIsFocused: () => true,
+  useNavigation: () => ({ addListener: () => () => undefined }),
   usePathname: () => route.pathname,
   useLocalSearchParams: () => ({ owner: 'owner', repo: 'repo', number: '1', scope: 'personal' }),
   useSegments: () => route.segments,
@@ -241,6 +240,12 @@ vi.mock('@/lib/glanceable/mount', () => ({ GlanceablePublisherMount: () => null 
 // like the glanceable mount — and the stub keeps its `expo` root import (which
 // needs `__DEV__` and a native binding) out of this DOM-free harness.
 vi.mock('@/components/launcher-surfaces-mount', () => ({ LauncherSurfacesMount: () => null }));
+// The briefing mount reads tRPC and the native SQLCipher dismissal journal
+// (expo-crypto needs `__DEV__` and a native binding), so it is a null mount in
+// this DOM-free harness.
+vi.mock('@/components/agent-briefing/briefing-sync-mount', () => ({
+  BriefingSyncMount: () => null,
+}));
 vi.mock('@/lib/organization-context', () => ({ OrganizationProvider: 'OrganizationProvider' }));
 vi.mock('@/components/offline-banner', () => ({ OfflineBanner: 'OfflineBanner' }));
 vi.mock('@/lib/query-client-lifecycle', () => ({

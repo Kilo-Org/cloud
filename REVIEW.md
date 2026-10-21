@@ -4,7 +4,7 @@
 
 **Flag these (high confidence only):**
 
-- A security issue in exactly one lens. Name the lens in the comment.
+- A security issue in one lens. Name the lens in the comment. If two lenses fit, the victim decides: cross-user or cross-tenant data exposure is `users`; credential, session, role, or entitlement mechanics are `auth`.
   - `platform` - harm to Kilo: billing and credit accounting, usage metering, quotas and limits, signup and abuse controls, free-model gating, cost or resource blow-up, availability.
   - `users` - harm to a Kilo user or organization: cross-user or cross-tenant reads and writes, IDOR, missing ownership or authorization check, sharing and invitation paths, session or account takeover, private-data leaks.
   - `third-party` - harm to others through Kilo: SSRF and outbound fetch, spam or abuse through agents, provider or integration credential misuse, supply-chain execution, chains that cross the platform and user boundaries.
@@ -51,7 +51,7 @@ Check each protection that the changed line needs before you call it missing:
 - Secret and private-data redaction in logs, errors, and events.
 - Outbound host allowlist for any fetch or webhook.
 
-A caller, a dependency, or a deployment setting outside the diff is an evidence gap. Report it as `[INFERENCE]` in the summary. Do not state that an exploit succeeded.
+Do not assume that a protection exists in code you did not read. Follow the changed caller when the repository has it. If a caller, a dependency, or a deployment setting stays unavailable, report the gap as `[INFERENCE]` in the summary. Do not state that an exploit succeeded.
 
 Map the severity:
 
@@ -140,6 +140,8 @@ Use this EXACT format for the summary comment. ALWAYS start with `<!-- kilo-revi
 
 One concise sentence naming the highest-risk issue and affected area.
 
+**Assumptions:** `[INFERENCE]` gaps and unproven concerns, or `none`.
+
 ### Overview
 
 | Severity   | Count |
@@ -179,6 +181,8 @@ One concise sentence naming the highest-risk issue and affected area.
 ### Executive Summary
 
 One concise sentence describing the reviewed scope and confidence level.
+
+**Assumptions:** `[INFERENCE]` gaps and unproven concerns, or `none`.
 
 <details>
 <summary><b>Files Reviewed (X files)</b></summary>

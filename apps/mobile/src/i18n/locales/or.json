@@ -1546,7 +1546,8 @@
       "bugs": "ବଗ୍",
       "style": "ଶୈଳୀ",
       "testing": "ପରୀକ୍ଷା",
-      "documentation": "ଡକ୍ୟୁମେଣ୍ଟେସନ୍"
+      "documentation": "ଡକ୍ୟୁମେଣ୍ଟେସନ୍",
+      "unknown": "ଅନ୍ୟ ({{area}})"
     },
     "gateThreshold": {
       "warning": "ଚେତାବନୀ"

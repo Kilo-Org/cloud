@@ -1546,7 +1546,8 @@
       "bugs": "Vead",
       "style": "Stiil",
       "testing": "Testimine",
-      "documentation": "Dokumentatsioon"
+      "documentation": "Dokumentatsioon",
+      "unknown": "Muu ({{area}})"
     },
     "gateThreshold": {
       "warning": "Hoiatus"

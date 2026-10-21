@@ -1584,7 +1584,8 @@
       "bugs": "Памылкі",
       "style": "Стыль",
       "testing": "Тэставанне",
-      "documentation": "Дакументацыя"
+      "documentation": "Дакументацыя",
+      "unknown": "Іншае ({{area}})"
     },
     "gateThreshold": {
       "warning": "Папярэджанне"

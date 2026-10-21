@@ -1546,7 +1546,8 @@
       "bugs": "Səhvlər",
       "style": "Stil",
       "testing": "Testlər",
-      "documentation": "Sənədləşdirmə"
+      "documentation": "Sənədləşdirmə",
+      "unknown": "Digər ({{area}})"
     },
     "gateThreshold": {
       "warning": "Xəbərdarlıq"

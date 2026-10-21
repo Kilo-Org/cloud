@@ -1584,7 +1584,8 @@
       "bugs": "Chyby",
       "style": "Styl",
       "testing": "Testování",
-      "documentation": "Dokumentace"
+      "documentation": "Dokumentace",
+      "unknown": "Jiné ({{area}})"
     },
     "gateThreshold": {
       "warning": "Varování"

@@ -1565,7 +1565,8 @@
       "bugs": "Greške",
       "style": "Stil",
       "testing": "Testiranje",
-      "documentation": "Dokumentacija"
+      "documentation": "Dokumentacija",
+      "unknown": "Ostalo ({{area}})"
     },
     "gateThreshold": {
       "warning": "Upozorenje"

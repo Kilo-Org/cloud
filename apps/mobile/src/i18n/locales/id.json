@@ -1033,7 +1033,8 @@
       "bugs": "Kesalahan kode",
       "style": "Gaya",
       "testing": "Pengujian",
-      "documentation": "Dokumentasi"
+      "documentation": "Dokumentasi",
+      "unknown": "Lainnya ({{area}})"
     },
     "gateThreshold": {
       "warning": "Peringatan"

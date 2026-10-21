@@ -1546,7 +1546,8 @@
       "bugs": "Defo lojisyèl",
       "style": "Estil",
       "testing": "Tès",
-      "documentation": "Dokimantasyon"
+      "documentation": "Dokimantasyon",
+      "unknown": "Lòt ({{area}})"
     },
     "gateThreshold": {
       "warning": "Avètisman"

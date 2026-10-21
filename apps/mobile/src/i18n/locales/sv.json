@@ -1546,7 +1546,8 @@
       "bugs": "Buggar",
       "style": "Stil",
       "testing": "Testning",
-      "documentation": "Dokumentation"
+      "documentation": "Dokumentation",
+      "unknown": "Annat ({{area}})"
     },
     "gateThreshold": {
       "warning": "Varning"

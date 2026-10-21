@@ -1622,7 +1622,8 @@
       "bugs": "Bygiau",
       "style": "Arddull",
       "testing": "Profi",
-      "documentation": "Dogfennaeth"
+      "documentation": "Dogfennaeth",
+      "unknown": "Arall ({{area}})"
     },
     "gateThreshold": {
       "warning": "Rhybudd"

@@ -1546,7 +1546,8 @@
       "bugs": "Defektet",
       "style": "Stili",
       "testing": "Testimi",
-      "documentation": "Dokumentacioni"
+      "documentation": "Dokumentacioni",
+      "unknown": "Tjetër ({{area}})"
     },
     "gateThreshold": {
       "warning": "Paralajmërim"

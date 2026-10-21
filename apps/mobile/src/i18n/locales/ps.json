@@ -1546,7 +1546,8 @@
       "bugs": "تېروتنې",
       "style": "د لیکلو بڼه",
       "testing": "ازموینه",
-      "documentation": "اسناد"
+      "documentation": "اسناد",
+      "unknown": "نور ({{area}})"
     },
     "gateThreshold": {
       "warning": "خبرداری"

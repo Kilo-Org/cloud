@@ -1033,7 +1033,8 @@
       "bugs": "Lỗi",
       "style": "Phong cách viết mã",
       "testing": "Kiểm thử",
-      "documentation": "Tài liệu"
+      "documentation": "Tài liệu",
+      "unknown": "Khác ({{area}})"
     },
     "gateThreshold": {
       "warning": "Cảnh báo"

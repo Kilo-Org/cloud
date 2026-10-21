@@ -1033,7 +1033,8 @@
       "bugs": "Fehler",
       "style": "Stil",
       "testing": "Tests",
-      "documentation": "Dokumentation"
+      "documentation": "Dokumentation",
+      "unknown": "Sonstiges ({{area}})"
     },
     "gateThreshold": {
       "warning": "Warnung"

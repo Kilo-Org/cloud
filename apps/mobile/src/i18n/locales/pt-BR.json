@@ -1005,7 +1005,8 @@
       "bugs": "Erros",
       "style": "Estilo",
       "testing": "Testes",
-      "documentation": "Documentação"
+      "documentation": "Documentação",
+      "unknown": "Outro ({{area}})"
     },
     "gateThreshold": {
       "warning": "Aviso"

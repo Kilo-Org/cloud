@@ -1546,7 +1546,8 @@
       "bugs": "Mga bug",
       "style": "Estilo",
       "testing": "Pagsubok",
-      "documentation": "Dokumentasyon"
+      "documentation": "Dokumentasyon",
+      "unknown": "Iba ({{area}})"
     },
     "gateThreshold": {
       "warning": "Babala"

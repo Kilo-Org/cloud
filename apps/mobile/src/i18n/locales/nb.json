@@ -1546,7 +1546,8 @@
       "bugs": "Feil",
       "style": "Stil",
       "testing": "Tester",
-      "documentation": "Dokumentasjon"
+      "documentation": "Dokumentasjon",
+      "unknown": "Annet ({{area}})"
     },
     "gateThreshold": {
       "warning": "Advarsel"

@@ -1546,7 +1546,8 @@
       "bugs": "Xatolar",
       "style": "Uslub",
       "testing": "Testlash",
-      "documentation": "Hujjatlar"
+      "documentation": "Hujjatlar",
+      "unknown": "Boshqa ({{area}})"
     },
     "gateThreshold": {
       "warning": "Ogohlantirish"

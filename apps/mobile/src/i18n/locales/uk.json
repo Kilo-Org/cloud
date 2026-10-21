@@ -1039,7 +1039,8 @@
       "bugs": "Помилки",
       "style": "Стиль",
       "testing": "Тестування",
-      "documentation": "Документація"
+      "documentation": "Документація",
+      "unknown": "Інше ({{area}})"
     },
     "gateThreshold": {
       "warning": "Попередження"

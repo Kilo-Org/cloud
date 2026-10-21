@@ -1546,7 +1546,8 @@
       "bugs": "บั๊ก",
       "style": "รูปแบบโค้ด",
       "testing": "การทดสอบ",
-      "documentation": "เอกสารประกอบ"
+      "documentation": "เอกสารประกอบ",
+      "unknown": "อื่นๆ ({{area}})"
     },
     "gateThreshold": {
       "warning": "คำเตือน"

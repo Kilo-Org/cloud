@@ -1546,7 +1546,8 @@
       "bugs": "Ohjelmavirheet",
       "style": "Tyyli",
       "testing": "Testaus",
-      "documentation": "Dokumentaatio"
+      "documentation": "Dokumentaatio",
+      "unknown": "Muu ({{area}})"
     },
     "gateThreshold": {
       "warning": "Varoitus"

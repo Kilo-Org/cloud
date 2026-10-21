@@ -1546,7 +1546,8 @@
       "bugs": "বাগ",
       "style": "কোডের ধরন",
       "testing": "পরীক্ষা",
-      "documentation": "ডকুমেন্টেশন"
+      "documentation": "ডকুমেন্টেশন",
+      "unknown": "অন্যান্য ({{area}})"
     },
     "gateThreshold": {
       "warning": "সতর্কতা"

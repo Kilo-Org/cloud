@@ -1546,7 +1546,8 @@
       "bugs": "Akatsak",
       "style": "Estiloa",
       "testing": "Probak",
-      "documentation": "Dokumentazioa"
+      "documentation": "Dokumentazioa",
+      "unknown": "Besteak ({{area}})"
     },
     "gateThreshold": {
       "warning": "Abisua"

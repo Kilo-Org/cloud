@@ -1546,7 +1546,8 @@
       "bugs": "Hibák",
       "style": "Stílus",
       "testing": "Tesztelés",
-      "documentation": "Dokumentáció"
+      "documentation": "Dokumentáció",
+      "unknown": "Egyéb ({{area}})"
     },
     "gateThreshold": {
       "warning": "Figyelmeztetés"

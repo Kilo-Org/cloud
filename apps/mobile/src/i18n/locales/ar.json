@@ -1045,7 +1045,8 @@
       "bugs": "الأخطاء",
       "style": "الأسلوب",
       "testing": "الاختبار",
-      "documentation": "التوثيق"
+      "documentation": "التوثيق",
+      "unknown": "آخر ({{area}})"
     },
     "gateThreshold": {
       "warning": "تحذير"

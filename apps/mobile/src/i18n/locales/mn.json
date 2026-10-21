@@ -1546,7 +1546,8 @@
       "bugs": "Алдаанууд",
       "style": "Бичлэгийн хэв маяг",
       "testing": "Туршилт",
-      "documentation": "Баримтжуулалт"
+      "documentation": "Баримтжуулалт",
+      "unknown": "Бусад ({{area}})"
     },
     "gateThreshold": {
       "warning": "Анхааруулга"

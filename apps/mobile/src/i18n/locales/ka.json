@@ -1546,7 +1546,8 @@
       "bugs": "ხარვეზები",
       "style": "სტილი",
       "testing": "ტესტირება",
-      "documentation": "დოკუმენტაცია"
+      "documentation": "დოკუმენტაცია",
+      "unknown": "სხვა ({{area}})"
     },
     "gateThreshold": {
       "warning": "გაფრთხილება"

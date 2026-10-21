@@ -1546,7 +1546,8 @@
       "bugs": "Pepijat",
       "style": "Gaya",
       "testing": "Pengujian",
-      "documentation": "Dokumentasi"
+      "documentation": "Dokumentasi",
+      "unknown": "Lain ({{area}})"
     },
     "gateThreshold": {
       "warning": "Amaran"

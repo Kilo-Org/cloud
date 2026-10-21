@@ -1033,7 +1033,8 @@
       "bugs": "バグ",
       "style": "スタイル",
       "testing": "テスト",
-      "documentation": "ドキュメント"
+      "documentation": "ドキュメント",
+      "unknown": "その他（{{area}}）"
     },
     "gateThreshold": {
       "warning": "警告"

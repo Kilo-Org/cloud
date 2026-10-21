@@ -1546,7 +1546,8 @@
       "bugs": "Грешки",
       "style": "Стил",
       "testing": "Тестване",
-      "documentation": "Документация"
+      "documentation": "Документация",
+      "unknown": "Друго ({{area}})"
     },
     "gateThreshold": {
       "warning": "Предупреждение"

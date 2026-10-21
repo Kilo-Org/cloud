@@ -348,6 +348,7 @@ describe('CreditsCard balance state', () => {
     const orgs = [
       { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
     ] as OrgListEntry[];
+    listState.payload = orgs;
     try {
       const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
       try {

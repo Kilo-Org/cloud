@@ -150,6 +150,7 @@ overrides:
   uuid@<11.1.1: 11.1.1
   serialize-javascript: '>=7.0.3'
   hono: 4.13.13
+  '@modelcontextprotocol/sdk@1.29.0': 1.32.1
   '@modelcontextprotocol/sdk@1.32.1>@hono/node-server': 2.0.10
   '@simplewebauthn/server>@peculiar/asn1-schema': 2.9.4
   '@simplewebauthn/server>@peculiar/asn1-x509': 2.9.4
@@ -538,7 +539,7 @@ importers:
         version: 1.5.2(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
       '@sentry/react-native':
         specifier: ~8.29.0
-        version: 8.29.0(@babel/core@7.29.7)(@expo/config-types@57.0.2)(@expo/config@57.0.9(typescript@7.0.2))(@expo/env@2.4.3)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@57.0.24)(expo@57.0.26)(metro-config@0.84.5(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.84.5)(open@11.0.0)(promise@8.3.0)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))
+        version: 8.29.0(@babel/core@7.29.7)(@expo/config-types@57.0.2)(@expo/config@57.0.9(typescript@7.0.2))(@expo/env@2.4.3)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@57.0.24)(expo@57.0.26)(metro-config@0.84.5)(metro-resolver@0.84.5)(open@11.0.0)(promise@8.3.0)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))
       '@shopify/flash-list':
         specifier: 2.3.3
         version: 2.3.3(@babel/runtime@7.29.7)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
@@ -5966,7 +5967,7 @@ packages:
     resolution: {integrity: sha512-e4cFxj3tiuMtsgOT4G9c1hXyGJhg7/Buj7VVeBacRY3fRtkRZZ59Q3nuVp2xbq8BGQXLXCDB253qMhklMOeUDg==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
-      '@modelcontextprotocol/sdk': ^1.25.2
+      '@modelcontextprotocol/sdk': 1.32.1
     peerDependenciesMeta:
       '@modelcontextprotocol/sdk':
         optional: true
@@ -6007,12 +6008,6 @@ packages:
   '@homebridge/ciao@1.3.9':
     resolution: {integrity: sha512-TMy9zy173jDOpnFXDqL3BPIQn5lfcAkSsivYQatCCakoHk4fLGd7QjfAaNGYE3Ox+/ZI6Lq0e1gGcz1qdw/IbA==}
     hasBin: true
-
-  '@hono/node-server@1.19.17':
-    resolution: {integrity: sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ==}
-    engines: {node: '>=18.14.1'}
-    peerDependencies:
-      hono: 4.13.13
 
   '@hono/node-server@2.0.10':
     resolution: {integrity: sha512-ZcnNVhKTmyDJeg0UlnZjvM73JBsTAuhrH/J4fjwGOw59PwOW51r4J+p6CsKZWXdKSme4MFqU62CZMOsdDrU4CA==}
@@ -6779,16 +6774,6 @@ packages:
       '@opentelemetry/api': ^1.9.0
     peerDependenciesMeta:
       '@opentelemetry/api':
-        optional: true
-
-  '@modelcontextprotocol/sdk@1.29.0':
-    resolution: {integrity: sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      '@cfworker/json-schema': ^4.1.1
-      zod: ^3.25 || ^4.0
-    peerDependenciesMeta:
-      '@cfworker/json-schema':
         optional: true
 
   '@modelcontextprotocol/sdk@1.32.1':
@@ -23755,14 +23740,14 @@ snapshots:
 
   '@fregante/relaxed-json@2.0.0': {}
 
-  '@google/genai@2.10.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
+  '@google/genai@2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
       google-auth-library: 10.6.2
       p-retry: 4.6.2
       protobufjs: 7.6.5
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     optionalDependencies:
-      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.4.3)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -23806,10 +23791,6 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
-
-  '@hono/node-server@1.19.17(hono@4.13.13)':
-    dependencies:
-      hono: 4.13.13
 
   '@hono/node-server@2.0.10(hono@4.13.13)':
     dependencies:
@@ -24928,30 +24909,6 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)':
-    dependencies:
-      '@hono/node-server': 1.19.17(hono@4.13.13)
-      ajv: 8.20.0
-      ajv-formats: 3.0.1
-      content-type: 1.0.5
-      cors: 2.8.6
-      cross-spawn: 7.0.6
-      eventsource: 3.0.7
-      eventsource-parser: 3.0.8
-      express: 5.2.1
-      express-rate-limit: 8.3.1(express@5.2.1)
-      hono: 4.13.13
-      jose: 6.2.3
-      json-schema-typed: 8.0.2
-      pkce-challenge: 5.0.1
-      raw-body: 3.0.2
-      zod: 4.4.3
-      zod-to-json-schema: 3.25.1(zod@4.4.3)
-    optionalDependencies:
-      '@cfworker/json-schema': 4.1.1
-    transitivePeerDependencies:
-      - supports-color
-
   '@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.4.3)':
     dependencies:
       '@hono/node-server': 2.0.10(hono@4.13.13)
@@ -25259,10 +25216,10 @@ snapshots:
 
   '@open-draft/deferred-promise@2.2.0': {}
 
-  '@openclaw/ai@2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)':
+  '@openclaw/ai@2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.4.3))(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.109.1(zod@4.4.3)
-      '@google/genai': 2.10.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      '@google/genai': 2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@mistralai/mistralai': 2.4.0(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
       partial-json: 0.1.7
@@ -27611,7 +27568,7 @@ snapshots:
       '@sentry/conventions': 0.16.0
       '@sentry/core': 10.69.0
 
-  '@sentry/react-native@8.29.0(@babel/core@7.29.7)(@expo/config-types@57.0.2)(@expo/config@57.0.9(typescript@7.0.2))(@expo/env@2.4.3)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@57.0.24)(expo@57.0.26)(metro-config@0.84.5(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.84.5)(open@11.0.0)(promise@8.3.0)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))':
+  '@sentry/react-native@8.29.0(@babel/core@7.29.7)(@expo/config-types@57.0.2)(@expo/config@57.0.9(typescript@7.0.2))(@expo/env@2.4.3)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@57.0.24)(expo@57.0.26)(metro-config@0.84.5)(metro-resolver@0.84.5)(open@11.0.0)(promise@8.3.0)(react-native@0.86.3(patch_hash=113932fc75a9e6f352c2a0668f6aa2be25e81326b7b96cc47f8420776a1a92f9)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))':
     dependencies:
       '@expo/config-plugins': 57.0.9(typescript@7.0.2)
       '@sentry/browser': 10.75.2
@@ -37063,15 +37020,15 @@ snapshots:
       '@clack/core': 1.4.2
       '@clack/prompts': 1.6.0
       '@earendil-works/pi-tui': 0.80.3
-      '@google/genai': 2.10.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      '@google/genai': 2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@grammyjs/runner': 2.0.3(grammy@1.44.0)
       '@grammyjs/transformer-throttler': 1.2.1(grammy@1.44.0)
       '@homebridge/ciao': 1.3.9
       '@lydell/node-pty': 1.2.0-beta.12
       '@mistralai/mistralai': 2.4.0(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.4.3)
       '@mozilla/readability': 0.6.0
-      '@openclaw/ai': 2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
+      '@openclaw/ai': 2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.4.3))(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
       '@openclaw/fs-safe': 0.4.1
       '@openclaw/proxyline': 0.3.3(undici@8.10.2)
       '@silvia-odwyer/photon-node': 0.3.4

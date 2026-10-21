@@ -3086,7 +3086,11 @@
       "separateEmailsHint": "Eralda e-posti aadressid komadega.",
       "thresholdLabel": "Hoiatuse saldopiir (USD)",
       "title": "Madala saldo hoiatus",
-      "emailsError": "Sisesta vähemalt üks kehtiv e-posti aadress. Eralda aadressid komadega.",
+      "emailsInvalid": "Üks või mitu e-posti aadressi ei ole kehtiv.",
+      "emailsRequired": "Sisesta vähemalt üks e-posti aadress.",
+      "saveEmailsError": "Mõned e-posti aadressid ei olnud lubatud. Kontrolli need üle ja proovi uuesti.",
+      "saveError": "Madala saldo hoiatust ei õnnestununud salvestada.",
+      "thresholdPlaceholder": "Sisesta summa",
       "thresholdError": "Sisesta nullist suurem summa."
     },
     "memberLimit": {

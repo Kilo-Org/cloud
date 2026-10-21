@@ -3086,7 +3086,11 @@
       "separateEmailsHint": "Aðgreindu tölvupóstföng með kommum.",
       "thresholdLabel": "Viðvörun þegar inneign fer undir (USD)",
       "title": "Viðvörun um lága inneign",
-      "emailsError": "Sláðu inn að minnsta kosti eitt gilt tölvupóstfang. Aðgreindu mörg föng með kommum.",
+      "emailsInvalid": "Eitt eða fleiri tölvupóstföng eru ekki gild.",
+      "emailsRequired": "Sláðu inn að minnsta kosti eitt tölvupóstfang.",
+      "saveEmailsError": "Sum tölvupóstföng voru ekki samþykkt. Athugaðu þau og reyndu aftur.",
+      "saveError": "Ekki tókst að vista viðvörun um lága inneign.",
+      "thresholdPlaceholder": "Sláðu inn upphæð",
       "thresholdError": "Sláðu inn upphæð sem er hærri en 0."
     },
     "memberLimit": {

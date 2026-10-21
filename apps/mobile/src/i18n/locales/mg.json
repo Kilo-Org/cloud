@@ -3086,7 +3086,11 @@
       "separateEmailsHint": "Saraho amin'ny faingo ny adiresy mailaka maromaro.",
       "thresholdLabel": "Ampandreneso raha latsaky ny (USD)",
       "title": "Fampandrenesana ambim-bola kely",
-      "emailsError": "Mampidira adiresy mailaka manan-kery iray farafahakeliny. Raha maromaro dia saraho amin'ny faingo.",
+      "emailsInvalid": "Tsy manan-kery ny adiresy mailaka iray na maromaro.",
+      "emailsRequired": "Mampidira adiresy mailaka iray farafahakeliny.",
+      "saveEmailsError": "Tsy nekena ny adiresy mailaka sasany. Hamarino izy ireo ary andramo indray.",
+      "saveError": "Tsy voatahiry ny fampandrenesana ambim-bola kely.",
+      "thresholdPlaceholder": "Mampidira vola",
       "thresholdError": "Mampidira vola mihoatra ny 0."
     },
     "memberLimit": {

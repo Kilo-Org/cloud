@@ -3085,7 +3085,11 @@
       "separateEmailsHint": "複数のメールアドレスはカンマで区切ってください。",
       "thresholdLabel": "通知する残高の下限（USD）",
       "title": "残高アラート",
-      "emailsError": "有効なメールアドレスを1つ以上入力してください。複数ある場合はカンマで区切ってください。",
+      "emailsInvalid": "無効なメールアドレスがあります。",
+      "emailsRequired": "メールアドレスを1つ以上入力してください。",
+      "saveEmailsError": "一部のメールアドレスが受け付けられませんでした。確認して、もう一度お試しください。",
+      "saveError": "残高アラートを保存できませんでした。",
+      "thresholdPlaceholder": "金額を入力",
       "thresholdError": "0より大きい金額を入力してください。"
     },
     "memberLimit": {

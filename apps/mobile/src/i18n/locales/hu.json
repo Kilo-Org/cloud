@@ -3086,7 +3086,11 @@
       "separateEmailsHint": "Ha több e-mail-címet adsz meg, vesszővel válaszd el őket.",
       "thresholdLabel": "Figyelmeztetés ez alatt (USD)",
       "title": "Figyelmeztetés alacsony egyenlegre",
-      "emailsError": "Adj meg legalább egy érvényes e-mail-címet. Több címet vesszővel válassz el.",
+      "emailsInvalid": "Egy vagy több e-mail-cím érvénytelen.",
+      "emailsRequired": "Adj meg legalább egy e-mail-címet.",
+      "saveEmailsError": "Néhány e-mail-címet nem fogadtunk el. Ellenőrizd őket, és próbáld újra.",
+      "saveError": "Nem sikerült elmenteni az alacsony egyenlegre figyelmeztetést.",
+      "thresholdPlaceholder": "Adj meg egy összeget",
       "thresholdError": "Adj meg 0-nál nagyobb összeget."
     },
     "memberLimit": {

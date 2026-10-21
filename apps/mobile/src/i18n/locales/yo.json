@@ -3086,7 +3086,11 @@
       "separateEmailsHint": "Lo àmì kọ́mà láti ya àwọn àdírẹ́sì ímeèlì sọ́tọ̀.",
       "thresholdLabel": "Kìlọ̀ tí owó bá dín ju (USD)",
       "title": "Ìkìlọ̀ owó tó kù díẹ̀",
-      "emailsError": "Tẹ ó kéré tán àdírẹ́sì ímeèlì tó péye kan. Lo àmì kọ́mà láti ya àwọn àdírẹ́sì sọ́tọ̀.",
+      "emailsInvalid": "Ọ̀kan tàbí ju bẹ́ẹ̀ lọ nínú àwọn àdírẹ́sì ímeèlì kò péye.",
+      "emailsRequired": "Tẹ ó kéré tán àdírẹ́sì ímeèlì tó péye kan.",
+      "saveEmailsError": "A kò gbà àwọn àdírẹ́sì ímeèlì míràn. Ṣàyẹ̀wọ̀ wọn kí o tún gbìyànjú.",
+      "saveError": "A kò lè fi ìkìlọ̀ owó tó kù díẹ̀ pamọ́.",
+      "thresholdPlaceholder": "Tẹ iye owó kan",
       "thresholdError": "Tẹ iye owó tó ju 0 lọ."
     },
     "memberLimit": {

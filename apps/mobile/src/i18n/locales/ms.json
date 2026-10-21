@@ -3086,7 +3086,11 @@
       "separateEmailsHint": "Pisahkan alamat e-mel dengan koma.",
       "thresholdLabel": "Amaran jika baki kurang daripada (USD)",
       "title": "Amaran baki rendah",
-      "emailsError": "Masukkan sekurang-kurangnya satu alamat e-mel yang sah. Pisahkan alamat e-mel dengan koma.",
+      "emailsInvalid": "Satu atau lebih alamat e-mel tidak sah.",
+      "emailsRequired": "Masukkan sekurang-kurangnya satu alamat e-mel.",
+      "saveEmailsError": "Sesetengah alamat e-mel tidak diterima. Semak dan cuba lagi.",
+      "saveError": "Tidak dapat menyimpan amaran baki rendah.",
+      "thresholdPlaceholder": "Masukkan amaun",
       "thresholdError": "Masukkan amaun yang lebih besar daripada 0."
     },
     "memberLimit": {

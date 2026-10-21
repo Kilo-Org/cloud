@@ -3125,7 +3125,11 @@
       "separateEmailsHint": "Separa gli indirizzi email con una virgola.",
       "thresholdLabel": "Soglia di avviso (USD)",
       "title": "Avviso di saldo basso",
-      "emailsError": "Inserisci almeno un indirizzo email valido. Se ne inserisci più di uno, separali con una virgola.",
+      "emailsInvalid": "Uno o più indirizzi email non sono validi.",
+      "emailsRequired": "Inserisci almeno un indirizzo email.",
+      "saveEmailsError": "Alcuni indirizzi email non sono stati accettati. Controllali e riprova.",
+      "saveError": "Impossibile salvare l'avviso di saldo basso.",
+      "thresholdPlaceholder": "Inserisci un importo",
       "thresholdError": "Inserisci un importo maggiore di 0."
     },
     "memberLimit": {

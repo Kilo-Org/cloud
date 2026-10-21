@@ -3086,7 +3086,11 @@
       "separateEmailsHint": "Erota sähköpostiosoitteet pilkuilla.",
       "thresholdLabel": "Saldon alaraja (USD)",
       "title": "Saldohälytys",
-      "emailsError": "Anna vähintään yksi kelvollinen sähköpostiosoite. Erota useat osoitteet pilkuilla.",
+      "emailsInvalid": "Yksi tai useampi sähköpostiosoite ei ole kelvollinen.",
+      "emailsRequired": "Anna vähintään yksi sähköpostiosoite.",
+      "saveEmailsError": "Osaa sähköpostiosoitteista ei hyväksytty. Tarkista ne ja yritä uudelleen.",
+      "saveError": "Saldohälytyksen tallentaminen ei onnistunut.",
+      "thresholdPlaceholder": "Anna summa",
       "thresholdError": "Anna nollaa suurempi summa."
     },
     "memberLimit": {

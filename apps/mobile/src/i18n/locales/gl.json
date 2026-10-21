@@ -3086,7 +3086,11 @@
       "separateEmailsHint": "Se introduces varios enderezos de correo, sepáraos con comas.",
       "thresholdLabel": "Alertar por baixo de (USD)",
       "title": "Alerta de saldo baixo",
-      "emailsError": "Introduce polo menos un enderezo de correo válido. Se introduces varios, sepáraos con comas.",
+      "emailsInvalid": "Un ou máis enderezos de correo non son válidos.",
+      "emailsRequired": "Introduce polo menos un enderezo de correo.",
+      "saveEmailsError": "Algúns enderezos de correo non foron aceptados. Compróbaos e téntao de novo.",
+      "saveError": "Non se puido gardar a alerta de saldo baixo.",
+      "thresholdPlaceholder": "Introduce unha cantidade",
       "thresholdError": "Introduce unha cantidade maior que 0."
     },
     "memberLimit": {

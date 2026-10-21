@@ -3166,7 +3166,11 @@
       "separateEmailsHint": "El. pašto adresus atskirkite kableliais.",
       "thresholdLabel": "Pranešti, kai likutis mažesnis nei (USD)",
       "title": "Pranešimas apie mažą likutį",
-      "emailsError": "Įveskite bent vieną tinkamą el. pašto adresą. Kelis adresus atskirkite kableliais.",
+      "emailsInvalid": "Vienas ar keli el. pašto adresai netinkami.",
+      "emailsRequired": "Įveskite bent vieną el. pašto adresą.",
+      "saveEmailsError": "Kai kurie el. pašto adresai nebuvo priimti. Patikrinkite juos ir bandykite dar kartą.",
+      "saveError": "Nepavyko išsaugoti pranešimo apie mažą likutį.",
+      "thresholdPlaceholder": "Įveskite sumą",
       "thresholdError": "Įveskite sumą, didesnę nei 0."
     },
     "memberLimit": {

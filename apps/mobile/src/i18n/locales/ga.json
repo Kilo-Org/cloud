@@ -3206,7 +3206,11 @@
       "separateEmailsHint": "Scar na seoltaí ríomhphoist le camóga.",
       "thresholdLabel": "Foláireamh faoi bhun (USD)",
       "title": "Foláireamh faoi iarmhéid íseal",
-      "emailsError": "Iontráil seoladh ríomhphoist bailí amháin ar a laghad. Scar seoltaí breise le camóga.",
+      "emailsInvalid": "Tá seoladh ríomhphoist amháin nó níos mó neamhbhailí.",
+      "emailsRequired": "Iontráil seoladh ríomhphoist amháin ar a laghad.",
+      "saveEmailsError": "Níor glacadh le cuid de na seoltaí ríomhphoist. Deimhnigh iad agus bain triail eile astu.",
+      "saveError": "Níorbh fhéidir an foláireamh faoi iarmhéid íseal a shábháil.",
+      "thresholdPlaceholder": "Iontráil méid",
       "thresholdError": "Iontráil méid níos mó ná 0."
     },
     "memberLimit": {

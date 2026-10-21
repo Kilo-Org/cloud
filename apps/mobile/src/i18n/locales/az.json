@@ -3086,7 +3086,11 @@
       "separateEmailsHint": "Bir neçə e-poçt ünvanını vergüllə ayır.",
       "thresholdLabel": "Xəbərdarlıq həddi (USD)",
       "title": "Aşağı balans xəbərdarlığı",
-      "emailsError": "Ən azı bir düzgün e-poçt ünvanı daxil et. Bir neçə ünvanı vergüllə ayır.",
+      "emailsInvalid": "Bir və ya bir neçə e-poçt ünvanı düzgün deyil.",
+      "emailsRequired": "Ən azı bir e-poçt ünvanı daxil et.",
+      "saveEmailsError": "Bəzi e-poçt ünvanları qəbul edilmədi. Onları yoxlayıb yenidən cəhd et.",
+      "saveError": "Aşağı balans xəbərdarlığını yadda saxlamaq alınmadı.",
+      "thresholdPlaceholder": "Məbləğ daxil et",
       "thresholdError": "0-Dan böyük məbləğ daxil et."
     },
     "memberLimit": {

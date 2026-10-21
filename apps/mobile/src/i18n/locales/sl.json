@@ -3166,7 +3166,11 @@
       "separateEmailsHint": "Več e-poštnih naslovov loči z vejicami.",
       "thresholdLabel": "Opozori, ko stanje pade pod (USD)",
       "title": "Opozorilo o nizkem stanju",
-      "emailsError": "Vnesi vsaj en veljaven e-poštni naslov. Če jih je več, jih loči z vejicami.",
+      "emailsInvalid": "Vsaj en e-poštni naslov ni veljaven.",
+      "emailsRequired": "Vnesi vsaj en e-poštni naslov.",
+      "saveEmailsError": "Nekaterih e-poštnih naslovov ni bilo mogoče sprejeti. Preveri jih in poskusi znova.",
+      "saveError": "Opozorila o nizkem stanju ni bilo mogoče shraniti.",
+      "thresholdPlaceholder": "Vnesi znesek",
       "thresholdError": "Vnesi znesek, večji od 0."
     },
     "memberLimit": {

@@ -3086,7 +3086,11 @@
       "separateEmailsHint": "Si ou antre plizyè adrès imel, separe yo ak vigil.",
       "thresholdLabel": "Voye alèt si balans lan pi ba pase (USD)",
       "title": "Alèt pou balans ki ba",
-      "emailsError": "Antre omwen yon adrès imel ki valab. Si gen plizyè, separe yo ak vigil.",
+      "emailsInvalid": "Gen yon oswa plizyè adrès imel ki pa valab.",
+      "emailsRequired": "Antre omwen yon adrès imel.",
+      "saveEmailsError": "Gen kèk adrès imel ki pa te aksepte. Verifye yo epi eseye ankò.",
+      "saveError": "Nou pa te ka anrejistre alèt pou balans ki ba.",
+      "thresholdPlaceholder": "Antre yon montan",
       "thresholdError": "Antre yon montan ki pi gran pase 0."
     },
     "memberLimit": {

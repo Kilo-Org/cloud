@@ -3166,7 +3166,11 @@
       "separateEmailsHint": "Více e-mailových adres oddělte čárkami.",
       "thresholdLabel": "Upozornit při zůstatku pod (USD)",
       "title": "Upozornění na nízký zůstatek",
-      "emailsError": "Zadejte alespoň jednu platnou e-mailovou adresu. Více adres oddělte čárkami.",
+      "emailsInvalid": "Jedna nebo více e-mailových adres není platných.",
+      "emailsRequired": "Zadejte alespoň jednu e-mailovou adresu.",
+      "saveEmailsError": "Některé e-mailové adresy nebyly přijaty. Zkontrolujte je a zkuste to znovu.",
+      "saveError": "Upozornění na nízký zůstatek se nepodařilo uložit.",
+      "thresholdPlaceholder": "Zadejte částku",
       "thresholdError": "Zadejte částku větší než 0."
     },
     "memberLimit": {

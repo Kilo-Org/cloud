@@ -3085,7 +3085,11 @@
       "separateEmailsHint": "Pisahkan setiap alamat email dengan koma.",
       "thresholdLabel": "Beri peringatan jika saldo di bawah (USD)",
       "title": "Peringatan saldo rendah",
-      "emailsError": "Masukkan setidaknya satu alamat email yang valid. Pisahkan dengan koma jika lebih dari satu.",
+      "emailsInvalid": "Satu atau beberapa alamat email tidak valid.",
+      "emailsRequired": "Masukkan setidaknya satu alamat email.",
+      "saveEmailsError": "Beberapa alamat email tidak diterima. Periksa dan coba lagi.",
+      "saveError": "Tidak dapat menyimpan peringatan saldo rendah.",
+      "thresholdPlaceholder": "Masukkan jumlah",
       "thresholdError": "Masukkan jumlah yang lebih besar dari 0."
     },
     "memberLimit": {

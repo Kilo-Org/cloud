@@ -3086,7 +3086,11 @@
       "separateEmailsHint": "Adskil e-mailadresser med kommaer.",
       "thresholdLabel": "Advar ved saldo under (USD)",
       "title": "Advarsel om lav saldo",
-      "emailsError": "Angiv mindst én gyldig e-mailadresse. Adskil flere adresser med kommaer.",
+      "emailsInvalid": "En eller flere e-mailadresser er ugyldige.",
+      "emailsRequired": "Angiv mindst én e-mailadresse.",
+      "saveEmailsError": "Nogle e-mailadresser blev ikke accepteret. Tjek dem, og prøv igen.",
+      "saveError": "Advarslen om lav saldo kunne ikke gemmes.",
+      "thresholdPlaceholder": "Angiv et beløb",
       "thresholdError": "Angiv et beløb over 0."
     },
     "memberLimit": {

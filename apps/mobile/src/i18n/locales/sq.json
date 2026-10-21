@@ -3086,7 +3086,11 @@
       "separateEmailsHint": "Ndaji adresat e emailit me presje.",
       "thresholdLabel": "Njofto kur gjendja bie nën (USD)",
       "title": "Njoftim për gjendje të ulët",
-      "emailsError": "Shkruaj të paktën një adresë të vlefshme emaili. Nëse shkruan disa, ndaji me presje.",
+      "emailsInvalid": "Një ose më shumë adresa emaili nuk janë të vlefshme.",
+      "emailsRequired": "Shkruaj të paktën një adresë emaili.",
+      "saveEmailsError": "Disa adresa emaili nuk u pranuan. Kontrolloji dhe provo sërish.",
+      "saveError": "Njoftimi për gjendje të ulët nuk u ruajt.",
+      "thresholdPlaceholder": "Shkruaj një shumë",
       "thresholdError": "Shkruaj një shumë më të madhe se 0."
     },
     "memberLimit": {

@@ -3085,7 +3085,11 @@
       "separateEmailsHint": "多个邮箱请用逗号分隔。",
       "thresholdLabel": "余额低于此金额时提醒（USD）",
       "title": "余额不足提醒",
-      "emailsError": "请输入至少一个有效的邮箱地址，多个地址用逗号分隔。",
+      "emailsInvalid": "有一个或多个邮箱地址无效。",
+      "emailsRequired": "请输入至少一个邮箱地址。",
+      "saveEmailsError": "部分邮箱地址未被接受，请检查后重试。",
+      "saveError": "无法保存余额不足提醒。",
+      "thresholdPlaceholder": "请输入金额",
       "thresholdError": "请输入大于 0 的金额。"
     },
     "memberLimit": {

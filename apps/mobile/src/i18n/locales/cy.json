@@ -3246,7 +3246,11 @@
       "separateEmailsHint": "Defnyddiwch gomâu i wahanu cyfeiriadau e-bost.",
       "thresholdLabel": "Rhybuddio o dan (USD)",
       "title": "Rhybudd balans isel",
-      "emailsError": "Nodwch o leiaf un cyfeiriad e-bost dilys. Defnyddiwch gomâu i wahanu cyfeiriadau.",
+      "emailsInvalid": "Mae un neu fwy o gyfeiriadau e-bost yn annilys.",
+      "emailsRequired": "Nodwch o leiaf un cyfeiriad e-bost.",
+      "saveEmailsError": "Ni chafodd rhai cyfeiriadau e-bost eu derbyn. Gwiriwch nhw a cheisiwch eto.",
+      "saveError": "Methwyd arbed y rhybudd balans isel.",
+      "thresholdPlaceholder": "Nodwch swm",
       "thresholdError": "Nodwch swm sy'n fwy na 0."
     },
     "memberLimit": {

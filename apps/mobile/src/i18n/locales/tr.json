@@ -3085,7 +3085,11 @@
       "separateEmailsHint": "Birden fazla e-posta adresini virgülle ayır.",
       "thresholdLabel": "Uyarı eşiği (USD)",
       "title": "Düşük bakiye uyarısı",
-      "emailsError": "En az bir geçerli e-posta adresi gir. Birden fazla adresi virgülle ayır.",
+      "emailsInvalid": "Bir veya daha fazla e-posta adresi geçersiz.",
+      "emailsRequired": "En az bir e-posta adresi gir.",
+      "saveEmailsError": "Bazı e-posta adresleri kabul edilmedi. Kontrol edip tekrar dene.",
+      "saveError": "Düşük bakiye uyarısı kaydedilemedi.",
+      "thresholdPlaceholder": "Bir tutar gir",
       "thresholdError": "0'Dan büyük bir tutar gir."
     },
     "memberLimit": {

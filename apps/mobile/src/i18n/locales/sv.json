@@ -3085,7 +3085,11 @@
       "separateEmailsHint": "Separera flera e-postadresser med kommatecken.",
       "thresholdLabel": "Varna under (USD)",
       "title": "Varning för lågt saldo",
-      "emailsError": "Ange minst en giltig e-postadress. Skilj flera adresser åt med kommatecken.",
+      "emailsInvalid": "En eller flera e-postadresser är inte giltiga.",
+      "emailsRequired": "Ange minst en e-postadress.",
+      "saveEmailsError": "Vissa e-postadresser accepterades inte. Kontrollera dem och försök igen.",
+      "saveError": "Det gick inte att spara varningen för lågt saldo.",
+      "thresholdPlaceholder": "Ange ett belopp",
       "thresholdError": "Ange ett belopp större än 0."
     },
     "memberLimit": {

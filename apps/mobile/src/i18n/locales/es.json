@@ -3125,7 +3125,11 @@
       "separateEmailsHint": "Separa las direcciones de correo con comas.",
       "thresholdLabel": "Avisar si el saldo es inferior a (USD)",
       "title": "Alerta de saldo bajo",
-      "emailsError": "Introduce al menos una dirección de correo válida. Si introduces varias, sepáralas con comas.",
+      "emailsInvalid": "Una o más direcciones de correo no son válidas.",
+      "emailsRequired": "Introduce al menos una dirección de correo.",
+      "saveEmailsError": "Algunas direcciones de correo no se han aceptado. Compruébalas e inténtalo de nuevo.",
+      "saveError": "No se ha podido guardar la alerta de saldo bajo.",
+      "thresholdPlaceholder": "Introduce un importe",
       "thresholdError": "Introduce un importe mayor que 0."
     },
     "memberLimit": {

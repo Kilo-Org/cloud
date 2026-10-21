@@ -3086,7 +3086,11 @@
       "separateEmailsHint": "Raba adiresoshin imel da waƙafi.",
       "thresholdLabel": "Faɗakar idan kuɗi sun yi ƙasa da (USD)",
       "title": "Faɗakarwar ƙarancin kuɗi",
-      "emailsError": "Shigar da aƙalla adireshin imel guda ɗaya mai inganci. Idan sun fi ɗaya, raba su da waƙafi.",
+      "emailsInvalid": "Wasu adiresoshin imel ba su da inganci.",
+      "emailsRequired": "Shigar da aƙalla adireshin imel guda ɗaya.",
+      "saveEmailsError": "An ƙi wasu adiresoshin imel. Duba su sannan a sake gwadawa.",
+      "saveError": "Ba a iya ajiye faɗakarwar ƙarancin kuɗi.",
+      "thresholdPlaceholder": "Shigar da adadin kuɗi",
       "thresholdError": "Shigar da adadin kuɗin da ya fi 0."
     },
     "memberLimit": {

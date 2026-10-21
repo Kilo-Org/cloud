@@ -34,7 +34,12 @@ export type RuntimeProxyCorrelation = {
 
 type RuntimeProxyRequestFailure =
   | { upstreamAttempted: false; rejectionStage: RuntimeProxyRejectionStage }
-  | { upstreamAttempted: true; upstreamStatus: number };
+  | { upstreamAttempted: true; upstreamStatus: number; upstreamVercelRequestId?: string };
+
+export function parseUpstreamVercelRequestId(value: unknown): string | undefined {
+  if (typeof value !== 'string' || value.length !== 44) return undefined;
+  return /^[a-z]{3}[1-9]::[a-z]{3}[1-9]::([a-z0-9]{5}-[0-9]{13}-[a-f0-9]{12})$/.exec(value)?.[1];
+}
 
 /**
  * Emits exactly one bounded diagnostic for a failed runtime credential proxy
@@ -49,7 +54,12 @@ export function logRuntimeProxyRequestFailed(
       logTag: RUNTIME_PROXY_REQUEST_FAILED_LOG_TAG,
       upstreamAttempted: input.upstreamAttempted,
       ...(input.upstreamAttempted
-        ? { upstreamStatus: input.upstreamStatus }
+        ? {
+            upstreamStatus: input.upstreamStatus,
+            ...(input.upstreamVercelRequestId
+              ? { upstreamVercelRequestId: input.upstreamVercelRequestId }
+              : {}),
+          }
         : { rejectionStage: input.rejectionStage }),
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
       ...(input.kiloSessionId ? { kiloSessionId: input.kiloSessionId } : {}),

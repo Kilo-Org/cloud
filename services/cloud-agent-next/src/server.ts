@@ -62,7 +62,10 @@ import {
   type RuntimeProxyHandleClaims,
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
-import { logRuntimeProxyRequestFailed } from './runtime-credential-proxy-diagnostics.js';
+import {
+  logRuntimeProxyRequestFailed,
+  parseUpstreamVercelRequestId,
+} from './runtime-credential-proxy-diagnostics.js';
 import { deriveKiloSandboxTargets, deriveLoopbackFacadeTargets } from './kilo/kilo-targets.js';
 import {
   inferRuntimeCredentialProxyRoute,
@@ -604,6 +607,10 @@ async function forwardRuntimeCredentialProxy(
       logRuntimeProxyRequestFailed({
         upstreamAttempted: true,
         upstreamStatus: response.status,
+        upstreamVercelRequestId:
+          route === 'provider'
+            ? parseUpstreamVercelRequestId(response.headers.get('x-vercel-id'))
+            : undefined,
         sessionId: claims.sessionId,
         kiloSessionId: claims.kiloSessionId,
       });

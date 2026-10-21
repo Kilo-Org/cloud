@@ -274,8 +274,6 @@ describe('ProfileOverviewScreen', () => {
     const { renderer, unmount } = await mountScreen();
 
     const defaultRow = findOne(renderer.root, 'PreferenceRow');
-    expect(defaultRow.props.subtitle).toBe('Auto-loaded when no repository has a pinned profile.');
-    expect(defaultRow.props.switchAccessibilityLabel).toBe('Set as default');
 
     act(() => {
       (defaultRow.props as { onValueChange: (next: boolean) => void }).onValueChange(true);

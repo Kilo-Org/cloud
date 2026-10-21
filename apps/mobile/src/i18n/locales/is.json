@@ -111,7 +111,9 @@
     "online": "Á netinu",
     "open": "Opna {{name}}",
     "openPullRequest": "Opna samrunabeiðni",
+    "completed": "Lokið",
     "pending": "Í bið",
+    "running": "Í gangi",
     "performance": "Afköst",
     "preferences": "Kjörstillingar",
     "privacyPolicy": "Persónuverndarstefna",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Ekki tókst að uppfæra kóðarýninn.",
     "configSaveFailed": "Ekki tókst að vista yfirferðarstillingar.",
     "status": {
-      "running": "Í gangi",
-      "completed": "Lokið",
       "interrupted": "Rofið"
     },
     "reviewStyle": {
@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Til baka í prófíl",
       "loadErrorMessage": "Athugaðu tenginguna og reyndu aftur.",
+
+      "chooseAccount": "Veldu reikning",
       "loadErrorTitle": "Ekki tókst að hlaða félögunum þínum.",
+      "noOrganization": "Ekkert félag",
+
+      "noOrganizationDescription": "Þessi reikningur er ekki hluti af félagi. Búðu til eða gakktu til liðs við félag á vefnum til að nota eiginleika félagsins eins og boð til meðlima og viðvaranir um lága stöðu.",
+
+      "openWebOrganizations": "Opna félög á vefnum",
+
       "organizationUnavailable": "Félagið er ekki tiltækt.",
-      "selectDescription": "Veldu félag úr prófílnum þínum til að halda áfram.",
+      "selectDescriptionWithOrganizations": "Þú tilheyrir einu eða fleiri félögum. Veldu reikninginn sem þessi skjár á að nota.",
+
       "selectOrganization": "Val á félagi",
       "unavailableDescription": "Þetta félag er ekki lengur tiltækt. Veldu eitt úr prófílnum þínum til að halda áfram.",
+
+      "unavailableSessionsDescription": "Þetta félag er ekki lengur tiltækt. Ekki er hægt að hlaða setum þess.",
       "accessDeniedDescription": "Þú hefur ekki aðgang að þessu félagi."
     },
     "creditActivity": {
@@ -3674,7 +3685,9 @@
       "jsonTooLarge": "Notaðu að hámarki 50 færslur, lyklar upp að 128 og gildi upp að 4096 stafir",
       "timeoutInvalid": "Tímamörk verða að vera heil tala af millisekúndum",
       "edit": "Breyta MCP miðlara",
-      "saveFailed": "Gat ekki vistað MCP þjón"
+      "saveFailed": "Gat ekki vistað MCP þjón",
+      "deleteFailed": "Gat ekki eytt MCP þjóni",
+      "updateFailed": "Gat ekki uppfært MCP þjón"
     },
     "agents": {
       "title": "Umboðsmenn prófíla",
@@ -3701,6 +3714,7 @@
       "visibilitySubagent": "Subagent — aðeins hægt að hringja frá öðrum",
       "visibilityAll": "Allt - bæði",
       "saveFailed": "Ekki tókst að vista umboðsmann",
+      "deleteFailed": "Ekki tókst að eyða umboðsmanni",
       "nameRequired": "Sláðu inn nafn umboðsmanns",
       "slugRequired": "Sláðu inn umboðssnigl",
       "slugInvalid": "Snigl verður að byrja á bókstaf og nota aðeins lágstafi, tölustafi og strik",
@@ -3715,10 +3729,12 @@
       "description": "Skipunarlýsing",
       "template": "Sniðmát",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Útskýrðu $ARGUMENTS",
       "subtask": "Keyra sem undirverkefni",
       "edit": "Breyta skástrik skipun",
       "saveFailed": "Ekki tókst að vista skipunina",
+      "deleteFailed": "Ekki tókst að eyða skipuninni",
       "nameRequired": "Sláðu inn heiti skipunar",
       "nameInvalid": "Nafn verður að byrja á lágstöfum og nota aðeins lágstafi, tölustafi og bandstrik",
       "templateRequired": "Sláðu inn skipanasniðmát",
@@ -3865,7 +3881,7 @@
     "view": "Lesa yfirlit",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Sýna rauntímastöðu",
+    "dismiss": "Vísa yfirliti frá",
     "offline": "Ótengt · vistað yfirlit",
     "cached": "Vistuð skýrsla · ekki hægt að uppfæra",
     "revised": "Endurskoðað · {{revision}}",

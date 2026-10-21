@@ -111,7 +111,9 @@
     "online": "ອອນໄລນ໌",
     "open": "ເປີດ {{name}}",
     "openPullRequest": "ເປີດຄຳຂໍລວມໂຄ້ດ",
+    "completed": "ສຳເລັດແລ້ວ",
     "pending": "ລໍຖ້າ",
+    "running": "ກຳລັງເຮັດວຽກ",
     "performance": "ປະສິດທິພາບ",
     "preferences": "ການຕັ້ງຄ່າສ່ວນຕົວ",
     "privacyPolicy": "ນະໂຍບາຍຄວາມເປັນສ່ວນຕົວ",
@@ -1536,8 +1538,6 @@
     "updateFailed": "ບໍ່ສາມາດອັບເດດເຄື່ອງມືກວດສອບໂຄ້ດໄດ້.",
     "configSaveFailed": "ບໍ່ສາມາດບັນທຶກການຕັ້ງຄ່າການກວດສອບໄດ້.",
     "status": {
-      "running": "ກຳລັງເຮັດວຽກ",
-      "completed": "ສຳເລັດແລ້ວ",
       "interrupted": "ຢຸດກາງຄັນ"
     },
     "reviewStyle": {
@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "ກັບໄປທີ່ໂປຣໄຟລ໌",
       "loadErrorMessage": "ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງໃໝ່.",
+
+      "chooseAccount": "ເລືອກບັນຊີ",
       "loadErrorTitle": "ບໍ່ສາມາດໂຫຼດລາຍຊື່ອົງກອນຂອງທ່ານໄດ້.",
+      "noOrganization": "ບໍ່ມີອົງກອນ",
+
+      "noOrganizationDescription": "ບັນຊີນີ້ບໍ່ແມ່ນສ່ວນໜຶ່ງຂອງອົງກອນ. ສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນໃນເວັບ ເພື່ອໃຊ້ຄຸນສົມບັດຂອງອົງກອນ ເຊັ່ນ ການເຊີນສະມາຊິກ ແລະ ການແຈ້ງເຕືອນຍອດເງິນຕ່ຳ.",
+
+      "openWebOrganizations": "ເປີດອົງກອນໃນເວັບ",
+
       "organizationUnavailable": "ບໍ່ສາມາດໃຊ້ງານອົງກອນນີ້ໄດ້.",
-      "selectDescription": "ເລືອກອົງກອນຈາກໂປຣໄຟລ໌ຂອງທ່ານເພື່ອສືບຕໍ່.",
+      "selectDescriptionWithOrganizations": "ທ່ານເປັນສະມາຊິກຂອງໜຶ່ງ ຫຼື ຫຼາຍອົງກອນ. ເລືອກບັນຊີທີ່ໜ້າຈໍນີ້ຄວນໃຊ້.",
+
       "selectOrganization": "ເລືອກອົງກອນ",
       "unavailableDescription": "ບໍ່ສາມາດໃຊ້ງານອົງກອນນີ້ໄດ້ອີກແລ້ວ. ເລືອກອົງກອນອື່ນຈາກໂປຣໄຟລ໌ຂອງທ່ານເພື່ອສືບຕໍ່.",
+
+      "unavailableSessionsDescription": "ບໍ່ສາມາດໃຊ້ງານອົງກອນນີ້ໄດ້ອີກແລ້ວ. ບໍ່ສາມາດໂຫຼດເຊດຊັນຂອງອົງກອນນີ້ໄດ້.",
       "accessDeniedDescription": "ທ່ານບໍ່ມີສິດເຂົ້າເຖິງອົງກອນນີ້."
     },
     "creditActivity": {
@@ -3674,7 +3685,9 @@
       "jsonTooLarge": "ໃຊ້ລາຍການສູງສຸດ 50 ລາຍການ ກະແຈສູງສຸດ 128 ແລະ ຄ່າສູງສຸດ 4096 ຕົວອັກສອນ",
       "timeoutInvalid": "ໝົດເວລາຕ້ອງເປັນຈຳນວນທັງໝົດຂອງມິນລີວິນາທີ",
       "edit": "ແກ້ໄຂເຊີບເວີ MCP",
-      "saveFailed": "ບໍ່ສາມາດບັນທຶກເຊີບເວີ MCP ໄດ້"
+      "saveFailed": "ບໍ່ສາມາດບັນທຶກເຊີບເວີ MCP ໄດ້",
+      "deleteFailed": "ບໍ່ສາມາດລຶບເຊີບເວີ MCP ໄດ້",
+      "updateFailed": "ບໍ່ສາມາດອັບເດດເຊີບເວີ MCP ໄດ້"
     },
     "agents": {
       "title": "ຕົວແທນໂປຣໄຟລ໌",
@@ -3701,6 +3714,7 @@
       "visibilitySubagent": "Subagent — ພຽງແຕ່ສາມາດໂທໄດ້ຈາກຄົນອື່ນ",
       "visibilityAll": "ທັງຫມົດ - ທັງຫມົດ",
       "saveFailed": "ບໍ່ສາມາດບັນທຶກຕົວແທນໄດ້",
+      "deleteFailed": "ບໍ່ສາມາດລຶບຕົວແທນໄດ້",
       "nameRequired": "ໃສ່ຊື່ຕົວແທນ",
       "slugRequired": "ໃສ່ຕົວແທນ slug",
       "slugInvalid": "Slug ຈະຕ້ອງເລີ່ມຕົ້ນດ້ວຍຕົວອັກສອນ ແລະໃຊ້ແຕ່ຕົວພິມນ້ອຍ, ຕົວເລກ, ແລະ dashes",
@@ -3715,10 +3729,12 @@
       "description": "ຄໍາອະທິບາຍຄໍາສັ່ງ",
       "template": "ແມ່ແບບ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "ອະທິບາຍ $ARGUMENTS",
       "subtask": "ດໍາເນີນການເປັນວຽກຍ່ອຍ",
       "edit": "ແກ້ໄຂຄໍາສັ່ງ slash",
       "saveFailed": "ບໍ່ສາມາດບັນທຶກຄຳສັ່ງໄດ້",
+      "deleteFailed": "ບໍ່ສາມາດລຶບຄຳສັ່ງໄດ້",
       "nameRequired": "ໃສ່ຊື່ຄໍາສັ່ງ",
       "nameInvalid": "ຊື່ຕ້ອງຂຶ້ນຕົ້ນດ້ວຍຕົວພິມນ້ອຍ ແລະ ໃຊ້ແຕ່ຕົວພິມນ້ອຍ, ຕົວເລກ ແລະ ຂີດ",
       "templateRequired": "ໃສ່ແມ່ແບບຄໍາສັ່ງ",
@@ -3865,7 +3881,7 @@
     "view": "ອ່ານສະຫຼຸບ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "ສະແດງສະຖານະປັດຈຸບັນ",
+    "dismiss": "ລະເວັ້ນສະຫຼຸບ",
     "offline": "ອອບລາຍ · ສະຫຼຸບທີ່ບັນທຶກໄວ້",
     "cached": "ລາຍງານທີ່ບັນທຶກໄວ້ · ບໍ່ສາມາດໂຫຼດຄືນໃໝ່",
     "revised": "ແກ້ໄຂແລ້ວ · {{revision}}",

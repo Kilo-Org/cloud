@@ -111,7 +111,9 @@
     "online": "آن لائن",
     "open": "{{name}} کھولیں",
     "openPullRequest": "پل ریکویسٹ کھولیں",
+    "completed": "مکمل",
     "pending": "زیر التوا",
+    "running": "چل رہا ہے",
     "performance": "کارکردگی",
     "preferences": "ترجیحات",
     "privacyPolicy": "رازداری کی پالیسی",
@@ -1536,8 +1538,6 @@
     "updateFailed": "ریویور کو اپ ڈیٹ نہیں کیا جا سکا۔",
     "configSaveFailed": "جائزے کی ترتیبات محفوظ نہیں ہو سکیں۔",
     "status": {
-      "running": "چل رہا ہے",
-      "completed": "مکمل",
       "interrupted": "رک گیا"
     },
     "reviewStyle": {
@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "پروفائل پر واپس جائیں",
       "loadErrorMessage": "اپنا انٹرنیٹ کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+
+      "chooseAccount": "ایک اکاؤنٹ منتخب کریں",
       "loadErrorTitle": "آپ کی تنظیمیں لوڈ نہیں ہو سکیں۔",
+      "noOrganization": "کوئی تنظیم نہیں",
+
+      "noOrganizationDescription": "یہ اکاؤنٹ کسی تنظیم کا حصہ نہیں ہے۔ ممبر دعوتیں اور کم بیلنس انتباہات جیسی تنظیمی خصوصیات استعمال کرنے کے لیے ویب پر ایک تنظیم بنائیں یا اس میں شامل ہوں۔",
+
+      "openWebOrganizations": "ویب پر تنظیمیں کھولیں",
+
       "organizationUnavailable": "تنظیم دستیاب نہیں ہے۔",
-      "selectDescription": "جاری رکھنے کے لیے اپنے پروفائل سے ایک تنظیم منتخب کریں۔",
+      "selectDescriptionWithOrganizations": "آپ ایک یا زیادہ تنظیموں سے تعلق رکھتے ہیں۔ وہ اکاؤنٹ منتخب کریں جو یہ اسکرین استعمال کرے۔",
+
       "selectOrganization": "ایک تنظیم منتخب کریں",
       "unavailableDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ جاری رکھنے کے لیے اپنے پروفائل سے کوئی اور تنظیم منتخب کریں۔",
+
+      "unavailableSessionsDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ اس کے سیشنز لوڈ نہیں ہو سکتے۔",
       "accessDeniedDescription": "آپ کو اس تنظیم تک رسائی حاصل نہیں ہے۔"
     },
     "creditActivity": {
@@ -3674,7 +3685,9 @@
       "jsonTooLarge": "زیادہ سے زیادہ 50 اندراجات استعمال کریں، چابیاں 128 تک اور اقدار 4096 حروف تک",
       "timeoutInvalid": "ٹائم آؤٹ ملی سیکنڈز کی پوری تعداد میں ہونا چاہیے۔",
       "edit": "MCP سرور میں ترمیم کریں۔",
-      "saveFailed": "MCP سرور محفوظ نہیں ہو سکا"
+      "saveFailed": "MCP سرور محفوظ نہیں ہو سکا",
+      "deleteFailed": "MCP سرور حذف نہیں ہو سکا",
+      "updateFailed": "MCP سرور اپ ڈیٹ نہیں ہو سکا"
     },
     "agents": {
       "title": "پروفائل ایجنٹس",
@@ -3701,6 +3714,7 @@
       "visibilitySubagent": "Subagent — صرف دوسروں سے کال کی جا سکتی ہے۔",
       "visibilityAll": "سبھی — دونوں",
       "saveFailed": "ایجنٹ کو محفوظ نہیں کیا جا سکا",
+      "deleteFailed": "ایجنٹ حذف نہیں کیا جا سکا",
       "nameRequired": "ایجنٹ کا نام درج کریں۔",
       "slugRequired": "ایک ایجنٹ سلگ درج کریں۔",
       "slugInvalid": "سلگ کا آغاز ایک حرف سے ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کرنا چاہیے۔",
@@ -3715,10 +3729,12 @@
       "description": "کمانڈ کی تفصیل",
       "template": "سانچہ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS کی وضاحت کریں۔",
       "subtask": "ذیلی کام کے طور پر چلائیں۔",
       "edit": "سلیش کمانڈ میں ترمیم کریں۔",
       "saveFailed": "کمانڈ کو محفوظ نہیں کیا جا سکا",
+      "deleteFailed": "کمانڈ حذف نہیں کی جا سکی",
       "nameRequired": "کمانڈ کا نام درج کریں۔",
       "nameInvalid": "نام کا آغاز چھوٹے حروف سے ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کرنا چاہیے۔",
       "templateRequired": "کمانڈ ٹیمپلیٹ درج کریں۔",
@@ -3865,7 +3881,7 @@
     "view": "بریفنگ پڑھیں",
     "viewWithPreview": "$t(agentBriefing.view)۔ {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "لائیو اسٹیٹس دکھائیں",
+    "dismiss": "بریفنگ نظر انداز کریں",
     "offline": "آف لائن · محفوظ شدہ بریفنگ",
     "cached": "محفوظ شدہ رپورٹ · ریفریش دستیاب نہیں",
     "revised": "نظرثانی شدہ · {{revision}}",

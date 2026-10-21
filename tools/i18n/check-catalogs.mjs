@@ -161,6 +161,7 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // identifier, so every catalog keeps it verbatim.
   'profiles.agents.topP',
   'profiles.slashCommands.namePlaceholder',
+  'profiles.slashCommands.agentPlaceholder',
   // The MCP count label. `MCP` is the protocol's own acronym, and its unit
   // word is already as short as a compact count badge allows, so every catalog
   // keeps the same "{{count}} MCP" the MCP-server rows use.
@@ -171,11 +172,9 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'modelChat.backends.messages',
   'share.reviewPrSubtitle',
   // Format-only strings with no translatable words: a placeholder-only screen
-  // title, a placeholder-plus-UTC time-range label, the GitLab merge request
-  // number (the provider's own "!" reference syntax), and a pure $t()
-  // reference that names the transcription-model section title.
+  // title, a placeholder-plus-UTC time-range label, and a pure $t() reference
+  // that names the transcription-model section title.
   'prReview.screen.title',
-  'prReview.terms.mergeRequestNumber',
   'securityAgent.auditReport.periodUtc',
   'preferences.transcriptionModel',
   // Pure $t() references in the tour: they name another key's label, so every

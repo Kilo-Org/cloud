@@ -111,7 +111,9 @@
     "online": "Nakakonekta",
     "open": "Buksan ang {{name}}",
     "openPullRequest": "Buksan ang PR",
+    "completed": "Nakumpleto",
     "pending": "Nakabinbin",
+    "running": "Tumatakbo",
     "performance": "Pagganap",
     "preferences": "Mga kagustuhan",
     "privacyPolicy": "Patakaran sa pribasiya",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Hindi na-update ang tagasuri.",
     "configSaveFailed": "Hindi na-save ang mga setting ng pagsusuri.",
     "status": {
-      "running": "Tumatakbo",
-      "completed": "Nakumpleto",
       "interrupted": "Naputol"
     },
     "reviewStyle": {
@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Bumalik sa profile",
       "loadErrorMessage": "Suriin ang koneksyon mo at subukan muli.",
+
+      "chooseAccount": "Pumili ng account",
       "loadErrorTitle": "Hindi ma-load ang iyong mga organisasyon.",
+      "noOrganization": "Walang organisasyon",
+
+      "noOrganizationDescription": "Ang account na ito ay hindi bahagi ng isang organisasyon. Gumawa o sumali sa isang organisasyon sa web upang magamit ang mga feature ng organisasyon tulad ng mga imbitasyon ng miyembro at mga alerto sa mababang balanse.",
+
+      "openWebOrganizations": "Buksan ang mga organisasyon sa web",
+
       "organizationUnavailable": "Hindi ma-access ang organisasyon.",
-      "selectDescription": "Pumili ng organisasyon mula sa iyong profile para magpatuloy.",
+      "selectDescriptionWithOrganizations": "Kasapi ka ng isa o higit pang organisasyon. Piliin ang account na dapat gamitin ng screen na ito.",
+
       "selectOrganization": "Pumili ng organisasyon",
       "unavailableDescription": "Hindi na ma-access ang organisasyong ito. Pumili ng isa mula sa iyong profile para magpatuloy.",
+
+      "unavailableSessionsDescription": "Hindi na ma-access ang organisasyong ito. Hindi ma-load ang mga session nito.",
       "accessDeniedDescription": "Wala kang access sa organisasyong ito."
     },
     "creditActivity": {
@@ -3674,7 +3685,9 @@
       "jsonTooLarge": "Gumamit ng hindi hihigit sa 50 entry, mga key hanggang 128 at mga value hanggang 4096 character",
       "timeoutInvalid": "Ang timeout ay dapat na isang buong bilang ng mga millisecond",
       "edit": "I-edit ang MCP server",
-      "saveFailed": "Hindi ma-save ang MCP server"
+      "saveFailed": "Hindi ma-save ang MCP server",
+      "deleteFailed": "Hindi ma-delete ang MCP server",
+      "updateFailed": "Hindi ma-update ang MCP server"
     },
     "agents": {
       "title": "Mga ahente ng profile",
@@ -3701,6 +3714,7 @@
       "visibilitySubagent": "Subagent — matatawag lang mula sa iba",
       "visibilityAll": "Lahat - pareho",
       "saveFailed": "Hindi ma-save ang ahente",
+      "deleteFailed": "Hindi ma-delete ang ahente",
       "nameRequired": "Maglagay ng pangalan ng ahente",
       "slugRequired": "Maglagay ng agent slug",
       "slugInvalid": "Ang slug ay dapat magsimula sa isang titik at gumamit lamang ng maliliit na titik, digit, at gitling",
@@ -3715,10 +3729,12 @@
       "description": "Paglalarawan ng utos",
       "template": "Padron",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Ipaliwanag ang $ARGUMENTS",
       "subtask": "Patakbuhin bilang subtask",
       "edit": "I-edit ang slash command",
       "saveFailed": "Hindi ma-save ang command",
+      "deleteFailed": "Hindi ma-delete ang command",
       "nameRequired": "Maglagay ng command name",
       "nameInvalid": "Ang pangalan ay dapat magsimula sa maliit na titik at gumamit lamang ng maliliit na titik, digit, at gitling",
       "templateRequired": "Maglagay ng command template",
@@ -3865,7 +3881,7 @@
     "view": "Basahin ang briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Ipakita ang live na status",
+    "dismiss": "Balewalain ang briefing",
     "offline": "Offline · naka-save na briefing",
     "cached": "Naka-save na ulat · hindi ma-refresh",
     "revised": "Binago · {{revision}}",

@@ -111,7 +111,9 @@
     "online": "Conectado",
     "open": "Abrir {{name}}",
     "openPullRequest": "Abrir PR",
+    "completed": "Concluída",
     "pending": "Pendente",
+    "running": "Em execução",
     "performance": "Desempenho",
     "preferences": "Preferências",
     "privacyPolicy": "Política de privacidade",
@@ -993,8 +995,6 @@
     "updateFailed": "Não foi possível atualizar o revisor.",
     "configSaveFailed": "Não foi possível salvar a configuração de revisão.",
     "status": {
-      "running": "Em execução",
-      "completed": "Concluída",
       "interrupted": "Interrompida"
     },
     "reviewStyle": {
@@ -3042,11 +3042,22 @@
     "boundary": {
       "backToProfile": "Voltar para o perfil",
       "loadErrorMessage": "Verifique sua conexão e tente novamente.",
+
+      "chooseAccount": "Selecione uma conta",
       "loadErrorTitle": "Não foi possível carregar suas organizações.",
+      "noOrganization": "Sem organização",
+
+      "noOrganizationDescription": "Esta conta não faz parte de uma organização. Crie ou entre em uma organização no site para usar recursos de organização como convites de membros e alertas de saldo baixo.",
+
+      "openWebOrganizations": "Abrir organizações no site",
+
       "organizationUnavailable": "A organização não está disponível.",
-      "selectDescription": "Escolha uma organização no seu perfil para continuar.",
+      "selectDescriptionWithOrganizations": "Você pertence a uma ou mais organizações. Escolha a conta que esta tela deve usar.",
+
       "selectOrganization": "Selecione uma organização",
       "unavailableDescription": "Esta organização não está mais disponível. Escolha outra no seu perfil para continuar.",
+
+      "unavailableSessionsDescription": "Esta organização não está mais disponível. Não é possível carregar as sessões dela.",
       "accessDeniedDescription": "Você não tem acesso a esta organização."
     },
     "creditActivity": {
@@ -3715,7 +3726,9 @@
       "jsonTooLarge": "Use no máximo 50 entradas, chaves de até 128 e valores de até 4096 caracteres",
       "timeoutInvalid": "O tempo limite deve ser um número inteiro de milissegundos",
       "edit": "Editar servidor MCP",
-      "saveFailed": "Não foi possível salvar o servidor MCP"
+      "saveFailed": "Não foi possível salvar o servidor MCP",
+      "deleteFailed": "Não foi possível excluir o servidor MCP",
+      "updateFailed": "Não foi possível atualizar o servidor MCP"
     },
     "agents": {
       "title": "Agentes de perfil",
@@ -3742,6 +3755,7 @@
       "visibilitySubagent": "Subagente – só pode ser chamado por outros",
       "visibilityAll": "Todos - ambos",
       "saveFailed": "Não foi possível salvar o agente",
+      "deleteFailed": "Não foi possível excluir o agente",
       "nameRequired": "Insira um nome de agente",
       "slugRequired": "Insira um slug de agente",
       "slugInvalid": "Slug deve começar com uma letra e usar apenas letras minúsculas, dígitos e travessões",
@@ -3756,10 +3770,12 @@
       "description": "Descrição do comando",
       "template": "Modelo",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explique $ARGUMENTS",
       "subtask": "Executar como subtarefa",
       "edit": "Editar comando de barra",
       "saveFailed": "Não foi possível salvar o comando",
+      "deleteFailed": "Não foi possível excluir o comando",
       "nameRequired": "Digite um nome de comando",
       "nameInvalid": "O nome deve começar com uma letra minúscula e usar apenas letras minúsculas, dígitos e travessões",
       "templateRequired": "Insira um modelo de comando",
@@ -3910,7 +3926,7 @@
     "view": "Ler resumo",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Mostrar status ao vivo",
+    "dismiss": "Ignorar resumo",
     "offline": "Offline · resumo salvo",
     "cached": "Relatório salvo · atualização indisponível",
     "revised": "Revisado · {{revision}}",

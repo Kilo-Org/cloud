@@ -111,7 +111,9 @@
     "online": "Na mreži",
     "open": "Otvori {{name}}",
     "openPullRequest": "Otvori zahtjev za spajanje",
+    "completed": "Završeno",
     "pending": "Na čekanju",
+    "running": "U toku",
     "performance": "Performanse",
     "preferences": "Postavke",
     "privacyPolicy": "Politika privatnosti",
@@ -1555,8 +1557,6 @@
     "updateFailed": "Nije moguće ažurirati agenta za pregled koda.",
     "configSaveFailed": "Nije moguće sačuvati postavke pregleda.",
     "status": {
-      "running": "U toku",
-      "completed": "Završeno",
       "interrupted": "Prekinuto"
     },
     "reviewStyle": {
@@ -3050,11 +3050,22 @@
     "boundary": {
       "backToProfile": "Nazad na profil",
       "loadErrorMessage": "Provjeri vezu i pokušaj ponovo.",
+
+      "chooseAccount": "Odaberi račun",
       "loadErrorTitle": "Nije moguće učitati tvoje organizacije.",
+      "noOrganization": "Nema organizacije",
+
+      "noOrganizationDescription": "Ovaj račun nije dio organizacije. Kreiraj ili se pridruži organizaciji na webu da bi koristio funkcije organizacije kao što su pozivnice za članove i upozorenja o niskom saldu.",
+
+      "openWebOrganizations": "Otvori organizacije na webu",
+
       "organizationUnavailable": "Organizacija nije dostupna.",
-      "selectDescription": "Odaberi organizaciju na svom profilu za nastavak.",
+      "selectDescriptionWithOrganizations": "Pripadaš jednoj ili više organizacija. Odaberi račun koji ovaj ekran treba koristiti.",
+
       "selectOrganization": "Odaberi organizaciju",
       "unavailableDescription": "Ova organizacija više nije dostupna. Odaberi drugu na svom profilu za nastavak.",
+
+      "unavailableSessionsDescription": "Ova organizacija više nije dostupna. Njezine sesije nije moguće učitati.",
       "accessDeniedDescription": "Nemaš pristup ovoj organizaciji."
     },
     "creditActivity": {
@@ -3715,7 +3726,9 @@
       "jsonTooLarge": "Koristite najviše 50 unosa, ključevi do 128 i vrijednosti do 4096 znakova",
       "timeoutInvalid": "Vremensko ograničenje mora biti cijeli broj milisekundi",
       "edit": "Uredite MCP server",
-      "saveFailed": "Nije moguće sačuvati MCP server"
+      "saveFailed": "Nije moguće sačuvati MCP server",
+      "deleteFailed": "Nije moguće izbrisati MCP server",
+      "updateFailed": "Nije moguće ažurirati MCP server"
     },
     "agents": {
       "title": "Profil agenti",
@@ -3742,6 +3755,7 @@
       "visibilitySubagent": "Subagent — može se pozvati samo od drugih",
       "visibilityAll": "Sve — oboje",
       "saveFailed": "Nije moguće sačuvati agenta",
+      "deleteFailed": "Nije moguće izbrisati agenta",
       "nameRequired": "Unesite ime agenta",
       "slugRequired": "Unesite puž agenta",
       "slugInvalid": "Slug mora početi slovom i koristiti samo mala slova, cifre i crtice",
@@ -3756,10 +3770,12 @@
       "description": "Opis komande",
       "template": "Predložak",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Objasnite $ARGUMENTS",
       "subtask": "Pokreni kao podzadatak",
       "edit": "Uredi naredbu kose crte",
       "saveFailed": "Nije moguće sačuvati naredbu",
+      "deleteFailed": "Nije moguće izbrisati naredbu",
       "nameRequired": "Unesite naziv komande",
       "nameInvalid": "Ime mora početi malim slovom i koristiti samo mala slova, cifre i crtice",
       "templateRequired": "Unesite predložak komande",
@@ -3910,7 +3926,7 @@
     "view": "Pročitaj pregled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Prikaži trenutni status",
+    "dismiss": "Odbaci pregled",
     "offline": "Van mreže · sačuvani pregled",
     "cached": "Sačuvani izvještaj · osvježavanje nedostupno",
     "revised": "Revidirano · {{revision}}",

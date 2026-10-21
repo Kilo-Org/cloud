@@ -111,7 +111,9 @@
     "online": "Prisijungęs",
     "open": "Atidaryti {{name}}",
     "openPullRequest": "Atidaryti pakeitimų užklausą",
+    "completed": "Baigta",
     "pending": "Laukiama",
+    "running": "Vykdoma",
     "performance": "Našumas",
     "preferences": "Nuostatos",
     "privacyPolicy": "Privatumo politika",
@@ -1574,8 +1576,6 @@
     "updateFailed": "Nepavyko atnaujinti kodo peržiūros agento.",
     "configSaveFailed": "Nepavyko išsaugoti peržiūros nustatymų.",
     "status": {
-      "running": "Vykdoma",
-      "completed": "Baigta",
       "interrupted": "Nutraukta"
     },
     "reviewStyle": {
@@ -3090,11 +3090,22 @@
     "boundary": {
       "backToProfile": "Grįžti į profilį",
       "loadErrorMessage": "Patikrink ryšį ir bandyk dar kartą.",
+
+      "chooseAccount": "Pasirinkite paskyrą",
       "loadErrorTitle": "Nepavyko įkelti jūsų organizacijų.",
+      "noOrganization": "Nėra organizacijos",
+
+      "noOrganizationDescription": "Ši paskyra nepriklauso jokiai organizacijai. Kad galėtumėte naudoti organizacijos funkcijas, tokias kaip narių kvietimai ir įspėjimai apie mažą likutį, sukurkite organizaciją arba prisijunkite prie jos naršyklėje.",
+
+      "openWebOrganizations": "Atidaryti organizacijas naršyklėje",
+
       "organizationUnavailable": "Organizacija nepasiekiama.",
-      "selectDescription": "Norėdami tęsti, savo profilyje pasirinkite organizaciją.",
+      "selectDescriptionWithOrganizations": "Priklausote vienai ar daugiau organizacijų. Pasirinkite paskyrą, kurią turėtų naudoti šis ekranas.",
+
       "selectOrganization": "Pasirinkite organizaciją",
       "unavailableDescription": "Ši organizacija nebepasiekiama. Norėdami tęsti, savo profilyje pasirinkite kitą organizaciją.",
+
+      "unavailableSessionsDescription": "Ši organizacija nebepasiekiama. Jos seansų įkelti negalima.",
       "accessDeniedDescription": "Neturite prieigos prie šios organizacijos."
     },
     "creditActivity": {
@@ -3756,7 +3767,9 @@
       "jsonTooLarge": "Naudokite ne daugiau kaip 50 įrašų, raktai iki 128 ir reikšmės iki 4096 simbolių",
       "timeoutInvalid": "Skirtasis laikas turi būti sveikas milisekundžių skaičius",
       "edit": "Redaguoti MCP serverį",
-      "saveFailed": "Nepavyko išsaugoti MCP serverio"
+      "saveFailed": "Nepavyko išsaugoti MCP serverio",
+      "deleteFailed": "Nepavyko ištrinti MCP serverio",
+      "updateFailed": "Nepavyko atnaujinti MCP serverio"
     },
     "agents": {
       "title": "Profilio agentai",
@@ -3783,6 +3796,7 @@
       "visibilitySubagent": "Subagentas – skambinama tik iš kitų",
       "visibilityAll": "Visi - abu",
       "saveFailed": "Nepavyko išsaugoti agento",
+      "deleteFailed": "Nepavyko ištrinti agento",
       "nameRequired": "Įveskite agento pavadinimą",
       "slugRequired": "Įveskite agento šliužą",
       "slugInvalid": "Slug turi prasidėti raide ir naudoti tik mažąsias raides, skaitmenis ir brūkšnius",
@@ -3797,10 +3811,12 @@
       "description": "Komandos aprašymas",
       "template": "Šablonas",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Paaiškinkite $ARGUMENTS",
       "subtask": "Vykdyti kaip papildomą užduotį",
       "edit": "Redaguoti pasvirojo brūkšnio komandą",
       "saveFailed": "Nepavyko išsaugoti komandos",
+      "deleteFailed": "Nepavyko ištrinti komandos",
       "nameRequired": "Įveskite komandos pavadinimą",
       "nameInvalid": "Pavadinimas turi prasidėti mažosiomis raidėmis ir naudoti tik mažąsias raides, skaitmenis ir brūkšnius",
       "templateRequired": "Įveskite komandos šabloną",
@@ -3955,7 +3971,7 @@
     "view": "Skaityti suvestinę",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Rodyti dabartinę būseną",
+    "dismiss": "Atmesti suvestinę",
     "offline": "Neprisijungta · išsaugota suvestinė",
     "cached": "Išsaugota ataskaita · atnaujinti negalima",
     "revised": "Pataisyta · {{revision}}",

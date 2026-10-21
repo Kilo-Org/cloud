@@ -111,7 +111,9 @@
     "online": "Verbunden",
     "open": "{{name}} öffnen",
     "openPullRequest": "Pull-Request öffnen",
+    "completed": "Abgeschlossen",
     "pending": "Ausstehend",
+    "running": "Läuft",
     "performance": "Leistung",
     "preferences": "Einstellungen",
     "privacyPolicy": "Datenschutzerklärung",
@@ -1021,8 +1023,6 @@
     "updateFailed": "Code Reviewer konnte nicht aktualisiert werden.",
     "configSaveFailed": "Die Review-Einstellungen konnten nicht gespeichert werden.",
     "status": {
-      "running": "Läuft",
-      "completed": "Abgeschlossen",
       "interrupted": "Unterbrochen"
     },
     "reviewStyle": {
@@ -3002,11 +3002,22 @@
     "boundary": {
       "backToProfile": "Zurück zum Profil",
       "loadErrorMessage": "Prüfe deine Verbindung und versuche es erneut.",
+
+      "chooseAccount": "Konto auswählen",
       "loadErrorTitle": "Deine Organisationen konnten nicht geladen werden.",
+      "noOrganization": "Keine Organisation",
+
+      "noOrganizationDescription": "Dieses Konto gehört keiner Organisation an. Erstelle eine Organisation oder tritt einer auf der Website bei, um Organisationsfunktionen wie Mitgliedseinladungen und Warnungen bei niedrigem Guthaben zu nutzen.",
+
+      "openWebOrganizations": "Organisationen auf der Website öffnen",
+
       "organizationUnavailable": "Die Organisation ist nicht verfügbar.",
-      "selectDescription": "Wähle in deinem Profil eine Organisation aus, um fortzufahren.",
+      "selectDescriptionWithOrganizations": "Du gehörst einer oder mehreren Organisationen an. Wähle das Konto aus, das dieser Bildschirm verwenden soll.",
+
       "selectOrganization": "Organisation auswählen",
       "unavailableDescription": "Diese Organisation ist nicht mehr verfügbar. Wähle in deinem Profil eine andere Organisation aus, um fortzufahren.",
+
+      "unavailableSessionsDescription": "Diese Organisation ist nicht mehr verfügbar. Ihre Sitzungen können nicht geladen werden.",
       "accessDeniedDescription": "Du hast keinen Zugriff auf diese Organisation."
     },
     "creditActivity": {
@@ -3674,7 +3685,9 @@
       "jsonTooLarge": "Verwenden Sie höchstens 50 Einträge, Schlüssel bis 128 und Werte bis 4096 Zeichen",
       "timeoutInvalid": "Das Zeitlimit muss eine ganze Zahl von Millisekunden betragen",
       "edit": "Bearbeiten Sie den MCP-Server",
-      "saveFailed": "Der MCP-Server konnte nicht gespeichert werden"
+      "saveFailed": "Der MCP-Server konnte nicht gespeichert werden",
+      "deleteFailed": "Der MCP-Server konnte nicht gelöscht werden",
+      "updateFailed": "Der MCP-Server konnte nicht aktualisiert werden"
     },
     "agents": {
       "title": "Profilagenten",
@@ -3701,6 +3714,7 @@
       "visibilitySubagent": "Subagent – nur von anderen aufrufbar",
       "visibilityAll": "Alle – beides",
       "saveFailed": "Der Agent konnte nicht gespeichert werden",
+      "deleteFailed": "Der Agent konnte nicht gelöscht werden",
       "nameRequired": "Geben Sie einen Agentennamen ein",
       "slugRequired": "Geben Sie einen Agenten-Slug ein",
       "slugInvalid": "Slug muss mit einem Buchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche verwenden",
@@ -3715,10 +3729,12 @@
       "description": "Befehlsbeschreibung",
       "template": "Vorlage",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Erklären Sie $ARGUMENTS",
       "subtask": "Als Unteraufgabe ausführen",
       "edit": "Slash-Befehl bearbeiten",
       "saveFailed": "Der Befehl konnte nicht gespeichert werden",
+      "deleteFailed": "Der Befehl konnte nicht gelöscht werden",
       "nameRequired": "Geben Sie einen Befehlsnamen ein",
       "nameInvalid": "Der Name muss mit einem Kleinbuchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten",
       "templateRequired": "Geben Sie eine Befehlsvorlage ein",
@@ -3865,7 +3881,7 @@
     "view": "Briefing lesen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Live-Status anzeigen",
+    "dismiss": "Briefing verwerfen",
     "offline": "Offline · gespeichertes Briefing",
     "cached": "Gespeicherter Bericht · Aktualisierung nicht verfügbar",
     "revised": "Überarbeitet · {{revision}}",

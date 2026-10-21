@@ -111,7 +111,9 @@
     "online": "在線上",
     "open": "開啟 {{name}}",
     "openPullRequest": "開啟提取要求",
+    "completed": "已完成",
     "pending": "待處理",
+    "running": "執行中",
     "performance": "效能",
     "preferences": "偏好設定",
     "privacyPolicy": "隱私權政策",
@@ -1021,8 +1023,6 @@
     "updateFailed": "無法更新審查員。",
     "configSaveFailed": "無法儲存審查設定。",
     "status": {
-      "running": "執行中",
-      "completed": "已完成",
       "interrupted": "已中斷"
     },
     "reviewStyle": {
@@ -3002,11 +3002,22 @@
     "boundary": {
       "backToProfile": "返回個人資料",
       "loadErrorMessage": "請檢查網路連線後再試一次。",
+
+      "chooseAccount": "選取帳戶",
       "loadErrorTitle": "無法載入你的組織清單。",
+      "noOrganization": "沒有組織",
+
+      "noOrganizationDescription": "此帳戶不屬於任何組織。請在網頁版建立或加入組織，以使用成員邀請和低餘額提醒等組織功能。",
+
+      "openWebOrganizations": "在網頁版開啟組織",
+
       "organizationUnavailable": "無法存取組織。",
-      "selectDescription": "請到個人資料頁面選取組織，即可繼續。",
+      "selectDescriptionWithOrganizations": "您屬於一個或多個組織。請選取此畫面應使用的帳戶。",
+
       "selectOrganization": "選取組織",
       "unavailableDescription": "此組織已無法存取。請到個人資料頁面選取其他組織，即可繼續。",
+
+      "unavailableSessionsDescription": "此組織已無法存取。無法載入其工作階段。",
       "accessDeniedDescription": "你沒有存取此組織的權限。"
     },
     "creditActivity": {
@@ -3674,7 +3685,9 @@
       "jsonTooLarge": "最多使用 50 個項目，鍵最多 128 個字元，值最多 4096 個字元",
       "timeoutInvalid": "超時必須是整數毫秒",
       "edit": "編輯 MCP 伺服器",
-      "saveFailed": "無法保存 MCP 伺服器"
+      "saveFailed": "無法保存 MCP 伺服器",
+      "deleteFailed": "無法刪除 MCP 伺服器",
+      "updateFailed": "無法更新 MCP 伺服器"
     },
     "agents": {
       "title": "設定檔代理",
@@ -3701,6 +3714,7 @@
       "visibilitySubagent": "子代理程式——只能從其他人調用",
       "visibilityAll": "全部 — 兩者",
       "saveFailed": "無法保存代理",
+      "deleteFailed": "無法刪除代理",
       "nameRequired": "輸入代理名稱",
       "slugRequired": "輸入代理 slug",
       "slugInvalid": "Slug 必須以字母開頭，且只能使用小寫字母、數字和破折號",
@@ -3715,10 +3729,12 @@
       "description": "命令說明",
       "template": "範本",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "解釋$ARGUMENTS",
       "subtask": "作為子任務運行",
       "edit": "編輯斜槓命令",
       "saveFailed": "無法保存命令",
+      "deleteFailed": "無法刪除命令",
       "nameRequired": "輸入命令名稱",
       "nameInvalid": "名稱必須以小寫字母開頭，且只能使用小寫字母、數字和破折號",
       "templateRequired": "輸入命令模板",
@@ -3865,7 +3881,7 @@
     "view": "閱讀簡報",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}，{{time}}",
-    "dismiss": "顯示即時狀態",
+    "dismiss": "忽略簡報",
     "offline": "離線 · 已儲存的簡報",
     "cached": "已儲存的報告 · 無法重新整理",
     "revised": "已修訂 · {{revision}}",

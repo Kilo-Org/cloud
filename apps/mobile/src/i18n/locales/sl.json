@@ -111,7 +111,9 @@
     "online": "Na spletu",
     "open": "Odpri {{name}}",
     "openPullRequest": "Odprta zahteva za združitev",
+    "completed": "Dokončano",
     "pending": "Na čakanju",
+    "running": "V teku",
     "performance": "Zmogljivost",
     "preferences": "Nastavitve",
     "privacyPolicy": "Politika zasebnosti",
@@ -1574,8 +1576,6 @@
     "updateFailed": "Pregledovalnika kode ni bilo mogoče posodobiti.",
     "configSaveFailed": "Nastavitev pregleda ni bilo mogoče shraniti.",
     "status": {
-      "running": "V teku",
-      "completed": "Dokončano",
       "interrupted": "Prekinjeno"
     },
     "reviewStyle": {
@@ -3090,11 +3090,22 @@
     "boundary": {
       "backToProfile": "Nazaj na profil",
       "loadErrorMessage": "Preveri povezavo in poskusi znova.",
+
+      "chooseAccount": "Izberi račun",
       "loadErrorTitle": "Tvojih organizacij ni bilo mogoče naložiti.",
+      "noOrganization": "Ni organizacije",
+
+      "noOrganizationDescription": "Ta račun ni del organizacije. Ustvari ali se pridruži organizaciji na spletu, da boš lahko uporabljal funkcije organizacije, kot so povabila za člane in opozorila o nizkem stanju.",
+
+      "openWebOrganizations": "Odpri organizacije na spletu",
+
       "organizationUnavailable": "Organizacija ni na voljo.",
-      "selectDescription": "Za nadaljevanje na svojem profilu izberi organizacijo.",
+      "selectDescriptionWithOrganizations": "Pripadaš eni ali več organizacijam. Izberi račun, ki naj ga ta zaslon uporablja.",
+
       "selectOrganization": "Izberi organizacijo",
       "unavailableDescription": "Ta organizacija ni več na voljo. Za nadaljevanje na svojem profilu izberi drugo.",
+
+      "unavailableSessionsDescription": "Ta organizacija ni več na voljo. Njenih sej ni mogoče naložiti.",
       "accessDeniedDescription": "Nimaš dostopa do te organizacije."
     },
     "creditActivity": {
@@ -3756,7 +3767,9 @@
       "jsonTooLarge": "Uporabite največ 50 vnosov, ključi do 128 in vrednosti do 4096 znakov",
       "timeoutInvalid": "Časovna omejitev mora biti celo število milisekund",
       "edit": "Uredi strežnik MCP",
-      "saveFailed": "Strežnika MCP ni bilo mogoče shraniti"
+      "saveFailed": "Strežnika MCP ni bilo mogoče shraniti",
+      "deleteFailed": "Strežnika MCP ni bilo mogoče izbrisati",
+      "updateFailed": "Strežnika MCP ni bilo mogoče posodobiti"
     },
     "agents": {
       "title": "Profilni agenti",
@@ -3783,6 +3796,7 @@
       "visibilitySubagent": "Subagent — na klic samo od drugih",
       "visibilityAll": "Vse — oboje",
       "saveFailed": "Agenta ni bilo mogoče shraniti",
+      "deleteFailed": "Agenta ni bilo mogoče izbrisati",
       "nameRequired": "Vnesite ime agenta",
       "slugRequired": "Vnesite polža agenta",
       "slugInvalid": "Polž se mora začeti s črko in uporabljati samo male črke, številke in pomišljaje",
@@ -3797,10 +3811,12 @@
       "description": "Opis ukaza",
       "template": "Predloga",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Pojasnite $ARGUMENTS",
       "subtask": "Zaženi kot podopravilo",
       "edit": "Uredi ukaz za poševnico",
       "saveFailed": "Ukaza ni bilo mogoče shraniti",
+      "deleteFailed": "Ukaza ni bilo mogoče izbrisati",
       "nameRequired": "Vnesite ime ukaza",
       "nameInvalid": "Ime se mora začeti z malo začetnico in uporabljati samo male črke, številke in pomišljaje",
       "templateRequired": "Vnesite predlogo ukaza",
@@ -3955,7 +3971,7 @@
     "view": "Preberi povzetek",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Prikaži trenutno stanje",
+    "dismiss": "Zavrzi povzetek",
     "offline": "Brez povezave · shranjen povzetek",
     "cached": "Shranjeno poročilo · osvežitev ni na voljo",
     "revised": "Popravljeno · {{revision}}",

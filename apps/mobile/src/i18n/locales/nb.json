@@ -111,7 +111,9 @@
     "online": "På nett",
     "open": "Åpne {{name}}",
     "openPullRequest": "Åpne PR",
+    "completed": "Fullført",
     "pending": "Venter",
+    "running": "Kjører",
     "performance": "Ytelse",
     "preferences": "Innstillinger",
     "privacyPolicy": "Personvernerklæring",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Kunne ikke oppdatere kodegranskeren.",
     "configSaveFailed": "Kunne ikke lagre innstillingene for kodegjennomgang.",
     "status": {
-      "running": "Kjører",
-      "completed": "Fullført",
       "interrupted": "Avbrutt"
     },
     "reviewStyle": {
@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Tilbake til profil",
       "loadErrorMessage": "Sjekk tilkoblingen og prøv igjen.",
+
+      "chooseAccount": "Velg en konto",
       "loadErrorTitle": "Kunne ikke laste inn organisasjonene dine.",
+      "noOrganization": "Ingen organisasjon",
+
+      "noOrganizationDescription": "Denne kontoen er ikke en del av en organisasjon. Opprett eller bli med i en organisasjon i nettleseren for å bruke organisasjonsfunksjoner som medlemsinvitasjoner og varsler om lav saldo.",
+
+      "openWebOrganizations": "Åpne organisasjoner i nettleseren",
+
       "organizationUnavailable": "Organisasjonen er ikke tilgjengelig.",
-      "selectDescription": "Velg en organisasjon fra profilen din for å fortsette.",
+      "selectDescriptionWithOrganizations": "Du tilhører én eller flere organisasjoner. Velg kontoen som denne skjermen skal bruke.",
+
       "selectOrganization": "Velg en organisasjon",
       "unavailableDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Velg en fra profilen din for å fortsette.",
+
+      "unavailableSessionsDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Øktene dens kan ikke lastes inn.",
       "accessDeniedDescription": "Du har ikke tilgang til denne organisasjonen."
     },
     "creditActivity": {
@@ -3674,7 +3685,9 @@
       "jsonTooLarge": "Bruk maks 50 oppføringer, nøkler opptil 128 og verdier opptil 4096 tegn",
       "timeoutInvalid": "Tidsavbrudd må være et helt antall millisekunder",
       "edit": "Rediger MCP-server",
-      "saveFailed": "Kunne ikke lagre MCP-serveren"
+      "saveFailed": "Kunne ikke lagre MCP-serveren",
+      "deleteFailed": "Kunne ikke slette MCP-serveren",
+      "updateFailed": "Kunne ikke oppdatere MCP-serveren"
     },
     "agents": {
       "title": "Profil agenter",
@@ -3701,6 +3714,7 @@
       "visibilitySubagent": "Subagent — kan kun ringes opp fra andre",
       "visibilityAll": "Alle - begge",
       "saveFailed": "Kunne ikke lagre agenten",
+      "deleteFailed": "Kunne ikke slette agenten",
       "nameRequired": "Skriv inn et agentnavn",
       "slugRequired": "Skriv inn en agentsnegl",
       "slugInvalid": "Slug må starte med en bokstav og kun bruke små bokstaver, sifre og bindestreker",
@@ -3715,10 +3729,12 @@
       "description": "Kommandobeskrivelse",
       "template": "Mal",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Forklar $ARGUMENTS",
       "subtask": "Kjør som deloppgave",
       "edit": "Rediger skråstrek-kommando",
       "saveFailed": "Kunne ikke lagre kommandoen",
+      "deleteFailed": "Kunne ikke slette kommandoen",
       "nameRequired": "Skriv inn et kommandonavn",
       "nameInvalid": "Navnet må begynne med en liten bokstav og kun bruke små bokstaver, sifre og bindestreker",
       "templateRequired": "Skriv inn en kommandomal",
@@ -3865,7 +3881,7 @@
     "view": "Les brief",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Vis live-status",
+    "dismiss": "Avvis brief",
     "offline": "Frakoblet · lagret brief",
     "cached": "Lagret rapport · kan ikke oppdateres",
     "revised": "Revidert · {{revision}}",

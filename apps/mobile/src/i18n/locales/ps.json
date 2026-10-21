@@ -111,7 +111,9 @@
     "online": "آنلاین",
     "open": "{{name}} پرانیزئ",
     "openPullRequest": "پل ریکویسټ پرانیزئ",
+    "completed": "بشپړ شوی",
     "pending": "په انتظار",
+    "running": "روان",
     "performance": "کارکردګي",
     "preferences": "غوره توبونه",
     "privacyPolicy": "د محرمیت تګلاره",
@@ -1536,8 +1538,6 @@
     "updateFailed": "بیاکتونکی تازه نه شو.",
     "configSaveFailed": "د بیاکتنې ترتیبات خوندي نه شول.",
     "status": {
-      "running": "روان",
-      "completed": "بشپړ شوی",
       "interrupted": "نیمګړی درېدلی"
     },
     "reviewStyle": {
@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "بېرته پروفایل ته ورشئ",
       "loadErrorMessage": "خپله انټرنېټي اړیکه وګورئ او بیا هڅه وکړئ.",
+
+      "chooseAccount": "یو حساب غوره کړئ",
       "loadErrorTitle": "ستاسو سازمانونه بار نه شول.",
+      "noOrganization": "هیڅ سازمان نشته",
+
+      "noOrganizationDescription": "دا حساب د یو سازمان برخه نه ده. د غړو بلنې او د ټیټ بیلانس خبرتیاوې په څیر د سازمان ځانګړتیاوې کارولو لپاره په ویب کې سازمان جوړ کړئ یا یو ځای شئ.",
+
+      "openWebOrganizations": "په ویب کې سازمانونه پرانیزئ",
+
       "organizationUnavailable": "سازمان د لاسرسي وړ نه دی.",
-      "selectDescription": "د دوام لپاره له خپل پروفایل څخه یو سازمان غوره کړئ.",
+      "selectDescriptionWithOrganizations": "تاسو د یو یا ډیرو سازمانونو غړی یاست. هغه حساب غوره کړئ چې دا سکرین باید یې وکاروي.",
+
       "selectOrganization": "یو سازمان غوره کړئ",
       "unavailableDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دوام لپاره له خپل پروفایل څخه یو سازمان غوره کړئ.",
+
+      "unavailableSessionsDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دې سازمان نښتې نشي لوډ کېدلی.",
       "accessDeniedDescription": "تاسو دې سازمان ته لاسرسی نه لرئ."
     },
     "creditActivity": {
@@ -3674,7 +3685,9 @@
       "jsonTooLarge": "تر 50 پورې ننوتنې وکاروئ، کلیدونه تر 128 او ارزښتونه تر 4096 تورو پورې",
       "timeoutInvalid": "د وخت پای باید د ملی ثانیو بشپړ شمیر وي",
       "edit": "د MCP سرور ترمیم کړئ",
-      "saveFailed": "د MCP سرور خوندي نه شو"
+      "saveFailed": "د MCP سرور خوندي نه شو",
+      "deleteFailed": "د MCP سرور ړنګول نشو کړای",
+      "updateFailed": "د MCP سرور نه سو تازه کړای"
     },
     "agents": {
       "title": "پروفایل اجنټان",
@@ -3701,6 +3714,7 @@
       "visibilitySubagent": "Subagent - یوازې د نورو څخه د غوښتنې وړ",
       "visibilityAll": "ټول - دواړه",
       "saveFailed": "اجنټ خوندي نشو کړای",
+      "deleteFailed": "اجنټ ړنګول نشو کړای",
       "nameRequired": "د اجنټ نوم دننه کړئ",
       "slugRequired": "د اجنټ سلګ داخل کړئ",
       "slugInvalid": "سلګ باید د یوه لیک سره پیل شي او یوازې کوچني توري، عددونه او ډیشونه وکاروي",
@@ -3715,10 +3729,12 @@
       "description": "د قوماندې توضیحات",
       "template": "کينډۍ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS تشریح کړئ",
       "subtask": "د فرعي دندې په توګه چلول",
       "edit": "د سلیش کمانډ ایډیټ کړئ",
       "saveFailed": "کمانډ خوندي نشو کړای",
+      "deleteFailed": "کمانډ ړنګول نشو کړای",
       "nameRequired": "د کمانډ نوم دننه کړئ",
       "nameInvalid": "نوم باید د کوچنیو تورو سره پیل شي او یوازې د کوچنیو تورو، عددونو او ډیشونو څخه کار واخلئ",
       "templateRequired": "د کمانډ ټیمپلیټ دننه کړئ",
@@ -3865,7 +3881,7 @@
     "view": "لنډیز ولولئ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "ژوندی حالت وښایاست",
+    "dismiss": "لنډیز له پامه وغورځوئ",
     "offline": "آفلاین · خوندي شوی لنډیز",
     "cached": "خوندي شوی راپور · تازه کول شوني نه دي",
     "revised": "بیاکتل شوی · {{revision}}",

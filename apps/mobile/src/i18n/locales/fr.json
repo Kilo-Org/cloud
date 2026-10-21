@@ -111,7 +111,9 @@
     "online": "En ligne",
     "open": "Ouvrir {{name}}",
     "openPullRequest": "Ouverture de la PR",
+    "completed": "Terminé",
     "pending": "En attente",
+    "running": "En cours",
     "performance": "Performances",
     "preferences": "Préférences",
     "privacyPolicy": "Politique de confidentialité",
@@ -993,8 +995,6 @@
     "updateFailed": "Impossible de mettre à jour l'agent de revue de code.",
     "configSaveFailed": "Impossible d'enregistrer la configuration de la revue.",
     "status": {
-      "running": "En cours",
-      "completed": "Terminé",
       "interrupted": "Interrompue"
     },
     "reviewStyle": {
@@ -3042,11 +3042,22 @@
     "boundary": {
       "backToProfile": "Retour au profil",
       "loadErrorMessage": "Vérifiez votre connexion et réessayez.",
+
+      "chooseAccount": "Choisir un compte",
       "loadErrorTitle": "Impossible de charger vos organisations.",
+      "noOrganization": "Aucune organisation",
+
+      "noOrganizationDescription": "Ce compte ne fait partie d'aucune organisation. Créez une organisation ou rejoignez-en une sur le site web pour utiliser les fonctionnalités d'organisation telles que les invitations de membres et les alertes de solde faible.",
+
+      "openWebOrganizations": "Ouvrir les organisations sur le site web",
+
       "organizationUnavailable": "L'organisation n'est pas disponible.",
-      "selectDescription": "Choisissez une organisation dans votre profil pour continuer.",
+      "selectDescriptionWithOrganizations": "Vous appartenez à une ou plusieurs organisations. Choisissez le compte que cet écran doit utiliser.",
+
       "selectOrganization": "Choix d'une organisation",
       "unavailableDescription": "Cette organisation n'est plus disponible. Choisissez-en une dans votre profil pour continuer.",
+
+      "unavailableSessionsDescription": "Cette organisation n'est plus disponible. Ses sessions ne peuvent pas être chargées.",
       "accessDeniedDescription": "Vous n'avez pas accès à cette organisation."
     },
     "creditActivity": {
@@ -3715,7 +3726,9 @@
       "jsonTooLarge": "Utilisez au maximum 50 entrées, des clés jusqu'à 128 et des valeurs jusqu'à 4096 caractères",
       "timeoutInvalid": "Le délai d'attente doit être un nombre entier de millisecondes",
       "edit": "Modifier le serveur MCP",
-      "saveFailed": "Impossible de sauvegarder le serveur MCP"
+      "saveFailed": "Impossible de sauvegarder le serveur MCP",
+      "deleteFailed": "Impossible de supprimer le serveur MCP",
+      "updateFailed": "Impossible de mettre à jour le serveur MCP"
     },
     "agents": {
       "title": "Agents de profil",
@@ -3742,6 +3755,7 @@
       "visibilitySubagent": "Sous-agent – appelable uniquement par d'autres",
       "visibilityAll": "Tous — les deux",
       "saveFailed": "Impossible de sauvegarder l'agent",
+      "deleteFailed": "Impossible de supprimer l'agent",
       "nameRequired": "Entrez un nom d'agent",
       "slugRequired": "Entrez un slug d'agent",
       "slugInvalid": "Slug doit commencer par une lettre et utiliser uniquement des lettres minuscules, des chiffres et des tirets.",
@@ -3756,10 +3770,12 @@
       "description": "Description de la commande",
       "template": "Modèle",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Expliquez $ARGUMENTS",
       "subtask": "Exécuter en tant que sous-tâche",
       "edit": "Modifier la commande barre oblique",
       "saveFailed": "Impossible d'enregistrer la commande",
+      "deleteFailed": "Impossible de supprimer la commande",
       "nameRequired": "Entrez un nom de commande",
       "nameInvalid": "Le nom doit commencer par une lettre minuscule et utiliser uniquement des lettres minuscules, des chiffres et des tirets.",
       "templateRequired": "Entrez un modèle de commande",
@@ -3910,7 +3926,7 @@
     "view": "Lire le briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Afficher le statut en direct",
+    "dismiss": "Ignorer le briefing",
     "offline": "Hors ligne · briefing enregistré",
     "cached": "Rapport enregistré · actualisation indisponible",
     "revised": "Révisé · {{revision}}",

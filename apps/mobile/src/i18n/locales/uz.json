@@ -111,7 +111,9 @@
     "online": "Onlayn",
     "open": "{{name}}ni ochish",
     "openPullRequest": "Ochiq PR",
+    "completed": "Yakunlangan",
     "pending": "Kutilmoqda",
+    "running": "Ishlamoqda",
     "performance": "Unumdorlik",
     "preferences": "Shaxsiy sozlamalar",
     "privacyPolicy": "Maxfiylik siyosati",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Kodni ko'rib chiquvchini yangilab bo'lmadi.",
     "configSaveFailed": "Ko'rib chiqish sozlamalarini saqlab bo'lmadi.",
     "status": {
-      "running": "Ishlamoqda",
-      "completed": "Yakunlangan",
       "interrupted": "Uzildi"
     },
     "reviewStyle": {
@@ -3010,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Profilga qaytish",
       "loadErrorMessage": "Internetga ulanishni tekshiring va qayta urinib ko‘ring.",
+
+      "chooseAccount": "Hisobni tanlang",
       "loadErrorTitle": "Tashkilotlaringizni yuklab bo'lmadi.",
+      "noOrganization": "Tashkilot yo'q",
+
+      "noOrganizationDescription": "Bu hisob hech qanday tashkilotga tegishli emas. A'zolarni taklif qilish va kam balans haqidagi ogohlantirishlar kabi tashkilot funksiyalaridan foydalanish uchun saytda tashkilot yarating yoki unga qo'shiling.",
+
+      "openWebOrganizations": "Tashkilotlarni saytda ochish",
+
       "organizationUnavailable": "Tashkilot mavjud emas.",
-      "selectDescription": "Davom etish uchun profilingizdan tashkilotni tanlang.",
+      "selectDescriptionWithOrganizations": "Siz bir yoki bir nechta tashkilotga a'zosiz. Bu ekran foydalanishi kerak bo'lgan hisobni tanlang.",
+
       "selectOrganization": "Tashkilotni tanlang",
       "unavailableDescription": "Bu tashkilot endi mavjud emas. Davom etish uchun profilingizdan boshqa tashkilotni tanlang.",
+
+      "unavailableSessionsDescription": "Bu tashkilot endi mavjud emas. Uning sessiyalarini yuklab bo'lmaydi.",
       "accessDeniedDescription": "Sizda ushbu tashkilotga kirish huquqi yo'q."
     },
     "creditActivity": {
@@ -3674,7 +3685,9 @@
       "jsonTooLarge": "Ko'pi bilan 50 ta yozuv, kalitlar 128 tagacha va qiymatlar 4096 belgigacha foydalaning",
       "timeoutInvalid": "Vaqt tugashi butun son millisekund bo'lishi kerak",
       "edit": "MCP serverini tahrirlash",
-      "saveFailed": "MCP serverini saqlab boʻlmadi"
+      "saveFailed": "MCP serverini saqlab boʻlmadi",
+      "deleteFailed": "MCP serverini oʻchirib boʻlmadi",
+      "updateFailed": "MCP serverini yangilab boʻlmadi"
     },
     "agents": {
       "title": "Profil agentlari",
@@ -3701,6 +3714,7 @@
       "visibilitySubagent": "Subagent - faqat boshqalar tomonidan chaqirilishi mumkin",
       "visibilityAll": "Hammasi - ikkalasi ham",
       "saveFailed": "Agentni saqlab boʻlmadi",
+      "deleteFailed": "Agentni oʻchirib boʻlmadi",
       "nameRequired": "Agent nomini kiriting",
       "slugRequired": "Agent slug'ini kiriting",
       "slugInvalid": "Slug harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
@@ -3715,10 +3729,12 @@
       "description": "Buyruq tavsifi",
       "template": "Shablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ni tushuntiring",
       "subtask": "Quyi vazifa sifatida ishga tushirish",
       "edit": "Slash buyrug'ini tahrirlash",
       "saveFailed": "Buyruq saqlanmadi",
+      "deleteFailed": "Buyruq oʻchirilmadi",
       "nameRequired": "Buyruq nomini kiriting",
       "nameInvalid": "Ism kichik harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
       "templateRequired": "Buyruq shablonini kiriting",
@@ -3865,7 +3881,7 @@
     "view": "Brifingni o‘qish",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Jonli holatni ko‘rsatish",
+    "dismiss": "Brifingni e’tiborsiz qoldirish",
     "offline": "Oflayn · saqlangan brifing",
     "cached": "Saqlangan hisobot · yangilab bo‘lmaydi",
     "revised": "Tahrirlangan · {{revision}}",

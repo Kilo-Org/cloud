@@ -111,7 +111,9 @@
     "online": "En línia",
     "open": "Obre {{name}}",
     "openPullRequest": "PR oberta",
+    "completed": "Finalitzada",
     "pending": "Pendent",
+    "running": "En execució",
     "performance": "Rendiment",
     "preferences": "Preferències",
     "privacyPolicy": "Política de privadesa",
@@ -1555,8 +1557,6 @@
     "updateFailed": "No s'ha pogut actualitzar el revisor.",
     "configSaveFailed": "No s'ha pogut desar la configuració de la revisió.",
     "status": {
-      "running": "En execució",
-      "completed": "Finalitzada",
       "interrupted": "Interrompuda"
     },
     "reviewStyle": {
@@ -3050,11 +3050,22 @@
     "boundary": {
       "backToProfile": "Torna al perfil",
       "loadErrorMessage": "Comprova la connexió i torna-ho a provar.",
+
+      "chooseAccount": "Selecciona un compte",
       "loadErrorTitle": "No s'han pogut carregar les teves organitzacions.",
+      "noOrganization": "Sense organització",
+
+      "noOrganizationDescription": "Aquest compte no forma part de cap organització. Crea'n una o uneix-te'n a una al web per utilitzar funcions d'organització com les invitacions de membres i les alertes de saldo baix.",
+
+      "openWebOrganizations": "Obre les organitzacions al web",
+
       "organizationUnavailable": "L'organització no està disponible.",
-      "selectDescription": "Tria una organització des del teu perfil per continuar.",
+      "selectDescriptionWithOrganizations": "Pertanys a una o més organitzacions. Tria el compte que ha d'utilitzar aquesta pantalla.",
+
       "selectOrganization": "Selecciona una organització",
       "unavailableDescription": "Aquesta organització ja no està disponible. Tria'n una des del teu perfil per continuar.",
+
+      "unavailableSessionsDescription": "Aquesta organització ja no està disponible. No es poden carregar les seves sessions.",
       "accessDeniedDescription": "No tens accés a aquesta organització."
     },
     "creditActivity": {
@@ -3715,7 +3726,9 @@
       "jsonTooLarge": "Utilitzeu com a màxim 50 entrades, claus de fins a 128 i valors de fins a 4096 caràcters",
       "timeoutInvalid": "El temps d'espera ha de ser un nombre sencer de mil·lisegons",
       "edit": "Edita el servidor MCP",
-      "saveFailed": "No s'ha pogut desar el servidor MCP"
+      "saveFailed": "No s'ha pogut desar el servidor MCP",
+      "deleteFailed": "No s'ha pogut suprimir el servidor MCP",
+      "updateFailed": "No s'ha pogut actualitzar el servidor MCP"
     },
     "agents": {
       "title": "Agents de perfil",
@@ -3742,6 +3755,7 @@
       "visibilitySubagent": "Subagent: només es pot trucar des d'altres",
       "visibilityAll": "Tots, tots dos",
       "saveFailed": "No s'ha pogut desar l'agent",
+      "deleteFailed": "No s'ha pogut suprimir l'agent",
       "nameRequired": "Introduïu un nom d'agent",
       "slugRequired": "Introduïu un llimac d'agent",
       "slugInvalid": "Slug ha de començar amb una lletra i utilitzar només lletres minúscules, dígits i guions",
@@ -3756,10 +3770,12 @@
       "description": "Descripció de l'ordre",
       "template": "Plantilla",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar com a subtasca",
       "edit": "Edita l'ordre de barra inclinada",
       "saveFailed": "No s'ha pogut desar l'ordre",
+      "deleteFailed": "No s'ha pogut suprimir l'ordre",
       "nameRequired": "Introduïu un nom d'ordre",
       "nameInvalid": "El nom ha de començar amb una lletra minúscula i utilitzar només lletres minúscules, dígits i guions",
       "templateRequired": "Introduïu una plantilla d'ordres",
@@ -3910,7 +3926,7 @@
     "view": "Llegeix el resum",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Mostra l'estat en directe",
+    "dismiss": "Descarta el resum",
     "offline": "Sense connexió · resum desat",
     "cached": "Informe desat · no es pot actualitzar",
     "revised": "Revisat · {{revision}}",

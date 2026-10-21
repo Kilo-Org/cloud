@@ -712,8 +712,6 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     expiry_hours: 30 * 24,
     description: 'Creator promo',
     total_redemptions_allowed: 30,
-    // Redemption disabled 2026-10-21. Clear this line to re-enable.
-    promotion_ends_at: new Date('2026-10-20'),
   },
   {
     encrypted_credit_category: 'Ask7EbCTpqKCGzYQb/Zpxw==:WUETQMOyhUlPm+QbEwKZXA==:f/fLRPibgFo=',

@@ -27,7 +27,6 @@ import caseComplexity from './datasets/case-complexity.json';
 import type { RunModelRow, RunRow } from './db';
 import {
   countCaseResultsByLane,
-  countCurrentProfilesByStatus,
   exactPairKey,
   existsNewerCompletedRun,
   getCaseResults,
@@ -462,11 +461,17 @@ export async function syncPlatformRegistry(
  * bound to its own measuring run's summaries — the same provenance rule owner
  * pools use, so platform and user tables read the one shared measurement set.
  *
- * The table is published only once the platform queue has settled: no entry
- * still pending or running. Publishing mid-measurement would put a table built
- * from the handful of models measured so far in front of every user — after an
- * engine bump that can be a single model taking all routes. A permanently
- * failing model does not block publishing, because `failed` is settled.
+ * The table is published once every pair it currently serves has a ready
+ * current-engine row. A pair still being measured is not served yet: the
+ * subscription promotes `servingPairs` only when the whole replacement set is
+ * ready, so it never appears in `desired` first. Waiting for the entire platform
+ * queue to settle instead lets one slow measurement — including one claimed by
+ * the user queue, which shares the registry row — hold back every other
+ * improvement to the live table for as long as it runs.
+ *
+ * This still refuses to publish a table thinner than the live one. After an
+ * engine bump every row is re-requested under the new engine, so `desired` keeps
+ * the previous serving pairs, no ready row matches them, and publishing waits.
  */
 export async function publishPlatformRoutingTable(
   env: Env,
@@ -504,16 +509,6 @@ export async function publishPlatformRoutingTable(
     return null;
   const desired = snapshotPairs(snapshot, true);
   const prices = catalogCandidatePrices(catalog);
-  const queueCounts = await countCurrentProfilesByStatus(env.BENCH_DB, current, 'platform');
-  const unsettled = queueCounts
-    .filter(row => row.status === 'pending' || row.status === 'running')
-    .reduce((total, row) => total + row.count, 0);
-  if (unsettled > 0) {
-    console.log(
-      JSON.stringify({ event: 'routing_table_publish_skipped_queue_unsettled', unsettled })
-    );
-    return null;
-  }
 
   const readyRows = await listReadyCurrentProfilesForEntries(env.BENCH_DB, current, desired);
   const readyEntries = readyRows
@@ -524,6 +519,18 @@ export async function publishPlatformRoutingTable(
     }));
   if (readyEntries.length === 0) {
     console.warn(JSON.stringify({ event: 'routing_table_publish_skipped_no_ready_entries' }));
+    return null;
+  }
+  const readyPairs = new Set(readyEntries.map(({ entry }) => exactPairKey(entry.model, entry.variant)));
+  const unreadyServingPair = desired.find(pair => !readyPairs.has(exactPairKey(pair.model, pair.variant)));
+  if (unreadyServingPair) {
+    console.log(
+      JSON.stringify({
+        event: 'routing_table_publish_skipped_serving_pair_unready',
+        model: unreadyServingPair.model,
+        variant: unreadyServingPair.variant,
+      })
+    );
     return null;
   }
 

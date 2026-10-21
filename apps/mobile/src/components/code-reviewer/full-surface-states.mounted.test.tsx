@@ -28,6 +28,7 @@ function review(id: string, prTitle = `Review ${id}`): ReviewStub {
 }
 
 const state = vi.hoisted(() => ({
+  insets: { left: 0, right: 0 },
   platform: 'gitlab',
   connected: false,
   scope: 'personal',
@@ -68,6 +69,9 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push: state.push }),
 }));
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: state.insets.left, right: state.insets.right }),
+}));
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
@@ -120,6 +124,8 @@ vi.mock('@/lib/hooks/use-code-reviews', () => ({ useReviewList: () => state.revi
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
 
 beforeEach(() => {
+  state.insets.left = 0;
+  state.insets.right = 0;
   state.platform = 'gitlab';
   state.connected = false;
   state.scope = 'personal';
@@ -245,6 +251,30 @@ describe('Reviewer repository bodies', () => {
 });
 
 describe('Recent review bodies', () => {
+  it.each([
+    ['portrait', 0, 0, 24, 24],
+    ['landscape', 47, 59, 71, 83],
+  ])(
+    'keeps the %s rows inside the side insets on top of the gutter',
+    async (_label, left, right, expectedLeft, expectedRight) => {
+      state.insets.left = left;
+      state.insets.right = right;
+      state.reviews.data = {
+        pages: [{ success: true, reviews: [review('r1'), review('r2')] }],
+        pageParams: [0],
+      };
+      const { renderer, unmount } = await renderWithProviders(
+        createElement(ReviewListScreen, { scope: 'personal' })
+      );
+      expect(firstList(renderer).props.contentContainerStyle).toEqual({
+        paddingTop: 16,
+        paddingLeft: expectedLeft,
+        paddingRight: expectedRight,
+      });
+      unmount();
+    }
+  );
+
   it.each([false, true])(
     'keeps the correct empty action with provider connection %s',
     async connected => {

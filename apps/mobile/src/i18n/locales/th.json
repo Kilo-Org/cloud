@@ -108,7 +108,7 @@
     "notFound": "ไม่พบข้อมูล",
     "online": "ออนไลน์",
     "open": "เปิด {{name}}",
-    "openPullRequest": "เปิดพูลรีเควสต์",
+    "openPullRequest": "เปิด PR",
     "pending": "รอดำเนินการ",
     "performance": "ประสิทธิภาพ",
     "preferences": "การตั้งค่า",
@@ -2681,10 +2681,10 @@
       "unavailable": "เซสชันนี้ไม่สามารถรับคำขออนุญาตได้"
     },
     "prBadge": {
-      "open": "เปิดพูลรีเควสต์",
-      "closed": "พูลรีเควสต์ที่ปิดแล้ว",
-      "merged": "พูลรีเควสต์ที่รวมโค้ดแล้ว",
-      "draft": "พูลรีเควสต์ฉบับร่าง",
+      "open": "เปิด PR",
+      "closed": "PR ที่ปิดแล้ว",
+      "merged": "PR ที่รวมโค้ดแล้ว",
+      "draft": "PR ฉบับร่าง",
       "updating": "กำลังอัปเดต, {{label}} #{{number}}",
       "label": "{{label}} หมายเลข {{number}}"
     },

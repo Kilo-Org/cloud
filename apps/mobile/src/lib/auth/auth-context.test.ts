@@ -95,6 +95,16 @@ vi.mock('@/lib/auth/logout-cleanup', () => ({
   runLogoutCleanup: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/lib/auth/admission', () => ({
+  getAdmission: vi.fn().mockResolvedValue({
+    platform: 'android',
+    kind: 'assertion',
+    challenge: 'challenge',
+    payload: 'integrity-token',
+  }),
+  clearAttestKeyOnRefusal: vi.fn(),
+}));
+
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   AppState: {

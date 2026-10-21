@@ -51,9 +51,10 @@ export async function exchangeLegacyToken(): Promise<{
       return null;
     }
     if (!admission) {
-      // This device can never attest, so the exchange can never succeed. Record
-      // the decision instead of requesting a challenge on every launch.
-      await SecureStore.setItemAsync(LEGACY_EXCHANGE_DONE_KEY, '1');
+      // This device cannot attest, so the exchange cannot succeed. It costs
+      // nothing to retry next launch — no challenge is requested for a device
+      // without capability — so do not write a permanent marker that would
+      // outlive a build-configuration fix.
       return null;
     }
 

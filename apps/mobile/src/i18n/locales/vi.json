@@ -943,6 +943,9 @@
       "gateHidden": "Ẩn",
       "gateNone": "Không có",
       "noFindings": "Không phát hiện vấn đề nào.",
+      "findingsUnavailable": "Không có kết quả vì phiên rà soát này đã thất bại.",
+      "serviceUnavailable": "Không thể kết nối với dịch vụ rà soát mã. Hãy rà soát lại khi dịch vụ khả dụng.",
+      "reviewFailed": "Phiên rà soát đã thất bại. Vui lòng thử lại.",
       "retryMessage": "Thao tác này sẽ chạy lại lượt rà soát mã.",
       "retryReview": "Rà soát lại",
       "retryNeedsSettings": "Trợ lý rà soát mã đang tắt hoặc cài đặt của trợ lý cần được xử lý. Hãy sửa cài đặt, sau đó rà soát lại.",
@@ -3665,7 +3668,7 @@
       "nameRequired": "Nhập tên đại lý",
       "slugRequired": "Nhập sên đại lý",
       "slugInvalid": "Slug phải bắt đầu bằng một chữ cái và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
-      "slugConflict": "Con sên đó được bảo lưu bởi một tác nhân tích hợp",
+      "slugConflict": "Slug đó đã được một tác nhân tích hợp sẵn hoặc tác nhân khác trong hồ sơ này sử dụng",
       "edit": "Chỉnh sửa đại lý"
     },
     "slashCommands": {

@@ -1433,6 +1433,9 @@
       "couldNotGetLatest": "Nu s-au putut obține cele mai recente date.",
       "byline": "{{repo}} #{{number}}, autor: {{author}}",
       "noFindings": "Nu există constatări.",
+      "findingsUnavailable": "Rezultatele nu sunt disponibile deoarece această revizuire a eșuat.",
+      "serviceUnavailable": "Nu s-a putut stabili conexiunea cu serviciul de revizuire a codului. Reîncearcă revizuirea când serviciul este disponibil.",
+      "reviewFailed": "Revizuirea a eșuat. Te rugăm să încerci din nou.",
       "showMore": "Afișează mai mult",
       "created": "Creată",
       "started": "Începută",
@@ -3706,7 +3709,7 @@
       "nameRequired": "Introduceți un nume de agent",
       "slugRequired": "Introduceți un melc de agent",
       "slugInvalid": "Slug trebuie să înceapă cu o literă și să folosească numai litere mici, cifre și liniuțe",
-      "slugConflict": "Acest melc este rezervat de un agent încorporat",
+      "slugConflict": "Acel slug este deja folosit de un agent integrat sau de un alt agent din acest profil",
       "edit": "Editați agentul"
     },
     "slashCommands": {

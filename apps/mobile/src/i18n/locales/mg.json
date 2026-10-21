@@ -1414,6 +1414,9 @@
       "couldNotGetLatest": "Tsy nety nalaina ny angona farany.",
       "byline": "{{repo}} #{{number}} nataon'i {{author}}",
       "noFindings": "Tsy misy olana hita.",
+      "findingsUnavailable": "Tsy misy valiny azo jerena satria tsy nahomby ity fanamarinana ity.",
+      "serviceUnavailable": "Tsy afaka nifandray tamin'ny tolotra fanamarinana kaody. Andramo indray ny fanamarinana rehefa azo ampiasaina ny tolotra.",
+      "reviewFailed": "Tsy nahomby ny fanamarinana. Andramo indray azafady.",
       "showMore": "Asehoy bebe kokoa",
       "created": "Noforonina",
       "started": "Nanomboka",
@@ -3665,7 +3668,7 @@
       "nameRequired": "Ampidiro anarana mpandraharaha",
       "slugRequired": "Ampidiro ny slug mpandraharaha",
       "slugInvalid": "Ny slug dia tsy maintsy manomboka amin'ny litera ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
-      "slugConflict": "Io slug io dia natokana ho an'ny mpandraharaha iray",
+      "slugConflict": "Etra io slug io efa ampiasain'ny azy ao anatiny na azy hafa amin'ity profil ity",
       "edit": "Ahitsio mpandraharaha"
     },
     "slashCommands": {

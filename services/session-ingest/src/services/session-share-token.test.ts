@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { jwtVerify, SignJWT } from 'jose';
+import { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import { getWorkerDb } from '@kilocode/db/client';
 import {
@@ -190,6 +192,35 @@ describe('session share tokens', () => {
       createdAt: '2026-08-19T10:00:00.000Z',
     });
     expect(selectResult).toHaveBeenCalledTimes(1);
+  });
+
+  it('gates organization shares on a live membership', async () => {
+    const select = {
+      from: vi.fn(() => select),
+      leftJoin: vi.fn((_table: unknown, _condition?: unknown) => select),
+      where: vi.fn((_condition: unknown) => select),
+      limit: vi.fn(() => select),
+      then: vi.fn((resolve: (value: unknown) => unknown) => resolve([])),
+    };
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => select) } as never);
+
+    const token = await signSessionShareToken(makeEnv(), {
+      sessionId: SESSION_ID,
+      publicId: PUBLIC_ID,
+    });
+
+    await expect(resolveSessionShareToken(makeEnv(), token)).resolves.toBeNull();
+    const condition = select.where.mock.calls[0]?.[0];
+    if (!(condition instanceof SQL)) {
+      throw new Error('Expected where condition');
+    }
+    const generated = new PgDialect().sqlToQuery(condition);
+    expect(generated.sql).toMatch(/"organizations"\."deleted_at" is null/i);
+    expect(generated.sql).toMatch(/"organization_memberships"\."id" is not null/i);
+    const joinSql = select.leftJoin.mock.calls
+      .map(([, joinCondition]) => new PgDialect().sqlToQuery(joinCondition as SQL).sql)
+      .join(' ');
+    expect(joinSql).toMatch(/"organization_memberships"\."kilo_user_id"/i);
   });
 
   it('propagates database failures as operational errors', async () => {

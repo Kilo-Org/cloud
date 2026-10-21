@@ -1414,6 +1414,9 @@
       "couldNotGetLatest": "Ezin izan da azken egoera lortu.",
       "byline": "{{repo}} #{{number}} · Egilea: {{author}}",
       "noFindings": "Ez dago aurkikuntzarik.",
+      "findingsUnavailable": "Emaitzak ez daude erabilgarri, berrikuspen honek huts egin duelako.",
+      "serviceUnavailable": "Ezin izan da kodea berrikusteko zerbitzuarekin konektatu. Egin berrikuspena berriro zerbitzua erabilgarri dagoenean.",
+      "reviewFailed": "Berrikuspenak huts egin du. Saiatu berriro, mesedez.",
       "showMore": "Erakutsi gehiago",
       "created": "Sortuta",
       "started": "Hasita",
@@ -3665,7 +3668,7 @@
       "nameRequired": "Sartu agentearen izena",
       "slugRequired": "Sartu agente bare bat",
       "slugInvalid": "Slug-ek letra batekin hasi behar du eta letra xeheak, zifrak eta marratxoak soilik erabili behar ditu",
-      "slugConflict": "Bare hori integratutako agente batek erreserbatzen du",
+      "slugConflict": "Slug hori dagoeneko erabiltzen du agenta integratu batek edo profil honetako beste agente batek",
       "edit": "Editatu agentea"
     },
     "slashCommands": {

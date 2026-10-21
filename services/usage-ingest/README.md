@@ -38,7 +38,9 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 Production commits `USAGE_INGEST_MODE=receipt`; staging commits `processing` with
 `https://staging-app.kilo.ai/api/internal/usage/record` as its Frankfurt writer URL.
 An absent mode also uses receipt behavior. Processing validates and writes events
-sequentially, preserving the supplied usage ID and validated fields.
+sequentially within each consumer invocation, preserving the supplied usage ID
+and validated fields. Concurrent invocations are capped by each environment's
+`max_concurrency` setting in the queue policy below.
 
 Processing uses `@kilocode/worker-utils/usage-writer-client` for the existing
 Frankfurt `/api/internal/usage/record` endpoint. Only a matching `recorded` or
@@ -46,6 +48,18 @@ Frankfurt `/api/internal/usage/record` endpoint. Only a matching `recorded` or
 configuration, unknown modes, and unavailable writes retry under the queue policy,
 then reach the DLQ. Processing logs contain the usage ID when valid, queue message
 ID, delivery attempt count, and categorical outcome/reason.
+
+Writer HTTP 429 and 503 also reject the queue invocation after all messages in the
+batch have been handled. Each successful message keeps its explicit ACK; failed
+messages keep their explicit retry using the configured delay and retry/DLQ budget.
+There is no extra writer attempt within an invocation. Other failures retain
+per-message retries without being classified as overload. Overload retry logs add
+`writer_status` and `invocation_failure: "writer_overloaded"`.
+An uncaught queue rejection supplies Cloudflare's invocation failure signal;
+`retry()` alone does not. Autoscaling considers that signal alongside backlog and
+the concurrency cap; no particular scale-down amount or timing is guaranteed.
+See [consumer concurrency](https://developers.cloudflare.com/queues/configuration/consumer-concurrency/)
+and [explicit ACK/retry behavior](https://developers.cloudflare.com/queues/configuration/batching-retries/).
 
 Both `usage_ingest_receipt` and `usage_ingest_processing` include an explicit
 `level` and `queue_action` (`ack` or `retry`). Receipts (including discarded invalid
@@ -112,9 +126,19 @@ context, not an authorization or accounting input. Older clients remain compatib
 `execution_region` identifies the persistence function's region when available:
 SFO HTTP handoffs record `fra1`; a local fallback in SFO records `sfo1`.
 Missing or unrecognized `VERCEL_REGION` values are reported as `unknown`.
-These labels describe the actual persistence entry/caller, so identify queue-only
-fallbacks using the deployment's flag settings and existing
-`usage accounting direct fallback` warning.
+With queue-only enabled, the gateway never calls a billing writer, including on
+publication failure. It retries transient publication failures up to three total
+attempts, with a fresh two-second timeout each and jittered 200–400 ms then
+400–600 ms backoffs. Every attempt reuses the same serialized event and usage ID;
+ambiguous acceptance can create duplicate messages, which the writer deduplicates.
+Configuration failures and HTTP outcomes other than 408/429/5xx are not retried.
+Redirects are terminal 3xx failures; their targets are never followed.
+Shadow publication retains one attempt. `usage enqueue retrying` logs the usage
+ID, categorical reason and failed attempt number before each retry. `usage accounting publication failed` logs the finalized
+`usageId` and categorical `reason`; accounting returns null and emits no gateway
+persistence completion. This is not durable recovery: unaccepted events may be
+lost, and ambiguous failures may still be recorded later by the consumer. With
+queue-only off, the existing SFO handoff-to-local fallback remains unchanged.
 
 `duration_ms` covers the shared persistence call and its awaited follow-up work,
 not pure SQL time. `event_age_ms` retains the original event timestamp across
@@ -148,13 +172,13 @@ reconcile against persisted usage rows when exact completeness matters.
 
 ## Queue policy
 
-Both environments use the same consumer settings:
+Both environments use the following consumer settings:
 
 | Consumer setting | Value | Purpose |
 |---|---|---|
 | `max_batch_size` | `1` | One message per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | `1` | One active consumer invocation per environment's source queue. |
+| `max_concurrency` | Production: `1`; staging: `100` | Cap active consumer invocations per source queue; staging uses a larger cap for load testing. |
 | `max_retries` | `3` | Initial delivery plus up to three retries. |
 | `retry_delay` | `60` seconds | Space failed deliveries by one minute rather than retrying immediately. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |

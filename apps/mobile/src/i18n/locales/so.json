@@ -1414,6 +1414,9 @@
       "couldNotGetLatest": "Xogta ugu dambaysa lama heli karin.",
       "byline": "{{repo}} #{{number}} oo uu qoray {{author}}",
       "noFindings": "Ma jiraan natiijooyin.",
+      "findingsUnavailable": "Natiijooyinka lama heli karo sababtoo ah dib-u-eegistan way fashilantay.",
+      "serviceUnavailable": "Lama xiriiri karin adeegga dib-u-eegista koodhka. Mar kale isku day dib-u-eegista marka adeegga la heli karo.",
+      "reviewFailed": "Dib-u-eegistu way fashilantay. Fadlan mar kale isku day.",
       "showMore": "Muuji wax badan",
       "created": "Waa la abuuray",
       "started": "Waa la bilaabay",
@@ -3665,7 +3668,7 @@
       "nameRequired": "Geli magaca wakiilka",
       "slugRequired": "Geli slug wakiilka",
       "slugInvalid": "Slug waa in uu ku bilaabmaa xaraf oo waa in uu isticmaalo xarfo yaryar, lambar, iyo dashes",
-      "slugConflict": "Dabaqyadaas waxaa xafiday wakiil ku dhex jira",
+      "slugConflict": "Slug-gaas horey waa la isticmaalay wakheel gudbiyey ama wakheel kale oo xiriirkan",
       "edit": "Wakiilka wax ka beddel"
     },
     "slashCommands": {

@@ -1452,6 +1452,9 @@
       "couldNotGetLatest": "Najnovšie údaje sa nepodarilo načítať.",
       "byline": "{{repo}} #{{number}} · autor: {{author}}",
       "noFindings": "Nenašli sa žiadne nálezy.",
+      "findingsUnavailable": "Výsledky nie sú k dispozícii, pretože táto kontrola zlyhala.",
+      "serviceUnavailable": "Nepodarilo sa pripojiť k službe kontroly kódu. Zopakujte kontrolu, keď bude služba dostupná.",
+      "reviewFailed": "Kontrola zlyhala. Skúste to znova.",
       "showMore": "Zobraziť viac",
       "created": "Vytvorené",
       "started": "Spustené",
@@ -3747,7 +3750,7 @@
       "nameRequired": "Zadajte meno agenta",
       "slugRequired": "Zadajte agenta slimáka",
       "slugInvalid": "Slug musí začínať písmenom a používať iba malé písmená, číslice a pomlčky",
-      "slugConflict": "Ten slimák je rezervovaný vstavaným agentom",
+      "slugConflict": "Tento slug už používa vstavaný agent alebo iný agent v tomto profile",
       "edit": "Upraviť zástupcu"
     },
     "slashCommands": {

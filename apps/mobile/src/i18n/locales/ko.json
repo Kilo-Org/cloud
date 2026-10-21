@@ -943,6 +943,9 @@
       "gateHidden": "숨김",
       "gateNone": "없음",
       "noFindings": "발견된 문제가 없습니다.",
+      "findingsUnavailable": "이 리뷰가 실패하여 결과를 확인할 수 없습니다.",
+      "serviceUnavailable": "코드 리뷰 서비스에 연결할 수 없습니다. 서비스를 사용할 수 있게 되면 리뷰를 다시 시도해 주세요.",
+      "reviewFailed": "리뷰에 실패했습니다. 다시 시도해 주세요.",
       "retryMessage": "코드 리뷰가 다시 실행됩니다.",
       "retryReview": "리뷰 다시 시도",
       "retryNeedsSettings": "코드 리뷰어가 꺼져 있거나 설정을 확인해야 합니다. 설정을 수정한 다음 이 리뷰를 다시 시도하세요.",
@@ -3665,7 +3668,7 @@
       "nameRequired": "상담사 이름을 입력하세요.",
       "slugRequired": "에이전트 슬러그를 입력하세요",
       "slugInvalid": "슬러그는 문자로 시작해야 하며 소문자, 숫자, 대시만 사용해야 합니다.",
-      "slugConflict": "해당 슬러그는 내장 에이전트에 의해 예약되어 있습니다.",
+      "slugConflict": "해당 슬러그는 내장 에이전트 또는 이 프로필의 다른 에이전트가 이미 사용 중입니다",
       "edit": "에이전트 편집"
     },
     "slashCommands": {

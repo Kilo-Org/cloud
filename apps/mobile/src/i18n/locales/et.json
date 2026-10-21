@@ -1414,6 +1414,9 @@
       "couldNotGetLatest": "Uusimaid andmeid ei õnnestunud laadida.",
       "byline": "{{repo}} #{{number}}, autor {{author}}",
       "noFindings": "Leide ei leitud.",
+      "findingsUnavailable": "Tulemused pole saadaval, sest see ülevaatus ebaõnnestus.",
+      "serviceUnavailable": "Koodi ülevaatuse teenusega ei õnnestunud ühendust luua. Proovi ülevaatust uuesti, kui teenus on saadaval.",
+      "reviewFailed": "Ülevaatus ebaõnnestus. Palun proovi uuesti.",
       "showMore": "Kuva rohkem",
       "created": "Loodud",
       "started": "Alustatud",
@@ -3665,7 +3668,7 @@
       "nameRequired": "Sisestage agendi nimi",
       "slugRequired": "Sisestage agent nälkjas",
       "slugInvalid": "Slug peab algama tähega ja kasutama ainult väiketähti, numbreid ja sidekriipse",
-      "slugConflict": "See nälkjas on reserveeritud sisseehitatud agenti poolt",
+      "slugConflict": "Seda slugi kasutab juba sisseehitatud agent või muu agent selles profiilis",
       "edit": "Redigeeri agenti"
     },
     "slashCommands": {

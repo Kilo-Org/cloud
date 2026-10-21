@@ -1414,6 +1414,9 @@
       "couldNotGetLatest": "A kò lè gba dátà tuntun.",
       "byline": "{{repo}} #{{number}} láti ọwọ́ {{author}}",
       "noFindings": "Kò sí àbùkù.",
+      "findingsUnavailable": "Àwọn àbájáde kò sí nítorí pé àtúnyẹ̀wò yìí kùnà.",
+      "serviceUnavailable": "A kò lè sopọ̀ mọ́ iṣẹ́ àtúnyẹ̀wò kóòdù. Tún gbìyànjú àtúnyẹ̀wò nígbà tí iṣẹ́ náà bá wà.",
+      "reviewFailed": "Àtúnyẹ̀wò náà kùnà. Jọ̀wọ́ tún gbìyànjú.",
       "showMore": "Fi sí i hàn",
       "created": "Tí a ṣẹ̀dá",
       "started": "Tí a bẹ̀rẹ̀",
@@ -3665,7 +3668,7 @@
       "nameRequired": "Tẹ orukọ aṣoju sii",
       "slugRequired": "Tẹ slug oluranlowo",
       "slugInvalid": "Slug gbọdọ bẹrẹ pẹlu lẹta kan ko si lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
-      "slugConflict": "Slug yẹn wa ni ipamọ nipasẹ aṣoju ti a ṣe sinu",
+      "slugConflict": "Slug yẹn ti wa ni lilo pẹlu aṣojú ti a fi sori ẹrọ tabi aṣojú miiran ninu profaili yii",
       "edit": "Aṣoju Ṣatunkọ"
     },
     "slashCommands": {

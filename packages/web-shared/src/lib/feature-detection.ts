@@ -24,7 +24,6 @@ export const FEATURE_VALUES = [
   'cloud-agent-web',
   'code-review',
   'code-review-memory',
-  'auto-triage',
   'app-builder',
   'agent-manager',
   'security-agent',

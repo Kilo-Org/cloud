@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   destroyDeciderCliContainer,
+  isCatalogLoadFailureResult,
   isExactModelUnavailableResult,
   parseContainerRunResponse,
   runDeciderCaseViaCli,
@@ -177,6 +178,67 @@ describe('runDeciderCaseViaCli', () => {
       latencyMs: 37,
       stderrTail: '\nHTTP 429 provider throttle',
     });
+  });
+});
+
+describe('CLI catalog load failures', () => {
+  const diagnostic =
+    'Model not found: kilo/candidate/model. Failed to load the Kilo model catalog (network). Check your connection and credentials.';
+  const emptyResult = { text: '', stderrTail: diagnostic, costUsd: null, timedOut: false };
+
+  it.each([null, 0])('recognizes an unbilled catalog failure with cost %s', costUsd => {
+    expect(isCatalogLoadFailureResult({ ...emptyResult, costUsd })).toBe(true);
+    expect(
+      isCatalogLoadFailureResult({
+        ...emptyResult,
+        costUsd,
+        stderrTail: `\u001b[31m${diagnostic}\u001b[0m`,
+      })
+    ).toBe(true);
+  });
+
+  it.each([
+    { text: 'answer' },
+    { costUsd: 0.01 },
+    { timedOut: true },
+    { stderrTail: 'Model not found: kilo/candidate/model. No models are currently available.' },
+    { stderrTail: 'Provider API failed (network). Check your connection and credentials.' },
+    { stderrTail: '' },
+  ])('preserves measurements and unrelated failures: %j', overrides => {
+    expect(isCatalogLoadFailureResult({ ...emptyResult, ...overrides })).toBe(false);
+  });
+
+  it.each([undefined, 'candidate/model', 'kilo/candidate/model'])(
+    'rejects catalog failure as exact unavailability with stored identity %s',
+    unavailableModelId => {
+      expect(
+        isExactModelUnavailableResult({ ...emptyResult, unavailableModelId }, 'candidate/model')
+      ).toBe(false);
+    }
+  );
+
+  it.each([
+    { stdoutLines: [] },
+    {
+      stdoutLines: [
+        JSON.stringify({
+          type: 'error',
+          error: {
+            name: 'ProviderModelNotFoundError',
+            data: { providerID: 'kilo', modelID: 'candidate/model' },
+          },
+        }),
+      ],
+    },
+  ])('does not retain an unavailable identity from a catalog failure: %j', ({ stdoutLines }) => {
+    const result = parseContainerRunResponse(
+      { exitCode: 0, durationMs: 12, stdoutLines, stderrTail: diagnostic },
+      Date.now(),
+      'candidate/model'
+    );
+    expect(isCatalogLoadFailureResult(result)).toBe(true);
+    expect(isExactModelUnavailableResult(result, 'candidate/model')).toBe(false);
+    expect(result.unavailableModelId).toBeUndefined();
   });
 });
 

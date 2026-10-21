@@ -915,6 +915,9 @@
       "gateHidden": "Nascosto",
       "gateNone": "Nessuno",
       "noFindings": "Non ci sono segnalazioni.",
+      "findingsUnavailable": "I risultati non sono disponibili perché questa revisione non è riuscita.",
+      "serviceUnavailable": "Impossibile contattare il servizio di revisione del codice. Ripeti la revisione quando il servizio sarà disponibile.",
+      "reviewFailed": "La revisione non è riuscita. Riprova.",
       "retryMessage": "Questa azione rieseguirà la revisione del codice.",
       "retryReview": "Ripeti la revisione",
       "retryNeedsSettings": "Il Revisore di codice è disattivato o le sue impostazioni richiedono attenzione. Correggi le impostazioni, poi ripeti questa revisione.",
@@ -3706,7 +3709,7 @@
       "nameRequired": "Inserisci il nome di un agente",
       "slugRequired": "Inserisci uno slug dell'agente",
       "slugInvalid": "Lo slug deve iniziare con una lettera e utilizzare solo lettere minuscole, cifre e trattini",
-      "slugConflict": "Questo slug è riservato da un agente integrato",
+      "slugConflict": "Quello slug è già usato da un agente integrato o da un altro agente in questo profilo",
       "edit": "Modifica agente"
     },
     "slashCommands": {

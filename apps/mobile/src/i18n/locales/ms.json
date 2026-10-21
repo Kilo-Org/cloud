@@ -1414,6 +1414,9 @@
       "couldNotGetLatest": "Tidak dapat mendapatkan maklumat terkini.",
       "byline": "{{repo}} #{{number}} oleh {{author}}",
       "noFindings": "Tiada penemuan.",
+      "findingsUnavailable": "Keputusan tidak tersedia kerana semakan ini gagal.",
+      "serviceUnavailable": "Tidak dapat menghubungi perkhidmatan semakan kod. Cuba semakan semula apabila perkhidmatan tersedia.",
+      "reviewFailed": "Semakan gagal. Sila cuba lagi.",
       "showMore": "Tunjukkan lebih banyak",
       "created": "Dicipta",
       "started": "Dimulakan",
@@ -3665,7 +3668,7 @@
       "nameRequired": "Masukkan nama ejen",
       "slugRequired": "Masukkan slug ejen",
       "slugInvalid": "Slug mesti bermula dengan huruf dan hanya menggunakan huruf kecil, digit dan sempang",
-      "slugConflict": "Slug itu ditempah oleh ejen terbina dalam",
+      "slugConflict": "Slug itu sudah digunakan oleh ejen terbina dalam atau ejen lain dalam profil ini",
       "edit": "Edit ejen"
     },
     "slashCommands": {

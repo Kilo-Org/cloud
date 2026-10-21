@@ -1414,6 +1414,9 @@
       "couldNotGetLatest": "Kunde inte hämta de senaste uppgifterna.",
       "byline": "{{repo}} #{{number}} av {{author}}",
       "noFindings": "Inga fynd upptäcktes.",
+      "findingsUnavailable": "Resultaten är inte tillgängliga eftersom den här granskningen misslyckades.",
+      "serviceUnavailable": "Kunde inte ansluta till tjänsten för kodgranskning. Gör om granskningen när tjänsten är tillgänglig.",
+      "reviewFailed": "Granskningen misslyckades. Försök igen.",
       "showMore": "Visa mer",
       "created": "Skapad",
       "started": "Startad",
@@ -3665,7 +3668,7 @@
       "nameRequired": "Ange ett agentnamn",
       "slugRequired": "Ange en agentsnigel",
       "slugInvalid": "Slug måste börja med en bokstav och endast använda små bokstäver, siffror och bindestreck",
-      "slugConflict": "Den snigeln är reserverad av en inbyggd agent",
+      "slugConflict": "Den slugen används redan av en inbyggd agent eller en annan agent i den här profilen",
       "edit": "Redigera agent"
     },
     "slashCommands": {

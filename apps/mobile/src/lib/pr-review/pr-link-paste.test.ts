@@ -4,7 +4,6 @@ import {
   decidePrLinkOpen,
   decidePrLinkPaste,
   prLinkToastClipboardEmptyCopy,
-  prLinkToastInvalidCopy,
   prLinkToastPasteDeniedCopy,
   selectPrLinkClearButtonVisible,
   selectPrLinkPasteEmptyReason,
@@ -147,13 +146,11 @@ describe('selectPrLinkClearButtonVisible', () => {
     expect(selectPrLinkClearButtonVisible({ hasInput: false })).toBe(false);
   });
 });
-
 describe('PR link toast copy', () => {
   it('exports the pinned toast copy strings', () => {
     expect(prLinkToastClipboardEmptyCopy()).toBe('Clipboard is empty');
     expect(prLinkToastPasteDeniedCopy()).toBe(
       'Paste access was denied. Allow paste and try again.'
     );
-    expect(prLinkToastInvalidCopy()).toBe('Not a pull request or merge request link');
   });
 });

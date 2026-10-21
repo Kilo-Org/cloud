@@ -1414,6 +1414,9 @@
       "couldNotGetLatest": "Kunne ikke hente de nyeste opplysningene.",
       "byline": "{{repo}} #{{number}} av {{author}}",
       "noFindings": "Ingen funn ble gjort.",
+      "findingsUnavailable": "Resultatene er ikke tilgjengelige fordi denne gjennomgangen mislyktes.",
+      "serviceUnavailable": "Kunne ikke koble til tjenesten for kodegjennomgang. Prøv gjennomgangen på nytt når tjenesten er tilgjengelig.",
+      "reviewFailed": "Gjennomgangen mislyktes. Prøv på nytt.",
       "showMore": "Vis mer",
       "created": "Opprettet",
       "started": "Startet",
@@ -3665,7 +3668,7 @@
       "nameRequired": "Skriv inn et agentnavn",
       "slugRequired": "Skriv inn en agentsnegl",
       "slugInvalid": "Slug må starte med en bokstav og kun bruke små bokstaver, sifre og bindestreker",
-      "slugConflict": "Den sneglen er reservert av en innebygd agent",
+      "slugConflict": "Det sluget er allerede i bruk av en innebygd agent eller en annen agent i denne profilen",
       "edit": "Rediger agent"
     },
     "slashCommands": {

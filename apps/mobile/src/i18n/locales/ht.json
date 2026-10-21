@@ -1414,6 +1414,9 @@
       "couldNotGetLatest": "Nou pa t ka jwenn dènye done yo.",
       "byline": "{{repo}} #{{number}} pa {{author}}",
       "noFindings": "Pa gen okenn konsta.",
+      "findingsUnavailable": "Rezilta yo pa disponib paske revizyon sa a echwe.",
+      "serviceUnavailable": "Nou pa t ka konekte ak sèvis revizyon kòd la. Eseye revizyon an ankò lè sèvis la disponib.",
+      "reviewFailed": "Revizyon an echwe. Tanpri eseye ankò.",
       "showMore": "Montre plis",
       "created": "Kreye",
       "started": "Kòmanse",
@@ -3665,7 +3668,7 @@
       "nameRequired": "Antre yon non ajan",
       "slugRequired": "Antre yon slug ajan",
       "slugInvalid": "Slug dwe kòmanse ak yon lèt epi sèvi ak sèlman lèt miniskil, chif, ak tire",
-      "slugConflict": "Slug sa rezève pa yon ajan entegre",
+      "slugConflict": "Slug sa a deja yon ajan entegre oswa yon lòt ajnan nan pwofil sa a ap itilize",
       "edit": "Edit ajan"
     },
     "slashCommands": {

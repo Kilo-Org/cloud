@@ -946,6 +946,9 @@
       "gateHidden": "Oculto",
       "gateNone": "Ninguno",
       "noFindings": "No hay hallazgos.",
+      "findingsUnavailable": "Los resultados no están disponibles porque esta revisión falló.",
+      "serviceUnavailable": "No se pudo conectar con el servicio de revisión de código. Vuelve a intentar la revisión cuando el servicio esté disponible.",
+      "reviewFailed": "La revisión falló. Vuelve a intentarlo.",
       "retryMessage": "Se volverá a ejecutar la revisión de código.",
       "retryReview": "Reintentar revisión",
       "retryNeedsSettings": "El Revisor de código está desactivado o su configuración requiere atención. Corrige la configuración y luego reintenta esta revisión.",
@@ -3706,7 +3709,7 @@
       "nameRequired": "Ingrese el nombre de un agente",
       "slugRequired": "Introduzca una babosa de agente",
       "slugInvalid": "Slug debe comenzar con una letra y usar solo letras minúsculas, dígitos y guiones.",
-      "slugConflict": "Esa babosa está reservada por un agente incorporado.",
+      "slugConflict": "Ese slug ya lo usa un agente integrado u otro agente de este perfil",
       "edit": "Editar agente"
     },
     "slashCommands": {

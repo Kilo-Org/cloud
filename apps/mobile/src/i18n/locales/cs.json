@@ -1452,6 +1452,9 @@
       "couldNotGetLatest": "Aktuální stav se nepodařilo načíst.",
       "byline": "{{repo}} #{{number}} · autor: {{author}}",
       "noFindings": "Kontrola neodhalila žádné nálezy.",
+      "findingsUnavailable": "Výsledky nejsou k dispozici, protože tato kontrola selhala.",
+      "serviceUnavailable": "Nepodařilo se připojit ke službě kontroly kódu. Zopakujte kontrolu, až bude služba dostupná.",
+      "reviewFailed": "Kontrola selhala. Zkuste to prosím znovu.",
       "showMore": "Zobrazit více",
       "created": "Vytvořeno",
       "started": "Zahájeno",
@@ -3747,7 +3750,7 @@
       "nameRequired": "Zadejte jméno agenta",
       "slugRequired": "Zadejte agenta slimáka",
       "slugInvalid": "Slug musí začínat písmenem a používat pouze malá písmena, číslice a pomlčky",
-      "slugConflict": "Ten slimák je rezervován vestavěným agentem",
+      "slugConflict": "Tento slug už používá vestavěný agent nebo jiný agent v tomto profilu",
       "edit": "Upravit agenta"
     },
     "slashCommands": {

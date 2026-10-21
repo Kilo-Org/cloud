@@ -16,7 +16,6 @@ import {
   Factory,
   Key,
   List,
-  ListChecks,
   MessageSquare,
   Plus,
   Receipt,
@@ -173,11 +172,6 @@ const cloudItems: SidebarStoryItem[] = [
     url: '/security-agent',
   },
   {
-    title: 'Auto Triage',
-    icon: ListChecks,
-    url: '/auto-triage',
-  },
-  {
     title: 'Deploy',
     icon: Rocket,
     url: '/deploy',
@@ -191,11 +185,6 @@ const cloudItems: SidebarStoryItem[] = [
     title: 'Managed Indexing',
     icon: Database,
     url: '/code-indexing',
-  },
-  {
-    title: 'MCP Gateway',
-    icon: Cable,
-    url: '/cloud/mcp-gateway',
   },
 ];
 

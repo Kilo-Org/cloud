@@ -77,6 +77,17 @@ describe('the document a view draws', () => {
     expect(document.startsWith('<meta http-equiv="Content-Security-Policy"')).toBe(true);
     expect(document).toContain('<p>a view</p>');
   });
+
+  it('keeps the doctype first, so a document without a head is not drawn in quirks mode', () => {
+    const document = viewDocument(
+      '<!doctype html><html><body><p>a view</p></body></html>',
+      "default-src 'none'"
+    );
+    expect(document.startsWith('<!doctype html>')).toBe(true);
+    expect(document.indexOf('Content-Security-Policy')).toBeLessThan(
+      document.indexOf('<p>a view</p>')
+    );
+  });
 });
 
 describe('the page a view is drawn in', () => {

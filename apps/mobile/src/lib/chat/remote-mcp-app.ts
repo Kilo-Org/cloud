@@ -116,10 +116,16 @@ export function contentSecurityPolicy(meta: Readonly<Record<string, unknown>> | 
 export function viewDocument(html: string, policy: string): string {
   const meta = `<meta http-equiv="Content-Security-Policy" content="${policy.replaceAll('"', '&quot;')}">`;
   const head = /<head[^>]*>/iu.exec(html);
-  if (head === null) {
-    return `${meta}${html}`;
+  if (head !== null) {
+    const at = head.index + head[0].length;
+    return `${html.slice(0, at)}${meta}${html.slice(at)}`;
   }
-  const at = head.index + head[0].length;
+  /* A document without a head still gets its policy before its own content, and
+     after the doctype when it has one: a start tag in front of the doctype is
+     a parse error, and the parser then draws the whole document in quirks
+     mode. The parser hoists the meta into the head it makes. */
+  const doctype = /^\s*<!doctype[^>]*>/iu.exec(html);
+  const at = doctype === null ? 0 : doctype.index + doctype[0].length;
   return `${html.slice(0, at)}${meta}${html.slice(at)}`;
 }
 

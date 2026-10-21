@@ -9,7 +9,8 @@ import { type RemoteMcpApp } from '@kilocode/harness-sdk/plugins/remote-mcp';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { mcpCallResultOf, openRemoteMcpApp, readRemoteMcpView } from '@/lib/chat/remote-mcp';
+import { mcpCallResultOf } from '@/lib/chat/remote-mcp-call-results';
+import { openRemoteMcpApp, readRemoteMcpView } from '@/lib/chat/remote-mcp';
 import {
   DEFAULT_VIEW_HEIGHT,
   MAX_VIEW_HEIGHT,
@@ -80,9 +81,11 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
+    setPageLoaded(false);
     setDocumentState({ kind: 'loading' });
     const read = async () => {
-      const document = await readRemoteMcpView(view);
+      const document = await readRemoteMcpView(view, controller.signal);
       if (!active) {
         return;
       }
@@ -93,6 +96,8 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
     void read();
     return () => {
       active = false;
+      // A row that scrolled away does not leave the request open.
+      controller.abort();
     };
   }, [attempt, view]);
 
@@ -166,6 +171,9 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
   return (
     <View style={{ height }} className="overflow-hidden rounded-lg bg-secondary">
       <WebView
+        // A retry gets a page of its own: a page that failed to load has no
+        // host object left to hand a document to.
+        key={attempt}
         ref={webView}
         source={{ html: VIEW_HOST_PAGE }}
         // Only the page itself may load; every tap stays in the app.

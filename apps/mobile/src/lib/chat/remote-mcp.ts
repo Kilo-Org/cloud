@@ -3,7 +3,6 @@ import { type Tool } from '@kilocode/harness-sdk';
 import {
   type RemoteMcpApp,
   type RemoteMcpAppContext,
-  type RemoteMcpCallAnswered,
   type RemoteMcpClientDeps,
   RemoteMcpError,
   type RemoteMcpOfferedTool,
@@ -13,6 +12,7 @@ import {
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 
+import { forgetCallResults, rememberCallResult } from './remote-mcp-call-results';
 import { credentialDeps, serverValue } from './remote-mcp-credentials';
 import {
   connectingOf,
@@ -70,6 +70,13 @@ export type RemoteMcpRequest = {
 const AUTOMATIC_TIMEOUT_MS = 4000;
 const RETRY_TIMEOUT_MS = 15_000;
 
+/**
+ * A view's document is read while the row that draws it is on screen, so it is
+ * bounded like a discovery rather than like a tool call: a server that does not
+ * answer leaves the row with its Retry, not a minute of waiting.
+ */
+const VIEW_READ_TIMEOUT_MS = 15_000;
+
 /** The deadline one discovery gets: the Retry's is the caller's own ask. */
 const deadlineFor = (request: RemoteMcpRequest): number =>
   request.retry === true ? RETRY_TIMEOUT_MS : AUTOMATIC_TIMEOUT_MS;
@@ -125,34 +132,6 @@ function depsFor(
     onCallResult: rememberCallResult,
     ...credentialDeps(server),
   };
-}
-
-/**
- * The whole answer a call received, kept for the row that draws it.
- *
- * A transcript holds the text the model read; a view renders the server's own
- * content and structured result, which the harness hands over here because the
- * text does not carry them. Only the most recent answers are kept: a reopened
- * transcript draws its views from the text alone, and nothing waits on one
- * that scrolled away.
- */
-const callResults = new Map<string, RemoteMcpCallAnswered>();
-const MAX_CALL_RESULTS = 50;
-
-function rememberCallResult(answered: RemoteMcpCallAnswered): void {
-  callResults.delete(answered.callId);
-  callResults.set(answered.callId, answered);
-  if (callResults.size > MAX_CALL_RESULTS) {
-    const oldest = callResults.keys().next().value;
-    if (oldest !== undefined) {
-      callResults.delete(oldest);
-    }
-  }
-}
-
-/** What a call answered, for the view that renders it; the text alone when it is gone. */
-export function mcpCallResultOf(callId: string): RemoteMcpCallAnswered | undefined {
-  return callResults.get(callId);
 }
 
 /** What a failed discovery or call leaves: an OAuth server that refused needs a person. */
@@ -324,7 +303,7 @@ export async function ensureRemoteMcp(
     generation += 1;
     cacheKey = key;
     discovered = new Map();
-    callResults.clear();
+    forgetCallResults();
     pending.clear();
     publish();
   }
@@ -392,13 +371,22 @@ function viewSourceOf(view: RemoteMcpToolView): RemoteMcpViewSource | undefined 
   return { server: serverValue(server), deps, tools: found.serverTools };
 }
 
-/** The document a tool's view is drawn from, held to the policy it declared. */
-export async function readRemoteMcpView(view: RemoteMcpToolView): Promise<RemoteMcpViewDocument> {
+/**
+ * The document a tool's view is drawn from, held to the policy it declared.
+ * `signal` ends the read with the row that asked for it.
+ */
+export async function readRemoteMcpView(
+  view: RemoteMcpToolView,
+  signal?: AbortSignal
+): Promise<RemoteMcpViewDocument> {
   const source = viewSourceOf(view);
-  const document =
-    source === undefined
-      ? ({ kind: 'unavailable' } as const)
-      : await readViewDocument(source, view);
+  if (source === undefined) {
+    return { kind: 'unavailable' };
+  }
+  const document = await readViewDocument(
+    { ...source, deps: { ...source.deps, timeoutMs: VIEW_READ_TIMEOUT_MS, signal } },
+    view
+  );
   return document;
 }
 
@@ -427,7 +415,7 @@ export function forgetRemoteMcp(): void {
   generation += 1;
   cacheKey = undefined;
   discovered = new Map();
-  callResults.clear();
+  forgetCallResults();
   pending.clear();
   inFlight = undefined;
   publish();

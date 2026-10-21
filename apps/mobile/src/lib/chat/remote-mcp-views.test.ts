@@ -94,8 +94,9 @@ vi.mock('@kilocode/harness-sdk/plugins/remote-mcp', () => ({
 
 // The module is loaded after its mocks exist, which a static import cannot
 // guarantee: `vi.mock` is hoisted, and this module reads the store at load time.
-const { ensureRemoteMcp, forgetRemoteMcp, mcpCallResultOf, openRemoteMcpApp, readRemoteMcpView } =
+const { ensureRemoteMcp, forgetRemoteMcp, openRemoteMcpApp, readRemoteMcpView } =
   await import('./remote-mcp');
+const { mcpCallResultOf } = await import('./remote-mcp-call-results');
 const { remoteServerView } = await import('./remote-mcp-surface');
 
 const chart = viewTool('mcp_alpha_chart', 'chart', 'ui://alpha/chart.html');

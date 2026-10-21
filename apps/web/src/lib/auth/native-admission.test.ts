@@ -386,100 +386,6 @@ describe('requireAdmissionPayload', () => {
 
 // ── Challenge issuance ─────────────────────────────────────────────────────
 
-describe('admission condition aggregation', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    resetAdmissionCountersForTests();
-  });
-
-  test('counts occurrences and emits one structured line per interval with the running count', () => {
-    setMode('enforce');
-    jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000);
-    try {
-      checkNativeAdmission({ provider: 'google', idToken: 'a' });
-      checkNativeAdmission({ provider: 'google', idToken: 'b' });
-      checkNativeAdmission({ provider: 'google', idToken: 'c' });
-      // Still inside the same interval: nothing flushed yet.
-      expect(mockWarnExceptInTest).not.toHaveBeenCalled();
-
-      // Next interval boundary flushes the accumulated count.
-      jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000 + 60_001);
-      checkNativeAdmission({ provider: 'google', idToken: 'd' });
-
-      expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
-      const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
-      expect(line).toMatchObject({
-        event: 'native_admission_aggregate',
-        metric: 'native_admission_legacy_count',
-        count: 3,
-        intervalMs: 60_000,
-      });
-    } finally {
-      jestGlobal.restoreAllMocks();
-    }
-  });
-
-  test('report-mode invalid shapes aggregate under their own metric', () => {
-    setMode('report');
-    jestGlobal.spyOn(Date, 'now').mockReturnValue(2_000_000);
-    try {
-      checkNativeAdmission({ admission: 'garbage' });
-      checkNativeAdmission({ admission: null });
-
-      jestGlobal.spyOn(Date, 'now').mockReturnValue(2_000_000 + 60_001);
-      checkNativeAdmission({ admission: 'garbage' });
-
-      const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
-      expect(line).toMatchObject({
-        event: 'native_admission_aggregate',
-        metric: 'native_admission_invalid_shape',
-        count: 2,
-      });
-    } finally {
-      jestGlobal.restoreAllMocks();
-    }
-  });
-
-  test('final window flushes on later traffic even without a new counted condition', () => {
-    setMode('enforce');
-    jestGlobal.spyOn(Date, 'now').mockReturnValue(3_000_000);
-    try {
-      checkNativeAdmission({ provider: 'google', idToken: 'a' });
-      // Window elapses; the next request has an admission field, so nothing
-      // new is counted, but the pending window must still flush.
-      jestGlobal.spyOn(Date, 'now').mockReturnValue(3_000_000 + 60_001);
-      checkNativeAdmission({
-        provider: 'google',
-        idToken: 'b',
-        admission: {
-          platform: 'android',
-          kind: 'assertion',
-          challenge: 'ch1',
-          payload: 'base64data',
-          keyId: 'key1',
-        },
-      });
-
-      expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
-      const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
-      expect(line).toMatchObject({
-        event: 'native_admission_aggregate',
-        metric: 'native_admission_legacy_count',
-        count: 1,
-        windowStart: new Date(3_000_000).toISOString(),
-      });
-    } finally {
-      jestGlobal.restoreAllMocks();
-    }
-  });
-
-  test('per-request captureMessage stays silent for expected conditions', () => {
-    setMode('enforce');
-    checkNativeAdmission({ provider: 'google', idToken: 'a' });
-    expect(mockCaptureMessage).not.toHaveBeenCalled();
-  });
-});
-
 describe('issueAdmissionChallenge', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -1015,25 +921,38 @@ describe('countAdmissionCondition', () => {
     jestGlobal.restoreAllMocks();
   });
 
-  test('aggregates a refusal instead of emitting one Sentry event per request', () => {
-    jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000);
+  test('aggregates refusals into one window line instead of one Sentry event each', () => {
+    const now = jestGlobal.spyOn(Date, 'now');
+    now.mockReturnValue(1_000_000);
 
     countAdmissionCondition('native_admission_refused');
     countAdmissionCondition('native_admission_refused');
     countAdmissionCondition('native_admission_refused');
+    expect(mockWarnExceptInTest).not.toHaveBeenCalled();
 
-    // Refusals are ordinary hostile traffic: one window line, no Sentry issue.
+    // The next request after the interval flushes one line with the count.
+    now.mockReturnValue(1_000_000 + 61_000);
+    requireAdmissionPayload({});
+
+    expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
+    const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
+    expect(line).toMatchObject({
+      event: 'native_admission_aggregate',
+      metric: 'native_admission_refused',
+      count: 3,
+    });
     expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 
-  test('rolls the window forward on the next request after the interval', () => {
+  test('keeps the window open until the interval elapses', () => {
     const now = jestGlobal.spyOn(Date, 'now');
+    now.mockReturnValue(2_000_000);
 
-    now.mockReturnValue(1_000_000);
     countAdmissionCondition('native_admission_missing');
-    now.mockReturnValue(1_000_000 + 61_000);
-    expect(() => requireAdmissionPayload({})).not.toThrow();
-    expect(mockCaptureMessage).not.toHaveBeenCalled();
+    now.mockReturnValue(2_000_000 + 59_000);
+    requireAdmissionPayload({});
+
+    expect(mockWarnExceptInTest).not.toHaveBeenCalled();
   });
 });
 

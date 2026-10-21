@@ -316,8 +316,9 @@ describe('CreditsCard balance state', () => {
     currentUser.userId = 'user-a';
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
     getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
-    // The personal query keeps a future grant, so a subtitle built from it
-    // instead of the selected organization's blocks would show 12/17/2026 twice.
+    // The personal query keeps its own future grant, so a subtitle built from
+    // it would read $5.00 expiring 1/17/2027, and one that summed both sources
+    // would read $7.00 expiring 12/17/2026.
     personalCreditBlocksQueryFn.mockResolvedValue({
       creditBlocks: [{ balance_mUsd: 5_000_000, expiry_date: '2027-01-17T12:00:00Z' }],
     });

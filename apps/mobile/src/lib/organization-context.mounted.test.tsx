@@ -146,7 +146,7 @@ describe('OrganizationProvider default organization', () => {
     await mount();
     expect(scope()).toMatchObject({ organizationId: 'org-b', isLoaded: true, error: null });
     await act(() => {
-      names.resolve([orgA]);
+      names.resolve([orgA, orgB]);
     });
     expect(scope().organizationId).toBe('org-b');
   });

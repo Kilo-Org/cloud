@@ -35,6 +35,8 @@
     "connectGithub": "Sambungkan GitHub",
     "cost": "Kos",
     "discard": "Buang",
+    "discardChangesMessage": "Perubahan anda akan hilang.",
+    "discardChangesTitle": "Buang perubahan?",
     "findings": "Dapatan",
     "mergeRequest": "permintaan gabungan",
     "notConnected": "Tidak disambungkan",
@@ -661,7 +663,8 @@
       "description": "Sambungkan akaun GitHub anda untuk menyemak permintaan tarik pada peranti mudah alih.",
       "gitlabDescription": "Sambungkan akaun GitLab anda untuk menyemak permintaan gabungan pada mudah alih.",
       "bitbucketDescription": "Sambungkan Bitbucket ke organisasi ini untuk menyemak permintaan tarik pada mudah alih.",
-      "bitbucketOrgOnlyDescription": "Pilih organisasi dalam profil anda untuk menyemak permintaan tarik Bitbucketnya."
+      "bitbucketOrgOnlyDescription": "Tukar akaun di atas kepada organisasi untuk menyemak permintaan tarik Bitbucket-nya.",
+      "contextLine": "Untuk {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "Semakan ini tidak dapat dihantar dalam keadaan sekarang. PR mungkin telah berubah, atau anda cuba menyemak permintaan tarik anda sendiri.",
       "reviewNotSubmittedTerm": "Semakan ini tidak dapat dihantar seperti sedia ada. {{term}} mungkin telah berubah, atau anda tidak boleh menyemak {{term}} anda sendiri.",
       "couldNotPostComment": "Tidak dapat menyiarkan komen.",
-      "couldNotSubmitReview": "Tidak dapat menghantar semakan. Semak sambungan anda dan cuba lagi."
+      "couldNotSubmitReview": "Tidak dapat menghantar semakan. Semak sambungan anda dan cuba lagi.",
+      "rateLimited": "Terlalu banyak permintaan. Sila cuba lagi kemudian.",
+      "conflict": "Item ini telah berubah semasa anda mengeditnya. Muat semula dan cuba lagi."
     },
     "operation": {
       "couldNotReply": "Tidak dapat membalas.",
@@ -1545,7 +1550,8 @@
       "bugs": "Pepijat",
       "style": "Gaya",
       "testing": "Pengujian",
-      "documentation": "Dokumentasi"
+      "documentation": "Dokumentasi",
+      "unknown": "Lain ({{area}})"
     },
     "gateThreshold": {
       "warning": "Amaran"
@@ -1657,7 +1663,14 @@
       "whereFound": "Lokasi penemuan ({{displayCount}})",
       "fullReport": "Laporan penuh yang dijana",
       "yes": "Ya",
-      "no": "Tidak"
+      "no": "Tidak",
+      "action": {
+        "analyzeCodebase": "Analisis asas kod",
+        "dismiss": "Tolak",
+        "manualReview": "Semakan manual",
+        "monitor": "Pantau",
+        "openPr": "Buka PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} penemuan",
@@ -1876,7 +1889,24 @@
       "title": "Laporan audit",
       "unavailable": "Laporan audit tidak tersedia",
       "unavailableDescription": "Hanya pemilik organisasi dan pengurus pengebilan boleh melihat laporan audit. Minta pemilik atau pengurus pengebilan memberikan anda akses.",
-      "queryFailed": "Pertanyaan untuk laporan tidak selesai. Cuba lagi."
+      "queryFailed": "Pertanyaan untuk laporan tidak selesai. Cuba lagi.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analisis selesai",
+        "findingAnalysisFailed": "Analisis gagal",
+        "findingAutoDismissed": "Ditolak secara automatik",
+        "findingCreated": "Diimport",
+        "findingDeleted": "Dihapuskan",
+        "findingDismissed": "Ditolak",
+        "findingSeverityChanged": "Keterukan diubah",
+        "findingStatusChange": "Status diubah",
+        "findingSuperseded": "Digantikan",
+        "remediationBlocked": "Pemulihan disekat",
+        "remediationCancelled": "Dibatalkan",
+        "remediationFailed": "Pemulihan gagal",
+        "remediationNoChangesNeeded": "Tiada perubahan diperlukan",
+        "remediationPrOpened": "PR dibuka",
+        "remediationQueued": "Pemulihan diminta"
+      }
     },
     "notifications": {
       "couldNotLoad": "Tidak dapat memuatkan tetapan pemberitahuan.",
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} tidak lagi tersedia. Model lalai anda digunakan.",
       "couldNotReadPendingSessions": "Tidak dapat membaca sesi yang menunggu. Cuba semula.",
       "failedToCreate": "Gagal mencipta sesi.",
+      "checkOrganizationAccess": "Sila semak akses anda ke organisasi ini, kemudian cuba semula.",
       "couldNotRefreshRepositories": "Tidak dapat memuatkan semula repositori. Sila cuba semula.",
       "discardDraftTitle": "Buang draf?",
       "discardDraftMessage": "Gesaan anda akan hilang.",
@@ -2732,6 +2763,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Sesi aktif anda tidak dapat dipaparkan sehingga data ini selesai dimuatkan.",
     "currentDeviceUnidentified": "Peranti semasa tidak dapat dikenal pasti.",
+    "kiloApp": "Apl Kilo",
     "noSessions": "Tiada sesi aktif",
     "noSessionsDescription": "Log masuk dengan apl Kilo pada peranti lain dan ia akan muncul di sini.",
     "onlyKiloAppSignIns": "Hanya sesi log masuk apl Kilo dipaparkan di sini. Sesi log masuk penyunting dan CLI tidak disenaraikan.",

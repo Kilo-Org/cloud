@@ -35,6 +35,8 @@
     "connectGithub": "Yhdistä GitHub-tili",
     "cost": "Kustannus",
     "discard": "Hylkää",
+    "discardChangesMessage": "Muutokset menetetään.",
+    "discardChangesTitle": "Hylätäänkö muutokset?",
     "findings": "Havainnot",
     "mergeRequest": "yhdistämispyyntö",
     "notConnected": "Ei yhdistetty",
@@ -661,7 +663,8 @@
       "description": "Yhdistä GitHub-tilisi, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
       "gitlabDescription": "Yhdistä GitLab-tilisi, niin voit katselmoida yhdistämispyyntöjä mobiililaitteella.",
       "bitbucketDescription": "Yhdistä Bitbucket tähän organisaatioon, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
-      "bitbucketOrgOnlyDescription": "Valitse profiilissasi organisaatio, niin voit katselmoida sen Bitbucket-muutospyyntöjä."
+      "bitbucketOrgOnlyDescription": "Vaihda yllä oleva tili organisaatioon, niin voit katselmoida sen Bitbucket-muutospyyntöjä.",
+      "contextLine": "{{organization}}-organisaatiolle"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "Tätä katselmointia ei voi lähettää sellaisenaan. PR on voinut muuttua tai kyseessä on oma muutospyyntösi, jota et voi katselmoida.",
       "reviewNotSubmittedTerm": "Tätä katselmointia ei voi lähettää sellaisenaan. {{term}} on voinut muuttua, tai kyseessä on oma {{term}}, jota et voi katselmoida.",
       "couldNotPostComment": "Kommenttia ei voitu julkaista.",
-      "couldNotSubmitReview": "Katselmointia ei voitu lähettää. Tarkista yhteys ja yritä uudelleen."
+      "couldNotSubmitReview": "Katselmointia ei voitu lähettää. Tarkista yhteys ja yritä uudelleen.",
+      "rateLimited": "Liian monta pyyntöä. Yritä myöhemmin uudelleen.",
+      "conflict": "Tämä muuttui, kun työstit sitä. Lataa se uudelleen ja yritä uudelleen."
     },
     "operation": {
       "couldNotReply": "Vastaaminen epäonnistui.",
@@ -1545,7 +1550,8 @@
       "bugs": "Ohjelmavirheet",
       "style": "Tyyli",
       "testing": "Testaus",
-      "documentation": "Dokumentaatio"
+      "documentation": "Dokumentaatio",
+      "unknown": "Muu ({{area}})"
     },
     "gateThreshold": {
       "warning": "Varoitus"
@@ -1657,7 +1663,14 @@
       "whereFound": "Havainnon sijainnit ({{displayCount}})",
       "fullReport": "Luotu raportti kokonaisuudessaan",
       "yes": "Kyllä",
-      "no": "Ei"
+      "no": "Ei",
+      "action": {
+        "analyzeCodebase": "Analysoi koodikanta",
+        "dismiss": "Ohita",
+        "manualReview": "Manuaalinen tarkistus",
+        "monitor": "Valvo",
+        "openPr": "Avaa PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} havaintoa",
@@ -1876,7 +1889,24 @@
       "title": "Tarkastusraportti",
       "unavailable": "Tarkastusraporttia ei ole saatavilla",
       "unavailableDescription": "Vain organisaation omistajat ja laskutusvastaavat voivat tarkastella tarkastusraportteja. Pyydä käyttöoikeus omistajalta tai laskutusvastaavalta.",
-      "queryFailed": "Raportin haku jäi kesken. Yritä uudelleen."
+      "queryFailed": "Raportin haku jäi kesken. Yritä uudelleen.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyysi valmistui",
+        "findingAnalysisFailed": "Analyysi epäonnistui",
+        "findingAutoDismissed": "Ohitettu automaattisesti",
+        "findingCreated": "Tuotu",
+        "findingDeleted": "Poistettu",
+        "findingDismissed": "Ohitettu",
+        "findingSeverityChanged": "Vakavuus muuttui",
+        "findingStatusChange": "Tila muuttui",
+        "findingSuperseded": "Korvattu",
+        "remediationBlocked": "Korjaus estetty",
+        "remediationCancelled": "Peruutettu",
+        "remediationFailed": "Korjaus epäonnistui",
+        "remediationNoChangesNeeded": "Muutoksia ei tarvita",
+        "remediationPrOpened": "PR avattu",
+        "remediationQueued": "Korjausta pyydetty"
+      }
     },
     "notifications": {
       "couldNotLoad": "Ilmoitusasetuksia ei voitu ladata.",
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} ei ole enää käytettävissä. Käytetään oletusmalliasi.",
       "couldNotReadPendingSessions": "Odottavia istuntoja ei voitu lukea. Yritä uudelleen.",
       "failedToCreate": "Istunnon luonti epäonnistui.",
+      "checkOrganizationAccess": "Tarkista oikeutesi tähän organisaatioon ja yritä uudelleen.",
       "couldNotRefreshRepositories": "Repositorioita ei voitu päivittää. Yritä uudelleen.",
       "discardDraftTitle": "Hylätäänkö luonnos?",
       "discardDraftMessage": "Kehotteesi poistetaan.",
@@ -2732,6 +2763,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Aktiiviset istuntosi eivät ole käytettävissä, ennen kuin niiden tiedot on ladattu.",
     "currentDeviceUnidentified": "Nykyistä laitetta ei voitu tunnistaa.",
+    "kiloApp": "Kilo-sovellus",
     "noSessions": "Ei aktiivisia istuntoja",
     "noSessionsDescription": "Kirjaudu Kilo-sovellukseen toisella laitteella, niin laite näkyy tässä.",
     "onlyKiloAppSignIns": "Täällä näkyvät vain Kilo-sovelluksen kirjautumiset. Editorin ja CLI:n kirjautumisia ei luetella.",

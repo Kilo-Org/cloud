@@ -35,6 +35,8 @@
     "connectGithub": "GitHub-ты қосу",
     "cost": "Құны",
     "discard": "Бас тарту",
+    "discardChangesMessage": "Сіздің өзгерісіңіз жоғалады.",
+    "discardChangesTitle": "Өзгерістерден бас тарту?",
     "findings": "Анықталған мәселелер",
     "mergeRequest": "біріктіру сұрауы",
     "notConnected": "Қосылмаған",
@@ -661,7 +663,8 @@
       "description": "Телефонда біріктіру сұрауларындағы кодты тексеру үшін GitHub тіркелгіңізді қосыңыз.",
       "gitlabDescription": "Мобильдіде біріктіру сұрауларын қарау үшін GitLab тіркелгіңізді қосыңыз.",
       "bitbucketDescription": "Мобильдіде тарту сұрауларын қарау үшін Bitbucket-ты осы ұйымға қосыңыз.",
-      "bitbucketOrgOnlyDescription": "Осы ұйымның Bitbucket тарту сұрауларын қарау үшін профиліңізден ұйымды таңдаңыз."
+      "bitbucketOrgOnlyDescription": "Жоғарыдағы тіркелгіні ұйымға ауыстырыңыз, оның Bitbucket тарту сұрауларын қарау үшін.",
+      "contextLine": "{{organization}} үшін"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "Кодты тексеру нәтижесін осы күйінде жіберу мүмкін емес. PR өзгерген болуы мүмкін немесе өз біріктіру сұрауыңыздағы кодты тексеруге рұқсат жоқ.",
       "reviewNotSubmittedTerm": "Бұл тексеруді осы күйінде жіберу мүмкін емес. {{term}} өзгерген болуы мүмкін, немесе сіз өз {{term}} бойынша тексере алмайсыз.",
       "couldNotPostComment": "Пікірді жариялау мүмкін болмады.",
-      "couldNotSubmitReview": "Кодты тексеру нәтижесін жіберу мүмкін болмады. Байланысты тексеріп, қайталап көріңіз."
+      "couldNotSubmitReview": "Кодты тексеру нәтижесін жіберу мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.",
+      "rateLimited": "Сұраныстар тым көп. Кейінірек қайталап көріңіз.",
+      "conflict": "Сіз жұмыс істеп жатқан кезде бұл өзгерді. Қайта жүктеңіз және қайталап көріңіз."
     },
     "operation": {
       "couldNotReply": "Жауап беру мүмкін болмады.",
@@ -1545,7 +1550,8 @@
       "bugs": "Қателер",
       "style": "Стиль",
       "testing": "Тестілеу",
-      "documentation": "Құжаттама"
+      "documentation": "Құжаттама",
+      "unknown": "Басқа ({{area}})"
     },
     "gateThreshold": {
       "warning": "Ескерту"
@@ -1657,7 +1663,14 @@
       "whereFound": "Табылған орындар ({{displayCount}})",
       "fullReport": "Жасалған толық есеп",
       "yes": "Иә",
-      "no": "Жоқ"
+      "no": "Жоқ",
+      "action": {
+        "analyzeCodebase": "Код базасын талдау",
+        "dismiss": "Қабылдамау",
+        "manualReview": "Қолмен тексеру",
+        "monitor": "Бақылау",
+        "openPr": "Тарту сұрауын ашу"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} мәселе",
@@ -1876,7 +1889,24 @@
       "title": "Аудит есебі",
       "unavailable": "Аудит есебі қолжетімсіз",
       "unavailableDescription": "Аудит есептерін тек ұйым иелері мен төлем менеджерлері көре алады. Ұйым иесінен немесе төлем менеджерінен кіруге рұқсат сұраңыз.",
-      "queryFailed": "Есеп сұрауы аяқталмады. Қайталап көріңіз."
+      "queryFailed": "Есеп сұрауы аяқталмады. Қайталап көріңіз.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Талдау аяқталды",
+        "findingAnalysisFailed": "Талдау сәтсіз аяқталды",
+        "findingAutoDismissed": "Автоматты түрде қабылданбады",
+        "findingCreated": "Импортталды",
+        "findingDeleted": "Жойылды",
+        "findingDismissed": "Қабылданбады",
+        "findingSeverityChanged": "Қауіптілік деңгейі өзгерді",
+        "findingStatusChange": "Күй өзгерді",
+        "findingSuperseded": "Ауыстырылды",
+        "remediationBlocked": "Түзету блокталды",
+        "remediationCancelled": "Болдырылмады",
+        "remediationFailed": "Түзету сәтсіз аяқталды",
+        "remediationNoChangesNeeded": "Өзгерістер қажет емес",
+        "remediationPrOpened": "Тарту сұрауы ашылды",
+        "remediationQueued": "Түзету сұралды"
+      }
     },
     "notifications": {
       "couldNotLoad": "Хабарландыру баптауларын жүктеу мүмкін болмады.",
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} енді қолжетімсіз. Әдепкі моделіңіз қолданылуда.",
       "couldNotReadPendingSessions": "Кезектегі сессияларды оқу мүмкін болмады. Қайталап көріңіз.",
       "failedToCreate": "Сессияны жасау мүмкін болмады.",
+      "checkOrganizationAccess": "Осы ұйымға кіру рұқсатын тексеріп, қайталап көріңіз.",
       "couldNotRefreshRepositories": "Репозиторийлерді жаңарту мүмкін болмады. Қайталап көріңіз.",
       "discardDraftTitle": "Нобайды жою керек пе?",
       "discardDraftMessage": "Сұрауыңыз жойылады.",
@@ -2732,6 +2763,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Деректер жүктелмейінше, белсенді сессияларыңызды көру мүмкін емес.",
     "currentDeviceUnidentified": "Осы құрылғыны анықтау мүмкін болмады.",
+    "kiloApp": "Kilo қолданбасы",
     "noSessions": "Белсенді сессиялар жоқ",
     "noSessionsDescription": "Басқа құрылғыда Kilo қолданбасына кіріңіз. Сол құрылғы осында көрсетіледі.",
     "onlyKiloAppSignIns": "Мұнда тек Kilo қолданбасына кіру сессиялары көрсетіледі. Редактор мен CLI арқылы кіру сессиялары көрсетілмейді.",

@@ -9,7 +9,7 @@
 // Retryable failures keep both controls enabled so the user can retry under the
 // same hoisted key.
 
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -54,6 +54,7 @@ const repositories = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
   data: [] as unknown[],
+  refetch: vi.fn(),
 }));
 const capability = vi.hoisted(() => ({
   canManage: false,
@@ -97,6 +98,11 @@ const focusEffect = vi.hoisted(() => ({
   effect: undefined as (() => void) | undefined,
 }));
 
+// Captures the refresh control element the dashboard passes to the scroll view.
+const tabScreen = vi.hoisted(() => ({
+  refreshControl: undefined as unknown,
+}));
+
 // Captures the retry-card props the dashboard renders per failure.
 const retryCards = vi.hoisted(() => ({
   cards: [] as {
@@ -123,6 +129,9 @@ vi.mock('expo-router', () => ({
   useFocusEffect: (effect: () => void) => {
     focusEffect.effect = effect;
   },
+}));
+vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
+  useRouteForegroundRefresh: vi.fn(),
 }));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: sheet.show }),
@@ -187,6 +196,7 @@ vi.mock('@kilocode/app-shared/security-agent', () => ({
     failed: number;
   }) => analysis.triageComplete + analysis.analyzing + analysis.notAnalyzed + analysis.failed,
   getSecurityRepositoriesInScope: () => [],
+  isPersonalSecurityScope: (scope: string) => scope === 'personal',
 }));
 vi.mock('@/lib/security-agent', () => ({
   getSecurityAgentPath: (scope: string, section: string) => `/security/${scope}/${section}`,
@@ -208,7 +218,10 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: (props: { children?: unknown }) => props.children,
+  TabScreenScrollView: (props: { children?: unknown; refreshControl?: unknown }) => {
+    tabScreen.refreshControl = props.refreshControl;
+    return props.children;
+  },
 }));
 
 type R = TestRenderer.ReactTestRenderer;
@@ -242,6 +255,19 @@ function findSyncButton(root: I, label: 'Sync now' | 'Sync findings'): I {
     throw new Error(`expected 1 ${label} button, got ${nodes.length}`);
   }
   return n;
+}
+
+function findFilterControl(root: I): I {
+  const filter = root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Pressable' &&
+      n.props.accessibilityLabel === 'Filter by repository'
+  )[0];
+  if (!filter) {
+    throw new Error('filter control not found');
+  }
+  return filter;
 }
 
 function syncDisabledStates(root: I): boolean[] {
@@ -278,6 +304,7 @@ describe('DashboardScreen sync control terminal states', () => {
     repositories.isLoading = false;
     repositories.isError = false;
     repositories.data = [];
+    repositories.refetch.mockClear();
     capability.canManage = false;
     dismissFailures.failures = [];
     dismissFailures.clear.mockClear();
@@ -353,21 +380,21 @@ describe('DashboardScreen repository filter sheet', () => {
     repositories.isLoading = false;
     repositories.isError = false;
     repositories.data = [];
+    repositories.refetch.mockReset();
+    repositories.refetch.mockResolvedValue({ isError: false });
+    // handleRefresh destructures { isError } from every refetch result.
+    dashboardStats.refetch.mockReset();
+    dashboardStats.refetch.mockResolvedValue({ isError: false });
+    lastSync.refetch.mockReset();
+    lastSync.refetch.mockResolvedValue({ isError: false });
     config.data = { slaEnabled: true };
     sheet.show.mockClear();
+    retryCards.cards = [];
   });
 
   it('opens the themed sheet with the repository options from the filter control', () => {
     const root = renderScreen();
-    const filter = root.root.findAll(
-      n =>
-        typeof n.type === 'string' &&
-        (n.type as string) === 'Pressable' &&
-        n.props.accessibilityLabel === 'Filter by repository'
-    )[0];
-    if (!filter) {
-      throw new Error('filter control not found');
-    }
+    const filter = findFilterControl(root.root);
 
     act(() => {
       (filter.props.onPress as () => void)();
@@ -382,6 +409,58 @@ describe('DashboardScreen repository filter sheet', () => {
       },
       expect.any(Function)
     );
+  });
+
+  it('disables the filter control while repositories are loading', () => {
+    repositories.isLoading = true;
+    const root = renderScreen();
+    const filter = findFilterControl(root.root);
+
+    expect(filter.props.disabled).toBe(true);
+  });
+
+  it('renders a retryable card for a failed repositories fetch and retries on tap', () => {
+    repositories.isError = true;
+    const root = renderScreen();
+    const filter = findFilterControl(root.root);
+
+    expect(filter.props.disabled).toBe(true);
+    expect(retryCards.cards).toHaveLength(1);
+    expect(retryCards.cards[0]?.retryable).toBe(true);
+    expect(retryCards.cards[0]?.lastError).toBe('Could not load repositories');
+
+    act(() => {
+      retryCards.cards[0]?.onRetry?.();
+    });
+
+    expect(repositories.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-enables the filter control and drops the card once the refetch succeeds', () => {
+    repositories.isError = true;
+    renderScreen();
+    expect(retryCards.cards).toHaveLength(1);
+
+    repositories.isError = false;
+    repositories.data = [{ fullName: 'kilo/repo' }];
+    retryCards.cards = [];
+    const root = renderScreen();
+    const filter = findFilterControl(root.root);
+
+    expect(filter.props.disabled).toBe(false);
+    expect(retryCards.cards).toHaveLength(0);
+  });
+
+  it('retries the repositories query on pull-to-refresh', async () => {
+    renderScreen();
+    const refreshControl = tabScreen.refreshControl as ReactElement<{ onRefresh: () => void }>;
+
+    await act(async () => {
+      refreshControl.props.onRefresh();
+      await Promise.resolve();
+    });
+
+    expect(repositories.refetch).toHaveBeenCalledTimes(1);
   });
 });
 

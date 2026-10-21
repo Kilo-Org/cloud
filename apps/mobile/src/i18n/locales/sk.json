@@ -35,6 +35,8 @@
     "connectGithub": "Pripojiť GitHub",
     "cost": "Cena",
     "discard": "Zahodiť",
+    "discardChangesMessage": "Vaše zmeny sa stratia.",
+    "discardChangesTitle": "Zahodiť zmeny?",
     "findings": "Zistenia",
     "mergeRequest": "merge request",
     "notConnected": "Nepripojené",
@@ -685,7 +687,8 @@
       "description": "Pripoj svoj účet GitHub a kontroluj žiadosti o zlúčenie v mobile.",
       "gitlabDescription": "Pripoj svoj účet GitLab a kontroluj merge requesty v mobile.",
       "bitbucketDescription": "Pripoj Bitbucket k tejto organizácii a kontroluj žiadosti o zlúčenie v mobile.",
-      "bitbucketOrgOnlyDescription": "Vyber organizáciu vo svojom profile a kontroluj jej Bitbucket žiadosti o zlúčenie."
+      "bitbucketOrgOnlyDescription": "Prepni účet hore na organizáciu a kontroluj jej žiadosti o zlúčenie na Bitbucku.",
+      "contextLine": "Pre {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -801,7 +804,9 @@
       "reviewNotSubmitted": "Túto kontrolu kódu nemožno odoslať v tejto podobe. PR sa mohol zmeniť alebo ide o tvoju vlastnú žiadosť o zlúčenie, ktorú nemôžeš posúdiť.",
       "reviewNotSubmittedTerm": "Túto kontrolu kódu nemožno odoslať v tejto podobe. {{term}} sa mohol zmeniť alebo nemôžeš posúdiť svoj vlastný {{term}}.",
       "couldNotPostComment": "Komentár sa nepodarilo odoslať.",
-      "couldNotSubmitReview": "Kontrolu kódu sa nepodarilo odoslať. Skontroluj pripojenie a skús to znova."
+      "couldNotSubmitReview": "Kontrolu kódu sa nepodarilo odoslať. Skontroluj pripojenie a skús to znova.",
+      "rateLimited": "Priveľa požiadaviek. Skús to znova neskôr.",
+      "conflict": "Toto sa zmenilo, kým si na tom pracoval. Znova ho načítaj a skús to znova."
     },
     "operation": {
       "couldNotReply": "Nepodarilo sa odpovedať.",
@@ -1583,7 +1588,8 @@
       "bugs": "Chyby",
       "style": "Štýl",
       "testing": "Testovanie",
-      "documentation": "Dokumentácia"
+      "documentation": "Dokumentácia",
+      "unknown": "Iné ({{area}})"
     },
     "gateThreshold": {
       "warning": "Upozornenie"
@@ -1697,7 +1703,14 @@
       "whereFound": "Miesta výskytu ({{displayCount}})",
       "fullReport": "Úplná vygenerovaná správa",
       "yes": "Áno",
-      "no": "Nie"
+      "no": "Nie",
+      "action": {
+        "analyzeCodebase": "Analyzovať kódovú základňu",
+        "dismiss": "Zamietnuť",
+        "manualReview": "Manuálne posúdenie",
+        "monitor": "Sledovať",
+        "openPr": "Otvoriť PR"
+      }
     },
     "dashboard": {
       "findingsCount": "Počet nálezov: {{displayCount}}",
@@ -1922,7 +1935,24 @@
       "title": "Správa o audite",
       "unavailable": "Správa o audite nie je dostupná",
       "unavailableDescription": "Správy o audite môžu zobrazovať iba vlastníci organizácie a správcovia fakturácie. Požiadajte vlastníka alebo správcu fakturácie o udelenie prístupu.",
-      "queryFailed": "Načítanie údajov pre správu sa nedokončilo. Skúste to znova."
+      "queryFailed": "Načítanie údajov pre správu sa nedokončilo. Skúste to znova.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analýza dokončená",
+        "findingAnalysisFailed": "Analýza zlyhala",
+        "findingAutoDismissed": "Automaticky zamietnuté",
+        "findingCreated": "Importované",
+        "findingDeleted": "Odstránené",
+        "findingDismissed": "Zamietnuté",
+        "findingSeverityChanged": "Zmena závažnosti",
+        "findingStatusChange": "Zmena stavu",
+        "findingSuperseded": "Nahradené",
+        "remediationBlocked": "Náprava zablokovaná",
+        "remediationCancelled": "Zrušené",
+        "remediationFailed": "Náprava zlyhala",
+        "remediationNoChangesNeeded": "Zmeny nie sú potrebné",
+        "remediationPrOpened": "Otvorená PR",
+        "remediationQueued": "Vyžiadaná náprava"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nastavenia upozornení sa nepodarilo načítať.",
@@ -2268,6 +2298,7 @@
       "prefillModelUnavailable": "Model {{model}} už nie je dostupný. Používa sa tvoj predvolený model.",
       "couldNotReadPendingSessions": "Čakajúce relácie sa nepodarilo načítať. Skús to znova.",
       "failedToCreate": "Reláciu sa nepodarilo vytvoriť.",
+      "checkOrganizationAccess": "Skontroluj si prístup k tejto organizácii a skús to znova.",
       "couldNotRefreshRepositories": "Repozitáre sa nepodarilo obnoviť. Skús to znova.",
       "discardDraftTitle": "Zahodiť koncept?",
       "discardDraftMessage": "Tvoje zadanie sa stratí.",
@@ -2810,6 +2841,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Tvoje aktívne relácie sa nedajú zobraziť, kým sa údaje nenačítajú.",
     "currentDeviceUnidentified": "Aktuálne zariadenie sa nepodarilo identifikovať.",
+    "kiloApp": "Aplikácia Kilo",
     "noSessions": "Žiadne aktívne relácie",
     "noSessionsDescription": "Prihlás sa do aplikácie Kilo na inom zariadení a zobrazí sa tu.",
     "onlyKiloAppSignIns": "Zobrazujú sa iba prihlásenia cez aplikáciu Kilo. Prihlásenia z editora a CLI nie sú uvedené.",

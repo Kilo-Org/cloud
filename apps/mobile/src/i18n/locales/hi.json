@@ -35,6 +35,8 @@
     "connectGithub": "GitHub जोड़ें",
     "cost": "लागत",
     "discard": "छोड़ दें",
+    "discardChangesMessage": "आपके परिवर्तन खो जाएँगे.",
+    "discardChangesTitle": "परिवर्तनों को छोड़ दें?",
     "findings": "मिली समस्याएँ",
     "mergeRequest": "मर्ज रिक्वेस्ट",
     "notConnected": "जुड़ा नहीं",
@@ -50,7 +52,7 @@
     "connected": "जुड़ा हुआ",
     "couldNotLoadModels": "मॉडल लोड नहीं हो सके।",
     "couldNotLoadRepositories": "रिपॉज़िटरी लोड नहीं हो सकीं।",
-    "critical": "गंभीर",
+    "critical": "अति गंभीर",
     "delete": "हटाएँ",
     "deleted": "हटाई गई",
     "details": "विवरण",
@@ -1033,7 +1035,8 @@
       "bugs": "बग",
       "style": "शैली",
       "testing": "परीक्षण",
-      "documentation": "दस्तावेज़ीकरण"
+      "documentation": "दस्तावेज़ीकरण",
+      "unknown": "अन्य ({{area}})"
     },
     "gateThreshold": {
       "warning": "चेतावनी"
@@ -1112,7 +1115,14 @@
       "triageReasoning": "प्राथमिक जाँच का तर्क",
       "watchInCloudAgent": "क्लाउड एजेंट में देखें",
       "whereFound": "समस्या मिलने की जगहें ({{displayCount}})",
-      "yes": "हाँ"
+      "yes": "हाँ",
+      "action": {
+        "analyzeCodebase": "कोडबेस का विश्लेषण करें",
+        "dismiss": "खारिज करें",
+        "manualReview": "मैन्युअल समीक्षा",
+        "monitor": "निगरानी करें",
+        "openPr": "पुल रिक्वेस्ट खोलें"
+      }
     },
     "analysisSettings": {
       "analysisModel": "विश्लेषण का मॉडल",
@@ -1134,7 +1144,24 @@
       "summary": "रिपोर्ट का सारांश",
       "title": "ऑडिट रिपोर्ट",
       "unavailable": "ऑडिट रिपोर्ट अनुपलब्ध",
-      "unavailableDescription": "केवल संगठन के मालिक और बिलिंग मैनेजर ही ऑडिट रिपोर्ट देख सकते हैं। किसी मालिक या बिलिंग मैनेजर से आपको अनुमति देने के लिए कहें।"
+      "unavailableDescription": "केवल संगठन के मालिक और बिलिंग मैनेजर ही ऑडिट रिपोर्ट देख सकते हैं। किसी मालिक या बिलिंग मैनेजर से आपको अनुमति देने के लिए कहें।",
+      "eventActions": {
+        "findingAnalysisCompleted": "विश्लेषण पूर्ण हुआ",
+        "findingAnalysisFailed": "विश्लेषण विफल रहा",
+        "findingAutoDismissed": "स्वतः खारिज किया गया",
+        "findingCreated": "आयातित",
+        "findingDeleted": "हटाया गया",
+        "findingDismissed": "खारिज किया गया",
+        "findingSeverityChanged": "गंभीरता बदली गई",
+        "findingStatusChange": "स्थिति बदली गई",
+        "findingSuperseded": "बदला गया",
+        "remediationBlocked": "सुधार अवरुद्ध हुआ",
+        "remediationCancelled": "रद्द किया गया",
+        "remediationFailed": "सुधार विफल रहा",
+        "remediationNoChangesNeeded": "कोई बदलाव आवश्यक नहीं",
+        "remediationPrOpened": "पुल रिक्वेस्ट खोली गई",
+        "remediationQueued": "सुधार का अनुरोध भेजा गया"
+      }
     },
     "auditReportButton": {
       "viewA11y": "ऑडिट रिपोर्ट देखें"
@@ -1222,7 +1249,7 @@
       "withinDeadlineDetail": "{{total}} में से {{within}} समय सीमा के भीतर",
       "noDeadlineData": "अभी किसी समस्या के लिए SLA की समय सीमा तय नहीं है",
       "deadlinePassed": "समय सीमा बीत गई",
-      "deadlinePassedDetail": "{{critical}} गंभीर, {{high}} उच्च",
+      "deadlinePassedDetail": "{{critical}} अति गंभीर, {{high}} उच्च",
       "dueThisWeek": "अंतिम तारीख इस सप्ताह",
       "dueThisWeekDetail": "{{exploitable}} समस्याओं का फ़ायदा उठाकर हमला संभव होने की पुष्टि",
       "noDeadline": "कोई समय सीमा नहीं",
@@ -1700,6 +1727,7 @@
       "prefillModelUnavailable": "{{model}} अब उपलब्ध नहीं है। आपके डिफ़ॉल्ट मॉडल का उपयोग हो रहा है।",
       "couldNotReadPendingSessions": "लंबित सत्र पढ़े नहीं जा सके। फिर से कोशिश करें।",
       "failedToCreate": "सत्र नहीं बन सका।",
+      "checkOrganizationAccess": "कृपया जाँच करें कि आपके पास इस संगठन का एक्सेस है, और फिर से कोशिश करें।",
       "couldNotRefreshRepositories": "रिपॉज़िटरी रीफ़्रेश नहीं हो सकीं। कृपया फिर से कोशिश करें।",
       "discardDraftTitle": "ड्राफ़्ट हटाएँ?",
       "discardDraftMessage": "आपका प्रॉम्प्ट हट जाएगा।",
@@ -2220,6 +2248,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "डेटा लोड होने तक आपके सक्रिय सत्र उपलब्ध नहीं होंगे।",
     "currentDeviceUnidentified": "इस डिवाइस की पहचान नहीं हो सकी।",
+    "kiloApp": "Kilo ऐप",
     "noSessions": "कोई सक्रिय सत्र नहीं",
     "noSessionsDescription": "किसी अन्य डिवाइस पर Kilo ऐप से साइन इन करें और वह यहाँ दिखाई देगा।",
     "onlyKiloAppSignIns": "यहाँ केवल Kilo ऐप में किए गए साइन इन दिखाई देते हैं। एडिटर और CLI के साइन इन इस सूची में नहीं हैं।",
@@ -2505,7 +2534,8 @@
       "description": "मोबाइल पर पुल रिक्वेस्ट की समीक्षा करने के लिए अपना GitHub खाता कनेक्ट करें।",
       "gitlabDescription": "मोबाइल पर मर्ज रिक्वेस्ट समीक्षित करने के लिए अपना GitLab खाता कनेक्ट करें।",
       "bitbucketDescription": "मोबाइल पर पुल रिक्वेस्ट समीक्षित करने के लिए इस संगठन को Bitbucket से कनेक्ट करें।",
-      "bitbucketOrgOnlyDescription": "अपनी प्रोफ़ाइल में कोई संगठन चुनें ताकि उसकी Bitbucket पुल रिक्वेस्ट समीक्षित की जा सकें।"
+      "bitbucketOrgOnlyDescription": "इसके Bitbucket पुल रिक्वेस्ट समीक्षित करने के लिए ऊपर दिए गए खाते को एक संगठन में बदलें।",
+      "contextLine": "{{organization}} के लिए"
     },
     "connectionExpired": "GitHub कनेक्शन की अवधि समाप्त हो गई।",
     "couldNotLoadPullRequest": "पुल रिक्वेस्ट लोड नहीं हो सकी।",
@@ -2932,7 +2962,9 @@
       "reviewNotSubmitted": "यह समीक्षा मौजूदा रूप में नहीं भेजी जा सकती। हो सकता है कि PR बदल गया हो या यह आपकी अपनी पुल रिक्वेस्ट हो, जिसकी समीक्षा आप नहीं कर सकते।",
       "reviewNotSubmittedTerm": "यह समीक्षा जैसी है वैसी सबमिट नहीं की जा सकती। हो सकता है {{term}} बदल गई हो, या आप अपनी खुद की {{term}} की समीक्षा नहीं कर सकते।",
       "couldNotPostComment": "टिप्पणी पोस्ट नहीं की जा सकी।",
-      "couldNotSubmitReview": "समीक्षा नहीं भेजी जा सकी। अपना कनेक्शन जाँचें और फिर से कोशिश करें।"
+      "couldNotSubmitReview": "समीक्षा नहीं भेजी जा सकी। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
+      "rateLimited": "बहुत ज़्यादा अनुरोध। कृपया बाद में फिर से कोशिश करें।",
+      "conflict": "यह आपके काम करते समय बदल गया। कृपया इसे फिर से लोड करें और फिर से कोशिश करें।"
     },
     "operation": {
       "couldNotReply": "जवाब नहीं भेजा जा सका।",

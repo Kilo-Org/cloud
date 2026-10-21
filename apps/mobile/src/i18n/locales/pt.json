@@ -35,6 +35,8 @@
     "connectGithub": "Ligar ao GitHub",
     "cost": "Custo",
     "discard": "Descartar",
+    "discardChangesMessage": "As suas alterações serão perdidas.",
+    "discardChangesTitle": "Descartar alterações?",
     "findings": "Ocorrências",
     "mergeRequest": "merge request",
     "notConnected": "Sem ligação",
@@ -673,7 +675,8 @@
       "description": "Liga a tua conta do GitHub para rever PRs no telemóvel.",
       "gitlabDescription": "Liga a tua conta do GitLab para rever merge requests no telemóvel.",
       "bitbucketDescription": "Liga o Bitbucket a esta organização para rever PRs no telemóvel.",
-      "bitbucketOrgOnlyDescription": "Seleciona uma organização no teu perfil para rever os PRs dessa organização no Bitbucket."
+      "bitbucketOrgOnlyDescription": "Muda a conta acima para uma organização para rever os respetivos PRs no Bitbucket.",
+      "contextLine": "Para {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -785,7 +788,9 @@
       "reviewNotSubmitted": "Não é possível enviar esta revisão no estado atual. O PR pode ter mudado ou podes estar a tentar rever o teu próprio PR.",
       "reviewNotSubmittedTerm": "Não é possível enviar esta revisão no estado atual. O {{term}} pode ter mudado ou não podes rever o teu próprio {{term}}.",
       "couldNotPostComment": "Não foi possível publicar o comentário.",
-      "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifica a tua ligação e tenta novamente."
+      "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifica a tua ligação e tenta novamente.",
+      "rateLimited": "Demasiados pedidos. Tente novamente mais tarde.",
+      "conflict": "Isto mudou enquanto trabalhavas nele. Recarrega-o e tenta novamente."
     },
     "operation": {
       "couldNotReply": "Não foi possível responder.",
@@ -1564,7 +1569,8 @@
       "bugs": "Erros",
       "style": "Estilo",
       "testing": "Testes",
-      "documentation": "Documentação"
+      "documentation": "Documentação",
+      "unknown": "Outro ({{area}})"
     },
     "gateThreshold": {
       "warning": "Aviso"
@@ -1677,7 +1683,14 @@
       "whereFound": "Locais onde foi detetada ({{displayCount}})",
       "fullReport": "Relatório completo gerado",
       "yes": "Sim",
-      "no": "Não"
+      "no": "Não",
+      "action": {
+        "analyzeCodebase": "Analisar base de código",
+        "dismiss": "Ignorar",
+        "manualReview": "Revisão manual",
+        "monitor": "Monitorizar",
+        "openPr": "Abrir pull request"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} ocorrências",
@@ -1899,7 +1912,24 @@
       "title": "Relatório de auditoria",
       "unavailable": "Relatório de auditoria indisponível",
       "unavailableDescription": "Apenas os proprietários da organização e os gestores de faturação podem ver relatórios de auditoria. Pede a um deles que te dê acesso.",
-      "queryFailed": "A consulta do relatório não foi concluída. Tenta novamente."
+      "queryFailed": "A consulta do relatório não foi concluída. Tenta novamente.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Análise concluída",
+        "findingAnalysisFailed": "Falha na análise",
+        "findingAutoDismissed": "Ignorado automaticamente",
+        "findingCreated": "Importado",
+        "findingDeleted": "Eliminado",
+        "findingDismissed": "Ignorado",
+        "findingSeverityChanged": "Severidade alterada",
+        "findingStatusChange": "Estado alterado",
+        "findingSuperseded": "Substituído",
+        "remediationBlocked": "Correção bloqueada",
+        "remediationCancelled": "Cancelada",
+        "remediationFailed": "Falha na correção",
+        "remediationNoChangesNeeded": "Não são necessárias alterações",
+        "remediationPrOpened": "Pull request aberto",
+        "remediationQueued": "Correção pedida"
+      }
     },
     "notifications": {
       "couldNotLoad": "Não foi possível carregar as definições de notificações.",
@@ -2240,6 +2270,7 @@
       "prefillModelUnavailable": "{{model}} já não está disponível. Está a ser usado o seu modelo predefinido.",
       "couldNotReadPendingSessions": "Não foi possível ler as sessões pendentes. Tente novamente.",
       "failedToCreate": "Não foi possível criar a sessão.",
+      "checkOrganizationAccess": "Verifique o seu acesso a esta organização e tente novamente.",
       "couldNotRefreshRepositories": "Não foi possível atualizar os repositórios. Tente novamente.",
       "discardDraftTitle": "Eliminar rascunho?",
       "discardDraftMessage": "O seu pedido será eliminado.",
@@ -2771,6 +2802,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "As suas sessões ativas só ficam disponíveis após o carregamento.",
     "currentDeviceUnidentified": "Não foi possível identificar o dispositivo atual.",
+    "kiloApp": "Aplicação Kilo",
     "noSessions": "Sem sessões ativas",
     "noSessionsDescription": "Inicie sessão na aplicação Kilo noutro dispositivo. A sessão aparecerá aqui.",
     "onlyKiloAppSignIns": "Apenas os inícios de sessão na aplicação Kilo aparecem aqui. Os inícios de sessão no editor e na CLI não são listados.",

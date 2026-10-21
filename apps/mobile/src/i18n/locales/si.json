@@ -35,6 +35,8 @@
     "connectGithub": "GitHub සම්බන්ධ කරන්න",
     "cost": "පිරිවැය",
     "discard": "ඉවතලන්න",
+    "discardChangesMessage": "ඔබගේ වෙනස්කම් නැති වී යයි.",
+    "discardChangesTitle": "වෙනස්කම් ඉවතලන්න?",
     "findings": "හඳුනාගත් ගැටලු",
     "mergeRequest": "මර්ජ ඉල්ලීම",
     "notConnected": "සම්බන්ධ නැත",
@@ -661,7 +663,8 @@
       "description": "ජංගම දුරකථනයෙන් පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඔබේ GitHub ගිණුම සම්බන්ධ කරන්න.",
       "gitlabDescription": "ජංගම දුරකථනයෙන් මර්ජ ඉල්ලීම් සමාලෝචනය කිරීමට ඔබේ GitLab ගිණුම සම්බන්ධ කරන්න.",
       "bitbucketDescription": "ජංගම දුරකථනයෙන් පුල් ඉල්ලීම් සමාලෝචනය කිරීමට Bitbucket මෙම සංවිධානයට සම්බන්ධ කරන්න.",
-      "bitbucketOrgOnlyDescription": "එහි Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඔබේ පැතිකඩේ සංවිධානයක් තෝරන්න."
+      "bitbucketOrgOnlyDescription": "එහි Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඉහත ගිණුම සංවිධානයකට මාරු කරන්න.",
+      "contextLine": "{{organization}} සඳහා"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "මෙම සමාලෝචනය පවතින තත්ත්වයෙන් ඉදිරිපත් කළ නොහැක. PR වෙනස් වී තිබිය හැක, නැතහොත් මෙය ඔබේම පුල් ඉල්ලීමක් නිසා ඔබට එය සමාලෝචනය කළ නොහැක.",
       "reviewNotSubmittedTerm": "මෙම සමාලෝචනය එලෙසම ඉදිරිපත් කළ නොහැක. {{term}} වෙනස් වී තිබිය හැකිය, නැතහොත් ඔබට ඔබේම {{term}} සමාලෝචනය කළ නොහැක.",
       "couldNotPostComment": "අදහස පළ කිරීමට නොහැකි විය.",
-      "couldNotSubmitReview": "සමාලෝචනය ඉදිරිපත් කිරීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න."
+      "couldNotSubmitReview": "සමාලෝචනය ඉදිරිපත් කිරීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "rateLimited": "ඉල්ලීම් ප්‍රමාණය ඉතා අධිකයි. කරුණාකර පසුව නැවත උත්සාහ කරන්න.",
+      "conflict": "ඔබ මේ මත වැඩ කරමින් සිටියදී මෙය වෙනස් විය. කරුණාකර නැවත පූරණය කර උත්සාහ කරන්න."
     },
     "operation": {
       "couldNotReply": "පිළිතුරු දීමට නොහැකි විය.",
@@ -1545,7 +1550,8 @@
       "bugs": "දෝෂ",
       "style": "කේත ශෛලිය",
       "testing": "පරීක්ෂාව",
-      "documentation": "ලේඛන"
+      "documentation": "ලේඛන",
+      "unknown": "වෙනත් ({{area}})"
     },
     "gateThreshold": {
       "warning": "අනතුරු ඇඟවීම"
@@ -1657,7 +1663,14 @@
       "whereFound": "මෙය හමු වූ ස්ථාන ({{displayCount}})",
       "fullReport": "සැකසූ සම්පූර්ණ වාර්තාව",
       "yes": "ඔව්",
-      "no": "නැත"
+      "no": "නැත",
+      "action": {
+        "analyzeCodebase": "කේත පදනම විශ්ලේෂණය කරන්න",
+        "dismiss": "ප්‍රතික්ෂේප කරන්න",
+        "manualReview": "අතින් සමාලෝචනය",
+        "monitor": "නිරීක්ෂණය කරන්න",
+        "openPr": "PR විවෘත කරන්න"
+      }
     },
     "dashboard": {
       "findingsCount": "සොයාගැනීම් {{displayCount}} ක්",
@@ -1876,7 +1889,24 @@
       "title": "විගණන වාර්තාව",
       "unavailable": "විගණන වාර්තාව ලබාගත නොහැක",
       "unavailableDescription": "විගණන වාර්තා බැලිය හැක්කේ සංවිධාන හිමිකරුවන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි. ඔබට ප්‍රවේශය ලබා දෙන ලෙස හිමිකරුවෙකුගෙන් හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
-      "queryFailed": "වාර්තා විමසුම අවසන් වූයේ නැත. නැවත උත්සාහ කරන්න."
+      "queryFailed": "වාර්තා විමසුම අවසන් වූයේ නැත. නැවත උත්සාහ කරන්න.",
+      "eventActions": {
+        "findingAnalysisCompleted": "විශ්ලේෂණය සම්පූර්ණ විය",
+        "findingAnalysisFailed": "විශ්ලේෂණය අසාර්ථක විය",
+        "findingAutoDismissed": "ස්වයංක්‍රීයව ප්‍රතික්ෂේප කර ඇත",
+        "findingCreated": "ආයාත කර ඇත",
+        "findingDeleted": "මකා දමා ඇත",
+        "findingDismissed": "ප්‍රතික්ෂේප කර ඇත",
+        "findingSeverityChanged": "බරපතලත්වය වෙනස් විය",
+        "findingStatusChange": "තත්ත්වය වෙනස් විය",
+        "findingSuperseded": "ප්‍රතිස්ථාපනය කර ඇත",
+        "remediationBlocked": "පිළියම් යෙදීම අවහිර කර ඇත",
+        "remediationCancelled": "අවලංගු කර ඇත",
+        "remediationFailed": "පිළියම් යෙදීම අසාර්ථක විය",
+        "remediationNoChangesNeeded": "වෙනස්කම් අවශ්‍ය නොවේ",
+        "remediationPrOpened": "PR විවෘත කර ඇත",
+        "remediationQueued": "පිළියම් යෙදීමට ඉල්ලා ඇත"
+      }
     },
     "notifications": {
       "couldNotLoad": "දැනුම්දීම් සැකසුම් පූරණය කළ නොහැකි විය.",
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} තවදුරටත් ලබා ගත නොහැක. ඔබේ පෙරනිමි මාදිලිය භාවිත වේ.",
       "couldNotReadPendingSessions": "පොරොත්තුවේ ඇති සැසි කියවිය නොහැකි විය. නැවත උත්සාහ කරන්න.",
       "failedToCreate": "සැසියක් සෑදිය නොහැකි විය.",
+      "checkOrganizationAccess": "මෙම සංවිධානයට ඔබගේ ප්‍රවේශය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "couldNotRefreshRepositories": "ගබඩා නැවුම් කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
       "discardDraftTitle": "කටු සටහන ඉවතලන්නද?",
       "discardDraftMessage": "ඔබේ ඉල්ලීම අහිමි වනු ඇත.",
@@ -2732,6 +2763,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "මෙය පූරණය වන තෙක් ඔබේ සක්‍රීය සැසි ලබා ගත නොහැක.",
     "currentDeviceUnidentified": "වත්මන් උපාංගය හඳුනාගත නොහැකි විය.",
+    "kiloApp": "Kilo යෙදුම",
     "noSessions": "සක්‍රීය සැසි නැත",
     "noSessionsDescription": "වෙනත් උපාංගයක Kilo යෙදුමෙන් පුරනය වන්න. එවිට එම උපාංගය මෙහි දිස්වේ.",
     "onlyKiloAppSignIns": "Kilo යෙදුමේ පුරනය වීම් පමණක් මෙහි දිස්වේ. සංස්කාරක සහ CLI පුරනය වීම් ලැයිස්තුගත නොවේ.",

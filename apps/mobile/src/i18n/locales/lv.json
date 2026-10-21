@@ -35,6 +35,8 @@
     "connectGithub": "Pievienot GitHub",
     "cost": "Izmaksas",
     "discard": "Atmest",
+    "discardChangesMessage": "Jūsu izmaiņas tiks zaudētas.",
+    "discardChangesTitle": "Atmest izmaiņas?",
     "findings": "Konstatējumi",
     "mergeRequest": "merge request",
     "notConnected": "Nav pievienots",
@@ -673,7 +675,8 @@
       "description": "Pievieno savu GitHub kontu, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē.",
       "gitlabDescription": "Pievieno savu GitLab kontu, lai pārskatītu merge requests mobilajā ierīcē.",
       "bitbucketDescription": "Pievieno Bitbucket šai organizācijai, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē.",
-      "bitbucketOrgOnlyDescription": "Profilā izvēlies organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus."
+      "bitbucketOrgOnlyDescription": "Pārslēdz augstāk redzamo kontu uz organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus.",
+      "contextLine": "Priekš {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -785,7 +788,9 @@
       "reviewNotSubmitted": "Šo vērtējumu pašreizējā veidā nevar iesniegt. Iespējams, PR ir mainījies vai arī tu mēģini vērtēt savu izmaiņu pieprasījumu.",
       "reviewNotSubmittedTerm": "Šo vērtējumu pašreizējā veidā nevar iesniegt. Iespējams, {{term}} ir mainījies, vai arī tu nevar vērtēt savu {{term}}.",
       "couldNotPostComment": "Neizdevās publicēt komentāru.",
-      "couldNotSubmitReview": "Neizdevās iesniegt vērtējumu. Pārbaudi savienojumu un mēģini vēlreiz."
+      "couldNotSubmitReview": "Neizdevās iesniegt vērtējumu. Pārbaudi savienojumu un mēģini vēlreiz.",
+      "rateLimited": "Pārāk daudz pieprasījumu. Lūdzu, mēģini vēlāk vēlreiz.",
+      "conflict": "Tas ir mainījies, kamēr tu ar to strādāji. Ielādē to no jauna un mēģini vēlreiz."
     },
     "operation": {
       "couldNotReply": "Neizdevās atbildēt.",
@@ -1564,7 +1569,8 @@
       "bugs": "Kļūdas",
       "style": "Stils",
       "testing": "Testēšana",
-      "documentation": "Dokumentācija"
+      "documentation": "Dokumentācija",
+      "unknown": "Cits ({{area}})"
     },
     "gateThreshold": {
       "warning": "Brīdinājums"
@@ -1677,7 +1683,14 @@
       "whereFound": "Konstatējuma atrašanās vietas ({{displayCount}})",
       "fullReport": "Pilns sagatavotais ziņojums",
       "yes": "Jā",
-      "no": "Nē"
+      "no": "Nē",
+      "action": {
+        "analyzeCodebase": "Analizēt koda bāzi",
+        "dismiss": "Noraidīt",
+        "manualReview": "Manuāla pārskatīšana",
+        "monitor": "Uzraudzīt",
+        "openPr": "Atvērt PR"
+      }
     },
     "dashboard": {
       "findingsCount": "Konstatējumi: {{displayCount}}",
@@ -1899,7 +1912,24 @@
       "title": "Audita ziņojums",
       "unavailable": "Audita ziņojums nav pieejams",
       "unavailableDescription": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var skatīt audita ziņojumus. Lūdz īpašnieku vai norēķinu pārvaldnieku piešķirt tev piekļuvi.",
-      "queryFailed": "Neizdevās pabeigt ziņojuma vaicājumu. Mēģini vēlreiz."
+      "queryFailed": "Neizdevās pabeigt ziņojuma vaicājumu. Mēģini vēlreiz.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analīze pabeigta",
+        "findingAnalysisFailed": "Analīze neizdevās",
+        "findingAutoDismissed": "Automātiski noraidīts",
+        "findingCreated": "Importēts",
+        "findingDeleted": "Izdzēsts",
+        "findingDismissed": "Noraidīts",
+        "findingSeverityChanged": "Mainīta smaguma pakāpe",
+        "findingStatusChange": "Mainīts statuss",
+        "findingSuperseded": "Aizstāts",
+        "remediationBlocked": "Labošana bloķēta",
+        "remediationCancelled": "Atcelta",
+        "remediationFailed": "Labošana neizdevās",
+        "remediationNoChangesNeeded": "Izmaiņas nav nepieciešamas",
+        "remediationPrOpened": "Atvērts PR",
+        "remediationQueued": "Labošana pieprasīta"
+      }
     },
     "notifications": {
       "couldNotLoad": "Neizdevās ielādēt paziņojumu iestatījumus.",
@@ -2240,6 +2270,7 @@
       "prefillModelUnavailable": "{{model}} vairs nav pieejams. Tiek izmantots tavs noklusējuma modelis.",
       "couldNotReadPendingSessions": "Neizdevās nolasīt gaidošās sesijas. Mēģini vēlreiz.",
       "failedToCreate": "Neizdevās izveidot sesiju.",
+      "checkOrganizationAccess": "Pārbaudi savu piekļuvi šai organizācijai un mēģini vēlreiz.",
       "couldNotRefreshRepositories": "Neizdevās atsvaidzināt repozitorijus. Lūdzu, mēģini vēlreiz.",
       "discardDraftTitle": "Atmest melnrakstu?",
       "discardDraftMessage": "Tava uzvedne tiks dzēsta.",
@@ -2771,6 +2802,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Tavas aktīvās sesijas būs pieejamas pēc datu ielādes.",
     "currentDeviceUnidentified": "Neizdevās identificēt pašreizējo ierīci.",
+    "kiloApp": "Kilo lietotne",
     "noSessions": "Nav aktīvu sesiju",
     "noSessionsDescription": "Pieraksties Kilo lietotnē citā ierīcē, un tā būs redzama šeit.",
     "onlyKiloAppSignIns": "Šeit ir redzamas tikai Kilo lietotnes sesijas. Redaktora un CLI sesijas nav iekļautas.",

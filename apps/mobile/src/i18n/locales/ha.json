@@ -35,6 +35,8 @@
     "connectGithub": "Haɗa GitHub",
     "cost": "Farashi",
     "discard": "Yi watsi",
+    "discardChangesMessage": "Za a rasa canje-canjenka.",
+    "discardChangesTitle": "A yi watsi da canje-canje?",
     "findings": "Sakamakon bincike",
     "mergeRequest": "buƙatar haɗawa",
     "notConnected": "Ba a haɗa ba",
@@ -661,7 +663,8 @@
       "description": "Haɗa asusunka na GitHub don yin bitar buƙatun haɗawa a waya.",
       "gitlabDescription": "Haɗa asusun GitLab ɗinka don bita buƙatun haɗawa a wayar hannu.",
       "bitbucketDescription": "Haɗa Bitbucket da wannan ƙungiya don bita buƙatun haɗa canje-canje a wayar hannu.",
-      "bitbucketOrgOnlyDescription": "Zaɓi ƙungiya a cikin bayanan martabarka don bita buƙatun haɗa canje-canje na Bitbucket na ƙungiyar."
+      "bitbucketOrgOnlyDescription": "Canja asusun da ke sama zuwa ƙungiya don bita buƙatun haɗa canje-canje na Bitbucket na ƙungiyar.",
+      "contextLine": "Don {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "Ba za a iya aika wannan bitar yadda take ba. Wataƙila PR ya canza, ko kuma ba za ka iya yin bitar buƙatar haɗawa da ka buɗe da kanka ba.",
       "reviewNotSubmittedTerm": "Ba a iya aika wannan bita yadda yake ba. Wataƙila {{term}} ya canza, ko ba za ka iya bita {{term}} ɗinka ba.",
       "couldNotPostComment": "Ba a iya wallafa tsokaci ba.",
-      "couldNotSubmitReview": "Ba a iya aika bita ba. Duba haɗinka na intanet ka sake gwadawa."
+      "couldNotSubmitReview": "Ba a iya aika bita ba. Duba haɗinka na intanet ka sake gwadawa.",
+      "rateLimited": "An yi buƙatu da yawa. Da fatan za a sake gwadawa daga baya.",
+      "conflict": "Wannan ya canza ne a lokacin da kake aiki a kansa. Loda shi daga kashi sannan ka sake gwadawa."
     },
     "operation": {
       "couldNotReply": "An kasa amsawa.",
@@ -1545,7 +1550,8 @@
       "bugs": "Kurakurai",
       "style": "Salo",
       "testing": "Gwaji",
-      "documentation": "Bayanan jagora"
+      "documentation": "Bayanan jagora",
+      "unknown": "Sauran ({{area}})"
     },
     "gateThreshold": {
       "warning": "Gargaɗi"
@@ -1657,7 +1663,14 @@
       "whereFound": "Inda aka samu wannan ({{displayCount}})",
       "fullReport": "Cikakken rahoton da aka samar",
       "yes": "Ee",
-      "no": "A'a"
+      "no": "A'a",
+      "action": {
+        "analyzeCodebase": "Bincika lambar tushe",
+        "dismiss": "Ware",
+        "manualReview": "Bincike da hannu",
+        "monitor": "Sa ido",
+        "openPr": "Buɗe PR"
+      }
     },
     "dashboard": {
       "findingsCount": "Matsaloli {{displayCount}} da aka gano",
@@ -1876,7 +1889,24 @@
       "title": "Rahoton bincike",
       "unavailable": "Ba a iya samun rahoton bincike",
       "unavailableDescription": "Masu mallakar ƙungiya da masu kula da biyan kuɗi kawai za su iya duba rahotannin bincike. Nemi mai ƙungiya ko mai kula da biyan kuɗi ya ba ka dama.",
-      "queryFailed": "Ba a kammala neman bayanan rahoton ba. Sake gwadawa."
+      "queryFailed": "Ba a kammala neman bayanan rahoton ba. Sake gwadawa.",
+      "eventActions": {
+        "findingAnalysisCompleted": "An kammala bincike",
+        "findingAnalysisFailed": "Bincike ya gaza",
+        "findingAutoDismissed": "An ware ta atomatik",
+        "findingCreated": "An shigo da shi",
+        "findingDeleted": "An share",
+        "findingDismissed": "An ware",
+        "findingSeverityChanged": "An canza tsanani",
+        "findingStatusChange": "An canza matsayi",
+        "findingSuperseded": "An maye gurbinsa",
+        "remediationBlocked": "An toshe gyara",
+        "remediationCancelled": "An soke",
+        "remediationFailed": "Gyara ya gaza",
+        "remediationNoChangesNeeded": "Babu buƙatar canje-canje",
+        "remediationPrOpened": "An buɗe PR",
+        "remediationQueued": "An nemi gyara"
+      }
     },
     "notifications": {
       "couldNotLoad": "An kasa loda saitunan sanarwa.",
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "An daina samun {{model}}. Ana amfani da samfurinka na asali.",
       "couldNotReadPendingSessions": "An kasa karanta zamannin da ke jira. Sake gwadawa.",
       "failedToCreate": "An kasa ƙirƙirar zama.",
+      "checkOrganizationAccess": "Ka duba damar shiga ga wannan ƙungiya, ka sake gwadawa.",
       "couldNotRefreshRepositories": "An kasa sabunta ma'ajiyoyi. Sake gwadawa.",
       "discardDraftTitle": "Watsar da daftari?",
       "discardDraftMessage": "Za a rasa umarnin aikinka.",
@@ -2732,6 +2763,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Ba za a iya nuna zamanninka da ke aiki ba har sai an loda waɗannan bayanan.",
     "currentDeviceUnidentified": "An kasa gano na'urar da ake amfani da ita.",
+    "kiloApp": "Manhajar Kilo",
     "noSessions": "Babu zamannin da ke aiki",
     "noSessionsDescription": "Shiga ta manhajar Kilo a wata na'ura, kuma za ta bayyana a nan.",
     "onlyKiloAppSignIns": "Shiga ta manhajar Kilo kawai ake nunawa a nan. Ba a nuna shiga ta editan lambar shiri ko CLI ba.",

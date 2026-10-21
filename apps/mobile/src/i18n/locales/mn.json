@@ -35,6 +35,8 @@
     "connectGithub": "GitHub холбох",
     "cost": "Зардал",
     "discard": "Хаях",
+    "discardChangesMessage": "Таны өөрчлөлтүүд алдагдах болно.",
+    "discardChangesTitle": "Өөрчлөлтүүдийг хаях уу?",
     "findings": "Илэрсэн асуудлууд",
     "mergeRequest": "нэгтгэх хүсэлт",
     "notConnected": "Холбогдоогүй",
@@ -661,7 +663,8 @@
       "description": "Гар утаснаасаа нэгтгэх хүсэлтүүдийг хянахын тулд GitHub бүртгэлээ холбоно уу.",
       "gitlabDescription": "Гар утаснаас нэгтгэх хүсэлтүүдийг шалгахын тулд GitLab бүртгэлээ холбоно уу.",
       "bitbucketDescription": "Гар утаснаас татах хүсэлтүүдийг шалгахын тулд Bitbucket-ийг энэ байгууллагад холбоно уу.",
-      "bitbucketOrgOnlyDescription": "Тухайн байгууллагын Bitbucket татах хүсэлтүүдийг шалгахын тулд профайлаасаа байгууллага сонгоно уу."
+      "bitbucketOrgOnlyDescription": "Түүний Bitbucket татах хүсэлтүүдийг шалгахын тулд дээрх бүртгэлийг байгууллагад шилжүүлнэ үү.",
+      "contextLine": "{{organization}}-ийн хувьд"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "Энэ хяналтыг одоогийн байдлаар нь илгээх боломжгүй. PR өөрчлөгдсөн байж болзошгүй, эсвэл та өөрийн нэгтгэх хүсэлтийг хянах гэж оролдсон байна.",
       "reviewNotSubmittedTerm": "Энэ шалгалтыг хэвээр нь илгээх боломжгүй. {{term}} өөрчлөгдсөн байж болзошгүй, эсвэл та өөрийн {{term}}-г шалгах боломжгүй.",
       "couldNotPostComment": "Сэтгэгдлийг нийтэлж чадсангүй.",
-      "couldNotSubmitReview": "Хяналтыг илгээж чадсангүй. Холболтоо шалгаад дахин оролдоно уу."
+      "couldNotSubmitReview": "Хяналтыг илгээж чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
+      "rateLimited": "Хэт олон хүсэлт илгээгдлээ. Дараа дахин оролдоно уу.",
+      "conflict": "Та ажиллаж байх үед энэ өөрчлөгдсөн байна. Дахин ачаалаад дахин оролдоно уу."
     },
     "operation": {
       "couldNotReply": "Хариу илгээж чадсангүй.",
@@ -1545,7 +1550,8 @@
       "bugs": "Алдаанууд",
       "style": "Бичлэгийн хэв маяг",
       "testing": "Туршилт",
-      "documentation": "Баримтжуулалт"
+      "documentation": "Баримтжуулалт",
+      "unknown": "Бусад ({{area}})"
     },
     "gateThreshold": {
       "warning": "Анхааруулга"
@@ -1657,7 +1663,14 @@
       "whereFound": "Илэрсэн байршлууд ({{displayCount}})",
       "fullReport": "Боловсруулсан бүрэн тайлан",
       "yes": "Тийм",
-      "no": "Үгүй"
+      "no": "Үгүй",
+      "action": {
+        "analyzeCodebase": "Кодын баазыг шинжлэх",
+        "dismiss": "Үгүйсгэх",
+        "manualReview": "Гараар хянан шалгах",
+        "monitor": "Ажиглах",
+        "openPr": "PR нээх"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} илэрсэн асуудал",
@@ -1876,7 +1889,24 @@
       "title": "Аудитын тайлан",
       "unavailable": "Аудитын тайланг үзэх боломжгүй",
       "unavailableDescription": "Зөвхөн байгууллагын эзэмшигч болон төлбөрийн менежер аудитын тайланг үзэх эрхтэй. Тэднээс хандах эрх хүснэ үү.",
-      "queryFailed": "Тайлангийн асуулга дуусаагүй. Дахин оролдоно уу."
+      "queryFailed": "Тайлангийн асуулга дуусаагүй. Дахин оролдоно уу.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Шинжилгээ дууссан",
+        "findingAnalysisFailed": "Шинжилгээ амжилтгүй боллоо",
+        "findingAutoDismissed": "Автомат үгүйсгэсэн",
+        "findingCreated": "Импортолсон",
+        "findingDeleted": "Устгасан",
+        "findingDismissed": "Үгүйсгэсэн",
+        "findingSeverityChanged": "Ноцтой байдал өөрчлөгдсөн",
+        "findingStatusChange": "Төлөв өөрчлөгдсөн",
+        "findingSuperseded": "Солигдсон",
+        "remediationBlocked": "Засвар хаагдсан",
+        "remediationCancelled": "Цуцлагдсан",
+        "remediationFailed": "Засвар амжилтгүй боллоо",
+        "remediationNoChangesNeeded": "Өөрчлөлт шаардлагагүй",
+        "remediationPrOpened": "PR нээгдсэн",
+        "remediationQueued": "Засвар хийх хүсэлт илгээсэн"
+      }
     },
     "notifications": {
       "couldNotLoad": "Мэдэгдлийн тохиргоог ачаалж чадсангүй.",
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} загварыг ашиглах боломжгүй болсон. Таны үндсэн загварыг ашиглаж байна.",
       "couldNotReadPendingSessions": "Хүлээгдэж буй сессүүдийг уншиж чадсангүй. Дахин оролдоно уу.",
       "failedToCreate": "Сесс үүсгэж чадсангүй.",
+      "checkOrganizationAccess": "Энэ байгууллагад хандах эрхээ шалгаад дахин оролдоно уу.",
       "couldNotRefreshRepositories": "Кодын сангийн жагсаалтыг шинэчилж чадсангүй. Дахин оролдоно уу.",
       "discardDraftTitle": "Нооргийг устгах уу?",
       "discardDraftMessage": "Таны бичсэн заавар устах болно.",
@@ -2732,6 +2763,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Энэ мэдээллийг ачаалж дуустал таны идэвхтэй нэвтрэлтүүдийг харах боломжгүй.",
     "currentDeviceUnidentified": "Одоогийн төхөөрөмжийг тодорхойлж чадсангүй.",
+    "kiloApp": "Kilo апп",
     "noSessions": "Идэвхтэй нэвтрэлт алга",
     "noSessionsDescription": "Өөр төхөөрөмж дээр Kilo аппаар нэвтэрвэл тэр төхөөрөмж энд харагдана.",
     "onlyKiloAppSignIns": "Энд зөвхөн Kilo аппын нэвтрэлтүүд харагдана. Код засварлагч болон CLI-ийн нэвтрэлтүүд орохгүй.",

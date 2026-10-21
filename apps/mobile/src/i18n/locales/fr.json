@@ -35,6 +35,8 @@
     "connectGithub": "Connecter GitHub",
     "cost": "Coût",
     "discard": "Abandonner",
+    "discardChangesMessage": "Vos modifications seront perdues.",
+    "discardChangesTitle": "Abandonner les modifications ?",
     "findings": "Problèmes détectés",
     "mergeRequest": "merge request",
     "notConnected": "Non connecté",
@@ -1005,7 +1007,8 @@
       "bugs": "Bogues",
       "style": "Style du code",
       "testing": "Tests",
-      "documentation": "Documentation du code"
+      "documentation": "Documentation du code",
+      "unknown": "Autre ({{area}})"
     },
     "gateThreshold": {
       "warning": "Avertissement"
@@ -1084,7 +1087,14 @@
       "triageReasoning": "Justification du triage",
       "watchInCloudAgent": "Suivre dans l'agent cloud",
       "whereFound": "Emplacements détectés ({{displayCount}})",
-      "yes": "Oui"
+      "yes": "Oui",
+      "action": {
+        "analyzeCodebase": "Analyser la base de code",
+        "dismiss": "Ignorer",
+        "manualReview": "Examen manuel",
+        "monitor": "Surveiller",
+        "openPr": "Ouvrir une PR"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Modèle d'analyse",
@@ -1106,7 +1116,24 @@
       "summary": "Résumé du rapport",
       "title": "Rapport d'audit",
       "unavailable": "Rapport d'audit indisponible",
-      "unavailableDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent consulter les rapports d'audit. Demandez à l'un d'eux de vous accorder l'accès."
+      "unavailableDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent consulter les rapports d'audit. Demandez à l'un d'eux de vous accorder l'accès.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyse terminée",
+        "findingAnalysisFailed": "Échec de l'analyse",
+        "findingAutoDismissed": "Ignoré automatiquement",
+        "findingCreated": "Importé",
+        "findingDeleted": "Supprimé",
+        "findingDismissed": "Ignoré",
+        "findingSeverityChanged": "Gravité modifiée",
+        "findingStatusChange": "Statut modifié",
+        "findingSuperseded": "Remplacé",
+        "remediationBlocked": "Correction bloquée",
+        "remediationCancelled": "Annulé",
+        "remediationFailed": "Échec de la correction",
+        "remediationNoChangesNeeded": "Aucune modification nécessaire",
+        "remediationPrOpened": "PR ouverte",
+        "remediationQueued": "Correction demandée"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Voir le rapport d'audit"
@@ -1613,6 +1640,7 @@
       "prefillModelUnavailable": "{{model}} n'est plus disponible. Votre modèle par défaut est utilisé.",
       "couldNotReadPendingSessions": "Impossible de lire les sessions en attente. Réessayez.",
       "failedToCreate": "Impossible de créer la session.",
+      "checkOrganizationAccess": "Vérifiez votre accès à cette organisation, puis réessayez.",
       "couldNotRefreshRepositories": "Impossible d'actualiser les dépôts. Réessayez.",
       "discardDraftTitle": "Supprimer le brouillon ?",
       "discardDraftMessage": "Votre consigne sera perdue.",
@@ -2175,6 +2203,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Vos sessions actives restent indisponibles tant que leur chargement n'a pas abouti.",
     "currentDeviceUnidentified": "Impossible d'identifier l'appareil actuel.",
+    "kiloApp": "Application Kilo",
     "noSessions": "Aucune session active",
     "noSessionsDescription": "Connectez-vous à l'application Kilo sur un autre appareil pour le voir apparaître ici.",
     "onlyKiloAppSignIns": "Seules les connexions à l'application Kilo apparaissent ici. Les connexions depuis l'éditeur ou la CLI ne sont pas affichées.",
@@ -2530,7 +2559,8 @@
       "description": "Connectez votre compte GitHub pour examiner des demandes de fusion sur mobile.",
       "gitlabDescription": "Connectez votre compte GitLab pour examiner des merge requests sur mobile.",
       "bitbucketDescription": "Connectez Bitbucket à cette organisation pour examiner des PR sur mobile.",
-      "bitbucketOrgOnlyDescription": "Sélectionnez une organisation dans votre profil pour examiner ses PR Bitbucket sur mobile."
+      "bitbucketOrgOnlyDescription": "Basculez le compte ci-dessus vers une organisation pour examiner ses PR Bitbucket.",
+      "contextLine": "Pour {{organization}}"
     },
     "connectionExpired": "La connexion à GitHub a expiré.",
     "couldNotLoadPullRequest": "Impossible de charger la demande de fusion.",
@@ -2972,7 +3002,9 @@
       "reviewNotSubmitted": "Impossible d'envoyer cette revue en l'état. La PR a peut-être changé ou vous tentez d'examiner votre propre demande de fusion, ce qui n'est pas autorisé.",
       "reviewNotSubmittedTerm": "Impossible d'envoyer cette revue en l'état. Il se peut que {{term}} ait changé, ou que vous ne puissiez pas examiner votre propre {{term}}.",
       "couldNotPostComment": "Impossible de publier le commentaire.",
-      "couldNotSubmitReview": "Impossible d'envoyer la revue. Vérifiez votre connexion et réessayez."
+      "couldNotSubmitReview": "Impossible d'envoyer la revue. Vérifiez votre connexion et réessayez.",
+      "rateLimited": "Trop de requêtes. Réessayez plus tard.",
+      "conflict": "Cet élément a été modifié pendant que vous y travailliez. Rechargez-le et réessayez."
     },
     "operation": {
       "couldNotReply": "Impossible de répondre.",

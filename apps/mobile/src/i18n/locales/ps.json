@@ -35,6 +35,8 @@
     "connectGithub": "GitHub ونښلوئ",
     "cost": "لګښت",
     "discard": "لغوه کړئ",
+    "discardChangesMessage": "ستاسو بدلونونه به له لاسه ورک شي.",
+    "discardChangesTitle": "تغییرات لغوه کړئ؟",
     "findings": "موندنې",
     "mergeRequest": "د یوځای کولو غوښتنه",
     "notConnected": "نه دی نښلول شوی",
@@ -661,7 +663,8 @@
       "description": "په موبایل کې د پل ریکویسټونو د بیاکتنې لپاره خپل GitHub حساب ونښلوئ.",
       "gitlabDescription": "په موبایل کې د یوځای کولو د غوښتنو د بیاکتنې لپاره خپل GitLab حساب ونښلوئ.",
       "bitbucketDescription": "په موبایل کې د پول ریکویسټونو د بیاکتنې لپاره Bitbucket له دې بنسټ سره ونښلوئ.",
-      "bitbucketOrgOnlyDescription": "خپل پروفایل کې یو بنسټ وټاکئ ترڅو د هغه Bitbucket پول ریکویسټونه وبیایۍ."
+      "bitbucketOrgOnlyDescription": "د هغې د Bitbucket پول ریکویسټونو د بیاکتنې لپاره پورته حساب یو بنسټ ته وبدلئ.",
+      "contextLine": "{{organization}} لپاره"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "دا بیاکتنه په اوسني حالت کې نه شي سپارل کېدای. کېدای شي PR بدل شوی وي، یا تاسو د خپل پل ریکویسټ د بیاکتنې اجازه نه لرئ.",
       "reviewNotSubmittedTerm": "دا بیاکتنه په همدې بڼه نه شي کولای وسپارل شي. کېدای شي {{term}} بدل شوی وي، یا تاسو خپله {{term}} نشئ کولای وبيایۍ.",
       "couldNotPostComment": "تبصره خپره نه شوه.",
-      "couldNotSubmitReview": "بیاکتنه ونه سپارل شوه. خپله اړیکه وګورئ او بیا هڅه وکړئ."
+      "couldNotSubmitReview": "بیاکتنه ونه سپارل شوه. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
+      "rateLimited": "ډېرې غوښتنې. مهرباني وکړئ وروسته بیا هڅه وکړئ.",
+      "conflict": "دا ستاسو د کار پر مهال بدل شوی دی. بیا یې لوډ کړئ او بیا هڅه وکړئ."
     },
     "operation": {
       "couldNotReply": "ځواب ونه لېږل شو.",
@@ -1545,7 +1550,8 @@
       "bugs": "تېروتنې",
       "style": "د لیکلو بڼه",
       "testing": "ازموینه",
-      "documentation": "اسناد"
+      "documentation": "اسناد",
+      "unknown": "نور ({{area}})"
     },
     "gateThreshold": {
       "warning": "خبرداری"
@@ -1657,7 +1663,14 @@
       "whereFound": "د موندلو ځایونه ({{displayCount}})",
       "fullReport": "بشپړ جوړ شوی راپور",
       "yes": "هو",
-      "no": "نه"
+      "no": "نه",
+      "action": {
+        "analyzeCodebase": "کوډبېس تحلیل کړئ",
+        "dismiss": "رد کړئ",
+        "manualReview": "لاسي بیاکتنه",
+        "monitor": "څارنه وکړئ",
+        "openPr": "پول ریکوئسټ پرانیزه"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} موندنې",
@@ -1876,7 +1889,24 @@
       "title": "د پلټنې راپور",
       "unavailable": "د پلټنې راپور نشته",
       "unavailableDescription": "یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي د پلټنې راپورونه وګوري. له یوه مالک یا د تادیاتو له مدیر څخه د لاسرسي اجازه وغواړئ.",
-      "queryFailed": "د راپور د معلوماتو غوښتنه بشپړه نه شوه. بیا هڅه وکړئ."
+      "queryFailed": "د راپور د معلوماتو غوښتنه بشپړه نه شوه. بیا هڅه وکړئ.",
+      "eventActions": {
+        "findingAnalysisCompleted": "تحلیل بشپړ شو",
+        "findingAnalysisFailed": "تحلیل ناکام شو",
+        "findingAutoDismissed": "په اتوماتيک ډول رد شو",
+        "findingCreated": "درآول شوی",
+        "findingDeleted": "ړنګ شو",
+        "findingDismissed": "رد شو",
+        "findingSeverityChanged": "د شدت بدلون",
+        "findingStatusChange": "د حالت بدلون",
+        "findingSuperseded": "ځای ناستی شو",
+        "remediationBlocked": "د اصلاح مخه ونیول شوه",
+        "remediationCancelled": "لغوه شو",
+        "remediationFailed": "اصلاح ناکام شو",
+        "remediationNoChangesNeeded": "بدلونونو ته اړتیا نشته",
+        "remediationPrOpened": "پول ریکوئسټ پرانیستل شو",
+        "remediationQueued": "د اصلاح غوښتنه وشوه"
+      }
     },
     "notifications": {
       "couldNotLoad": "د خبرتیاوو ترتیبات بار نه شول.",
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} نور د لاسرسي وړ نه دی. ستاسو تلواله ماډل کارول کېږي.",
       "couldNotReadPendingSessions": "په تمه ناستې ونه لوستل شوې. بیا هڅه وکړئ.",
       "failedToCreate": "ناسته جوړه نه شوه.",
+      "checkOrganizationAccess": "د دې ادارې لاسرسی وګورئ، بیا هڅه وکړئ.",
       "couldNotRefreshRepositories": "زېرمتونونه تازه نه شول. بیا هڅه وکړئ.",
       "discardDraftTitle": "مسوده ړنګه کړم؟",
       "discardDraftMessage": "ستاسو پرامپټ به له منځه ولاړ شي.",
@@ -2732,6 +2763,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "تر بارېدو پورې ستاسو فعالې ناستې د لاسرسي وړ نه دي.",
     "currentDeviceUnidentified": "اوسنۍ وسیله ونه پېژندل شوه.",
+    "kiloApp": "د Kilo اپلیکیشن",
     "noSessions": "هېڅ فعاله ناسته نشته",
     "noSessionsDescription": "په بله وسیله کې د Kilo اپلیکیشن ته ننوځئ، ناسته به یې دلته ښکاره شي.",
     "onlyKiloAppSignIns": "دلته یوازې د Kilo اپلیکیشن ننوتنې ښکاري. د کوډ سمونګر او CLI ننوتنې په لېست کې نه راځي.",

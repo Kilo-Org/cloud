@@ -35,6 +35,8 @@
     "connectGithub": "GitHub जडान गर्नुहोस्",
     "cost": "लागत",
     "discard": "खारेज गर्नुहोस्",
+    "discardChangesMessage": "तपाईंका परिवर्तनहरू हराउनेछन्।",
+    "discardChangesTitle": "परिवर्तनहरू खारेज गर्नुहोस्?",
     "findings": "भेटिएका समस्या",
     "mergeRequest": "मर्ज रिक्वेस्ट",
     "notConnected": "जडान छैन",
@@ -661,7 +663,8 @@
       "description": "मोबाइलमा पुल रिक्वेस्टको समीक्षा गर्न आफ्नो GitHub खाता जडान गर्नुहोस्।",
       "gitlabDescription": "मोबाइलमा मर्ज रिक्वेस्टहरू समीक्षा गर्न आफ्नो GitLab खाता जडान गर्नुहोस्।",
       "bitbucketDescription": "मोबाइलमा पुल रिक्वेस्टहरू समीक्षा गर्न यो संस्थालाई Bitbucket सँग जडान गर्नुहोस्।",
-      "bitbucketOrgOnlyDescription": "त्यसका Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न आफ्नो प्रोफाइलमा एउटा संस्था चयन गर्नुहोस्।"
+      "bitbucketOrgOnlyDescription": "यसको Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न माथिको खाता एउटा संस्थामा स्विच गर्नुहोस्।",
+      "contextLine": "{{organization}} का लागि"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "यो समीक्षा हालको अवस्थामा पठाउन सकिँदैन। PR मा परिवर्तन भएको हुन सक्छ वा तपाईं आफ्नै पुल रिक्वेस्टको समीक्षा गर्दै हुनुहुन्छ।",
       "reviewNotSubmittedTerm": "यो समीक्षा यथावत पेश गर्न सकिँदैन। {{term}} परिवर्तन भएको हुनसक्छ, वा तपाईंले आफ्नै {{term}} को समीक्षा गर्न सक्नुहुन्न।",
       "couldNotPostComment": "टिप्पणी पोस्ट गर्न सकिएन।",
-      "couldNotSubmitReview": "समीक्षा पठाउन सकिएन। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।"
+      "couldNotSubmitReview": "समीक्षा पठाउन सकिएन। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+      "rateLimited": "धेरै अनुरोधहरू। कृपया पछि फेरि प्रयास गर्नुहोस्।",
+      "conflict": "तपाईं योमा काम गरिरहँदा यो परिवर्तन भयो। यो फेरि लोड गर्नुहोस् र फेरि प्रयास गर्नुहोस्।"
     },
     "operation": {
       "couldNotReply": "जवाफ दिन सकिएन।",
@@ -1545,7 +1550,8 @@
       "bugs": "बगहरू",
       "style": "शैली",
       "testing": "परीक्षण",
-      "documentation": "दस्तावेजीकरण"
+      "documentation": "दस्तावेजीकरण",
+      "unknown": "अन्य ({{area}})"
     },
     "gateThreshold": {
       "warning": "चेतावनी"
@@ -1657,7 +1663,14 @@
       "whereFound": "फेला परेका स्थानहरू ({{displayCount}})",
       "fullReport": "तयार गरिएको पूर्ण प्रतिवेदन",
       "yes": "हो",
-      "no": "होइन"
+      "no": "होइन",
+      "action": {
+        "analyzeCodebase": "कोडबेस विश्लेषण गर्नुहोस्",
+        "dismiss": "खारेज गर्नुहोस्",
+        "manualReview": "म्यानुअल समीक्षा",
+        "monitor": "निगरानी गर्नुहोस्",
+        "openPr": "पुल रिक्वेस्ट खोल्नुहोस्"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} सुरक्षा समस्या",
@@ -1876,7 +1889,24 @@
       "title": "अडिट प्रतिवेदन",
       "unavailable": "अडिट प्रतिवेदन उपलब्ध छैन",
       "unavailableDescription": "संस्थाका मालिक र बिलिङ प्रबन्धकहरूले मात्र अडिट प्रतिवेदन हेर्न सक्छन्। पहुँचका लागि संस्थाका मालिक वा बिलिङ प्रबन्धकलाई अनुरोध गर्नुहोस्।",
-      "queryFailed": "प्रतिवेदनको क्वेरी पूरा भएन। फेरि प्रयास गर्नुहोस्।"
+      "queryFailed": "प्रतिवेदनको क्वेरी पूरा भएन। फेरि प्रयास गर्नुहोस्।",
+      "eventActions": {
+        "findingAnalysisCompleted": "विश्लेषण पूरा भयो",
+        "findingAnalysisFailed": "विश्लेषण असफल भयो",
+        "findingAutoDismissed": "स्वतः खारेज गरियो",
+        "findingCreated": "आयात गरियो",
+        "findingDeleted": "मेटियो",
+        "findingDismissed": "खारेज गरियो",
+        "findingSeverityChanged": "गम्भीरता परिवर्तन भयो",
+        "findingStatusChange": "स्थिति परिवर्तन भयो",
+        "findingSuperseded": "प्रतिस्थापित भयो",
+        "remediationBlocked": "सुधार रोकियो",
+        "remediationCancelled": "रद्द गरियो",
+        "remediationFailed": "सुधार असफल भयो",
+        "remediationNoChangesNeeded": "कुनै परिवर्तन आवश्यक छैन",
+        "remediationPrOpened": "पुल रिक्वेस्ट खोलियो",
+        "remediationQueued": "सुधारको अनुरोध गरिएको"
+      }
     },
     "notifications": {
       "couldNotLoad": "सूचनाका सेटिङहरू लोड गर्न सकिएन।",
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} अब उपलब्ध छैन। तपाईंको पूर्वनिर्धारित मोडेल प्रयोग हुँदैछ।",
       "couldNotReadPendingSessions": "पर्खाइमा रहेका सत्रहरू पढ्न सकिएन। फेरि प्रयास गर्नुहोस्।",
       "failedToCreate": "सत्र बनाउन सकिएन।",
+      "checkOrganizationAccess": "यस संगठनमा तपाईंको पहुँच जाँच गर्नुहोस्, अनि फेरि प्रयास गर्नुहोस्।",
       "couldNotRefreshRepositories": "रिपोजिटरीहरूको सूची ताजा गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
       "discardDraftTitle": "मस्यौदा मेट्ने?",
       "discardDraftMessage": "तपाईंको प्रम्प्ट मेटिनेछ।",
@@ -2732,6 +2763,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "यो लोड नभएसम्म तपाईंका सक्रिय सत्रहरू अनुपलब्ध छन्।",
     "currentDeviceUnidentified": "हालको यन्त्र पहिचान गर्न सकिएन।",
+    "kiloApp": "Kilo एप",
     "noSessions": "कुनै सक्रिय सत्र छैन",
     "noSessionsDescription": "अर्को यन्त्रमा Kilo एपबाट साइन इन गर्नुहोस्। त्यसपछि त्यो यन्त्र यहाँ देखिनेछ।",
     "onlyKiloAppSignIns": "यहाँ केवल Kilo एप साइन-इनहरू देखिन्छन्। एडिटर र CLI साइन-इनहरू सूचीबद्ध छैनन्।",

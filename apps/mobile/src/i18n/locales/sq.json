@@ -35,6 +35,8 @@
     "connectGithub": "Lidhu me GitHub",
     "cost": "Kostoja",
     "discard": "Mos ruaj",
+    "discardChangesMessage": "Ndryshimet tuaja do të humbin.",
+    "discardChangesTitle": "Mos ruaj ndryshimet?",
     "findings": "Gjetjet",
     "mergeRequest": "kërkesë integrimi",
     "notConnected": "Pa lidhje",
@@ -661,7 +663,8 @@
       "description": "Lidh llogarinë tënde të GitHub për të rishikuar kërkesat për bashkim në telefon.",
       "gitlabDescription": "Lidho llogarinë tënde GitLab për të rishikuar kërkesat e integrimit në celular.",
       "bitbucketDescription": "Lidho Bitbucket me këtë organizatë për të rishikuar kërkesat për bashkim në celular.",
-      "bitbucketOrgOnlyDescription": "Përzgjidh një organizatë në profilin tënd për të rishikuar kërkesat e saj për bashkim në Bitbucket."
+      "bitbucketOrgOnlyDescription": "Ndrysho llogarinë e mësipërme në një organizatë për të rishikuar kërkesat për bashkim në Bitbucket.",
+      "contextLine": "Për {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "Ky rishikim nuk mund të dërgohet në gjendjen aktuale. PR-ja mund të ketë ndryshuar ose nuk lejohet të rishikosh kërkesën tënde për bashkim.",
       "reviewNotSubmittedTerm": "Ky rishikim nuk mund të dërgohet siç është. Mbase {{term}} ka ndryshuar, ose nuk mund të rishikosh {{term}} tënde.",
       "couldNotPostComment": "Nuk u arrit të postohej komenti.",
-      "couldNotSubmitReview": "Nuk u dërgua rishikimi. Kontrollo lidhjen dhe provo përsëri."
+      "couldNotSubmitReview": "Nuk u dërgua rishikimi. Kontrollo lidhjen dhe provo përsëri.",
+      "rateLimited": "Shumë kërkesa. Provo përsëri më vonë.",
+      "conflict": "Kjo ndryshoi ndërkohë që po punonit në të. Ringarkoje dhe provo përsëri."
     },
     "operation": {
       "couldNotReply": "Përgjigjja nuk u dërgua.",
@@ -1545,7 +1550,8 @@
       "bugs": "Defektet",
       "style": "Stili",
       "testing": "Testimi",
-      "documentation": "Dokumentacioni"
+      "documentation": "Dokumentacioni",
+      "unknown": "Tjetër ({{area}})"
     },
     "gateThreshold": {
       "warning": "Paralajmërim"
@@ -1657,7 +1663,14 @@
       "whereFound": "Ku u gjet ({{displayCount}})",
       "fullReport": "Raporti i plotë i gjeneruar",
       "yes": "Po",
-      "no": "Jo"
+      "no": "Jo",
+      "action": {
+        "analyzeCodebase": "Analizo bazën e kodit",
+        "dismiss": "Refuzoje",
+        "manualReview": "Rishikim manual",
+        "monitor": "Mbikëqyr",
+        "openPr": "Hap PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} gjetje",
@@ -1876,7 +1889,24 @@
       "title": "Raporti i auditimit",
       "unavailable": "Raporti i auditimit nuk është i disponueshëm",
       "unavailableDescription": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund të shohin raportet e auditimit. Kërkoji një pronari ose menaxheri të faturimit të të japë qasje.",
-      "queryFailed": "Kërkimi për raportin nuk përfundoi. Provo përsëri."
+      "queryFailed": "Kërkimi për raportin nuk përfundoi. Provo përsëri.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiza përfundoi",
+        "findingAnalysisFailed": "Analiza dështoi",
+        "findingAutoDismissed": "U refuzua automatikisht",
+        "findingCreated": "Importuar",
+        "findingDeleted": "U fshi",
+        "findingDismissed": "U refuzua",
+        "findingSeverityChanged": "Rëndësia u ndryshua",
+        "findingStatusChange": "Statusi u ndryshua",
+        "findingSuperseded": "U zëvendësua",
+        "remediationBlocked": "Korrigjimi u bllokua",
+        "remediationCancelled": "U anulua",
+        "remediationFailed": "Korrigjimi dështoi",
+        "remediationNoChangesNeeded": "Nuk nevojiten ndryshime",
+        "remediationPrOpened": "U hap PR",
+        "remediationQueued": "U kërkua korrigjimi"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nuk u ngarkuan cilësimet e njoftimeve.",
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} nuk është më i disponueshëm. Po përdoret modeli yt i parazgjedhur.",
       "couldNotReadPendingSessions": "Nuk u lexuan seancat në pritje. Provo përsëri.",
       "failedToCreate": "Nuk u krijua seanca.",
+      "checkOrganizationAccess": "Kontrollo aksesin tënd në këtë organizatë dhe provo përsëri.",
       "couldNotRefreshRepositories": "Nuk u rifreskuan depot. Provo përsëri.",
       "discardDraftTitle": "Të fshihet drafti?",
       "discardDraftMessage": "Kërkesa jote do të humbasë.",
@@ -2732,6 +2763,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Seancat e tua aktive nuk janë të disponueshme derisa të ngarkohen të dhënat.",
     "currentDeviceUnidentified": "Nuk u identifikua pajisja aktuale.",
+    "kiloApp": "Aplikacioni Kilo",
     "noSessions": "Nuk ka seanca aktive",
     "noSessionsDescription": "Hyr në aplikacionin Kilo në një pajisje tjetër dhe ajo do të shfaqet këtu.",
     "onlyKiloAppSignIns": "Këtu shfaqen vetëm hyrjet nga aplikacioni Kilo. Hyrjet nga redaktori dhe CLI nuk renditen.",

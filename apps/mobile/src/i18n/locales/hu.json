@@ -35,6 +35,8 @@
     "connectGithub": "GitHub csatlakoztatása",
     "cost": "Költség",
     "discard": "Elvetés",
+    "discardChangesMessage": "A módosításai elvesznek.",
+    "discardChangesTitle": "Elveti a módosításokat?",
     "findings": "Találatok",
     "mergeRequest": "merge request",
     "notConnected": "Nincs csatlakoztatva",
@@ -661,7 +663,8 @@
       "description": "Csatlakoztasd a GitHub-fiókodat a módosítási kérelmek mobilos kódellenőrzéséhez.",
       "gitlabDescription": "Csatlakoztasd a GitLab-fiókodat a merge requests kódellenőrzéséhez mobilon.",
       "bitbucketDescription": "Csatlakoztasd a Bitbucketot ehhez a szervezethez a módosítási kérelmek mobilos kódellenőrzéséhez.",
-      "bitbucketOrgOnlyDescription": "Válassz szervezetet a profilodban, hogy átnézd annak Bitbucket-módosítási kérelmeit."
+      "bitbucketOrgOnlyDescription": "Váltsd a fenti fiókot egy szervezetre a Bitbucket-módosítási kérelmek kódellenőrzéséhez.",
+      "contextLine": "{{organization}} számára"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "Ez a kódellenőrzés a jelenlegi formájában nem küldhető el. Lehet, hogy a PR megváltozott, vagy a saját módosítási kérelmedet próbálod ellenőrizni, ami nem engedélyezett.",
       "reviewNotSubmittedTerm": "Ez a kódellenőrzés a jelenlegi formájában nem küldhető el. Lehet, hogy a {{term}} megváltozott, vagy nem ellenőrizheted a saját {{term}}.",
       "couldNotPostComment": "Nem sikerült közzétenni a hozzászólást.",
-      "couldNotSubmitReview": "Nem sikerült elküldeni a kódellenőrzést. Ellenőrizd az internetkapcsolatot, és próbáld újra."
+      "couldNotSubmitReview": "Nem sikerült elküldeni a kódellenőrzést. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
+      "rateLimited": "Túl sok kérés. Próbáld újra később.",
+      "conflict": "Ez megváltozott, miközben dolgoztál rajta. Töltsd újra, és próbáld újra."
     },
     "operation": {
       "couldNotReply": "Nem sikerült válaszolni.",
@@ -1545,7 +1550,8 @@
       "bugs": "Hibák",
       "style": "Stílus",
       "testing": "Tesztelés",
-      "documentation": "Dokumentáció"
+      "documentation": "Dokumentáció",
+      "unknown": "Egyéb ({{area}})"
     },
     "gateThreshold": {
       "warning": "Figyelmeztetés"
@@ -1657,7 +1663,14 @@
       "whereFound": "Előfordulási helyek ({{displayCount}})",
       "fullReport": "Teljes elkészült jelentés",
       "yes": "Igen",
-      "no": "Nem"
+      "no": "Nem",
+      "action": {
+        "analyzeCodebase": "Kódbázis elemzése",
+        "dismiss": "Elutasítás",
+        "manualReview": "Manuális ellenőrzés",
+        "monitor": "Figyelés",
+        "openPr": "PR megnyitása"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} találat",
@@ -1876,7 +1889,24 @@
       "title": "Auditjelentés",
       "unavailable": "Az auditjelentés nem érhető el",
       "unavailableDescription": "Csak a szervezet tulajdonosai és a számlázásért felelős kezelők tekinthetik meg az auditjelentéseket. Kérj hozzáférést egy tulajdonostól vagy a számlázásért felelős kezelőtől.",
-      "queryFailed": "A jelentés lekérdezése nem fejeződött be. Próbáld újra."
+      "queryFailed": "A jelentés lekérdezése nem fejeződött be. Próbáld újra.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Elemzés befejezve",
+        "findingAnalysisFailed": "Elemzés sikertelen",
+        "findingAutoDismissed": "Automatikusan elutasítva",
+        "findingCreated": "Importálva",
+        "findingDeleted": "Törölve",
+        "findingDismissed": "Elutasítva",
+        "findingSeverityChanged": "Súlyosság módosítva",
+        "findingStatusChange": "Állapot módosítva",
+        "findingSuperseded": "Helyettesítve",
+        "remediationBlocked": "Hibajavítás blokkolva",
+        "remediationCancelled": "Megszakítva",
+        "remediationFailed": "Hibajavítás sikertelen",
+        "remediationNoChangesNeeded": "Nincs szükség módosításra",
+        "remediationPrOpened": "PR megnyitva",
+        "remediationQueued": "Hibajavítás kérve"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nem sikerült betölteni az értesítési beállításokat.",
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "Ez a modell már nem érhető el: {{model}}. Helyette az alapértelmezett modelledet használjuk.",
       "couldNotReadPendingSessions": "Nem sikerült beolvasni a függőben lévő munkameneteket. Próbáld újra.",
       "failedToCreate": "Nem sikerült létrehozni a munkamenetet.",
+      "checkOrganizationAccess": "Ellenőrizd a hozzáférésed ehhez a szervezethez, majd próbáld újra.",
       "couldNotRefreshRepositories": "Nem sikerült frissíteni a tárolókat. Próbáld újra.",
       "discardDraftTitle": "Piszkozat elvetése?",
       "discardDraftMessage": "Az utasításod elvész.",
@@ -2732,6 +2763,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "A betöltés befejezéséig az aktív munkameneteid nem érhetők el.",
     "currentDeviceUnidentified": "Nem sikerült azonosítani az aktuális eszközt.",
+    "kiloApp": "Kilo alkalmazás",
     "noSessions": "Nincs aktív munkamenet",
     "noSessionsDescription": "Jelentkezz be a Kilo alkalmazásba egy másik eszközön, és az eszköz itt is megjelenik.",
     "onlyKiloAppSignIns": "Itt csak a Kilo alkalmazásba történő bejelentkezések jelennek meg. A szerkesztőbe és a CLI-be történő bejelentkezéseket nem soroljuk fel.",

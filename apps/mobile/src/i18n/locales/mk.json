@@ -35,6 +35,8 @@
     "connectGithub": "Поврзи GitHub",
     "cost": "Трошок",
     "discard": "Отфрли",
+    "discardChangesMessage": "Вашите промени ќе бидат изгубени.",
+    "discardChangesTitle": "Отфрли промени?",
     "findings": "Наоди",
     "mergeRequest": "merge барање",
     "notConnected": "Неповрзано",
@@ -661,7 +663,8 @@
       "description": "Поврзи ја твојата сметка на GitHub за да прегледуваш барања за спојување од телефонот.",
       "gitlabDescription": "Поврзете ја вашата GitLab сметка за преглед на merge барања на мобилно.",
       "bitbucketDescription": "Поврзете Bitbucket со оваа организација за преглед на барања за спојување на мобилно.",
-      "bitbucketOrgOnlyDescription": "Изберете организација во вашиот профил за да ги прегледате нејзините Bitbucket барања за спојување."
+      "bitbucketOrgOnlyDescription": "Префрлете ја сметката погоре на организација за преглед на нејзините барања за спојување на Bitbucket.",
+      "contextLine": "За {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +772,9 @@
       "reviewNotSubmitted": "Овој преглед не може да се испрати во сегашната состојба. Можеби PR е променет или се обидуваш да прегледаш сопствено барање за спојување.",
       "reviewNotSubmittedTerm": "Овој преглед не може да се поднесе во сегашна состојба. {{term}} можеби се променил или не можете да го прегледате вашето сопствено {{term}}.",
       "couldNotPostComment": "Не успеа објавувањето на коментарот.",
-      "couldNotSubmitReview": "Не успеа испраќањето на прегледот. Провери ја врската и обиди се повторно."
+      "couldNotSubmitReview": "Не успеа испраќањето на прегледот. Провери ја врската и обиди се повторно.",
+      "rateLimited": "Премногу барања. Обиди се повторно подоцна.",
+      "conflict": "Ова се промени додека работеше на него. Вчитај го повторно и обиди се повторно."
     },
     "operation": {
       "couldNotReply": "Одговорот не се испрати.",
@@ -1545,7 +1550,8 @@
       "bugs": "Грешки",
       "style": "Стил",
       "testing": "Тестирање",
-      "documentation": "Документација"
+      "documentation": "Документација",
+      "unknown": "Друго ({{area}})"
     },
     "gateThreshold": {
       "warning": "Предупредување"
@@ -1657,7 +1663,14 @@
       "whereFound": "Места на откривање ({{displayCount}})",
       "fullReport": "Целосен генериран извештај",
       "yes": "Да",
-      "no": "Не"
+      "no": "Не",
+      "action": {
+        "analyzeCodebase": "Анализирај го кодот",
+        "dismiss": "Отфрли",
+        "manualReview": "Мануелна ревизија",
+        "monitor": "Мониторирај",
+        "openPr": "Отвори PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} наоди",
@@ -1876,7 +1889,24 @@
       "title": "Извештај за ревизија",
       "unavailable": "Извештајот за ревизија е недостапен",
       "unavailableDescription": "Само сопствениците на организацијата и менаџерите за наплата можат да гледаат извештаи за ревизија. Побарај од сопственик или менаџер за наплата да ти даде пристап.",
-      "queryFailed": "Барањето за извештајот не заврши. Обиди се повторно."
+      "queryFailed": "Барањето за извештајот не заврши. Обиди се повторно.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Завршена анализа",
+        "findingAnalysisFailed": "Неуспешна анализа",
+        "findingAutoDismissed": "Автоматски отфрлено",
+        "findingCreated": "Импортирано",
+        "findingDeleted": "Избришано",
+        "findingDismissed": "Отфрлено",
+        "findingSeverityChanged": "Променета сериозност",
+        "findingStatusChange": "Променет статус",
+        "findingSuperseded": "Заменето",
+        "remediationBlocked": "Блокирано санирање",
+        "remediationCancelled": "Откажано",
+        "remediationFailed": "Неуспешно санирање",
+        "remediationNoChangesNeeded": "Не се потребни промени",
+        "remediationPrOpened": "Отворен PR",
+        "remediationQueued": "Побарано санирање"
+      }
     },
     "notifications": {
       "couldNotLoad": "Не успеа вчитувањето на поставките за известувања.",
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} веќе не е достапен. Се користи твојот стандарден модел.",
       "couldNotReadPendingSessions": "Не успеа вчитувањето на сесиите што чекаат. Обиди се повторно.",
       "failedToCreate": "Не успеа создавањето на сесијата.",
+      "checkOrganizationAccess": "Провери го пристапот до оваа организација и обиди се повторно.",
       "couldNotRefreshRepositories": "Не успеа освежувањето на репозиториумите. Обиди се повторно.",
       "discardDraftTitle": "Да се отфрли нацртот?",
       "discardDraftMessage": "Твоето упатство ќе се изгуби.",
@@ -2732,6 +2763,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Твоите активни сесии не се достапни додека не заврши вчитувањето.",
     "currentDeviceUnidentified": "Не успеа препознавањето на тековниот уред.",
+    "kiloApp": "Апликација Kilo",
     "noSessions": "Нема активни сесии",
     "noSessionsDescription": "Најави се во апликацијата Kilo на друг уред и тој ќе се прикаже тука.",
     "onlyKiloAppSignIns": "Тука се прикажуваат само најавувањата во апликацијата Kilo. Најавувањата преку уредувачот и CLI не се наведени.",

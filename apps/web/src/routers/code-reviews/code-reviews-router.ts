@@ -67,6 +67,7 @@ import { v2SnapshotToLogEntries, v1BlobToLogEntries } from '@/lib/code-reviews/s
 import { codeReviewAnalyticsRouter } from './code-review-analytics-router';
 import {
   getManualCodeReviewConfig,
+  getManualCodeReviewConfigForDetail,
   isLocalKiloCodeReview,
   shouldPublishCodeReviewToProvider,
 } from '@/lib/code-reviews/manual-config';
@@ -408,7 +409,10 @@ export const codeReviewRouter = createTRPCRouter({
         selectedModel = selectedModelFromReviewSources({
           persistedModel: null,
           repoFullName: review.repo_full_name,
-          config: getManualCodeReviewConfig(review)?.agentConfig ?? null,
+          // Detail-read tolerance: a legacy row whose stored manual_config
+          // fails the strict schema must not fail the whole load; read it as
+          // "no manual config" and fall through to the owner agent config.
+          config: getManualCodeReviewConfigForDetail(review)?.agentConfig ?? null,
         });
         if (!selectedModel) {
           const owner = review.owned_by_organization_id
@@ -462,6 +466,15 @@ export const codeReviewRouter = createTRPCRouter({
       if (error instanceof TRPCError) {
         throw error;
       }
+      // A non-TRPC failure here resolves to the client as a generic, retryable
+      // `success: false`. Without this line the real cause is invisible in
+      // production: the resolved failure never reaches Sentry and the request
+      // logs show only a 200/207. reviewId identifies the row; the line
+      // carries no user data.
+      logExceptInTest('[codeReviews.get] Failed to load review', {
+        reviewId: input.reviewId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return failureResult(error instanceof Error ? error.message : 'Failed to get code review');
     }
   }),

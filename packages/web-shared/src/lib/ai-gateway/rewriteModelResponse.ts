@@ -439,6 +439,11 @@ function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
       usage.prompt_tokens_details.cached_tokens = 0; // OpenCode crashes if this is absent
     }
   }
+  if (usage.completion_tokens_details) {
+    if (usage.completion_tokens_details.reasoning_tokens === undefined) {
+      usage.completion_tokens_details.reasoning_tokens = 0; // strict OpenRouter clients reject a details object that omits this
+    }
+  }
 }
 
 export async function rewriteModelResponse_ChatCompletions({
@@ -546,6 +551,12 @@ export async function rewriteModelResponse_ChatCompletions({
             }
             if (delta.tool_calls === null) {
               delete delta.tool_calls;
+            }
+            for (const toolCall of delta.tool_calls ?? []) {
+              // Some APIs set null on argument continuation chunks, which @openrouter/ai-sdk-provider rejects
+              if (toolCall.type === null) {
+                delete toolCall.type;
+              }
             }
             applyReasoningDetailsResponseTransform(responseTransforms, delta);
           }

@@ -35,6 +35,8 @@
     "connectGithub": "Підключити GitHub",
     "cost": "Вартість",
     "discard": "Відкинути",
+    "discardChangesMessage": "Ваші зміни буде втрачено.",
+    "discardChangesTitle": "Відкинути зміни?",
     "findings": "Виявлені проблеми",
     "mergeRequest": "merge-запит",
     "notConnected": "Не підключено",
@@ -1039,7 +1041,8 @@
       "bugs": "Помилки",
       "style": "Стиль",
       "testing": "Тестування",
-      "documentation": "Документація"
+      "documentation": "Документація",
+      "unknown": "Інше ({{area}})"
     },
     "gateThreshold": {
       "warning": "Попередження"
@@ -1118,7 +1121,14 @@
       "triageReasoning": "Обґрунтування первинної оцінки",
       "watchInCloudAgent": "Переглянути в хмарному агенті",
       "whereFound": "Місця виявлення ({{displayCount}})",
-      "yes": "Так"
+      "yes": "Так",
+      "action": {
+        "analyzeCodebase": "Проаналізувати кодову базу",
+        "dismiss": "Відхилити",
+        "manualReview": "Перевірка вручну",
+        "monitor": "Спостерігати",
+        "openPr": "Відкрити запит на витягування"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Модель аналізу",
@@ -1140,7 +1150,24 @@
       "summary": "Підсумок звіту",
       "title": "Звіт аудиту",
       "unavailable": "Звіт аудиту недоступний",
-      "unavailableDescription": "Переглядати звіти аудиту можуть лише власники організації та менеджери з оплати. Попросіть власника або менеджера з оплати надати вам доступ."
+      "unavailableDescription": "Переглядати звіти аудиту можуть лише власники організації та менеджери з оплати. Попросіть власника або менеджера з оплати надати вам доступ.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Аналіз завершено",
+        "findingAnalysisFailed": "Помилка аналізу",
+        "findingAutoDismissed": "Відхилено автоматично",
+        "findingCreated": "Імпортовано",
+        "findingDeleted": "Видалено",
+        "findingDismissed": "Відхилено",
+        "findingSeverityChanged": "Змінено рівень серйозності",
+        "findingStatusChange": "Статус змінено",
+        "findingSuperseded": "Замінено",
+        "remediationBlocked": "Виправлення заблоковано",
+        "remediationCancelled": "Скасовано",
+        "remediationFailed": "Помилка виправлення",
+        "remediationNoChangesNeeded": "Зміни не потрібні",
+        "remediationPrOpened": "Відкрито запит на витягування",
+        "remediationQueued": "Надіслано запит на виправлення"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Переглянути звіт аудиту"
@@ -1724,6 +1751,7 @@
       "prefillModelUnavailable": "Модель {{model}} більше недоступна. Використовується ваша типова модель.",
       "couldNotReadPendingSessions": "Не вдалося прочитати дані сеансів у черзі. Спробуйте ще раз.",
       "failedToCreate": "Не вдалося створити сеанс.",
+      "checkOrganizationAccess": "Перевірте свій доступ до цієї організації, а потім спробуйте ще раз.",
       "couldNotRefreshRepositories": "Не вдалося оновити список репозиторіїв. Спробуйте ще раз.",
       "discardDraftTitle": "Видалити чернетку?",
       "discardDraftMessage": "Ваш запит буде втрачено.",
@@ -2266,6 +2294,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Ваші активні сеанси будуть доступні після завантаження даних.",
     "currentDeviceUnidentified": "Не вдалося визначити поточний пристрій.",
+    "kiloApp": "Застосунок Kilo",
     "noSessions": "Немає активних сеансів",
     "noSessionsDescription": "Увійдіть у застосунок Kilo на іншому пристрої, і він з'явиться тут.",
     "onlyKiloAppSignIns": "Тут відображаються лише входи в застосунок Kilo. Входи через редактор і CLI не відображаються.",
@@ -2555,7 +2584,8 @@
       "description": "Підключіть обліковий запис GitHub, щоб перевіряти запити на злиття в мобільному застосунку.",
       "gitlabDescription": "Підключіть обліковий запис GitLab, щоб переглядати merge-запити з мобільного.",
       "bitbucketDescription": "Підключіть Bitbucket до цієї організації, щоб переглядати запити на злиття з мобільного.",
-      "bitbucketOrgOnlyDescription": "Виберіть організацію у профілі, щоб переглядати її запити на злиття Bitbucket."
+      "bitbucketOrgOnlyDescription": "Перемкніть обліковий запис, вказаний вище, на організацію, щоб переглядати її запити на злиття в Bitbucket.",
+      "contextLine": "Для {{organization}}"
     },
     "connectionExpired": "Термін дії підключення до GitHub минув.",
     "couldNotLoadPullRequest": "Не вдалося завантажити запит на злиття.",
@@ -3012,7 +3042,9 @@
       "reviewNotSubmitted": "Цей результат перевірки коду неможливо надіслати в поточному вигляді. Можливо, PR змінився або ви намагаєтеся перевірити власний запит на злиття.",
       "reviewNotSubmittedTerm": "Це рев'ю неможливо надіслати як є. {{term}} міг змінитися, або ви не можете ревіювати власний {{term}}.",
       "couldNotPostComment": "Не вдалося опублікувати коментар.",
-      "couldNotSubmitReview": "Не вдалося надіслати результат перевірки коду. Перевірте з'єднання та спробуйте ще раз."
+      "couldNotSubmitReview": "Не вдалося надіслати результат перевірки коду. Перевірте з'єднання та спробуйте ще раз.",
+      "rateLimited": "Забагато запитів. Спробуйте ще раз пізніше.",
+      "conflict": "Він змінився, поки ви над ним працювали. Перезавантажте його та спробуйте ще раз."
     },
     "operation": {
       "couldNotReply": "Не вдалося відповісти.",

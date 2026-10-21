@@ -2,6 +2,8 @@ import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
+import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
+import { GetEgressAuditInputSchema } from '@kilocode/worker-utils/egress-audit';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   clientKiloSessionIdSchema,
@@ -31,6 +33,7 @@ export {
   SandboxStatusSnapshotSchema as baseGetSandboxStatusNextOutputSchema,
   SANDBOX_STATUS_DETAIL_MESSAGES,
 } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
+export { GetEgressAuditResponseSchema as baseGetEgressAuditNextOutputSchema } from '@kilocode/worker-utils/egress-audit';
 export type {
   SandboxLifecycleStatus,
   SandboxProviderLabel,
@@ -643,6 +646,11 @@ export const baseCancelQueuedMessageNextSchema = z.object({
 export const baseGetSessionNextSchema = z.object({
   cloudAgentSessionId: z.string(),
 });
+
+export const baseGetEgressAuditNextSchema = GetEgressAuditInputSchema.extend({
+  cloudAgentSessionId: z.string().regex(SESSION_ID_RE, 'Invalid session ID format'),
+  limit: z.number().int().min(1).max(100).default(50),
+}).strict();
 
 export const baseGetSandboxStatusNextSchema = z
   .object({

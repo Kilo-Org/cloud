@@ -83,11 +83,13 @@ afterEach(() => vi.unstubAllGlobals());
 describe('native egress policy forwarding', () => {
   it.each([
     { egressAllowlist: undefined },
+    { egressAllowlist: undefined, egressAudit: true },
     { egressAllowlist: [] },
     { egressAllowlist: ['agent.example.com', 'github.com'] },
+    { egressAllowlist: ['agent.example.com'], egressAudit: true },
   ])(
     'preserves policy across initial and fallback launch: $egressAllowlist',
-    async ({ egressAllowlist }) => {
+    async ({ egressAllowlist, egressAudit }) => {
       const launchWrapper = vi.fn().mockResolvedValue({ started: true, startSource: 'image' });
       const container = {
         launchWrapper,
@@ -97,6 +99,7 @@ describe('native egress policy forwarding', () => {
         logicalSandboxId: SANDBOX_ID,
         allocationName: SANDBOX_ID,
         egressAllowlist,
+        egressAudit,
         getContainer: () => container as unknown as DurableObjectStub<SandboxContainers>,
       });
       const created = await provider.create({ intentId: 'egress-attempt', createdAt: 0 });
@@ -115,6 +118,7 @@ describe('native egress policy forwarding', () => {
       for (const [input] of launchWrapper.mock.calls) {
         if (egressAllowlist === undefined) expect(input).not.toHaveProperty('egressAllowlist');
         else expect(input.egressAllowlist).toEqual(egressAllowlist);
+        expect(input.egressAudit).toBe(egressAudit);
       }
     }
   );

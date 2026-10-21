@@ -1246,6 +1246,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         JSON.stringify(metadata.workspace?.egressAllowlist ?? []) &&
       JSON.stringify(this.registration.sandboxSelection?.egressAllowlist ?? []) ===
         JSON.stringify(sandboxSelection.egressAllowlist ?? []) &&
+      (existing.workspace?.egressAudit ?? false) === (metadata.workspace?.egressAudit ?? false) &&
+      (this.registration.sandboxSelection?.egressAudit ?? false) ===
+        (sandboxSelection.egressAudit ?? false) &&
       (existing.initialMessage?.id ?? null) === (messageId ?? null) &&
       (existing.clone?.cloneUpToMessageId ?? null) === (metadata.clone?.cloneUpToMessageId ?? null)
     );

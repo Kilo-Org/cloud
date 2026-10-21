@@ -43,15 +43,22 @@ describe('buildControlPlanePromptPayload', () => {
 });
 
 describe('buildControlPlaneCreateInput', () => {
-  it.each([
-    { egressMode: undefined, egressAllowlist: undefined },
-    { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
-    { egressMode: 'allowlist' as const, egressAllowlist: undefined },
-    { egressMode: 'allowlist' as const, egressAllowlist: [] },
-    { egressMode: 'allowlist' as const, egressAllowlist: ['Z.Example.COM.', 'example.com'] },
-  ])(
+  it.each(
+    [
+      { egressMode: undefined, egressAllowlist: undefined },
+      { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
+      { egressMode: 'allowlist' as const, egressAllowlist: undefined },
+      { egressMode: 'allowlist' as const, egressAllowlist: [] },
+      { egressMode: 'allowlist' as const, egressAllowlist: ['Z.Example.COM.', 'example.com'] },
+    ].flatMap(policy =>
+      [undefined, false, true].map(egressAudit => ({
+        ...policy,
+        egressAudit,
+      }))
+    )
+  )(
     'persists and selects the same policy for start and registration: %j',
-    async ({ egressMode, egressAllowlist }) => {
+    async ({ egressMode, egressAllowlist, egressAudit }) => {
       const command = {
         identity: { sessionId: 'workspace_12345678-1234-1234-1234-123456789abc', userId: 'usr_1' },
         auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
@@ -65,6 +72,7 @@ describe('buildControlPlaneCreateInput', () => {
           sandboxProvider: 'cloudflare-containers' as const,
           egressMode,
           egressAllowlist,
+          egressAudit,
         },
       };
       const created = await buildControlPlaneCreateInput({
@@ -85,6 +93,12 @@ describe('buildControlPlaneCreateInput', () => {
         expect(input.sandboxSelection.egressMode).toBe(egressMode);
         expect(input.metadata.workspace?.egressAllowlist).toEqual(expected);
         expect(input.sandboxSelection.egressAllowlist).toEqual(expected);
+        expect(input.metadata.workspace?.egressAudit).toBe(egressAudit);
+        expect(input.sandboxSelection.egressAudit).toBe(egressAudit);
+        expect(
+          buildControlPlaneSessionRegistration(input.metadata, input.sandboxSelection)
+            .sandboxSelection?.egressAudit
+        ).toBe(egressAudit);
         expect(
           buildControlPlaneSessionRegistration(input.metadata, input.sandboxSelection)
             .sandboxSelection?.egressAllowlist

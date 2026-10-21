@@ -22,6 +22,7 @@
     "./sandbox-id": "./src/sandbox-id.ts",
     "./sandbox-allocation": "./src/sandbox-allocation.ts",
     "./egress-allowlist": "./src/egress-allowlist.ts",
+    "./egress-audit": "./src/egress-audit.ts",
     "./sha256": "./src/sha256.ts",
     "./hostname-label": "./src/hostname-label.ts",
     "./deployment-slug": "./src/deployment-slug.ts",

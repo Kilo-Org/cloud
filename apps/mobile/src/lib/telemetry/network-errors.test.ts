@@ -18,7 +18,7 @@ import {
   stripQueryString,
   trpcProcedureFromUrl,
 } from '@/lib/telemetry/network-errors';
-import { NETWORK_BODY_CONTEXT } from '@/lib/telemetry/sentry-scrub';
+import { NETWORK_BODY_CONTEXT, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 
 let events: TelemetryEvent[] = [];
 let breadcrumbs: TelemetryBreadcrumb[] = [];
@@ -124,36 +124,45 @@ describe('trpcProcedureFromUrl', () => {
 });
 
 describe('readTrpcErrorContext', () => {
-  it('reads direct data.* metadata', () => {
+  it('reads direct data.* metadata without the free-text message', () => {
     const error = {
-      data: { code: 'TIMEOUT', httpStatus: 504, path: 'session.list', message: 'late' },
+      data: {
+        code: 'TIMEOUT',
+        httpStatus: 504,
+        path: 'session.list',
+        message: 'alice@example.com',
+      },
     };
     expect(readTrpcErrorContext(error)).toEqual({
       code: 'TIMEOUT',
       httpStatus: 504,
       path: 'session.list',
-      message: 'late',
     });
   });
 
-  it('reads shaped shape.data.* metadata', () => {
+  it('reads shaped shape.data.* metadata without the free-text message', () => {
     const error = {
-      shape: { data: { code: 'UNAUTHORIZED', httpStatus: 401, path: 'user.me', message: 'no' } },
+      shape: {
+        data: {
+          code: 'UNAUTHORIZED',
+          httpStatus: 401,
+          path: 'user.me',
+          message: 'alice@example.com',
+        },
+      },
     };
     expect(readTrpcErrorContext(error)).toEqual({
       code: 'UNAUTHORIZED',
       httpStatus: 401,
       path: 'user.me',
-      message: 'no',
     });
   });
 
-  it('falls back to the top-level code and Error message', () => {
+  it('reads the top-level code and never the Error message', () => {
     expect(readTrpcErrorContext(namedError('Error', 'plain failure'))).toEqual({
       code: undefined,
       httpStatus: undefined,
       path: undefined,
-      message: 'plain failure',
     });
   });
 
@@ -162,7 +171,6 @@ describe('readTrpcErrorContext', () => {
       code: undefined,
       httpStatus: undefined,
       path: undefined,
-      message: undefined,
     });
   });
 });
@@ -526,12 +534,17 @@ describe('createNetworkErrorFetch', () => {
       outcome: 'http_error',
       trpcCode: 'BAD_REQUEST',
     });
-    // The parsed tRPC body is not passed to `captureException` (Sentry would
+    // The parsed tRPC error is not passed to `captureException` (Sentry would
     // title the issue from an SDK frame): a real Error carries the stable
-    // message and the body rides in the payload context `scrubEvent` redacts.
+    // message and the body contributes only its metadata to the payload
+    // context `scrubEvent` limits to the same fields.
     expect(event?.error).toBeInstanceOf(Error);
     expect(errorMessageOf(event)).toBe('GET /api/trpc/session.list -> 400');
-    expect(event?.contexts?.[NETWORK_BODY_CONTEXT]).toEqual({ data: batchError });
+    expect(event?.contexts?.[NETWORK_BODY_CONTEXT]).toEqual({
+      code: 'BAD_REQUEST',
+      httpStatus: 400,
+      path: 'session.list',
+    });
     // Keyed away from the synthesized exception name: that context is owned by
     // `extraErrorDataIntegration`, which would overwrite it with `{}`.
     expect(event?.contexts?.NetworkError).toBeUndefined();
@@ -854,7 +867,7 @@ describe('reportNetworkError', () => {
     expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'UNAUTHORIZED']);
   });
 
-  it('keeps a real Error and carries a non-Error context in the payload context', () => {
+  it('keeps a real Error and carries a non-Error context as metadata only', () => {
     const original = new Error('socket closed');
     reportNetworkError({
       source: 'fetch',
@@ -877,11 +890,24 @@ describe('reportNetworkError', () => {
     const event = reportedEvent();
     expect(event?.error).toBeInstanceOf(Error);
     expect(event?.error).not.toBe(body);
-    expect(event?.contexts?.[NETWORK_BODY_CONTEXT]).toEqual({ data: body });
+    expect(event?.contexts?.[NETWORK_BODY_CONTEXT]).toEqual({ code: 'FORBIDDEN' });
     // The extra-error-data integration owns `contexts[error.name]` and would
     // replace anything stored there with the error's own (empty) properties.
     expect(event?.contexts?.NetworkError).toBeUndefined();
     expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'a.b', 'FORBIDDEN']);
+  });
+
+  it('carries no payload context for a body without tRPC metadata', () => {
+    reportNetworkError({
+      source: 'trpc',
+      url: 'https://example.com/api/trpc/a.b',
+      durationMs: 4,
+      error: { message: 'upstream said no' },
+    });
+
+    const event = reportedEvent();
+    expect(event?.contexts?.[NETWORK_BODY_CONTEXT]).toBeUndefined();
+    expect(JSON.stringify(event)).not.toContain('upstream said no');
   });
 
   it('reads shaped server error metadata into the trpc.code tag', () => {
@@ -900,6 +926,53 @@ describe('reportNetworkError', () => {
     expect(event?.contexts?.network).toMatchObject({
       procedure: 'user.me',
       trpcCode: 'UNAUTHORIZED',
+    });
+  });
+});
+
+describe('network error telemetry egress', () => {
+  it('never sends a response body address to the captured event', async () => {
+    const address = 'alice@example.com';
+    const body = [
+      { result: { data: 'ok' } },
+      {
+        error: {
+          message: `no account for ${address}`,
+          code: -32_600,
+          data: {
+            code: 'BAD_REQUEST',
+            httpStatus: 400,
+            path: 'session.list',
+            email: address,
+            note: `contact ${address}`,
+          },
+        },
+      },
+    ];
+    const response = Response.json(body, { status: 207, statusText: 'Multi-Status' });
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
+      source: 'trpc',
+      isResponseError: status => status >= 400 || status === 207,
+      readResponseError: readTrpcResponseError,
+    });
+
+    await wrapped('https://example.com/api/trpc/session.list?batch=1');
+
+    const event = reportedEvent();
+    if (event === undefined) {
+      throw new Error('expected one reported event');
+    }
+    const scrubbed = scrubEvent(event);
+    const captured = JSON.stringify({
+      ...scrubbed,
+      error: scrubbed.error instanceof Error ? scrubbed.error.message : scrubbed.error,
+    });
+    expect(captured).not.toContain(address);
+    expect(captured).not.toContain('no account for');
+    expect(event.contexts?.[NETWORK_BODY_CONTEXT]).toEqual({
+      code: 'BAD_REQUEST',
+      httpStatus: 400,
+      path: 'session.list',
     });
   });
 });

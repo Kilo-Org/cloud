@@ -171,7 +171,7 @@ describe('scrubEvent', () => {
     expect(result.contexts.TRPCClientError.data.token).toBe('[redacted]');
   });
 
-  it('redacts the app payload context the exception integration does not own', () => {
+  it('rebuilds the app payload context from its allow-listed fields', () => {
     const event = {
       // The integration replaces `contexts[error.name]`; the payload lives
       // under a different key, so it survives to be redacted here.
@@ -179,15 +179,57 @@ describe('scrubEvent', () => {
       contexts: {
         NetworkError: {},
         [NETWORK_BODY_CONTEXT]: {
-          data: { code: 'UNAUTHORIZED', token: 'abcdefghijklmnopqrst' },
+          code: 'UNAUTHORIZED',
+          httpStatus: 401,
+          path: 'session.list',
+          message: 'alice@example.com signed in twice',
+          email: 'alice@example.com',
+          nested: { token: 'abcdefghijklmnopqrst' },
         },
       },
     };
 
     const result = scrubEvent(event);
 
-    expect(result.contexts[NETWORK_BODY_CONTEXT].data.code).toBe('UNAUTHORIZED');
-    expect(result.contexts[NETWORK_BODY_CONTEXT].data.token).toBe('[redacted]');
+    expect(result.contexts[NETWORK_BODY_CONTEXT]).toEqual({
+      code: 'UNAUTHORIZED',
+      httpStatus: 401,
+      path: 'session.list',
+    });
+    expect(JSON.stringify(result.contexts)).not.toContain('alice@example.com');
+    expect(JSON.stringify(result.contexts)).not.toContain('abcdefghijklmnopqrst');
+  });
+
+  it('drops a payload field whose value is not the allow-listed type', () => {
+    const event = {
+      exception: { values: [{ type: 'NetworkError' }] },
+      contexts: {
+        [NETWORK_BODY_CONTEXT]: {
+          code: { text: 'UNAUTHORIZED' },
+          httpStatus: '401 alice@example.com',
+          path: ['session.list'],
+        },
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts[NETWORK_BODY_CONTEXT]).toEqual({});
+    expect(JSON.stringify(result.contexts)).not.toContain('alice@example.com');
+  });
+
+  it('redacts a token-shaped run inside a kept payload field', () => {
+    const event = {
+      exception: { values: [{ type: 'NetworkError' }] },
+      contexts: { [NETWORK_BODY_CONTEXT]: { code: 'abcdefghijklmnopqrst', path: 'a.b' } },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts[NETWORK_BODY_CONTEXT]).toEqual({
+      code: '[redacted]',
+      path: 'a.b',
+    });
   });
 
   it('leaves structured network and trace contexts intact', () => {

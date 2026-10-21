@@ -188,14 +188,20 @@ describe('fingerprint policy', () => {
     expect(second).not.toBe(first);
   });
 
-  it('keeps the tRPC body in its payload context and no token in the fingerprint', () => {
+  it('keeps only the tRPC metadata of the body and no token in the fingerprint', () => {
     reportNetworkError({
       source: 'trpc',
       url: 'http://127.0.0.1:10416/api/trpc/session.list?input=%7B%22token%22%3A%22supersecret%22%7D',
       method: 'POST',
       durationMs: 5,
       error: {
-        data: { code: 'UNAUTHORIZED', path: 'session.list', token: 'abcdefghijklmnopqrst' },
+        message: 'alice@example.com is not allowed',
+        data: {
+          code: 'UNAUTHORIZED',
+          path: 'session.list',
+          token: 'abcdefghijklmnopqrst',
+          email: 'alice@example.com',
+        },
       },
     });
 
@@ -207,13 +213,16 @@ describe('fingerprint policy', () => {
     const event = scrubCapture(error, options);
     const fingerprint = JSON.stringify(event.fingerprint);
 
-    // The body reaches the event in its payload context — not under the
+    // The body reaches the event only as its metadata — not under the
     // exception name `extraErrorDataIntegration` overwrites with `{}` — and
-    // scrubEvent redacts the token inside it.
+    // scrubEvent keeps that context to the same allow-list.
     expect(event.contexts?.[NETWORK_BODY_CONTEXT]).toEqual({
-      data: { data: { code: 'UNAUTHORIZED', path: 'session.list', token: '[redacted]' } },
+      code: 'UNAUTHORIZED',
+      path: 'session.list',
     });
-    expect(JSON.stringify(event.contexts)).not.toContain('abcdefghijklmnopqrst');
+    const serialized = JSON.stringify(event.contexts);
+    expect(serialized).not.toContain('abcdefghijklmnopqrst');
+    expect(serialized).not.toContain('alice@example.com');
     expect(fingerprint).not.toContain('abcdefghijklmnopqrst');
     expect(fingerprint).not.toContain('supersecret');
     expect(fingerprint).not.toContain('input=');

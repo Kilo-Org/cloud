@@ -90,7 +90,12 @@ function makeRequest(model = 'inception/mercury-edit-2') {
 function setOrganizationAuth({
   balance = 1000,
   settings,
-}: { balance?: number; settings?: OrganizationSettings } = {}) {
+  policyDataCollection = settings?.data_collection,
+}: {
+  balance?: number;
+  settings?: OrganizationSettings;
+  policyDataCollection?: OrganizationSettings['data_collection'];
+} = {}) {
   mockedGetUserFromAuth.mockResolvedValue({
     user: {
       id: 'user-123',
@@ -104,6 +109,10 @@ function setOrganizationAuth({
     balance,
     settings,
     plan: 'teams',
+  });
+  mockedResolveOrganizationMemberModelDecision.mockResolvedValue({
+    policy: { dataCollection: policyDataCollection } as never,
+    decision: { allowed: true },
   });
   mockedGetBYOKforOrganization.mockResolvedValue(null);
   mockedGetBYOKforUser.mockResolvedValue(null);
@@ -271,6 +280,24 @@ describe('POST /api/fim/completions', () => {
       balance: 0,
       settings: { data_collection: 'deny' } satisfies OrganizationSettings,
     });
+    mockedGetBYOKforOrganization.mockResolvedValue([
+      { providerId: 'inception', decryptedAPIKey: 'org-inception-key' },
+    ] as never);
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: ProxyErrorType.data_collection_required,
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('applies the organization policy to every membership role', async () => {
+    // The organization row is the source of the policy for every membership role.
+    setOrganizationAuth({ balance: 0, policyDataCollection: 'deny' });
     mockedGetBYOKforOrganization.mockResolvedValue([
       { providerId: 'inception', decryptedAPIKey: 'org-inception-key' },
     ] as never);

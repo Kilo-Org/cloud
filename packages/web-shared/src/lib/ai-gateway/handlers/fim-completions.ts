@@ -223,11 +223,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   setTag('ui.ai_model', requestBody.model);
   // Use read replica for balance check - this is a read-only operation that can tolerate
   // slight replication lag, and provides lower latency for US users
-  const { balance, settings, plan, payer } = await getBalanceAndOrgSettings(
-    organizationId,
-    user,
-    readDb
-  );
+  const { balance, plan, payer } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
   if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
     return NextResponse.json(
@@ -240,7 +236,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   }
 
   if (organizationId) {
-    const { decision } = await resolveOrganizationMemberModelDecision({
+    const { policy, decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
       kiloUserId: user.id,
       modelId: requestBody.model,
@@ -250,12 +246,11 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     if (decision.eligibleProviderRoutes && !decision.eligibleProviderRoutes.has(fimProvider)) {
       return modelNotAllowedResponse();
     }
-  }
-
-  // The organization's settings carry its data-use policy. When the policy denies data
-  // collection, this route answers with the standard dataCollectionRequiredResponse.
-  if (settings?.data_collection === 'deny') {
-    return dataCollectionRequiredResponse();
+    // The resolved organization policy carries its data-use setting. When it denies data
+    // collection, this route answers with the standard dataCollectionRequiredResponse.
+    if (policy.dataCollection === 'deny') {
+      return dataCollectionRequiredResponse();
+    }
   }
 
   const systemKey = getSystemApiKey(fimProvider);

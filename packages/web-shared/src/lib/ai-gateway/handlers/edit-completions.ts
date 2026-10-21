@@ -30,6 +30,7 @@ import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { findSupportedFimModel } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
@@ -217,11 +218,8 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   // Use read replica for balance check - this is a read-only operation that can tolerate
   // slight replication lag, and provides lower latency for US users.
-  const { balance, settings, plan, payer } = await getBalanceAndOrgSettings(
-    organizationId,
-    user,
-    readDb
-  );
+  const { balance, plan, payer } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+  let organizationDataCollection: OrganizationSettings['data_collection'];
 
   if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
     return NextResponse.json(
@@ -234,12 +232,13 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   }
 
   if (organizationId) {
-    const { decision } = await resolveOrganizationMemberModelDecision({
+    const { policy, decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
       kiloUserId: user.id,
       modelId: requestBody.model,
       fromDb: readDb,
     });
+    organizationDataCollection = policy.dataCollection;
     if (
       !decision.allowed ||
       (decision.eligibleProviderRoutes && !decision.eligibleProviderRoutes.has(editProvider))
@@ -262,7 +261,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   // the standard API tier we call here. Until we sign an enterprise agreement
   // or Inception adds a per-request flag, refusing is the only way to honor
   // the org's stated intent.
-  if (settings?.data_collection === 'deny') {
+  if (organizationDataCollection === 'deny') {
     return dataCollectionRequiredResponse();
   }
 

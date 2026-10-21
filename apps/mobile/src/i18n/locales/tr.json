@@ -111,7 +111,9 @@
     "online": "Çevrimiçi",
     "open": "{{name}} öğesini aç",
     "openPullRequest": "Açık çekme isteği",
+    "completed": "Tamamlandı",
     "pending": "Bekliyor",
+    "running": "Çalışıyor",
     "performance": "Performans",
     "preferences": "Tercihler",
     "privacyPolicy": "Gizlilik politikası",
@@ -1021,8 +1023,6 @@
     "updateFailed": "Kod inceleyici güncellenemedi.",
     "configSaveFailed": "İnceleme ayarları kaydedilemedi.",
     "status": {
-      "running": "Çalışıyor",
-      "completed": "Tamamlandı",
       "interrupted": "Kesintiye uğradı"
     },
     "reviewStyle": {
@@ -1381,7 +1381,6 @@
       "installApp": "GitHub uygulamasını yükle",
       "reauthorizeButton": "GitHub uygulamasını yeniden yetkilendir",
       "reauthorizeDescription": "Güvenlik ajanının Dependabot uyarılarına erişebilmesi için vulnerability_alerts izni gerekir. Bu izni vermek için GitHub uygulamasını yeniden yetkilendir.",
-      "reauthorizeFailed": "Yeniden yetkilendirme başlatılamadı. Lütfen tekrar dene.",
       "reauthorizeTitle": "Ek izinler gerekiyor",
       "setupFailed": "GitHub kurulumu başlatılamadı. Lütfen tekrar dene."
     },
@@ -1404,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "Değişiklikleri kaydet",
       "unsavedMessage": "Bu ekrandan ayrılmadan önce değişikliklerini kaydetmek ister misin?",
+      "unsavedInvalidMessage": "Bu değişiklikler henüz kaydedilemez. Kaydetmek için bunları düzelt veya ayrılmak için vazgeç.",
       "unsavedTitle": "Kaydedilmemiş değişiklikler"
     },
     "setup": {
@@ -1797,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}} satır",
       "matchesBadge_one": "{{displayCount}} eşleşme",
       "matchesBadge_other": "{{displayCount}} eşleşme",
-      "noOutput": "Çıktı yok."
+      "noOutput": "Çıktı yok.",
+      "translationFailed": "Çeviri başarısız oldu"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}. satırlar (kısaltıldı)",
@@ -3001,11 +3002,22 @@
     "boundary": {
       "backToProfile": "Profile geri dön",
       "loadErrorMessage": "Bağlantını kontrol edip tekrar dene.",
+
+      "chooseAccount": "Bir hesap seç",
       "loadErrorTitle": "Kuruluşların yüklenemedi.",
+      "noOrganization": "Kuruluş yok",
+
+      "noOrganizationDescription": "Bu hesap bir kuruluşun parçası değil. Üye davetleri ve düşük bakiye uyarıları gibi kuruluş özelliklerini kullanmak için web sitesinde bir kuruluş oluştur veya birine katıl.",
+
+      "openWebOrganizations": "Kuruluşları web sitesinde aç",
+
       "organizationUnavailable": "Kuruluş kullanılamıyor.",
-      "selectDescription": "Devam etmek için profilinden bir kuruluş seç.",
+      "selectDescriptionWithOrganizations": "Bir veya daha fazla kuruluşa aitsin. Bu ekranın kullanması gereken hesabı seç.",
+
       "selectOrganization": "Bir kuruluş seç",
       "unavailableDescription": "Bu kuruluş artık kullanılamıyor. Devam etmek için profilinden başka bir kuruluş seç.",
+
+      "unavailableSessionsDescription": "Bu kuruluş artık kullanılamıyor. Oturumları yüklenemiyor.",
       "accessDeniedDescription": "Bu kuruluşa erişimin yok."
     },
     "creditActivity": {
@@ -3673,7 +3685,9 @@
       "jsonTooLarge": "En fazla 50 giriş, 128'e kadar anahtar ve 4096 karaktere kadar değer kullanın",
       "timeoutInvalid": "Zaman aşımı tam sayı milisaniye olmalıdır",
       "edit": "MCP sunucusunu düzenle",
-      "saveFailed": "MCP sunucusu kaydedilemedi"
+      "saveFailed": "MCP sunucusu kaydedilemedi",
+      "deleteFailed": "MCP sunucusu silinemedi",
+      "updateFailed": "MCP sunucusu güncellenemedi"
     },
     "agents": {
       "title": "Profil aracıları",
@@ -3700,6 +3714,7 @@
       "visibilitySubagent": "Alt temsilci — yalnızca başkaları tarafından aranabilir",
       "visibilityAll": "Hepsi - ikisi de",
       "saveFailed": "Temsilci kaydedilemedi",
+      "deleteFailed": "Temsilci silinemedi",
       "nameRequired": "Bir temsilci adı girin",
       "slugRequired": "Bir temsilci bilgisi girin",
       "slugInvalid": "Bilgi bir harfle başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
@@ -3714,10 +3729,12 @@
       "description": "Komut açıklaması",
       "template": "Şablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS'ı açıklayın",
       "subtask": "Alt görev olarak çalıştır",
       "edit": "Eğik çizgi komutunu düzenle",
       "saveFailed": "Komut kaydedilemedi",
+      "deleteFailed": "Komut silinemedi",
       "nameRequired": "Bir komut adı girin",
       "nameInvalid": "Ad küçük harfle başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
       "templateRequired": "Bir komut şablonu girin",
@@ -3864,7 +3881,7 @@
     "view": "Özeti oku",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Canlı durumu göster",
+    "dismiss": "Özeti yok say",
     "offline": "Çevrimdışı · kayıtlı özet",
     "cached": "Kayıtlı rapor · yenileme kullanılamıyor",
     "revised": "Revize edildi · {{revision}}",

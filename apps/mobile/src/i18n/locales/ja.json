@@ -111,7 +111,9 @@
     "online": "オンライン",
     "open": "{{name}}を開く",
     "openPullRequest": "プルリクエストを開く",
+    "completed": "完了",
     "pending": "保留中",
+    "running": "実行中",
     "performance": "性能",
     "preferences": "設定",
     "privacyPolicy": "プライバシーポリシー",
@@ -1021,8 +1023,6 @@
     "updateFailed": "レビュアーを更新できませんでした。",
     "configSaveFailed": "レビュー設定を保存できませんでした。",
     "status": {
-      "running": "実行中",
-      "completed": "完了",
       "interrupted": "中断"
     },
     "reviewStyle": {
@@ -1381,7 +1381,6 @@
       "installApp": "GitHub Appをインストール",
       "reauthorizeButton": "GitHub Appを再承認",
       "reauthorizeDescription": "セキュリティエージェントがDependabotアラートにアクセスするには、vulnerability_alerts権限が必要です。GitHub Appを再承認して、この権限を付与してください。",
-      "reauthorizeFailed": "再承認を開始できませんでした。もう一度お試しください。",
       "reauthorizeTitle": "追加の権限が必要です",
       "setupFailed": "GitHubのセットアップを開始できませんでした。もう一度お試しください。"
     },
@@ -1404,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "変更を保存",
       "unsavedMessage": "この画面を離れる前に変更を保存しますか？",
+      "unsavedInvalidMessage": "これらの変更はまだ保存できません。保存するには修正し、離れるには破棄してください。",
       "unsavedTitle": "未保存の変更"
     },
     "setup": {
@@ -1797,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}}行",
       "matchesBadge_one": "{{displayCount}}件",
       "matchesBadge_other": "{{displayCount}}件",
-      "noOutput": "出力はありません。"
+      "noOutput": "出力はありません。",
+      "translationFailed": "翻訳に失敗しました"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}～{{end}}行目（一部省略）",
@@ -3001,11 +3002,22 @@
     "boundary": {
       "backToProfile": "プロフィールに戻る",
       "loadErrorMessage": "接続を確認して、もう一度お試しください。",
+
+      "chooseAccount": "アカウントを選択",
       "loadErrorTitle": "組織を読み込めませんでした。",
+      "noOrganization": "組織なし",
+
+      "noOrganizationDescription": "このアカウントは組織に属していません。メンバーの招待や残高不足のアラートなどの組織機能を使用するには、ウェブで組織を作成するか参加してください。",
+
+      "openWebOrganizations": "ウェブで組織を開く",
+
       "organizationUnavailable": "組織を利用できません。",
-      "selectDescription": "続行するには、プロフィールから組織を選択してください。",
+      "selectDescriptionWithOrganizations": "あなたは1つ以上の組織に所属しています。この画面で使用するアカウントを選択してください。",
+
       "selectOrganization": "組織を選択",
       "unavailableDescription": "この組織は利用できなくなりました。続行するには、プロフィールから組織を選択してください。",
+
+      "unavailableSessionsDescription": "この組織は利用できなくなりました。セッションを読み込めません。",
       "accessDeniedDescription": "この組織にアクセスする権限がありません。"
     },
     "creditActivity": {
@@ -3651,7 +3663,7 @@
       "empty": "MCP サーバーはまだありません",
       "name": "サーバー名",
       "type": "サーバーの種類",
-      "localType": "地元",
+      "localType": "ローカル",
       "remoteType": "リモート",
       "command": "コマンドライン",
       "url": "URL",
@@ -3673,7 +3685,9 @@
       "jsonTooLarge": "最大50件のエントリ（キーは128文字、値は4096文字まで）を使用してください",
       "timeoutInvalid": "タイムアウトはミリ秒単位の整数でなければなりません",
       "edit": "MCPサーバーの編集",
-      "saveFailed": "MCP サーバーを保存できませんでした"
+      "saveFailed": "MCP サーバーを保存できませんでした",
+      "deleteFailed": "MCP サーバーを削除できませんでした",
+      "updateFailed": "MCP サーバーを更新できませんでした"
     },
     "agents": {
       "title": "プロファイルエージェント",
@@ -3700,6 +3714,7 @@
       "visibilitySubagent": "サブエージェント — 他からのみ呼び出し可能",
       "visibilityAll": "すべて — 両方",
       "saveFailed": "エージェントを保存できませんでした",
+      "deleteFailed": "エージェントを削除できませんでした",
       "nameRequired": "エージェント名を入力してください",
       "slugRequired": "エージェントスラッグを入力してください",
       "slugInvalid": "スラグは文字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
@@ -3714,10 +3729,12 @@
       "description": "コマンドの説明",
       "template": "テンプレート",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS の説明",
       "subtask": "サブタスクとして実行",
       "edit": "スラッシュコマンドの編集",
       "saveFailed": "コマンドを保存できませんでした",
+      "deleteFailed": "コマンドを削除できませんでした",
       "nameRequired": "コマンド名を入力してください",
       "nameInvalid": "名前は小文字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
       "templateRequired": "コマンドテンプレートを入力してください",
@@ -3864,7 +3881,7 @@
     "view": "ブリーフィングを読む",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}、{{time}}",
-    "dismiss": "ライブ状況を表示",
+    "dismiss": "ブリーフィングを却下",
     "offline": "オフライン · 保存済みブリーフィング",
     "cached": "保存済みレポート · 更新できません",
     "revised": "改訂 · {{revision}}",

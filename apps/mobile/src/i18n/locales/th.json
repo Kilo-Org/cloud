@@ -111,7 +111,9 @@
     "online": "ออนไลน์",
     "open": "เปิด {{name}}",
     "openPullRequest": "เปิดพูลรีเควสต์",
+    "completed": "เสร็จสิ้น",
     "pending": "รอดำเนินการ",
+    "running": "กำลังทำงาน",
     "performance": "ประสิทธิภาพ",
     "preferences": "การตั้งค่า",
     "privacyPolicy": "นโยบายความเป็นส่วนตัว",
@@ -1536,8 +1538,6 @@
     "updateFailed": "อัปเดตตัวตรวจสอบโค้ดไม่สำเร็จ",
     "configSaveFailed": "บันทึกการตั้งค่าการตรวจสอบไม่สำเร็จ",
     "status": {
-      "running": "กำลังทำงาน",
-      "completed": "เสร็จสิ้น",
       "interrupted": "ถูกขัดจังหวะ"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "บันทึกการเปลี่ยนแปลง",
       "unsavedTitle": "การเปลี่ยนแปลงที่ยังไม่บันทึก",
-      "unsavedMessage": "บันทึกการเปลี่ยนแปลงก่อนออกจากหน้าจอนี้หรือไม่?"
+      "unsavedMessage": "บันทึกการเปลี่ยนแปลงก่อนออกจากหน้าจอนี้หรือไม่?",
+      "unsavedInvalidMessage": "ยังไม่สามารถบันทึกการเปลี่ยนแปลงเหล่านี้ได้ แก้ไขให้ถูกต้องเพื่อบันทึก หรือทิ้งเพื่อออก"
     },
     "auditReportButton": {
       "viewA11y": "ดูรายงานการตรวจสอบ"
@@ -1938,7 +1939,6 @@
       "installApp": "ติดตั้ง GitHub App",
       "reauthorizeButton": "ให้สิทธิ์ GitHub App อีกครั้ง",
       "reauthorizeDescription": "Security Agent ต้องใช้สิทธิ์ vulnerability_alerts เพื่อเข้าถึงการแจ้งเตือน Dependabot ให้สิทธิ์ GitHub App อีกครั้งเพื่อเพิ่มสิทธิ์นี้",
-      "reauthorizeFailed": "ไม่สามารถเริ่มขั้นตอนการให้สิทธิ์อีกครั้งได้ กรุณาลองอีกครั้ง",
       "reauthorizeTitle": "ต้องมีสิทธิ์เพิ่มเติม",
       "setupFailed": "ไม่สามารถเริ่มการตั้งค่า GitHub ได้ กรุณาลองอีกครั้ง"
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} บรรทัด",
       "matchesBadge_one": "พบ {{displayCount}} รายการ",
       "matchesBadge_other": "พบ {{displayCount}} รายการ",
-      "noOutput": "ไม่มีเอาต์พุต"
+      "noOutput": "ไม่มีเอาต์พุต",
+      "translationFailed": "การแปลล้มเหลว"
     },
     "readToolMarkdown": {
       "linesTruncated": "บรรทัด {{start}}–{{end}} (ตัดบางส่วนออก)",
@@ -3009,11 +3010,22 @@
     "boundary": {
       "backToProfile": "กลับไปยังโปรไฟล์",
       "loadErrorMessage": "ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
+
+      "chooseAccount": "เลือกบัญชี",
       "loadErrorTitle": "โหลดองค์กรของคุณไม่สำเร็จ",
+      "noOrganization": "ไม่มีองค์กร",
+
+      "noOrganizationDescription": "บัญชีนี้ไม่ได้เป็นส่วนหนึ่งขององค์กร สร้างหรือเข้าร่วมองค์กรบนเว็บเพื่อใช้ฟีเจอร์ขององค์กร เช่น คำเชิญสมาชิกและการแจ้งเตือนยอดคงเหลือต่ำ",
+
+      "openWebOrganizations": "เปิดองค์กรบนเว็บ",
+
       "organizationUnavailable": "องค์กรไม่พร้อมใช้งาน",
-      "selectDescription": "เลือกองค์กรจากโปรไฟล์ของคุณเพื่อดำเนินการต่อ",
+      "selectDescriptionWithOrganizations": "คุณเป็นสมาชิกขององค์กรหนึ่งแห่งขึ้นไป เลือกบัญชีที่หน้าจอนี้ควรใช้",
+
       "selectOrganization": "เลือกองค์กร",
       "unavailableDescription": "องค์กรนี้ไม่พร้อมใช้งานแล้ว เลือกองค์กรอื่นจากโปรไฟล์เพื่อดำเนินการต่อ",
+
+      "unavailableSessionsDescription": "องค์กรนี้ไม่พร้อมใช้งานแล้ว โหลดเซสชันขององค์กรนี้ไม่ได้",
       "accessDeniedDescription": "คุณไม่มีสิทธิ์เข้าถึงองค์กรนี้"
     },
     "creditActivity": {
@@ -3610,23 +3622,23 @@
     "deletedToast": "ลบโปรไฟล์ \"{{name}}\" แล้ว",
     "variablesTitle": "ตัวแปรสภาพแวดล้อม",
     "addVariable": "เพิ่มตัวแปร",
-    "keyLabel": "สำคัญ",
+    "keyLabel": "คีย์",
     "keyTooLong": "คีย์ต้องมี 256 อักขระหรือน้อยกว่า",
     "keyDuplicate": "คีย์นี้มีอยู่ในโปรไฟล์แล้ว",
     "valueLabel": "ค่า",
     "secretLabel": "ความลับ",
     "secrets": {
       "markSecret": "ทำเครื่องหมายว่าเป็นความลับ",
-      "masked": "คุณค่าที่ซ่อนอยู่",
-      "reveal": "เผยคุณค่า",
-      "newValuePlaceholder": "ป้อนค่าเป็นความลับใหม่",
-      "valuePlaceholder": "ค่าเป็นความลับ (เข้ารหัสแล้ว)"
+      "masked": "ค่าที่ซ่อนอยู่",
+      "reveal": "แสดงค่า",
+      "newValuePlaceholder": "ป้อนค่าความลับใหม่",
+      "valuePlaceholder": "ค่าความลับ (จะเข้ารหัส)"
     },
     "variablesEmpty": "ยังไม่มีตัวแปร",
     "variablesSaveFailed": "ไม่สามารถบันทึกตัวแปรได้",
     "commandsTitle": "คำสั่งการตั้งค่า",
     "addCommand": "เพิ่มคำสั่ง",
-    "commandLabel": "สั่งการ",
+    "commandLabel": "คำสั่ง",
     "commandPlaceholder": "เช่น pnpm install",
     "commandsEmpty": "ยังไม่มีคำสั่งการตั้งค่า",
     "commandsSaveFailed": "ไม่สามารถบันทึกคำสั่งการตั้งค่าได้",
@@ -3643,7 +3655,7 @@
     "skillNameInvalid": "ชื่อทักษะต้องขึ้นต้นด้วยตัวอักษรหรือตัวเลข และใช้เฉพาะตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น",
     "skillContentRequired": "จำเป็นต้องมีเนื้อหาทักษะ",
     "skillSaveFailed": "ไม่สามารถบันทึกทักษะได้",
-    "skillsHint": "วาง SKILL.md และกรอกชื่อลงไป เพิ่มทักษะจากโทรศัพท์ของคุณโดยไม่ต้องลากและวาง",
+    "skillsHint": "วาง SKILL.md แล้วชื่อจะถูกกรอกให้อัตโนมัติ เพิ่มทักษะจากโทรศัพท์ของคุณโดยไม่ต้องลากและวาง",
     "skillEditTitle": "แก้ไขทักษะ",
     "mcp": {
       "title": "เซิร์ฟเวอร์ MCP",
@@ -3651,11 +3663,11 @@
       "empty": "ยังไม่มีเซิร์ฟเวอร์ MCP",
       "name": "ชื่อเซิร์ฟเวอร์",
       "type": "ประเภทเซิร์ฟเวอร์",
-      "localType": "ท้องถิ่น",
+      "localType": "ในเครื่อง",
       "remoteType": "ระยะไกล",
       "command": "บรรทัดคำสั่ง",
       "url": "URL",
-      "environment": "สิ่งแวดล้อม (JSON)",
+      "environment": "ตัวแปรสภาพแวดล้อม (JSON)",
       "headers": "ส่วนหัว (JSON)",
       "timeout": "หมดเวลา",
       "secretCount": "การนับความลับ",
@@ -3671,16 +3683,18 @@
       "urlTooLong": "URL ต้องมี 2048 อักขระหรือน้อยกว่า",
       "jsonInvalid": "ป้อน JSON ที่ถูกต้อง — ออบเจ็กต์ของค่าสตริง",
       "jsonTooLarge": "ใช้รายการไม่เกิน 50 รายการ คีย์ไม่เกิน 128 และค่าไม่เกิน 4096 อักขระ",
-      "timeoutInvalid": "การหมดเวลาต้องเป็นจำนวนมิลลิวินาทีทั้งหมด",
+      "timeoutInvalid": "การหมดเวลาต้องเป็นจำนวนเต็มมิลลิวินาที",
       "edit": "แก้ไขเซิร์ฟเวอร์ MCP",
-      "saveFailed": "ไม่สามารถบันทึกเซิร์ฟเวอร์ MCP"
+      "saveFailed": "ไม่สามารถบันทึกเซิร์ฟเวอร์ MCP",
+      "deleteFailed": "ไม่สามารถลบเซิร์ฟเวอร์ MCP ได้",
+      "updateFailed": "ไม่สามารถอัปเดตเซิร์ฟเวอร์ MCP ได้"
     },
     "agents": {
       "title": "ตัวแทนโปรไฟล์",
       "add": "เพิ่มตัวแทน",
       "empty": "ยังไม่มีตัวแทน",
       "name": "ชื่อตัวแทน",
-      "slug": "ตัวแทนทาก",
+      "slug": "Slug ของตัวแทน",
       "description": "คำอธิบายตัวแทน",
       "model": "การแทนที่โมเดล",
       "modelPlaceholder": "ใช้ค่าเริ่มต้นของเซสชัน",
@@ -3700,10 +3714,11 @@
       "visibilitySubagent": "Subagent — สามารถเรียกได้จากผู้อื่นเท่านั้น",
       "visibilityAll": "ทั้งหมด - ทั้งสองอย่าง",
       "saveFailed": "ไม่สามารถบันทึกตัวแทนได้",
+      "deleteFailed": "ไม่สามารถลบตัวแทนได้",
       "nameRequired": "ป้อนชื่อตัวแทน",
-      "slugRequired": "ใส่ตัวแทนทาก",
+      "slugRequired": "ป้อน Slug ของตัวแทน",
       "slugInvalid": "Slug ต้องขึ้นต้นด้วยตัวอักษรและใช้เฉพาะตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น",
-      "slugConflict": "สลักนั้นมีเอเจนต์ในตัวหรือเอเจนต์อื่นในโปรไฟล์นี้ใช้งานอยู่แล้ว",
+      "slugConflict": "Slug นี้ถูกใช้โดยตัวแทนในตัวหรือตัวแทนอื่นในโปรไฟล์นี้แล้ว",
       "edit": "แก้ไขตัวแทน"
     },
     "slashCommands": {
@@ -3714,37 +3729,39 @@
       "description": "คำอธิบายคำสั่ง",
       "template": "แม่แบบ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "อธิบาย $ARGUMENTS",
       "subtask": "ทำงานเป็นงานย่อย",
       "edit": "แก้ไขคำสั่งสแลช",
       "saveFailed": "ไม่สามารถบันทึกคำสั่งได้",
+      "deleteFailed": "ไม่สามารถลบคำสั่งได้",
       "nameRequired": "ป้อนชื่อคำสั่ง",
       "nameInvalid": "ชื่อต้องขึ้นต้นด้วยตัวอักษรพิมพ์เล็กและใช้เฉพาะตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น",
-      "templateRequired": "ป้อนเทมเพลตคำสั่ง",
+      "templateRequired": "ป้อนแม่แบบคำสั่ง",
       "nameConflict": "ชื่อนั้นถูกสงวนไว้โดยคำสั่งในตัว"
     },
     "repoBindings": {
-      "title": "โปรไฟล์เริ่มต้นสำหรับ Repos",
+      "title": "โปรไฟล์เริ่มต้นสำหรับคลังโค้ด",
       "add": "เพิ่มค่าเริ่มต้น",
       "empty": "ไม่มีการกำหนดค่าเริ่มต้น",
-      "emptyDescription": "เพิ่มค่าเริ่มต้นเพื่อใช้โปรไฟล์โดยอัตโนมัติเมื่อเริ่มต้นเซสชันสำหรับ repo",
-      "repo": "เลือกที่เก็บ...",
+      "emptyDescription": "เพิ่มค่าเริ่มต้นเพื่อใช้โปรไฟล์โดยอัตโนมัติเมื่อเริ่มต้นเซสชันสำหรับคลังโค้ด",
+      "repo": "เลือกคลังโค้ด...",
       "profile": "เลือกโปรไฟล์",
       "remove": "เลิกผูก",
       "private": "ส่วนตัว",
-      "search": "ค้นหาที่เก็บ...",
+      "search": "ค้นหาคลังโค้ด...",
       "addedToast": "โปรไฟล์เริ่มต้นที่ตั้งไว้สำหรับ \"{{repo}}\"",
       "addFailed": "ไม่สามารถตั้งค่าโปรไฟล์เริ่มต้นได้",
-      "removedToast": "โปรไฟล์เริ่มต้นถูกลบสำหรับ \"{{repo}}\"",
-      "removeFailed": "ไม่สามารถลบโปรไฟล์เริ่มต้นได้",
-      "pinnedTitle": "ปักหมุดไว้ที่คลังแล้ว",
-      "pinRepo": "ปักหมุด repo",
-      "pinnedEmpty": "ไม่ถูกตรึงไว้ที่ที่เก็บใด ๆ",
-      "pinnedDescription": "โหลดอัตโนมัติทุกครั้งที่เซสชันกำหนดเป้าหมายหนึ่งในที่เก็บเหล่านี้",
+      "removedToast": "เลิกผูกโปรไฟล์เริ่มต้นสำหรับ \"{{repo}}\" แล้ว",
+      "removeFailed": "ไม่สามารถเลิกผูกโปรไฟล์เริ่มต้นได้",
+      "pinnedTitle": "ปักหมุดไว้ในคลังโค้ดแล้ว",
+      "pinRepo": "ปักหมุดคลังโค้ด",
+      "pinnedEmpty": "ยังไม่ได้ปักหมุดไว้ที่คลังโค้ดใด ๆ",
+      "pinnedDescription": "โหลดอัตโนมัติทุกครั้งที่เซสชันกำหนดเป้าหมายหนึ่งในคลังโค้ดเหล่านี้",
       "pinnedToast": "ปักหมุดไว้ที่ \"{{repo}}\"",
-      "pinFailed": "ปักหมุด repo ไม่ได้",
-      "unboundToast": "Repo ไม่ถูกผูกไว้",
-      "unbindFailed": "ไม่สามารถเลิกผูก repo ได้"
+      "pinFailed": "ไม่สามารถปักหมุดคลังโค้ดได้",
+      "unboundToast": "เลิกผูกคลังโค้ดแล้ว",
+      "unbindFailed": "ไม่สามารถเลิกผูกคลังโค้ดได้"
     }
   },
   "credits": {
@@ -3864,7 +3881,7 @@
     "view": "อ่านสรุป",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "แสดงสถานะสด",
+    "dismiss": "ละเว้นสรุป",
     "offline": "ออฟไลน์ · สรุปที่บันทึกไว้",
     "cached": "รายงานที่บันทึกไว้ · รีเฟรชไม่ได้",
     "revised": "แก้ไขแล้ว · {{revision}}",

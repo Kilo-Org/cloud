@@ -111,7 +111,9 @@
     "online": "ଅନଲାଇନ୍",
     "open": "{{name}} ଖୋଲନ୍ତୁ",
     "openPullRequest": "ଖୋଲା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
+    "completed": "ସମାପ୍ତ",
     "pending": "ଅପେକ୍ଷାରତ",
+    "running": "ଚାଲୁଛି",
     "performance": "କାର୍ଯ୍ୟଦକ୍ଷତା",
     "preferences": "ପସନ୍ଦ",
     "privacyPolicy": "ଗୋପନୀୟତା ନୀତି",
@@ -1536,8 +1538,6 @@
     "updateFailed": "କୋଡ୍ ସମୀକ୍ଷକ ଅପଡେଟ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "configSaveFailed": "ସମୀକ୍ଷା ସେଟିଂସ୍ ସଂରକ୍ଷଣ ହୋଇପାରିଲା ନାହିଁ।",
     "status": {
-      "running": "ଚାଲୁଛି",
-      "completed": "ସମାପ୍ତ",
       "interrupted": "ବ୍ୟାହତ"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରନ୍ତୁ",
       "unsavedTitle": "ସଂରକ୍ଷିତ ହୋଇନଥିବା ପରିବର୍ତ୍ତନ",
-      "unsavedMessage": "ଏହି ସ୍କ୍ରିନରୁ ବାହାରିବା ପୂର୍ବରୁ ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରିବେ?"
+      "unsavedMessage": "ଏହି ସ୍କ୍ରିନରୁ ବାହାରିବା ପୂର୍ବରୁ ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରିବେ?",
+      "unsavedInvalidMessage": "ଏହି ପରିବର୍ତ୍ତନଗୁଡ଼ିକ ଏବେ ସଂରକ୍ଷଣ କରାଯାଇପାରିବ ନାହିଁ। ସଂରକ୍ଷଣ କରିବାକୁ ସେଗୁଡ଼ିକୁ ସଜାଡ଼ନ୍ତୁ, କିମ୍ବା ବାହାରିଯିବାକୁ ସେଗୁଡ଼ିକୁ ଛାଡ଼ିଦିଅନ୍ତୁ।"
     },
     "auditReportButton": {
       "viewA11y": "ଅଡିଟ୍ ରିପୋର୍ଟ ଦେଖନ୍ତୁ"
@@ -1938,7 +1939,6 @@
       "installApp": "GitHub ଆପ୍ ସଂସ୍ଥାପନ କରନ୍ତୁ",
       "reauthorizeButton": "GitHub ଆପ୍‌କୁ ପୁଣି ଅନୁମତି ଦିଅନ୍ତୁ",
       "reauthorizeDescription": "Dependabot ସତର୍କତା ଦେଖିବାକୁ ସୁରକ୍ଷା ଏଜେଣ୍ଟକୁ vulnerability_alerts ଅନୁମତି ଆବଶ୍ୟକ। ଏହି ଅନୁମତି ଦେବାକୁ GitHub ଆପ୍‌କୁ ପୁଣି ଅନୁମତି ଦିଅନ୍ତୁ।",
-      "reauthorizeFailed": "ପୁଣି ଅନୁମତି ଦେବା ପ୍ରକ୍ରିୟା ଆରମ୍ଭ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "reauthorizeTitle": "ଅତିରିକ୍ତ ଅନୁମତି ଆବଶ୍ୟକ",
       "setupFailed": "GitHub ସେଟଅପ୍ ଆରମ୍ଭ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}}ଟି ଧାଡ଼ି",
       "matchesBadge_one": "{{displayCount}}ଟି ମେଳ",
       "matchesBadge_other": "{{displayCount}}ଟି ମେଳ",
-      "noOutput": "କୌଣସି ଆଉଟପୁଟ୍ ନାହିଁ।"
+      "noOutput": "କୌଣସି ଆଉଟପୁଟ୍ ନାହିଁ।",
+      "translationFailed": "ଅନୁବାଦ ବିଫଳ ହେଲା"
     },
     "readToolMarkdown": {
       "linesTruncated": "ଧାଡ଼ି {{start}}–{{end}} (କାଟି ଦିଆଯାଇଛି)",
@@ -3009,11 +3010,22 @@
     "boundary": {
       "backToProfile": "ପ୍ରୋଫାଇଲକୁ ଫେରନ୍ତୁ",
       "loadErrorMessage": "ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+
+      "chooseAccount": "ଏକ ଖାତା ବାଛନ୍ତୁ",
       "loadErrorTitle": "ଆପଣଙ୍କ ସଂଗଠନଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "noOrganization": "କୋଣସି ସଂଗଠନ ନାହିଁ",
+
+      "noOrganizationDescription": "ଏହି ଖାତା କୌଣସି ସଂଗଠନର ଅଂଶ ନୁହେଁ। ସଦସ୍ୟ ଆମନ୍ତ୍ରଣ ଏବଂ କମ୍ ବାଲାନ୍ସ ସତର୍କତା ପରି ସଂଗଠନ ସୁବିଧାଗୁଡ଼ିକ ବ୍ୟବହାର କରିବାକୁ ୱେବ୍‌ରେ ଏକ ସଂଗଠନ ସୃଷ୍ଟି କରନ୍ତୁ କିମ୍ବା ଯୋଗ ଦିଅନ୍ତୁ।",
+
+      "openWebOrganizations": "ୱେବ୍‌ରେ ସଂଗଠନଗୁଡ଼ିକ ଖୋଲନ୍ତୁ",
+
       "organizationUnavailable": "ସଂଗଠନ ଉପଲବ୍ଧ ନାହିଁ।",
-      "selectDescription": "ଆଗକୁ ବଢ଼ିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଏକ ସଂଗଠନ ବାଛନ୍ତୁ।",
+      "selectDescriptionWithOrganizations": "ଆପଣ ଏକ କିମ୍ବା ଅଧିକ ସଂଗଠନର ସଦସ୍ୟ। ଏହି ସ୍କ୍ରିନ୍ ବ୍ୟବହାର କରିବା ଉଚିତ ଖାତା ବାଛନ୍ତୁ।",
+
       "selectOrganization": "ଏକ ସଂଗଠନ ବାଛନ୍ତୁ",
       "unavailableDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଆଗକୁ ବଢ଼ିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଅନ୍ୟ ଏକ ସଂଗଠନ ବାଛନ୍ତୁ।",
+
+      "unavailableSessionsDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଏହାର ସେସନ୍ ଲୋଡ୍ କରାଯାଇପାରିବ ନାହିଁ।",
       "accessDeniedDescription": "ଆପଣଙ୍କର ଏହି ସଂଗଠନରେ ପ୍ରବେଶ ଅଧିକାର ନାହିଁ।"
     },
     "creditActivity": {
@@ -3673,7 +3685,9 @@
       "jsonTooLarge": "ସର୍ବାଧିକ 50 ଏଣ୍ଟ୍ରି ବ୍ୟବହାର କରନ୍ତୁ, ଚାବି 128 ପର୍ଯ୍ୟନ୍ତ ଏବଂ ମୂଲ୍ୟ 4096 ଅକ୍ଷର ପର୍ଯ୍ୟନ୍ତ",
       "timeoutInvalid": "ସମୟ ସମାପ୍ତ ହେବା ନିଶ୍ଚିତ ଭାବରେ ଏକ ମିଲିସେକେଣ୍ଡ।",
       "edit": "MCP ସର୍ଭର ସଂପାଦନ କରନ୍ତୁ।",
-      "saveFailed": "MCP ସର୍ଭର ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ।"
+      "saveFailed": "MCP ସର୍ଭର ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ।",
+      "deleteFailed": "MCP ସର୍ଭର ଡିଲିଟ୍ କରିପାରିଲା ନାହିଁ।",
+      "updateFailed": "MCP ସର୍ଭର ଅପଡେଟ୍ କରିପାରିଲା ନାହିଁ।"
     },
     "agents": {
       "title": "ପ୍ରୋଫାଇଲ୍ ଏଜେଣ୍ଟଗୁଡିକ।",
@@ -3700,6 +3714,7 @@
       "visibilitySubagent": "ସବଜେଣ୍ଟ୍ - କେବଳ ଅନ୍ୟମାନଙ୍କଠାରୁ କଲ୍ ଯୋଗ୍ୟ।",
       "visibilityAll": "ସମସ୍ତ - ଉଭୟ",
       "saveFailed": "ଏଜେଣ୍ଟ ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ।",
+      "deleteFailed": "ଏଜେଣ୍ଟ ଡିଲିଟ୍ କରିପାରିଲା ନାହିଁ।",
       "nameRequired": "ଏକ ଏଜେଣ୍ଟ ନାମ ପ୍ରବେଶ କରନ୍ତୁ।",
       "slugRequired": "ଏକ ଏଜେଣ୍ଟ ସ୍ଲଗ୍ ପ୍ରବେଶ କରନ୍ତୁ।",
       "slugInvalid": "ସ୍ଲଗ୍ ନିଶ୍ଚିତ ଭାବରେ ଏକ ଅକ୍ଷରରୁ ଆରମ୍ଭ ହେବ ଏବଂ କେବଳ ଲୋୟର କେସ୍ ଅକ୍ଷର, ସଂଖ୍ୟା, ଏବଂ ଡ୍ୟାସ୍ ବ୍ୟବହାର କରିବ।",
@@ -3714,10 +3729,12 @@
       "description": "ନିର୍ଦ୍ଦେଶ ବର୍ଣ୍ଣନା",
       "template": "ଟେମ୍ପଲେଟ୍।",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ବ୍ୟାଖ୍ୟା କର।",
       "subtask": "ସବଟାସ୍କ ଭାବରେ ଚଲାନ୍ତୁ।",
       "edit": "ସ୍ଲାସ୍ କମାଣ୍ଡ୍ ଏଡିଟ୍ କରନ୍ତୁ।",
       "saveFailed": "କମାଣ୍ଡ୍ ସେଭ୍ କରିପାରିଲା ନାହିଁ।",
+      "deleteFailed": "କମାଣ୍ଡ୍ ଡିଲିଟ୍ କରିପାରିଲା ନାହିଁ।",
       "nameRequired": "ଏକ ନିର୍ଦ୍ଦେଶ ନାମ ପ୍ରବେଶ କରନ୍ତୁ।",
       "nameInvalid": "ନାମ ନିଶ୍ଚିତ ଭାବରେ ଏକ ଛୋଟ ଅକ୍ଷରରୁ ଆରମ୍ଭ ହେବ ଏବଂ କେବଳ ଲୋୟର କେସ୍ ଅକ୍ଷର, ସଂଖ୍ୟା ଏବଂ ଡ୍ୟାସ୍ ବ୍ୟବହାର କରିବ।",
       "templateRequired": "ଏକ ନିର୍ଦ୍ଦେଶ ଟେମ୍ପଲେଟ୍ ପ୍ରବେଶ କରନ୍ତୁ।",
@@ -3864,7 +3881,7 @@
     "view": "ସାରାଂଶ ପଢନ୍ତୁ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "ଲାଇଭ ସ୍ଥିତି ଦେଖାନ୍ତୁ",
+    "dismiss": "ସାରାଂଶ ଖାରଜ କରନ୍ତୁ",
     "offline": "ଅଫଲାଇନ · ସଂରକ୍ଷିତ ସାରାଂଶ",
     "cached": "ସଂରକ୍ଷିତ ରିପୋର୍ଟ · ରିଫ୍ରେସ ଉପଲବ୍ଧ ନାହିଁ",
     "revised": "ସଂଶୋଧିତ · {{revision}}",

@@ -111,7 +111,9 @@
     "online": "Em linha",
     "open": "Abrir {{name}}",
     "openPullRequest": "Abrir PR",
+    "completed": "Concluída",
     "pending": "Pendente",
+    "running": "Em execução",
     "performance": "Desempenho",
     "preferences": "Preferências",
     "privacyPolicy": "Política de privacidade",
@@ -1555,8 +1557,6 @@
     "updateFailed": "Não foi possível atualizar o revisor.",
     "configSaveFailed": "Não foi possível guardar a configuração da revisão.",
     "status": {
-      "running": "Em execução",
-      "completed": "Concluída",
       "interrupted": "Interrompida"
     },
     "reviewStyle": {
@@ -1895,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Guardar alterações",
       "unsavedTitle": "Alterações não guardadas",
-      "unsavedMessage": "Guardar as alterações antes de sair deste ecrã?"
+      "unsavedMessage": "Guardar as alterações antes de sair deste ecrã?",
+      "unsavedInvalidMessage": "Estas alterações ainda não podem ser guardadas. Corrija-as para guardar ou descarte-as para sair."
     },
     "auditReportButton": {
       "viewA11y": "Ver relatório de auditoria"
@@ -1961,7 +1962,6 @@
       "installApp": "Instalar aplicação do GitHub",
       "reauthorizeButton": "Renovar autorização da aplicação do GitHub",
       "reauthorizeDescription": "O agente de segurança precisa da permissão vulnerability_alerts para aceder aos alertas do Dependabot. Volta a autorizar a aplicação do GitHub para conceder esta permissão.",
-      "reauthorizeFailed": "Não foi possível iniciar a renovação da autorização. Tenta novamente.",
       "reauthorizeTitle": "Permissões adicionais necessárias",
       "setupFailed": "Não foi possível iniciar a configuração do GitHub. Tenta novamente."
     },
@@ -2344,7 +2344,8 @@
       "matchesBadge_one": "{{displayCount}} correspondência",
       "matchesBadge_other": "{{displayCount}} correspondências",
       "matchesBadge_many": "{{displayCount}} correspondências",
-      "noOutput": "Sem saída."
+      "noOutput": "Sem saída.",
+      "translationFailed": "Falha na tradução"
     },
     "readToolMarkdown": {
       "linesTruncated": "linhas {{start}}–{{end}} (truncadas)",
@@ -3049,11 +3050,22 @@
     "boundary": {
       "backToProfile": "Voltar ao perfil",
       "loadErrorMessage": "Verifica a tua ligação e tenta novamente.",
+
+      "chooseAccount": "Selecionar uma conta",
       "loadErrorTitle": "Não foi possível carregar as suas organizações.",
+      "noOrganization": "Sem organização",
+
+      "noOrganizationDescription": "Esta conta não faz parte de uma organização. Crie ou ingresse em uma organização na web para usar recursos de organização como convites de membros e alertas de saldo baixo.",
+
+      "openWebOrganizations": "Abrir organizações na web",
+
       "organizationUnavailable": "A organização não está disponível.",
-      "selectDescription": "Escolha uma organização no seu perfil para continuar.",
+      "selectDescriptionWithOrganizations": "Você pertence a uma ou mais organizações. Escolha a conta que esta tela deve usar.",
+
       "selectOrganization": "Selecionar uma organização",
       "unavailableDescription": "Esta organização já não está disponível. Escolha outra no seu perfil para continuar.",
+
+      "unavailableSessionsDescription": "Esta organização já não está disponível. Não é possível carregar as suas sessões.",
       "accessDeniedDescription": "Não tem acesso a esta organização."
     },
     "creditActivity": {
@@ -3714,7 +3726,9 @@
       "jsonTooLarge": "Utilize no máximo 50 entradas, chaves até 128 e valores até 4096 caracteres",
       "timeoutInvalid": "O tempo limite deve ser um número inteiro de milissegundos",
       "edit": "Editar servidor MCP",
-      "saveFailed": "Não foi possível guardar o servidor MCP"
+      "saveFailed": "Não foi possível guardar o servidor MCP",
+      "deleteFailed": "Não foi possível eliminar o servidor MCP",
+      "updateFailed": "Não foi possível atualizar o servidor MCP"
     },
     "agents": {
       "title": "Agentes do perfil",
@@ -3741,6 +3755,7 @@
       "visibilitySubagent": "Subagente — só pode ser invocado por outros",
       "visibilityAll": "Todos — ambos",
       "saveFailed": "Não foi possível guardar o agente",
+      "deleteFailed": "Não foi possível eliminar o agente",
       "nameRequired": "Introduza um nome de agente",
       "slugRequired": "Introduza um slug de agente",
       "slugInvalid": "O slug deve começar por uma letra e usar apenas letras minúsculas, dígitos e hífenes",
@@ -3755,10 +3770,12 @@
       "description": "Descrição do comando",
       "template": "Modelo",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar como subtarefa",
       "edit": "Editar comando de barra",
       "saveFailed": "Não foi possível guardar o comando",
+      "deleteFailed": "Não foi possível eliminar o comando",
       "nameRequired": "Introduza um nome de comando",
       "nameInvalid": "O nome deve começar por uma letra minúscula e usar apenas letras minúsculas, dígitos e hífenes",
       "templateRequired": "Introduza um modelo de comando",
@@ -3909,7 +3926,7 @@
     "view": "Ler resumo",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Mostrar estado em direto",
+    "dismiss": "Ignorar resumo",
     "offline": "Offline · resumo guardado",
     "cached": "Relatório guardado · atualização indisponível",
     "revised": "Revisto · {{revision}}",

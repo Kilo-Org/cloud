@@ -111,7 +111,9 @@
     "online": "Dị n'ịntanetị",
     "open": "Mepee {{name}}",
     "openPullRequest": "Meghe arịrịọ ijikọ koodu",
+    "completed": "Emechara",
     "pending": "Na-echere",
+    "running": "Na-arụ ọrụ",
     "performance": "Arụmọrụ",
     "preferences": "Mmasị",
     "privacyPolicy": "Amụma nzuzo",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Enweghị ike imelite onye nyocha.",
     "configSaveFailed": "Enweghị ike ichekwa nhazi nyocha.",
     "status": {
-      "running": "Na-arụ ọrụ",
-      "completed": "Emechara",
       "interrupted": "A kwụsịrị tupu ọ gwụchaa"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Chekwaa mgbanwe",
       "unsavedTitle": "Mgbanwe echekwaghị",
-      "unsavedMessage": "Chekwaa mgbanwe gị tupu ịhapụ ihuenyo a?"
+      "unsavedMessage": "Chekwaa mgbanwe gị tupu ịhapụ ihuenyo a?",
+      "unsavedInvalidMessage": "Enweghị ike ichekwa mgbanwe ndị a ugbu a. Dozie ha iji chekwaa, ma ọ bụ tụfuo ha iji pụọ."
     },
     "auditReportButton": {
       "viewA11y": "Lee akụkọ nyocha"
@@ -1938,7 +1939,6 @@
       "installApp": "Wụnye ngwa GitHub",
       "reauthorizeButton": "Nye ngwa GitHub ikike ọzọ",
       "reauthorizeDescription": "Onye nnọchi anya nchebe chọrọ ikike vulnerability_alerts iji nweta ọkwa Dependabot. Nye ngwa GitHub ikike ọzọ iji nye ikike a.",
-      "reauthorizeFailed": "Enweghị ike ịmalite inye ikike ọzọ. Biko nwaa ọzọ.",
       "reauthorizeTitle": "Achọrọ ikike ndị ọzọ",
       "setupFailed": "Enweghị ike ịmalite nhazi GitHub. Biko nwaa ọzọ."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "ahịrị {{displayCount}}",
       "matchesBadge_one": "ndakọrịta {{displayCount}}",
       "matchesBadge_other": "ndakọrịta {{displayCount}}",
-      "noOutput": "Enweghị mpụta."
+      "noOutput": "Enweghị mpụta.",
+      "translationFailed": "Ọsịsa agaghị"
     },
     "readToolMarkdown": {
       "linesTruncated": "ahịrị {{start}}–{{end}} (ebipụrụ akụkụ)",
@@ -3009,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Laghachi na profaịlụ",
       "loadErrorMessage": "Lelee njikọ gị ma nwaa ọzọ.",
+
+      "chooseAccount": "Họrọ akaụntụ",
       "loadErrorTitle": "Enweghị ike ibudata ụlọ ọrụ gị.",
+      "noOrganization": "Enweghị ụlọ ọrụ",
+
+      "noOrganizationDescription": "Akaụntụ a esonyeghị na ụlọ ọrụ. Mepụta ma ọ bụ sonye na ụlọ ọrụ na webụ iji jiri atụmatụ ụlọ ọrụ dị ka ịkpọ ndị otu oku na ịdọ aka ná ntị gbasara obere ego n'akaụntụ.",
+
+      "openWebOrganizations": "Mepee ụlọ ọrụ na webụ",
+
       "organizationUnavailable": "Ụlọ ọrụ adịghị.",
-      "selectDescription": "Họrọ ụlọ ọrụ site na profaịlụ gị ka ị gaa n'ihu.",
+      "selectDescriptionWithOrganizations": "Ị so n'otu ụlọ ọrụ ma ọ bụ karịa. Họrọ akaụntụ nke ihuenyo a kwesịrị iji.",
+
       "selectOrganization": "Họrọ ụlọ ọrụ",
       "unavailableDescription": "Ụlọ ọrụ a adịkwaghị. Họrọ otu site na profaịlụ gị ka ị gaa n'ihu.",
+
+      "unavailableSessionsDescription": "Ụlọ ọrụ a adịkwaghị. Enweghi ike ibu oge ya.",
       "accessDeniedDescription": "Ị nweghị ikike ịbanye n'ụlọ ọrụ a."
     },
     "creditActivity": {
@@ -3673,7 +3685,9 @@
       "jsonTooLarge": "Ejila ihe karịrị ndenye 50, igodo ruo 128 na uru ruo mkpụrụedemede 4096",
       "timeoutInvalid": "Oge ngwụcha ga-abụrịrị ọnụ ọgụgụ millisekọnd dum",
       "edit": "Dezie ihe nkesa MCP",
-      "saveFailed": "Enweghị ike ichekwa ihe nkesa MCP"
+      "saveFailed": "Enweghị ike ichekwa ihe nkesa MCP",
+      "deleteFailed": "Enweghị ike ihichapụ ihe nkesa MCP",
+      "updateFailed": "Enweghị ike melite ihe nkesa MCP"
     },
     "agents": {
       "title": "Ndị ọrụ profaịlụ",
@@ -3700,6 +3714,7 @@
       "visibilitySubagent": "Subagent - naanị ndị ọzọ nwere ike ịkpọ",
       "visibilityAll": "All - abụọ",
       "saveFailed": "Enweghị ike ichekwa onye nnọchi anya",
+      "deleteFailed": "Enweghị ike ihichapụ onye nnọchi anya",
       "nameRequired": "Tinye aha onye nnọchi anya",
       "slugRequired": "Tinye ihe nnọchite slug",
       "slugInvalid": "Slug ga-eji mkpụrụedemede malite ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ, na ngwucha",
@@ -3714,10 +3729,12 @@
       "description": "Nkọwa iwu",
       "template": "Ụdị",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Kọwaa $ARGUMENTS",
       "subtask": "Gbaa ọsọ dị ka obere ọrụ",
       "edit": "Dezie slash iwu",
       "saveFailed": "Enweghị ike ịchekwa iwu",
+      "deleteFailed": "Enweghị ike ihichapụ iwu",
       "nameRequired": "Tinye aha iwu",
       "nameInvalid": "Aha ga-eji obere mkpụrụedemede malite ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ, na akara akara",
       "templateRequired": "Tinye ndebiri iwu",
@@ -3864,7 +3881,7 @@
     "view": "Gụọ nkọwa",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Gosi ọnọdụ ugbu a",
+    "dismiss": "Leghara nkọwa anya",
     "offline": "Enweghị ịntanetị · nkọwa echekwara",
     "cached": "Akụkọ echekwara · enweghị ike imeghari",
     "revised": "Edoziri · {{revision}}",

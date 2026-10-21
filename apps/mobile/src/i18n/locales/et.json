@@ -111,7 +111,9 @@
     "online": "Võrgus",
     "open": "Ava {{name}}",
     "openPullRequest": "Ava tõmbetaotlus",
+    "completed": "Lõpetatud",
     "pending": "Ootel",
+    "running": "Töötab",
     "performance": "Jõudlus",
     "preferences": "Eelistused",
     "privacyPolicy": "Privaatsuspoliitika",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Koodiülevaataja uuendamine ebaõnnestus.",
     "configSaveFailed": "Ülevaatuse seadete salvestamine ebaõnnestus.",
     "status": {
-      "running": "Töötab",
-      "completed": "Lõpetatud",
       "interrupted": "Katkestatud"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Salvesta muudatused",
       "unsavedTitle": "Salvestamata muudatused",
-      "unsavedMessage": "Kas salvestada muudatused enne sellelt ekraanilt lahkumist?"
+      "unsavedMessage": "Kas salvestada muudatused enne sellelt ekraanilt lahkumist?",
+      "unsavedInvalidMessage": "Neid muudatusi ei saa veel salvestada. Paranda need salvestamiseks või loobu neist lahkumiseks."
     },
     "auditReportButton": {
       "viewA11y": "Vaata auditiaruannet"
@@ -1938,7 +1939,6 @@
       "installApp": "Paigalda GitHubi rakendus",
       "reauthorizeButton": "Volita GitHubi rakendus uuesti",
       "reauthorizeDescription": "Turvaagent vajab õigust vulnerability_alerts, et pääseda ligi Dependaboti hoiatustele. Selle õiguse andmiseks volita GitHubi rakendus uuesti.",
-      "reauthorizeFailed": "Uuesti volitamist ei õnnestunud alustada. Proovi uuesti.",
       "reauthorizeTitle": "Vaja on täiendavaid õigusi",
       "setupFailed": "GitHubi seadistamist ei õnnestunud alustada. Proovi uuesti."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} rida",
       "matchesBadge_one": "{{displayCount}} vastet",
       "matchesBadge_other": "{{displayCount}} vastet",
-      "noOutput": "Väljund puudub."
+      "noOutput": "Väljund puudub.",
+      "translationFailed": "Tõlge ebaõnnestus"
     },
     "readToolMarkdown": {
       "linesTruncated": "read {{start}}–{{end}} (kärbitud)",
@@ -3009,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Tagasi profiilile",
       "loadErrorMessage": "Kontrolli ühendust ja proovi uuesti.",
+
+      "chooseAccount": "Vali konto",
       "loadErrorTitle": "Sinu organisatsioone ei õnnestunud laadida.",
+      "noOrganization": "Organisatsioon puudub",
+
+      "noOrganizationDescription": "See konto ei kuulu ühtegi organisatsiooni. Organisatsiooni funktsioonide, nagu liikmekutsed ja väikese saldo hoiatused, kasutamiseks loo organisatsioon või liitu sellega veebis.",
+
+      "openWebOrganizations": "Ava organisatsioonid veebis",
+
       "organizationUnavailable": "Organisatsioon pole saadaval.",
-      "selectDescription": "Jätkamiseks vali oma profiililt organisatsioon.",
+      "selectDescriptionWithOrganizations": "Kuulud ühte või mitmesse organisatsiooni. Vali konto, mida see ekraan peaks kasutama.",
+
       "selectOrganization": "Vali organisatsioon",
       "unavailableDescription": "See organisatsioon pole enam saadaval. Jätkamiseks vali oma profiililt teine organisatsioon.",
+
+      "unavailableSessionsDescription": "See organisatsioon pole enam saadaval. Selle seansse ei saa laadida.",
       "accessDeniedDescription": "Sul puudub juurdepääs sellele organisatsioonile."
     },
     "creditActivity": {
@@ -3673,7 +3685,9 @@
       "jsonTooLarge": "Kasuta kõige rohkem 50 kirjet, võtmed kuni 128 ja väärtused kuni 4096 tähemärki",
       "timeoutInvalid": "Aegumine peab olema täisarv millisekundeid",
       "edit": "Redigeeri MCP-serverit",
-      "saveFailed": "MCP-serverit ei saanud salvestada"
+      "saveFailed": "MCP-serverit ei saanud salvestada",
+      "deleteFailed": "MCP-serverit ei õnnestunud kustutada",
+      "updateFailed": "MCP-serverit ei õnnestunud värskendada"
     },
     "agents": {
       "title": "Profiiliagendid",
@@ -3700,6 +3714,7 @@
       "visibilitySubagent": "Subagent — ainult teistelt helistatav",
       "visibilityAll": "Kõik - mõlemad",
       "saveFailed": "Agenti ei õnnestunud salvestada",
+      "deleteFailed": "Agenti ei õnnestunud kustutada",
       "nameRequired": "Sisestage agendi nimi",
       "slugRequired": "Sisestage agent nälkjas",
       "slugInvalid": "Slug peab algama tähega ja kasutama ainult väiketähti, numbreid ja sidekriipse",
@@ -3714,10 +3729,12 @@
       "description": "Käsu kirjeldus",
       "template": "Mall",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Selgitage $ARGUMENTS",
       "subtask": "Käivita alamülesandena",
       "edit": "Muuda kaldkriipsu käsku",
       "saveFailed": "Käsku ei saanud salvestada",
+      "deleteFailed": "Käsku ei õnnestunud kustutada",
       "nameRequired": "Sisestage käsu nimi",
       "nameInvalid": "Nimi peab algama väiketähtedega ja kasutama ainult väiketähti, numbreid ja sidekriipse",
       "templateRequired": "Sisestage käsumall",
@@ -3864,7 +3881,7 @@
     "view": "Loe ülevaadet",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Näita reaalajas olekut",
+    "dismiss": "Jäta ülevaade kõrvale",
     "offline": "Võrguühenduseta · salvestatud ülevaade",
     "cached": "Salvestatud aruanne · värskendamine pole saadaval",
     "revised": "Muudetud · {{revision}}",

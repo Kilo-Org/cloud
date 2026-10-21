@@ -111,7 +111,9 @@
     "online": "آنلاین",
     "open": "باز کردن {{name}}",
     "openPullRequest": "پول ریکوئست باز",
+    "completed": "تکمیل‌شده",
     "pending": "در انتظار",
+    "running": "در حال اجرا",
     "performance": "عملکرد",
     "preferences": "تنظیمات دلخواه",
     "privacyPolicy": "خط‌مشی حریم خصوصی",
@@ -1536,8 +1538,6 @@
     "updateFailed": "به‌روزرسانی بررسی‌کننده کد ممکن نشد.",
     "configSaveFailed": "ذخیره تنظیمات بررسی ممکن نشد.",
     "status": {
-      "running": "در حال اجرا",
-      "completed": "تکمیل‌شده",
       "interrupted": "قطع شد"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "ذخیره تغییرات",
       "unsavedTitle": "تغییرات ذخیره‌نشده",
-      "unsavedMessage": "تغییرات شما پیش از خروج از این صفحه ذخیره شوند؟"
+      "unsavedMessage": "تغییرات شما پیش از خروج از این صفحه ذخیره شوند؟",
+      "unsavedInvalidMessage": "این تغییرات هنوز ذخیره نمی‌شوند. برای ذخیره اصلاحشان کنید، یا برای خروج کنارشان بگذارید."
     },
     "auditReportButton": {
       "viewA11y": "مشاهده گزارش ممیزی"
@@ -1938,7 +1939,6 @@
       "installApp": "نصب برنامه GitHub",
       "reauthorizeButton": "اعطای مجدد مجوز به برنامه GitHub",
       "reauthorizeDescription": "عامل امنیتی برای دسترسی به هشدارهای Dependabot به مجوز vulnerability_alerts نیاز دارد. برای دادن این مجوز، دوباره دسترسی برنامه GitHub را تأیید کنید.",
-      "reauthorizeFailed": "شروع فرایند اعطای مجدد مجوز ممکن نشد. لطفاً دوباره تلاش کنید.",
       "reauthorizeTitle": "مجوزهای بیشتری لازم است",
       "setupFailed": "شروع راه‌اندازی GitHub ممکن نشد. لطفاً دوباره تلاش کنید."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} خط",
       "matchesBadge_one": "{{displayCount}} تطابق",
       "matchesBadge_other": "{{displayCount}} تطابق",
-      "noOutput": "هیچ خروجی وجود ندارد."
+      "noOutput": "هیچ خروجی وجود ندارد.",
+      "translationFailed": "ترجمه ناموفق بود"
     },
     "readToolMarkdown": {
       "linesTruncated": "خطوط {{start}}–{{end}} (نمایش ناقص)",
@@ -3009,11 +3010,22 @@
     "boundary": {
       "backToProfile": "بازگشت به پروفایل",
       "loadErrorMessage": "اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.",
+
+      "chooseAccount": "انتخاب حساب",
       "loadErrorTitle": "بارگذاری سازمان‌های شما ممکن نشد.",
+      "noOrganization": "بدون سازمان",
+
+      "noOrganizationDescription": "این حساب بخشی از هیچ سازمانی نیست. برای استفاده از ویژگی‌های سازمان مانند دعوت اعضا و هشدارهای موجودی کم، در وب یک سازمان ایجاد کنید یا به یکی بپیوندید.",
+
+      "openWebOrganizations": "باز کردن سازمان‌ها در وب",
+
       "organizationUnavailable": "سازمان در دسترس نیست.",
-      "selectDescription": "برای ادامه، در پروفایل خود یک سازمان انتخاب کنید.",
+      "selectDescriptionWithOrganizations": "شما عضو یک یا چند سازمان هستید. حسابی را انتخاب کنید که این صفحه باید استفاده کند.",
+
       "selectOrganization": "انتخاب سازمان",
       "unavailableDescription": "این سازمان دیگر در دسترس نیست. برای ادامه، در پروفایل خود سازمان دیگری انتخاب کنید.",
+
+      "unavailableSessionsDescription": "این سازمان دیگر در دسترس نیست. جلسات آن قابل بارگذاری نیست.",
       "accessDeniedDescription": "شما به این سازمان دسترسی ندارید."
     },
     "creditActivity": {
@@ -3673,7 +3685,9 @@
       "jsonTooLarge": "حداکثر 50 ورودی، کلیدها تا 128 و مقادیر تا 4096 نویسه استفاده کنید",
       "timeoutInvalid": "تایم اوت باید چندین میلی ثانیه باشد",
       "edit": "ویرایش سرور MCP",
-      "saveFailed": "سرور MCP ذخیره نشد"
+      "saveFailed": "سرور MCP ذخیره نشد",
+      "deleteFailed": "سرور MCP حذف نشد",
+      "updateFailed": "سرور MCP به‌روزرسانی نشد"
     },
     "agents": {
       "title": "نمایندگان پروفایل",
@@ -3700,6 +3714,7 @@
       "visibilitySubagent": "Subagent - فقط از دیگران قابل تماس است",
       "visibilityAll": "همه - هر دو",
       "saveFailed": "عامل ذخیره نشد",
+      "deleteFailed": "عامل حذف نشد",
       "nameRequired": "یک نام نماینده وارد کنید",
       "slugRequired": "یک اسلاگ عامل را وارد کنید",
       "slugInvalid": "Slug باید با یک حرف شروع شود و فقط از حروف کوچک، اعداد و خط تیره استفاده کند",
@@ -3714,10 +3729,12 @@
       "description": "توضیحات فرمان",
       "template": "الگو",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS را توضیح دهید",
       "subtask": "به عنوان وظیفه فرعی اجرا شود",
       "edit": "ویرایش دستور اسلش",
       "saveFailed": "فرمان ذخیره نشد",
+      "deleteFailed": "فرمان حذف نشد",
       "nameRequired": "یک نام فرمان وارد کنید",
       "nameInvalid": "نام باید با یک حرف کوچک شروع شود و فقط از حروف کوچک، ارقام و خط تیره استفاده کند",
       "templateRequired": "یک قالب فرمان را وارد کنید",
@@ -3864,7 +3881,7 @@
     "view": "خواندن گزارش",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "نمایش وضعیت زنده",
+    "dismiss": "نادیده گرفتن گزارش",
     "offline": "آفلاین · گزارش ذخیره‌شده",
     "cached": "گزارش ذخیره‌شده · به‌روزرسانی در دسترس نیست",
     "revised": "بازبینی‌شده · {{revision}}",

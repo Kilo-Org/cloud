@@ -111,7 +111,9 @@
     "online": "Онлајн",
     "open": "Отвори {{name}}",
     "openPullRequest": "Отворен PR",
+    "completed": "Завршено",
     "pending": "На чекање",
+    "running": "Во тек",
     "performance": "Перформанси",
     "preferences": "Лични поставки",
     "privacyPolicy": "Политика за приватност",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Не успеа ажурирањето на прегледувачот на код.",
     "configSaveFailed": "Не успеа зачувувањето на поставките за преглед.",
     "status": {
-      "running": "Во тек",
-      "completed": "Завршено",
       "interrupted": "Прекинато"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Зачувај ги промените",
       "unsavedTitle": "Незачувани промени",
-      "unsavedMessage": "Да се зачуваат промените пред да го напуштиш овој екран?"
+      "unsavedMessage": "Да се зачуваат промените пред да го напуштиш овој екран?",
+      "unsavedInvalidMessage": "Овие промени сè уште не можат да се зачуваат. Исправи ги за да зачуваш или отфрли ги за да го напуштиш."
     },
     "auditReportButton": {
       "viewA11y": "Прегледај го извештајот за ревизија"
@@ -1938,7 +1939,6 @@
       "installApp": "Инсталирај ја апликацијата на GitHub",
       "reauthorizeButton": "Повторно овласти ја апликацијата на GitHub",
       "reauthorizeDescription": "На безбедносниот агент му треба дозволата vulnerability_alerts за пристап до предупредувањата од Dependabot. Повторно овласти ја апликацијата на GitHub за да ја доделиш оваа дозвола.",
-      "reauthorizeFailed": "Не можеше да се започне повторното овластување. Обиди се повторно.",
       "reauthorizeTitle": "Потребни се дополнителни дозволи",
       "setupFailed": "Не можеше да се започне поставувањето на GitHub. Обиди се повторно."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} редови",
       "matchesBadge_one": "{{displayCount}} совпаѓање",
       "matchesBadge_other": "{{displayCount}} совпаѓања",
-      "noOutput": "Нема излез."
+      "noOutput": "Нема излез.",
+      "translationFailed": "Преводот не успеа"
     },
     "readToolMarkdown": {
       "linesTruncated": "редови {{start}}–{{end}} (скратено)",
@@ -3009,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Назад на профилот",
       "loadErrorMessage": "Провери ја врската и обиди се повторно.",
+
+      "chooseAccount": "Избери сметка",
       "loadErrorTitle": "Не успеа вчитувањето на твоите организации.",
+      "noOrganization": "Нема организација",
+
+      "noOrganizationDescription": "Оваа сметка не е дел од организација. Создај или придружи се на организација на веб-страницата за да ги користиш функциите на организацијата, како покани за членови и предупредувања за низок баланс.",
+
+      "openWebOrganizations": "Отвори организации на веб-страницата",
+
       "organizationUnavailable": "Организацијата не е достапна.",
-      "selectDescription": "Избери организација од твојот профил за да продолжиш.",
+      "selectDescriptionWithOrganizations": "Припаѓаш на една или повеќе организации. Избери ја сметката што треба да ја користи овој екран.",
+
       "selectOrganization": "Избор на организација",
       "unavailableDescription": "Оваа организација веќе не е достапна. Избери друга од твојот профил за да продолжиш.",
+
+      "unavailableSessionsDescription": "Оваа организација веќе не е достапна. Нејзините сесии не можат да се вчитаат.",
       "accessDeniedDescription": "Немаш пристап до оваа организација."
     },
     "creditActivity": {
@@ -3673,7 +3685,9 @@
       "jsonTooLarge": "Користете најмногу 50 записи, клучеви до 128 и вредности до 4096 знаци",
       "timeoutInvalid": "Истекот на времето мора да биде цел број од милисекунди",
       "edit": "Уреди MCP сервер",
-      "saveFailed": "Не може да се зачува MCP серверот"
+      "saveFailed": "Не може да се зачува MCP серверот",
+      "deleteFailed": "Не може да се избрише MCP серверот",
+      "updateFailed": "Не може да се ажурира MCP серверот"
     },
     "agents": {
       "title": "Агенти за профили",
@@ -3700,6 +3714,7 @@
       "visibilitySubagent": "Субагент - може да се повика само од други",
       "visibilityAll": "Сите - и двете",
       "saveFailed": "Не може да се зачува агентот",
+      "deleteFailed": "Не може да се избрише агентот",
       "nameRequired": "Внесете име на агент",
       "slugRequired": "Внесете голтка агент",
       "slugInvalid": "Slug мора да започнува со буква и да користи само мали букви, цифри и цртички",
@@ -3714,10 +3729,12 @@
       "description": "Опис на командата",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Објасни $ARGUMENTS",
       "subtask": "Стартувај како подзадача",
       "edit": "Уреди команда коса црта",
       "saveFailed": "Не може да се зачува командата",
+      "deleteFailed": "Не може да се избрише командата",
       "nameRequired": "Внесете име на команда",
       "nameInvalid": "Името мора да започнува со мала буква и да користи само мали букви, цифри и цртички",
       "templateRequired": "Внесете образец за команда",
@@ -3864,7 +3881,7 @@
     "view": "Прочитај преглед",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Прикажи статус во живо",
+    "dismiss": "Отфрли го прегледот",
     "offline": "Офлајн · зачуван преглед",
     "cached": "Зачуван извештај · освежувањето е недостапно",
     "revised": "Ревидирано · {{revision}}",

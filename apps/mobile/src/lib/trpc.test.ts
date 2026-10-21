@@ -186,6 +186,16 @@ describe('getAuthHeaders', () => {
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
   });
 
+  it('sends the app product token as the User-Agent on every tRPC call', async () => {
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const headers = await loadHeaders();
+
+    await expect(headers()).resolves.toMatchObject({
+      'User-Agent': 'Kilo-Code/1.0.4 (ios)',
+    });
+  });
+
   it('uses the newest owner token published while the cold expiry was read', async () => {
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('token-expires-at', String(Date.now() - 1000));
@@ -211,11 +221,6 @@ describe('getAuthHeaders', () => {
 
 const mockFetch = vi.fn();
 
-// Suppress Node.js 24 unhandledRejection from AbortController.abort()
-// with a non-DOMException reason during fake-timer tests.
-// eslint-disable-next-line @typescript-eslint/no-empty-function
-function swallowUnhandledRejection(): void {}
-
 describe('deadlineFetch', () => {
   beforeEach(() => {
     vi.useRealTimers();
@@ -239,7 +244,6 @@ describe('deadlineFetch', () => {
 
   it('rejects with RequestDeadlineError when the deadline expires', async () => {
     vi.useFakeTimers();
-    process.on('unhandledRejection', swallowUnhandledRejection);
     try {
       // Fetch never resolves unless its signal aborts — simulates a hanging
       // backend where the only thing that cancels the request is the deadline.
@@ -262,13 +266,12 @@ describe('deadlineFetch', () => {
       const { deadlineFetch } = await import('./trpc');
       const promise = deadlineFetch('https://api.example.com/api/trpc');
 
-      vi.advanceTimersByTime(15_001);
-      // eslint-disable-next-line typescript-eslint/await-thenable
-      await vi.runAllTicks();
-
-      await expect(promise).rejects.toThrow('timed out after 15000ms');
+      // Attach the rejection handler before the fake clock reaches the
+      // deadline, so the settled promise never goes unhandled.
+      const rejection = expect(promise).rejects.toThrow('timed out after 15000ms');
+      await vi.advanceTimersByTimeAsync(15_001);
+      await rejection;
     } finally {
-      process.off('unhandledRejection', swallowUnhandledRejection);
       vi.useRealTimers();
     }
   });
@@ -311,14 +314,15 @@ describe('deadlineFetch', () => {
         signal: controller.signal,
       });
 
-      // Let the fetch start, then abort from the caller side.
-      await vi.advanceTimersByTimeAsync(0);
+      // Let the fetch start, then abort from the caller side. Attach the
+      // rejection handler before aborting, so the settled promise never goes
+      // unhandled.
+      const rejection = expect(promise).rejects.toThrow('caller cancelled mid-flight');
       controller.abort(new Error('caller cancelled mid-flight'));
 
-      // eslint-disable-next-line typescript-eslint/await-thenable
-      await vi.runAllTicks();
+      await vi.advanceTimersByTimeAsync(0);
 
-      await expect(promise).rejects.toThrow('caller cancelled mid-flight');
+      await rejection;
     } finally {
       vi.useRealTimers();
     }

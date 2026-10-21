@@ -152,7 +152,7 @@ describe('BashToolCard', () => {
   });
 
   it.each([
-    '/workspace/org/user/sessions/agent-one/README',
+    '/workspace/org/user/sessions/agent_36c067fe-a515-4fcf-876d-40ec25a90171/README',
     '/workspace/7c21ccc1-e50c-4b65-a2a5-d89c70310f4b/sessions/workspace_36c067fe-a515-4fcf-876d-40ec25a90171/README',
   ])('shortens workspace path %s only in the fallback preview', path => {
     const command = `cat ${path}\npwd`;

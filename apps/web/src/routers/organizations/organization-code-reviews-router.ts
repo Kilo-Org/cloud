@@ -9,7 +9,13 @@ import {
   ensureOrganizationAccess,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
+import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
 import {
+  getGitHubConnectionStatusForOwner,
   getIntegrationForOrganization,
   updateIntegrationMetadata,
 } from '@/lib/integrations/db/platform-integrations';
@@ -40,7 +46,10 @@ import {
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
-import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
+import {
+  getValidGitLabToken,
+  isGitLabCredentialConnected,
+} from '@/lib/integrations/gitlab-service';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   clearCodeReviewActionRequiredState,
@@ -362,6 +371,17 @@ async function ensureBitbucketWorkspaceWebhook(input: {
   }
 }
 
+// The rotated secret is returned to the caller, so an elevated admin rotation
+// is recorded durably. The secret itself is never logged.
+async function recordGitLabSecretRotation(ctx: TRPCContext, organizationId: string) {
+  await recordElevatedOrganizationAdminAction(ctx, {
+    organizationId,
+    requiredRoles: ORGANIZATION_BILLING_ROLES,
+    action: 'organization.gitlab_webhook_secret.rotate',
+    message: 'Rotated GitLab webhook secret (new secret returned to the caller)',
+  });
+}
+
 export const organizationReviewAgentRouter = createTRPCRouter({
   createManualReviewJob: organizationMemberMutationProcedure
     .input(CreateManualReviewJobInputSchema)
@@ -441,27 +461,12 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
   /**
    * Gets the GitHub App installation status
-   * (Replaces getGitHubStatus - now checks for GitHub App instead of OAuth)
    */
   getGitHubStatus: organizationMemberProcedure.query(async ({ input }) => {
-    const integration = await getIntegrationForOrganization(input.organizationId, 'github');
-
-    if (!isPlatformIntegrationHealthy(integration)) {
-      return {
-        connected: false,
-        integration: null,
-      };
-    }
-
-    return {
-      connected: true,
-      integration: {
-        accountLogin: integration.platform_account_login,
-        repositorySelection: integration.repository_access,
-        installedAt: integration.installed_at,
-        isValid: true,
-      },
-    };
+    return await getGitHubConnectionStatusForOwner({
+      type: 'org',
+      id: input.organizationId,
+    });
   }),
 
   /**
@@ -483,10 +488,34 @@ export const organizationReviewAgentRouter = createTRPCRouter({
   /**
    * Gets the GitLab OAuth integration status for organization
    */
-  getGitLabStatus: organizationMemberProcedure.query(async ({ input }) => {
+  getGitLabStatus: organizationMemberProcedure.query(async ({ input, ctx }) => {
     const integration = await getIntegrationForOrganization(input.organizationId, PLATFORM.GITLAB);
 
     if (!isPlatformIntegrationHealthy(integration)) {
+      return {
+        connected: false,
+        integration: null,
+      };
+    }
+
+    // The row being healthy says nothing about the stored credential. Ask the
+    // token service to resolve it, exactly as a review read would, so an
+    // expired or revoked credential reports as not connected instead of
+    // sending the settings surface into review-only content.
+    //
+    // The broker authorizes only a direct member of the integration's
+    // organization, so this consult runs for direct members only. Kilo admins
+    // and parent-organization role holders (no membership row) keep the
+    // row-based answer — the broker would refuse them as not_connected and
+    // fake a broken connection for a healthy organization.
+    const isDirectMember = await isOrganizationMember(db, input.organizationId, ctx.user.id);
+    if (
+      isDirectMember &&
+      !(await isGitLabCredentialConnected(integration, {
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+      }))
+    ) {
       return {
         connected: false,
         integration: null,
@@ -1364,6 +1393,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           actor_name: ctx.user.google_user_name,
           message: 'Rotated GitLab webhook secret (no Kilo-managed webhooks to re-sync)',
         });
+        await recordGitLabSecretRotation(ctx, organizationId);
         return {
           webhookSecret: newSecret,
           webhookSync: {
@@ -1452,6 +1482,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         message: `Rotated GitLab webhook secret (webhooks: ${webhookSyncResult.updated} updated, ${webhookSyncResult.errors.length} errors)`,
       });
 
+      await recordGitLabSecretRotation(ctx, organizationId);
       return {
         webhookSecret: newSecret,
         webhookSync: webhookSyncResult,

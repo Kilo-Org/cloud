@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { NavigationContext } from '@/lib/navigation/navigation-context';
-import { SheetHeader } from '@/components/sheet-header';
+import { SheetHeader, type SheetHeaderTopInset } from '@/components/sheet-header';
 
 export function PickerSheet({
   title,
@@ -21,6 +21,12 @@ export function PickerSheet({
   scrollable = true,
   disabled = false,
   onHardwareBack,
+  /**
+   * Half-detent-only shells (mode-picker pins `sheetAllowedDetents: [0.5]`)
+   * can never reach the window top, so their header must not reserve the
+   * status-bar inset — it would only be a dead band above the title.
+   */
+  topInset = 'bottom-form-sheet',
 }: {
   title: string;
   onDone: () => void;
@@ -51,6 +57,7 @@ export function PickerSheet({
    * BottomSheetBehavior dismissal.
    */
   onHardwareBack?: () => boolean;
+  topInset?: SheetHeaderTopInset;
 }) {
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
@@ -134,7 +141,7 @@ export function PickerSheet({
           doneLabel={doneLabel}
           cancelLabel={cancelLabel}
           disabled={disabled}
-          topInset="bottom-form-sheet"
+          topInset={topInset}
         />
         {headerContent}
       </View>

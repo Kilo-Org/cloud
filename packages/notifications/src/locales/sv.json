@@ -41,11 +41,11 @@
   "internal": {
     "lowBalance": {
       "title": "Lågbalansvarning",
-      "body": "{{organizationName}} saldo föll under ${{minimumBalanceUsd}}"
+      "body": "{{organizationName}}s saldo föll under ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Utgiftsvarning",
-      "body": "{{scopeName}} utgifter översteg ${{amountUsd}}"
+      "body": "{{scopeName}}s utgifter översteg ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Ny säkerhetsupptäckt ({{severity}})",

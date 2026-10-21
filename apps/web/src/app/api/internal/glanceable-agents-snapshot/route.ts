@@ -39,7 +39,7 @@ function logSnapshotAudit(
   status: number,
   startedAt: number,
   organizationScoped: boolean,
-  authMethod?: InternalSessionAuthMethod
+  authMethod: InternalSessionAuthMethod
 ): void {
   console.log(
     JSON.stringify({
@@ -68,11 +68,11 @@ export async function POST(req: NextRequest) {
   if (authMethod === 'bearer') {
     const token = extractBearerToken(req.headers.get('authorization'));
     if (!token) {
-      logSnapshotAudit('unauthorized', 401, startedAt, false);
+      logSnapshotAudit('unauthorized', 401, startedAt, false, authMethod);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE });
     }
     if (!GLANCEABLE_SNAPSHOT_SIGNING_SECRET) {
-      logSnapshotAudit('unavailable', 503, startedAt, false);
+      logSnapshotAudit('unavailable', 503, startedAt, false, authMethod);
       return NextResponse.json(
         { error: 'Service temporarily unavailable' },
         { status: 503, headers: NO_STORE }
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       secret: GLANCEABLE_SNAPSHOT_SIGNING_SECRET,
     });
     if (!credential.ok) {
-      logSnapshotAudit('unauthorized', 401, startedAt, false);
+      logSnapshotAudit('unauthorized', 401, startedAt, false, authMethod);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE });
     }
     authorizedUserId = credential.userId;
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
       !INTERNAL_API_SECRET ||
       !timingSafeEqual(provided, INTERNAL_API_SECRET)
     ) {
-      logSnapshotAudit('unauthorized', 401, startedAt, false);
+      logSnapshotAudit('unauthorized', 401, startedAt, false, authMethod);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE });
     }
   }
@@ -103,13 +103,13 @@ export async function POST(req: NextRequest) {
   const rawBody: unknown = await req.json().catch(() => null);
   const parsedBody = BodySchema.safeParse(rawBody);
   if (!parsedBody.success) {
-    logSnapshotAudit('invalid_request', 400, startedAt, false);
+    logSnapshotAudit('invalid_request', 400, startedAt, false, authMethod);
     return NextResponse.json({ error: 'Invalid body' }, { status: 400, headers: NO_STORE });
   }
 
   const { userId, organizationId } = parsedBody.data;
   if (authorizedUserId !== undefined && userId !== authorizedUserId) {
-    logSnapshotAudit('forbidden', 403, startedAt, organizationId !== null);
+    logSnapshotAudit('forbidden', 403, startedAt, organizationId !== null, authMethod);
     return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: NO_STORE });
   }
 
@@ -127,10 +127,10 @@ export async function POST(req: NextRequest) {
         error instanceof TRPCError &&
         (error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN')
       ) {
-        logSnapshotAudit('access_denied', 403, startedAt, true);
+        logSnapshotAudit('access_denied', 403, startedAt, true, authMethod);
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403, headers: NO_STORE });
       }
-      logSnapshotAudit('access_check_failed', 500, startedAt, true);
+      logSnapshotAudit('access_check_failed', 500, startedAt, true, authMethod);
       return NextResponse.json(
         { error: 'Organization access check failed' },
         { status: 500, headers: NO_STORE }

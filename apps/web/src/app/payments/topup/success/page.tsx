@@ -1,9 +1,9 @@
 'use client';
 
-import type { CreditTransaction } from '@kilocode/db/schema';
 import { redirect } from 'next/navigation';
 import { useEffect } from 'react';
-import { fetchCreditTransactionIdForStripeSession, getPaymentReturnUrl } from './actions';
+import type { TopUpTransactionSummary } from './actions';
+import { fetchTopUpTransactionForStripeSession, getPaymentReturnUrl } from './actions';
 import BigLoader from '@/components/BigLoader';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import {
@@ -16,7 +16,7 @@ import { PageContainer } from '@/components/layouts/PageContainer';
 
 const MAX_TRANSACTION_LOOKUP_ATTEMPTS = 15;
 
-export function getRedirectUrl(txn: CreditTransaction | undefined, returnUrl: string | null) {
+export function getRedirectUrl(txn: TopUpTransactionSummary | undefined, returnUrl: string | null) {
   if (returnUrl) {
     return returnUrl;
   }
@@ -26,12 +26,12 @@ export function getRedirectUrl(txn: CreditTransaction | undefined, returnUrl: st
     params.set(TOPUP_STATUS_QUERY_STRING_KEY, TOPUP_STATUS_PENDING);
     return `/credits?${params.toString()}`;
   }
-  if (!txn.organization_id) {
+  if (!txn.organizationId) {
     params.set(TOPUP_TRANSACTION_QUERY_STRING_KEY, txn.id);
     return `/credits?${params.toString()}`;
   }
-  params.set(TOPUP_AMOUNT_QUERY_STRING_KEY, fromMicrodollars(txn.amount_microdollars).toString());
-  return `/organizations/${txn.organization_id}?${params.toString()}`;
+  params.set(TOPUP_AMOUNT_QUERY_STRING_KEY, fromMicrodollars(txn.amountMicrodollars).toString());
+  return `/organizations/${txn.organizationId}?${params.toString()}`;
 }
 
 export default function TopUpSuccessPage() {
@@ -44,15 +44,19 @@ export default function TopUpSuccessPage() {
       const returnUrlPromise = getPaymentReturnUrl().catch(() => null);
       const findCreditTransaction = async (
         attempt: number
-      ): Promise<CreditTransaction | undefined> => {
+      ): Promise<TopUpTransactionSummary | undefined> => {
         if (attempt >= MAX_TRANSACTION_LOOKUP_ATTEMPTS || cancelled) return undefined;
 
         await new Promise(resolve => setTimeout(resolve, attempt * 100));
         if (cancelled) return undefined;
 
         console.info(`Attempt ${attempt + 1} to fetch credit transaction ID`);
-        const transaction = await fetchCreditTransactionIdForStripeSession(sessionId);
-        return transaction ?? findCreditTransaction(attempt + 1);
+        const result = await fetchTopUpTransactionForStripeSession(sessionId);
+        if (result.status === 'found') return result.transaction;
+        // The checkout cannot be resolved for this caller, so another attempt
+        // repeats the same answer.
+        if (result.status === 'unavailable') return undefined;
+        return findCreditTransaction(attempt + 1);
       };
 
       const [creditTransaction, returnUrl] = await Promise.all([

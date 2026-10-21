@@ -5020,6 +5020,36 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
     );
   });
 
+  test.each([
+    { field: 'failure_code', overrides: { failure_code: 'authentication_required' } },
+    {
+      field: 'outcome.reason',
+      overrides: {
+        outcome: { reason: 'authentication_required' } as unknown as Stripe.Charge.Outcome,
+      },
+    },
+  ])(
+    'a charge failed by authentication ($field) is not reported as a declined card',
+    async scenario => {
+      const charge = sampleStripeCharge({
+        id: `ch_bouncer_auth_${scenario.field}`,
+        customer: testUser.stripe_customer_id,
+        ...scenario.overrides,
+      });
+      const event = {
+        ...baseStripeEvent(),
+        id: `evt_bouncer_auth_charge_${scenario.field}`,
+        type: 'charge.failed',
+        data: { object: charge },
+      } as unknown as Stripe.Event;
+
+      await processStripePaymentEventHook(event);
+
+      const rows = await db.select().from(bouncer_credit_event_outbox);
+      expect(rows).toHaveLength(0);
+    }
+  );
+
   test('payment_intent.payment_failed reports the decline with the card read from its charge', async () => {
     const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
       sampleStripeChargeResponse(

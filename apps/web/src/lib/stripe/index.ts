@@ -329,18 +329,31 @@ async function bouncerCardFingerprintForPaymentMethodId(
  * Decline codes that mean the customer did not finish authentication. A retried 3DS challenge is
  * not a declined card, and counting it would reach bouncer's `card_testing` threshold of three
  * failures per payer in an hour and block a paying customer once that reason is enforced.
+ * `authentication_failed` is a charge outcome reason; the others are payment intent error codes.
  */
 const AUTHENTICATION_FAILURE_CODES: Record<string, true> = {
+  authentication_failed: true,
   authentication_required: true,
   payment_intent_authentication_failure: true,
 };
+
+function isAuthenticationFailureCode(code: string | null | undefined): boolean {
+  return code != null && AUTHENTICATION_FAILURE_CODES[code] === true;
+}
 
 /** True when a failed payment intent records an authentication failure rather than a decline. */
 function isAuthenticationFailure(paymentIntent: Stripe.PaymentIntent): boolean {
   const error = paymentIntent.last_payment_error;
   return (
-    AUTHENTICATION_FAILURE_CODES[error?.code ?? ''] === true ||
-    AUTHENTICATION_FAILURE_CODES[error?.decline_code ?? ''] === true
+    isAuthenticationFailureCode(error?.code) || isAuthenticationFailureCode(error?.decline_code)
+  );
+}
+
+/** True when a failed charge records an authentication failure rather than a declined card. */
+function isAuthenticationFailureCharge(charge: Stripe.Charge): boolean {
+  return (
+    isAuthenticationFailureCode(charge.failure_code) ||
+    isAuthenticationFailureCode(charge.outcome?.reason)
   );
 }
 
@@ -1922,6 +1935,9 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
     case 'charge.failed': {
       const charge = event.data.object;
+      if (isAuthenticationFailureCharge(charge)) {
+        break;
+      }
       await reportDeclinedCharge({
         owner: {
           kiloUserId: charge.metadata?.kiloUserId,

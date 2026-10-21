@@ -146,12 +146,13 @@ export function PreferredProviderOrderContent() {
           <CardDescription>
             Preferred inference provider order for OpenRouter and Vercel requests, stored in the{' '}
             <code>preferred_provider_order</code> column of <code>ai_gateway_config</code>. Rules
-            are checked top to bottom: the first rule whose <code>substring</code> occurs in the
-            requested model ID sets <code>provider.order</code> to its <code>providers</code>, and
-            an empty <code>providers</code> list means no preference. The order is only applied when
-            the caller did not send one, and the first provider also picks the price shown in the
-            model catalog. Provider slugs are OpenRouter slugs, optionally with an endpoint variant
-            such as <code>minimax/fp8</code>.{' '}
+            are checked top to bottom. A rule matches when the requested model ID contains at least
+            one of its <code>includes</code> substrings and none of its optional{' '}
+            <code>excludes</code> substrings. The first matching rule sets{' '}
+            <code>provider.order</code> to its <code>providers</code>; when no rule matches, there
+            is no preference. The order is only applied when the caller did not send one, and the
+            first provider also picks the price shown in the model catalog. Provider slugs are
+            OpenRouter slugs, optionally with an endpoint variant such as <code>minimax/fp8</code>.{' '}
             <strong>
               The gateway does not read this configuration yet; it still uses the built-in rules.
             </strong>

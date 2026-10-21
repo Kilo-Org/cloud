@@ -2447,56 +2447,58 @@ export const PreferredProviderSlugSchema = z
     'Provider slugs may only contain lowercase letters, digits, . and -, with at most one /'
   );
 
-export const PreferredProviderOrderRuleSchema = z.object({
-  substring: z
-    .string()
-    .trim()
-    .regex(
-      /^[a-z0-9./:~-]+$/,
-      'Substrings may only contain lowercase letters, digits, and . / : ~ -'
-    ),
-  providers: z
-    .array(PreferredProviderSlugSchema)
-    .max(PREFERRED_PROVIDER_ORDER_MAX_PROVIDERS)
-    .superRefine((providers, ctx) => {
-      const seen = new Set<string>();
-      for (const [index, provider] of providers.entries()) {
-        if (seen.has(provider)) {
-          ctx.addIssue({
-            code: 'custom',
-            message: `Duplicate provider "${provider}"`,
-            path: [index],
-          });
-        }
-        seen.add(provider);
+const PreferredProviderOrderSubstringSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^[a-z0-9./:~-]+$/,
+    'Substrings may only contain lowercase letters, digits, and . / : ~ -'
+  );
+
+function uniqueStringArray<T extends z.ZodString>(item: T, label: string) {
+  return z.array(item).superRefine((values, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, value] of values.entries()) {
+      if (seen.has(value)) {
+        ctx.addIssue({ code: 'custom', message: `Duplicate ${label} "${value}"`, path: [index] });
       }
-    }),
-});
+      seen.add(value);
+    }
+  });
+}
+
+/**
+ * Matches a model ID that contains at least one `includes` substring and no
+ * `excludes` substring.
+ */
+export const PreferredProviderOrderRuleSchema = z
+  .object({
+    includes: uniqueStringArray(PreferredProviderOrderSubstringSchema, 'substring').min(1),
+    excludes: uniqueStringArray(PreferredProviderOrderSubstringSchema, 'substring').optional(),
+    providers: uniqueStringArray(PreferredProviderSlugSchema, 'provider')
+      .min(1)
+      .max(PREFERRED_PROVIDER_ORDER_MAX_PROVIDERS),
+  })
+  .superRefine(({ includes, excludes }, ctx) => {
+    for (const [index, exclude] of (excludes ?? []).entries()) {
+      if (includes.includes(exclude)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `"${exclude}" is both included and excluded`,
+          path: ['excludes', index],
+        });
+      }
+    }
+  });
 
 export type PreferredProviderOrderRule = z.infer<typeof PreferredProviderOrderRuleSchema>;
 
 /**
- * Ordered rules: the first rule whose `substring` occurs in the requested model
- * ID decides the provider order, and an empty `providers` list means no
- * preference. Stored as an array because jsonb does not keep object key order.
+ * Ordered rules: the first matching rule decides the provider order. Stored as
+ * an array because jsonb does not keep object key order.
  */
 export const PreferredProviderOrderConfigSchema = z.object({
-  rules: z
-    .array(PreferredProviderOrderRuleSchema)
-    .max(PREFERRED_PROVIDER_ORDER_MAX_RULES)
-    .superRefine((rules, ctx) => {
-      const seen = new Set<string>();
-      for (const [index, { substring }] of rules.entries()) {
-        if (seen.has(substring)) {
-          ctx.addIssue({
-            code: 'custom',
-            message: `Duplicate substring "${substring}"`,
-            path: [index, 'substring'],
-          });
-        }
-        seen.add(substring);
-      }
-    }),
+  rules: z.array(PreferredProviderOrderRuleSchema).max(PREFERRED_PROVIDER_ORDER_MAX_RULES),
 });
 
 export type PreferredProviderOrderConfig = z.infer<typeof PreferredProviderOrderConfigSchema>;

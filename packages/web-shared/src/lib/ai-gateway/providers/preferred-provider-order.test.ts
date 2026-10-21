@@ -39,51 +39,60 @@ describe('PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG', () => {
 describe('resolvePreferredProviderOrder', () => {
   const config: PreferredProviderOrderConfig = {
     rules: [
-      { substring: 'model-x-lite', providers: [] },
-      { substring: 'model-x', providers: ['provider-a', 'provider-b'] },
-      { substring: 'vendor/', providers: ['provider-c'] },
+      {
+        includes: ['model-x', 'model-y'],
+        excludes: ['-lite'],
+        providers: ['provider-a', 'provider-b'],
+      },
+      { includes: ['vendor/'], providers: ['provider-c'] },
     ],
   };
 
-  it('uses the first matching rule', () => {
-    expect(resolvePreferredProviderOrder(config, 'vendor/model-x')).toEqual([
-      'provider-a',
-      'provider-b',
-    ]);
+  it.each(['vendor/model-x', 'model-y'])('matches any include in %s', model => {
+    expect(resolvePreferredProviderOrder(config, model)).toEqual(['provider-a', 'provider-b']);
   });
 
-  it('stops at a matching rule with no providers', () => {
-    expect(resolvePreferredProviderOrder(config, 'vendor/model-x-lite')).toEqual([]);
+  it('skips a rule when an exclude matches and continues with the next rule', () => {
+    expect(resolvePreferredProviderOrder(config, 'vendor/model-x-lite')).toEqual(['provider-c']);
   });
 
   it('returns no providers when nothing matches', () => {
-    expect(resolvePreferredProviderOrder(config, 'other/model-y')).toEqual([]);
+    expect(resolvePreferredProviderOrder(config, 'other/model-z-lite')).toEqual([]);
   });
 
   it('returns a copy that callers can mutate', () => {
     resolvePreferredProviderOrder(config, 'vendor/model-x').push('provider-z');
-    expect(config.rules[1].providers).toEqual(['provider-a', 'provider-b']);
+    expect(config.rules[0].providers).toEqual(['provider-a', 'provider-b']);
   });
 });
 
 describe('PreferredProviderOrderConfigSchema', () => {
+  it('accepts a rule without excludes', () => {
+    const config = { rules: [{ includes: ['claude'], providers: ['google-vertex'] }] };
+    expect(PreferredProviderOrderConfigSchema.safeParse(config).success).toBe(true);
+  });
+
   it.each([
+    ['no includes', { includes: [], providers: ['openai'] }],
+    ['no providers', { includes: ['a'], providers: [] }],
+    ['duplicate includes', { includes: ['a', 'a'], providers: ['openai'] }],
+    ['duplicate excludes', { includes: ['a'], excludes: ['b', 'b'], providers: ['openai'] }],
     [
-      'duplicate substrings',
-      {
-        rules: [
-          { substring: 'a', providers: [] },
-          { substring: 'a', providers: [] },
-        ],
-      },
+      'an include that is also excluded',
+      { includes: ['a'], excludes: ['a'], providers: ['openai'] },
     ],
-    ['duplicate providers', { rules: [{ substring: 'a', providers: ['openai', 'openai'] }] }],
-    ['an empty substring', { rules: [{ substring: ' ', providers: ['openai'] }] }],
-    ['an uppercase substring', { rules: [{ substring: 'Claude', providers: ['openai'] }] }],
-    ['an uppercase provider', { rules: [{ substring: 'a', providers: ['OpenAI'] }] }],
-    ['a provider with two slashes', { rules: [{ substring: 'a', providers: ['a/b/c'] }] }],
-    ['an object mapping', { rules: { claude: ['google-vertex'] } }],
-  ])('rejects %s', (_, config) => {
+    ['duplicate providers', { includes: ['a'], providers: ['openai', 'openai'] }],
+    ['an empty substring', { includes: [' '], providers: ['openai'] }],
+    ['an uppercase substring', { includes: ['Claude'], providers: ['openai'] }],
+    ['an uppercase provider', { includes: ['a'], providers: ['OpenAI'] }],
+    ['a provider with two slashes', { includes: ['a'], providers: ['a/b/c'] }],
+    ['the old substring shape', { substring: 'a', providers: ['openai'] }],
+  ])('rejects a rule with %s', (_, rule) => {
+    expect(PreferredProviderOrderConfigSchema.safeParse({ rules: [rule] }).success).toBe(false);
+  });
+
+  it('rejects an object mapping', () => {
+    const config = { rules: { claude: ['google-vertex'] } };
     expect(PreferredProviderOrderConfigSchema.safeParse(config).success).toBe(false);
   });
 });

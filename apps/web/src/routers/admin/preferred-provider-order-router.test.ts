@@ -11,9 +11,9 @@ let nonAdmin: User;
 
 const config: PreferredProviderOrderConfig = {
   rules: [
-    { substring: 'gpt-oss', providers: [] },
-    { substring: 'claude', providers: ['amazon-bedrock', 'google-vertex'] },
-    { substring: 'minimax', providers: ['minimax/fp8'] },
+    { includes: ['openai', 'gpt'], excludes: ['gpt-oss'], providers: ['openai'] },
+    { includes: ['claude'], providers: ['amazon-bedrock', 'google-vertex'] },
+    { includes: ['minimax'], providers: ['minimax/fp8'] },
   ],
 };
 
@@ -101,7 +101,7 @@ describe('adminPreferredProviderOrderRouter', () => {
     const caller = await createCallerForUser(admin.id);
     await expect(
       caller.admin.preferredProviderOrder.set({
-        config: { rules: [config.rules[1], config.rules[1]] },
+        config: { rules: [{ includes: ['gpt'], excludes: ['gpt'], providers: ['openai'] }] },
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(await db.select().from(ai_gateway_config)).toEqual([]);

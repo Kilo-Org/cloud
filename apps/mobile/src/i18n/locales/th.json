@@ -3678,7 +3678,7 @@
       "description": "คำอธิบายคำสั่ง",
       "template": "แม่แบบ",
       "namePlaceholder": "explain",
-      "agentPlaceholder": "เช่น Code",
+      "agentPlaceholder": "เช่น code",
       "templatePlaceholder": "อธิบาย $ARGUMENTS",
       "subtask": "ทำงานเป็นงานย่อย",
       "edit": "แก้ไขคำสั่งสแลช",

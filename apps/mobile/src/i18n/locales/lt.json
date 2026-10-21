@@ -1451,6 +1451,9 @@
       "couldNotGetLatest": "Nepavyko gauti naujausių duomenų.",
       "byline": "{{repo}} #{{number}} · Autorius: {{author}}",
       "noFindings": "Radinių nerasta.",
+      "findingsUnavailable": "Rezultatai nepasiekiami, nes ši peržiūra nepavyko.",
+      "serviceUnavailable": "Nepavyko prisijungti prie kodo peržiūros paslaugos. Pakartokite peržiūrą, kai paslauga bus pasiekiama.",
+      "reviewFailed": "Peržiūra nepavyko. Bandykite dar kartą.",
       "showMore": "Rodyti daugiau",
       "created": "Sukurta",
       "started": "Pradėta",
@@ -3746,7 +3749,7 @@
       "nameRequired": "Įveskite agento pavadinimą",
       "slugRequired": "Įveskite agento šliužą",
       "slugInvalid": "Slug turi prasidėti raide ir naudoti tik mažąsias raides, skaitmenis ir brūkšnius",
-      "slugConflict": "Tą šliužą rezervuoja įmontuotas agentas",
+      "slugConflict": "Tą slug jau naudoja įmontuotas agentas arba kitas agentas šiame profilyje",
       "edit": "Redaguoti agentą"
     },
     "slashCommands": {

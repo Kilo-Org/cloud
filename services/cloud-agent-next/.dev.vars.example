@@ -47,8 +47,9 @@ REAPER_INTERVAL_MS=300000
 # Comma-separated list of org IDs that use per-session Cloudflare sandboxes, or `*` for all orgs
 PER_SESSION_SANDBOX_ORG_IDS=
 
-# Code Reviewer sessions run on the control plane for these owners.
+# Code Reviewer sessions use the Cloudflare Containers runtime for these owners.
 # Comma-separated user or org IDs, or `*` for all including personal accounts.
+CODE_REVIEW_CONTAINERS_ORG_IDS=
 # Comma-separated user or org IDs allowed to pick a sandbox destination, or `*` for all
 SANDBOX_SELECTION_IDS=*
 

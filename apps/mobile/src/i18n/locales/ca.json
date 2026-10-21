@@ -1432,6 +1432,9 @@
       "couldNotGetLatest": "No s'han pogut obtenir les dades més recents.",
       "byline": "{{repo}} #{{number}} · Autor: {{author}}",
       "noFindings": "No hi ha incidències.",
+      "findingsUnavailable": "Els resultats no estan disponibles perquè aquesta revisió ha fallat.",
+      "serviceUnavailable": "No s'ha pogut connectar amb el servei de revisió de codi. Torna a provar la revisió quan el servei estigui disponible.",
+      "reviewFailed": "La revisió ha fallat. Si us plau, torna-ho a provar.",
       "showMore": "Mostra'n més",
       "created": "Data de creació",
       "started": "Data d'inici",
@@ -3705,7 +3708,7 @@
       "nameRequired": "Introduïu un nom d'agent",
       "slugRequired": "Introduïu un llimac d'agent",
       "slugInvalid": "Slug ha de començar amb una lletra i utilitzar només lletres minúscules, dígits i guions",
-      "slugConflict": "Aquest llimac està reservat per un agent integrat",
+      "slugConflict": "Aquest slug ja l'utilitza un agent integrat o un altre agent d'aquest perfil",
       "edit": "Edita l'agent"
     },
     "slashCommands": {

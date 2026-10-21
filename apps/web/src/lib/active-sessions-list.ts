@@ -12,6 +12,7 @@ import {
   github_branch_pull_requests,
 } from '@kilocode/db/schema';
 import { and, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
 import {
   associatedPrSchema,
   formatAssociatedPr,
@@ -137,6 +138,13 @@ type EnrichmentRow = {
   status: string | null;
   title: string | null;
   organization_id: string | null;
+  /**
+   * Whether the caller may still read this row's organization. Personal rows
+   * are always accessible. Selected as a column so enrichment can drop
+   * former-organization heartbeat rows even when the worker's live feed does
+   * not know about organizations.
+   */
+  organization_is_accessible?: boolean;
   git_url: string | null;
   last_activity_at: string | null;
   status_updated_at: string | null;
@@ -454,6 +462,10 @@ export async function listActiveSessions({
           status: cli_sessions_v2.status,
           title: cli_sessions_v2.title,
           organization_id: cli_sessions_v2.organization_id,
+          organization_is_accessible: activeOrganizationAccessSql(
+            cli_sessions_v2.organization_id,
+            userId
+          ),
           git_url: cli_sessions_v2.git_url,
           last_activity_at: cli_sessions_v2.last_activity_at,
           status_updated_at: cli_sessions_v2.status_updated_at,
@@ -508,10 +520,15 @@ export async function listActiveSessions({
     sessions = [];
     for (const session of parsed.sessions) {
       const row = byId.get(session.id);
-      // No `cli_sessions_v2` row → unattributable → personal. An SQL-side filter
-      // could not tell this case apart from "belongs to another organization".
+      // No `cli_sessions_v2` row → unattributable → personal. Filtering in SQL
+      // cannot tell that case apart from "belongs to an organization the caller
+      // can no longer access", so the access decision is made after enrichment:
+      // a former-organization row must be dropped, not relabelled personal.
       const rowOrganizationId = row?.organization_id ?? null;
       if (organizationId !== undefined && rowOrganizationId !== organizationId) {
+        continue;
+      }
+      if (organizationId === undefined && row && !row.organization_is_accessible) {
         continue;
       }
       sessions.push(mapEnrichedHeartbeatSession(session, row));
@@ -584,6 +601,9 @@ export async function listActiveSessions({
             isNull(cli_sessions_v2.parent_session_id),
             isNotNull(cli_sessions_v2.cloud_agent_session_id),
             orgPredicate,
+            organizationId === undefined
+              ? activeOrganizationAccessSql(cli_sessions_v2.organization_id, userId)
+              : undefined,
             livePredicate
           )
         )

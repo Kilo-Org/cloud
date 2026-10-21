@@ -1470,6 +1470,9 @@
       "couldNotGetLatest": "Ma setgħetx tinkiseb l-aħħar dejta.",
       "byline": "{{repo}} #{{number}} minn {{author}}",
       "noFindings": "M'hemm l-ebda sejba.",
+      "findingsUnavailable": "Ir-riżultati mhumiex disponibbli għax din ir-reviżjoni falliet.",
+      "serviceUnavailable": "Ma setax isir kuntatt mas-servizz tar-reviżjoni tal-kodiċi. Erġa' pprova r-reviżjoni meta s-servizz ikun disponibbli.",
+      "reviewFailed": "Ir-reviżjoni falliet. Jekk jogħġbok, erġa' pprova.",
       "showMore": "Uri aktar",
       "created": "Maħluqa",
       "started": "Bdiet",
@@ -3787,7 +3790,7 @@
       "nameRequired": "Daħħal isem ta' aġent",
       "slugRequired": "Daħħal aġent slug",
       "slugInvalid": "Slug għandu jibda b'ittra u juża biss ittri żgħar, ċifri u sings",
-      "slugConflict": "Dik slug hija riservata minn aġent inkorporat",
+      "slugConflict": "Dak is-slug diġà qed jintuża minn aġent integrat jew aġent ieħor f'dan il-profil",
       "edit": "Editja l-aġent"
     },
     "slashCommands": {

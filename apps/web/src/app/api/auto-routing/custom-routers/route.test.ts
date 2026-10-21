@@ -883,7 +883,7 @@ describe('/api/auto-routing/custom-routers', () => {
 
     test('accepts a body whose entries sit at every bound', async () => {
       const fill = (units: number, index: number) =>
-        `${'a'.repeat(units - 3)}${index.toString().padStart(2, '0')}`;
+        `${'a'.repeat(units - 2)}${index.toString().padStart(2, '0')}`;
       const entries = Array.from({ length: 20 }, (_, index) => ({
         kind: 'client' as const,
         provider: fill(100, index),

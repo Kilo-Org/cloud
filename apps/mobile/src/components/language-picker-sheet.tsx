@@ -30,7 +30,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
-// the list fills the sheet's body.
+// the list fills the sheet's body. The list stays transparent: the route's
+// themed `contentStyle` paints the surface (see the (auth) layout), and a
+// second opaque layer would cover the sheet's own themed surface.
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
   paddingHorizontal: 16,
@@ -164,6 +166,15 @@ export function LanguagePickerSheet({
     }
   };
 
+  // The preference was persisted before the reload attempt, so a failed reload
+  // is not a failed change: Continue leaves the sheet with the saved language.
+  // Clearing the failed state first keeps the normal sheet from re-arming the
+  // guard, and `closePicker` arms the one-shot skip the guard is still holding.
+  const handleContinue = () => {
+    setReloadFailed(false);
+    closePicker();
+  };
+
   const retryReload = async () => {
     if (busy) {
       return;
@@ -184,6 +195,8 @@ export function LanguagePickerSheet({
           void retryReload();
         }}
         doneLabel={t('common.retry')}
+        onCancel={handleContinue}
+        cancelLabel={t('common.continue')}
         disabled={busy}
         scrollable={false}
       >
@@ -271,7 +284,7 @@ export function LanguagePickerSheet({
         />
       ) : (
         <FlashList
-          style={[listStyle, { backgroundColor: colors.background }]}
+          style={listStyle}
           contentContainerStyle={listContentContainerStyle}
           data={items}
           keyExtractor={item => item.key}

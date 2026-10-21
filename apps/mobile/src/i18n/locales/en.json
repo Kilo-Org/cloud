@@ -1,4 +1,68 @@
 {
+  "agentBriefing": {
+    "title": "Morning briefing",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Some historical activity may be missing. ≥ means at least this much; unknown is not zero.",
+    "available": "Available briefings",
+    "history": "Briefing history",
+    "historyHint": "Reports are kept for 30 days, including dismissed reports.",
+    "settings": "Briefing settings",
+    "empty": "No overnight activity",
+    "emptyHint": "Your cloud and CLI coding sessions will appear here after an active night.",
+    "loadError": "Could not load briefings",
+    "sessions": "Active overnight",
+    "pullRequests": "PRs opened",
+    "blockers": "New blockers",
+    "spend": "Overnight spend",
+    "view": "Read briefing",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Dismiss briefing",
+    "offline": "Offline · saved briefing",
+    "cached": "Saved report · refresh unavailable",
+    "revised": "Revised · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "AI summary",
+    "summaryDisabled": "Structured report · AI is off for this context",
+    "summaryPending": "AI summary is in progress. It will attach here when ready.",
+    "summaryFailed": "AI summary failed. Retrying may incur another charge.",
+    "summaryUnavailable": "AI summary unavailable. Your structured report is still available.",
+    "summaryOutdated": "This summary predates the latest report revision.",
+    "summaryCharge": "AI charged {{cost}}",
+    "summaryChargePending": "AI charge pending reconciliation",
+    "generate": "Generate summary",
+    "retrySummary": "Retry paid summary",
+    "sources": "Evidence and artifacts",
+    "timezone": "Briefing time zone",
+    "deviceTimezone": "Use device time zone",
+    "timezoneHint": "IANA time zone, for example Europe/Berlin. Schedule changes apply to future nights.",
+    "nightStart": "Night starts",
+    "morningStart": "Night ends / morning starts",
+    "morningEnd": "Morning ends",
+    "timeHint": "The Home card restores live status when morning ends, even offline.",
+    "invalidSchedule": "Choose a valid time zone and non-overlapping, non-empty night and morning periods.",
+    "notificationsHint": "One generic notification per morning when your first report is ready. Independent of paid AI summaries.",
+    "notificationPermission": "Enable device notifications in $t(common.notifications) to receive your briefing.",
+    "aiOptIn": "Paid AI summaries",
+    "aiHint": "Optional for this context only. Selected, redacted excerpts and structured facts are sent to your model in your app language. Charges use this context’s balance.",
+    "defaultModel": "Use Kilo’s default model",
+    "duration": "Time safeguard (minutes)",
+    "spendLimit": "Spend safeguard (USD)",
+    "safeguardHint": "Finite per-summary safeguards, not a daily budget. Defaults: 10 minutes and $2. A report publishes after at most five minutes while generation continues within these limits.",
+    "invalidSafeguards": "Enter positive, finite time and spend limits.",
+    "estimate": "Estimate {{estimate}} · maximum {{maximum}}",
+    "estimateUnavailable": "A paid summary is not available for these settings.",
+    "estimatePricingUnavailable": "Pricing for this model is unavailable.",
+    "estimateBalanceUnavailable": "Not enough balance for a paid summary.",
+    "estimateModelNotAllowed": "This model isn’t allowed here.",
+    "estimateSpendLimitTooLow": "Raise the spend safeguard to allow this summary.",
+    "confirmPaid": "Enable paid summaries for {{context}}?",
+    "confirmGeneration": "Generate a paid summary?",
+    "paidDisclosure": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}} minute limit. Charges apply even if generation fails.",
+    "enable": "Enable paid summaries",
+    "contextSettings": "AI settings · {{context}}",
+    "allContexts": "Personal and organization briefings stay separate."
+  },
   "common": {
     "cancel": "Cancel",
     "done": "Done",
@@ -36,6 +100,8 @@
     "connectGithub": "Connect GitHub",
     "cost": "Cost",
     "discard": "Discard",
+    "discardChangesMessage": "Your changes will be lost.",
+    "discardChangesTitle": "Discard changes?",
     "findings": "Findings",
     "mergeRequest": "merge request",
     "notConnected": "Not connected",
@@ -111,7 +177,9 @@
     "online": "Online",
     "open": "Open {{name}}",
     "openPullRequest": "Open pull request",
+    "completed": "Completed",
     "pending": "Pending",
+    "running": "Running",
     "performance": "Performance",
     "preferences": "Preferences",
     "privacyPolicy": "Privacy Policy",
@@ -662,7 +730,8 @@
       "description": "Connect your GitHub account to review pull requests on mobile.",
       "gitlabDescription": "Connect your GitLab account to review merge requests on mobile.",
       "bitbucketDescription": "Connect Bitbucket to this organization to review pull requests on mobile.",
-      "bitbucketOrgOnlyDescription": "Select an organization in your profile to review its Bitbucket pull requests."
+      "bitbucketOrgOnlyDescription": "Switch the account above to an organization to review its Bitbucket pull requests.",
+      "contextLine": "For {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -770,7 +839,9 @@
       "reviewNotSubmitted": "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request.",
       "reviewNotSubmittedTerm": "This review can't be submitted as is. The {{term}} may have changed, or you can't review your own {{term}}.",
       "couldNotPostComment": "Could not post comment.",
-      "couldNotSubmitReview": "Could not submit review. Check your connection and try again."
+      "couldNotSubmitReview": "Could not submit review. Check your connection and try again.",
+      "rateLimited": "Too many requests. Please try again later.",
+      "conflict": "This changed while you were working on it. Reload it and try again."
     },
     "operation": {
       "couldNotReply": "Could not reply.",
@@ -1413,6 +1484,9 @@
       "couldNotGetLatest": "Couldn't get the latest.",
       "byline": "{{repo}} #{{number}} by {{author}}",
       "noFindings": "No findings",
+      "findingsUnavailable": "Results are unavailable because this review failed.",
+      "serviceUnavailable": "Could not reach the code review service. Retry the review when the service is available.",
+      "reviewFailed": "The review failed. Please try again.",
       "showMore": "Show more",
       "created": "Created",
       "started": "Started",
@@ -1528,8 +1602,6 @@
     "updateFailed": "Failed to update reviewer",
     "configSaveFailed": "Failed to save review config",
     "status": {
-      "running": "Running",
-      "completed": "Completed",
       "interrupted": "Interrupted"
     },
     "reviewStyle": {
@@ -1542,7 +1614,8 @@
       "bugs": "Bugs",
       "style": "Style",
       "testing": "Testing",
-      "documentation": "Documentation"
+      "documentation": "Documentation",
+      "unknown": "Other ({{area}})"
     },
     "gateThreshold": {
       "warning": "Warning"
@@ -1645,6 +1718,13 @@
       "watchInCloudAgent": "Watch in Cloud Agent",
       "triageConfidence": "Triage confidence",
       "suggestedAction": "Suggested action",
+      "action": {
+        "dismiss": "Dismiss",
+        "analyzeCodebase": "Analyze codebase",
+        "manualReview": "Manual review",
+        "openPr": "Open PR",
+        "monitor": "Monitor"
+      },
       "triageReasoning": "Triage reasoning",
       "exploitable": "Exploitable",
       "notRecorded": "Not recorded",
@@ -1856,7 +1936,8 @@
     "settingsSave": {
       "saveChanges": "Save changes",
       "unsavedTitle": "Unsaved changes",
-      "unsavedMessage": "Save your changes before leaving this screen?"
+      "unsavedMessage": "Save your changes before leaving this screen?",
+      "unsavedInvalidMessage": "These changes can't be saved yet. Fix them to save, or discard them to leave."
     },
     "auditReportButton": {
       "viewA11y": "View audit report"
@@ -1864,6 +1945,23 @@
     "auditReport": {
       "couldNotLoad": "Could not load the audit report",
       "events": "Events",
+      "eventActions": {
+        "findingCreated": "Imported",
+        "findingSeverityChanged": "Severity changed",
+        "findingStatusChange": "Status changed",
+        "findingDismissed": "Dismissed",
+        "findingAutoDismissed": "Auto dismissed",
+        "findingSuperseded": "Superseded",
+        "findingAnalysisCompleted": "Analysis completed",
+        "findingAnalysisFailed": "Analysis failed",
+        "remediationQueued": "Remediation requested",
+        "remediationPrOpened": "PR opened",
+        "remediationFailed": "Remediation failed",
+        "remediationBlocked": "Remediation blocked",
+        "remediationNoChangesNeeded": "No changes needed",
+        "remediationCancelled": "Cancelled",
+        "findingDeleted": "Deleted"
+      },
       "generated": "Generated {{generatedAt}}",
       "noActivity": "No recorded activity",
       "noActivityDescription": "Kilo has no reportable Security Finding activity from {{start}} to {{end}}.",
@@ -1904,8 +2002,7 @@
       "couldNotLoad": "Could not load Security Agent",
       "installApp": "Install GitHub App",
       "reauthorizeButton": "Re-authorize GitHub App",
-      "reauthorizeDescription": "Security Agent requires the vulnerability_alerts permission to access Dependabot alerts. Re-authorize the GitHub App to grant this permission.",
-      "reauthorizeFailed": "Could not start re-authorization. Please try again.",
+      "reauthorizeDescription": "Security Agent needs permission to read Dependabot alerts. Re-authorize the GitHub App to grant this permission.",
       "reauthorizeTitle": "Additional permissions required",
       "setupFailed": "Could not start GitHub setup. Please try again."
     },
@@ -2214,6 +2311,7 @@
       "prefillModelUnavailable": "{{model}} is no longer available. Using your default model.",
       "couldNotReadPendingSessions": "Could not read pending sessions. Try again.",
       "failedToCreate": "Failed to create session",
+      "checkOrganizationAccess": "Check your access to this organization, then try again.",
       "couldNotRefreshRepositories": "Could not refresh repositories. Please try again.",
       "discardDraftTitle": "Discard draft?",
       "discardDraftMessage": "Your prompt will be lost.",
@@ -2283,7 +2381,8 @@
       "matchesBadge_one": "{{displayCount}} match",
       "matchesBadge": "{{displayCount}} matches",
       "matchesBadge_other": "{{displayCount}} matches",
-      "noOutput": "No output."
+      "noOutput": "No output.",
+      "translationFailed": "Translation failed"
     },
     "readToolMarkdown": {
       "linesTruncated": "lines {{start}}–{{end}} (truncated)",
@@ -2646,7 +2745,7 @@
       "exitSession": "Exit the session",
       "clearSession": "End this session and start a new one",
       "compactDescription": "compact the current session context",
-      "goalDescription": "Keep working toward a session goal. /goal <objective> or pause, resume, clear",
+      "goalDescription": "Keep working toward a session goal. /goal <objective> or pause, resume, clear. A goal may wait on a scheduled wakeup, a cron task, or a background process: the wait suspends the goal until it fires and the goal resumes itself; /goal pause and /goal clear cancel its armed timers. If the objective is to wait for a deploy, build, or CI job, schedule that wait immediately; do not explore the repository first.",
       "initDescription": "guided AGENTS.md setup",
       "resumeClaudeDescription": "import a Claude Code session transcript",
       "resumeCodexDescription": "import an OpenAI Codex session transcript",
@@ -2734,6 +2833,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Your active sessions are unavailable until this loads.",
     "currentDeviceUnidentified": "Current device could not be identified",
+    "kiloApp": "Kilo app",
     "noSessions": "No active sessions",
     "noSessionsDescription": "Sign in with the Kilo app on another device and it will show up here.",
     "onlyKiloAppSignIns": "Only Kilo app sign-ins appear here. Editor and CLI sign-ins are not listed.",
@@ -2752,7 +2852,7 @@
     "title": "Trusted hosts",
     "subtitle": "Hosts you trust to open without asking",
     "emptyTitle": "No trusted hosts",
-    "emptyDescription": "When you trust a link's host, it opens without asking again.",
+    "emptyDescription": "When you trust a link's host or an image host, it opens without asking again.",
     "imagesSectionTitle": "Trusted image hosts",
     "imagesSectionDescription": "Images from these hosts load without asking again.",
     "imagesSectionEmpty": "No trusted image hosts",
@@ -2898,6 +2998,7 @@
   },
   "consent": {
     "kilo": "Kilo",
+    "summaryTitle": "Data sharing preferences",
     "beforeWeGetStarted": "Before we get started",
     "introDescription": "Kilo sends your messages to AI providers to generate responses. Here's what's shared and with whom.",
     "required": "Required to use Kilo",
@@ -2907,7 +3008,6 @@
     "accountDescription": "Your Kilo account ID and request metadata, used to authenticate you and meter usage.",
     "diagnosticsTitle": "App diagnostics",
     "diagnosticsDescription": "Crash and error reports, with app content removed, used to keep the app stable.",
-    "optional": "Optional",
     "helpImprove": "Help improve Kilo",
     "helpImproveDescription": "Share anonymous product analytics and install source. You can change this any time in Settings.",
     "seeFullDetails": "See full details",
@@ -3414,6 +3514,9 @@
     "localModels": {
       "title": "On-device models",
       "help": "On-device models run on this phone. Your prompts and replies stay on the device.",
+      "switchTitle": "Switch to an on-device model?",
+      "switchMessage": "Switching to {{name}} processes this conversation's prompts and context on this phone, not on a remote server.",
+      "switchConfirm": "Switch model",
       "systemPurpose": "The model built into this device's system. It runs on the device.",
       "apple": "Apple Intelligence (on device)",
       "checking": "Checking availability…",
@@ -3548,9 +3651,15 @@
     "loadFailed": "Couldn't load profiles",
     "counts": {
       "vars": "{{count}} vars",
+      "vars_one": "{{count}} var",
+      "vars_other": "{{count}} vars",
       "mcp": "{{count}} MCP",
       "skills": "{{count}} skills",
+      "skills_one": "{{count}} skill",
+      "skills_other": "{{count}} skills",
       "commands": "{{count}} cmds",
+      "commands_one": "{{count}} cmd",
+      "commands_other": "{{count}} cmds",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}s",
       "commandsShort": "{{count}}c"
@@ -3569,7 +3678,6 @@
     "personalDefaultDescription": "Auto-loaded when no repository has a pinned profile.",
     "organizationDefaultDescription": "Auto-loaded for members who have no personal default.",
     "setAsDefault": "Set as default",
-    "removeDefault": "Remove as default",
     "saveFailed": "Couldn't save profile",
     "deleteTitle": "Delete profile",
     "deleteMessage": "This permanently removes the profile and its settings. This cannot be undone.",
@@ -3600,6 +3708,8 @@
     "commandsSaveFailed": "Couldn't save setup commands",
     "moveUp": "Move up",
     "moveDown": "Move down",
+    "moveCommandUp": "Move command {{position}} up",
+    "moveCommandDown": "Move command {{position}} down",
     "skillsTitle": "Skills",
     "addSkill": "Add skill",
     "skillNameLabel": "Skill name",
@@ -3669,7 +3779,7 @@
       "nameRequired": "Enter an agent name",
       "slugRequired": "Enter an agent slug",
       "slugInvalid": "Slug must start with a letter and use only lowercase letters, digits, and dashes",
-      "slugConflict": "That slug is reserved by a built-in agent",
+      "slugConflict": "That slug is already taken by a built-in or another agent in this profile",
       "edit": "Edit agent"
     },
     "slashCommands": {
@@ -3680,6 +3790,7 @@
       "description": "Command description",
       "template": "Template",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explain $ARGUMENTS",
       "subtask": "Run as subtask",
       "edit": "Edit slash command",

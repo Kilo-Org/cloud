@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./account-access": "./src/account-access.ts",
     "./bitbucket-workspace-access-token": "./src/bitbucket-workspace-access-token.ts",
     "./gitlab-credential": "./src/gitlab-credential.ts",
     "./slack-credential": "./src/slack-credential.ts",
@@ -14,6 +15,7 @@
     "./kilo-token-auth": "./src/kilo-token-auth.ts",
     "./kilo-token": "./src/kilo-token.ts",
     "./kilo-token-policy": "./src/kilo-token-policy.ts",
+    "./cloud-agent-authority": "./src/cloud-agent-authority.ts",
     "./runtime-authorization": "./src/runtime-authorization.ts",
     "./runtime-authorization-contract": "./src/runtime-authorization-contract.ts",
     "./runtime-proxy-attestation": "./src/runtime-proxy-attestation.ts",
@@ -53,7 +55,8 @@
     "./user-id-encoding": "./src/user-id-encoding.ts",
     "./github-authorization": "./src/github-authorization.ts",
     "./bounded-stream-reader": "./src/bounded-stream-reader.ts",
-    "./usage-writer-client": "./src/usage-writer-client.ts"
+    "./usage-writer-client": "./src/usage-writer-client.ts",
+    "./organization-membership": "./src/organization-membership.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -62,6 +65,7 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/worker-utils/src"
   },
   "dependencies": {
+    "@kilocode/app-shared": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",

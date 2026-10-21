@@ -40,7 +40,7 @@ type MutationErrorDisplay = {
 type Classification = ReturnType<typeof classifyPrReviewMutationError>;
 
 type MutationErrorDisplayOptions = {
-  /** The raw thrown error, used for the retryable composer / edit-comment copy. */
+  /** The raw thrown error, read for the ambiguous / persistence markers and the 404 code. */
   readonly rawError?: unknown;
   /**
    * The connected provider's noun, already translated (s6f): on the submit
@@ -69,8 +69,8 @@ function badRequestMessage(surface: MutationErrorDisplaySurface, term?: string):
 }
 
 /**
- * Maps a mutation classification (and optional raw error for retryable
- * composer copy) to the inline message the sheet should show.
+ * Maps a mutation classification (and the raw error for the ambiguous /
+ * persistence / 404 markers) to the inline message the sheet should show.
  */
 export function mutationErrorDisplay(
   surface: MutationErrorDisplaySurface,
@@ -106,12 +106,23 @@ export function mutationErrorDisplay(
   if (classification.kind === 'reconnect') {
     return { kind: 'reconnect', message: i18n.t('prReview.connectionExpired') };
   }
+  // The server's raw text never reaches the inline box, whatever the
+  // retryable carrier was. A rate limit gets the localized wait copy (the
+  // server's "try again in about N minutes" is English-only); a conflict
+  // names the reload-and-retry recovery. Both before the submit return, so
+  // every surface gets them.
+  if (readTrpcErrorField(rawError, 'code') === 'TOO_MANY_REQUESTS') {
+    return { kind: 'retryable', message: i18n.t('prReview.mutationError.rateLimited') };
+  }
+  if (readTrpcErrorField(rawError, 'code') === 'CONFLICT') {
+    return { kind: 'retryable', message: i18n.t('prReview.mutationError.conflict') };
+  }
   if (surface === 'submit') {
     return { kind: 'retryable', message: i18n.t('prReview.mutationError.couldNotSubmitReview') };
   }
   const message =
-    rawError instanceof Error && rawError.message.length > 0
-      ? rawError.message
+    surface === 'edit-comment'
+      ? i18n.t('prReview.discussion.commentEditFailed')
       : i18n.t('prReview.mutationError.couldNotPostComment');
   return { kind: 'retryable', message };
 }

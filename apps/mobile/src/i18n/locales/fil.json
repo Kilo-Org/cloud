@@ -36,6 +36,8 @@
     "connectGithub": "Ikonekta ang GitHub",
     "cost": "Gastos",
     "discard": "Itapon",
+    "discardChangesMessage": "Mawawala ang iyong mga pagbabago.",
+    "discardChangesTitle": "Itatapon ang mga pagbabago?",
     "findings": "Mga natukoy na isyu",
     "mergeRequest": "merge request",
     "notConnected": "Hindi nakakonekta",
@@ -110,7 +112,9 @@
     "online": "Nakakonekta",
     "open": "Buksan ang {{name}}",
     "openPullRequest": "Buksan ang PR",
+    "completed": "Nakumpleto",
     "pending": "Nakabinbin",
+    "running": "Tumatakbo",
     "performance": "Pagganap",
     "preferences": "Mga kagustuhan",
     "privacyPolicy": "Patakaran sa pribasiya",
@@ -662,7 +666,8 @@
       "description": "Ikonekta ang GitHub account mo para makapagsuri ng mga pull request sa mobile.",
       "gitlabDescription": "Ikonekta ang iyong GitLab account para suriin ang mga merge request sa mobile.",
       "bitbucketDescription": "Ikonekta ang Bitbucket sa organizasyong ito para suriin ang mga pull request sa mobile.",
-      "bitbucketOrgOnlyDescription": "Pumili ng organisasyon sa iyong profile para suriin ang mga pull request nito sa Bitbucket."
+      "bitbucketOrgOnlyDescription": "Palitan ang account sa itaas ng isang organisasyon para suriin ang mga pull request nito sa Bitbucket.",
+      "contextLine": "Para sa {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -770,7 +775,9 @@
       "reviewNotSubmitted": "Hindi maisumite ang pagsusuring ito sa kasalukuyang anyo nito. Maaaring nagbago ang PR, o hindi ka puwedeng magsuri ng sarili mong pull request.",
       "reviewNotSubmittedTerm": "Hindi maisumite ang pagsusuring ito sa kasalukuyang anyo. Baka nagbago ang {{term}}, o hindi mo masusuri ang sarili mong {{term}}.",
       "couldNotPostComment": "Hindi ma-post ang komento.",
-      "couldNotSubmitReview": "Hindi maisumite ang pagsusuri. Suriin ang koneksyon mo at subukan muli."
+      "couldNotSubmitReview": "Hindi maisumite ang pagsusuri. Suriin ang koneksyon mo at subukan muli.",
+      "rateLimited": "Masyadong maraming kahilingan. Pakisubukang muli sa ibang pagkakataon.",
+      "conflict": "Nagbago ito habang ginagawa mo ito. I-reload ito at subukang muli."
     },
     "operation": {
       "couldNotReply": "Hindi maipadala ang sagot.",
@@ -1413,6 +1420,9 @@
       "couldNotGetLatest": "Hindi makuha ang pinakabagong data.",
       "byline": "{{repo}} #{{number}} ni {{author}}",
       "noFindings": "Walang natukoy na isyu.",
+      "findingsUnavailable": "Hindi available ang mga resulta dahil nabigo ang pagsusuring ito.",
+      "serviceUnavailable": "Hindi makakonekta sa serbisyo ng pagsusuri ng code. Subukang muli ang pagsusuri kapag available na ang serbisyo.",
+      "reviewFailed": "Nabigo ang pagsusuri. Pakisubukang muli.",
       "showMore": "Magpakita ng higit pa",
       "created": "Nalikha",
       "started": "Nagsimula",
@@ -1528,8 +1538,6 @@
     "updateFailed": "Hindi na-update ang tagasuri.",
     "configSaveFailed": "Hindi na-save ang mga setting ng pagsusuri.",
     "status": {
-      "running": "Tumatakbo",
-      "completed": "Nakumpleto",
       "interrupted": "Naputol"
     },
     "reviewStyle": {
@@ -1542,7 +1550,8 @@
       "bugs": "Mga bug",
       "style": "Estilo",
       "testing": "Pagsubok",
-      "documentation": "Dokumentasyon"
+      "documentation": "Dokumentasyon",
+      "unknown": "Iba ({{area}})"
     },
     "gateThreshold": {
       "warning": "Babala"
@@ -1654,7 +1663,14 @@
       "whereFound": "Mga lokasyon kung saan ito natukoy ({{displayCount}})",
       "fullReport": "Buong nabuong ulat",
       "yes": "Oo",
-      "no": "Hindi"
+      "no": "Hindi",
+      "action": {
+        "analyzeCodebase": "Suriin ang codebase",
+        "dismiss": "I-dismiss",
+        "manualReview": "Manwal na pagrereview",
+        "monitor": "Subaybayan",
+        "openPr": "Magbukas ng PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} natukoy na isyu",
@@ -1856,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "I-save ang mga pagbabago",
       "unsavedTitle": "Mga hindi na-save na pagbabago",
-      "unsavedMessage": "I-save ang mga pagbabago mo bago umalis sa screen na ito?"
+      "unsavedMessage": "I-save ang mga pagbabago mo bago umalis sa screen na ito?",
+      "unsavedInvalidMessage": "Hindi pa ma-save ang mga pagbabagong ito. Ayusin ang mga ito para ma-save, o itapon ang mga ito para umalis."
     },
     "auditReportButton": {
       "viewA11y": "Tingnan ang ulat ng audit"
@@ -1873,7 +1890,24 @@
       "title": "Ulat ng audit",
       "unavailable": "Hindi makuha ang ulat ng audit",
       "unavailableDescription": "Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring tumingin sa mga ulat ng audit. Humingi ng access sa isa sa kanila.",
-      "queryFailed": "Hindi natapos ang pagkuha ng ulat. Subukang muli."
+      "queryFailed": "Hindi natapos ang pagkuha ng ulat. Subukang muli.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Natapos ang pagsusuri",
+        "findingAnalysisFailed": "Nabigo ang pagsusuri",
+        "findingAutoDismissed": "Awtomatikong na-dismiss",
+        "findingCreated": "Na-import",
+        "findingDeleted": "Nabura",
+        "findingDismissed": "Na-dismiss",
+        "findingSeverityChanged": "Nagbago ang kalubhaan",
+        "findingStatusChange": "Nagbago ang status",
+        "findingSuperseded": "Napalitan",
+        "remediationBlocked": "Nahadlangan ang pag-aayos",
+        "remediationCancelled": "Nakansela",
+        "remediationFailed": "Nabigo ang pag-aayos",
+        "remediationNoChangesNeeded": "Walang kinakailangang pagbabago",
+        "remediationPrOpened": "Nagbukas ng PR",
+        "remediationQueued": "Hiniling ang pag-aayos"
+      }
     },
     "notifications": {
       "couldNotLoad": "Hindi ma-load ang mga setting ng abiso.",
@@ -1905,7 +1939,6 @@
       "installApp": "I-install ang GitHub App",
       "reauthorizeButton": "Pahintulutan muli ang GitHub App",
       "reauthorizeDescription": "Kailangan ng Security Agent ang pahintulot na vulnerability_alerts para ma-access ang mga alerto ng Dependabot. Pahintulutan muli ang GitHub App para ibigay ito.",
-      "reauthorizeFailed": "Hindi masimulan ang muling pagbibigay ng pahintulot. Pakisubukang muli.",
       "reauthorizeTitle": "Kailangan ng mga karagdagang pahintulot",
       "setupFailed": "Hindi masimulan ang setup ng GitHub. Pakisubukang muli."
     },
@@ -2214,6 +2247,7 @@
       "prefillModelUnavailable": "Hindi na magamit ang {{model}}. Ginagamit ang iyong paunang itinakdang modelo.",
       "couldNotReadPendingSessions": "Hindi mabasa ang mga nakabinbing sesyon. Subukang muli.",
       "failedToCreate": "Hindi makagawa ng sesyon.",
+      "checkOrganizationAccess": "Suriin ang iyong access sa Organisasyon na ito, at subukang muli.",
       "couldNotRefreshRepositories": "Hindi ma-refresh ang mga imbakan ng code. Subukang muli.",
       "discardDraftTitle": "Burahin ang burador?",
       "discardDraftMessage": "Mawawala ang iyong prompt.",
@@ -2283,7 +2317,8 @@
       "linesBadge_other": "{{displayCount}} na linya",
       "matchesBadge_one": "{{displayCount}} tugma",
       "matchesBadge_other": "{{displayCount}} tugma",
-      "noOutput": "Walang output."
+      "noOutput": "Walang output.",
+      "translationFailed": "Nabigo ang pagsasalin"
     },
     "readToolMarkdown": {
       "linesTruncated": "mga linyang {{start}}–{{end}} (pinaikli)",
@@ -2734,6 +2769,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Hindi makikita ang mga aktibo mong sesyon hangga't hindi ito na-load.",
     "currentDeviceUnidentified": "Hindi matukoy ang kasalukuyang device.",
+    "kiloApp": "Kilo app",
     "noSessions": "Walang aktibong sesyon",
     "noSessionsDescription": "Mag-sign in gamit ang Kilo app sa ibang device para makita ito rito.",
     "onlyKiloAppSignIns": "Ang mga sign-in sa Kilo app lang ang lumalabas dito. Hindi nakalista ang mga sign-in sa editor at CLI.",
@@ -2886,6 +2922,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Bago tayo magsimula",
+    "summaryTitle": "Kagustuhan sa pagbabahagi ng datos",
     "introDescription": "Ipinapadala ng Kilo ang mga mensahe mo sa mga tagapagbigay ng serbisyo ng AI para makabuo ng mga tugon. Narito ang ibinabahagi at kung sino ang tumatanggap nito.",
     "required": "Kinakailangan para magamit ang Kilo",
     "promptsTitle": "Ang iyong mga prompt at pag-uusap",
@@ -2894,7 +2931,6 @@
     "accountDescription": "Ang ID ng iyong akawnt sa Kilo at metadata ng kahilingan, na ginagamit para patunayan ang iyong pagkakakilanlan at sukatin ang paggamit.",
     "diagnosticsTitle": "Pagsusuri sa mga problema ng app",
     "diagnosticsDescription": "Mga ulat ng pag-crash at error na ginagamit para panatilihing maayos ang app. Inaalis ang nilalaman ng app sa mga ulat.",
-    "optional": "Opsyonal",
     "helpImprove": "Tumulong na mapabuti ang Kilo",
     "helpImproveDescription": "Ibahagi ang datos sa paggamit ng produkto na walang pagkakakilanlan mo, pati ang pinagmulan ng pag-install. Maaari mo itong baguhin anumang oras sa mga setting.",
     "seeFullDetails": "Tingnan ang lahat ng detalye",
@@ -3473,6 +3509,9 @@
     "localModels": {
       "title": "Mga modelong nasa device",
       "help": "Tumatakbo sa teleponong ito ang mga modelong nasa device. Mananatili sa device ang iyong mga prompt at sagot.",
+      "switchTitle": "Lumipat sa modelong nasa device?",
+      "switchMessage": "Kapag lumipat ka sa {{name}}, ipoproseso ang mga prompt at konteksto ng pag-uusap na ito sa teleponong ito, hindi sa isang remote server.",
+      "switchConfirm": "Lumipat ng modelo",
       "systemPurpose": "Ang modelong naka-built in sa system ng device na ito. Tumatakbo ito sa device.",
       "apple": "Apple Intelligence (sa device)",
       "checking": "Tinitingnan kung available…",
@@ -3569,7 +3608,6 @@
     "personalDefaultDescription": "Awtomatikong na-load kapag walang repository na may naka-pin na profile.",
     "organizationDefaultDescription": "Awtomatikong na-load para sa mga miyembrong walang personal na default.",
     "setAsDefault": "Itakda bilang default",
-    "removeDefault": "Alisin bilang default",
     "saveFailed": "Hindi ma-save ang profile",
     "deleteTitle": "Tanggalin ang profile",
     "deleteMessage": "Permanente nitong inaalis ang profile at mga setting nito. Hindi na ito maaaring bawiin.",
@@ -3595,11 +3633,13 @@
     "commandsTitle": "Mga utos sa pag-setup",
     "addCommand": "Magdagdag ng utos",
     "commandLabel": "Utos",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "hal. pnpm install",
     "commandsEmpty": "Wala pang setup command",
     "commandsSaveFailed": "Hindi ma-save ang mga command sa pag-setup",
     "moveUp": "Umakyat",
     "moveDown": "Ilipat pababa",
+    "moveCommandUp": "Ilipat ang utos {{position}} pataas",
+    "moveCommandDown": "Ilipat ang utos {{position}} pababa",
     "skillsTitle": "Mga kasanayan",
     "addSkill": "Magdagdag ng kasanayan",
     "skillNameLabel": "Pangalan ng kasanayan",
@@ -3669,7 +3709,7 @@
       "nameRequired": "Maglagay ng pangalan ng ahente",
       "slugRequired": "Maglagay ng agent slug",
       "slugInvalid": "Ang slug ay dapat magsimula sa isang titik at gumamit lamang ng maliliit na titik, digit, at gitling",
-      "slugConflict": "Ang slug na iyon ay nakalaan ng isang built-in na ahente",
+      "slugConflict": "Ginagamit na ng isang built-in na agent o iba pang agent sa profile na ito ang slug na iyon",
       "edit": "I-edit ang ahente"
     },
     "slashCommands": {
@@ -3680,6 +3720,7 @@
       "description": "Paglalarawan ng utos",
       "template": "Padron",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Ipaliwanag ang $ARGUMENTS",
       "subtask": "Patakbuhin bilang subtask",
       "edit": "I-edit ang slash command",
@@ -3811,5 +3852,69 @@
       "title": "I-save sa listahan",
       "saved": "Na-save sa {{list}}"
     }
+  },
+  "agentBriefing": {
+    "title": "Briefing sa umaga",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Maaaring may kulang na nakaraang aktibidad. Ang ≥ ay nangangahulugang hindi bababa rito; ang hindi alam ay hindi zero.",
+    "available": "Mga available na briefing",
+    "history": "Kasaysayan ng briefing",
+    "historyHint": "Itinatago ang mga ulat nang 30 araw, kasama ang mga na-dismiss.",
+    "settings": "Mga setting ng briefing",
+    "empty": "Walang aktibidad magdamag",
+    "emptyHint": "Lalabas dito ang iyong mga cloud at CLI coding session pagkatapos ng aktibong gabi.",
+    "loadError": "Hindi ma-load ang mga briefing",
+    "sessions": "Aktibo magdamag",
+    "pullRequests": "Mga binuksang PRs",
+    "blockers": "Mga bagong blocker",
+    "spend": "Gastos magdamag",
+    "view": "Basahin ang briefing",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Balewalain ang briefing",
+    "offline": "Offline · naka-save na briefing",
+    "cached": "Naka-save na ulat · hindi ma-refresh",
+    "revised": "Binago · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "Buod ng AI",
+    "summaryDisabled": "Nakaayos na ulat · naka-off ang AI sa kontekstong ito",
+    "summaryPending": "Ginagawa pa ang buod ng AI. Ilalakip ito rito kapag handa na.",
+    "summaryFailed": "Nabigo ang buod ng AI. Maaaring may panibagong singil kapag sinubukan muli.",
+    "summaryUnavailable": "Hindi available ang buod ng AI. Available pa rin ang iyong nakaayos na ulat.",
+    "summaryOutdated": "Mas luma ang buod na ito kaysa sa pinakabagong rebisyon ng ulat.",
+    "summaryCharge": "Naningil ang AI ng {{cost}}",
+    "summaryChargePending": "Hinihintay ang pagtutugma ng singil ng AI",
+    "generate": "Gumawa ng buod",
+    "retrySummary": "Subukan muli ang bayad na buod",
+    "sources": "Ebidensya at artifact",
+    "timezone": "Time zone ng briefing",
+    "deviceTimezone": "Gamitin ang time zone ng device",
+    "timezoneHint": "IANA time zone, halimbawa Europe/Berlin. Sa mga susunod na gabi magagamit ang pagbabago sa iskedyul.",
+    "nightStart": "Simula ng gabi",
+    "morningStart": "Katapusan ng gabi / simula ng umaga",
+    "morningEnd": "Katapusan ng umaga",
+    "timeHint": "Ibinabalik ng Home card ang live na status kapag natapos ang umaga, kahit offline.",
+    "invalidSchedule": "Pumili ng wastong time zone at hindi nagsasapaw at hindi walang lamang panahon ng gabi at umaga.",
+    "notificationsHint": "Isang pangkalahatang abiso bawat umaga kapag handa na ang iyong unang ulat. Hiwalay sa mga bayad na buod ng AI.",
+    "notificationPermission": "I-enable ang mga abiso ng device sa $t(common.notifications) para matanggap ang iyong briefing.",
+    "aiOptIn": "Mga bayad na buod ng AI",
+    "aiHint": "Opsyonal para sa kontekstong ito lamang. Ipinapadala sa iyong model ang mga piniling na-redact na sipi at nakaayos na datos sa wika ng iyong app. Ginagamit ng singil ang balanse ng kontekstong ito.",
+    "defaultModel": "Gamitin ang default na model ng Kilo",
+    "duration": "Limitasyon sa oras (minuto)",
+    "spendLimit": "Limitasyon sa gastos (USD)",
+    "safeguardHint": "Tiyak na limitasyon bawat buod, hindi pang-araw-araw na budget. Default: 10 minuto at $2. Ilalathala ang ulat pagkalipas ng hanggang limang minuto habang nagpapatuloy ang paggawa sa loob ng mga limitasyong ito.",
+    "invalidSafeguards": "Maglagay ng positibo at tiyak na limitasyon sa oras at gastos.",
+    "estimate": "Tantiya {{estimate}} · maximum {{maximum}}",
+    "estimateUnavailable": "Hindi available ang bayad na buod para sa mga setting na ito.",
+    "estimatePricingUnavailable": "Walang available na presyo para sa modelong ito.",
+    "estimateBalanceUnavailable": "Kulang ang balanse para sa bayad na buod.",
+    "estimateModelNotAllowed": "Hindi pinapayagan ang modelong ito dito.",
+    "estimateSpendLimitTooLow": "Itaas ang spend safeguard para payagan ang buod na ito.",
+    "confirmPaid": "I-enable ang mga bayad na buod para sa {{context}}?",
+    "confirmGeneration": "Gumawa ng bayad na buod?",
+    "paidDisclosure": "Tinatayang {{estimate}}, hanggang {{maximum}}, na may limitasyong {{minutes}} minuto. May singil kahit mabigo ang paggawa.",
+    "enable": "I-enable ang mga bayad na buod",
+    "contextSettings": "Mga setting ng AI · {{context}}",
+    "allContexts": "Magkahiwalay ang mga personal at pang-organisasyong briefing."
   }
 }

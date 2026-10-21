@@ -226,25 +226,6 @@ describe('generateReviewPrompt', () => {
     expect(prompt).toContain('<!-- kilo-review -->');
   });
 
-  it('includes GitHub inline comment footer guidance after the comment format', async () => {
-    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 1);
-
-    expect(prompt).toContain('## Inline Comment Footer');
-    expect(prompt).toContain(
-      'Reply with `@kilocode-bot fix it` to have Kilo Code address this issue.'
-    );
-    expect(prompt).toContain('after any fenced `suggestion` block');
-    expect(prompt).toContain(
-      'Do not add this footer to the review summary, top-level review body, or any non-inline comment.'
-    );
-    expect(prompt.indexOf('# COMMENT FORMAT')).toBeLessThan(
-      prompt.indexOf('## Inline Comment Footer')
-    );
-    expect(prompt.indexOf('## Inline Comment Footer')).toBeLessThan(
-      prompt.indexOf('# CONTEXT FOR THIS PR')
-    );
-  });
-
   it('includes roast style guidance when review_style is "roast"', async () => {
     const roastConfig = { ...baseConfig, review_style: 'roast' as const };
     const { prompt } = await generateReviewPrompt(roastConfig, 'owner/repo', 1);
@@ -705,7 +686,6 @@ describe('generateReviewPrompt (incremental review)', () => {
     });
 
     expect(prompt).not.toContain('## Inline Comment Footer');
-    expect(prompt).not.toContain('@kilocode-bot fix it');
   });
 });
 

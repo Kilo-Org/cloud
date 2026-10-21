@@ -409,9 +409,9 @@ export async function getMergeRequest(
     // Counts come from the diffs. Fold every page GitLab will serve — it caps
     // a merge request's diff collection at the project's `diff_max_files`
     // (1000 by default), which the page bound covers — so a large merge
-    // request reports complete totals instead of its first 150 files. Each page
-    // is folded into the running counters the moment it arrives and dropped, so
-    // the walk never holds the parsed diff text it only reads once.
+    // request reports complete totals. Each page is folded into the running
+    // counters the moment it arrives and dropped, so the walk never holds the
+    // parsed diff text it only reads once.
     let diffFileCount = 0;
     let additions = 0;
     let deletions = 0;

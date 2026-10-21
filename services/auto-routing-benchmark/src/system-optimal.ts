@@ -18,13 +18,14 @@ import {
   listReadyCurrentProfilesForEntries,
   savePolicyComputed,
 } from './db';
-import {
-  catalogCandidatePrices,
-  fetchBenchmarkModelCatalog,
-  platformRegistryEntries,
-} from './platform-models';
+import { catalogCandidatePrices, fetchBenchmarkModelCatalog } from './platform-models';
 import { variantFromStorage } from './reasoning-effort';
 import { computeEngineIdentity } from './run';
+import {
+  PLATFORM_SUBSCRIPTION_OWNER,
+  loadSubscriptionSnapshot,
+  snapshotPairs,
+} from './subscriptions';
 import { isGradedSweepResult, summarizeSweep } from './scoreboard/sweep';
 import type { OfflineSweep, OfflineSweepSummary } from './scoreboard/schema';
 
@@ -357,7 +358,10 @@ async function optimizeRegistryThresholds(
     repetitions: config.deciderRepetitions,
   };
   const catalog = await fetchBenchmarkModelCatalog(env);
-  const desired = platformRegistryEntries(config, catalog);
+  const desired = snapshotPairs(
+    await loadSubscriptionSnapshot(env.BENCH_DB, router, PLATFORM_SUBSCRIPTION_OWNER),
+    true
+  );
   const readyRows = await listReadyCurrentProfilesForEntries(env.BENCH_DB, current, desired);
   const readyEntries = readyRows
     .filter((row): row is typeof row & { run_id: string } => Boolean(row.run_id))

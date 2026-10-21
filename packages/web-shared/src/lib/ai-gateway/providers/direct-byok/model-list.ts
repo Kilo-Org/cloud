@@ -44,7 +44,11 @@ function enhanceDirectByokModelList({
   const seenIds = new Set<string>();
   const syncedModels = new Map(remainingModels.map(model => [model.id, model]));
   return [...recommendedModels, ...remainingModels]
-    .filter(model => (seenIds.has(model.id) ? false : (seenIds.add(model.id), true)))
+    .filter(model => {
+      if (seenIds.has(model.id)) return false;
+      seenIds.add(model.id);
+      return true;
+    })
     .map(model => {
       const flags = new Set(model.flags);
       if (recommendedModels.some(m => m.id === model.id)) flags.add('recommended');

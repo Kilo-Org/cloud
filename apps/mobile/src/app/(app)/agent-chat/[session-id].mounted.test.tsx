@@ -986,6 +986,33 @@ describe('SessionDetailScreen valid session-id', () => {
     expect(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry')).toBeUndefined();
   });
 
+  it('retires the session when a replaced account is denied its metadata', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
+    const renderer = await mountRoute();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+
+    // Account A rendered this session from a read that landed during the open,
+    // which arms the rendered-session guard for A's generation.
+    queryState.dataUpdatedAt = Date.now();
+    await updateRoute(renderer);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+
+    // Credentials are then replaced in place on the same route instance: the
+    // guard must not carry over and mask the successor's denial.
+    act(() => {
+      beginReplacement();
+      commitAccount('B');
+    });
+    queryState.data = null;
+    queryState.dataUpdatedAt = 0;
+    queryState.isError = true;
+    queryState.error = { data: { code: 'NOT_FOUND' } };
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    expect(propOf(findByType(renderer.root, 'QueryError')[0], 'variant')).toBe('not-found');
+  });
+
   it('renders the session content with the parsed session-id and enables the query', async () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     const renderer = await mountRoute();

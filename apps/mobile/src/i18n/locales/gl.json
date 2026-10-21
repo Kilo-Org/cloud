@@ -770,7 +770,9 @@
       "reviewNotSubmitted": "Esta revisión non se pode enviar tal e como está. Pode que a PR cambiase ou que esteas a revisar a túa propia solicitude de integración, o que non está permitido.",
       "reviewNotSubmittedTerm": "Esta revisión non se pode enviar tal como está. Pode que a {{term}} cambiase ou que non poidas revisar a túa propia {{term}}.",
       "couldNotPostComment": "Non se puido publicar o comentario.",
-      "couldNotSubmitReview": "Non se puido enviar a revisión. Comproba a conexión e téntao de novo."
+      "couldNotSubmitReview": "Non se puido enviar a revisión. Comproba a conexión e téntao de novo.",
+      "rateLimited": "Demasiadas solicitudes. Téntao de novo máis tarde.",
+      "conflict": "Isto cambiou mentres estabas a traballar nel. Volve cargalo e téntao de novo."
     },
     "operation": {
       "couldNotReply": "Non se puido responder.",
@@ -2214,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} xa non está dispoñible. Usarase o teu modelo predeterminado.",
       "couldNotReadPendingSessions": "Non se puideron ler as sesións pendentes. Téntao de novo.",
       "failedToCreate": "Non se puido crear a sesión.",
+      "checkOrganizationAccess": "Comproba o teu acceso a esta organización e téntao de novo.",
       "couldNotRefreshRepositories": "Non se puideron actualizar os repositorios. Téntao de novo.",
       "discardDraftTitle": "Descartar o borrador?",
       "discardDraftMessage": "Perderase a túa instrución.",

@@ -802,7 +802,9 @@
       "reviewNotSubmitted": "Dabartinės peržiūros pateikti negalima. PR galėjo pasikeisti arba bandai peržiūrėti savo paties pakeitimų užklausą.",
       "reviewNotSubmittedTerm": "Šios peržiūros pateikti negalima. {{term}} galėjo pasikeisti arba negali peržiūrėti savo {{term}}.",
       "couldNotPostComment": "Nepavyko paskelbti komentaro.",
-      "couldNotSubmitReview": "Nepavyko pateikti peržiūros. Patikrink ryšį ir bandyk dar kartą."
+      "couldNotSubmitReview": "Nepavyko pateikti peržiūros. Patikrink ryšį ir bandyk dar kartą.",
+      "rateLimited": "Gauta per daug užklausų. Bandykite vėliau dar kartą.",
+      "conflict": "Tai pasikeitė, kol dirbote. Įkelkite iš naujo ir bandykite dar kartą."
     },
     "operation": {
       "couldNotReply": "Nepavyko atsakyti.",
@@ -2270,6 +2272,7 @@
       "prefillModelUnavailable": "Modelis „{{model}}“ nebepasiekiamas. Naudojamas numatytasis modelis.",
       "couldNotReadPendingSessions": "Nepavyko nuskaityti laukiančių sesijų. Bandykite dar kartą.",
       "failedToCreate": "Nepavyko sukurti sesijos.",
+      "checkOrganizationAccess": "Patikrinkite prieigą prie šios organizacijos ir bandykite dar kartą.",
       "couldNotRefreshRepositories": "Nepavyko atnaujinti saugyklų. Bandykite dar kartą.",
       "discardDraftTitle": "Atmesti juodraštį?",
       "discardDraftMessage": "Jūsų užklausa bus prarasta.",

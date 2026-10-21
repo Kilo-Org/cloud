@@ -818,7 +818,9 @@
       "reviewNotSubmitted": "Din ir-reviżjoni ma tistax tintbagħat kif inhi. Il-PR seta' nbidel, jew ma tistax tirrevedi t-talba għall-għaqda tiegħek stess.",
       "reviewNotSubmittedTerm": "Din ir-reviżjoni ma tistax tintbagħat hekk kif inhi. Il-{{term}} fori nbidel, jew ma tistax tirrevedi l-{{term}} tiegħek stess.",
       "couldNotPostComment": "Ma setax jiġi ppubblikat il-kumment.",
-      "couldNotSubmitReview": "Ma setgħetx tintbagħat ir-reviżjoni. Iċċekkja l-konnessjoni tiegħek u erġa' pprova."
+      "couldNotSubmitReview": "Ma setgħetx tintbagħat ir-reviżjoni. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+      "rateLimited": "Żżejjed talbiet. Jekk jogħġbok erġa' pprova aktar tard.",
+      "conflict": "Din inbidlet waqt li kont taħdem fuqha. Iċċarġja mill-ġdid u erġa' pprova."
     },
     "operation": {
       "couldNotReply": "Ma stajniex nibagħtu t-tweġiba.",
@@ -2298,6 +2300,7 @@
       "prefillModelUnavailable": "{{model}} m'għadux disponibbli. Qed jintuża l-mudell prestabbilit tiegħek.",
       "couldNotReadPendingSessions": "Ma setgħux jinqraw is-sessjonijiet pendenti. Erġa' pprova.",
       "failedToCreate": "Ma setgħetx tinħoloq is-sessjoni.",
+      "checkOrganizationAccess": "Iċċekkja l-aċċess tiegħek għal din l-organizzazzjoni, imbagħad erġa' pprova.",
       "couldNotRefreshRepositories": "Ma setgħux jiġu aġġornati r-repożitorji. Erġa' pprova.",
       "discardDraftTitle": "Twarrab l-abbozz?",
       "discardDraftMessage": "L-istruzzjoni tiegħek se tintilef.",

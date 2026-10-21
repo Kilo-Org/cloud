@@ -1713,6 +1713,7 @@
       "prefillModelUnavailable": "{{model}} ya no está disponible. Se está usando tu modelo predeterminado.",
       "couldNotReadPendingSessions": "No se pudieron leer las sesiones pendientes. Inténtalo de nuevo.",
       "failedToCreate": "No se pudo crear la sesión.",
+      "checkOrganizationAccess": "Comprueba tu acceso a esta organización e inténtalo de nuevo.",
       "couldNotRefreshRepositories": "No se pudieron actualizar los repositorios. Inténtalo de nuevo.",
       "discardDraftTitle": "¿Descartar borrador?",
       "discardDraftMessage": "Se perderán tus instrucciones.",
@@ -2975,7 +2976,9 @@
       "reviewNotSubmitted": "Esta revisión no se puede enviar en su estado actual. Puede que la PR haya cambiado o que no tengas permiso para revisar tu propia PR.",
       "reviewNotSubmittedTerm": "Esta revisión no se puede enviar en su estado actual. Puede que {{term}} haya cambiado o que no tengas permiso para revisar tu propio {{term}}.",
       "couldNotPostComment": "No se pudo publicar el comentario.",
-      "couldNotSubmitReview": "No se pudo enviar la revisión. Comprueba tu conexión e inténtalo de nuevo."
+      "couldNotSubmitReview": "No se pudo enviar la revisión. Comprueba tu conexión e inténtalo de nuevo.",
+      "rateLimited": "Demasiadas solicitudes. Inténtalo de nuevo más tarde.",
+      "conflict": "Esto cambió mientras trabajabas en ello. Vuelve a cargarlo e inténtalo de nuevo."
     },
     "operation": {
       "couldNotReply": "No se pudo responder.",

@@ -770,7 +770,9 @@
       "reviewNotSubmitted": "Ba za a iya aika wannan bitar yadda take ba. Wataƙila PR ya canza, ko kuma ba za ka iya yin bitar buƙatar haɗawa da ka buɗe da kanka ba.",
       "reviewNotSubmittedTerm": "Ba a iya aika wannan bita yadda yake ba. Wataƙila {{term}} ya canza, ko ba za ka iya bita {{term}} ɗinka ba.",
       "couldNotPostComment": "Ba a iya wallafa tsokaci ba.",
-      "couldNotSubmitReview": "Ba a iya aika bita ba. Duba haɗinka na intanet ka sake gwadawa."
+      "couldNotSubmitReview": "Ba a iya aika bita ba. Duba haɗinka na intanet ka sake gwadawa.",
+      "rateLimited": "An yi buƙatu da yawa. Da fatan za a sake gwadawa daga baya.",
+      "conflict": "Wannan ya canza ne a lokacin da kake aiki a kansa. Loda shi daga kashi sannan ka sake gwadawa."
     },
     "operation": {
       "couldNotReply": "An kasa amsawa.",
@@ -2214,6 +2216,7 @@
       "prefillModelUnavailable": "An daina samun {{model}}. Ana amfani da samfurinka na asali.",
       "couldNotReadPendingSessions": "An kasa karanta zamannin da ke jira. Sake gwadawa.",
       "failedToCreate": "An kasa ƙirƙirar zama.",
+      "checkOrganizationAccess": "Ka duba damar shiga ga wannan ƙungiya, ka sake gwadawa.",
       "couldNotRefreshRepositories": "An kasa sabunta ma'ajiyoyi. Sake gwadawa.",
       "discardDraftTitle": "Watsar da daftari?",
       "discardDraftMessage": "Za a rasa umarnin aikinka.",

@@ -1701,6 +1701,7 @@
       "prefillModelUnavailable": "{{model}} tidak lagi tersedia. Model bawaanmu digunakan sebagai pengganti.",
       "couldNotReadPendingSessions": "Tidak dapat membaca sesi yang menunggu diproses. Coba lagi.",
       "failedToCreate": "Gagal membuat sesi.",
+      "checkOrganizationAccess": "Periksa aksesmu ke organisasi ini, lalu coba lagi.",
       "couldNotRefreshRepositories": "Tidak dapat memuat ulang repositori. Coba lagi.",
       "discardDraftTitle": "Buang draf?",
       "discardDraftMessage": "Instruksimu akan hilang.",
@@ -2935,7 +2936,9 @@
       "reviewNotSubmitted": "Tinjauan ini tidak dapat dikirim dalam kondisi saat ini. PR mungkin sudah berubah, atau kamu mencoba meninjau PR milikmu sendiri.",
       "reviewNotSubmittedTerm": "Tinjauan ini tidak dapat dikirim seperti adanya. {{term}} mungkin telah berubah, atau kamu tidak dapat meninjau {{term}} milikmu sendiri.",
       "couldNotPostComment": "Tidak dapat mengirim komentar.",
-      "couldNotSubmitReview": "Tidak dapat mengirim tinjauan. Periksa koneksimu dan coba lagi."
+      "couldNotSubmitReview": "Tidak dapat mengirim tinjauan. Periksa koneksimu dan coba lagi.",
+      "rateLimited": "Terlalu banyak permintaan. Coba lagi nanti.",
+      "conflict": "Ini berubah saat Anda sedang mengerjakannya. Muat ulang dan coba lagi."
     },
     "operation": {
       "couldNotReply": "Tidak dapat membalas.",

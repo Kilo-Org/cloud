@@ -1701,6 +1701,7 @@
       "prefillModelUnavailable": "{{model}} không còn dùng được. Hiện đang dùng mô hình mặc định của bạn.",
       "couldNotReadPendingSessions": "Không thể đọc danh sách phiên đang chờ. Vui lòng thử lại.",
       "failedToCreate": "Không thể tạo phiên.",
+      "checkOrganizationAccess": "Vui lòng kiểm tra quyền truy cập của bạn vào tổ chức này rồi thử lại.",
       "couldNotRefreshRepositories": "Không thể làm mới danh sách kho mã. Vui lòng thử lại.",
       "discardDraftTitle": "Hủy bản nháp?",
       "discardDraftMessage": "Nội dung yêu cầu của bạn sẽ bị mất.",
@@ -2935,7 +2936,9 @@
       "reviewNotSubmitted": "Không thể gửi bản đánh giá này ở trạng thái hiện tại. Có thể PR đã thay đổi hoặc đây là PR của bạn nên bạn không thể tự đánh giá.",
       "reviewNotSubmittedTerm": "Không thể gửi đánh giá này ở trạng thái hiện tại. {{term}} có thể đã thay đổi, hoặc bạn không thể đánh giá {{term}} của chính mình.",
       "couldNotPostComment": "Không thể đăng bình luận.",
-      "couldNotSubmitReview": "Không thể gửi đánh giá. Kiểm tra kết nối và thử lại."
+      "couldNotSubmitReview": "Không thể gửi đánh giá. Kiểm tra kết nối và thử lại.",
+      "rateLimited": "Quá nhiều yêu cầu. Vui lòng thử lại sau.",
+      "conflict": "Mục này đã thay đổi trong khi bạn đang làm việc trên đó. Vui lòng tải lại và thử lại."
     },
     "operation": {
       "couldNotReply": "Không thể trả lời.",

@@ -770,7 +770,9 @@
       "reviewNotSubmitted": "Bu kod baxışını indiki vəziyyətdə göndərmək mümkün deyil. PR dəyişmiş ola bilər və ya öz birləşdirmə sorğuna kod baxışı göndərməyə çalışırsan.",
       "reviewNotSubmittedTerm": "Bu baxış olduğu kimi göndərilə bilmir. {{term}} dəyişmiş ola bilər və ya öz {{term}}na baxış keçirə bilməzsən.",
       "couldNotPostComment": "Şərhi göndərmək mümkün olmadı.",
-      "couldNotSubmitReview": "Kod baxışını göndərmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et."
+      "couldNotSubmitReview": "Kod baxışını göndərmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
+      "rateLimited": "Çoxlu sorğu göndərilib. Bir az sonra yenidən cəhd et.",
+      "conflict": "Bu, siz üzərində işləyərkən dəyişildi. Yenidən yükləyin və yenidən cəhd edin."
     },
     "operation": {
       "couldNotReply": "Cavab vermək mümkün olmadı.",
@@ -2214,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} artıq əlçatan deyil. Standart modelindən istifadə olunur.",
       "couldNotReadPendingSessions": "Gözləyən sessiyaları oxumaq mümkün olmadı. Yenidən cəhd et.",
       "failedToCreate": "Sessiya yaratmaq mümkün olmadı.",
+      "checkOrganizationAccess": "Təşkilata giriş icazəni yoxla və yenidən cəhd et.",
       "couldNotRefreshRepositories": "Repozitoriyaları yeniləmək mümkün olmadı. Yenidən cəhd et.",
       "discardDraftTitle": "Qaralama silinsin?",
       "discardDraftMessage": "Sorğun silinəcək.",

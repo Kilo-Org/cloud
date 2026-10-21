@@ -770,7 +770,9 @@
       "reviewNotSubmitted": "Seda ülevaatust ei saa praegusel kujul esitada. PR võib olla muutunud või proovid üle vaadata enda tõmbetaotlust, mis pole lubatud.",
       "reviewNotSubmittedTerm": "Seda ülevaatust ei saa praegusel kujul esitada. {{term}} võib olla muutunud või ei tohi omaenda {{term}} üle vaadata.",
       "couldNotPostComment": "Kommentaari ei õnnestunud postitada.",
-      "couldNotSubmitReview": "Ülevaatuse esitamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti."
+      "couldNotSubmitReview": "Ülevaatuse esitamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.",
+      "rateLimited": "Liiga palju päringuid. Proovi hiljem uuesti.",
+      "conflict": "See muutus, samal ajal kui sa sellega tegelesid. Laadi see uuesti ja proovi uuesti."
     },
     "operation": {
       "couldNotReply": "Vastamine ebaõnnestus.",
@@ -2214,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} pole enam saadaval. Kasutatakse sinu vaikemudelit.",
       "couldNotReadPendingSessions": "Ootel seansside lugemine ebaõnnestus. Proovi uuesti.",
       "failedToCreate": "Seansi loomine ebaõnnestus.",
+      "checkOrganizationAccess": "Kontrolli oma juurdepääsu sellele organisatsioonile ja proovi uuesti.",
       "couldNotRefreshRepositories": "Hoidlate värskendamine ebaõnnestus. Proovi uuesti.",
       "discardDraftTitle": "Kas loobuda mustandist?",
       "discardDraftMessage": "Sinu viip läheb kaotsi.",

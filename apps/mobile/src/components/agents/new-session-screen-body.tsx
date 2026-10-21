@@ -28,6 +28,7 @@ import {
   mergeProfileAndRuntimeModeOptions,
   resolvePinnedAgentModel,
 } from '@/components/agents/mode-normalize';
+import { cloudPrepareFailureMessage } from '@/components/agents/cloud-prepare-error-display';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
 import { useNewSessionModelState } from '@/components/agents/new-session-model-provider';
@@ -1079,12 +1080,8 @@ export function NewSessionScreenBody() {
           if (error instanceof Error && error.message === CLONE_CUT_NOT_FOUND_CODE) {
             // The cut message is not in the saved source yet: say so, Start stays enabled.
             message = i18n.t(FORK_CUT_NOT_SYNCED_KEY);
-          } else if (
-            error instanceof Error &&
-            error.message &&
-            !isCloudPrepareRetryableError(error)
-          ) {
-            message = error.message;
+          } else if (!isCloudPrepareRetryableError(error)) {
+            message = cloudPrepareFailureMessage(error);
           }
           toast.error(message);
         } finally {

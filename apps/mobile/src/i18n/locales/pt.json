@@ -786,7 +786,9 @@
       "reviewNotSubmitted": "Não é possível enviar esta revisão no estado atual. O PR pode ter mudado ou podes estar a tentar rever o teu próprio PR.",
       "reviewNotSubmittedTerm": "Não é possível enviar esta revisão no estado atual. O {{term}} pode ter mudado ou não podes rever o teu próprio {{term}}.",
       "couldNotPostComment": "Não foi possível publicar o comentário.",
-      "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifica a tua ligação e tenta novamente."
+      "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifica a tua ligação e tenta novamente.",
+      "rateLimited": "Demasiados pedidos. Tente novamente mais tarde.",
+      "conflict": "Isto mudou enquanto trabalhavas nele. Recarrega-o e tenta novamente."
     },
     "operation": {
       "couldNotReply": "Não foi possível responder.",
@@ -2242,6 +2244,7 @@
       "prefillModelUnavailable": "{{model}} já não está disponível. Está a ser usado o seu modelo predefinido.",
       "couldNotReadPendingSessions": "Não foi possível ler as sessões pendentes. Tente novamente.",
       "failedToCreate": "Não foi possível criar a sessão.",
+      "checkOrganizationAccess": "Verifique o seu acesso a esta organização e tente novamente.",
       "couldNotRefreshRepositories": "Não foi possível atualizar os repositórios. Tente novamente.",
       "discardDraftTitle": "Eliminar rascunho?",
       "discardDraftMessage": "O seu pedido será eliminado.",

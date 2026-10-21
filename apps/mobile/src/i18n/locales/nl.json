@@ -1701,6 +1701,7 @@
       "prefillModelUnavailable": "{{model}} is niet meer beschikbaar. Je standaardmodel wordt gebruikt.",
       "couldNotReadPendingSessions": "De wachtende sessies konden niet worden uitgelezen. Probeer het opnieuw.",
       "failedToCreate": "De sessie kon niet worden aangemaakt.",
+      "checkOrganizationAccess": "Controleer je toegang tot deze organisatie en probeer het opnieuw.",
       "couldNotRefreshRepositories": "De repositories konden niet worden vernieuwd. Probeer het opnieuw.",
       "discardDraftTitle": "Concept verwijderen?",
       "discardDraftMessage": "Je prompt gaat verloren.",
@@ -2935,7 +2936,9 @@
       "reviewNotSubmitted": "Deze beoordeling kan in de huidige vorm niet worden verzonden. Mogelijk is de PR gewijzigd of probeer je je eigen PR te beoordelen.",
       "reviewNotSubmittedTerm": "Deze beoordeling kan niet in de huidige vorm worden verzonden. Mogelijk is de {{term}} gewijzigd, of kun je je eigen {{term}} niet beoordelen.",
       "couldNotPostComment": "De opmerking kon niet worden geplaatst.",
-      "couldNotSubmitReview": "De beoordeling kon niet worden verzonden. Controleer je verbinding en probeer het opnieuw."
+      "couldNotSubmitReview": "De beoordeling kon niet worden verzonden. Controleer je verbinding en probeer het opnieuw.",
+      "rateLimited": "Te veel verzoeken. Probeer het later opnieuw.",
+      "conflict": "Dit is gewijzigd terwijl je ermee bezig was. Laad het opnieuw en probeer het nog eens."
     },
     "operation": {
       "couldNotReply": "Het antwoord kon niet worden verzonden.",

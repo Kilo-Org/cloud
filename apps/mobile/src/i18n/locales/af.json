@@ -770,7 +770,9 @@
       "reviewNotSubmitted": "Hierdie hersiening kan nie in sy huidige vorm ingedien word nie. Die PR het dalk verander, of jy probeer dalk jou eie trekversoek hersien, wat nie toegelaat word nie.",
       "reviewNotSubmittedTerm": "Hierdie hersiening kan nie in sy huidige vorm ingedien word nie. Die {{term}} het dalk verander, of jy kan nie jou eie {{term}} hersien nie.",
       "couldNotPostComment": "Kon nie kommentaar plaas nie.",
-      "couldNotSubmitReview": "Kon nie die hersiening indien nie. Kontroleer jou verbinding en probeer weer."
+      "couldNotSubmitReview": "Kon nie die hersiening indien nie. Kontroleer jou verbinding en probeer weer.",
+      "rateLimited": "Te veel versoeke. Probeer asseblief later weer.",
+      "conflict": "Dit het verander terwyl jy daaraan gewerk het. Laai dit weer en probeer asseblief weer."
     },
     "operation": {
       "couldNotReply": "Die antwoord kon nie gestuur word nie.",
@@ -2214,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} is nie meer beskikbaar nie. Jou standaardmodel word gebruik.",
       "couldNotReadPendingSessions": "Die hangende sessies kon nie gelees word nie. Probeer weer.",
       "failedToCreate": "Die sessie kon nie geskep word nie.",
+      "checkOrganizationAccess": "Kontroleer jou toegang tot hierdie organisasie en probeer asseblief weer.",
       "couldNotRefreshRepositories": "Die bewaarplekke kon nie verfris word nie. Probeer asseblief weer.",
       "discardDraftTitle": "Konsep weggooi?",
       "discardDraftMessage": "Jou opdrag sal verlore gaan.",

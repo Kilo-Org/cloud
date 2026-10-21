@@ -770,7 +770,9 @@
       "reviewNotSubmitted": "Gamaaggamni kun akkuma jirutti dhiheeffamuu hin danda'u. PR jijjiirameera ta'a, ykn gaaffii walitti makuu mataa keetii gamaaggamuu hin dandeessu.",
       "reviewNotSubmittedTerm": "Gamaaggamaan kun akkasumaan hin galmaa'u. {{term}} jijjiirame ta'uu danda'a, yookiin {{term}} ofii kee gamaaggamuu hin dandeessu.",
       "couldNotPostComment": "Yaada maxxansuu hin dandeenye.",
-      "couldNotSubmitReview": "Gamaaggama dhiheessuun hin danda'amne. Walqunnamtii kee ilaaliitii irra deebi'ii yaali."
+      "couldNotSubmitReview": "Gamaaggama dhiheessuun hin danda'amne. Walqunnamtii kee ilaaliitii irra deebi'ii yaali.",
+      "rateLimited": "Hawwisni baay'ee hedduudha. Yeroo booda irratti deebi'ii yaali.",
+      "conflict": "Kun yeroo ati isaa irratti hojjettutti jijjiirameera. Deebi'ii fe'adhu irratti deebi'ii yaali."
     },
     "operation": {
       "couldNotReply": "Deebii kennuun hin danda'amne.",
@@ -2214,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} kana booda hin argamu. Moodela durtii kee fayyadamaa jirra.",
       "couldNotReadPendingSessions": "Turtiiwwan eegumsarra jiran dubbisuu hin danda'amne. Deebi'ii yaali.",
       "failedToCreate": "Turtii uumuu hin danda'amne.",
+      "checkOrganizationAccess": "Dhaabbata kanaaf galii kee mirkaneessitii deebi'ii yaali.",
       "couldNotRefreshRepositories": "Kuusaawwan koodii haaromsuu hin danda'amne. Deebi'ii yaali.",
       "discardDraftTitle": "Wixinee haqxaa?",
       "discardDraftMessage": "Gaaffiin kee ni bada.",

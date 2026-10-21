@@ -1614,6 +1614,7 @@
       "prefillModelUnavailable": "{{model}} n'est plus disponible. Votre modèle par défaut est utilisé.",
       "couldNotReadPendingSessions": "Impossible de lire les sessions en attente. Réessayez.",
       "failedToCreate": "Impossible de créer la session.",
+      "checkOrganizationAccess": "Vérifiez votre accès à cette organisation, puis réessayez.",
       "couldNotRefreshRepositories": "Impossible d'actualiser les dépôts. Réessayez.",
       "discardDraftTitle": "Supprimer le brouillon ?",
       "discardDraftMessage": "Votre consigne sera perdue.",
@@ -2975,7 +2976,9 @@
       "reviewNotSubmitted": "Impossible d'envoyer cette revue en l'état. La PR a peut-être changé ou vous tentez d'examiner votre propre demande de fusion, ce qui n'est pas autorisé.",
       "reviewNotSubmittedTerm": "Impossible d'envoyer cette revue en l'état. Il se peut que {{term}} ait changé, ou que vous ne puissiez pas examiner votre propre {{term}}.",
       "couldNotPostComment": "Impossible de publier le commentaire.",
-      "couldNotSubmitReview": "Impossible d'envoyer la revue. Vérifiez votre connexion et réessayez."
+      "couldNotSubmitReview": "Impossible d'envoyer la revue. Vérifiez votre connexion et réessayez.",
+      "rateLimited": "Trop de requêtes. Réessayez plus tard.",
+      "conflict": "Cet élément a été modifié pendant que vous y travailliez. Rechargez-le et réessayez."
     },
     "operation": {
       "couldNotReply": "Impossible de répondre.",

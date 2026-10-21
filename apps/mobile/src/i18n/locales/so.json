@@ -770,7 +770,9 @@
       "reviewNotSubmitted": "Dib-u-eegistan lama gudbin karo sida ay tahay. Waxaa laga yaabaa in PR-ka la beddelay ama inaadan dib u eegi karin codsigaaga isku-darka.",
       "reviewNotSubmittedTerm": "Dib-u-eegistan laguma diri karo sida uu yahay. {{term}} waa la yaabaa inuu isbeddelay, ama ma dib-u-eegi kartid {{term}} kaa ah.",
       "couldNotPostComment": "Faallada lama daabici karin.",
-      "couldNotSubmitReview": "Dib-u-eegista lama gudbin karin. Hubi xiriirkaaga oo mar kale isku day."
+      "couldNotSubmitReview": "Dib-u-eegista lama gudbin karin. Hubi xiriirkaaga oo mar kale isku day.",
+      "rateLimited": "Codsiyo aad u badan. Fadlan mar kale isku day.",
+      "conflict": "Tani way isbedhesay markaad ku shaqaynayso. Fadlan mar kale soo shubo oo isku day."
     },
     "operation": {
       "couldNotReply": "Lama jawaabi karin.",
@@ -2214,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} mar dambe lama heli karo. Waxaa la isticmaalayaa moodeelkaaga caadiga ah.",
       "couldNotReadPendingSessions": "Kalfadhiyada sugaya lama akhrin karin. Mar kale isku day.",
       "failedToCreate": "Kalfadhiga lama abuuri karin.",
+      "checkOrganizationAccess": "Hubi gelitaankaada ururkan, markaa mar kale isku day.",
       "couldNotRefreshRepositories": "Kaydadka lama cusboonaysiin karin. Fadlan mar kale isku day.",
       "discardDraftTitle": "Ma tirtiraysaa qabyada?",
       "discardDraftMessage": "Tilmaantaadu way lumi doontaa.",

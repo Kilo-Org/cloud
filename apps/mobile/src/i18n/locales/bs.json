@@ -786,7 +786,9 @@
       "reviewNotSubmitted": "Ovaj pregled se ne može poslati u trenutnom obliku. PR je možda promijenjen ili pokušavaš pregledati vlastiti zahtjev za spajanje.",
       "reviewNotSubmittedTerm": "Ovaj pregled se ne može poslati u trenutnom obliku. {{term}} je možda promijenjen ili ne možeš pregledati vlastiti {{term}}.",
       "couldNotPostComment": "Objavljivanje komentara nije uspjelo.",
-      "couldNotSubmitReview": "Slanje pregleda nije uspjelo. Provjeri vezu i pokušaj ponovo."
+      "couldNotSubmitReview": "Slanje pregleda nije uspjelo. Provjeri vezu i pokušaj ponovo.",
+      "rateLimited": "Previše zahtjeva. Pokušaj ponovo kasnije.",
+      "conflict": "Ovo se promijenilo dok ste radili na njemu. Ponovo ga učitajte i pokušajte ponovo."
     },
     "operation": {
       "couldNotReply": "Nije moguće poslati odgovor.",
@@ -2242,6 +2244,7 @@
       "prefillModelUnavailable": "{{model}} više nije dostupan. Koristi se tvoj zadani model.",
       "couldNotReadPendingSessions": "Nije moguće učitati sesije na čekanju. Pokušaj ponovo.",
       "failedToCreate": "Nije moguće kreirati sesiju.",
+      "checkOrganizationAccess": "Provjeri svoj pristup ovoj organizaciji i pokušaj ponovo.",
       "couldNotRefreshRepositories": "Nije moguće osvježiti repozitorije. Pokušaj ponovo.",
       "discardDraftTitle": "Odbaciti nacrt?",
       "discardDraftMessage": "Tvoj upit će biti izgubljen.",

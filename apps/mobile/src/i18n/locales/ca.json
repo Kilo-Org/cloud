@@ -786,7 +786,9 @@
       "reviewNotSubmitted": "Aquesta revisió no es pot enviar tal com està. Pot ser que la PR hagi canviat o que estiguis intentant revisar la teva pròpia sol·licitud d'integració.",
       "reviewNotSubmittedTerm": "Aquesta revisió no es pot enviar tal com està. Pot ser que la {{term}} hagi canviat o que no puguis revisar la teva pròpia {{term}}.",
       "couldNotPostComment": "No s'ha pogut publicar el comentari.",
-      "couldNotSubmitReview": "No s'ha pogut enviar la revisió. Comprova la connexió i torna-ho a provar."
+      "couldNotSubmitReview": "No s'ha pogut enviar la revisió. Comprova la connexió i torna-ho a provar.",
+      "rateLimited": "S'han rebut massa sol·licituds. Torna-ho a provar més tard.",
+      "conflict": "Això ha canviat mentre hi treballaves. Torna-ho a carregar i torna-ho a provar."
     },
     "operation": {
       "couldNotReply": "No s'ha pogut respondre.",
@@ -2242,6 +2244,7 @@
       "prefillModelUnavailable": "{{model}} ja no està disponible. S'està utilitzant el teu model predeterminat.",
       "couldNotReadPendingSessions": "No s'han pogut llegir les sessions pendents. Torna-ho a provar.",
       "failedToCreate": "No s'ha pogut crear la sessió.",
+      "checkOrganizationAccess": "Comproveu el vostre accés a aquesta organització i torneu-ho a provar.",
       "couldNotRefreshRepositories": "No s'han pogut actualitzar els repositoris. Torna-ho a provar.",
       "discardDraftTitle": "Vols descartar l'esborrany?",
       "discardDraftMessage": "Es perdrà el teu missatge.",

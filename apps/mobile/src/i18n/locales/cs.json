@@ -802,7 +802,9 @@
       "reviewNotSubmitted": "Tuto revizi nelze v aktuálním stavu odeslat. PR se možná změnil nebo se pokoušíš o revizi vlastního PR, což není povolené.",
       "reviewNotSubmittedTerm": "Tuto revizi nelze v aktuálním stavu odeslat. {{term}} se možná změnil nebo nemůžeš revidovat vlastní {{term}}.",
       "couldNotPostComment": "Komentář se nepodařilo odeslat.",
-      "couldNotSubmitReview": "Revizi se nepodařilo odeslat. Zkontroluj připojení a zkus to znovu."
+      "couldNotSubmitReview": "Revizi se nepodařilo odeslat. Zkontroluj připojení a zkus to znovu.",
+      "rateLimited": "Příliš mnoho požadavků. Zkuste to prosím později znovu.",
+      "conflict": "Tato položka se změnila, zatímco jste na ní pracovali. Znovu ji načtěte a zkuste to znovu."
     },
     "operation": {
       "couldNotReply": "Odpověď se nepodařilo odeslat.",
@@ -2270,6 +2272,7 @@
       "prefillModelUnavailable": "{{model}} již není k dispozici. Používá se váš výchozí model.",
       "couldNotReadPendingSessions": "Čekající relace se nepodařilo načíst. Zkuste to znovu.",
       "failedToCreate": "Relaci se nepodařilo vytvořit.",
+      "checkOrganizationAccess": "Zkontrolujte svůj přístup k této organizaci a zkuste to znovu.",
       "couldNotRefreshRepositories": "Seznam repozitářů se nepodařilo obnovit. Zkuste to znovu.",
       "discardDraftTitle": "Zahodit koncept?",
       "discardDraftMessage": "Vaše zadání se smaže.",

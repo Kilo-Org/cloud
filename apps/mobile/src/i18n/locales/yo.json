@@ -770,7 +770,9 @@
       "reviewNotSubmitted": "A kò lè fi àtúnyẹ̀wò yìí ránṣẹ́ bí ó ṣe wà. PR náà lè ti yí padà, tàbí o kò lè ṣe àtúnyẹ̀wò ìbéèrè ìṣọ̀kan tìrẹ.",
       "reviewNotSubmittedTerm": "Kò ṣeé fi àtúnyẹ̀wò yìí ránṣẹ́ gẹ́gẹ́ bí ó ṣe wà. Ó lè jẹ́ pé {{term}} ti yí padà, tàbí kò lè ṣàtúnyẹ̀wò {{term}} tirẹ.",
       "couldNotPostComment": "A kò lè fi àsọyé ránṣẹ́.",
-      "couldNotSubmitReview": "A kò lè fi àtúnyẹ̀wò ránṣẹ́. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú."
+      "couldNotSubmitReview": "A kò lè fi àtúnyẹ̀wò ránṣẹ́. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú.",
+      "rateLimited": "Ìbéèrè pọ̀ jù. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+      "conflict": "Èyí ti yí padà nígbà tí o ń ṣiṣẹ́ lórí rẹ̀. Jọ̀wọ́ gbé e wọlé, kí o sì tún gbìyànjú lẹ́ẹ̀kan sí i."
     },
     "operation": {
       "couldNotReply": "A kò lè fi èsì ránṣẹ́.",
@@ -2214,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} kò sí mọ́. Àwòṣe àiyípadà rẹ ni a ń lò.",
       "couldNotReadPendingSessions": "A kò lè ka àwọn ìgbà iṣẹ́ tó ń dúró. Gbìyànjú lẹ́ẹ̀kan sí i.",
       "failedToCreate": "A kò lè ṣẹ̀dá ìgbà iṣẹ́.",
+      "checkOrganizationAccess": "Jọ̀wọ́ ṣàyẹ̀wò àṣẹ ìwọlé rẹ sí àjọ yìí, kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "couldNotRefreshRepositories": "A kò lè tún àwọn ibi ìpamọ́ kóòdù gbé wọlé. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "discardDraftTitle": "Pa àkọ́kọ́ ìkọ̀wé rẹ́?",
       "discardDraftMessage": "Ọ̀rọ̀ ìtọ́ni rẹ yóò sọnù.",

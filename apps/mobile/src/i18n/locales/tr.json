@@ -1701,6 +1701,7 @@
       "prefillModelUnavailable": "{{model}} artık kullanılamıyor. Varsayılan modelin kullanılıyor.",
       "couldNotReadPendingSessions": "Bekleyen oturumlar okunamadı. Tekrar dene.",
       "failedToCreate": "Oturum oluşturulamadı.",
+      "checkOrganizationAccess": "Bu kuruluşa erişiminizi kontrol edin, ardından tekrar deneyin.",
       "couldNotRefreshRepositories": "Depolar yenilenemedi. Tekrar dene.",
       "discardDraftTitle": "Taslak silinsin mi?",
       "discardDraftMessage": "İstemin silinecek.",
@@ -2935,7 +2936,9 @@
       "reviewNotSubmitted": "Bu inceleme bu hâliyle gönderilemiyor. PR değişmiş olabilir veya kendi çekme isteğini incelemeye çalışıyor olabilirsin.",
       "reviewNotSubmittedTerm": "Bu inceleme olduğu gibi gönderilemez. {{term}} değişmiş olabilir veya kendi {{term}}ni gözden geçiremezsin.",
       "couldNotPostComment": "Yorum gönderilemedi.",
-      "couldNotSubmitReview": "İnceleme gönderilemedi. Bağlantını kontrol et ve tekrar dene."
+      "couldNotSubmitReview": "İnceleme gönderilemedi. Bağlantını kontrol et ve tekrar dene.",
+      "rateLimited": "Çok fazla istek gönderildi. Lütfen daha sonra tekrar dene.",
+      "conflict": "Bu, üzerinde çalıştığın sırada değişti. Yeniden yükle ve tekrar dene."
     },
     "operation": {
       "couldNotReply": "Yanıt verilemedi.",

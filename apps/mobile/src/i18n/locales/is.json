@@ -770,7 +770,9 @@
       "reviewNotSubmitted": "Ekki er hægt að senda þessa yfirferð í núverandi mynd. PR-beiðnin gæti hafa breyst eða þú ert að yfirfara eigin sameiningarbeiðni, sem er ekki leyfilegt.",
       "reviewNotSubmittedTerm": "Ekki er hægt að senda þessa yfirferð í núverandi mynd. {{term}} gæti hafa breyst, eða þú mátt ekki yfirfara þína eigin {{term}}.",
       "couldNotPostComment": "Ekki tókst að birta athugasemd.",
-      "couldNotSubmitReview": "Ekki tókst að senda yfirferð. Athugaðu tenginguna og reyndu aftur."
+      "couldNotSubmitReview": "Ekki tókst að senda yfirferð. Athugaðu tenginguna og reyndu aftur.",
+      "rateLimited": "Of margar beiðnir. Reyndu aftur seinna.",
+      "conflict": "Þessu var breytt á meðan þú varst að vinna í því. Hlaðaðu því aftur inn og reyndu aftur."
     },
     "operation": {
       "couldNotReply": "Tókst ekki að svara.",
@@ -2214,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} er ekki lengur tiltækt. Sjálfgefna líkanið þitt er notað í staðinn.",
       "couldNotReadPendingSessions": "Ekki tókst að lesa lotur í bið. Reyndu aftur.",
       "failedToCreate": "Ekki tókst að búa til lotu.",
+      "checkOrganizationAccess": "Athugaðu aðganginn þinn að þessari stofnun, og reyndu aftur.",
       "couldNotRefreshRepositories": "Ekki tókst að endurnýja kóðasöfnin. Reyndu aftur.",
       "discardDraftTitle": "Farga drögum?",
       "discardDraftMessage": "Skilaboðin þín glatast.",

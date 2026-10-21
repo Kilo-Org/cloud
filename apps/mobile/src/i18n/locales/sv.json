@@ -770,7 +770,9 @@
       "reviewNotSubmitted": "Den här granskningen kan inte skickas i sitt nuvarande skick. PR:en kan ha ändrats, eller så gäller den din egen PR som du inte får granska.",
       "reviewNotSubmittedTerm": "Den här granskningen kan inte skickas i sitt nuvarande skick. Det kan bero på att {{term}} har ändrats, eller på att du inte kan granska din egen {{term}}.",
       "couldNotPostComment": "Kunde inte publicera kommentaren.",
-      "couldNotSubmitReview": "Kunde inte skicka granskningen. Kontrollera anslutningen och försök igen."
+      "couldNotSubmitReview": "Kunde inte skicka granskningen. Kontrollera anslutningen och försök igen.",
+      "rateLimited": "För många förfrågningar. Försök igen senare.",
+      "conflict": "Det här ändrades medan du arbetade med det. Ladda om det och försök igen."
     },
     "operation": {
       "couldNotReply": "Det gick inte att skicka svaret.",
@@ -2214,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} är inte längre tillgänglig. Din standardmodell används i stället.",
       "couldNotReadPendingSessions": "Det gick inte att läsa in väntande sessioner. Försök igen.",
       "failedToCreate": "Det gick inte att skapa sessionen.",
+      "checkOrganizationAccess": "Kontrollera din åtkomst till den här organisationen och försök igen.",
       "couldNotRefreshRepositories": "Det gick inte att uppdatera kodarkiven. Försök igen.",
       "discardDraftTitle": "Ta bort utkastet?",
       "discardDraftMessage": "Din prompt går förlorad.",

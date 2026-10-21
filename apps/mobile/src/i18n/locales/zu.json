@@ -770,7 +770,9 @@
       "reviewNotSubmitted": "Lokhu kubuyekeza akukwazi ukuthunyelwa njengoba kunjalo. Kungenzeka i-PR ishintshile, noma awukwazi ukubuyekeza isicelo sakho sokuhlanganisa.",
       "reviewNotSubmittedTerm": "Lokhu kubuyekeza akukwazi ukuthunyelwa kanjalo. Kungenzeka {{term}} kushintshe, noma awukwazi ukubuyekeza {{term}} wakho siqu.",
       "couldNotPostComment": "Asikwazanga ukuthumela amazwana.",
-      "couldNotSubmitReview": "Asikwazanga ukuthumela ukubuyekeza. Hlola ukuxhumana kwakho bese uzama futhi."
+      "couldNotSubmitReview": "Asikwazanga ukuthumela ukubuyekeza. Hlola ukuxhumana kwakho bese uzama futhi.",
+      "rateLimited": "Izicelo eziningi kakhulu. Sicela uzame futhi kamuva.",
+      "conflict": "Lokhu kushintshile ngesikhathi usebenza kukho. Sicela ukulayishe kabusha bese uzama futhi."
     },
     "operation": {
       "couldNotReply": "Asikwazanga ukuphendula.",
@@ -2214,6 +2216,7 @@
       "prefillModelUnavailable": "{{model}} ayisatholakali. Kusetshenziswa imodeli yakho ezenzakalelayo.",
       "couldNotReadPendingSessions": "Asikwazanga ukufunda iziseshini ezilindile. Zama futhi.",
       "failedToCreate": "Asikwazanga ukudala iseshini.",
+      "checkOrganizationAccess": "Sicela uhlolo ukufinyelela kwakho kule nhlangano, bese uzama futhi.",
       "couldNotRefreshRepositories": "Asikwazanga ukuvuselela izinqolobane zekhodi. Sicela uzame futhi.",
       "discardDraftTitle": "Uyafuna ukulahla okusalungiswa?",
       "discardDraftMessage": "Isicelo sakho sizolahleka.",

@@ -770,7 +770,9 @@
       "reviewNotSubmitted": "Tsy azo alefa amin'izao endriny izao ity fandinihana ity. Mety niova ny PR, na tsy azonao atao ny mandinika ny fangatahana fampiraisana nataonao.",
       "reviewNotSubmittedTerm": "Tsy azo alefa toy izao ny fandinihana. Mety io {{term}} io, na tsy afaka mamandrika ny {{term}}-anao manokana ianao.",
       "couldNotPostComment": "Tsy navoaka ny hevitra.",
-      "couldNotSubmitReview": "Tsy nalefa ny fandinihana. Jereo ny fifandraisanao ary andramo indray."
+      "couldNotSubmitReview": "Tsy nalefa ny fandinihana. Jereo ny fifandraisanao ary andramo indray.",
+      "rateLimited": "Be loatra ny fangatahana. Andramo indray azafady rehefa afara kelikely.",
+      "conflict": "Niova ity nandritra ny nampiasanao azy. Ampidiro indray ary andramo indray azafady."
     },
     "operation": {
       "couldNotReply": "Tsy tafalefa ny valiny.",
@@ -2214,6 +2216,7 @@
       "prefillModelUnavailable": "Tsy azo ampiasaina intsony ny {{model}}. Ny modely voafidinao mialoha no ampiasaina.",
       "couldNotReadPendingSessions": "Tsy voavaky ny fotoam-piasana miandry. Andramo indray.",
       "failedToCreate": "Tsy nahomby ny famoronana fotoam-piasana.",
+      "checkOrganizationAccess": "Jereo ny fidiranao amin'ity fikambanana ity, avy eo andramo indray azafady.",
       "couldNotRefreshRepositories": "Tsy nahomby ny fanavaozana ny lisitry ny tahirin-kaody. Andramo indray azafady.",
       "discardDraftTitle": "Hariana ve ny volavola?",
       "discardDraftMessage": "Ho very ny toromarikanao.",

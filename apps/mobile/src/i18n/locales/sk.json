@@ -802,7 +802,9 @@
       "reviewNotSubmitted": "Túto kontrolu kódu nemožno odoslať v tejto podobe. PR sa mohol zmeniť alebo ide o tvoju vlastnú žiadosť o zlúčenie, ktorú nemôžeš posúdiť.",
       "reviewNotSubmittedTerm": "Túto kontrolu kódu nemožno odoslať v tejto podobe. {{term}} sa mohol zmeniť alebo nemôžeš posúdiť svoj vlastný {{term}}.",
       "couldNotPostComment": "Komentár sa nepodarilo odoslať.",
-      "couldNotSubmitReview": "Kontrolu kódu sa nepodarilo odoslať. Skontroluj pripojenie a skús to znova."
+      "couldNotSubmitReview": "Kontrolu kódu sa nepodarilo odoslať. Skontroluj pripojenie a skús to znova.",
+      "rateLimited": "Priveľa požiadaviek. Skús to znova neskôr.",
+      "conflict": "Toto sa zmenilo, kým si na tom pracoval. Znova ho načítaj a skús to znova."
     },
     "operation": {
       "couldNotReply": "Nepodarilo sa odpovedať.",
@@ -2270,6 +2272,7 @@
       "prefillModelUnavailable": "Model {{model}} už nie je dostupný. Používa sa tvoj predvolený model.",
       "couldNotReadPendingSessions": "Čakajúce relácie sa nepodarilo načítať. Skús to znova.",
       "failedToCreate": "Reláciu sa nepodarilo vytvoriť.",
+      "checkOrganizationAccess": "Skontroluj si prístup k tejto organizácii a skús to znova.",
       "couldNotRefreshRepositories": "Repozitáre sa nepodarilo obnoviť. Skús to znova.",
       "discardDraftTitle": "Zahodiť koncept?",
       "discardDraftMessage": "Tvoje zadanie sa stratí.",

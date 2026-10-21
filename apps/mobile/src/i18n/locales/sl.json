@@ -802,7 +802,9 @@
       "reviewNotSubmitted": "Tega pregleda ni mogoče oddati v trenutni obliki. PR se je morda spremenil ali pa poskušaš pregledati svoj zahtevek za združitev.",
       "reviewNotSubmittedTerm": "Tega pregleda ni mogoče oddati v trenutni obliki. {{term}} se je morda spremenil ali ne moreš pregledovati svojega {{term}}.",
       "couldNotPostComment": "Komentarja ni bilo mogoče objaviti.",
-      "couldNotSubmitReview": "Pregleda ni bilo mogoče oddati. Preveri povezavo in poskusi znova."
+      "couldNotSubmitReview": "Pregleda ni bilo mogoče oddati. Preveri povezavo in poskusi znova.",
+      "rateLimited": "Preveč zahtev. Poskusi znova pozneje.",
+      "conflict": "To se je spremenilo, medtem ko si delal na njem. Znova ga naloži in poskusi znova."
     },
     "operation": {
       "couldNotReply": "Odgovora ni bilo mogoče poslati.",
@@ -2270,6 +2272,7 @@
       "prefillModelUnavailable": "{{model}} ni več na voljo. Uporabljen je tvoj privzeti model.",
       "couldNotReadPendingSessions": "Čakajočih sej ni bilo mogoče prebrati. Poskusi znova.",
       "failedToCreate": "Seje ni bilo mogoče ustvariti.",
+      "checkOrganizationAccess": "Preveri dostop do te organizacije in poskusi znova.",
       "couldNotRefreshRepositories": "Skladišč ni bilo mogoče osvežiti. Poskusi znova.",
       "discardDraftTitle": "Želiš zavreči osnutek?",
       "discardDraftMessage": "Tvoj poziv se ne bo shranil.",

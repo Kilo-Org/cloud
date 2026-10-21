@@ -88,11 +88,15 @@ const logoutCleanupStoreEnvelopeSchema = z.object({
 /**
  * A read that feeds a read-modify-write keeps "nothing stored" and "could not
  * read" apart, so a mutation aborts instead of persisting a list derived from
- * a store it never read.
+ * a store it never read. `unreadable` is a valid payload this build cannot
+ * interpret (an unknown store version): it is kept for the build that wrote
+ * it. `corrupt` is a payload that is not valid JSON, so nothing in it is
+ * recoverable and the next write may replace it.
  */
 export type LogoutCleanupStoreRead =
   | { readonly status: 'records'; readonly records: LogoutCleanupRecord[] }
-  | { readonly status: 'unreadable' };
+  | { readonly status: 'unreadable' }
+  | { readonly status: 'corrupt' };
 
 type ParsedJson = { readonly ok: true; readonly value: unknown } | { readonly ok: false };
 
@@ -110,7 +114,7 @@ function parseStoredRecords(raw: string | null): LogoutCleanupStoreRead {
   }
   const parsed = parseJson(raw);
   if (!parsed.ok) {
-    return { status: 'unreadable' };
+    return { status: 'corrupt' };
   }
   const envelope = logoutCleanupStoreEnvelopeSchema.safeParse(parsed.value);
   if (envelope.success) {
@@ -172,7 +176,20 @@ export async function readLogoutCleanupStore(): Promise<LogoutCleanupStoreRead> 
   if (stored.status === 'unreadable') {
     return { status: 'unreadable' };
   }
-  return parseStoredRecords(stored.value);
+  const read = parseStoredRecords(stored.value);
+  if (read.status !== 'records') {
+    // Report the state, never the payload: it can hold account ids and device
+    // tokens. A corrupt payload is repaired by the next write; an unknown
+    // version stays for the build that wrote it.
+    Sentry.captureException(new Error('Logout cleanup store is not readable by this build'), {
+      tags: {
+        'error.subsystem': 'auth',
+        'error.operation': 'read_logout_cleanup_store',
+        'logout.cleanup.store': read.status,
+      },
+    });
+  }
+  return read;
 }
 
 /** Read-only view of the pending records; an unreadable store reads as none. */
@@ -241,10 +258,11 @@ async function chainLogoutCleanupRecords(
   await chainSave(LOGOUT_CLEANUP_TOMBSTONE_KEY, async () => {
     const read = await readLogoutCleanupStore();
     if (read.status === 'unreadable') {
-      // Nothing safe to modify: keep the stored payload for a later read.
+      // Nothing safe to modify: keep the payload for the build that wrote it.
       return;
     }
-    await writeLogoutCleanupRecords(mutate(read.records));
+    // A corrupt payload has nothing recoverable, so this write repairs it.
+    await writeLogoutCleanupRecords(mutate(read.status === 'records' ? read.records : []));
   });
 }
 
@@ -421,10 +439,11 @@ async function runActivityCleanup(
     await chainSave(LOGOUT_CLEANUP_TOMBSTONE_KEY, async () => {
       const read = await readLogoutCleanupStore();
       if (read.status === 'unreadable') {
-        // Nothing safe to modify: keep the stored payload for a later read.
+        // Nothing safe to modify: keep the payload for the build that wrote it.
         return;
       }
-      const records = read.records;
+      // A corrupt payload has nothing recoverable, so this write repairs it.
+      const records = read.status === 'records' ? read.records : [];
       const pending = logoutCleanupRecordFor(records, userId);
       await writeLogoutCleanupRecords(
         upsertLogoutCleanupRecord(records, {

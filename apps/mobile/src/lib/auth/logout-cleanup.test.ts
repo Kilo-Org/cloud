@@ -514,14 +514,33 @@ describe('runLogoutCleanup', () => {
     expect(await storedRecordFor('u2')).toBeUndefined();
   });
 
-  it('leaves an unreadable stored payload untouched when a logout records nothing', async () => {
+  it('repairs an unparseable stored payload when a logout records its cleanup', async () => {
+    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, '{not json');
+    pushOutcome('token', 'push-1');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
+    const { captureException } = await import('@sentry/react-native');
+
+    await runLogoutCleanup();
+
+    expect(await storedRecordFor('u1')).toMatchObject({ userId: 'u1', pushTokens: ['push-1'] });
+    expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'auth',
+        'error.operation': 'read_logout_cleanup_store',
+        'logout.cleanup.store': 'corrupt',
+      },
+    });
+  });
+
+  it('removes an unparseable stored payload when a logout has nothing to record', async () => {
     store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, '{not json');
     pushOutcome('none');
     trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
 
     await runLogoutCleanup();
 
-    expect(store.get(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe('{not json');
+    expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
   });
 
   it('leaves a stored payload of an unknown version untouched', async () => {
@@ -550,7 +569,7 @@ describe('runLogoutCleanup', () => {
     expect(await storedRecordFor('u1')).toMatchObject({ userId: 'u1', pushTokens: ['push-a'] });
   });
 
-  it('reads an unreadable stored payload as no pending records', async () => {
+  it('reads an unparseable stored payload as no pending records', async () => {
     store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, 'not-json');
 
     await expect(readLogoutCleanupRecords()).resolves.toEqual([]);

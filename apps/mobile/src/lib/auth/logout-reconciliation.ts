@@ -43,6 +43,8 @@ export type ReconciliationAttemptOutcome =
   | { kind: 'expired-retained' }
   | { kind: 'different-user-retained' }
   | { kind: 'unreadable-store' }
+  | { kind: 'corrupt-repaired' }
+  | { kind: 'corrupt-retained' }
   | { kind: 'attempted'; tombstoneDeleted: boolean };
 
 /** Test-only: clears the single-flight and spacing state between tests. */
@@ -111,7 +113,8 @@ export async function hasPendingActivityUnregister(userId: string | null): Promi
   if (read.status === 'unreadable') {
     return false;
   }
-  return read.records.some(
+  const records = read.status === 'records' ? read.records : [];
+  return records.some(
     record =>
       record.needsActivityUnregister &&
       (userId === null || record.userId === null || record.userId === userId)
@@ -124,20 +127,26 @@ async function runReconciliation(
 ): Promise<ReconciliationAttemptOutcome> {
   const stored = await readLogoutCleanupStore();
   if (stored.status === 'unreadable') {
-    // Nothing safe to retry or rewrite: keep the payload for a later read.
+    // Nothing safe to retry or rewrite: keep the payload for the build that
+    // wrote it.
     return { kind: 'unreadable-store' };
   }
-  const records = stored.records;
+  // A corrupt payload has nothing recoverable, so this attempt repairs it.
+  const corrupt = stored.status === 'corrupt';
+  const records = stored.status === 'records' ? stored.records : [];
   const now = Date.now();
   const live = records.filter(record => now - record.failedAt <= TOMBSTONE_MAX_AGE_MS);
   const expiredPurged = live.length !== records.length;
 
   const owned = live.filter(record => record.userId === null || record.userId === userId);
   if (owned.length === 0) {
-    if (!expiredPurged) {
+    if (!expiredPurged && !corrupt) {
       return live.length > 0 ? { kind: 'different-user-retained' } : { kind: 'no-tombstone' };
     }
     const persisted = await persistRecords(epoch, live);
+    if (corrupt) {
+      return { kind: persisted ? 'corrupt-repaired' : 'corrupt-retained' };
+    }
     return { kind: persisted ? 'expired-discarded' : 'expired-retained' };
   }
 

@@ -4,17 +4,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type LogoutCleanupRecord } from '@/lib/auth/logout-cleanup';
 
 const cleanupMock = vi.hoisted(() => {
-  const readState: { records: LogoutCleanupRecord[]; unreadable: boolean } = {
+  const readState: { records: LogoutCleanupRecord[]; unreadable: boolean; corrupt: boolean } = {
     records: [],
     unreadable: false,
+    corrupt: false,
   };
   return {
     readState,
     defaultStoreRead: async () => {
       await Promise.resolve();
-      return readState.unreadable
-        ? ({ status: 'unreadable' } as const)
-        : ({ status: 'records', records: readState.records } as const);
+      if (readState.unreadable) {
+        return { status: 'unreadable' } as const;
+      }
+      if (readState.corrupt) {
+        return { status: 'corrupt' } as const;
+      }
+      return { status: 'records', records: readState.records } as const;
     },
     awaitActivityCleanupSettled: vi.fn().mockResolvedValue(undefined),
     readLogoutCleanupStore: vi.fn(),
@@ -72,6 +77,7 @@ describe('attemptLogoutReconciliation', () => {
     resetLogoutReconciliationForTests();
     cleanupMock.readState.records = [];
     cleanupMock.readState.unreadable = false;
+    cleanupMock.readState.corrupt = false;
     cleanupMock.readLogoutCleanupStore.mockImplementation(cleanupMock.defaultStoreRead);
     cleanupMock.writeLogoutCleanupRecords.mockResolvedValue(undefined);
   });
@@ -91,6 +97,18 @@ describe('attemptLogoutReconciliation', () => {
     // A store that cannot be read must not be rewritten from an empty list.
     expect(outcome).toEqual({ kind: 'unreadable-store' });
     expect(cleanupMock.writeLogoutCleanupRecords).not.toHaveBeenCalled();
+    expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
+  });
+
+  it('repairs a store payload that is not valid JSON', async () => {
+    cleanupMock.readState.corrupt = true;
+
+    const outcome = await attemptLogoutReconciliation('u1');
+
+    // Nothing in an unparseable payload is recoverable, so the attempt
+    // replaces it with the empty list instead of retrying it forever.
+    expect(outcome).toEqual({ kind: 'corrupt-repaired' });
+    expect(cleanupMock.writeLogoutCleanupRecords).toHaveBeenCalledWith([]);
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
   });
 

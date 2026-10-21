@@ -1,5 +1,5 @@
-import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, createElement } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
 import { getTabBarIconForwardHeight, getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
@@ -22,10 +22,16 @@ const layout = vi.hoisted(() => ({
  * events.
  */
 const keyboard = vi.hoisted(() => ({ occlusion: 0 }));
+/** Captures `scrollFocusedInputAboveKeyboard` calls at the module boundary. */
+const reveal = vi.hoisted(() => ({ fn: vi.fn() }));
 
 vi.mock('react-native-keyboard-controller', () => ({
   useKeyboardState: <T,>(selector: (state: { height: number }) => T) =>
     selector({ height: keyboard.occlusion }),
+}));
+
+vi.mock('@/lib/keyboard-reveal', () => ({
+  scrollFocusedInputAboveKeyboard: reveal.fn,
 }));
 
 vi.mock('react-native', () => ({
@@ -64,11 +70,23 @@ async function clearanceFor(showLabel: boolean | null): Promise<number> {
   }
 }
 
+/** A scroll-frame layout event for the reveal test. */
+const frame = (width: number, height: number) => ({
+  nativeEvent: { layout: { width, height, x: 0, y: 0 } },
+});
+
+beforeEach(() => {
+  // The reveal fires through a 400ms settle timer; fake timers drive it.
+  vi.useFakeTimers();
+});
+
 afterEach(() => {
   layout.bottom = 16;
   layout.fontScale = DEFAULT_FONT_SCALE;
   layout.platform = 'android';
   keyboard.occlusion = 0;
+  reveal.fn.mockClear();
+  vi.useRealTimers();
 });
 
 describe('tab screen bottom clearance', () => {
@@ -139,11 +157,12 @@ describe('TabScreenScrollView keyboard occlusion', () => {
     unmount();
   });
 
-  it('leaves the IME to the native inset when an iOS caller opts in', async () => {
-    // The input screens set `automaticallyAdjustKeyboardInsets`, which reserves
-    // the IME and reveals the focused field natively. Folding the occlusion into
-    // the frame margin as well would book it twice, so the frame keeps no
-    // keyboard margin here (the tab bar hides while the IME is up).
+  it('reserves the IME in the frame even when an iOS caller opts into the native inset', async () => {
+    // `automaticallyAdjustKeyboardInsets` reserves the IME natively, but its
+    // scroll reveal does not clamp programmatic scrolls to the keyboard top —
+    // focused content stayed under the IME with no scroll range to drag it
+    // clear. The wrapper reserves the occlusion in the frame itself and drops
+    // the prop, so the viewport always ends at the IME's top edge.
     layout.platform = 'ios';
     layout.bottom = 34;
     layout.fontScale = 1;
@@ -156,7 +175,8 @@ describe('TabScreenScrollView keyboard occlusion', () => {
       )
     );
     const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
-    expect(scroll?.props.style).toEqual([undefined, { marginBottom: 0 }]);
+    expect(scroll?.props.style).toEqual([undefined, { marginBottom: 300 }]);
+    expect(scroll?.props.automaticallyAdjustKeyboardInsets).toBe(false);
     unmount();
   });
 
@@ -192,5 +212,67 @@ describe('TabScreenScrollView keyboard occlusion', () => {
     const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
     expect(scroll?.props.keyboardShouldPersistTaps).toBe('never');
     unmount();
+  });
+
+  it('re-reveals the focused input when the IME opens and when the frame re-lays out', async () => {
+    // Two re-layouts leave the focused row (and whatever sits under it) parked
+    // behind the IME, with no scroll slack to drag it clear:
+    // - the IME opening: the keyboard animation re-insets the content without a
+    //   layout event, and the native focus reveal can leave the field covered,
+    // - a rotation while the field stays focused: the native inset reveal runs
+    //   on focus only. Both re-run the reveal once the transition has landed.
+    layout.platform = 'ios';
+    layout.bottom = 34;
+    layout.fontScale = 1;
+    keyboard.occlusion = 300;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        TabScreenScrollView,
+        { automaticallyAdjustKeyboardInsets: true },
+        createElement('Content')
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+    const layoutHandler = (scroll as { props: { onLayout?: (event: unknown) => void } }).props
+      .onLayout;
+    expect(layoutHandler).toBeTypeOf('function');
+    // The IME opening (keyboard state reaches 300 at mount) schedules the
+    // reveal; it fires once the transition has landed.
+    await act(async () => {
+      await Promise.resolve(vi.advanceTimersByTime(400));
+    });
+    expect(reveal.fn).toHaveBeenCalledTimes(1);
+    // An initial frame layout, then a size change with the IME up reschedules;
+    // the timer defers past the stale-geometry layout.
+    layoutHandler?.(frame(874, 402));
+    layoutHandler?.(frame(402, 874));
+    await act(async () => {
+      await Promise.resolve(vi.advanceTimersByTime(400));
+    });
+    expect(reveal.fn).toHaveBeenCalledTimes(2);
+    // Same-size layout pass: no reveal.
+    layoutHandler?.(frame(402, 874));
+    await act(async () => {
+      await Promise.resolve(vi.advanceTimersByTime(400));
+    });
+    expect(reveal.fn).toHaveBeenCalledTimes(2);
+    unmount();
+    // The keyboard-open trigger is universal now: a frame-margin caller
+    // (Android) with the IME up schedules too, and a same-size layout on it
+    // changes nothing.
+    const plain = await renderWithProviders(
+      createElement(TabScreenScrollView, null, createElement('Content'))
+    );
+    const [plainScroll] = plain.renderer.root.findAllByType('ScrollView', { deep: false });
+    const plainHandler = (plainScroll as { props: { onLayout?: (event: unknown) => void } }).props
+      .onLayout;
+    expect(plainHandler).toBeTypeOf('function');
+    plainHandler?.(frame(874, 402));
+    plainHandler?.(frame(874, 402));
+    await act(async () => {
+      await Promise.resolve(vi.advanceTimersByTime(400));
+    });
+    expect(reveal.fn).toHaveBeenCalledTimes(3);
+    plain.unmount();
   });
 });

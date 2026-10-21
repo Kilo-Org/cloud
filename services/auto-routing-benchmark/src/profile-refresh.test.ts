@@ -32,12 +32,24 @@ function seedProfile(model: string, status = 'ready') {
     .run(model, status, measuredAt, measuredAt);
 }
 
-function seedCase(model: string, error: string | null = null) {
+function seedCase(
+  model: string,
+  error: string | null = null,
+  measured: { costUsd?: number | null; outputPrefix?: string | null; timedOut?: boolean } = {}
+) {
   sqlite
     .prepare(`INSERT INTO case_results (
-    run_id, model, variant, case_id, score, latency_ms, exit_code, error, rep
-  ) VALUES ('source', ?, '', 'case-a', 1, 10, ?, ?, 0)`)
-    .run(model, error ? 1 : 0, error);
+    run_id, model, variant, case_id, score, latency_ms, exit_code, error, rep,
+    cost_usd, output_prefix, timed_out
+  ) VALUES ('source', ?, '', 'case-a', 1, 10, ?, ?, 0, ?, ?, ?)`)
+    .run(
+      model,
+      error ? 1 : 0,
+      error,
+      measured.costUsd ?? null,
+      measured.outputPrefix ?? null,
+      measured.timedOut ? 1 : 0
+    );
 }
 
 beforeEach(() => {
@@ -109,29 +121,102 @@ describe('targeted benchmark refresh', () => {
     ]);
   });
 
-  it('repairs unavailable-model measurements without resetting valid profiles', async () => {
+  it.each([
+    'Error: Model not found: kilo/vendor/selected.',
+    'Error: Model not found: vendor/selected. Did you mean: vendor/other?',
+    '\u001b[31mError:\u001b[0m Model not found: kilo/vendor/selected',
+  ])(
+    'repairs exact unavailable-model measurements without resetting valid profiles: %s',
+    async error => {
+      seedProfile('vendor/selected');
+      seedProfile('vendor/other');
+      seedCase('vendor/selected', error);
+      seedCase('vendor/other');
+      const result = await refreshCurrentProfiles(
+        db,
+        {
+          ...current,
+          mode: 'repair_unavailable',
+          entries: [
+            { model: 'vendor/selected', variant: null },
+            { model: 'vendor/other', variant: null },
+          ],
+        },
+        catalog,
+        refreshedAt
+      );
+      expect(result.refreshed).toEqual([{ model: 'vendor/selected', variant: null }]);
+      expect(result.skipped).toEqual([{ model: 'vendor/other', variant: null }]);
+      expect(
+        sqlite.prepare(`SELECT status FROM benchmark_profiles WHERE model='vendor/other'`).get()
+      ).toEqual({ status: 'ready' });
+    }
+  );
+
+  it.each([
+    {
+      error:
+        'Model not found: kilo/vendor/selected. Failed to load the Kilo model catalog (network). Check your connection and credentials.',
+    },
+    { error: 'Model not found: kilo/vendor/selected-other' },
+    { error: 'Model not found: kilo/vendor/other' },
+    { error: 'Model not found: kilo/vendor/selected', costUsd: 0.01 },
+    { error: 'Model not found: kilo/vendor/selected', timedOut: true },
+    { error: 'Model not found: kilo/vendor/selected', outputPrefix: 'measured answer' },
+    { error: 'Provider API failed: resource not found' },
+  ])(
+    'does not repair catalog failures or unrelated measurements: %j',
+    async ({ error, ...measured }) => {
+      seedProfile('vendor/selected');
+      seedCase('vendor/selected', error, measured);
+      const result = await refreshCurrentProfiles(
+        db,
+        {
+          ...current,
+          mode: 'repair_unavailable',
+          entries: [{ model: 'vendor/selected', variant: null }],
+        },
+        catalog,
+        refreshedAt
+      );
+      expect(result).toEqual({
+        refreshed: [],
+        unavailable: [],
+        skipped: [{ model: 'vendor/selected', variant: null }],
+      });
+      expect(
+        sqlite.prepare(`SELECT status, run_id, invalidated_at FROM benchmark_profiles`).get()
+      ).toEqual({ status: 'ready', run_id: 'source', invalidated_at: null });
+    }
+  );
+
+  it('does not repair a profile whose measurement changed after reading lookup failures', async () => {
     seedProfile('vendor/selected');
-    seedProfile('vendor/other');
-    seedCase('vendor/selected', 'Error: Model not found: kilo/vendor/selected.');
-    seedCase('vendor/other');
+    seedCase('vendor/selected', 'Model not found: kilo/vendor/selected');
+    seedRun('replacement');
+    let calls = 0;
+    const racingDb = sqliteD1(sqlite, () => {
+      calls += 1;
+      if (calls === 3)
+        sqlite
+          .prepare(`UPDATE benchmark_profiles SET run_id='replacement'
+        WHERE model='vendor/selected'`)
+          .run();
+    });
     const result = await refreshCurrentProfiles(
-      db,
+      racingDb,
       {
         ...current,
         mode: 'repair_unavailable',
-        entries: [
-          { model: 'vendor/selected', variant: null },
-          { model: 'vendor/other', variant: null },
-        ],
+        entries: [{ model: 'vendor/selected', variant: null }],
       },
       catalog,
       refreshedAt
     );
-    expect(result.refreshed).toEqual([{ model: 'vendor/selected', variant: null }]);
-    expect(result.skipped).toEqual([{ model: 'vendor/other', variant: null }]);
+    expect(result.skipped).toEqual([{ model: 'vendor/selected', variant: null }]);
     expect(
-      sqlite.prepare(`SELECT status FROM benchmark_profiles WHERE model='vendor/other'`).get()
-    ).toEqual({ status: 'ready' });
+      sqlite.prepare(`SELECT status, run_id, invalidated_at FROM benchmark_profiles`).get()
+    ).toEqual({ status: 'ready', run_id: 'replacement', invalidated_at: null });
   });
 
   it('refuses a selection containing an active measurement without partial changes', async () => {

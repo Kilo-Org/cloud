@@ -593,6 +593,9 @@ The backend owns scheduling, report revisions, optional paid summaries, and noti
 AI summaries and briefing notifications require separate opt-ins.
 Summary settings include a model override and finite generation time and spend limits.
 The default summary model is `~deepseek/deepseek-flash-latest`.
+Pricing estimates and gateway spend checks resolve latest-model aliases through the stored catalog target.
+An alias remains unavailable when its target is missing or has no usable pricing.
+The gateway rejects an alias request if provider routing selects a different target from the priced catalog target.
 The structured report remains available when generation fails or reaches a limit.
 
 Apply database migrations before deploying the session-ingest, notification, gateway, and web changes.

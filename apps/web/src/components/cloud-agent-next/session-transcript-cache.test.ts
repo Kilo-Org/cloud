@@ -41,7 +41,8 @@ describe('web session transcript cache', () => {
   it('keeps only the recent transcript while the live page restores pagination', async () => {
     const cache = createWebSessionTranscriptCache(queryClient, 'personal');
     cache.write(page('ses-1', 60));
-    const snapshot = await cache.read('ses-1' as KiloSessionId);
+    await Promise.resolve(); // writes land in a microtask
+    const snapshot = cache.read('ses-1' as KiloSessionId);
     expect(snapshot?.messages).toHaveLength(50);
     expect(snapshot?.messages[0].info.id).toBe('message-10');
     expect(snapshot?.messages.at(-1)?.info.id).toBe('message-59');
@@ -53,9 +54,10 @@ describe('web session transcript cache', () => {
     const personal = createWebSessionTranscriptCache(queryClient, 'personal');
     const organization = createWebSessionTranscriptCache(queryClient, 'organization');
     personal.write(page('ses-1'));
-    expect(await personal.read('ses-2' as KiloSessionId)).toBeNull();
-    expect(await organization.read('ses-1' as KiloSessionId)).toBeNull();
-    expect(await personal.read('ses-1' as KiloSessionId)).not.toBeNull();
+    await Promise.resolve(); // writes land in a microtask
+    expect(personal.read('ses-2' as KiloSessionId)).toBeNull();
+    expect(organization.read('ses-1' as KiloSessionId)).toBeNull();
+    expect(personal.read('ses-1' as KiloSessionId)).not.toBeNull();
   });
 
   it('evicts the oldest transcript after five cached sessions', async () => {
@@ -64,8 +66,9 @@ describe('web session transcript cache', () => {
       jest.spyOn(Date, 'now').mockReturnValue(1000 + index);
       cache.write(page(`ses-${index}`));
     }
-    expect(await cache.read('ses-0' as KiloSessionId)).toBeNull();
-    expect(await cache.read('ses-5' as KiloSessionId)).not.toBeNull();
+    await Promise.resolve(); // writes land in a microtask
+    expect(cache.read('ses-0' as KiloSessionId)).toBeNull();
+    expect(cache.read('ses-5' as KiloSessionId)).not.toBeNull();
     expect(queryClient.getQueryCache().getAll()).toHaveLength(5);
   });
 
@@ -73,14 +76,16 @@ describe('web session transcript cache', () => {
     const cache = createWebSessionTranscriptCache(queryClient, 'personal');
     cache.write(page('ses-1'));
     cache.write(page('ses-1', 1, 'x'.repeat(1_000_000)));
-    expect(await cache.read('ses-1' as KiloSessionId)).toBeNull();
+    await Promise.resolve(); // writes land in a microtask
+    expect(cache.read('ses-1' as KiloSessionId)).toBeNull();
   });
 
   it('retains the latest write even when timestamps match', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(1000);
     const cache = createWebSessionTranscriptCache(queryClient, 'personal');
     for (let index = 0; index < 6; index++) cache.write(page(`ses-${index}`));
-    expect(await cache.read('ses-5' as KiloSessionId)).not.toBeNull();
-    expect(await cache.read('ses-0' as KiloSessionId)).toBeNull();
+    await Promise.resolve(); // writes land in a microtask
+    expect(cache.read('ses-5' as KiloSessionId)).not.toBeNull();
+    expect(cache.read('ses-0' as KiloSessionId)).toBeNull();
   });
 });

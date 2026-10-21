@@ -35,6 +35,8 @@
     "connectGithub": "Conectar GitHub",
     "cost": "Custo",
     "discard": "Descartar",
+    "discardChangesMessage": "Perderanse os teus cambios.",
+    "discardChangesTitle": "Descartar os cambios?",
     "findings": "Problemas detectados",
     "mergeRequest": "solicitude de fusión",
     "notConnected": "Sen conexión",
@@ -109,7 +111,9 @@
     "online": "En liña",
     "open": "Abrir {{name}}",
     "openPullRequest": "Apertura da solicitude de cambios",
+    "completed": "Rematado",
     "pending": "Pendente",
+    "running": "En execución",
     "performance": "Rendemento",
     "preferences": "Preferencias",
     "privacyPolicy": "Política de privacidade",
@@ -603,7 +607,7 @@
       "openAccessibility": "Abrir solicitude de integración ou de fusión",
       "clearLink": "Limpar a ligazón",
       "pasteLink": "Pegar a ligazón á solicitude de integración ou de fusión",
-      "open": "Apertura"
+      "open": "Abrir"
     },
     "checks": {
       "title": "Comprobacións",
@@ -661,7 +665,8 @@
       "description": "Conecta a túa conta de GitHub para revisar solicitudes de integración no móbil.",
       "gitlabDescription": "Conecta a túa conta de GitLab para revisar solicitudes de fusión no móbil.",
       "bitbucketDescription": "Conecta Bitbucket a esta organización para revisar solicitudes de integración no móbil.",
-      "bitbucketOrgOnlyDescription": "Selecciona unha organización no teu perfil para revisar as súas solicitudes de integración de Bitbucket."
+      "bitbucketOrgOnlyDescription": "Cambia a conta de arriba a unha organización para revisar as súas solicitudes de integración en Bitbucket.",
+      "contextLine": "Para {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "Esta revisión non se pode enviar tal e como está. Pode que a PR cambiase ou que esteas a revisar a túa propia solicitude de integración, o que non está permitido.",
       "reviewNotSubmittedTerm": "Esta revisión non se pode enviar tal como está. Pode que a {{term}} cambiase ou que non poidas revisar a túa propia {{term}}.",
       "couldNotPostComment": "Non se puido publicar o comentario.",
-      "couldNotSubmitReview": "Non se puido enviar a revisión. Comproba a conexión e téntao de novo."
+      "couldNotSubmitReview": "Non se puido enviar a revisión. Comproba a conexión e téntao de novo.",
+      "rateLimited": "Demasiadas solicitudes. Téntao de novo máis tarde.",
+      "conflict": "Isto cambiou mentres estabas a traballar nel. Volve cargalo e téntao de novo."
     },
     "operation": {
       "couldNotReply": "Non se puido responder.",
@@ -1413,6 +1420,9 @@
       "couldNotGetLatest": "Non se puido obter a información máis recente.",
       "byline": "{{repo}} #{{number}} por {{author}}",
       "noFindings": "Non hai achados.",
+      "findingsUnavailable": "Os resultados non están dispoñibles porque esta revisión fallou.",
+      "serviceUnavailable": "Non se puido conectar co servizo de revisión de código. Tenta de novo a revisión cando o servizo estea dispoñible.",
+      "reviewFailed": "A revisión fallou. Téntao de novo, por favor.",
       "showMore": "Amosar máis",
       "created": "Creada",
       "started": "Iniciada",
@@ -1528,8 +1538,6 @@
     "updateFailed": "Non se puido actualizar o revisor.",
     "configSaveFailed": "Non se puido gardar a configuración da revisión.",
     "status": {
-      "running": "En execución",
-      "completed": "Rematado",
       "interrupted": "Interrompida"
     },
     "reviewStyle": {
@@ -1542,7 +1550,8 @@
       "bugs": "Erros",
       "style": "Estilo",
       "testing": "Probas",
-      "documentation": "Documentación"
+      "documentation": "Documentación",
+      "unknown": "Outro ({{area}})"
     },
     "gateThreshold": {
       "warning": "Aviso"
@@ -1654,7 +1663,14 @@
       "whereFound": "Localizacións do achado ({{displayCount}})",
       "fullReport": "Informe xerado completo",
       "yes": "Si",
-      "no": "Non"
+      "no": "Non",
+      "action": {
+        "analyzeCodebase": "Analizar a base de código",
+        "dismiss": "Rexeitar",
+        "manualReview": "Revisión manual",
+        "monitor": "Monitorizar",
+        "openPr": "Abrir PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} achados",
@@ -1856,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Gardar cambios",
       "unsavedTitle": "Cambios sen gardar",
-      "unsavedMessage": "Queres gardar os cambios antes de saír desta pantalla?"
+      "unsavedMessage": "Queres gardar os cambios antes de saír desta pantalla?",
+      "unsavedInvalidMessage": "Estes cambios aínda non se poden gardar. Corríxeos para gardalos ou descártaos para saír."
     },
     "auditReportButton": {
       "viewA11y": "Ver informe de auditoría"
@@ -1873,7 +1890,24 @@
       "title": "Informe de auditoría",
       "unavailable": "Informe de auditoría non dispoñible",
       "unavailableDescription": "Só os propietarios da organización e os xestores de facturación poden ver os informes de auditoría. Pídelle a un propietario ou xestor de facturación que che conceda acceso.",
-      "queryFailed": "A consulta do informe non rematou. Téntao de novo."
+      "queryFailed": "A consulta do informe non rematou. Téntao de novo.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Análise completada",
+        "findingAnalysisFailed": "Produciuse un erro na análise",
+        "findingAutoDismissed": "Rexeitado automaticamente",
+        "findingCreated": "Importado",
+        "findingDeleted": "Eliminado",
+        "findingDismissed": "Rexeitado",
+        "findingSeverityChanged": "Cambiouse a gravidade",
+        "findingStatusChange": "Cambiouse o estado",
+        "findingSuperseded": "Substituído",
+        "remediationBlocked": "Corrección bloqueada",
+        "remediationCancelled": "Cancelada",
+        "remediationFailed": "Produciuse un erro na corrección",
+        "remediationNoChangesNeeded": "Non se precisan cambios",
+        "remediationPrOpened": "PR aberto",
+        "remediationQueued": "Corrección solicitada"
+      }
     },
     "notifications": {
       "couldNotLoad": "Non se puido cargar a configuración das notificacións.",
@@ -1905,7 +1939,6 @@
       "installApp": "Instalar a aplicación de GitHub",
       "reauthorizeButton": "Volver autorizar a aplicación de GitHub",
       "reauthorizeDescription": "O axente de seguridade require o permiso vulnerability_alerts para acceder aos avisos de Dependabot. Volve autorizar a aplicación de GitHub para conceder este permiso.",
-      "reauthorizeFailed": "Non se puido iniciar a reautorización. Téntao de novo.",
       "reauthorizeTitle": "Requírense permisos adicionais",
       "setupFailed": "Non se puido iniciar a configuración de GitHub. Téntao de novo."
     },
@@ -2209,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} xa non está dispoñible. Usarase o teu modelo predeterminado.",
       "couldNotReadPendingSessions": "Non se puideron ler as sesións pendentes. Téntao de novo.",
       "failedToCreate": "Non se puido crear a sesión.",
+      "checkOrganizationAccess": "Comproba o teu acceso a esta organización e téntao de novo.",
       "couldNotRefreshRepositories": "Non se puideron actualizar os repositorios. Téntao de novo.",
       "discardDraftTitle": "Descartar o borrador?",
       "discardDraftMessage": "Perderase a túa instrución.",
@@ -2278,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} liñas",
       "matchesBadge_one": "{{displayCount}} coincidencia",
       "matchesBadge_other": "{{displayCount}} coincidencias",
-      "noOutput": "Non hai saída."
+      "noOutput": "Non hai saída.",
+      "translationFailed": "Fallou a tradución"
     },
     "readToolMarkdown": {
       "linesTruncated": "liñas {{start}}–{{end}} (contido truncado)",
@@ -2692,7 +2727,7 @@
       "invalidLink": "Non se pode abrir esta ligazón.",
       "hostConfirmTitle": "Abrir a ligazón externa?",
       "hostConfirmMessage": "Esta ligazón abre {{host}} no teu navegador.",
-      "open": "Apertura",
+      "open": "Abrir",
       "trustThisHost": "Confiar neste dominio"
     },
     "folderPicker": {
@@ -2729,6 +2764,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Non se poden mostrar as túas sesións activas ata que se carguen os datos.",
     "currentDeviceUnidentified": "Non se puido identificar o dispositivo actual.",
+    "kiloApp": "Aplicación de Kilo",
     "noSessions": "Non hai sesións activas",
     "noSessionsDescription": "Inicia sesión coa aplicación de Kilo noutro dispositivo e aparecerá aquí.",
     "onlyKiloAppSignIns": "Aquí só aparecen os inicios de sesión da aplicación de Kilo. Non se inclúen os do editor nin os do CLI.",
@@ -2881,6 +2917,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Antes de comezar",
+    "summaryTitle": "Preferencias de compartición de datos",
     "introDescription": "Kilo envía as túas mensaxes aos provedores de IA para xerar respostas. Isto é o que se comparte e con quen.",
     "required": "Necesario para usar Kilo",
     "promptsTitle": "As túas instrucións e conversas",
@@ -2889,7 +2926,6 @@
     "accountDescription": "O identificador da túa conta de Kilo e os metadatos das solicitudes, usados para autenticarte e medir o uso.",
     "diagnosticsTitle": "Diagnósticos da aplicación",
     "diagnosticsDescription": "Informes de peches inesperados e erros, sen o contido da aplicación, para manter a aplicación estable.",
-    "optional": "Opcional",
     "helpImprove": "Axudar a mellorar Kilo",
     "helpImproveDescription": "Comparte estatísticas de uso anónimas e a orixe da instalación. Podes cambiar esta opción en calquera momento na configuración.",
     "seeFullDetails": "Ver todos os detalles",
@@ -3468,6 +3504,9 @@
     "localModels": {
       "title": "Modelos no dispositivo",
       "help": "Os modelos no dispositivo execútanse neste teléfono. As túas solicitudes e respostas quedan no dispositivo.",
+      "switchTitle": "Cambiar a un modelo no dispositivo?",
+      "switchMessage": "Ao cambiar a {{name}}, as instrucións e o contexto desta conversa procesaranse neste teléfono, non nun servidor remoto.",
+      "switchConfirm": "Cambiar de modelo",
       "systemPurpose": "O modelo integrado no sistema deste dispositivo. Execútase no dispositivo.",
       "apple": "Apple Intelligence (no dispositivo)",
       "checking": "Comprobando a dispoñibilidade…",
@@ -3564,7 +3603,6 @@
     "personalDefaultDescription": "Carga automaticamente cando ningún repositorio ten un perfil fixado.",
     "organizationDefaultDescription": "Cargado automático para membros que non teñen ningún valor predeterminado persoal.",
     "setAsDefault": "Establecer como predeterminado",
-    "removeDefault": "Eliminar por defecto",
     "saveFailed": "Non se puido gardar o perfil",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Isto elimina permanentemente o perfil e a súa configuración. Isto non se pode desfacer.",
@@ -3590,11 +3628,13 @@
     "commandsTitle": "Comandos de configuración",
     "addCommand": "Engadir comando",
     "commandLabel": "Comando",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "p. ex. pnpm install",
     "commandsEmpty": "Aínda non hai comandos de configuración",
     "commandsSaveFailed": "Non se puideron gardar os comandos de configuración",
     "moveUp": "Moverse cara arriba",
     "moveDown": "Mover cara abaixo",
+    "moveCommandUp": "Mover o comando {{position}} cara arriba",
+    "moveCommandDown": "Mover o comando {{position}} cara abaixo",
     "skillsTitle": "Habilidades",
     "addSkill": "Engade habilidade",
     "skillNameLabel": "Nome da habilidade",
@@ -3634,18 +3674,20 @@
       "jsonTooLarge": "Usa como máximo 50 entradas, chaves de ata 128 e valores de ata 4096 caracteres",
       "timeoutInvalid": "O tempo de espera debe ser dun número enteiro de milisegundos",
       "edit": "Editar servidor MCP",
-      "saveFailed": "Non se puido gardar o servidor MCP"
+      "saveFailed": "Non se puido gardar o servidor MCP",
+      "deleteFailed": "Non se puido eliminar o servidor MCP",
+      "updateFailed": "Non se puido actualizar o servidor MCP"
     },
     "agents": {
       "title": "Axentes de perfil",
       "add": "Engadir axente",
       "empty": "Aínda non hai axentes",
       "name": "Nome do axente",
-      "slug": "Axente babosa",
+      "slug": "Slug do axente",
       "description": "Descrición do axente",
       "model": "Anulación do modelo",
       "modelPlaceholder": "Usar sesión predeterminada",
-      "prompt": "Aviso do sistema",
+      "prompt": "Prompt do sistema",
       "steps": "Pasos máximos",
       "stepsPlaceholder": "p. ex. 50",
       "temperature": "Temperatura",
@@ -3661,10 +3703,11 @@
       "visibilitySubagent": "Subaxente: só se pode chamar desde outros",
       "visibilityAll": "Todos - ambos",
       "saveFailed": "Non se puido gardar o axente",
+      "deleteFailed": "Non se puido eliminar o axente",
       "nameRequired": "Introduza un nome de axente",
       "slugRequired": "Introduza unha babosa de axente",
       "slugInvalid": "Slug debe comezar cunha letra e usar só letras minúsculas, díxitos e guións",
-      "slugConflict": "Esa babosa está reservada por un axente incorporado",
+      "slugConflict": "Ese slug xa o usa un axente integrado ou outro axente deste perfil",
       "edit": "Editar axente"
     },
     "slashCommands": {
@@ -3675,10 +3718,12 @@
       "description": "Descrición do comando",
       "template": "Modelo",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar como subtarefa",
       "edit": "Comando de edición de barra",
       "saveFailed": "Non se puido gardar o comando",
+      "deleteFailed": "Non se puido eliminar o comando",
       "nameRequired": "Introduza un nome de comando",
       "nameInvalid": "O nome debe comezar cunha letra minúscula e usar só letras minúsculas, díxitos e guións",
       "templateRequired": "Introduza un modelo de comando",
@@ -3825,7 +3870,7 @@
     "view": "Ler resumo",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Amosar estado en directo",
+    "dismiss": "Descartar o resumo",
     "offline": "Sen conexión · resumo gardado",
     "cached": "Informe gardado · non se pode actualizar",
     "revised": "Revisado · {{revision}}",

@@ -2228,17 +2228,6 @@ export const CustomLlmExtraHeadersSchema = z.record(z.string(), z.string());
 
 export type CustomLlmExtraHeaders = z.infer<typeof CustomLlmExtraHeadersSchema>;
 
-// All price fields are in dollars per token (e.g. "0.000001" = $1 per million tokens),
-// matching the OpenRouter pricing convention.
-export const CustomLlmPricingSchema = z.object({
-  prompt: z.string(),
-  completion: z.string(),
-  input_cache_read: z.string().optional(),
-  input_cache_write: z.string().optional(),
-});
-
-export type CustomLlmPricing = z.infer<typeof CustomLlmPricingSchema>;
-
 export const CustomLlmMetadataSchema = z.object({
   context_length: z.number(),
   max_completion_tokens: z.number(),
@@ -2317,11 +2306,27 @@ export const CustomLlmSecureProxyCredentialsSchema = z.object({
 
 export type CustomLlmSecureProxyCredentials = z.infer<typeof CustomLlmSecureProxyCredentialsSchema>;
 
+/**
+ * Signs requests with AWS Signature Version 4 using IAM access keys, for Amazon
+ * Bedrock's OpenAI-compatible and Anthropic Messages endpoints on
+ * `bedrock-runtime` or `bedrock-mantle`. Bedrock API keys need no signing and
+ * use `api_key` (or `x-api-key` on Anthropic routes).
+ */
+export const CustomLlmAwsBedrockCredentialsSchema = z.object({
+  type: z.literal('aws_bedrock'),
+  region: z.string().min(1),
+  access_key_id: z.string().min(1),
+  secret_access_key: z.string().min(1),
+});
+
+export type CustomLlmAwsBedrockCredentials = z.infer<typeof CustomLlmAwsBedrockCredentialsSchema>;
+
 export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
   CustomLlmApiKeyCredentialsSchema,
   CustomLlmXApiKeyCredentialsSchema,
   GoogleServiceAccountKeySchema,
   CustomLlmSecureProxyCredentialsSchema,
+  CustomLlmAwsBedrockCredentialsSchema,
 ]);
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
@@ -2332,15 +2337,25 @@ export const CustomLlmDefinitionSchema = z.object({
   display_name: z.string(),
   organization_ids: z.array(z.uuid()),
   group_ids: z.array(z.uuid()).optional(),
-  pricing: CustomLlmPricingSchema.optional(),
 });
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
-const GatewayModelIdSchema = z
+export const GatewayModelIdSchema = z
   .string()
   .trim()
   .regex(/^[a-z0-9./:~-]+$/, 'Model IDs may only contain lowercase letters, digits, and . / : ~ -');
+
+/** Kilo-owned model namespaces; mirrors the prefixes in web-shared `model-utils.ts`. */
+const RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES = ['kilo/', 'kilo-auto/', 'kilocode/'];
+
+/** `:` selects a gateway variant and `~` an OpenRouter alias, so neither may appear. */
+export const CustomLlmPublicIdSchema = GatewayModelIdSchema.refine(
+  id => !id.includes(':') && !id.includes('~'),
+  { message: 'public_id must not contain ":" or "~"' }
+).refine(id => !RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.some(prefix => id.startsWith(prefix)), {
+  message: `public_id must not start with ${RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.join(', ')}`,
+});
 
 export const AutoFreeModelSchema = z.object({
   model: GatewayModelIdSchema,

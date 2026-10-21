@@ -291,7 +291,6 @@ export class GlanceablePublisher {
       return;
     }
 
-    // `needsApproval` is optional, so normalize it for the coalesce decision.
     const previousNeedsApproval = this.current?.needsApproval ?? 0;
 
     if (isEligibleGlanceableWork(snapshot)) {
@@ -302,7 +301,7 @@ export class GlanceablePublisher {
         this.activityStarted = true;
       } else if (
         snapshot.needsInput !== this.current?.needsInput ||
-        (snapshot.needsApproval ?? 0) !== previousNeedsApproval
+        snapshot.needsApproval !== previousNeedsApproval
       ) {
         // Actionable needs-input/approval changes must reach the launcher
         // immediately: `needsApproval` gates the Approve control on every

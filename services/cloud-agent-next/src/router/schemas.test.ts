@@ -52,6 +52,49 @@ const baseStartInput = {
 };
 
 describe('grouped unified session input contracts', () => {
+  it('accepts an optional operation key on start for any client origin', () => {
+    const valid = {
+      ...baseStartInput,
+      operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      options: {
+        kilocodeOrganizationId: '123e4567-e89b-12d3-a456-426614174011',
+        createdOnPlatform: 'desktop',
+      },
+    };
+    expect(StartSessionInput.parse(valid)).toEqual(valid);
+    expect(StartSessionInput.parse(baseStartInput)).toEqual(baseStartInput);
+    for (const input of [
+      { ...valid, operationKey: 'not-a-uuid' },
+      { ...valid, operationKey: null },
+      { ...valid, options: { ...valid.options, clientProvenance: 'browser' } },
+      { ...valid, options: { ...valid.options, skipBalanceCheck: true } },
+    ]) {
+      expect(StartSessionInput.safeParse(input).success).toBe(false);
+    }
+  });
+
+  it('accepts replay metadata and preserves the existing start response contract', () => {
+    const output = {
+      cloudAgentSessionId: validSessionId,
+      kiloSessionId: validKiloSessionId,
+      messageId: validMessageId,
+      delivery: 'queued',
+    };
+    expect(StartSessionOutput.safeParse(output).success).toBe(true);
+    expect(
+      StartSessionOutput.safeParse({
+        ...output,
+        replayed: true,
+      }).success
+    ).toBe(true);
+    expect(
+      StartSessionOutput.safeParse({
+        ...output,
+        replayed: 'true',
+      }).success
+    ).toBe(false);
+  });
+
   it.each(
     [[], ['Z.Example.COM.', 'example.com', 'EXAMPLE.COM']].map(egressAllowlist => ({
       egressAllowlist,

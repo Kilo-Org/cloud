@@ -117,22 +117,32 @@ function notifySlack(input: SubmitUserFeedbackInput): void {
   if (!SLACK_USER_FEEDBACK_WEBHOOK_URL) return;
 
   const textLines = [
-    '*New user feedback:* :old_man_yells_at_kilo:',
-    `• user: \`${input.userId}\``,
-    `• for: \`${input.feedbackFor ?? FeedbackFor.Unknown}\``,
-    `• source: \`${input.source ?? FeedbackSource.Unknown}\``,
-    input.feedbackBatch ? `• batch: \`${input.feedbackBatch}\`` : null,
-    '',
+    'New user feedback:',
+    `• user: ${input.userId}`,
+    `• for: ${input.feedbackFor ?? FeedbackFor.Unknown}`,
+    `• source: ${input.source ?? FeedbackSource.Unknown}`,
+    input.feedbackBatch ? `• batch: ${input.feedbackBatch}` : null,
     '• raw feedback:',
-    '```',
-    input.feedbackText?.trim() ? input.feedbackText.trim() : '_<empty>_',
-    '```',
+    input.feedbackText || '<empty>',
   ].filter((line): line is string => !!line);
+
+  // Slack parses angle-bracket links and mentions independently of Markdown.
+  const text = textLines
+    .join('\n')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
 
   fetch(SLACK_USER_FEEDBACK_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: textLines.join('\n') }),
+    body: JSON.stringify({
+      text,
+      mrkdwn: false,
+      parse: 'none',
+      unfurl_links: false,
+      unfurl_media: false,
+    }),
   }).catch(error => {
     console.error('[UserFeedback] Failed to post to Slack webhook', error);
   });

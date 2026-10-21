@@ -88,7 +88,7 @@ export const appBuilderFeedbackRouter = createTRPCRouter({
               },
               {
                 type: 'section',
-                text: { type: 'plain_text', text: feedbackText || '<empty>' },
+                text: { type: 'plain_text', text: feedbackText || '<empty>', emoji: false },
               },
             ],
           }),

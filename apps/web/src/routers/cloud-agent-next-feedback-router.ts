@@ -21,6 +21,19 @@ const feedbackSessionTypeLabels = {
   'read-only': 'Read-only',
 } as const satisfies Record<z.infer<typeof feedbackSessionTypeSchema>, string>;
 
+function formatSessionSlackLink(kiloSessionId: string | undefined): string {
+  if (!kiloSessionId) return '_unknown_';
+
+  const label = kiloSessionId
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
+
+  return `<https://app.kilo.ai/admin/session-traces?sessionId=${encodeURIComponent(
+    kiloSessionId
+  )}|${label}>`;
+}
+
 const CreateCloudAgentFeedbackInputSchema = z.object({
   cloud_agent_session_id: z.string().max(500).optional(),
   kilo_session_id: z.string().max(500).optional(),
@@ -60,9 +73,7 @@ export const cloudAgentNextFeedbackRouter = createTRPCRouter({
 
       // Best-effort Slack notification
       if (SLACK_USER_FEEDBACK_WEBHOOK_URL) {
-        const sessionLink = input.kilo_session_id
-          ? `<https://app.kilo.ai/admin/session-traces?sessionId=${input.kilo_session_id}|${input.kilo_session_id}>`
-          : '_unknown_';
+        const sessionLink = formatSessionSlackLink(input.kilo_session_id);
 
         const metadataLines = [
           `• session: ${sessionLink}`,
@@ -89,7 +100,7 @@ export const cloudAgentNextFeedbackRouter = createTRPCRouter({
               },
               {
                 type: 'section',
-                text: { type: 'mrkdwn', text: metadataLines.join('\n') },
+                text: { type: 'mrkdwn', text: metadataLines.join('\n'), verbatim: true },
               },
               {
                 type: 'section',
@@ -97,7 +108,7 @@ export const cloudAgentNextFeedbackRouter = createTRPCRouter({
               },
               {
                 type: 'section',
-                text: { type: 'plain_text', text: feedbackText || '<empty>' },
+                text: { type: 'plain_text', text: feedbackText || '<empty>', emoji: false },
               },
             ],
           }),

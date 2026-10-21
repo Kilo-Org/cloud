@@ -60,6 +60,12 @@ export type NewSessionConfigureFormProps = {
   isFetchingInstances: boolean;
   onRefreshInstances: () => void;
   onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
+  /**
+   * The computer target is selected with no computer bound yet (the tour's
+   * computer path with zero connected computers): the selector shows the
+   * no-computer copy instead of the Cloud Agent label until one connects.
+   */
+  pendingComputer?: boolean;
   showInstanceDisconnectedNote: boolean;
   // Launch folder (remote CLI only). `""` means the launch directory.
   folderPath: string;

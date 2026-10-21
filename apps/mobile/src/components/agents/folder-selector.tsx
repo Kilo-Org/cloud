@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
 
 import { Text } from '@/components/ui/text';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { folderPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -68,6 +69,10 @@ function FolderSelector({
 /**
  * Labeled "Folder" field: the field title plus the chrome selector. Lives in
  * this module so the configure form stays under its line limit.
+ *
+ * `runOnInstance` is null for the tour's computer target with no connected
+ * computer yet: the Folder row renders the setup hint instead of the picker
+ * control, since there is no connection to list folders on.
  */
 export function LaunchFolderField({
   folderPath,
@@ -76,11 +81,26 @@ export function LaunchFolderField({
   disabled,
 }: {
   folderPath: string;
-  runOnInstance: InstancePickerInstance;
+  runOnInstance: InstancePickerInstance | null;
   onChangeFolderPath: (path: string) => void;
   disabled: boolean;
 }) {
   const { t } = useTranslation();
+  if (runOnInstance === null) {
+    // The tour's computer target with no connected computer yet: keep the
+    // remote surface's Folder row but inert, since there is no connection to
+    // list folders on. The setup hint under Start names the recovery.
+    return (
+      <View className="mt-5">
+        <Text className="mb-2 text-sm font-medium text-muted-foreground">
+          {t('agentChat.folderPicker.fieldLabel')}
+        </Text>
+        <Text className="text-sm text-muted-foreground">
+          {stripInlineCodeMarkers(t('agentChat.instancePicker.noCliInstancesDescription'))}
+        </Text>
+      </View>
+    );
+  }
   return (
     <View className="mt-5">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">

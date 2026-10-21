@@ -2029,17 +2029,17 @@
     "search": {
       "searching": "Söker",
       "searchSessions": "Sök efter sessioner",
-      "searchSessionsPlaceholder": "Sök efter sessioner"
+      "searchSessionsPlaceholder": "Sök efter sessioner..."
     },
     "sessionList": {
-      "couldNotLoadActive": "Kunde inte läsa in aktiva sessioner.",
+      "couldNotLoadActive": "Kunde inte läsa in aktiva sessioner",
       "couldNotRefresh": "Kunde inte uppdatera",
       "noSessionsYetDescription": "Starta en programmeringsuppgift från mobilen. Dina sessioner visas här.",
       "viewHistory": "Sessionshistorik",
       "noMatches": "Inga matchande sessioner",
       "tryDifferentSearch": "Prova en annan sökterm.",
       "tryAdjustFilters": "Prova att ändra eller rensa filtren.",
-      "couldNotSearch": "Kunde inte söka bland sessionerna.",
+      "couldNotSearch": "Kunde inte söka bland sessionerna",
       "completedWillAppear": "Slutförda sessioner visas här.",
       "noPastSessions": "Inga tidigare sessioner",
       "pastSessions": "Tidigare sessioner",
@@ -2053,21 +2053,21 @@
       "renameMessage": "Ange ett nytt namn för den här sessionen.",
       "copyId": "Kopiera sessions-ID",
       "idCopied": "Sessions-ID kopierat",
-      "couldNotCopyId": "Kunde inte kopiera sessions-ID.",
+      "couldNotCopyId": "Kunde inte kopiera sessions-ID",
       "untitled": "Namnlös session",
       "actions": "Sessionsåtgärder",
       "sessionDeleted": "Session borttagen",
-      "needsInput": "väntar på svar",
+      "needsInput": "behöver inmatning",
       "fromPlatform": "från {{platform}}",
-      "cent_one": "dollarcent",
+      "cent_one": "cent",
       "cent": "cent",
       "cent_other": "cent",
-      "dollar_one": "uS-dollar",
+      "dollar_one": "dollar",
       "dollar": "dollar",
       "dollar_other": "dollar",
       "costSpoken": "kostnad {{cost}}",
       "costSpokenWithTime": "kostnad {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "PR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunde inte öppna GitHub",
@@ -2097,8 +2097,8 @@
       "backToSessions": "Tillbaka till sessionerna",
       "follow": "Följ på låsskärmen",
       "unfollow": "Sluta följa på låsskärmen",
-      "couldNotLoad": "Det gick inte att läsa in sessionen.",
-      "failedToLoadDetails": "Det gick inte att läsa in sessionsinformationen.",
+      "couldNotLoad": "Det gick inte att läsa in sessionen",
+      "failedToLoadDetails": "Det gick inte att läsa in sessionsinformationen",
       "failedToStopExecution": "Det gick inte att stoppa körningen.",
       "stopped": "Sessionen stoppad",
       "committing": "Committar…",
@@ -2106,7 +2106,7 @@
       "commitFailed": "Committen misslyckades",
       "renameSession": "Byt namn på sessionen",
       "renamePlaceholder": "Sessionens namn",
-      "transcriptAccessibility": "Meddelandehistorik",
+      "transcriptAccessibility": "Sessionstranskript",
       "readOnly": "Den här sessionen är skrivskyddad.",
       "continueInNewSession": "Fortsätt i en ny session",
       "emptyDescription": "Skicka ett meddelande nedan för att komma igång.",
@@ -2114,7 +2114,7 @@
       "emptyTitle": "Inga meddelanden ännu",
       "renameAccessibility": "Byt namn på sessionen: {{title}}",
       "cloningSession": "Klonar sessionen",
-      "couldNotLoadThisSession": "Det gick inte att läsa in den här sessionen.",
+      "couldNotLoadThisSession": "Det gick inte att läsa in den här sessionen",
       "cloneFailedRetry": "Kunde inte klona den här sessionen. Försök igen.",
       "notEnoughCredits": "Du har inte tillräckligt med krediter för att köra Cloud Agent. Fyll på krediter och försök igen.",
       "previousTaskFinishing": "Den föregående uppgiften håller på att avslutas. Vänta en stund.",
@@ -2217,7 +2217,7 @@
       "discardDraftMessage": "Din prompt går förlorad.",
       "discardWithUploadsMessage": "Din prompt och uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
       "discardFailed": "Det gick inte att ta bort utkastet. Försök igen.",
-      "remoteHint": "Kör `kilo remote` på din dator, eller `/remote` i en aktiv CLI-session, för att styra en lokal kilo-process.",
+      "remoteHint": "För att köra på din dator startar du Kilo där och låter det köras.",
       "continueFrom": "Sessionen {{title}} fortsätter.",
       "importingSession": "Importerar sessionen",
       "cliCannotContinue": "Den här CLI-versionen kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI-instans.",
@@ -2260,7 +2260,7 @@
     "toolCard": {
       "accessibility": "Verktyget {{label}}, {{status}}",
       "accessibilityLabel": "Verktyget {{name}}, {{status}}",
-      "noTasks": "Det finns inga uppgifter.",
+      "noTasks": "Inga uppgifter.",
       "toolRead": "läs",
       "toolEdit": "redigera",
       "toolWrite": "skriv",
@@ -2314,9 +2314,9 @@
       "accessibility": "Läge: {{label}}"
     },
     "modeOptions": {
-      "code": "Koda",
+      "code": "Kod",
       "plan": "Planering",
-      "debug": "Felsök",
+      "debug": "Felsökning",
       "orchestrator": "Samordnare",
       "ask": "Fråga",
       "codeDescription": "Skriv och ändra kod",
@@ -2328,7 +2328,7 @@
     "repoPicker": {
       "title": "Välj kodarkiv",
       "searchLabel": "Sök efter kodarkiv",
-      "searchPlaceholder": "Sök efter kodarkiv",
+      "searchPlaceholder": "Sök efter kodarkiv...",
       "noMatches": "Inga träffar",
       "noRepositories": "Inga kodarkiv tillgängliga",
       "noRepositoriesDescription": "Inga kodarkiv är anslutna till ditt konto.",
@@ -2375,11 +2375,11 @@
       "failedToRender": "Det gick inte att visa innehållet."
     },
     "messageFailure": {
-      "deliveryTitle": "Det gick inte att leverera meddelandet.",
+      "deliveryTitle": "Kunde inte leverera",
       "deliveryInterrupted": "Du avbröt det här meddelandet.",
       "deliveryExhausted": "Meddelandet kunde inte levereras trots flera försök.",
       "deliveryExecution": "Agenten kunde inte bearbeta det här meddelandet.",
-      "assistantTitle": "Det gick inte att generera svaret.",
+      "assistantTitle": "Svaret misslyckades",
       "assistantProviderRejected": "Leverantören avvisade begäran.",
       "assistantStopped": "Svaret avbröts.",
       "assistantContextOverflow": "Konversationen är för lång för modellen.",
@@ -2391,8 +2391,8 @@
       "imagePreviewUnavailableInSession": "Bilden kan inte förhandsvisas i den här sessionen.",
       "viewImage": "Visa bild",
       "viewImageWithAlt": "Visa bild {{alt}}",
-      "imageOutput": "Genererad bild",
-      "imageOutputWithFilename": "Genererad bild, {{filename}}",
+      "imageOutput": "Bildutdata",
+      "imageOutputWithFilename": "Bildutdata, {{filename}}",
       "openFullScreen": "Öppna {{name}} i helskärm",
       "preview": "Förhandsvisa {{name}}",
       "couldNotLoadFile": "Kunde inte läsa in den här filen.",
@@ -2429,11 +2429,11 @@
       "retrying": "Försöker igen…"
     },
     "questionCard": {
-      "title": "Agenten behöver ett svar",
+      "title": "Agenten behöver inmatning",
       "skipQuestionsTitle": "Hoppa över frågorna?",
       "skipQuestionsMessage": "Agenten hoppar över det här steget.",
       "answerProgress": "{{answered}} av {{total}} besvarade",
-      "selectAllThatApply": "Markera alla alternativ som stämmer.",
+      "selectAllThatApply": "Markera alla alternativ som stämmer",
       "option": "{{label}}",
       "optionSelected": "{{label}}, markerat",
       "typeYourOwnAnswer": "Skriv ditt eget svar",
@@ -2450,12 +2450,12 @@
       "failedToSubmitAnswer": "Det gick inte att skicka svaret. Försök igen.",
       "failedToRespondToPermission": "Det gick inte att svara på behörighetsförfrågan. Försök igen.",
       "submissionFailed": "Det gick inte att skicka. Försök igen.",
-      "questionAnnouncement": "Agenten behöver ditt svar. Meddelandefältet är inaktiverat medan du svarar.",
-      "permissionAnnouncement": "Agenten behöver behörighet för att fortsätta. Meddelandefältet är inaktiverat tills du har gjort ditt val.",
+      "questionAnnouncement": "Agenten behöver ditt svar. Meddelandefältet är pausat medan du svarar.",
+      "permissionAnnouncement": "Agenten behöver behörighet för att fortsätta. Meddelandefältet är pausat tills du har gjort ditt val.",
       "positionHint": "(1 av {{displayCount}})",
-      "movedPastPrompt": "Agenten har gått vidare från den här frågan. Kortet stängs när sessionen fortsätter.",
-      "waitingForAnswer": "Agenten väntar på ditt svar. Ditt meddelande till agenten väntar så länge frågan är öppen.",
-      "waitingForPermission": "Agenten väntar på behörighet. Ditt meddelande till agenten väntar så länge förfrågan är öppen."
+      "movedPastPrompt": "Agenten har gått vidare från den här förfrågan. Kortet stängs när sessionen fortsätter.",
+      "waitingForAnswer": "Agenten väntar på ditt svar. Ditt meddelande till agenten är pausat så länge frågan är öppen.",
+      "waitingForPermission": "Agenten väntar på behörighet. Ditt meddelande till agenten är pausat så länge förfrågan är öppen."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -2467,8 +2467,8 @@
       "waitingForActivity": "Väntar på aktivitet"
     },
     "childSessionSheet": {
-      "couldNotLoad": "Det gick inte att läsa in underagentens session.",
-      "failed": "Underagentens session misslyckades.",
+      "couldNotLoad": "Det gick inte att läsa in underagentens session",
+      "failed": "Underagentens session misslyckades",
       "noMessages": "Inga meddelanden från underagenten",
       "noMessagesDescription": "Underagentens session avslutades utan någon meddelandehistorik.",
       "loading": "Läser in underagentens session",
@@ -2569,7 +2569,7 @@
       "waitForUploads": "Vänta tills bilagorna har laddats upp.",
       "pasteFromClipboard": "Klistra in från urklipp",
       "stopGenerating": "Stoppa genereringen",
-      "selectModelBeforeSending": "Välj en modell innan du skickar meddelandet.",
+      "selectModelBeforeSending": "Välj en modell innan du skickar meddelandet",
       "preparingPlaceholder": "Förbereder miljön…",
       "finalizingPlaceholder": "Avslutar…",
       "sessionLoadFailed": "Sessionen kunde inte läsas in. Försök igen först.",
@@ -2676,17 +2676,17 @@
       "unavailable": "Den här sessionen kan inte ta emot behörighetsbegäranden."
     },
     "prBadge": {
-      "open": "öppna PR",
+      "open": "öppen PR",
       "closed": "stängd PR",
       "merged": "sammanslagen PR",
-      "draft": "pR-utkast",
+      "draft": "PR-utkast",
       "updating": "Uppdaterar, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "Läs in",
       "loadWithHost": "Läs in från {{host}}",
-      "httpsOnly": "Endast bilder via HTTPS kan läsas in.",
+      "httpsOnly": "Endast HTTPS-bilder",
       "trustTitle": "Läs in bild från {{host}}?",
       "trustMessage": "Om du betror {{host}} läses dess bilder in utan att fråga varje gång. Du kan återkalla det senare under Betrodda webbplatser.",
       "loadOnce": "Läs in en gång"
@@ -2796,7 +2796,7 @@
     "optionsExpiredDescription": "Gå tillbaka och öppna väljaren igen från föregående skärm."
   },
   "sessionRow": {
-    "needsInput": "VÄNTAR PÅ SVAR",
+    "needsInput": "BEHÖVER INMATNING",
     "scheduled": "SCHEMALAGD"
   },
   "voiceInput": {
@@ -3175,7 +3175,7 @@
     "signedOut": "Logga in för att se agenter",
     "privacy": "Öppna Kilo för att se agenter",
     "openAgents": "Öppna agenter",
-    "needsInput": "Väntar på svar",
+    "needsInput": "Behöver inmatning",
     "newestSession": "Nyaste: {{title}}",
     "noneWaiting": "Inga agenter väntar",
     "newAgent": "Ny agent",

@@ -3694,15 +3694,15 @@
       "nameConflict": "Det namnet är reserverat av ett inbyggt kommando"
     },
     "repoBindings": {
-      "title": "Standardprofiler för Kodarkiv",
+      "title": "Standardprofiler för kodarkiv",
       "add": "Lägg till standard",
       "empty": "Inga standardinställningar konfigurerade",
       "emptyDescription": "Lägg till en standard för att automatiskt tillämpa en profil när du startar sessioner för ett kodarkiv.",
-      "repo": "Välj kodarkiv...",
+      "repo": "Välj kodarkiv…",
       "profile": "Välj profil",
       "remove": "Koppla från",
       "private": "Privat",
-      "search": "Sök kodarkiv...",
+      "search": "Sök kodarkiv…",
       "addedToast": "Standardprofil inställd för \"{{repo}}\"",
       "addFailed": "Det gick inte att ange standardprofil",
       "removedToast": "Standardprofilen har tagits bort för \"{{repo}}\"",

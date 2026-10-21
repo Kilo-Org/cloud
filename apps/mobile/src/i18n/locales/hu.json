@@ -1531,7 +1531,7 @@
     "updateFailed": "Nem sikerült frissíteni a kódellenőrzőt.",
     "configSaveFailed": "Nem sikerült menteni a kódellenőrzési beállításokat.",
     "status": {
-      "running": "Fut",
+      "running": "Folyamatban",
       "completed": "Befejezve",
       "interrupted": "Megszakítva"
     },
@@ -2369,7 +2369,7 @@
       "thought": "Gondolat",
       "showDetails": "Részletek megjelenítése",
       "pending": "Függőben…",
-      "running": "Fut…"
+      "running": "Folyamatban…"
     },
     "messageErrorBoundary": {
       "failedToRender": "Nem sikerült megjeleníteni a tartalmat."

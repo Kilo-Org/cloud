@@ -141,6 +141,8 @@ vi.mock('@/components/query-error', () => ({
 
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 
+vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
+
 vi.mock('@/components/ui/button', () => ({
   Button: (props: { children?: unknown; onPress?: () => void; accessibilityLabel?: string }) => {
     buttons.rendered.push(props);

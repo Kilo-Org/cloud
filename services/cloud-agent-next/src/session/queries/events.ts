@@ -97,6 +97,7 @@ export type UpsertEventParams = InsertEventParams & {
 export type EventQueryFilters = {
   /** Exclusive: id > fromId */
   fromId?: EventId;
+  toId?: EventId;
   /** Only return events for these execution IDs */
   executionIds?: string[];
   /** Only return events of these types */
@@ -116,6 +117,7 @@ function buildConditions(filters: Omit<EventQueryFilters, 'limit'>): SQL[] {
   if (filters.fromId !== undefined) {
     conditions.push(gt(events.id, filters.fromId));
   }
+  if (filters.toId !== undefined) conditions.push(lte(events.id, filters.toId));
   if (filters.executionIds?.length) {
     conditions.push(inArray(events.execution_id, filters.executionIds));
   }

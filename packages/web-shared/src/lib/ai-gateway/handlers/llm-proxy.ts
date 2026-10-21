@@ -600,7 +600,7 @@ export async function handleLlmProxyRequest(
     const rateLimitSubject = resolveFreeModelRateLimitSubject(accountKey, ipAddress);
     if (await isFreeModelRateLimited(request, rateLimitSubject)) {
       console.warn(
-        `Model rate limit exceeded, ${freeModelRateLimitKey(rateLimitSubject)}, model: ${effectiveModelIdLowerCased}`
+        `Model rate limit exceeded, ${freeModelRateLimitKey(rateLimitSubject)}, model: ${effectiveModelIdLowerCased}, feature: ${feature ?? 'none'}`
       );
       return rateLimitSubject.kind === 'account'
         ? accountFreeModelLimitResponse()

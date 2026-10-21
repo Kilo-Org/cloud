@@ -485,6 +485,38 @@ describe('agent briefing ownership and lifecycle', () => {
       (await agentBriefingRouter.createCaller({ user }).list({ scope: 'personal' })).reports
     ).toHaveLength(0);
   });
+  it('reopens summary generation when late evidence makes a published quiet night active', async () => {
+    const now = await seedQuietNight();
+    await db.insert(agent_briefing_context_preferences).values({
+      kilo_user_id: user.id,
+      context_key: 'personal',
+      ai_enabled: true,
+      model: 'test/bounded',
+    });
+    await sweepAgentBriefings(now);
+    const sessionId = `ses_briefing_${sessionSequence++}`;
+    await db.insert(cli_sessions_v2).values({
+      session_id: sessionId,
+      kilo_user_id: user.id,
+      title: 'Late activity',
+      created_on_platform: 'cli',
+    });
+    await db.insert(agent_briefing_events).values({
+      id: crypto.randomUUID(),
+      session_id: sessionId,
+      kilo_user_id: user.id,
+      kind: 'activity',
+      occurred_at: new Date(now.getTime() - 30 * 60_000).toISOString(),
+    });
+    await sweepAgentBriefings(new Date(now.getTime() + 120_000));
+    const report = (await db.select().from(agent_briefing_reports)).find(
+      entry => entry.organization_id === null
+    );
+    if (!report) throw new Error('Personal quiet report was not created');
+    expect(report.published_at).not.toBeNull();
+    expect(report.facts).toMatchObject({ scorecard: { sessions: 1 } });
+    expect(report.summary).toMatchObject({ status: 'pending', text: null, error: null });
+  });
   it('requires estimate consent and finite per-context safeguards before paid generation', async () => {
     const caller = agentBriefingRouter.createCaller({ user });
     await expect(caller.updateContextPreferences({ aiEnabled: true })).rejects.toMatchObject({

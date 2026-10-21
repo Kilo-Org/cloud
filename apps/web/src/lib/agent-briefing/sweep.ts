@@ -172,7 +172,18 @@ export async function sweepAgentBriefings(now = new Date()) {
       continue;
     }
     let summary = briefingSummarySchema.parse(row.summary);
-    if (!row.published_at && summary.status === 'disabled') {
+    /**
+     * The `unavailable` state a quiet publish writes before any generation ran. Late evidence can
+     * still make the night active, and that report may then enter generation like any other.
+     */
+    const quietSummaryOnly =
+      summary.status === 'unavailable' &&
+      summary.error === null &&
+      summary.text === null &&
+      summary.costMicrodollars === 0 &&
+      summary.startedAt === null &&
+      row.generation_id === null;
+    if ((!row.published_at && summary.status === 'disabled') || quietSummaryOnly) {
       const settings = await briefingContextSettings(row.kilo_user_id, row.organization_id);
       if (settings.aiEnabled && new Date(row.morning_end_at) > now) {
         const [updated] = await db
@@ -184,12 +195,12 @@ export async function sweepAgentBriefings(now = new Date()) {
           .where(
             and(
               eq(agent_briefing_reports.id, row.id),
-              sql`${agent_briefing_reports.summary}->>'status' = 'disabled'`
+              sql`${agent_briefing_reports.summary}->>'status' = ${summary.status}`
             )
           )
           .returning();
         if (updated) row = updated;
-      } else {
+      } else if (!row.published_at) {
         const [published] = await db
           .update(agent_briefing_reports)
           .set({

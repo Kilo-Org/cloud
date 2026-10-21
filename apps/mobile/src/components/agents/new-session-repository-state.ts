@@ -170,6 +170,9 @@ export function detectRepositoryPlatform(
   if (!gitUrl) {
     return undefined;
   }
+  // An scp-style value keeps its host exactly as written, and the URL parser
+  // preserves it for non-special schemes (`ssh://`), so both forms meet here
+  // and are compared in one case.
   let hostname: string | undefined = /^git@([^:]+):/.exec(gitUrl)?.[1];
   if (hostname === undefined) {
     try {
@@ -178,13 +181,14 @@ export function detectRepositoryPlatform(
       return undefined;
     }
   }
-  if (hostname === 'github.com') {
+  const host = hostname.toLowerCase();
+  if (host === 'github.com') {
     return 'github';
   }
-  if (hostname === 'gitlab.com') {
+  if (host === 'gitlab.com') {
     return 'gitlab';
   }
-  if (hostname === 'bitbucket.org') {
+  if (host === 'bitbucket.org') {
     return 'bitbucket';
   }
   return undefined;

@@ -237,7 +237,9 @@ packageExtensions:
       '@types/react': '*'
 patchedDependencies:
   # Text date styles for the glanceable widgets and Live Activity: `elapsed`
-  # ("31 minutes", no seconds) and `ago` ("3 minutes ago").
+  # ("31 minutes", no seconds) and `ago` ("3 minutes ago"). Also separates a
+  # bottom sheet's drag gesture from its back/scrim dismissal and lets a caller
+  # veto a requested dismissal, so a scrolling form can keep its values.
   '@expo/ui@58.0.17': patches/@expo+ui@58.0.17.patch
   expo-dev-launcher@58.0.14: patches/expo-dev-launcher@58.0.14.patch
   # A zero badge count must not cancel every app notification: upstream called
@@ -256,7 +258,11 @@ patchedDependencies:
   # `(tabs)` route vanishes from the generated `Href` union and typecheck
   # rejects valid navigations.
   '@expo/router-server@58.0.13': patches/@expo+router-server@58.0.13.patch
-  expo-server-sdk: patches/expo-server-sdk.patch
+  # workerd has no undici ALPN support and the bundle must not read package.json
+  # at runtime: use globalThis.fetch and inline the SDK version the push request
+  # headers report. The patch hard-codes 6.1.0, so it is pinned to that release
+  # instead of widening to every later one.
+  expo-server-sdk@6.1.0: patches/expo-server-sdk@6.1.0.patch
   # Android: keep the React host after a headless expo-task-manager run. The
   # loader destroyed the host after each background task, and a destroyed host
   # keeps its native memory, so each background push or refresh added a new
@@ -288,7 +294,7 @@ patchedDependencies:
   llama.rn@0.12.9: patches/llama.rn@0.12.9.patch
   # Expo Router's Activity host needs the React Native component registry through the styling facade.
   react-native-css@3.0.7: patches/react-native-css@3.0.7.patch
-  '@expo/react-native-action-sheet@4.1.1': patches/@expo__react-native-action-sheet@4.1.1.patch
+  '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

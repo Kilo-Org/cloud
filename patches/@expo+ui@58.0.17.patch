@@ -1,3 +1,71 @@
+diff --git a/android/build.gradle b/android/build.gradle
+--- a/android/build.gradle
++++ b/android/build.gradle
+@@ -48,6 +48,10 @@
+   implementation "com.squareup.okhttp3:okhttp:4.9.2"
+   implementation "com.google.android.material:material:1.13.0"
+   implementation "androidx.core:core-ktx:1.18.0"
++  // The back press the sheet owns (ModalBottomSheetView.kt) comes from
++  // androidx.activity.compose.BackHandler, which the module otherwise only
++  // reaches transitively.
++  implementation "androidx.activity:activity-compose:1.11.0"
+ 
+   // Testing
+   testImplementation 'junit:junit:4.13.2'
+diff --git a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
+--- a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
++++ b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
+@@ -8,6 +8,7 @@
+ import android.graphics.Color
+ import android.view.KeyEvent
+ import android.view.inputmethod.InputMethodManager
++import androidx.activity.compose.BackHandler
+ import androidx.compose.material3.BottomSheetDefaults
+ import androidx.compose.material3.ExperimentalMaterial3Api
+ import androidx.compose.material3.MaterialTheme
+@@ -171,11 +172,19 @@
+       else -> null
+     },
+     properties = ModalBottomSheetProperties(
+-      shouldDismissOnBackPress = props.properties.shouldDismissOnBackPress,
++      // Repo-local: Material3 answers a back press by hiding the sheet itself,
++      // before JavaScript hears the request, so a caller could never ask its own
++      // "Keep editing / Discard" question. The sheet answers Back below instead,
++      // and hides only when JavaScript drops the sheet.
++      shouldDismissOnBackPress = false,
+       shouldDismissOnClickOutside = props.properties.shouldDismissOnClickOutside
+     ),
+     modifier = ModifierRegistry.applyModifiers(props.modifiers, appContext, composableScope, globalEventDispatcher)
+   ) {
++    // Registered inside the dialog, so it runs before the wrapper's fallback.
++    if (props.properties.shouldDismissOnBackPress) {
++      BackHandler { onDismissRequest() }
++    }
+     ForwardKeyEventsToActivity(appContext.currentActivity)
+     Children(UIComposableScope(), filter = { !isSlotView(it) })
+   }
+diff --git a/build/community/bottom-sheet/types.d.ts b/build/community/bottom-sheet/types.d.ts
+--- a/build/community/bottom-sheet/types.d.ts
++++ b/build/community/bottom-sheet/types.d.ts
+@@ -170,6 +170,18 @@
+      */
+     enablePanDownToClose?: boolean;
+     /**
++     * Whether a downward drag on the sheet, or a backdrop tap on iOS, dismisses it.
++     * Repo-local.
++     * @default enablePanDownToClose
++     */
++    dismissGestures?: boolean;
++    /**
++     * Called before a native dismissal the sheet received by itself (iOS backdrop
++     * tap, Android back press or scrim tap). Return `false` to keep it presented.
++     * Repo-local.
++     */
++    onRequestDismiss?: () => boolean;
++    /**
+      * Whether the sheet should automatically size to fit its content.
+      * @default true
+      *
 diff --git a/build/swift-ui/Text/index.d.ts b/build/swift-ui/Text/index.d.ts
 --- a/build/swift-ui/Text/index.d.ts
 +++ b/build/swift-ui/Text/index.d.ts
@@ -56,6 +124,114 @@ diff --git a/ios/TextView.swift b/ios/TextView.swift
      } else if let date = props.date {
        text = Text(date, style: props.dateStyle?.toSwiftUI() ?? .date)
      } else {
+diff --git a/src/community/bottom-sheet/BottomSheet.android.tsx b/src/community/bottom-sheet/BottomSheet.android.tsx
+--- a/src/community/bottom-sheet/BottomSheet.android.tsx
++++ b/src/community/bottom-sheet/BottomSheet.android.tsx
+@@ -61,6 +61,11 @@
+     onClose,
+     onDismiss,
+     enablePanDownToClose = false,
++    // Repo-local: on Android the drag gesture, the back button and the scrim are
++    // separate native controls; without this, turning the gesture off also
++    // turned back and the scrim off.
++    dismissGestures = enablePanDownToClose,
++    onRequestDismiss,
+     enableDynamicSizing = true,
+     handleComponent,
+     backgroundStyle,
+@@ -97,6 +102,8 @@
+   onCloseRef.current = onClose;
+   const onDismissRef = useRef(onDismiss);
+   onDismissRef.current = onDismiss;
++  const onRequestDismissRef = useRef(onRequestDismiss);
++  onRequestDismissRef.current = onRequestDismiss;
+ 
+   const fireCloseCallbacks = useCallback(() => {
+     if (closedRef.current) return;
+@@ -120,6 +127,9 @@
+   }, [clampIndex, indexProp, fireCloseCallbacks]);
+ 
+   const handleDismiss = useCallback(() => {
++    // A back press or scrim tap asks; it does not have to be obeyed. Keeping the
++    // native sheet mounted leaves the dialog up, so the caller can confirm first.
++    if (onRequestDismissRef.current?.() === false) return;
+     setIsOpen(false);
+     fireCloseCallbacks();
+   }, [fireCloseCallbacks]);
+@@ -193,7 +203,7 @@
+             skipPartiallyExpanded={skipPartially}
+             initialFullyExpanded={hasMultipleSnapPoints && pendingIndexRef.current === maxIndex}
+             showDragHandle={handleComponent !== null}
+-            sheetGesturesEnabled={enablePanDownToClose}
++            sheetGesturesEnabled={dismissGestures}
+             containerColor={containerColor}
+             properties={{
+               shouldDismissOnBackPress: enablePanDownToClose,
+diff --git a/src/community/bottom-sheet/BottomSheet.ios.tsx b/src/community/bottom-sheet/BottomSheet.ios.tsx
+--- a/src/community/bottom-sheet/BottomSheet.ios.tsx
++++ b/src/community/bottom-sheet/BottomSheet.ios.tsx
+@@ -89,6 +89,9 @@
+     onClose,
+     onDismiss,
+     enablePanDownToClose = false,
++    // Repo-local: the drag/backdrop gesture can stay off while `enablePanDownToClose`
++    // keeps the dismissal paths a platform can separate (Android back and scrim).
++    dismissGestures = enablePanDownToClose,
+     enableDynamicSizing = true,
+     handleComponent,
+     backgroundStyle,
+@@ -209,7 +212,7 @@
+             }),
+           ]),
+       presentationDragIndicator(handleComponent === null ? 'hidden' : 'visible'),
+-      interactiveDismissDisabled(!enablePanDownToClose),
++      interactiveDismissDisabled(!dismissGestures),
+       ...(bg ? [presentationBackground(bg)] : []),
+     ];
+   }, [
+@@ -219,6 +222,7 @@
+     handleDetentChange,
+     handleComponent,
+     enablePanDownToClose,
++    dismissGestures,
+     backgroundStyle,
+   ]);
+ 
+diff --git a/src/community/bottom-sheet/types.ts b/src/community/bottom-sheet/types.ts
+--- a/src/community/bottom-sheet/types.ts
++++ b/src/community/bottom-sheet/types.ts
+@@ -192,6 +192,31 @@
+   enablePanDownToClose?: boolean;
+ 
+   /**
++   * Whether a downward drag on the sheet, or a backdrop tap on iOS, dismisses it.
++   * Repo-local.
++   * @default enablePanDownToClose
++   *
++   * @remarks Android keeps the back button and scrim dismiss from
++   * `enablePanDownToClose` while the drag gesture can stay off. A scrolled
++   * `ScrollView` inside the sheet never hands its drag to the native sheet on
++   * Android, but on iOS the native sheet claims every downward drag that starts
++   * over a React Native scroll view, so a form sheet there must pass `false` and
++   * dismiss through its own controls.
++   */
++  dismissGestures?: boolean;
++
++  /**
++   * Called before a native dismissal the sheet received by itself (iOS backdrop
++   * tap, Android back press or scrim tap). Return `false` to keep it presented;
++   * the caller usually answers with a confirmation. Repo-local.
++   *
++   * @remarks A drag dismissal has already started when it is reported and cannot
++   * be vetoed, so pair this with `dismissGestures={false}` on a surface that must
++   * never dismiss by accident.
++   */
++  onRequestDismiss?: () => boolean;
++
++  /**
+    * Whether the sheet should automatically size to fit its content.
+    * @default true
+    *
 diff --git a/src/swift-ui/Text/index.tsx b/src/swift-ui/Text/index.tsx
 --- a/src/swift-ui/Text/index.tsx
 +++ b/src/swift-ui/Text/index.tsx

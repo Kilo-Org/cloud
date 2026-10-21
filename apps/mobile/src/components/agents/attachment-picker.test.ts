@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { normalizeImageAsset, pickAgentAttachments, pickAgentPicture } from './attachment-picker';
 import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
+import { PICKER_LAUNCH_CONTEXT_KEY, PICKER_RESTORE_RECORD_KEY } from '@/lib/storage-keys';
 
 const reactNativeMock = vi.hoisted(() => ({
   alert: vi.fn(),
@@ -440,12 +441,18 @@ describe('agent picture picker', () => {
 
     expect(await pickPictureWithSheetSelection(0)).toEqual([]);
 
-    const stored = vi.mocked(SecureStore.setItemAsync).mock.calls.at(-1)?.[1] ?? '';
-    expect(JSON.parse(stored)).toMatchObject({
+    const writes = vi.mocked(SecureStore.setItemAsync).mock.calls;
+    const contextWrite = writes.findLast(([key]) => key === PICKER_LAUNCH_CONTEXT_KEY);
+    expect(JSON.parse(contextWrite?.[1] ?? '')).toMatchObject({
       userId: 'user-1',
       surface: 'agent-picture',
       sessionId: null,
     });
+    // The composer record is written beside it and retired when the picker
+    // comes back, so the next app start has nothing to reopen.
+    const recordWrite = writes.findLast(([key]) => key === PICKER_RESTORE_RECORD_KEY);
+    expect(recordWrite?.[1]).toEqual(contextWrite?.[1]);
+    expect(vi.mocked(SecureStore.deleteItemAsync)).toHaveBeenCalledWith(PICKER_RESTORE_RECORD_KEY);
   });
 
   // A rejected permission request, or a synchronous throw while building the

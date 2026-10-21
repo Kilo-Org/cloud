@@ -35,6 +35,8 @@
     "connectGithub": "Ikonekta ang GitHub",
     "cost": "Gastos",
     "discard": "Itapon",
+    "discardChangesMessage": "Mawawala ang iyong mga pagbabago.",
+    "discardChangesTitle": "Itatapon ang mga pagbabago?",
     "findings": "Mga natukoy na isyu",
     "mergeRequest": "merge request",
     "notConnected": "Hindi nakakonekta",
@@ -109,7 +111,9 @@
     "online": "Nakakonekta",
     "open": "Buksan ang {{name}}",
     "openPullRequest": "Buksan ang PR",
+    "completed": "Nakumpleto",
     "pending": "Nakabinbin",
+    "running": "Tumatakbo",
     "performance": "Pagganap",
     "preferences": "Mga kagustuhan",
     "privacyPolicy": "Patakaran sa pribasiya",
@@ -661,7 +665,8 @@
       "description": "Ikonekta ang GitHub account mo para makapagsuri ng mga pull request sa mobile.",
       "gitlabDescription": "Ikonekta ang iyong GitLab account para suriin ang mga merge request sa mobile.",
       "bitbucketDescription": "Ikonekta ang Bitbucket sa organizasyong ito para suriin ang mga pull request sa mobile.",
-      "bitbucketOrgOnlyDescription": "Pumili ng organisasyon sa iyong profile para suriin ang mga pull request nito sa Bitbucket."
+      "bitbucketOrgOnlyDescription": "Palitan ang account sa itaas ng isang organisasyon para suriin ang mga pull request nito sa Bitbucket.",
+      "contextLine": "Para sa {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "Hindi maisumite ang pagsusuring ito sa kasalukuyang anyo nito. Maaaring nagbago ang PR, o hindi ka puwedeng magsuri ng sarili mong pull request.",
       "reviewNotSubmittedTerm": "Hindi maisumite ang pagsusuring ito sa kasalukuyang anyo. Baka nagbago ang {{term}}, o hindi mo masusuri ang sarili mong {{term}}.",
       "couldNotPostComment": "Hindi ma-post ang komento.",
-      "couldNotSubmitReview": "Hindi maisumite ang pagsusuri. Suriin ang koneksyon mo at subukan muli."
+      "couldNotSubmitReview": "Hindi maisumite ang pagsusuri. Suriin ang koneksyon mo at subukan muli.",
+      "rateLimited": "Masyadong maraming kahilingan. Pakisubukang muli sa ibang pagkakataon.",
+      "conflict": "Nagbago ito habang ginagawa mo ito. I-reload ito at subukang muli."
     },
     "operation": {
       "couldNotReply": "Hindi maipadala ang sagot.",
@@ -1531,8 +1538,6 @@
     "updateFailed": "Hindi na-update ang tagasuri.",
     "configSaveFailed": "Hindi na-save ang mga setting ng pagsusuri.",
     "status": {
-      "running": "Tumatakbo",
-      "completed": "Nakumpleto",
       "interrupted": "Naputol"
     },
     "reviewStyle": {
@@ -1545,7 +1550,8 @@
       "bugs": "Mga bug",
       "style": "Estilo",
       "testing": "Pagsubok",
-      "documentation": "Dokumentasyon"
+      "documentation": "Dokumentasyon",
+      "unknown": "Iba ({{area}})"
     },
     "gateThreshold": {
       "warning": "Babala"
@@ -1657,7 +1663,14 @@
       "whereFound": "Mga lokasyon kung saan ito natukoy ({{displayCount}})",
       "fullReport": "Buong nabuong ulat",
       "yes": "Oo",
-      "no": "Hindi"
+      "no": "Hindi",
+      "action": {
+        "analyzeCodebase": "Suriin ang codebase",
+        "dismiss": "I-dismiss",
+        "manualReview": "Manwal na pagrereview",
+        "monitor": "Subaybayan",
+        "openPr": "Magbukas ng PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} natukoy na isyu",
@@ -1859,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "I-save ang mga pagbabago",
       "unsavedTitle": "Mga hindi na-save na pagbabago",
-      "unsavedMessage": "I-save ang mga pagbabago mo bago umalis sa screen na ito?"
+      "unsavedMessage": "I-save ang mga pagbabago mo bago umalis sa screen na ito?",
+      "unsavedInvalidMessage": "Hindi pa ma-save ang mga pagbabagong ito. Ayusin ang mga ito para ma-save, o itapon ang mga ito para umalis."
     },
     "auditReportButton": {
       "viewA11y": "Tingnan ang ulat ng audit"
@@ -1876,7 +1890,24 @@
       "title": "Ulat ng audit",
       "unavailable": "Hindi makuha ang ulat ng audit",
       "unavailableDescription": "Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring tumingin sa mga ulat ng audit. Humingi ng access sa isa sa kanila.",
-      "queryFailed": "Hindi natapos ang pagkuha ng ulat. Subukang muli."
+      "queryFailed": "Hindi natapos ang pagkuha ng ulat. Subukang muli.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Natapos ang pagsusuri",
+        "findingAnalysisFailed": "Nabigo ang pagsusuri",
+        "findingAutoDismissed": "Awtomatikong na-dismiss",
+        "findingCreated": "Na-import",
+        "findingDeleted": "Nabura",
+        "findingDismissed": "Na-dismiss",
+        "findingSeverityChanged": "Nagbago ang kalubhaan",
+        "findingStatusChange": "Nagbago ang status",
+        "findingSuperseded": "Napalitan",
+        "remediationBlocked": "Nahadlangan ang pag-aayos",
+        "remediationCancelled": "Nakansela",
+        "remediationFailed": "Nabigo ang pag-aayos",
+        "remediationNoChangesNeeded": "Walang kinakailangang pagbabago",
+        "remediationPrOpened": "Nagbukas ng PR",
+        "remediationQueued": "Hiniling ang pag-aayos"
+      }
     },
     "notifications": {
       "couldNotLoad": "Hindi ma-load ang mga setting ng abiso.",
@@ -1908,7 +1939,6 @@
       "installApp": "I-install ang GitHub App",
       "reauthorizeButton": "Pahintulutan muli ang GitHub App",
       "reauthorizeDescription": "Kailangan ng Security Agent ang pahintulot na vulnerability_alerts para ma-access ang mga alerto ng Dependabot. Pahintulutan muli ang GitHub App para ibigay ito.",
-      "reauthorizeFailed": "Hindi masimulan ang muling pagbibigay ng pahintulot. Pakisubukang muli.",
       "reauthorizeTitle": "Kailangan ng mga karagdagang pahintulot",
       "setupFailed": "Hindi masimulan ang setup ng GitHub. Pakisubukang muli."
     },
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "Hindi na magamit ang {{model}}. Ginagamit ang iyong paunang itinakdang modelo.",
       "couldNotReadPendingSessions": "Hindi mabasa ang mga nakabinbing sesyon. Subukang muli.",
       "failedToCreate": "Hindi makagawa ng sesyon.",
+      "checkOrganizationAccess": "Suriin ang iyong access sa Organisasyon na ito, at subukang muli.",
       "couldNotRefreshRepositories": "Hindi ma-refresh ang mga imbakan ng code. Subukang muli.",
       "discardDraftTitle": "Burahin ang burador?",
       "discardDraftMessage": "Mawawala ang iyong prompt.",
@@ -2281,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} na linya",
       "matchesBadge_one": "{{displayCount}} tugma",
       "matchesBadge_other": "{{displayCount}} tugma",
-      "noOutput": "Walang output."
+      "noOutput": "Walang output.",
+      "translationFailed": "Nabigo ang pagsasalin"
     },
     "readToolMarkdown": {
       "linesTruncated": "mga linyang {{start}}–{{end}} (pinaikli)",
@@ -2978,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Bumalik sa profile",
       "loadErrorMessage": "Suriin ang koneksyon mo at subukan muli.",
+
+      "chooseAccount": "Pumili ng account",
       "loadErrorTitle": "Hindi ma-load ang iyong mga organisasyon.",
+      "noOrganization": "Walang organisasyon",
+
+      "noOrganizationDescription": "Ang account na ito ay hindi bahagi ng isang organisasyon. Gumawa o sumali sa isang organisasyon sa web upang magamit ang mga feature ng organisasyon tulad ng mga imbitasyon ng miyembro at mga alerto sa mababang balanse.",
+
+      "openWebOrganizations": "Buksan ang mga organisasyon sa web",
+
       "organizationUnavailable": "Hindi ma-access ang organisasyon.",
-      "selectDescription": "Pumili ng organisasyon mula sa iyong profile para magpatuloy.",
+      "selectDescriptionWithOrganizations": "Kasapi ka ng isa o higit pang organisasyon. Piliin ang account na dapat gamitin ng screen na ito.",
+
       "selectOrganization": "Pumili ng organisasyon",
       "unavailableDescription": "Hindi na ma-access ang organisasyong ito. Pumili ng isa mula sa iyong profile para magpatuloy.",
+
+      "unavailableSessionsDescription": "Hindi na ma-access ang organisasyong ito. Hindi ma-load ang mga session nito.",
       "accessDeniedDescription": "Wala kang access sa organisasyong ito."
     },
     "creditActivity": {
@@ -3642,7 +3685,9 @@
       "jsonTooLarge": "Gumamit ng hindi hihigit sa 50 entry, mga key hanggang 128 at mga value hanggang 4096 character",
       "timeoutInvalid": "Ang timeout ay dapat na isang buong bilang ng mga millisecond",
       "edit": "I-edit ang MCP server",
-      "saveFailed": "Hindi ma-save ang MCP server"
+      "saveFailed": "Hindi ma-save ang MCP server",
+      "deleteFailed": "Hindi ma-delete ang MCP server",
+      "updateFailed": "Hindi ma-update ang MCP server"
     },
     "agents": {
       "title": "Mga ahente ng profile",
@@ -3669,6 +3714,7 @@
       "visibilitySubagent": "Subagent — matatawag lang mula sa iba",
       "visibilityAll": "Lahat - pareho",
       "saveFailed": "Hindi ma-save ang ahente",
+      "deleteFailed": "Hindi ma-delete ang ahente",
       "nameRequired": "Maglagay ng pangalan ng ahente",
       "slugRequired": "Maglagay ng agent slug",
       "slugInvalid": "Ang slug ay dapat magsimula sa isang titik at gumamit lamang ng maliliit na titik, digit, at gitling",
@@ -3683,10 +3729,12 @@
       "description": "Paglalarawan ng utos",
       "template": "Padron",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Ipaliwanag ang $ARGUMENTS",
       "subtask": "Patakbuhin bilang subtask",
       "edit": "I-edit ang slash command",
       "saveFailed": "Hindi ma-save ang command",
+      "deleteFailed": "Hindi ma-delete ang command",
       "nameRequired": "Maglagay ng command name",
       "nameInvalid": "Ang pangalan ay dapat magsimula sa maliit na titik at gumamit lamang ng maliliit na titik, digit, at gitling",
       "templateRequired": "Maglagay ng command template",
@@ -3833,7 +3881,7 @@
     "view": "Basahin ang briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Ipakita ang live na status",
+    "dismiss": "Balewalain ang briefing",
     "offline": "Offline · naka-save na briefing",
     "cached": "Naka-save na ulat · hindi ma-refresh",
     "revised": "Binago · {{revision}}",

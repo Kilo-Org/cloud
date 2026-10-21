@@ -27,9 +27,13 @@ const captureIdle = vi.hoisted(() => (cb: () => void) => {
 });
 const getProfileAgentScopeMock = vi.hoisted(() => vi.fn());
 const openExternalUrlFn = vi.hoisted(() => vi.fn());
+const connectivityState = vi.hoisted(() => ({
+  value: 'online' as 'online' | 'offline' | 'unknown',
+}));
 
 export {
   authState,
+  connectivityState,
   getProfileAgentScopeMock,
   idleState,
   keys,
@@ -103,6 +107,12 @@ vi.mock('@/components/use-delete-account', () => ({
 
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'user-1' }),
+}));
+
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => connectivityState.value,
+  useCommittedConnectivityStatus: () => connectivityState.value,
+  useOfflineBannerState: () => connectivityState.value === 'offline',
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({

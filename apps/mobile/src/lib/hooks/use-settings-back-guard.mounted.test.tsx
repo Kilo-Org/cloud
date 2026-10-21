@@ -183,6 +183,10 @@ describe('useSettingsBackGuard', () => {
 
     triggerPreventRemove();
     const dialog = currentDialog();
+    expect(dialog?.title).toBe('Unsaved changes');
+    expect(dialog?.message).toBe(
+      "These changes can't be saved yet. Fix them to save, or discard them to leave."
+    );
     // Nothing valid to persist, so there is no Save action to offer.
     expect(dialog?.extraAction).toBeUndefined();
     expect(dialog?.cancelLabel).toBe('Keep editing');

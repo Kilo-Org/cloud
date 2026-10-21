@@ -90,6 +90,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo', () => ({ reloadAppAsync }));
+
 vi.mock('@/i18n/apply-language', async importOriginal => {
   const actual = await importOriginal<typeof ApplyLanguageModule>();
   return {
@@ -438,7 +439,7 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
-  it('keeps Retry as the only action when the reload fails', async () => {
+  it('offers Continue beside Retry so a saved language is not trapped behind the reload', async () => {
     reloadAppAsync.mockRejectedValue(new Error('reload failed'));
     const onClose = vi.fn<() => void>();
     const renderer = await applySelection(onClose, 'العربية');
@@ -447,7 +448,28 @@ describe('LanguagePickerSheet apply', () => {
     if (!failedSheet) {
       throw new Error('PickerSheet not found');
     }
-    expect(failedSheet.props.onCancel).toBeUndefined();
+    expect(failedSheet.props.cancelLabel).toBe('Continue');
+    expect(failedSheet.props.onCancel).toEqual(expect.any(Function));
+    expect(failedSheet.props.doneLabel).toBe('Retry');
+    // The failed state holds the guard while Retry is on screen.
+    expect(prevention.enabled).toBe(true);
+    expect(prevention.disable).not.toHaveBeenCalled();
+
+    act(() => {
+      (failedSheet.props.onCancel as () => void)();
+    });
+
+    // Continue leaves the failed state without another reload: the preference
+    // was persisted before the reload attempt, so the sheet closes into the
+    // normal picker instead of asking for a retry that may never succeed.
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    expect(findByType(renderer.root, 'PickerSheet')[0]?.props.doneLabel).toBe('Done');
+
+    // Closing releases the guard the failed state held, so the sheet's own
+    // close is the one navigation it lets through.
+    expect(prevention.disable).toHaveBeenCalledTimes(1);
+    expect(prevention.enabled).toBe(false);
 
     renderer.unmount();
   });

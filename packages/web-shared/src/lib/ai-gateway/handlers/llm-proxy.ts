@@ -61,6 +61,8 @@ import {
   autoRoutingUnavailableResponse,
   invalidAutoDecisionResponse,
   paidModelAuthRequiredResponse,
+  anonymousFreeModelLimitResponse,
+  accountFreeModelLimitResponse,
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   unavailableModelResponse,
@@ -83,9 +85,14 @@ import {
 import {
   createAnonymousContext,
   isAnonymousContext,
+  isAnonymousUserId,
   type AnonymousUserContext,
 } from '@kilocode/web-shared/lib/anonymous';
-import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import {
+  freeModelRateLimitKey,
+  isFreeModelRateLimited,
+  type FreeModelRateLimitSubject,
+} from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   gatewayRateLimitKey,
@@ -194,25 +201,30 @@ function validatePath(
   return { errorResponse: invalidPathResponse() };
 }
 
-async function resolveFreeModelRateLimitKey(
+/**
+ * Signed-in callers count per account, keyed on the signed `kiloUserId` in their
+ * token (see `gatewayRateLimitKey`), so the check needs no database query.
+ * Anonymous callers count per IP, except that server-side products on Kilo
+ * infrastructure IPs must authenticate: those IPs are shared by every user.
+ */
+function resolveFreeModelRateLimitSubject(
+  accountKey: string,
   feature: FeatureValue | null,
-  ipAddress: string,
-  authPromise: Promise<{ user: { id: string } | null }>
-): Promise<NextResponseType<unknown> | string> {
-  if (isUserRateLimitedFeature(feature) && isCloudflareIP(ipAddress)) {
-    const { user } = await authPromise;
-    if (!user) {
-      return NextResponse.json(
-        {
-          error: 'Authentication required for this feature',
-          error_type: ProxyErrorType.authentication_required,
-        },
-        { status: 401 }
-      );
-    }
-    return `user:${user.id}`;
+  ipAddress: string
+): NextResponseType<unknown> | FreeModelRateLimitSubject {
+  if (!isAnonymousUserId(accountKey)) {
+    return { kind: 'account', kiloUserId: accountKey };
   }
-  return `ip:${ipAddress}`;
+  if (isUserRateLimitedFeature(feature) && isCloudflareIP(ipAddress)) {
+    return NextResponse.json(
+      {
+        error: 'Authentication required for this feature',
+        error_type: ProxyErrorType.authentication_required,
+      },
+      { status: 401 }
+    );
+  }
+  return { kind: 'ip', ipAddress };
 }
 
 export async function handleLlmProxyRequest(
@@ -601,26 +613,18 @@ export async function handleLlmProxyRequest(
   // the report-only decide call and the usage event, which share this request.
   const clientIp = bareIpLiteral(ipAddress);
 
-  // For free models: server-side products (cloud-agent, code-review, app-builder,
-  // gastown) rate-limit per user when the request comes from Cloudflare IPs (Kilo
-  // infrastructure). All other products rate-limit per IP (fast pre-auth path).
   // Custom LLMs are exempt, even when their id matches a free-model pattern.
   if (isFreeRequestedModel && !(await isCustomLlm(effectiveModelIdLowerCased))) {
-    const rateLimitKey = await resolveFreeModelRateLimitKey(feature, ipAddress, authPromise);
-    if (rateLimitKey instanceof NextResponse) return rateLimitKey;
+    const rateLimitSubject = resolveFreeModelRateLimitSubject(accountKey, feature, ipAddress);
+    if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
 
-    if (await isFreeModelRateLimited(request, rateLimitKey)) {
+    if (await isFreeModelRateLimited(request, rateLimitSubject)) {
       console.warn(
-        `Model rate limit exceeded, ${rateLimitKey}, model: ${effectiveModelIdLowerCased}`
+        `Model rate limit exceeded, ${freeModelRateLimitKey(rateLimitSubject)}, model: ${effectiveModelIdLowerCased}`
       );
-      return NextResponse.json(
-        {
-          error: 'Rate limit exceeded',
-          error_type: ProxyErrorType.rate_limit_exceeded,
-          message: 'Model usage limit reached. Please try again later.',
-        },
-        { status: 429 }
-      );
+      return rateLimitSubject.kind === 'account'
+        ? accountFreeModelLimitResponse()
+        : anonymousFreeModelLimitResponse();
     }
   }
 

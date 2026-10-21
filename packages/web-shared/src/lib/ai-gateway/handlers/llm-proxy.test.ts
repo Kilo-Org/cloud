@@ -1303,7 +1303,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   });
 
   it.each([gemma_4_26b_a4b_it_free_model.public_id, 'test/free-model:free', 'openrouter/free'])(
-    'applies free-model rate limiting per IP to the free model %s',
+    'applies free-model rate limiting per IP to anonymous callers of the free model %s',
     async modelId => {
       mockedIsFreeModelRateLimited.mockResolvedValue(true);
 
@@ -1312,28 +1312,47 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
       expect(response.status).toBe(429);
       expect(await response.json()).toMatchObject({
+        error: { code: 'PROMOTION_MODEL_LIMIT_REACHED' },
         error_type: 'rate_limit_exceeded',
-        message: 'Model usage limit reached. Please try again later.',
       });
-      expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), 'ip:127.0.0.1');
+      expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+        kind: 'ip',
+        ipAddress: '127.0.0.1',
+      });
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
     }
   );
 
-  it('applies free-model rate limiting per user to server-side products on Cloudflare IPs', async () => {
+  it.each([
+    ['a client on its own IP', {}],
+    [
+      'a server-side product on a Cloudflare IP',
+      { 'x-forwarded-for': '104.16.0.1', 'x-kilocode-feature': 'cloud-agent' },
+    ],
+  ])('applies free-model rate limiting per account to %s', async (_caller, headers) => {
     setUserAuth();
     mockedIsFreeModelRateLimited.mockResolvedValue(true);
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
       makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id), {
-        'x-forwarded-for': '104.16.0.1',
-        'x-kilocode-feature': 'cloud-agent',
+        authorization: `Bearer ${signedToken(KILO_GATEWAY_AUDIENCE)}`,
+        ...headers,
       }) as never
     );
 
     expect(response.status).toBe(429);
-    expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), 'user:user-123');
+    const body = await response.json();
+    expect(body).toMatchObject({
+      error_type: 'rate_limit_exceeded',
+      message:
+        'Free model usage limit reached. Please try again later, or switch to a paid model or your own API key.',
+    });
+    expect(JSON.stringify(body)).not.toContain('PROMOTION_MODEL_LIMIT_REACHED');
+    expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'account',
+      kiloUserId: 'user-123',
+    });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
@@ -1379,7 +1398,10 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), 'ip:127.0.0.1');
+    expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'ip',
+      ipAddress: '127.0.0.1',
+    });
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 

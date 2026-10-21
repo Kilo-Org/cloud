@@ -46,7 +46,9 @@ describe('confirmStartAgent', () => {
       sessionId: 'ses_1',
     });
     const message = mocks.alert.mock.calls.at(-1)?.[1] as string | undefined;
-    expect(message).toContain(i18n.t('appActions.start.confirmMessage', { prompt: 'fix the build' }));
+    expect(message).toContain(
+      i18n.t('appActions.start.confirmMessage', { prompt: 'fix the build' })
+    );
     expect(message).toContain(`${i18n.t('common.repository')}: o/r`);
     expect(message).toContain(`${i18n.t('agentChat.session.title')}: ses_1`);
   });

@@ -67,7 +67,7 @@ type McpAppViewProps = {
   readonly view: RemoteMcpToolView;
 };
 
-export function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
+function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
   const { t, i18n } = useTranslation();
   const dark = useColorScheme() === 'dark';
   const [pageLoaded, setPageLoaded] = useState(false);

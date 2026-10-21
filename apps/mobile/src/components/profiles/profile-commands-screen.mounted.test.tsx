@@ -9,6 +9,7 @@ import {
   findOne,
   mountScreen,
   pressableDisabled,
+  pressMove,
   pressPressable,
   rerenderScreen,
   testProfile,
@@ -27,14 +28,16 @@ const h = vi.hoisted(() => ({
     refetch: vi.fn(),
   },
   mutations: {
-    setCommands: { mutateAsync: vi.fn(), isPending: false },
+    setCommands: { mutateAsync: vi.fn() },
   },
+  back: vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfile: () => h.query,
   useAgentProfileMutations: () => h.mutations,
 }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ back: h.back }) }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
   View: 'View',
@@ -93,7 +96,6 @@ describe('ProfileCommandsScreen', () => {
       isPending: true,
       isRefetching: false,
     });
-    Object.assign(h.mutations.setCommands, { isPending: false });
   });
 
   it('loading: renders skeletons and no rows', async () => {
@@ -157,7 +159,7 @@ describe('ProfileCommandsScreen', () => {
     h.mutations.setCommands.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Move down', 0);
+    pressMove(renderer.root, 'down', 1);
 
     await waitFor(() => h.mutations.setCommands.mutateAsync.mock.calls.length > 0);
     expect(h.mutations.setCommands.mutateAsync.mock.calls[0]?.[0]).toEqual({
@@ -168,16 +170,39 @@ describe('ProfileCommandsScreen', () => {
     unmount();
   });
 
+  it('names each reorder control by its one-based position', async () => {
+    h.query.data = testProfile(['a', 'b', 'c']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const labels = findAll(renderer.root, 'Pressable')
+      .map(node => node.props.accessibilityLabel)
+      .filter(
+        (label): label is string => typeof label === 'string' && label.startsWith('Move command ')
+      );
+    expect(labels).toEqual([
+      'Move command 1 up',
+      'Move command 1 down',
+      'Move command 2 up',
+      'Move command 2 down',
+      'Move command 3 up',
+      'Move command 3 down',
+    ]);
+
+    unmount();
+  });
+
   it('edge: the move buttons are disabled at both ends', async () => {
     h.query.data = testProfile(['a', 'b', 'c']);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
 
-    expect(pressableDisabled(renderer.root, 'Move up', 0)).toBe(true);
-    expect(pressableDisabled(renderer.root, 'Move down', 0)).toBe(false);
-    expect(pressableDisabled(renderer.root, 'Move down', 2)).toBe(true);
-    expect(pressableDisabled(renderer.root, 'Move up', 2)).toBe(false);
+    expect(pressableDisabled(renderer.root, 'Move command 1 up')).toBe(true);
+    expect(pressableDisabled(renderer.root, 'Move command 1 down')).toBe(false);
+    expect(pressableDisabled(renderer.root, 'Move command 3 down')).toBe(true);
+    expect(pressableDisabled(renderer.root, 'Move command 3 up')).toBe(false);
 
     unmount();
   });
@@ -252,6 +277,7 @@ describe('ProfileCommandsScreen', () => {
     });
     expect(findFields(renderer.root)[0]?.props.nativeText).toBe('new draft');
     commitRow(renderer.root, 0);
+    await waitFor(() => h.mutations.setCommands.mutateAsync.mock.calls.length === 2);
     expect(h.mutations.setCommands.mutateAsync).toHaveBeenLastCalledWith({
       profileId: 'profile-1',
       commands: ['new draft'],
@@ -279,7 +305,6 @@ describe('ProfileCommandsScreen', () => {
     const { renderer, queryClient, unmount } = await mountScreen();
     changeRowText(renderer.root, 0, 'submitted');
     commitRow(renderer.root, 0);
-    h.mutations.setCommands.isPending = true;
     changeRowText(renderer.root, 0, 'newer draft');
     h.query.data = testProfile(['old']);
     act(() => {
@@ -290,12 +315,12 @@ describe('ProfileCommandsScreen', () => {
       pending.resolve({ success: true });
       await pending.promise;
     });
-    h.mutations.setCommands.isPending = false;
     h.query.data = testProfile(['submitted']);
     act(() => {
       rerenderScreen(renderer, queryClient);
     });
     commitRow(renderer.root, 0);
+    await waitFor(() => h.mutations.setCommands.mutateAsync.mock.calls.length === 2);
     expect(h.mutations.setCommands.mutateAsync).toHaveBeenLastCalledWith({
       profileId: 'profile-1',
       commands: ['newer draft'],

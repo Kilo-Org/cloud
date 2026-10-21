@@ -141,6 +141,7 @@ function githubPrPayload(overrides: Record<string, unknown> = {}): Record<string
     head: { sha: 'head-sha', ref: 'feature/z', repo: { full_name: 'kilo/repo' } },
     base: { repo: { full_name: 'kilo/repo' } },
     updated_at: '2026-01-01T00:00:00Z',
+    created_at: '2025-12-31T23:00:00Z',
     ...overrides,
   };
 }
@@ -168,6 +169,7 @@ describe('fetchPullRequestByNumber', () => {
       title: 'Feature Z',
       headSha: 'head-sha',
       updatedAt: '2026-01-01T00:00:00Z',
+      createdAt: '2025-12-31T23:00:00Z',
       baseRepoFullName: 'kilo/repo',
       headRepoFullName: 'kilo/repo',
       headRef: 'feature/z',

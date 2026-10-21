@@ -35,6 +35,8 @@
     "connectGithub": "GitHubと連携",
     "cost": "コスト",
     "discard": "破棄",
+    "discardChangesMessage": "変更内容は失われます。",
+    "discardChangesTitle": "変更を破棄しますか？",
     "findings": "検出事項",
     "mergeRequest": "マージリクエスト",
     "notConnected": "未連携",
@@ -943,6 +945,9 @@
       "gateHidden": "非表示",
       "gateNone": "なし",
       "noFindings": "指摘はありません。",
+      "findingsUnavailable": "このレビューが失敗したため、結果を表示できません。",
+      "serviceUnavailable": "コードレビューサービスに接続できませんでした。サービスが利用可能になったら、レビューを再試行してください。",
+      "reviewFailed": "レビューに失敗しました。もう一度お試しください。",
       "retryMessage": "コードレビューをもう一度実行します。",
       "retryReview": "レビューを再試行",
       "retryNeedsSettings": "コードレビュアーがオフになっているか、設定の確認が必要です。設定を修正してから、このレビューを再試行してください。",
@@ -1030,7 +1035,8 @@
       "bugs": "バグ",
       "style": "スタイル",
       "testing": "テスト",
-      "documentation": "ドキュメント"
+      "documentation": "ドキュメント",
+      "unknown": "その他（{{area}}）"
     },
     "gateThreshold": {
       "warning": "警告"
@@ -1109,7 +1115,14 @@
       "triageReasoning": "トリアージの判断根拠",
       "watchInCloudAgent": "クラウドエージェントで確認",
       "whereFound": "検出場所（{{displayCount}}）",
-      "yes": "はい"
+      "yes": "はい",
+      "action": {
+        "analyzeCodebase": "コードベースを分析",
+        "dismiss": "却下",
+        "manualReview": "手動レビュー",
+        "monitor": "監視",
+        "openPr": "プルリクエストを作成"
+      }
     },
     "analysisSettings": {
       "analysisModel": "分析モデル",
@@ -1131,7 +1144,24 @@
       "summary": "レポートの概要",
       "title": "監査レポート",
       "unavailable": "監査レポートを利用できません",
-      "unavailableDescription": "監査レポートを表示できるのは、組織のオーナーと請求管理者のみです。アクセス権の付与をオーナーまたは請求管理者に依頼してください。"
+      "unavailableDescription": "監査レポートを表示できるのは、組織のオーナーと請求管理者のみです。アクセス権の付与をオーナーまたは請求管理者に依頼してください。",
+      "eventActions": {
+        "findingAnalysisCompleted": "分析が完了しました",
+        "findingAnalysisFailed": "分析に失敗しました",
+        "findingAutoDismissed": "自動的に却下されました",
+        "findingCreated": "インポート済み",
+        "findingDeleted": "削除されました",
+        "findingDismissed": "却下されました",
+        "findingSeverityChanged": "重要度が変更されました",
+        "findingStatusChange": "ステータスが変更されました",
+        "findingSuperseded": "置き換えられました",
+        "remediationBlocked": "修復がブロックされました",
+        "remediationCancelled": "キャンセルされました",
+        "remediationFailed": "修復に失敗しました",
+        "remediationNoChangesNeeded": "変更は不要",
+        "remediationPrOpened": "プルリクエストがオープンされました",
+        "remediationQueued": "修復リクエスト済み"
+      }
     },
     "auditReportButton": {
       "viewA11y": "監査レポートを表示"
@@ -1697,6 +1727,7 @@
       "prefillModelUnavailable": "{{model}}は利用できなくなりました。デフォルトモデルを使用します。",
       "couldNotReadPendingSessions": "保留中のセッションを読み取れませんでした。もう一度お試しください。",
       "failedToCreate": "セッションを作成できませんでした。",
+      "checkOrganizationAccess": "この組織へのアクセス権を確認して、もう一度お試しください。",
       "couldNotRefreshRepositories": "リポジトリを更新できませんでした。もう一度お試しください。",
       "discardDraftTitle": "下書きを破棄しますか？",
       "discardDraftMessage": "入力したプロンプトが削除されます。",
@@ -2217,6 +2248,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "読み込みが完了するまで、サインイン中のセッションは表示できません。",
     "currentDeviceUnidentified": "現在のデバイスを特定できませんでした。",
+    "kiloApp": "Kiloアプリ",
     "noSessions": "サインイン中のセッションはありません",
     "noSessionsDescription": "別のデバイスでKiloアプリにサインインすると、ここに表示されます。",
     "onlyKiloAppSignIns": "ここにはKiloアプリのサインインのみ表示されます。エディターとCLIのサインインは表示されません。",
@@ -2369,6 +2401,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "始める前に",
+    "summaryTitle": "データ共有の設定",
     "introDescription": "Kiloは応答を生成するために、メッセージをAIプロバイダーに送信します。共有する内容と共有先は以下のとおりです。",
     "required": "Kiloの利用に必要なデータ共有",
     "promptsTitle": "プロンプトと会話",
@@ -2377,7 +2410,6 @@
     "accountDescription": "KiloのアカウントIDとリクエストのメタデータを、認証と利用量の計測に使用します。",
     "diagnosticsTitle": "アプリの診断情報",
     "diagnosticsDescription": "アプリ内のコンテンツを除いたクラッシュやエラーのレポートを、アプリの安定性を保つために使用します。",
-    "optional": "任意",
     "helpImprove": "Kiloの改善に協力",
     "helpImproveDescription": "匿名の利用状況データとインストール元の情報を共有します。この設定はいつでも変更できます。",
     "seeFullDetails": "詳細を表示",
@@ -2502,7 +2534,8 @@
       "description": "モバイルでプルリクエストをレビューするには、GitHubアカウントを接続してください。",
       "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
       "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
-      "bitbucketOrgOnlyDescription": "プロフィールで組織を選択すると、そのBitbucketプルリクエストをレビューできます。"
+      "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
+      "contextLine": "{{organization}}用"
     },
     "connectionExpired": "GitHubとの連携が期限切れになりました。",
     "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした。",
@@ -2929,7 +2962,9 @@
       "reviewNotSubmitted": "このレビューはこのままでは送信できません。PRが更新されていないか、自分が作成したプルリクエストではないか確認してください。",
       "reviewNotSubmittedTerm": "このレビューはそのまま送信できません。{{term}}が変更されたか、自分の{{term}}はレビューできません。",
       "couldNotPostComment": "コメントを投稿できませんでした。",
-      "couldNotSubmitReview": "レビューを送信できませんでした。接続を確認して、もう一度お試しください。"
+      "couldNotSubmitReview": "レビューを送信できませんでした。接続を確認して、もう一度お試しください。",
+      "rateLimited": "リクエストが多すぎます。しばらくしてからもう一度お試しください。",
+      "conflict": "作業中にこれが変更されました。読み込み直してもう一度お試しください。"
     },
     "operation": {
       "couldNotReply": "返信できませんでした。",
@@ -3468,6 +3503,9 @@
     "localModels": {
       "title": "オンデバイスモデル",
       "help": "オンデバイスモデルはこのスマートフォン上で動作します。プロンプトと返信はデバイス内にとどまります。",
+      "switchTitle": "オンデバイスモデルに切り替えますか？",
+      "switchMessage": "{{name}}に切り替えると、この会話のプロンプトとコンテキストがリモートサーバーではなく、このスマートフォン上で処理されます。",
+      "switchConfirm": "モデルを切り替える",
       "systemPurpose": "このデバイスのシステムに組み込まれたモデルです。デバイス上で動作します。",
       "apple": "Apple Intelligence（デバイス上）",
       "checking": "利用可能か確認中…",
@@ -3564,7 +3602,6 @@
     "personalDefaultDescription": "リポジトリに固定プロファイルがない場合に自動ロードされます。",
     "organizationDefaultDescription": "個人のデフォルトがないメンバーの場合は自動ロードされます。",
     "setAsDefault": "デフォルトとして設定",
-    "removeDefault": "デフォルトとして削除",
     "saveFailed": "プロフィールを保存できませんでした",
     "deleteTitle": "プロフィールの削除",
     "deleteMessage": "これにより、プロファイルとその設定が完全に削除されます。これを元に戻すことはできません。",
@@ -3590,11 +3627,13 @@
     "commandsTitle": "セットアップコマンド",
     "addCommand": "コマンドの追加",
     "commandLabel": "指示",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "例: pnpm install",
     "commandsEmpty": "セットアップ コマンドはまだありません",
     "commandsSaveFailed": "セットアップコマンドを保存できませんでした",
     "moveUp": "上に移動",
     "moveDown": "下に移動",
+    "moveCommandUp": "コマンド{{position}}を上に移動",
+    "moveCommandDown": "コマンド{{position}}を下に移動",
     "skillsTitle": "スキル",
     "addSkill": "スキルの追加",
     "skillNameLabel": "スキル名",
@@ -3664,7 +3703,7 @@
       "nameRequired": "エージェント名を入力してください",
       "slugRequired": "エージェントスラッグを入力してください",
       "slugInvalid": "スラグは文字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
-      "slugConflict": "そのスラッグは組み込みエージェントによって予約されています",
+      "slugConflict": "そのスラッグは組み込みエージェントまたはこのプロファイルの別のエージェントが既に使用しています",
       "edit": "エージェントの編集"
     },
     "slashCommands": {
@@ -3806,5 +3845,69 @@
       "title": "リストに保存",
       "saved": "{{list}}に保存しました"
     }
+  },
+  "agentBriefing": {
+    "title": "朝のブリーフィング",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "過去のアクティビティの一部が欠けている可能性があります。≥は「少なくともこの量」を意味し、不明はゼロではありません。",
+    "available": "利用可能なブリーフィング",
+    "history": "ブリーフィング履歴",
+    "historyHint": "レポートは閉じたものも含めて30日間保存されます。",
+    "settings": "ブリーフィング設定",
+    "empty": "夜間のアクティビティはありません",
+    "emptyHint": "アクティブな夜の後、クラウドとCLIのコーディングセッションがここに表示されます。",
+    "loadError": "ブリーフィングを読み込めませんでした",
+    "sessions": "夜間に稼働",
+    "pullRequests": "作成されたPRs",
+    "blockers": "新しいブロッカー",
+    "spend": "夜間の支出",
+    "view": "ブリーフィングを読む",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}、{{time}}",
+    "dismiss": "ライブ状況を表示",
+    "offline": "オフライン · 保存済みブリーフィング",
+    "cached": "保存済みレポート · 更新できません",
+    "revised": "改訂 · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "AI要約",
+    "summaryDisabled": "構造化レポート · このコンテキストではAIはオフです",
+    "summaryPending": "AI要約を作成中です。完了するとここに追加されます。",
+    "summaryFailed": "AI要約に失敗しました。再試行すると再度料金が発生する場合があります。",
+    "summaryUnavailable": "AI要約は利用できません。構造化レポートは引き続き利用できます。",
+    "summaryOutdated": "この要約は最新のレポート改訂より前のものです。",
+    "summaryCharge": "AI料金 {{cost}}",
+    "summaryChargePending": "AI料金は精算待ちです",
+    "generate": "要約を生成",
+    "retrySummary": "有料要約を再試行",
+    "sources": "根拠と成果物",
+    "timezone": "ブリーフィングのタイムゾーン",
+    "deviceTimezone": "デバイスのタイムゾーンを使用",
+    "timezoneHint": "IANAタイムゾーン(例: Europe/Berlin)。スケジュールの変更は今後の夜に適用されます。",
+    "nightStart": "夜の開始",
+    "morningStart": "夜の終了 / 朝の開始",
+    "morningEnd": "朝の終了",
+    "timeHint": "朝が終わると、オフラインでもホームカードはライブ状況に戻ります。",
+    "invalidSchedule": "有効なタイムゾーンと、重複せず空でない夜と朝の期間を選択してください。",
+    "notificationsHint": "最初のレポートの準備ができたら、毎朝1回一般的な通知が届きます。有料のAI要約とは無関係です。",
+    "notificationPermission": "ブリーフィングを受け取るには、$t(common.notifications)でデバイスの通知を有効にしてください。",
+    "aiOptIn": "有料AI要約",
+    "aiHint": "このコンテキストのみのオプションです。選択・編集済みの抜粋と構造化された事実が、アプリの言語でモデルに送信されます。料金はこのコンテキストの残高から支払われます。",
+    "defaultModel": "Kiloのデフォルトモデルを使用",
+    "duration": "時間の上限(分)",
+    "spendLimit": "支出の上限(USD)",
+    "safeguardHint": "要約ごとの上限であり、1日の予算ではありません。デフォルト: 10分と$2。生成がこの上限内で続く間も、レポートは最長5分後に公開されます。",
+    "invalidSafeguards": "正の有限な時間と支出の上限を入力してください。",
+    "estimate": "推定 {{estimate}} · 最大 {{maximum}}",
+    "estimateUnavailable": "これらの設定では有料サマリーを利用できません。",
+    "confirmPaid": "{{context}}の有料要約を有効にしますか?",
+    "confirmGeneration": "有料要約を生成しますか?",
+    "paidDisclosure": "見積もり{{estimate}}、最大{{maximum}}、制限時間{{minutes}}分。生成に失敗しても料金が発生します。",
+    "enable": "有料要約を有効にする",
+    "contextSettings": "AI設定 · {{context}}",
+    "allContexts": "個人と組織のブリーフィングは別々に管理されます。",
+    "estimatePricingUnavailable": "このモデルの価格情報はご利用いただけません。",
+    "estimateBalanceUnavailable": "有料サマリーには残高が不足しています。",
+    "estimateModelNotAllowed": "このモデルはここでは使用できません。",
+    "estimateSpendLimitTooLow": "このサマリーを許可するには利用上限を引き上げてください。"
   }
 }

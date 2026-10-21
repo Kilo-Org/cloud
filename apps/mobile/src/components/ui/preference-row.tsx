@@ -14,12 +14,6 @@ type PreferenceRowProps = Readonly<{
   disabled: boolean;
   busy?: boolean;
   onValueChange: (next: boolean) => void;
-  /**
-   * Accessibility label for the switch. Defaults to the row title; pass an
-   * action label when the title names the setting and the action differs
-   * (e.g. "Default profile" row whose switch says "Remove as default").
-   */
-  switchAccessibilityLabel?: string;
 }>;
 
 /** Switch row shaped like the Notifications category row. */
@@ -31,26 +25,18 @@ export function PreferenceRow({
   disabled,
   busy = false,
   onValueChange,
-  switchAccessibilityLabel,
 }: PreferenceRowProps) {
   const colors = useThemeColors();
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      {/* One named control: the title is what a tap names, so it has to move
-          the value. A second accessibilityLabel on the native Switch made
-          Appium prefer that Switch, whose elementClick does not fire
-          onValueChange, and left the row On after two taps. The Switch stays
-          outside this Pressable so a finger on the thumb cannot fire both. */}
       <Pressable
         className="min-h-11 min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70"
         disabled={disabled}
         onPress={() => {
           onValueChange(!value);
         }}
-        accessibilityRole="switch"
-        accessibilityLabel={switchAccessibilityLabel ?? title}
-        accessibilityHint={subtitle}
-        accessibilityState={{ disabled, busy, checked: value }}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
       >
         {busy ? (
           <ActivityIndicator size="small" color={colors.mutedForeground} />
@@ -80,9 +66,9 @@ export function PreferenceRow({
       <Switch
         value={value}
         disabled={disabled}
-        accessible={false}
-        importantForAccessibility="no"
-        accessibilityElementsHidden
+        accessibilityLabel={title}
+        accessibilityHint={subtitle}
+        accessibilityState={{ disabled, busy, checked: value }}
         onValueChange={onValueChange}
       />
     </View>

@@ -39,9 +39,11 @@ export function SecurityCommandRetryCard({
           <Button size="sm" className="flex-1" onPress={onRetry}>
             <Text>{t('common.retry')}</Text>
           </Button>
-          <Button size="sm" variant="ghost" onPress={onDiscard}>
-            <Text>{t('common.discard')}</Text>
-          </Button>
+          {onDiscard ? (
+            <Button size="sm" variant="ghost" onPress={onDiscard}>
+              <Text>{t('common.discard')}</Text>
+            </Button>
+          ) : null}
         </View>
       ) : null}
     </View>

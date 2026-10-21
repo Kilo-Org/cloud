@@ -38,10 +38,13 @@
     "typecheck": "tsgo --noEmit && pnpm -C wrapper run typecheck",
     "typecheck:fake-llm": "tsgo --noEmit -p tsconfig.fake-llm.json",
     "snapshot:vercel": "tsx scripts/vercel-snapshot.ts",
-    "update-default-slash-commands": "node scripts/update-default-slash-commands.mjs"
+    "update-default-slash-commands": "node scripts/update-default-slash-commands.mjs",
+    "test:runtime-installer": "tsx --test --test-concurrency=1 test/runtime-installer/*.test.ts",
+    "runtime:publish": "tsx scripts/publish-runtime.ts",
+    "test:runtime-ci": "node --test scripts/runtime-ci-admission.test.mjs scripts/runtime-workflow.test.mjs"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.12.9",
+    "@cloudflare/sandbox": "0.12.12",
     "@hono/trpc-server": "0.4.2",
     "@kilocode/cloud-agent-profile": "workspace:*",
     "@kilocode/container-usage": "workspace:*",
@@ -62,7 +65,7 @@
   "devDependencies": {
     "@cloudflare/containers": "0.3.7",
     "@cloudflare/vitest-pool-workers": "0.18.6",
-    "@kilocode/sdk": "7.8.1",
+    "@kilocode/sdk": "7.8.15",
     "@types/jsonwebtoken": "catalog:",
     "@types/node": "catalog:",
     "@types/ws": "^8.5.12",
@@ -74,6 +77,7 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "aws4fetch": "catalog:"
   }
 }

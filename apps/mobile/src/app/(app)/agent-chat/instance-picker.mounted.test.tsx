@@ -23,6 +23,7 @@ const fetchInstances = vi.hoisted(() =>
 const queryOptionsCalls = vi.hoisted(() => [] as Record<string, unknown>[]);
 const bridge = vi.hoisted(() => ({
   currentValue: null as InstancePickerInstance | null,
+  pendingComputer: false,
   onSelect: vi.fn(),
 }));
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
@@ -207,6 +208,7 @@ describe('InstancePickerScreen list', () => {
     fetchInstances.mockReset().mockResolvedValue({ instances: [CLI_INSTANCE, REMOTE_INSTANCE] });
     queryOptionsCalls.length = 0;
     bridge.currentValue = CLI_INSTANCE;
+    bridge.pendingComputer = false;
     bridge.onSelect.mockClear();
     router.back.mockClear();
     insets.bottom = 0;
@@ -279,6 +281,22 @@ describe('InstancePickerScreen list', () => {
 
     const style = flashListOf(renderer.root).props.contentContainerStyle;
     expect(style?.paddingBottom).toBe(50);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('marks no row checked while the pending computer target owns the form', async () => {
+    bridge.currentValue = null;
+    bridge.pendingComputer = true;
+    const renderer = await mount();
+
+    // Every radio renders unchecked: the Cloud Agent default is not the
+    // current target, and no instance row is bound either.
+    for (const radio of radios(renderer.root)) {
+      expect(radio.props.accessibilityState).toMatchObject({ checked: false });
+    }
 
     act(() => {
       renderer.unmount();

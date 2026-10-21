@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react';
 import { CloudChatPage } from '@/components/cloud-agent-next/CloudChatPage';
+import type { KnownModel } from '@/components/cloud-agent-next/known-models';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 type CloudChatPageWrapperNextProps = {
@@ -9,6 +10,7 @@ type CloudChatPageWrapperNextProps = {
   organizationName?: string;
   organizationRole: OrganizationRole;
   currentUserId: string;
+  knownModels: KnownModel[];
 };
 
 export function CloudChatPageWrapperNext({
@@ -16,16 +18,16 @@ export function CloudChatPageWrapperNext({
   organizationName,
   organizationRole,
   currentUserId,
+  knownModels,
 }: CloudChatPageWrapperNextProps) {
   return (
-    <Suspense
-      fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}
-    >
+    <Suspense fallback={<div className="h-full" />}>
       <CloudChatPage
         organizationId={organizationId}
         organizationName={organizationName}
         organizationRole={organizationRole}
         currentUserId={currentUserId}
+        knownModels={knownModels}
       />
     </Suspense>
   );

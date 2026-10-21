@@ -147,7 +147,9 @@ export function computeExclusiveLayout(input: ExclusiveLayoutInput): {
     .filter(name => fs.statSync(path.join(parent, name)).isDirectory())
     .map(name => path.join(parent, name));
   const sessionParent =
-    path.basename(parent) === 'worktrees' || path.basename(parent) === 'sessions';
+    path.basename(parent) === 'worktrees' ||
+    path.basename(parent) === 'sessions' ||
+    directory === '/workspace/app';
   return {
     exclusive:
       sessionParent &&

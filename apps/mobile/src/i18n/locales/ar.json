@@ -35,6 +35,8 @@
     "connectGithub": "ربط GitHub",
     "cost": "التكلفة",
     "discard": "تجاهل",
+    "discardChangesMessage": "ستفقد تغييراتك.",
+    "discardChangesTitle": "تجاهل التغييرات؟",
     "findings": "الملاحظات",
     "mergeRequest": "طلب دمج",
     "notConnected": "غير مرتبط",
@@ -955,6 +957,9 @@
       "gateHidden": "مخفي",
       "gateNone": "لا شيء",
       "noFindings": "لا توجد نتائج.",
+      "findingsUnavailable": "النتائج غير متاحة لأن هذه المراجعة فشلت.",
+      "serviceUnavailable": "تعذّر الاتصال بخدمة مراجعة الكود. أعد المراجعة عندما تصبح الخدمة متاحة.",
+      "reviewFailed": "فشلت المراجعة. يُرجى المحاولة مرة أخرى.",
       "retryMessage": "سيؤدي هذا إلى إعادة مراجعة الشفرة.",
       "retryReview": "إعادة المراجعة",
       "retryNeedsSettings": "مراجع الشيفرة متوقف أو تحتاج إعداداته إلى انتباه. أصلح الإعدادات، ثم أعد هذه المراجعة.",
@@ -1042,7 +1047,8 @@
       "bugs": "الأخطاء",
       "style": "الأسلوب",
       "testing": "الاختبار",
-      "documentation": "التوثيق"
+      "documentation": "التوثيق",
+      "unknown": "آخر ({{area}})"
     },
     "gateThreshold": {
       "warning": "تحذير"
@@ -1121,7 +1127,14 @@
       "triageReasoning": "مبررات الفرز الأولي",
       "watchInCloudAgent": "المتابعة في وكيل السحابة",
       "whereFound": "مواضع الاكتشاف ({{displayCount}})",
-      "yes": "نعم"
+      "yes": "نعم",
+      "action": {
+        "analyzeCodebase": "تحليل قاعدة الكود",
+        "dismiss": "تجاهل",
+        "manualReview": "مراجعة يدوية",
+        "monitor": "مراقبة",
+        "openPr": "فتح طلب السحب"
+      }
     },
     "analysisSettings": {
       "analysisModel": "نموذج التحليل",
@@ -1143,7 +1156,24 @@
       "summary": "ملخص التقرير",
       "title": "تقرير التدقيق",
       "unavailable": "تقرير التدقيق غير متاح",
-      "unavailableDescription": "يمكن لمالكي المؤسسة ومديري الفوترة فقط عرض تقارير التدقيق. اطلب من أحدهم منحك صلاحية الوصول."
+      "unavailableDescription": "يمكن لمالكي المؤسسة ومديري الفوترة فقط عرض تقارير التدقيق. اطلب من أحدهم منحك صلاحية الوصول.",
+      "eventActions": {
+        "findingAnalysisCompleted": "اكتمل التحليل",
+        "findingAnalysisFailed": "فشل التحليل",
+        "findingAutoDismissed": "تم التجاهل تلقائيًا",
+        "findingCreated": "تم الاستيراد",
+        "findingDeleted": "محذوف",
+        "findingDismissed": "مستبعدة",
+        "findingSeverityChanged": "تم تغيير درجة الخطورة",
+        "findingStatusChange": "تم تغيير الحالة",
+        "findingSuperseded": "مستبدلة",
+        "remediationBlocked": "المعالجة متوقفة بسبب عائق",
+        "remediationCancelled": "تم الإلغاء",
+        "remediationFailed": "فشلت المعالجة",
+        "remediationNoChangesNeeded": "لا حاجة إلى تغييرات",
+        "remediationPrOpened": "تم فتح PR",
+        "remediationQueued": "تم طلب المعالجة"
+      }
     },
     "auditReportButton": {
       "viewA11y": "عرض تقرير التدقيق"
@@ -1745,6 +1775,7 @@
       "prefillModelUnavailable": "لم يعد {{model}} متاحًا. نستخدم نموذجك الافتراضي.",
       "couldNotReadPendingSessions": "تعذّرت قراءة الجلسات المعلقة. حاول مرة أخرى.",
       "failedToCreate": "تعذّر إنشاء الجلسة.",
+      "checkOrganizationAccess": "تحقّق من صلاحية وصولك إلى هذه المؤسسة، ثم حاول مرة أخرى.",
       "couldNotRefreshRepositories": "تعذّر تحديث المستودعات. حاول مرة أخرى.",
       "discardDraftTitle": "حذف المسودة؟",
       "discardDraftMessage": "ستفقد التعليمات التي كتبتها.",
@@ -2309,6 +2340,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "لا يمكن عرض جلساتك النشطة حتى يكتمل تحميل البيانات.",
     "currentDeviceUnidentified": "تعذّر التعرّف على الجهاز الحالي.",
+    "kiloApp": "تطبيق Kilo",
     "noSessions": "لا توجد جلسات نشطة",
     "noSessionsDescription": "سجّل الدخول بتطبيق Kilo على جهاز آخر وسيظهر هنا.",
     "onlyKiloAppSignIns": "تظهر هنا فقط عمليات تسجيل الدخول عبر تطبيق Kilo. لا تُدرج عمليات تسجيل الدخول عبر المحرر أو CLI.",
@@ -2465,6 +2497,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "قبل أن نبدأ",
+    "summaryTitle": "تفضيلات مشاركة البيانات",
     "introDescription": "يرسل Kilo رسائلك إلى مزودي نماذج الذكاء الاصطناعي لإنشاء الردود. إليك البيانات التي نشاركها والجهات التي تتلقاها.",
     "required": "مطلوب لاستخدام Kilo",
     "promptsTitle": "تعليماتك ومحادثاتك",
@@ -2473,7 +2506,6 @@
     "accountDescription": "معرّف حسابك على Kilo والبيانات الوصفية للطلبات، للتحقق من هويتك وقياس الاستخدام.",
     "diagnosticsTitle": "بيانات تشخيص التطبيق",
     "diagnosticsDescription": "تقارير الأعطال والأخطاء، مع إزالة محتوى التطبيق، تُستخدم للحفاظ على استقرار التطبيق.",
-    "optional": "اختياري",
     "helpImprove": "المساعدة في تحسين Kilo",
     "helpImproveDescription": "شارك بيانات تحليل استخدام المنتج دون الكشف عن هويتك، ومصدر تثبيت التطبيق. يمكنك تغيير هذا الخيار في أي وقت من الإعدادات.",
     "seeFullDetails": "عرض التفاصيل الكاملة",
@@ -2602,7 +2634,8 @@
       "description": "اربط حسابك على GitHub لمراجعة طلبات السحب على الجوال.",
       "gitlabDescription": "اربط حسابك في GitLab لمراجعة طلبات الدمج على الجوال.",
       "bitbucketDescription": "اربط Bitbucket بهذه المؤسسة لمراجعة طلبات السحب على الجوال.",
-      "bitbucketOrgOnlyDescription": "اختر مؤسسة في ملفك الشخصي لمراجعة طلبات السحب الخاصة بها على Bitbucket."
+      "bitbucketOrgOnlyDescription": "بدّل الحساب أعلاه إلى مؤسسة لمراجعة طلبات السحب الخاصة بها على Bitbucket.",
+      "contextLine": "لـ{{organization}}"
     },
     "connectionExpired": "انتهت صلاحية الربط مع GitHub.",
     "couldNotLoadPullRequest": "تعذّر تحميل طلب السحب.",
@@ -3089,7 +3122,9 @@
       "reviewNotSubmitted": "لا يمكن إرسال هذه المراجعة كما هي. ربما تغيّر PR، أو أنك تحاول مراجعة طلب سحب أنشأته بنفسك.",
       "reviewNotSubmittedTerm": "لا يمكن إرسال هذه المراجعة كما هي. ربما تم تغيير {{term}}، أو لا يمكنك مراجعة {{term}} الخاص بك.",
       "couldNotPostComment": "تعذّر نشر التعليق.",
-      "couldNotSubmitReview": "تعذّر إرسال المراجعة. تحقق من اتصالك وحاول مرة أخرى."
+      "couldNotSubmitReview": "تعذّر إرسال المراجعة. تحقق من اتصالك وحاول مرة أخرى.",
+      "rateLimited": "طلبات كثيرة جدًا. حاول مرة أخرى لاحقًا.",
+      "conflict": "لقد تغيّر هذا أثناء عملك عليه. أعد تحميله وحاول مرة أخرى."
     },
     "operation": {
       "couldNotReply": "تعذّر الرد.",
@@ -3632,6 +3667,9 @@
     "localModels": {
       "title": "النماذج على الجهاز",
       "help": "تعمل النماذج على الجهاز على هذا الهاتف. تبقى طلباتك والردود على الجهاز.",
+      "switchTitle": "هل تريد التبديل إلى نموذج على الجهاز؟",
+      "switchMessage": "يؤدي التبديل إلى {{name}} إلى معالجة موجّهات هذه المحادثة وسياقها على هذا الهاتف، وليس على خادم بعيد.",
+      "switchConfirm": "تبديل النموذج",
       "systemPurpose": "النموذج المدمج في نظام هذا الجهاز. يعمل على الجهاز.",
       "apple": "Apple Intelligence (على الجهاز)",
       "checking": "جارٍ التحقق من التوفر…",
@@ -3728,7 +3766,6 @@
     "personalDefaultDescription": "يتم تحميله تلقائيًا عندما لا يكون لدى أي مستودع ملف تعريف مثبت.",
     "organizationDefaultDescription": "يتم تحميلها تلقائيًا للأعضاء الذين ليس لديهم أي تقصير شخصي.",
     "setAsDefault": "تعيين كافتراضي",
-    "removeDefault": "إزالة كافتراضي",
     "saveFailed": "تعذر حفظ الملف الشخصي",
     "deleteTitle": "حذف الملف الشخصي",
     "deleteMessage": "يؤدي هذا إلى إزالة الملف الشخصي وإعداداته نهائيًا. لا يمكن التراجع عن هذا.",
@@ -3754,11 +3791,13 @@
     "commandsTitle": "أوامر الإعداد",
     "addCommand": "إضافة أمر",
     "commandLabel": "يأمر",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "مثال: pnpm install",
     "commandsEmpty": "لا توجد أوامر الإعداد حتى الآن",
     "commandsSaveFailed": "تعذر حفظ أوامر الإعداد",
     "moveUp": "تحرك للأعلى",
     "moveDown": "تحرك للأسفل",
+    "moveCommandUp": "انقل الأمر {{position}} لأعلى",
+    "moveCommandDown": "انقل الأمر {{position}} لأسفل",
     "skillsTitle": "مهارات",
     "addSkill": "أضف مهارة",
     "skillNameLabel": "اسم المهارة",
@@ -3828,7 +3867,7 @@
       "nameRequired": "أدخل اسم الوكيل",
       "slugRequired": "أدخل سبيكة وكيل",
       "slugInvalid": "يجب أن يبدأ الرمز بحرف ويستخدم فقط الأحرف الصغيرة والأرقام والشرطات",
-      "slugConflict": "هذه سبيكة محجوزة بواسطة وكيل مدمج",
+      "slugConflict": "هذا المعرّف محجوز بواسطة وكيل مدمج أو وكيل آخر في هذا الملف الشخصي",
       "edit": "تحرير الوكيل"
     },
     "slashCommands": {
@@ -3986,5 +4025,69 @@
       "title": "حفظ في قائمة",
       "saved": "تم الحفظ في {{list}}"
     }
+  },
+  "agentBriefing": {
+    "title": "الملخص الصباحي",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "قد يكون بعض النشاط السابق مفقودًا. تعني ≥ هذا القدر على الأقل، وغير المعروف لا يعني صفرًا.",
+    "available": "الملخصات المتاحة",
+    "history": "سجل الملخصات",
+    "historyHint": "يُحتفظ بالتقارير لمدة 30 يومًا، بما فيها التقارير التي تم تجاهلها.",
+    "settings": "إعدادات الملخص",
+    "empty": "لا يوجد نشاط ليلي",
+    "emptyHint": "ستظهر هنا جلسات البرمجة السحابية وجلسات CLI بعد ليلة نشطة.",
+    "loadError": "تعذّر تحميل الملخصات",
+    "sessions": "نشطة خلال الليل",
+    "pullRequests": "PRs المفتوحة",
+    "blockers": "عوائق جديدة",
+    "spend": "الإنفاق الليلي",
+    "view": "قراءة الملخص",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}، {{time}}",
+    "dismiss": "عرض الحالة المباشرة",
+    "offline": "غير متصل · ملخص محفوظ",
+    "cached": "تقرير محفوظ · التحديث غير متاح",
+    "revised": "منقّح · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "ملخص AI",
+    "summaryDisabled": "تقرير منظّم · AI متوقف في هذا السياق",
+    "summaryPending": "جارٍ إعداد ملخص AI. سيُرفق هنا عند جاهزيته.",
+    "summaryFailed": "فشل ملخص AI. قد تؤدي إعادة المحاولة إلى رسوم إضافية.",
+    "summaryUnavailable": "ملخص AI غير متاح. لا يزال تقريرك المنظّم متاحًا.",
+    "summaryOutdated": "هذا الملخص أقدم من أحدث نسخة منقّحة من التقرير.",
+    "summaryCharge": "رسوم AI: {{cost}}",
+    "summaryChargePending": "رسوم AI بانتظار التسوية",
+    "generate": "إنشاء ملخص",
+    "retrySummary": "إعادة محاولة الملخص المدفوع",
+    "sources": "الأدلة والمخرجات",
+    "timezone": "المنطقة الزمنية للملخص",
+    "deviceTimezone": "استخدام المنطقة الزمنية للجهاز",
+    "timezoneHint": "منطقة زمنية وفق IANA، مثل Europe/Berlin. تُطبّق تغييرات الجدول على الليالي القادمة.",
+    "nightStart": "بداية الليل",
+    "morningStart": "نهاية الليل / بداية الصباح",
+    "morningEnd": "نهاية الصباح",
+    "timeHint": "تعيد بطاقة الرئيسية عرض الحالة المباشرة عند انتهاء الصباح، حتى دون اتصال.",
+    "invalidSchedule": "اختر منطقة زمنية صالحة وفترات ليل وصباح غير فارغة وغير متداخلة.",
+    "notificationsHint": "إشعار عام واحد كل صباح عند جاهزية تقريرك الأول. مستقل عن ملخصات AI المدفوعة.",
+    "notificationPermission": "فعّل إشعارات الجهاز في $t(common.notifications) لتلقي ملخصك.",
+    "aiOptIn": "ملخصات AI المدفوعة",
+    "aiHint": "اختيارية لهذا السياق فقط. تُرسل مقتطفات مختارة ومنقّحة وحقائق منظّمة إلى نموذجك بلغة التطبيق. تُخصم الرسوم من رصيد هذا السياق.",
+    "defaultModel": "استخدام نموذج Kilo الافتراضي",
+    "duration": "حد الوقت (بالدقائق)",
+    "spendLimit": "حد الإنفاق (USD)",
+    "safeguardHint": "حدود محددة لكل ملخص، وليست ميزانية يومية. الافتراضي: 10 دقائق و$2. يُنشر التقرير خلال خمس دقائق كحد أقصى بينما يستمر الإنشاء ضمن هذه الحدود.",
+    "invalidSafeguards": "أدخل حدودًا موجبة ومحددة للوقت والإنفاق.",
+    "estimate": "التقدير {{estimate}} · الحد الأقصى {{maximum}}",
+    "estimateUnavailable": "الملخص المدفوع غير متاح لهذه الإعدادات.",
+    "confirmPaid": "تفعيل الملخصات المدفوعة لـ {{context}}؟",
+    "confirmGeneration": "إنشاء ملخص مدفوع؟",
+    "paidDisclosure": "التكلفة المقدّرة {{estimate}}، وحتى {{maximum}}، بحد زمني {{minutes}} دقيقة. تُطبّق الرسوم حتى إذا فشل الإنشاء.",
+    "enable": "تفعيل الملخصات المدفوعة",
+    "contextSettings": "إعدادات AI · {{context}}",
+    "allContexts": "تبقى الملخصات الشخصية وملخصات المؤسسة منفصلة.",
+    "estimatePricingUnavailable": "تسعير هذا النموذج غير متاح.",
+    "estimateBalanceUnavailable": "لا يوجد رصيد كافٍ لملخص مدفوع.",
+    "estimateModelNotAllowed": "هذا النموذج غير مسموح به هنا.",
+    "estimateSpendLimitTooLow": "ارفع حد الإنفاق للسماح بهذا الملخص."
   }
 }

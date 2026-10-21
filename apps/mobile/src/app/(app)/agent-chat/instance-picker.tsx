@@ -153,6 +153,9 @@ export default function InstancePickerScreen() {
   );
 
   const currentConnectionId = bridge?.currentValue?.connectionId ?? null;
+  // The pending computer target owns the form: neither the Cloud Agent row
+  // nor any instance row is the current selection, so no check mark renders.
+  const pendingComputer = bridge?.pendingComputer === true && currentConnectionId === null;
 
   // Hoisted so the list keeps one renderer identity across unrelated screen
   // renders (a poll tick, the bridge refresh); FlashList's memoized cell
@@ -170,7 +173,7 @@ export default function InstancePickerScreen() {
         );
       }
       const item = row.instance;
-      const selected = item.connectionId === currentConnectionId;
+      const selected = !pendingComputer && item.connectionId === currentConnectionId;
       const InstanceIcon = item.kind === 'remote' ? Server : Terminal;
       const identity = item.dedupSuffix
         ? t('agentChat.instancePicker.instanceOnProjectSuffix', {
@@ -216,7 +219,7 @@ export default function InstancePickerScreen() {
         </Pressable>
       );
     },
-    [currentConnectionId, colors, handleSelectInstance, t, i18n.language]
+    [currentConnectionId, pendingComputer, colors, handleSelectInstance, t, i18n.language]
   );
 
   if (!bridge) {
@@ -312,7 +315,7 @@ export default function InstancePickerScreen() {
             onPress={handleSelectCloudAgent}
             {...radioItemA11y({
               label: t('agentChat.instancePicker.runOnCloudAgent'),
-              checked: currentConnectionId === null,
+              checked: currentConnectionId === null && !pendingComputer,
             })}
           >
             <Cloud size={18} color={colors.foreground} />
@@ -324,7 +327,9 @@ export default function InstancePickerScreen() {
                 {t('agentChat.instancePicker.cloudAgentDescription')}
               </Text>
             </View>
-            {currentConnectionId === null ? <Check size={18} color={colors.primary} /> : null}
+            {currentConnectionId === null && !pendingComputer ? (
+              <Check size={18} color={colors.primary} />
+            ) : null}
           </Pressable>
         }
         ListEmptyComponent={

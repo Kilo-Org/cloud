@@ -190,6 +190,61 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     });
   });
 
+  test.each([
+    ['a closed socket', 'UND_ERR_SOCKET', 'upstream_disconnect', 'interrupted'],
+    ['a reset connection', 'ECONNRESET', 'upstream_disconnect', 'interrupted'],
+    ['an idle body timeout', 'UND_ERR_BODY_TIMEOUT', 'timeout', 'timed out'],
+  ])(
+    'reports an undici body termination after %s',
+    async (_description, causeCode, errorType, messageFragment) => {
+      const terminated = () =>
+        new TypeError('terminated', { cause: Object.assign(new Error(), { code: causeCode }) });
+
+      const jsonResult = await rewrite({
+        response: failingResponse('application/json', terminated()),
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      });
+      expect(jsonResult.status).toBe(503);
+      expect(await jsonResult.json()).toEqual({
+        error: expect.stringContaining(messageFragment),
+        error_type: errorType,
+        message: expect.stringContaining(messageFragment),
+      });
+
+      const sseResult = await rewrite({
+        response: failingResponse(
+          'text/event-stream',
+          terminated(),
+          'data: {"id":"gen-1","type":"ping","choices":[]}\n\n'
+        ),
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      });
+      const events = dataObjects(await readOutputStream(sseResult)) as {
+        error?: { message: string };
+      }[];
+      expect(events).toHaveLength(2);
+      expect(events[1].error?.message).toContain(messageFragment);
+    }
+  );
+
+  test('still fails the response for an unrecognized JSON read error', async () => {
+    await expect(
+      rewrite({
+        response: failingResponse('application/json', new TypeError('unexpected')),
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+      })
+    ).rejects.toThrow('unexpected');
+  });
+
   test.each(['high', 'medium', 'low', 'none', null])(
     'omits effort advice for effort %s',
     async reasoningEffort => {

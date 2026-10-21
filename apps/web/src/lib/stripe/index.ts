@@ -314,6 +314,44 @@ async function bouncerCardFingerprintForChargeId(chargeId: string): Promise<stri
 }
 
 /**
+ * Reports one declined charge attempt to bouncer as `charge.failed`.
+ *
+ * Stripe describes one attempt with up to two events: `charge.failed`, and
+ * `payment_intent.payment_failed` for the payment intent behind it. Both carry the same charge id,
+ * so the event id is derived from that charge and a second event for the same attempt counts once.
+ * An attempt with no charge keeps its payment intent id. An attempt with neither id is skipped
+ * with a visible log, so an enqueue is never keyed on an empty string.
+ */
+async function reportDeclinedCharge(params: {
+  owner: Parameters<typeof resolveBouncerCreditOwner>[0];
+  chargeId: string | null | undefined;
+  paymentIntentId: string | null | undefined;
+  occurredAt: Date;
+  cardFingerprint: string | null;
+}): Promise<void> {
+  const chargeId = params.chargeId ?? null;
+  const eventId = chargeId
+    ? `charge:${chargeId}`
+    : params.paymentIntentId
+      ? `payment_intent:${params.paymentIntentId}`
+      : null;
+  if (!eventId) {
+    warnExceptInTest('Bouncer declined charge has no charge or payment intent id; skipping');
+    return;
+  }
+  await reportWebhookCreditEvent(
+    params.owner,
+    {
+      type: 'charge.failed',
+      eventId,
+      occurredAt: params.occurredAt,
+      cardFingerprint: params.cardFingerprint,
+    },
+    params.cardFingerprint ? null : chargeId
+  );
+}
+
+/**
  * Reports the bouncer `charge.attempted` for an organization seat change, right before the prorated
  * invoice is paid. The organization comes from the seat subscription metadata.
  */
@@ -1841,19 +1879,35 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
     case 'charge.failed': {
       const charge = event.data.object;
-      await reportWebhookCreditEvent(
-        {
+      await reportDeclinedCharge({
+        owner: {
           kiloUserId: charge.metadata?.kiloUserId,
           organizationId: charge.metadata?.organizationId,
           customer: charge.customer,
         },
-        {
-          type: 'charge.failed',
-          eventId: event.id,
-          occurredAt: new Date(event.created * 1000),
-          cardFingerprint: charge.payment_method_details?.card?.fingerprint ?? null,
-        }
-      );
+        chargeId: charge.id,
+        paymentIntentId: stripeReferenceId(charge.payment_intent),
+        occurredAt: new Date(event.created * 1000),
+        cardFingerprint: charge.payment_method_details?.card?.fingerprint ?? null,
+      });
+      break;
+    }
+
+    // A declined card reaches the webhook as this event, not as `charge.failed`. Reporting it keeps
+    // bouncer's `card_testing` rule fed; without it the rule never sees a failure.
+    case 'payment_intent.payment_failed': {
+      const paymentIntent = event.data.object;
+      await reportDeclinedCharge({
+        owner: {
+          kiloUserId: paymentIntent.metadata?.kiloUserId,
+          organizationId: paymentIntent.metadata?.organizationId,
+          customer: paymentIntent.customer,
+        },
+        chargeId: stripeReferenceId(paymentIntent.latest_charge),
+        paymentIntentId: paymentIntent.id,
+        occurredAt: new Date(event.created * 1000),
+        cardFingerprint: null,
+      });
       break;
     }
 

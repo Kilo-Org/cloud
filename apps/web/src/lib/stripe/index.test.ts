@@ -5003,16 +5003,153 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
     const rows = await db.select().from(bouncer_credit_event_outbox);
     expect(rows).toHaveLength(1);
     expect(rows[0].event_type).toBe('charge.failed');
-    expect(rows[0].event_id).toBe('evt_bouncer_failed');
+    expect(rows[0].event_id).toBe('charge:ch_bouncer_failed');
     expect(rows[0].user_id).toBe(testUser.id);
     expect(rows[0].payload).toEqual(
       expect.objectContaining({
         type: 'charge.failed',
-        eventId: 'evt_bouncer_failed',
+        eventId: 'charge:ch_bouncer_failed',
         userId: testUser.id,
         cardFingerprint: 'fp_failed',
       })
     );
+  });
+
+  test('payment_intent.payment_failed reports the decline with the card read from its charge', async () => {
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_bouncer_pi_failed',
+          customer: testUser.stripe_customer_id,
+          payment_method_details: {
+            card: { fingerprint: 'fp_pi_failed' },
+          } as unknown as Stripe.Charge.PaymentMethodDetails,
+        })
+      )
+    );
+    const event = {
+      ...baseStripeEvent(),
+      id: 'evt_bouncer_pi_failed',
+      type: 'payment_intent.payment_failed',
+      data: {
+        object: {
+          id: 'pi_bouncer_failed',
+          object: 'payment_intent',
+          customer: testUser.stripe_customer_id,
+          latest_charge: 'ch_bouncer_pi_failed',
+          metadata: {},
+        },
+      },
+    } as unknown as Stripe.Event;
+
+    await processStripePaymentEventHook(event);
+
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_type).toBe('charge.failed');
+    expect(rows[0].event_id).toBe('charge:ch_bouncer_pi_failed');
+    expect(retrieveSpy).toHaveBeenCalledWith('ch_bouncer_pi_failed');
+    expect(rows[0].payload).toEqual(
+      expect.objectContaining({
+        type: 'charge.failed',
+        eventId: 'charge:ch_bouncer_pi_failed',
+        userId: testUser.id,
+        cardFingerprint: 'fp_pi_failed',
+      })
+    );
+  });
+
+  test('one declined charge counts once when both of its events arrive', async () => {
+    jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_bouncer_decline_once',
+          customer: testUser.stripe_customer_id,
+        })
+      )
+    );
+    const charge = sampleStripeCharge({
+      id: 'ch_bouncer_decline_once',
+      customer: testUser.stripe_customer_id,
+    });
+
+    await processStripePaymentEventHook({
+      ...baseStripeEvent(),
+      id: 'evt_bouncer_decline_pi',
+      type: 'payment_intent.payment_failed',
+      data: {
+        object: {
+          id: 'pi_bouncer_decline_once',
+          object: 'payment_intent',
+          customer: testUser.stripe_customer_id,
+          latest_charge: 'ch_bouncer_decline_once',
+          metadata: {},
+        },
+      },
+    } as unknown as Stripe.Event);
+    await processStripePaymentEventHook({
+      ...baseStripeEvent(),
+      id: 'evt_bouncer_decline_charge',
+      type: 'charge.failed',
+      data: { object: charge },
+    } as unknown as Stripe.Event);
+
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_id).toBe('charge:ch_bouncer_decline_once');
+  });
+
+  test('a declined payment intent with no charge keeps its own event id', async () => {
+    const event = {
+      ...baseStripeEvent(),
+      id: 'evt_bouncer_pi_no_charge',
+      type: 'payment_intent.payment_failed',
+      data: {
+        object: {
+          id: 'pi_bouncer_no_charge',
+          object: 'payment_intent',
+          customer: testUser.stripe_customer_id,
+          latest_charge: null,
+          metadata: {},
+        },
+      },
+    } as unknown as Stripe.Event;
+
+    await processStripePaymentEventHook(event);
+
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_id).toBe('payment_intent:pi_bouncer_no_charge');
+    expect(rows[0].payload).toEqual(
+      expect.objectContaining({
+        type: 'charge.failed',
+        eventId: 'payment_intent:pi_bouncer_no_charge',
+      })
+    );
+    // The wire body omits an absent fingerprint; bouncer reads that as null and raises `missing_card`.
+    expect(rows[0].payload.cardFingerprint ?? null).toBeNull();
+  });
+
+  test('payment_intent.payment_failed is skipped when no owner resolves', async () => {
+    const event = {
+      ...baseStripeEvent(),
+      id: 'evt_bouncer_pi_orphan',
+      type: 'payment_intent.payment_failed',
+      data: {
+        object: {
+          id: 'pi_bouncer_orphan',
+          object: 'payment_intent',
+          customer: 'cus_bouncer_orphan',
+          latest_charge: 'ch_bouncer_orphan_pi',
+          metadata: {},
+        },
+      },
+    } as unknown as Stripe.Event;
+
+    await processStripePaymentEventHook(event);
+
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(0);
   });
 
   test('charge.failed is skipped when no owner resolves', async () => {

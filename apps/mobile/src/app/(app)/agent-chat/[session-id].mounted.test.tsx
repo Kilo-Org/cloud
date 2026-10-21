@@ -947,7 +947,7 @@ describe('SessionDetailScreen valid session-id', () => {
   it.each(['NOT_FOUND', 'UNAUTHORIZED', 'FORBIDDEN'])(
     'keeps the mounted transcript when a background metadata refresh returns %s',
     async code => {
-      useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+      useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
       const renderer = await mountRoute();
       expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
       const manager = managers.at(-1)?.manager;
@@ -970,7 +970,7 @@ describe('SessionDetailScreen valid session-id', () => {
   );
 
   it('retires a session whose metadata was cached by a previous mount', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     const renderer = await mountRoute();
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
 

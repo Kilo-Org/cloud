@@ -1573,7 +1573,7 @@
         "recoveryLabel": "BYOK-beállítások frissítése"
       },
       "selectedModelUnavailable": {
-        "description": "A kódellenőrző kikapcsolt, mert a kiválasztott modell nem érhető el a felhőügynök munkameneteihez. Válassz egy elérhető modellt, majd engedélyezd újra a kódellenőrzőt.",
+        "description": "A kódellenőrző kikapcsolt, mert a kiválasztott modell nem érhető el a Cloud Agent munkameneteihez. Válassz egy elérhető modellt, majd engedélyezd újra a kódellenőrzőt.",
         "recoveryLabel": "Kódellenőrző beállításainak frissítése"
       },
       "repeatedRepositoryCloneTimeout": {
@@ -1651,7 +1651,7 @@
       "analyzeRepository": "Adattár elemzése",
       "capacityFull": "Nincs szabad elemzési kapacitás. Várd meg, amíg egy folyamatban lévő elemzés befejeződik.",
       "couldNotCheckCapacity": "Nem sikerült ellenőrizni az elemzési kapacitást.",
-      "watchInCloudAgent": "Megtekintés a felhőügynöknél",
+      "watchInCloudAgent": "Figyelés a Cloud Agentben",
       "triageConfidence": "Előzetes értékelés megbízhatósága",
       "suggestedAction": "Javasolt művelet",
       "triageReasoning": "Előzetes értékelés indoklása",

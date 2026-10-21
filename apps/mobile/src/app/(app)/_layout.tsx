@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
+import { PickerLaunchRestoreMount } from '@/components/agents/picker-launch-restore-mount';
 import { BriefingSyncMount } from '@/components/agent-briefing/briefing-sync-mount';
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
@@ -129,6 +130,7 @@ export default function AppLayout() {
       <ForegroundReconciliationMount />
       <AppWideFreshnessMount />
       <SharePayloadNavigator />
+      <PickerLaunchRestoreMount />
       <TourAutoOpen />
       <KiloChatProvider>
         <KiloChatPresenceMount>
@@ -162,7 +164,10 @@ export default function AppLayout() {
             <Stack.Screen name="agent-chat/profile-picker" options={sheetOptions} />
             <Stack.Screen name="todos/[list-id]" />
             <Stack.Screen name="todos/item/[item-id]" />
-            <Stack.Screen name="todos/list-settings" options={sheetOptions} />
+            <Stack.Screen
+              name="todos/list-settings"
+              options={{ ...sheetOptions, gestureEnabled: false }}
+            />
             <Stack.Screen name="agent-briefing/index" />
             <Stack.Screen name="agent-briefing/[report-id]" />
             <Stack.Screen name="agent-briefing/settings" />

@@ -315,6 +315,27 @@ describe('activeSessionSchema scheduledAt', () => {
   });
 });
 
+describe('live session status values', () => {
+  const sessionID = 'ses_12345678901234567890123456';
+
+  it.each(['question', 'permission'] as const)('keeps the documented %s status', type => {
+    expect(sessionStatusDataSchema.parse({ sessionID, status: { type } }).status).toEqual({ type });
+  });
+
+  it('keeps a status type this SDK does not know yet together with its payload', () => {
+    const status = { type: 'offline', requestID: 'que_123', message: 'Kilo is offline' };
+
+    expect(sessionStatusDataSchema.parse({ sessionID, status }).status).toEqual(status);
+  });
+
+  it.each([{ type: 'retry' }, { type: 'retry', attempt: 1, message: 'Rate limited' }, {}, 'busy'])(
+    'still rejects a status that is not a readable status object: %p',
+    status => {
+      expect(sessionStatusDataSchema.safeParse({ sessionID, status }).success).toBe(false);
+    }
+  );
+});
+
 describe('remoteCommandCatalogV1Schema runtime-sourced commands', () => {
   it('keeps a skill-sourced command beside an MCP-sourced one', () => {
     const parsed = remoteCommandCatalogV1Schema.parse({

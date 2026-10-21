@@ -62,9 +62,7 @@ export function ChoiceRow({
         onPress();
       }}
       accessibilityRole={multi ? 'checkbox' : 'radio'}
-      accessibilityLabel={
-        namedParts.length > 0 ? formatList(namedParts, i18n.language) : undefined
-      }
+      accessibilityLabel={namedParts.length > 0 ? formatList(namedParts, i18n.language) : undefined}
       accessibilityState={{ checked: selected, disabled: Boolean(disabled), busy }}
     >
       {children ?? (

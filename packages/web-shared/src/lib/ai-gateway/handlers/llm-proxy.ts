@@ -34,11 +34,11 @@ import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import { isKiloExclusiveRateLimitedModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   accountForMicrodollarUsage,
   captureProxyError,
@@ -111,7 +111,6 @@ import { checkAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-mode
 import {
   fetchCustomRouterDecision,
   fetchEfficientAutoDecision,
-  FRONTIER_ROUTING_FLAG,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
 import {
   AUTO_DECISION_HEADER,
@@ -120,7 +119,6 @@ import {
   type AutoRouter,
   type CustomRouterReference,
 } from '@kilocode/auto-routing-contracts';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import {
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
@@ -401,6 +399,7 @@ export async function handleLlmProxyRequest(
   // validation after resolution.
   let routingTarget: string | null = null;
   let legacyClassifierCostUsd = 0;
+  let autoRoutingUnavailable = false;
   // Efficient/balanced and custom router requests resolve through an auto-routing pool. Kept for
   // the org policy check below so a failed routing decision gets a specific
   // auto-routing error instead of the generic model-not-allowed error.
@@ -494,12 +493,6 @@ export async function handleLlmProxyRequest(
       // The classifier uses Kilo's paid credential. Unauthenticated callers
       // must never spend classification without a user to attribute it to.
       if (!user || authFailedResponse) return null;
-      if (
-        router === 'frontier' &&
-        !(await isReleaseToggleEnabled(FRONTIER_ROUTING_FLAG, user.id))
-      ) {
-        return null;
-      }
       const owner = { userId: user.id, organizationId: organizationId ?? null };
       const deniedModelIds = await autoRoutingDenials(
         policy => collectDeniedAutoRoutingModelIds(policy, owner, router),
@@ -560,7 +553,6 @@ export async function handleLlmProxyRequest(
       {
         model: requestedModelLowerCased,
         modeHeader,
-        featureHeader: feature,
         sessionId: taskId ?? null,
         apiKind: requestBodyParsed.kind,
         clientIp: ipAddress ?? null,
@@ -587,13 +579,13 @@ export async function handleLlmProxyRequest(
     if (autoResult.kind === 'custom_router_error') {
       return customRouterErrorResponse(autoResult.code, autoResult.message);
     }
-    if (autoResult.kind === 'auto_routing_unavailable') {
-      return autoRoutingUnavailableResponse(requestedModelLowerCased);
-    }
-    routingTarget = autoResult.routingTarget ?? null;
+    autoRoutingUnavailable = autoResult.kind === 'auto_routing_unavailable';
+    routingTarget = autoResult.kind === 'ok' ? (autoResult.routingTarget ?? null) : null;
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
+  // Custom LLMs count as free; `getProvider` still refuses callers without access.
+  const isFreeRequestedModel = await isFreeModel(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -609,11 +601,11 @@ export async function handleLlmProxyRequest(
   // the report-only decide call and the usage event, which share this request.
   const clientIp = bareIpLiteral(ipAddress);
 
-  // For rate-limited Kilo-exclusive models: server-side products (cloud-agent,
-  // code-review, app-builder, gastown) rate-limit per user when the request comes
-  // from Cloudflare IPs (Kilo infrastructure). All other products rate-limit per
-  // IP (fast pre-auth path).
-  if (isKiloExclusiveRateLimitedModel(effectiveModelIdLowerCased)) {
+  // For free models: server-side products (cloud-agent, code-review, app-builder,
+  // gastown) rate-limit per user when the request comes from Cloudflare IPs (Kilo
+  // infrastructure). All other products rate-limit per IP (fast pre-auth path).
+  // Custom LLMs are exempt, even when their id matches a free-model pattern.
+  if (isFreeRequestedModel && !(await isCustomLlm(effectiveModelIdLowerCased))) {
     const rateLimitKey = await resolveFreeModelRateLimitKey(feature, ipAddress, authPromise);
     if (rateLimitKey instanceof NextResponse) return rateLimitKey;
 
@@ -660,7 +652,7 @@ export async function handleLlmProxyRequest(
     }
 
     // No valid auth
-    if (!isFreeModel(effectiveModelIdLowerCased)) {
+    if (!isFreeRequestedModel) {
       return paidModelAuthRequiredResponse();
     }
 
@@ -736,6 +728,7 @@ export async function handleLlmProxyRequest(
             organizationId,
             provider: 'openrouter',
             requested_model: requestedModelLowerCased,
+            is_free: false,
             promptInfo: {
               system_prompt_prefix: '',
               system_prompt_length: 0,
@@ -775,6 +768,7 @@ export async function handleLlmProxyRequest(
       })()
     );
   }
+  if (autoRoutingUnavailable) return autoRoutingUnavailableResponse(requestedModelLowerCased);
 
   if (
     requestBodyParsed.kind === 'responses' &&
@@ -851,6 +845,10 @@ export async function handleLlmProxyRequest(
     // instead of silently serving the request through another billing path.
     return chatGptReconnectResponse(providerResult.message);
   }
+  if (providerResult.kind === 'custom-llm-unavailable') {
+    // Same response as an unknown model id, so callers cannot probe for custom LLMs.
+    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+  }
   const effectiveProviderContext = providerResult;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
@@ -902,7 +900,7 @@ export async function handleLlmProxyRequest(
 
     if (
       !canSpendPaidUsage(balance) &&
-      !isFreeModel(effectiveModelIdLowerCased) &&
+      !effectiveProviderContext.isFree &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {
@@ -933,6 +931,7 @@ export async function handleLlmProxyRequest(
     kiloUserId: user.id,
     provider: effectiveProviderContext.provider.id,
     requested_model: effectiveModelIdLowerCased,
+    is_free: effectiveProviderContext.isFree,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
@@ -978,7 +977,7 @@ export async function handleLlmProxyRequest(
   setTag('ui.ai_model', requestBodyParsed.body.model);
 
   if (
-    hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased) &&
+    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
     isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();

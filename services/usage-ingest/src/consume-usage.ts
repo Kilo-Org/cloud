@@ -1,5 +1,5 @@
 import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
-import { recordUsage } from '@kilocode/worker-utils/usage-writer-client';
+import { recordUsage, type UsageWriteOutcome } from '@kilocode/worker-utils/usage-writer-client';
 import type { Env } from './publish-usage';
 import { handleQueue as handleReceiptQueue } from './receipt-usage';
 
@@ -11,30 +11,64 @@ export function handleQueue(batch: MessageBatch<unknown>, env: Env): void | Prom
 }
 
 async function processQueue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
+  let writerOverloaded = false;
   for (const message of batch.messages) {
+    const queueWaitMs = Math.max(0, Date.now() - message.timestamp.getTime());
     const parsed = UsageRecordRequestSchema.safeParse(message.body);
-    const outcome =
-      env.USAGE_INGEST_MODE !== 'processing'
-        ? { kind: 'unavailable', reason: 'invalid_mode' }
-        : !parsed.success
-          ? { kind: 'unavailable', reason: 'invalid_event' }
-          : await recordUsage(parsed.data, {
-              url: env.USAGE_WRITER_URL,
-              secret: env.USAGE_WRITER_SECRET,
-              protectionBypass: env.USAGE_WRITER_PROTECTION_BYPASS,
-            });
+    let outcome:
+      | UsageWriteOutcome
+      | { kind: 'unavailable'; reason: 'invalid_mode' | 'invalid_event' };
+    let writerDurationMs: number | undefined;
+    if (env.USAGE_INGEST_MODE !== 'processing') {
+      outcome = { kind: 'unavailable', reason: 'invalid_mode' };
+    } else if (!parsed.success) {
+      outcome = { kind: 'unavailable', reason: 'invalid_event' };
+    } else {
+      const writerStartedAt = performance.now();
+      outcome = await recordUsage(parsed.data, {
+        url: env.USAGE_WRITER_URL,
+        secret: env.USAGE_WRITER_SECRET,
+        protectionBypass: env.USAGE_WRITER_PROTECTION_BYPASS,
+        source: 'queue',
+      });
+      if (outcome.kind !== 'unavailable' || outcome.reason !== 'missing_config') {
+        writerDurationMs = Math.round(performance.now() - writerStartedAt);
+      }
+    }
 
-    console.log(
+    const writerStatus =
+      outcome.kind === 'unavailable' && outcome.reason === 'http_error'
+        ? outcome.status
+        : undefined;
+    const overloaded = writerStatus === 429 || writerStatus === 503;
+    writerOverloaded ||= overloaded;
+    const acknowledged = outcome.kind === 'recorded' || outcome.kind === 'duplicate';
+    const level = acknowledged ? 'info' : 'warn';
+    console[level](
       JSON.stringify({
+        level,
         event: 'usage_ingest_processing',
         outcome: outcome.kind,
         ...('reason' in outcome ? { reason: outcome.reason } : {}),
+        queue_action: acknowledged ? 'ack' : 'retry',
+        ...(overloaded
+          ? { writer_status: writerStatus, invocation_failure: 'writer_overloaded' }
+          : {}),
         queue_message_id: message.id,
         delivery_attempts: message.attempts,
-        ...(parsed.success ? { usage_id: parsed.data.core.id } : {}),
+        queue_wait_ms: queueWaitMs,
+        ...(parsed.success
+          ? {
+              usage_id: parsed.data.core.id,
+              event_age_ms: Math.max(0, Date.now() - Date.parse(parsed.data.core.created_at)),
+            }
+          : {}),
+        ...(writerDurationMs === undefined ? {} : { writer_duration_ms: writerDurationMs }),
       })
     );
-    if (outcome.kind === 'recorded' || outcome.kind === 'duplicate') message.ack();
+    if (acknowledged) message.ack();
     else message.retry();
   }
+  // Explicit ACKs/retries survive the rejection; retry() alone is not an invocation failure.
+  if (writerOverloaded) throw new Error('Usage writer overloaded (HTTP 429/503)');
 }

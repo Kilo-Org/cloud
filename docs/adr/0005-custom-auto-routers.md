@@ -268,8 +268,9 @@ pnpm --filter web script src/scripts/notify-auto-routing-pool-users.ts --cutover
 ```
 
 The dry run writes a private hashed plan, but sends nothing.
-Personal owners and direct or inherited organization billing contacts receive one grouped notice
-per address. Missing contacts block sending rather than silently omitting an owner.
+Live personal owners and direct or inherited organization billing contacts receive one grouped
+notice per address. Soft-deleted users are never owners or contacts. An owner with no live, valid
+contact is not sent. The plan saves its private hash, and the output reports the unreachable count.
 Reuse the same timestamp and directory. `--refresh-plan` reviews cohort changes without resending
 successful targets. Resolve unknown delivery outcomes against provider records with
 `--reconcile-target` and `--reconcile-outcome`; use `--help` for the exact recovery procedure.

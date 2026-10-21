@@ -154,6 +154,58 @@ export async function getGitLabIntegration(owner: Owner): Promise<PlatformIntegr
 }
 
 /**
+ * Deadline for the status read's broker round trip. Shorter than the broker
+ * client's own 30s request timeout: status renders spinners in the mobile
+ * connect gate, so a hung token service must fail open quickly.
+ */
+const GITLAB_CREDENTIAL_STATUS_TIMEOUT_MS = 3_000;
+
+/**
+ * Whether the integration's stored credential is currently usable. Asks the
+ * private-key holding token service to resolve it — the same resolution every
+ * review read performs — so a row that is active but whose credential the
+ * broker refuses answers `connected: false` instead of faking health.
+ *
+ * Only a definitive broker refusal disconnects. `temporarily_unavailable`
+ * (and any transport error, already mapped inside the broker client) fails
+ * open, so a token-service blip never renders a working connection as
+ * broken.
+ *
+ * Status is a hot read (the mobile connect gate spins on it), so the broker
+ * request races a short per-call deadline instead of the broker client's 30s
+ * request timeout: a hung token service answers `connected: true` after the
+ * deadline rather than stalling the settings surface. The race loser is only
+ * a discarded response — the broker client's own AbortController still cleans
+ * up.
+ */
+export async function isGitLabCredentialConnected(
+  integration: PlatformIntegration,
+  actor: GitLabCredentialActor
+): Promise<boolean> {
+  const { promise: deadline, resolve: hitDeadline } =
+    Promise.withResolvers<GitLabCredentialBrokerResult>();
+  const timer = setTimeout(
+    () => hitDeadline({ status: 'temporarily_unavailable' }),
+    GITLAB_CREDENTIAL_STATUS_TIMEOUT_MS
+  );
+  timer.unref?.();
+  try {
+    const result = await Promise.race([
+      fetchGitLabCredential(actor, {
+        credential: 'integration',
+        integrationId: integration.id,
+      }),
+      deadline,
+    ]);
+    if (result.status === 'available') return true;
+    if (result.status === 'reconnect_required' || result.status === 'not_connected') return false;
+    return true;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Resolve a GitLab credential through the private-key holding token service.
  */
 function requireAvailableGitLabCredential(

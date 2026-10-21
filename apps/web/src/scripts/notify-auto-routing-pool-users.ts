@@ -5,6 +5,10 @@ import {
   runPoolNotifications,
 } from './lib/auto-routing-pool-notifications';
 import type { PoolNotificationResult } from './lib/auto-routing-pool-notifications';
+import { createRequire } from 'node:module';
+import type { sendAutoRoutingPoolNoticeEmail as sendAutoRoutingPoolNoticeEmailType } from '@kilocode/web-shared/lib/auto-routing-pool-notice-email';
+
+const requireFromScript = createRequire(__filename);
 
 function report(result: PoolNotificationResult, cutoverAt: string) {
   console.log(JSON.stringify({ ...result, cutoverAt }));
@@ -21,8 +25,10 @@ Run only after the full migration scan is clean and migrated model IDs have been
 The default is a dry run: it discovers live contacts and saves hashed targets, without sending.
 Inspect counts and targetStatuses, then rerun with the same arguments plus --send to deliver.
 Reuse the same private state directory for every retry. Sent targets are never implicitly resent.
-Missing or invalid billing contacts fail the entire live preflight; affected owners are not skipped.
-Ordinary dry runs and --send reject live recipients/router metadata that differ from the saved plan.
+Soft-deleted users are never owners or billing contacts. An owner with no live, valid contact is
+not sent; its private hash is saved in the plan and the unreachable count is reported.
+Ordinary dry runs and --send reject live recipients, router metadata, or unreachable owners that
+differ from the saved plan.
 
 --refresh-plan is an explicit dry run that reviews and saves the current live plan:
 new recipients become pending, removed recipients become inactive and are not sent, and all
@@ -86,9 +92,13 @@ No raw recipient lists are printed or exported. --send requires configured produ
       ...options,
       owners,
       sendEmail: async (target, cutoverAt) => {
-        // Keep the credential-dependent mail module outside the dry-run path.
-        const { sendAutoRoutingPoolNoticeEmail } =
-          await import('@kilocode/web-shared/lib/auto-routing-pool-notice-email');
+        // Deferred so dry runs need no mail configuration. It must be a CommonJS require: a
+        // dynamic import() uses the ESM loader, which rejects Sentry's CommonJS namespace.
+        const {
+          sendAutoRoutingPoolNoticeEmail,
+        }: {
+          sendAutoRoutingPoolNoticeEmail: typeof sendAutoRoutingPoolNoticeEmailType;
+        } = requireFromScript('@kilocode/web-shared/lib/auto-routing-pool-notice-email');
         return sendAutoRoutingPoolNoticeEmail({ ...target, cutoverAt });
       },
     });

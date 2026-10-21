@@ -32,7 +32,6 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
   const { manager, state } = useProject();
   const trpc = useTRPC();
 
-  // Get the active session (last in state.sessions)
   const activeSession =
     state.sessions.length > 0 ? state.sessions[state.sessions.length - 1] : undefined;
 
@@ -180,9 +179,6 @@ export function FeedbackDialog({ disabled, organizationId }: FeedbackDialogProps
   );
 }
 
-/**
- * Build recent_messages from V1 CloudMessage array.
- */
 function buildV1RecentMessages(
   messages: CloudMessage[]
 ): { role: string; text: string; ts: number }[] {
@@ -194,7 +190,6 @@ function buildV1RecentMessages(
 }
 
 /**
- * Build recent_messages from V2 StoredMessage array.
  * V2 messages store text in parts, not on info directly.
  */
 function buildV2RecentMessages(

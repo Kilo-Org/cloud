@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
+import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
@@ -44,11 +45,13 @@ import {
   checkExclusiveModelProviderAllowed,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
+  countAndStoreEmbeddingUsage,
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
   extractReasoningSetting,
   getOrganizationProviderPrivacy,
+  getOutputHeaders,
   lastUserPromptText,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
@@ -57,6 +60,36 @@ import {
   requestedLogprobs,
   requestedSamples,
 } from './llm-proxy-helpers';
+
+describe('getOutputHeaders', () => {
+  it.each(['text/event-stream', 'text/event-stream; charset=utf-8', 'Text/Event-Stream'])(
+    'prevents intermediary compression and caching of %s responses',
+    contentType => {
+      const response = new Response(null, {
+        headers: { 'content-type': contentType, 'cache-control': 'public, max-age=3600' },
+      });
+
+      const headers = getOutputHeaders(response);
+
+      expect(headers.get('content-type')).toBe(contentType);
+      expect(headers.get('content-encoding')).toBe('identity');
+      expect(headers.get('cache-control')).toBe('no-cache, no-transform');
+      expect(response.headers.get('cache-control')).toBe('public, max-age=3600');
+    }
+  );
+
+  it.each(['application/json', 'text/plain', 'text/event-stream-other'])(
+    'prevents intermediary caching and compression of %s responses',
+    contentType => {
+      const headers = getOutputHeaders(
+        new Response(null, { headers: { 'content-type': contentType } })
+      );
+
+      expect(headers.get('content-encoding')).toBe('identity');
+      expect(headers.get('cache-control')).toBe('no-cache, no-transform');
+    }
+  );
+});
 
 describe('extractReasoningSetting', () => {
   it.each<{ name: string; body: unknown; expected: string | null }>([
@@ -373,6 +406,41 @@ describe('parseEditUsageFromResponse', () => {
   });
 });
 
+describe('countAndStoreEmbeddingUsage', () => {
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+  });
+
+  it.each([
+    { is_free: false, user_byok: false, expectedCost: 1000 },
+    { is_free: true, user_byok: false, expectedCost: 0 },
+    { is_free: false, user_byok: true, expectedCost: 0 },
+  ])('uses the free/BYOK snapshots for embedding cost: %j', async testCase => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+      is_free: testCase.is_free,
+      user_byok: testCase.user_byok,
+    };
+    const response = new Response(
+      JSON.stringify({
+        id: 'embedding-id',
+        model: 'test/embedding',
+        usage: { prompt_tokens: 10, cost: 0.001 },
+      })
+    );
+
+    countAndStoreEmbeddingUsage(response, usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: testCase.expectedCost, market_cost: 1000 }),
+      usageContext
+    );
+  });
+});
+
 describe('countAndStoreFimUsage', () => {
   function makeUsageContext(
     overrides: Partial<MicrodollarUsageContext> = {}
@@ -399,6 +467,7 @@ describe('countAndStoreFimUsage', () => {
       editor_name: null,
       machine_id: null,
       user_byok: false,
+      is_free: false,
       has_tools: false,
       feature: null,
       session_id: null,
@@ -458,8 +527,11 @@ describe('countAndStoreFimUsage', () => {
     expect(stats.market_cost).toBe(390);
   });
 
-  it('does not bill BYOK requests', async () => {
-    countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext({ user_byok: true }), undefined);
+  it.each([
+    { user_byok: true, is_free: false },
+    { user_byok: false, is_free: true },
+  ])('does not bill BYOK or free requests: %j', async overrides => {
+    countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext(overrides), undefined);
 
     await new Promise(resolve => setImmediate(resolve));
 
@@ -496,6 +568,7 @@ describe('countAndStoreEditUsage', () => {
       editor_name: null,
       machine_id: null,
       user_byok: false,
+      is_free: false,
       has_tools: false,
       feature: null,
       session_id: null,
@@ -519,7 +592,10 @@ describe('countAndStoreEditUsage', () => {
     mockedLogMicrodollarUsage.mockResolvedValue(null);
   });
 
-  it('zeros both cost_mUsd and cacheDiscount_mUsd for BYOK requests', async () => {
+  it.each([
+    { user_byok: true, is_free: false },
+    { user_byok: false, is_free: true },
+  ])('zeros costs for BYOK or free requests: %j', async overrides => {
     const response = makeUpstreamResponse({
       id: 'edit-byok',
       model: 'mercury-edit-2',
@@ -532,7 +608,7 @@ describe('countAndStoreEditUsage', () => {
       choices: [],
     });
 
-    countAndStoreEditUsage(response, makeUsageContext({ user_byok: true }), undefined);
+    countAndStoreEditUsage(response, makeUsageContext(overrides), undefined);
 
     // Allow the async usage parse + after() callback to settle.
     await new Promise(resolve => setImmediate(resolve));
@@ -1007,10 +1083,81 @@ describe('makeErrorReadable', () => {
 
       expect(result?.status).toBe(status);
       const body = await result?.json();
+      const baselineBody = await baseline?.json();
       expect(body).toMatchObject({ error_type: 'byok_error' });
-      expect(body).toEqual(await baseline?.json());
+      expect(body.message.startsWith(baselineBody.message)).toBe(true);
     }
   );
+
+  it('appends the provider explanation to a specific BYOK 401 message', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'direct-byok',
+      requestedModel: 'opencode-go/glm-5.3-flash',
+      request,
+      response: Response.json(
+        {
+          error: {
+            type: 'authentication_error',
+            code: 'api_key_expired',
+            message:
+              'This API key has expired. Create a new API key in OpenCode Console and replace it in your client or secret store.',
+          },
+        },
+        { status: 401 }
+      ),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    const expected =
+      '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration. Provider message: This API key has expired. Create a new API key in OpenCode Console and replace it in your client or secret store.';
+    expect(result?.status).toBe(401);
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
+
+  it('appends the provider explanation to the OpenCode Go BYOK permission message', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'direct-byok',
+      requestedModel: 'opencode-go/mimo-v2.5',
+      request,
+      response: Response.json(
+        { message: 'Synthetic data collection opt-in required.' },
+        { status: 403 }
+      ),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    const expected =
+      '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go. Provider message: Synthetic data collection opt-in required.';
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
+
+  it('removes control characters and bounds provider text appended to a specific BYOK message', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'synthetic-model',
+      request,
+      response: Response.json(
+        { error: { message: `  Synthetic\u0000\n${'x'.repeat(400)}  ` } },
+        { status: 429 }
+      ),
+      userByokProviderIds: ['anthropic'],
+    });
+
+    const expected = `[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider. Provider message: ${`Synthetic  ${'x'.repeat(400)}`.slice(0, 300)}`;
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
 
   it.each([400, 500, 502, 503])(
     'leaves non-BYOK errors and BYOK outages unchanged for status %i',

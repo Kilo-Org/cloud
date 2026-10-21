@@ -14,7 +14,7 @@ import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
-import { PRESELECT_CLOUD_RUN_ON } from '@/lib/run-on-destination';
+import { PRESELECT_CLOUD_RUN_ON, PRESELECT_COMPUTER_RUN_ON } from '@/lib/run-on-destination';
 import { dismissTour } from '@/lib/tour/tour-dismiss';
 import { useTourCompletion } from '@/lib/tour/tour-completion';
 
@@ -23,14 +23,15 @@ import { useTourCompletion } from '@/lib/tour/tour-completion';
  *
  * The shell owns the fork. Both cards hand straight off to the new-session
  * page: the Cloud card preselects the Cloud Agent, while the computer card
- * passes no run-on param so the form restores the person's stored preference
- * and they pick their computer there. Either hand-off records the per-account
- * decision and replaces the tour, so the tour never re-opens. Skip and Android
- * hardware Back are the other decision — record it the instant the person
- * dismisses, then pop back to the screen that opened the tour (Home on
- * auto-open, Profile on the Tutorial replay); a tour with nothing beneath it
- * lands on Home instead (see `dismissTour`). Nothing here ever clears the
- * decision.
+ * preselects the computer target — the form binds the first connected
+ * computer, and none connected keeps the computer target selected with the
+ * setup hint instead of silently switching to the Cloud Agent. Either
+ * hand-off records the per-account decision and replaces the tour, so the
+ * tour never re-opens. Skip and Android hardware Back are the other decision
+ * — record it the instant the person dismisses, then pop back to the screen
+ * that opened the tour (Home on auto-open, Profile on the Tutorial replay);
+ * a tour with nothing beneath it lands on Home instead (see `dismissTour`).
+ * Nothing here ever clears the decision.
  */
 
 type ForkStepProps = {
@@ -143,8 +144,9 @@ export function TourScreen() {
   // stack-safe replace exists for (KILO-APP-25). It pushes instead and drops
   // the tour route once the push transition has ended, the same end state
   // `replace` produces. The run-on param is transient — the stored run-on
-  // preference is never written here. The computer card omits it so the form
-  // restores the stored preference and the person picks their computer there.
+  // preference is never written here. The computer card preselects the
+  // computer target; the form binds the first connected computer and never
+  // consults the stored preference.
   const handOff = useCallback(
     (runOn?: string) => {
       recordCompleted();
@@ -156,7 +158,7 @@ export function TourScreen() {
 
   const choosePath = useCallback(
     (next: 'cloud' | 'remote') => {
-      handOff(next === 'cloud' ? PRESELECT_CLOUD_RUN_ON : undefined);
+      handOff(next === 'cloud' ? PRESELECT_CLOUD_RUN_ON : PRESELECT_COMPUTER_RUN_ON);
     },
     [handOff]
   );

@@ -38,7 +38,6 @@ import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/uti
 import {
   addReactionToPR,
   createPRComment,
-  hasPRCommentWithMarker,
   findKiloReviewComment,
   updateKiloReviewComment,
   updateCheckRun,
@@ -47,7 +46,6 @@ import type { CheckRunConclusion } from '@/lib/integrations/platforms/github/ada
 import {
   addReactionToMR,
   createMRNote,
-  hasMRNoteWithMarker,
   findKiloReviewNote,
   updateKiloReviewNote,
   setCommitStatus,
@@ -70,6 +68,7 @@ import {
 } from '@/lib/code-reviews/platform/gitlab-access';
 import { terminalReasonFromCloudAgentFailure } from '@/lib/code-reviews/terminal-reason-from-failure';
 import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
+import { postCodeReviewBillingNotice } from '@/lib/code-reviews/billing';
 import {
   appendReviewSummaryFooter,
   buildReviewSummaryFooter,
@@ -683,7 +682,6 @@ async function resolveTerminalOwner(
 }
 
 const GITHUB_COMMENT_MAX_CHARACTERS = 65_536;
-const BILLING_NOTICE_MARKER = '<!-- kilo-billing-notice -->';
 const MODEL_NOT_FOUND_SUMMARY_URL = 'https://app.kilo.ai/code-reviews';
 const MODEL_NOT_FOUND_CHECK_TITLE = 'Selected model is no longer available';
 const MODEL_NOT_FOUND_STATUS_SUMMARY = `The review did not run because the selected model is no longer available. Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
@@ -695,11 +693,6 @@ const MODEL_NOT_FOUND_SUMMARY_BODY = `<!-- kilo-review -->
 The review did not run because the selected model is no longer available.
 
 Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
-
-const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
-**Kilo Code Review could not run — your account is out of credits.**
-
-[Add credits](https://app.kilo.ai/) or [switch to a free model](https://app.kilo.ai/code-reviews) to enable reviews on this change.`;
 
 /**
  * Read a review's usage data.
@@ -1863,27 +1856,7 @@ export async function POST(
                 status === 'failed' &&
                 isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
               ) {
-                const alreadyPosted = await hasPRCommentWithMarker(
-                  integration.platform_installation_id,
-                  repoOwner,
-                  repoName,
-                  review.pr_number,
-                  BILLING_NOTICE_MARKER,
-                  appType
-                );
-                if (!alreadyPosted) {
-                  await createPRComment(
-                    integration.platform_installation_id,
-                    repoOwner,
-                    repoName,
-                    review.pr_number,
-                    BILLING_NOTICE_BODY,
-                    appType
-                  );
-                  logExceptInTest(
-                    `[code-review-status] Posted billing notice on ${review.repo_full_name}#${review.pr_number}`
-                  );
-                }
+                await postCodeReviewBillingNotice(review, integration);
               }
 
               // Summary history and footer (completed only)
@@ -1961,25 +1934,7 @@ export async function POST(
                 status === 'failed' &&
                 isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
               ) {
-                const alreadyPosted = await hasMRNoteWithMarker(
-                  accessToken,
-                  review.repo_full_name,
-                  review.pr_number,
-                  BILLING_NOTICE_MARKER,
-                  instanceUrl
-                );
-                if (!alreadyPosted) {
-                  await createMRNote(
-                    accessToken,
-                    review.repo_full_name,
-                    review.pr_number,
-                    BILLING_NOTICE_BODY,
-                    instanceUrl
-                  );
-                  logExceptInTest(
-                    `[code-review-status] Posted billing notice on GitLab MR ${review.repo_full_name}!${review.pr_number}`
-                  );
-                }
+                await postCodeReviewBillingNotice(review, integration, { gitlabAccessToken });
               }
 
               // Summary history and footer (completed only)

@@ -67,6 +67,9 @@ import {
   type PendingCodeReviewCreatedAtWindow,
 } from './dispatch-constants';
 import { getManualCodeReviewConfig, shouldPublishCodeReviewToProvider } from '../manual-config';
+import { CODE_REVIEW_BILLING_FAILURE_MESSAGE, finalizeCodeReviewBillingFailure } from '../billing';
+import { settleCodeReviewLedgerRow } from '../code-review-ledger';
+import { resolveCodeReviewDispatchBilling } from './dispatch-billing';
 
 export type DispatchResult = {
   dispatched: number;
@@ -100,6 +103,17 @@ class CodeReviewActionRequiredDispatchError extends Error {
     super(getCodeReviewActionRequiredCopy(reason).description);
     this.name = 'CodeReviewActionRequiredDispatchError';
     this.reason = reason;
+  }
+}
+
+/**
+ * The review's paying account cannot cover the worker's minimum admission
+ * balance. Thrown before the worker call so no session is prepared.
+ */
+class CodeReviewInsufficientCreditsDispatchError extends Error {
+  constructor() {
+    super(CODE_REVIEW_BILLING_FAILURE_MESSAGE);
+    this.name = 'CodeReviewInsufficientCreditsDispatchError';
   }
 }
 
@@ -338,6 +352,15 @@ export async function tryDispatchPendingReviews(
         const reservation = reservations[i];
         const error = result.reason;
         const errorMessage = getErrorMessage(error);
+
+        if (error instanceof CodeReviewInsufficientCreditsDispatchError) {
+          await failReviewForInsufficientCredits(
+            reservation.review,
+            reservation.dispatchReservationId
+          );
+          continue;
+        }
+
         const actionRequiredReason = getActionRequiredReasonFromError(error);
         const actionRequiredStateAlreadyPresent =
           error instanceof CodeReviewActionRequiredDispatchError;
@@ -482,6 +505,98 @@ export async function tryDispatchPendingReviews(
   }
 }
 
+/**
+ * Terminalize a review refused for insufficient credits before any worker
+ * call: persist the billing outcome, settle the ledger, and close the provider
+ * gate with the same notice the status callback posts for a worker-side
+ * billing failure.
+ */
+async function failReviewForInsufficientCredits(
+  review: CloudAgentCodeReview,
+  dispatchReservationId: string
+): Promise<void> {
+  let failed = false;
+  try {
+    failed = await failReservedQueuedReview(
+      review.id,
+      dispatchReservationId,
+      CODE_REVIEW_BILLING_FAILURE_MESSAGE,
+      'billing'
+    );
+  } catch (error) {
+    errorExceptInTest('[dispatchReview] Failed to mark review failed for insufficient credits', {
+      reviewId: review.id,
+      error,
+    });
+    captureException(error, {
+      tags: { operation: 'dispatch-review-insufficient-credits' },
+      extra: { reviewId: review.id },
+    });
+    try {
+      await releaseQueuedReviewClaim(review.id, dispatchReservationId);
+    } catch (releaseError) {
+      errorExceptInTest('[dispatchReview] Failed to release review claim', {
+        reviewId: review.id,
+        releaseError,
+      });
+      captureException(releaseError, {
+        tags: { operation: 'release-insufficient-credits-review-reservation' },
+        extra: { reviewId: review.id },
+      });
+    }
+    return;
+  }
+
+  if (!failed) {
+    logExceptInTest('[dispatchReview] Review claim changed before the credit refusal landed', {
+      reviewId: review.id,
+    });
+    return;
+  }
+
+  try {
+    const attempt = await ensureCurrentCodeReviewAttemptFromReview(review);
+    await updateCodeReviewAttemptForCallback({
+      codeReviewId: review.id,
+      attemptId: attempt.id,
+      status: 'failed',
+      errorMessage: CODE_REVIEW_BILLING_FAILURE_MESSAGE,
+      terminalReason: 'billing',
+      completedAt: new Date(),
+    });
+  } catch (error) {
+    errorExceptInTest('[dispatchReview] Failed to record insufficient-credits attempt', {
+      reviewId: review.id,
+      error,
+    });
+    captureException(error, {
+      tags: { operation: 'dispatch-review-insufficient-credits-attempt' },
+      extra: { reviewId: review.id },
+    });
+  }
+
+  try {
+    await settleCodeReviewLedgerRow({
+      reviewId: review.id,
+      status: 'failed',
+      terminalReason: 'billing',
+      triggerSource: review.trigger_source ?? null,
+    });
+  } catch (error) {
+    errorExceptInTest('[dispatchReview] Failed to settle code review ledger row', {
+      reviewId: review.id,
+      error,
+    });
+    captureException(error, {
+      tags: { operation: 'dispatch-review-insufficient-credits-ledger' },
+      extra: { reviewId: review.id },
+    });
+  }
+
+  if (!shouldPublishCodeReviewToProvider(review)) return;
+  await finalizeCodeReviewBillingFailure(review);
+}
+
 async function dispatchReservedReview(reservation: ReservedReview, owner: Owner): Promise<boolean> {
   const { review, dispatchReservationId } = reservation;
   const platform = parseCodeReviewPlatform(review.platform);
@@ -501,9 +616,11 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
   }
 
   let agentConfig: Parameters<typeof prepareReviewPayload>[0]['agentConfig'];
+  let reviewModel: string;
 
   if (manualConfig) {
     agentConfig = { config: manualConfig.agentConfig };
+    reviewModel = manualConfig.agentConfig.model_slug || DEFAULT_CODE_REVIEW_MODEL;
   } else {
     const persistedAgentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
     if (!persistedAgentConfig) {
@@ -534,6 +651,7 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
       review.repo_full_name,
       DEFAULT_CODE_REVIEW_MODEL
     );
+    reviewModel = effectiveModel.modelSlug;
     if (effectiveModel.source === 'repository_override') {
       logExceptInTest('[dispatchReview] Applying per-repository model override', {
         reviewId: review.id,
@@ -551,6 +669,17 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     } else {
       agentConfig = persistedAgentConfig;
     }
+  }
+
+  const billing = await resolveCodeReviewDispatchBilling({ owner, model: reviewModel });
+  if (!billing.skipBalanceCheck && !billing.canAfford) {
+    logExceptInTest('[dispatchReview] Review requires more credits than the payer has', {
+      reviewId: review.id,
+      owner,
+      model: reviewModel,
+      balanceMicrodollars: billing.balanceMicrodollars,
+    });
+    throw new CodeReviewInsufficientCreditsDispatchError();
   }
 
   const payload = await prepareReviewPayload({
@@ -628,7 +757,7 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     await codeReviewWorkerClient.dispatchReview({
       ...dispatchPayload,
       attemptId: attempt.id,
-      skipBalanceCheck: true,
+      skipBalanceCheck: billing.skipBalanceCheck,
     });
   } catch (dispatchError) {
     errorExceptInTest('[dispatchReview] Worker dispatch failed', {

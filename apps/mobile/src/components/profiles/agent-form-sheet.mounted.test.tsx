@@ -95,10 +95,11 @@ function modelOption(id: string, variants: string[]) {
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-function mountSheet(agent: AgentSource | null) {
+function mountSheet(agent: AgentSource | null, existingSlugs: readonly string[] = []) {
   return renderWithProviders(
     createElement(AgentFormSheet, {
       agent,
+      existingSlugs,
       organizationId: undefined,
       isSaving: false,
       onClose: () => {

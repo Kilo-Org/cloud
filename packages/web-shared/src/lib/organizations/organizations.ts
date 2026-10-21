@@ -13,6 +13,7 @@ import {
   OrganizationSettingsSchema,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
+  cli_sessions_v2,
   kilocode_users,
   organization_invitations,
   organization_membership_removals,
@@ -820,23 +821,6 @@ export async function acceptOrganizationInvite(
   }
 }
 
-/**
- * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
- */
-export async function isOrganizationMember(
-  organizationId: Organization['id'],
-  userId: User['id'],
-  fromDb: typeof db = db
-) {
-  const result = await fromDb.query.organization_memberships.findFirst({
-    where: and(
-      eq(organization_memberships.organization_id, organizationId),
-      eq(organization_memberships.kilo_user_id, userId)
-    ),
-  });
-  return !!result;
-}
-
 export function getAcceptInviteUrl(inviteToken: OrganizationInvitation['token']): string {
   const acceptInviteUrl = `${APP_URL}/users/accept-invite/${inviteToken}`;
   return acceptInviteUrl;
@@ -910,14 +894,24 @@ export async function setOrganizationRecommendationsDigestEnabled(
 export async function markOrganizationAsDeleted(
   organizationId: Organization['id'],
   txn?: DrizzleTransaction
-): Promise<void> {
-  const execute = async (tx: DrizzleTransaction) => {
+): Promise<Organization['id'][]> {
+  const execute = async (tx: DrizzleTransaction): Promise<Organization['id'][]> => {
     const [organization] = await tx
       .select({ id: organizations.id })
       .from(organizations)
       .where(eq(organizations.id, organizationId))
       .for('update');
-    if (!organization) return;
+    if (!organization) return [];
+
+    const members = await tx
+      .select({ id: organization_memberships.kilo_user_id })
+      .from(organization_memberships)
+      .where(eq(organization_memberships.organization_id, organizationId));
+
+    await tx
+      .update(cli_sessions_v2)
+      .set({ public_id: null })
+      .where(eq(cli_sessions_v2.organization_id, organizationId));
     await tx
       .delete(provider_oauth_attempts)
       .where(eq(provider_oauth_attempts.owned_by_organization_id, organizationId));
@@ -925,9 +919,11 @@ export async function markOrganizationAsDeleted(
       .update(organizations)
       .set({ ...auto_deleted_at })
       .where(eq(organizations.id, organizationId));
+
+    return members.map(member => member.id);
   };
-  if (txn) await execute(txn);
-  else await db.transaction(execute);
+  if (txn) return execute(txn);
+  return db.transaction(execute);
 }
 
 export async function getOrganizationMemberByEmail(

@@ -22,10 +22,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
   classifyProviderState,
-  PERSONAL_SCOPE,
   useGitHubStatus,
   useGitLabStatus,
   useGitLabWebhookWarning,
@@ -34,6 +32,7 @@ import {
   useSaveReviewConfig,
   useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
+import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ACTION_REQUIRED_KEYS } from '@/components/code-reviewer/action-required-keys';
 
@@ -53,9 +52,7 @@ export function PlatformOverviewScreen({
   const permission = useReviewerPermission(scope);
   const canEdit = permission.status === 'ready' && permission.canEdit;
   const { hasWebhookSyncWarning } = useGitLabWebhookWarning(scope, platform);
-  const { models, isLoading: modelsLoading } = useAvailableModels(
-    scope === PERSONAL_SCOPE ? undefined : scope
-  );
+  const { models, isLoading: modelsLoading } = useReviewerModels(scope);
 
   if (permission.status === 'error') {
     return (

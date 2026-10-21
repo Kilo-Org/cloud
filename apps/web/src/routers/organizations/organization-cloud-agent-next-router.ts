@@ -7,6 +7,7 @@ import {
   rethrowCloudAgentError,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
+import { isPublicRepoUrlEnabled } from '@/lib/cloud-agent-next/public-repo-url';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
@@ -340,6 +341,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         githubRepo,
         githubIntegrationId,
         bitbucketRepo,
+        publicRepoUrl,
         organizationId,
         attachments,
         images,
@@ -369,6 +371,14 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           bitbucketWorkspaceUuid: bitbucketRepo.workspaceUuid,
           bitbucketRepositoryUuid: bitbucketRepo.repositoryUuid,
         };
+      } else if (publicRepoUrl) {
+        if (!isPublicRepoUrlEnabled()) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Public repository URLs are only available in local development',
+          });
+        }
+        gitParams = { gitUrl: publicRepoUrl };
       } else {
         gitParams = { githubRepo, githubIntegrationId, platform: PLATFORM.GITHUB };
       }
@@ -412,6 +422,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         headersList: ctx.headersList,
         sourceKiloSessionId: input.sourceKiloSessionId,
         operationKey: input.operationKey,
+        kiloSessionId: input.kiloSessionId,
         organizationId: input.organizationId,
       })
     ),

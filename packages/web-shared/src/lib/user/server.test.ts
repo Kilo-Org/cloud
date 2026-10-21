@@ -22,8 +22,8 @@ jest.mock('next/navigation', () => ({
 }));
 
 import { afterEach, beforeEach, describe, test, expect } from '@jest/globals';
+import { isEmailBlacklistedByDomain } from '@kilocode/worker-utils/account-access';
 import {
-  isEmailBlacklistedByDomain,
   isBlockedTLD,
   getUserUUID,
   uuidSchema,

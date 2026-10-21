@@ -1,4 +1,4 @@
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { GatewayModelListConfigSchema } from '@kilocode/db/schema-types';
 import { eq } from 'drizzle-orm';
@@ -7,7 +7,7 @@ import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model'
 
 /** Throws on an invalid stored list, so the cached getter keeps its last valid value. */
 export async function readPreferredModels(): Promise<string[]> {
-  const [row] = await db
+  const [row] = await readDb
     .select({ preferred_models: ai_gateway_config.preferred_models })
     .from(ai_gateway_config)
     .where(eq(ai_gateway_config.id, 1))

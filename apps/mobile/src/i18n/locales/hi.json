@@ -35,6 +35,8 @@
     "connectGithub": "GitHub जोड़ें",
     "cost": "लागत",
     "discard": "छोड़ दें",
+    "discardChangesMessage": "आपके परिवर्तन खो जाएँगे.",
+    "discardChangesTitle": "परिवर्तनों को छोड़ दें?",
     "findings": "मिली समस्याएँ",
     "mergeRequest": "मर्ज रिक्वेस्ट",
     "notConnected": "जुड़ा नहीं",
@@ -50,7 +52,7 @@
     "connected": "जुड़ा हुआ",
     "couldNotLoadModels": "मॉडल लोड नहीं हो सके।",
     "couldNotLoadRepositories": "रिपॉज़िटरी लोड नहीं हो सकीं।",
-    "critical": "गंभीर",
+    "critical": "अति गंभीर",
     "delete": "हटाएँ",
     "deleted": "हटाई गई",
     "details": "विवरण",
@@ -109,7 +111,9 @@
     "online": "ऑनलाइन",
     "open": "{{name}} खोलें",
     "openPullRequest": "पुल रिक्वेस्ट खोलें",
+    "completed": "पूरा",
     "pending": "लंबित",
+    "running": "चल रहा है",
     "performance": "प्रदर्शन",
     "preferences": "पसंद",
     "privacyPolicy": "गोपनीयता नीति",
@@ -1019,8 +1023,6 @@
     "updateFailed": "समीक्षक अपडेट नहीं हो सका।",
     "configSaveFailed": "समीक्षा की सेटिंग सहेजी नहीं जा सकीं।",
     "status": {
-      "running": "चल रहा है",
-      "completed": "पूरा",
       "interrupted": "बाधित"
     },
     "reviewStyle": {
@@ -1113,7 +1115,14 @@
       "triageReasoning": "प्राथमिक जाँच का तर्क",
       "watchInCloudAgent": "क्लाउड एजेंट में देखें",
       "whereFound": "समस्या मिलने की जगहें ({{displayCount}})",
-      "yes": "हाँ"
+      "yes": "हाँ",
+      "action": {
+        "analyzeCodebase": "कोडबेस का विश्लेषण करें",
+        "dismiss": "खारिज करें",
+        "manualReview": "मैन्युअल समीक्षा",
+        "monitor": "निगरानी करें",
+        "openPr": "पुल रिक्वेस्ट खोलें"
+      }
     },
     "analysisSettings": {
       "analysisModel": "विश्लेषण का मॉडल",
@@ -1135,7 +1144,24 @@
       "summary": "रिपोर्ट का सारांश",
       "title": "ऑडिट रिपोर्ट",
       "unavailable": "ऑडिट रिपोर्ट अनुपलब्ध",
-      "unavailableDescription": "केवल संगठन के मालिक और बिलिंग मैनेजर ही ऑडिट रिपोर्ट देख सकते हैं। किसी मालिक या बिलिंग मैनेजर से आपको अनुमति देने के लिए कहें।"
+      "unavailableDescription": "केवल संगठन के मालिक और बिलिंग मैनेजर ही ऑडिट रिपोर्ट देख सकते हैं। किसी मालिक या बिलिंग मैनेजर से आपको अनुमति देने के लिए कहें।",
+      "eventActions": {
+        "findingAnalysisCompleted": "विश्लेषण पूर्ण हुआ",
+        "findingAnalysisFailed": "विश्लेषण विफल रहा",
+        "findingAutoDismissed": "स्वतः खारिज किया गया",
+        "findingCreated": "आयातित",
+        "findingDeleted": "हटाया गया",
+        "findingDismissed": "खारिज किया गया",
+        "findingSeverityChanged": "गंभीरता बदली गई",
+        "findingStatusChange": "स्थिति बदली गई",
+        "findingSuperseded": "बदला गया",
+        "remediationBlocked": "सुधार अवरुद्ध हुआ",
+        "remediationCancelled": "रद्द किया गया",
+        "remediationFailed": "सुधार विफल रहा",
+        "remediationNoChangesNeeded": "कोई बदलाव आवश्यक नहीं",
+        "remediationPrOpened": "पुल रिक्वेस्ट खोली गई",
+        "remediationQueued": "सुधार का अनुरोध भेजा गया"
+      }
     },
     "auditReportButton": {
       "viewA11y": "ऑडिट रिपोर्ट देखें"
@@ -1223,7 +1249,7 @@
       "withinDeadlineDetail": "{{total}} में से {{within}} समय सीमा के भीतर",
       "noDeadlineData": "अभी किसी समस्या के लिए SLA की समय सीमा तय नहीं है",
       "deadlinePassed": "समय सीमा बीत गई",
-      "deadlinePassedDetail": "{{critical}} गंभीर, {{high}} उच्च",
+      "deadlinePassedDetail": "{{critical}} अति गंभीर, {{high}} उच्च",
       "dueThisWeek": "अंतिम तारीख इस सप्ताह",
       "dueThisWeekDetail": "{{exploitable}} समस्याओं का फ़ायदा उठाकर हमला संभव होने की पुष्टि",
       "noDeadline": "कोई समय सीमा नहीं",
@@ -1355,7 +1381,6 @@
       "installApp": "GitHub ऐप इंस्टॉल करें",
       "reauthorizeButton": "GitHub ऐप को फिर से अधिकृत करें",
       "reauthorizeDescription": "Dependabot अलर्ट तक पहुँचने के लिए सुरक्षा एजेंट को vulnerability_alerts अनुमति चाहिए। यह अनुमति देने के लिए GitHub ऐप को फिर से अधिकृत करें।",
-      "reauthorizeFailed": "फिर से अधिकृत करने की प्रक्रिया शुरू नहीं हो सकी। कृपया फिर से कोशिश करें।",
       "reauthorizeTitle": "अतिरिक्त अनुमतियाँ आवश्यक",
       "setupFailed": "GitHub सेटअप शुरू नहीं हो सका। कृपया फिर से कोशिश करें।"
     },
@@ -1378,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "बदलाव सहेजें",
       "unsavedMessage": "इस स्क्रीन से जाने से पहले अपने बदलाव सहेजना चाहते हैं?",
+      "unsavedInvalidMessage": "ये बदलाव अभी सहेजे नहीं जा सकते। सहेजने के लिए इन्हें ठीक करें, या जाने के लिए इन्हें छोड़ दें।",
       "unsavedTitle": "बिना सहेजे गए बदलाव"
     },
     "setup": {
@@ -2158,7 +2184,8 @@
       "linesBadge_other": "{{displayCount}} पंक्तियाँ",
       "matchesBadge_one": "{{displayCount}} मिलान",
       "matchesBadge_other": "{{displayCount}} मिलान",
-      "noOutput": "कोई आउटपुट नहीं है।"
+      "noOutput": "कोई आउटपुट नहीं है।",
+      "translationFailed": "अनुवाद विफल हुआ"
     },
     "autoApprove": {
       "title": "स्वतः अनुमोदन",
@@ -2975,11 +3002,22 @@
     "boundary": {
       "backToProfile": "प्रोफ़ाइल पर वापस जाएँ",
       "loadErrorMessage": "अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
+
+      "chooseAccount": "एक खाता चुनें",
       "loadErrorTitle": "आपके संगठन लोड नहीं हो सके।",
+      "noOrganization": "कोई संगठन नहीं",
+
+      "noOrganizationDescription": "यह खाता किसी संगठन का हिस्सा नहीं है। सदस्य आमंत्रण और कम बैलेंस अलर्ट जैसी संगठन सुविधाओं का उपयोग करने के लिए वेब पर एक संगठन बनाएँ या उसमें शामिल हों।",
+
+      "openWebOrganizations": "वेब पर संगठन खोलें",
+
       "organizationUnavailable": "संगठन उपलब्ध नहीं है।",
-      "selectDescription": "जारी रखने के लिए अपनी प्रोफ़ाइल से एक संगठन चुनें।",
+      "selectDescriptionWithOrganizations": "आप एक या अधिक संगठनों से जुड़े हैं। वह खाता चुनें जिसका इस स्क्रीन को उपयोग करना चाहिए।",
+
       "selectOrganization": "एक संगठन चुनें",
       "unavailableDescription": "यह संगठन अब उपलब्ध नहीं है। जारी रखने के लिए अपनी प्रोफ़ाइल से दूसरा संगठन चुनें।",
+
+      "unavailableSessionsDescription": "यह संगठन अब उपलब्ध नहीं है। इसके सत्र लोड नहीं किए जा सकते।",
       "accessDeniedDescription": "आपको इस संगठन का ऐक्सेस नहीं है।"
     },
     "creditActivity": {
@@ -3647,7 +3685,9 @@
       "jsonTooLarge": "अधिकतम 50 प्रविष्टियाँ उपयोग करें, कुंजियाँ 128 तक और मान 4096 अक्षरों तक",
       "timeoutInvalid": "टाइमआउट पूर्णांक मिलीसेकेंड का होना चाहिए",
       "edit": "एमसीपी सर्वर संपादित करें",
-      "saveFailed": "MCP सर्वर सहेजा नहीं जा सका"
+      "saveFailed": "MCP सर्वर सहेजा नहीं जा सका",
+      "deleteFailed": "MCP सर्वर हटाया नहीं जा सका",
+      "updateFailed": "MCP सर्वर अपडेट नहीं किया जा सका"
     },
     "agents": {
       "title": "प्रोफ़ाइल एजेंट",
@@ -3674,6 +3714,7 @@
       "visibilitySubagent": "सबएजेंट - केवल दूसरों से कॉल करने योग्य",
       "visibilityAll": "सभी - दोनों",
       "saveFailed": "एजेंट को बचाया नहीं जा सका",
+      "deleteFailed": "एजेंट को हटाया नहीं जा सका",
       "nameRequired": "एक एजेंट का नाम दर्ज करें",
       "slugRequired": "एक एजेंट स्लग दर्ज करें",
       "slugInvalid": "स्लग को एक अक्षर से शुरू करना चाहिए और केवल छोटे अक्षरों, अंकों और डैश का उपयोग करना चाहिए",
@@ -3688,11 +3729,12 @@
       "description": "आदेश विवरण",
       "template": "खाका",
       "namePlaceholder": "explain",
-      "agentPlaceholder": "जैसे कोड",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS स्पष्ट करें",
       "subtask": "उपकार्य के रूप में चलाएँ",
       "edit": "स्लैश कमांड संपादित करें",
       "saveFailed": "आदेश सहेजा नहीं जा सका",
+      "deleteFailed": "आदेश हटाया नहीं जा सका",
       "nameRequired": "एक कमांड नाम दर्ज करें",
       "nameInvalid": "नाम छोटे अक्षर से शुरू होना चाहिए और केवल छोटे अक्षर, अंक और डैश का उपयोग करना चाहिए",
       "templateRequired": "एक कमांड टेम्पलेट दर्ज करें",
@@ -3839,7 +3881,7 @@
     "view": "ब्रीफ़िंग पढ़ें",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "लाइव स्थिति दिखाएँ",
+    "dismiss": "ब्रीफ़िंग खारिज करें",
     "offline": "ऑफ़लाइन · सहेजी गई ब्रीफ़िंग",
     "cached": "सहेजी गई रिपोर्ट · रीफ़्रेश उपलब्ध नहीं",
     "revised": "संशोधित · {{revision}}",

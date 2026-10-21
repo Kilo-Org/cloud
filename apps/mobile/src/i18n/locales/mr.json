@@ -35,6 +35,8 @@
     "connectGithub": "GitHub जोडा",
     "cost": "खर्च",
     "discard": "टाकून द्या",
+    "discardChangesMessage": "तुमचे बदल गमावले जातील.",
+    "discardChangesTitle": "बदल टाकून द्यायचे का?",
     "findings": "निष्कर्ष",
     "mergeRequest": "मर्ज रिक्वेस्ट",
     "notConnected": "जोडलेले नाही",
@@ -109,7 +111,9 @@
     "online": "ऑनलाइन",
     "open": "{{name}} उघडा",
     "openPullRequest": "पुल रिक्वेस्ट उघडा",
+    "completed": "पूर्ण",
     "pending": "प्रलंबित",
+    "running": "चालू आहे",
     "performance": "कार्यक्षमता",
     "preferences": "प्राधान्ये",
     "privacyPolicy": "गोपनीयता धोरण",
@@ -1534,8 +1538,6 @@
     "updateFailed": "कोड पुनरावलोकक अद्ययावत करता आला नाही.",
     "configSaveFailed": "पुनरावलोकनाच्या सेटिंग्ज जतन करता आल्या नाहीत.",
     "status": {
-      "running": "चालू आहे",
-      "completed": "पूर्ण",
       "interrupted": "व्यत्यय आला"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "आढळलेली ठिकाणे ({{displayCount}})",
       "fullReport": "तयार केलेला संपूर्ण अहवाल",
       "yes": "होय",
-      "no": "नाही"
+      "no": "नाही",
+      "action": {
+        "analyzeCodebase": "कोडबेसचे विश्लेषण करा",
+        "dismiss": "नाकारा",
+        "manualReview": "मॅन्युअल पुनरावलोकन",
+        "monitor": "निरीक्षण करा",
+        "openPr": "PR उघडा"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} निष्कर्ष",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "बदल जतन करा",
       "unsavedTitle": "जतन न केलेले बदल",
-      "unsavedMessage": "ही स्क्रीन सोडण्यापूर्वी तुमचे बदल जतन करायचे?"
+      "unsavedMessage": "ही स्क्रीन सोडण्यापूर्वी तुमचे बदल जतन करायचे?",
+      "unsavedInvalidMessage": "हे बदल अजून जतन करता येत नाहीत. जतन करण्यासाठी हे दुरुस्त करा, किंवा सोडून जाण्यासाठी हे टाकून द्या."
     },
     "auditReportButton": {
       "viewA11y": "ऑडिट अहवाल पाहा"
@@ -1880,7 +1890,24 @@
       "title": "ऑडिट अहवाल",
       "unavailable": "ऑडिट अहवाल अनुपलब्ध",
       "unavailableDescription": "केवळ संस्थेचे मालक आणि बिलिंग व्यवस्थापक ऑडिट अहवाल पाहू शकतात. तुम्हाला प्रवेश देण्याची विनंती त्यांच्याकडे करा.",
-      "queryFailed": "अहवालासाठीची क्वेरी पूर्ण झाली नाही. पुन्हा प्रयत्न करा."
+      "queryFailed": "अहवालासाठीची क्वेरी पूर्ण झाली नाही. पुन्हा प्रयत्न करा.",
+      "eventActions": {
+        "findingAnalysisCompleted": "विश्लेषण पूर्ण झाले",
+        "findingAnalysisFailed": "विश्लेषण अयशस्वी झाले",
+        "findingAutoDismissed": "स्वयंचलितपणे नाकारले",
+        "findingCreated": "आयात केले",
+        "findingDeleted": "हटवले",
+        "findingDismissed": "नाकारले",
+        "findingSeverityChanged": "तीव्रता बदलली",
+        "findingStatusChange": "स्थिती बदलली",
+        "findingSuperseded": "जुने झाले",
+        "remediationBlocked": "निराकरण अडवले गेले",
+        "remediationCancelled": "रद्द केले",
+        "remediationFailed": "निराकरण अयशस्वी झाले",
+        "remediationNoChangesNeeded": "बदलांची गरज नाही",
+        "remediationPrOpened": "PR उघडले",
+        "remediationQueued": "निराकरणाची विनंती केली"
+      }
     },
     "notifications": {
       "couldNotLoad": "सूचनांच्या सेटिंग्ज लोड करता आल्या नाहीत.",
@@ -1912,7 +1939,6 @@
       "installApp": "GitHub ॲप इन्स्टॉल करा",
       "reauthorizeButton": "GitHub ॲपला पुन्हा परवानगी द्या",
       "reauthorizeDescription": "Dependabot सूचना पाहण्यासाठी सुरक्षा एजंटला vulnerability_alerts ही परवानगी आवश्यक आहे. ती देण्यासाठी GitHub ॲपला पुन्हा परवानगी द्या.",
-      "reauthorizeFailed": "पुन्हा परवानगी देण्याची प्रक्रिया सुरू करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
       "reauthorizeTitle": "अतिरिक्त परवानग्या आवश्यक",
       "setupFailed": "GitHub सेटअप सुरू करता आला नाही. कृपया पुन्हा प्रयत्न करा."
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} ओळी",
       "matchesBadge_one": "{{displayCount}} जुळणारे परिणाम",
       "matchesBadge_other": "{{displayCount}} जुळणारे परिणाम",
-      "noOutput": "कोणतेही आउटपुट नाही."
+      "noOutput": "कोणतेही आउटपुट नाही.",
+      "translationFailed": "अनुवाद अयशस्वी"
     },
     "readToolMarkdown": {
       "linesTruncated": "ओळी {{start}}–{{end}} (काही मजकूर वगळला)",
@@ -2983,11 +3010,22 @@
     "boundary": {
       "backToProfile": "प्रोफाइलवर परत जा",
       "loadErrorMessage": "इंटरनेट जोडणी तपासा आणि पुन्हा प्रयत्न करा.",
+
+      "chooseAccount": "खाते निवडा",
       "loadErrorTitle": "तुमच्या संस्था लोड करता आल्या नाहीत.",
+      "noOrganization": "कोणतीही संस्था नाही",
+
+      "noOrganizationDescription": "हे खाते कोणत्याही संस्थेचा भाग नाही. सदस्य आमंत्रणे आणि कमी शिल्लक सूचना यांसारखी संस्था वैशिष्ट्ये वापरण्यासाठी वेबवर संस्था तयार करा किंवा एकात सामील व्हा.",
+
+      "openWebOrganizations": "वेबवर संस्था उघडा",
+
       "organizationUnavailable": "संस्था उपलब्ध नाही.",
-      "selectDescription": "पुढे जाण्यासाठी तुमच्या प्रोफाइलमधून संस्था निवडा.",
+      "selectDescriptionWithOrganizations": "तुम्ही एक किंवा अधिक संस्थांचे सदस्य आहात. ही स्क्रीन जे खाते वापरावे ते निवडा.",
+
       "selectOrganization": "संस्था निवडा",
       "unavailableDescription": "ही संस्था आता उपलब्ध नाही. पुढे जाण्यासाठी तुमच्या प्रोफाइलमधून दुसरी संस्था निवडा.",
+
+      "unavailableSessionsDescription": "ही संस्था आता उपलब्ध नाही. तिचे सत्र लोड केले जू शकत नाहीत.",
       "accessDeniedDescription": "तुम्हाला या संस्थेमध्ये प्रवेश नाही."
     },
     "creditActivity": {
@@ -3647,7 +3685,9 @@
       "jsonTooLarge": "कमाल 50 नोंदी वापरा, की 128 पर्यंत आणि मूल्ये 4096 अक्षरांपर्यंत",
       "timeoutInvalid": "कालबाह्य पूर्ण संख्या मिलीसेकंद असणे आवश्यक आहे",
       "edit": "MCP सर्व्हर संपादित करा",
-      "saveFailed": "MCP सर्व्हर जतन करू शकलो नाही"
+      "saveFailed": "MCP सर्व्हर जतन करू शकलो नाही",
+      "deleteFailed": "MCP सर्व्हर हटवू शकलो नाही",
+      "updateFailed": "MCP सर्व्हर अपडेट करू शकलो नाही"
     },
     "agents": {
       "title": "प्रोफाइल एजंट",
@@ -3674,6 +3714,7 @@
       "visibilitySubagent": "Subagent — फक्त इतरांकडून कॉल करण्यायोग्य",
       "visibilityAll": "सर्व - दोन्ही",
       "saveFailed": "एजंट जतन करू शकलो नाही",
+      "deleteFailed": "एजंट हटवू शकलो नाही",
       "nameRequired": "एजंटचे नाव एंटर करा",
       "slugRequired": "एजंट स्लग एंटर करा",
       "slugInvalid": "स्लग अक्षराने सुरू होणे आवश्यक आहे आणि फक्त लोअरकेस अक्षरे, अंक आणि डॅश वापरणे आवश्यक आहे",
@@ -3688,11 +3729,12 @@
       "description": "आदेश वर्णन",
       "template": "साचा",
       "namePlaceholder": "explain",
-      "agentPlaceholder": "उदा. कोड",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS स्पष्ट करा",
       "subtask": "सबटास्क म्हणून चालवा",
       "edit": "स्लॅश कमांड संपादित करा",
       "saveFailed": "कमांड सेव्ह करू शकलो नाही",
+      "deleteFailed": "कमांड हटवू शकलो नाही",
       "nameRequired": "कमांडचे नाव एंटर करा",
       "nameInvalid": "नाव लोअरकेस अक्षराने सुरू होणे आवश्यक आहे आणि फक्त लोअरकेस अक्षरे, अंक आणि डॅश वापरणे आवश्यक आहे",
       "templateRequired": "कमांड टेम्पलेट प्रविष्ट करा",
@@ -3839,7 +3881,7 @@
     "view": "आढावा वाचा",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "थेट स्थिती दाखवा",
+    "dismiss": "आढावाकडे दुर्लक्ष करा",
     "offline": "ऑफलाइन · जतन केलेला आढावा",
     "cached": "जतन केलेला अहवाल · रिफ्रेश उपलब्ध नाही",
     "revised": "सुधारित · {{revision}}",

@@ -35,6 +35,8 @@
     "connectGithub": "Koppel GitHub",
     "cost": "Koste",
     "discard": "Gooi weg",
+    "discardChangesMessage": "Jou wysigings sal verlore gaan.",
+    "discardChangesTitle": "Gooi wysigings weg?",
     "findings": "Bevindings",
     "mergeRequest": "merge request",
     "notConnected": "Nie gekoppel nie",
@@ -109,7 +111,9 @@
     "online": "Aanlyn",
     "open": "Maak {{name}} oop",
     "openPullRequest": "Oop trekversoek",
+    "completed": "Voltooi",
     "pending": "Hangend",
+    "running": "Aktief",
     "performance": "Werkverrigting",
     "preferences": "Voorkeure",
     "privacyPolicy": "Privaatheidsbeleid",
@@ -1534,8 +1538,6 @@
     "updateFailed": "Die Kodehersiener kon nie bygewerk word nie.",
     "configSaveFailed": "Die hersieningsinstellings kon nie gestoor word nie.",
     "status": {
-      "running": "Aktief",
-      "completed": "Voltooi",
       "interrupted": "Onderbreek"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "Waar dit gevind is ({{displayCount}})",
       "fullReport": "Volledige gegenereerde verslag",
       "yes": "Ja",
-      "no": "Nee"
+      "no": "Nee",
+      "action": {
+        "analyzeCodebase": "Analiseer kodebasis",
+        "dismiss": "Wys af",
+        "manualReview": "Handmatige hersiening",
+        "monitor": "Monitor",
+        "openPr": "Maak PR oop"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} bevindings",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Stoor veranderinge",
       "unsavedTitle": "Ongestoorde veranderinge",
-      "unsavedMessage": "Stoor jou veranderinge voordat jy hierdie skerm verlaat?"
+      "unsavedMessage": "Stoor jou veranderinge voordat jy hierdie skerm verlaat?",
+      "unsavedInvalidMessage": "Hierdie veranderinge kan nog nie gestoor word nie. Maak dit reg om te stoor, of gooi dit weg om te verlaat."
     },
     "auditReportButton": {
       "viewA11y": "Bekyk ouditverslag"
@@ -1880,7 +1890,24 @@
       "title": "Ouditverslag",
       "unavailable": "Ouditverslag onbeskikbaar",
       "unavailableDescription": "Slegs organisasie-eienaars en faktureringsbestuurders kan ouditverslae bekyk. Vra 'n eienaar of faktureringsbestuurder om jou toegang te gee.",
-      "queryFailed": "Die verslagnavraag is nie voltooi nie. Probeer weer."
+      "queryFailed": "Die verslagnavraag is nie voltooi nie. Probeer weer.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Ontleding voltooi",
+        "findingAnalysisFailed": "Ontleding misluk",
+        "findingAutoDismissed": "Outomaties afgewys",
+        "findingCreated": "Geïmporteer",
+        "findingDeleted": "Geskrap",
+        "findingDismissed": "Verwerp",
+        "findingSeverityChanged": "Ernstigheid verander",
+        "findingStatusChange": "Status verander",
+        "findingSuperseded": "Vervang",
+        "remediationBlocked": "Regstelling geblokkeer",
+        "remediationCancelled": "Gekanselleer",
+        "remediationFailed": "Regstelling misluk",
+        "remediationNoChangesNeeded": "Geen veranderinge nodig nie",
+        "remediationPrOpened": "PR geopen",
+        "remediationQueued": "Regstelling versoek"
+      }
     },
     "notifications": {
       "couldNotLoad": "Die kennisgewinginstellings kon nie gelaai word nie.",
@@ -1912,7 +1939,6 @@
       "installApp": "Installeer die GitHub-app",
       "reauthorizeButton": "Magtig die GitHub-app weer",
       "reauthorizeDescription": "Die Sekuriteitsagent benodig die vulnerability_alerts-toestemming vir toegang tot Dependabot-waarskuwings. Magtig die GitHub-app weer om hierdie toestemming te verleen.",
-      "reauthorizeFailed": "Die hernuwing van magtiging kon nie begin word nie. Probeer asseblief weer.",
       "reauthorizeTitle": "Bykomende toestemmings vereis",
       "setupFailed": "Kon nie GitHub-opstelling begin nie. Probeer asseblief weer."
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} reëls",
       "matchesBadge_one": "{{displayCount}} treffer",
       "matchesBadge_other": "{{displayCount}} treffers",
-      "noOutput": "Geen uitset nie."
+      "noOutput": "Geen uitset nie.",
+      "translationFailed": "Vertaling het misluk"
     },
     "readToolMarkdown": {
       "linesTruncated": "reëls {{start}}–{{end}} (afgekap)",
@@ -2983,11 +3010,22 @@
     "boundary": {
       "backToProfile": "Terug na profiel",
       "loadErrorMessage": "Kontroleer jou verbinding en probeer weer.",
+
+      "chooseAccount": "Kies 'n rekening",
       "loadErrorTitle": "Jou organisasies kon nie gelaai word nie.",
+      "noOrganization": "Geen organisasie",
+
+      "noOrganizationDescription": "Hierdie rekening is nie deel van 'n organisasie nie. Skep of sluit by een aan op die web om organisasiefunksies soos lede-uitnodigings en waarskuwings oor lae saldo te gebruik.",
+
+      "openWebOrganizations": "Maak organisasies op die web oop",
+
       "organizationUnavailable": "Die organisasie is nie beskikbaar nie.",
-      "selectDescription": "Kies 'n organisasie uit jou profiel om voort te gaan.",
+      "selectDescriptionWithOrganizations": "Jy behoort aan een of meer organisasies. Kies die rekening wat hierdie skerm moet gebruik.",
+
       "selectOrganization": "Kies 'n organisasie",
       "unavailableDescription": "Hierdie organisasie is nie meer beskikbaar nie. Kies een uit jou profiel om voort te gaan.",
+
+      "unavailableSessionsDescription": "Hierdie organisasie is nie meer beskikbaar nie. Sessies daarvoor kan nie gelaai word nie.",
       "accessDeniedDescription": "Jy het nie toegang tot hierdie organisasie nie."
     },
     "creditActivity": {
@@ -3647,7 +3685,9 @@
       "jsonTooLarge": "Gebruik hoogstens 50 inskrywings, sleutels tot 128 en waardes tot 4096 karakters",
       "timeoutInvalid": "Uitteltyd moet 'n hele aantal millisekondes wees",
       "edit": "Wysig MCP-bediener",
-      "saveFailed": "Kon nie MCP-bediener stoor nie"
+      "saveFailed": "Kon nie MCP-bediener stoor nie",
+      "deleteFailed": "Kon nie MCP-bediener verwyder nie",
+      "updateFailed": "Kon nie MCP-bediener opdateer nie"
     },
     "agents": {
       "title": "Profiel agente",
@@ -3674,6 +3714,7 @@
       "visibilitySubagent": "Subagent - slegs oproepbaar vanaf ander",
       "visibilityAll": "Almal - albei",
       "saveFailed": "Kon nie agent stoor nie",
+      "deleteFailed": "Kon nie agent verwyder nie",
       "nameRequired": "Voer 'n agentnaam in",
       "slugRequired": "Voer 'n agentslak in",
       "slugInvalid": "Slak moet met 'n letter begin en slegs kleinletters, syfers en strepe gebruik",
@@ -3688,11 +3729,12 @@
       "description": "Opdrag beskrywing",
       "template": "Sjabloon",
       "namePlaceholder": "explain",
-      "agentPlaceholder": "bv. Kode",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Verduidelik $ARGUMENTS",
       "subtask": "Hardloop as subtaak",
       "edit": "Wysig skuinsstreep opdrag",
       "saveFailed": "Kon nie opdrag stoor nie",
+      "deleteFailed": "Kon nie opdrag verwyder nie",
       "nameRequired": "Voer 'n opdragnaam in",
       "nameInvalid": "Naam moet met 'n kleinletter begin en slegs kleinletters, syfers en strepe gebruik",
       "templateRequired": "Voer 'n opdragsjabloon in",
@@ -3839,7 +3881,7 @@
     "view": "Lees verslag",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Wys regstreekse status",
+    "dismiss": "Verwerp verslag",
     "offline": "Vanlyn · gestoorde verslag",
     "cached": "Gestoorde verslag · verfris nie beskikbaar nie",
     "revised": "Hersien · {{revision}}",

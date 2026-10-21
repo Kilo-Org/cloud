@@ -35,6 +35,8 @@
     "connectGithub": "Ceangail le GitHub",
     "cost": "Costas",
     "discard": "Caith uait",
+    "discardChangesMessage": "Caillfidh tú do chuid athruithe.",
+    "discardChangesTitle": "Caith athruithe uait?",
     "findings": "Torthaí",
     "mergeRequest": "iarratas cumaisc",
     "notConnected": "Gan nasc",
@@ -109,7 +111,9 @@
     "online": "Ar líne",
     "open": "Oscail {{name}}",
     "openPullRequest": "Oscail an t-iarratas tarraingthe",
+    "completed": "Críochnaithe",
     "pending": "Ar feitheamh",
+    "running": "Ag rith",
     "performance": "Feidhmíocht",
     "preferences": "Roghanna",
     "privacyPolicy": "Beartas príobháideachta",
@@ -1591,8 +1595,6 @@
     "updateFailed": "Níorbh fhéidir an t-athbhreithneoir a nuashonrú.",
     "configSaveFailed": "Níorbh fhéidir cumraíocht an athbhreithnithe a shábháil.",
     "status": {
-      "running": "Ag rith",
-      "completed": "Críochnaithe",
       "interrupted": "Idirbhriste"
     },
     "reviewStyle": {
@@ -1721,7 +1723,14 @@
       "whereFound": "Cá bhfuarthas é seo ({{displayCount}})",
       "fullReport": "An tuarascáil iomlán a gineadh",
       "yes": "Tá",
-      "no": "Níl"
+      "no": "Níl",
+      "action": {
+        "analyzeCodebase": "Anailísigh an cód",
+        "dismiss": "Dífheidhmigh",
+        "manualReview": "Athbhreithniú láimhe",
+        "monitor": "Monatóireacht",
+        "openPr": "Oscail PR"
+      }
     },
     "dashboard": {
       "findingsCount": "Torthaí: {{displayCount}}",
@@ -1932,7 +1941,8 @@
     "settingsSave": {
       "saveChanges": "Sábháil athruithe",
       "unsavedTitle": "Athruithe gan sábháil",
-      "unsavedMessage": "Ar mhaith leat d'athruithe a shábháil sula bhfágann tú an scáileán seo?"
+      "unsavedMessage": "Ar mhaith leat d'athruithe a shábháil sula bhfágann tú an scáileán seo?",
+      "unsavedInvalidMessage": "Ní féidir na hathruithe seo a shábháil fós. Ceartaigh iad le sábháil, nó caith uait iad le fágáil."
     },
     "auditReportButton": {
       "viewA11y": "Féach ar an tuarascáil iniúchta"
@@ -1949,7 +1959,24 @@
       "title": "Tuarascáil iniúchta",
       "unavailable": "Níl an tuarascáil iniúchta ar fáil",
       "unavailableDescription": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála tuarascálacha iniúchta a fheiceáil. Iarr ar úinéir nó ar bhainisteoir billeála rochtain a thabhairt duit.",
-      "queryFailed": "Níor críochnaíodh iarratas na tuarascála. Bain triail as arís."
+      "queryFailed": "Níor críochnaíodh iarratas na tuarascála. Bain triail as arís.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Cuireadh an anailís i gcrích",
+        "findingAnalysisFailed": "Theip ar an anailís",
+        "findingAutoDismissed": "Dífheidhmithe go huathoibríoch",
+        "findingCreated": "Iompórtáladh",
+        "findingDeleted": "Scriosta",
+        "findingDismissed": "Dífheidhmithe",
+        "findingSeverityChanged": "Athraíodh déine",
+        "findingStatusChange": "Athraíodh stádas",
+        "findingSuperseded": "Cuireadh in ionad",
+        "remediationBlocked": "Cuireadh cosc ar an leasú",
+        "remediationCancelled": "Curtha ar ceal",
+        "remediationFailed": "Theip ar an leasú",
+        "remediationNoChangesNeeded": "Níor theastaigh aon athruithe",
+        "remediationPrOpened": "Osclaíodh PR",
+        "remediationQueued": "Iarradh leasú"
+      }
     },
     "notifications": {
       "couldNotLoad": "Níorbh fhéidir na socruithe fógraí a lódáil.",
@@ -1981,7 +2008,6 @@
       "installApp": "Suiteáil an aip GitHub",
       "reauthorizeButton": "Athúdaraigh an aip GitHub",
       "reauthorizeDescription": "Teastaíonn an cead vulnerability_alerts ón nGníomhaire slándála chun rochtain a fháil ar fholáirimh Dependabot. Athúdaraigh an aip GitHub chun an cead seo a thabhairt.",
-      "reauthorizeFailed": "Níorbh fhéidir an t-athúdarú a thosú. Bain triail as arís le do thoil.",
       "reauthorizeTitle": "Teastaíonn ceadanna breise",
       "setupFailed": "Níorbh fhéidir socrú GitHub a thosú. Bain triail as arís le do thoil."
     },
@@ -2382,7 +2408,8 @@
       "matchesBadge_two": "{{displayCount}} toradh",
       "matchesBadge_few": "{{displayCount}} toradh",
       "matchesBadge_many": "{{displayCount}} toradh",
-      "noOutput": "Níl aon aschur ann."
+      "noOutput": "Níl aon aschur ann.",
+      "translationFailed": "Theip ar an aistriúchán"
     },
     "readToolMarkdown": {
       "linesTruncated": "línte {{start}}–{{end}} (teasctha)",
@@ -3103,11 +3130,22 @@
     "boundary": {
       "backToProfile": "Ar ais go dtí an phróifíl",
       "loadErrorMessage": "Seiceáil do nasc agus bain triail eile as.",
+
+      "chooseAccount": "Roghnaigh cuntas",
       "loadErrorTitle": "Níorbh fhéidir d'eagraíochtaí a lódáil.",
+      "noOrganization": "Gan eagraíocht",
+
+      "noOrganizationDescription": "Níl an cuntas seo mar chuid d'eagraíocht. Cruthaigh eagraíocht nó bí páirteach i gceann ar an ngréasán chun gnéithe eagraíochta a úsáid ar nós cuirí do bhaill agus foláirimh maidir le hiarmhéid íseal.",
+
+      "openWebOrganizations": "Oscail eagraíochtaí ar an ngréasán",
+
       "organizationUnavailable": "Níl an eagraíocht ar fáil.",
-      "selectDescription": "Roghnaigh eagraíocht ó do phróifíl le leanúint ar aghaidh.",
+      "selectDescriptionWithOrganizations": "Baineann tú le heagraíocht amháin nó níos mó. Roghnaigh an cuntas ar cheart don scáileán seo a úsáid.",
+
       "selectOrganization": "Roghnaigh eagraíocht",
       "unavailableDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Roghnaigh ceann ó do phróifíl le leanúint ar aghaidh.",
+
+      "unavailableSessionsDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Ní féidir a seisiúin a luchtú.",
       "accessDeniedDescription": "Níl rochtain agat ar an eagraíocht seo."
     },
     "creditActivity": {
@@ -3770,7 +3808,9 @@
       "jsonTooLarge": "Úsáid 50 iontráil ar a mhéad, eochracha suas le 128 agus luachanna suas le 4096 carachtar",
       "timeoutInvalid": "Caithfidh teorainn ama a bheith ina iomlán de na milleasoicindí",
       "edit": "Cuir freastalaí MCP in eagar",
-      "saveFailed": "Níorbh fhéidir an freastalaí MCP a shábháil"
+      "saveFailed": "Níorbh fhéidir an freastalaí MCP a shábháil",
+      "deleteFailed": "Níorbh fhéidir an freastalaí MCP a scriosadh",
+      "updateFailed": "Níorbh fhéidir an freastalaí MCP a nuashonrú"
     },
     "agents": {
       "title": "Gníomhairí próifíl",
@@ -3797,6 +3837,7 @@
       "visibilitySubagent": "Fo-ghníomhaire — inghlaoite ó dhaoine eile amháin",
       "visibilityAll": "Gach - araon",
       "saveFailed": "Níorbh fhéidir an gníomhaire a shábháil",
+      "deleteFailed": "Níorbh fhéidir an gníomhaire a scriosadh",
       "nameRequired": "Cuir isteach ainm gníomhaire",
       "slugRequired": "Cuir isteach seilide gníomhaire",
       "slugInvalid": "Caithfidh sluga tosú le litir agus gan ach litreacha beaga, digití agus daiseanna a úsáid",
@@ -3811,11 +3852,12 @@
       "description": "Cur síos ar ordú",
       "template": "Teimpléad",
       "namePlaceholder": "explain",
-      "agentPlaceholder": "m.sh. Code",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Mínigh $ARGUMENTS",
       "subtask": "Rith mar fhothasc",
       "edit": "Cuir ordú slais in eagar",
       "saveFailed": "Níorbh fhéidir an t-ordú a shábháil",
+      "deleteFailed": "Níorbh fhéidir an t-ordú a scriosadh",
       "nameRequired": "Cuir isteach ainm ordaithe",
       "nameInvalid": "Caithfidh an t-ainm tosú le litir chás íochtair agus gan ach litreacha beaga, digití agus daiseanna a úsáid",
       "templateRequired": "Cuir isteach teimpléad ordaithe",
@@ -3974,7 +4016,7 @@
     "view": "Léigh an achoimre",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Taispeáin stádas beo",
+    "dismiss": "Cuir an achoimre as an áireamh",
     "offline": "As líne · achoimre shábháilte",
     "cached": "Tuarascáil shábháilte · ní féidir athnuachan",
     "revised": "Athbhreithnithe · {{revision}}",

@@ -4,7 +4,14 @@ import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import { startAttempt, type RouteContext } from '../../src/control-plane/sandbox/routes.js';
+import * as scopeHandleAdoption from '../../src/control-plane/sandbox/scope-handle-adoption.js';
 import { logger } from '../../src/logger.js';
+import {
+  CONTROL_DIAGNOSTIC_STRING_CHARSET,
+  CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH,
+} from '../../src/sandbox-control/diagnostics.js';
+import { createGrantDiagnostic } from '../../src/sandbox-control/grant-diagnostic.js';
 import migrations from '../../src/control-plane/sandbox/drizzle/migrations.js';
 import {
   routes as routesTable,
@@ -29,6 +36,7 @@ import {
   type ControlPlanePrepareInput,
   type ControlPlaneRouteSpec,
   type ControlPlaneRouteUpdate,
+  type ControlPlaneRouteView,
   type ControlPlaneWrapperFrame,
 } from '../../src/shared/control-plane-protocol.js';
 import {
@@ -777,6 +785,14 @@ describe('SandboxControlV2 credentials (B3)', () => {
       expect(diagnostics.some(diagnostic => diagnostic.stage === 'mixed_credential_class')).toBe(
         true
       );
+      expect(
+        diagnostics.some(
+          diagnostic =>
+            diagnostic.stage === 'mixed_credential_class' &&
+            diagnostic.grantPhase === 'compatibility' &&
+            diagnostic.grantFailureReason === 'mixed_credential_class'
+        )
+      ).toBe(true);
       expect((await readRouteRow(stub, SESSION))?.grant === before).toBe(true);
       expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
       // The joiner fails at admission, before any prepare frame reaches the wrapper.
@@ -2203,6 +2219,1010 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(next?.type).toBe('session.prepare');
     if (next?.type !== 'session.prepare') throw new Error('expected session.prepare');
     expect(next.spec.sessionId).toBe(SESSION_NEXT);
+  });
+});
+
+const SUPER_SECRET_TOKEN = 'SUPER_SECRET_TOKEN';
+const USER_SECRET = 'user_secret_991';
+const SECRET_REPO_URL = 'https://secret.example/acme/widgets.git';
+const REPO_SECRET = 'repo_secret_442';
+const CONTENT_SECRET = 'content_secret_773';
+const GITHUB_INTEGRATION_ID = '11111111-1111-4111-8111-111111111111';
+
+type GrantBrokerCalls = { kilo: number; github: number; gitlab: number; authorize: number };
+
+/**
+ * The broker seam: the object bound to `GIT_TOKEN_SERVICE` carries only service
+ * methods, so a method failure is never confused with a binding failure. Call
+ * counters live on the sibling test object.
+ */
+type GrantBrokerService = {
+  issueKiloSessionCapability: () => Promise<unknown>;
+  issueGitHubSessionCapability: () => Promise<unknown>;
+  issueGitLabSessionCapability: () => Promise<unknown>;
+  authorizeCloudAgentGitHubRepo: () => Promise<unknown>;
+  /** Present only in the cold-grant GitHub resolution cases below. */
+  getCloudAgentAuthForRepo?: (params: Record<string, unknown>) => Promise<unknown>;
+};
+
+function createGrantBroker(): { calls: GrantBrokerCalls; service: GrantBrokerService } {
+  const calls: GrantBrokerCalls = { kilo: 0, github: 0, gitlab: 0, authorize: 0 };
+  const service: GrantBrokerService = {
+    async issueKiloSessionCapability() {
+      calls.kilo += 1;
+      return { success: true, capability: `kka1.${calls.kilo}` };
+    },
+    async issueGitHubSessionCapability() {
+      calls.github += 1;
+      return {
+        success: true,
+        capability: `kgh2.${calls.github}`,
+        installationId: 1,
+        accountLogin: 'acme',
+        appType: 'standard',
+        source: 'managed',
+      };
+    },
+    async issueGitLabSessionCapability() {
+      calls.gitlab += 1;
+      return { success: false, reason: 'no_token' };
+    },
+    async authorizeCloudAgentGitHubRepo() {
+      calls.authorize += 1;
+      return { success: true };
+    },
+  };
+  return { calls, service };
+}
+
+async function installGrantBroker(
+  stub: DurableObjectStub<SandboxControlV2>,
+  service: GrantBrokerService,
+  mutate?: (env: Record<string, unknown>) => void
+): Promise<void> {
+  await runInDurableObject(stub, instance => {
+    const mutableEnv = instance.env as Record<string, unknown>;
+    mutableEnv.GIT_TOKEN_SERVICE = service;
+    mutate?.(mutableEnv);
+  });
+}
+
+function captureRouteFailed(): {
+  events: Record<string, unknown>[];
+  restore: () => void;
+  forAttempt: (attemptId: string) => Record<string, unknown>[];
+} {
+  const events: Record<string, unknown>[] = [];
+  const spy = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+    const bounded = fields as unknown as Record<string, unknown>;
+    if (bounded.diagnosticEvent === 'route_failed') events.push(bounded);
+    return logger;
+  });
+  return {
+    events,
+    restore: () => spy.mockRestore(),
+    forAttempt: (attemptId: string) => events.filter(event => event.attemptId === attemptId),
+  };
+}
+
+function failedAttemptId(view: ControlPlaneRouteView): string {
+  if (view.state !== 'failed') throw new Error(`expected a failed route, got ${view.state}`);
+  return view.attemptId;
+}
+
+describe('SandboxControlV2 cold grant rejection diagnostics', () => {
+  it('labels an unbound containment namespace as configuration', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const stub = await setup(provider);
+    // The selected containment namespace is missing, not redirected to a
+    // stand-in that throws. The original idFromName call still raises.
+    await installGrantBroker(stub, broker.service, env => {
+      delete env.SandboxContainment;
+    });
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare(prepareInput(SESSION));
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(view).toEqual({
+      state: 'failed',
+      attemptId: expect.any(String),
+      reason: 'workspace_setup_failed',
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      diagnosticEvent: 'route_failed',
+      stage: 'credential_grant_failed',
+      reason: 'workspace_setup_failed',
+      grantPhase: 'configuration',
+      grantFailureReason: 'namespace_unbound',
+      provider: 'cloudflare',
+    });
+    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
+    const row = await readRouteRow(stub, SESSION);
+    expect(row?.state).toBe('failed');
+    expect(row?.attempt_deadline_at).toBe(0);
+  });
+
+  it('labels a missing runtime proxy target as configuration with the token class', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const stub = await setup(provider);
+    // The local test config binds WORKER_URL; this case needs it absent so the
+    // runtime proxy has no target.
+    await installGrantBroker(stub, broker.service, env => {
+      env.WORKER_URL = undefined;
+    });
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare(
+      prepareInput(SESSION, credentialsSource(SESSION, { kiloToken: runtimeAuthorizedKiloToken() }))
+    );
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      grantPhase: 'configuration',
+      grantFailureReason: 'runtime_proxy_targets_unavailable',
+      provider: 'cloudflare',
+      containment: 'enabled',
+      repositoryKind: 'github',
+      tokenClass: 'runtime_authorized',
+    });
+    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
+  });
+
+  it('labels an invalid Kilo token as validation and omits the token class', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const stub = await setup(provider);
+    await installGrantBroker(stub, broker.service);
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare(
+      prepareInput(
+        SESSION,
+        credentialsSource(SESSION, { userId: USER_SECRET, kiloToken: `kka1.${SUPER_SECRET_TOKEN}` })
+      )
+    );
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      grantPhase: 'validation',
+      grantFailureReason: 'invalid_token',
+    });
+    // The helper rejects before its repository and decode steps, so neither the
+    // repository kind nor the token class is set on this attempt. The Sandbox DO
+    // has already decoded the token for its own decision; the helper has not.
+    expect(events[0]).not.toHaveProperty('repositoryKind');
+    expect(events[0]).not.toHaveProperty('tokenClass');
+    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
+    expect(JSON.stringify(events)).not.toContain(SUPER_SECRET_TOKEN);
+    expect(JSON.stringify(events)).not.toContain(USER_SECRET);
+  });
+
+  it('labels declared GitHub issuance with the broker reason and bounds the payload', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    broker.service.issueGitHubSessionCapability = async () => {
+      broker.calls.github += 1;
+      return { success: false, reason: 'repository_not_installed' };
+    };
+    const stub = await setup(provider);
+    await installGrantBroker(stub, broker.service);
+
+    const capture = captureRouteFailed();
+    // Markers in every input class that must never reach the payload: token,
+    // user id, repository identity (which becomes the clone URL) and content
+    // (the session directory).
+    const source = credentialsSource(SESSION, {
+      userId: USER_SECRET,
+      kiloToken: SUPER_SECRET_TOKEN,
+      repository: { type: 'github', repo: `acme/widgets_${REPO_SECRET}` },
+    });
+    const view = await stub.prepare(
+      prepareInput(SESSION, source, {
+        ...routeSpec(SESSION),
+        directory: `/workspace/${CONTENT_SECRET}`,
+      })
+    );
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      diagnosticEvent: 'route_failed',
+      stage: 'credential_grant_failed',
+      reason: 'workspace_setup_failed',
+      grantPhase: 'broker_issuance',
+      grantFailureReason: 'repository_not_installed',
+      provider: 'cloudflare',
+      containment: 'enabled',
+      repositoryKind: 'github',
+      tokenClass: 'legacy',
+    });
+    expect(broker.calls).toEqual({ kilo: 1, github: 1, gitlab: 0, authorize: 0 });
+    const serialized = JSON.stringify(events[0]);
+    expect(serialized.length).toBeLessThanOrEqual(2048);
+    for (const marker of [SUPER_SECRET_TOKEN, USER_SECRET, REPO_SECRET, CONTENT_SECRET]) {
+      expect(serialized).not.toContain(marker);
+    }
+    const row = await readRouteRow(stub, SESSION);
+    expect(row?.state).toBe('failed');
+    expect(row?.attempt_deadline_at).toBe(0);
+  });
+
+  it('labels declared GitHub authorization before any capability issue', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    broker.service.authorizeCloudAgentGitHubRepo = async () => {
+      broker.calls.authorize += 1;
+      return { success: false, reason: 'integration_mismatch' };
+    };
+    const stub = await setup(provider);
+    await installGrantBroker(stub, broker.service);
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare(
+      prepareInput(
+        SESSION,
+        credentialsSource(SESSION, {
+          repository: {
+            type: 'github',
+            repo: 'acme/widgets',
+            githubIntegrationId: GITHUB_INTEGRATION_ID,
+          },
+        })
+      )
+    );
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      grantPhase: 'broker_authorization',
+      grantFailureReason: 'integration_mismatch',
+    });
+    expect(broker.calls).toEqual({ kilo: 1, github: 0, gitlab: 0, authorize: 1 });
+  });
+
+  it('labels Kilo issuance with the client reason', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    broker.service.issueKiloSessionCapability = async () => {
+      broker.calls.kilo += 1;
+      return { success: false, reason: 'invalid_targets' };
+    };
+    const stub = await setup(provider);
+    await installGrantBroker(stub, broker.service);
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare(prepareInput(SESSION));
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      grantPhase: 'broker_issuance',
+      grantFailureReason: 'invalid_targets',
+    });
+    expect(broker.calls).toEqual({ kilo: 1, github: 0, gitlab: 0, authorize: 0 });
+  });
+
+  it('labels a missing whole service binding as configuration', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const stub = await setup(provider);
+    // The whole binding is gone, not just one method: a present binding whose
+    // method is absent would be `rpc_error`, not `service_not_configured`.
+    await installGrantBroker(stub, broker.service, env => {
+      delete env.GIT_TOKEN_SERVICE;
+    });
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare(prepareInput(SESSION));
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(view).toEqual({
+      state: 'failed',
+      attemptId: expect.any(String),
+      reason: 'workspace_setup_failed',
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      grantPhase: 'configuration',
+      grantFailureReason: 'service_not_configured',
+      stage: 'credential_grant_failed',
+      reason: 'workspace_setup_failed',
+    });
+    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
+    const row = await readRouteRow(stub, SESSION);
+    expect(row?.state).toBe('failed');
+    expect(row?.attempt_deadline_at).toBe(0);
+  });
+
+  it('allowlists GitLab reasons and collapses a raw string to unknown', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const stub = await setup(provider);
+    await installGrantBroker(stub, broker.service);
+    const source = (sessionId: string) =>
+      credentialsSource(sessionId, { repository: { type: 'gitlab', url: SECRET_REPO_URL } });
+
+    broker.service.issueGitLabSessionCapability = async () => {
+      broker.calls.gitlab += 1;
+      return { success: false, reason: 'no_token' };
+    };
+    const capture = captureRouteFailed();
+    const first = await stub.prepare(prepareInput(SESSION, source(SESSION)));
+    const firstEvents = capture.forAttempt(failedAttemptId(first));
+
+    broker.service.issueGitLabSessionCapability = async () => {
+      broker.calls.gitlab += 1;
+      return { success: false, reason: 'https://secret.example/leak' };
+    };
+    const second = await stub.prepare(prepareInput(SESSION_NEXT, source(SESSION_NEXT)));
+    const secondEvents = capture.forAttempt(failedAttemptId(second));
+    capture.restore();
+
+    expect(firstEvents).toHaveLength(1);
+    expect(firstEvents[0]).toMatchObject({
+      grantPhase: 'broker_issuance',
+      grantFailureReason: 'no_token',
+    });
+    expect(secondEvents).toHaveLength(1);
+    expect(secondEvents[0]).toMatchObject({
+      grantPhase: 'broker_issuance',
+      grantFailureReason: 'unknown',
+    });
+    expect(JSON.stringify(secondEvents)).not.toContain('https://secret.example');
+  });
+
+  it('labels a cross-scope directory collision as compatibility', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider);
+    await prepareWarmRoute(stub, provider);
+
+    const capture = captureRouteFailed();
+    const collidingSpec: ControlPlaneRouteSpec = {
+      ...routeSpec(SESSION_NEXT),
+      directory: `/workspace/${SESSION}`,
+    };
+    const view = await stub.prepare(
+      prepareInput(SESSION_NEXT, credentialsSource(SESSION_NEXT), collidingSpec)
+    );
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      grantPhase: 'compatibility',
+      grantFailureReason: 'scope_mismatch',
+      stage: 'credential_grant_failed',
+    });
+  });
+
+  it('seals a timed-out attempt against a late rejection and lets a sibling proceed', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const stub = await setup(provider);
+    await installGrantBroker(stub, broker.service);
+    // Production uses the provider-stop bound; shorten it for the test.
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, { grantIssueTimeoutMs: () => 200 });
+    });
+
+    let hanging = true;
+    let rejectKilo: (error: Error) => void = () => {};
+    broker.service.issueKiloSessionCapability = () => {
+      broker.calls.kilo += 1;
+      if (hanging) {
+        return new Promise<never>((_resolve, reject) => {
+          rejectKilo = reject;
+        });
+      }
+      return Promise.resolve({ success: true, capability: `kka1.${broker.calls.kilo}` });
+    };
+
+    const capture = captureRouteFailed();
+    const started = Date.now();
+    const view = await stub.prepare(prepareInput(SESSION));
+    const elapsed = Date.now() - started;
+    const attemptId = failedAttemptId(view);
+    expect(elapsed).toBeGreaterThanOrEqual(100);
+    expect(elapsed).toBeLessThan(5_000);
+    const timeoutEvents = capture.forAttempt(attemptId);
+    expect(timeoutEvents).toHaveLength(1);
+    expect(timeoutEvents[0]).toMatchObject({
+      grantPhase: 'timeout',
+      grantFailureReason: 'issuance_timeout',
+      stage: 'credential_grant_failed',
+      reason: 'workspace_setup_failed',
+      provider: 'cloudflare',
+      containment: 'enabled',
+    });
+    const eventBeforeLateSettlement = structuredClone(timeoutEvents[0]);
+    const rowBeforeLateSettlement = await readRouteRow(stub, SESSION);
+    expect(rowBeforeLateSettlement?.state).toBe('failed');
+    expect(rowBeforeLateSettlement?.attempt_deadline_at).toBe(0);
+
+    // The serial queue is free, so the sibling still prepares.
+    hanging = false;
+    expect((await stub.prepare(prepareInput(SESSION_NEXT))).state).toBe('preparing');
+
+    // The late rejection lands on the sealed attempt and cannot rewrite it.
+    rejectKilo(new Error(SUPER_SECRET_TOKEN));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    capture.restore();
+
+    expect(capture.forAttempt(attemptId)).toHaveLength(1);
+    expect(capture.events.filter(event => event.attemptId === attemptId)).toHaveLength(1);
+    expect(capture.forAttempt(attemptId)[0]).toEqual(eventBeforeLateSettlement);
+    const rowAfterLateSettlement = await readRouteRow(stub, SESSION);
+    expect(rowAfterLateSettlement).toEqual(rowBeforeLateSettlement);
+    expect(rowAfterLateSettlement?.state).toBe('failed');
+    expect(rowAfterLateSettlement?.attempt_deadline_at).toBe(0);
+    expect((await stub.status({ sessionId: SESSION_NEXT })).view.state).toBe('preparing');
+    expect(JSON.stringify(capture.events)).not.toContain(SUPER_SECRET_TOKEN);
+  });
+
+  it('passes the original thrown reference to the stage owner', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider);
+
+    const frozenError = Object.freeze(new Error('held frozen error'));
+    const typedError = Object.freeze(new scopeHandleAdoption.ScopeMemberLimitError());
+    const stageSpy = vi.spyOn(scopeHandleAdoption, 'admissionFailureStage');
+    const capture = captureRouteFailed();
+
+    const run = async (thrown: unknown): Promise<void> => {
+      await runInDurableObject(stub, async (_instance, state) => {
+        const db = drizzle(state.storage, { logger: false });
+        const ctx = {
+          db,
+          now: () => 1_000,
+          routePreparationMs: 1_000,
+          sendPrepare: () => {},
+          notify: async () => {},
+          issueGrant: async (): Promise<never> => {
+            throw thrown;
+          },
+          applyPolicy: async () => true,
+          publishGrant: () => {},
+        } as unknown as RouteContext;
+        await startAttempt(ctx, routeSpec(SESSION), credentialsSource(SESSION), null);
+      });
+    };
+
+    await run(frozenError);
+    await run(SUPER_SECRET_TOKEN);
+    await run(typedError);
+    capture.restore();
+
+    const calls = stageSpy.mock.calls;
+    stageSpy.mockRestore();
+    // The stage owner still receives the exact reference the issuer threw.
+    expect(calls[0]?.[0]).toBe(frozenError);
+    expect(calls[1]?.[0]).toBe(SUPER_SECRET_TOKEN);
+    expect(calls[2]?.[0]).toBe(typedError);
+
+    expect(Object.isFrozen(frozenError)).toBe(true);
+    expect(frozenError.message).toBe('held frozen error');
+    expect(typedError).toBeInstanceOf(scopeHandleAdoption.ScopeMemberLimitError);
+
+    expect(capture.events).toHaveLength(3);
+    expect(capture.events.map(event => event.stage)).toEqual([
+      'credential_grant_failed',
+      'credential_grant_failed',
+      'scope_member_limit',
+    ]);
+    expect(capture.events.every(event => event.reason === 'workspace_setup_failed')).toBe(true);
+    // The catch never reads the thrown value, so the unset context stays unknown.
+    expect(
+      capture.events.every(
+        event => event.grantPhase === 'unknown' && event.grantFailureReason === 'unknown'
+      )
+    ).toBe(true);
+  });
+
+  it('bounds the real route_failed diagnostic payload from its producer', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    // An arbitrary broker reason the allowlist cannot name; it must collapse to
+    // `unknown` and never reach the emitted event.
+    const sentinelReason = 'sentinel_reason_not_in_any_allowlist';
+    // A synthetic marker the broker returns alongside its decision. Production
+    // reads only `success`/`reason`, so the raw response must not be echoed.
+    const brokerSecretMarker = 'broker_payload_secret_marker_8675309';
+    let brokerCalls = 0;
+    broker.service.getCloudAgentAuthForRepo = async () => {
+      brokerCalls += 1;
+      return { success: false, reason: sentinelReason, secret: brokerSecretMarker };
+    };
+    const stub = await setup(provider, createFakeCredentialBroker(), {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+    });
+    await installGrantBroker(stub, broker.service);
+    // A synthetic user secret genuinely carried through the credential source.
+    const source = credentialsSource(SESSION, { userId: USER_SECRET });
+    const containmentOff = {
+      provider: 'cloudflare' as const,
+      containment: { kilocode: false, github: false },
+    };
+    // Past the 128-char production string cap and still all allowed-charset
+    // characters, so only the length cap can bound it.
+    const oversizedSessionId = `workspace_${'a'.repeat(CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH + 64)}`;
+    expect(oversizedSessionId.length).toBeGreaterThan(CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH);
+
+    const capture = captureRouteFailed();
+    let brokerEvent: Record<string, unknown> | undefined;
+    let oversizedEvent: Record<string, unknown> | undefined;
+    try {
+      // (1) Normal identity: the real Sandbox DO reaches the SCM broker through
+      // the grant owner and the broker rejects.
+      const brokerView = await stub.prepare({
+        ...prepareInput(SESSION, source),
+        sandboxSelection: containmentOff,
+      });
+      expect(brokerView).toEqual({
+        state: 'failed',
+        attemptId: expect.any(String),
+        reason: 'workspace_setup_failed',
+      });
+      const brokerEvents = capture.forAttempt(failedAttemptId(brokerView));
+      expect(brokerEvents).toHaveLength(1);
+      brokerEvent = brokerEvents[0];
+
+      // (2) Oversized session id: the real member validation rejects before any
+      // broker call, and the producer redacts the too-long value.
+      const oversizedView = await stub.prepare({
+        ...prepareInput(SESSION, source, {
+          ...routeSpec(SESSION),
+          sessionId: oversizedSessionId,
+        }),
+        sandboxSelection: containmentOff,
+      });
+      expect(oversizedView).toEqual({
+        state: 'failed',
+        attemptId: expect.any(String),
+        reason: 'workspace_setup_failed',
+      });
+      const oversizedEvents = capture.forAttempt(failedAttemptId(oversizedView));
+      expect(oversizedEvents).toHaveLength(1);
+      oversizedEvent = oversizedEvents[0];
+    } finally {
+      capture.restore();
+    }
+    if (brokerEvent === undefined || oversizedEvent === undefined) {
+      throw new Error('missing captured route_failed events');
+    }
+
+    // (1) The closed twelve-key owner payload: four failRoute keys, the six
+    // pickable grant fields, and the two fixed logger keys. Nothing else.
+    expect(Object.keys(brokerEvent).sort()).toEqual(
+      [
+        'sessionId',
+        'attemptId',
+        'reason',
+        'stage',
+        'grantPhase',
+        'grantFailureReason',
+        'provider',
+        'containment',
+        'repositoryKind',
+        'tokenClass',
+        'logTag',
+        'diagnosticEvent',
+      ].sort()
+    );
+    expect(brokerEvent).toMatchObject({
+      diagnosticEvent: 'route_failed',
+      logTag: 'sandbox_control',
+      reason: 'workspace_setup_failed',
+      stage: 'credential_grant_failed',
+      grantPhase: 'broker_issuance',
+      grantFailureReason: 'unknown',
+      provider: 'cloudflare',
+      containment: 'disabled',
+      repositoryKind: 'github',
+      tokenClass: 'legacy',
+    });
+    // The route failure is unchanged: failed state with no armed deadline.
+    const brokerRow = await readRouteRow(stub, SESSION);
+    expect(brokerRow?.state).toBe('failed');
+    expect(brokerRow?.attempt_deadline_at).toBe(0);
+
+    // (2) Ten keys: the earlier member rejection has no repository/token facts,
+    // and the oversized session id is redacted by the cap, never truncated.
+    expect(Object.keys(oversizedEvent).sort()).toEqual(
+      [
+        'sessionId',
+        'attemptId',
+        'reason',
+        'stage',
+        'grantPhase',
+        'grantFailureReason',
+        'provider',
+        'containment',
+        'logTag',
+        'diagnosticEvent',
+      ].sort()
+    );
+    expect(oversizedEvent).toMatchObject({
+      diagnosticEvent: 'route_failed',
+      logTag: 'sandbox_control',
+      reason: 'workspace_setup_failed',
+      stage: 'credential_grant_failed',
+      grantPhase: 'validation',
+      grantFailureReason: 'invalid_member',
+      provider: 'cloudflare',
+      containment: 'disabled',
+      sessionId: 'redacted',
+    });
+    expect(JSON.stringify(oversizedEvent)).not.toContain(oversizedSessionId);
+    const oversizedRow = await readRouteRow(stub, oversizedSessionId);
+    expect(oversizedRow?.state).toBe('failed');
+    expect(oversizedRow?.attempt_deadline_at).toBe(0);
+    // Only the first prepare reached the broker; validation stops the second.
+    expect(brokerCalls).toBe(1);
+
+    // No supplied marker reaches either payload: the collapsed broker reason, the
+    // raw broker response's secret property, and the synthetic user secret
+    // carried through the credential source.
+    for (const marker of [sentinelReason, brokerSecretMarker, USER_SECRET]) {
+      expect(JSON.stringify(brokerEvent)).not.toContain(marker);
+      expect(JSON.stringify(oversizedEvent)).not.toContain(marker);
+    }
+
+    // Per-field cap and charset over the actual captured values: every emitted
+    // string is bounded by the production cap and inside the allowed charset.
+    for (const event of [brokerEvent, oversizedEvent]) {
+      for (const [key, value] of Object.entries(event)) {
+        expect(typeof value).toBe('string');
+        expect(String(value).length, key).toBeLessThanOrEqual(CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH);
+        expect(CONTROL_DIAGNOSTIC_STRING_CHARSET.test(String(value)), key).toBe(true);
+      }
+    }
+
+    // A conservative byte ceiling derived from the actual captured keys and the
+    // producer's rules: every variable string value is capped at
+    // CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH, and only `logTag`/`diagnosticEvent`
+    // carry the two fixed producer values. It bounds this route_failed payload,
+    // not the surrounding logger envelope (inherited tags/ids are unbounded).
+    const fixedValueLengths: Record<string, number> = {
+      logTag: 'sandbox_control'.length,
+      diagnosticEvent: 'route_failed'.length,
+    };
+    const ceilingFor = (event: Record<string, unknown>): number => {
+      const keys = Object.keys(event);
+      const fieldBytes = keys.reduce(
+        (total, key) =>
+          total + key.length + (fixedValueLengths[key] ?? CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH) + 5,
+        0
+      );
+      return fieldBytes + (keys.length - 1) + 2;
+    };
+    const actualBytes = (event: Record<string, unknown>): number =>
+      new TextEncoder().encode(JSON.stringify(event)).length;
+
+    // Locally derived fixed-literal ceiling per captured key set: each value is
+    // capped at CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH except the two fixed producer
+    // values, so the twelve-key owner payload bounds at 1501 bytes and the
+    // ten-key validation payload at 1209.
+    expect(ceilingFor(brokerEvent)).toBe(1501);
+    expect(ceilingFor(oversizedEvent)).toBe(1209);
+    // Measured UTF-8 bytes of the captured payloads. `attemptId` is a fixed-length
+    // UUID and every other value is pinned above, so these are deterministic.
+    expect(actualBytes(brokerEvent)).toBe(400);
+    expect(actualBytes(oversizedEvent)).toBe(316);
+    expect(actualBytes(brokerEvent)).toBeLessThan(ceilingFor(brokerEvent));
+    expect(actualBytes(brokerEvent)).toBeLessThanOrEqual(2048);
+    expect(actualBytes(oversizedEvent)).toBeLessThan(ceilingFor(oversizedEvent));
+    expect(actualBytes(oversizedEvent)).toBeLessThanOrEqual(2048);
+  });
+
+  it('seals facts and the decision once the timeout flag is set', () => {
+    // Late writes, from a brokered promise that lost the race, must not change
+    // the snapshot, and each snapshot is detached from the live context.
+    const sealed = createGrantDiagnostic();
+    sealed.fact({ provider: 'cloudflare', containment: 'enabled' });
+    sealed.markTimeout();
+    sealed.fact({ provider: 'vercel', repositoryKind: 'gitlab', tokenClass: 'legacy' });
+    sealed.record({ grantPhase: 'validation', grantFailureReason: 'invalid_token' });
+    const snapshot = sealed.snapshot();
+    expect(snapshot).toEqual({
+      grantPhase: 'timeout',
+      grantFailureReason: 'issuance_timeout',
+      provider: 'cloudflare',
+      containment: 'enabled',
+    });
+    snapshot.repositoryKind = 'bitbucket';
+    expect(sealed.snapshot()).toEqual({
+      grantPhase: 'timeout',
+      grantFailureReason: 'issuance_timeout',
+      provider: 'cloudflare',
+      containment: 'enabled',
+    });
+
+    // A recorded decision before the flag still yields the timeout phase.
+    const decided = createGrantDiagnostic();
+    decided.fact({ tokenClass: 'legacy' });
+    decided.record({ grantPhase: 'broker_issuance', grantFailureReason: 'invalid_targets' });
+    decided.markTimeout();
+    decided.record({ grantPhase: 'validation', grantFailureReason: 'invalid_token' });
+    expect(decided.snapshot()).toEqual({
+      grantPhase: 'timeout',
+      grantFailureReason: 'issuance_timeout',
+      tokenClass: 'legacy',
+    });
+  });
+
+  it('labels a contained GitHub resolution failure with the broker reason', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const authCalls: Record<string, unknown>[] = [];
+    broker.service.getCloudAgentAuthForRepo = async params => {
+      authCalls.push(params);
+      return { success: false, reason: 'repository_not_installed' };
+    };
+    const stub = await setupVercel(provider, createFakeCredentialBroker());
+    await installGrantBroker(stub, broker.service);
+    const source = {
+      ...credentialsSource(SESSION, {
+        repository: {
+          type: 'github' as const,
+          repo: 'acme/widgets',
+          githubIntegrationId: GITHUB_INTEGRATION_ID,
+          githubAccessPurpose: 'agent' as const,
+        },
+      }),
+      createdOnPlatform: 'cloud-agent-web',
+    };
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare(prepareInput(SESSION, source));
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(view).toEqual({
+      state: 'failed',
+      attemptId: expect.any(String),
+      reason: 'workspace_setup_failed',
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      stage: 'credential_grant_failed',
+      reason: 'workspace_setup_failed',
+      grantPhase: 'broker_issuance',
+      grantFailureReason: 'repository_not_installed',
+    });
+    expect(authCalls).toHaveLength(1);
+    // `cloud-agent-web` would make the repository flag true; the contained
+    // caller must pass false regardless.
+    expect(authCalls[0]).toMatchObject({
+      allowUserAuthorization: false,
+      accessPurpose: 'agent',
+      orgId: 'org_123',
+      expectedIntegrationId: GITHUB_INTEGRATION_ID,
+      userId: 'user_123',
+      githubRepo: 'acme/widgets',
+    });
+    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
+  });
+
+  it('collapses an unlisted contained-off GitHub resolution reason to unknown', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const authCalls: Record<string, unknown>[] = [];
+    broker.service.getCloudAgentAuthForRepo = async params => {
+      authCalls.push(params);
+      return { success: false, reason: 'https://secret.example/leak' };
+    };
+    const stub = await setup(provider, createFakeCredentialBroker(), {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+    });
+    await installGrantBroker(stub, broker.service);
+    const source: ControlPlaneCredentialSource = {
+      ...credentialsSource(SESSION),
+      createdOnPlatform: 'slack',
+    };
+    delete source.orgId;
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare({
+      ...prepareInput(SESSION, source),
+      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+    });
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(view).toEqual({
+      state: 'failed',
+      attemptId: expect.any(String),
+      reason: 'workspace_setup_failed',
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      stage: 'credential_grant_failed',
+      reason: 'workspace_setup_failed',
+      grantPhase: 'broker_issuance',
+      grantFailureReason: 'unknown',
+    });
+    expect(authCalls).toHaveLength(1);
+    // `slack` makes the repository flag true; the direct caller must pass it.
+    expect(authCalls[0]).toMatchObject({
+      allowUserAuthorization: true,
+      accessPurpose: 'workflow',
+      userId: 'user_123',
+      githubRepo: 'acme/widgets',
+    });
+    expect(authCalls[0]).not.toHaveProperty('orgId');
+    expect(authCalls[0]).not.toHaveProperty('expectedIntegrationId');
+    expect(JSON.stringify(events)).not.toContain('https://secret.example/leak');
+  });
+
+  it('maps a contained-off GitHub configuration reason to the configuration phase', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const authCalls: Record<string, unknown>[] = [];
+    broker.service.getCloudAgentAuthForRepo = async params => {
+      authCalls.push(params);
+      return { success: false, reason: 'service_not_configured' };
+    };
+    const stub = await setup(provider, createFakeCredentialBroker(), {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+    });
+    await installGrantBroker(stub, broker.service);
+    const source: ControlPlaneCredentialSource = {
+      ...credentialsSource(SESSION),
+      createdOnPlatform: 'slack',
+    };
+    delete source.orgId;
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare({
+      ...prepareInput(SESSION, source),
+      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+    });
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    // The shared helper still routes through `brokerGrantFailure`, so an
+    // operator-setting reason overrides the `broker_issuance` phase.
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      grantPhase: 'configuration',
+      grantFailureReason: 'service_not_configured',
+    });
+    expect(authCalls).toHaveLength(1);
+  });
+
+  it('rejects a managed GitHub resolve that returns no native token', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const authCalls: Record<string, unknown>[] = [];
+    broker.service.getCloudAgentAuthForRepo = async params => {
+      authCalls.push(params);
+      return {
+        success: true,
+        githubToken: '',
+        installationId: 1,
+        appType: 'standard',
+        accountLogin: 'acme',
+        source: 'installation',
+        gitAuthor: { name: 'acme[bot]', email: '1+acme[bot]@users.noreply.github.com' },
+      };
+    };
+    const stub = await setup(provider, createFakeCredentialBroker(), {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+    });
+    await installGrantBroker(stub, broker.service);
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare({
+      ...prepareInput(SESSION),
+      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+    });
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      grantPhase: 'validation',
+      grantFailureReason: 'missing_native_token',
+    });
+    // The broker call happened; the empty token is the post-assignment check.
+    expect(authCalls).toHaveLength(1);
+  });
+
+  it('keeps the resolved GitHub app and alias for a contained Vercel grant', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const authCalls: Record<string, unknown>[] = [];
+    broker.service.getCloudAgentAuthForRepo = async params => {
+      authCalls.push(params);
+      return {
+        success: true,
+        githubToken: 'native-github-contained-token',
+        installationId: 1,
+        appType: 'lite',
+        accountLogin: 'acme',
+        source: 'installation',
+        gitAuthor: {
+          name: 'review-lite[bot]',
+          email: '456+review-lite[bot]@users.noreply.github.com',
+        },
+      };
+    };
+    const stub = await setupVercel(provider, createFakeCredentialBroker());
+    await installGrantBroker(stub, broker.service);
+    const source = {
+      ...credentialsSource(SESSION, {
+        repository: { type: 'github' as const, repo: 'acme/widgets' },
+      }),
+      createdOnPlatform: 'cloud-agent-web',
+    };
+
+    const view = await stub.prepare(prepareInput(SESSION, source));
+    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
+
+    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      scm?: {
+        nativeToken?: string;
+        alias?: string;
+        githubAppType?: string;
+        author?: { name: string; email: string };
+      };
+    };
+    expect(grant.scm?.nativeToken).toBe('native-github-contained-token');
+    expect(grant.scm?.alias).toBeDefined();
+    expect(grant.scm?.githubAppType).toBe('lite');
+    expect(grant.scm?.author).toEqual({
+      name: 'review-lite[bot]',
+      email: '456+review-lite[bot]@users.noreply.github.com',
+    });
+    expect(authCalls).toHaveLength(1);
+    expect(authCalls[0]).toMatchObject({ allowUserAuthorization: false });
+  });
+
+  it('keeps an explicit native GitHub token without calling the broker', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const authCalls: Record<string, unknown>[] = [];
+    broker.service.getCloudAgentAuthForRepo = async params => {
+      authCalls.push(params);
+      return { success: false, reason: 'unexpected' };
+    };
+    const stub = await setup(provider, createFakeCredentialBroker(), {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+    });
+    await installGrantBroker(stub, broker.service);
+    const explicitToken = 'ghp_explicit_native_token_value';
+    const source = credentialsSource(SESSION, {
+      repository: { type: 'github', repo: 'acme/widgets', token: explicitToken },
+    });
+
+    const view = await stub.prepare({
+      ...prepareInput(SESSION, source),
+      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+    });
+    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
+
+    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      scm?: { nativeToken?: string; alias?: string; githubAppType?: string; author?: unknown };
+    };
+    expect(grant.scm?.nativeToken).toBe(explicitToken);
+    expect(grant.scm?.alias).toBeUndefined();
+    expect(grant.scm?.githubAppType).toBeUndefined();
+    expect(grant.scm?.author).toBeUndefined();
+    expect(authCalls).toHaveLength(0);
+    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
   });
 });
 

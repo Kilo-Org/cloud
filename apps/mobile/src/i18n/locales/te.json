@@ -35,6 +35,8 @@
     "connectGithub": "GitHubను కనెక్ట్ చేయండి",
     "cost": "ఖర్చు",
     "discard": "విస్మరించండి",
+    "discardChangesMessage": "మీ మార్పులు కోల్పోతాయి.",
+    "discardChangesTitle": "మార్పులను విస్మరించండి",
     "findings": "గుర్తించిన సమస్యలు",
     "mergeRequest": "మెర్జ్ రిక్వెస్ట్",
     "notConnected": "కనెక్ట్ కాలేదు",
@@ -109,7 +111,9 @@
     "online": "ఆన్‌లైన్",
     "open": "{{name}}ను తెరవండి",
     "openPullRequest": "ఓపెన్ పుల్ రిక్వెస్ట్",
+    "completed": "పూర్తయింది",
     "pending": "వేచి ఉంది",
+    "running": "నడుస్తోంది",
     "performance": "పనితీరు",
     "preferences": "ప్రాధాన్యతలు",
     "privacyPolicy": "గోప్యతా విధానం",
@@ -1534,8 +1538,6 @@
     "updateFailed": "కోడ్ సమీక్షకుడిని అప్‌డేట్ చేయలేకపోయాము.",
     "configSaveFailed": "సమీక్ష సెట్టింగ్‌లను సేవ్ చేయలేకపోయాము.",
     "status": {
-      "running": "నడుస్తోంది",
-      "completed": "పూర్తయింది",
       "interrupted": "అంతరాయం కలిగింది"
     },
     "reviewStyle": {
@@ -1661,7 +1663,14 @@
       "whereFound": "గుర్తించిన చోటులు ({{displayCount}})",
       "fullReport": "రూపొందించిన పూర్తి నివేదిక",
       "yes": "అవును",
-      "no": "లేదు"
+      "no": "లేదు",
+      "action": {
+        "analyzeCodebase": "కోడ్‌బేస్‌ను విశ్లేషించండి",
+        "dismiss": "తిరస్కరించండి",
+        "manualReview": "మాన్యువల్ సమీక్ష",
+        "monitor": "పర్యవేక్షించండి",
+        "openPr": "PR తెరవండి"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} సమస్యలు",
@@ -1863,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "మార్పులను సేవ్ చేయండి",
       "unsavedTitle": "సేవ్ చేయని మార్పులు",
-      "unsavedMessage": "ఈ స్క్రీన్ నుంచి వెళ్లే ముందు మీ మార్పులను సేవ్ చేయాలా?"
+      "unsavedMessage": "ఈ స్క్రీన్ నుంచి వెళ్లే ముందు మీ మార్పులను సేవ్ చేయాలా?",
+      "unsavedInvalidMessage": "ఈ మార్పులను ఇంకా సేవ్ చేయలేము. సేవ్ చేయడానికి వాటిని సరిచేయండి, లేదా వెళ్లడానికి వాటిని విస్మరించండి."
     },
     "auditReportButton": {
       "viewA11y": "ఆడిట్ నివేదికను చూడండి"
@@ -1880,7 +1890,24 @@
       "title": "ఆడిట్ నివేదిక",
       "unavailable": "ఆడిట్ నివేదిక అందుబాటులో లేదు",
       "unavailableDescription": "సంస్థ యజమానులు, బిల్లింగ్ మేనేజర్లు మాత్రమే ఆడిట్ నివేదికలను చూడగలరు. వీటిని చూడటానికి అనుమతి ఇవ్వమని యజమానిని లేదా బిల్లింగ్ మేనేజర్‌ను అడగండి.",
-      "queryFailed": "నివేదిక కోసం చేసిన క్వెరీ పూర్తి కాలేదు. మళ్లీ ప్రయత్నించండి."
+      "queryFailed": "నివేదిక కోసం చేసిన క్వెరీ పూర్తి కాలేదు. మళ్లీ ప్రయత్నించండి.",
+      "eventActions": {
+        "findingAnalysisCompleted": "విశ్లేషణ పూర్తయింది",
+        "findingAnalysisFailed": "విశ్లేషణ విఫలమైంది",
+        "findingAutoDismissed": "స్వయంచాలకంగా తిరస్కరించబడింది",
+        "findingCreated": "దిగుమతి చేయబడింది",
+        "findingDeleted": "తొలగించబడింది",
+        "findingDismissed": "తిరస్కరించబడింది",
+        "findingSeverityChanged": "తీవ్రత మార్చబడింది",
+        "findingStatusChange": "స్థితి మార్చబడింది",
+        "findingSuperseded": "భర్తీ చేయబడింది",
+        "remediationBlocked": "పరిష్కారం నిరోధించబడింది",
+        "remediationCancelled": "రద్దు చేయబడింది",
+        "remediationFailed": "పరిష్కారం విఫలమైంది",
+        "remediationNoChangesNeeded": "మార్పులు అవసరం లేదు",
+        "remediationPrOpened": "PR తెరవబడింది",
+        "remediationQueued": "పరిష్కారం అభ్యర్థించబడింది"
+      }
     },
     "notifications": {
       "couldNotLoad": "నోటిఫికేషన్ సెట్టింగ్‌లను లోడ్ చేయలేకపోయాము.",
@@ -1912,7 +1939,6 @@
       "installApp": "GitHub యాప్‌ను ఇన్‌స్టాల్ చేయండి",
       "reauthorizeButton": "GitHub యాప్‌కు మళ్లీ అనుమతి ఇవ్వండి",
       "reauthorizeDescription": "Dependabot హెచ్చరికలను యాక్సెస్ చేయడానికి భద్రతా ఏజెంట్‌కు vulnerability_alerts అనుమతి అవసరం. ఈ అనుమతి ఇవ్వడానికి GitHub యాప్‌కు మళ్లీ అనుమతి ఇవ్వండి.",
-      "reauthorizeFailed": "మళ్లీ అనుమతి ఇచ్చే ప్రక్రియను ప్రారంభించలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి.",
       "reauthorizeTitle": "అదనపు అనుమతులు అవసరం",
       "setupFailed": "GitHub సెటప్‌ను ప్రారంభించలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి."
     },
@@ -2286,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} పంక్తులు",
       "matchesBadge_one": "{{displayCount}} సరిపోలిక",
       "matchesBadge_other": "{{displayCount}} సరిపోలికలు",
-      "noOutput": "అవుట్పుట్ లేదు."
+      "noOutput": "అవుట్పుట్ లేదు.",
+      "translationFailed": "అనువాదం విఫలమైంది"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} పంక్తులు (కొంత భాగం మాత్రమే)",
@@ -2983,11 +3010,22 @@
     "boundary": {
       "backToProfile": "ప్రొఫైల్‌కు తిరిగి వెళ్లండి",
       "loadErrorMessage": "మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
+
+      "chooseAccount": "ఖాతాను ఎంచుకోండి",
       "loadErrorTitle": "మీ సంస్థలను లోడ్ చేయలేకపోయాము.",
+      "noOrganization": "సంస్థ లేదు",
+
+      "noOrganizationDescription": "ఈ ఖాతా ఏ సంస్థలోనూ భాగం కాదు. సభ్యుల ఆహ్వానాలు మరియు తక్కువ బ్యాలెన్స్ హెచ్చరికల వంటి సంస్థ ఫీచర్‌లను ఉపయోగించడానికి వెబ్‌సైట్‌లో సంస్థను సృష్టించండి లేదా చేరండి.",
+
+      "openWebOrganizations": "వెబ్‌సైట్‌లో సంస్థలను తెరవండి",
+
       "organizationUnavailable": "సంస్థ అందుబాటులో లేదు.",
-      "selectDescription": "కొనసాగించడానికి మీ ప్రొఫైల్‌లో ఒక సంస్థను ఎంచుకోండి.",
+      "selectDescriptionWithOrganizations": "మీరు ఒకటి లేదా అంతకంటే ఎక్కువ సంస్థలకు చెందినవారు. ఈ స్క్రీన్ ఉపయోగించాల్సిన ఖాతాను ఎంచుకోండి.",
+
       "selectOrganization": "ఒక సంస్థను ఎంచుకోండి",
       "unavailableDescription": "ఈ సంస్థ ఇక అందుబాటులో లేదు. కొనసాగించడానికి మీ ప్రొఫైల్‌లో మరో సంస్థను ఎంచుకోండి.",
+
+      "unavailableSessionsDescription": "ఈ సంస్థ ఇక అందుబాటులో లేదు. దాని సెషన్లను లోడ్ చేయడం సాధ్యం కాదు.",
       "accessDeniedDescription": "ఈ సంస్థను యాక్సెస్ చేయడానికి మీకు అనుమతి లేదు."
     },
     "creditActivity": {
@@ -3647,7 +3685,9 @@
       "jsonTooLarge": "గరిష్ఠంగా 50 ఎంట్రీలను ఉపయోగించండి, కీలు 128 వరకు మరియు విలువలు 4096 అక్షరాల వరకు",
       "timeoutInvalid": "సమయం ముగియడం తప్పనిసరిగా మిల్లీసెకన్ల సంఖ్య అయి ఉండాలి",
       "edit": "MCP సర్వర్‌ని సవరించండి",
-      "saveFailed": "MCP సర్వర్‌ని సేవ్ చేయడం సాధ్యపడలేదు"
+      "saveFailed": "MCP సర్వర్‌ని సేవ్ చేయడం సాధ్యపడలేదు",
+      "deleteFailed": "MCP సర్వర్‌ని డిలీట్ చేయడం సాధ్యపడలేదు",
+      "updateFailed": "MCP సర్వర్‌ని అప్‌డేట్ చేయడం సాధ్యపడలేదు"
     },
     "agents": {
       "title": "ప్రొఫైల్ ఏజెంట్లు",
@@ -3674,6 +3714,7 @@
       "visibilitySubagent": "సబ్జెక్ట్ — ఇతరుల నుండి మాత్రమే పిలవబడుతుంది",
       "visibilityAll": "అన్నీ - రెండూ",
       "saveFailed": "ఏజెంట్‌ని సేవ్ చేయడం సాధ్యపడలేదు",
+      "deleteFailed": "ఏజెంట్‌ని డిలీట్ చేయడం సాధ్యపడలేదు",
       "nameRequired": "ఏజెంట్ పేరును నమోదు చేయండి",
       "slugRequired": "ఏజెంట్ స్లగ్‌ని నమోదు చేయండి",
       "slugInvalid": "స్లగ్ తప్పనిసరిగా అక్షరంతో ప్రారంభం కావాలి మరియు చిన్న అక్షరాలు, అంకెలు మరియు డాష్‌లను మాత్రమే ఉపయోగించాలి",
@@ -3688,11 +3729,12 @@
       "description": "కమాండ్ వివరణ",
       "template": "మూస",
       "namePlaceholder": "explain",
-      "agentPlaceholder": "ఉదా కోడ్",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTSని వివరించండి",
       "subtask": "సబ్‌టాస్క్‌గా అమలు చేయండి",
       "edit": "స్లాష్ ఆదేశాన్ని సవరించండి",
       "saveFailed": "ఆదేశాన్ని సేవ్ చేయడం సాధ్యపడలేదు",
+      "deleteFailed": "ఆదేశాన్ని డిలీట్ చేయడం సాధ్యపడలేదు",
       "nameRequired": "కమాండ్ పేరును నమోదు చేయండి",
       "nameInvalid": "పేరు తప్పనిసరిగా చిన్న అక్షరంతో ప్రారంభం కావాలి మరియు చిన్న అక్షరాలు, అంకెలు మరియు డాష్‌లను మాత్రమే ఉపయోగించాలి",
       "templateRequired": "కమాండ్ టెంప్లేట్‌ను నమోదు చేయండి",
@@ -3839,7 +3881,7 @@
     "view": "బ్రీఫింగ్ చదవండి",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "ప్రత్యక్ష స్థితిని చూపండి",
+    "dismiss": "బ్రీఫింగ్ విస్మరించండి",
     "offline": "ఆఫ్‌లైన్ · సేవ్ చేసిన బ్రీఫింగ్",
     "cached": "సేవ్ చేసిన రిపోర్ట్ · రిఫ్రెష్ అందుబాటులో లేదు",
     "revised": "సవరించబడింది · {{revision}}",

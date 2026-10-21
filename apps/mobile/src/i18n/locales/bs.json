@@ -35,6 +35,8 @@
     "connectGithub": "Poveži GitHub",
     "cost": "Trošak",
     "discard": "Odbaci",
+    "discardChangesMessage": "Vaše promjene će biti izgubljene.",
+    "discardChangesTitle": "Odbaci promjene?",
     "findings": "Nalazi",
     "mergeRequest": "merge request",
     "notConnected": "Nije povezano",
@@ -109,7 +111,9 @@
     "online": "Na mreži",
     "open": "Otvori {{name}}",
     "openPullRequest": "Otvori zahtjev za spajanje",
+    "completed": "Završeno",
     "pending": "Na čekanju",
+    "running": "U toku",
     "performance": "Performanse",
     "preferences": "Postavke",
     "privacyPolicy": "Politika privatnosti",
@@ -1553,8 +1557,6 @@
     "updateFailed": "Nije moguće ažurirati agenta za pregled koda.",
     "configSaveFailed": "Nije moguće sačuvati postavke pregleda.",
     "status": {
-      "running": "U toku",
-      "completed": "Završeno",
       "interrupted": "Prekinuto"
     },
     "reviewStyle": {
@@ -1681,7 +1683,14 @@
       "whereFound": "Mjesta pronalaska ({{displayCount}})",
       "fullReport": "Cjelovit generirani izvještaj",
       "yes": "Da",
-      "no": "Ne"
+      "no": "Ne",
+      "action": {
+        "analyzeCodebase": "Analiziraj bazu koda",
+        "dismiss": "Odbaci",
+        "manualReview": "Ručna provjera",
+        "monitor": "Prati",
+        "openPr": "Otvori pull request"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} nalaza",
@@ -1886,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Sačuvaj izmjene",
       "unsavedTitle": "Nesačuvane izmjene",
-      "unsavedMessage": "Sačuvati izmjene prije napuštanja ovog ekrana?"
+      "unsavedMessage": "Sačuvati izmjene prije napuštanja ovog ekrana?",
+      "unsavedInvalidMessage": "Ove izmjene se još ne mogu sačuvati. Ispravi ih da bi sačuvao ili ih odbaci da bi otišao."
     },
     "auditReportButton": {
       "viewA11y": "Pogledaj revizijski izvještaj"
@@ -1903,7 +1913,24 @@
       "title": "Revizijski izvještaj",
       "unavailable": "Revizijski izvještaj nije dostupan",
       "unavailableDescription": "Samo vlasnici organizacije i upravitelji naplate mogu pregledavati revizijske izvještaje. Zatraži pristup od vlasnika ili upravitelja naplate.",
-      "queryFailed": "Upit za izvještaj nije završen. Pokušaj ponovo."
+      "queryFailed": "Upit za izvještaj nije završen. Pokušaj ponovo.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiza dovršena",
+        "findingAnalysisFailed": "Analiza nije uspjela",
+        "findingAutoDismissed": "Automatski odbačeno",
+        "findingCreated": "Uvezeno",
+        "findingDeleted": "Obrisano",
+        "findingDismissed": "Odbačeno",
+        "findingSeverityChanged": "Ozbiljnost promijenjena",
+        "findingStatusChange": "Status promijenjen",
+        "findingSuperseded": "Zamijenjeno",
+        "remediationBlocked": "Otklanjanje blokirano",
+        "remediationCancelled": "Otkazano",
+        "remediationFailed": "Otklanjanje nije uspjelo",
+        "remediationNoChangesNeeded": "Nisu potrebne izmjene",
+        "remediationPrOpened": "Pull request otvoren",
+        "remediationQueued": "Zatraženo otklanjanje"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nije moguće učitati postavke obavijesti.",
@@ -1935,7 +1962,6 @@
       "installApp": "Instaliraj GitHub aplikaciju",
       "reauthorizeButton": "Ponovo autoriziraj GitHub aplikaciju",
       "reauthorizeDescription": "Sigurnosni agent zahtijeva dozvolu vulnerability_alerts za pristup upozorenjima iz Dependabota. Ponovo autoriziraj GitHub aplikaciju da dodijeliš ovu dozvolu.",
-      "reauthorizeFailed": "Nije moguće započeti ponovnu autorizaciju. Pokušaj ponovo.",
       "reauthorizeTitle": "Potrebne dodatne dozvole",
       "setupFailed": "Nije moguće započeti podešavanje GitHuba. Pokušaj ponovo."
     },
@@ -2318,7 +2344,8 @@
       "matchesBadge_one": "{{displayCount}} podudaranje",
       "matchesBadge_other": "{{displayCount}} podudaranja",
       "matchesBadge_few": "{{displayCount}} podudaranja",
-      "noOutput": "Nema izlaza."
+      "noOutput": "Nema izlaza.",
+      "translationFailed": "Prijevod nije uspio"
     },
     "readToolMarkdown": {
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",
@@ -3023,11 +3050,22 @@
     "boundary": {
       "backToProfile": "Nazad na profil",
       "loadErrorMessage": "Provjeri vezu i pokušaj ponovo.",
+
+      "chooseAccount": "Odaberi račun",
       "loadErrorTitle": "Nije moguće učitati tvoje organizacije.",
+      "noOrganization": "Nema organizacije",
+
+      "noOrganizationDescription": "Ovaj račun nije dio organizacije. Kreiraj ili se pridruži organizaciji na webu da bi koristio funkcije organizacije kao što su pozivnice za članove i upozorenja o niskom saldu.",
+
+      "openWebOrganizations": "Otvori organizacije na webu",
+
       "organizationUnavailable": "Organizacija nije dostupna.",
-      "selectDescription": "Odaberi organizaciju na svom profilu za nastavak.",
+      "selectDescriptionWithOrganizations": "Pripadaš jednoj ili više organizacija. Odaberi račun koji ovaj ekran treba koristiti.",
+
       "selectOrganization": "Odaberi organizaciju",
       "unavailableDescription": "Ova organizacija više nije dostupna. Odaberi drugu na svom profilu za nastavak.",
+
+      "unavailableSessionsDescription": "Ova organizacija više nije dostupna. Njezine sesije nije moguće učitati.",
       "accessDeniedDescription": "Nemaš pristup ovoj organizaciji."
     },
     "creditActivity": {
@@ -3688,7 +3726,9 @@
       "jsonTooLarge": "Koristite najviše 50 unosa, ključevi do 128 i vrijednosti do 4096 znakova",
       "timeoutInvalid": "Vremensko ograničenje mora biti cijeli broj milisekundi",
       "edit": "Uredite MCP server",
-      "saveFailed": "Nije moguće sačuvati MCP server"
+      "saveFailed": "Nije moguće sačuvati MCP server",
+      "deleteFailed": "Nije moguće izbrisati MCP server",
+      "updateFailed": "Nije moguće ažurirati MCP server"
     },
     "agents": {
       "title": "Profil agenti",
@@ -3715,6 +3755,7 @@
       "visibilitySubagent": "Subagent — može se pozvati samo od drugih",
       "visibilityAll": "Sve — oboje",
       "saveFailed": "Nije moguće sačuvati agenta",
+      "deleteFailed": "Nije moguće izbrisati agenta",
       "nameRequired": "Unesite ime agenta",
       "slugRequired": "Unesite puž agenta",
       "slugInvalid": "Slug mora početi slovom i koristiti samo mala slova, cifre i crtice",
@@ -3729,11 +3770,12 @@
       "description": "Opis komande",
       "template": "Predložak",
       "namePlaceholder": "explain",
-      "agentPlaceholder": "npr. Code",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Objasnite $ARGUMENTS",
       "subtask": "Pokreni kao podzadatak",
       "edit": "Uredi naredbu kose crte",
       "saveFailed": "Nije moguće sačuvati naredbu",
+      "deleteFailed": "Nije moguće izbrisati naredbu",
       "nameRequired": "Unesite naziv komande",
       "nameInvalid": "Ime mora početi malim slovom i koristiti samo mala slova, cifre i crtice",
       "templateRequired": "Unesite predložak komande",
@@ -3884,7 +3926,7 @@
     "view": "Pročitaj pregled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Prikaži trenutni status",
+    "dismiss": "Odbaci pregled",
     "offline": "Van mreže · sačuvani pregled",
     "cached": "Sačuvani izvještaj · osvježavanje nedostupno",
     "revised": "Revidirano · {{revision}}",

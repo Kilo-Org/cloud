@@ -35,6 +35,8 @@
     "connectGithub": "Kết nối GitHub",
     "cost": "Chi phí",
     "discard": "Hủy bỏ",
+    "discardChangesMessage": "Các thay đổi của bạn sẽ bị mất.",
+    "discardChangesTitle": "Hủy bỏ thay đổi?",
     "findings": "Vấn đề",
     "mergeRequest": "merge request",
     "notConnected": "Chưa kết nối",
@@ -109,7 +111,9 @@
     "online": "Trực tuyến",
     "open": "Mở {{name}}",
     "openPullRequest": "Mở yêu cầu hợp nhất",
+    "completed": "Đã hoàn tất",
     "pending": "Đang chờ",
+    "running": "Đang chạy",
     "performance": "Hiệu năng",
     "preferences": "Tùy chọn",
     "privacyPolicy": "Chính sách quyền riêng tư",
@@ -1019,8 +1023,6 @@
     "updateFailed": "Không thể cập nhật Trình rà soát mã.",
     "configSaveFailed": "Không thể lưu cấu hình rà soát.",
     "status": {
-      "running": "Đang chạy",
-      "completed": "Đã hoàn tất",
       "interrupted": "Bị gián đoạn"
     },
     "reviewStyle": {
@@ -1113,7 +1115,14 @@
       "triageReasoning": "Cơ sở phân loại",
       "watchInCloudAgent": "Theo dõi trong Trợ lý đám mây",
       "whereFound": "Vị trí phát hiện ({{displayCount}})",
-      "yes": "Có"
+      "yes": "Có",
+      "action": {
+        "analyzeCodebase": "Phân tích cơ sở mã",
+        "dismiss": "Loại bỏ",
+        "manualReview": "Xem xét thủ công",
+        "monitor": "Theo dõi",
+        "openPr": "Mở pull request"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Mô hình phân tích",
@@ -1135,7 +1144,24 @@
       "summary": "Tóm tắt báo cáo",
       "title": "Báo cáo kiểm toán",
       "unavailable": "Không có báo cáo kiểm toán",
-      "unavailableDescription": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể xem báo cáo kiểm toán. Hãy nhờ chủ sở hữu hoặc người quản lý thanh toán cấp quyền truy cập cho bạn."
+      "unavailableDescription": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể xem báo cáo kiểm toán. Hãy nhờ chủ sở hữu hoặc người quản lý thanh toán cấp quyền truy cập cho bạn.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Đã hoàn tất phân tích",
+        "findingAnalysisFailed": "Phân tích thất bại",
+        "findingAutoDismissed": "Đã tự động loại bỏ",
+        "findingCreated": "Đã nhập",
+        "findingDeleted": "Đã xóa",
+        "findingDismissed": "Đã loại bỏ",
+        "findingSeverityChanged": "Mức độ nghiêm trọng đã thay đổi",
+        "findingStatusChange": "Trạng thái đã thay đổi",
+        "findingSuperseded": "Đã bị thay thế",
+        "remediationBlocked": "Khắc phục bị chặn",
+        "remediationCancelled": "Đã hủy",
+        "remediationFailed": "Khắc phục thất bại",
+        "remediationNoChangesNeeded": "Không cần thay đổi",
+        "remediationPrOpened": "Đã mở pull request",
+        "remediationQueued": "Đã yêu cầu khắc phục"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Xem báo cáo kiểm toán"
@@ -1355,7 +1381,6 @@
       "installApp": "Cài đặt ứng dụng GitHub",
       "reauthorizeButton": "Cấp quyền lại cho ứng dụng GitHub",
       "reauthorizeDescription": "Trợ lý bảo mật cần quyền vulnerability_alerts để truy cập cảnh báo Dependabot. Hãy cấp quyền lại cho ứng dụng GitHub để bổ sung quyền này.",
-      "reauthorizeFailed": "Không thể bắt đầu cấp quyền lại. Vui lòng thử lại.",
       "reauthorizeTitle": "Cần thêm quyền",
       "setupFailed": "Không thể bắt đầu thiết lập GitHub. Vui lòng thử lại."
     },
@@ -1378,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "Lưu thay đổi",
       "unsavedMessage": "Bạn có muốn lưu thay đổi trước khi rời màn hình này không?",
+      "unsavedInvalidMessage": "Những thay đổi này chưa thể lưu. Hãy sửa chúng để lưu, hoặc hủy bỏ chúng để rời đi.",
       "unsavedTitle": "Thay đổi chưa lưu"
     },
     "setup": {
@@ -1771,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}} dòng",
       "matchesBadge_one": "{{displayCount}} kết quả khớp",
       "matchesBadge_other": "{{displayCount}} kết quả khớp",
-      "noOutput": "Không có đầu ra."
+      "noOutput": "Không có đầu ra.",
+      "translationFailed": "Dịch thất bại"
     },
     "readToolMarkdown": {
       "linesTruncated": "dòng {{start}}–{{end}} (đã cắt bớt)",
@@ -2975,11 +3002,22 @@
     "boundary": {
       "backToProfile": "Quay lại hồ sơ",
       "loadErrorMessage": "Kiểm tra kết nối và thử lại.",
+
+      "chooseAccount": "Chọn tài khoản",
       "loadErrorTitle": "Không thể tải danh sách tổ chức của bạn.",
+      "noOrganization": "Không có tổ chức",
+
+      "noOrganizationDescription": "Tài khoản này không thuộc tổ chức nào. Hãy tạo hoặc tham gia một tổ chức trên web để sử dụng các tính năng của tổ chức như lời mời thành viên và cảnh báo số dư thấp.",
+
+      "openWebOrganizations": "Mở tổ chức trên web",
+
       "organizationUnavailable": "Không thể truy cập tổ chức.",
-      "selectDescription": "Chọn một tổ chức từ hồ sơ của bạn để tiếp tục.",
+      "selectDescriptionWithOrganizations": "Bạn thuộc một hoặc nhiều tổ chức. Chọn tài khoản mà màn hình này nên sử dụng.",
+
       "selectOrganization": "Chọn một tổ chức",
       "unavailableDescription": "Bạn không còn truy cập được tổ chức này. Hãy chọn tổ chức khác trong hồ sơ để tiếp tục.",
+
+      "unavailableSessionsDescription": "Bạn không còn truy cập được tổ chức này. Không thể tải phiên của tổ chức này.",
       "accessDeniedDescription": "Bạn không có quyền truy cập vào tổ chức này."
     },
     "creditActivity": {
@@ -3625,7 +3663,7 @@
       "empty": "Chưa có máy chủ MCP",
       "name": "Tên máy chủ",
       "type": "Loại máy chủ",
-      "localType": "Địa phương",
+      "localType": "Cục bộ",
       "remoteType": "Xa",
       "command": "Dòng lệnh",
       "url": "URL",
@@ -3647,7 +3685,9 @@
       "jsonTooLarge": "Dùng tối đa 50 mục, khóa tối đa 128 và giá trị tối đa 4096 ký tự",
       "timeoutInvalid": "Thời gian chờ phải là số nguyên mili giây",
       "edit": "Chỉnh sửa máy chủ MCP",
-      "saveFailed": "Không thể lưu máy chủ MCP"
+      "saveFailed": "Không thể lưu máy chủ MCP",
+      "deleteFailed": "Không thể xóa máy chủ MCP",
+      "updateFailed": "Không thể cập nhật máy chủ MCP"
     },
     "agents": {
       "title": "Hồ sơ đại lý",
@@ -3674,6 +3714,7 @@
       "visibilitySubagent": "Subagent - chỉ có thể gọi được từ người khác",
       "visibilityAll": "Tất cả - cả hai",
       "saveFailed": "Không thể lưu đại lý",
+      "deleteFailed": "Không thể xóa đại lý",
       "nameRequired": "Nhập tên đại lý",
       "slugRequired": "Nhập sên đại lý",
       "slugInvalid": "Slug phải bắt đầu bằng một chữ cái và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
@@ -3688,11 +3729,12 @@
       "description": "Mô tả lệnh",
       "template": "Bản mẫu",
       "namePlaceholder": "explain",
-      "agentPlaceholder": "ví dụ. Mã",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Giải thích $ARGUMENTS",
       "subtask": "Chạy dưới dạng nhiệm vụ phụ",
       "edit": "Chỉnh sửa lệnh gạch chéo",
       "saveFailed": "Không thể lưu lệnh",
+      "deleteFailed": "Không thể xóa lệnh",
       "nameRequired": "Nhập tên lệnh",
       "nameInvalid": "Tên phải bắt đầu bằng chữ cái viết thường và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
       "templateRequired": "Nhập mẫu lệnh",
@@ -3839,7 +3881,7 @@
     "view": "Đọc bản tin",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Hiện trạng thái trực tiếp",
+    "dismiss": "Bỏ qua bản tin",
     "offline": "Ngoại tuyến · bản tin đã lưu",
     "cached": "Báo cáo đã lưu · không thể làm mới",
     "revised": "Đã sửa đổi · {{revision}}",

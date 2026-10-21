@@ -35,6 +35,8 @@
     "connectGithub": "Hubungkan GitHub",
     "cost": "Biaya",
     "discard": "Buang",
+    "discardChangesMessage": "Perubahan Anda akan hilang.",
+    "discardChangesTitle": "Buang perubahan?",
     "findings": "Temuan",
     "mergeRequest": "merge request",
     "notConnected": "Tidak terhubung",
@@ -109,7 +111,9 @@
     "online": "Daring",
     "open": "Buka {{name}}",
     "openPullRequest": "Buka PR",
+    "completed": "Selesai",
     "pending": "Menunggu",
+    "running": "Berjalan",
     "performance": "Kinerja",
     "preferences": "Preferensi",
     "privacyPolicy": "Kebijakan privasi",
@@ -1019,8 +1023,6 @@
     "updateFailed": "Gagal memperbarui peninjau.",
     "configSaveFailed": "Gagal menyimpan konfigurasi tinjauan.",
     "status": {
-      "running": "Berjalan",
-      "completed": "Selesai",
       "interrupted": "Terputus"
     },
     "reviewStyle": {
@@ -1113,7 +1115,14 @@
       "triageReasoning": "Dasar penilaian triase",
       "watchInCloudAgent": "Pantau di Agen cloud",
       "whereFound": "Lokasi temuan ({{displayCount}})",
-      "yes": "Ya"
+      "yes": "Ya",
+      "action": {
+        "analyzeCodebase": "Analisis basis kode",
+        "dismiss": "Abaikan",
+        "manualReview": "Tinjauan manual",
+        "monitor": "Pantau",
+        "openPr": "Buka PR"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Model analisis",
@@ -1135,7 +1144,24 @@
       "summary": "Ringkasan laporan",
       "title": "Laporan audit",
       "unavailable": "Laporan audit tidak tersedia",
-      "unavailableDescription": "Hanya pemilik organisasi dan manajer penagihan yang dapat melihat laporan audit. Minta akses kepada pemilik organisasi atau manajer penagihan."
+      "unavailableDescription": "Hanya pemilik organisasi dan manajer penagihan yang dapat melihat laporan audit. Minta akses kepada pemilik organisasi atau manajer penagihan.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analisis selesai",
+        "findingAnalysisFailed": "Analisis gagal",
+        "findingAutoDismissed": "Diabaikan otomatis",
+        "findingCreated": "Diimpor",
+        "findingDeleted": "Dihapus",
+        "findingDismissed": "Diabaikan",
+        "findingSeverityChanged": "Keparahan diubah",
+        "findingStatusChange": "Status diubah",
+        "findingSuperseded": "Digantikan",
+        "remediationBlocked": "Perbaikan diblokir",
+        "remediationCancelled": "Dibatalkan",
+        "remediationFailed": "Perbaikan gagal",
+        "remediationNoChangesNeeded": "Tidak perlu perubahan",
+        "remediationPrOpened": "PR dibuka",
+        "remediationQueued": "Perbaikan diminta"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Lihat laporan audit"
@@ -1355,7 +1381,6 @@
       "installApp": "Pasang aplikasi GitHub",
       "reauthorizeButton": "Otorisasi ulang aplikasi GitHub",
       "reauthorizeDescription": "Agen keamanan memerlukan izin vulnerability_alerts untuk mengakses peringatan Dependabot. Otorisasi ulang aplikasi GitHub untuk memberikan izin ini.",
-      "reauthorizeFailed": "Tidak dapat memulai otorisasi ulang. Coba lagi.",
       "reauthorizeTitle": "Perlu izin tambahan",
       "setupFailed": "Tidak dapat memulai penyiapan GitHub. Coba lagi."
     },
@@ -1378,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "Simpan perubahan",
       "unsavedMessage": "Simpan perubahan sebelum meninggalkan layar ini?",
+      "unsavedInvalidMessage": "Perubahan ini belum dapat disimpan. Perbaiki untuk menyimpan, atau buang untuk meninggalkan.",
       "unsavedTitle": "Perubahan belum disimpan"
     },
     "setup": {
@@ -1771,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}} baris",
       "matchesBadge_one": "{{displayCount}} kecocokan",
       "matchesBadge_other": "{{displayCount}} kecocokan",
-      "noOutput": "Tidak ada keluaran."
+      "noOutput": "Tidak ada keluaran.",
+      "translationFailed": "Terjemahan gagal"
     },
     "readToolMarkdown": {
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",
@@ -2975,11 +3002,22 @@
     "boundary": {
       "backToProfile": "Kembali ke profil",
       "loadErrorMessage": "Periksa koneksimu dan coba lagi.",
+
+      "chooseAccount": "Pilih akun",
       "loadErrorTitle": "Tidak dapat memuat daftar organisasimu.",
+      "noOrganization": "Tidak ada organisasi",
+
+      "noOrganizationDescription": "Akun ini bukan bagian dari organisasi. Buat atau gabung ke organisasi di web untuk menggunakan fitur organisasi seperti undangan anggota dan peringatan saldo rendah.",
+
+      "openWebOrganizations": "Buka organisasi di web",
+
       "organizationUnavailable": "Organisasi tidak tersedia.",
-      "selectDescription": "Pilih organisasi dari profilmu untuk melanjutkan.",
+      "selectDescriptionWithOrganizations": "Kamu termasuk dalam satu atau beberapa organisasi. Pilih akun yang harus digunakan layar ini.",
+
       "selectOrganization": "Pilih organisasi",
       "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih organisasi lain dari profilmu untuk melanjutkan.",
+
+      "unavailableSessionsDescription": "Organisasi ini tidak lagi tersedia. Sesi untuk organisasi ini tidak dapat dimuat.",
       "accessDeniedDescription": "Kamu tidak memiliki akses ke organisasi ini."
     },
     "creditActivity": {
@@ -3647,7 +3685,9 @@
       "jsonTooLarge": "Gunakan maksimal 50 entri, kunci hingga 128 dan nilai hingga 4096 karakter",
       "timeoutInvalid": "Batas waktu harus berupa bilangan bulat dalam milidetik",
       "edit": "Sunting server MCP",
-      "saveFailed": "Tidak dapat menyimpan server MCP"
+      "saveFailed": "Tidak dapat menyimpan server MCP",
+      "deleteFailed": "Tidak dapat menghapus server MCP",
+      "updateFailed": "Tidak dapat memperbarui server MCP"
     },
     "agents": {
       "title": "Agen profil",
@@ -3674,6 +3714,7 @@
       "visibilitySubagent": "Subagen — hanya dapat dihubungi dari orang lain",
       "visibilityAll": "Semua—keduanya",
       "saveFailed": "Tidak dapat menyelamatkan agen",
+      "deleteFailed": "Tidak dapat menghapus agen",
       "nameRequired": "Masukkan nama agen",
       "slugRequired": "Masukkan siput agen",
       "slugInvalid": "Siput harus dimulai dengan huruf dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
@@ -3688,11 +3729,12 @@
       "description": "Deskripsi perintah",
       "template": "Templat",
       "namePlaceholder": "explain",
-      "agentPlaceholder": "misalnya Code",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Jelaskan $ARGUMENTS",
       "subtask": "Jalankan sebagai subtugas",
       "edit": "Edit perintah garis miring",
       "saveFailed": "Tidak dapat menyimpan perintah",
+      "deleteFailed": "Tidak dapat menghapus perintah",
       "nameRequired": "Masukkan nama perintah",
       "nameInvalid": "Nama harus dimulai dengan huruf kecil dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
       "templateRequired": "Masukkan templat perintah",
@@ -3839,7 +3881,7 @@
     "view": "Baca ringkasan",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Tampilkan status langsung",
+    "dismiss": "Abaikan ringkasan",
     "offline": "Offline · ringkasan tersimpan",
     "cached": "Laporan tersimpan · tidak dapat diperbarui",
     "revised": "Direvisi · {{revision}}",

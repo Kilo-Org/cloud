@@ -107,7 +107,7 @@ export function processMessagesApiUsage(
 }
 
 export async function parseMessagesMicrodollarUsageFromStream(
-  stream: ReadableStream,
+  stream: ReadableStream<Uint8Array>,
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,

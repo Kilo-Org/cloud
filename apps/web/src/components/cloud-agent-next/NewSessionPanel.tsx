@@ -230,7 +230,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       ? 'Enter an https git URL'
       : null;
   const hasPublicRepo = trimmedPublicRepoUrl.length > 0 && publicRepoUrlError === null;
-  const [attachmentMessageUuid, setAttachmentMessageUuid] = useState(() => uuidv4());
+  const [attachmentMessageUuid] = useState(() => uuidv4());
   // Repo profile bindings are only keyed by GitHub/GitLab today.
   const profileBindingPlatform: Exclude<RepositoryPlatform, 'bitbucket'> | undefined =
     selectedPlatform === 'bitbucket' ? undefined : selectedPlatform;
@@ -1139,8 +1139,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         attachmentNames: attachmentUpload.attachments.map(a => a.file.name),
       },
     });
-    attachmentUpload.clearAttachments();
-    setAttachmentMessageUuid(uuidv4());
+    // The local session owns these uploads now; clearing would delete them before prepare links them.
     // The lock stays held: the panel unmounts with this navigation, and a second
     // submit before then would create a second session.
     router.push(`${basePath}/chat?sessionId=${kiloSessionId}`);

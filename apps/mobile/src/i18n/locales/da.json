@@ -25,6 +25,7 @@
     "error": "fejl: {{error}}",
     "back": "Tilbage",
     "somethingWentWrong": "Noget gik galt.",
+    "actionNotRecorded": "Vi kunne ikke registrere denne handling. Prøv igen senere.",
     "couldNotOpen": "{{label}} kunne ikke åbnes.",
     "link": "weblink",
     "takingLonger": "Det tager længere tid end forventet. Du kan lukke denne skærm og tjekke igen senere.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub fuldførte ikke fletningen.",
       "mergeResultNotCompleted": "{{term}} blev ikke flettet. Tjek dens status, og prøv igen.",
       "ambiguous": "Handlingen kunne ikke bekræftes. Tjek PR'en, før du prøver igen.",
-      "persistenceFailed": "Vi kunne ikke registrere denne handling. Prøv igen senere.",
       "forbidden": "Du har ikke tilladelse til denne handling."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "Indlæser hukommelse for gennemgange",
       "couldNotLoad": "Hukommelsen for gennemgange kunne ikke indlæses.",
       "off": "Hukommelsen for gennemgange er slået fra.",
+      "on": "Hukommelsen for gennemgange er slået til.",
       "offDescription": "Slå den til, så Kilo kan lære af svar fra de vedligeholdelsesansvarlige og foreslå retningslinjer til REVIEW.md.",
-      "readOnlyDescription": "Kun organisationsejere og faktureringsadministratorer kan aktivere hukommelsen for gennemgange.",
+      "readOnlyDescription": "Kun organisationsejere og faktureringsadministratorer kan ændre hukommelsen for gennemgange.",
       "enable": "Aktivér hukommelse for gennemgange",
       "loadingProposals": "Indlæser forslag",
       "couldNotLoadProposals": "Forslagene kunne ikke indlæses.",
@@ -1879,6 +1880,9 @@
       "viewA11y": "Vis revisionsrapport"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-administrator",
+      "actorMaskedUser": "Maskeret bruger",
+      "actorSystem": "Kilo-system",
       "couldNotLoad": "Revisionsrapporten kunne ikke indlæses.",
       "events": "Hændelser",
       "generated": "Rapporten blev genereret {{generatedAt}}.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "En synkronisering er muligvis ikke fuldført. Prøv igen for at afklare status, eller kassér den.",
       "syncInProgress": "En sikkerhedssynkronisering er allerede i gang. Prøv igen.",
       "dismissalInProgress": "Denne afvisning er allerede i gang. Prøv igen.",
-      "couldNotReadPendingSyncs": "De ventende synkroniseringer kunne ikke læses. Prøv igen."
+      "couldNotReadPendingSyncs": "De ventende synkroniseringer kunne ikke læses. Prøv igen.",
+      "ambiguous": "Handlingen kunne ikke bekræftes. Tjek sikkerhedsgennemgangen, før du prøver igen.",
+      "settleFailed": "Handlingen blev gennemført, men vi kunne ikke registrere resultatet. Prøv igen.",
+      "replayFailed": "Denne handling blev ikke gennemført. Prøv igen.",
+      "actionFailed": "Handlingen kunne ikke gennemføres. Prøv igen.",
+      "actionBlocked": "Handlingen kunne ikke gennemføres. Problemet skal løses, før du kan prøve igen."
     },
     "analysisState": {
       "queued": "Analyse i kø",
@@ -2772,7 +2781,7 @@
     "thisDevice": "Denne enhed",
     "viewProfile": "Vis profil",
     "signOutThisDevice": "Log ud af denne enhed",
-    "signOutThisSession": "Log ud af denne session",
+    "signOutSessionLabel": "Log ud af {{device}}, logget ind {{signedIn}}",
     "sessionSignedOut": "Sessionen er logget ud.",
     "signOutThisDeviceTitle": "Log ud af denne enhed?",
     "signOutThisSessionTitle": "Log ud af denne session?",
@@ -3077,7 +3086,11 @@
       "separateEmailsHint": "Adskil e-mailadresser med kommaer.",
       "thresholdLabel": "Advar ved saldo under (USD)",
       "title": "Advarsel om lav saldo",
-      "emailsError": "Angiv mindst én gyldig e-mailadresse. Adskil flere adresser med kommaer.",
+      "emailsInvalid": "En eller flere e-mailadresser er ugyldige.",
+      "emailsRequired": "Angiv mindst én e-mailadresse.",
+      "saveEmailsError": "Nogle e-mailadresser blev ikke accepteret. Tjek dem, og prøv igen.",
+      "saveError": "Advarslen om lav saldo kunne ikke gemmes.",
+      "thresholdPlaceholder": "Angiv et beløb",
       "thresholdError": "Angiv et beløb over 0."
     },
     "memberLimit": {
@@ -3088,6 +3101,7 @@
       "removeLimit": "Fjern grænse",
       "title": "Daglig forbrugsgrænse",
       "blankError": "Angiv et beløb, eller tryk på Fjern grænse nedenfor.",
+      "blankWithoutLimitError": "Angiv en daglig grænse mellem 0 og {{max}}.",
       "rangeError": "Angiv et beløb mellem 0 og {{max}}."
     },
     "members": {
@@ -3626,7 +3640,6 @@
     "keyTooLong": "Nøglen må højst være 256 tegn",
     "keyDuplicate": "Denne nøgle findes allerede i profilen",
     "valueLabel": "Værdi",
-    "secretLabel": "Hemmelighed",
     "secrets": {
       "markSecret": "Markér som hemmelig",
       "masked": "Skjult værdi",

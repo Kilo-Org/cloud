@@ -25,6 +25,7 @@
     "error": "pogreška: {{error}}",
     "back": "Natrag",
     "somethingWentWrong": "Došlo je do pogreške.",
+    "actionNotRecorded": "Nismo mogli zabilježiti ovu radnju. Pokušaj ponovno kasnije.",
     "couldNotOpen": "Nije moguće otvoriti {{label}}.",
     "link": "poveznica",
     "takingLonger": "Ovo traje dulje od očekivanog. Možeš zatvoriti ovaj zaslon i ponovno provjeriti.",
@@ -800,7 +801,6 @@
       "mergeResultDefaultError": "GitHub nije dovršio spajanje.",
       "mergeResultNotCompleted": "{{term}} nije spojen. Provjeri njegovo stanje i pokuši ponovno.",
       "ambiguous": "Nije moguće potvrditi ishod — provjeri PR prije ponovnog pokušaja.",
-      "persistenceFailed": "Nismo mogli zabilježiti ovu radnju. Pokušaj ponovno kasnije.",
       "forbidden": "Ova radnja nije dopuštena."
     },
     "capabilities": {
@@ -1475,8 +1475,9 @@
       "loading": "Učitavanje memorije pregleda",
       "couldNotLoad": "Nije moguće učitati memoriju pregleda.",
       "off": "Memorija pregleda je isključena.",
+      "on": "Memorija pregleda je uključena.",
       "offDescription": "Uključi je kako bi Kilo učio iz odgovora održavatelja i predlagao smjernice za datoteku REVIEW.md.",
-      "readOnlyDescription": "Samo vlasnici organizacije i voditelji naplate mogu omogućiti memoriju pregleda.",
+      "readOnlyDescription": "Samo vlasnici organizacije i voditelji naplate mogu promijeniti memoriju pregleda.",
       "enable": "Omogući memoriju pregleda",
       "loadingProposals": "Učitavanje prijedloga",
       "couldNotLoadProposals": "Nije moguće učitati prijedloge.",
@@ -1902,6 +1903,9 @@
       "viewA11y": "Pogledaj izvješće o reviziji"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administrator",
+      "actorMaskedUser": "Maskirani korisnik",
+      "actorSystem": "Kilo sustav",
       "couldNotLoad": "Nije moguće učitati izvješće o reviziji.",
       "events": "Događaji",
       "generated": "Izvješće je izrađeno {{generatedAt}}.",
@@ -1980,7 +1984,12 @@
       "syncMayNotHaveCompleted": "Sinkronizacija možda nije dovršena. Pokušaj ponovno da uskladiš njezino stanje ili je odbaci.",
       "syncInProgress": "Sinkronizacija sigurnosnih nalaza već je u tijeku. Pokušaj ponovno.",
       "dismissalInProgress": "Odbacivanje ovog nalaza već je u tijeku. Pokušaj ponovno.",
-      "couldNotReadPendingSyncs": "Nije moguće pročitati sinkronizacije na čekanju. Pokušaj ponovno."
+      "couldNotReadPendingSyncs": "Nije moguće pročitati sinkronizacije na čekanju. Pokušaj ponovno.",
+      "ambiguous": "Nije moguće potvrditi ishod — provjeri pregled sigurnosti prije ponovnog pokušaja.",
+      "settleFailed": "Radnja je izvršena, ali nismo mogli zabilježiti rezultat. Pokušaj ponovno.",
+      "replayFailed": "Ova radnja nije dovršena. Pokušaj ponovno.",
+      "actionFailed": "Nije moguće dovršiti ovu radnju. Pokušaj ponovno.",
+      "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem je potrebno riješiti prije ponovnog pokušaja."
     },
     "analysisState": {
       "queued": "Analiza u redu čekanja",
@@ -2811,7 +2820,7 @@
     "thisDevice": "Ovaj uređaj",
     "viewProfile": "Prikaži profil",
     "signOutThisDevice": "Odjavi ovaj uređaj",
-    "signOutThisSession": "Odjavi ovu sesiju",
+    "signOutSessionLabel": "Odjavi {{device}}, prijava: {{signedIn}}",
     "sessionSignedOut": "Sesija odjavljena.",
     "signOutThisDeviceTitle": "Odjaviti ovaj uređaj?",
     "signOutThisSessionTitle": "Odjaviti ovu sesiju?",
@@ -3117,7 +3126,11 @@
       "separateEmailsHint": "Odvoji adrese e-pošte zarezima.",
       "thresholdLabel": "Prag upozorenja (USD)",
       "title": "Upozorenje o niskom saldu",
-      "emailsError": "Unesi barem jednu valjanu adresu e-pošte. Ako ih unosiš više, odvoji ih zarezima.",
+      "emailsInvalid": "Jedna ili više adresa e-pošte nisu valjane.",
+      "emailsRequired": "Unesi barem jednu adresu e-pošte.",
+      "saveEmailsError": "Neke adrese e-pošte nisu prihvaćene. Provjeri ih i pokušaj ponovno.",
+      "saveError": "Nije moguće spremiti upozorenje o niskom saldu.",
+      "thresholdPlaceholder": "Unesi iznos",
       "thresholdError": "Unesi iznos veći od 0."
     },
     "memberLimit": {
@@ -3128,6 +3141,7 @@
       "removeLimit": "Ukloni ograničenje",
       "title": "Dnevno ograničenje potrošnje",
       "blankError": "Unesi iznos ili ukloni ograničenje s pomoću gumba u nastavku.",
+      "blankWithoutLimitError": "Unesi dnevno ograničenje između 0 i {{max}}.",
       "rangeError": "Unesi iznos između 0 i {{max}}."
     },
     "members": {
@@ -3667,7 +3681,6 @@
     "keyTooLong": "Ključ može imati najviše 256 znakova",
     "keyDuplicate": "Ovaj ključ već postoji u profilu",
     "valueLabel": "Vrijednost",
-    "secretLabel": "Tajna",
     "secrets": {
       "markSecret": "Označi kao tajno",
       "masked": "Skrivena vrijednost",

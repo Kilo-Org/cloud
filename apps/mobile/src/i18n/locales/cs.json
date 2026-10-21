@@ -25,6 +25,7 @@
     "error": "chyba: {{error}}",
     "back": "Zpět",
     "somethingWentWrong": "Něco se pokazilo.",
+    "actionNotRecorded": "Tuto akci se nepodařilo zaznamenat. Zkus to později.",
     "couldNotOpen": "Nepodařilo se otevřít {{label}}.",
     "link": "odkaz",
     "takingLonger": "Trvá to déle, než se očekávalo. Tuto obrazovku můžeš zavřít a stav zkontrolovat později.",
@@ -816,7 +817,6 @@
       "mergeResultDefaultError": "GitHub nedokončil sloučení.",
       "mergeResultNotCompleted": "{{term}} nebyl sloučen. Zkontroluj jeho stav a zkus to znovu.",
       "ambiguous": "Výsledek se nepodařilo potvrdit. Před dalším pokusem zkontroluj PR.",
-      "persistenceFailed": "Tuto akci se nepodařilo zaznamenat. Zkus to později.",
       "forbidden": "K této akci nemáš oprávnění."
     },
     "capabilities": {
@@ -1494,8 +1494,9 @@
       "loading": "Načítání paměti kontrol",
       "couldNotLoad": "Paměť kontrol se nepodařilo načíst.",
       "off": "Paměť kontrol je vypnutá.",
+      "on": "Paměť kontrol je zapnutá.",
       "offDescription": "Zapněte paměť kontrol, aby se Kilo mohlo učit z odpovědí správců a navrhovat pokyny do souboru REVIEW.md.",
-      "readOnlyDescription": "Paměť kontrol mohou zapnout pouze vlastníci organizace a správci fakturace.",
+      "readOnlyDescription": "Paměť kontrol mohou změnit pouze vlastníci organizace a správci fakturace.",
       "enable": "Zapnout paměť kontrol",
       "loadingProposals": "Načítání návrhů",
       "couldNotLoadProposals": "Návrhy se nepodařilo načíst.",
@@ -1925,6 +1926,9 @@
       "viewA11y": "Zobrazit zprávu o auditu"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Správce Kilo",
+      "actorMaskedUser": "Maskovaný uživatel",
+      "actorSystem": "Systém Kilo",
       "couldNotLoad": "Zprávu o auditu se nepodařilo načíst.",
       "events": "Události",
       "generated": "Zpráva byla vygenerována {{generatedAt}}.",
@@ -2003,7 +2007,12 @@
       "syncMayNotHaveCompleted": "Synchronizace se možná nedokončila. Opakováním sjednoťte její stav, nebo ji zahoďte.",
       "syncInProgress": "Synchronizace bezpečnostních nálezů již probíhá. Zkuste to znovu.",
       "dismissalInProgress": "Zamítání tohoto nálezu již probíhá. Zkuste to znovu.",
-      "couldNotReadPendingSyncs": "Čekající synchronizace se nepodařilo načíst. Zkuste to znovu."
+      "couldNotReadPendingSyncs": "Čekající synchronizace se nepodařilo načíst. Zkuste to znovu.",
+      "ambiguous": "Výsledek se nepodařilo potvrdit. Před dalším pokusem zkontrolujte bezpečnostní kontrolu.",
+      "settleFailed": "Akce proběhla, ale výsledek se nám nepodařilo zaznamenat. Zkuste to znovu.",
+      "replayFailed": "Tato akce neproběhla. Zkuste to znovu.",
+      "actionFailed": "Tuto akci se nepodařilo dokončit. Zkuste to znovu.",
+      "actionBlocked": "Tuto akci se nepodařilo dokončit. Problém je nutné nejprve vyřešit, teprve pak můžete akci zopakovat."
     },
     "analysisState": {
       "queued": "Analýza ve frontě",
@@ -2851,7 +2860,7 @@
     "webBrowser": "Webový prohlížeč",
     "viewProfile": "Zobrazit profil",
     "signOutThisDevice": "Odhlásit toto zařízení",
-    "signOutThisSession": "Odhlásit tuto relaci",
+    "signOutSessionLabel": "Odhlásit zařízení {{device}}, přihlášení: {{signedIn}}",
     "sessionSignedOut": "Relace byla odhlášena.",
     "signOutThisDeviceTitle": "Odhlásit toto zařízení?",
     "signOutThisSessionTitle": "Odhlásit tuto relaci?",
@@ -3157,7 +3166,11 @@
       "separateEmailsHint": "Více e-mailových adres oddělte čárkami.",
       "thresholdLabel": "Upozornit při zůstatku pod (USD)",
       "title": "Upozornění na nízký zůstatek",
-      "emailsError": "Zadejte alespoň jednu platnou e-mailovou adresu. Více adres oddělte čárkami.",
+      "emailsInvalid": "Jedna nebo více e-mailových adres není platných.",
+      "emailsRequired": "Zadejte alespoň jednu e-mailovou adresu.",
+      "saveEmailsError": "Některé e-mailové adresy nebyly přijaty. Zkontrolujte je a zkuste to znovu.",
+      "saveError": "Upozornění na nízký zůstatek se nepodařilo uložit.",
+      "thresholdPlaceholder": "Zadejte částku",
       "thresholdError": "Zadejte částku větší než 0."
     },
     "memberLimit": {
@@ -3168,6 +3181,7 @@
       "removeLimit": "Zrušit limit",
       "title": "Denní limit útraty",
       "blankError": "Zadejte částku nebo níže klepněte na tlačítko Zrušit limit.",
+      "blankWithoutLimitError": "Zadejte denní limit mezi 0 a {{max}}.",
       "rangeError": "Zadejte částku mezi 0 a {{max}}."
     },
     "members": {
@@ -3708,7 +3722,6 @@
     "keyTooLong": "Klíč musí mít 256 znaků nebo méně",
     "keyDuplicate": "Tento klíč už v profilu existuje",
     "valueLabel": "Hodnota",
-    "secretLabel": "Tajný",
     "secrets": {
       "markSecret": "Označit jako tajné",
       "masked": "Skrytá hodnota",

@@ -74,7 +74,6 @@ function notify(): void {
   }
 }
 
-/** Parse a stored record; a corrupt, unreadable, or placeholder-bearing mirror reads as absent. */
 /**
  * Routes that moved out of a tab stack into the root stack. A record mirrored
  * by an older build still names the old stack; replaying it would open an
@@ -95,6 +94,7 @@ function currentRouteHref(href: string): string {
   return href;
 }
 
+/** Parse a stored record; a corrupt, unreadable, or placeholder-bearing mirror reads as absent. */
 function parseStoredRecord(raw: string): LastRouteRecord | null {
   try {
     const result = lastRouteSchema.safeParse(JSON.parse(raw));

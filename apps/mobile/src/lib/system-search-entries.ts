@@ -31,6 +31,7 @@ import { sessionDisplayTitle } from '@/lib/session-display-title';
 
 import {
   APP_SCHEME,
+  canonicalSystemSearchId,
   deeplinkPathFromHref,
   FINDING_HREF_PREFIX,
   PULL_REQUEST_HREF_PREFIX,
@@ -357,8 +358,11 @@ export function findingSearchDocument(
  * navigate.
  */
 export function systemSearchHrefFromId(id: string): string | null {
-  const known = ROUTE_ID_PATTERNS.some(pattern => pattern.test(id));
-  return known ? id : null;
+  // An id indexed before a route moved resolves to where the screen lives now;
+  // the OS hands the old id back until the next sync replaces the entry.
+  const canonical = canonicalSystemSearchId(id);
+  const known = ROUTE_ID_PATTERNS.some(pattern => pattern.test(canonical));
+  return known ? canonical : null;
 }
 
 /** The personal scope name shared by the session and finding sources. */
@@ -387,19 +391,24 @@ export function systemSearchSourceKey(family: SystemSearchFamily, scope: string)
  * cold start hydrates only some queries) is left in place.
  */
 export function systemSearchSourceKeysOfId(id: string): string[] {
-  if (systemSearchHrefFromId(id) === null) {
+  const href = systemSearchHrefFromId(id);
+  if (href === null) {
     return [];
   }
-  if (id.startsWith(SESSION_HREF_PREFIX)) {
+  const canonical = href;
+  if (canonical.startsWith(SESSION_HREF_PREFIX)) {
     return [
-      systemSearchSourceKey('sessions', organizationIdOfSessionId(id) ?? PERSONAL_SOURCE_SCOPE),
+      systemSearchSourceKey(
+        'sessions',
+        organizationIdOfSessionId(canonical) ?? PERSONAL_SOURCE_SCOPE
+      ),
     ];
   }
-  if (id.startsWith(PULL_REQUEST_HREF_PREFIX)) {
-    return [systemSearchSourceKey('pullRequests', providerOfPullRequestId(id))];
+  if (canonical.startsWith(PULL_REQUEST_HREF_PREFIX)) {
+    return [systemSearchSourceKey('pullRequests', providerOfPullRequestId(canonical))];
   }
-  if (id.startsWith(FINDING_HREF_PREFIX)) {
-    const scope = findingScopeOfId(id);
+  if (canonical.startsWith(FINDING_HREF_PREFIX)) {
+    const scope = findingScopeOfId(canonical);
     return scope === null ? [] : [systemSearchSourceKey('findings', scope)];
   }
   return [];
@@ -445,10 +454,8 @@ function findingScopeOfId(id: string): string | null {
  * stripped; null for an unrecognised id.
  */
 export function systemSearchDeeplinkFromId(id: string): string | null {
-  if (systemSearchHrefFromId(id) === null) {
-    return null;
-  }
-  return `${APP_SCHEME}${deeplinkPathFromHref(id)}`;
+  const href = systemSearchHrefFromId(id);
+  return href === null ? null : `${APP_SCHEME}${deeplinkPathFromHref(href)}`;
 }
 
 /**

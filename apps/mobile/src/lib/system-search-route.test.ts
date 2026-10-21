@@ -306,6 +306,12 @@ describe('system-search-route', () => {
       }
     });
 
+    it('resolves an id indexed before the finding route moved', () => {
+      expect(
+        systemSearchHrefFromRoute('/(app)/(tabs)/(3_profile)/security-agent/org-1/findings/f-1')
+      ).toBe('/(app)/security-agent/org-1/findings/f-1');
+    });
+
     it('resolves the link Android stores to the exact screen', () => {
       for (const id of ids) {
         const link = systemSearchDeeplinkFromId(id);

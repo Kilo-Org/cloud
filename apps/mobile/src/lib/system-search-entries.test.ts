@@ -481,6 +481,54 @@ describe('planSystemSearchUpdate', () => {
   });
 });
 
+const LEGACY_FINDING_ID = '/(app)/(tabs)/(3_profile)/security-agent/org-1/findings/finding-1';
+
+describe('ids indexed before the finding route moved', () => {
+  it('resolves to the screen the app shows now', () => {
+    expect(systemSearchHrefFromId(LEGACY_FINDING_ID)).toBe(
+      '/(app)/security-agent/org-1/findings/finding-1'
+    );
+  });
+
+  it('still names the source whose enumeration may remove it', () => {
+    expect(systemSearchSourceKeysOfId(LEGACY_FINDING_ID)).toEqual([
+      systemSearchSourceKey('findings', 'org-1'),
+    ]);
+  });
+
+  it('hands the OS the same link the current id carries', () => {
+    expect(systemSearchDeeplinkFromId(LEGACY_FINDING_ID)).toBe(
+      'kiloapp://security-agent/org-1/findings/finding-1'
+    );
+  });
+
+  it('is removed and replaced once its source is enumerated', () => {
+    const legacy: SystemSearchDocument = {
+      id: LEGACY_FINDING_ID,
+      title: 'SQL injection',
+      description: 'acme/api · critical',
+      keywords: ['acme/api'],
+      route: 'kiloapp://security-agent/org-1/findings/finding-1',
+      // A fingerprint written before the move names no source, so the id alone
+      // decides which scope may remove it.
+      fingerprint: '{}',
+    };
+    const current = findingSearchDocument(
+      { id: 'finding-1', title: 'SQL injection', severity: 'critical', repo_full_name: 'acme/api' },
+      'org-1'
+    );
+
+    const plan = planSystemSearchUpdate({
+      indexed: [legacy],
+      documents: [current],
+      observedSources: new Set([systemSearchSourceKey('findings', 'org-1')]),
+    });
+
+    expect(plan.remove).toEqual([LEGACY_FINDING_ID]);
+    expect(plan.add).toEqual([current]);
+  });
+});
+
 describe('systemSearchSourceKeysOfId', () => {
   it('reads the scope out of each indexed id shape', () => {
     expect(systemSearchSourceKeysOfId('/(app)/agent-chat/sess-1?organizationId=org-1')).toEqual([

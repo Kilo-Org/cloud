@@ -14,6 +14,26 @@ export const SESSION_HREF_PREFIX = '/(app)/agent-chat/';
 export const PULL_REQUEST_HREF_PREFIX = '/(app)/pr-review/';
 export const FINDING_HREF_PREFIX = '/(app)/security-agent/';
 
+/**
+ * Prefixes of ids the app indexed before a family's route moved. The OS keeps
+ * an entry until the app removes it, and a result picked before the next sync
+ * is handed back as the id it was indexed with, so an older id must still name
+ * the screen it points at now.
+ */
+const MOVED_HREF_PREFIXES: readonly (readonly [string, string])[] = [
+  ['/(app)/(tabs)/(3_profile)/security-agent/', FINDING_HREF_PREFIX],
+];
+
+/** An indexed id at the route the app shows today. */
+export function canonicalSystemSearchId(id: string): string {
+  for (const [from, to] of MOVED_HREF_PREFIXES) {
+    if (id.startsWith(from)) {
+      return `${to}${id.slice(from.length)}`;
+    }
+  }
+  return id;
+}
+
 /** The app-scheme prefix every deeplink carries. */
 export const APP_SCHEME = 'kiloapp://';
 

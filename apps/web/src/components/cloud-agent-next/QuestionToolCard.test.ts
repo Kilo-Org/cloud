@@ -28,16 +28,8 @@ function installLinkedomDom(): {
   container: HTMLElement;
 } {
   const requireFromHere = createRequire(__filename);
-  const loadLinkedom = (): { parseHTML: LinkedomParseHtml } => {
-    try {
-      return requireFromHere('linkedom') as { parseHTML: LinkedomParseHtml };
-    } catch {
-      return requireFromHere(
-        '../../../../node_modules/.pnpm/linkedom@0.18.12/node_modules/linkedom'
-      ) as { parseHTML: LinkedomParseHtml };
-    }
-  };
-  const { parseHTML } = loadLinkedom();
+  const requireFromNext = createRequire(requireFromHere.resolve('next/package.json'));
+  const { parseHTML } = requireFromNext('linkedom') as { parseHTML: LinkedomParseHtml };
   const { window, document } = parseHTML(
     '<!doctype html><html><body><div id="root"></div></body></html>'
   );

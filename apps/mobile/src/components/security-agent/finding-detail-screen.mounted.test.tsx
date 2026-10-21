@@ -121,7 +121,7 @@ vi.mock('@/lib/utils', () => ({
 
 type R = TestRenderer.ReactTestRenderer;
 let renderer: R | undefined = undefined;
-const scopeRoot = '/(app)/(tabs)/(3_profile)/security-agent/personal';
+const scopeRoot = '/(app)/security-agent/personal';
 const detailPath = `${scopeRoot}/findings/finding-1`;
 
 function renderScreen(): R {

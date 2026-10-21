@@ -19,11 +19,11 @@ type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
 const TAB_SCREEN_BOTTOM_GAP = 16;
 
 /**
- * The tab bar's rendered height for this screen's clearance:
- * `useEffectiveTabBarHeight` supplies the tabs layout's label decision, the
- * safe-area bottom inset and the platform, so the clearance cannot drift from
- * the rendered bar height. Shared by the scroll viewport and by
- * `useTabBarBottomPadding`.
+ * The bottom chrome this screen clears: the tab bar's rendered height under the
+ * tabs navigator, or the safe-area inset alone on a root-stack screen, where no
+ * bar is drawn. `useEffectiveTabBarHeight` supplies the tabs layout's label
+ * decision, the inset and the platform, so the clearance cannot drift from what
+ * is on screen. Shared by the scroll viewport and by `useTabBarBottomPadding`.
  */
 function useTabBarHeight() {
   return useEffectiveTabBarHeight();

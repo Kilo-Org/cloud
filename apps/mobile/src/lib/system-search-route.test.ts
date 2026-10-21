@@ -68,7 +68,7 @@ import {
 
 const SESSION_ID = '/(app)/agent-chat/session-1';
 const PR_ID = '/(app)/pr-review/owner/repo/42';
-const FINDING_ID = '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1';
+const FINDING_ID = '/(app)/security-agent/personal/findings/finding-1';
 
 /** The source of the durable record, the only place the source is observable. */
 function persistedSource(): string | null {

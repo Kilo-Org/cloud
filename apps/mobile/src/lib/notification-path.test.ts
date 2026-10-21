@@ -169,7 +169,7 @@ describe('notificationPathForData', () => {
         findingId: 'finding-1',
         scope: 'personal',
       })
-    ).toBe('/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1?via=push');
+    ).toBe('/(app)/security-agent/personal/findings/finding-1?via=push');
   });
 
   it('routes security_finding notifications for an organization scope', () => {
@@ -179,7 +179,7 @@ describe('notificationPathForData', () => {
         findingId: 'finding-2',
         scope: 'org-xyz',
       })
-    ).toBe('/(app)/(tabs)/(3_profile)/security-agent/org-xyz/findings/finding-2?via=push');
+    ).toBe('/(app)/security-agent/org-xyz/findings/finding-2?via=push');
   });
 
   it('routes every security_lifecycle event value to the finding detail path', () => {
@@ -202,7 +202,7 @@ describe('notificationPathForData', () => {
           findingId: 'finding-3',
           scope: 'personal',
         })
-      ).toBe('/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-3?via=push');
+      ).toBe('/(app)/security-agent/personal/findings/finding-3?via=push');
     }
   });
 
@@ -214,6 +214,6 @@ describe('notificationPathForData', () => {
         findingId: 'finding-4',
         scope: 'org-xyz',
       })
-    ).toBe('/(app)/(tabs)/(3_profile)/security-agent/org-xyz/findings/finding-4?via=push');
+    ).toBe('/(app)/security-agent/org-xyz/findings/finding-4?via=push');
   });
 });

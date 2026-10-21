@@ -89,7 +89,7 @@ const ROUTE_ID_PATTERNS: readonly RegExp[] = [
   new RegExp(String.raw`^/\(app\)/agent-chat/${ID_SEGMENT}(?:\?[^#]*)?$`),
   new RegExp(String.raw`^/\(app\)/pr-review/${ID_SEGMENT}(?:/${ID_SEGMENT})*(?:\?[^#]*)?$`),
   new RegExp(
-    String.raw`^/\(app\)/\(tabs\)/\(3_profile\)/security-agent/${ID_SEGMENT}/findings/${ID_SEGMENT}(?:\?[^#]*)?$`
+    String.raw`^/\(app\)/security-agent/${ID_SEGMENT}/findings/${ID_SEGMENT}(?:\?[^#]*)?$`
   ),
 ];
 
@@ -440,9 +440,9 @@ function findingScopeOfId(id: string): string | null {
 }
 
 /**
- * The id as a link the OS can hand back to the app. Expo Router groups
- * (`(app)`, `(tabs)/(3_profile)`) are app-internal and never appear in a
- * deeplink, so they are stripped; null for an unrecognised id.
+ * The id as a link the OS can hand back to the app. The Expo Router group
+ * (`(app)`) is app-internal and never appears in a deeplink, so it is
+ * stripped; null for an unrecognised id.
  */
 export function systemSearchDeeplinkFromId(id: string): string | null {
   if (systemSearchHrefFromId(id) === null) {

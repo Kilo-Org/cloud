@@ -3,7 +3,7 @@ import { createElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import ReposRoute from '@/app/(app)/(tabs)/(3_profile)/code-reviewer/[scope]/[platform]/(edit)/repos';
+import ReposRoute from '@/app/(app)/code-reviewer/[scope]/[platform]/(edit)/repos';
 import { ReviewListScreen } from './review-list-screen';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
@@ -258,7 +258,7 @@ describe('Recent review bodies', () => {
       const action = empty.props.action as ReactElement<{ onPress: () => void }>;
       action.props.onPress();
       expect(state.push).toHaveBeenCalledWith(
-        `/(app)/(tabs)/(3_profile)/code-reviewer/personal${connected ? '/manual-review' : ''}`
+        `/(app)/code-reviewer/personal${connected ? '/manual-review' : ''}`
       );
       unmount();
     }

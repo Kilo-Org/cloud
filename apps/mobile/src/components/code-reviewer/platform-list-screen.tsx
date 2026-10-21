@@ -98,9 +98,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
                   subtitle={connectionSubtitle(status)}
                   last={index === platforms.length - 1}
                   onPress={() => {
-                    router.push(
-                      `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${platform}` as Href
-                    );
+                    router.push(`/(app)/code-reviewer/${scope}/${platform}` as Href);
                   }}
                 />
               );
@@ -117,7 +115,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
               icon={History}
               title={t('codeReviewer.reviewList.title')}
               onPress={() => {
-                router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/reviews` as Href);
+                router.push(`/(app)/code-reviewer/${scope}/reviews` as Href);
               }}
             />
             <ConfigureRow
@@ -125,9 +123,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
               title={t('codeReviewer.manualReview.title')}
               last
               onPress={() => {
-                router.push(
-                  `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/manual-review` as Href
-                );
+                router.push(`/(app)/code-reviewer/${scope}/manual-review` as Href);
               }}
             />
           </View>

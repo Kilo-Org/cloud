@@ -162,7 +162,7 @@ export function PlatformOverviewScreen({
   }
 
   const pushField = (field: string) => {
-    router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${platform}/${field}` as Href);
+    router.push(`/(app)/code-reviewer/${scope}/${platform}/${field}` as Href);
   };
 
   const data = config.data;
@@ -194,9 +194,7 @@ export function PlatformOverviewScreen({
           onOpenReviewMemory:
             platform === 'github'
               ? () => {
-                  router.push(
-                    `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/review-memory` as Href
-                  );
+                  router.push(`/(app)/code-reviewer/${scope}/review-memory` as Href);
                 }
               : undefined,
         });

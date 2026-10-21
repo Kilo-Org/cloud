@@ -11,9 +11,7 @@ export default function CodeReviewerReviewDetailRoute() {
 
   if (!scope || !reviewId) {
     const backTo = (
-      scope
-        ? `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/reviews`
-        : '/(app)/(tabs)/(3_profile)'
+      scope ? `/(app)/code-reviewer/${scope}/reviews` : '/(app)/(tabs)/(3_profile)'
     ) as Href;
     return <InvalidRouteState backTo={backTo} />;
   }

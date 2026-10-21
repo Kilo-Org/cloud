@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type PushData } from '@kilocode/notifications';
 
-import SecurityAgentScopeLayout from '@/app/(app)/(tabs)/(3_profile)/security-agent/[scope]/_layout';
+import SecurityAgentScopeLayout from '@/app/(app)/security-agent/[scope]/_layout';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { notificationPathForData } from './notification-path';
 
@@ -134,9 +134,7 @@ describe.each(['personal', 'org-example'])('security notification history (%s)',
 
     const data = { ...payload, scope, findingId: 'finding-123' } satisfies PushData;
     const path = notificationPathForData(data);
-    expect(path).toBe(
-      `/(app)/(tabs)/(3_profile)/security-agent/${scope}/findings/finding-123?via=push`
-    );
+    expect(path).toBe(`/(app)/security-agent/${scope}/findings/finding-123?via=push`);
     const url = new URL(path, 'https://example.test');
     const segments = url.pathname.split('/');
     const action = {
@@ -188,7 +186,7 @@ it.each([{ scope: undefined }, { scope: '' }, { scope: ['personal', 'org-example
   ({ scope }) => {
     const tree = mountScope(scope);
     expect(tree.root.findByType(InvalidRouteState).props).toMatchObject({
-      backTo: '/(app)/(tabs)/(3_profile)/security-agent',
+      backTo: '/(app)/security-agent',
     });
     expect(captured.stack).toBeUndefined();
   }

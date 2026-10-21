@@ -18,7 +18,7 @@ export default function SecurityAgentScopeLayout() {
   const sheetOptions = useFormSheetScreenOptions();
 
   if (!scope) {
-    return <InvalidRouteState backTo={'/(app)/(tabs)/(3_profile)/security-agent' as Href} />;
+    return <InvalidRouteState backTo={'/(app)/security-agent' as Href} />;
   }
 
   return (

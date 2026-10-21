@@ -705,9 +705,7 @@ describe('deep-link-launch', () => {
       _setGetLinkingURLForTests(() => 'https://app.kilo.ai/security-agent/findings');
       captureLaunchDeepLink();
       // Assert immediately — no await. The point of the test is synchronicity.
-      expect(getPendingDeepLink()).toBe(
-        '/(app)/(tabs)/(3_profile)/security-agent/personal/findings'
-      );
+      expect(getPendingDeepLink()).toBe('/(app)/security-agent/personal/findings');
     });
 
     it('carries the resume anchor of a cold launch URL into the stash', () => {

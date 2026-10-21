@@ -75,6 +75,26 @@ function notify(): void {
 }
 
 /** Parse a stored record; a corrupt, unreadable, or placeholder-bearing mirror reads as absent. */
+/**
+ * Routes that moved out of a tab stack into the root stack. A record mirrored
+ * by an older build still names the old stack; replaying it would open an
+ * unmatched route after the update, so the parse maps it to where the screen
+ * lives now.
+ */
+const MOVED_ROUTE_PREFIXES: readonly (readonly [string, string])[] = [
+  ['/(app)/(tabs)/(3_profile)/code-reviewer', '/(app)/code-reviewer'],
+  ['/(app)/(tabs)/(3_profile)/security-agent', '/(app)/security-agent'],
+];
+
+function currentRouteHref(href: string): string {
+  for (const [from, to] of MOVED_ROUTE_PREFIXES) {
+    if (href === from || href.startsWith(`${from}/`) || href.startsWith(`${from}?`)) {
+      return `${to}${href.slice(from.length)}`;
+    }
+  }
+  return href;
+}
+
 function parseStoredRecord(raw: string): LastRouteRecord | null {
   try {
     const result = lastRouteSchema.safeParse(JSON.parse(raw));
@@ -84,7 +104,8 @@ function parseStoredRecord(raw: string): LastRouteRecord | null {
     // A record written before hrefs were concrete names a route pattern
     // (`profiles/[profileId]/variables`); restoring it opens a screen whose
     // data reads cannot resolve, so it is dropped instead of replayed once.
-    return isConcreteLastRouteHref(result.data.href) ? result.data : null;
+    const href = currentRouteHref(result.data.href);
+    return isConcreteLastRouteHref(href) ? { ...result.data, href } : null;
   } catch {
     return null;
   }

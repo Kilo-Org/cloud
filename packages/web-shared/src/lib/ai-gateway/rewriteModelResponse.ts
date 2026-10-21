@@ -566,6 +566,12 @@ export async function rewriteModelResponse_ChatCompletions({
             json.choices = [];
           }
 
+          // Vertex AI's managed models attach usage without token counts to intermediate chunks,
+          // which the AI SDK rejects
+          if (json.usage && typeof json.usage.prompt_tokens !== 'number') {
+            delete json.usage;
+          }
+
           if (json.usage) {
             rewriteUsage(json.usage, removeCost);
           }
@@ -816,7 +822,20 @@ type ResponsesApiEvent = {
   type: string;
   sequence_number?: number;
   response?: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
+  item?: unknown;
 };
+
+/**
+ * Amazon Bedrock's mantle `/v1` endpoint names a completed output item's id
+ * `item_id`, so the AI SDK cannot match the finished tool call to the one it
+ * started. Restore `id` from it.
+ */
+function restoreResponsesOutputItemId(item: unknown) {
+  if (typeof item !== 'object' || item === null || Array.isArray(item)) return;
+  if (!('id' in item) && 'item_id' in item && typeof item.item_id === 'string') {
+    Object.assign(item, { id: item.item_id });
+  }
+}
 
 export async function rewriteModelResponse_Responses({
   response,
@@ -897,6 +916,10 @@ export async function rewriteModelResponse_Responses({
           const json = JSON.parse(event.data) as ResponsesApiEvent;
           if (json.sequence_number !== undefined) {
             nextSequenceNumber = Math.max(nextSequenceNumber, json.sequence_number + 1);
+          }
+          restoreResponsesOutputItemId(json.item);
+          for (const item of json.response?.output ?? []) {
+            restoreResponsesOutputItemId(item);
           }
           if (json.response) {
             if (generationId === undefined && json.response.id) {

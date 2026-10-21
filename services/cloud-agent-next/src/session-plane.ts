@@ -7,25 +7,6 @@ export const CONTROL_PLANE_SESSION_PREFIX = 'workspace_';
 /** `billingOrigin` value that identifies a Code Reviewer session. */
 export const CODE_REVIEW_PLATFORM = 'code-review';
 
-/**
- * Origins whose new sessions run on the control plane: interactive web, the
- * chat bots, Security Agent analysis/remediation, webhook ingest and scheduled
- * runs. Every other origin — app-builder, CLI and unknown
- * values — stays legacy until it is moved explicitly.
- */
-const CONTROL_PLANE_ORIGINS: ReadonlySet<string> = new Set([
-  'cloud-agent-web',
-  'desktop',
-  'slack',
-  'github',
-  'linear',
-  'discord',
-  'security-agent',
-  'security-remediation',
-  'webhook',
-  'scheduled',
-]);
-
 export type ControlPlaneOwnerEnv = {
   CODE_REVIEW_CONTROL_PLANE_IDS?: string;
   CODE_REVIEW_CONTAINERS_ORG_IDS?: string;
@@ -102,12 +83,6 @@ export type SessionCreateOrigin = {
   billingOrigin?: string;
 };
 
-export function isControlPlaneOrigin(origin?: SessionCreateOrigin): boolean {
-  return (
-    origin?.createdOnPlatform !== undefined && CONTROL_PLANE_ORIGINS.has(origin.createdOnPlatform)
-  );
-}
-
 export function isCodeReviewSession(origin?: SessionCreateOrigin): boolean {
   return origin?.billingOrigin === CODE_REVIEW_PLATFORM;
 }
@@ -169,17 +144,16 @@ export function isPreviewOwner(
   );
 }
 
+/**
+ * Every new session runs on the control plane. Legacy `agent_*` sessions keep
+ * their plane from the session ID, but no new session is created there.
+ */
 export function sessionPlaneForNewOwner(
-  env: ControlPlaneOwnerEnv,
-  owner: { userId: string; orgId?: string },
-  origin?: SessionCreateOrigin
+  _env: ControlPlaneOwnerEnv,
+  _owner: { userId: string; orgId?: string },
+  _origin?: SessionCreateOrigin
 ): SessionPlane {
-  if (isCodeReviewSession(origin)) {
-    return isCodeReviewControlPlaneOwner(env, owner) || isCodeReviewContainersOwner(env, owner)
-      ? 'control'
-      : 'legacy';
-  }
-  return isControlPlaneOrigin(origin) ? 'control' : 'legacy';
+  return 'control';
 }
 
 function ownerIdInList(raw: string | undefined, id: string | undefined): boolean {

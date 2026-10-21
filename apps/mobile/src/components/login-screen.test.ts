@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // the native modules stubbed.
 
 import { parseDeviceAuthTokenResponse } from '@/lib/auth/native-auth-contract';
+import { type DeviceAuthError } from '@/lib/auth/device-auth-state';
 import { i18n } from '@/i18n';
 import {
   clearPersistedLoginDrafts,
@@ -26,7 +27,7 @@ const deviceAuth = vi.hoisted(() => ({
   code: undefined as string | undefined,
   refreshToken: undefined as string | undefined,
   expiresIn: undefined as number | undefined,
-  error: undefined as string | undefined,
+  error: undefined as DeviceAuthError | undefined,
   verificationUrl: undefined as string | undefined,
   resumed: false,
 }));
@@ -239,8 +240,14 @@ describe('login-screen error mapping', () => {
     expect(errorMessage('denied', undefined)).toBe('Access was denied.');
   });
 
-  it('falls back to the provided error for unknown status', () => {
-    expect(errorMessage('error', 'custom error')).toBe('custom error');
+  it('translates a keyed error descriptor at render', () => {
+    expect(errorMessage('error', { kind: 'key', key: 'authErrors.networkError' })).toBe(
+      'Network error. Please try again.'
+    );
+  });
+
+  it('passes a server-authored error text through untranslated', () => {
+    expect(errorMessage('error', { kind: 'text', text: 'custom error' })).toBe('custom error');
   });
 
   it('falls back to default when no error is provided', () => {
@@ -446,7 +453,7 @@ describe('login-screen timeout error dismissal', () => {
     deviceAuth.code = undefined;
     deviceAuth.refreshToken = undefined;
     deviceAuth.expiresIn = undefined;
-    deviceAuth.error = i18n.t('authErrors.signInTimedOut');
+    deviceAuth.error = { kind: 'key', key: 'authErrors.signInTimedOut' };
     deviceAuth.verificationUrl = undefined;
     deviceAuth.resumed = false;
     clearDeviceError.mockClear();
@@ -497,6 +504,35 @@ describe('login-screen timeout error dismissal', () => {
       false
     );
 
+    renderer.unmount();
+  });
+
+  // The descriptor stores a catalog key, so flipping the i18n instance under a
+  // mounted screen must re-read the banner in the new language — the defect
+  // this PR fixes was exactly a banner that stayed in the previous language.
+  // The German string is read after the flip: the de catalog loads lazily, so
+  // a `lng: 'de'` lookup before changeLanguage falls back to English.
+  it('re-renders the stored error banner in the new language after changeLanguage', async () => {
+    const renderer = await mountLoginScreen();
+
+    await act(async () => {
+      await i18n.changeLanguage('de');
+    });
+    try {
+      const germanTimeout = i18n.t('authErrors.signInTimedOut');
+      expect(germanTimeout).not.toBe('Sign-in timed out. Please try again.');
+      expect(
+        findByType(renderer.root, 'Text').some(node => node.props.children === germanTimeout)
+      ).toBe(true);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+    // The flip back proves the banner re-reads on every language change, not
+    // just on a one-way switch.
+    const englishTimeout = i18n.t('authErrors.signInTimedOut');
+    expect(
+      findByType(renderer.root, 'Text').some(node => node.props.children === englishTimeout)
+    ).toBe(true);
     renderer.unmount();
   });
 });

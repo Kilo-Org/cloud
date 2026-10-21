@@ -12,7 +12,13 @@ import { i18n } from '@/i18n';
 import { GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAuth } from '@/lib/auth/auth-context';
-import { defaultErrorMessage, mapError, signupStepUpMessage } from '@/lib/auth/auth-error-messages';
+import {
+  type AuthErrorMessageKey,
+  defaultErrorMessage,
+  mapError,
+  mapErrorKey,
+  signupStepUpMessage,
+} from '@/lib/auth/auth-error-messages';
 import { hasStringCode, postAuth, type PostAuthFailure } from '@/lib/auth/auth-fetch';
 import {
   buildChallengeEntry,
@@ -67,9 +73,12 @@ async function tokenRefusalMessage(
 
 type BusyAction = 'apple' | 'google' | 'passkey' | 'otp-send' | 'otp-verify' | undefined;
 
+/** The email-field error keys the inline slot can carry; translated at render. */
+type EmailErrorKey = 'login.pleaseEnterEmail' | AuthErrorMessageKey;
+
 type NativeAuthResult = {
   busy: BusyAction;
-  emailError: string | undefined;
+  emailErrorKey: EmailErrorKey | undefined;
   clearEmailError: () => void;
   googleConfigured: boolean;
   signInWithApple: () => Promise<void>;
@@ -85,13 +94,13 @@ type NativeAuthResult = {
 export function useNativeAuth(): NativeAuthResult {
   const { signIn } = useAuth();
   const [busy, setBusy] = useState<BusyAction>(undefined);
-  const [emailError, setEmailError] = useState<string | undefined>(undefined);
+  const [emailErrorKey, setEmailErrorKey] = useState<EmailErrorKey | undefined>(undefined);
   const busyRef = useRef<BusyAction>(undefined);
   const challengeRef = useRef<{ email: string; challengeId: string } | null>(null);
   const { ssoRecovery, clearSsoRecovery, handleSsoError } = useSsoRecovery();
 
   const clearEmailError = useCallback(() => {
-    setEmailError(undefined);
+    setEmailErrorKey(undefined);
   }, []);
 
   const startAction = useCallback(
@@ -300,11 +309,11 @@ export function useNativeAuth(): NativeAuthResult {
     async (rawEmail: string) => {
       const email = rawEmail.trim().toLowerCase();
       if (!email) {
-        setEmailError(i18n.t('login.pleaseEnterEmail'));
+        setEmailErrorKey('login.pleaseEnterEmail');
         return false;
       }
       if (!emailAddressSchema.safeParse(email).success) {
-        setEmailError(mapError('INVALID_REQUEST'));
+        setEmailErrorKey(mapErrorKey('INVALID_REQUEST'));
         return false;
       }
 
@@ -323,7 +332,7 @@ export function useNativeAuth(): NativeAuthResult {
             result.errorCode === 'INVALID_REQUEST' ||
             result.errorCode === 'INVALID_EMAIL'
           ) {
-            setEmailError(mapError(result.errorCode));
+            setEmailErrorKey(mapErrorKey(result.errorCode));
           } else {
             toast.error(mapError(result.errorCode));
           }
@@ -410,7 +419,7 @@ export function useNativeAuth(): NativeAuthResult {
 
   return {
     busy,
-    emailError,
+    emailErrorKey,
     clearEmailError,
     googleConfigured,
     signInWithApple,

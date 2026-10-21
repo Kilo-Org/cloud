@@ -210,6 +210,13 @@ const config: ExpoConfig = {
       // disables both capabilities and the App Store profile loses them.
       'com.apple.developer.kernel.extended-virtual-addressing': true,
       'com.apple.developer.kernel.increased-memory-limit': true,
+      // Dev-only: the process that registers the artifacts File Provider domain
+      // and sets its automatically-enabled testing mode is the app itself, and
+      // iOS checks the calling process's entitlements. Apple does not grant
+      // this capability on distribution profiles, so production builds must
+      // not carry it (with the paired extension entitlement in
+      // plugins/withArtifactFileProvider.js).
+      ...(isProductionBuild ? {} : { 'com.apple.developer.fileprovider.testing-mode': true }),
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -233,6 +240,13 @@ const config: ExpoConfig = {
       // composer) can be opened in place.
       UIFileSharingEnabled: true,
       LSSupportsOpeningDocumentsInPlace: true,
+      // Dev-only signal paired with the testing-mode entitlement above: the
+      // artifacts provider module reads it from the app bundle's Info.plist
+      // to decide whether to register the domain with the automatically-
+      // enabled testing mode. `#if DEBUG` is the wrong gate — EAS builds
+      // non-production profiles with the Release configuration — so the
+      // profile is the signal on both sides.
+      ...(isProductionBuild ? {} : { KiloArtifactsFileProviderTesting: true }),
     },
   },
   android: {
@@ -472,6 +486,11 @@ const config: ExpoConfig = {
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
+    // Android 15+ draws text from glyph bounds while React Native measures it
+    // from advances, which clips words in a script the fallback font supplies.
+    // Android-only by capability: iOS has one text layout for both jobs, so its
+    // half is nothing. See the plugin's doc comment.
+    './plugins/withAndroidTextViewBounds',
     // One implementation for iOS and Android: the discard confirm is the same
     // shared `Alert.alert` call on both platforms, and iOS's `UIAlertController`
     // already draws that copy as given (it exposes no casing transform to
@@ -485,6 +504,11 @@ const config: ExpoConfig = {
     // by capability — iOS's UIAlertController already follows the system
     // appearance and takes no app-token override (see the plugin's doc comment).
     './plugins/withAndroidAlertDialogTheme',
+    // Overrides androidx.compose.ui's `close_sheet` accessibility string — the
+    // label Material3 gives the dismiss scrim of every native sheet — with the
+    // app's own `common.close` for all 87 languages. Android-only: the resource
+    // exists only in the androidx compose artifacts.
+    './plugins/withAndroidSheetCloseLabel',
     './plugins/withAndroidExpoModuleRepos',
     // Writes the app target's single `Localizable.strings` per language: the
     // four App Intent actions and their parameters resolve their

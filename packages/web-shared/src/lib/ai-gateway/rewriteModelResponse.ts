@@ -13,11 +13,12 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { UpstreamTimeoutError } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { getUpstreamBodyTermination } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import type {
   ChatCompletionChunk,
   OpenRouterUsage,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import { isDynamicallyOptedIntoRequestLogging } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
+import { getDynamicRequestLoggingMode } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
@@ -110,12 +111,11 @@ async function createRequestLogCapture(
   logging: RequestLoggingParams
 ): Promise<RequestLogCapture | null> {
   const { user, organization_id, session_id, vercel_request_id, request } = logging;
-  if (
-    !(await isDynamicallyOptedIntoRequestLogging({
-      accountId: user?.id ?? null,
-      organizationId: organization_id,
-    }))
-  ) {
+  const loggingMode = await getDynamicRequestLoggingMode({
+    accountId: user?.id ?? null,
+    organizationId: organization_id,
+  });
+  if (loggingMode === null) {
     return null;
   }
   const status = response.status;
@@ -154,6 +154,9 @@ async function createRequestLogCapture(
               }
             : detectToolCallArgumentErrors(responseText, request)
           : { response_body_read_error: responseReadError };
+      if (loggingMode === 'errors_only' && status < 400 && detectedError === null) {
+        return;
+      }
       const { columns: blobColumns, uploadError } = await uploadApiRequestLogBlobs({
         request: JSON.stringify(redactApiRequestLogRequest(request)),
         response: responseText,
@@ -272,7 +275,9 @@ function getResponseReadError(
     return null;
   }
 
-  if (error.name === 'ResponseAborted') {
+  const upstreamBodyTermination = getUpstreamBodyTermination(error);
+
+  if (error.name === 'ResponseAborted' || upstreamBodyTermination === 'disconnect') {
     return {
       errorType: 'upstream_disconnect',
       message: withRequestId(
@@ -296,7 +301,7 @@ function getResponseReadError(
     };
   }
 
-  if (error.name === 'TimeoutError') {
+  if (error.name === 'TimeoutError' || upstreamBodyTermination === 'timeout') {
     return {
       errorType: 'timeout',
       message: withRequestId(
@@ -434,6 +439,11 @@ function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
       usage.prompt_tokens_details.cached_tokens = 0; // OpenCode crashes if this is absent
     }
   }
+  if (usage.completion_tokens_details) {
+    if (usage.completion_tokens_details.reasoning_tokens === undefined) {
+      usage.completion_tokens_details.reasoning_tokens = 0; // strict OpenRouter clients reject a details object that omits this
+    }
+  }
 }
 
 export async function rewriteModelResponse_ChatCompletions({
@@ -541,6 +551,12 @@ export async function rewriteModelResponse_ChatCompletions({
             }
             if (delta.tool_calls === null) {
               delete delta.tool_calls;
+            }
+            for (const toolCall of delta.tool_calls ?? []) {
+              // Some APIs set null on argument continuation chunks, which @openrouter/ai-sdk-provider rejects
+              if (toolCall.type === null) {
+                delete toolCall.type;
+              }
             }
             applyReasoningDetailsResponseTransform(responseTransforms, delta);
           }
@@ -965,10 +981,12 @@ export async function rewriteModelResponse({
 }: RewriteModelResponseParams): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
   const customPricing = getCustomPricing(model);
+  // Custom LLMs are always free, so an upstream-reported cost must not reach the user.
   const requiresCostRemoval =
-    (providerId === 'openrouter' || providerId === 'vercel') &&
-    (isKiloExclusiveFreeModel(model) ||
-      (customPricing !== undefined && !customPricing.fallbackOnly));
+    providerId === 'custom' ||
+    ((providerId === 'openrouter' || providerId === 'vercel') &&
+      (isKiloExclusiveFreeModel(model) ||
+        (customPricing !== undefined && !customPricing.fallbackOnly)));
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   const { vercel_request_id: vercelRequestId } = logging;

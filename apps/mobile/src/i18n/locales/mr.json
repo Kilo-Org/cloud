@@ -35,6 +35,8 @@
     "connectGithub": "GitHub जोडा",
     "cost": "खर्च",
     "discard": "टाकून द्या",
+    "discardChangesMessage": "तुमचे बदल गमावले जातील.",
+    "discardChangesTitle": "बदल टाकून द्यायचे का?",
     "findings": "निष्कर्ष",
     "mergeRequest": "मर्ज रिक्वेस्ट",
     "notConnected": "जोडलेले नाही",
@@ -109,7 +111,9 @@
     "online": "ऑनलाइन",
     "open": "{{name}} उघडा",
     "openPullRequest": "पुल रिक्वेस्ट उघडा",
+    "completed": "पूर्ण",
     "pending": "प्रलंबित",
+    "running": "चालू आहे",
     "performance": "कार्यक्षमता",
     "preferences": "प्राधान्ये",
     "privacyPolicy": "गोपनीयता धोरण",
@@ -661,7 +665,8 @@
       "description": "मोबाइलवर पुल रिक्वेस्टचे पुनरावलोकन करण्यासाठी तुमचे GitHub खाते कनेक्ट करा.",
       "gitlabDescription": "मोबाइलवर मर्ज रिक्वेस्ट तपासण्यासाठी तुमचे GitLab खाते कनेक्ट करा.",
       "bitbucketDescription": "मोबाइलवर पुल रिक्वेस्ट तपासण्यासाठी हे संघटन Bitbucket शी कनेक्ट करा.",
-      "bitbucketOrgOnlyDescription": "तुमच्या प्रोफाइलमध्ये एक संघटन निवडा जेणेकरून त्याची Bitbucket पुल रिक्वेस्ट तपासता येतील."
+      "bitbucketOrgOnlyDescription": "त्याच्या Bitbucket पुल रिक्वेस्ट तपासण्यासाठी वरील खाते एका संघटनेत बदला.",
+      "contextLine": "{{organization}} साठी"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "हे पुनरावलोकन सध्याच्या स्वरूपात सादर करता येत नाही. PR बदलला असेल किंवा ही तुमची स्वतःची पुल रिक्वेस्ट असेल, जिचे तुम्ही पुनरावलोकन करू शकत नाही.",
       "reviewNotSubmittedTerm": "हे पुनरावलोकन तसेच सबमिट करता येत नाही. {{term}} बदलली असेल, किंवा तुम्ही तुमच्या स्वतःच्या {{term}} चे पुनरावलोकन करू शकत नाही.",
       "couldNotPostComment": "टिप्पणी पोस्ट करता आली नाही.",
-      "couldNotSubmitReview": "पुनरावलोकन सादर करता आले नाही. इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा."
+      "couldNotSubmitReview": "पुनरावलोकन सादर करता आले नाही. इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+      "rateLimited": "खूप जास्त विनंत्या. कृपया नंतर पुन्हा प्रयत्न करा.",
+      "conflict": "तुम्ही यावर काम करत असताना हे बदलले. कृपया हे पुन्हा लोड करून पुन्हा प्रयत्न करा."
     },
     "operation": {
       "couldNotReply": "उत्तर देता आले नाही.",
@@ -1413,6 +1420,9 @@
       "couldNotGetLatest": "सध्याची माहिती मिळवता आली नाही.",
       "byline": "{{repo}} #{{number}} — {{author}} यांनी तयार केलेली",
       "noFindings": "कोणतेही निष्कर्ष आढळले नाहीत.",
+      "findingsUnavailable": "हे पुनरावलोकन अयशस्वी झाल्यामुळे परिणाम उपलब्ध नाहीत.",
+      "serviceUnavailable": "कोड पुनरावलोकन सेवेशी संपर्क साधता आला नाही. सेवा उपलब्ध झाल्यावर पुनरावलोकन पुन्हा करा.",
+      "reviewFailed": "पुनरावलोकन अयशस्वी झाले. कृपया पुन्हा प्रयत्न करा.",
       "showMore": "आणखी दाखवा",
       "created": "तयार केले",
       "started": "सुरू केले",
@@ -1528,8 +1538,6 @@
     "updateFailed": "कोड पुनरावलोकक अद्ययावत करता आला नाही.",
     "configSaveFailed": "पुनरावलोकनाच्या सेटिंग्ज जतन करता आल्या नाहीत.",
     "status": {
-      "running": "चालू आहे",
-      "completed": "पूर्ण",
       "interrupted": "व्यत्यय आला"
     },
     "reviewStyle": {
@@ -1542,7 +1550,8 @@
       "bugs": "बग",
       "style": "शैली",
       "testing": "चाचणी",
-      "documentation": "दस्तऐवजीकरण"
+      "documentation": "दस्तऐवजीकरण",
+      "unknown": "इतर ({{area}})"
     },
     "gateThreshold": {
       "warning": "चेतावणी"
@@ -1654,7 +1663,14 @@
       "whereFound": "आढळलेली ठिकाणे ({{displayCount}})",
       "fullReport": "तयार केलेला संपूर्ण अहवाल",
       "yes": "होय",
-      "no": "नाही"
+      "no": "नाही",
+      "action": {
+        "analyzeCodebase": "कोडबेसचे विश्लेषण करा",
+        "dismiss": "नाकारा",
+        "manualReview": "मॅन्युअल पुनरावलोकन",
+        "monitor": "निरीक्षण करा",
+        "openPr": "PR उघडा"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} निष्कर्ष",
@@ -1856,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "बदल जतन करा",
       "unsavedTitle": "जतन न केलेले बदल",
-      "unsavedMessage": "ही स्क्रीन सोडण्यापूर्वी तुमचे बदल जतन करायचे?"
+      "unsavedMessage": "ही स्क्रीन सोडण्यापूर्वी तुमचे बदल जतन करायचे?",
+      "unsavedInvalidMessage": "हे बदल अजून जतन करता येत नाहीत. जतन करण्यासाठी हे दुरुस्त करा, किंवा सोडून जाण्यासाठी हे टाकून द्या."
     },
     "auditReportButton": {
       "viewA11y": "ऑडिट अहवाल पाहा"
@@ -1873,7 +1890,24 @@
       "title": "ऑडिट अहवाल",
       "unavailable": "ऑडिट अहवाल अनुपलब्ध",
       "unavailableDescription": "केवळ संस्थेचे मालक आणि बिलिंग व्यवस्थापक ऑडिट अहवाल पाहू शकतात. तुम्हाला प्रवेश देण्याची विनंती त्यांच्याकडे करा.",
-      "queryFailed": "अहवालासाठीची क्वेरी पूर्ण झाली नाही. पुन्हा प्रयत्न करा."
+      "queryFailed": "अहवालासाठीची क्वेरी पूर्ण झाली नाही. पुन्हा प्रयत्न करा.",
+      "eventActions": {
+        "findingAnalysisCompleted": "विश्लेषण पूर्ण झाले",
+        "findingAnalysisFailed": "विश्लेषण अयशस्वी झाले",
+        "findingAutoDismissed": "स्वयंचलितपणे नाकारले",
+        "findingCreated": "आयात केले",
+        "findingDeleted": "हटवले",
+        "findingDismissed": "नाकारले",
+        "findingSeverityChanged": "तीव्रता बदलली",
+        "findingStatusChange": "स्थिती बदलली",
+        "findingSuperseded": "जुने झाले",
+        "remediationBlocked": "निराकरण अडवले गेले",
+        "remediationCancelled": "रद्द केले",
+        "remediationFailed": "निराकरण अयशस्वी झाले",
+        "remediationNoChangesNeeded": "बदलांची गरज नाही",
+        "remediationPrOpened": "PR उघडले",
+        "remediationQueued": "निराकरणाची विनंती केली"
+      }
     },
     "notifications": {
       "couldNotLoad": "सूचनांच्या सेटिंग्ज लोड करता आल्या नाहीत.",
@@ -1905,7 +1939,6 @@
       "installApp": "GitHub ॲप इन्स्टॉल करा",
       "reauthorizeButton": "GitHub ॲपला पुन्हा परवानगी द्या",
       "reauthorizeDescription": "Dependabot सूचना पाहण्यासाठी सुरक्षा एजंटला vulnerability_alerts ही परवानगी आवश्यक आहे. ती देण्यासाठी GitHub ॲपला पुन्हा परवानगी द्या.",
-      "reauthorizeFailed": "पुन्हा परवानगी देण्याची प्रक्रिया सुरू करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
       "reauthorizeTitle": "अतिरिक्त परवानग्या आवश्यक",
       "setupFailed": "GitHub सेटअप सुरू करता आला नाही. कृपया पुन्हा प्रयत्न करा."
     },
@@ -2209,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} आता उपलब्ध नाही. त्याऐवजी तुमचे डीफॉल्ट मॉडेल वापरले जात आहे.",
       "couldNotReadPendingSessions": "प्रलंबित सत्रे वाचता आली नाहीत. पुन्हा प्रयत्न करा.",
       "failedToCreate": "सत्र तयार करता आले नाही.",
+      "checkOrganizationAccess": "या संस्थेकडील तुमचा प्रवेश तपासा आणि पुन्हा प्रयत्न करा.",
       "couldNotRefreshRepositories": "रिपॉझिटरींची यादी रिफ्रेश करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
       "discardDraftTitle": "मसुदा रद्द करायचा?",
       "discardDraftMessage": "तुमचा प्रॉम्प्ट हटवला जाईल.",
@@ -2278,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} ओळी",
       "matchesBadge_one": "{{displayCount}} जुळणारे परिणाम",
       "matchesBadge_other": "{{displayCount}} जुळणारे परिणाम",
-      "noOutput": "कोणतेही आउटपुट नाही."
+      "noOutput": "कोणतेही आउटपुट नाही.",
+      "translationFailed": "अनुवाद अयशस्वी"
     },
     "readToolMarkdown": {
       "linesTruncated": "ओळी {{start}}–{{end}} (काही मजकूर वगळला)",
@@ -2729,6 +2764,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "हे लोड होईपर्यंत तुमची सक्रिय सत्रे अनुपलब्ध आहेत.",
     "currentDeviceUnidentified": "सध्याचे डिव्हाइस ओळखता आले नाही.",
+    "kiloApp": "Kilo अ‍ॅप",
     "noSessions": "सक्रिय सत्रे नाहीत",
     "noSessionsDescription": "दुसऱ्या डिव्हाइसवरील Kilo अ‍ॅपमध्ये साइन इन करा. ते सत्र येथे दिसेल.",
     "onlyKiloAppSignIns": "येथे फक्त Kilo अ‍ॅपमधील साइन इनची सत्रे दिसतात. एडिटर आणि CLI मधील सत्रे या यादीत नाहीत.",
@@ -2881,6 +2917,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "आपण सुरू करण्यापूर्वी",
+    "summaryTitle": "डेटा शेअरिंग प्राधान्ये",
     "introDescription": "प्रतिसाद तयार करण्यासाठी Kilo तुमचे संदेश AI सेवा पुरवठादारांना पाठवते. कोणता डेटा कोणासोबत शेअर केला जातो ते खाली दिले आहे.",
     "required": "Kilo वापरण्यासाठी आवश्यक",
     "promptsTitle": "तुमचे प्रॉम्प्ट आणि संभाषणे",
@@ -2889,7 +2926,6 @@
     "accountDescription": "तुमची ओळख पडताळण्यासाठी आणि वापर मोजण्यासाठी तुमच्या Kilo खात्याचा ID आणि विनंतीचा मेटाडेटा वापरला जातो.",
     "diagnosticsTitle": "अ‍ॅपमधील समस्यांचे निदान",
     "diagnosticsDescription": "अ‍ॅप स्थिर ठेवण्यासाठी क्रॅश आणि त्रुटींचे अहवाल वापरले जातात. या अहवालांमधून अ‍ॅपमधील मजकूर व इतर सामग्री काढलेली असते.",
-    "optional": "ऐच्छिक",
     "helpImprove": "Kilo सुधारण्यास मदत करा",
     "helpImproveDescription": "ओळख उघड न करणारा अ‍ॅप वापराचा डेटा आणि अ‍ॅप कुठून इंस्टॉल केले याची माहिती शेअर करा. तुम्ही हे कधीही सेटिंग्जमध्ये बदलू शकता.",
     "seeFullDetails": "पूर्ण तपशील पहा",
@@ -2974,11 +3010,22 @@
     "boundary": {
       "backToProfile": "प्रोफाइलवर परत जा",
       "loadErrorMessage": "इंटरनेट जोडणी तपासा आणि पुन्हा प्रयत्न करा.",
+
+      "chooseAccount": "खाते निवडा",
       "loadErrorTitle": "तुमच्या संस्था लोड करता आल्या नाहीत.",
+      "noOrganization": "कोणतीही संस्था नाही",
+
+      "noOrganizationDescription": "हे खाते कोणत्याही संस्थेचा भाग नाही. सदस्य आमंत्रणे आणि कमी शिल्लक सूचना यांसारखी संस्था वैशिष्ट्ये वापरण्यासाठी वेबवर संस्था तयार करा किंवा एकात सामील व्हा.",
+
+      "openWebOrganizations": "वेबवर संस्था उघडा",
+
       "organizationUnavailable": "संस्था उपलब्ध नाही.",
-      "selectDescription": "पुढे जाण्यासाठी तुमच्या प्रोफाइलमधून संस्था निवडा.",
+      "selectDescriptionWithOrganizations": "तुम्ही एक किंवा अधिक संस्थांचे सदस्य आहात. ही स्क्रीन जे खाते वापरावे ते निवडा.",
+
       "selectOrganization": "संस्था निवडा",
       "unavailableDescription": "ही संस्था आता उपलब्ध नाही. पुढे जाण्यासाठी तुमच्या प्रोफाइलमधून दुसरी संस्था निवडा.",
+
+      "unavailableSessionsDescription": "ही संस्था आता उपलब्ध नाही. तिचे सत्र लोड केले जू शकत नाहीत.",
       "accessDeniedDescription": "तुम्हाला या संस्थेमध्ये प्रवेश नाही."
     },
     "creditActivity": {
@@ -3468,6 +3515,9 @@
     "localModels": {
       "title": "डिव्हाइसवरील मॉडेल",
       "help": "डिव्हाइसवरील मॉडेल या फोनवरच चालतात. तुमचे प्रॉम्प्ट आणि उत्तरे डिव्हाइसवरच राहतात.",
+      "switchTitle": "डिव्हाइसवरील मॉडेलवर स्विच करायचे?",
+      "switchMessage": "{{name}} वर स्विच केल्यावर या संभाषणाचे प्रॉम्प्ट आणि संदर्भ यांवर दूरस्थ सर्व्हरवर नाही, तर या फोनवरच प्रक्रिया केली जाईल.",
+      "switchConfirm": "मॉडेल बदला",
       "systemPurpose": "या डिव्हाइसच्या सिस्टममध्ये अंगभूत असलेले मॉडेल. ते डिव्हाइसवरच चालते.",
       "apple": "Apple Intelligence (डिव्हाइसवर)",
       "checking": "उपलब्धता तपासत आहे…",
@@ -3564,7 +3614,6 @@
     "personalDefaultDescription": "कोणत्याही रेपॉजिटरीमध्ये पिन केलेले प्रोफाइल नसताना स्वयं-लोड होते.",
     "organizationDefaultDescription": "वैयक्तिक डीफॉल्ट नसलेल्या सदस्यांसाठी स्वयं-लोड.",
     "setAsDefault": "डीफॉल्ट म्हणून सेट करा",
-    "removeDefault": "डीफॉल्ट म्हणून काढा",
     "saveFailed": "प्रोफाइल सेव्ह करू शकलो नाही",
     "deleteTitle": "प्रोफाइल हटवा",
     "deleteMessage": "हे प्रोफाइल आणि त्याची सेटिंग्ज कायमची काढून टाकते. हे पूर्ववत केले जाऊ शकत नाही.",
@@ -3590,11 +3639,13 @@
     "commandsTitle": "सेटअप कमांड",
     "addCommand": "आदेश जोडा",
     "commandLabel": "आज्ञा",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "उदा. pnpm install",
     "commandsEmpty": "अद्याप सेटअप आदेश नाहीत",
     "commandsSaveFailed": "सेटअप कमांड सेव्ह करू शकलो नाही",
     "moveUp": "वर हलवा",
     "moveDown": "खाली हलवा",
+    "moveCommandUp": "आदेश {{position}} वर हलवा",
+    "moveCommandDown": "आदेश {{position}} खाली हलवा",
     "skillsTitle": "कौशल्य",
     "addSkill": "कौशल्य जोडा",
     "skillNameLabel": "कौशल्याचे नाव",
@@ -3634,7 +3685,9 @@
       "jsonTooLarge": "कमाल 50 नोंदी वापरा, की 128 पर्यंत आणि मूल्ये 4096 अक्षरांपर्यंत",
       "timeoutInvalid": "कालबाह्य पूर्ण संख्या मिलीसेकंद असणे आवश्यक आहे",
       "edit": "MCP सर्व्हर संपादित करा",
-      "saveFailed": "MCP सर्व्हर जतन करू शकलो नाही"
+      "saveFailed": "MCP सर्व्हर जतन करू शकलो नाही",
+      "deleteFailed": "MCP सर्व्हर हटवू शकलो नाही",
+      "updateFailed": "MCP सर्व्हर अपडेट करू शकलो नाही"
     },
     "agents": {
       "title": "प्रोफाइल एजंट",
@@ -3661,10 +3714,11 @@
       "visibilitySubagent": "Subagent — फक्त इतरांकडून कॉल करण्यायोग्य",
       "visibilityAll": "सर्व - दोन्ही",
       "saveFailed": "एजंट जतन करू शकलो नाही",
+      "deleteFailed": "एजंट हटवू शकलो नाही",
       "nameRequired": "एजंटचे नाव एंटर करा",
       "slugRequired": "एजंट स्लग एंटर करा",
       "slugInvalid": "स्लग अक्षराने सुरू होणे आवश्यक आहे आणि फक्त लोअरकेस अक्षरे, अंक आणि डॅश वापरणे आवश्यक आहे",
-      "slugConflict": "तो गोगलगाय अंगभूत एजंटने राखून ठेवला आहे",
+      "slugConflict": "तो स्लॅग आधीच बिल्ट-इन एजंत किंवा या प्रोफाइलमधील दुसऱ्या एजंतकडून वापरला जातो",
       "edit": "एजंट संपादित करा"
     },
     "slashCommands": {
@@ -3675,10 +3729,12 @@
       "description": "आदेश वर्णन",
       "template": "साचा",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS स्पष्ट करा",
       "subtask": "सबटास्क म्हणून चालवा",
       "edit": "स्लॅश कमांड संपादित करा",
       "saveFailed": "कमांड सेव्ह करू शकलो नाही",
+      "deleteFailed": "कमांड हटवू शकलो नाही",
       "nameRequired": "कमांडचे नाव एंटर करा",
       "nameInvalid": "नाव लोअरकेस अक्षराने सुरू होणे आवश्यक आहे आणि फक्त लोअरकेस अक्षरे, अंक आणि डॅश वापरणे आवश्यक आहे",
       "templateRequired": "कमांड टेम्पलेट प्रविष्ट करा",
@@ -3806,5 +3862,69 @@
       "title": "यादीत जतन करा",
       "saved": "{{list}} मध्ये जतन केले"
     }
+  },
+  "agentBriefing": {
+    "title": "सकाळचा आढावा",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "काही जुनी क्रियाकलाप माहिती गहाळ असू शकते. ≥ म्हणजे किमान इतके; अज्ञात म्हणजे शून्य नाही.",
+    "available": "उपलब्ध आढावे",
+    "history": "आढावा इतिहास",
+    "historyHint": "डिसमिस केलेल्या अहवालांसह सर्व अहवाल 30 दिवस ठेवले जातात.",
+    "settings": "आढावा सेटिंग्ज",
+    "empty": "रात्रभरात कोणतीही क्रियाकलाप नाही",
+    "emptyHint": "सक्रिय रात्रीनंतर तुमची क्लाउड आणि CLI कोडिंग सत्रे येथे दिसतील.",
+    "loadError": "आढावे लोड करता आले नाहीत",
+    "sessions": "रात्रभर सक्रिय",
+    "pullRequests": "उघडलेले PRs",
+    "blockers": "नवीन अडथळे",
+    "spend": "रात्रभरातील खर्च",
+    "view": "आढावा वाचा",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "आढावाकडे दुर्लक्ष करा",
+    "offline": "ऑफलाइन · जतन केलेला आढावा",
+    "cached": "जतन केलेला अहवाल · रिफ्रेश उपलब्ध नाही",
+    "revised": "सुधारित · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "AI सारांश",
+    "summaryDisabled": "संरचित अहवाल · या संदर्भासाठी AI बंद आहे",
+    "summaryPending": "AI सारांश तयार होत आहे. तयार झाल्यावर तो येथे जोडला जाईल.",
+    "summaryFailed": "AI सारांश अयशस्वी झाला. पुन्हा प्रयत्न केल्यास पुन्हा शुल्क लागू शकते.",
+    "summaryUnavailable": "AI सारांश उपलब्ध नाही. तुमचा संरचित अहवाल अजूनही उपलब्ध आहे.",
+    "summaryOutdated": "हा सारांश नवीनतम अहवाल आवृत्तीपूर्वीचा आहे.",
+    "summaryCharge": "AI शुल्क {{cost}}",
+    "summaryChargePending": "AI शुल्क ताळमेळ प्रलंबित",
+    "generate": "सारांश तयार करा",
+    "retrySummary": "सशुल्क सारांश पुन्हा प्रयत्न करा",
+    "sources": "पुरावे आणि आर्टिफॅक्ट्स",
+    "timezone": "आढावा वेळ क्षेत्र",
+    "deviceTimezone": "डिव्हाइसचे वेळ क्षेत्र वापरा",
+    "timezoneHint": "IANA वेळ क्षेत्र, उदा. Europe/Berlin. वेळापत्रकातील बदल पुढील रात्रींना लागू होतात.",
+    "nightStart": "रात्र सुरू",
+    "morningStart": "रात्र संपते / सकाळ सुरू",
+    "morningEnd": "सकाळ संपते",
+    "timeHint": "सकाळ संपल्यावर Home कार्ड थेट स्थिती पुन्हा दाखवते, ऑफलाइन असतानाही.",
+    "invalidSchedule": "वैध वेळ क्षेत्र आणि एकमेकांवर न येणारे, रिकामे नसलेले रात्र व सकाळ कालावधी निवडा.",
+    "notificationsHint": "तुमचा पहिला अहवाल तयार झाल्यावर दररोज सकाळी एक सामान्य सूचना. सशुल्क AI सारांशांपासून स्वतंत्र.",
+    "notificationPermission": "तुमचा आढावा मिळवण्यासाठी $t(common.notifications) मध्ये डिव्हाइस सूचना सुरू करा.",
+    "aiOptIn": "सशुल्क AI सारांश",
+    "aiHint": "फक्त या संदर्भासाठी ऐच्छिक. निवडक, संपादित उतारे आणि संरचित तथ्ये तुमच्या ॲप भाषेत तुमच्या मॉडेलला पाठवली जातात. शुल्क या संदर्भाच्या शिल्लकमधून आकारले जाते.",
+    "defaultModel": "Kilo चे डीफॉल्ट मॉडेल वापरा",
+    "duration": "वेळ मर्यादा (मिनिटे)",
+    "spendLimit": "खर्च मर्यादा (USD)",
+    "safeguardHint": "प्रत्येक सारांशासाठी निश्चित मर्यादा, दैनिक बजेट नाही. डीफॉल्ट: 10 मिनिटे आणि $2. या मर्यादेत निर्मिती सुरू असताना जास्तीत जास्त पाच मिनिटांनंतर अहवाल प्रकाशित होतो.",
+    "invalidSafeguards": "धनात्मक, निश्चित वेळ आणि खर्च मर्यादा प्रविष्ट करा.",
+    "estimate": "अंदाज {{estimate}} · कमाल {{maximum}}",
+    "estimateUnavailable": "या सेटिंग्ससाठी सशुल्क सारांश उपलब्ध नाही.",
+    "confirmPaid": "{{context}} साठी सशुल्क सारांश सुरू करायचे?",
+    "confirmGeneration": "सशुल्क सारांश तयार करायचा?",
+    "paidDisclosure": "अंदाजे {{estimate}}, कमाल {{maximum}}, {{minutes}} मिनिटांच्या मर्यादेसह. निर्मिती अयशस्वी झाली तरी शुल्क लागू होते.",
+    "enable": "सशुल्क सारांश सुरू करा",
+    "contextSettings": "AI सेटिंग्ज · {{context}}",
+    "allContexts": "वैयक्तिक आणि संस्थेचे आढावे वेगळे ठेवले जातात.",
+    "estimatePricingUnavailable": "या मॉडेलचे मूल्यनिर्धारण उपलब्ध नाही.",
+    "estimateBalanceUnavailable": "सशुल्क सारांशासाठी पुरेशी शिल्लक नाही.",
+    "estimateModelNotAllowed": "या मॉडेलला येथे परवानगी नाही.",
+    "estimateSpendLimitTooLow": "हा सारांश परवानगी देण्यासाठी खर्च मर्यादा वाढवा."
   }
 }

@@ -1,0 +1,4 @@
+{
+  "default": { "mode": "preinstalled", "image": "all-in-one" },
+  "targets": {}
+}

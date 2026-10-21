@@ -3512,7 +3512,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agent starten vereist een prompt. Voeg een prompt toe en voer de actie opnieuw uit.",
-      "repositoryRequired": "Agent starten vereist een repository. Open Kilo en kies er een in een nieuwe sessie, voer de actie daarna opnieuw uit.",
+      "repositoryRequired": "Agent starten vereist een repository. Open Kilo en kies er een, voer de actie daarna opnieuw uit.",
       "repositoryUnknown": "Kilo herkent {{repository}} niet als GitHub- of GitLab-repository. Kies een andere repository in Kilo.",
       "repositoryUnsupported": "{{repository}} is een Bitbucket-repository — Agent starten kan die nog niet gebruiken. Kies een andere repository in Kilo."
     }

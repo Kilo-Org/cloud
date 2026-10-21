@@ -3512,7 +3512,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Az ügynök indításához utasítás szükséges. Adj hozzá utasítást, és futtasd újra.",
-      "repositoryRequired": "Az ügynök indításához adattár szükséges. Nyisd meg a Kilo alkalmazást, válassz egyet egy új munkamenetben, majd futtasd újra.",
+      "repositoryRequired": "Az ügynök indításához adattár szükséges. Nyisd meg a Kilo alkalmazást, válassz egyet, majd futtasd újra.",
       "repositoryUnknown": "A Kilo nem ismeri fel a {{repository}} nevet GitHub- vagy GitLab-adattárként. Válassz másik adattárat a Kilóban.",
       "repositoryUnsupported": "A {{repository}} egy Bitbucket-adattár — Az Ügynök indítása még nem tudja használni. Válassz másik adattárat a Kilóban."
     }

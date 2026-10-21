@@ -3676,7 +3676,7 @@
   "appActions": {
     "start": {
       "promptRequired": "يتطلب تشغيل وكيل تعليمات. أضف تعليمات ثم شغّله مرة أخرى.",
-      "repositoryRequired": "يتطلب تشغيل وكيل مستودعًا. افتح Kilo واختر مستودعًا في جلسة جديدة، ثم شغّله مرة أخرى.",
+      "repositoryRequired": "يتطلب تشغيل وكيل مستودعًا. افتح Kilo واختر مستودعًا، ثم شغّله مرة أخرى.",
       "repositoryUnknown": "لا يتعرّف Kilo على {{repository}} كمستودع GitHub أو GitLab. اختر مستودعًا آخر في Kilo.",
       "repositoryUnsupported": "{{repository}} مستودع Bitbucket — لا يستطيع تشغيل وكيل استخدامه بعد. اختر مستودعًا آخر في Kilo."
     }

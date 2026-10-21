@@ -3594,7 +3594,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Ke spuštění agenta je potřeba zadání. Přidej zadání a spusť ho znovu.",
-      "repositoryRequired": "Ke spuštění agenta je potřeba repozitář. Otevři Kilo a vyber jeden v nové relaci, a pak ho spusť znovu.",
+      "repositoryRequired": "Ke spuštění agenta je potřeba repozitář. Otevři Kilo a vyber jeden, a pak ho spusť znovu.",
       "repositoryUnknown": "Kilo nerozpoznává {{repository}} jako repozitář na GitHubu nebo GitLabu. Vyber jiný repozitář v Kilu.",
       "repositoryUnsupported": "{{repository}} je repozitář na Bitbucketu — Spustit agenta ho zatím nemůže použít. Vyber jiný repozitář v Kilu."
     }

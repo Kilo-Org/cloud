@@ -3553,7 +3553,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Lai sāktu aģentu, nepieciešama uzvedne. Pievieno uzvedni un palaid to vēlreiz.",
-      "repositoryRequired": "Lai sāktu aģentu, nepieciešama repozitorija. Atver Kilo un izvēlies vienu jaunā sesijā, pēc tam palaid to vēlreiz.",
+      "repositoryRequired": "Lai sāktu aģentu, nepieciešama repozitorija. Atver Kilo un izvēlies vienu, pēc tam palaid to vēlreiz.",
       "repositoryUnknown": "Kilo neatpazīst {{repository}} kā GitHub vai GitLab repozitoriju. Izvēlies citu repozitoriju Kilo.",
       "repositoryUnsupported": "{{repository}} ir Bitbucket repozitorijs — Sākt aģentu to vēl nevar izmantot. Izvēlies citu repozitoriju Kilo."
     }

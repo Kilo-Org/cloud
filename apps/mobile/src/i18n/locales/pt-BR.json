@@ -3553,7 +3553,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Iniciar agente precisa de um prompt. Adicione um prompt e execute novamente.",
-      "repositoryRequired": "Iniciar agente precisa de um repositório. Abra o Kilo e escolha um em uma nova sessão, depois execute novamente.",
+      "repositoryRequired": "Iniciar agente precisa de um repositório. Abra o Kilo e escolha um, depois execute novamente.",
       "repositoryUnknown": "O Kilo não reconhece {{repository}} como um repositório do GitHub ou GitLab. Escolha outro repositório no Kilo.",
       "repositoryUnsupported": "{{repository}} é um repositório do Bitbucket — Iniciar agente ainda não pode usá-lo. Escolha outro repositório no Kilo."
     }

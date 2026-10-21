@@ -3512,7 +3512,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Bilow wakiilka wuxuu u baahan yahay tilmaan. Ku dar tilmaan kadibna mar kale orod.",
-      "repositoryRequired": "Bilow wakiilka wuxuu u baahan yahay kayd. Fur Kilo oo ku dooro mid shir cusub ah, kadibna mar kale orod.",
+      "repositoryRequired": "Bilow wakiilka wuxuu u baahan yahay kayd. Fur Kilo oo ku dooro mid, kadibna mar kale orod.",
       "repositoryUnknown": "Kilo kama aqoonsado {{repository}} kayd GitHub ama GitLab ah. Dooro kayd kale gudaha Kilo.",
       "repositoryUnsupported": "{{repository}} waa kayd Bitbucket — Bilow wakiilka weli ma isticmaali karo. Dooro kayd kale gudaha Kilo."
     }

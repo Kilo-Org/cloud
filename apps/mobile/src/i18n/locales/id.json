@@ -3512,7 +3512,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Mulai agen memerlukan instruksi. Tambahkan instruksi lalu jalankan lagi.",
-      "repositoryRequired": "Mulai agen memerlukan repositori. Buka Kilo dan pilih satu di sesi baru, lalu jalankan lagi.",
+      "repositoryRequired": "Mulai agen memerlukan repositori. Buka Kilo dan pilih satu, lalu jalankan lagi.",
       "repositoryUnknown": "Kilo tidak mengenali {{repository}} sebagai repositori GitHub atau GitLab. Pilih repositori lain di Kilo.",
       "repositoryUnsupported": "{{repository}} adalah repositori Bitbucket — Mulai agen belum bisa menggunakannya. Pilih repositori lain di Kilo."
     }

@@ -6,7 +6,6 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 
 import { PrBadge, PrBadgeSkeleton } from './PrBadge';
 import { PrHoverCardContent } from './PrHoverCardContent';
-import { WatchPrDialog } from './WatchPrDialog';
 import type { StoredSession } from './types';
 
 type SessionPrIndicatorProps = {
@@ -50,25 +49,23 @@ export function SessionPrIndicator({ session }: SessionPrIndicatorProps) {
   const pr = session.associatedPr;
 
   return (
-    <div className="flex shrink-0 items-center gap-1">
-      <HoverCard openDelay={120} closeDelay={80}>
-        <HoverCardTrigger asChild>
-          <PrBadge pr={pr} onClick={handleBadgeClick} />
-        </HoverCardTrigger>
-        <HoverCardContent
-          align="end"
-          side="left"
-          className="w-72"
-          onClick={event => event.stopPropagation()}
-        >
-          <PrHoverCardContent
-            pr={pr}
-            sessionId={session.sessionId}
-            gitBranch={session.branch ?? null}
-          />
-        </HoverCardContent>
-      </HoverCard>
-      {pr.platform === 'github' && <WatchPrDialog sessionId={session.sessionId} pr={pr} />}
-    </div>
+    <HoverCard openDelay={120} closeDelay={80}>
+      <HoverCardTrigger asChild>
+        <PrBadge pr={pr} onClick={handleBadgeClick} />
+      </HoverCardTrigger>
+      <HoverCardContent
+        align="end"
+        side="left"
+        collisionPadding={8}
+        className="w-72 max-w-[var(--radix-hover-card-content-available-width)]"
+        onClick={event => event.stopPropagation()}
+      >
+        <PrHoverCardContent
+          pr={pr}
+          sessionId={session.sessionId}
+          gitBranch={session.branch ?? null}
+        />
+      </HoverCardContent>
+    </HoverCard>
   );
 }

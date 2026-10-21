@@ -35,9 +35,7 @@ vi.mock('expo-router', async () => {
 vi.mock('react-native', async () => {
   const { NativeTextInput } = await import('./todo-list-model-picker.mounted.test-helpers');
   return {
-    // The settings screen arms a hardware Back listener; the mock records the
-    // subscription so mounting the screen does not throw on the missing export.
-    BackHandler: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+    BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
     I18nManager: { isRTL: false },
     Keyboard: { dismiss: vi.fn() },
     Pressable: 'Pressable',

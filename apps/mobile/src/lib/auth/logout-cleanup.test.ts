@@ -57,7 +57,8 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
 }));
 
 import {
-  readLogoutCleanupTombstone,
+  type LogoutCleanupRecord,
+  readLogoutCleanupRecords,
   runLogoutCleanup,
   unregisterActivityTokensAndTombstone,
 } from '@/lib/auth/logout-cleanup';
@@ -73,6 +74,9 @@ import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
 /* eslint-enable import/first */
 
 const GET_ME_QUERY_KEY: readonly unknown[] = [['user', 'getMe'], { type: 'query' }];
+
+/** Records written by these tests are fresh, so reconciliation processes them. */
+const RECENT_FAILED_AT = Date.now();
 
 function base64url(input: string): string {
   return btoa(input).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
@@ -90,6 +94,27 @@ function seedUser(userId: string | null): void {
   } else {
     queryClient.setQueryData(GET_ME_QUERY_KEY, { id: userId });
   }
+}
+
+function makeRecord(overrides: Partial<LogoutCleanupRecord> = {}): LogoutCleanupRecord {
+  return {
+    userId: 'u1',
+    pushTokens: [],
+    pushLookupPending: false,
+    needsActivityUnregister: false,
+    activityTokens: [],
+    failedAt: RECENT_FAILED_AT,
+    ...overrides,
+  };
+}
+
+function seedRecords(records: LogoutCleanupRecord[]): void {
+  store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify({ version: 2, records }));
+}
+
+async function storedRecordFor(owner: string | null): Promise<LogoutCleanupRecord | undefined> {
+  const records = await readLogoutCleanupRecords();
+  return records.find(record => record.userId === owner);
 }
 
 function pushOutcome(kind: 'token' | 'none' | 'lookup-failed', token?: string): void {
@@ -110,7 +135,7 @@ describe('runLogoutCleanup', () => {
     deliveryMock.unregisterTokens.mockResolvedValue({ ok: true, tokens: [] });
   });
 
-  it('revokes the session and unregisters the token, then deletes any existing tombstone on full success', async () => {
+  it('revokes the session and unregisters the token, then stores no record on full success', async () => {
     store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify({ stale: true }));
     pushOutcome('token');
     trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
@@ -156,36 +181,39 @@ describe('runLogoutCleanup', () => {
     expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
   });
 
-  it('writes both flags when both remote parts reject', async () => {
+  it('records the push token when the unregister rejects', async () => {
     pushOutcome('token');
     trpcMock.revokeCurrentDeviceSession.mutate.mockRejectedValue(new Error('network down'));
     trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
 
     await runLogoutCleanup();
 
-    const tombstone = await readLogoutCleanupTombstone();
-    expect(tombstone).toEqual({
+    expect(await storedRecordFor('u1')).toEqual({
       userId: 'u1',
-      pushToken: 'push-1',
-      needsPushUnregister: true,
+      pushTokens: ['push-1'],
+      pushLookupPending: false,
       needsActivityUnregister: false,
       activityTokens: [],
       failedAt: expect.any(Number),
     });
   });
 
-  it('writes only the push flag when only the unregister rejects', async () => {
+  it('records the failed activity tokens alongside the push token', async () => {
     pushOutcome('token');
     trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
     trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
+    deliveryMock.unregisterTokens.mockResolvedValue({
+      ok: false,
+      tokens: ['activity-token-1'],
+    });
 
     await runLogoutCleanup();
 
-    const tombstone = await readLogoutCleanupTombstone();
-    expect(tombstone).toMatchObject({
+    expect(await storedRecordFor('u1')).toMatchObject({
       userId: 'u1',
-      pushToken: 'push-1',
-      needsPushUnregister: true,
+      pushTokens: ['push-1'],
+      needsActivityUnregister: true,
+      activityTokens: ['activity-token-1'],
     });
   });
 
@@ -196,21 +224,20 @@ describe('runLogoutCleanup', () => {
 
     await runLogoutCleanup();
 
-    // Nothing outstanding: the tombstone is deleted, not written.
+    // Nothing outstanding: no record is stored.
     expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
   });
 
-  it('records a lookup-failed push outcome as outstanding with pushToken null', async () => {
+  it('records a lookup-failed push outcome as pending with no token value', async () => {
     pushOutcome('lookup-failed');
     trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
 
     await runLogoutCleanup();
 
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
-    const tombstone = await readLogoutCleanupTombstone();
-    expect(tombstone).toMatchObject({
-      needsPushUnregister: true,
-      pushToken: null,
+    expect(await storedRecordFor('u1')).toMatchObject({
+      pushLookupPending: true,
+      pushTokens: [],
     });
   });
 
@@ -224,7 +251,7 @@ describe('runLogoutCleanup', () => {
     expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
   });
 
-  it('awaits the activity unregister and tombstones its recorded tokens when it fails', async () => {
+  it('awaits the activity unregister and records its failed tokens', async () => {
     pushOutcome('none');
     trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
     deliveryMock.unregisterTokens.mockResolvedValue({
@@ -235,15 +262,14 @@ describe('runLogoutCleanup', () => {
     await runLogoutCleanup();
 
     expect(deliveryMock.unregisterTokens).toHaveBeenCalledTimes(1);
-    const tombstone = await readLogoutCleanupTombstone();
-    expect(tombstone).toMatchObject({
-      needsPushUnregister: false,
+    expect(await storedRecordFor('u1')).toMatchObject({
+      pushTokens: [],
       needsActivityUnregister: true,
       activityTokens: ['activity-token-1', 'activity-token-2'],
     });
   });
 
-  it('does not write the tombstone until the activity unregister settles', async () => {
+  it('does not write the record until the activity unregister settles', async () => {
     pushOutcome('none');
     trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
     const gate = { release: null as (() => void) | null };
@@ -257,7 +283,7 @@ describe('runLogoutCleanup', () => {
 
     const run = runLogoutCleanup();
     // Flush microtasks and a macrotask: the activity unregister is still in
-    // flight, so the tombstone must not be written yet.
+    // flight, so the record must not be written yet.
     await new Promise<void>(resolve => {
       setTimeout(resolve, 0);
     });
@@ -266,14 +292,13 @@ describe('runLogoutCleanup', () => {
     gate.release?.();
     await run;
 
-    const tombstone = await readLogoutCleanupTombstone();
-    expect(tombstone).toMatchObject({
+    expect(await storedRecordFor('u1')).toMatchObject({
       needsActivityUnregister: true,
       activityTokens: ['activity-token-1'],
     });
   });
 
-  it('still resolves when a tombstone write fails and reports it to Sentry', async () => {
+  it('still resolves when a record write fails and reports it to Sentry', async () => {
     pushOutcome('token');
     trpcMock.revokeCurrentDeviceSession.mutate.mockRejectedValue(new Error('network down'));
     trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
@@ -296,61 +321,179 @@ describe('runLogoutCleanup', () => {
     await expect(runLogoutCleanup()).resolves.toBeUndefined();
 
     // The failed lookup is treated as outstanding so reconciliation re-reads.
-    const tombstone = await readLogoutCleanupTombstone();
-    expect(tombstone).toMatchObject({
-      needsPushUnregister: true,
-      pushToken: null,
+    expect(await storedRecordFor('u1')).toMatchObject({
+      pushLookupPending: true,
+      pushTokens: [],
     });
   });
 
+  it('merges new obligations into this account’s earlier pending record', async () => {
+    seedRecords([
+      makeRecord({
+        userId: 'u1',
+        pushTokens: ['earlier-push'],
+        needsActivityUnregister: true,
+        activityTokens: ['earlier-activity'],
+      }),
+    ]);
+    pushOutcome('token', 'push-1');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
+    deliveryMock.unregisterTokens.mockResolvedValue({ ok: false, tokens: ['new-activity'] });
+
+    await runLogoutCleanup();
+
+    expect(await storedRecordFor('u1')).toMatchObject({
+      userId: 'u1',
+      pushTokens: ['earlier-push', 'push-1'],
+      needsActivityUnregister: true,
+      activityTokens: ['earlier-activity', 'new-activity'],
+    });
+  });
+
+  it('keeps an earlier pending obligation when this logout completes its own push unregister', async () => {
+    seedRecords([
+      makeRecord({
+        userId: 'u1',
+        pushTokens: ['push-1', 'earlier-push'],
+        needsActivityUnregister: true,
+        activityTokens: ['earlier-activity'],
+      }),
+    ]);
+    pushOutcome('token', 'push-1');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
+
+    await runLogoutCleanup();
+
+    // `push-1` was just unregistered; the earlier token and the pending
+    // activity tokens still need a retry, so the record stays.
+    expect(await storedRecordFor('u1')).toMatchObject({
+      userId: 'u1',
+      pushTokens: ['earlier-push'],
+      needsActivityUnregister: true,
+      activityTokens: ['earlier-activity'],
+    });
+  });
+
+  it('keeps a pending record of a different account on a successful logout', async () => {
+    seedRecords([
+      makeRecord({ userId: 'u1', pushTokens: ['push-a'], needsActivityUnregister: true }),
+    ]);
+    seedUser('u2');
+    pushOutcome('token', 'push-b');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
+
+    await runLogoutCleanup();
+
+    expect(await storedRecordFor('u1')).toMatchObject({
+      userId: 'u1',
+      pushTokens: ['push-a'],
+      needsActivityUnregister: true,
+    });
+    expect(await storedRecordFor('u2')).toBeUndefined();
+  });
+
+  it('keeps a pending record of a different account on a failed logout', async () => {
+    seedRecords([makeRecord({ userId: 'u1', pushTokens: ['push-a'] })]);
+    seedUser('u2');
+    pushOutcome('token', 'push-b');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
+
+    await runLogoutCleanup();
+
+    expect(await storedRecordFor('u1')).toMatchObject({ userId: 'u1', pushTokens: ['push-a'] });
+    expect(await storedRecordFor('u2')).toMatchObject({ userId: 'u2', pushTokens: ['push-b'] });
+  });
+
   // An omitted userId must not be read as `undefined` (which would become a
-  // different-user skip), and a non-finite failedAt must not survive: an
+  // different-account skip), and a non-finite failedAt must not survive: an
   // invalid record is discarded as absent.
   it.each([
-    ['omits every required field', { deviceSessionId: 'session-1' }, null],
+    ['omits every required field', { deviceSessionId: 'session-1' }, []],
     [
       'has a wrong field type',
       { userId: 'u1', pushToken: null, needsPushUnregister: 'yes', failedAt: 1_700_000_000_000 },
-      null,
+      [],
     ],
     [
       'has a non-numeric failedAt',
       { userId: null, pushToken: null, needsPushUnregister: false, failedAt: 'soon' },
-      null,
+      [],
     ],
     [
       'has a null failedAt (JSON.stringify writes a non-finite number as null)',
       { userId: null, pushToken: null, needsPushUnregister: false, failedAt: Infinity },
-      null,
+      [],
     ],
     [
-      'is fully valid',
-      { userId: 'u1', pushToken: null, needsPushUnregister: false, failedAt: 1_700_000_000_000 },
-      {
-        userId: 'u1',
-        pushToken: null,
-        needsPushUnregister: false,
-        needsActivityUnregister: false,
-        activityTokens: [],
-        failedAt: 1_700_000_000_000,
-      },
+      'is a valid record of the previous shape',
+      { userId: 'u1', pushToken: 'push-1', needsPushUnregister: true, failedAt: 1_700_000_000_000 },
+      [
+        {
+          userId: 'u1',
+          pushTokens: ['push-1'],
+          pushLookupPending: false,
+          needsActivityUnregister: false,
+          activityTokens: [],
+          failedAt: 1_700_000_000_000,
+        },
+      ],
     ],
     [
-      'is valid with a null userId (identity unknown)',
-      { userId: null, pushToken: 'push-1', needsPushUnregister: true, failedAt: 1_700_000_000_000 },
-      {
-        userId: null,
-        pushToken: 'push-1',
-        needsPushUnregister: true,
-        needsActivityUnregister: false,
-        activityTokens: [],
-        failedAt: 1_700_000_000_000,
-      },
+      'is a previous-shape record with an unknown identity',
+      { userId: null, pushToken: null, needsPushUnregister: true, failedAt: 1_700_000_000_000 },
+      [
+        {
+          userId: null,
+          pushTokens: [],
+          pushLookupPending: true,
+          needsActivityUnregister: false,
+          activityTokens: [],
+          failedAt: 1_700_000_000_000,
+        },
+      ],
     ],
-  ])('reads a persisted tombstone that %s', async (_label, persisted, expected) => {
+  ])('reads a persisted record list that %s', async (_label, persisted, expected) => {
     store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify(persisted));
 
-    await expect(readLogoutCleanupTombstone()).resolves.toEqual(expected);
+    await expect(readLogoutCleanupRecords()).resolves.toEqual(expected);
+  });
+
+  it('migrates a previous-shape record when the list is next written', async () => {
+    store.set(
+      LOGOUT_CLEANUP_TOMBSTONE_KEY,
+      JSON.stringify({ userId: 'u2', pushToken: 'push-b', needsPushUnregister: true, failedAt: 1 })
+    );
+    seedUser('u1');
+    pushOutcome('token', 'push-1');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
+
+    await runLogoutCleanup();
+
+    expect(JSON.parse(store.get(LOGOUT_CLEANUP_TOMBSTONE_KEY) ?? '{}')).toMatchObject({
+      version: 2,
+      records: [
+        { userId: 'u2', pushTokens: ['push-b'] },
+        { userId: 'u1', pushTokens: ['push-1'] },
+      ],
+    });
+  });
+
+  it('keeps one record per account when the same account logs out twice', async () => {
+    pushOutcome('token', 'push-1');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
+
+    await runLogoutCleanup();
+    await runLogoutCleanup();
+
+    await expect(readLogoutCleanupRecords()).resolves.toMatchObject([
+      { userId: 'u1', pushTokens: ['push-1'] },
+    ]);
   });
 });
 
@@ -363,7 +506,7 @@ describe('unregisterActivityTokensAndTombstone', () => {
     deliveryMock.unregisterTokens.mockResolvedValue({ ok: true, tokens: [] });
   });
 
-  it('unregisters the activity tokens and writes no tombstone on success', async () => {
+  it('unregisters the activity tokens and writes no record on success', async () => {
     deliveryMock.unregisterTokens.mockResolvedValue({ ok: true, tokens: ['a1', 'a2'] });
 
     await expect(unregisterActivityTokensAndTombstone()).resolves.toBeUndefined();
@@ -372,7 +515,7 @@ describe('unregisterActivityTokensAndTombstone', () => {
     expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
   });
 
-  it('tombstones the recorded activity tokens when the unregister fails', async () => {
+  it('records the failed activity tokens when the unregister fails', async () => {
     deliveryMock.unregisterTokens.mockResolvedValue({
       ok: false,
       tokens: ['activity-token-1', 'activity-token-2'],
@@ -380,17 +523,15 @@ describe('unregisterActivityTokensAndTombstone', () => {
 
     await unregisterActivityTokensAndTombstone();
 
-    const tombstone = await readLogoutCleanupTombstone();
-    expect(tombstone).toMatchObject({
+    expect(await storedRecordFor('u1')).toMatchObject({
       userId: 'u1',
-      pushToken: null,
-      needsPushUnregister: false,
+      pushTokens: [],
       needsActivityUnregister: true,
       activityTokens: ['activity-token-1', 'activity-token-2'],
     });
   });
 
-  it('retains scope delivery and tombstones only the failed ended activity', async () => {
+  it('retains scope delivery and records only the failed ended activity', async () => {
     const rows = new Set(['scope-token', 'ended-token']);
     deliveryMock.unregisterTokens.mockImplementation(async (lifetime: 'scope' | 'activity') => {
       await Promise.resolve();
@@ -403,14 +544,14 @@ describe('unregisterActivityTokensAndTombstone', () => {
     await unregisterActivityTokensAndTombstone('activity');
 
     expect(rows).toEqual(new Set(['scope-token', 'ended-token']));
-    expect(await readLogoutCleanupTombstone()).toMatchObject({
+    expect(await storedRecordFor('u1')).toMatchObject({
       userId: 'u1',
       needsActivityUnregister: true,
       activityTokens: ['ended-token'],
     });
   });
 
-  it('finishes an earlier activity tombstone write before successful logout clears it', async () => {
+  it('merges into the pending record of this account when logout follows a failed activity end', async () => {
     const { setItemAsync } = await import('expo-secure-store');
     const writing = Promise.withResolvers<undefined>();
     const writeGate = Promise.withResolvers<undefined>();
@@ -434,84 +575,73 @@ describe('unregisterActivityTokensAndTombstone', () => {
     writeGate.resolve(undefined);
     await Promise.all([activityEnd, logout]);
 
-    expect(await readLogoutCleanupTombstone()).toBeNull();
+    // The failed activity token is still owed, so logout keeps it pending.
+    expect(await storedRecordFor('u1')).toMatchObject({
+      userId: 'u1',
+      needsActivityUnregister: true,
+      activityTokens: ['ended-token'],
+    });
   });
 
-  it('leaves an existing tombstone untouched on success so a pending push unregister survives', async () => {
-    store.set(
-      LOGOUT_CLEANUP_TOMBSTONE_KEY,
-      JSON.stringify({
-        userId: 'u1',
-        pushToken: 'push-1',
-        needsPushUnregister: true,
-        needsActivityUnregister: false,
-        activityTokens: [],
-        failedAt: 1_700_000_000_000,
-      })
-    );
+  it('leaves an existing pending push unregister of this account untouched on success', async () => {
+    seedRecords([makeRecord({ userId: 'u1', pushTokens: ['push-1'] })]);
     deliveryMock.unregisterTokens.mockResolvedValue({ ok: true, tokens: ['a1'] });
 
     await unregisterActivityTokensAndTombstone();
 
-    const tombstone = await readLogoutCleanupTombstone();
-    expect(tombstone).toMatchObject({
-      needsPushUnregister: true,
-      pushToken: 'push-1',
+    expect(await storedRecordFor('u1')).toMatchObject({
+      userId: 'u1',
+      pushTokens: ['push-1'],
       needsActivityUnregister: false,
     });
   });
 
-  it.each(['push-1', null])(
-    'preserves same-owner push cleanup and failed activity tokens (%s)',
-    async pushToken => {
-      store.set(
-        LOGOUT_CLEANUP_TOMBSTONE_KEY,
-        JSON.stringify({
-          userId: 'u1',
-          pushToken,
-          needsPushUnregister: true,
-          needsActivityUnregister: true,
-          activityTokens: ['earlier-activity', 'shared-activity'],
-          failedAt: Date.now(),
-        })
-      );
-      deliveryMock.unregisterTokens.mockResolvedValue({
-        ok: false,
-        tokens: ['shared-activity', 'new-activity'],
-      });
-
-      await unregisterActivityTokensAndTombstone();
-
-      expect(await readLogoutCleanupTombstone()).toMatchObject({
+  it('preserves this account’s pending push tokens and failed activity tokens', async () => {
+    seedRecords([
+      makeRecord({
         userId: 'u1',
-        pushToken,
-        needsPushUnregister: true,
+        pushTokens: ['push-1', 'push-earlier'],
         needsActivityUnregister: true,
-        activityTokens: ['earlier-activity', 'shared-activity', 'new-activity'],
-      });
-    }
-  );
+        activityTokens: ['earlier-activity', 'shared-activity'],
+      }),
+    ]);
+    deliveryMock.unregisterTokens.mockResolvedValue({
+      ok: false,
+      tokens: ['shared-activity', 'new-activity'],
+    });
 
-  it("does not transfer another known owner's pending tokens into the new cleanup", async () => {
-    store.set(
-      LOGOUT_CLEANUP_TOMBSTONE_KEY,
-      JSON.stringify({
+    await unregisterActivityTokensAndTombstone();
+
+    expect(await storedRecordFor('u1')).toMatchObject({
+      userId: 'u1',
+      pushTokens: ['push-1', 'push-earlier'],
+      needsActivityUnregister: true,
+      activityTokens: ['earlier-activity', 'shared-activity', 'new-activity'],
+    });
+  });
+
+  it('keeps the pending record of a different account unchanged', async () => {
+    seedRecords([
+      makeRecord({
         userId: 'u2',
-        pushToken: 'other-push',
-        needsPushUnregister: true,
+        pushTokens: ['other-push'],
         needsActivityUnregister: true,
         activityTokens: ['other-activity'],
-        failedAt: Date.now(),
-      })
-    );
+      }),
+    ]);
     deliveryMock.unregisterTokens.mockResolvedValue({ ok: false, tokens: ['current-activity'] });
 
     await unregisterActivityTokensAndTombstone();
 
-    expect(await readLogoutCleanupTombstone()).toMatchObject({
+    expect(await storedRecordFor('u2')).toMatchObject({
+      userId: 'u2',
+      pushTokens: ['other-push'],
+      needsActivityUnregister: true,
+      activityTokens: ['other-activity'],
+    });
+    expect(await storedRecordFor('u1')).toMatchObject({
       userId: 'u1',
-      pushToken: null,
-      needsPushUnregister: false,
+      pushTokens: [],
       needsActivityUnregister: true,
       activityTokens: ['current-activity'],
     });
@@ -548,7 +678,7 @@ describe('unregisterActivityTokensAndTombstone', () => {
 
     expect(pendingBeforeWrite).toBeUndefined();
     expect(pending).toBe(true);
-    expect(await readLogoutCleanupTombstone()).toMatchObject({
+    expect(await storedRecordFor('u1')).toMatchObject({
       needsActivityUnregister: true,
       activityTokens: ['first-activity', 'second-activity'],
     });
@@ -560,17 +690,14 @@ describe('unregisterActivityTokensAndTombstone', () => {
   ])(
     'preserves later scope cleanup after reconciliation $path',
     async ({ pushSucceeds, activityTokens }) => {
-      store.set(
-        LOGOUT_CLEANUP_TOMBSTONE_KEY,
-        JSON.stringify({
+      seedRecords([
+        makeRecord({
           userId: 'u1',
-          pushToken: 'push-1',
-          needsPushUnregister: true,
+          pushTokens: ['push-1'],
           needsActivityUnregister: activityTokens.length > 0,
           activityTokens,
-          failedAt: Date.now(),
-        })
-      );
+        }),
+      ]);
       const pushStarted = Promise.withResolvers<undefined>();
       const pushGate = Promise.withResolvers<undefined>();
       trpcMock.unregisterPushToken.mutate.mockImplementationOnce(async () => {
@@ -588,7 +715,7 @@ describe('unregisterActivityTokensAndTombstone', () => {
       const attempt = attemptLogoutReconciliation('u1');
       await pushStarted.promise;
       const cleanup = unregisterActivityTokensAndTombstone();
-      // Let the failed scope cleanup reach its tombstone merge while the
+      // Let the failed scope cleanup reach its record merge while the
       // reconciliation still holds the older record.
       await new Promise<void>(resolve => {
         setTimeout(resolve, 0);
@@ -596,16 +723,14 @@ describe('unregisterActivityTokensAndTombstone', () => {
       pushGate.resolve(undefined);
       await Promise.all([attempt, cleanup]);
 
-      const tombstone = await readLogoutCleanupTombstone();
-      expect(tombstone).toMatchObject({
+      expect(await storedRecordFor('u1')).toMatchObject({
         userId: 'u1',
         needsActivityUnregister: true,
         activityTokens: ['later-activity'],
       });
       if (!pushSucceeds) {
-        expect(tombstone).toMatchObject({
-          pushToken: 'push-1',
-          needsPushUnregister: true,
+        expect(await storedRecordFor('u1')).toMatchObject({
+          pushTokens: ['push-1'],
         });
       }
       expect(await attemptLogoutReconciliation('u1')).toEqual({ kind: 'spacing-skipped' });

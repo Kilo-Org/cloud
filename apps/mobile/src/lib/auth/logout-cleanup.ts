@@ -11,9 +11,14 @@ import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
 import { trpcClient } from '@/lib/trpc';
 
 /**
- * Safe-retry tombstone for a failed push-token unregister (DEC-01). Exactly
- * ONE pending cleanup is supported: a later failed logout overwrites an
- * earlier tombstone.
+ * Safe-retry records for remote cleanup that failed at logout (DEC-01).
+ *
+ * One record is stored per account, keyed by `userId` (`null` while the
+ * account identity is unknown). Every mutator reads the record list it is
+ * about to change inside `chainSave`, so a logout, an account/org switch and
+ * the reconciliation retry never race each other. A record is merged with the
+ * obligations already pending for the same account, and a record written for
+ * one account is never removed or rewritten while another account is handled.
  *
  * A failed device-session revoke is NOT retried. The device already destroyed
  * the refresh token locally, and the access token expires within 1 h, so the
@@ -22,63 +27,177 @@ import { trpcClient } from '@/lib/trpc';
  * notifications for the signed-out account until the row is gone, which the
  * user sees.
  *
- * The tombstone is written directly with `SecureStore.setItemAsync`,
- * deliberately NOT epoch-fenced: it must survive sign-out by design, and
- * sign-out must never delete it.
+ * The record is written directly with `SecureStore.setItemAsync`, deliberately
+ * NOT epoch-fenced: it must survive sign-out by design, and sign-out must
+ * never delete it.
  */
+
 /**
  * Every field is validated so a malformed record is discarded instead of being
- * interpreted as a different-user skip or driving unsafe remote cleanup.
+ * interpreted as a different-account skip or driving unsafe remote cleanup.
  * `z.number()` rejects NaN and Infinity, so `failedAt` is always finite.
+ *
+ * `pushLookupPending` records a logout whose device push token could not be
+ * read: reconciliation re-reads the stable device token then. `pushTokens`
+ * holds every token value still waiting for an unregister, so a rotated token
+ * is not dropped when a newer logout succeeds.
  */
-const logoutCleanupTombstoneSchema = z.object({
-  /** getMe cache identity at logout, or null when the query had not resolved. */
+const logoutCleanupRecordSchema = z.object({
+  /** Account identity at logout, or null when it was unknown. */
   userId: z.string().nullable(),
-  /** Device push token at logout; null when lookup failed or permission missing. */
-  pushToken: z.string().nullable(),
-  needsPushUnregister: z.boolean(),
-  /**
-   * Activity-token unregister (Live Activity / push-to-start) outstanding at
-   * logout. Defaults keep pre-change tombstones parseable.
-   */
-  needsActivityUnregister: z.boolean().default(false),
-  /** The exact activity tokens captured at logout; retried verbatim, never the current session's. */
-  activityTokens: z.array(z.string()).default([]),
-  /** Epoch ms of the failed logout; reconciliation discards past 30 days. */
+  /** Push token values still awaiting unregister. */
+  pushTokens: z.array(z.string()),
+  /** The device push token could not be read at logout; re-read it later. */
+  pushLookupPending: z.boolean(),
+  /** Activity-token unregister (Live Activity / push-to-start) outstanding. */
+  needsActivityUnregister: z.boolean(),
+  /** The exact activity tokens captured at logout; retried verbatim. */
+  activityTokens: z.array(z.string()),
+  /** Epoch ms of the latest failed logout; records past 30 days are discarded. */
   failedAt: z.number(),
 });
 
-export type LogoutCleanupTombstone = z.infer<typeof logoutCleanupTombstoneSchema>;
+export type LogoutCleanupRecord = z.infer<typeof logoutCleanupRecordSchema>;
 
-export async function readLogoutCleanupTombstone(): Promise<LogoutCleanupTombstone | null> {
+/** Account identity a record belongs to; null while it is unknown. */
+export type LogoutCleanupOwner = string | null;
+
+/**
+ * The pre-ownership record shape (a single object, one `pushToken`). It is
+ * read as a one-record list so an obligation written by the previous version
+ * survives the update; the next write persists the versioned list.
+ */
+const legacyLogoutCleanupRecordSchema = z.object({
+  userId: z.string().nullable(),
+  pushToken: z.string().nullable(),
+  needsPushUnregister: z.boolean(),
+  needsActivityUnregister: z.boolean().default(false),
+  activityTokens: z.array(z.string()).default([]),
+  failedAt: z.number(),
+});
+
+const LOGOUT_CLEANUP_STORE_VERSION = 2;
+
+const logoutCleanupStoreSchema = z.object({
+  version: z.literal(LOGOUT_CLEANUP_STORE_VERSION),
+  records: z.array(logoutCleanupRecordSchema),
+});
+
+function fromLegacyRecord(
+  legacy: z.infer<typeof legacyLogoutCleanupRecordSchema>
+): LogoutCleanupRecord {
+  return {
+    userId: legacy.userId,
+    pushTokens: legacy.needsPushUnregister && legacy.pushToken !== null ? [legacy.pushToken] : [],
+    pushLookupPending: legacy.needsPushUnregister && legacy.pushToken === null,
+    needsActivityUnregister: legacy.needsActivityUnregister,
+    activityTokens: legacy.activityTokens,
+    failedAt: legacy.failedAt,
+  };
+}
+
+/** One record per owner; the first valid entry for an owner wins. */
+function dedupeByOwner(records: readonly LogoutCleanupRecord[]): LogoutCleanupRecord[] {
+  const byOwner = new Map<string, LogoutCleanupRecord>();
+  for (const record of records) {
+    const key = record.userId ?? '';
+    if (!byOwner.has(key)) {
+      byOwner.set(key, record);
+    }
+  }
+  return [...byOwner.values()];
+}
+
+/**
+ * Reads every stored record, validating each one. A corrupt entry is discarded
+ * instead of being interpreted as a different-account skip or driving unsafe
+ * remote cleanup.
+ */
+export async function readLogoutCleanupRecords(): Promise<LogoutCleanupRecord[]> {
   try {
     const raw = await SecureStore.getItemAsync(LOGOUT_CLEANUP_TOMBSTONE_KEY);
     if (!raw) {
-      return null;
+      return [];
     }
-    const parsed = logoutCleanupTombstoneSchema.safeParse(JSON.parse(raw));
-    if (!parsed.success) {
-      // A corrupt or invalid tombstone is discarded as absent: nothing is
-      // actionable, the next failed logout writes a fresh one, and the record
-      // can never become a different-user skip or trigger remote cleanup.
-      return null;
+    const parsed: unknown = JSON.parse(raw);
+    const store = logoutCleanupStoreSchema.safeParse(parsed);
+    if (store.success) {
+      return dedupeByOwner(store.data.records);
     }
-    return parsed.data;
+    const legacy = legacyLogoutCleanupRecordSchema.safeParse(parsed);
+    return legacy.success ? [fromLegacyRecord(legacy.data)] : [];
   } catch {
-    // A corrupt tombstone is discarded: nothing actionable, and the next
-    // failed logout writes a fresh one.
-    return null;
+    // A corrupt record list is discarded as absent: nothing is actionable, and
+    // the next failed logout writes a fresh record.
+    return [];
   }
 }
 
-export async function deleteLogoutCleanupTombstone(): Promise<void> {
-  await SecureStore.deleteItemAsync(LOGOUT_CLEANUP_TOMBSTONE_KEY);
+export function logoutCleanupRecordFor(
+  records: readonly LogoutCleanupRecord[],
+  owner: LogoutCleanupOwner
+): LogoutCleanupRecord | null {
+  return records.find(record => record.userId === owner) ?? null;
 }
 
-export async function writeLogoutCleanupTombstone(
-  tombstone: LogoutCleanupTombstone
+/** Whether the record still describes remote work to retry. */
+export function hasLogoutCleanupObligation(record: LogoutCleanupRecord): boolean {
+  return record.pushLookupPending || record.pushTokens.length > 0 || record.needsActivityUnregister;
+}
+
+/** Replaces only the record of the same owner; every other record is kept. */
+export function upsertLogoutCleanupRecord(
+  records: readonly LogoutCleanupRecord[],
+  record: LogoutCleanupRecord
+): LogoutCleanupRecord[] {
+  return [...records.filter(existing => existing.userId !== record.userId), record];
+}
+
+/** Removes only the record of `owner`; every other record is kept. */
+export function removeLogoutCleanupRecord(
+  records: readonly LogoutCleanupRecord[],
+  owner: LogoutCleanupOwner
+): LogoutCleanupRecord[] {
+  return records.filter(record => record.userId !== owner);
+}
+
+/**
+ * Persists the record list, dropping records with nothing left to retry. An
+ * empty list removes the key.
+ *
+ * Mutating callers must run read → change → write inside
+ * `chainSave(LOGOUT_CLEANUP_TOMBSTONE_KEY)`; `chainLogoutCleanupRecords` does
+ * that for standalone callers.
+ */
+export async function writeLogoutCleanupRecords(
+  records: readonly LogoutCleanupRecord[]
 ): Promise<void> {
-  await SecureStore.setItemAsync(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify(tombstone));
+  const live = dedupeByOwner(records.filter(record => hasLogoutCleanupObligation(record)));
+  if (live.length === 0) {
+    await SecureStore.deleteItemAsync(LOGOUT_CLEANUP_TOMBSTONE_KEY);
+    return;
+  }
+  await SecureStore.setItemAsync(
+    LOGOUT_CLEANUP_TOMBSTONE_KEY,
+    JSON.stringify({ version: LOGOUT_CLEANUP_STORE_VERSION, records: live })
+  );
+}
+
+/**
+ * Reads, changes and writes the record list as one serialized transaction with
+ * the other logout-cleanup writers.
+ */
+export async function chainLogoutCleanupRecords(
+  mutate: (records: LogoutCleanupRecord[]) => LogoutCleanupRecord[]
+): Promise<void> {
+  await chainSave(LOGOUT_CLEANUP_TOMBSTONE_KEY, async () => {
+    const records = await readLogoutCleanupRecords();
+    await writeLogoutCleanupRecords(mutate(records));
+  });
+}
+
+function uniqueTokens(tokens: readonly string[]): string[] {
+  return [...new Set(tokens)];
 }
 
 /**
@@ -89,20 +208,22 @@ export async function writeLogoutCleanupTombstone(
  *
  * - Revokes the current device session and unregisters the device push token
  *   concurrently, bounded at 15 s each by the tRPC client's `deadlineFetch`.
- * - A failed revoke is not recorded: see the tombstone type for why. A failed
- *   push or activity-token unregister writes a tombstone; a fully successful
- *   one deletes any existing tombstone, and is never retried later.
+ * - A failed revoke is not recorded: see the record type for why. A failed
+ *   push or activity-token unregister is merged into this account's record; a
+ *   fully successful one leaves this account's record only when no earlier
+ *   obligation for it is still pending, and never touches another account's
+ *   record.
  */
 export async function runLogoutCleanup(): Promise<void> {
   try {
     const userId = readCachedUserId(queryClient);
-    // Terminal blanking can already be retiring tokens. Finish its tombstone
-    // write before full logout decides whether to replace or delete that record.
+    // Terminal blanking can already be retiring tokens. Finish its record
+    // write before full logout merges into that same account's record.
     await awaitActivityCleanupSettled();
 
     // Push token outcome: 'none' → nothing to unregister; 'lookup-failed' →
     // a server row may exist, so reconciliation re-reads the stable device
-    // token and the tombstone stores pushToken: null.
+    // token and the record marks the lookup as pending.
     let pushToken: string | null = null;
     let pushLookupFailed = false;
     try {
@@ -119,7 +240,7 @@ export async function runLogoutCleanup(): Promise<void> {
 
     // Unregister activity tokens (Live Activity / push-to-start) before the
     // device session revoke: the revoke ends this token's auth, so a later
-    // delete can only answer 401. A failed unregister is tombstoned and retried
+    // delete can only answer 401. A failed unregister is recorded and retried
     // at the next authenticated opportunity against the recorded tokens only.
     const activityResult = await getGlanceableDelivery().unregisterTokens();
     const needsActivityUnregister = !activityResult.ok;
@@ -139,27 +260,41 @@ export async function runLogoutCleanup(): Promise<void> {
       emitNotificationTokenUpdated('unregistered');
     }
 
-    let needsPushUnregister = false;
-    if (pushLookupFailed) {
-      needsPushUnregister = true;
-    } else if (pushToken !== null && unregister.status === 'rejected') {
-      needsPushUnregister = true;
-    }
+    const needsPushUnregister =
+      pushLookupFailed || (pushToken !== null && unregister.status === 'rejected');
 
     try {
-      await (needsPushUnregister || needsActivityUnregister
-        ? writeLogoutCleanupTombstone({
-            userId,
-            pushToken,
-            needsPushUnregister,
-            needsActivityUnregister,
-            activityTokens: activityResult.tokens,
-            failedAt: Date.now(),
-          })
-        : deleteLogoutCleanupTombstone());
+      await chainLogoutCleanupRecords(records => {
+        const pending = logoutCleanupRecordFor(records, userId);
+        const pushTokenHandled = pushToken !== null && unregister.status === 'fulfilled';
+        const record: LogoutCleanupRecord = {
+          userId,
+          // Keep token values still owed by an earlier logout of this
+          // account, minus the one this logout just unregistered.
+          pushTokens: uniqueTokens([
+            ...(pending?.pushTokens ?? []).filter(
+              token => !(pushTokenHandled && token === pushToken)
+            ),
+            ...(needsPushUnregister && pushToken !== null ? [pushToken] : []),
+          ]),
+          // This logout read the device token (or its absence) again, so its
+          // outcome supersedes an earlier unknown-token attempt.
+          pushLookupPending: pushLookupFailed,
+          needsActivityUnregister:
+            needsActivityUnregister || (pending?.needsActivityUnregister ?? false),
+          activityTokens: uniqueTokens([
+            ...(pending?.needsActivityUnregister ? pending.activityTokens : []),
+            ...(needsActivityUnregister ? activityResult.tokens : []),
+          ]),
+          failedAt: Date.now(),
+        };
+        return hasLogoutCleanupObligation(record)
+          ? upsertLogoutCleanupRecord(records, record)
+          : removeLogoutCleanupRecord(records, userId);
+      });
     } catch (error) {
-      // A tombstone write failure is reported but never blocks logout: the
-      // push row stays removable on the next successful unregister.
+      // A record write failure is reported but never blocks logout: the push
+      // row stays removable on the next successful unregister.
       Sentry.captureException(error, {
         tags: { 'error.subsystem': 'auth', 'error.operation': 'write_logout_tombstone' },
       });
@@ -175,7 +310,7 @@ export async function runLogoutCleanup(): Promise<void> {
 
 let activityCleanupInFlight: Promise<void> | null = null;
 
-/** Wait for scope cleanup, including its tombstone write, before checking registration safety. */
+/** Wait for scope cleanup, including its record write, before checking registration safety. */
 export async function awaitActivityCleanupSettled(): Promise<void> {
   if (activityCleanupInFlight !== null) {
     await activityCleanupInFlight;
@@ -184,17 +319,18 @@ export async function awaitActivityCleanupSettled(): Promise<void> {
 
 /**
  * Unregister the recorded activity tokens (Live Activity / push-to-start) and
- * tombstone a failure, WITHOUT revoking the device session or unregistering
- * the Expo push token (those are logout-only). Never throws by contract.
+ * record a failure, WITHOUT revoking the device session or unregistering the
+ * Expo push token (those are logout-only). Never throws by contract.
  *
  * Ordinary activity ends pass `activity` to preserve scope delivery. Account
  * switch (`signIn`) and org switch (`setOrganizationId`) retire the whole scope,
  * where the prior scope's activity tokens must stop receiving APNs before the
  * new scope registers its own. The cached user id is read before any switch
- * clears it, so a failed unregister tombstones the prior account's identity —
+ * clears it, so a failed unregister records the prior account's identity —
  * the same ordering `runLogoutCleanup` relies on. A successful unregister
- * leaves any existing tombstone untouched. A failure merges the same owner's
- * pending push cleanup and failed activity tokens so both survive a switch.
+ * leaves every record untouched. A failure merges this account's pending push
+ * cleanup and failed activity tokens so both survive a switch, and leaves the
+ * other accounts' records untouched.
  */
 export async function unregisterActivityTokensAndTombstone(
   lifetime: ActivityTokenLifetime = 'scope',
@@ -222,7 +358,7 @@ async function runActivityCleanup(
   try {
     const userId = readCachedUserId(queryClient);
     // Start the unregister now to fence stale registration intent. Serialize
-    // only the tombstone merge behind earlier cleanup writes.
+    // only the record merge behind earlier cleanup writes.
     const result = await getGlanceableDelivery().unregisterTokens(lifetime, activityToken);
     await previous;
     if (result.ok) {
@@ -231,24 +367,24 @@ async function runActivityCleanup(
     // Reconciliation must finish with its captured record before this merge
     // adds obligations that its deletion or partial-success rewrite cannot see.
     await chainSave(LOGOUT_CLEANUP_TOMBSTONE_KEY, async () => {
-      const tombstone = await readLogoutCleanupTombstone();
-      const pending = tombstone?.userId === userId ? tombstone : null;
-      await writeLogoutCleanupTombstone({
-        userId,
-        pushToken: pending?.pushToken ?? null,
-        needsPushUnregister: pending?.needsPushUnregister ?? false,
-        needsActivityUnregister: true,
-        activityTokens: [
-          ...new Set([
+      const records = await readLogoutCleanupRecords();
+      const pending = logoutCleanupRecordFor(records, userId);
+      await writeLogoutCleanupRecords(
+        upsertLogoutCleanupRecord(records, {
+          userId,
+          pushTokens: pending?.pushTokens ?? [],
+          pushLookupPending: pending?.pushLookupPending ?? false,
+          needsActivityUnregister: true,
+          activityTokens: uniqueTokens([
             ...(pending?.needsActivityUnregister ? pending.activityTokens : []),
             ...result.tokens,
           ]),
-        ],
-        failedAt: Date.now(),
-      });
+          failedAt: Date.now(),
+        })
+      );
     });
   } catch (error) {
-    // Never throw: a failed unregister or tombstone write must not block the
+    // Never throw: a failed unregister or record write must not block the
     // account or org switch.
     Sentry.captureException(error, {
       tags: {

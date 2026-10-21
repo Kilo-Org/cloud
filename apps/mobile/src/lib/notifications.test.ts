@@ -2857,7 +2857,7 @@ describe('cold iOS background delivery', () => {
     expect(rows).toEqual(
       new Map([['scope-token', { kind: 'ios_push_to_start', organizationId: 'org-9' }]])
     );
-    expect(await background.cleanup.readLogoutCleanupTombstone()).toBeNull();
+    expect(await background.cleanup.readLogoutCleanupRecords()).toEqual([]);
   });
 
   it('waits for the real adapter to submit the native deadline before background completion', async () => {
@@ -3032,18 +3032,21 @@ describe('cold iOS background delivery', () => {
     expect(native.exists).toBe(false);
     expect(rows.has('scope-token')).toBe(true);
     expect(rows.has('failed-activity-token')).toBe(true);
-    expect(await background.cleanup.readLogoutCleanupTombstone()).toMatchObject({
-      userId: null,
-      needsPushUnregister: false,
-      needsActivityUnregister: true,
-      activityTokens: ['failed-activity-token'],
-    });
+    expect(await background.cleanup.readLogoutCleanupRecords()).toMatchObject([
+      {
+        userId: null,
+        pushTokens: [],
+        pushLookupPending: false,
+        needsActivityUnregister: true,
+        activityTokens: ['failed-activity-token'],
+      },
+    ]);
     const { attemptLogoutReconciliation } = await import('@/lib/auth/logout-reconciliation');
     await attemptLogoutReconciliation('u1');
     expect(rows).toEqual(
       new Map([['scope-token', { kind: 'ios_push_to_start', organizationId: 'org-9' }]])
     );
-    expect(await background.cleanup.readLogoutCleanupTombstone()).toBeNull();
+    expect(await background.cleanup.readLogoutCleanupRecords()).toEqual([]);
   });
 });
 

@@ -18,6 +18,7 @@ import { textRequestPriceCeiling } from '@kilocode/web-shared/lib/ai-gateway/req
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
+  briefingScorecardSchema,
   briefingSummarySchema,
   briefingSummaryErrorSchema,
   redactBriefingExcerpt,
@@ -29,6 +30,12 @@ import {
   serializeBriefing,
   type BriefingReportRow,
 } from './store';
+
+/** A report with no overnight activity has nothing to summarize, so it is never billable. */
+function briefingHasActivity(row: BriefingReportRow): boolean {
+  const scorecard = briefingScorecardSchema.safeParse(row.facts.scorecard);
+  return !scorecard.success || scorecard.data.sessions > 0;
+}
 
 const estimateClaimsSchema = z.object({
   purpose: z.literal('agent-briefing-estimate'),
@@ -204,7 +211,7 @@ export async function estimateBriefingSummary(
     maximumCostMicrodollars: maxSpendMicrodollars,
     maxDurationSeconds,
     estimateToken: jwt.sign(claims, NEXTAUTH_SECRET, { algorithm: 'HS256', expiresIn: 15 * 60 }),
-    canGenerate: unavailableReason === null,
+    canGenerate: unavailableReason === null && (report === null || briefingHasActivity(report)),
     unavailableReason,
   };
 }
@@ -238,6 +245,11 @@ export async function queueBriefingSummary(
   const summary = briefingSummarySchema.parse(row.summary);
   if (!setting.aiEnabled)
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Enable AI for this context first' });
+  if (!briefingHasActivity(row))
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'A report without overnight activity has nothing to summarize',
+    });
   if (
     retry
       ? !(summary.status === 'failed' && summary.costMicrodollars > 0 && summary.canRetry)

@@ -39,6 +39,18 @@ export const briefingSummarySchema = z.object({
   error: briefingSummaryErrorSchema.nullable(),
   canRetry: z.boolean(),
 });
+export const briefingScorecardSchema = z.object({
+  sessions: z.number(),
+  pullRequests: z.number(),
+  blockers: z.number(),
+  spendMicrodollars: z.number(),
+});
+export const briefingCoverageSchema = z.object({
+  activity: z.enum(['complete', 'partial']),
+  spend: z.enum(['complete', 'partial', 'unavailable']),
+  blockers: z.enum(['complete', 'partial']),
+  pullRequests: z.enum(['complete', 'partial']),
+});
 export const briefingReportSchema = z.object({
   id: z.string(),
   context: briefingContextSchema,
@@ -52,18 +64,8 @@ export const briefingReportSchema = z.object({
   revised: z.boolean(),
   readAt: z.string().datetime().nullable(),
   dismissedAt: z.string().datetime().nullable(),
-  scorecard: z.object({
-    sessions: z.number(),
-    pullRequests: z.number(),
-    blockers: z.number(),
-    spendMicrodollars: z.number(),
-  }),
-  coverage: z.object({
-    activity: z.enum(['complete', 'partial']),
-    spend: z.enum(['complete', 'partial', 'unavailable']),
-    blockers: z.enum(['complete', 'partial']),
-    pullRequests: z.enum(['complete', 'partial']),
-  }),
+  scorecard: briefingScorecardSchema,
+  coverage: briefingCoverageSchema,
   sessions: z.array(
     z.object({
       sessionId: z.string(),
@@ -98,6 +100,8 @@ export const briefingPreferencesSchema = z.object({
 export type BriefingContext = z.infer<typeof briefingContextSchema>;
 export type BriefingSource = z.infer<typeof briefingSourceSchema>;
 export type BriefingSummary = z.infer<typeof briefingSummarySchema>;
+export type BriefingScorecard = z.infer<typeof briefingScorecardSchema>;
+export type BriefingCoverage = z.infer<typeof briefingCoverageSchema>;
 export type BriefingReport = z.infer<typeof briefingReportSchema>;
 export type BriefingPreferences = z.infer<typeof briefingPreferencesSchema>;
 export type BriefingContextPreferences = z.infer<typeof briefingContextPreferencesSchema>;

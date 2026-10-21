@@ -202,7 +202,8 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
 ## Rollout and cutover
 
 1. Deploy contracts, benchmark support, web, serving, and gateway integration behind the
-   `kilo-auto-custom-routers` flag. Publish the CLI after cloud verification.
+   `kilo-auto-custom-routers` flag. Publish the CLI after cloud verification. The flag was
+   rolled out to everyone and removed before the cutover; custom routers no longer have a gate.
 2. Deploy the overlap migration separately from graduation. Keep legacy serving, settings,
    and storage. Run the silent conversion before sending the advance notice.
    - Each saved pool becomes an owner-scoped `efficient` custom router.
@@ -211,8 +212,7 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
      Custom modes are independent of platform mode settings and organization mode inheritance.
      Platform mode settings remain stored and editable throughout the transition.
    - Keep the migrated slug stable and reject deletion until graduation; benchmark difficulty remains editable.
-   - Migrated owners and authorized organization editors can use their router without the flag.
-     This does not enable unrelated router creation.
+   - Migrated owners and authorized organization editors keep using their router.
    - New legacy pool saves also convert before acknowledging success, including owners missed
      by an earlier scan.
 3. Resolve every conversion exception and verify both model IDs before the blast.
@@ -232,7 +232,7 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
    - The custom model ID retains its own pool and independently selected mode and benchmark difficulty.
    - Remove legacy pool settings/UI, custom-mode inheritance compatibility, and temporary pool edit guards.
      Keep the platform mode endpoint, mode-only UI, and persisted mode storage.
-   - Remove the rollout flag. Do not reconvert pools or resend the advance notice.
+   - Do not reconvert pools or resend the advance notice.
 7. Retire one-time pool conversion tooling after verification. Preserve the existing mode Durable
    Object, its binding, namespace, and saved modes. Do not apply a `deleted_classes` migration.
 

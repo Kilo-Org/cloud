@@ -73,8 +73,6 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
   );
   const store: ProjectStore = createProjectStore(initialState);
 
-  // --- Session building ---
-
   function toDisplayInfo(info: ProjectSessionInfo): SessionDisplayInfo {
     return {
       id: info.id,
@@ -162,8 +160,6 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     return sessions;
   }
 
-  // --- Session change detection (upgrade or GitHub migration) ---
-
   function handleSessionChanged(
     newSessionId: string,
     userMessage: { text: string; images?: Images }
@@ -233,8 +229,6 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     return { info, parts: [textPart] };
   }
 
-  // --- Preview polling ---
-
   function startPreviewPollingIfNeeded(): void {
     if (previewPollingState?.isPolling || destroyed) return;
 
@@ -247,8 +241,6 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
       isDestroyed: () => destroyed,
     });
   }
-
-  // --- Initialize sessions ---
 
   const sessions = buildSessions(project);
   store.setState({ sessions });
@@ -270,8 +262,6 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
   } else {
     startPreviewPollingIfNeeded();
   }
-
-  // --- Public API ---
 
   function subscribe(listener: () => void): () => void {
     const unsubscribe = store.subscribe(listener);

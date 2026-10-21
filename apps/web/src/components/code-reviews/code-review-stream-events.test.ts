@@ -125,6 +125,46 @@ describe('toCodeReviewDisplayEvent', () => {
     });
   });
 
+  it('preserves the full multiline text of long live responses', () => {
+    const text = `${'Reviewing the changed files. '.repeat(20)}\nFinal finding after the preview limit.`;
+
+    expect(
+      toCodeReviewDisplayEvent(
+        kilocode('message.part.updated', {
+          part: { id: 'prt_text', type: 'text', text },
+        })
+      )
+    ).toEqual({
+      timestamp: '2026-08-18T12:00:00.000Z',
+      message: text,
+      eventType: 'text',
+      key: 'prt_text',
+    });
+  });
+
+  it('preserves long tool commands without dropping their arguments', () => {
+    const command = `pnpm test ${'src/components/code-reviews/review.test.ts '.repeat(5)}--runInBand`;
+
+    expect(
+      toCodeReviewDisplayEvent(
+        kilocode('message.part.updated', {
+          part: {
+            id: 'prt_bash',
+            type: 'tool',
+            tool: 'bash',
+            state: { status: 'completed', input: { command } },
+          },
+        })
+      )
+    ).toEqual({
+      timestamp: '2026-08-18T12:00:00.000Z',
+      message: 'Tool: bash',
+      content: command,
+      eventType: 'tool',
+      key: 'prt_bash',
+    });
+  });
+
   it('shows completed canonical text parts without a tool state', () => {
     expect(
       toCodeReviewDisplayEvent(

@@ -107,6 +107,22 @@ describe('pushDataSchema spend_alert', () => {
         .success
     ).toBe(false);
   });
+
+  it('rejects an organization-scope alert with no organizationId to route the tap', () => {
+    expect(pushDataSchema.safeParse({ type: 'spend_alert', scope: 'organization' }).success).toBe(
+      false
+    );
+  });
+
+  it('rejects a personal-scope alert that names an organization', () => {
+    expect(
+      pushDataSchema.safeParse({
+        type: 'spend_alert',
+        scope: 'personal',
+        organizationId: 'org-1',
+      }).success
+    ).toBe(false);
+  });
 });
 
 describe('pushDataSchema active_agents_glanceable', () => {
@@ -234,6 +250,17 @@ describe('pushDataSchema cloud_agent_session', () => {
       cliSessionId: 'cli1',
       category: 'attention',
       prUrl: 42,
+    };
+    expect(pushDataSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('rejects an empty prUrl so the Open PR action never targets nothing', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'permission',
+      prUrl: '',
     };
     expect(pushDataSchema.safeParse(payload).success).toBe(false);
   });

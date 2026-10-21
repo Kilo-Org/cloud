@@ -36,6 +36,7 @@ import {
   useBoundedDiffFontMetrics,
 } from '@/components/pr-review/diff/diff-font-metrics';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import {
   PrDiffFileListHeader,
   useDiffViewMode,
@@ -274,7 +275,27 @@ export function PrReviewFileList({
 
   if (files.length === 0) {
     if (firstPageErrorState?.kind === 'not-found') {
-      return <TabStateMessage title={copy.unavailableTitle} message={copy.unavailableMessage} />;
+      // GitLab folds its connection failures into the same NOT_FOUND a deleted
+      // merge request produces, so provider scopes offer the read retry and
+      // the connection check instead of a dead end (GitHub keeps the terminal
+      // copy — its recovery is the install CTA on the Overview).
+      const isProviderScope = scope.ref.platform !== 'github';
+      return (
+        <TabStateMessage
+          title={copy.unavailableTitle}
+          message={copy.unavailableMessage}
+          action={
+            isProviderScope ? (
+              <PrReviewUnavailableActions
+                onRetry={() => {
+                  void query.refetch();
+                }}
+                isRetrying={query.isFetching}
+              />
+            ) : undefined
+          }
+        />
+      );
     }
     if (firstPageErrorState?.kind === 'permission') {
       return (
@@ -283,7 +304,7 @@ export function PrReviewFileList({
     }
     if (firstPageErrorState?.kind === 'reconnect') {
       return (
-        <CenteredState className="px-6">
+        <CenteredState contentContainerClassName="px-6">
           <PrReviewReconnectNotice />
         </CenteredState>
       );

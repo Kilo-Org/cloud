@@ -52,7 +52,9 @@ export const POST = withRestTiming('/api/auth/native/otp', async (request: Reque
   const { email } = validation.data;
 
   const eligibility = await checkEmailSignInEligibility(email, request as NextRequest);
-  if (!eligibility.ok) {
+  // Deliver the code so the response does not reveal account existence; the
+  // token exchange refuses the signup with a step-up shipped apps can render.
+  if (!eligibility.ok && eligibility.errorCode !== 'EMAIL-SIGNUP-DISABLED') {
     if (eligibility.errorCode === 'INVALID_EMAIL') {
       await enforceResponseFloor(startTime);
       return NextResponse.json({ success: true, challengeId: randomUUID() });

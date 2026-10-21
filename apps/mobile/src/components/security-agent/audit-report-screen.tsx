@@ -36,6 +36,40 @@ const SEVERITY_LABEL_KEYS = {
   unknown: 'common.unknown',
 } as const;
 
+// Literal keys, never a template: the catalog check scans the source for the
+// keys a lookup passes on, and a computed key is invisible to it. An action
+// the server adds before this app learns it falls back to the server label.
+const EVENT_ACTION_LABEL_KEYS: Record<string, string> = Object.freeze({
+  'security.finding.created': 'securityAgent.auditReport.eventActions.findingCreated',
+  'security.finding.severity_changed':
+    'securityAgent.auditReport.eventActions.findingSeverityChanged',
+  'security.finding.status_change': 'securityAgent.auditReport.eventActions.findingStatusChange',
+  'security.finding.dismissed': 'securityAgent.auditReport.eventActions.findingDismissed',
+  'security.finding.auto_dismissed': 'securityAgent.auditReport.eventActions.findingAutoDismissed',
+  'security.finding.superseded': 'securityAgent.auditReport.eventActions.findingSuperseded',
+  'security.finding.analysis_completed':
+    'securityAgent.auditReport.eventActions.findingAnalysisCompleted',
+  'security.finding.analysis_failed':
+    'securityAgent.auditReport.eventActions.findingAnalysisFailed',
+  'security.remediation.queued': 'securityAgent.auditReport.eventActions.remediationQueued',
+  'security.remediation.pr_opened': 'securityAgent.auditReport.eventActions.remediationPrOpened',
+  'security.remediation.failed': 'securityAgent.auditReport.eventActions.remediationFailed',
+  'security.remediation.blocked': 'securityAgent.auditReport.eventActions.remediationBlocked',
+  'security.remediation.no_changes_needed':
+    'securityAgent.auditReport.eventActions.remediationNoChangesNeeded',
+  'security.remediation.cancelled': 'securityAgent.auditReport.eventActions.remediationCancelled',
+  'security.finding.deleted': 'securityAgent.auditReport.eventActions.findingDeleted',
+});
+
+function eventLabel(action: string, serverLabel: string): string {
+  // Object.hasOwn: a bare index would return inherited members like
+  // `constructor` or `toString` instead of undefined for an unknown action.
+  const key = Object.hasOwn(EVENT_ACTION_LABEL_KEYS, action)
+    ? EVENT_ACTION_LABEL_KEYS[action]
+    : undefined;
+  return key === undefined ? serverLabel : i18n.t(key);
+}
+
 // Personal and org procedures resolve to nominally distinct tRPC option
 // types even when structurally identical, so we always call both hooks (one
 // disabled) and return whichever is active — the same branching pattern as
@@ -141,7 +175,7 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
       <View className="gap-3">
         {finding.events.map(event => (
           <View key={event.id} className="gap-0.5">
-            <Text className="text-sm">{event.label}</Text>
+            <Text className="text-sm">{eventLabel(event.action, event.label)}</Text>
             <Text variant="muted" className="text-xs">
               {formatDate(parseTimestamp(event.occurredAt), i18n.language, { timeZone: 'UTC' })} ·{' '}
               {event.actor.displayName}

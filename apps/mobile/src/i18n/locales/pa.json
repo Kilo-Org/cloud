@@ -2771,7 +2771,7 @@
     "thisDevice": "ਇਹ ਡਿਵਾਈਸ",
     "viewProfile": "ਪ੍ਰੋਫਾਈਲ ਵੇਖੋ",
     "signOutThisDevice": "ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰੋ",
-    "signOutThisSession": "ਇਸ ਸੈਸ਼ਨ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰੋ",
+    "signOutSessionLabel": "{{device}} ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰੋ",
     "sessionSignedOut": "ਸੈਸ਼ਨ ਸਾਈਨ ਆਉਟ ਹੋ ਗਿਆ।",
     "signOutThisDeviceTitle": "ਕੀ ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰਨਾ ਹੈ?",
     "signOutThisSessionTitle": "ਕੀ ਇਸ ਸੈਸ਼ਨ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰਨਾ ਹੈ?",

@@ -2279,7 +2279,7 @@
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver perfil",
     "signOutThisDevice": "Sair deste dispositivo",
-    "signOutThisSession": "Encerrar esta sessão",
+    "signOutSessionLabel": "Sair de {{device}}",
     "sessionSignedOut": "Sessão encerrada.",
     "signOutThisDeviceTitle": "Sair deste dispositivo?",
     "signOutThisSessionTitle": "Encerrar esta sessão?",

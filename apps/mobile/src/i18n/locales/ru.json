@@ -2302,7 +2302,7 @@
     "thisDevice": "Это устройство",
     "viewProfile": "Открыть профиль",
     "signOutThisDevice": "Выйти на этом устройстве",
-    "signOutThisSession": "Завершить этот сеанс",
+    "signOutSessionLabel": "Выйти на {{device}}",
     "sessionSignedOut": "Сеанс завершён.",
     "signOutThisDeviceTitle": "Выйти на этом устройстве?",
     "signOutThisSessionTitle": "Завершить этот сеанс?",

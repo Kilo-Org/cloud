@@ -2771,7 +2771,7 @@
     "thisDevice": "Tämä laite",
     "viewProfile": "Näytä profiili",
     "signOutThisDevice": "Kirjaa tämä laite ulos",
-    "signOutThisSession": "Kirjaa tämä istunto ulos",
+    "signOutSessionLabel": "Kirjaa {{device}} ulos",
     "sessionSignedOut": "Istunto kirjattiin ulos.",
     "signOutThisDeviceTitle": "Kirjataanko tämä laite ulos?",
     "signOutThisSessionTitle": "Kirjataanko tämä istunto ulos?",

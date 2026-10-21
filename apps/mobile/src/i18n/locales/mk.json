@@ -2772,7 +2772,7 @@
     "viewProfile": "Прикажи профил",
     "webBrowser": "Веб прелистувач",
     "signOutThisDevice": "Одјави го овој уред",
-    "signOutThisSession": "Одјави ја оваа сесија",
+    "signOutSessionLabel": "Одјави го {{device}}",
     "sessionSignedOut": "Сесијата е одјавена.",
     "signOutThisDeviceTitle": "Да се одјави овој уред?",
     "signOutThisSessionTitle": "Да се одјави оваа сесија?",

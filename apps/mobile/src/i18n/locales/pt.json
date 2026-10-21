@@ -2810,7 +2810,7 @@
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver perfil",
     "signOutThisDevice": "Terminar sessão neste dispositivo",
-    "signOutThisSession": "Terminar esta sessão",
+    "signOutSessionLabel": "Terminar sessão em {{device}}",
     "sessionSignedOut": "Sessão terminada.",
     "signOutThisDeviceTitle": "Terminar sessão neste dispositivo?",
     "signOutThisSessionTitle": "Terminar esta sessão?",

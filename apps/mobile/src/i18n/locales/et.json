@@ -2771,7 +2771,7 @@
     "thisDevice": "See seade",
     "viewProfile": "Vaata profiili",
     "signOutThisDevice": "Logi sellest seadmest välja",
-    "signOutThisSession": "Logi sellest seansist välja",
+    "signOutSessionLabel": "Logi seadmest {{device}} välja",
     "sessionSignedOut": "Seansist on välja logitud.",
     "signOutThisDeviceTitle": "Kas logida sellest seadmest välja?",
     "signOutThisSessionTitle": "Kas logida sellest seansist välja?",

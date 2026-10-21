@@ -2849,7 +2849,7 @@
     "thisDevice": "Ta naprava",
     "viewProfile": "Prikaži profil",
     "signOutThisDevice": "Odjavi to napravo",
-    "signOutThisSession": "Odjavi to sejo",
+    "signOutSessionLabel": "Odjavi napravo {{device}}",
     "sessionSignedOut": "Seja je odjavljena.",
     "signOutThisDeviceTitle": "Želiš odjaviti to napravo?",
     "signOutThisSessionTitle": "Želiš odjaviti to sejo?",

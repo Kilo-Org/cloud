@@ -2303,7 +2303,7 @@
     "webBrowser": "Веббраузер",
     "viewProfile": "Переглянути профіль",
     "signOutThisDevice": "Вийти на цьому пристрої",
-    "signOutThisSession": "Завершити цей сеанс",
+    "signOutSessionLabel": "Вийти на пристрої {{device}}",
     "sessionSignedOut": "Сеанс завершено.",
     "signOutThisDeviceTitle": "Вийти на цьому пристрої?",
     "signOutThisSessionTitle": "Завершити цей сеанс?",

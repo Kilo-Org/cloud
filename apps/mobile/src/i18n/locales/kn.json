@@ -2771,7 +2771,7 @@
     "thisDevice": "ಈ ಸಾಧನ",
     "viewProfile": "ಪ್ರೊಫೈಲ್ ವೀಕ್ಷಿಸಿ",
     "signOutThisDevice": "ಈ ಸಾಧನದಿಂದ ಸೈನ್ ಔಟ್ ಮಾಡಿ",
-    "signOutThisSession": "ಈ ಸೆಶನ್‌ನಿಂದ ಸೈನ್ ಔಟ್ ಮಾಡಿ",
+    "signOutSessionLabel": "{{device}} ನಿಂದ ಸೈನ್ ಔಟ್ ಮಾಡಿ",
     "sessionSignedOut": "ಸೆಶನ್‌ನಿಂದ ಸೈನ್ ಔಟ್ ಆಗಿದೆ.",
     "signOutThisDeviceTitle": "ಈ ಸಾಧನದಿಂದ ಸೈನ್ ಔಟ್ ಮಾಡಬೇಕೆ?",
     "signOutThisSessionTitle": "ಈ ಸೆಶನ್‌ನಿಂದ ಸೈನ್ ಔಟ್ ಮಾಡಬೇಕೆ?",

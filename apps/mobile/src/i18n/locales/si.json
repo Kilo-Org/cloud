@@ -2771,7 +2771,7 @@
     "thisDevice": "මෙම උපාංගය",
     "viewProfile": "පැතිකඩ බලන්න",
     "signOutThisDevice": "මෙම උපාංගයෙන් පිටවන්න",
-    "signOutThisSession": "මෙම සැසියෙන් පිටවන්න",
+    "signOutSessionLabel": "{{device}} උපාංගයෙන් පිටවන්න",
     "sessionSignedOut": "සැසියෙන් පිටව ඇත.",
     "signOutThisDeviceTitle": "මෙම උපාංගයෙන් පිටවන්නද?",
     "signOutThisSessionTitle": "මෙම සැසියෙන් පිටවන්නද?",

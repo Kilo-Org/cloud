@@ -2279,7 +2279,7 @@
     "thisDevice": "המכשיר הזה",
     "viewProfile": "הצגת הפרופיל",
     "signOutThisDevice": "ניתוק המכשיר הזה מהחשבון",
-    "signOutThisSession": "ניתוק החיבור הזה",
+    "signOutSessionLabel": "ניתוק {{device}} מהחשבון",
     "sessionSignedOut": "החיבור נותק.",
     "signOutThisDeviceTitle": "להתנתק מהמכשיר הזה?",
     "signOutThisSessionTitle": "לנתק את החיבור הזה?",

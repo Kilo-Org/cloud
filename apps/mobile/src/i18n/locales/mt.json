@@ -2889,7 +2889,7 @@
     "viewProfile": "Ara l-profil",
     "webBrowser": "Brawżer tal-web",
     "signOutThisDevice": "Oħroġ mill-kont fuq dan l-apparat",
-    "signOutThisSession": "Oħroġ mill-kont f'din is-sessjoni",
+    "signOutSessionLabel": "Oħroġ mill-kont fuq {{device}}",
     "sessionSignedOut": "Il-ħruġ mill-kont f'din is-sessjoni tlesta.",
     "signOutThisDeviceTitle": "Toħroġ mill-kont fuq dan l-apparat?",
     "signOutThisSessionTitle": "Toħroġ mill-kont f'din is-sessjoni?",

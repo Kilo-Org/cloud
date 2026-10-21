@@ -2849,7 +2849,7 @@
     "thisDevice": "Toto zariadenie",
     "viewProfile": "Zobraziť profil",
     "signOutThisDevice": "Odhlásiť toto zariadenie",
-    "signOutThisSession": "Odhlásiť túto reláciu",
+    "signOutSessionLabel": "Odhlásiť zariadenie {{device}}",
     "sessionSignedOut": "Relácia bola odhlásená.",
     "signOutThisDeviceTitle": "Odhlásiť toto zariadenie?",
     "signOutThisSessionTitle": "Odhlásiť túto reláciu?",

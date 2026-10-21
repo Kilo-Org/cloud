@@ -2771,7 +2771,7 @@
     "thisDevice": "Meeshaa kana",
     "viewProfile": "Piroofaayilii ilaali",
     "signOutThisDevice": "Meeshaa kana herrega keessaa baasi",
-    "signOutThisSession": "Turtii kana herrega keessaa baasi",
+    "signOutSessionLabel": "{{device}} herrega keessaa baasi",
     "sessionSignedOut": "Turtiin herrega keessaa baafameera.",
     "signOutThisDeviceTitle": "Meeshaa kana herrega keessaa baastaa?",
     "signOutThisSessionTitle": "Turtii kana herrega keessaa baastaa?",

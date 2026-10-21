@@ -2772,7 +2772,7 @@
     "webBrowser": "Webblaaier",
     "viewProfile": "Bekyk profiel",
     "signOutThisDevice": "Teken hierdie toestel uit",
-    "signOutThisSession": "Teken hierdie sessie uit",
+    "signOutSessionLabel": "Teken {{device}} uit",
     "sessionSignedOut": "Sessie uitgeteken.",
     "signOutThisDeviceTitle": "Hierdie toestel uitteken?",
     "signOutThisSessionTitle": "Hierdie sessie uitteken?",

@@ -2771,7 +2771,7 @@
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver o perfil",
     "signOutThisDevice": "Pechar a sesión deste dispositivo",
-    "signOutThisSession": "Pechar esta sesión",
+    "signOutSessionLabel": "Pechar a sesión de {{device}}",
     "sessionSignedOut": "Sesión pechada.",
     "signOutThisDeviceTitle": "Pechar a sesión deste dispositivo?",
     "signOutThisSessionTitle": "Pechar esta sesión?",

@@ -2771,7 +2771,7 @@
     "thisDevice": "Den här enheten",
     "viewProfile": "Visa profil",
     "signOutThisDevice": "Logga ut från den här enheten",
-    "signOutThisSession": "Logga ut den här sessionen",
+    "signOutSessionLabel": "Logga ut från {{device}}",
     "sessionSignedOut": "Sessionen är utloggad.",
     "signOutThisDeviceTitle": "Logga ut från den här enheten?",
     "signOutThisSessionTitle": "Logga ut den här sessionen?",

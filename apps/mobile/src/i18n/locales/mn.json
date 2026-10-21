@@ -2772,7 +2772,7 @@
     "viewProfile": "Профайл үзэх",
     "webBrowser": "Вэб хөтөч",
     "signOutThisDevice": "Энэ төхөөрөмжөөс гарах",
-    "signOutThisSession": "Энэ нэвтрэлтийг дуусгах",
+    "signOutSessionLabel": "{{device}} төхөөрөмжөөс гарах",
     "sessionSignedOut": "Нэвтрэлтийг дуусгалаа.",
     "signOutThisDeviceTitle": "Энэ төхөөрөмжөөс гарах уу?",
     "signOutThisSessionTitle": "Энэ нэвтрэлтийг дуусгах уу?",

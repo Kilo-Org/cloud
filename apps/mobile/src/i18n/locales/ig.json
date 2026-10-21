@@ -2771,7 +2771,7 @@
     "thisDevice": "Ngwaọrụ a",
     "viewProfile": "Lelee profaịlụ",
     "signOutThisDevice": "Pụọ na ngwaọrụ a",
-    "signOutThisSession": "Pụọ na nnọkọ a",
+    "signOutSessionLabel": "Pụọ na {{device}}",
     "sessionSignedOut": "Apụrụ na nnọkọ ahụ.",
     "signOutThisDeviceTitle": "Pụọ na ngwaọrụ a?",
     "signOutThisSessionTitle": "Pụọ na nnọkọ a?",

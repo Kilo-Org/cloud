@@ -2772,7 +2772,7 @@
     "webBrowser": "Isiphequluli sewebhu",
     "viewProfile": "Buka iphrofayili",
     "signOutThisDevice": "Phuma ngemvume kule divayisi",
-    "signOutThisSession": "Phuma ngemvume kule seshini",
+    "signOutSessionLabel": "Phuma ngemvume ku-{{device}}",
     "sessionSignedOut": "Iseshini ikhishiwe ku-akhawunti.",
     "signOutThisDeviceTitle": "Uyafuna ukuphuma ngemvume kule divayisi?",
     "signOutThisSessionTitle": "Uyafuna ukuphuma ngemvume kule seshini?",

@@ -2771,7 +2771,7 @@
     "thisDevice": "Այս սարքը",
     "viewProfile": "Դիտել պրոֆիլը",
     "signOutThisDevice": "Դուրս գալ այս սարքից",
-    "signOutThisSession": "Դուրս գալ այս նիստից",
+    "signOutSessionLabel": "Դուրս գալ {{device}} սարքից",
     "sessionSignedOut": "Հաշվից դուրս գալը կատարված է։",
     "signOutThisDeviceTitle": "Դո՞ւրս գալ այս սարքի հաշվից",
     "signOutThisSessionTitle": "Դո՞ւրս գալ այս նիստից",

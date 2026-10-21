@@ -15,6 +15,7 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
+import { isolateBidiText } from '@/lib/bidi';
 import {
   classifyDeviceSessionsState,
   type DeviceSession,
@@ -69,7 +70,9 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
         accessibilityLabel={
           session.isCurrent
             ? t('deviceSessions.signOutThisDevice')
-            : t('deviceSessions.signOutThisSession')
+            : t('deviceSessions.signOutSessionLabel', {
+                device: isolateBidiText(deviceSessionLabel(session.user_agent)),
+              })
         }
         className="min-h-[44px] min-w-[44px] shrink-0 items-center justify-center active:opacity-70"
       >
@@ -130,7 +133,7 @@ export function DeviceSessionsScreen() {
     confirm({
       title: t('deviceSessions.signOutThisSessionTitle'),
       message: t('deviceSessions.signOutThisSessionMessage', {
-        device: deviceSessionLabel(session.user_agent),
+        device: isolateBidiText(deviceSessionLabel(session.user_agent)),
       }),
       confirmLabel: t('common.signOut'),
       onConfirm: () => {

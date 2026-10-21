@@ -439,6 +439,11 @@ function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
       usage.prompt_tokens_details.cached_tokens = 0; // OpenCode crashes if this is absent
     }
   }
+  if (usage.completion_tokens_details) {
+    if (usage.completion_tokens_details.reasoning_tokens === undefined) {
+      usage.completion_tokens_details.reasoning_tokens = 0; // strict OpenRouter clients reject a details object that omits this
+    }
+  }
 }
 
 export async function rewriteModelResponse_ChatCompletions({

@@ -490,6 +490,102 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
     });
 
+    test('defaults reasoning_tokens to 0 when completion_tokens_details omits it', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        usage: {
+          cost: 0.5,
+          is_byok: true,
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15,
+          prompt_tokens_details: { cached_tokens: 3 },
+          completion_tokens_details: { text_tokens: 3 },
+        },
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.usage).toEqual({
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_tokens_details: { cached_tokens: 3 },
+        completion_tokens_details: { text_tokens: 3, reasoning_tokens: 0 },
+      });
+    });
+
+    test.each([0, 7])(
+      'preserves a supplied reasoning_tokens value of %s',
+      async reasoningTokens => {
+        const upstream = jsonResponse({
+          model: 'upstream-model',
+          usage: {
+            prompt_tokens: 10,
+            completion_tokens: 5,
+            total_tokens: 15,
+            prompt_tokens_details: { cached_tokens: 3 },
+            completion_tokens_details: { reasoning_tokens: reasoningTokens },
+          },
+        });
+
+        const result = await rewriteModelResponse_ChatCompletions({
+          response: upstream,
+          removeCost: true,
+          capture: null,
+          vercelRequestId: null,
+          reasoningEffort: null,
+          responseTransforms: null,
+        });
+        const json = await result.json();
+
+        expect(json.usage).toEqual({
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15,
+          prompt_tokens_details: { cached_tokens: 3 },
+          completion_tokens_details: { reasoning_tokens: reasoningTokens },
+        });
+      }
+    );
+
+    test('leaves usage unchanged when completion_tokens_details is absent', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15,
+          prompt_tokens_details: { cached_tokens: 3 },
+        },
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.usage).toEqual({
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_tokens_details: { cached_tokens: 3 },
+      });
+    });
+
     test('passes through invalid JSON bodies unchanged and preserves status', async () => {
       const upstream = new Response('not-json{', {
         status: 502,
@@ -1010,6 +1106,60 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(chunk.usage.cost).toBeUndefined();
       expect(chunk.usage.is_byok).toBeUndefined();
       expect(chunk.usage.prompt_tokens_details.cached_tokens).toBe(0);
+    });
+
+    test('defaults reasoning_tokens in a usage-only chunk and still terminates with [DONE]', async () => {
+      const upstream = sseResponse(
+        'data: {"id":"gen-chat","model":"upstream-model","choices":[],"usage":{"cost":1,"prompt_tokens":4,"completion_tokens":2,"total_tokens":6,"prompt_tokens_details":{"cached_tokens":1},"completion_tokens_details":{"text_tokens":3}}}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const sse = await readOutputStream(result);
+      const [chunk] = dataObjects(sse) as Array<{
+        usage: {
+          prompt_tokens: number;
+          completion_tokens: number;
+          total_tokens: number;
+          prompt_tokens_details: { cached_tokens: number };
+          completion_tokens_details: { text_tokens?: number; reasoning_tokens: number };
+        };
+      }>;
+
+      expect(chunk.usage).toEqual({
+        prompt_tokens: 4,
+        completion_tokens: 2,
+        total_tokens: 6,
+        prompt_tokens_details: { cached_tokens: 1 },
+        completion_tokens_details: { text_tokens: 3, reasoning_tokens: 0 },
+      });
+      expect(dataPayloads(sse)).toContain('[DONE]');
+    });
+
+    test('keeps the pre-rewrite clone for accounting byte-for-byte', async () => {
+      const body =
+        'data: {"id":"gen-chat","model":"upstream-model","choices":[],"usage":{"cost":1,"prompt_tokens":4,"completion_tokens":2,"total_tokens":6,"prompt_tokens_details":{"cached_tokens":1},"completion_tokens_details":{"text_tokens":3}}}\n\n';
+      const upstream = sseResponse(body);
+      const accountingClone = upstream.clone();
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      await readOutputStream(result);
+
+      expect(await accountingClone.text()).toBe(body);
     });
 
     test('forwards SSE comments as a processing keep-alive', async () => {

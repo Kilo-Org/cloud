@@ -33,6 +33,28 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   errorExceptInTest: (...args: unknown[]) => mockedErrorExceptInTest(...args),
 }));
 
+// The catalog lookup hits the database; each test states the price it returns.
+const mockedResolveEmbeddingCatalogCost = jest.fn(
+  async (_params: {
+    provider: string;
+    modelIds: readonly string[];
+    promptTokens: number;
+  }): Promise<number | null> => null
+);
+jest.mock('@kilocode/web-shared/lib/ai-gateway/embeddings/embedding-cost', () => ({
+  resolveEmbeddingCatalogCost_mUsd: (
+    params: Parameters<typeof mockedResolveEmbeddingCatalogCost>[0]
+  ) => mockedResolveEmbeddingCatalogCost(params),
+}));
+
+jest.mock('@sentry/nextjs', () => ({
+  ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
+  captureMessage: jest.fn(),
+  captureException: jest.fn(),
+}));
+
+import { captureMessage } from '@sentry/nextjs';
+
 import {
   gemma_4_26b_a4b_it_free_model,
   glyph_cluster_stealth_free_model,
@@ -407,8 +429,31 @@ describe('parseEditUsageFromResponse', () => {
 });
 
 describe('countAndStoreEmbeddingUsage', () => {
+  function makeEmbeddingContext(
+    overrides: Partial<MicrodollarUsageContext> = {}
+  ): MicrodollarUsageContext {
+    return {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'openai/text-embedding-3-small',
+      ...overrides,
+    };
+  }
+
+  function makeCostlessResponse(promptTokens = 1_000): Response {
+    return new Response(
+      JSON.stringify({
+        id: 'embedding-id',
+        model: 'openai/text-embedding-3-small',
+        usage: { prompt_tokens: promptTokens, total_tokens: promptTokens },
+      })
+    );
+  }
+
   beforeEach(() => {
     mockedLogMicrodollarUsage.mockClear();
+    mockedResolveEmbeddingCatalogCost.mockClear();
+    jest.mocked(captureMessage).mockClear();
   });
 
   it.each([
@@ -436,6 +481,99 @@ describe('countAndStoreEmbeddingUsage', () => {
 
     expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
       expect.objectContaining({ cost_mUsd: testCase.expectedCost, market_cost: 1000 }),
+      usageContext
+    );
+  });
+
+  it('prices usage from the catalogued prompt price of the served model', async () => {
+    const usageContext = makeEmbeddingContext();
+    mockedResolveEmbeddingCatalogCost.mockResolvedValue(20);
+
+    countAndStoreEmbeddingUsage(makeCostlessResponse(), usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedResolveEmbeddingCatalogCost).toHaveBeenCalledWith({
+      provider: 'openrouter',
+      modelIds: ['openai/text-embedding-3-small'],
+      promptTokens: 1_000,
+    });
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 20, market_cost: 20 }),
+      usageContext
+    );
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('keeps the cost an upstream response reports instead of the catalog price', async () => {
+    const usageContext = makeEmbeddingContext();
+    mockedResolveEmbeddingCatalogCost.mockResolvedValue(20);
+    const response = new Response(
+      JSON.stringify({
+        id: 'embedding-id',
+        model: 'openai/text-embedding-3-small',
+        usage: { prompt_tokens: 1_000, total_tokens: 1_000, cost: 0.001 },
+      })
+    );
+
+    countAndStoreEmbeddingUsage(response, usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedResolveEmbeddingCatalogCost).not.toHaveBeenCalled();
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 1_000, market_cost: 1_000 }),
+      usageContext
+    );
+  });
+
+  it('records the catalog market cost of a BYOK request without charging it', async () => {
+    const usageContext = makeEmbeddingContext({ user_byok: true });
+    mockedResolveEmbeddingCatalogCost.mockResolvedValue(30);
+
+    countAndStoreEmbeddingUsage(makeCostlessResponse(), usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 0, market_cost: 30 }),
+      usageContext
+    );
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('reports usage whose cost is unknown', async () => {
+    const usageContext = makeEmbeddingContext();
+    mockedResolveEmbeddingCatalogCost.mockResolvedValue(null);
+
+    countAndStoreEmbeddingUsage(makeCostlessResponse(), usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 0, market_cost: 0 }),
+      usageContext
+    );
+    expect(captureMessage).toHaveBeenCalledWith(
+      'SUSPICIOUS: embedding usage cost is unknown',
+      expect.objectContaining({
+        level: 'error',
+        tags: { source: 'embedding_usage_processing' },
+        extra: expect.objectContaining({
+          provider: 'openrouter',
+          requested_model: 'openai/text-embedding-3-small',
+          inputTokens: 1_000,
+        }),
+      })
+    );
+  });
+
+  it('leaves an error response out of catalog pricing', async () => {
+    const usageContext = makeEmbeddingContext({ status_code: 500 });
+
+    countAndStoreEmbeddingUsage(makeCostlessResponse(), usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedResolveEmbeddingCatalogCost).not.toHaveBeenCalled();
+    expect(captureMessage).not.toHaveBeenCalled();
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 0, hasError: true }),
       usageContext
     );
   });
@@ -686,6 +824,67 @@ describe('parseEmbeddingUsageFromResponse', () => {
     const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.cost_mUsd).toBe(0);
+  });
+
+  it('should read the cost the Vercel AI Gateway reports in provider metadata', () => {
+    const response = makeResponse({
+      usage: { prompt_tokens: 100, total_tokens: 100 },
+      providerMetadata: { gateway: { cost: '0.00005', marketCost: '0.00008' } },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200);
+
+    expect(result.cost_mUsd).toBe(80);
+    expect(result.is_byok).toBeNull();
+  });
+
+  it('should read the OpenAI-compatible provider_metadata spelling', () => {
+    const response = makeResponse({
+      usage: { prompt_tokens: 100, total_tokens: 100 },
+      provider_metadata: {
+        gateway: {
+          cost: '0.00005',
+          routing: {
+            modelAttempts: [
+              { success: true, providerAttempts: [{ success: true, credentialType: 'byok' }] },
+            ],
+          },
+        },
+      },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200);
+
+    expect(result.cost_mUsd).toBe(50);
+    expect(result.is_byok).toBe(true);
+  });
+
+  it('should prefer a cost in the usage payload over provider metadata', () => {
+    const response = makeResponse({
+      usage: { prompt_tokens: 100, total_tokens: 100, cost: 0.001 },
+      providerMetadata: { gateway: { cost: '0.00005' } },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200);
+
+    expect(result.cost_mUsd).toBe(1000);
+  });
+
+  it('should price a BYOK usage payload from its upstream inference cost', () => {
+    const response = makeResponse({
+      usage: {
+        prompt_tokens: 100,
+        total_tokens: 100,
+        cost: 0.0000015,
+        is_byok: true,
+        cost_details: { upstream_inference_cost: 0.00003 },
+      },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200);
+
+    expect(result.cost_mUsd).toBe(30);
+    expect(result.is_byok).toBe(true);
   });
 
   it('should extract id as messageId', () => {

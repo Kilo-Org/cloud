@@ -46,7 +46,13 @@ import type {
   GatewayChatApiKind,
   ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { computeOpenRouterCostFields } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import {
+  computeOpenRouterCostFields,
+  computeVercelCostMicrodollars,
+  extractVercelIsByok,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import type { VercelProviderMetaData } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { resolveEmbeddingCatalogCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/embeddings/embedding-cost';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
@@ -1279,6 +1285,8 @@ type EmbeddingUsage = {
   prompt_tokens: number;
   total_tokens: number;
   cost?: number;
+  cost_details?: { upstream_inference_cost: number };
+  is_byok?: boolean | null;
 };
 
 type EmbeddingResponse = {
@@ -1286,6 +1294,10 @@ type EmbeddingResponse = {
   object: 'list';
   model: string;
   usage: EmbeddingUsage;
+  /** Vercel AI Gateway cost metadata, as the gateway spells it in its SDK. */
+  providerMetadata?: VercelProviderMetaData;
+  /** The same Vercel AI Gateway payload in the OpenAI-compatible spelling. */
+  provider_metadata?: VercelProviderMetaData;
 };
 
 type TranscriptionUsage = {
@@ -1311,9 +1323,6 @@ export function parseEmbeddingUsageFromResponse(
 ): MicrodollarUsageStats {
   const json: EmbeddingResponse = JSON.parse(responseText);
 
-  // Upstream providers (OpenRouter, Vercel) include cost in USD → convert to microdollars.
-  const cost_mUsd = json.usage.cost != null ? toMicrodollars(json.usage.cost) : 0;
-
   return {
     messageId: json.id ?? null,
     model: json.model,
@@ -1324,8 +1333,10 @@ export function parseEmbeddingUsageFromResponse(
     outputTokens: 0,
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
-    cost_mUsd,
-    is_byok: null,
+    cost_mUsd: embeddingCostMicrodollars(json),
+    is_byok:
+      json.usage.is_byok ??
+      extractVercelIsByok(json.providerMetadata?.gateway ?? json.provider_metadata?.gateway),
     upstream_id: null,
     finish_reason: null,
     latency: null,
@@ -1335,6 +1346,24 @@ export function parseEmbeddingUsageFromResponse(
     cancelled: false,
     status_code: statusCode,
   };
+}
+
+/**
+ * The cost an embeddings response reports itself, in microdollars, or 0 when it
+ * reports none. OpenRouter puts it in the usage payload, charging BYOK requests
+ * only for the upstream inference cost; the Vercel AI Gateway puts it in
+ * provider metadata.
+ */
+function embeddingCostMicrodollars(json: EmbeddingResponse): number {
+  const usage = json.usage;
+  if (usage.is_byok && usage.cost_details) {
+    return toMicrodollars(usage.cost_details.upstream_inference_cost);
+  }
+  if (usage.cost != null) {
+    return toMicrodollars(usage.cost);
+  }
+  const vercelGateway = json.providerMetadata?.gateway ?? json.provider_metadata?.gateway;
+  return vercelGateway ? computeVercelCostMicrodollars(vercelGateway) : 0;
 }
 
 export function parseTranscriptionUsageFromResponse(
@@ -1391,6 +1420,32 @@ export function extractEmbeddingPromptInfo(body: { input: unknown }): PromptInfo
   };
 }
 
+/**
+ * Prices embedding usage: the cost fields the response reports, then the
+ * catalogued prompt price of the served embedding model.
+ */
+async function withResolvedEmbeddingCost(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext
+): Promise<MicrodollarUsageStats> {
+  if (usageStats.hasError || usageStats.cost_mUsd !== 0 || usageStats.inputTokens <= 0) {
+    return usageStats;
+  }
+  const modelIds = [
+    ...new Set(
+      [usageStats.model, usageContext.requested_model].filter(
+        (modelId): modelId is string => typeof modelId === 'string' && modelId.length > 0
+      )
+    ),
+  ];
+  const cost_mUsd = await resolveEmbeddingCatalogCost_mUsd({
+    provider: usageContext.provider,
+    modelIds,
+    promptTokens: usageStats.inputTokens,
+  });
+  return cost_mUsd === null ? usageStats : { ...usageStats, cost_mUsd };
+}
+
 export function countAndStoreEmbeddingUsage(
   clonedResponse: Response,
   usageContext: MicrodollarUsageContext,
@@ -1407,26 +1462,51 @@ export function countAndStoreEmbeddingUsage(
         .catch(() => null);
 
   after(
-    usageStatsPromise.then(usageStats => {
-      requestSpan?.end();
-      if (!usageStats) {
-        captureMessage('SUSPICIOUS: No embedding usage information', {
-          level: 'error',
-          tags: { source: 'embedding_usage_processing' },
-          extra: { usageContext },
-        });
-        return;
-      }
+    usageStatsPromise
+      .then(usageStats => usageStats && withResolvedEmbeddingCost(usageStats, usageContext))
+      .then(usageStats => {
+        requestSpan?.end();
+        if (!usageStats) {
+          captureMessage('SUSPICIOUS: No embedding usage information', {
+            level: 'error',
+            tags: { source: 'embedding_usage_processing' },
+            extra: { usageContext },
+          });
+          return;
+        }
 
-      // Preserve the real upstream cost before free-model or BYOK zeroing.
-      usageStats.market_cost = usageStats.cost_mUsd;
+        // Preserve the real upstream cost before free-model or BYOK zeroing.
+        usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.is_free || usageContext.user_byok) {
-        usageStats.cost_mUsd = 0;
-      }
+        if (usageContext.is_free || usageContext.user_byok) {
+          usageStats.cost_mUsd = 0;
+        }
 
-      return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
-    })
+        if (
+          !usageStats.hasError &&
+          usageStats.inputTokens > 0 &&
+          usageStats.market_cost === 0 &&
+          !usageContext.is_free &&
+          !usageContext.user_byok
+        ) {
+          // Keep usage-accounting coverage observable: a billable request whose
+          // cost is unknown is reported for follow-up.
+          captureMessage('SUSPICIOUS: embedding usage cost is unknown', {
+            level: 'error',
+            tags: { source: 'embedding_usage_processing' },
+            extra: {
+              messageId: usageStats.messageId,
+              model: usageStats.model,
+              requested_model: usageContext.requested_model,
+              provider: usageContext.provider,
+              inputTokens: usageStats.inputTokens,
+              status_code: usageStats.status_code,
+            },
+          });
+        }
+
+        return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
+      })
   );
 }
 

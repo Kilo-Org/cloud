@@ -32,8 +32,8 @@ const LEGACY_KILO_SESSION_ID_PATTERN =
 
 /**
  * Kilo session ids are either a v1 UUID or the v2 `ses_` + 26 alphanumerics
- * contract. Only an id of one of those shapes may be used to build the admin
- * link that the Slack notification carries.
+ * contract. The Slack notification carries the id, so only an id of one of
+ * those shapes is accepted.
  */
 const kiloSessionIdSchema = z
   .string()

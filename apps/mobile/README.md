@@ -11,6 +11,13 @@ Humans: follow instructions below or talk to [@iscekic](https://github.com/iscek
 - PostHog feature flag infrastructure and the version-aware registry remain available for future flags.
 - KiloClaw tab visibility still depends on instance ownership.
 
+## Organization hub connectivity
+
+Usage tiles retain labels and show cached totals or em dash placeholders.
+Unavailable usage and low-balance settings expose Retry. The low-balance row
+retries its settings read until data is available, then opens configuration.
+Cached settings remain visible during offline pauses and refresh failures.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.

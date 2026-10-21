@@ -379,7 +379,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           });
           throw new TRPCError({
             code: 'SERVICE_UNAVAILABLE',
-            message: 'Could not verify access to that GitLab project. Please try again.',
+            message:
+              "Could not verify access to that GitLab project. Check this organization's GitLab connection and try again.",
           });
         }
         if (!projectAvailable) {

@@ -688,4 +688,95 @@ describe('addCacheBreakpoints', () => {
 
     expect(request.body.messages.at(-1)?.content).toBe('Latest prompt');
   });
+
+  test('leaves a chat completions body unchanged when a content block carries cache_control', () => {
+    let deepest: Record<string, unknown> = {
+      type: 'text',
+      text: 'Deep prompt',
+      cache_control: { type: 'ephemeral' },
+    };
+    for (let level = 1; level < 20_000; level += 1) {
+      deepest = { nested: deepest };
+    }
+
+    const request = {
+      kind: 'chat_completions',
+      body: {
+        model: 'test-model',
+        messages: [
+          { role: 'system', content: 'You are helpful.' },
+          { role: 'user', content: [{ type: 'text', text: 'Latest prompt' }, deepest] },
+        ],
+      },
+    } as unknown as GatewayRequest;
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.messages.at(0)?.content).toBe('You are helpful.');
+    expect((request.body.messages.at(-1)?.content as unknown[])[0]).toEqual({
+      type: 'text',
+      text: 'Latest prompt',
+    });
+  });
+
+  test('leaves a responses body unchanged when its first message carries prompt_cache_breakpoint', () => {
+    const marker = {
+      type: 'message',
+      role: 'user',
+      content: [
+        { type: 'input_text', text: 'First prompt', prompt_cache_breakpoint: { mode: 'explicit' } },
+      ],
+    };
+    const input = [
+      marker,
+      ...Array.from({ length: 5_000 }, (_, index) => ({
+        type: 'message',
+        role: 'user',
+        content: `Prompt ${index}`,
+      })),
+    ];
+
+    const request = {
+      kind: 'responses',
+      body: { model: 'test-model', input },
+    } as unknown as GatewayRequest;
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.input?.at(0)).toEqual(marker);
+    expect(request.body.input?.at(-1)).toEqual({
+      type: 'message',
+      role: 'user',
+      content: 'Prompt 4999',
+    });
+  });
+
+  test('leaves a chat completions body with many object nodes unchanged', () => {
+    const filler = Array.from({ length: 20_000 }, (_, index) => ({
+      first: `first-${index}`,
+      second: `second-${index}`,
+      third: `third-${index}`,
+      fourth: `fourth-${index}`,
+      fifth: `fifth-${index}`,
+      sixth: `sixth-${index}`,
+    }));
+
+    const request = {
+      kind: 'chat_completions',
+      body: {
+        model: 'test-model',
+        messages: [
+          { role: 'system', content: 'You are helpful.' },
+          { role: 'user', content: [{ type: 'text', text: 'Latest prompt' }, { filler }] },
+        ],
+      },
+    } as unknown as GatewayRequest;
+
+    addCacheBreakpoints(request);
+
+    const content = request.body.messages.at(-1)?.content as unknown[];
+    expect(request.body.messages.at(0)?.content).toBe('You are helpful.');
+    expect(content).toHaveLength(2);
+    expect(content[0]).toEqual({ type: 'text', text: 'Latest prompt' });
+  });
 });

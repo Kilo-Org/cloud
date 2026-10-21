@@ -192,17 +192,37 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+const CACHE_CONTROL_NODE_BUDGET = 100_000;
+
 function containsCacheControl(value: unknown): boolean {
-  if (Array.isArray(value)) {
-    return value.some(containsCacheControl);
+  const pending: unknown[] = [value];
+  let visited = 0;
+  while (pending.length > 0) {
+    if (visited >= CACHE_CONTROL_NODE_BUDGET) {
+      return true;
+    }
+    const current = pending.pop();
+    visited += 1;
+    if (Array.isArray(current)) {
+      for (const item of current) {
+        pending.push(item);
+      }
+      continue;
+    }
+    if (!isObjectRecord(current)) {
+      continue;
+    }
+    if (
+      Object.hasOwn(current, 'cache_control') ||
+      Object.hasOwn(current, 'prompt_cache_breakpoint')
+    ) {
+      return true;
+    }
+    for (const nested of Object.values(current)) {
+      pending.push(nested);
+    }
   }
-  if (!isObjectRecord(value)) {
-    return false;
-  }
-  if (Object.hasOwn(value, 'cache_control') || Object.hasOwn(value, 'prompt_cache_breakpoint')) {
-    return true;
-  }
-  return Object.values(value).some(containsCacheControl);
+  return false;
 }
 
 export function addCacheBreakpoints(request: GatewayRequest) {

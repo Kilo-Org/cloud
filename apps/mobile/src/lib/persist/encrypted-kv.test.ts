@@ -15,8 +15,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = new Map<string, string>();
 // Every SQL statement in the order it ran. All three seams append: `getFirstSync`
-// (the cipher and journal-mode probes), `execSync` (`PRAGMA key`), and
-// `prepareSync` (Drizzle's queries and the migration), so this is the whole
+// (the cipher and journal-mode probes), `execSync` (`PRAGMA key`, busy_timeout),
+// and `prepareSync` (Drizzle's queries and the migration), so this is the whole
 // statement stream for one open.
 const sqlLog: string[] = [];
 let randomCallCount = 0;

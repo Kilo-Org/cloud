@@ -30,9 +30,9 @@ import { kv } from './schema';
  * pragmas must all run before anything reads the schema, and Drizzle would
  * prepare a statement that itself reads it. Once the connection is keyed, the
  * table lives in `./schema.ts`, the `drizzle/` migrations are generated from
- * it, and every query goes through Drizzle. Drizzle's expo driver wraps the
- * *synchronous* handle, so the statements themselves block the JS thread; the
- * exported API stays async because opening and keying do not.
+ * it, and this module's queries go through Drizzle. Drizzle's expo driver
+ * wraps the *synchronous* handle, so the statements themselves block the JS
+ * thread; the exported API stays async because opening and keying do not.
  *
  * Opening is single-flight: one module-level open promise, awaited by every
  * caller. A wrong key or a corrupt file fails the `sqlite_master` probe and

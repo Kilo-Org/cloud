@@ -2862,7 +2862,7 @@
     "gatewayModelUnavailableNotice": "Ba a ƙara ba da wannan samfuri ba. Matsa $t(transcriptionModel.title) don zaɓar wani.",
     "gatewaySignInRequired": "Shiga don amfani da mayar da magana ta Kilo Gateway.",
     "gatewayNoModel": "Da farko zaɓi samfurin mayar da magana zuwa rubutu a Zaɓuɓɓuka.",
-    "testTitle": "Gwada shigar da murya",
+    "testTitle": "Gwada shigar da rubutu ta murya",
     "testPlaceholder": "Danna makirufo ka fara magana.",
     "testClear": "Share rubutu"
   },

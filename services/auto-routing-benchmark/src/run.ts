@@ -37,6 +37,7 @@ import {
   deletePendingDeciderOutput,
   needsPendingOutputRecovery,
   listPendingOutputRecoveries,
+  listCurrentPlatformProfileStatuses,
   claimDeciderGrading,
   releaseDeciderGrading,
   getLatestSummariesByModel,
@@ -521,14 +522,28 @@ export async function publishPlatformRoutingTable(
     console.warn(JSON.stringify({ event: 'routing_table_publish_skipped_no_ready_entries' }));
     return null;
   }
-  const readyPairs = new Set(readyEntries.map(({ entry }) => exactPairKey(entry.model, entry.variant)));
-  const unreadyServingPair = desired.find(pair => !readyPairs.has(exactPairKey(pair.model, pair.variant)));
-  if (unreadyServingPair) {
+  const readyPairs = new Set(
+    readyEntries.map(({ entry }) => exactPairKey(entry.model, entry.variant))
+  );
+  const statuses = await listCurrentPlatformProfileStatuses(env.BENCH_DB, current);
+  const statusByPair = new Map(
+    statuses.map(row => [exactPairKey(row.model, row.variant), row.status])
+  );
+  // A served pair that is ready carries over. One that is settled `failed` drops out,
+  // as it did when the gate counted only pending and running rows. A pair that is
+  // missing, pending or running is mid-re-measurement, or has no row under this engine
+  // yet, so publishing now would drop it from the live table.
+  const blocking = desired.find(pair => {
+    const key = exactPairKey(pair.model, pair.variant);
+    return !readyPairs.has(key) && statusByPair.get(key) !== 'failed';
+  });
+  if (blocking) {
     console.log(
       JSON.stringify({
         event: 'routing_table_publish_skipped_serving_pair_unready',
-        model: unreadyServingPair.model,
-        variant: unreadyServingPair.variant,
+        model: blocking.model,
+        variant: blocking.variant,
+        status: statusByPair.get(exactPairKey(blocking.model, blocking.variant)) ?? 'missing',
       })
     );
     return null;

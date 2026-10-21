@@ -3,8 +3,12 @@ import type { TRPCClient } from '@trpc/client';
 import type { RootRouter } from '@/routers/root-router';
 import { releaseLocalSessionUploads, type LocalSessionRequest } from './local-session-request';
 
-const personalRelease = jest.fn<() => Promise<void>>();
-const organizationRelease = jest.fn<() => Promise<void>>();
+const personalRelease =
+  jest.fn<TRPCClient<RootRouter>['cloudAgentNext']['releasePendingUploads']['mutate']>();
+const organizationRelease =
+  jest.fn<
+    TRPCClient<RootRouter>['organizations']['cloudAgentNext']['releasePendingUploads']['mutate']
+  >();
 const client = {
   cloudAgentNext: { releasePendingUploads: { mutate: personalRelease } },
   organizations: {
@@ -23,8 +27,8 @@ const input = {
 describe('releaseLocalSessionUploads', () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    personalRelease.mockResolvedValue(undefined);
-    organizationRelease.mockResolvedValue(undefined);
+    personalRelease.mockResolvedValue({ success: true });
+    organizationRelease.mockResolvedValue({ success: true });
   });
 
   it('releases full attachment keys for a personal session and OAuth user ID', async () => {

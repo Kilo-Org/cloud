@@ -2007,7 +2007,11 @@ describe('cli-sessions-v2-router', () => {
       mockGetSession.mockRejectedValue(new Error('not mocked'));
     });
 
-    it.each(['11111111-1111-4111-8111-111111111111', 'agent_legacy'])(
+    it.each([
+      '11111111-1111-4111-8111-111111111111',
+      'agent_legacy',
+      'agent_11111111-1111-4111-8111-111111111111',
+    ])(
       'returns historical metadata for unsupported runtime identifier %s',
       async cloudAgentSessionId => {
         await db.insert(cli_sessions_v2).values({
@@ -2028,7 +2032,7 @@ describe('cli-sessions-v2-router', () => {
       }
     );
 
-    it.each(['agent', 'workspace'])(
+    it.each(['workspace'])(
       'preserves runtime failures for current %s identifiers',
       async prefix => {
         await db.insert(cli_sessions_v2).values({

@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./account-access": "./src/account-access.ts",
     "./bitbucket-workspace-access-token": "./src/bitbucket-workspace-access-token.ts",
     "./gitlab-credential": "./src/gitlab-credential.ts",
     "./slack-credential": "./src/slack-credential.ts",
@@ -53,7 +54,8 @@
     "./user-id-encoding": "./src/user-id-encoding.ts",
     "./github-authorization": "./src/github-authorization.ts",
     "./bounded-stream-reader": "./src/bounded-stream-reader.ts",
-    "./usage-writer-client": "./src/usage-writer-client.ts"
+    "./usage-writer-client": "./src/usage-writer-client.ts",
+    "./organization-membership": "./src/organization-membership.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -62,6 +64,7 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/worker-utils/src"
   },
   "dependencies": {
+    "@kilocode/app-shared": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",

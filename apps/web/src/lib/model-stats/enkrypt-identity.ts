@@ -2,7 +2,6 @@ import { EnkryptScoreSchema } from '@kilocode/db/schema-types';
 import type { EnkryptScore } from '@kilocode/db/schema-types';
 import * as z from 'zod';
 import {
-  CUSTOM_LLM_PREFIX,
   KILO_AUTO_MODEL_PREFIX,
   KILOCLAW_KILO_PROVIDER_PREFIX,
   KILOCODE_KILO_PROVIDER_PREFIX,
@@ -453,7 +452,6 @@ export function parseEnkryptScores(value: unknown): ParsedEnkryptScores {
 }
 
 const excludedPrefixes = [
-  CUSTOM_LLM_PREFIX,
   KILO_AUTO_MODEL_PREFIX,
   KILOCLAW_KILO_PROVIDER_PREFIX,
   KILOCODE_KILO_PROVIDER_PREFIX,

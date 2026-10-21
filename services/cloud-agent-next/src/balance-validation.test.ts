@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   validateBalanceOnly,
   extractProcedureName,
+  extractProcedureNames,
+  extractBalanceRequestScope,
+  readTrpcCalls,
   extractOrgIdFromUrl,
   fetchOrgIdForSession,
   BALANCE_REQUIRED_MUTATIONS,
@@ -344,6 +347,158 @@ describe('balance-validation', () => {
     it('returns null for malformed tRPC paths', () => {
       expect(extractProcedureName('/trpc')).toBeNull();
       expect(extractProcedureName('/trpc/')).toBeNull();
+    });
+  });
+
+  describe('extractProcedureNames', () => {
+    it('returns a single procedure for non-batch requests', () => {
+      expect(extractProcedureNames('/trpc/start', false)).toEqual(['start']);
+      expect(extractProcedureNames('/trpc/start/', false)).toEqual(['start']);
+      expect(extractProcedureNames('/trpc/start,send', false)).toEqual(['start,send']);
+    });
+
+    it('splits batch paths at commas', () => {
+      expect(extractProcedureNames('/trpc/start,send', true)).toEqual(['start', 'send']);
+      expect(extractProcedureNames('/trpc/start,send/', true)).toEqual(['start', 'send']);
+    });
+
+    it('keeps empty batch segments so call positions match their inputs', () => {
+      expect(extractProcedureNames('/trpc/,,send', true)).toEqual(['', '', 'send']);
+      expect(extractProcedureNames('/trpc/send,,send', true)).toEqual(['send', '', 'send']);
+      expect(extractProcedureNames('/trpc/send,', true)).toEqual(['send', '']);
+    });
+
+    it('decodes encoded batch separators before splitting', () => {
+      expect(extractProcedureNames('/trpc/start%2Csend', true)).toEqual(['start', 'send']);
+      expect(extractProcedureNames('/trpc/,,%73end', true)).toEqual(['', '', 'send']);
+    });
+
+    it('returns an empty list for non-tRPC or empty paths', () => {
+      expect(extractProcedureNames('/', true)).toEqual([]);
+      expect(extractProcedureNames('/trpc', true)).toEqual([]);
+      expect(extractProcedureNames('/trpc/', true)).toEqual([]);
+      expect(extractProcedureNames('/trpcextra/start', true)).toEqual([]);
+    });
+
+    it('returns null when the path cannot be decoded', () => {
+      expect(extractProcedureNames('/trpc/start%ZZ', true)).toBeNull();
+    });
+  });
+
+  describe('readTrpcCalls', () => {
+    it('maps each batch input by call index', async () => {
+      const request = new Request('https://worker.test/trpc/start%2Csend?batch=1', {
+        method: 'POST',
+        body: JSON.stringify({
+          0: { options: { kilocodeOrganizationId: 'org-a' } },
+          1: { id: 'b' },
+        }),
+      });
+
+      await expect(readTrpcCalls(request, new URL(request.url))).resolves.toEqual({
+        success: true,
+        isBatch: true,
+        calls: [
+          { procedure: 'start', input: { options: { kilocodeOrganizationId: 'org-a' } } },
+          { procedure: 'send', input: { id: 'b' } },
+        ],
+      });
+    });
+
+    it('keeps inputs attached to their original position around empty segments', async () => {
+      const request = new Request('https://worker.test/trpc/,,send?batch=1', {
+        method: 'POST',
+        body: JSON.stringify({
+          0: { options: { kilocodeOrganizationId: 'org-a' } },
+          2: { id: 'c' },
+        }),
+      });
+
+      await expect(readTrpcCalls(request, new URL(request.url))).resolves.toEqual({
+        success: true,
+        isBatch: true,
+        calls: [
+          { procedure: '', input: { options: { kilocodeOrganizationId: 'org-a' } } },
+          { procedure: '', input: undefined },
+          { procedure: 'send', input: { id: 'c' } },
+        ],
+      });
+    });
+
+    it('keeps empty positions when an encoded comma adds a procedure', async () => {
+      const request = new Request('https://worker.test/trpc/,start%2Csend?batch=1', {
+        method: 'POST',
+        body: JSON.stringify({
+          0: { id: 'a' },
+          1: { id: 'b' },
+          2: { id: 'c' },
+        }),
+      });
+
+      await expect(readTrpcCalls(request, new URL(request.url))).resolves.toEqual({
+        success: true,
+        isBatch: true,
+        calls: [
+          { procedure: '', input: { id: 'a' } },
+          { procedure: 'start', input: { id: 'b' } },
+          { procedure: 'send', input: { id: 'c' } },
+        ],
+      });
+    });
+
+    it('reads GET inputs from the query parameter', async () => {
+      const input = encodeURIComponent(JSON.stringify({ kilocodeOrganizationId: 'org-a' }));
+      const request = new Request(`https://worker.test/trpc/getSandboxStatus?input=${input}`);
+
+      await expect(readTrpcCalls(request, new URL(request.url))).resolves.toEqual({
+        success: true,
+        isBatch: false,
+        calls: [{ procedure: 'getSandboxStatus', input: { kilocodeOrganizationId: 'org-a' } }],
+      });
+    });
+
+    it.each([
+      ['a non-object batch body', JSON.stringify(['start'])],
+      ['invalid JSON', '{'],
+    ])('rejects %s', async (_name, body) => {
+      const request = new Request('https://worker.test/trpc/start?batch=1', {
+        method: 'POST',
+        body,
+      });
+
+      await expect(readTrpcCalls(request, new URL(request.url))).resolves.toEqual({
+        success: false,
+        message: 'Invalid request body',
+      });
+    });
+  });
+
+  describe('extractBalanceRequestScope', () => {
+    it('uses only the nested options organization for start', () => {
+      expect(
+        extractBalanceRequestScope('start', {
+          kilocodeOrganizationId: 'org-top-level',
+          options: { kilocodeOrganizationId: 'org-options' },
+        })
+      ).toEqual({ orgId: 'org-options' });
+
+      expect(
+        extractBalanceRequestScope('start', { kilocodeOrganizationId: 'org-top-level' })
+      ).toEqual({ orgId: undefined, sessionId: undefined });
+    });
+
+    it('reads the session identifier and caller-supplied expected organization', () => {
+      expect(
+        extractBalanceRequestScope('send', {
+          cloudAgentSessionId: 'agent-123',
+          kilocodeOrganizationId: 'org-expected',
+        })
+      ).toEqual({ orgId: 'org-expected', sessionId: 'agent-123' });
+    });
+
+    it('returns an empty scope for non-object inputs', () => {
+      expect(extractBalanceRequestScope('start', null)).toEqual({});
+      expect(extractBalanceRequestScope('start', 'start')).toEqual({});
     });
   });
 

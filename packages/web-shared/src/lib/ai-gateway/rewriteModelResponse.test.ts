@@ -804,6 +804,27 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       }
     });
 
+    test('drops chunk usage without token counts and keeps complete usage', async () => {
+      const upstream = sseResponse(
+        'data: {"id":"gen-1","choices":[{"index":0,"delta":{"content":"hi"}}],"usage":{"extra_properties":{"google":{"traffic_type":"ON_DEMAND"}}}}\n\n' +
+          'data: {"id":"gen-1","choices":[],"usage":{"prompt_tokens":3,"completion_tokens":1,"total_tokens":4}}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const [first, last] = dataObjects(await readOutputStream(result));
+
+      expect(first).not.toHaveProperty('usage');
+      expect(last).toMatchObject({ usage: { prompt_tokens: 3, completion_tokens: 1 } });
+    });
+
     test.each([
       ['ResponseAborted', 'upstream_disconnect'],
       ['TimeoutError', 'timeout'],
@@ -1461,6 +1482,27 @@ describe('rewriteModelResponse_Responses', () => {
     expect(json.usage.cost).toBeUndefined();
     expect(json.usage.is_byok).toBeUndefined();
     expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
+  });
+
+  test('restores the id of output items that only carry item_id', async () => {
+    const upstream = sseResponse(
+      'data: {"type":"response.output_item.done","item":{"type":"function_call","item_id":"fc_1","call_id":"call_1","name":"read","arguments":"{}"}}\n\n' +
+        'data: {"type":"response.completed","response":{"output":[{"type":"function_call","item_id":"fc_1","call_id":"call_1"},{"type":"message","id":"msg_1"}]}}\n\n'
+    );
+
+    const result = await rewriteModelResponse_Responses({
+      response: upstream,
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const [done, completed] = dataObjects(await readOutputStream(result));
+
+    expect(done).toMatchObject({ item: { id: 'fc_1', item_id: 'fc_1' } });
+    expect(completed).toMatchObject({
+      response: { output: [{ id: 'fc_1' }, { id: 'msg_1' }] },
+    });
   });
 
   test('strips nested response usage and closes after the completed event', async () => {

@@ -337,6 +337,7 @@ describe('validateAdmissionPayload', () => {
 describe('checkNativeAdmission', () => {
   beforeEach(() => {
     delete process.env.NATIVE_ADMISSION_MODE;
+    delete process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL;
     jest.clearAllMocks();
   });
 
@@ -411,10 +412,47 @@ describe('checkNativeAdmission', () => {
       setMode('enforce');
     });
 
-    test('absent admission field admits and counts the condition', () => {
+    test('refuses a request without a valid admission payload', () => {
       const result = checkNativeAdmission({ provider: 'google', idToken: 'abc' });
-      expect(result).toEqual({ admission: { ok: true }, verifyAsync: false });
+      expect(result).toEqual({
+        admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' },
+        verifyAsync: false,
+      });
       expect(mockCaptureMessage).not.toHaveBeenCalled();
+    });
+
+    test('admits a request inside the legacy grace window', () => {
+      jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000);
+      process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = new Date(1_000_000 + 60_000).toISOString();
+      try {
+        expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
+          admission: { ok: true },
+          verifyAsync: false,
+        });
+      } finally {
+        jestGlobal.restoreAllMocks();
+      }
+    });
+
+    test('refuses a request at the legacy grace deadline', () => {
+      jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000);
+      process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = new Date(1_000_000).toISOString();
+      try {
+        expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
+          admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' },
+          verifyAsync: false,
+        });
+      } finally {
+        jestGlobal.restoreAllMocks();
+      }
+    });
+
+    test('refuses a request when the grace deadline is unparseable', () => {
+      process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = 'not-a-date';
+      expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
+        admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' },
+        verifyAsync: false,
+      });
     });
 
     test('well-formed ios attestation passes sync check', () => {
@@ -480,12 +518,14 @@ describe('checkNativeAdmission', () => {
 
 describe('admission condition aggregation', () => {
   beforeEach(() => {
+    delete process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL;
     jest.clearAllMocks();
     resetAdmissionCountersForTests();
   });
 
   test('counts occurrences and emits one structured line per interval with the running count', () => {
     setMode('enforce');
+    process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = new Date(5_000_000).toISOString();
     jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000);
     try {
       checkNativeAdmission({ provider: 'google', idToken: 'a' });
@@ -502,9 +542,29 @@ describe('admission condition aggregation', () => {
       const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
       expect(line).toMatchObject({
         event: 'native_admission_aggregate',
-        metric: 'native_admission_legacy_count',
+        metric: 'native_admission_legacy_grace_admit',
         count: 3,
         intervalMs: 60_000,
+      });
+    } finally {
+      jestGlobal.restoreAllMocks();
+    }
+  });
+
+  test('counts expired-legacy refusals under their own metric', () => {
+    setMode('enforce');
+    process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = new Date(1_000_000).toISOString();
+    jestGlobal.spyOn(Date, 'now').mockReturnValue(2_000_000);
+    try {
+      checkNativeAdmission({ provider: 'google', idToken: 'a' });
+      jestGlobal.spyOn(Date, 'now').mockReturnValue(2_000_000 + 60_001);
+      checkNativeAdmission({ provider: 'google', idToken: 'b' });
+
+      const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
+      expect(line).toMatchObject({
+        event: 'native_admission_aggregate',
+        metric: 'native_admission_legacy_grace_expired',
+        count: 1,
       });
     } finally {
       jestGlobal.restoreAllMocks();
@@ -534,6 +594,7 @@ describe('admission condition aggregation', () => {
 
   test('final window flushes on later traffic even without a new counted condition', () => {
     setMode('enforce');
+    process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = new Date(9_000_000).toISOString();
     jestGlobal.spyOn(Date, 'now').mockReturnValue(3_000_000);
     try {
       checkNativeAdmission({ provider: 'google', idToken: 'a' });
@@ -556,7 +617,7 @@ describe('admission condition aggregation', () => {
       const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
       expect(line).toMatchObject({
         event: 'native_admission_aggregate',
-        metric: 'native_admission_legacy_count',
+        metric: 'native_admission_legacy_grace_admit',
         count: 1,
         windowStart: new Date(3_000_000).toISOString(),
       });

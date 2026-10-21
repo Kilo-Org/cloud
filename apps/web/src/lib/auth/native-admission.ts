@@ -187,14 +187,36 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
 
 // ── Admission gate (sync) ──────────────────────────────────────────────────
 
+/** ISO-8601 close of the native admission compatibility window. */
+const LEGACY_GRACE_UNTIL_ENV = 'NATIVE_ADMISSION_LEGACY_GRACE_UNTIL';
+
+type LegacyGraceState = 'active' | 'expired' | 'invalid' | 'unset';
+
+/**
+ * State of the native admission compatibility window.
+ *
+ * The setting is a cutover instant, not a switch: the window is open only
+ * before it, so it cannot stay open by accident. Unset, unparseable and past
+ * values all leave it closed.
+ */
+function evaluateLegacyGrace(now: number): LegacyGraceState {
+  const raw = getEnvVariable(LEGACY_GRACE_UNTIL_ENV).trim();
+  if (!raw) return 'unset';
+  const until = Date.parse(raw);
+  if (Number.isNaN(until)) return 'invalid';
+  return now < until ? 'active' : 'expired';
+}
+
 /**
  * Evaluate admission for a native auth request body.
  *
  * Mode behaviour:
  * - 'off':      admit everything.
  * - 'report':   evaluate and log, always admit.
- * - 'enforce':  validate admission. Absent field = legacy admit + count.
- *               Present invalid = refuse. Provider fault = 5xx via throw.
+ * - 'enforce':  require a valid admission payload. Requests inside the
+ *               compatibility window (NATIVE_ADMISSION_LEGACY_GRACE_UNTIL) are
+ *               admitted; the requirement applies once it closes. A malformed
+ *               payload is refused. Provider fault = 5xx via throw.
  *
  * Returns whether async verification is needed ('report' and 'enforce' modes
  * with a valid admission payload).
@@ -206,9 +228,11 @@ export function checkNativeAdmission(body: Record<string, unknown>): {
 } {
   const mode = getEnvVariable('NATIVE_ADMISSION_MODE') as NativeAdmissionMode;
 
+  const now = Date.now();
+
   // Roll the telemetry window on any native auth request, so the final
   // window of a sparse traffic pattern still flushes.
-  rollAdmissionWindowIfNeeded(Date.now());
+  rollAdmissionWindowIfNeeded(now);
 
   // off mode (or unset) always admits with no async verification
   if (!mode || mode === 'off') {
@@ -218,10 +242,22 @@ export function checkNativeAdmission(body: Record<string, unknown>): {
   const hasAdmission = 'admission' in body && body['admission'] !== undefined;
 
   if (!hasAdmission) {
-    if (mode === 'enforce') {
-      countAdmissionCondition('native_admission_legacy_count');
+    if (mode === 'report') {
+      return { admission: { ok: true }, verifyAsync: false };
     }
-    return { admission: { ok: true }, verifyAsync: false };
+    const grace = evaluateLegacyGrace(now);
+    if (grace === 'active') {
+      countAdmissionCondition('native_admission_legacy_grace_admit');
+      return { admission: { ok: true }, verifyAsync: false };
+    }
+    countAdmissionCondition(
+      grace === 'invalid'
+        ? 'native_admission_legacy_grace_invalid'
+        : grace === 'expired'
+          ? 'native_admission_legacy_grace_expired'
+          : 'native_admission_legacy_refused'
+    );
+    return { admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' }, verifyAsync: false };
   }
 
   // Validate the admission payload shape synchronously.

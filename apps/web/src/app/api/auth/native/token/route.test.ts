@@ -115,6 +115,12 @@ const mockCaptureMessage = jest.mocked(captureMessage);
 
 const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
 
+// The real gate, for tests that must exercise the mode logic end to end
+// instead of pinning a mocked result.
+const actualCheckNativeAdmission = jest.requireActual<{
+  checkNativeAdmission: typeof checkNativeAdmission;
+}>('@/lib/auth/native-admission').checkNativeAdmission;
+
 describe('POST /api/auth/native/token', () => {
   const createRequest = (body: unknown) =>
     new NextRequest('http://localhost:3000/api/auth/native/token', {
@@ -1260,6 +1266,47 @@ describe('POST /api/auth/native/token', () => {
       // Must not proceed to provider verification.
       expect(mockVerifyNativeGoogleIdToken).not.toHaveBeenCalled();
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('requires an admission payload for a token request under enforce mode', async () => {
+      mockCheckNativeAdmission.mockImplementation(actualCheckNativeAdmission);
+      process.env.NATIVE_ADMISSION_MODE = 'enforce';
+      delete process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL;
+      try {
+        const response = await POST(
+          createRequest({ provider: 'google', idToken: 'google-id-token' })
+        );
+        expect(response.status).toBe(403);
+        expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+        expect(mockVerifyNativeGoogleIdToken).not.toHaveBeenCalled();
+        expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+        expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      } finally {
+        delete process.env.NATIVE_ADMISSION_MODE;
+      }
+    });
+
+    it('accepts a token request inside the legacy grace window', async () => {
+      mockCheckNativeAdmission.mockImplementation(actualCheckNativeAdmission);
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+      process.env.NATIVE_ADMISSION_MODE = 'enforce';
+      process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = new Date(
+        Date.now() + 60 * 60 * 1000
+      ).toISOString();
+      try {
+        const response = await POST(
+          createRequest({ provider: 'google', idToken: 'google-id-token' })
+        );
+        expect(response.status).toBe(200);
+        expect(mockVerifyNativeGoogleIdToken).toHaveBeenCalled();
+        expect(mockGenerateApiToken).toHaveBeenCalled();
+      } finally {
+        delete process.env.NATIVE_ADMISSION_MODE;
+        delete process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL;
+      }
     });
 
     it('runs admission check before provider verification', async () => {

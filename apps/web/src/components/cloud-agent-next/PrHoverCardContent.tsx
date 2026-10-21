@@ -102,6 +102,32 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
       )}
 
       <div className="border-border/60 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 border-t pt-3 text-xs">
+        {pr.platform === 'github' && (
+          <>
+            <span
+              className="text-muted-foreground"
+              title="Checks received via webhooks for the current commit. Earlier checks may be missing; requiredness is unknown."
+            >
+              Checks (observed)
+            </span>
+            <span className="tabular-nums">
+              {pr.observations?.checks
+                ? `${pr.observations.checks.total}${pr.observations.truncated ? '+' : ''} total / ${pr.observations.checks.failed}${pr.observations.truncated ? '+' : ''} failed`
+                : 'Unknown'}
+            </span>
+            <span
+              className="text-muted-foreground"
+              title="Unresolved review threads observed via webhooks, not individual replies. Earlier threads may be missing."
+            >
+              Unresolved threads
+            </span>
+            <span className="tabular-nums">
+              {pr.observations?.unresolvedThreads == null
+                ? 'Unknown'
+                : `${pr.observations.unresolvedThreads}${pr.observations.truncated ? '+' : ''}`}
+            </span>
+          </>
+        )}
         {pr.reviewDecision && (
           <>
             <span className="text-muted-foreground">Review</span>

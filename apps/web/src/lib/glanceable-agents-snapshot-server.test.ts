@@ -480,6 +480,7 @@ describe('buildGlanceableDeliveryForUser', () => {
             lastSyncedAt: '2026-10-12T09:00:00.000Z',
             reviewDecision: null,
             reviewDecisionPending: false,
+            observations: null,
             platform: 'github',
           },
         },

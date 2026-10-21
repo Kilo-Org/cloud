@@ -35,6 +35,8 @@ vi.mock('expo-router', async () => {
 vi.mock('react-native', async () => {
   const { NativeTextInput } = await import('./todo-list-model-picker.mounted.test-helpers');
   return {
+    // The settings sheet arms the hardware Back listener while it is focused.
+    BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
     I18nManager: { isRTL: false },
     Keyboard: { dismiss: vi.fn() },
     Pressable: 'Pressable',

@@ -547,6 +547,12 @@ export async function rewriteModelResponse_ChatCompletions({
             if (delta.tool_calls === null) {
               delete delta.tool_calls;
             }
+            for (const toolCall of delta.tool_calls ?? []) {
+              // Some APIs set null on argument continuation chunks, which @openrouter/ai-sdk-provider rejects
+              if (toolCall.type === null) {
+                delete toolCall.type;
+              }
+            }
             applyReasoningDetailsResponseTransform(responseTransforms, delta);
           }
 

@@ -2,6 +2,7 @@ import {
   ClassifierOutputSchema,
   MirrorPayloadSchema,
   DEFAULT_AUTO_ROUTER,
+  isCustomRouterModelId,
   poolEntryKey,
   taxonomyRouteKey,
   type AutoRoutingDecision,
@@ -54,17 +55,21 @@ import {
 } from './decision-engine';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
-import { fetchCustomRoutingTable } from './benchmark-origin';
 import { getRoutingTable } from './routing-table';
-import { getEffectiveAutoRoutingSettings } from './routing-mode';
+import {
+  getEffectiveAutoRoutingSettings,
+  getOwnerCustomRoutingTable,
+  type AutoRoutingSettingsOwner,
+} from './routing-mode';
 import type { HonoEnv } from './hono-env';
+import { resolveLegacyPoolRouting, type LegacyPoolRouting } from './legacy-pool-overlap';
 import { getModelCapabilities } from './model-capabilities';
 import type { ModelCapabilitiesMap } from './model-capabilities';
 import { recordClassifierUsage, type ClassifierCallKind } from './classifier-usage';
 
 const CUSTOM_ROUTING_TABLE_CACHE_TTL_MS = 60_000;
+export const CUSTOM_ROUTING_TABLE_CACHE_MAX_ENTRIES = 64;
 
-/** Ordered canonical key for an Efficient model pool (sort by poolEntryKey). */
 export function orderedPoolCacheKey(pool: EfficientModelPool): string {
   return [...pool]
     .map(entry => poolEntryKey(entry))
@@ -72,7 +77,6 @@ export function orderedPoolCacheKey(pool: EfficientModelPool): string {
     .join('\n');
 }
 
-// Per-pool-key isolate caches that close over the pool entries (~60s TTL).
 const customTableLoaders = new Map<
   string,
   ReturnType<typeof ttlCached<Env, RoutingTable | null>>
@@ -87,14 +91,20 @@ export function clearCustomRoutingTableCache(): void {
 
 async function loadCustomRoutingTable(
   env: Env,
-  pool: EfficientModelPool
+  pool: EfficientModelPool,
+  owner: AutoRoutingSettingsOwner
 ): Promise<RoutingTable | null> {
-  const key = orderedPoolCacheKey(pool);
+  const key = JSON.stringify([owner.ownerType, owner.ownerId, orderedPoolCacheKey(pool)]);
   let cache = customTableLoaders.get(key);
   if (!cache) {
-    const poolSnapshot = pool;
+    if (customTableLoaders.size >= CUSTOM_ROUTING_TABLE_CACHE_MAX_ENTRIES) {
+      const oldestKey = customTableLoaders.keys().next().value;
+      if (oldestKey !== undefined) {
+        customTableLoaders.delete(oldestKey);
+      }
+    }
     cache = ttlCached(CUSTOM_ROUTING_TABLE_CACHE_TTL_MS, (e: Env) =>
-      fetchCustomRoutingTable(e, poolSnapshot)
+      getOwnerCustomRoutingTable(e, owner)
     );
     customTableLoaders.set(key, cache);
   }
@@ -409,9 +419,15 @@ export type DecisionTarget = {
 export type DecisionRun = {
   response: AutoRoutingDecisionResponse;
   routingTable: RoutingTable | null;
+  capabilities: ModelCapabilitiesMap;
+  constraints: RoutingConstraints | undefined;
 };
 
-function platformTarget(c: Context<HonoEnv>, payload: MirrorPayload): DecisionTarget {
+function platformTarget(
+  c: Context<HonoEnv>,
+  payload: MirrorPayload,
+  settings?: LegacyPoolRouting
+): DecisionTarget {
   const router = payload.router ?? DEFAULT_AUTO_ROUTER;
   return {
     scope: router,
@@ -419,18 +435,20 @@ function platformTarget(c: Context<HonoEnv>, payload: MirrorPayload): DecisionTa
     deniedModelIds: new Set(payload.routingPolicy?.deniedModelIds ?? []),
     loadRouting: async timings => {
       const settingsStartedAt = performance.now();
-      const effectiveSettings = await getEffectiveAutoRoutingSettings(c.env, {
-        userId: payload.userId,
-        organizationId: payload.organizationId,
-      });
+      const effectiveSettings =
+        settings ??
+        (await getEffectiveAutoRoutingSettings(c.env, {
+          userId: payload.userId,
+          organizationId: payload.organizationId,
+        }));
       timings.settingsMs = performance.now() - settingsStartedAt;
       const configuredPool = router === 'efficient' ? effectiveSettings.pool : null;
 
       const tableStartedAt = performance.now();
       const [routingTable, shadowRoutingTable] = await Promise.all([
-        configuredPool === null
+        configuredPool === null || effectiveSettings.poolOwner === null
           ? getRoutingTable(c.env, router)
-          : loadCustomRoutingTable(c.env, configuredPool),
+          : loadCustomRoutingTable(c.env, configuredPool, effectiveSettings.poolOwner),
         router === 'efficient' ? getShadowRoutingTable(c.env) : null,
       ]);
       timings.tableMs = performance.now() - tableStartedAt;
@@ -740,6 +758,8 @@ export async function runDecision(
     return {
       response: { cost: 0, decision: outcome.decision, classifierResult: null },
       routingTable,
+      capabilities,
+      constraints,
     };
   }
   if (outcome.kind === 'cache_hit') {
@@ -807,7 +827,12 @@ export async function runDecision(
         shadow
       );
     }
-    return { response: decisionResponse(cached, payload.input, decision), routingTable };
+    return {
+      response: decisionResponse(cached, payload.input, decision),
+      routingTable,
+      capabilities,
+      constraints,
+    };
   }
 
   try {
@@ -870,6 +895,8 @@ export async function runDecision(
     return {
       response: decisionResponse(classifier.classification, payload.input, decision),
       routingTable,
+      capabilities,
+      constraints,
     };
   } catch (error) {
     recordDecision(
@@ -882,7 +909,7 @@ export async function runDecision(
       sticky,
       speculative ? 'speculative' : 'sync'
     );
-    return { response: emptyDecisionResponse(), routingTable };
+    return { response: emptyDecisionResponse(), routingTable, capabilities, constraints };
   }
 }
 
@@ -893,17 +920,27 @@ async function decideCustomRouter(
 ): Promise<Response> {
   try {
     const owner = customRouterOwner(reference, payload);
-    const router = owner ? await findCustomRouter(c.env, owner, reference.slug) : null;
-    if (!router) throw new CustomRouterError('router_not_found', 'Custom router not found');
+    const stored = owner ? await findCustomRouter(c.env, owner, reference.slug) : null;
+    if (!stored) throw new CustomRouterError('router_not_found', 'Custom router not found');
+    // A platform alias resolved to its canonical pool keeps platform mode precedence (ADR 0005).
+    const platformMode =
+      stored.legacyPool && !isCustomRouterModelId(payload.input.requestedModel.toLowerCase())
+        ? (await resolveLegacyPoolRouting(c.env, payload))?.mode
+        : undefined;
     const routing = customRouting(
-      router,
+      platformMode ? { ...stored, mode: platformMode } : stored,
       payload.clientEntries ?? [],
       new Set(payload.routingPolicy?.deniedModelIds ?? [])
     );
     const run = await runDecision(
       c,
       payload,
-      customRouterTarget(c.env, promise => c.executionCtx.waitUntil(promise), routing)
+      customRouterTarget(
+        c.env,
+        promise => c.executionCtx.waitUntil(promise),
+        routing,
+        payload.input.requestedModel
+      )
     );
     return c.json({ ...run.response, decision: customRouterDecision(routing, run) });
   } catch (error) {
@@ -928,6 +965,33 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   }
   const payload = parsed.data;
   if (payload.customRouter) return decideCustomRouter(c, payload, payload.customRouter);
-  const { response } = await runDecision(c, payload, platformTarget(c, payload));
+  const settings =
+    (payload.router ?? DEFAULT_AUTO_ROUTER) === 'efficient'
+      ? await resolveLegacyPoolRouting(c.env, payload)
+      : undefined;
+  if (settings?.router) {
+    try {
+      const routing = customRouting(
+        settings.router,
+        payload.clientEntries ?? [],
+        new Set(payload.routingPolicy?.deniedModelIds ?? [])
+      );
+      const run = await runDecision(
+        c,
+        payload,
+        customRouterTarget(
+          c.env,
+          promise => c.executionCtx.waitUntil(promise),
+          routing,
+          payload.input.requestedModel
+        )
+      );
+      return c.json({ ...run.response, decision: customRouterDecision(routing, run) });
+    } catch (error) {
+      if (error instanceof CustomRouterError) return customRouterErrorResponse(error);
+      throw error;
+    }
+  }
+  const { response } = await runDecision(c, payload, platformTarget(c, payload, settings));
   return c.json(response);
 };

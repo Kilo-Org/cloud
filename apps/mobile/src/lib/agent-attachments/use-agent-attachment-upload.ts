@@ -29,10 +29,7 @@ import {
   hasAnyUnclaimedAttachment,
   isAnyAttachmentUploading,
 } from '@/lib/agent-attachments/agent-attachment-types';
-import {
-  stripImageMetadata,
-  strippedExtension,
-} from '@/lib/agent-attachments/strip-image-metadata';
+import { stripImageMetadata } from '@/lib/agent-attachments/strip-image-metadata';
 import {
   describeTerminalReason,
   measureLocalSize,
@@ -497,22 +494,21 @@ export function useAgentAttachmentUpload(
           let metadataStripFailed = false;
           if (classified.kind === 'image') {
             // Strip EXIF/GPS/maker notes before measuring so `size` reflects
-            // the stripped file. A failure keeps the original URI and marks
-            // the chip so the composer can warn.
+            // the stripped file. A failure marks the chip so the composer can
+            // warn; the original URI is never used as an attachment.
             // eslint-disable-next-line no-await-in-loop -- each candidate's strip must complete before its size is measured
-            const strippedUri = await stripImageMetadata(candidate.uri, ext);
-            if (strippedUri !== candidate.uri) {
-              const newExt = strippedExtension(ext);
-              ext = newExt;
-              localUri = strippedUri;
+            const stripped = await stripImageMetadata(candidate.uri, ext);
+            if (stripped.ok) {
+              ext = stripped.extension;
+              localUri = stripped.uri;
               localFileOwned = true;
               // The stripped copy is a new app-owned cache file the picker did
               // not register. Register it so logout's reapTempFiles({ all:
               // true }) deletes it; the original candidate.uri stays registered
               // separately and is also reaped (or left for the picker).
-              registerTempFile(strippedUri);
+              registerTempFile(stripped.uri);
               // eslint-disable-next-line no-await-in-loop -- measure the stripped file before the next candidate
-              const strippedSize = await measureLocalSize(strippedUri);
+              const strippedSize = await measureLocalSize(stripped.uri);
               finalSize = strippedSize !== null && strippedSize > 0 ? strippedSize : finalSize;
             } else {
               metadataStripFailed = true;

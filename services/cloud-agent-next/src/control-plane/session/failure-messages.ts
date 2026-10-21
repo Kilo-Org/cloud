@@ -4,6 +4,10 @@ import {
 } from '../../shared/control-plane-protocol.js';
 
 const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
+  runtime_artifact_unauthorized: 'Runtime download was not authorized',
+  runtime_artifact_invalid: 'Runtime artifact verification failed',
+  runtime_cli_probe_failed: 'Runtime CLI validation failed',
+  runtime_supervisor_missing: 'Runtime supervisor is missing',
   preparation_timeout: 'Environment preparation timed out',
   workspace_setup_failed: 'Workspace setup failed',
   agent_unavailable: 'The agent became unavailable',

@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
+import { BriefingSyncMount } from '@/components/agent-briefing/briefing-sync-mount';
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { LauncherSurfacesMount } from '@/components/launcher-surfaces-mount';
@@ -122,6 +123,7 @@ export default function AppLayout() {
       <GlanceablePublisherMount />
       <LauncherSurfacesMount />
       <CachePersistenceMount />
+      <BriefingSyncMount />
       <ToolSummaryTranslationRetryMount />
       <StorePurchaseRecoveryMount />
       <ForegroundReconciliationMount />
@@ -161,6 +163,9 @@ export default function AppLayout() {
             <Stack.Screen name="todos/[list-id]" />
             <Stack.Screen name="todos/item/[item-id]" />
             <Stack.Screen name="todos/list-settings" options={sheetOptions} />
+            <Stack.Screen name="agent-briefing/index" />
+            <Stack.Screen name="agent-briefing/[report-id]" />
+            <Stack.Screen name="agent-briefing/settings" />
             <Stack.Screen name="share-gate" options={sheetOptions} />
             <Stack.Screen name="language-picker" options={searchSheetOptions} />
             <Stack.Screen name="transcription-model-picker" options={sheetOptions} />

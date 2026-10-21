@@ -84,6 +84,12 @@ vi.mock('@/components/ui/icons', () => ({
   Wallet: 'Wallet',
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+// The briefing toggle reads the briefing preferences through the briefing API
+// and the native SQLCipher dismissal journal; the notification categories this
+// suite asserts are independent of it.
+vi.mock('@/components/agent-briefing/briefing-notification-toggle', () => ({
+  BriefingNotificationToggle: () => null,
+}));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: (props: { children?: unknown }) => props.children,
 }));

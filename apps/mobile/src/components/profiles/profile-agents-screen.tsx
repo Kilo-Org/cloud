@@ -28,6 +28,12 @@ function hasUsableMessage(error: unknown): boolean {
   return error instanceof Error && error.message.trim().length > 0;
 }
 
+/** A tRPC CONFLICT from the agent mutations is the per-profile slug unique index. */
+function isSlugConflict(error: unknown): boolean {
+  const code = (error as { data?: { code?: unknown } } | null | undefined)?.data?.code;
+  return code === 'CONFLICT';
+}
+
 type AgentRowViewProps = Readonly<{
   name: string;
   slug: string;
@@ -120,9 +126,14 @@ export function ProfileAgentsScreen({
   const rows = agentRows(agents);
   // `null` = closed, `{ source: null }` = add, `{ source }` = edit that agent.
   const [form, setForm] = useState<{ source: AgentSource | null } | null>(null);
+  // A save the server rejected on the slug shows the inline conflict message
+  // instead of only a toast: the sheet stays open on the typed values, so the
+  // user can rename without retyping the form.
+  const [serverSlugConflict, setServerSlugConflict] = useState(false);
 
   const startAdd = () => {
     setForm({ source: null });
+    setServerSlugConflict(false);
   };
 
   const closeForm = () => {
@@ -138,6 +149,10 @@ export function ProfileAgentsScreen({
         ? createAgent.mutateAsync({ profileId, ...payload })
         : updateAgent.mutateAsync({ profileId, agentId: target.id, ...payload }));
     } catch (error) {
+      if (isSlugConflict(error)) {
+        setServerSlugConflict(true);
+        return;
+      }
       if (!hasUsableMessage(error)) {
         toast.error(t('profiles.agents.saveFailed'));
       }
@@ -212,6 +227,7 @@ export function ProfileAgentsScreen({
               model={row.model}
               onEdit={() => {
                 setForm({ source });
+                setServerSlugConflict(false);
               }}
               onDelete={() => {
                 confirmDelete(source);
@@ -242,8 +258,12 @@ export function ProfileAgentsScreen({
       {form !== null ? (
         <AgentFormSheet
           agent={form.source}
+          existingSlugs={agents
+            .filter(candidate => candidate.id !== form.source?.id)
+            .map(candidate => candidate.slug)}
           organizationId={organizationId}
           isSaving={createAgent.isPending || updateAgent.isPending}
+          slugConflictFromServer={serverSlugConflict}
           onClose={closeForm}
           onSave={payload => {
             void saveAgent(form.source, payload);

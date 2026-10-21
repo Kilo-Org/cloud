@@ -26,10 +26,7 @@ jest.mock('@/lib/organizations/organization-billing', () => ({
 
 // Entitlement classification the way the app reads it, so a case asserts the
 // stage an organization lands in rather than only the raw timestamp.
-function trialStatusOf(organization: {
-  free_trial_end_at: string | null;
-  created_at: string;
-}) {
+function trialStatusOf(organization: { free_trial_end_at: string | null; created_at: string }) {
   return getOrgTrialStatusFromDays(
     getDaysRemainingInTrial(organization.free_trial_end_at, organization.created_at)
   );

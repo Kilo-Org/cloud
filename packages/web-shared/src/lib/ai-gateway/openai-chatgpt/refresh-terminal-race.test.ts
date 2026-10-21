@@ -71,7 +71,9 @@ describe('terminal refresh failure against a real database', () => {
     await expect(resolveOpenAiChatGptAccessToken(owner)).resolves.toEqual({ kind: 'terminal' });
 
     const request = fetchMock.mock.calls[0][1] as RequestInit;
-    expect(typeof request.body === 'string' ? request.body : '').toContain('stale-refresh-token');
+    const body = request.body;
+    if (typeof body !== 'string') throw new Error('expected a form-encoded refresh request body');
+    expect(new URLSearchParams(body).get('refresh_token')).toBe('stale-refresh-token');
 
     const stored = await getOpenAiChatGptStoredConnection(owner);
     expect(stored?.isEnabled).toBe(false);

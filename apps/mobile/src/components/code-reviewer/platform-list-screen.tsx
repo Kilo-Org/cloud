@@ -17,7 +17,7 @@ import {
   useGitHubStatus,
   useGitLabStatus,
 } from '@/lib/hooks/use-code-reviewer';
-import { useOrganizationScopeAccess } from '@/lib/hooks/use-organization-scope-access';
+import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 import { useTRPC } from '@/lib/trpc';
 
 const PLATFORM_ICONS = {
@@ -67,11 +67,10 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
   const bitbucketReadiness = useBitbucketReadiness(scope);
-  const access = useOrganizationScopeAccess(isPersonal ? undefined : scope, [
-    githubStatus.error,
-    gitlabStatus.error,
-    bitbucketReadiness.error,
-  ]);
+  const access = classifyOrganizationScopeAccess({
+    isOrganizationScope: !isPersonal,
+    errors: [githubStatus.error, gitlabStatus.error, bitbucketReadiness.error],
+  });
 
   // Re-resolve membership and every platform status together: a restored
   // membership must land the real rows, and a live installer account must not

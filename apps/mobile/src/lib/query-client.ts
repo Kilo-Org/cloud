@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { handleTrpcQueryError } from '@/lib/auth/trpc-unauthorized';
 import { reportTrpcError } from '@/lib/force-update-signal';
 import { reportAppError } from '@/lib/telemetry/app-error-reporting';
-import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
+import { isPermissionDeniedError, isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 
 export type ActiveSessionsQueryMetadata = Readonly<{
   acceptedRevision: number;
@@ -139,48 +139,6 @@ const PERMANENT_CODES = new Set([
   'CONFLICT',
   'UNPROCESSABLE_CONTENT',
 ]);
-
-type TrpcErrorData = {
-  code?: string;
-  authRequired?: boolean;
-};
-
-const trpcErrorDataSchema = z.object({
-  code: z.string().optional(),
-  authRequired: z.boolean().optional(),
-});
-const trpcErrorShapeSchema = z.object({
-  data: z.unknown().optional(),
-  shape: z.object({ data: z.unknown().optional() }).optional(),
-});
-
-/** The serialized tRPC error data, from either the direct or shaped variant. */
-function trpcErrorData(error: unknown): TrpcErrorData | undefined {
-  const parsedError = trpcErrorShapeSchema.safeParse(error);
-  if (!parsedError.success) {
-    return undefined;
-  }
-  const direct = trpcErrorDataSchema.safeParse(parsedError.data.data);
-  if (direct.success) {
-    return direct.data;
-  }
-  const shaped = trpcErrorDataSchema.safeParse(parsedError.data.shape?.data);
-  return shaped.success ? shaped.data : undefined;
-}
-
-/**
- * True when the error is a permission loss: a `FORBIDDEN`, or a procedure-level
- * `UNAUTHORIZED` without the context-level `authRequired` flag (which the
- * unauthorized handler signs the user out on). Permission loss must drop the
- * affected cache, not the session.
- */
-function isPermissionDeniedError(error: unknown): boolean {
-  const data = trpcErrorData(error);
-  if (data?.code === 'FORBIDDEN') {
-    return true;
-  }
-  return data?.code === 'UNAUTHORIZED' && data.authRequired !== true;
-}
 
 type QueryKeyInput = { organizationId?: unknown };
 

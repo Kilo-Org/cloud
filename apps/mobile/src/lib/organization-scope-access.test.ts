@@ -2,64 +2,56 @@ import { describe, expect, it } from 'vitest';
 
 import { classifyOrganizationScopeAccess } from './organization-scope-access';
 
-const denial = (code: string) => ({ data: { code } });
+const denied = (code: string, extra: Record<string, unknown> = {}) => ({
+  data: { code, httpStatus: code === 'NOT_FOUND' ? 404 : 401, ...extra },
+});
 
-function accessFor(patch: {
-  organizationId?: string | undefined;
-  membershipIds?: readonly string[] | undefined;
-  errors?: readonly ({ data?: { code?: string } } | null | undefined)[];
-}) {
+function accessFor(patch: { isOrganizationScope?: boolean; errors?: readonly unknown[] }) {
   return classifyOrganizationScopeAccess({
-    organizationId: 'org-1',
-    membershipIds: ['org-1'],
+    isOrganizationScope: true,
     errors: [],
     ...patch,
   });
 }
 
 describe('classifyOrganizationScopeAccess', () => {
-  it('grants the personal scope and never reads it as a denial', () => {
-    expect(
-      accessFor({ organizationId: undefined, membershipIds: [], errors: [denial('UNAUTHORIZED')] })
-    ).toBe('granted');
+  it('grants a personal scope and never reads it as a denial', () => {
+    expect(accessFor({ isOrganizationScope: false, errors: [denied('UNAUTHORIZED')] })).toBe(
+      'granted'
+    );
   });
 
-  it('grants a current membership', () => {
+  it('grants while the scope has no error', () => {
     expect(accessFor({})).toBe('granted');
   });
 
-  it('denies an organization the settled membership list no longer contains', () => {
-    expect(accessFor({ membershipIds: ['org-2'] })).toBe('denied');
+  it.each(['FORBIDDEN', 'UNAUTHORIZED'])('denies on a %s report', code => {
+    expect(accessFor({ errors: [denied(code)] })).toBe('denied');
   });
-
-  it('grants while the membership list has not settled', () => {
-    expect(accessFor({ membershipIds: undefined })).toBe('granted');
-  });
-
-  it.each(['UNAUTHORIZED', 'FORBIDDEN'])(
-    'denies on a %s report from an organization query',
-    code => {
-      expect(accessFor({ errors: [denial(code)] })).toBe('denied');
-    }
-  );
 
   it('reports a deleted organization as not-found', () => {
-    expect(accessFor({ errors: [denial('NOT_FOUND')] })).toBe('not-found');
+    expect(accessFor({ errors: [denied('NOT_FOUND')] })).toBe('not-found');
   });
 
-  it('keeps a denial whose query still carries cached data', () => {
-    expect(accessFor({ membershipIds: ['org-1'], errors: [undefined, denial('FORBIDDEN')] })).toBe(
-      'denied'
-    );
+  it('keeps a denial that arrives beside cached data', () => {
+    expect(accessFor({ errors: [undefined, denied('FORBIDDEN')] })).toBe('denied');
+  });
+
+  it('reads a shaped server error', () => {
+    expect(accessFor({ errors: [{ shape: { data: { code: 'FORBIDDEN' } } }] })).toBe('denied');
+  });
+
+  it('does not treat a session-level unauthorized response as lost access', () => {
+    expect(accessFor({ errors: [denied('UNAUTHORIZED', { authRequired: true })] })).toBe('granted');
   });
 
   it('prefers a denial over a not-found report', () => {
-    expect(accessFor({ errors: [denial('NOT_FOUND'), denial('UNAUTHORIZED')] })).toBe('denied');
+    expect(accessFor({ errors: [denied('NOT_FOUND'), denied('UNAUTHORIZED')] })).toBe('denied');
   });
 
   it('ignores unrelated error codes', () => {
-    expect(accessFor({ errors: [denial('INTERNAL_SERVER_ERROR'), denial('TIMEOUT')] })).toBe(
-      'granted'
-    );
+    expect(
+      accessFor({ errors: [denied('INTERNAL_SERVER_ERROR'), denied('TIMEOUT'), undefined] })
+    ).toBe('granted');
   });
 });

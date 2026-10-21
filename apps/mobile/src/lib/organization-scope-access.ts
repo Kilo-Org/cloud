@@ -1,58 +1,38 @@
-import * as z from 'zod';
+import { isPermissionDeniedError, readTrpcErrorField } from '@/lib/trpc-error';
 
 /**
  * Whether an organization-scoped screen may render the organization's own
- * data. A lost membership and a denied request are the same state for the
- * reader: the organization exists (or existed) but this account may not see
- * it, so a first-run or empty screen would be a false statement.
+ * data. A denied request is the only evidence that access is gone: the server
+ * decides access from more than the membership list (a Kilo admin reaches any
+ * organization, and a parent owner, admin or billing manager reaches each child
+ * organization), so absence from the client's list is not proof of lost access.
  *
- * `granted` is also the answer while the membership list is still unknown: a
- * load failure of that list is not evidence of lost access, and the product
- * queries still get their own chance to report a denial.
+ * `granted` is also the answer while the scope's queries are still in flight or
+ * failed for an unrelated reason; the caller keeps its own loading and
+ * retryable-error states.
  */
 export type OrganizationScopeAccess = 'granted' | 'denied' | 'not-found';
 
-const DENIAL_CODES = new Set(['UNAUTHORIZED', 'FORBIDDEN']);
-
-// A query error is a `TRPCClientErrorLike` (whose `data` is nullable and may
-// carry no code) or a plain `Error`; parse the envelope instead of assuming it.
-const QueryErrorShape = z.looseObject({
-  data: z.looseObject({ code: z.string() }).nullish(),
-});
-
-/** The tRPC error code of a query error, or `undefined` when it carries none. */
-function errorCode(error: unknown): string | undefined {
-  const parsed = QueryErrorShape.safeParse(error);
-  return parsed.success ? parsed.data.data?.code : undefined;
-}
-
 export function classifyOrganizationScopeAccess({
-  organizationId,
-  membershipIds,
+  isOrganizationScope,
   errors,
 }: {
-  /** The organization scope being rendered; `undefined` for the personal scope. */
-  organizationId: string | undefined;
-  /** Ids from the loaded membership list, `undefined` until that list settles. */
-  membershipIds: readonly string[] | undefined;
-  /** Errors of the queries that carry organization-scoped data. */
+  /** False for a personal scope, which has no membership to lose. */
+  isOrganizationScope: boolean;
+  /** Errors of the queries that carry the scope's own data. */
   errors: readonly unknown[];
 }): OrganizationScopeAccess {
-  if (organizationId === undefined) {
+  if (!isOrganizationScope) {
     return 'granted';
   }
-  // Read the code from every error, not from each query's `isError`: a query
-  // that already has cached data keeps that data beside a failed refetch, and a
-  // denial must override it.
-  const codes = errors.map(error => errorCode(error));
-  if (codes.some(code => code !== undefined && DENIAL_CODES.has(code))) {
+  // Read every query's error, not its `isError`: a query that still holds
+  // cached data keeps that data beside a failed refetch, and a denial must
+  // override it.
+  if (errors.some(error => isPermissionDeniedError(error))) {
     return 'denied';
   }
-  if (codes.includes('NOT_FOUND')) {
+  if (errors.some(error => readTrpcErrorField(error, 'code') === 'NOT_FOUND')) {
     return 'not-found';
   }
-  if (membershipIds === undefined) {
-    return 'granted';
-  }
-  return membershipIds.includes(organizationId) ? 'granted' : 'denied';
+  return 'granted';
 }

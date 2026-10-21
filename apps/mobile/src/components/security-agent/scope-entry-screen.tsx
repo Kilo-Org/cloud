@@ -24,7 +24,7 @@ import {
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
-import { useOrganizationScopeAccess } from '@/lib/hooks/use-organization-scope-access';
+import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 
 function ScopeEntrySkeleton() {
   const { t } = useTranslation();
@@ -54,11 +54,10 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const capability = useSecurityAgentCapability(scope);
   const recovery = useRetrySecurityAgentSettings(scope);
   const isConnectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
-  const access = useOrganizationScopeAccess(isPersonalSecurityScope(scope) ? undefined : scope, [
-    permission.error,
-    config.error,
-    repositories.error,
-  ]);
+  const access = classifyOrganizationScopeAccess({
+    isOrganizationScope: !isPersonalSecurityScope(scope),
+    errors: [permission.error, config.error, repositories.error],
+  });
 
   // Pending includes uncached queries paused by NetInfo. Cached query errors
   // must not replace usable settings or a resolved capability with an error screen.

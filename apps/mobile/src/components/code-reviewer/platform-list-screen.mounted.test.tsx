@@ -9,52 +9,46 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { PlatformListScreen } from './platform-list-screen';
 
-const accessMock = vi.hoisted(() => vi.fn());
 const refetchMocks = vi.hoisted(() => ({
-  list: vi.fn(),
-  github: vi.fn(),
-  gitlab: vi.fn(),
-  bitbucket: vi.fn(),
+  list: vi.fn<() => void>(),
+  github: vi.fn<() => void>(),
+  gitlab: vi.fn<() => void>(),
+  bitbucket: vi.fn<() => void>(),
 }));
+const membership = vi.hoisted(() => ({
+  organizations: [] as { organizationId: string; organizationName: string }[],
+}));
+const status = vi.hoisted(() => ({ error: undefined as unknown }));
 
-vi.mock('@/lib/hooks/use-organization-scope-access', () => ({
-  useOrganizationScopeAccess: (...args: unknown[]) => accessMock(...args),
-}));
+const denial = { data: { code: 'UNAUTHORIZED', httpStatus: 401 } };
+
+function statusResult(refetch: () => void) {
+  return {
+    data: status.error ? undefined : { connected: false },
+    isLoading: false,
+    isError: status.error !== undefined,
+    isFetching: false,
+    error: status.error,
+    refetch,
+  };
+}
 
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   PERSONAL_SCOPE: 'personal',
-  useGitHubStatus: () => ({
-    data: { connected: false },
-    isLoading: false,
-    isError: false,
-    isFetching: false,
-    refetch: refetchMocks.github,
-  }),
-  useGitLabStatus: () => ({
-    data: { connected: false },
-    isLoading: false,
-    isError: false,
-    isFetching: false,
-    refetch: refetchMocks.gitlab,
-  }),
-  useBitbucketReadiness: () => ({
-    data: { ready: false },
-    isLoading: false,
-    isError: false,
-    isFetching: false,
-    refetch: refetchMocks.bitbucket,
-  }),
+  useGitHubStatus: () => statusResult(refetchMocks.github),
+  useGitLabStatus: () => statusResult(refetchMocks.gitlab),
+  useBitbucketReadiness: () => statusResult(refetchMocks.bitbucket),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({
-    data: [{ organizationId: 'org-lost', organizationName: 'Drain Labs' }],
+    data: membership.organizations,
     isFetching: false,
     refetch: refetchMocks.list,
   }),
 }));
 
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -113,16 +107,16 @@ function findByType(root: TestRenderer.ReactTestInstance, type: string) {
 }
 
 beforeEach(() => {
-  accessMock.mockReset();
-  accessMock.mockReturnValue('granted');
+  status.error = undefined;
+  membership.organizations = [{ organizationId: 'org-lost', organizationName: 'Drain Labs' }];
   for (const refetch of Object.values(refetchMocks)) {
     refetch.mockReset();
   }
 });
 
 describe('PlatformListScreen organization access', () => {
-  it('renders the no-access surface instead of the platform rows for a lost organization', () => {
-    accessMock.mockReturnValue('denied');
+  it('renders the no-access surface instead of the platform rows when the scope is denied', () => {
+    status.error = denial;
     const renderer = mountScreen();
     const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
 
@@ -136,13 +130,27 @@ describe('PlatformListScreen organization access', () => {
     });
   });
 
+  it('falls back to the generic organization title when the membership list no longer names it', () => {
+    status.error = denial;
+    membership.organizations = [];
+    const renderer = mountScreen();
+    const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
+
+    expect(denied?.props.title).toBe('Organization');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('re-reads the membership and every platform status on Retry', () => {
-    accessMock.mockReturnValue('not-found');
+    status.error = { data: { code: 'NOT_FOUND', httpStatus: 404 } };
     const renderer = mountScreen();
     const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
     if (!denied) {
       throw new Error('the no-access surface did not render');
     }
+    expect(denied.props.kind).toBe('not-found');
 
     act(() => {
       (denied.props.onRetry as () => void)();

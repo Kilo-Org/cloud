@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AUTO_ROUTING_DENIED_MODELS_PATH,
   CUSTOM_ROUTER_DECIDE_PATH,
+  CUSTOM_ROUTER_EVAL_CASE_PATH,
   CUSTOM_ROUTER_EVAL_PLAN_PATH,
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
   CUSTOM_ROUTER_TABLE_PATH,
@@ -1215,6 +1216,24 @@ describe('client eval proxy', () => {
       CUSTOM_ROUTER_EVAL_PLAN_PATH,
       paddedBody({ routerId: ROUTER_ID }, limit + 1)
     );
+    expect(tooLarge.status).toBe(400);
+    expect(await tooLarge.json()).toEqual({
+      error: { code: 'invalid_request', message: 'Request body is too large' },
+    });
+    expect(benchmarkFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts an eval case at the body cap and refuses a larger one', async () => {
+    const limit = 16_000;
+    const body = { routerId: ROUTER_ID, caseId: 'case-1' };
+    benchmarkFetch.mockResolvedValueOnce(Response.json({}));
+    const atLimit = await post(CUSTOM_ROUTER_EVAL_CASE_PATH, paddedBody(body, limit));
+    expect(atLimit.status).toBe(200);
+    expect(forwarded(CUSTOM_ROUTER_EVAL_CASE_PATH)).toMatchObject({
+      routerId: ROUTER_ID,
+      caseId: 'case-1',
+    });
+    const tooLarge = await post(CUSTOM_ROUTER_EVAL_CASE_PATH, paddedBody(body, limit + 1));
     expect(tooLarge.status).toBe(400);
     expect(await tooLarge.json()).toEqual({
       error: { code: 'invalid_request', message: 'Request body is too large' },

@@ -501,6 +501,41 @@ describe('recomputeUserBalances', () => {
     expect(updatedUser!.microdollars_used).toBe(4_500_000);
   });
 
+  test('should count rows recorded before the billed amount was stored at their cost', async () => {
+    const user = await insertTestUser();
+
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: 100_000_000,
+      is_free: false,
+      credit_category: 'purchase',
+      original_baseline_microdollars_used: 0,
+    });
+
+    await db.insert(exa_usage_log).values({
+      kilo_user_id: user.id,
+      path: '/search',
+      cost_microdollars: 3_000_000,
+      charged_to_balance: true,
+    });
+
+    await db
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: 100_000_000,
+        microdollars_used: 3_000_000,
+      })
+      .where(eq(kilocode_users.id, user.id));
+
+    const result = await recomputeUserBalances({ userId: user.id });
+    expect(result.success).toBe(true);
+
+    const updatedUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(updatedUser!.microdollars_used).toBe(3_000_000);
+  });
+
   test('should exclude org Exa charged usage from personal recompute', async () => {
     const user = await insertTestUser();
     const orgId = crypto.randomUUID();

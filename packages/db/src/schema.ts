@@ -10250,7 +10250,9 @@ export const exa_usage_log = pgTable(
     organization_id: uuid(),
     path: text().notNull(),
     cost_microdollars: bigint({ mode: 'number' }).notNull(),
-    charged_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    // Billed amount for this request. Null on rows recorded before the column
+    // existed, where the whole cost was billed.
+    charged_microdollars: bigint({ mode: 'number' }),
     charged_to_balance: boolean().notNull().default(false),
     feature_id: text(),
     type: text(),

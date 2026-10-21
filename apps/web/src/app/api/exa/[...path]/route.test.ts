@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import type { User } from '@kilocode/db/schema';
 import {
@@ -38,11 +39,13 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 }));
 
 jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/find-user-by-id');
 jest.mock('@/lib/exa-usage');
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
+const mockedFindUserById = jest.mocked(findUserById);
 const mockedGetExaMonthlyUsage = jest.mocked(getExaMonthlyUsage);
 const mockedGetExaFreeAllowanceMicrodollars = jest.mocked(getExaFreeAllowanceMicrodollars);
 const mockedRecordExaUsage = jest.mocked(recordExaUsage);
@@ -86,6 +89,7 @@ describe('POST /api/exa/[...path]', () => {
     // Default: user is within free tier, no existing row
     mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 0, freeAllowance: null });
     mockedGetExaFreeAllowanceMicrodollars.mockReturnValue(EXA_MONTHLY_ALLOWANCE_MICRODOLLARS);
+    mockedFindUserById.mockImplementation(async id => ({ id }) as User);
     mockedRecordExaUsage.mockResolvedValue();
   });
 
@@ -265,6 +269,7 @@ describe('POST /api/exa/[...path]', () => {
       const response = await POST(makeRequest('/search') as never);
 
       expect(response.status).toBe(200);
+      expect(mockedFindUserById).not.toHaveBeenCalled();
       expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
     });
 
@@ -296,6 +301,7 @@ describe('POST /api/exa/[...path]', () => {
 
       expect(response.status).toBe(200);
       expect(mockedGetExaMonthlyUsage.mock.calls[0][1]).toBe(db);
+      expect(mockedFindUserById).toHaveBeenCalledWith('user-123', db);
       expect(mockedGetBalanceAndOrgSettings.mock.calls[0][0]).toBeUndefined();
       expect(mockedGetBalanceAndOrgSettings.mock.calls[0][2]).toBe(db);
     });

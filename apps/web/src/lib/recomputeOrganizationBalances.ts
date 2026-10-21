@@ -20,7 +20,7 @@ import {
   compute_usage_charge,
   type Organization,
 } from '@kilocode/db/schema';
-import { eq, and, asc, gt } from 'drizzle-orm';
+import { eq, and, asc, gt, sql } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { computeExpiration } from '@kilocode/web-shared/lib/creditExpiration';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
@@ -71,9 +71,12 @@ export async function recomputeOrganizationBalances(args: {
   // Per-request Exa charges for this org. Using the log instead of the
   // monthly aggregate so each charge is interleaved chronologically with LLM
   // usage — required for correct credit-expiration baselines.
+  // Rows recorded before the billed amount was stored billed their whole cost.
   const exaUsage = await db
     .select({
-      cost: exa_usage_log.charged_microdollars,
+      cost: sql<number>`coalesce(${exa_usage_log.charged_microdollars}, ${exa_usage_log.cost_microdollars})`.mapWith(
+        Number
+      ),
       created_at: exa_usage_log.created_at,
     })
     .from(exa_usage_log)

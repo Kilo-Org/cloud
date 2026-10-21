@@ -1,0 +1,1 @@
+ALTER TABLE "exa_usage_log" ADD COLUMN "charged_microdollars" bigint;

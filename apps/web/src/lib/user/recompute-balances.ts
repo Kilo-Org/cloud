@@ -13,7 +13,7 @@ import {
   compute_usage_charge,
   type User,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, gt, asc } from 'drizzle-orm';
+import { eq, and, isNull, gt, asc, sql } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
 import { computeExpiration } from '@kilocode/web-shared/lib/creditExpiration';
@@ -33,7 +33,7 @@ export type MigrationResult = Result<UserBalanceUpdates, string>;
  *
  * Postconditions:
  * - microdollars_used = sum(personal microdollar_usage.cost)
- *   + sum(personal exa_usage_log.charged_microdollars where charged_to_balance)
+ *   + sum(personal exa_usage_log billed amount where charged_to_balance)
  *   + sum(compute_usage_charge.amount_microdollars where user_id matches)
  * - total_microdollars_acquired = sum(credit_transactions) [including any new adjustment]
  * - All expiring credit transactions have expiration_baseline_microdollars_used set
@@ -93,10 +93,13 @@ async function fetchUserBalanceData(userId: string) {
 
   // Per-request Exa charges (personal only). Using the log instead of the
   // monthly aggregate so each charge is interleaved chronologically with LLM
-  // usage — required for correct credit-expiration baselines.
+  // usage — required for correct credit-expiration baselines. Rows recorded
+  // before the billed amount was stored billed their whole cost.
   const exaUsage = await db
     .select({
-      cost: exa_usage_log.charged_microdollars,
+      cost: sql<number>`coalesce(${exa_usage_log.charged_microdollars}, ${exa_usage_log.cost_microdollars})`.mapWith(
+        Number
+      ),
       created_at: exa_usage_log.created_at,
     })
     .from(exa_usage_log)

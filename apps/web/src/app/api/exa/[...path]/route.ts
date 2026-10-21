@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { EXA_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { after } from 'next/server';
@@ -83,7 +84,10 @@ export async function POST(request: NextRequest) {
   const allowanceExhausted = monthlyUsage >= allowance;
 
   if (allowanceExhausted) {
-    const { balance } = await getBalanceAndOrgSettings(organizationId, user, db);
+    // The auth helper loads the user row from the replica; read it again from the
+    // primary so a personal balance reflects usage that has already been recorded.
+    const balanceUser = (await findUserById(user.id, db)) ?? user;
+    const { balance } = await getBalanceAndOrgSettings(organizationId, balanceUser, db);
     if (balance <= 0) {
       return NextResponse.json(
         {

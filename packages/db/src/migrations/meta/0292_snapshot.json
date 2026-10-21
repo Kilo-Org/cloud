@@ -1,5 +1,5 @@
 {
-  "id": "f9321c44-01aa-4625-b94a-035b0ff7df1b",
+  "id": "409d8df4-917f-4046-bf50-808a03f449ee",
   "prevId": "140eaf3d-3dc3-47a6-8127-257c20dfa20d",
   "version": "7",
   "dialect": "postgresql",
@@ -12976,8 +12976,7 @@
           "name": "charged_microdollars",
           "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "default": 0
+          "notNull": false
         },
         "charged_to_balance": {
           "name": "charged_to_balance",

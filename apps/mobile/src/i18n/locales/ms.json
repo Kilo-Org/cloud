@@ -25,6 +25,7 @@
     "error": "ralat: {{error}}",
     "back": "Kembali",
     "somethingWentWrong": "Berlaku ralat.",
+    "actionNotRecorded": "Kami tidak dapat merekodkan tindakan ini. Sila cuba lagi kemudian.",
     "couldNotOpen": "Tidak dapat membuka {{label}}.",
     "link": "pautan",
     "takingLonger": "Proses ini mengambil masa lebih lama daripada jangkaan. Anda boleh menutup skrin ini dan menyemak semula kemudian.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub tidak menyelesaikan penggabungan.",
       "mergeResultNotCompleted": "{{term}} tidak digabungkan. Semak keadaannya dan cuba lagi.",
       "ambiguous": "Tidak dapat mengesahkan hasil tindakan. Semak PR sebelum mencuba lagi.",
-      "persistenceFailed": "Kami tidak dapat merekodkan tindakan ini. Sila cuba lagi kemudian.",
       "forbidden": "Tindakan ini tidak dibenarkan."
     },
     "capabilities": {
@@ -1957,7 +1957,12 @@
       "syncMayNotHaveCompleted": "Penyegerakan mungkin belum selesai. Cuba lagi untuk menyelaraskan statusnya atau buang rekodnya.",
       "syncInProgress": "Penyegerakan keselamatan sedang berjalan. Sila cuba lagi.",
       "dismissalInProgress": "Proses mengetepikan penemuan ini sedang berjalan. Sila cuba lagi.",
-      "couldNotReadPendingSyncs": "Tidak dapat membaca penyegerakan yang belum selesai. Cuba lagi."
+      "couldNotReadPendingSyncs": "Tidak dapat membaca penyegerakan yang belum selesai. Cuba lagi.",
+      "ambiguous": "Tidak dapat mengesahkan hasil tindakan. Semak semakan keselamatan sebelum mencuba lagi.",
+      "settleFailed": "Tindakan telah selesai, tetapi kami tidak dapat merekodkan hasilnya. Sila cuba lagi.",
+      "replayFailed": "Tindakan ini tidak selesai. Sila cuba lagi.",
+      "actionFailed": "Tindakan ini tidak dapat disiapkan. Sila cuba lagi.",
+      "actionBlocked": "Tindakan ini tidak dapat disiapkan. Masalah ini perlu diselesaikan terlebih dahulu."
     },
     "analysisState": {
       "queued": "Analisis dalam baris gilir",

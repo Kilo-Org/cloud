@@ -25,6 +25,7 @@
     "error": "villa: {{error}}",
     "back": "Til baka",
     "somethingWentWrong": "Eitthvað fór úrskeiðis.",
+    "actionNotRecorded": "Ekki tókst að skrá þessa aðgerð. Reyndu aftur síðar.",
     "couldNotOpen": "Ekki tókst að opna {{label}}.",
     "link": "tengill",
     "takingLonger": "Þetta tekur lengri tíma en gert var ráð fyrir. Þú getur lokað þessu og athugað aftur.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub lauk ekki sameiningunni.",
       "mergeResultNotCompleted": "{{term}} var ekki sameinuð. Athugaðu stöðuna og reyndu aftur.",
       "ambiguous": "Ekki tókst að staðfesta niðurstöðuna — athugaðu PR-beiðnina áður en þú reynir aftur.",
-      "persistenceFailed": "Ekki tókst að skrá þessa aðgerð. Reyndu aftur síðar.",
       "forbidden": "Þú hefur ekki heimild til þessarar aðgerðar."
     },
     "capabilities": {
@@ -1957,7 +1957,12 @@
       "syncMayNotHaveCompleted": "Samstillingu er hugsanlega ekki lokið. Reyndu aftur til að samræma stöðuna eða fargaðu beiðninni.",
       "syncInProgress": "Öryggissamstilling er þegar í gangi. Reyndu aftur.",
       "dismissalInProgress": "Þessi frávísun er þegar í gangi. Reyndu aftur.",
-      "couldNotReadPendingSyncs": "Ekki tókst að lesa samstillingar í bið. Reyndu aftur."
+      "couldNotReadPendingSyncs": "Ekki tókst að lesa samstillingar í bið. Reyndu aftur.",
+      "ambiguous": "Ekki tókst að staðfesta niðurstöðuna — athugaðu öryggisskoðunina áður en þú reynir aftur.",
+      "settleFailed": "Aðgerðinni var lokið, en okkur tókst ekki að skrá niðurstöðuna. Reyndu aftur.",
+      "replayFailed": "Þessari aðgerð var ekki lokið. Reyndu aftur.",
+      "actionFailed": "Ekki tókst að ljúka þessari aðgerð. Reyndu aftur.",
+      "actionBlocked": "Ekki tókst að ljúka þessari aðgerð. Leysa verður vandamálið áður en þú getur reynt aftur."
     },
     "analysisState": {
       "queued": "Greining í biðröð",

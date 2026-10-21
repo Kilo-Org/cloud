@@ -25,6 +25,7 @@
     "error": "iphutha: {{error}}",
     "back": "Emuva",
     "somethingWentWrong": "Kukhona okungahambanga kahle.",
+    "actionNotRecorded": "Asikwazanga ukurekhoda lesi senzo. Sicela uzame futhi kamuva.",
     "couldNotOpen": "Asikwazanga ukuvula {{label}}.",
     "link": "isixhumanisi",
     "takingLonger": "Lokhu kuthatha isikhathi eside kunalokho okulindelekile. Ungakwazi ukuvala bese ubheka futhi.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "I-GitHub ayizange iqede ukuhlanganisa.",
       "mergeResultNotCompleted": "{{term}} alihlanganisiwe. Bheka isimo salo bese uzama futhi.",
       "ambiguous": "Asikwazanga ukuqinisekisa — hlola i-PR ngaphambi kokuzama futhi.",
-      "persistenceFailed": "Asikwazanga ukurekhoda lesi senzo. Sicela uzame futhi kamuva.",
       "forbidden": "Lesi senzo asivunyelwe."
     },
     "capabilities": {
@@ -1957,7 +1957,12 @@
       "syncMayNotHaveCompleted": "Kungenzeka ukuvumelanisa akuphelanga. Phinda uzame ukuze kulungiswe isimo sakho, noma ukulahle.",
       "syncInProgress": "Ukuvumelanisa kokuphepha sekuqhubeka. Sicela uzame futhi.",
       "dismissalInProgress": "Lokhu kuchitha sekuyaqhubeka. Sicela uzame futhi.",
-      "couldNotReadPendingSyncs": "Asikwazanga ukufunda ukuvumelanisa okulindile. Zama futhi."
+      "couldNotReadPendingSyncs": "Asikwazanga ukufunda ukuvumelanisa okulindile. Zama futhi.",
+      "ambiguous": "Asikwazanga ukuqinisekisa — hlola ukubuyekezwa kokuphepha ngaphambi kokuzama futhi.",
+      "settleFailed": "Isenzo siqedile, kepha asikwazanga ukubhala umphumela. Sicela uzame futhi.",
+      "replayFailed": "Lesi senzo asiqedile. Sicela uzame futhi.",
+      "actionFailed": "Asikwazanga ukuqedela lesi senzo. Sicela uzame futhi.",
+      "actionBlocked": "Asikwazanga ukuqedela lesi senzo. Kumele kulungiswe le nkinga kuqala."
     },
     "analysisState": {
       "queued": "Ukuhlaziywa kusemgqeni",

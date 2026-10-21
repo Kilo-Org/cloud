@@ -25,6 +25,7 @@
     "error": "dogoggora: {{error}}",
     "back": "Deebi'i",
     "somethingWentWrong": "Dogoggorri uumame.",
+    "actionNotRecorded": "Gocha kana galmeessuu hin dandeenye. Maaloo booda deebi'ii yaali.",
     "couldNotOpen": "{{label}} banuun hin danda'amne.",
     "link": "liinkii",
     "takingLonger": "Kun yeroo eegame caalaa fudhataa jira. Kana cuftee irra deebi'ii ilaaluu dandeessa.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub walitti makuu hin xumurre.",
       "mergeResultNotCompleted": "{{term}} ni raawwatame hin jiru. Haala isaa ilaali itti deebi'ii yaali.",
       "ambiguous": "Mirkaneessuu hin dandeenye — deebi'ii yaaluu dura PR ilaali.",
-      "persistenceFailed": "Gocha kana galmeessuu hin dandeenye. Maaloo booda deebi'ii yaali.",
       "forbidden": "Hayyamni hin jiru."
     },
     "capabilities": {
@@ -1957,7 +1957,12 @@
       "syncMayNotHaveCompleted": "Walsimsiisuun hin xumuramne ta'a. Walsimsiisuu xumuruuf irra deebi'ii yaali, ykn dhiisi.",
       "syncInProgress": "Walsimsiisuun nageenyaa duraanuu adeemaa jira. Irra deebi'ii yaali.",
       "dismissalInProgress": "Dhiisuun kun duraanuu adeemaa jira. Irra deebi'ii yaali.",
-      "couldNotReadPendingSyncs": "Walsimsiisuu eegaa jiru dubbisuun hin danda'amne. Irra deebi'ii yaali."
+      "couldNotReadPendingSyncs": "Walsimsiisuu eegaa jiru dubbisuun hin danda'amne. Irra deebi'ii yaali.",
+      "ambiguous": "Mirkaneessuu hin dandeenye — deebi'ii yaaluu dura qorannoo nageenyaa ilaali.",
+      "settleFailed": "Tarkaanfiin xumuramee, garuu bu'aa isaa galmeessuu hin dandeenye. Irra deebi'ii yaali.",
+      "replayFailed": "Tarkaanfi kun hin xumuramne. Irra deebi'ii yaali.",
+      "actionFailed": "Tarkaanfa kana xumuruu hin dandeenye. Irra deebi'ii yaali.",
+      "actionBlocked": "Tarkaanfa kana xumuruu hin dandeenye. Rakkoon kana duraan furuu qaba."
     },
     "analysisState": {
       "queued": "Xiinxalli dabaree eeggachaa jira",

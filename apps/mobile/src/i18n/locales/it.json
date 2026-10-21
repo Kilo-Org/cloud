@@ -25,6 +25,7 @@
     "error": "errore: {{error}}",
     "back": "Indietro",
     "somethingWentWrong": "Si è verificato un errore.",
+    "actionNotRecorded": "Impossibile registrare questa azione. Riprova più tardi.",
     "couldNotOpen": "Impossibile aprire {{label}}.",
     "link": "collegamento",
     "takingLonger": "Questa operazione richiede più tempo del previsto. Puoi chiudere questa schermata e ricontrollare più tardi.",
@@ -1418,7 +1419,12 @@
       "syncMayNotHaveCompleted": "Una sincronizzazione potrebbe non essere terminata. Riprova per verificarne e aggiornarne lo stato oppure scartala.",
       "syncInProgress": "Una sincronizzazione di sicurezza è già in corso. Riprova.",
       "dismissalInProgress": "L'esclusione di questa segnalazione è già in corso. Riprova.",
-      "couldNotReadPendingSyncs": "Impossibile leggere le sincronizzazioni in sospeso. Riprova."
+      "couldNotReadPendingSyncs": "Impossibile leggere le sincronizzazioni in sospeso. Riprova.",
+      "ambiguous": "Impossibile confermare l'esito dell'operazione. Controlla la revisione di sicurezza prima di riprovare.",
+      "settleFailed": "L'operazione è stata completata, ma non è stato possibile registrare il risultato. Riprova.",
+      "replayFailed": "Questa operazione non è stata completata. Riprova.",
+      "actionFailed": "Impossibile completare questa operazione. Riprova.",
+      "actionBlocked": "Impossibile completare questa operazione. Il problema deve essere risolto prima di riprovare."
     },
     "analysisState": {
       "queued": "Analisi in coda",
@@ -3013,7 +3019,6 @@
       "mergeResultDefaultError": "GitHub non ha completato l'unione.",
       "mergeResultNotCompleted": "Unione di {{term}} non completata. Verifica lo stato e riprova.",
       "ambiguous": "Impossibile confermare l'esito dell'operazione. Controlla la PR prima di riprovare.",
-      "persistenceFailed": "Impossibile registrare questa azione. Riprova più tardi.",
       "forbidden": "Non hai l'autorizzazione per questa operazione."
     },
     "capabilities": {

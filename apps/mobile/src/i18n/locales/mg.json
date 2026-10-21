@@ -25,6 +25,7 @@
     "error": "hadisoana: {{error}}",
     "back": "Miverena",
     "somethingWentWrong": "Nisy olana.",
+    "actionNotRecorded": "Tsy vitanay ny nandrakitra ity hetsika ity. Andramo indray azafady any aoriana.",
     "couldNotOpen": "Tsy voasokatra ny {{label}}.",
     "link": "rohy",
     "takingLonger": "Maharitra ela noho ny nandrasana izany. Azonao akatona ity ary jerena indray avy eo.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "Tsy vitan'ny GitHub ny fampiraisana.",
       "mergeResultNotCompleted": "Tsy nampidirina ny {{term}}. Jereo ny toerany ary andramo indray.",
       "ambiguous": "Tsy voamarina ny vokatra — jereo ny PR alohan'ny hanandramana indray.",
-      "persistenceFailed": "Tsy vitanay ny nandrakitra ity hetsika ity. Andramo indray azafady any aoriana.",
       "forbidden": "Voarara izany."
     },
     "capabilities": {
@@ -1957,7 +1957,12 @@
       "syncMayNotHaveCompleted": "Mety tsy vita ny fampifanarahana iray. Andramo indray mba hampifanaraka ny angona, na ario ilay fangatahana.",
       "syncInProgress": "Efa mandeha ny fampifanarahana ny angon'ny fiarovana. Andramo indray azafady.",
       "dismissalInProgress": "Efa mandeha ity fanilihana ity. Andramo indray azafady.",
-      "couldNotReadPendingSyncs": "Tsy nety novakina ny fampifanarahana mbola miandry. Andramo indray."
+      "couldNotReadPendingSyncs": "Tsy nety novakina ny fampifanarahana mbola miandry. Andramo indray.",
+      "ambiguous": "Tsy voamarina ny vokatra — jereo ny fanamarinana ny fiarovana alohan'ny hanandramana indray.",
+      "settleFailed": "Vita ny hetsika, fa tsy voatahiry ny vokatra. Andramo indray azafady.",
+      "replayFailed": "Tsy vita ity hetsika ity. Andramo indray azafady.",
+      "actionFailed": "Tsy azo vitaina ity hetsika ity. Andramo indray azafady.",
+      "actionBlocked": "Tsy azo vitaina ity hetsika ity. Mila vahana aloha ny olana."
     },
     "analysisState": {
       "queued": "Voalahatra ny famakafakana",

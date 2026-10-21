@@ -25,6 +25,7 @@
     "error": "pogreška: {{error}}",
     "back": "Natrag",
     "somethingWentWrong": "Došlo je do pogreške.",
+    "actionNotRecorded": "Nismo mogli zabilježiti ovu radnju. Pokušaj ponovno kasnije.",
     "couldNotOpen": "Nije moguće otvoriti {{label}}.",
     "link": "poveznica",
     "takingLonger": "Ovo traje dulje od očekivanog. Možeš zatvoriti ovaj zaslon i ponovno provjeriti.",
@@ -800,7 +801,6 @@
       "mergeResultDefaultError": "GitHub nije dovršio spajanje.",
       "mergeResultNotCompleted": "{{term}} nije spojen. Provjeri njegovo stanje i pokuši ponovno.",
       "ambiguous": "Nije moguće potvrditi ishod — provjeri PR prije ponovnog pokušaja.",
-      "persistenceFailed": "Nismo mogli zabilježiti ovu radnju. Pokušaj ponovno kasnije.",
       "forbidden": "Ova radnja nije dopuštena."
     },
     "capabilities": {
@@ -1980,7 +1980,12 @@
       "syncMayNotHaveCompleted": "Sinkronizacija možda nije dovršena. Pokušaj ponovno da uskladiš njezino stanje ili je odbaci.",
       "syncInProgress": "Sinkronizacija sigurnosnih nalaza već je u tijeku. Pokušaj ponovno.",
       "dismissalInProgress": "Odbacivanje ovog nalaza već je u tijeku. Pokušaj ponovno.",
-      "couldNotReadPendingSyncs": "Nije moguće pročitati sinkronizacije na čekanju. Pokušaj ponovno."
+      "couldNotReadPendingSyncs": "Nije moguće pročitati sinkronizacije na čekanju. Pokušaj ponovno.",
+      "ambiguous": "Nije moguće potvrditi ishod — provjeri pregled sigurnosti prije ponovnog pokušaja.",
+      "settleFailed": "Radnja je izvršena, ali nismo mogli zabilježiti rezultat. Pokušaj ponovno.",
+      "replayFailed": "Ova radnja nije dovršena. Pokušaj ponovno.",
+      "actionFailed": "Nije moguće dovršiti ovu radnju. Pokušaj ponovno.",
+      "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem je potrebno riješiti prije ponovnog pokušaja."
     },
     "analysisState": {
       "queued": "Analiza u redu čekanja",

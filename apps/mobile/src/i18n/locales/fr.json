@@ -25,6 +25,7 @@
     "error": "erreur : {{error}}",
     "back": "Retour",
     "somethingWentWrong": "Une erreur s'est produite.",
+    "actionNotRecorded": "Nous n'avons pas pu enregistrer cette action. Veuillez réessayer plus tard.",
     "couldNotOpen": "Impossible d'ouvrir {{label}}.",
     "link": "lien",
     "takingLonger": "Cela prend plus de temps que prévu. Vous pouvez fermer cet écran et revenir vérifier plus tard.",
@@ -1418,7 +1419,12 @@
       "syncMayNotHaveCompleted": "Une synchronisation n'a peut-être pas abouti. Réessayez pour mettre son état à jour, ou abandonnez.",
       "syncInProgress": "Une synchronisation des données de sécurité est déjà en cours. Réessayez.",
       "dismissalInProgress": "L'exclusion de ce signalement est déjà en cours. Réessayez.",
-      "couldNotReadPendingSyncs": "Impossible de lire les synchronisations en attente. Réessayez."
+      "couldNotReadPendingSyncs": "Impossible de lire les synchronisations en attente. Réessayez.",
+      "ambiguous": "Impossible de confirmer le résultat. Vérifiez la révision de sécurité avant de réessayer.",
+      "settleFailed": "L'action a été effectuée, mais nous n'avons pas pu enregistrer le résultat. Réessayez.",
+      "replayFailed": "Cette action n'a pas abouti. Réessayez.",
+      "actionFailed": "Impossible d'effectuer cette action. Réessayez.",
+      "actionBlocked": "Impossible d'effectuer cette action. Le problème doit être résolu avant de pouvoir réessayer."
     },
     "analysisState": {
       "queued": "Analyse en file d'attente",
@@ -3013,7 +3019,6 @@
       "mergeResultDefaultError": "GitHub n'a pas terminé la fusion.",
       "mergeResultNotCompleted": "La fusion de {{term}} n'a pas abouti. Vérifiez son état et réessayez.",
       "ambiguous": "Impossible de confirmer le résultat. Vérifiez la PR avant de réessayer.",
-      "persistenceFailed": "Nous n'avons pas pu enregistrer cette action. Veuillez réessayer plus tard.",
       "forbidden": "Cette action n'est pas autorisée."
     },
     "capabilities": {

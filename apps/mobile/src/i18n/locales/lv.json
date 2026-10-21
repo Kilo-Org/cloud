@@ -25,6 +25,7 @@
     "error": "kļūda: {{error}}",
     "back": "Atpakaļ",
     "somethingWentWrong": "Radās kļūda.",
+    "actionNotRecorded": "Neizdevās reģistrēt šo darbību. Mēģini vēlreiz vēlāk.",
     "couldNotOpen": "Neizdevās atvērt {{label}}.",
     "link": "saite",
     "takingLonger": "Tas aizņem vairāk laika, nekā gaidīts. Vari aizvērt šo ekrānu un pārbaudīt vēlreiz.",
@@ -800,7 +801,6 @@
       "mergeResultDefaultError": "GitHub nepabeidza apvienošanu.",
       "mergeResultNotCompleted": "{{term}} netika apvienots. Pārbaudi tā statusu un mēģini vēlreiz.",
       "ambiguous": "Neizdevās apstiprināt rezultātu — pirms atkārtota mēģinājuma pārbaudi PR.",
-      "persistenceFailed": "Neizdevās reģistrēt šo darbību. Mēģini vēlreiz vēlāk.",
       "forbidden": "Šī darbība nav atļauta."
     },
     "capabilities": {
@@ -1980,7 +1980,12 @@
       "syncMayNotHaveCompleted": "Sinhronizācija, iespējams, nav pabeigta. Mēģini vēlreiz, lai atjauninātu tās stāvokli, vai atmet to.",
       "syncInProgress": "Drošības datu sinhronizācija jau notiek. Lūdzu, mēģini vēlreiz.",
       "dismissalInProgress": "Šī noraidīšana jau notiek. Lūdzu, mēģini vēlreiz.",
-      "couldNotReadPendingSyncs": "Neizdevās nolasīt gaidošās sinhronizācijas. Mēģini vēlreiz."
+      "couldNotReadPendingSyncs": "Neizdevās nolasīt gaidošās sinhronizācijas. Mēģini vēlreiz.",
+      "ambiguous": "Neizdevās apstiprināt rezultātu — pirms atkārtota mēģinājuma pārbaudi drošības pārskatījumu.",
+      "settleFailed": "Darbība tika pabeigta, bet mēs nevarējām reģistrēt rezultātu. Lūdzu, mēģini vēlreiz.",
+      "replayFailed": "Šī darbība netika pabeigta. Lūdzu, mēģini vēlreiz.",
+      "actionFailed": "Neizdevās pabeigt šo darbību. Lūdzu, mēģini vēlreiz.",
+      "actionBlocked": "Neizdevās pabeigt šo darbību. Vispirms jāatrisina problēma, lai varētu mēģināt vēlreiz."
     },
     "analysisState": {
       "queued": "Analīze rindā",

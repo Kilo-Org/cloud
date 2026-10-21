@@ -25,6 +25,7 @@
     "error": "eroare: {{error}}",
     "back": "Înapoi",
     "somethingWentWrong": "A apărut o eroare.",
+    "actionNotRecorded": "Nu am putut înregistra această acțiune. Încearcă din nou mai târziu.",
     "couldNotOpen": "Nu s-a putut deschide {{label}}.",
     "link": "legătură",
     "takingLonger": "Operația durează mai mult decât era de așteptat. Poți închide acest ecran și verifica din nou mai târziu.",
@@ -800,7 +801,6 @@
       "mergeResultDefaultError": "GitHub nu a finalizat îmbinarea.",
       "mergeResultNotCompleted": "{{term}} nu a fost îmbinat. Verifică starea lui și încearcă din nou.",
       "ambiguous": "Nu s-a putut confirma rezultatul — verifică PR-ul înainte de a încerca din nou.",
-      "persistenceFailed": "Nu am putut înregistra această acțiune. Încearcă din nou mai târziu.",
       "forbidden": "Accesul este interzis."
     },
     "capabilities": {
@@ -1980,7 +1980,12 @@
       "syncMayNotHaveCompleted": "Este posibil ca o sincronizare să nu se fi finalizat. Reîncearcă pentru a-i actualiza starea sau renunță.",
       "syncInProgress": "O sincronizare de securitate este deja în curs. Încearcă din nou.",
       "dismissalInProgress": "Această respingere este deja în curs. Încearcă din nou.",
-      "couldNotReadPendingSyncs": "Nu s-au putut citi sincronizările în așteptare. Încearcă din nou."
+      "couldNotReadPendingSyncs": "Nu s-au putut citi sincronizările în așteptare. Încearcă din nou.",
+      "ambiguous": "Nu s-a putut confirma rezultatul — verifică revizuirea de securitate înainte de a încerca din nou.",
+      "settleFailed": "Acțiunea s-a finalizat, dar nu am putut înregistra rezultatul. Încearcă din nou.",
+      "replayFailed": "Această acțiune nu s-a finalizat. Încearcă din nou.",
+      "actionFailed": "Această acțiune nu a putut fi finalizată. Încearcă din nou.",
+      "actionBlocked": "Această acțiune nu a putut fi finalizată. Problema trebuie rezolvată înainte de a încerca din nou."
     },
     "analysisState": {
       "queued": "Analiză în coadă",

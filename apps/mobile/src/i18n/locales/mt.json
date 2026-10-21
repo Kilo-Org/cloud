@@ -25,6 +25,7 @@
     "error": "żball: {{error}}",
     "back": "Lura",
     "somethingWentWrong": "Xi ħaġa marret ħażin.",
+    "actionNotRecorded": "Ma stajniex nirreġistraw din l-azzjoni. Jekk jogħġbok erġa' pprova aktar tard.",
     "couldNotOpen": "Ma stajniex niftħu {{label}}.",
     "link": "ħolqa",
     "takingLonger": "Dan qed jieħu aktar żmien milli mistenni. Tista' tagħlaq dan u tiċċekkja għal darb'oħra.",
@@ -832,7 +833,6 @@
       "mergeResultDefaultError": "GitHub ma temmx l-għaqda.",
       "mergeResultNotCompleted": "Il-{{term}} ma ngħaqadx. Iċċekkja l-istat tiegħu u erġa' pprova.",
       "ambiguous": "Ma stajniex nikkonfermaw ir-riżultat — iċċekkja l-PR qabel terġa' tipprova.",
-      "persistenceFailed": "Ma stajniex nirreġistraw din l-azzjoni. Jekk jogħġbok erġa' pprova aktar tard.",
       "forbidden": "Din l-azzjoni mhix permessa."
     },
     "capabilities": {
@@ -2026,7 +2026,12 @@
       "syncMayNotHaveCompleted": "Jista' jkun li sinkronizzazzjoni ma tlestietx. Erġa' pprova biex tivverifika u taġġorna l-istat tagħha, jew warrabha.",
       "syncInProgress": "Sinkronizzazzjoni tas-sigurtà diġà għaddejja. Jekk jogħġbok erġa' pprova.",
       "dismissalInProgress": "Dan it-twarrib diġà qed isir. Jekk jogħġbok erġa' pprova.",
-      "couldNotReadPendingSyncs": "Ma setgħux jinqraw is-sinkronizzazzjonijiet pendenti. Erġa' pprova."
+      "couldNotReadPendingSyncs": "Ma setgħux jinqraw is-sinkronizzazzjonijiet pendenti. Erġa' pprova.",
+      "ambiguous": "Ma stajniex nikkonfermaw ir-riżultat — iċċekkja r-reviżjoni tas-sigurtà qabel terġa' tipprova.",
+      "settleFailed": "L-azzjoni tlestiet, imma ma stajniex nirreġistraw ir-riżultat. Jekk jogħġbok erġa' pprova.",
+      "replayFailed": "Din l-azzjoni ma tlestietx. Jekk jogħġbok erġa' pprova.",
+      "actionFailed": "Ma stajniex nikkompletaw din l-azzjoni. Jekk jogħġbok erġa' pprova.",
+      "actionBlocked": "Ma stajniex nikkompletaw din l-azzjoni. Il-problema trid titfixxa qabel ma tista' terġa' tipprova."
     },
     "analysisState": {
       "queued": "Analiżi fil-kju",

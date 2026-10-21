@@ -25,6 +25,7 @@
     "error": "earráid: {{error}}",
     "back": "Ar ais",
     "somethingWentWrong": "Tharla earráid.",
+    "actionNotRecorded": "Níorbh fhéidir linn an gníomh seo a thaifeadadh. Bain triail as arís níos déanaí.",
     "couldNotOpen": "Níorbh fhéidir {{label}} a oscailt.",
     "link": "nasc",
     "takingLonger": "Tá sé seo ag tógáil níos faide ná mar a bhíothas ag súil leis. Is féidir leat é seo a dhúnadh agus seiceáil arís.",
@@ -832,7 +833,6 @@
       "mergeResultDefaultError": "Níor chríochnaigh GitHub an cumasc.",
       "mergeResultNotCompleted": "Níor cumascadh an {{term}}. Seiceáil a stádas agus bain triail eile as.",
       "ambiguous": "Níorbh fhéidir an toradh a dheimhniú — seiceáil an PR sula mbainfidh tú triail as arís.",
-      "persistenceFailed": "Níorbh fhéidir linn an gníomh seo a thaifeadadh. Bain triail as arís níos déanaí.",
       "forbidden": "Tá an gníomh seo toirmiscthe."
     },
     "capabilities": {
@@ -2026,7 +2026,12 @@
       "syncMayNotHaveCompleted": "Seans nár críochnaíodh sioncronú. Bain triail as arís chun a stádas a réiteach, nó caith amach é.",
       "syncInProgress": "Tá sioncronú slándála ar siúl cheana. Bain triail as arís le do thoil.",
       "dismissalInProgress": "Tá an díbhe seo ar siúl cheana. Bain triail as arís le do thoil.",
-      "couldNotReadPendingSyncs": "Níorbh fhéidir sioncronuithe ar feitheamh a léamh. Bain triail as arís."
+      "couldNotReadPendingSyncs": "Níorbh fhéidir sioncronuithe ar feitheamh a léamh. Bain triail as arís.",
+      "ambiguous": "Níorbh fhéidir an toradh a dheimhniú — seiceáil an athbhreithniú slándála sula mbainfidh tú triail as arís.",
+      "settleFailed": "Rinneadh an gníomh, ach níorbh fhéidir linn an toradh a thaifeadadh. Bain triail as arís le do thoil.",
+      "replayFailed": "Níor chríochnaigh an gníomh seo. Bain triail as arís le do thoil.",
+      "actionFailed": "Níorbh fhéidir an gníomh seo a chríochnú. Bain triail as arís le do thoil.",
+      "actionBlocked": "Níorbh fhéidir an gníomh seo a chríochnú. Caithfear an fhadhb a réiteach ar dtús."
     },
     "analysisState": {
       "queued": "Anailís sa scuaine",

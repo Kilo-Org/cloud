@@ -25,6 +25,7 @@
     "error": "xəta: {{error}}",
     "back": "Geri",
     "somethingWentWrong": "Xəta baş verdi.",
+    "actionNotRecorded": "Bu əməliyyatı qeydə almaq mümkün olmadı. Bir az sonra yenidən cəhd et.",
     "couldNotOpen": "{{label}} açılmadı.",
     "link": "keçid",
     "takingLonger": "Bu, gözləniləndən çox vaxt aparır. Bu ekranı bağlayıb yenidən yoxlaya bilərsən.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub birləşdirməni tamamlamadı.",
       "mergeResultNotCompleted": "{{term}} birləşdirilmədi. Vəziyyətini yoxla və yenidən cəhd et.",
       "ambiguous": "Nəticəni təsdiqləmək mümkün olmadı — yenidən cəhd etməzdən əvvəl PR-i yoxla.",
-      "persistenceFailed": "Bu əməliyyatı qeydə almaq mümkün olmadı. Bir az sonra yenidən cəhd et.",
       "forbidden": "İcazə yoxdur."
     },
     "capabilities": {
@@ -1957,7 +1957,12 @@
       "syncMayNotHaveCompleted": "Sinxronlaşdırma tamamlanmamış ola bilər. Vəziyyəti dəqiqləşdirmək üçün yenidən cəhd et və ya ləğv et.",
       "syncInProgress": "Təhlükəsizlik məlumatlarının sinxronlaşdırılması artıq davam edir. Yenidən cəhd et.",
       "dismissalInProgress": "Bu tapıntının rədd edilməsi artıq davam edir. Yenidən cəhd et.",
-      "couldNotReadPendingSyncs": "Gözləyən sinxronlaşdırmaları oxumaq mümkün olmadı. Yenidən cəhd et."
+      "couldNotReadPendingSyncs": "Gözləyən sinxronlaşdırmaları oxumaq mümkün olmadı. Yenidən cəhd et.",
+      "ambiguous": "Nəticəni təsdiqləmək mümkün olmadı — yenidən cəhd etməzdən əvvəl təhlükəsizlik icmalını yoxla.",
+      "settleFailed": "İş tamamlandı, lakin nəticəni qeyd edə bilmədik. Yenidən cəhd et.",
+      "replayFailed": "Bu iş tamamlanmadı. Yenidən cəhd et.",
+      "actionFailed": "Bu işi tamamlamaq mümkün olmadı. Yenidən cəhd et.",
+      "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz."
     },
     "analysisState": {
       "queued": "Təhlil növbəyə alınıb",

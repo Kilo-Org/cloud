@@ -53,6 +53,7 @@ export function SheetHeader({
   onShare,
   sharing = false,
   disabled = false,
+  doneDisabled = false,
   topInset = 'always',
 }: {
   title: string;
@@ -71,7 +72,14 @@ export function SheetHeader({
   cancelLabel?: string;
   onShare?: () => void;
   sharing?: boolean;
+  /** Disables both controls. Use `doneDisabled` when only the commit waits. */
   disabled?: boolean;
+  /**
+   * Disables the Done control alone, so Cancel still closes a sheet that is
+   * saving. A full-window sheet has no drag dismissal left, so Cancel is the
+   * only way out while a write is in flight.
+   */
+  doneDisabled?: boolean;
   topInset?: SheetHeaderTopInset;
 }) {
   const { t } = useTranslation();
@@ -208,7 +216,7 @@ export function SheetHeader({
           </View>
           <Pressable
             onPress={onDone}
-            disabled={disabled}
+            disabled={disabled || doneDisabled}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={resolvedDoneLabel}

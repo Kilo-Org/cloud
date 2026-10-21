@@ -35,6 +35,8 @@
     "connectGithub": "ភ្ជាប់ GitHub",
     "cost": "ចំណាយ",
     "discard": "បោះបង់",
+    "discardChangesMessage": "ការផ្លាស់ប្តូររបស់អ្នកនឹងបាត់បង់។",
+    "discardChangesTitle": "បោះបង់ការផ្លាស់ប្តូរ?",
     "findings": "បញ្ហាដែលរកឃើញ",
     "mergeRequest": "សំណើបញ្ចូល",
     "notConnected": "មិនទាន់ភ្ជាប់",
@@ -109,7 +111,9 @@
     "online": "អនឡាញ",
     "open": "បើក {{name}}",
     "openPullRequest": "បើកសំណើបញ្ចូលកូដ",
+    "completed": "បានបញ្ចប់",
     "pending": "កំពុងរង់ចាំ",
+    "running": "កំពុងដំណើរការ",
     "performance": "ប្រសិទ្ធភាព",
     "preferences": "ចំណូលចិត្ត",
     "privacyPolicy": "គោលការណ៍ឯកជនភាព",
@@ -661,7 +665,8 @@
       "description": "ភ្ជាប់គណនី GitHub របស់អ្នក ដើម្បីពិនិត្យសំណើបញ្ចូលកូដនៅលើទូរស័ព្ទ។",
       "gitlabDescription": "ភ្ជាប់គណនី GitLab របស់អ្នកដើម្បីពិនិត្យសំណើបញ្ចូលលើទូរស័ព្ទ។",
       "bitbucketDescription": "ភ្ជាប់ Bitbucket ទៅអង្គភាពនេះដើម្បីពិនិត្យសំណើបញ្ចូលកូដលើទូរស័ព្ទ។",
-      "bitbucketOrgOnlyDescription": "ជ្រើសរើសអង្គភាពមួយក្នុងប្រវត្តិរូបរបស់អ្នកដើម្បីពិនិត្យសំណើបញ្ចូលកូដ Bitbucket របស់វា។"
+      "bitbucketOrgOnlyDescription": "ប្ដូរគណនីខាងលើទៅអង្គភាពមួយដើម្បីពិនិត្យសំណើបញ្ចូលកូដ Bitbucket របស់វា។",
+      "contextLine": "សម្រាប់ {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "មិនអាចដាក់ស្នើការពិនិត្យនេះក្នុងស្ថានភាពបច្ចុប្បន្នបានទេ។ PR អាចបានផ្លាស់ប្តូរ ឬអ្នកកំពុងពិនិត្យសំណើបញ្ចូលកូដរបស់ខ្លួនឯង ដែលមិនត្រូវបានអនុញ្ញាត។",
       "reviewNotSubmittedTerm": "មិនអាចដាក់សំណើការពិនិត្យនេះតាមរូបភាពបច្ចុប្បន្នបានទេ។ {{term}} អាចបានផ្លាស់ប្តូរ ឬអ្នកមិនអាចពិនិត្យ{{term}}របស់ខ្លួនឯងបានទេ។",
       "couldNotPostComment": "មិនអាចបង្ហោះមតិយោបល់បានទេ។",
-      "couldNotSubmitReview": "មិនអាចដាក់ស្នើការពិនិត្យបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។"
+      "couldNotSubmitReview": "មិនអាចដាក់ស្នើការពិនិត្យបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
+      "rateLimited": "សំណើច្រើនពេក។ សូមព្យាយាមម្តងទៀតនៅពេលក្រោយ។",
+      "conflict": "នេះបានផ្លាស់ប្តូរនៅពេលអ្នកកំពុងធ្វើការលើវា។ សូមផ្ទុកឡើងវិញហើយព្យាយាមម្តងទៀត។"
     },
     "operation": {
       "couldNotReply": "មិនអាចឆ្លើយតបបានទេ។",
@@ -1531,8 +1538,6 @@
     "updateFailed": "មិនអាចធ្វើបច្ចុប្បន្នភាពឧបករណ៍ត្រួតពិនិត្យកូដបានទេ។",
     "configSaveFailed": "មិនអាចរក្សាទុកការកំណត់ការត្រួតពិនិត្យបានទេ។",
     "status": {
-      "running": "កំពុងដំណើរការ",
-      "completed": "បានបញ្ចប់",
       "interrupted": "បានផ្អាកកណ្តាលទី"
     },
     "reviewStyle": {
@@ -1545,7 +1550,8 @@
       "bugs": "កំហុស",
       "style": "រចនាប័ទ្មកូដ",
       "testing": "ការធ្វើតេស្ត",
-      "documentation": "ឯកសារ"
+      "documentation": "ឯកសារ",
+      "unknown": "ផ្សេងទៀត ({{area}})"
     },
     "gateThreshold": {
       "warning": "ការព្រមាន"
@@ -1657,7 +1663,14 @@
       "whereFound": "ទីតាំងដែលរកឃើញ ({{displayCount}})",
       "fullReport": "របាយការណ៍ពេញលេញដែលបានបង្កើត",
       "yes": "បាទ/ចាស",
-      "no": "ទេ"
+      "no": "ទេ",
+      "action": {
+        "analyzeCodebase": "វិភាគមូលដ្ឋានកូដ",
+        "dismiss": "បដិសេធ",
+        "manualReview": "ការពិនិត្យដោយដៃ",
+        "monitor": "ត្រួតពិនិត្យ",
+        "openPr": "បើកសំណើទាញ"
+      }
     },
     "dashboard": {
       "findingsCount": "បញ្ហាដែលរកឃើញចំនួន {{displayCount}}",
@@ -1859,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "រក្សាទុកការផ្លាស់ប្តូរ",
       "unsavedTitle": "ការផ្លាស់ប្តូរដែលមិនទាន់រក្សាទុក",
-      "unsavedMessage": "រក្សាទុកការផ្លាស់ប្តូររបស់អ្នក មុនពេលចាកចេញពីអេក្រង់នេះ?"
+      "unsavedMessage": "រក្សាទុកការផ្លាស់ប្តូររបស់អ្នក មុនពេលចាកចេញពីអេក្រង់នេះ?",
+      "unsavedInvalidMessage": "ការផ្លាស់ប្តូរទាំងនេះមិនទាន់អាចរក្សាទុកបាននៅឡើយទេ។ កែតម្រូវពួកវាដើម្បីរក្សាទុក ឬបោះបង់ពួកវាដើម្បីចាកចេញ។"
     },
     "auditReportButton": {
       "viewA11y": "មើលរបាយការណ៍សវនកម្ម"
@@ -1876,7 +1890,24 @@
       "title": "របាយការណ៍សវនកម្ម",
       "unavailable": "មិនអាចមើលរបាយការណ៍សវនកម្មបានទេ",
       "unavailableDescription": "មានតែម្ចាស់អង្គការ និងអ្នកគ្រប់គ្រងការទូទាត់ប៉ុណ្ណោះដែលអាចមើលរបាយការណ៍សវនកម្មបាន។ សុំឱ្យម្ចាស់ ឬអ្នកគ្រប់គ្រងការទូទាត់ផ្តល់សិទ្ធិឱ្យអ្នក។",
-      "queryFailed": "ការទាញយកទិន្នន័យរបាយការណ៍មិនបានបញ្ចប់ទេ។ សូមព្យាយាមម្តងទៀត។"
+      "queryFailed": "ការទាញយកទិន្នន័យរបាយការណ៍មិនបានបញ្ចប់ទេ។ សូមព្យាយាមម្តងទៀត។",
+      "eventActions": {
+        "findingAnalysisCompleted": "ការវិភាគបានបញ្ចប់",
+        "findingAnalysisFailed": "ការវិភាគបរាជ័យ",
+        "findingAutoDismissed": "បានបដិសេធ​ដោយស្វ័យប្រវត្តិ",
+        "findingCreated": "បាននាំចូល",
+        "findingDeleted": "បានលុប",
+        "findingDismissed": "បានបដិសេធ",
+        "findingSeverityChanged": "បានផ្លាស់ប្តូរកម្រិតធ្ងន់ធ្ងរ",
+        "findingStatusChange": "បានផ្លាស់ប្តូរស្ថានភាព",
+        "findingSuperseded": "បានជំនួស",
+        "remediationBlocked": "ការជួសជុលត្រូវបានរារាំង",
+        "remediationCancelled": "បានបោះបង់",
+        "remediationFailed": "ការជួសជុលបរាជ័យ",
+        "remediationNoChangesNeeded": "មិនត្រូវការផ្លាស់ប្តូរ",
+        "remediationPrOpened": "បានបើកសំណើទាញ",
+        "remediationQueued": "បានស្នើសុំការជួសជុល"
+      }
     },
     "notifications": {
       "couldNotLoad": "មិនអាចផ្ទុកការកំណត់ការជូនដំណឹងបានទេ។",
@@ -1908,7 +1939,6 @@
       "installApp": "ដំឡើងកម្មវិធី GitHub",
       "reauthorizeButton": "ផ្តល់សិទ្ធិឱ្យកម្មវិធី GitHub ឡើងវិញ",
       "reauthorizeDescription": "ភ្នាក់ងារសុវត្ថិភាពត្រូវការសិទ្ធិ vulnerability_alerts ដើម្បីចូលមើលការជូនដំណឹងពី Dependabot។ ផ្តល់សិទ្ធិឱ្យកម្មវិធី GitHub ឡើងវិញ ដើម្បីបន្ថែមសិទ្ធិនេះ។",
-      "reauthorizeFailed": "មិនអាចចាប់ផ្តើមការផ្តល់សិទ្ធិឡើងវិញបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "reauthorizeTitle": "ត្រូវការសិទ្ធិបន្ថែម",
       "setupFailed": "មិនអាចចាប់ផ្តើមការរៀបចំ GitHub បានទេ។ សូមព្យាយាមម្តងទៀត។"
     },
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} លែងអាចប្រើបានទៀតហើយ។ កំពុងប្រើម៉ូដែលលំនាំដើមរបស់អ្នក។",
       "couldNotReadPendingSessions": "មិនអាចអានវគ្គដែលកំពុងរង់ចាំបានទេ។ ព្យាយាមម្តងទៀត។",
       "failedToCreate": "មិនអាចបង្កើតវគ្គបានទេ។",
+      "checkOrganizationAccess": "សូមពិនិត្យការចូលប្រើអង្គការនេះរបស់អ្នក រួចសូមព្យាយាមម្តងទៀត។",
       "couldNotRefreshRepositories": "មិនអាចផ្ទុកបញ្ជីឃ្លាំងកូដឡើងវិញបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "discardDraftTitle": "បោះបង់សេចក្តីព្រាង?",
       "discardDraftMessage": "សេចក្តីណែនាំដែលអ្នកបានសរសេរនឹងបាត់បង់។",
@@ -2281,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} បន្ទាត់",
       "matchesBadge_one": "ត្រូវគ្នា {{displayCount}}",
       "matchesBadge_other": "ត្រូវគ្នា {{displayCount}}",
-      "noOutput": "គ្មានលទ្ធផលទេ។"
+      "noOutput": "គ្មានលទ្ធផលទេ។",
+      "translationFailed": "ការបកប្រែបរាជ័យ"
     },
     "readToolMarkdown": {
       "linesTruncated": "បន្ទាត់ {{start}}–{{end}} (បានកាត់ឱ្យខ្លី)",
@@ -2978,11 +3010,22 @@
     "boundary": {
       "backToProfile": "ត្រឡប់ទៅប្រវត្តិរូប",
       "loadErrorMessage": "សូមពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
+
+      "chooseAccount": "ជ្រើសរើសគណនី",
       "loadErrorTitle": "មិនអាចផ្ទុកអង្គការរបស់អ្នកបានទេ។",
+      "noOrganization": "គ្មានអង្គការ",
+
+      "noOrganizationDescription": "គណនីនេះមិនមែនជាផ្នែកនៃអង្គការទេ។ បង្កើត ឬចូលរួមអង្គការមួយនៅលើគេហទំព័រ ដើម្បីប្រើមុខងារអង្គការដូចជាការអញ្ជើញសមាជិក និងការជូនដំណឹងអំពីសមតុល្យទាប។",
+
+      "openWebOrganizations": "បើកអង្គការនៅលើគេហទំព័រ",
+
       "organizationUnavailable": "មិនអាចចូលប្រើអង្គការបានទេ។",
-      "selectDescription": "ជ្រើសរើសអង្គការពីប្រវត្តិរូបរបស់អ្នកដើម្បីបន្ត។",
+      "selectDescriptionWithOrganizations": "អ្នកជាសមាជិកនៃអង្គការមួយ ឬច្រើន។ ជ្រើសរើសគណនីដែលអេក្រង់នេះគួរប្រើ។",
+
       "selectOrganization": "ជ្រើសរើសអង្គការ",
       "unavailableDescription": "អង្គការនេះលែងអាចចូលប្រើបានទៀតហើយ។ ជ្រើសរើសអង្គការមួយពីប្រវត្តិរូបរបស់អ្នក ដើម្បីបន្ត។",
+
+      "unavailableSessionsDescription": "អង្គការនេះលែងអាចចូលប្រើបានទៀតហើយ។ មិនអាចផ្ទុកសម័យរបស់វាបានទេ។",
       "accessDeniedDescription": "អ្នកមិនមានសិទ្ធិចូលប្រើអង្គការនេះទេ។"
     },
     "creditActivity": {
@@ -3642,7 +3685,9 @@
       "jsonTooLarge": "ប្រើធាតុច្រើនបំផុត 50 សោរហូតដល់ 128 និងតម្លៃរហូតដល់ 4096 តួអក្សរ",
       "timeoutInvalid": "ការអស់ពេលត្រូវតែជាចំនួនមីលីវិនាទីទាំងមូល",
       "edit": "កែសម្រួលម៉ាស៊ីនមេ MCP",
-      "saveFailed": "មិនអាចរក្សាទុកម៉ាស៊ីនមេ MCP បានទេ។"
+      "saveFailed": "មិនអាចរក្សាទុកម៉ាស៊ីនមេ MCP បានទេ។",
+      "deleteFailed": "មិនអាចលុបម៉ាស៊ីនមេ MCP បានទេ។",
+      "updateFailed": "មិនអាចធ្វើបច្ចុប្បន្នភាពម៉ាស៊ីនមេ MCP បានទេ។"
     },
     "agents": {
       "title": "ភ្នាក់ងារប្រវត្តិរូប",
@@ -3669,6 +3714,7 @@
       "visibilitySubagent": "Subagent - អាចហៅបានតែពីអ្នកដទៃប៉ុណ្ណោះ។",
       "visibilityAll": "ទាំងអស់ - ទាំងពីរ",
       "saveFailed": "មិនអាចរក្សាទុកភ្នាក់ងារបានទេ។",
+      "deleteFailed": "មិនអាចលុបភ្នាក់ងារបានទេ។",
       "nameRequired": "បញ្ចូលឈ្មោះភ្នាក់ងារ",
       "slugRequired": "បញ្ចូល slug ភ្នាក់ងារ",
       "slugInvalid": "Slug ត្រូវតែចាប់ផ្តើមដោយអក្សរ ហើយប្រើតែអក្សរតូច ខ្ទង់ និងសញ្ញាដាច់ៗប៉ុណ្ណោះ។",
@@ -3683,10 +3729,12 @@
       "description": "ការពិពណ៌នាពាក្យបញ្ជា",
       "template": "គំរូ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "ពន្យល់ $ARGUMENTS",
       "subtask": "ដំណើរការជាកិច្ចការរង",
       "edit": "កែសម្រួលពាក្យបញ្ជា slash",
       "saveFailed": "មិនអាចរក្សាទុកពាក្យបញ្ជាបានទេ។",
+      "deleteFailed": "មិនអាចលុបពាក្យបញ្ជាបានទេ។",
       "nameRequired": "បញ្ចូលឈ្មោះពាក្យបញ្ជា",
       "nameInvalid": "ឈ្មោះត្រូវតែចាប់ផ្តើមដោយអក្សរតូច ហើយប្រើតែអក្សរតូច ខ្ទង់ និងសញ្ញាដាច់ៗប៉ុណ្ណោះ។",
       "templateRequired": "បញ្ចូលគំរូពាក្យបញ្ជា",
@@ -3833,7 +3881,7 @@
     "view": "អានសេចក្តីសង្ខេប",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "បង្ហាញស្ថានភាពផ្ទាល់",
+    "dismiss": "មិនអើពើនឹងសេចក្តីសង្ខេប",
     "offline": "គ្មានអ៊ីនធឺណិត · សេចក្តីសង្ខេបដែលបានរក្សាទុក",
     "cached": "របាយការណ៍ដែលបានរក្សាទុក · មិនអាចធ្វើឱ្យស្រស់បាន",
     "revised": "បានកែប្រែ · {{revision}}",

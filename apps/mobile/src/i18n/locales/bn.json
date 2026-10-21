@@ -35,6 +35,8 @@
     "connectGithub": "GitHub সংযুক্ত করুন",
     "cost": "খরচ",
     "discard": "বাতিল করুন",
+    "discardChangesMessage": "আপনার পরিবর্তনগুলো হারিয়ে যাবে।",
+    "discardChangesTitle": "পরিবর্তনগুলো বাতিল করবেন?",
     "findings": "শনাক্ত সমস্যা",
     "mergeRequest": "মার্জ রিকোয়েস্ট",
     "notConnected": "সংযুক্ত নয়",
@@ -109,7 +111,9 @@
     "online": "অনলাইন",
     "open": "{{name}} খুলুন",
     "openPullRequest": "খোলা পুল রিকোয়েস্ট",
+    "completed": "সম্পন্ন",
     "pending": "অপেক্ষমাণ",
+    "running": "চলছে",
     "performance": "কর্মদক্ষতা",
     "preferences": "পছন্দের সেটিংস",
     "privacyPolicy": "গোপনীয়তা নীতি",
@@ -661,7 +665,8 @@
       "description": "মোবাইলে পুল রিকোয়েস্ট রিভিউ করতে আপনার GitHub অ্যাকাউন্ট সংযুক্ত করুন।",
       "gitlabDescription": "মোবাইলে মার্জ রিকোয়েস্ট রিভিউ করতে আপনার GitLab অ্যাকাউন্ট সংযুক্ত করুন।",
       "bitbucketDescription": "মোবাইলে পুল রিকোয়েস্ট রিভিউ করতে এই অর্গানাইজেশনটিকে Bitbucket-এর সঙ্গে সংযুক্ত করুন।",
-      "bitbucketOrgOnlyDescription": "আপনার প্রোফাইলে একটি অর্গানাইজেশন বেছে নিন যাতে তার Bitbucket পুল রিকোয়েস্টগুলো রিভিউ করা যায়।"
+      "bitbucketOrgOnlyDescription": "উপরে থাকা অ্যাকাউন্ট একটি অর্গানাইজেশনে সুইচ করুন তার Bitbucket পুল রিকোয়েস্ট রিভিউ করতে।",
+      "contextLine": "{{organization}}-এর জন্য"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "এই রিভিউটি বর্তমান অবস্থায় জমা দেওয়া যাবে না। PR বদলে গিয়ে থাকতে পারে অথবা এটি আপনার নিজের পুল রিকোয়েস্ট, যা আপনি রিভিউ করতে পারবেন না।",
       "reviewNotSubmittedTerm": "এই রিভিউটি যেমন আছে তেমনই জমা দেওয়া যাবে না। সম্ভবত {{term}} বদলে গেছে, অথবা আপনি নিজের {{term}} রিভিউ করতে পারবেন না।",
       "couldNotPostComment": "মন্তব্য পোস্ট করা যায়নি।",
-      "couldNotSubmitReview": "রিভিউ জমা দেওয়া যায়নি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।"
+      "couldNotSubmitReview": "রিভিউ জমা দেওয়া যায়নি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
+      "rateLimited": "অনেক বেশি অনুরোধ। পরে আবার চেষ্টা করুন।",
+      "conflict": "আপনি কাজ করার সময় এটি পরিবর্তিত হয়েছে। এটি পুনরায় লোড করে আবার চেষ্টা করুন।"
     },
     "operation": {
       "couldNotReply": "উত্তর দেওয়া যায়নি।",
@@ -1531,8 +1538,6 @@
     "updateFailed": "কোড রিভিউয়ার আপডেট করা যায়নি।",
     "configSaveFailed": "পর্যালোচনার কনফিগারেশন সংরক্ষণ করা যায়নি।",
     "status": {
-      "running": "চলছে",
-      "completed": "সম্পন্ন",
       "interrupted": "বাধাগ্রস্ত"
     },
     "reviewStyle": {
@@ -1545,7 +1550,8 @@
       "bugs": "বাগ",
       "style": "কোডের ধরন",
       "testing": "পরীক্ষা",
-      "documentation": "ডকুমেন্টেশন"
+      "documentation": "ডকুমেন্টেশন",
+      "unknown": "অন্যান্য ({{area}})"
     },
     "gateThreshold": {
       "warning": "সতর্কতা"
@@ -1657,7 +1663,14 @@
       "whereFound": "যেখানে এটি পাওয়া গেছে ({{displayCount}})",
       "fullReport": "তৈরি করা সম্পূর্ণ রিপোর্ট",
       "yes": "হ্যাঁ",
-      "no": "না"
+      "no": "না",
+      "action": {
+        "analyzeCodebase": "কোডবেস বিশ্লেষণ করুন",
+        "dismiss": "অগ্রাহ্য করুন",
+        "manualReview": "ম্যানুয়াল পর্যালোচনা",
+        "monitor": "নজর রাখুন",
+        "openPr": "পুল রিকোয়েস্ট খুলুন"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}}টি ত্রুটি",
@@ -1859,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "পরিবর্তন সংরক্ষণ করুন",
       "unsavedTitle": "অসংরক্ষিত পরিবর্তন",
-      "unsavedMessage": "এই স্ক্রিন ছাড়ার আগে পরিবর্তনগুলো সংরক্ষণ করবেন?"
+      "unsavedMessage": "এই স্ক্রিন ছাড়ার আগে পরিবর্তনগুলো সংরক্ষণ করবেন?",
+      "unsavedInvalidMessage": "এই পরিবর্তনগুলো এখনো সংরক্ষণ করা যাবে না। সংরক্ষণ করতে এগুলো ঠিক করুন, অথবা ছেড়ে যেতে বাতিল করুন।"
     },
     "auditReportButton": {
       "viewA11y": "অডিট রিপোর্ট দেখুন"
@@ -1876,7 +1890,24 @@
       "title": "অডিট রিপোর্ট",
       "unavailable": "অডিট রিপোর্ট পাওয়া যাচ্ছে না",
       "unavailableDescription": "শুধুমাত্র সংস্থার মালিক এবং বিলিং ম্যানেজাররা অডিট রিপোর্ট দেখতে পারেন। দেখার অনুমতির জন্য কোনো মালিক বা বিলিং ম্যানেজারকে অনুরোধ করুন।",
-      "queryFailed": "রিপোর্টের তথ্য আনার কাজ শেষ হয়নি। আবার চেষ্টা করুন।"
+      "queryFailed": "রিপোর্টের তথ্য আনার কাজ শেষ হয়নি। আবার চেষ্টা করুন।",
+      "eventActions": {
+        "findingAnalysisCompleted": "বিশ্লেষণ সম্পন্ন হয়েছে",
+        "findingAnalysisFailed": "বিশ্লেষণ ব্যর্থ হয়েছে",
+        "findingAutoDismissed": "স্বয়ংক্রিয়ভাবে অগ্রাহ্য করা হয়েছে",
+        "findingCreated": "ইমপোর্ট করা হয়েছে",
+        "findingDeleted": "মোছা হয়েছে",
+        "findingDismissed": "খারিজ",
+        "findingSeverityChanged": "তীব্রতা পরিবর্তিত হয়েছে",
+        "findingStatusChange": "স্ট্যাটাস পরিবর্তিত হয়েছে",
+        "findingSuperseded": "প্রতিস্থাপিত",
+        "remediationBlocked": "সমাধানের কাজ আটকে আছে",
+        "remediationCancelled": "বাতিল",
+        "remediationFailed": "সমাধান ব্যর্থ হয়েছে",
+        "remediationNoChangesNeeded": "কোনো পরিবর্তনের প্রয়োজন নেই",
+        "remediationPrOpened": "PR খোলা হয়েছে",
+        "remediationQueued": "সমাধানের অনুরোধ করা হয়েছে"
+      }
     },
     "notifications": {
       "couldNotLoad": "বিজ্ঞপ্তির সেটিংস লোড করা যায়নি।",
@@ -1908,7 +1939,6 @@
       "installApp": "GitHub অ্যাপ ইনস্টল করুন",
       "reauthorizeButton": "GitHub অ্যাপ পুনরায় অনুমোদন করুন",
       "reauthorizeDescription": "Dependabot-এর সতর্কতা দেখতে সিকিউরিটি এজেন্টের vulnerability_alerts অনুমতি প্রয়োজন। এই অনুমতি দিতে GitHub অ্যাপটি পুনরায় অনুমোদন করুন।",
-      "reauthorizeFailed": "পুনরায় অনুমোদন শুরু করা যায়নি। আবার চেষ্টা করুন।",
       "reauthorizeTitle": "অতিরিক্ত অনুমতি প্রয়োজন",
       "setupFailed": "GitHub সেটআপ শুরু করা যায়নি। আবার চেষ্টা করুন।"
     },
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} আর ব্যবহার করা যাচ্ছে না। আপনার ডিফল্ট মডেল ব্যবহার করা হচ্ছে।",
       "couldNotReadPendingSessions": "অপেক্ষমাণ সেশনের তথ্য পড়া যায়নি। আবার চেষ্টা করুন।",
       "failedToCreate": "সেশন তৈরি করা যায়নি।",
+      "checkOrganizationAccess": "এই সংস্থায় আপনার অ্যাক্সেস পরীক্ষা করে আবার চেষ্টা করুন।",
       "couldNotRefreshRepositories": "রিপোজিটরি রিফ্রেশ করা যায়নি। আবার চেষ্টা করুন।",
       "discardDraftTitle": "খসড়া বাতিল করবেন?",
       "discardDraftMessage": "আপনার প্রম্পট হারিয়ে যাবে।",
@@ -2281,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}}টি লাইন",
       "matchesBadge_one": "{{displayCount}}টি মিল",
       "matchesBadge_other": "{{displayCount}}টি মিল",
-      "noOutput": "কোনো আউটপুট নেই।"
+      "noOutput": "কোনো আউটপুট নেই।",
+      "translationFailed": "অনুবাদ ব্যর্থ হয়েছে"
     },
     "readToolMarkdown": {
       "linesTruncated": "লাইন {{start}}–{{end}} (আংশিক দেখানো হয়েছে)",
@@ -2978,11 +3010,22 @@
     "boundary": {
       "backToProfile": "প্রোফাইলে ফিরে যান",
       "loadErrorMessage": "আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
+
+      "chooseAccount": "একটি অ্যাকাউন্ট নির্বাচন করুন",
       "loadErrorTitle": "আপনার সংস্থাগুলো লোড করা যায়নি।",
+      "noOrganization": "কোনো সংস্থা নেই",
+
+      "noOrganizationDescription": "এই অ্যাকাউন্টটি কোনো সংস্থার অংশ নয়। সদস্য আমন্ত্রণ এবং কম ব্যালেন্স সতর্কতার মতো সংস্থার বৈশিষ্ট্য ব্যবহার করতে ওয়েবে একটি সংস্থা তৈরি করুন বা যোগ দিন।",
+
+      "openWebOrganizations": "ওয়েবে সংস্থাগুলি খুলুন",
+
       "organizationUnavailable": "সংস্থাটি পাওয়া যাচ্ছে না।",
-      "selectDescription": "চালিয়ে যেতে আপনার প্রোফাইল থেকে একটি সংস্থা বেছে নিন।",
+      "selectDescriptionWithOrganizations": "আপনি এক বা একাধিক সংস্থার সদস্য। এই স্ক্রিনটি যে অ্যাকাউন্ট ব্যবহার করবে সেটি বেছে নিন।",
+
       "selectOrganization": "একটি সংস্থা নির্বাচন করুন",
       "unavailableDescription": "এই সংস্থাটি আর পাওয়া যাচ্ছে না। চালিয়ে যেতে আপনার প্রোফাইল থেকে অন্য একটি সংস্থা বেছে নিন।",
+
+      "unavailableSessionsDescription": "এই সংস্থাটি আর পাওয়া যাচ্ছে না। এর সেশনগুলো লোড করা যাবে না।",
       "accessDeniedDescription": "এই সংস্থায় আপনার অ্যাক্সেস নেই।"
     },
     "creditActivity": {
@@ -3642,7 +3685,9 @@
       "jsonTooLarge": "সর্বোচ্চ 50টি এন্ট্রি ব্যবহার করুন, কী 128টি পর্যন্ত এবং মান 4096টি অক্ষর পর্যন্ত",
       "timeoutInvalid": "টাইমআউট অবশ্যই মিলিসেকেন্ডের পূর্ণ সংখ্যা হতে হবে",
       "edit": "MCP সার্ভার সম্পাদনা করুন",
-      "saveFailed": "MCP সার্ভার সংরক্ষণ করা যায়নি"
+      "saveFailed": "MCP সার্ভার সংরক্ষণ করা যায়নি",
+      "deleteFailed": "MCP সার্ভার মুছে ফেলা যায়নি",
+      "updateFailed": "MCP সার্ভার আপডেট করা যায়নি"
     },
     "agents": {
       "title": "প্রোফাইল এজেন্ট",
@@ -3669,6 +3714,7 @@
       "visibilitySubagent": "Subagent — শুধুমাত্র অন্যদের থেকে কলযোগ্য",
       "visibilityAll": "সব — উভয়",
       "saveFailed": "এজেন্ট সংরক্ষণ করতে পারেনি",
+      "deleteFailed": "এজেন্ট মুছে ফেলা যায়নি",
       "nameRequired": "একটি এজেন্ট নাম লিখুন",
       "slugRequired": "একটি এজেন্ট স্লাগ লিখুন",
       "slugInvalid": "স্লাগ একটি অক্ষর দিয়ে শুরু করতে হবে এবং শুধুমাত্র ছোট হাতের অক্ষর, সংখ্যা এবং ড্যাশ ব্যবহার করতে হবে",
@@ -3683,10 +3729,12 @@
       "description": "কমান্ডের বিবরণ",
       "template": "টেমপ্লেট",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ব্যাখ্যা করুন",
       "subtask": "সাবটাস্ক হিসাবে চালান",
       "edit": "স্ল্যাশ কমান্ড সম্পাদনা করুন",
       "saveFailed": "কমান্ড সংরক্ষণ করা যায়নি",
+      "deleteFailed": "কমান্ড মুছে ফেলা যায়নি",
       "nameRequired": "একটি কমান্ডের নাম লিখুন",
       "nameInvalid": "নাম অবশ্যই ছোট হাতের অক্ষর দিয়ে শুরু করতে হবে এবং শুধুমাত্র ছোট হাতের অক্ষর, সংখ্যা এবং ড্যাশ ব্যবহার করতে হবে",
       "templateRequired": "একটি কমান্ড টেমপ্লেট লিখুন",
@@ -3833,7 +3881,7 @@
     "view": "ব্রিফিং পড়ুন",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "লাইভ স্ট্যাটাস দেখান",
+    "dismiss": "ব্রিফিং খারিজ করুন",
     "offline": "অফলাইন · সংরক্ষিত ব্রিফিং",
     "cached": "সংরক্ষিত রিপোর্ট · রিফ্রেশ করা যাচ্ছে না",
     "revised": "সংশোধিত · {{revision}}",

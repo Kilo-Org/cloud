@@ -40,6 +40,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { openExternalUrl } from '@/lib/external-link';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
 import {
   getCodeReviewerProfilePath,
@@ -104,6 +105,16 @@ export function ProfileScreen() {
   } = useQuery({
     ...trpc.user.getAuthProviders.queryOptions(),
     enabled: isAuthenticated && afterInteractions,
+    // The Linked accounts row must settle while the online manager reports
+    // offline: a paused read is pending without fetching, so `isLoading` is
+    // false and the section neither paints a row nor an error. This one either
+    // answers or fails once the control-plane deadline lands, and the error
+    // surface below then offers Retry.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
   });
   const {
     data: orgs,
@@ -135,6 +146,10 @@ export function ProfileScreen() {
   const feedbackPrompt = useFeedbackPrompt();
 
   const { t } = useTranslation();
+  // Reactive: a connectivity commit re-renders the error-variant selection, so
+  // a read that settled by failing while the device is confirmed offline says
+  // so instead of presenting itself as a server fault.
+  const committedConnectivity = useCommittedConnectivityStatus();
 
   // Personal context has no selected organization to label, so its row opens
   // the account picker; otherwise the row names the destination for the active
@@ -322,7 +337,7 @@ export function ProfileScreen() {
             </Text>
             {organizationsError ? (
               <QueryError
-                variant="server"
+                variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
                 placement="top"
                 title={t('profile.couldNotLoadOrganization')}
                 message={t('profile.couldNotLoadOrganizationDescription')}
@@ -429,7 +444,7 @@ export function ProfileScreen() {
 
             {providersError && (
               <QueryError
-                variant="server"
+                variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
                 placement="top"
                 title={t('profile.couldNotLoadAccounts')}
                 onRetry={() => void refetchProviders()}

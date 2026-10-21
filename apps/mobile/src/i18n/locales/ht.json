@@ -1879,6 +1879,9 @@
       "viewA11y": "Gade rapò odit la"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administratè Kilo",
+      "actorMaskedUser": "Itilizatè maske",
+      "actorSystem": "Sistèm Kilo",
       "couldNotLoad": "Nou pa t ka chaje rapò odit la.",
       "events": "Evènman",
       "generated": "Rapò a pwodui {{generatedAt}}.",

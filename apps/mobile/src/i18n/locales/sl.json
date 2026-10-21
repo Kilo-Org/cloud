@@ -1925,6 +1925,9 @@
       "viewA11y": "Prikaži poročilo o reviziji"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Skrbnik Kilo",
+      "actorMaskedUser": "Maskirani uporabnik",
+      "actorSystem": "Sistem Kilo",
       "couldNotLoad": "Poročila o reviziji ni bilo mogoče naložiti.",
       "events": "Dogodki",
       "generated": "Poročilo je bilo ustvarjeno {{generatedAt}}.",

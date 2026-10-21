@@ -1879,6 +1879,9 @@
       "viewA11y": "ഓഡിറ്റ് റിപ്പോർട്ട് കാണുക"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo അഡ്മിൻ",
+      "actorMaskedUser": "മറയ്ക്കപ്പെട്ട ഉപയോക്താവ്",
+      "actorSystem": "Kilo സിസ്റ്റം",
       "couldNotLoad": "ഓഡിറ്റ് റിപ്പോർട്ട് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "events": "സംഭവങ്ങൾ",
       "generated": "{{generatedAt}}-ൽ തയ്യാറാക്കി.",

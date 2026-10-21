@@ -1879,6 +1879,9 @@
       "viewA11y": "ଅଡିଟ୍ ରିପୋର୍ଟ ଦେଖନ୍ତୁ"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo ଆଡମିନ୍",
+      "actorMaskedUser": "ଲୁଚାଯାଇଥିବା ଉପଭୋକ୍ତା",
+      "actorSystem": "Kilo ସିଷ୍ଟମ୍",
       "couldNotLoad": "ଅଡିଟ୍ ରିପୋର୍ଟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "events": "ଘଟଣା",
       "generated": "{{generatedAt}} ରେ ତିଆରି ହୋଇଛି।",

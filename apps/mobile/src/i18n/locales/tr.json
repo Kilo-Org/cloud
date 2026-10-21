@@ -1134,6 +1134,9 @@
       "triageModel": "Ön değerlendirme modeli"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo yöneticisi",
+      "actorMaskedUser": "Maskelenmiş kullanıcı",
+      "actorSystem": "Kilo sistemi",
       "couldNotLoad": "Denetim raporu yüklenemedi.",
       "events": "Olaylar",
       "generated": "Raporun oluşturulma zamanı: {{generatedAt}}.",

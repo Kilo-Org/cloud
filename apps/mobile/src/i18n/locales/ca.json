@@ -1902,6 +1902,9 @@
       "viewA11y": "Consulta l'informe d'auditoria"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrador de Kilo",
+      "actorMaskedUser": "Usuari emmascarat",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "No s'ha pogut carregar l'informe d'auditoria.",
       "events": "Esdeveniments",
       "generated": "L'informe s'ha generat el {{generatedAt}}.",

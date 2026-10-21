@@ -1879,6 +1879,9 @@
       "viewA11y": "Аудитын тайланг үзэх"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo админ",
+      "actorMaskedUser": "Нууцлагдсан хэрэглэгч",
+      "actorSystem": "Kilo систем",
       "couldNotLoad": "Аудитын тайланг ачаалж чадсангүй.",
       "events": "Үйл явдлууд",
       "generated": "{{generatedAt}} үед үүсгэсэн.",

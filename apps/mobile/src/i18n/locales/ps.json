@@ -1879,6 +1879,9 @@
       "viewA11y": "د پلټنې راپور وګورئ"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "د Kilo مدیر",
+      "actorMaskedUser": "پټ شوی کارن",
+      "actorSystem": "د Kilo سیسټم",
       "couldNotLoad": "د پلټنې راپور بار نه شو.",
       "events": "پېښې",
       "generated": "په {{generatedAt}} جوړ شو.",

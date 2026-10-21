@@ -1134,6 +1134,9 @@
       "triageModel": "Modell für die Ersteinschätzung"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-Administrator",
+      "actorMaskedUser": "Maskierter Benutzer",
+      "actorSystem": "Kilo-System",
       "couldNotLoad": "Der Auditbericht konnte nicht geladen werden.",
       "events": "Ereignisse",
       "generated": "Der Bericht wurde am {{generatedAt}} erstellt.",

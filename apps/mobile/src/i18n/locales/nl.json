@@ -1134,6 +1134,9 @@
       "triageModel": "Model voor de eerste beoordeling"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-beheerder",
+      "actorMaskedUser": "Gemaskeerde gebruiker",
+      "actorSystem": "Kilo-systeem",
       "couldNotLoad": "Het auditrapport kon niet worden geladen.",
       "events": "Gebeurtenissen",
       "generated": "Dit rapport is gegenereerd op {{generatedAt}}.",

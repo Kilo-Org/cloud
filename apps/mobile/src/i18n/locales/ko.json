@@ -1134,6 +1134,9 @@
       "triageModel": "분류 모델"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo 관리자",
+      "actorMaskedUser": "마스킹된 사용자",
+      "actorSystem": "Kilo 시스템",
       "couldNotLoad": "감사 보고서를 불러올 수 없습니다.",
       "events": "이벤트",
       "generated": "{{generatedAt}}에 생성되었습니다.",

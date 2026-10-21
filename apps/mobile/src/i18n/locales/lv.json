@@ -1902,6 +1902,9 @@
       "viewA11y": "Skatīt audita ziņojumu"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administrators",
+      "actorMaskedUser": "Maskēts lietotājs",
+      "actorSystem": "Kilo sistēma",
       "couldNotLoad": "Neizdevās ielādēt audita ziņojumu.",
       "events": "Notikumi",
       "generated": "Ziņojums sagatavots {{generatedAt}}.",

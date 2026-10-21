@@ -1140,6 +1140,9 @@
       "triageModel": "Model wstępnej oceny"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrator Kilo",
+      "actorMaskedUser": "Zamaskowany użytkownik",
+      "actorSystem": "System Kilo",
       "couldNotLoad": "Nie udało się wczytać raportu audytu.",
       "events": "Zdarzenia",
       "generated": "Wygenerowano {{generatedAt}}.",

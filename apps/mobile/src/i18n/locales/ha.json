@@ -1879,6 +1879,9 @@
       "viewA11y": "Duba rahoton bincike"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Manajan Kilo",
+      "actorMaskedUser": "Mai amfani da aka ɓoye",
+      "actorSystem": "Tsarin Kilo",
       "couldNotLoad": "An kasa loda rahoton bincike.",
       "events": "Abubuwan da suka faru",
       "generated": "An samar da rahoton {{generatedAt}}.",

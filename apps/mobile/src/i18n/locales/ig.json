@@ -1879,6 +1879,9 @@
       "viewA11y": "Lee akụkọ nyocha"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Onye nchịkwa Kilo",
+      "actorMaskedUser": "Onye na-eji ngwa zoro ezo",
+      "actorSystem": "Sistemụ Kilo",
       "couldNotLoad": "Enweghị ike ibudata akụkọ nyocha.",
       "events": "Ihe omume",
       "generated": "E mepụtara ya {{generatedAt}}.",

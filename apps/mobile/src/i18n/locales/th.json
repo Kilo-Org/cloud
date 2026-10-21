@@ -1879,6 +1879,9 @@
       "viewA11y": "ดูรายงานการตรวจสอบ"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "ผู้ดูแลระบบ Kilo",
+      "actorMaskedUser": "ผู้ใช้ที่ซ่อนตัวตน",
+      "actorSystem": "ระบบ Kilo",
       "couldNotLoad": "ไม่สามารถโหลดรายงานการตรวจสอบได้",
       "events": "เหตุการณ์",
       "generated": "สร้างเมื่อ {{generatedAt}}",

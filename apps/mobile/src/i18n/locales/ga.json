@@ -1948,6 +1948,9 @@
       "viewA11y": "Féach ar an tuarascáil iniúchta"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Riarthóir Kilo",
+      "actorMaskedUser": "Úsáideoir folaithe",
+      "actorSystem": "Córas Kilo",
       "couldNotLoad": "Níorbh fhéidir an tuarascáil iniúchta a lódáil.",
       "events": "Imeachtaí",
       "generated": "Gineadh an tuarascáil: {{generatedAt}}.",

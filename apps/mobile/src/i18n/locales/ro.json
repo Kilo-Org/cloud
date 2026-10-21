@@ -1902,6 +1902,9 @@
       "viewA11y": "Vezi raportul de audit"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrator Kilo",
+      "actorMaskedUser": "Utilizator mascat",
+      "actorSystem": "Sistemul Kilo",
       "couldNotLoad": "Nu s-a putut încărca raportul de audit.",
       "events": "Evenimente",
       "generated": "Raport generat la {{generatedAt}}.",

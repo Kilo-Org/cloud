@@ -1925,6 +1925,9 @@
       "viewA11y": "Zobrazit zprávu o auditu"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Správce Kilo",
+      "actorMaskedUser": "Maskovaný uživatel",
+      "actorSystem": "Systém Kilo",
       "couldNotLoad": "Zprávu o auditu se nepodařilo načíst.",
       "events": "Události",
       "generated": "Zpráva byla vygenerována {{generatedAt}}.",

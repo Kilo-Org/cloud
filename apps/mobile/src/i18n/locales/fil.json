@@ -1879,6 +1879,9 @@
       "viewA11y": "Tingnan ang ulat ng audit"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Tagapangasiwa ng Kilo",
+      "actorMaskedUser": "Naka-mask na user",
+      "actorSystem": "Kilo system",
       "couldNotLoad": "Hindi ma-load ang ulat ng audit.",
       "events": "Mga kaganapan",
       "generated": "Nabuo noong {{generatedAt}}.",

@@ -1879,6 +1879,9 @@
       "viewA11y": "Прегледај го извештајот за ревизија"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo администратор",
+      "actorMaskedUser": "Маскиран корисник",
+      "actorSystem": "Систем Kilo",
       "couldNotLoad": "Не успеа вчитувањето на извештајот за ревизија.",
       "events": "Настани",
       "generated": "Извештајот е генериран {{generatedAt}}.",

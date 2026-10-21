@@ -1879,6 +1879,9 @@
       "viewA11y": "Bekyk ouditverslag"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-administrateur",
+      "actorMaskedUser": "Gemaskeerde gebruiker",
+      "actorSystem": "Kilo-stelsel",
       "couldNotLoad": "Die ouditverslag kon nie gelaai word nie.",
       "events": "Gebeure",
       "generated": "Die verslag is op {{generatedAt}} gegenereer.",

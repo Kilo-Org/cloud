@@ -1137,6 +1137,9 @@
       "triageModel": "מודל למיון ראשוני"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "מנהל Kilo",
+      "actorMaskedUser": "משתמש מוסתר",
+      "actorSystem": "מערכת Kilo",
       "couldNotLoad": "לא ניתן לטעון את דוח הביקורת.",
       "events": "אירועים",
       "generated": "מועד יצירת הדוח: {{generatedAt}}.",

@@ -1902,6 +1902,9 @@
       "viewA11y": "Ver relatório de auditoria"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrador Kilo",
+      "actorMaskedUser": "Utilizador mascarado",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "Não foi possível carregar o relatório de auditoria.",
       "events": "Eventos",
       "generated": "Relatório gerado em {{generatedAt}}.",

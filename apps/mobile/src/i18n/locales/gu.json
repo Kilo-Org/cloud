@@ -1879,6 +1879,9 @@
       "viewA11y": "ઑડિટ અહેવાલ જુઓ"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo સંચાલક",
+      "actorMaskedUser": "છુપાવેલો વપરાશકર્તા",
+      "actorSystem": "Kilo સિસ્ટમ",
       "couldNotLoad": "ઑડિટ અહેવાલ લોડ કરી શકાયો નહીં.",
       "events": "ઘટનાઓ",
       "generated": "{{generatedAt}} ના રોજ તૈયાર કર્યો.",

@@ -1879,6 +1879,9 @@
       "viewA11y": "Näytä tarkastusraportti"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-ylläpitäjä",
+      "actorMaskedUser": "Piilotettu käyttäjä",
+      "actorSystem": "Kilo-järjestelmä",
       "couldNotLoad": "Tarkastusraporttia ei voitu ladata",
       "events": "Tapahtumat",
       "generated": "Raportti luotiin {{generatedAt}}",

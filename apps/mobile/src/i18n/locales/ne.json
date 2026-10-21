@@ -1879,6 +1879,9 @@
       "viewA11y": "अडिट प्रतिवेदन हेर्नुहोस्"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo एड्मिन",
+      "actorMaskedUser": "लुकाइएको प्रयोगकर्ता",
+      "actorSystem": "Kilo प्रणाली",
       "couldNotLoad": "अडिट प्रतिवेदन लोड गर्न सकिएन।",
       "events": "घटनाहरू",
       "generated": "{{generatedAt}} मा तयार गरिएको हो।",

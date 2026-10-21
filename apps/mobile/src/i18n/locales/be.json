@@ -1925,6 +1925,9 @@
       "viewA11y": "Праглядзець справаздачу аўдыту"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Адміністратар Kilo",
+      "actorMaskedUser": "Схаваны карыстальнік",
+      "actorSystem": "Сістэма Kilo",
       "couldNotLoad": "Не атрымалася загрузіць справаздачу аўдыту.",
       "events": "Падзеі",
       "generated": "Справаздача створана: {{generatedAt}}.",

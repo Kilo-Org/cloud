@@ -1943,6 +1943,9 @@
       "viewA11y": "View audit report"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo Admin",
+      "actorMaskedUser": "Masked user",
+      "actorSystem": "Kilo system",
       "couldNotLoad": "Could not load the audit report",
       "events": "Events",
       "eventActions": {

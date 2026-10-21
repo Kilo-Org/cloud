@@ -1134,6 +1134,9 @@
       "triageModel": "Mô hình phân loại"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Quản trị viên Kilo",
+      "actorMaskedUser": "Người dùng bị che giấu",
+      "actorSystem": "Hệ thống Kilo",
       "couldNotLoad": "Không thể tải báo cáo kiểm toán.",
       "events": "Sự kiện",
       "generated": "Báo cáo được tạo vào {{generatedAt}}.",

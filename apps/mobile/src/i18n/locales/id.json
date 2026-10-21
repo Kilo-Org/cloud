@@ -1134,6 +1134,9 @@
       "triageModel": "Model triase"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Admin Kilo",
+      "actorMaskedUser": "Pengguna tersamarkan",
+      "actorSystem": "Sistem Kilo",
       "couldNotLoad": "Tidak dapat memuat laporan audit.",
       "events": "Peristiwa",
       "generated": "Laporan dibuat pada {{generatedAt}}.",

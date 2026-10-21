@@ -1879,6 +1879,9 @@
       "viewA11y": "Visa revisionsrapport"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-administratör",
+      "actorMaskedUser": "Maskerad användare",
+      "actorSystem": "Kilo-system",
       "couldNotLoad": "Kunde inte läsa in revisionsrapporten",
       "events": "Händelser",
       "generated": "Rapporten skapades {{generatedAt}}",

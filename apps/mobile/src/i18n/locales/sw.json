@@ -1879,6 +1879,9 @@
       "viewA11y": "Tazama ripoti ya ukaguzi"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Msimamizi wa Kilo",
+      "actorMaskedUser": "Mtumiaji aliyefichwa",
+      "actorSystem": "Mfumo wa Kilo",
       "couldNotLoad": "Imeshindikana kupakia ripoti ya ukaguzi.",
       "events": "Matukio",
       "generated": "Ripoti imetengenezwa {{generatedAt}}.",

@@ -1879,6 +1879,9 @@
       "viewA11y": "Դիտել աուդիտի հաշվետվությունը"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo ադմինիստրատոր",
+      "actorMaskedUser": "Թաքցված օգտատեր",
+      "actorSystem": "Kilo համակարգ",
       "couldNotLoad": "Չհաջողվեց բեռնել աուդիտի հաշվետվությունը։",
       "events": "Իրադարձություններ",
       "generated": "Ստեղծվել է {{generatedAt}}։",

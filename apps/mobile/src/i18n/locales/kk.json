@@ -1879,6 +1879,9 @@
       "viewA11y": "Аудит есебін қарау"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo әкімшісі",
+      "actorMaskedUser": "Жасырылған пайдаланушы",
+      "actorSystem": "Kilo жүйесі",
       "couldNotLoad": "Аудит есебін жүктеу мүмкін болмады.",
       "events": "Оқиғалар",
       "generated": "Жасалған уақыты: {{generatedAt}}.",

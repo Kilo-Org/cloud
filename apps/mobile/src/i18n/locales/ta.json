@@ -1879,6 +1879,9 @@
       "viewA11y": "தணிக்கை அறிக்கையைப் பார்க்கவும்"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo நிர்வாகர்",
+      "actorMaskedUser": "மறைக்கப்பட்ட பயனர்",
+      "actorSystem": "Kilo அமைப்பு",
       "couldNotLoad": "தணிக்கை அறிக்கையை ஏற்ற முடியவில்லை.",
       "events": "நிகழ்வுகள்",
       "generated": "உருவாக்கப்பட்ட நேரம்: {{generatedAt}}.",

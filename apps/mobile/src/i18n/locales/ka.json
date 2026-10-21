@@ -1879,6 +1879,9 @@
       "viewA11y": "აუდიტის ანგარიშის ნახვა"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo ადმინისტრატორი",
+      "actorMaskedUser": "დამალული მომხმარებელი",
+      "actorSystem": "Kilo სისტემა",
       "couldNotLoad": "აუდიტის ანგარიშის ჩატვირთვა ვერ მოხერხდა.",
       "events": "მოვლენები",
       "generated": "შექმნის დრო: {{generatedAt}}.",

@@ -1879,6 +1879,9 @@
       "viewA11y": "অডিট রিপোর্ট দেখুন"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo অ্যাডমিন",
+      "actorMaskedUser": "গোপন ব্যবহারকারী",
+      "actorSystem": "Kilo সিস্টেম",
       "couldNotLoad": "অডিট রিপোর্ট লোড করা যায়নি।",
       "events": "ইভেন্ট",
       "generated": "তৈরির সময়: {{generatedAt}}।",

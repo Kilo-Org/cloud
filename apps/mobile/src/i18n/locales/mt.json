@@ -1948,6 +1948,9 @@
       "viewA11y": "Ara r-rapport tal-awditjar"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Amministratur Kilo",
+      "actorMaskedUser": "Utent maskerat",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "Ma setax jitgħabba r-rapport tal-awditjar.",
       "events": "Avvenimenti",
       "generated": "Ir-rapport ġie ġġenerat {{generatedAt}}.",

@@ -1902,6 +1902,9 @@
       "viewA11y": "Prikaži izveštaj o reviziji"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administrator",
+      "actorMaskedUser": "Maskirani korisnik",
+      "actorSystem": "Kilo sistem",
       "couldNotLoad": "Nije moguće učitati izveštaj o reviziji.",
       "events": "Događaji",
       "generated": "Izveštaj je generisan {{generatedAt}}.",

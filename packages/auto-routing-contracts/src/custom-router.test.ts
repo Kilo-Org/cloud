@@ -13,9 +13,19 @@ import {
   CustomRouterDecideResponseSchema,
   CustomRouterDefinitionSchema,
   CustomRouterEntriesSchema,
+  CustomRouterClientEntryIdSchema,
   CustomRouterErrorCodeSchema,
   CustomRouterErrorResponseSchema,
   GatewayCustomRouterEntrySchema,
+  MAX_CLIENT_CONTEXT_LENGTH,
+  MAX_CLIENT_INPUT_MODALITIES,
+  MAX_CLIENT_INPUT_MODALITY_LENGTH,
+  MAX_CLIENT_PRICE_PER_MTOK_USD,
+  MAX_CLIENT_VARIANTS,
+  MAX_CLIENT_VARIANT_LENGTH,
+  MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGTH,
+  MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH,
+  MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH,
   UpdateCustomRouterRequestSchema,
   customRouterCandidateModel,
   customRouterClientEntriesPath,
@@ -150,6 +160,133 @@ describe('custom router entries', () => {
       ClientCustomRouterEntrySchema.safeParse({ ...clientEntry, variants: ['x', 'x'] }).success
     ).toBe(false);
     expect(CustomRouterEntriesSchema.safeParse([gatewayEntry, clientEntry]).success).toBe(true);
+  });
+});
+
+describe('custom router entry bounds', () => {
+  const atModelLimit = 'a'.repeat(MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH);
+  const client = (overrides: Record<string, unknown> = {}) => ({ ...clientEntry, ...overrides });
+
+  it('accepts realistic catalog values and rejects one unit past each bound', () => {
+    expect(
+      ClientCustomRouterEntrySchema.safeParse(
+        client({
+          provider: 'p'.repeat(MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH),
+          model: atModelLimit,
+          variants: ['v'.repeat(MAX_CLIENT_VARIANT_LENGTH)],
+          capabilities: {
+            contextLength: MAX_CLIENT_CONTEXT_LENGTH,
+            inputModalities: ['m'.repeat(MAX_CLIENT_INPUT_MODALITY_LENGTH)],
+            toolCall: true,
+            reasoning: true,
+          },
+          pricing: {
+            inputPerMTokUsd: MAX_CLIENT_PRICE_PER_MTOK_USD,
+            outputPerMTokUsd: MAX_CLIENT_PRICE_PER_MTOK_USD,
+            cacheReadPerMTokUsd: MAX_CLIENT_PRICE_PER_MTOK_USD,
+          },
+        })
+      ).success
+    ).toBe(true);
+
+    expect(
+      ClientCustomRouterEntrySchema.safeParse(client({ model: `${atModelLimit}a` })).success
+    ).toBe(false);
+    expect(
+      GatewayCustomRouterEntrySchema.safeParse({ kind: 'gateway', model: `${atModelLimit}a` })
+        .success
+    ).toBe(false);
+    expect(
+      ClientCustomRouterEntrySchema.safeParse(
+        client({ provider: 'p'.repeat(MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH + 1) })
+      ).success
+    ).toBe(false);
+    expect(
+      CustomRouterClientEntryIdSchema.safeParse({ provider: 'ollama', model: `${atModelLimit}a` })
+        .success
+    ).toBe(false);
+  });
+
+  it('bounds the variant and modality collections', () => {
+    const variants = Array.from({ length: MAX_CLIENT_VARIANTS }, (_, index) => `variant-${index}`);
+    expect(ClientCustomRouterEntrySchema.safeParse(client({ variants })).success).toBe(true);
+    expect(
+      ClientCustomRouterEntrySchema.safeParse(client({ variants: [...variants, 'extra'] })).success
+    ).toBe(false);
+    expect(
+      ClientCustomRouterEntrySchema.safeParse(
+        client({ variants: ['v'.repeat(MAX_CLIENT_VARIANT_LENGTH + 1)] })
+      ).success
+    ).toBe(false);
+
+    const modalities = Array.from(
+      { length: MAX_CLIENT_INPUT_MODALITIES },
+      (_, index) => `modality-${index}`
+    );
+    expect(
+      ClientCustomRouterEntrySchema.safeParse(
+        client({ capabilities: { ...clientEntry.capabilities, inputModalities: modalities } })
+      ).success
+    ).toBe(true);
+    expect(
+      ClientCustomRouterEntrySchema.safeParse(
+        client({
+          capabilities: {
+            ...clientEntry.capabilities,
+            inputModalities: [...modalities, 'extra'],
+          },
+        })
+      ).success
+    ).toBe(false);
+    expect(
+      ClientCustomRouterEntrySchema.safeParse(
+        client({
+          capabilities: {
+            ...clientEntry.capabilities,
+            inputModalities: ['m'.repeat(MAX_CLIENT_INPUT_MODALITY_LENGTH + 1)],
+          },
+        })
+      ).success
+    ).toBe(false);
+  });
+
+  it('requires finite, bounded context lengths and prices', () => {
+    const withCapabilities = (capabilities: Record<string, unknown>) =>
+      ClientCustomRouterEntrySchema.safeParse(
+        client({ capabilities: { ...clientEntry.capabilities, ...capabilities } })
+      ).success;
+    const withPricing = (pricing: null | Record<string, unknown>) =>
+      ClientCustomRouterEntrySchema.safeParse(client({ pricing })).success;
+
+    expect(withCapabilities({ contextLength: null })).toBe(true);
+    expect(withCapabilities({ contextLength: MAX_CLIENT_CONTEXT_LENGTH + 1 })).toBe(false);
+    expect(withCapabilities({ contextLength: Number.POSITIVE_INFINITY })).toBe(false);
+    expect(withPricing(null)).toBe(true);
+    expect(withPricing({ inputPerMTokUsd: 0, outputPerMTokUsd: 0 })).toBe(true);
+    expect(
+      withPricing({
+        inputPerMTokUsd: MAX_CLIENT_PRICE_PER_MTOK_USD + 1,
+        outputPerMTokUsd: 0,
+      })
+    ).toBe(false);
+    expect(withPricing({ inputPerMTokUsd: Number.POSITIVE_INFINITY, outputPerMTokUsd: 0 })).toBe(
+      false
+    );
+    expect(withPricing({ inputPerMTokUsd: 0, outputPerMTokUsd: Number.NaN })).toBe(false);
+  });
+
+  it('bounds the default entry key and accepts a maximal realistic pool', () => {
+    const entries = Array.from({ length: 20 }, (_, index) =>
+      client({ model: `${'m'.repeat(MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH - 4)}${index}` })
+    );
+    expect(CustomRouterEntriesSchema.safeParse(entries).success).toBe(true);
+    expect(
+      CustomRouterDefinitionSchema.safeParse({
+        ...definition,
+        entries: [gatewayEntry],
+        defaultEntryKey: `gateway:${'a'.repeat(MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGTH)}`,
+      }).success
+    ).toBe(false);
   });
 });
 

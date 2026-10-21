@@ -95,15 +95,18 @@ The benchmark worker stays the only writer of measurements and routing tables.
 - Platform-paid admission is limited to 20 new models per base router per owner per rolling 24
   hours. Ready and pending models do not count. A save over the limit gets `quota_exceeded`
   (HTTP 429) with `retryAt`, and every other validation runs before admission.
-  Web saves fetch the catalog before locking, then serialize final validation, admission, and
-  the write with the owner's PostgreSQL advisory lock. Updates validate and admit the merged,
-  locked definition; deletes and client-entry edits use the same lock. All registration batches
-  share a ten-second HTTP deadline, including response-body reads. A batch that fails in transit
-  or gets a worker 5xx before the deadline is retried once.
+  Web saves fetch the catalog and admit benchmarks before locking, so the owner's PostgreSQL
+  advisory lock covers only the final validation and the write: a queued save never holds a
+  pooled connection across an outbound benchmark request. Admission runs at most one in-flight
+  request per owner. Updates admit the merged definition computed from a pre-lock read; if a
+  concurrent save changes the base router or pool before the lock is taken, the locked definition
+  is admitted again under the lock. Deletes and client-entry edits use the same lock without
+  admission. All registration batches share a ten-second HTTP deadline, including response-body
+  reads. A batch that fails in transit or gets a worker 5xx before the deadline is retried once.
   PostgreSQL and worker D1 do not share a transaction: an ambiguous HTTP failure, a later batch
-  rejection, or a database commit failure can leave already-admitted profiles and quota charges.
-  There is no refund API. Re-registering current pending, running, or ready profiles is
-  idempotent, but cannot undo those charges.
+  rejection, a database commit failure, or a save that loses a concurrent race can leave
+  already-admitted profiles and quota charges. There is no refund API. Re-registering current
+  pending, running, or ready profiles is idempotent, but cannot undo those charges.
 - The frontier base gets an owner queue, as the efficient base has today.
 - Client profiles are keyed by (owner, base router, entry key, variant, engine identity,
   repetitions). They are never shared with another owner or promoted to the platform.

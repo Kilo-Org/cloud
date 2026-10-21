@@ -12,6 +12,20 @@ export const MAX_CUSTOM_ROUTER_ENTRIES = 20;
 export const MAX_CUSTOM_ROUTER_NAME_LENGTH = 100;
 export const CUSTOM_ROUTER_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 
+// Entry fields are client-supplied and stored verbatim, so each one carries an explicit bound.
+// Every limit sits far above the real catalogs: gateway and CLI provider/model IDs are well under
+// half of them, real context windows stay under 2M tokens, and real prices under $1k per MTok.
+export const MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH = 200;
+export const MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH = 100;
+export const MAX_CLIENT_VARIANTS = 20;
+export const MAX_CLIENT_VARIANT_LENGTH = 100;
+export const MAX_CLIENT_INPUT_MODALITIES = 10;
+export const MAX_CLIENT_INPUT_MODALITY_LENGTH = 50;
+export const MAX_CLIENT_CONTEXT_LENGTH = 10_000_000;
+export const MAX_CLIENT_PRICE_PER_MTOK_USD = 1_000_000;
+// `gateway:<model>` or `client:<provider>/<model>` at the bounds above.
+export const MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGTH = 320;
+
 export const CustomRouterScopeSchema = z.enum(['user', 'org']);
 export type CustomRouterScope = z.infer<typeof CustomRouterScopeSchema>;
 
@@ -53,13 +67,14 @@ function addReservedSlugIssue(scope: CustomRouterScope, slug: string, ctx: z.Ref
   }
 }
 
-const ModelIdSchema = z.string().trim().min(1);
+const ModelIdSchema = z.string().trim().min(1).max(MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH);
 export const CLIENT_CANDIDATE_PREFIX = 'client:';
 // Provider IDs must not contain '/': the entry key splits at the first '/'.
 const ClientProviderIdSchema = z
   .string()
   .trim()
   .min(1)
+  .max(MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH)
   .refine(provider => !provider.includes('/'), 'Provider ID must not contain /');
 
 export const GatewayCustomRouterEntrySchema = z.object({
@@ -73,17 +88,24 @@ export const GatewayCustomRouterEntrySchema = z.object({
 export type GatewayCustomRouterEntry = z.infer<typeof GatewayCustomRouterEntrySchema>;
 
 export const ClientModelCapabilitiesSchema = z.object({
-  contextLength: z.number().int().positive().nullable(),
-  inputModalities: z.array(z.string().trim().min(1)),
+  contextLength: z.number().int().positive().max(MAX_CLIENT_CONTEXT_LENGTH).nullable(),
+  inputModalities: z
+    .array(z.string().trim().min(1).max(MAX_CLIENT_INPUT_MODALITY_LENGTH))
+    .max(MAX_CLIENT_INPUT_MODALITIES),
   toolCall: z.boolean(),
   reasoning: z.boolean(),
 });
 export type ClientModelCapabilities = z.infer<typeof ClientModelCapabilitiesSchema>;
 
 export const ClientModelPricingSchema = z.object({
-  inputPerMTokUsd: z.number().nonnegative(),
-  outputPerMTokUsd: z.number().nonnegative(),
-  cacheReadPerMTokUsd: z.number().nonnegative().optional(),
+  inputPerMTokUsd: z.number().finite().nonnegative().max(MAX_CLIENT_PRICE_PER_MTOK_USD),
+  outputPerMTokUsd: z.number().finite().nonnegative().max(MAX_CLIENT_PRICE_PER_MTOK_USD),
+  cacheReadPerMTokUsd: z
+    .number()
+    .finite()
+    .nonnegative()
+    .max(MAX_CLIENT_PRICE_PER_MTOK_USD)
+    .optional(),
 });
 export type ClientModelPricing = z.infer<typeof ClientModelPricingSchema>;
 
@@ -93,7 +115,8 @@ export const ClientCustomRouterEntrySchema = z.object({
   model: ModelIdSchema,
   // Empty means the model has one null variant.
   variants: z
-    .array(z.string().trim().min(1))
+    .array(z.string().trim().min(1).max(MAX_CLIENT_VARIANT_LENGTH))
+    .max(MAX_CLIENT_VARIANTS)
     .refine(variants => new Set(variants).size === variants.length, 'Variants must be unique'),
   capabilities: ClientModelCapabilitiesSchema,
   // Null means the model costs $0.
@@ -183,7 +206,7 @@ function addDefaultEntryIssue(
 }
 
 const CustomRouterNameSchema = z.string().trim().min(1).max(MAX_CUSTOM_ROUTER_NAME_LENGTH);
-const EntryKeySchema = z.string().min(1);
+const EntryKeySchema = z.string().min(1).max(MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGTH);
 
 export const CustomRouterDefinitionSchema = z
   .object({

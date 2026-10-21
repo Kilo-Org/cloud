@@ -83,6 +83,7 @@
         "src/plugins/remote-mcp/remote-mcp.test.ts",
         "src/plugins/remote-mcp/remote-mcp-fixture.ts",
         "src/plugins/remote-mcp/remote-mcp-oauth-fixture.ts",
+        "src/plugins/remote-mcp/app.ts",
         "src/plugins/conformance.test.ts",
         "src/core/resume-fixture.ts",
         "src/core/image.test.ts"

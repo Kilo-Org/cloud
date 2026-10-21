@@ -261,7 +261,10 @@ const chartApp: Tools = {
       _meta: { ui: { resourceUri: 'ui://work/chart.html' } },
     },
   ],
-  call: () => ({ content: [{ type: 'text', text: 'chart drawn' }] }),
+  call: () => ({
+    content: [{ type: 'text', text: 'chart drawn' }],
+    structuredContent: { points: 3 },
+  }),
   read: uri =>
     uri === 'ui://work/chart.html'
       ? {

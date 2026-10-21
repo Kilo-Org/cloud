@@ -2583,6 +2583,12 @@ describe('createSessionWithLedger admission ladder', () => {
 
     await expect(runCreate(ctx)).rejects.toThrow('routing failed');
 
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'sandbox_identity', code: 'sandbox_id_derivation_failed' },
+      }),
+      expect.any(Object)
+    );
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
@@ -2594,6 +2600,44 @@ describe('createSessionWithLedger admission ladder', () => {
     expect(settleOptions(0)?.outboxEvent).toMatchObject({
       properties: { outcome: 'failed', admission: 'new', failure_stage: 'sandbox' },
     });
+  });
+
+  it('rethrows the primary sandbox error when the telemetry failure record fails', async () => {
+    selectControlPlaneSandboxMock.mockRejectedValueOnce(new Error('routing failed'));
+    recordSessionFailureMock.mockRejectedValueOnce(new Error('telemetry down'));
+    const ctx = makeContext(makeDoStub());
+
+    await expect(runCreate(ctx)).rejects.toThrow('routing failed');
+
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ rowId: ROW_ID, status: 'failed', outcomeCode: 'sandbox' })
+    );
+  });
+
+  it('settles failed with the allocation stage when the session report write fails', async () => {
+    createSessionReportMock.mockRejectedValueOnce(new Error('report store unavailable'));
+    const ctx = makeContext(makeDoStub());
+
+    await expect(runCreate(ctx)).rejects.toThrow('report store unavailable');
+
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ rowId: ROW_ID, status: 'failed', outcomeCode: 'report' })
+    );
+  });
+
+  it('settles failed with the sandbox stage when the sandbox identity write fails', async () => {
+    recordSandboxIdentityMock.mockRejectedValueOnce(new Error('identity write failed'));
+    const ctx = makeContext(makeDoStub());
+
+    await expect(runCreate(ctx)).rejects.toThrow('identity write failed');
+
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ rowId: ROW_ID, status: 'failed', outcomeCode: 'sandbox' })
+    );
   });
 
   it('settles failed with the ownership_row stage when the ownership write fails', async () => {
@@ -2646,6 +2690,12 @@ describe('createSessionWithLedger admission ladder', () => {
         onlyIfEmpty: true,
       })
     );
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'registration', code: 'do_registration_rejected' },
+      }),
+      expect.any(Object)
+    );
   });
 
   it('settles failed with the initial_admission stage when admission is rejected', async () => {
@@ -2686,6 +2736,12 @@ describe('createSessionWithLedger admission ladder', () => {
       rowId: ROW_ID,
     });
     expect(settleOperationMock).not.toHaveBeenCalled();
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+      }),
+      expect.any(Object)
+    );
   });
 
   it('surfaces a typed retryable internal error when the completed settle fails after a successful DO registration', async () => {
@@ -3584,7 +3640,6 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
 
 describe('createSessionWithLedger worktree and ownership reconciliation', () => {
   const sandboxId = 'ses-0123456789abcdef';
-  const sharedSandboxId = 'usr-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -4060,24 +4115,16 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       label: 'isolated Vercel sandbox',
       storedSandboxId: 'ses-fedcba9876543210',
       provider: 'vercel' as const,
-      route: undefined,
-    },
-    {
-      label: 'shared Cloudflare sandbox route',
-      storedSandboxId: sharedSandboxId,
-      provider: 'cloudflare' as const,
-      route: { kind: 'shared' as const, routeKey: sharedSandboxId },
     },
     {
       label: 'placed Cloudflare sandbox',
       storedSandboxId: PLACED_SANDBOX_ID,
       provider: 'cloudflare' as const,
-      route: undefined,
       sandboxKind: 'shared' as const,
     },
   ])(
     'restores the recorded $label without recomputing routing',
-    async ({ storedSandboxId, provider, route, sandboxKind }) => {
+    async ({ storedSandboxId, provider, sandboxKind }) => {
       const input = request();
       const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
       const ctx = context(doStub);
@@ -4098,7 +4145,6 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
           canonical_result: await canonicalProgress(input, {
             sandboxId: storedSandboxId,
             sandboxProvider: provider,
-            ...(route ? { sandboxRoute: route } : {}),
             ...(sandboxKind ? { sandboxKind } : {}),
           }),
         }),
@@ -4117,7 +4163,6 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
             sandboxId: storedSandboxId,
             sandboxProvider: provider,
             worktreeId: WORKTREE_ID,
-            ...(route ? { sandboxRoute: route } : {}),
           }),
         })
       );

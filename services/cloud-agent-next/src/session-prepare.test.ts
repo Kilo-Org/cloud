@@ -51,6 +51,12 @@ vi.mock('./db/pg.js', () => ({
   })),
 }));
 
+vi.mock('./telemetry/session-reports.js', () => ({
+  createCloudAgentSessionReport: vi.fn().mockResolvedValue(undefined),
+  recordCloudAgentSandboxIdentity: vi.fn().mockResolvedValue(undefined),
+  recordCloudAgentSessionFailure: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('./utils/kilo-session-id.js', () => ({
   generateKiloSessionId: vi.fn(() => 'cli-session-abc123'),
 }));

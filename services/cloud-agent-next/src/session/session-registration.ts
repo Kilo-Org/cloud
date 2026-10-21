@@ -41,6 +41,7 @@ import type { OperationLedgerRow } from '@kilocode/db/schema';
 import {
   cloudAgentWorktreeIdSchema,
   type CloudAgentWorktreeId,
+  type CreateSessionForCloudAgentParams,
   type CreateSessionForCloudAgentResult,
 } from '@kilocode/session-ingest-contracts';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
@@ -70,7 +71,7 @@ import {
 } from './control-plane-session-input.js';
 import type { GroupedRegisterSessionInput } from './session-registration-metadata.js';
 import { getPgDb } from '../db/pg.js';
-import { generateSessionId } from '../session-identity.js';
+import { generateSessionId, isControlSession } from '../session-identity.js';
 import { getWorktreeWorkspacePath } from '../workspace.js';
 import {
   cloudflareSandboxSmallNativeReplacement,
@@ -88,6 +89,11 @@ import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import { initialAdmissionFailure } from './admission-failure.js';
+import {
+  createCloudAgentSessionReport,
+  recordCloudAgentSandboxIdentity,
+  recordCloudAgentSessionFailure,
+} from '../telemetry/session-reports.js';
 import { createMessageId } from './message-id.js';
 import { isPolicyBearingAuthToken } from './policy-bearing-token.js';
 import type { MessageResultRPCResponse } from './message-result.js';
@@ -106,10 +112,6 @@ import type { SessionCreateRequest, SessionRepositoryRequest } from './session-r
 import { egressAllowlistSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 
 export type SessionRegistrationInput = SessionCreateRequest;
-
-type SharedSandboxRouteMetadata = NonNullable<
-  NonNullable<SessionMetadata['workspace']>['sandboxRoute']
->;
 
 function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
@@ -139,16 +141,11 @@ function assertSupportedSandboxAllocation(
 
 function assertEgressPolicyAllocation(
   input: SessionRegistrationInput,
-  allocation: Pick<
-    SessionRegistrationResult,
-    'cloudAgentSessionId' | 'sandboxProvider' | 'sandboxRoute' | 'sandboxKind'
-  >
+  allocation: Pick<SessionRegistrationResult, 'sandboxProvider' | 'sandboxKind'>
 ): void {
   if (input.runtime?.egressMode !== 'allowlist') return;
   if (
-    !allocation.cloudAgentSessionId.startsWith('workspace_') ||
     allocation.sandboxProvider !== 'cloudflare-containers' ||
-    allocation.sandboxRoute !== undefined ||
     allocation.sandboxKind === 'shared'
   ) {
     throw new TRPCError({
@@ -170,7 +167,6 @@ export type SessionRegistrationResult = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
   sandboxId: SandboxId;
-  sandboxRoute?: SharedSandboxRouteMetadata;
   sandboxKind?: SandboxKind;
   sandboxProvider: SandboxSelection['provider'];
   worktreeId?: CloudAgentWorktreeId;
@@ -361,7 +357,7 @@ function creationInProgressError(): TRPCError {
  * takeover must reject them before any DO or ingest write.
  */
 function assertStoredControlPlaneSessionId(sessionId: unknown): asserts sessionId is string {
-  if (typeof sessionId !== 'string' || !sessionId.startsWith('workspace_')) {
+  if (typeof sessionId !== 'string' || !isControlSession(sessionId)) {
     throw creationInProgressError();
   }
 }
@@ -471,6 +467,33 @@ function sessionCreateSettledOutboxEvent(params: {
   };
 }
 
+async function createIngestOwnershipRow(
+  env: Env,
+  params: CreateSessionForCloudAgentParams
+): Promise<CreateSessionForCloudAgentResult | undefined> {
+  try {
+    return await env.SESSION_INGEST.createSessionForCloudAgent(params);
+  } catch (error) {
+    logger
+      .withFields({
+        kiloSessionId: params.sessionId,
+        cloudAgentSessionId: params.cloudAgentSessionId,
+        kiloUserId: params.kiloUserId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      .error('session-ingest RPC createSessionForCloudAgent failed');
+    throw error;
+  }
+}
+
+async function recordPostSetupFailure(record: () => Promise<void>): Promise<void> {
+  try {
+    await record();
+  } catch {
+    logger.warn('Failed to record Cloud Agent setup failure after Durable Object outcome');
+  }
+}
+
 /**
  * Canonical repository URL for the session-ingest ownership row. GitHub builds
  * the URL from the `owner/repo` slug; every other provider already carries a
@@ -537,7 +560,7 @@ function worktreeEnabledForCreate(
     return false;
   }
   const recordedIds = canonicalSessionIds(row);
-  if (recordedIds) return recordedIds.cloudAgentSessionId.startsWith('workspace_');
+  if (recordedIds) return isControlSession(recordedIds.cloudAgentSessionId);
 
   return true;
 }
@@ -577,7 +600,7 @@ async function issueSessionRuntimeAuthorization(
   const orgId = input.options?.kilocodeOrganizationId;
   let runtimeAuthorization: NewSessionAllocation['runtimeAuthorization'];
   if (isPolicyBearingAuthToken(ctx.authToken)) {
-    if (cloudAgentSessionId.startsWith('workspace_')) assertRuntimeIsolationAdmission(ctx.env);
+    assertRuntimeIsolationAdmission(ctx.env);
     const secret = ctx.env.NEXTAUTH_SECRET;
     const nextAuthSecret = typeof secret === 'string' ? secret : await secret.get();
     if (!nextAuthSecret)
@@ -705,6 +728,17 @@ async function allocateNewSession(
         ...(isSelectableSandboxAllocation(sandboxAllocation) ? { sandboxAllocation } : {}),
       });
     }
+
+    if (initialTurn) {
+      await createCloudAgentSessionReport(
+        {
+          cloudAgentSessionId,
+          kiloSessionId,
+          initialMessageId: initialTurn.messageId,
+        },
+        ctx.env
+      );
+    }
   } catch (error) {
     rethrowAllocationFailure(ledger, 'report', error);
   }
@@ -727,16 +761,26 @@ async function allocateNewSession(
     sandboxKind = decision.sandboxKind;
     sandboxProvider = decision.provider;
   } catch (error) {
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        {
+          cloudAgentSessionId,
+          failure: { stage: 'sandbox_identity', code: 'sandbox_id_derivation_failed' },
+        },
+        ctx.env
+      )
+    );
     rethrowAllocationFailure(ledger, 'sandbox', error);
   }
 
   try {
-    assertEgressPolicyAllocation(input, {
-      cloudAgentSessionId,
-      sandboxProvider,
-      sandboxRoute: undefined,
-      sandboxKind,
-    });
+    await recordCloudAgentSandboxIdentity({ cloudAgentSessionId, sandboxId }, ctx.env);
+  } catch (error) {
+    rethrowAllocationFailure(ledger, 'sandbox', error);
+  }
+
+  try {
+    assertEgressPolicyAllocation(input, { sandboxProvider, sandboxKind });
   } catch (error) {
     rethrowAllocationFailure(ledger, 'sandbox', error);
   }
@@ -771,7 +815,7 @@ async function allocateNewSession(
   const cloneFromKiloSessionId = input.clone?.cloneFromKiloSessionId;
   let ingestResult: CreateSessionForCloudAgentResult | undefined;
   try {
-    ingestResult = await ctx.env.SESSION_INGEST.createSessionForCloudAgent({
+    ingestResult = await createIngestOwnershipRow(ctx.env, {
       sessionId: kiloSessionId,
       kiloUserId: ctx.userId,
       cloudAgentSessionId,
@@ -790,6 +834,15 @@ async function allocateNewSession(
         : {}),
     });
   } catch (error) {
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        {
+          cloudAgentSessionId,
+          failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+        },
+        ctx.env
+      )
+    );
     if (worktreeId && ledger) {
       await ledger.onTransportFailure();
       throw error;
@@ -898,7 +951,6 @@ function rebuildRecordedSessionAllocation(
   const initialMessageId = canonical.initialMessageId;
   const sandboxId = canonical.sandboxId;
   const sandboxProvider = canonical.sandboxProvider;
-  const sandboxRoute = canonical.sandboxRoute;
   // A legacy prefixed key recorded no kind; a placed key never rebuilds without one.
   const recordedKind = sandboxKindSchema.optional().safeParse(canonical.sandboxKind);
   if (
@@ -912,10 +964,7 @@ function rebuildRecordedSessionAllocation(
   const requestedChoice = requestedSandboxAllocation(input);
   const requested = isSelectableSandboxAllocation(requestedChoice) ? requestedChoice : undefined;
   const recorded = sandboxAllocationSchema.optional().safeParse(canonical.sandboxAllocation);
-  const replacement =
-    typeof cloudAgentSessionId === 'string'
-      ? sandboxSmallReplacementForSession(input, ctx, cloudAgentSessionId, options)
-      : undefined;
+  const replacement = sandboxSmallReplacementForSession(input, ctx, cloudAgentSessionId, options);
   if (
     !recorded.success ||
     !recordedSandboxAllocationMatchesRequest(recorded.data, requested, replacement)
@@ -934,7 +983,6 @@ function rebuildRecordedSessionAllocation(
       workspace: {
         sandboxId,
         sandboxProvider,
-        sandboxRoute,
         sandboxKind,
         sandboxAllocation: recorded.data,
       },
@@ -957,9 +1005,6 @@ function rebuildRecordedSessionAllocation(
 
   let worktreeId: CloudAgentWorktreeId | undefined;
   if (worktreeCreate) {
-    if (!cloudAgentSessionId.startsWith('workspace_')) {
-      throw creationInProgressError();
-    }
     const parsed = cloudAgentWorktreeIdSchema.safeParse(
       `worktree_${cloudAgentSessionId.slice('workspace_'.length)}`
     );
@@ -967,19 +1012,6 @@ function rebuildRecordedSessionAllocation(
       throw creationInProgressError();
     }
     worktreeId = parsed.data;
-  }
-
-  let route: SharedSandboxRouteMetadata | undefined;
-  if (sandboxRoute !== undefined) {
-    if (
-      typeof sandboxRoute !== 'object' ||
-      sandboxRoute === null ||
-      (sandboxRoute as Record<string, unknown>).kind !== 'shared' ||
-      typeof (sandboxRoute as Record<string, unknown>).routeKey !== 'string'
-    ) {
-      throw creationInProgressError();
-    }
-    route = sandboxRoute as SharedSandboxRouteMetadata;
   }
 
   let initialTurn: AcceptedExecutionTurn | undefined;
@@ -991,19 +1023,13 @@ function rebuildRecordedSessionAllocation(
     initialTurn = { ...accepted, messageId: initialMessageId };
   }
 
-  assertEgressPolicyAllocation(input, {
-    cloudAgentSessionId,
-    sandboxProvider: recordedProvider.data,
-    sandboxRoute: route,
-    sandboxKind,
-  });
+  assertEgressPolicyAllocation(input, { sandboxProvider: recordedProvider.data, sandboxKind });
   const cloneFromKiloSessionId = input.clone?.cloneFromKiloSessionId;
 
   return {
     cloudAgentSessionId,
     kiloSessionId,
     sandboxId: sandboxId as SandboxId,
-    sandboxRoute: route,
     ...(sandboxKind ? { sandboxKind } : {}),
     sandboxProvider: recordedProvider.data,
     ...(worktreeId ? { worktreeId } : {}),
@@ -1095,7 +1121,6 @@ function buildSessionRegistrationCommand(
             ),
           }
         : {}),
-      ...(allocation.sandboxRoute ? { sandboxRoute: allocation.sandboxRoute } : {}),
       ...(allocation.sandboxKind ? { sandboxKind: allocation.sandboxKind } : {}),
       credentialContainment: allocation.credentialContainment,
       ...(allocation.sandboxAllocation
@@ -1150,13 +1175,34 @@ export async function registerNewSession(
   assertSupportedSandboxAllocation(rawInput, options);
   const input = rawInput;
   const allocation = await allocateNewSession(input, ctx, options);
-  const registerResult = await registerControlPlaneSession(
-    buildSessionRegistrationCommand(input, ctx, allocation, options),
-    ctx,
-    allocation
-  );
+  let registerResult: { success: boolean; error?: string };
+  try {
+    registerResult = await registerControlPlaneSession(
+      buildSessionRegistrationCommand(input, ctx, allocation, options),
+      ctx,
+      allocation
+    );
+  } catch (error) {
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        {
+          cloudAgentSessionId: allocation.cloudAgentSessionId,
+          failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+        },
+        ctx.env
+      )
+    );
+    throw error;
+  }
 
   if (!registerResult.success) {
+    const failure = { stage: 'registration', code: 'do_registration_rejected' } as const;
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        { cloudAgentSessionId: allocation.cloudAgentSessionId, failure },
+        ctx.env
+      )
+    );
     await allocation.rollbackCliSession();
     logger.withFields({ error: registerResult.error }).error('Failed to register session in DO');
     throw new TRPCError({
@@ -1246,6 +1292,15 @@ async function registerAndAdmitInitialTurn(
       initialTurn
     );
   } catch (error) {
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        {
+          cloudAgentSessionId: allocation.cloudAgentSessionId,
+          failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+        },
+        ctx.env
+      )
+    );
     if (ledger) {
       await ledger.onTransportFailure();
     }
@@ -1257,6 +1312,12 @@ async function registerAndAdmitInitialTurn(
       admission.failureBoundary === 'registration'
         ? ({ stage: 'registration', code: 'do_registration_rejected' } as const)
         : initialAdmissionFailure(admission);
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        { cloudAgentSessionId: allocation.cloudAgentSessionId, failure },
+        ctx.env
+      )
+    );
     await allocation.rollbackCliSession();
     logger
       .withFields({ error: admission.error, resultCode: admission.code })
@@ -1328,6 +1389,15 @@ async function registerAllocatedSession(
   try {
     registerResult = await registerControlPlaneSession(command, ctx, allocation);
   } catch (error) {
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        {
+          cloudAgentSessionId: allocation.cloudAgentSessionId,
+          failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+        },
+        ctx.env
+      )
+    );
     if (ledger) {
       await ledger.onTransportFailure();
     }
@@ -1336,6 +1406,12 @@ async function registerAllocatedSession(
 
   if (!registerResult.success && registerResult.error !== 'Session already registered') {
     const failure = { stage: 'registration', code: 'do_registration_rejected' } as const;
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        { cloudAgentSessionId: allocation.cloudAgentSessionId, failure },
+        ctx.env
+      )
+    );
     await allocation.rollbackCliSession();
     logger.withFields({ error: registerResult.error }).error('Failed to register session in DO');
     if (ledger) {
@@ -2037,7 +2113,7 @@ async function resumeCloneCreate(
 
   let ingestResult: CreateSessionForCloudAgentResult | undefined;
   try {
-    ingestResult = await ctx.env.SESSION_INGEST.createSessionForCloudAgent({
+    ingestResult = await createIngestOwnershipRow(ctx.env, {
       sessionId: ids.kiloSessionId,
       kiloUserId: ctx.userId,
       cloudAgentSessionId: ids.cloudAgentSessionId,
@@ -2052,6 +2128,15 @@ async function resumeCloneCreate(
         : {}),
     });
   } catch (error) {
+    await recordPostSetupFailure(() =>
+      recordCloudAgentSessionFailure(
+        {
+          cloudAgentSessionId: ids.cloudAgentSessionId,
+          failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+        },
+        ctx.env
+      )
+    );
     await hooks.onTransportFailure();
     throw error;
   }
@@ -2130,7 +2215,7 @@ async function resumeFirstWorktreeCreate(
   if (!ownershipExists) {
     let ingestResult: CreateSessionForCloudAgentResult | undefined;
     try {
-      ingestResult = await ctx.env.SESSION_INGEST.createSessionForCloudAgent({
+      ingestResult = await createIngestOwnershipRow(ctx.env, {
         sessionId: allocation.kiloSessionId,
         kiloUserId: ctx.userId,
         cloudAgentSessionId: allocation.cloudAgentSessionId,
@@ -2146,6 +2231,15 @@ async function resumeFirstWorktreeCreate(
         },
       });
     } catch (error) {
+      await recordPostSetupFailure(() =>
+        recordCloudAgentSessionFailure(
+          {
+            cloudAgentSessionId: allocation.cloudAgentSessionId,
+            failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+          },
+          ctx.env
+        )
+      );
       await hooks.onTransportFailure();
       throw error;
     }

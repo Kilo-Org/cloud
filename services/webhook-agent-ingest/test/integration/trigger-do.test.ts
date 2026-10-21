@@ -29,6 +29,109 @@ describe('TriggerDO', () => {
   const testOrgNamespace = `org/${testOrgId}`;
 
   describe('configure', () => {
+    it.each(['webhook', 'scheduled'] as const)(
+      'persists immutable creator identity in SQLite, responses and KV for %s triggers',
+      async activationMode => {
+        const triggerId = `creator-${activationMode}`;
+        const stub = env.TRIGGER_DO.get(
+          env.TRIGGER_DO.idFromName(`${testOrgNamespace}/${triggerId}`)
+        );
+        const input = {
+          executionUserId: 'oauth/creator',
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'model-1',
+          promptTemplate: 'Process {{body}}',
+          activationMode,
+          ...(activationMode === 'webhook'
+            ? { webhookAuth: { header: 'x-secret', secret: 'secret' } }
+            : { cronExpression: '* * * * *' }),
+        };
+        await stub.configure(testOrgNamespace, triggerId, input);
+        await stub.updateConfig({ promptTemplate: 'Updated {{body}}' });
+        expect((await stub.getConfigForResponse())?.executionUserId).toBe('oauth/creator');
+        await runInDurableObject(stub, async (instance, state) => {
+          const cached = await state.storage.get<{ executionUserId?: string }>('config');
+          expect(cached?.executionUserId).toBe('oauth/creator');
+          expect(
+            drizzle(state.storage)
+              .select({ executionUserId: triggerConfig.execution_user_id })
+              .from(triggerConfig)
+              .get()?.executionUserId
+          ).toBe('oauth/creator');
+          await state.storage.delete('config');
+          expect((await instance.getConfig())?.executionUserId).toBe('oauth/creator');
+          await expect(
+            instance.configure(testOrgNamespace, triggerId, {
+              ...input,
+              executionUserId: 'other-user',
+            })
+          ).rejects.toThrow('immutable');
+          await expect(
+            instance.configure(testOrgNamespace, triggerId, {
+              ...input,
+              executionUserId: undefined,
+            })
+          ).rejects.toThrow('immutable');
+          if (activationMode === 'webhook') {
+            await expect(instance.updateConfig({ webhookAuth: { secret: null } })).rejects.toThrow(
+              'Webhook auth is required'
+            );
+          }
+        });
+        expect((await stub.getConfig())?.executionUserId).toBe('oauth/creator');
+      }
+    );
+
+    it('defaults legacy identities to null and prevents opting into creator mode after creation', async () => {
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testOrgNamespace}/legacy-execution`)
+      );
+      const input = {
+        githubRepo: 'owner/repo',
+        promptTemplate: 'test',
+        webhookAuth: { header: 'x-secret', secret: 'secret' },
+      };
+      await stub.configure(testOrgNamespace, 'legacy-execution', input);
+      expect((await stub.getConfig())?.executionUserId).toBeNull();
+      await runInDurableObject(stub, async instance => {
+        await expect(
+          instance.configure(testOrgNamespace, 'legacy-execution', {
+            ...input,
+            executionUserId: 'creator',
+          })
+        ).rejects.toThrow('immutable');
+      });
+    });
+
+    it('rejects personal, KiloClaw and unauthenticated creator configs without writes', async () => {
+      const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('invalid-creator'));
+      await runInDurableObject(stub, async (instance, state) => {
+        const input = {
+          executionUserId: 'creator',
+          promptTemplate: 'test',
+          webhookAuth: { header: 'x-secret', secret: 'secret' },
+        };
+        await expect(
+          instance.configure(testUserNamespace, 'invalid-creator', input)
+        ).rejects.toThrow('only supported for organization');
+        await expect(
+          instance.configure(testOrgNamespace, 'invalid-creator', {
+            ...input,
+            targetType: 'kiloclaw_chat',
+          })
+        ).rejects.toThrow('only supported for organization');
+        await expect(
+          instance.configure(testOrgNamespace, 'invalid-creator', {
+            ...input,
+            webhookAuth: undefined,
+          })
+        ).rejects.toThrow('Webhook auth is required');
+        expect(await instance.getConfig()).toBeNull();
+        expect(await state.storage.get('config')).toBeUndefined();
+      });
+    });
+
     it.each([
       ['webhook', undefined],
       ['scheduled', '* * * * *'],

@@ -179,6 +179,7 @@ type RouteContext = Context<HonoContext>;
 export const TriggerConfigInput = z
   .object({
     targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
+    executionUserId: z.string().min(1).optional(),
     kiloclawInstanceId: z.string().uuid().optional(),
     githubRepo: z.string().trim().min(1, 'githubRepo is required').optional(),
     mode: z.string().trim().min(1, 'mode is required').optional(),
@@ -204,6 +205,22 @@ export const TriggerConfigInput = z
     cronTimezone: z.string().max(50).optional().default('UTC'),
   })
   .superRefine((data, ctx) => {
+    if (data.executionUserId !== undefined) {
+      if (data.targetType !== 'cloud_agent') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'executionUserId is only supported for Cloud Agent triggers',
+          path: ['executionUserId'],
+        });
+      }
+      if (data.activationMode !== 'scheduled' && !data.webhookAuth) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Webhook auth is required for creator execution',
+          path: ['webhookAuth'],
+        });
+      }
+    }
     if (data.activationMode === 'scheduled') {
       if (!data.cronExpression) {
         ctx.addIssue({
@@ -291,6 +308,7 @@ export const TriggerConfigInput = z
 // immutable after creation. To change target type or instance, delete and recreate.
 export const TriggerConfigUpdateInput = z
   .object({
+    executionUserId: z.never().optional(),
     mode: z.string().trim().min(1).optional(),
     model: z.string().trim().min(1).optional(),
     variant: z
@@ -361,6 +379,9 @@ async function handleCreateTrigger(
   }
 
   const config = parsedConfig.data;
+  if (config.executionUserId !== undefined && !namespace.startsWith('org/')) {
+    return c.json(resError('executionUserId is only supported for organization triggers'), 400);
+  }
 
   try {
     const result = await withDORetry(
@@ -393,8 +414,11 @@ async function handleCreateTrigger(
       201
     );
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith('Webhook auth')) {
-      logger.warn('Failed to create trigger due to invalid webhook auth', {
+    if (
+      error instanceof Error &&
+      (error.message.startsWith('Webhook auth') || error.message.startsWith('Execution user'))
+    ) {
+      logger.warn('Failed to create trigger due to invalid configuration', {
         namespace,
         triggerId,
         error: error.message,

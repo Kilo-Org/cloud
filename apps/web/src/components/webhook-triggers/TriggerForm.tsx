@@ -45,6 +45,7 @@ import type { AgentMode } from '@/components/cloud-agent/types';
 
 export type TriggerFormData = {
   triggerId: string;
+  runAsCreator?: boolean;
   activationMode: 'webhook' | 'scheduled';
   cronExpression?: string;
   cronTimezone?: string;
@@ -70,6 +71,7 @@ export type TriggerFormProps = {
   organizationId?: string;
   initialData?: {
     triggerId: string;
+    executionUserId?: string | null;
     activationMode?: 'webhook' | 'scheduled';
     cronExpression?: string | null;
     cronTimezone?: string | null;
@@ -133,6 +135,7 @@ export function TriggerForm({
   inboundUrl,
 }: TriggerFormProps) {
   const isEditMode = formMode === 'edit';
+  const [runAsCreator, setRunAsCreator] = useState(!!initialData?.executionUserId);
 
   // Form state
   const [activationMode, setActivationMode] = useState<'webhook' | 'scheduled'>(
@@ -192,6 +195,7 @@ export function TriggerForm({
   // Reset form when initialData changes (for edit mode)
   useEffect(() => {
     if (initialData) {
+      setRunAsCreator(!!initialData.executionUserId);
       setActivationMode(initialData.activationMode ?? 'webhook');
       setCronExpression(initialData.cronExpression ?? '');
       setCronTimezone(initialData.cronTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -210,6 +214,7 @@ export function TriggerForm({
       setWebhookAuthHeader(initialData.webhookAuthHeader ?? '');
     }
     if (!initialData) {
+      setRunAsCreator(false);
       setWebhookAuthEnabled(false);
       setWebhookAuthHeader('');
       setSandboxAllocation('automatic');
@@ -324,6 +329,10 @@ export function TriggerForm({
       errors.push(webhookAuthHeaderError);
     }
 
+    if (runAsCreator && !isScheduled && !webhookAuthEnabled) {
+      errors.push('Webhook authentication is required when running as the creator');
+    }
+
     if (!isScheduled && webhookAuthSecretError) {
       errors.push(webhookAuthSecretError);
     }
@@ -350,6 +359,8 @@ export function TriggerForm({
     profileId,
     webhookAuthHeaderError,
     webhookAuthSecretError,
+    runAsCreator,
+    webhookAuthEnabled,
     sandboxAllocation,
     initialSandboxAllocation,
     isEditMode,
@@ -390,6 +401,7 @@ export function TriggerForm({
 
     return {
       triggerId,
+      runAsCreator: organizationId ? runAsCreator : undefined,
       activationMode,
       cronExpression: isScheduled ? cronExpression.trim() : undefined,
       cronTimezone: isScheduled ? cronTimezone : undefined,
@@ -411,6 +423,8 @@ export function TriggerForm({
     isFormValid,
     profileId,
     triggerId,
+    runAsCreator,
+    organizationId,
     activationMode,
     cronExpression,
     cronTimezone,
@@ -647,7 +661,41 @@ export function TriggerForm({
               )}
             </div>
 
-            {/* Prompt Template */}
+            {organizationId && (
+              <div className="space-y-2">
+                <div className="flex min-h-11 items-center gap-3">
+                  <Checkbox
+                    id="runAsCreator"
+                    checked={runAsCreator}
+                    onCheckedChange={checked => {
+                      setRunAsCreator(checked === true);
+                      if (checked) setWebhookAuthEnabled(true);
+                    }}
+                    disabled={isEditMode || isLoading}
+                    aria-describedby="runAsCreatorHelp"
+                  />
+                  <Label htmlFor="runAsCreator" className="cursor-pointer font-normal">
+                    Run as webhook creator
+                  </Label>
+                </div>
+                <p id="runAsCreatorHelp" className="text-muted-foreground max-w-prose text-xs">
+                  {runAsCreator
+                    ? 'Runs as the user who created this trigger, using organization credits. Only the creator can edit it. Execution stops if they leave the organization or their account is blocked.'
+                    : 'Runs as the organization webhook bot by default.'}
+                  {isEditMode
+                    ? ' Execution identity cannot be changed. Create a new trigger to use a different identity.'
+                    : ' This choice cannot be changed after creation. Creator-run webhooks require authentication.'}
+                </p>
+                {runAsCreator && (
+                  <p className="text-muted-foreground max-w-prose text-xs">
+                    Organization profiles and repository settings remain shared. Members who can
+                    edit them can affect runs under your identity. Enable this only if you trust
+                    those members.
+                  </p>
+                )}
+              </div>
+            )}
+
             <PromptTemplateField
               value={promptTemplate}
               onChange={setPromptTemplate}
@@ -748,7 +796,7 @@ export function TriggerForm({
                           setWebhookAuthSecret('');
                         }
                       }}
-                      disabled={isLoading}
+                      disabled={isLoading || runAsCreator}
                     />
                     <Label htmlFor="webhookAuthEnabled" className="cursor-pointer font-normal">
                       {webhookAuthEnabled ? 'Authentication enabled' : 'Authentication disabled'}

@@ -9,6 +9,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isUniqueViolation } from '@/lib/db-errors';
 import {
   cloud_agent_webhook_triggers,
+  organization_memberships,
   agent_environment_profiles,
   kiloclaw_instances,
   type User,
@@ -42,6 +43,7 @@ export const WebhookTriggerCreateInput = z
   .object({
     triggerId: triggerIdCreateSchema,
     organizationId: z.string().uuid().optional(),
+    runAsCreator: z.boolean().optional(),
     targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
     // KiloClaw Chat target fields
     kiloclawInstanceId: z.string().uuid().optional(),
@@ -71,6 +73,22 @@ export const WebhookTriggerCreateInput = z
     cronTimezone: z.string().max(50).optional().default('UTC'),
   })
   .superRefine((data, ctx) => {
+    if (data.runAsCreator) {
+      if (!data.organizationId || data.targetType !== 'cloud_agent') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Run as creator is only available for organization Cloud Agent triggers',
+          path: ['runAsCreator'],
+        });
+      }
+      if (data.activationMode === 'webhook' && !data.webhookAuth) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Webhook authentication is required when running as the creator',
+          path: ['webhookAuth'],
+        });
+      }
+    }
     if (data.activationMode === 'scheduled') {
       if (!data.cronExpression) {
         ctx.addIssue({
@@ -426,6 +444,24 @@ export const webhookTriggersRouter = createTRPCRouter({
       await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
     }
 
+    if (input.runAsCreator && input.organizationId) {
+      const memberships = await db
+        .select({ id: organization_memberships.id })
+        .from(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, input.organizationId),
+            eq(organization_memberships.kilo_user_id, userId)
+          )
+        );
+      if (!memberships.length) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Run as creator requires direct organization membership',
+        });
+      }
+    }
+
     if (
       input.sandboxAllocation &&
       !(await canSetSandboxAllocation(ctx.user, input.organizationId))
@@ -519,6 +555,7 @@ export const webhookTriggersRouter = createTRPCRouter({
         input.triggerId,
         {
           targetType: input.targetType,
+          executionUserId: input.runAsCreator ? userId : undefined,
           kiloclawInstanceId: input.kiloclawInstanceId,
           githubRepo: input.githubRepo,
           mode: input.mode,
@@ -606,6 +643,32 @@ export const webhookTriggersRouter = createTRPCRouter({
 
     // Verify ownership via PostgreSQL
     const dbTrigger = await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
+
+    if (input.organizationId) {
+      const currentTrigger = await getWorkerTrigger(
+        undefined,
+        input.organizationId,
+        input.triggerId
+      );
+      if (currentTrigger.found === 'error') {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Unable to verify trigger execution identity',
+        });
+      }
+      if (!currentTrigger.found) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Trigger not found' });
+      }
+      if (
+        currentTrigger.config.executionUserId &&
+        currentTrigger.config.executionUserId !== userId
+      ) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the creator can update a trigger that runs as its creator',
+        });
+      }
+    }
 
     if (input.sandboxAllocation !== undefined && dbTrigger.target_type === 'kiloclaw_chat') {
       throw new TRPCError({

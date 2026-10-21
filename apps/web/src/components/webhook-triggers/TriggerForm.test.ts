@@ -30,7 +30,20 @@ jest.mock('@/components/ui/label', () => ({
     createElement('label', props, children),
 }));
 jest.mock('@/components/ui/switch', () => ({ Switch: () => null }));
-jest.mock('@/components/ui/checkbox', () => ({ Checkbox: () => null }));
+jest.mock('@/components/ui/checkbox', () => ({
+  Checkbox: ({
+    onCheckedChange,
+    ...props
+  }: React.InputHTMLAttributes<HTMLInputElement> & {
+    onCheckedChange?: (checked: boolean) => void;
+  }) =>
+    createElement('input', {
+      ...props,
+      type: 'checkbox',
+      onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
+        onCheckedChange?.(event.target.checked),
+    }),
+}));
 type SelectInjectedProps = {
   onValueChange?: (value: string) => void;
   selectDisabled?: boolean;
@@ -328,6 +341,55 @@ describe('TriggerForm variants', () => {
     act(() => root?.render(createElement(TriggerForm, allProps)));
     return { container: dom.container, onSubmit, allProps };
   }
+
+  it('does not offer creator mode for personal triggers', () => {
+    const { container } = render({ mode: 'create' });
+    expect(container.querySelector('#runAsCreator')).toBeNull();
+  });
+
+  it('requires authentication when selecting creator mode for an organization webhook', () => {
+    const { container, onSubmit } = render({ mode: 'create', organizationId: 'org-1' });
+    const checkbox = container.querySelector<HTMLInputElement>('#runAsCreator');
+    if (!checkbox) throw new Error('creator checkbox missing');
+    act(() => {
+      const reactPropsKey = Object.keys(checkbox).find(key => key.startsWith('__reactProps'));
+      if (!reactPropsKey) throw new Error('checkbox props missing');
+      const props = (checkbox as unknown as Record<string, { onChange: (event: unknown) => void }>)[
+        reactPropsKey
+      ];
+      props.onChange({ target: { checked: true } });
+    });
+    expect(container.querySelector('#webhookAuthHeader')).not.toBeNull();
+    submit(container);
+    expect(onSubmit).not.toHaveBeenCalled();
+    const header = container.querySelector<HTMLInputElement>('#webhookAuthHeader');
+    const secret = container.querySelector<HTMLInputElement>('#webhookAuthSecret');
+    if (!header || !secret) throw new Error('authentication inputs missing');
+    changeValue(header, 'x-secret');
+    changeValue(secret, 'shared-secret');
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runAsCreator: true,
+        webhookAuth: { enabled: true, header: 'x-secret', secret: 'shared-secret' },
+      })
+    );
+  });
+
+  it('shows saved creator mode as immutable when editing', () => {
+    const { container, onSubmit } = render({
+      organizationId: 'org-1',
+      initialData: {
+        ...initialData('high', 'scheduled'),
+        executionUserId: 'oauth/github/creator',
+      },
+    });
+    const checkbox = container.querySelector<HTMLInputElement>('#runAsCreator');
+    expect(checkbox?.checked).toBe(true);
+    expect(checkbox?.disabled).toBe(true);
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ runAsCreator: true }));
+  });
 
   it.each(['webhook', 'scheduled'] as const)(
     'omits unset legacy %s edit variants, including after catalogue metadata arrives',

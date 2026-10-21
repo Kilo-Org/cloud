@@ -1474,6 +1474,31 @@ describe('api routes', () => {
     expect(readKiloSdkMessages).toHaveBeenCalledWith({ limit: 50, before: undefined });
   });
 
+  it('requires a live organization when authorizing message reads', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => null),
+    } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    const condition = fns.selectWhere.mock.calls[0]?.[0];
+    if (!(condition instanceof SQL)) {
+      throw new Error('Expected where condition');
+    }
+    const generated = new PgDialect().sqlToQuery(condition);
+    expect(generated.sql).toMatch(/"organizations"\."deleted_at" is null/i);
+    expect(generated.sql).toMatch(/"organization_memberships"\."id" is not null/i);
+  });
+
   it('GET /session/:sessionId/messages forwards the ingest snapshot metadata alongside the page', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
@@ -2554,7 +2579,7 @@ describe('api routes', () => {
       }
       const generated = new PgDialect().sqlToQuery(query);
       expect(generated.sql).toContain('INNER JOIN "organizations"');
-      expect(generated.sql).toContain('"organizations"."deleted_at" IS NULL');
+      expect(generated.sql).toMatch(/"organizations"\."deleted_at" is null/i);
       expect(generated.sql).toContain('"organization_memberships"."kilo_user_id" = $4');
       return { rows: [{ public_id: generated.params[0] }] };
     });

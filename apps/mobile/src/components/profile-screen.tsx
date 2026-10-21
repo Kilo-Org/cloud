@@ -326,6 +326,16 @@ export function ProfileScreen() {
               router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
             }}
           />
+          <ConfigureRow
+            icon={BookOpenCheck}
+            title={t('agentBriefing.title')}
+            subtitle={t('agentBriefing.historyHint')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            onPress={() => {
+              router.push('/(app)/agent-briefing' as Href);
+            }}
+          />
           {/* Permanent replay entry: opens the tour at any time, including
               after the account finished or skipped it. Opening it is an
               explicit user action, never a re-arm of the auto-open. */}

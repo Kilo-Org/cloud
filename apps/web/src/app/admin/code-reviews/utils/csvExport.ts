@@ -40,7 +40,7 @@ type CodeReviewExportRow = {
  * - This prevents execution of formulas like =HYPERLINK() or =CMD|'/C calc'!A0
  *
  * Standard CSV escaping:
- * - Values containing commas, quotes, or newlines are wrapped in double quotes
+ * - Values containing commas, quotes, or line breaks are wrapped in double quotes
  * - Internal double quotes are escaped by doubling them
  */
 function escapeCsvValue(value: string | number | null | undefined): string {
@@ -54,7 +54,7 @@ function escapeCsvValue(value: string | number | null | undefined): string {
   }
 
   // Standard CSV escaping
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+  if (str.includes(',') || str.includes('"') || /[\r\n]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;

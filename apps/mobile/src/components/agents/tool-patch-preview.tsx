@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { DiffLine } from '@/components/pr-review/diff/diff-line';
-import { cloudAgentFileLabel } from '@/lib/cloud-agent-path';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 
 import { type ToolPatchFile, type ToolPatchModel } from './tool-patch-model';
 

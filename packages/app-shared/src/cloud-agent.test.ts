@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { cloudAgentFileLabel } from '@/lib/cloud-agent-path';
+import { cloudAgentFileLabel } from './cloud-agent';
 
 describe('cloudAgentFileLabel', () => {
   it('strips a personal session workspace root', () => {

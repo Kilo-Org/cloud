@@ -3,7 +3,7 @@ import { buildToolDetailSummary } from '@kilocode/app-shared/tool-detail';
 import { z } from 'zod';
 
 import { i18n } from '@/i18n';
-import { cloudAgentFileLabel } from '@/lib/cloud-agent-path';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { formatList, formatNumber } from '@/lib/format';
 import { getToolFileAttachments, getToolImageAttachments } from './tool-card-attachments';
 import { getDirectoryName, getFilename, truncateText } from './tool-card-utils';

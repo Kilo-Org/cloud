@@ -9,7 +9,7 @@ import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { cloudAgentFileLabel } from '@/lib/cloud-agent-path';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { PartRenderer } from './part-renderer';

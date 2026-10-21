@@ -1,4 +1,5 @@
 import { FilePlus } from 'lucide-react';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { ToolCardShell } from './ToolCardShell';
 import { ToolDiagnostics, ToolDiff, ToolDiffStats, ToolFilePath } from './ToolDiff';
 import { ToolCodeBlock } from './ToolOutput';
@@ -29,7 +30,9 @@ export function WriteToolCard({ toolPart }: WriteToolCardProps) {
       status={state.status}
     >
       {filePath && (
-        <div className="text-muted-foreground font-mono text-xs break-all">{filePath}</div>
+        <div className="text-muted-foreground font-mono text-xs break-all">
+          {cloudAgentFileLabel(filePath)}
+        </div>
       )}
       <ToolDiff
         patch={patch}

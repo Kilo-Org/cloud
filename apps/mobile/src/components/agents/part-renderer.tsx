@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { cloudAgentFileLabel } from '@/lib/cloud-agent-path';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { formatNumber } from '@/lib/format';
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';

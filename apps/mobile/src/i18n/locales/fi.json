@@ -3687,7 +3687,7 @@
     "repoBindings": {
       "title": "Koodivarastojen oletusprofiilit",
       "add": "Lisää oletusprofiili",
-      "empty": "Ei oletusprofiileja määritetty",
+      "empty": "Ei määritettyjä oletusprofiileja",
       "emptyDescription": "Lisää oletusprofiili, joka ottaa profiilin käyttöön automaattisesti, kun koodivarastolle aloitetaan istuntoja.",
       "repo": "Valitse koodivarasto…",
       "profile": "Valitse profiili",

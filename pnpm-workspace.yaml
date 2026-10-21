@@ -56,6 +56,7 @@ catalog:
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
   - tsx
+  - '@cloudflare/sandbox@0.12.12'
   # Cloudflare's DO-managed container runtime (ctx.container, snapshotContainer).
   # wrangler 4.134.0 is the first release with local development support for
   # DO-managed Containers (named-image selection via ctx.container.images).
@@ -282,6 +283,7 @@ patchedDependencies:
   # cancelled the glanceable refresh run in progress.
   expo-background-task@57.0.21: patches/expo-background-task@57.0.21.patch
   stripe@23.0.0: patches/stripe@23.0.0.patch
+  '@expo/react-native-action-sheet@4.1.1': patches/@expo__react-native-action-sheet@4.1.1.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

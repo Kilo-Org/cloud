@@ -58,6 +58,11 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({ purgePostHogPersistence: vi.
 // typeof` syntax crashes Node's parser in the pure (node) test environment.
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
+// `exchange-legacy-token` builds the app `User-Agent` through
+// `client-metadata` -> `expo-application`; that module's expo root needs
+// `__DEV__` and cannot load in the node test environment.
+vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
+
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   clearAgentModelPreference: vi.fn(),
 }));
@@ -91,6 +96,7 @@ vi.mock('@/lib/auth/logout-cleanup', () => ({
 }));
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   AppState: {
     addEventListener: vi.fn(() => ({ remove: vi.fn() })),
   },

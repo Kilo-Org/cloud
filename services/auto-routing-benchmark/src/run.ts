@@ -509,6 +509,9 @@ export async function publishPlatformRoutingTable(
   )
     return null;
   const desired = snapshotPairs(snapshot, true);
+  const targets = new Set(
+    snapshotPairs(snapshot, false).map(pair => exactPairKey(pair.model, pair.variant))
+  );
   const prices = catalogCandidatePrices(catalog);
 
   const readyRows = await listReadyCurrentProfilesForEntries(env.BENCH_DB, current, desired);
@@ -522,6 +525,13 @@ export async function publishPlatformRoutingTable(
     console.warn(JSON.stringify({ event: 'routing_table_publish_skipped_no_ready_entries' }));
     return null;
   }
+  // `desired` is the serving set, which `servingSubscriptionSnapshot` already restricts
+  // to ready rows, so it cannot show that a live pair is about to disappear. The live
+  // table can: a pair it serves, that is still a target, and that has no ready row under
+  // this engine would drop out of the new build. That is a re-measurement in flight or an
+  // engine bump, and either way the existing table stays. A settled `failed` pair is
+  // allowed to drop out, as it was when the gate counted only pending and running rows.
+  const previous = await getLatestRoutingTable(env.BENCH_DB, router).catch(() => null);
   const readyPairs = new Set(
     readyEntries.map(({ entry }) => exactPairKey(entry.model, entry.variant))
   );
@@ -529,21 +539,27 @@ export async function publishPlatformRoutingTable(
   const statusByPair = new Map(
     statuses.map(row => [exactPairKey(row.model, row.variant), row.status])
   );
-  // A served pair that is ready carries over. One that is settled `failed` drops out,
-  // as it did when the gate counted only pending and running rows. A pair that is
-  // missing, pending or running is mid-re-measurement, or has no row under this engine
-  // yet, so publishing now would drop it from the live table.
-  const blocking = desired.find(pair => {
+  const livePairs = new Map<string, { model: string; variant: string | null }>();
+  const previousRoutes = previous?.table.routes;
+  if (previousRoutes) {
+    for (const candidates of Object.values(previousRoutes)) {
+      for (const candidate of candidates) {
+        const variant = candidate.variant ?? null;
+        livePairs.set(exactPairKey(candidate.model, variant), { model: candidate.model, variant });
+      }
+    }
+  }
+  const dropped = [...livePairs.values()].find(pair => {
     const key = exactPairKey(pair.model, pair.variant);
-    return !readyPairs.has(key) && statusByPair.get(key) !== 'failed';
+    return !readyPairs.has(key) && targets.has(key) && statusByPair.get(key) !== 'failed';
   });
-  if (blocking) {
+  if (dropped) {
     console.log(
       JSON.stringify({
         event: 'routing_table_publish_skipped_serving_pair_unready',
-        model: blocking.model,
-        variant: blocking.variant,
-        status: statusByPair.get(exactPairKey(blocking.model, blocking.variant)) ?? 'missing',
+        model: dropped.model,
+        variant: dropped.variant,
+        status: statusByPair.get(exactPairKey(dropped.model, dropped.variant)) ?? 'missing',
       })
     );
     return null;
@@ -601,8 +617,7 @@ export async function publishPlatformRoutingTable(
 
   // The version hashes the contributing registry rows and the config knobs, so
   // an identical version means an identical table. Skip the write and the flush.
-  const published = await getLatestRoutingTable(env.BENCH_DB, router).catch(() => null);
-  if (published?.table.version === table.version) {
+  if (previous?.table.version === table.version) {
     return { version: table.version };
   }
 

@@ -7,6 +7,7 @@ import { TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
 import type {
   PolicySettingComputedMap,
   PolicySettingOverrides,
+  RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 import type { BenchmarkJobMessage } from './run';
@@ -773,6 +774,41 @@ describe('decider run completion', () => {
     expect(markRunFailed).not.toHaveBeenCalled();
   });
 
+  function liveRoutingTable(pairs: { model: string; variant: string | null }[]): {
+    table: RoutingTable;
+    publishedAt: string;
+  } {
+    return {
+      publishedAt: '2026-10-20T18:00:00.000Z',
+      table: {
+        version: 'registry-live',
+        generatedAt: '2026-10-20T18:00:00.000Z',
+        minAccuracy: 0.7,
+        switchCostFactor: 3,
+        bestAccuracySwitchThreshold: 0.05,
+        productionTokenProfile: null,
+        switchHorizonTurns: 18,
+        source: 'benchmark',
+        routes: Object.fromEntries(
+          TAXONOMY_ROUTE_KEYS.map(routeKey => [
+            routeKey,
+            pairs.map(pair => ({
+              model: pair.model,
+              variant: pair.variant,
+              accuracy: 0.9,
+              cases: 10,
+              avgCostUsd: 0.001,
+              p50LatencyMs: 100,
+              estimatedRequestCostUsd: 0.002,
+              meetsThreshold: true,
+              pricing: null,
+            })),
+          ])
+        ) as RoutingTable['routes'],
+      },
+    };
+  }
+
   it('publishes the ready exact pairs while other platform pairs are still measuring', async () => {
     const runId = 'decider-publish-1';
     mockRunState(runId, 'platform', [{ model: 'platform/a', variant: '' }]);
@@ -842,7 +878,13 @@ describe('decider run completion', () => {
     expect(kvDelete).toHaveBeenCalled();
   });
 
-  it('keeps the published table while a served pair is still re-measuring', async () => {
+  it('keeps the published table while a live pair is still re-measuring', async () => {
+    vi.mocked(getLatestRoutingTable).mockResolvedValue(
+      liveRoutingTable([
+        { model: 'platform/a', variant: null },
+        { model: 'platform/b', variant: 'high' },
+      ])
+    );
     vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
       { model: 'platform/a', variant: '', run_id: 'decider-publish-2' },
     ]);
@@ -874,7 +916,13 @@ describe('decider run completion', () => {
     expect(kvDelete).not.toHaveBeenCalled();
   });
 
-  it('keeps the published table while a served pair has no row under this engine', async () => {
+  it('keeps the published table while a live pair has no row under this engine', async () => {
+    vi.mocked(getLatestRoutingTable).mockResolvedValue(
+      liveRoutingTable([
+        { model: 'platform/a', variant: null },
+        { model: 'platform/b', variant: 'high' },
+      ])
+    );
     vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
       { model: 'platform/a', variant: '', run_id: 'decider-publish-3' },
     ]);
@@ -904,7 +952,13 @@ describe('decider run completion', () => {
     expect(saveRoutingTable).not.toHaveBeenCalled();
   });
 
-  it('publishes without a served pair whose re-measurement failed', async () => {
+  it('publishes without a live pair whose re-measurement failed', async () => {
+    vi.mocked(getLatestRoutingTable).mockResolvedValue(
+      liveRoutingTable([
+        { model: 'platform/a', variant: null },
+        { model: 'platform/b', variant: 'high' },
+      ])
+    );
     vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
       { model: 'platform/a', variant: '', run_id: 'decider-publish-4' },
     ]);
@@ -937,6 +991,92 @@ describe('decider run completion', () => {
     expect(
       table.routes['implementation/code_generation'].map(candidate => candidate.model)
     ).toEqual(['platform/a']);
+  });
+
+  it('does not publish a thin table as an engine bump re-measures the live pairs', async () => {
+    vi.mocked(getLatestRoutingTable).mockResolvedValue(
+      liveRoutingTable([
+        { model: 'platform/a', variant: null },
+        { model: 'platform/b', variant: 'high' },
+      ])
+    );
+    const summariesFor = (model: string, variant: string | null, runId: string) =>
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        model,
+        variant,
+        runId,
+        routeKey,
+        accuracy: 0.9,
+        avgCostUsd: 0.002,
+        avgLatencyMs: 100,
+        p50LatencyMs: 100,
+        p95LatencyMs: 150,
+        cases: 10,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+      }));
+    // The bump promoted only the pairs measured so far, so `a` serves alone while `b` waits.
+    vi.mocked(servingSubscriptionSnapshot).mockResolvedValue([
+      {
+        model: 'platform/a',
+        pairs: [{ model: 'platform/a', variant: null }],
+        servingPairs: [{ model: 'platform/a', variant: null }],
+        resolutionError: null,
+      },
+      {
+        model: 'platform/b',
+        pairs: [{ model: 'platform/b', variant: 'high' }],
+        servingPairs: [],
+        resolutionError: null,
+      },
+    ]);
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: 'platform/a', variant: '', run_id: 'bump-a' },
+    ]);
+    vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
+      { model: 'platform/a', variant: null, status: 'ready' },
+      { model: 'platform/b', variant: 'high', status: 'pending' },
+    ]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue(summariesFor('platform/a', null, 'bump-a'));
+
+    await expect(publishPlatformRoutingTable(env, fetch)).resolves.toBeNull();
+    expect(saveRoutingTable).not.toHaveBeenCalled();
+
+    // Once every live pair is ready again the table publishes with both.
+    vi.mocked(servingSubscriptionSnapshot).mockResolvedValue([
+      {
+        model: 'platform/a',
+        pairs: [{ model: 'platform/a', variant: null }],
+        servingPairs: [{ model: 'platform/a', variant: null }],
+        resolutionError: null,
+      },
+      {
+        model: 'platform/b',
+        pairs: [{ model: 'platform/b', variant: 'high' }],
+        servingPairs: [{ model: 'platform/b', variant: 'high' }],
+        resolutionError: null,
+      },
+    ]);
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: 'platform/a', variant: '', run_id: 'bump-a' },
+      { model: 'platform/b', variant: 'high', run_id: 'bump-b' },
+    ]);
+    vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
+      { model: 'platform/a', variant: null, status: 'ready' },
+      { model: 'platform/b', variant: 'high', status: 'ready' },
+    ]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue([
+      ...summariesFor('platform/a', null, 'bump-a'),
+      ...summariesFor('platform/b', 'high', 'bump-b'),
+    ]);
+
+    await expect(publishPlatformRoutingTable(env, fetch)).resolves.not.toBeNull();
+
+    const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
+    expect(
+      table.routes['implementation/code_generation'].map(candidate => candidate.model)
+    ).toEqual(['platform/a', 'platform/b']);
   });
 
   it('failRunAndDrain fails the claimed registry rows and drains both queues', async () => {

@@ -98,6 +98,16 @@ const confirmationRequests = vi.hoisted(() => ({
 
 const navigationRoutes = ['session-detail'];
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+// The New-session fallback the route renders for a session id that cannot be a
+// real session: the composer's full graph (drafts, voice input, spawn hooks)
+// cannot load in the node-mounted harness, and this suite only needs to pin
+// which surface the route chose.
+vi.mock('@/components/agents/new-session-model-provider', () => ({
+  NewSessionModelProvider: 'NewSessionModelProvider',
+}));
+vi.mock('@/components/agents/new-session-screen-body', () => ({
+  NewSessionScreenBody: 'NewSessionScreenBody',
+}));
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
@@ -446,7 +456,9 @@ beforeEach(() => {
           return { type: 'read-only', kiloSessionId: id };
         },
         getTicket: vi.fn(),
-        fetchSnapshot: vi.fn().mockResolvedValue({ info: { id: 'sess-1' }, messages: [] }),
+        fetchSnapshot: vi
+          .fn()
+          .mockResolvedValue({ info: { id: 'ses_12345678901234567890123456' }, messages: [] }),
         fetchSnapshotPage: async (id, options) => {
           if (id === CHILD_ID) {
             const page = await childPageMock(id, options);
@@ -549,13 +561,36 @@ describe('SessionDetailScreen invalid session-id', () => {
   });
 
   it('renders InvalidRouteState with the app backTo when session-id is an array', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': ['sess-1', 'sess-2'] });
+    useLocalSearchParamsMock.mockReturnValue({
+      'session-id': ['ses_12345678901234567890123456', 'ses_12345678901234567890123457'],
+    });
     const renderer = await mountRoute();
 
     const invalid = findByType(renderer.root, 'InvalidRouteState');
     expect(invalid).toHaveLength(1);
     expect(propOf(invalid[0], 'backTo')).toBe('/(app)');
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    expect(queryEnabled()).toBe(false);
+  });
+
+  it('renders the New-session composer when the param cannot be a real session id', async () => {
+    // A malformed or hand-built deep link can deliver a segment that can never
+    // resolve to a session (the all-zeros UUID was observed in the wild from a
+    // press on the Agents New session button). The id fails the server-side
+    // shape, so the route renders the composer the user asked for instead of
+    // mounting a session screen that can only end in "Not found".
+    // No `organizationId` param: this is the exact shape the in-the-wild deep
+    // link carried, whose metadata gate would otherwise stay enabled.
+    useLocalSearchParamsMock.mockReturnValue({
+      'session-id': '00000000-0000-0000-0000-000000000000',
+    });
+    const renderer = await mountRoute();
+
+    expect(findByType(renderer.root, 'NewSessionScreenBody')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    expect(findByType(renderer.root, 'InvalidRouteState')).toHaveLength(0);
+    // The doomed id never starts a metadata read, even with the gate's other
+    // conditions (confirmed owner, no organization route) all true.
     expect(queryEnabled()).toBe(false);
   });
 });
@@ -578,7 +613,7 @@ describe('SessionDetailScreen display scope', () => {
     { label: 'legacy Personal', route: undefined, data: {}, expected: null },
   ])('passes resolved $label without changing global scope', async state => {
     useLocalSearchParamsMock.mockReturnValue({
-      'session-id': 'sess-1',
+      'session-id': 'ses_12345678901234567890123456',
       organizationId: state.route,
     });
     queryState.data = state.data;
@@ -600,7 +635,7 @@ describe('SessionDetailScreen display scope', () => {
   it.each(['pending', 'INTERNAL_SERVER_ERROR', 'NOT_FOUND', 'UNAUTHORIZED'])(
     'omits context labels from the %s header and preserves recovery actions',
     async state => {
-      useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+      useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
       queryState.data = null;
       queryState.isPending = state === 'pending';
       queryState.isError = state !== 'pending';
@@ -635,7 +670,7 @@ describe('SessionDetailScreen display scope', () => {
   );
 
   it('resolves scope when a failed metadata read later succeeds', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     queryState.data = null;
     queryState.isError = true;
     queryState.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
@@ -663,7 +698,7 @@ describe('SessionDetailScreen display scope', () => {
 
 describe('SessionDetailScreen metadata read that cannot settle', () => {
   it('mounts the session when the offline metadata read is paused', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     queryState.data = null;
     queryState.isPending = true;
     queryState.fetchStatus = 'paused';
@@ -677,7 +712,7 @@ describe('SessionDetailScreen metadata read that cannot settle', () => {
   });
 
   it('keeps an offline session mounted while its metadata starts fetching on reconnect', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     queryState.data = null;
     queryState.isPending = true;
     queryState.fetchStatus = 'paused';
@@ -694,11 +729,11 @@ describe('SessionDetailScreen metadata read that cannot settle', () => {
   });
 
   it('does not reuse the mounted scope admission for a different session', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     const renderer = await mountRoute();
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
 
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-2' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123457' });
     queryState.data = null;
     queryState.isPending = true;
     queryState.fetchStatus = 'fetching';
@@ -713,7 +748,7 @@ describe('SessionDetailScreen metadata read that cannot settle', () => {
     onTestFinished(() => {
       vi.useRealTimers();
     });
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     queryState.data = null;
     queryState.isPending = true;
     queryState.fetchStatus = 'fetching';
@@ -732,7 +767,7 @@ describe('SessionDetailScreen metadata read that cannot settle', () => {
   });
 
   it('keeps the mounted manager when the paused read later resolves an organization', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     queryState.data = null;
     queryState.isPending = true;
     queryState.fetchStatus = 'paused';
@@ -766,7 +801,7 @@ describe('SessionDetailScreen restored scope', () => {
     // only this state may scope the session from the persisted hint.
     markRestoredAuthenticatedOwner();
     secureStoreMock.getItemAsync.mockResolvedValue('user-A');
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     queryState.data = null;
     queryState.isPending = true;
     queryState.fetchStatus = 'paused';
@@ -878,7 +913,7 @@ describe('SessionDetailScreen restored scope', () => {
 
 describe('SessionDetailScreen valid session-id', () => {
   it('keeps the mounted transcript when a background metadata refresh fails', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     const renderer = await mountRoute();
     const manager = managers.at(-1)?.manager;
     queryState.isError = true;
@@ -890,19 +925,22 @@ describe('SessionDetailScreen valid session-id', () => {
   });
 
   it('renders the session content with the parsed session-id and enables the query', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     const renderer = await mountRoute();
 
     const content = findByType(renderer.root, 'SessionDetailContent');
     expect(content).toHaveLength(1);
-    expect(propOf(content[0], 'sessionId')).toBe('sess-1');
+    expect(propOf(content[0], 'sessionId')).toBe('ses_12345678901234567890123456');
     expect(findByType(renderer.root, 'InvalidRouteState')).toHaveLength(0);
     expect(queryEnabled()).toBe(true);
-    expect(queryInput()).toEqual({ session_id: 'sess-1' });
+    expect(queryInput()).toEqual({ session_id: 'ses_12345678901234567890123456' });
   });
 
   it('forwards the parsed `at` anchor to the session content', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', at: 'msg_42' });
+    useLocalSearchParamsMock.mockReturnValue({
+      'session-id': 'ses_12345678901234567890123456',
+      at: 'msg_42',
+    });
     const renderer = await mountRoute();
 
     const content = findByType(renderer.root, 'SessionDetailContent');
@@ -911,7 +949,7 @@ describe('SessionDetailScreen valid session-id', () => {
   });
 
   it('opens at the bottom with no anchor when `at` is missing or unusable', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     const renderer = await mountRoute();
     expect(propOf(findByType(renderer.root, 'SessionDetailContent')[0], 'resumeAt')).toBeNull();
   });
@@ -923,7 +961,10 @@ describe('SessionDetailScreen valid session-id', () => {
   // below. Rendering one here would resurrect the control the request removed
   // and shift the pill at the loading -> loaded swap.
   it('reserves the context pill without a copy control on the loading header', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', at: 'msg_42' });
+    useLocalSearchParamsMock.mockReturnValue({
+      'session-id': 'ses_12345678901234567890123456',
+      at: 'msg_42',
+    });
     queryState.data = null;
     queryState.isPending = true;
     const renderer = await mountRoute();
@@ -947,12 +988,14 @@ describe('SessionDetailScreen valid session-id', () => {
 
 describe('SessionDetailScreen foreground refresh scope', () => {
   it('invalidates only the opened session metadata and model preferences', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     await mountRoute();
 
     // The key is built from the opened session's own input, not a procedure-wide
     // prefix and not the empty-id fallback.
-    expect(cliSessionGetQueryKeyMock).toHaveBeenCalledWith({ session_id: 'sess-1' });
+    expect(cliSessionGetQueryKeyMock).toHaveBeenCalledWith({
+      session_id: 'ses_12345678901234567890123456',
+    });
     expect(useRouteForegroundRefreshMock).toHaveBeenCalled();
     const keys = useRouteForegroundRefreshMock.mock.calls.at(-1)?.[0];
     expect(keys).toEqual([[['cliSessionsV2', 'get']], [['modelPreferences']]]);
@@ -965,7 +1008,10 @@ describe('SessionDetailScreen foreground refresh scope', () => {
 function transcriptPage(sessionId: KiloSessionId, messageId: string, text: string) {
   return {
     kind: 'success',
-    info: { id: sessionId, ...(sessionId === CHILD_ID ? { parentID: 'sess-1' } : {}) },
+    info: {
+      id: sessionId,
+      ...(sessionId === CHILD_ID ? { parentID: 'ses_12345678901234567890123456' } : {}),
+    },
     messages: [
       {
         info: stubUserMessage({ id: messageId, sessionID: sessionId }),
@@ -1008,7 +1054,10 @@ function childIds({ store, manager }: ManagerProbe): string[] {
 }
 
 async function startChildPage(pageKind: 'first' | 'older') {
-  useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', organizationId: 'org-a' });
+  useLocalSearchParamsMock.mockReturnValue({
+    'session-id': 'ses_12345678901234567890123456',
+    organizationId: 'org-a',
+  });
   const renderer = await mountRoute();
   const current = managers.at(-1);
   if (!current) {
@@ -1054,7 +1103,7 @@ describe.each(['first', 'older'] as const)('SessionDetailScreen %s child-page sc
       transition: 'root replacement',
       change: () => {
         useLocalSearchParamsMock.mockReturnValue({
-          'session-id': 'sess-2',
+          'session-id': 'ses_12345678901234567890123457',
           organizationId: 'org-a',
         });
       },
@@ -1063,7 +1112,7 @@ describe.each(['first', 'older'] as const)('SessionDetailScreen %s child-page sc
       transition: 'context replacement',
       change: () => {
         useLocalSearchParamsMock.mockReturnValue({
-          'session-id': 'sess-1',
+          'session-id': 'ses_12345678901234567890123456',
           organizationId: 'org-b',
         });
       },
@@ -1204,7 +1253,7 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
       client.clear();
       vi.useRealTimers();
     });
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     const tree = createElement(QueryClientProvider, { client }, createElement(SessionDetailScreen));
     const renderer = await mountRoute(tree);
     await act(async () => {
@@ -1234,7 +1283,10 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     authState.token = 'account-b-token';
     authState.isSigningOut = false;
     setSignOutActive(false);
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', organizationId: 'org-a' });
+    useLocalSearchParamsMock.mockReturnValue({
+      'session-id': 'ses_12345678901234567890123456',
+      organizationId: 'org-a',
+    });
     const renderer = await mountRoute();
     expect(rootRequests).toEqual([]);
     expect(transcriptText(renderer, 'RootText')).toBe('');
@@ -1247,7 +1299,7 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
   });
 
   it('mounts the session for a temporary metadata failure so the cached transcript can paint', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     queryState.data = null;
     queryState.isError = true;
     queryState.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
@@ -1264,7 +1316,7 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     { code: 'NOT_FOUND', variant: 'not-found' },
     { code: 'UNAUTHORIZED', variant: 'permission' },
   ])('keeps $code terminal with no retry action', async ({ code, variant }) => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     queryState.isError = true;
     queryState.error = { data: { code } };
     const renderer = await mountRoute();
@@ -1281,7 +1333,10 @@ describe('SessionDetailScreen fresh authentication scope', () => {
   // Fresh mounts now consume the producer's pending/confirmed association, not token history.
   it('starts no old-account work when first mounted during pending replacement', async () => {
     beginReplacement();
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', organizationId: 'org-a' });
+    useLocalSearchParamsMock.mockReturnValue({
+      'session-id': 'ses_12345678901234567890123456',
+      organizationId: 'org-a',
+    });
     const renderer = await mountRoute();
 
     expect.soft(rootRequests).toEqual([]);
@@ -1298,7 +1353,10 @@ describe('SessionDetailScreen fresh authentication scope', () => {
   it('initializes current-account rows on a fresh mount and route re-entry', async () => {
     beginReplacement();
     commitAccount('A');
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', organizationId: 'org-a' });
+    useLocalSearchParamsMock.mockReturnValue({
+      'session-id': 'ses_12345678901234567890123456',
+      organizationId: 'org-a',
+    });
     const renderer = await mountRoute();
     expect(transcriptText(renderer, 'RootText')).toBe('Account A root row');
     const previous = managers.at(-1);
@@ -1344,7 +1402,7 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     if (hasHistory) {
       navigationRoutes.unshift('previous-screen');
     }
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
     if (source === 'identity') {
       beginReplacement();
       commitCredentials('B');
@@ -1390,14 +1448,14 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
     });
     beginReplacement();
     commitCredentials('B');
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
   });
 
   it.each([undefined, 'org-a'])(
     'shows the header and existing skeletons while identity is pending with organization %s',
     async organizationId => {
       useLocalSearchParamsMock.mockReturnValue({
-        'session-id': 'sess-1',
+        'session-id': 'ses_12345678901234567890123456',
         organizationId,
         title: 'Account A private title',
       });
@@ -1578,7 +1636,7 @@ describe.each([
         vi.useRealTimers();
       });
       useLocalSearchParamsMock.mockReturnValue({
-        'session-id': 'sess-1',
+        'session-id': 'ses_12345678901234567890123456',
         organizationId,
         title:
           mountKind === 'fresh pending mount'
@@ -1678,14 +1736,14 @@ describe('SessionDetailScreen malformed part transcript', () => {
     // the crash surfaces in shouldRenderReasoningPart exactly as Sentry saw it.
     const reasoningNoText = {
       id: 'part-a-broken-reasoning',
-      sessionID: 'sess-1',
+      sessionID: 'ses_12345678901234567890123456',
       messageID: 'msg-assistant-broken',
       type: 'reasoning',
       time: { start: 1, end: 2 },
     } as unknown as Part;
     const assistantInfo: AssistantMessage = {
       id: 'msg-assistant-broken',
-      sessionID: 'sess-1',
+      sessionID: 'ses_12345678901234567890123456',
       role: 'assistant',
       time: { created: 2 },
       parentID: 'msg-user-question',
@@ -1699,14 +1757,17 @@ describe('SessionDetailScreen malformed part transcript', () => {
     };
     rootPageMock.mockResolvedValueOnce({
       kind: 'success',
-      info: { id: 'sess-1' },
+      info: { id: 'ses_12345678901234567890123456' },
       messages: [
         {
-          info: stubUserMessage({ id: 'msg-user-question', sessionID: 'sess-1' }),
+          info: stubUserMessage({
+            id: 'msg-user-question',
+            sessionID: 'ses_12345678901234567890123456',
+          }),
           parts: [
             stubTextPart({
               id: 'part-question',
-              sessionID: 'sess-1',
+              sessionID: 'ses_12345678901234567890123456',
               messageID: 'msg-user-question',
               text: 'Question about the queue',
             }),
@@ -1718,7 +1779,7 @@ describe('SessionDetailScreen malformed part transcript', () => {
             reasoningNoText,
             {
               id: 'part-z-answer',
-              sessionID: 'sess-1',
+              sessionID: 'ses_12345678901234567890123456',
               messageID: 'msg-assistant-broken',
               type: 'text',
               text: 'Answer visible after broken reasoning',
@@ -1730,7 +1791,10 @@ describe('SessionDetailScreen malformed part transcript', () => {
       omittedItemCount: 0,
     } satisfies SessionSnapshotPageOutcome);
 
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', organizationId: 'org-a' });
+    useLocalSearchParamsMock.mockReturnValue({
+      'session-id': 'ses_12345678901234567890123456',
+      organizationId: 'org-a',
+    });
     const renderer = await mountRoute();
 
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
@@ -1759,14 +1823,14 @@ describe('SessionDetailScreen malformed patch part transcript', () => {
     // the first one the transcript's `.some(partRendersContent)` visits.
     const patchNoFiles = {
       id: 'part-a-broken-patch',
-      sessionID: 'sess-1',
+      sessionID: 'ses_12345678901234567890123456',
       messageID: 'msg-assistant-broken-patch',
       type: 'patch',
       hash: 'abc',
     } as unknown as Part;
     const assistantInfo: AssistantMessage = {
       id: 'msg-assistant-broken-patch',
-      sessionID: 'sess-1',
+      sessionID: 'ses_12345678901234567890123456',
       role: 'assistant',
       time: { created: 2 },
       parentID: 'msg-user-question',
@@ -1780,14 +1844,17 @@ describe('SessionDetailScreen malformed patch part transcript', () => {
     };
     rootPageMock.mockResolvedValueOnce({
       kind: 'success',
-      info: { id: 'sess-1' },
+      info: { id: 'ses_12345678901234567890123456' },
       messages: [
         {
-          info: stubUserMessage({ id: 'msg-user-question', sessionID: 'sess-1' }),
+          info: stubUserMessage({
+            id: 'msg-user-question',
+            sessionID: 'ses_12345678901234567890123456',
+          }),
           parts: [
             stubTextPart({
               id: 'part-question',
-              sessionID: 'sess-1',
+              sessionID: 'ses_12345678901234567890123456',
               messageID: 'msg-user-question',
               text: 'Question about the patch',
             }),
@@ -1799,7 +1866,7 @@ describe('SessionDetailScreen malformed patch part transcript', () => {
             patchNoFiles,
             {
               id: 'part-z-answer',
-              sessionID: 'sess-1',
+              sessionID: 'ses_12345678901234567890123456',
               messageID: 'msg-assistant-broken-patch',
               type: 'text',
               text: 'Answer visible after broken patch',
@@ -1811,7 +1878,10 @@ describe('SessionDetailScreen malformed patch part transcript', () => {
       omittedItemCount: 0,
     } satisfies SessionSnapshotPageOutcome);
 
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', organizationId: 'org-a' });
+    useLocalSearchParamsMock.mockReturnValue({
+      'session-id': 'ses_12345678901234567890123456',
+      organizationId: 'org-a',
+    });
     const renderer = await mountRoute();
 
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);

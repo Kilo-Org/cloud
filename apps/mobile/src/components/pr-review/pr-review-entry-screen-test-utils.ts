@@ -105,6 +105,7 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 // the field now uses is the one `@/components/ui/input` owns and s3 covers.
 vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/icons', () => ({
   Clipboard: 'ClipboardIcon',

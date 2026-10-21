@@ -3664,7 +3664,7 @@
       "nameRequired": "Futni një emër agjenti",
       "slugRequired": "Fut një slug agjenti",
       "slugInvalid": "Slug duhet të fillojë me një shkronjë dhe të përdorë vetëm shkronja të vogla, shifra dhe viza",
-      "slugConflict": "Ai slug është i rezervuar nga një agjent i integruar",
+      "slugConflict": "Ai slug është tashmë në përdorim nga një agjent i integruar ose një agjent tjetër në këtë profil",
       "edit": "Përpunoni agjent"
     },
     "slashCommands": {

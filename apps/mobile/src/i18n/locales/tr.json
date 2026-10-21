@@ -3664,7 +3664,7 @@
       "nameRequired": "Bir temsilci adı girin",
       "slugRequired": "Bir temsilci bilgisi girin",
       "slugInvalid": "Bilgi bir harfle başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
-      "slugConflict": "Bu bilgi yerleşik bir aracı tarafından ayrılmıştır",
+      "slugConflict": "Bu slug, yerleşik bir ajan veya bu profildeki başka bir ajan tarafından zaten kullanılıyor",
       "edit": "Temsilciyi düzenle"
     },
     "slashCommands": {

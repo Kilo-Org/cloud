@@ -3787,7 +3787,7 @@
       "nameRequired": "Daħħal isem ta' aġent",
       "slugRequired": "Daħħal aġent slug",
       "slugInvalid": "Slug għandu jibda b'ittra u juża biss ittri żgħar, ċifri u sings",
-      "slugConflict": "Dik slug hija riservata minn aġent inkorporat",
+      "slugConflict": "Dak is-slug diġà qed jintuża minn aġent integrat jew aġent ieħor f'dan il-profil",
       "edit": "Editja l-aġent"
     },
     "slashCommands": {

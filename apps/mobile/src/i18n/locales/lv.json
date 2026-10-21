@@ -3705,7 +3705,7 @@
       "nameRequired": "Ievadiet aģenta nosaukumu",
       "slugRequired": "Ievadiet aģenta lodes",
       "slugInvalid": "Slug jāsākas ar burtu un jāizmanto tikai mazie burti, cipari un domuzīmes",
-      "slugConflict": "Šo sliņķi rezervē iebūvētais aģents",
+      "slugConflict": "Šo slug jau izmanto iebūvēts aģents vai cits aģents šajā profilā",
       "edit": "Rediģēt aģentu"
     },
     "slashCommands": {

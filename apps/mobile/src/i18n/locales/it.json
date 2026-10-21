@@ -3705,7 +3705,7 @@
       "nameRequired": "Inserisci il nome di un agente",
       "slugRequired": "Inserisci uno slug dell'agente",
       "slugInvalid": "Lo slug deve iniziare con una lettera e utilizzare solo lettere minuscole, cifre e trattini",
-      "slugConflict": "Questo slug è riservato da un agente integrato",
+      "slugConflict": "Quello slug è già usato da un agente integrato o da un altro agente in questo profilo",
       "edit": "Modifica agente"
     },
     "slashCommands": {

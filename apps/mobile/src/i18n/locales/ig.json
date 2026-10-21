@@ -3664,7 +3664,7 @@
       "nameRequired": "Tinye aha onye nnọchi anya",
       "slugRequired": "Tinye ihe nnọchite slug",
       "slugInvalid": "Slug ga-eji mkpụrụedemede malite ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ, na ngwucha",
-      "slugConflict": "Edobere slug ahụ site n'aka onye arụrụ n'ime ya",
+      "slugConflict": "Ahụ slug ahụ na ndị omume obibi ma ọ bụ ndị omume ọzọ na profaịlụ a na-eji ya ugbu a",
       "edit": "Onye ọrụ dezie"
     },
     "slashCommands": {

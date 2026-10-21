@@ -4,11 +4,11 @@
 
 **Flag these (high confidence only):**
 
-- A security issue in one lens. Name the lens in the comment. If two lenses fit, the victim decides: cross-user or cross-tenant data exposure is `users`; credential, session, role, or entitlement mechanics are `auth`.
-  - `platform` - harm to Kilo: billing and credit accounting, usage metering, quotas and limits, signup and abuse controls, free-model gating, cost or resource blow-up, availability.
-  - `users` - harm to a Kilo user or organization: cross-user or cross-tenant reads and writes, IDOR, missing ownership or authorization check, sharing and invitation paths, session or account takeover, private-data leaks.
+- A security issue in one lens. Name the lens in the comment. If two lenses fit, the victim decides: cross-user or cross-tenant data exposure is `users`; credential, session, role, or scope mechanics are `auth`.
+  - `platform` - harm to Kilo: billing and credit accounting, usage metering, quotas and limits, signup and abuse controls, entitlement gating such as free models, cost or resource blow-up, availability.
+  - `users` - harm to a Kilo user or organization: cross-user or cross-tenant reads and writes, IDOR, missing ownership or authorization check, invitations and sharing, session or account takeover, private-data leaks.
   - `third-party` - harm to others through Kilo: SSRF and outbound fetch, spam or abuse through agents, provider or integration credential misuse, supply-chain execution, chains that cross the platform and user boundaries.
-  - `auth` - sign-in, recovery, linking, invitations, organization switching, credential refresh, logout, revoke, suspend, delete; ownership, roles, scopes, admin access, service trust, commercial entitlement.
+  - `auth` - credential and identity lifecycle: sign-in, recovery, linking, organization switching, credential refresh, logout, revoke, suspend, delete, machine identity, and the roles and scopes on those paths.
 - Runtime errors (null/undefined access, missing await)
 - Logic bugs (wrong conditions, off-by-one)
 - Typos that cause runtime errors
@@ -33,7 +33,7 @@
 
 # SECURITY EVIDENCE
 
-Flag a security issue only when the diff establishes the attack chain: the attacker-controlled input, the boundary it crosses, and the missing protection. State the chain in the comment:
+Report a security issue only from code you read. Every security comment names the lens, the boundary the changed code crosses, and the missing protection. Only `CRITICAL` needs the whole chain:
 
 ```
 actor -> input -> boundary -> impact -> preconditions

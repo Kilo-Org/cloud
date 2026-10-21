@@ -38,7 +38,7 @@ export function ToolRunSheet({ visible, parts, onClose, onOpenPart }: Readonly<T
       />
 
       {parts.length === 0 ? (
-        <CenteredState className="px-4">
+        <CenteredState contentContainerClassName="px-4">
           <View className="items-center py-6">
             <Text className="text-sm text-muted-foreground">
               {t('agentChat.partDetail.detailsUnavailable')}

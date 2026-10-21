@@ -3050,11 +3050,22 @@
     "boundary": {
       "backToProfile": "Înapoi la profil",
       "loadErrorMessage": "Verifică conexiunea și încearcă din nou.",
+
+      "chooseAccount": "Selectează un cont",
       "loadErrorTitle": "Nu s-au putut încărca organizațiile tale.",
+      "noOrganization": "Nicio organizație",
+
+      "noOrganizationDescription": "Acest cont nu face parte dintr-o organizație. Creează sau alătură-te unei organizații pe site pentru a folosi funcții de organizație precum invitațiile pentru membri și alertele de sold scăzut.",
+
+      "openWebOrganizations": "Deschide organizațiile pe site",
+
       "organizationUnavailable": "Organizația nu este disponibilă.",
-      "selectDescription": "Alege o organizație din profilul tău pentru a continua.",
+      "selectDescriptionWithOrganizations": "Aparții unei sau mai multor organizații. Alege contul pe care ar trebui să îl folosească acest ecran.",
+
       "selectOrganization": "Selectează o organizație",
       "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua.",
+
+      "unavailableSessionsDescription": "Această organizație nu mai este disponibilă. Sesiunile ei nu pot fi încărcate.",
       "accessDeniedDescription": "Nu ai acces la această organizație."
     },
     "creditActivity": {
@@ -3715,7 +3726,9 @@
       "jsonTooLarge": "Folosiți cel mult 50 de intrări, chei de până la 128 și valori de până la 4096 de caractere",
       "timeoutInvalid": "Timeout trebuie să fie un număr întreg de milisecunde",
       "edit": "Editați serverul MCP",
-      "saveFailed": "Serverul MCP nu a putut fi salvat"
+      "saveFailed": "Serverul MCP nu a putut fi salvat",
+      "deleteFailed": "Serverul MCP nu a putut fi șters",
+      "updateFailed": "Serverul MCP nu a putut fi actualizat"
     },
     "agents": {
       "title": "Agenți de profil",
@@ -3742,6 +3755,7 @@
       "visibilitySubagent": "Subagent - apelabil numai de la alții",
       "visibilityAll": "Toate — ambele",
       "saveFailed": "Agentul nu a putut fi salvat",
+      "deleteFailed": "Agentul nu a putut fi șters",
       "nameRequired": "Introduceți un nume de agent",
       "slugRequired": "Introduceți un melc de agent",
       "slugInvalid": "Slug trebuie să înceapă cu o literă și să folosească numai litere mici, cifre și liniuțe",
@@ -3761,6 +3775,7 @@
       "subtask": "Rulați ca subsarcină",
       "edit": "Comanda Editați slash",
       "saveFailed": "Comanda nu a putut fi salvată",
+      "deleteFailed": "Comanda nu a putut fi ștearsă",
       "nameRequired": "Introduceți un nume de comandă",
       "nameInvalid": "Numele trebuie să înceapă cu o literă mică și să folosească numai litere mici, cifre și liniuțe",
       "templateRequired": "Introduceți un șablon de comandă",

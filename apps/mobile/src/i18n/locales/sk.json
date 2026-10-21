@@ -3090,11 +3090,22 @@
     "boundary": {
       "backToProfile": "Späť na profil",
       "loadErrorMessage": "Skontroluj pripojenie a skús to znova.",
+
+      "chooseAccount": "Vyber účet",
       "loadErrorTitle": "Tvoje organizácie sa nepodarilo načítať.",
+      "noOrganization": "Žiadna organizácia",
+
+      "noOrganizationDescription": "Tento účet nie je súčasťou organizácie. Vytvor organizáciu alebo sa k nej pripoj na webe, aby si mohol používať funkcie organizácie, ako sú pozvánky pre členov a upozornenia na nízky zostatok.",
+
+      "openWebOrganizations": "Otvoriť organizácie na webe",
+
       "organizationUnavailable": "Organizácia nie je dostupná.",
-      "selectDescription": "Ak chceš pokračovať, vyber organizáciu vo svojom profile.",
+      "selectDescriptionWithOrganizations": "Patríš k jednej alebo viacerým organizáciám. Vyber účet, ktorý má táto obrazovka používať.",
+
       "selectOrganization": "Vybrať organizáciu",
       "unavailableDescription": "Táto organizácia už nie je dostupná. Ak chceš pokračovať, vyber inú vo svojom profile.",
+
+      "unavailableSessionsDescription": "Táto organizácia už nie je dostupná. Jej relácie nie je možné načítať.",
       "accessDeniedDescription": "Nemáš prístup k tejto organizácii."
     },
     "creditActivity": {
@@ -3756,7 +3767,9 @@
       "jsonTooLarge": "Použite najviac 50 položiek, kľúče do 128 a hodnoty do 4096 znakov",
       "timeoutInvalid": "Časový limit musí byť celý počet milisekúnd",
       "edit": "Upravte server MCP",
-      "saveFailed": "Server MCP sa nepodarilo uložiť"
+      "saveFailed": "Server MCP sa nepodarilo uložiť",
+      "deleteFailed": "Server MCP sa nepodarilo vymazať",
+      "updateFailed": "Server MCP sa nepodarilo aktualizovať"
     },
     "agents": {
       "title": "Profiloví agenti",
@@ -3783,6 +3796,7 @@
       "visibilitySubagent": "Subagent — volateľný iba od ostatných",
       "visibilityAll": "Všetky — oboje",
       "saveFailed": "Agenta sa nepodarilo uložiť",
+      "deleteFailed": "Agenta sa nepodarilo vymazať",
       "nameRequired": "Zadajte meno agenta",
       "slugRequired": "Zadajte agenta slimáka",
       "slugInvalid": "Slug musí začínať písmenom a používať iba malé písmená, číslice a pomlčky",
@@ -3802,6 +3816,7 @@
       "subtask": "Spustiť ako podúlohu",
       "edit": "Príkaz na úpravu lomky",
       "saveFailed": "Príkaz sa nepodarilo uložiť",
+      "deleteFailed": "Príkaz sa nepodarilo vymazať",
       "nameRequired": "Zadajte názov príkazu",
       "nameInvalid": "Názov musí začínať malým písmenom a používať iba malé písmená, číslice a pomlčky",
       "templateRequired": "Zadajte šablónu príkazu",

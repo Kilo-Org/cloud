@@ -3087,12 +3087,17 @@
     "boundary": {
       "accessDeniedDescription": "You do not have access to this organization.",
       "backToProfile": "Back to profile",
+      "chooseAccount": "Choose an account",
       "loadErrorMessage": "Check your connection and try again.",
       "loadErrorTitle": "Couldn't load your organizations",
+      "noOrganization": "No organization",
+      "noOrganizationDescription": "This account is not part of an organization. Create or join one on the web to use organization features like member invites and low-balance alerts.",
+      "openWebOrganizations": "Open organizations on web",
       "organizationUnavailable": "Organization unavailable",
-      "selectDescription": "Choose an organization from your profile to continue.",
+      "selectDescriptionWithOrganizations": "You belong to one or more organizations. Choose the account this screen should use.",
       "selectOrganization": "Select an organization",
-      "unavailableDescription": "This organization is no longer available. Choose one from your profile to continue."
+      "unavailableDescription": "This organization is no longer available. Choose another account from the account picker to continue.",
+      "unavailableSessionsDescription": "This organization is no longer available. Sessions for it cannot be loaded."
     },
     "creditActivity": {
       "emptyDescription": "Purchases, usage, and credit adjustments for this organization will appear here as they happen.",
@@ -3744,7 +3749,9 @@
       "jsonTooLarge": "Use at most 50 entries, keys up to 128 and values up to 4096 characters",
       "timeoutInvalid": "Timeout must be a whole number of milliseconds",
       "edit": "Edit MCP server",
-      "saveFailed": "Couldn't save MCP server"
+      "saveFailed": "Couldn't save MCP server",
+      "deleteFailed": "Couldn't delete MCP server",
+      "updateFailed": "Couldn't update MCP server"
     },
     "agents": {
       "title": "Profile agents",
@@ -3771,6 +3778,7 @@
       "visibilitySubagent": "Subagent — only callable from others",
       "visibilityAll": "All — both",
       "saveFailed": "Couldn't save agent",
+      "deleteFailed": "Couldn't delete agent",
       "nameRequired": "Enter an agent name",
       "slugRequired": "Enter an agent slug",
       "slugInvalid": "Slug must start with a letter and use only lowercase letters, digits, and dashes",
@@ -3790,6 +3798,7 @@
       "subtask": "Run as subtask",
       "edit": "Edit slash command",
       "saveFailed": "Couldn't save command",
+      "deleteFailed": "Couldn't delete command",
       "nameRequired": "Enter a command name",
       "nameInvalid": "Name must start with a lowercase letter and use only lowercase letters, digits, and dashes",
       "templateRequired": "Enter a command template",

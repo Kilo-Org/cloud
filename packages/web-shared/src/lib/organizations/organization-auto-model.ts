@@ -146,6 +146,14 @@ export async function validateOrganizationAutoTarget(
     return { kind: 'ok', modelId: rawModelId };
   }
 
+  const restrictions = {
+    requireModelInCurrentSnapshot: organization.plan === 'enterprise',
+    providerAllowList:
+      organization.plan === 'enterprise' ? organization.settings.provider_allow_list : undefined,
+    modelDenyList:
+      organization.plan === 'enterprise' ? (organization.settings.model_deny_list ?? []) : [],
+  };
+
   const directByokTarget = await getDirectByokModel(rawModelId);
   if (directByokTarget.provider && directByokTarget.model) {
     const byok = await getBYOKforOrganization(options.dbClient ?? readDb, organization.id, [
@@ -166,19 +174,19 @@ export async function validateOrganizationAutoTarget(
         message: `Organization Auto route target '${targetModelId}' does not support the ${options.apiKind} API.`,
       };
     }
-    return {
-      kind: 'ok',
-      modelId: formatDirectByokModelId(directByokTarget.provider, directByokTarget.model),
-    };
+    const directByokModelId = formatDirectByokModelId(
+      directByokTarget.provider,
+      directByokTarget.model
+    );
+    const isAllowed = createAllowPredicateFromRestrictions(restrictions);
+    if (!(await isAllowed(directByokModelId))) {
+      return {
+        kind: 'error',
+        message: `Organization Auto route target '${targetModelId}' is not allowed by the organization's model policy.`,
+      };
+    }
+    return { kind: 'ok', modelId: directByokModelId };
   }
-
-  const restrictions = {
-    requireModelInCurrentSnapshot: organization.plan === 'enterprise',
-    providerAllowList:
-      organization.plan === 'enterprise' ? organization.settings.provider_allow_list : undefined,
-    modelDenyList:
-      organization.plan === 'enterprise' ? (organization.settings.model_deny_list ?? []) : [],
-  };
 
   if (normalizedModelId.startsWith('kilo-auto/')) {
     if (!isOrganizationAutoTargetModel(normalizedModelId)) {

@@ -252,11 +252,11 @@ describe('Reviewer repository bodies', () => {
 
 describe('Recent review bodies', () => {
   it.each([
-    ['portrait', 0, 0, 24, 24],
-    ['landscape', 47, 59, 71, 83],
+    { orientation: 'portrait', left: 0, right: 0, paddingLeft: 24, paddingRight: 24 },
+    { orientation: 'landscape', left: 47, right: 59, paddingLeft: 71, paddingRight: 83 },
   ])(
-    'keeps the %s rows inside the side insets on top of the gutter',
-    async (_label, left, right, expectedLeft, expectedRight) => {
+    'keeps the $orientation rows inside the side insets on top of the gutter',
+    async ({ left, right, paddingLeft, paddingRight }) => {
       state.insets.left = left;
       state.insets.right = right;
       state.reviews.data = {
@@ -268,8 +268,8 @@ describe('Recent review bodies', () => {
       );
       expect(firstList(renderer).props.contentContainerStyle).toEqual({
         paddingTop: 16,
-        paddingLeft: expectedLeft,
-        paddingRight: expectedRight,
+        paddingLeft,
+        paddingRight,
       });
       unmount();
     }

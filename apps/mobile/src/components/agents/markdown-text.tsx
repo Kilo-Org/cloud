@@ -3,7 +3,9 @@ import { View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { MarkdownCodeFence } from './markdown-code-fence';
 import { MarkdownEnriched } from './markdown-enriched';
+import { splitMarkdownFences } from './markdown-fences';
 import {
   type MarkdownCopyCodeHandler,
   type MarkdownLinkLongPressHandler,
@@ -16,7 +18,7 @@ import {
   splitMarkdownHtmlIncremental,
 } from './markdown-html';
 import { MarkdownMermaid } from './markdown-mermaid';
-import { getPalette, type MarkdownVariant } from './markdown-palette';
+import { getPalette, type MarkdownPalette, type MarkdownVariant } from './markdown-palette';
 import { markdownHtmlSplitCache } from './markdown-parse-cache';
 
 export type MarkdownTextProps = {
@@ -91,47 +93,75 @@ export function MarkdownText({
             onPressLink={onPressLink}
           />
         ) : (
-          splitMermaidFences(segment.raw).map((part, partIndex) =>
-            part.type === 'mermaid' ? (
-              <MarkdownMermaid
-                key={`md-mermaid-${index}-${partIndex}`}
-                source={part.raw}
-                palette={palette}
-              />
-            ) : (
-              <MarkdownEnriched
-                key={`md-content-${index}-${partIndex}`}
-                value={part.raw}
-                palette={palette}
-                selectable={selectable}
-                onLongPressLink={onLongPressLink}
-                onPressLink={onPressLink}
-                onCopyCode={onCopyCode}
-              />
-            )
-          )
+          <MarkdownRun
+            key={`md-content-${index}`}
+            raw={segment.raw}
+            palette={palette}
+            selectable={selectable}
+            onLongPressLink={onLongPressLink}
+            onPressLink={onPressLink}
+            onCopyCode={onCopyCode}
+          />
         )
       )}
     </View>
   );
 }
 
-// A closed ```mermaid fence at the start of a line. An unclosed fence (still
-// streaming) does not match, so it stays a code block until it closes.
-const MERMAID_FENCE = /^```mermaid[ \t]*\n([\s\S]*?)\n```[ \t]*$/gm;
+type MarkdownRunProps = {
+  raw: string;
+  palette: MarkdownPalette;
+  selectable: boolean;
+  onLongPressLink?: MarkdownLinkLongPressHandler;
+  onPressLink?: MarkdownLinkPressHandler;
+  onCopyCode?: MarkdownCopyCodeHandler;
+};
 
-function splitMermaidFences(raw: string): { type: 'markdown' | 'mermaid'; raw: string }[] {
-  const parts: { type: 'markdown' | 'mermaid'; raw: string }[] = [];
-  let last = 0;
-  for (const match of raw.matchAll(MERMAID_FENCE)) {
-    if (match.index > last) {
-      parts.push({ type: 'markdown', raw: raw.slice(last, match.index) });
-    }
-    parts.push({ type: 'mermaid', raw: match[1] ?? '' });
-    last = match.index + match[0].length;
-  }
-  if (last < raw.length || parts.length === 0) {
-    parts.push({ type: 'markdown', raw: raw.slice(last) });
-  }
-  return parts;
+/**
+ * One markdown run: its fenced code blocks are drawn by this app (wrapping, so
+ * a long line stays readable inside the bubble) and everything between them by
+ * the native renderer. A mermaid fence keeps the diagram renderer once it is
+ * closed; while a streamed append is still open the source shows as code, as the
+ * fence regex it replaces did.
+ */
+function MarkdownRun({
+  raw,
+  palette,
+  selectable,
+  onLongPressLink,
+  onPressLink,
+  onCopyCode,
+}: Readonly<MarkdownRunProps>) {
+  const runs = useMemo(() => splitMarkdownFences(raw), [raw]);
+  return (
+    <>
+      {runs.map((run, index) => {
+        if (run.type === 'text') {
+          return (
+            <MarkdownEnriched
+              key={`md-text-${index}`}
+              value={run.raw}
+              palette={palette}
+              selectable={selectable}
+              onLongPressLink={onLongPressLink}
+              onPressLink={onPressLink}
+              onCopyCode={onCopyCode}
+            />
+          );
+        }
+        return run.language === 'mermaid' && run.closed ? (
+          <MarkdownMermaid key={`md-fence-${index}`} source={run.code} palette={palette} />
+        ) : (
+          <MarkdownCodeFence
+            key={`md-fence-${index}`}
+            code={run.code}
+            language={run.language}
+            palette={palette}
+            selectable={selectable}
+            onCopyCode={onCopyCode}
+          />
+        );
+      })}
+    </>
+  );
 }

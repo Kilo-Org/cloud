@@ -68,7 +68,11 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronDown: 'ChevronDown',
   ChevronRight: 'ChevronRight',
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: translate }) }));
+vi.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: () => undefined },
+  useTranslation: () => ({ t: translate }),
+}));
+vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: translate } }));
 vi.mock('@native-html/render', async () => ({
   ...(await vi.importActual<typeof RenderHtmlExports>('@native-html/render')),
   default: 'RenderHTML',
@@ -94,6 +98,7 @@ vi.mock('@/lib/hooks/use-trusted-image-hosts', () => ({
   formatTrustedImageHost: (uri: string) => /^https?:\/\/([^/?#]+)/.exec(uri)?.[1] ?? null,
 }));
 vi.mock('@/components/ui/image-viewer', () => ({ ImageViewer: 'ImageViewer' }));
+vi.mock('./markdown-code-fence', () => ({ MarkdownCodeFence: 'MarkdownCodeFence' }));
 vi.mock('./markdown-mermaid', () => ({ MarkdownMermaid: 'MarkdownMermaid' }));
 vi.mock('./markdown-image', () => ({ MarkdownImage: 'MarkdownImage' }));
 vi.mock('./markdown-image-confirm', () => ({
@@ -130,9 +135,22 @@ const RenderHTMLType = 'RenderHTML' as unknown as ComponentType;
 const AnchorType = 'Anchor' as unknown as ComponentType;
 const MarkdownImageType = 'MarkdownImage' as unknown as ComponentType;
 const EnrichedType = 'EnrichedMarkdownText' as unknown as ComponentType;
+const CodeFenceType = 'MarkdownCodeFence' as unknown as ComponentType;
 const MermaidType = 'MarkdownMermaid' as unknown as ComponentType;
 const ImageViewerType = 'ImageViewer' as unknown as ComponentType;
 const TextType = 'Text' as unknown as ComponentType;
+
+type CodeFenceProps = { code: string; language: string | null };
+
+/** The fences the app draws itself, in render order. */
+function codeFences(renderer: TestRenderer.ReactTestRenderer): CodeFenceProps[] {
+  return renderer.root
+    .findAllByType(CodeFenceType)
+    .map(({ props }) => ({
+      code: (props as CodeFenceProps).code,
+      language: (props as CodeFenceProps).language,
+    }));
+}
 
 type EnrichedHostProps = {
   markdown: string;
@@ -234,12 +252,13 @@ describe('MarkdownText HTML routing', () => {
     expect(markdownSources(renderer).join('')).toBe('');
   });
 
-  it('keeps plain Markdown and fenced HTML on the Markdown path', async () => {
+  it('keeps plain Markdown on the Markdown path and hands a fence to the fence renderer', async () => {
     const value = 'Hello **world**\n\n```html\n<div>code only</div>\n```';
     const renderer = await mount(<MarkdownText value={value} />);
 
     expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
-    expect(markdownSources(renderer)).toEqual([value]);
+    expect(markdownSources(renderer)).toEqual(['Hello **world**\n\n']);
+    expect(codeFences(renderer)).toEqual([{ code: '<div>code only</div>', language: 'html' }]);
     expect(lexer).toHaveBeenCalledTimes(1);
 
     await act(async () => {
@@ -426,7 +445,7 @@ describe('MarkdownText HTML routing', () => {
     expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
   });
 
-  it('keeps tables and fenced code around block HTML on the Markdown path', async () => {
+  it('keeps a table around block HTML on the Markdown path and the fence on its own renderer', async () => {
     const value =
       '| Name |\n| --- |\n| Kilo |\n\n<section>safe HTML</section>\n\n```ts\nconst answer = 42;\n```';
     const renderer = await mount(<MarkdownText value={value} />);
@@ -436,7 +455,8 @@ describe('MarkdownText HTML routing', () => {
     ]);
     const sources = markdownSources(renderer);
     expect(sources[0]).toContain('| Kilo |');
-    expect(sources).toContain('\n\n```ts\nconst answer = 42;\n```');
+    expect(sources.join('')).not.toContain('const answer = 42;');
+    expect(codeFences(renderer)).toEqual([{ code: 'const answer = 42;', language: 'ts' }]);
   });
 
   it('routes block HTML and removes active, style, form, media, SVG, and metadata nodes', async () => {
@@ -650,15 +670,16 @@ describe('MarkdownText mermaid fences', () => {
     expect(renderer.root.findAllByType(MermaidType).map(node => node.props.source)).toEqual([
       'graph TD\n  A --> B',
     ]);
-    expect(markdownSources(renderer)).toEqual(['Before\n\n', '\n\nAfter']);
+    expect(markdownSources(renderer)).toEqual(['Before\n\n', '\nAfter']);
+    expect(codeFences(renderer)).toHaveLength(0);
   });
 
-  it('keeps a streaming (unclosed) mermaid fence on the Markdown path', async () => {
+  it('draws a streaming (unclosed) mermaid fence as code until it closes', async () => {
     const value = 'Before\n\n```mermaid\ngraph TD\n  A --> B';
     const renderer = await mount(<MarkdownText value={value} />);
 
     expect(renderer.root.findAllByType(MermaidType)).toHaveLength(0);
-    expect(markdownSources(renderer)).toEqual([value]);
+    expect(codeFences(renderer)).toEqual([{ code: 'graph TD\n  A --> B', language: 'mermaid' }]);
   });
 });
 
@@ -765,7 +786,8 @@ describe('MarkdownText HTML converted to markdown', () => {
     const value = 'Bold in HTML:\n\n```html\n<b>x</b>\n```';
     const renderer = await mount(<MarkdownText value={value} />);
 
-    expect(markdownSources(renderer)).toEqual([value]);
+    expect(markdownSources(renderer)).toEqual(['Bold in HTML:\n\n']);
+    expect(codeFences(renderer)).toEqual([{ code: '<b>x</b>', language: 'html' }]);
     expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
   });
 

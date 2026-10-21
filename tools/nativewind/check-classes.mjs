@@ -121,6 +121,22 @@ function endOfQuoted(text, start) {
   return index + 1;
 }
 
+/** Index just past the line or block comment at `start`, or -1 if none. */
+function endOfComment(text, start) {
+  if (text[start] !== '/') {
+    return -1;
+  }
+  if (text[start + 1] === '/') {
+    const end = text.indexOf('\n', start);
+    return end === -1 ? text.length : end;
+  }
+  if (text[start + 1] === '*') {
+    const end = text.indexOf('*/', start + 2);
+    return end === -1 ? text.length : end + 2;
+  }
+  return -1;
+}
+
 /** Index of the `}` matching the `{` at `start`, skipping quoted text. */
 function endOfBraces(text, start) {
   let depth = 0;
@@ -128,6 +144,9 @@ function endOfBraces(text, start) {
     const char = text[index];
     if (char === '"' || char === "'" || char === '`') {
       index = endOfQuoted(text, index) - 1;
+    } else if (char === '/') {
+      const end = endOfComment(text, index);
+      index = end === -1 ? index : end - 1;
     } else if (char === '{') {
       depth++;
     } else if (char === '}' && --depth === 0) {
@@ -140,7 +159,7 @@ function endOfBraces(text, start) {
 /**
  * Index of the `>` closing the type argument list that starts at `start`
  * (`<FlashList<Row> ...>`). `=>` inside a function type does not close it,
- * and `>>` closes two nested lists.
+ * `>>` closes two nested lists, and an object type keeps its braces.
  */
 function endOfTypeArguments(text, start) {
   let depth = 0;
@@ -148,15 +167,15 @@ function endOfTypeArguments(text, start) {
     const char = text[index];
     if (char === '"' || char === "'" || char === '`') {
       index = endOfQuoted(text, index) - 1;
+    } else if (char === '/') {
+      const end = endOfComment(text, index);
+      index = end === -1 ? index : end - 1;
     } else if (char === '<') {
       depth++;
     } else if (char === '>' && text[index - 1] !== '=') {
       if (--depth === 0) {
         return index;
       }
-    } else if (char === ';' || char === '{' || char === '}') {
-      // Not a type argument list: keep the tag start as-is.
-      return -1;
     }
   }
   return -1;
@@ -165,7 +184,8 @@ function endOfTypeArguments(text, start) {
 /**
  * Index of the `>` closing the tag whose attributes start at `start`. A nested
  * JSX value or an arrow function keeps its braces open, so `=>` inside an
- * attribute cannot end the tag early.
+ * attribute cannot end the tag early, and a comment between attributes is
+ * skipped whole.
  */
 function endOfTag(text, start) {
   let depth = 0;
@@ -173,6 +193,9 @@ function endOfTag(text, start) {
     const char = text[index];
     if (char === '"' || char === "'" || char === '`') {
       index = endOfQuoted(text, index) - 1;
+    } else if (char === '/') {
+      const end = endOfComment(text, index);
+      index = end === -1 ? index : end - 1;
     } else if (char === '{') {
       depth++;
     } else if (char === '}') {
@@ -220,12 +243,9 @@ function classStrings(expression) {
       }
       strings.push(chunk);
       index = end + 1;
-    } else if (char === '/' && expression[index + 1] === '/') {
-      const end = expression.indexOf('\n', index);
-      index = end === -1 ? expression.length : end;
-    } else if (char === '/' && expression[index + 1] === '*') {
-      const end = expression.indexOf('*/', index + 2);
-      index = end === -1 ? expression.length : end + 2;
+    } else if (char === '/') {
+      const end = endOfComment(expression, index);
+      index = end === -1 ? index + 1 : end;
     } else if (char === '{') {
       const end = endOfBraces(expression, index);
       if (end === -1) {
@@ -252,6 +272,9 @@ function ownClassStrings(attributes) {
     const char = attributes[index];
     if (char === '"' || char === "'" || char === '`') {
       index = endOfQuoted(attributes, index) - 1;
+    } else if (char === '/') {
+      const end = endOfComment(attributes, index);
+      index = end === -1 ? index : end - 1;
     } else if (char === '{') {
       depth++;
     } else if (char === '}') {
@@ -294,10 +317,9 @@ function checkScrollPadding(relative, text) {
     let attributesStart = match.index + match[0].length;
     if (text[attributesStart] === '<') {
       const typeEnd = endOfTypeArguments(text, attributesStart);
-      if (typeEnd === -1) {
-        continue;
+      if (typeEnd !== -1) {
+        attributesStart = typeEnd + 1;
       }
-      attributesStart = typeEnd + 1;
     }
     const tagEnd = endOfTag(text, attributesStart);
     if (tagEnd === -1) {
@@ -358,13 +380,14 @@ function checkRawText(relative, text) {
  * `en-US` calls are a separate decision.
  *
  * ECMA-402 lets the constructors run without `new`, so the names match both
- * forms. The call parenthesis is required so a type reference such as
- * `Intl.DateTimeFormatOptions` or a `Intl.NumberFormat` annotation stays out.
+ * forms. The no-`new` form requires its call parenthesis so a type reference
+ * such as `Intl.DateTimeFormatOptions` or an `Intl.NumberFormat` annotation
+ * stays out; `new Intl.X` matches on its own, parenthesis or not.
  */
 const INTL_CONSTRUCTORS =
   'Collator|DateTimeFormat|DisplayNames|DurationFormat|ListFormat|Locale|NumberFormat|PluralRules|RelativeTimeFormat|Segmenter';
 const DIRECT_INTL = new RegExp(
-  `(?:new\\s+)?Intl\\.(?:${INTL_CONSTRUCTORS})\\s*\\(|\\.toLocale(?:Date|Time|)String\\s*\\(`,
+  `new\\s+Intl\\.\\w+|Intl\\.(?:${INTL_CONSTRUCTORS})\\s*\\(|\\.toLocale(?:Date|Time|)String\\s*\\(`,
   'g'
 );
 const DIRECT_INTL_DIR = join(ROOT, 'apps/mobile/src');

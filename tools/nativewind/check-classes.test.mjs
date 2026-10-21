@@ -114,7 +114,7 @@ test('flags Intl formatters built with or without new', context => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /"Intl\.DateTimeFormat\(" builds its own formatter/);
   assert.match(result.stderr, /"Intl\.NumberFormat\(" builds its own formatter/);
-  assert.match(result.stderr, /"new Intl\.DateTimeFormat\(" builds its own formatter/);
+  assert.match(result.stderr, /"new Intl\.DateTimeFormat" builds its own formatter/);
 });
 
 test('accepts Intl type references', context => {
@@ -138,6 +138,33 @@ test('reads padding from a typed scroll container tag', context => {
   });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /<FlashList> carries "px-5" on its own className/);
+});
+
+test('reads a typed tag past comments and object type arguments', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/screen.tsx':
+      'export const a = (\n' +
+      '  <FlashList<{ id: string }>\n' +
+      "    // the render's tail > and a stray } stay inside the comment\n" +
+      '    renderItem={({ item }) => <View className="px-4" />}\n' +
+      "    className={cn('flex-1', 'p-2')}\n" +
+      '  />\n' +
+      ');\n',
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /<FlashList> carries "p-2" on its own className/);
+  assert.doesNotMatch(result.stderr, /px-4/);
+});
+
+test('flags an Intl constructor without call parentheses after new', context => {
+  const result = runChecker(context, {
+    'apps/mobile/src/format.ts':
+      'export const a = new Intl.DateTimeFormat;\n' +
+      "export const b = new Intl.NumberFormat\n  ('en-US');\n",
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /"new Intl\.DateTimeFormat" builds its own formatter/);
+  assert.match(result.stderr, /"new Intl\.NumberFormat" builds its own formatter/);
 });
 
 test('flags an opacity modifier on primary-disabled and hair-soft', context => {

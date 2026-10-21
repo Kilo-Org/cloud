@@ -8,7 +8,11 @@ const PART_ITEM_ID_ROOT = 'part';
 
 export type PartItemIdentityRange = { start: string; end: string };
 
-export type PartItemIdentity = { messageId: string; partId: string };
+export type PartItemIdentity = {
+  messageId: string;
+  partId: string;
+  layout: 'current' | 'previous';
+};
 
 export function getPartItemIdentity(messageId: string, partId: string): string {
   return `${PART_ITEM_ID_ROOT}/${messageId}/${partId}`;
@@ -41,33 +45,64 @@ export function getPartItemIdentityRanges(messageId: string): PartItemIdentityRa
   return [getPartItemIdentityRange(messageId), getPreviousPartItemIdentityRange(messageId)];
 }
 
+export type PartItemRowPosition = {
+  id: number;
+  ingested_at: number | null;
+  item_id: string;
+};
+
 /**
- * Runs one read per part identity layout and merges the results in `compare` order.
+ * Yields one message's part rows in `order`, reading one `item_id` range per layout.
  *
- * A single `item_id` range per layout keeps each read on the `item_id` index; an OR over both
- * ranges makes SQLite fall back to a rowid scan of every part row in the session, so the merge
- * happens here instead. Each read pages with the caller's cursor, so both stay bounded.
+ * One range per layout keeps every read on the `item_id` index. Each layout pages with its own
+ * cursor, and the two streams are merged as they are read.
  */
-export function mergePartIdentityRanges<T>(
-  messageId: string,
-  read: (range: PartItemIdentityRange) => T[],
-  compare: (left: T, right: T) => number
-): T[] {
-  const [current, previous] = getPartItemIdentityRanges(messageId).map(read);
-  const merged: T[] = [];
-  let currentIndex = 0;
-  let previousIndex = 0;
-  while (currentIndex < current.length && previousIndex < previous.length) {
-    if (compare(current[currentIndex], previous[previousIndex]) <= 0) {
-      merged.push(current[currentIndex]);
-      currentIndex += 1;
-    } else {
-      merged.push(previous[previousIndex]);
-      previousIndex += 1;
+export function* streamMessagePartRows<T extends PartItemRowPosition>(options: {
+  messageId: string;
+  order: 'row-id' | 'ingest';
+  batchSize: number;
+  fetchPage: (range: PartItemIdentityRange, after: T | undefined, limit: number) => T[];
+}): Generator<T> {
+  const { messageId, order, batchSize, fetchPage } = options;
+  const compare =
+    order === 'ingest' ? comparePartIngestOrder : (left: T, right: T) => left.id - right.id;
+  const sources = getPartItemIdentityRanges(messageId).map((range, index) => ({
+    layout: index === 0 ? ('current' as const) : ('previous' as const),
+    range,
+    buffer: [] as T[],
+    after: undefined as T | undefined,
+    done: false,
+  }));
+
+  for (;;) {
+    for (const source of sources) {
+      if (source.done || source.buffer.length > 0) continue;
+      const page = fetchPage(source.range, source.after, batchSize);
+      source.buffer = page.filter(row => {
+        const identity = parsePartItemIdentity(row.item_id);
+        // Rows of the other layout are skipped here; ids with no part identity are passed through
+        // for the caller to validate.
+        return identity === null || identity.layout === source.layout;
+      });
+      const lastRow = page[page.length - 1];
+      if (lastRow !== undefined) source.after = lastRow;
+      source.done = page.length < batchSize;
     }
+
+    let next: T | undefined;
+    let nextSource: (typeof sources)[number] | undefined;
+    for (const source of sources) {
+      const head = source.buffer[0];
+      if (head === undefined) continue;
+      if (next === undefined || compare(head, next) < 0) {
+        next = head;
+        nextSource = source;
+      }
+    }
+    if (next === undefined || nextSource === undefined) return;
+    nextSource.buffer.shift();
+    yield next;
   }
-  merged.push(...current.slice(currentIndex), ...previous.slice(previousIndex));
-  return merged;
 }
 
 /** Emission order of ingest rows: `ingested_at` (nulls first), then the row id. */
@@ -87,10 +122,10 @@ export function comparePartIngestOrder(
 export function parsePartItemIdentity(itemId: string): PartItemIdentity | null {
   const segments = itemId.split('/');
   if (segments.length === 3 && segments[0] === PART_ITEM_ID_ROOT) {
-    return { messageId: segments[1], partId: segments[2] };
+    return { messageId: segments[1], partId: segments[2], layout: 'current' };
   }
   if (segments.length === 2) {
-    return { messageId: segments[0], partId: segments[1] };
+    return { messageId: segments[0], partId: segments[1], layout: 'previous' };
   }
   return null;
 }

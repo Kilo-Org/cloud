@@ -30,10 +30,9 @@ import type { Env } from '../env';
 import type { IngestBatch } from '../types/session-sync';
 import type { SessionDataItem } from '../types/session-sync';
 import {
-  comparePartIngestOrder,
   getItemIdentity,
   getPreviousPartItemIdentity,
-  mergePartIdentityRanges,
+  streamMessagePartRows,
 } from '../util/compaction';
 import { isItemWithinMessageCut } from '../util/message-cut';
 import {
@@ -354,6 +353,24 @@ export type IngestResult =
   | { accepted: false; reason: 'deleted'; changes: never[] };
 /** How many of the newest message rows to inspect when pairing an idle transition with the assistant turn that just finished. */
 const COMPLETED_MESSAGE_SCAN_LIMIT = 50;
+
+/** Part rows read per batch when building the excerpt a completed turn's push carries. */
+const EXCERPT_PART_BATCH_SIZE = 256;
+
+type PartExcerptRow = {
+  id: number;
+  ingested_at: number | null;
+  item_id: string;
+  item_data: string;
+};
+
+type PartExportRow = {
+  id: number;
+  ingested_at: number | null;
+  item_id: string;
+  item_data: string;
+  item_data_r2_key: string | null;
+};
 
 type IngestLifecycleEvent =
   | { type: 'session_open' }
@@ -1180,13 +1197,17 @@ export class SessionIngestDO extends DurableObject<Env> {
 
   /** Builds a text excerpt for a completed assistant message from its already-ingested text parts. */
   private buildAssistantExcerptForMessage(messageId: string): string {
-    const rows = mergePartIdentityRanges(
+    const itemDataRows: string[] = [];
+    for (const row of streamMessagePartRows<PartExcerptRow>({
       messageId,
-      range =>
+      order: 'ingest',
+      batchSize: EXCERPT_PART_BATCH_SIZE,
+      fetchPage: (range, after, limit) =>
         this.db
           .select({
             id: ingestItems.id,
             ingested_at: ingestItems.ingested_at,
+            item_id: ingestItems.item_id,
             item_data: ingestItems.item_data,
           })
           .from(ingestItems)
@@ -1195,17 +1216,22 @@ export class SessionIngestDO extends DurableObject<Env> {
               eq(ingestItems.item_type, 'part'),
               gte(ingestItems.item_id, range.start),
               lt(ingestItems.item_id, range.end),
-              isNull(ingestItems.item_data_r2_key)
+              isNull(ingestItems.item_data_r2_key),
+              after
+                ? afterIngestOrderCursor({ ingestedAt: after.ingested_at, id: after.id })
+                : undefined
             )
           )
           .orderBy(ingestItems.ingested_at, ingestItems.id)
+          .limit(limit)
           .all(),
-      comparePartIngestOrder
-    );
+    })) {
+      itemDataRows.push(row.item_data);
+    }
 
     // Parts offloaded to R2 (oversized items) store '{}' inline; skip them rather
     // than fetching from R2 — this is a best-effort excerpt, not a full transcript.
-    return buildAssistantExcerpt(rows.map(row => row.item_data));
+    return buildAssistantExcerpt(itemDataRows);
   }
 
   /**
@@ -1322,44 +1348,43 @@ export class SessionIngestDO extends DurableObject<Env> {
               // when stored before parts had their own namespace
               const msgId = msgRow.item_id.slice('message/'.length);
               controller.enqueue(encoder.encode(',"parts":['));
-              let partCursor: IngestOrderCursor | undefined;
               let firstPart = true;
 
-              while (true) {
-                const partBatch = mergePartIdentityRanges(
-                  msgId,
-                  range =>
-                    db
-                      .select({
-                        id: ingestItems.id,
-                        ingested_at: ingestItems.ingested_at,
-                        item_data: ingestItems.item_data,
-                        item_data_r2_key: ingestItems.item_data_r2_key,
-                      })
-                      .from(ingestItems)
-                      .where(
-                        and(
-                          eq(ingestItems.item_type, 'part'),
-                          gte(ingestItems.item_id, range.start),
-                          lt(ingestItems.item_id, range.end),
-                          partCursor ? afterIngestOrderCursor(partCursor) : undefined
-                        )
+              for (const partRow of streamMessagePartRows<PartExportRow>({
+                messageId: msgId,
+                order: 'ingest',
+                batchSize: CURSOR_BATCH,
+                fetchPage: (range, after, limit) =>
+                  db
+                    .select({
+                      id: ingestItems.id,
+                      ingested_at: ingestItems.ingested_at,
+                      item_id: ingestItems.item_id,
+                      item_data: ingestItems.item_data,
+                      item_data_r2_key: ingestItems.item_data_r2_key,
+                    })
+                    .from(ingestItems)
+                    .where(
+                      and(
+                        eq(ingestItems.item_type, 'part'),
+                        gte(ingestItems.item_id, range.start),
+                        lt(ingestItems.item_id, range.end),
+                        after
+                          ? afterIngestOrderCursor({
+                              ingestedAt: after.ingested_at,
+                              id: after.id,
+                            })
+                          : undefined
                       )
-                      .orderBy(ingestItems.ingested_at, ingestItems.id)
-                      .limit(CURSOR_BATCH)
-                      .all(),
-                  comparePartIngestOrder
-                );
+                    )
+                    .orderBy(ingestItems.ingested_at, ingestItems.id)
+                    .limit(limit)
+                    .all(),
+              })) {
+                if (!firstPart) controller.enqueue(encoder.encode(','));
+                firstPart = false;
 
-                if (partBatch.length === 0) break;
-                partCursor = ingestOrderCursor(partBatch[partBatch.length - 1]);
-
-                for (const partRow of partBatch) {
-                  if (!firstPart) controller.enqueue(encoder.encode(','));
-                  firstPart = false;
-
-                  await enqueueItemData(controller, partRow, r2, encoder);
-                }
+                await enqueueItemData(controller, partRow, r2, encoder);
               }
 
               controller.enqueue(encoder.encode(']}'));

@@ -414,6 +414,96 @@ describe('SessionIngestDO integration', () => {
         },
       ]);
     });
+
+    it('exports parts stored under both layouts', async () => {
+      const sessionId = 'ses_part_layout_both_0000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest([{ type: 'message', data: message(sessionId) }], kiloUserId, sessionId, 1);
+      await runInDurableObject(stub, async (_instance, state) => {
+        for (let index = 0; index < 12; index += 1) {
+          const id = `prt_previous_${String(index).padStart(2, '0')}`;
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+            `msg_a/${id}`,
+            'part',
+            JSON.stringify({
+              id,
+              sessionID: sessionId,
+              messageID: 'msg_a',
+              type: 'text',
+              text: id,
+            }),
+            1000 + index
+          );
+        }
+      });
+      await stub.ingest(
+        Array.from({ length: 12 }, (_unused, index) => {
+          const id = `prt_current_${String(index).padStart(2, '0')}`;
+          return {
+            type: 'part' as const,
+            data: { id, sessionID: sessionId, messageID: 'msg_a', type: 'text', text: id },
+          };
+        }),
+        kiloUserId,
+        sessionId,
+        1,
+        5000
+      );
+
+      const exported = JSON.parse(await stub.getAllStream().then(s => new Response(s).text())) as {
+        messages: Array<{ parts: Array<{ id: string }> }>;
+      };
+      expect(exported.messages.flatMap(entry => entry.parts.map(part => part.id))).toEqual([
+        ...Array.from(
+          { length: 12 },
+          (_unused, index) => `prt_previous_${String(index).padStart(2, '0')}`
+        ),
+        ...Array.from(
+          { length: 12 },
+          (_unused, index) => `prt_current_${String(index).padStart(2, '0')}`
+        ),
+      ]);
+
+      const read = await stub.readKiloSdkMessages({});
+      if ('kind' in read) throw new Error(`unexpected read failure: ${read.kind}`);
+      expect(read.messages[0]?.parts).toHaveLength(24);
+    });
+
+    it('exports a message own parts when the ranges share a prefix', async () => {
+      const sessionId = 'ses_part_layout_overlap_000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'message/part',
+          'message',
+          JSON.stringify({ id: 'part', time: { created: 1 } }),
+          1000
+        );
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'part/prt_legacy',
+          'part',
+          JSON.stringify({ id: 'prt_legacy', messageID: 'part', type: 'text', text: 'own' }),
+          1001
+        );
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'part/msg_other/prt_other',
+          'part',
+          JSON.stringify({ id: 'prt_other', messageID: 'msg_other', type: 'text', text: 'other' }),
+          1002
+        );
+      });
+
+      const exported = JSON.parse(await stub.getAllStream().then(s => new Response(s).text())) as {
+        messages: Array<{ info: { id: string }; parts: Array<{ id: string }> }>;
+      };
+      expect(
+        exported.messages.map(entry => [entry.info.id, entry.parts.map(part => part.id)])
+      ).toEqual([['part', ['prt_legacy']]]);
+    });
   });
 
   describe('SDK session snapshot reads', () => {

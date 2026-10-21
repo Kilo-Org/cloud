@@ -5,6 +5,7 @@ import type {
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getRawOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { briefingPriceBound, briefingPrompt } from './summary';
 import type { BriefingReportRow } from './store';
 
@@ -14,6 +15,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/openrouter'),
   getRawOpenRouterModels: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
+  getUnavailableModelIds: jest.fn(),
 }));
 
 function catalogModel(id: string, pricing: OpenRouterModel['pricing']): OpenRouterModel {
@@ -37,6 +41,7 @@ describe('briefing model pricing', () => {
 
   beforeEach(() => {
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    jest.mocked(getUnavailableModelIds).mockResolvedValue(new Set<string>());
     jest
       .mocked(getRawOpenRouterModels)
       .mockResolvedValue({ data: [aion] } satisfies OpenRouterModelsResponse);
@@ -58,6 +63,28 @@ describe('briefing model pricing', () => {
     await expect(
       briefingPriceBound('vendor/unlisted', 'Overnight activity', 2_000_000)
     ).rejects.toThrow('model_pricing_unavailable');
+  });
+
+  it('refuses a model the gateway marks unavailable', async () => {
+    jest.mocked(getUnavailableModelIds).mockResolvedValue(new Set([aion.id]));
+
+    await expect(briefingPriceBound(aion.id, 'Overnight activity', 2_000_000)).rejects.toThrow(
+      'model_not_allowed'
+    );
+  });
+
+  it('refuses a priced catalog model the picker hides when a snapshot exists', async () => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      'vendor/listed': {
+        id: 'vendor/listed',
+        name: 'Listed',
+        endpoints: [{ pricing: { prompt: '0.000001', completion: '0.000002' } }],
+      } satisfies StoredModel,
+    });
+
+    await expect(briefingPriceBound(aion.id, 'Overnight activity', 2_000_000)).rejects.toThrow(
+      'model_not_allowed'
+    );
   });
 
   it('rejects a picker price with unknown rates', async () => {

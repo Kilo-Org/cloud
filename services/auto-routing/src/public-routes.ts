@@ -116,6 +116,20 @@ async function requireCallerPaidUsageBalance(caller: Caller): Promise<void> {
   requirePaidUsageBalance(await loadPayerBalanceUsd(caller));
 }
 
+// An eval is paid by the router owner: the caller's own balance for a personal router, or the
+// organization balance for an organization router. Either payer admits the request here;
+// loadEditableRouter applies the exact owner rule afterwards.
+async function requireEvalPayerPaidUsageBalance(caller: Caller): Promise<void> {
+  if (canSpendPaidUsage(caller.userBalanceMicrodollars / 1_000_000)) return;
+  if (
+    caller.organizationId !== null &&
+    canSpendPaidUsage(await loadOrganizationBalanceUsd(caller.db, caller.organizationId))
+  ) {
+    return;
+  }
+  throw new CustomRouterError('insufficient_balance', 'Insufficient balance');
+}
+
 export const publicDecideHandler = publicHandler(async c => {
   const caller = await authenticateCaller(c.env, c.req.raw.headers);
   await requireCallerPaidUsageBalance(caller);
@@ -243,7 +257,7 @@ async function loadEditableRouter(
 
 export const evalPlanHandler = publicHandler(async c => {
   const caller = await authenticateCaller(c.env, c.req.raw.headers);
-  await requireCallerPaidUsageBalance(caller);
+  await requireEvalPayerPaidUsageBalance(caller);
   const request = parseBody(
     ClientEvalPlanRequestSchema,
     (await readJson(c, MAX_EVAL_PLAN_OR_CASE_REQUEST_BODY_BYTES)).json
@@ -261,7 +275,7 @@ export const evalPlanHandler = publicHandler(async c => {
 
 export const evalCaseHandler = publicHandler(async c => {
   const caller = await authenticateCaller(c.env, c.req.raw.headers);
-  await requireCallerPaidUsageBalance(caller);
+  await requireEvalPayerPaidUsageBalance(caller);
   const request = parseBody(
     ClientEvalCaseRequestSchema,
     (await readJson(c, MAX_EVAL_PLAN_OR_CASE_REQUEST_BODY_BYTES)).json
@@ -276,7 +290,7 @@ export const evalCaseHandler = publicHandler(async c => {
 
 export const evalResultHandler = publicHandler(async c => {
   const caller = await authenticateCaller(c.env, c.req.raw.headers);
-  await requireCallerPaidUsageBalance(caller);
+  await requireEvalPayerPaidUsageBalance(caller);
   const upload = parseBody(
     ClientEvalResultUploadSchema,
     (await readJson(c, MAX_EVAL_RESULT_REQUEST_BODY_BYTES)).json

@@ -321,6 +321,17 @@ async function decisionOf(res: Response) {
   return CustomRouterDecideResponseSchema.parse(await res.json());
 }
 
+// A user whose credited balance is fully spent.
+function spentBalanceUser() {
+  return {
+    api_token_pepper: 'pepper-1',
+    blocked_reason: null,
+    google_user_email: 'dev@example.com',
+    total_microdollars_acquired: 1_000_000,
+    microdollars_used: 1_000_000,
+  };
+}
+
 async function errorCode(res: Response) {
   const body = (await res.json()) as { error: { code: string } };
   return body.error.code;
@@ -1097,6 +1108,7 @@ describe('client eval proxy', () => {
       customRouter({ ownerType: 'org', ownerId: ORG_ID, slug: 'team' })
     );
     findOrganizationMemberRole.mockResolvedValue('billing_manager');
+    findOrganizationMemberBalanceRow.mockResolvedValue(null);
     benchmarkFetch.mockResolvedValueOnce(Response.json({ score: 1 }));
     const upload = {
       routerId: ROUTER_ID,
@@ -1155,10 +1167,9 @@ describe('client eval proxy', () => {
     expect(benchmarkFetch).not.toHaveBeenCalled();
   });
 
-  it('requires an organization allowance from an organization caller', async () => {
-    findOrganizationMemberBalanceRow.mockResolvedValue(
-      memberBalanceRow({ microdollar_limit: 1_000_000, microdollar_usage: 1_000_000 })
-    );
+  it('requires a funded payer for an eval plan', async () => {
+    dbRows.user = [spentBalanceUser()];
+    dbRows.organization = [{ total_microdollars_acquired: 1_000, microdollars_used: 1_000 }];
     const { res, bodyUsed } = await postStream(CUSTOM_ROUTER_EVAL_PLAN_PATH, streamingBody(), {
       'X-KiloCode-OrganizationId': ORG_ID,
     });
@@ -1167,6 +1178,27 @@ describe('client eval proxy', () => {
     expect(bodyUsed).toBe(false);
     expect(findCustomRouterById).not.toHaveBeenCalled();
     expect(benchmarkFetch).not.toHaveBeenCalled();
+  });
+
+  it('runs an eval plan for an organization billing manager funded by the organization', async () => {
+    findCustomRouterById.mockResolvedValue(
+      customRouter({ ownerType: 'org', ownerId: ORG_ID, slug: 'team' })
+    );
+    findOrganizationMemberRole.mockResolvedValue('billing_manager');
+    findOrganizationMemberBalanceRow.mockResolvedValue(null);
+    dbRows.user = [spentBalanceUser()];
+    benchmarkFetch.mockResolvedValueOnce(Response.json({}));
+    const res = await post(
+      CUSTOM_ROUTER_EVAL_PLAN_PATH,
+      { routerId: ROUTER_ID },
+      { 'X-KiloCode-OrganizationId': ORG_ID }
+    );
+    expect(res.status).toBe(200);
+    expect(forwarded(CUSTOM_ROUTER_EVAL_PLAN_PATH)).toMatchObject({
+      routerId: ROUTER_ID,
+      ownerType: 'org',
+      ownerId: ORG_ID,
+    });
   });
 
   it('accepts an eval plan at the body cap and refuses a larger one', async () => {

@@ -111,7 +111,9 @@
     "online": "W sieci",
     "open": "Otwórz {{name}}",
     "openPullRequest": "Otwórz PR",
+    "completed": "Ukończono",
     "pending": "Oczekuje",
+    "running": "W toku",
     "performance": "Wydajność",
     "preferences": "Preferencje",
     "privacyPolicy": "Polityka prywatności",
@@ -1027,8 +1029,6 @@
     "updateFailed": "Nie udało się zaktualizować recenzenta kodu.",
     "configSaveFailed": "Nie udało się zapisać konfiguracji przeglądu.",
     "status": {
-      "running": "W toku",
-      "completed": "Ukończono",
       "interrupted": "Przerwano"
     },
     "reviewStyle": {
@@ -1396,7 +1396,6 @@
       "installApp": "Zainstaluj aplikację GitHub",
       "reauthorizeButton": "Autoryzuj ponownie aplikację GitHub",
       "reauthorizeDescription": "Agent bezpieczeństwa wymaga uprawnienia vulnerability_alerts, aby uzyskać dostęp do alertów Dependabot. Autoryzuj ponownie aplikację GitHub, aby przyznać to uprawnienie.",
-      "reauthorizeFailed": "Nie udało się rozpocząć ponownej autoryzacji. Spróbuj ponownie.",
       "reauthorizeTitle": "Wymagane dodatkowe uprawnienia",
       "setupFailed": "Nie udało się rozpocząć konfiguracji GitHub. Spróbuj ponownie."
     },
@@ -1421,6 +1420,7 @@
     "settingsSave": {
       "saveChanges": "Zapisz zmiany",
       "unsavedMessage": "Zapisać zmiany przed opuszczeniem tego ekranu?",
+      "unsavedInvalidMessage": "Tych zmian nie można jeszcze zapisać. Popraw je, aby zapisać, lub odrzuć je, aby wyjść.",
       "unsavedTitle": "Niezapisane zmiany"
     },
     "setup": {
@@ -1832,7 +1832,8 @@
       "matchesBadge_other": "dopasowania: {{displayCount}}",
       "matchesBadge_few": "dopasowania: {{displayCount}}",
       "matchesBadge_many": "dopasowań: {{displayCount}}",
-      "noOutput": "Brak wyjścia."
+      "noOutput": "Brak wyjścia.",
+      "translationFailed": "Tłumaczenie nie powiodło się"
     },
     "readToolMarkdown": {
       "linesTruncated": "wiersze {{start}}–{{end}} (skrócono)",
@@ -3758,7 +3759,9 @@
       "jsonTooLarge": "Użyj maksymalnie 50 wpisów, klucze do 128 i wartości do 4096 znaków",
       "timeoutInvalid": "Limit czasu musi być liczbą całkowitą milisekund",
       "edit": "Edytuj serwer MCP",
-      "saveFailed": "Nie można zapisać serwera MCP"
+      "saveFailed": "Nie można zapisać serwera MCP",
+      "deleteFailed": "Nie można usunąć serwera MCP",
+      "updateFailed": "Nie można zaktualizować serwera MCP"
     },
     "agents": {
       "title": "Agenci profilowi",
@@ -3785,6 +3788,7 @@
       "visibilitySubagent": "Subagent — można go wywołać tylko od innych osób",
       "visibilityAll": "Wszyscy – oba",
       "saveFailed": "Nie udało się zapisać agenta",
+      "deleteFailed": "Nie udało się usunąć agenta",
       "nameRequired": "Wprowadź nazwę agenta",
       "slugRequired": "Wprowadź ślimak agenta",
       "slugInvalid": "Ślimak musi zaczynać się od litery i używać tylko małych liter, cyfr i myślników",
@@ -3799,10 +3803,12 @@
       "description": "Opis polecenia",
       "template": "Szablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Wyjaśnij $ARGUMENTS",
       "subtask": "Uruchom jako podzadanie",
       "edit": "Edytuj polecenie ukośnika",
       "saveFailed": "Nie udało się zapisać polecenia",
+      "deleteFailed": "Nie udało się usunąć polecenia",
       "nameRequired": "Wprowadź nazwę polecenia",
       "nameInvalid": "Nazwa musi zaczynać się od małej litery i zawierać wyłącznie małe litery, cyfry i myślniki",
       "templateRequired": "Wprowadź szablon polecenia",
@@ -3957,7 +3963,7 @@
     "view": "Przeczytaj raport",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Pokaż bieżący stan",
+    "dismiss": "Odrzuć raport",
     "offline": "Offline · zapisany raport",
     "cached": "Zapisany raport · odświeżanie niedostępne",
     "revised": "Zaktualizowano · {{revision}}",

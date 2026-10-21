@@ -111,7 +111,9 @@
     "online": "Připojeno",
     "open": "Otevřít {{name}}",
     "openPullRequest": "Otevřít PR",
+    "completed": "Dokončeno",
     "pending": "Čeká",
+    "running": "Běží",
     "performance": "Výkon",
     "preferences": "Předvolby",
     "privacyPolicy": "Zásady ochrany osobních údajů",
@@ -1574,8 +1576,6 @@
     "updateFailed": "Agenta pro kontrolu kódu se nepodařilo aktualizovat.",
     "configSaveFailed": "Nastavení kontrol kódu se nepodařilo uložit.",
     "status": {
-      "running": "Běží",
-      "completed": "Dokončeno",
       "interrupted": "Přerušeno"
     },
     "reviewStyle": {
@@ -1918,7 +1918,8 @@
     "settingsSave": {
       "saveChanges": "Uložit změny",
       "unsavedTitle": "Neuložené změny",
-      "unsavedMessage": "Uložit změny před opuštěním této obrazovky?"
+      "unsavedMessage": "Uložit změny před opuštěním této obrazovky?",
+      "unsavedInvalidMessage": "Tyto změny zatím nelze uložit. Oprav je, abys je mohl uložit, nebo je zahoď, abys mohl odejít."
     },
     "auditReportButton": {
       "viewA11y": "Zobrazit zprávu o auditu"
@@ -1987,7 +1988,6 @@
       "installApp": "Nainstalovat aplikaci GitHub",
       "reauthorizeButton": "Znovu autorizovat aplikaci GitHub",
       "reauthorizeDescription": "Bezpečnostní agent potřebuje k přístupu k upozorněním Dependabot oprávnění vulnerability_alerts. Udělte ho opětovnou autorizací aplikace GitHub.",
-      "reauthorizeFailed": "Opětovnou autorizaci se nepodařilo zahájit. Zkuste to znovu.",
       "reauthorizeTitle": "Jsou vyžadována další oprávnění",
       "setupFailed": "Nastavení GitHubu se nepodařilo spustit. Zkuste to znovu."
     },
@@ -2379,7 +2379,8 @@
       "matchesBadge_other": "shody: {{displayCount}}",
       "matchesBadge_few": "shody: {{displayCount}}",
       "matchesBadge_many": "shod: {{displayCount}}",
-      "noOutput": "Žádný výstup."
+      "noOutput": "Žádný výstup.",
+      "translationFailed": "Překlad se nezdařil"
     },
     "readToolMarkdown": {
       "linesTruncated": "řádky {{start}}–{{end}} (zkráceno)",
@@ -3736,7 +3737,7 @@
       "empty": "Zatím žádné servery MCP",
       "name": "Název serveru",
       "type": "Typ serveru",
-      "localType": "Místní",
+      "localType": "Lokální",
       "remoteType": "Vzdálený",
       "command": "Příkazový řádek",
       "url": "URL",
@@ -3758,7 +3759,9 @@
       "jsonTooLarge": "Použijte nejvýše 50 položek, klíče do 128 a hodnoty do 4096 znaků",
       "timeoutInvalid": "Časový limit musí být celý počet milisekund",
       "edit": "Upravit server MCP",
-      "saveFailed": "Server MCP se nepodařilo uložit"
+      "saveFailed": "Server MCP se nepodařilo uložit",
+      "deleteFailed": "Server MCP se nepodařilo smazat",
+      "updateFailed": "Server MCP se nepodařilo aktualizovat"
     },
     "agents": {
       "title": "Profiloví agenti",
@@ -3785,6 +3788,7 @@
       "visibilitySubagent": "Subagent — lze volat pouze od ostatních",
       "visibilityAll": "Všichni – oba",
       "saveFailed": "Agenta se nepodařilo uložit",
+      "deleteFailed": "Agenta se nepodařilo smazat",
       "nameRequired": "Zadejte jméno agenta",
       "slugRequired": "Zadejte agenta slimáka",
       "slugInvalid": "Slug musí začínat písmenem a používat pouze malá písmena, číslice a pomlčky",
@@ -3799,10 +3803,12 @@
       "description": "Popis příkazu",
       "template": "Šablona",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Vysvětlete $ARGUMENTS",
       "subtask": "Spustit jako dílčí úkol",
       "edit": "Příkaz upravit lomítko",
       "saveFailed": "Příkaz se nepodařilo uložit",
+      "deleteFailed": "Příkaz se nepodařilo smazat",
       "nameRequired": "Zadejte název příkazu",
       "nameInvalid": "Název musí začínat malým písmenem a používat pouze malá písmena, číslice a pomlčky",
       "templateRequired": "Zadejte šablonu příkazu",
@@ -3957,7 +3963,7 @@
     "view": "Číst přehled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Zobrazit živý stav",
+    "dismiss": "Zamítnout přehled",
     "offline": "Offline · uložený přehled",
     "cached": "Uložený report · obnovení nedostupné",
     "revised": "Upraveno · {{revision}}",

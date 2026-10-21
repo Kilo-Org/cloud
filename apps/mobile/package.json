@@ -20,7 +20,7 @@
     "format:check": "oxfmt --list-different src",
     "check:unused": "node --env-file=.env node_modules/knip/bin/knip.js --no-config-hints",
     "check:i18n": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.i18n.json apps/mobile/src packages/app-shared/src && node ../../tools/i18n/check-catalogs.mjs",
-    "check:plurals": "node ../../tools/i18n/check-plurals.mjs",
+    "check:plurals": "node ../../tools/i18n/check-plurals.mjs --source-only",
     "check:classes": "node ../../tools/nativewind/check-classes.mjs",
     "test": "node scripts/assert-theme-colors.mjs && vitest run",
     "test:watch": "vitest"
@@ -61,6 +61,7 @@
     "@tanstack/react-query-persist-client": "catalog:",
     "@trpc/client": "catalog:",
     "@trpc/tanstack-react-query": "catalog:",
+    "character-entities": "2.0.2",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "drizzle-orm": "catalog:",

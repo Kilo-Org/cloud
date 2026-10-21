@@ -111,7 +111,9 @@
     "online": "Forbundet",
     "open": "Åbn {{name}}",
     "openPullRequest": "Åbn PR",
+    "completed": "Afsluttet",
     "pending": "Afventer",
+    "running": "Kører",
     "performance": "Ydeevne",
     "preferences": "Indstillinger",
     "privacyPolicy": "Privatlivspolitik",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Code Reviewer kunne ikke opdateres.",
     "configSaveFailed": "Indstillingerne for gennemgange kunne ikke gemmes.",
     "status": {
-      "running": "Kører",
-      "completed": "Afsluttet",
       "interrupted": "Afbrudt"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Gem ændringer",
       "unsavedTitle": "Ugemte ændringer",
-      "unsavedMessage": "Vil du gemme dine ændringer, før du forlader denne skærm?"
+      "unsavedMessage": "Vil du gemme dine ændringer, før du forlader denne skærm?",
+      "unsavedInvalidMessage": "Disse ændringer kan ikke gemmes endnu. Ret dem for at gemme, eller kassér dem for at forlade."
     },
     "auditReportButton": {
       "viewA11y": "Vis revisionsrapport"
@@ -1941,7 +1942,6 @@
       "installApp": "Installér GitHub-appen",
       "reauthorizeButton": "Godkend GitHub-appen igen",
       "reauthorizeDescription": "Security Agent kræver tilladelsen vulnerability_alerts for at få adgang til Dependabot-advarsler. Godkend GitHub-appen igen for at give denne tilladelse.",
-      "reauthorizeFailed": "En ny godkendelse kunne ikke startes. Prøv igen.",
       "reauthorizeTitle": "Yderligere tilladelser påkrævet",
       "setupFailed": "Opsætningen af GitHub kunne ikke startes. Prøv igen."
     },
@@ -2315,7 +2315,8 @@
       "linesBadge_other": "{{displayCount}} linjer",
       "matchesBadge_one": "{{displayCount}} resultat",
       "matchesBadge_other": "{{displayCount}} resultater",
-      "noOutput": "Ingen output."
+      "noOutput": "Ingen output.",
+      "translationFailed": "Oversættelse mislykkedes"
     },
     "readToolMarkdown": {
       "linesTruncated": "linje {{start}}–{{end}} (forkortet)",
@@ -3676,7 +3677,9 @@
       "jsonTooLarge": "Brug højst 50 poster, nøgler op til 128 og værdier op til 4096 tegn",
       "timeoutInvalid": "Timeout skal være et helt antal millisekunder",
       "edit": "Rediger MCP-server",
-      "saveFailed": "MCP-serveren kunne ikke gemmes"
+      "saveFailed": "MCP-serveren kunne ikke gemmes",
+      "deleteFailed": "MCP-serveren kunne ikke slettes",
+      "updateFailed": "MCP-serveren kunne ikke opdateres"
     },
     "agents": {
       "title": "Profilagenter",
@@ -3703,6 +3706,7 @@
       "visibilitySubagent": "Subagent — kan kun kaldes fra andre",
       "visibilityAll": "Alle - begge",
       "saveFailed": "Agenten kunne ikke gemmes",
+      "deleteFailed": "Agenten kunne ikke slettes",
       "nameRequired": "Indtast et agentnavn",
       "slugRequired": "Indtast en agentsnegl",
       "slugInvalid": "Slug skal starte med et bogstav og kun bruge små bogstaver, cifre og bindestreger",
@@ -3717,10 +3721,12 @@
       "description": "Kommandobeskrivelse",
       "template": "Skabelon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Forklar $ARGUMENTS",
       "subtask": "Kør som underopgave",
       "edit": "Rediger skråstreg kommando",
       "saveFailed": "Kommandoen kunne ikke gemmes",
+      "deleteFailed": "Kommandoen kunne ikke slettes",
       "nameRequired": "Indtast et kommandonavn",
       "nameInvalid": "Navnet skal starte med et lille bogstav og kun bruge små bogstaver, cifre og bindestreger",
       "templateRequired": "Indtast en kommandoskabelon",
@@ -3867,7 +3873,7 @@
     "view": "Læs briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Vis live-status",
+    "dismiss": "Afvis briefing",
     "offline": "Offline · gemt briefing",
     "cached": "Gemt rapport · kan ikke opdateres",
     "revised": "Revideret · {{revision}}",

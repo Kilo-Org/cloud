@@ -111,7 +111,9 @@
     "online": "Conectat",
     "open": "Deschide {{name}}",
     "openPullRequest": "Deschidere PR",
+    "completed": "Finalizat",
     "pending": "În așteptare",
+    "running": "Rulează",
     "performance": "Performanță",
     "preferences": "Preferințe",
     "privacyPolicy": "Politica de confidențialitate",
@@ -1555,8 +1557,6 @@
     "updateFailed": "Nu s-a putut actualiza agentul de revizuire a codului.",
     "configSaveFailed": "Nu s-a putut salva configurația revizuirii.",
     "status": {
-      "running": "Rulează",
-      "completed": "Finalizat",
       "interrupted": "Întreruptă"
     },
     "reviewStyle": {
@@ -1895,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Salvează modificările",
       "unsavedTitle": "Modificări nesalvate",
-      "unsavedMessage": "Salvezi modificările înainte de a părăsi acest ecran?"
+      "unsavedMessage": "Salvezi modificările înainte de a părăsi acest ecran?",
+      "unsavedInvalidMessage": "Aceste modificări nu pot fi încă salvate. Corectează-le pentru a salva sau renunță la ele pentru a pleca."
     },
     "auditReportButton": {
       "viewA11y": "Vezi raportul de audit"
@@ -1964,7 +1965,6 @@
       "installApp": "Instalează aplicația GitHub",
       "reauthorizeButton": "Autorizează din nou aplicația GitHub",
       "reauthorizeDescription": "Agentul de securitate are nevoie de permisiunea vulnerability_alerts pentru a accesa alertele Dependabot. Autorizează din nou aplicația GitHub pentru a acorda această permisiune.",
-      "reauthorizeFailed": "Nu s-a putut începe reautorizarea. Încearcă din nou.",
       "reauthorizeTitle": "Sunt necesare permisiuni suplimentare",
       "setupFailed": "Nu s-a putut începe configurarea GitHub. Încearcă din nou."
     },
@@ -2347,7 +2347,8 @@
       "matchesBadge_one": "{{displayCount}} potrivire",
       "matchesBadge_other": "{{displayCount}} potriviri",
       "matchesBadge_few": "{{displayCount}} potriviri",
-      "noOutput": "Nicio ieșire."
+      "noOutput": "Nicio ieșire.",
+      "translationFailed": "Traducerea a eșuat"
     },
     "readToolMarkdown": {
       "linesTruncated": "liniile {{start}}–{{end}} (trunchiate)",
@@ -3717,7 +3718,9 @@
       "jsonTooLarge": "Folosiți cel mult 50 de intrări, chei de până la 128 și valori de până la 4096 de caractere",
       "timeoutInvalid": "Timeout trebuie să fie un număr întreg de milisecunde",
       "edit": "Editați serverul MCP",
-      "saveFailed": "Serverul MCP nu a putut fi salvat"
+      "saveFailed": "Serverul MCP nu a putut fi salvat",
+      "deleteFailed": "Serverul MCP nu a putut fi șters",
+      "updateFailed": "Serverul MCP nu a putut fi actualizat"
     },
     "agents": {
       "title": "Agenți de profil",
@@ -3744,6 +3747,7 @@
       "visibilitySubagent": "Subagent - apelabil numai de la alții",
       "visibilityAll": "Toate — ambele",
       "saveFailed": "Agentul nu a putut fi salvat",
+      "deleteFailed": "Agentul nu a putut fi șters",
       "nameRequired": "Introduceți un nume de agent",
       "slugRequired": "Introduceți un melc de agent",
       "slugInvalid": "Slug trebuie să înceapă cu o literă și să folosească numai litere mici, cifre și liniuțe",
@@ -3758,10 +3762,12 @@
       "description": "Descrierea comenzii",
       "template": "Șablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explicați $ARGUMENTS",
       "subtask": "Rulați ca subsarcină",
       "edit": "Comanda Editați slash",
       "saveFailed": "Comanda nu a putut fi salvată",
+      "deleteFailed": "Comanda nu a putut fi ștearsă",
       "nameRequired": "Introduceți un nume de comandă",
       "nameInvalid": "Numele trebuie să înceapă cu o literă mică și să folosească numai litere mici, cifre și liniuțe",
       "templateRequired": "Introduceți un șablon de comandă",
@@ -3912,7 +3918,7 @@
     "view": "Citește rezumatul",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Afișează starea live",
+    "dismiss": "Ignoră rezumatul",
     "offline": "Offline · rezumat salvat",
     "cached": "Raport salvat · reîmprospătare indisponibilă",
     "revised": "Revizuit · {{revision}}",

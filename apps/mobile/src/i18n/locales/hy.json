@@ -111,7 +111,9 @@
     "online": "Առցանց",
     "open": "Բացել {{name}}-ը",
     "openPullRequest": "Բաց միավորման հարցում",
+    "completed": "Ավարտված",
     "pending": "Սպասման մեջ",
+    "running": "Ընթացքում է",
     "performance": "Արտադրողականություն",
     "preferences": "Նախապատվություններ",
     "privacyPolicy": "Գաղտնիության քաղաքականություն",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Չհաջողվեց թարմացնել Կոդի ստուգիչը։",
     "configSaveFailed": "Չհաջողվեց պահպանել ստուգման կարգավորումները։",
     "status": {
-      "running": "Ընթացքում է",
-      "completed": "Ավարտված",
       "interrupted": "Ընդհատված"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Պահպանել փոփոխությունները",
       "unsavedTitle": "Չպահպանված փոփոխություններ",
-      "unsavedMessage": "Պահպանե՞լ փոփոխությունները՝ այս էկրանից դուրս գալուց առաջ։"
+      "unsavedMessage": "Պահպանե՞լ փոփոխությունները՝ այս էկրանից դուրս գալուց առաջ։",
+      "unsavedInvalidMessage": "Այս փոփոխությունները դեռ հնարավոր չէ պահպանել։ Ուղղիր դրանք պահպանելու համար, կամ հրաժարվիր դրանցից՝ դուրս գալու համար։"
     },
     "auditReportButton": {
       "viewA11y": "Դիտել աուդիտի հաշվետվությունը"
@@ -1941,7 +1942,6 @@
       "installApp": "Տեղադրել GitHub հավելվածը",
       "reauthorizeButton": "Կրկին լիազորել GitHub հավելվածը",
       "reauthorizeDescription": "Անվտանգության գործակալին անհրաժեշտ է vulnerability_alerts թույլտվությունը՝ Dependabot-ի ահազանգերին հասանելիություն ստանալու համար։ Կրկին լիազորիր GitHub հավելվածը՝ այս թույլտվությունը տրամադրելու համար։",
-      "reauthorizeFailed": "Չհաջողվեց սկսել կրկնակի լիազորումը։ Կրկին փորձիր։",
       "reauthorizeTitle": "Լրացուցիչ թույլտվություններ են պահանջվում",
       "setupFailed": "Չհաջողվեց սկսել GitHub-ի կարգավորումը։ Կրկին փորձիր։"
     },
@@ -2315,7 +2315,8 @@
       "linesBadge_other": "{{displayCount}} տող",
       "matchesBadge_one": "{{displayCount}} համընկնում",
       "matchesBadge_other": "{{displayCount}} համընկնում",
-      "noOutput": "Ելք չկա։"
+      "noOutput": "Ելք չկա։",
+      "translationFailed": "Թարգմանությունը ձախողվեց"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} տողերը (կրճատված)",
@@ -3676,7 +3677,9 @@
       "jsonTooLarge": "Օգտագործեք առավելագույնը 50 մուտք, բանալիներ՝ մինչև 128 և արժեքներ՝ մինչև 4096 նիշ",
       "timeoutInvalid": "Ժամկետը պետք է լինի միլիվայրկյանների ամբողջ քանակ",
       "edit": "Խմբագրել MCP սերվերը",
-      "saveFailed": "Չհաջողվեց պահպանել MCP սերվերը"
+      "saveFailed": "Չհաջողվեց պահպանել MCP սերվերը",
+      "deleteFailed": "Չհաջողվեց ջնջել MCP սերվերը",
+      "updateFailed": "Չհաջողվեց թարմացնել MCP սերվերը"
     },
     "agents": {
       "title": "Պրոֆիլային գործակալներ",
@@ -3703,6 +3706,7 @@
       "visibilitySubagent": "Ենթաբաժին. կարելի է կանչել միայն ուրիշներից",
       "visibilityAll": "Բոլորը - երկուսն էլ",
       "saveFailed": "Չհաջողվեց փրկել գործակալին",
+      "deleteFailed": "Չհաջողվեց ջնջել գործակալը",
       "nameRequired": "Մուտքագրեք գործակալի անունը",
       "slugRequired": "Մուտքագրեք գործակալ slug",
       "slugInvalid": "Slug-ը պետք է սկսվի տառով և օգտագործի միայն փոքրատառեր, թվանշաններ և գծիկներ",
@@ -3717,10 +3721,12 @@
       "description": "Հրամանի նկարագրություն",
       "template": "Կաղապար",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Բացատրեք $ARGUMENTS",
       "subtask": "Գործարկել որպես ենթաառաջադրանք",
       "edit": "Խմբագրել շեղ հրամանը",
       "saveFailed": "Չհաջողվեց պահել հրամանը",
+      "deleteFailed": "Չհաջողվեց ջնջել հրամանը",
       "nameRequired": "Մուտքագրեք հրամանի անունը",
       "nameInvalid": "Անունը պետք է սկսվի փոքրատառով և օգտագործի միայն փոքրատառեր, թվանշաններ և գծիկներ",
       "templateRequired": "Մուտքագրեք հրամանի ձևանմուշ",
@@ -3867,7 +3873,7 @@
     "view": "Կարդալ ամփոփումը",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Ցույց տալ ընթացիկ կարգավիճակը",
+    "dismiss": "Անտեսել ամփոփումը",
     "offline": "Անցանց · պահված ամփոփում",
     "cached": "Պահված հաշվետվություն · թարմացումն անհասանելի է",
     "revised": "Վերանայված · {{revision}}",

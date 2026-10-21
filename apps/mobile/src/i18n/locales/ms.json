@@ -111,7 +111,9 @@
     "online": "Dalam talian",
     "open": "Buka {{name}}",
     "openPullRequest": "Buka PR",
+    "completed": "Selesai",
     "pending": "Menunggu",
+    "running": "Sedang berjalan",
     "performance": "Prestasi",
     "preferences": "Keutamaan",
     "privacyPolicy": "Dasar privasi",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Gagal mengemas kini penyemak.",
     "configSaveFailed": "Gagal menyimpan konfigurasi semakan.",
     "status": {
-      "running": "Sedang berjalan",
-      "completed": "Selesai",
       "interrupted": "Terganggu"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Simpan perubahan",
       "unsavedTitle": "Perubahan belum disimpan",
-      "unsavedMessage": "Simpan perubahan anda sebelum meninggalkan skrin ini?"
+      "unsavedMessage": "Simpan perubahan anda sebelum meninggalkan skrin ini?",
+      "unsavedInvalidMessage": "Perubahan ini belum boleh disimpan. Betulkan untuk menyimpan, atau buang untuk meninggalkan."
     },
     "auditReportButton": {
       "viewA11y": "Lihat laporan audit"
@@ -1941,7 +1942,6 @@
       "installApp": "Pasang apl GitHub",
       "reauthorizeButton": "Berikan semula kebenaran kepada apl GitHub",
       "reauthorizeDescription": "Ejen Keselamatan memerlukan kebenaran vulnerability_alerts untuk mengakses amaran Dependabot. Berikan semula kebenaran kepada apl GitHub untuk membenarkan akses ini.",
-      "reauthorizeFailed": "Tidak dapat memulakan proses pemberian semula kebenaran. Sila cuba lagi.",
       "reauthorizeTitle": "Kebenaran tambahan diperlukan",
       "setupFailed": "Tidak dapat memulakan persediaan GitHub. Sila cuba lagi."
     },
@@ -2315,7 +2315,8 @@
       "linesBadge_other": "{{displayCount}} baris",
       "matchesBadge_one": "{{displayCount}} padanan",
       "matchesBadge_other": "{{displayCount}} padanan",
-      "noOutput": "Tiada keluaran."
+      "noOutput": "Tiada keluaran.",
+      "translationFailed": "Terjemahan gagal"
     },
     "readToolMarkdown": {
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",
@@ -3676,7 +3677,9 @@
       "jsonTooLarge": "Gunakan paling banyak 50 entri, kunci sehingga 128 dan nilai sehingga 4096 aksara",
       "timeoutInvalid": "Tamat masa mestilah bilangan keseluruhan milisaat",
       "edit": "Edit pelayan MCP",
-      "saveFailed": "Tidak dapat menyimpan pelayan MCP"
+      "saveFailed": "Tidak dapat menyimpan pelayan MCP",
+      "deleteFailed": "Tidak dapat memadam pelayan MCP",
+      "updateFailed": "Tidak dapat mengemas kini pelayan MCP"
     },
     "agents": {
       "title": "Ejen profil",
@@ -3703,6 +3706,7 @@
       "visibilitySubagent": "Subagen — hanya boleh dipanggil daripada orang lain",
       "visibilityAll": "Semua - kedua-duanya",
       "saveFailed": "Tidak dapat menyelamatkan ejen",
+      "deleteFailed": "Tidak dapat memadam ejen",
       "nameRequired": "Masukkan nama ejen",
       "slugRequired": "Masukkan slug ejen",
       "slugInvalid": "Slug mesti bermula dengan huruf dan hanya menggunakan huruf kecil, digit dan sempang",
@@ -3717,10 +3721,12 @@
       "description": "Penerangan perintah",
       "template": "templat",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Terangkan $ARGUMENTS",
       "subtask": "Jalankan sebagai subtugas",
       "edit": "Edit arahan slash",
       "saveFailed": "Tidak dapat menyimpan arahan",
+      "deleteFailed": "Tidak dapat memadam arahan",
       "nameRequired": "Masukkan nama arahan",
       "nameInvalid": "Nama mesti bermula dengan huruf kecil dan hanya menggunakan huruf kecil, angka dan sempang",
       "templateRequired": "Masukkan templat arahan",
@@ -3867,7 +3873,7 @@
     "view": "Baca taklimat",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Tunjukkan status langsung",
+    "dismiss": "Ketepikan taklimat",
     "offline": "Luar talian · taklimat disimpan",
     "cached": "Laporan disimpan · muat semula tidak tersedia",
     "revised": "Disemak · {{revision}}",

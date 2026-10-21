@@ -111,7 +111,9 @@
     "online": "Ar-lein",
     "open": "Agor {{name}}",
     "openPullRequest": "Agor cais tynnu",
+    "completed": "Wedi'i gwblhau",
     "pending": "Yn aros",
+    "running": "Yn rhedeg",
     "performance": "Perfformiad",
     "preferences": "Dewisiadau",
     "privacyPolicy": "Polisi preifatrwydd",
@@ -1612,8 +1614,6 @@
     "updateFailed": "Ni ellid diweddaru'r adolygydd.",
     "configSaveFailed": "Ni ellid cadw gosodiadau'r adolygiad.",
     "status": {
-      "running": "Yn rhedeg",
-      "completed": "Wedi'i gwblhau",
       "interrupted": "Wedi'i atal"
     },
     "reviewStyle": {
@@ -1964,7 +1964,8 @@
     "settingsSave": {
       "saveChanges": "Cadw newidiadau",
       "unsavedTitle": "Newidiadau heb eu cadw",
-      "unsavedMessage": "Cadw eich newidiadau cyn gadael y sgrin hon?"
+      "unsavedMessage": "Cadw eich newidiadau cyn gadael y sgrin hon?",
+      "unsavedInvalidMessage": "Ni ellir cadw'r newidiadau hyn eto. Trwsiwch nhw i gadw, neu eu gwaredu i adael."
     },
     "auditReportButton": {
       "viewA11y": "Gweld adroddiad archwilio"
@@ -2033,7 +2034,6 @@
       "installApp": "Gosod ap GitHub",
       "reauthorizeButton": "Ailawdurdodi ap GitHub",
       "reauthorizeDescription": "Mae angen y caniatâd vulnerability_alerts ar yr Asiant diogelwch i gael mynediad at rybuddion Dependabot. Ailawdurdodwch ap GitHub i roi'r caniatâd hwn.",
-      "reauthorizeFailed": "Ni ellid dechrau ailawdurdodi. Ceisiwch eto.",
       "reauthorizeTitle": "Angen caniatadau ychwanegol",
       "setupFailed": "Ni ellid dechrau sefydlu GitHub. Ceisiwch eto."
     },
@@ -2443,7 +2443,8 @@
       "matchesBadge_two": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_few": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_many": "{{displayCount}} cyfatebiaeth",
-      "noOutput": "Dim allbwn."
+      "noOutput": "Dim allbwn.",
+      "translationFailed": "Methodd y cyfieithiad"
     },
     "readToolMarkdown": {
       "linesTruncated": "llinellau {{start}}–{{end}} (wedi'u cwtogi)",
@@ -3840,7 +3841,9 @@
       "jsonTooLarge": "Defnyddiwch 50 cofnod ar y mwyaf, allweddi hyd at 128 a gwerthoedd hyd at 4096 nod",
       "timeoutInvalid": "Rhaid i'r terfyn amser fod yn nifer gyfan o filieiliadau",
       "edit": "Golygu gweinydd MCP",
-      "saveFailed": "Methu â chadw gweinydd MCP"
+      "saveFailed": "Methu â chadw gweinydd MCP",
+      "deleteFailed": "Methu â dileu gweinydd MCP",
+      "updateFailed": "Methu â ddiweddaru gweinydd MCP"
     },
     "agents": {
       "title": "Asiantau proffil",
@@ -3867,6 +3870,7 @@
       "visibilitySubagent": "Subagent — dim ond ei alw gan eraill",
       "visibilityAll": "Pawb—y ddau",
       "saveFailed": "Ni fu modd cadw'r asiant",
+      "deleteFailed": "Ni fu modd dileu'r asiant",
       "nameRequired": "Rhowch enw asiant",
       "slugRequired": "Rhowch wlithen asiant",
       "slugInvalid": "Rhaid i wlithen ddechrau gyda llythyren a defnyddio llythrennau bach, digidau a llinellau llinellau yn unig",
@@ -3881,10 +3885,12 @@
       "description": "Disgrifiad gorchymyn",
       "template": "Templed",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Eglurwch $ARGUMENTS",
       "subtask": "Rhedeg fel is-dasg",
       "edit": "Golygu gorchymyn slaes",
       "saveFailed": "Ni fu modd cadw'r gorchymyn",
+      "deleteFailed": "Ni fu modd dileu'r gorchymyn",
       "nameRequired": "Rhowch enw gorchymyn",
       "nameInvalid": "Rhaid i'r enw ddechrau gyda llythyren fach a defnyddio llythrennau bach, digidau a llinellau llinellau yn unig",
       "templateRequired": "Rhowch dempled gorchymyn",
@@ -4047,7 +4053,7 @@
     "view": "Darllen y briff",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Dangos statws byw",
+    "dismiss": "Diystyru'r briff",
     "offline": "All-lein · briff wedi'i gadw",
     "cached": "Adroddiad wedi'i gadw · methu adnewyddu",
     "revised": "Diwygiwyd · {{revision}}",

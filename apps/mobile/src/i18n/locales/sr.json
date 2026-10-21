@@ -111,7 +111,9 @@
     "online": "Na mreži",
     "open": "Otvori {{name}}",
     "openPullRequest": "Otvori PR",
+    "completed": "Završeno",
     "pending": "Na čekanju",
+    "running": "U toku",
     "performance": "Performanse",
     "preferences": "Podešavanja",
     "privacyPolicy": "Politika privatnosti",
@@ -1555,8 +1557,6 @@
     "updateFailed": "Nije moguće ažurirati agenta za pregled koda.",
     "configSaveFailed": "Nije moguće sačuvati podešavanja pregleda.",
     "status": {
-      "running": "U toku",
-      "completed": "Završeno",
       "interrupted": "Prekinuto"
     },
     "reviewStyle": {
@@ -1895,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Sačuvaj promene",
       "unsavedTitle": "Nesačuvane promene",
-      "unsavedMessage": "Sačuvati promene pre napuštanja ovog ekrana?"
+      "unsavedMessage": "Sačuvati promene pre napuštanja ovog ekrana?",
+      "unsavedInvalidMessage": "Ove promene još ne mogu da se sačuvaju. Ispravi ih da bi ih sačuvao ili ih odbaci da bi otišao."
     },
     "auditReportButton": {
       "viewA11y": "Prikaži izveštaj o reviziji"
@@ -1964,7 +1965,6 @@
       "installApp": "Instaliraj GitHub aplikaciju",
       "reauthorizeButton": "Ponovo ovlasti GitHub aplikaciju",
       "reauthorizeDescription": "Bezbednosni agent zahteva dozvolu vulnerability_alerts za pristup Dependabot upozorenjima. Ponovo ovlasti GitHub aplikaciju da joj dodeliš ovu dozvolu.",
-      "reauthorizeFailed": "Ponovno ovlašćivanje se ne može pokrenuti. Pokušaj ponovo.",
       "reauthorizeTitle": "Potrebne su dodatne dozvole",
       "setupFailed": "Nije moguće pokrenuti podešavanje za GitHub. Pokušaj ponovo."
     },
@@ -2347,7 +2347,8 @@
       "matchesBadge_one": "podudaranje: {{displayCount}}",
       "matchesBadge_other": "podudaranja: {{displayCount}}",
       "matchesBadge_few": "podudaranja: {{displayCount}}",
-      "noOutput": "Nema izlaza."
+      "noOutput": "Nema izlaza.",
+      "translationFailed": "Prevod nije uspeo"
     },
     "readToolMarkdown": {
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",
@@ -3717,7 +3718,9 @@
       "jsonTooLarge": "Koristite najviše 50 unosa, ključevi do 128 i vrednosti do 4096 znakova",
       "timeoutInvalid": "Vreme čekanja mora biti ceo broj milisekundi",
       "edit": "Uredite MCP server",
-      "saveFailed": "Nije moguće sačuvati MCP server"
+      "saveFailed": "Nije moguće sačuvati MCP server",
+      "deleteFailed": "Nije moguće izbrisati MCP server",
+      "updateFailed": "Nije moguće ažurirati MCP server"
     },
     "agents": {
       "title": "Profil agenti",
@@ -3744,6 +3747,7 @@
       "visibilitySubagent": "Subagent — može se pozvati samo od drugih",
       "visibilityAll": "Svi — oboje",
       "saveFailed": "Nije moguće sačuvati agenta",
+      "deleteFailed": "Nije moguće izbrisati agenta",
       "nameRequired": "Unesite ime agenta",
       "slugRequired": "Unesite slug agenta",
       "slugInvalid": "Slug mora početi slovom i koristiti samo mala slova, cifre i crtice",
@@ -3758,10 +3762,12 @@
       "description": "Opis komande",
       "template": "Šablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Objasnite $ARGUMENTS",
       "subtask": "Pokreni kao podzadatak",
       "edit": "Naredba za uređivanje kose crte",
       "saveFailed": "Nije moguće sačuvati komandu",
+      "deleteFailed": "Nije moguće izbrisati komandu",
       "nameRequired": "Unesite ime komande",
       "nameInvalid": "Ime mora da počinje malim slovom i da koristi samo mala slova, cifre i crtice",
       "templateRequired": "Unesite šablon komande",
@@ -3912,7 +3918,7 @@
     "view": "Pročitaj pregled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Prikaži status uživo",
+    "dismiss": "Odbaci pregled",
     "offline": "Van mreže · sačuvan pregled",
     "cached": "Sačuvan izveštaj · osvežavanje nije dostupno",
     "revised": "Izmenjeno · {{revision}}",

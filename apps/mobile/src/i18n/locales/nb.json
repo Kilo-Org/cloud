@@ -111,7 +111,9 @@
     "online": "På nett",
     "open": "Åpne {{name}}",
     "openPullRequest": "Åpne PR",
+    "completed": "Fullført",
     "pending": "Venter",
+    "running": "Kjører",
     "performance": "Ytelse",
     "preferences": "Innstillinger",
     "privacyPolicy": "Personvernerklæring",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Kunne ikke oppdatere kodegranskeren.",
     "configSaveFailed": "Kunne ikke lagre innstillingene for kodegjennomgang.",
     "status": {
-      "running": "Kjører",
-      "completed": "Fullført",
       "interrupted": "Avbrutt"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Lagre endringer",
       "unsavedTitle": "Ulagrede endringer",
-      "unsavedMessage": "Vil du lagre endringene før du går ut av dette skjermbildet?"
+      "unsavedMessage": "Vil du lagre endringene før du går ut av dette skjermbildet?",
+      "unsavedInvalidMessage": "Disse endringene kan ikke lagres ennå. Rett dem for å lagre, eller forkast dem for å gå ut."
     },
     "auditReportButton": {
       "viewA11y": "Vis revisjonsrapport"
@@ -1941,7 +1942,6 @@
       "installApp": "Installer GitHub-appen",
       "reauthorizeButton": "Autoriser GitHub-appen på nytt",
       "reauthorizeDescription": "Sikkerhetsagenten trenger tillatelsen vulnerability_alerts for å få tilgang til Dependabot-varsler. Autoriser GitHub-appen på nytt for å gi denne tillatelsen.",
-      "reauthorizeFailed": "Kunne ikke starte autoriseringen på nytt. Prøv igjen.",
       "reauthorizeTitle": "Flere tillatelser kreves",
       "setupFailed": "Kunne ikke starte GitHub-oppsettet. Prøv igjen."
     },
@@ -2315,7 +2315,8 @@
       "linesBadge_other": "{{displayCount}} linjer",
       "matchesBadge_one": "{{displayCount}} treff",
       "matchesBadge_other": "{{displayCount}} treff",
-      "noOutput": "Ingen utdata."
+      "noOutput": "Ingen utdata.",
+      "translationFailed": "Oversettelse mislyktes"
     },
     "readToolMarkdown": {
       "linesTruncated": "linje {{start}}–{{end}} (avkortet)",
@@ -3676,7 +3677,9 @@
       "jsonTooLarge": "Bruk maks 50 oppføringer, nøkler opptil 128 og verdier opptil 4096 tegn",
       "timeoutInvalid": "Tidsavbrudd må være et helt antall millisekunder",
       "edit": "Rediger MCP-server",
-      "saveFailed": "Kunne ikke lagre MCP-serveren"
+      "saveFailed": "Kunne ikke lagre MCP-serveren",
+      "deleteFailed": "Kunne ikke slette MCP-serveren",
+      "updateFailed": "Kunne ikke oppdatere MCP-serveren"
     },
     "agents": {
       "title": "Profil agenter",
@@ -3703,6 +3706,7 @@
       "visibilitySubagent": "Subagent — kan kun ringes opp fra andre",
       "visibilityAll": "Alle - begge",
       "saveFailed": "Kunne ikke lagre agenten",
+      "deleteFailed": "Kunne ikke slette agenten",
       "nameRequired": "Skriv inn et agentnavn",
       "slugRequired": "Skriv inn en agentsnegl",
       "slugInvalid": "Slug må starte med en bokstav og kun bruke små bokstaver, sifre og bindestreker",
@@ -3717,10 +3721,12 @@
       "description": "Kommandobeskrivelse",
       "template": "Mal",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Forklar $ARGUMENTS",
       "subtask": "Kjør som deloppgave",
       "edit": "Rediger skråstrek-kommando",
       "saveFailed": "Kunne ikke lagre kommandoen",
+      "deleteFailed": "Kunne ikke slette kommandoen",
       "nameRequired": "Skriv inn et kommandonavn",
       "nameInvalid": "Navnet må begynne med en liten bokstav og kun bruke små bokstaver, sifre og bindestreker",
       "templateRequired": "Skriv inn en kommandomal",
@@ -3867,7 +3873,7 @@
     "view": "Les brief",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Vis live-status",
+    "dismiss": "Avvis brief",
     "offline": "Frakoblet · lagret brief",
     "cached": "Lagret rapport · kan ikke oppdateres",
     "revised": "Revidert · {{revision}}",

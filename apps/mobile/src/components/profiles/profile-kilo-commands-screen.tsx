@@ -104,7 +104,7 @@ export function ProfileKiloCommandsScreen({
       await deleteKiloCommand.mutateAsync({ profileId, commandId });
     } catch (error) {
       if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.slashCommands.saveFailed'));
+        toast.error(t('profiles.slashCommands.deleteFailed'));
       }
     }
   };

@@ -111,7 +111,9 @@
     "online": "В сети",
     "open": "Открыть {{name}}",
     "openPullRequest": "Открыть pull request",
+    "completed": "Завершено",
     "pending": "Ожидание",
+    "running": "В работе",
     "performance": "Производительность",
     "preferences": "Настройки",
     "privacyPolicy": "Политика конфиденциальности",
@@ -1027,8 +1029,6 @@
     "updateFailed": "Не удалось обновить настройки проверки кода.",
     "configSaveFailed": "Не удалось сохранить настройки проверки.",
     "status": {
-      "running": "В работе",
-      "completed": "Завершено",
       "interrupted": "Прервано"
     },
     "reviewStyle": {
@@ -1396,7 +1396,6 @@
       "installApp": "Установить приложение GitHub",
       "reauthorizeButton": "Повторно авторизовать приложение GitHub",
       "reauthorizeDescription": "Агенту безопасности требуется разрешение vulnerability_alerts для доступа к оповещениям Dependabot. Повторно авторизуйте приложение GitHub, чтобы предоставить это разрешение.",
-      "reauthorizeFailed": "Не удалось начать повторную авторизацию. Попробуйте снова.",
       "reauthorizeTitle": "Требуются дополнительные разрешения",
       "setupFailed": "Не удалось начать настройку GitHub. Попробуйте снова."
     },
@@ -1421,6 +1420,7 @@
     "settingsSave": {
       "saveChanges": "Сохранить изменения",
       "unsavedMessage": "Сохранить изменения перед выходом?",
+      "unsavedInvalidMessage": "Эти изменения пока нельзя сохранить. Исправьте их, чтобы сохранить, или отмените их, чтобы выйти.",
       "unsavedTitle": "Несохраненные изменения"
     },
     "setup": {
@@ -1832,7 +1832,8 @@
       "matchesBadge_other": "совпадений: {{displayCount}}",
       "matchesBadge_few": "совпадения: {{displayCount}}",
       "matchesBadge_many": "совпадений: {{displayCount}}",
-      "noOutput": "Нет вывода."
+      "noOutput": "Нет вывода.",
+      "translationFailed": "Не удалось перевести"
     },
     "readToolMarkdown": {
       "linesTruncated": "строки {{start}}–{{end}} (вывод сокращён)",
@@ -3736,7 +3737,7 @@
       "empty": "Серверов MCP пока нет",
       "name": "Имя сервера",
       "type": "Тип сервера",
-      "localType": "Местный",
+      "localType": "Локальный",
       "remoteType": "Удаленный",
       "command": "Командная строка",
       "url": "URL-адрес",
@@ -3758,7 +3759,9 @@
       "jsonTooLarge": "Используйте не более 50 записей, ключи до 128 и значения до 4096 символов",
       "timeoutInvalid": "Таймаут должен составлять целое число миллисекунд.",
       "edit": "Редактировать MCP-сервер",
-      "saveFailed": "Не удалось сохранить сервер MCP."
+      "saveFailed": "Не удалось сохранить сервер MCP.",
+      "deleteFailed": "Не удалось удалить сервер MCP.",
+      "updateFailed": "Не удалось обновить сервер MCP."
     },
     "agents": {
       "title": "Профильные агенты",
@@ -3785,6 +3788,7 @@
       "visibilitySubagent": "Субагент — доступен только для вызова от других",
       "visibilityAll": "Все — оба",
       "saveFailed": "Не удалось сохранить агента.",
+      "deleteFailed": "Не удалось удалить агента.",
       "nameRequired": "Введите имя агента",
       "slugRequired": "Введите ярлык агента",
       "slugInvalid": "Ссылка должна начинаться с буквы и содержать только строчные буквы, цифры и тире.",
@@ -3799,10 +3803,12 @@
       "description": "Описание команды",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Объясните $ARGUMENTS",
       "subtask": "Запустить как подзадачу",
       "edit": "Команда редактирования косой черты",
       "saveFailed": "Не удалось сохранить команду",
+      "deleteFailed": "Не удалось удалить команду",
       "nameRequired": "Введите имя команды",
       "nameInvalid": "Имя должно начинаться со строчной буквы и использовать только строчные буквы, цифры и тире.",
       "templateRequired": "Введите шаблон команды",
@@ -3957,7 +3963,7 @@
     "view": "Читать сводку",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Показать текущий статус",
+    "dismiss": "Отклонить сводку",
     "offline": "Офлайн · сохранённая сводка",
     "cached": "Сохранённый отчёт · обновление недоступно",
     "revised": "Изменено · {{revision}}",

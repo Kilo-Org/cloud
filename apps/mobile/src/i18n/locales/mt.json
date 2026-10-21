@@ -111,7 +111,9 @@
     "online": "Onlajn",
     "open": "Iftaħ {{name}}",
     "openPullRequest": "Ftuħ tal-PR",
+    "completed": "Lest",
     "pending": "Pendenti",
+    "running": "Għaddej",
     "performance": "Prestazzjoni",
     "preferences": "Preferenzi",
     "privacyPolicy": "Politika tal-privatezza",
@@ -1593,8 +1595,6 @@
     "updateFailed": "Ma setax jiġi aġġornat ir-reviżur.",
     "configSaveFailed": "Ma setgħetx tiġi ssejvjata l-konfigurazzjoni tar-reviżjoni.",
     "status": {
-      "running": "Għaddej",
-      "completed": "Lest",
       "interrupted": "Interrotta"
     },
     "reviewStyle": {
@@ -1941,7 +1941,8 @@
     "settingsSave": {
       "saveChanges": "Issejvja l-bidliet",
       "unsavedTitle": "Bidliet mhux issejvjati",
-      "unsavedMessage": "Trid tissejvja l-bidliet tiegħek qabel ma titlaq minn dan l-iskrin?"
+      "unsavedMessage": "Trid tissejvja l-bidliet tiegħek qabel ma titlaq minn dan l-iskrin?",
+      "unsavedInvalidMessage": "Dawn il-bidliet għadhom ma jistgħux jiġu ssejvjati. Sejjibhom biex tissejvja, jew warrabhom biex titlaq."
     },
     "auditReportButton": {
       "viewA11y": "Ara r-rapport tal-awditjar"
@@ -2010,7 +2011,6 @@
       "installApp": "Installa l-app ta' GitHub",
       "reauthorizeButton": "Erġa' awtorizza l-app ta' GitHub",
       "reauthorizeDescription": "L-aġent tas-sigurtà jeħtieġ il-permess vulnerability_alerts biex jaċċessa l-allerti ta' Dependabot. Erġa' awtorizza l-app ta' GitHub biex tagħti dan il-permess.",
-      "reauthorizeFailed": "Ma setgħetx tinbeda r-awtorizzazzjoni mill-ġdid. Jekk jogħġbok erġa' pprova.",
       "reauthorizeTitle": "Permessi addizzjonali meħtieġa",
       "setupFailed": "Ma setgħetx tinbeda l-konfigurazzjoni ta' GitHub. Jekk jogħġbok erġa' pprova."
     },
@@ -2411,7 +2411,8 @@
       "matchesBadge_two": "{{displayCount}} riżultati",
       "matchesBadge_few": "{{displayCount}} riżultati",
       "matchesBadge_many": "{{displayCount}} riżultati",
-      "noOutput": "M'hemm l-ebda ħruġ."
+      "noOutput": "M'hemm l-ebda ħruġ.",
+      "translationFailed": "It-traduzzjoni falliet"
     },
     "readToolMarkdown": {
       "linesTruncated": "linji {{start}}–{{end}} (maqtugħa)",
@@ -3799,7 +3800,9 @@
       "jsonTooLarge": "Uża mhux aktar minn 50 entrata, ewlenin sa 128 u valuri sa 4096 karattru",
       "timeoutInvalid": "Timeout għandu jkun numru sħiħ ta' millisekondi",
       "edit": "Editja server MCP",
-      "saveFailed": "Ma setax isalva server MCP"
+      "saveFailed": "Ma setax isalva server MCP",
+      "deleteFailed": "Ma setax jħassar is-server MCP",
+      "updateFailed": "Ma setax jaġġorna s-server MCP"
     },
     "agents": {
       "title": "Aġenti tal-profil",
@@ -3826,6 +3829,7 @@
       "visibilitySubagent": "Subaġent - jissejjaħ biss minn oħrajn",
       "visibilityAll": "Kollha - it-tnejn",
       "saveFailed": "Ma setax isalva l-aġent",
+      "deleteFailed": "Ma setax jħassar l-aġent",
       "nameRequired": "Daħħal isem ta' aġent",
       "slugRequired": "Daħħal aġent slug",
       "slugInvalid": "Slug għandu jibda b'ittra u juża biss ittri żgħar, ċifri u sings",
@@ -3840,10 +3844,12 @@
       "description": "Deskrizzjoni tal-kmand",
       "template": "Mudell",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Spjega $ARGUMENTS",
       "subtask": "Mexxi bħala subtask",
       "edit": "Editja kmand slash",
       "saveFailed": "Ma setax isalva l-kmand",
+      "deleteFailed": "Ma setax jħassar il-kmand",
       "nameRequired": "Daħħal isem tal-kmand",
       "nameInvalid": "L-isem irid jibda b'ittra żgħira u juża biss ittri żgħar, ċifri u sings",
       "templateRequired": "Daħħal mudell ta' kmand",
@@ -4002,7 +4008,7 @@
     "view": "Aqra l-briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Uri l-istatus live",
+    "dismiss": "Warrab il-briefing",
     "offline": "Offline · briefing issejvjat",
     "cached": "Rapport issejvjat · aġġornament mhux disponibbli",
     "revised": "Rivedut · {{revision}}",

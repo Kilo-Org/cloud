@@ -111,7 +111,9 @@
     "online": "سەرهێڵ",
     "open": "کردنەوەی {{name}}",
     "openPullRequest": "کردنەوەی داواکاری یەکخستن",
+    "completed": "تەواوکراو",
     "pending": "چاوەڕوان",
+    "running": "لە کاردا",
     "performance": "کارایی",
     "preferences": "ڕێکخستنە کەسییەکان",
     "privacyPolicy": "سیاسەتی تایبەتی",
@@ -1536,8 +1538,6 @@
     "updateFailed": "نەتوانرا پێداچوونەوەکار نوێ بکرێتەوە.",
     "configSaveFailed": "نەتوانرا ڕێکخستنەکانی پێداچوونەوە پاشەکەوت بکرێن.",
     "status": {
-      "running": "لە کاردا",
-      "completed": "تەواوکراو",
       "interrupted": "پچڕاو"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "گۆڕانکارییەکان پاشەکەوت بکە",
       "unsavedTitle": "گۆڕانکارییە پاشەکەوتنەکراوەکان",
-      "unsavedMessage": "پێش جێهێشتنی ئەم شاشەیە، گۆڕانکارییەکانت پاشەکەوت بکرێن؟"
+      "unsavedMessage": "پێش جێهێشتنی ئەم شاشەیە، گۆڕانکارییەکانت پاشەکەوت بکرێن؟",
+      "unsavedInvalidMessage": "ئەم گۆڕانکارییانە هێشتا ناتوانرێن پاشەکەوت بکرێن. بۆ پاشەکەوتکردن چاکییان بکە، یان بۆ جێهێشتن وازهێنیان لێبکە."
     },
     "auditReportButton": {
       "viewA11y": "ڕاپۆرتی وردبینی ببینە"
@@ -1941,7 +1942,6 @@
       "installApp": "ئەپی GitHub دابمەزرێنە",
       "reauthorizeButton": "دووبارە مۆڵەت بدە بە ئەپی GitHub",
       "reauthorizeDescription": "ئەجێنتی ئاسایش بۆ دەستگەیشتن بە ئاگادارکردنەوەکانی Dependabot پێویستی بە مۆڵەتی vulnerability_alerts هەیە. بۆ پێدانی ئەم مۆڵەتە، دووبارە مۆڵەت بدە بە ئەپی GitHub.",
-      "reauthorizeFailed": "نەتوانرا پرۆسەی دووبارە مۆڵەتدان دەست پێ بکرێت. تکایە دووبارە هەوڵ بدە.",
       "reauthorizeTitle": "مۆڵەتی زیاتر پێویستە",
       "setupFailed": "نەتوانرا ڕێکخستنی GitHub دەست پێ بکرێت. تکایە دووبارە هەوڵ بدە."
     },
@@ -2315,7 +2315,8 @@
       "linesBadge_other": "{{displayCount}} دێڕ",
       "matchesBadge_one": "{{displayCount}} ئەنجام",
       "matchesBadge_other": "{{displayCount}} ئەنجام",
-      "noOutput": "هیچ دەرچووێک نییە."
+      "noOutput": "هیچ دەرچووێک نییە.",
+      "translationFailed": "وەرگێڕان سەرکەوتوو نەبوو"
     },
     "readToolMarkdown": {
       "linesTruncated": "دێڕەکانی {{start}}–{{end}} (کورتکراوە)",
@@ -3676,7 +3677,9 @@
       "jsonTooLarge": "زیاتر لە 50 تۆمار بەکارمەهێنە، کلیلەکان تا 128 و بەهاکان تا 4096 نووسە",
       "timeoutInvalid": "کات بەسەرچوون دەبێت ژمارەیەکی تەواو لە میلی چرکە بێت",
       "edit": "دەستکاری سێرڤەری MCP بکە",
-      "saveFailed": "نەتوانرا سێرڤەری MCP پاشەکەوت بکات"
+      "saveFailed": "نەتوانرا سێرڤەری MCP پاشەکەوت بکات",
+      "deleteFailed": "نەتوانرا سێرڤەری MCP بسڕێتەوە",
+      "updateFailed": "نەتوانرا سێرڤەری MCP نوێ بکرێتەوە"
     },
     "agents": {
       "title": "بریکاری پڕۆفایلی",
@@ -3703,6 +3706,7 @@
       "visibilitySubagent": "Subagent — تەنها لە کەسانی ترەوە پەیوەندی پێوە دەکرێت",
       "visibilityAll": "هەموو — هەردووکیان",
       "saveFailed": "نەیتوانی بریکار ڕزگار بکات",
+      "deleteFailed": "نەیتوانی بریکار بسڕێتەوە",
       "nameRequired": "ناوی بریکارێک بنووسە",
       "slugRequired": "داخڵکردنی بریکاری slug",
       "slugInvalid": "سلۆگ دەبێت بە پیتێک دەست پێبکات و تەنها پیتی بچووک و ژمارە و هێڵکاری بەکاربهێنێت",
@@ -3717,10 +3721,12 @@
       "description": "وەسفکردنی فەرمان",
       "template": "قاڵب",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ڕوون بکەرەوە",
       "subtask": "وەکو ئەرکی لاوەکی کارپێبکە",
       "edit": "فەرمانی دەستکاریکردنی slash",
       "saveFailed": "نەتوانرا فەرمانەکە پاشەکەوت بکرێت",
+      "deleteFailed": "نەتوانرا فەرمانەکە بسڕێتەوە",
       "nameRequired": "ناوی فەرمانێک داخڵ بکە",
       "nameInvalid": "ناو دەبێت بە پیتی بچووک دەست پێبکات و تەنها پیتی بچووک و ژمارە و هێڵکاری بەکاربهێنێت",
       "templateRequired": "قاڵبێکی فەرمان داخڵ بکە",
@@ -3867,7 +3873,7 @@
     "view": "خوێندنەوەی کورتە",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "پیشاندانی دۆخی ڕاستەوخۆ",
+    "dismiss": "پشتگوێخستنی کورتە",
     "offline": "دەرهێڵ · کورتەی پاشەکەوتکراو",
     "cached": "ڕاپۆرتی پاشەکەوتکراو · نوێکردنەوە بەردەست نییە",
     "revised": "پێداچوونەوەکراو · {{revision}}",

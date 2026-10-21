@@ -111,7 +111,9 @@
     "online": "У мережі",
     "open": "Відкрити {{name}}",
     "openPullRequest": "Відкрити запит на злиття",
+    "completed": "Завершено",
     "pending": "Очікує",
+    "running": "Виконується",
     "performance": "Продуктивність",
     "preferences": "Налаштування",
     "privacyPolicy": "Політика конфіденційності",
@@ -1027,8 +1029,6 @@
     "updateFailed": "Не вдалося оновити налаштування перевірки коду.",
     "configSaveFailed": "Не вдалося зберегти налаштування перевірки.",
     "status": {
-      "running": "Виконується",
-      "completed": "Завершено",
       "interrupted": "Перервано"
     },
     "reviewStyle": {
@@ -1396,7 +1396,6 @@
       "installApp": "Установити застосунок GitHub",
       "reauthorizeButton": "Повторно авторизувати застосунок GitHub",
       "reauthorizeDescription": "Агент безпеки потребує дозволу vulnerability_alerts для доступу до сповіщень Dependabot. Повторно авторизуйте застосунок GitHub, щоб надати цей дозвіл.",
-      "reauthorizeFailed": "Не вдалося розпочати повторну авторизацію. Спробуйте ще раз.",
       "reauthorizeTitle": "Потрібні додаткові дозволи",
       "setupFailed": "Не вдалося розпочати налаштування GitHub. Спробуйте ще раз."
     },
@@ -1421,6 +1420,7 @@
     "settingsSave": {
       "saveChanges": "Зберегти зміни",
       "unsavedMessage": "Зберегти зміни, перш ніж закрити цей екран?",
+      "unsavedInvalidMessage": "Ці зміни ще не можна зберегти. Виправте їх, щоб зберегти, або відкиньте, щоб вийти.",
       "unsavedTitle": "Незбережені зміни"
     },
     "setup": {
@@ -1832,7 +1832,8 @@
       "matchesBadge_other": "збігів: {{displayCount}}",
       "matchesBadge_few": "збіги: {{displayCount}}",
       "matchesBadge_many": "збігів: {{displayCount}}",
-      "noOutput": "Немає виводу."
+      "noOutput": "Немає виводу.",
+      "translationFailed": "Не вдалося перекласти"
     },
     "readToolMarkdown": {
       "linesTruncated": "рядки {{start}}–{{end}} (скорочено)",
@@ -3736,7 +3737,7 @@
       "empty": "Серверів MCP ще немає",
       "name": "Ім'я сервера",
       "type": "Тип сервера",
-      "localType": "Місцевий",
+      "localType": "Локальний",
       "remoteType": "Дистанційний",
       "command": "Командний рядок",
       "url": "URL",
@@ -3758,7 +3759,9 @@
       "jsonTooLarge": "Використовуйте не більше 50 записів, ключі до 128 і значення до 4096 символів",
       "timeoutInvalid": "Час очікування має становити цілу кількість мілісекунд",
       "edit": "Редагувати сервер MCP",
-      "saveFailed": "Не вдалося зберегти сервер MCP"
+      "saveFailed": "Не вдалося зберегти сервер MCP",
+      "deleteFailed": "Не вдалося видалити сервер MCP",
+      "updateFailed": "Не вдалося оновити сервер MCP"
     },
     "agents": {
       "title": "Профільні агенти",
@@ -3785,6 +3788,7 @@
       "visibilitySubagent": "Субагент — тільки для виклику від інших",
       "visibilityAll": "Всі — обидва",
       "saveFailed": "Не вдалося зберегти агента",
+      "deleteFailed": "Не вдалося видалити агента",
       "nameRequired": "Введіть ім'я агента",
       "slugRequired": "Введіть слизь агента",
       "slugInvalid": "Слизень має починатися з літери та використовувати лише малі літери, цифри та тире",
@@ -3799,10 +3803,12 @@
       "description": "Опис команди",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Поясніть $ARGUMENTS",
       "subtask": "Запуск як підзавдання",
       "edit": "Редагувати команду косої риски",
       "saveFailed": "Не вдалося зберегти команду",
+      "deleteFailed": "Не вдалося видалити команду",
       "nameRequired": "Введіть назву команди",
       "nameInvalid": "Ім’я має починатися з малої літери та використовувати лише малі літери, цифри та тире",
       "templateRequired": "Введіть шаблон команди",
@@ -3957,7 +3963,7 @@
     "view": "Читати брифінг",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Показати поточний стан",
+    "dismiss": "Відхилити брифінг",
     "offline": "Офлайн · збережений брифінг",
     "cached": "Збережений звіт · оновлення недоступне",
     "revised": "Оновлено · {{revision}}",

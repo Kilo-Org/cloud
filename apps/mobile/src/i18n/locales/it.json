@@ -111,7 +111,9 @@
     "online": "In linea",
     "open": "Apri {{name}}",
     "openPullRequest": "Apri la PR",
+    "completed": "Completata",
     "pending": "In attesa",
+    "running": "In esecuzione",
     "performance": "Prestazioni",
     "preferences": "Preferenze",
     "privacyPolicy": "Informativa sulla privacy",
@@ -993,8 +995,6 @@
     "updateFailed": "Impossibile aggiornare il revisore.",
     "configSaveFailed": "Impossibile salvare la configurazione della revisione.",
     "status": {
-      "running": "In esecuzione",
-      "completed": "Completata",
       "interrupted": "Interrotta"
     },
     "reviewStyle": {
@@ -1359,7 +1359,6 @@
       "installApp": "Installa l'app GitHub",
       "reauthorizeButton": "Riautorizza l'app GitHub",
       "reauthorizeDescription": "Security Agent richiede l'autorizzazione vulnerability_alerts per accedere agli avvisi di Dependabot. Riautorizza l'app GitHub per concederla.",
-      "reauthorizeFailed": "Impossibile avviare la riautorizzazione. Riprova.",
       "reauthorizeTitle": "Servono autorizzazioni aggiuntive",
       "setupFailed": "Impossibile avviare la configurazione di GitHub. Riprova."
     },
@@ -1383,6 +1382,7 @@
     "settingsSave": {
       "saveChanges": "Salva le modifiche",
       "unsavedMessage": "Salvare le modifiche prima di uscire da questa schermata?",
+      "unsavedInvalidMessage": "Queste modifiche non possono ancora essere salvate. Correggile per salvare o scartale per uscire.",
       "unsavedTitle": "Modifiche non salvate"
     },
     "setup": {
@@ -1785,7 +1785,8 @@
       "matchesBadge_one": "{{displayCount}} corrispondenza",
       "matchesBadge_other": "{{displayCount}} corrispondenze",
       "matchesBadge_many": "{{displayCount}} corrispondenze",
-      "noOutput": "Nessun output."
+      "noOutput": "Nessun output.",
+      "translationFailed": "Traduzione non riuscita"
     },
     "readToolMarkdown": {
       "linesTruncated": "righe {{start}}–{{end}} (troncate)",
@@ -3717,18 +3718,20 @@
       "jsonTooLarge": "Usa al massimo 50 voci, chiavi fino a 128 e valori fino a 4096 caratteri",
       "timeoutInvalid": "Il timeout deve essere un numero intero di millisecondi",
       "edit": "Modifica il server MCP",
-      "saveFailed": "Impossibile salvare il server MCP"
+      "saveFailed": "Impossibile salvare il server MCP",
+      "deleteFailed": "Impossibile eliminare il server MCP",
+      "updateFailed": "Impossibile aggiornare il server MCP"
     },
     "agents": {
       "title": "Agenti del profilo",
       "add": "Aggiungi agente",
       "empty": "Nessun agente ancora",
       "name": "Nome dell'agente",
-      "slug": "Lumaca dell'agente",
+      "slug": "Slug dell'agente",
       "description": "Descrizione dell'agente",
       "model": "Sostituzione del modello",
       "modelPlaceholder": "Utilizza l'impostazione predefinita della sessione",
-      "prompt": "Richiesta di sistema",
+      "prompt": "Prompt di sistema",
       "steps": "Passi massimi",
       "stepsPlaceholder": "es. 50",
       "temperature": "Temperatura",
@@ -3744,6 +3747,7 @@
       "visibilitySubagent": "Subagente: richiamabile solo da altri",
       "visibilityAll": "Tutti, entrambi",
       "saveFailed": "Impossibile salvare l'agente",
+      "deleteFailed": "Impossibile eliminare l'agente",
       "nameRequired": "Inserisci il nome di un agente",
       "slugRequired": "Inserisci uno slug dell'agente",
       "slugInvalid": "Lo slug deve iniziare con una lettera e utilizzare solo lettere minuscole, cifre e trattini",
@@ -3758,10 +3762,12 @@
       "description": "Descrizione del comando",
       "template": "Modello",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Spiega $ARGUMENTS",
       "subtask": "Esegui come attività secondaria",
       "edit": "Comando Modifica barra",
       "saveFailed": "Impossibile salvare il comando",
+      "deleteFailed": "Impossibile eliminare il comando",
       "nameRequired": "Immettere un nome di comando",
       "nameInvalid": "Il nome deve iniziare con una lettera minuscola e utilizzare solo lettere minuscole, numeri e trattini",
       "templateRequired": "Immettere un modello di comando",
@@ -3912,7 +3918,7 @@
     "view": "Leggi briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Mostra stato live",
+    "dismiss": "Ignora il briefing",
     "offline": "Offline · briefing salvato",
     "cached": "Report salvato · aggiornamento non disponibile",
     "revised": "Revisionato · {{revision}}",

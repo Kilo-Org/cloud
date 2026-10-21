@@ -111,7 +111,9 @@
     "online": "অনলাইন",
     "open": "{{name}} খুলুন",
     "openPullRequest": "খোলা পুল রিকোয়েস্ট",
+    "completed": "সম্পন্ন",
     "pending": "অপেক্ষমাণ",
+    "running": "চলছে",
     "performance": "কর্মদক্ষতা",
     "preferences": "পছন্দের সেটিংস",
     "privacyPolicy": "গোপনীয়তা নীতি",
@@ -1536,8 +1538,6 @@
     "updateFailed": "কোড রিভিউয়ার আপডেট করা যায়নি।",
     "configSaveFailed": "পর্যালোচনার কনফিগারেশন সংরক্ষণ করা যায়নি।",
     "status": {
-      "running": "চলছে",
-      "completed": "সম্পন্ন",
       "interrupted": "বাধাগ্রস্ত"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "পরিবর্তন সংরক্ষণ করুন",
       "unsavedTitle": "অসংরক্ষিত পরিবর্তন",
-      "unsavedMessage": "এই স্ক্রিন ছাড়ার আগে পরিবর্তনগুলো সংরক্ষণ করবেন?"
+      "unsavedMessage": "এই স্ক্রিন ছাড়ার আগে পরিবর্তনগুলো সংরক্ষণ করবেন?",
+      "unsavedInvalidMessage": "এই পরিবর্তনগুলো এখনো সংরক্ষণ করা যাবে না। সংরক্ষণ করতে এগুলো ঠিক করুন, অথবা ছেড়ে যেতে বাতিল করুন।"
     },
     "auditReportButton": {
       "viewA11y": "অডিট রিপোর্ট দেখুন"
@@ -1941,7 +1942,6 @@
       "installApp": "GitHub অ্যাপ ইনস্টল করুন",
       "reauthorizeButton": "GitHub অ্যাপ পুনরায় অনুমোদন করুন",
       "reauthorizeDescription": "Dependabot-এর সতর্কতা দেখতে সিকিউরিটি এজেন্টের vulnerability_alerts অনুমতি প্রয়োজন। এই অনুমতি দিতে GitHub অ্যাপটি পুনরায় অনুমোদন করুন।",
-      "reauthorizeFailed": "পুনরায় অনুমোদন শুরু করা যায়নি। আবার চেষ্টা করুন।",
       "reauthorizeTitle": "অতিরিক্ত অনুমতি প্রয়োজন",
       "setupFailed": "GitHub সেটআপ শুরু করা যায়নি। আবার চেষ্টা করুন।"
     },
@@ -2315,7 +2315,8 @@
       "linesBadge_other": "{{displayCount}}টি লাইন",
       "matchesBadge_one": "{{displayCount}}টি মিল",
       "matchesBadge_other": "{{displayCount}}টি মিল",
-      "noOutput": "কোনো আউটপুট নেই।"
+      "noOutput": "কোনো আউটপুট নেই।",
+      "translationFailed": "অনুবাদ ব্যর্থ হয়েছে"
     },
     "readToolMarkdown": {
       "linesTruncated": "লাইন {{start}}–{{end}} (আংশিক দেখানো হয়েছে)",
@@ -3676,7 +3677,9 @@
       "jsonTooLarge": "সর্বোচ্চ 50টি এন্ট্রি ব্যবহার করুন, কী 128টি পর্যন্ত এবং মান 4096টি অক্ষর পর্যন্ত",
       "timeoutInvalid": "টাইমআউট অবশ্যই মিলিসেকেন্ডের পূর্ণ সংখ্যা হতে হবে",
       "edit": "MCP সার্ভার সম্পাদনা করুন",
-      "saveFailed": "MCP সার্ভার সংরক্ষণ করা যায়নি"
+      "saveFailed": "MCP সার্ভার সংরক্ষণ করা যায়নি",
+      "deleteFailed": "MCP সার্ভার মুছে ফেলা যায়নি",
+      "updateFailed": "MCP সার্ভার আপডেট করা যায়নি"
     },
     "agents": {
       "title": "প্রোফাইল এজেন্ট",
@@ -3703,6 +3706,7 @@
       "visibilitySubagent": "Subagent — শুধুমাত্র অন্যদের থেকে কলযোগ্য",
       "visibilityAll": "সব — উভয়",
       "saveFailed": "এজেন্ট সংরক্ষণ করতে পারেনি",
+      "deleteFailed": "এজেন্ট মুছে ফেলা যায়নি",
       "nameRequired": "একটি এজেন্ট নাম লিখুন",
       "slugRequired": "একটি এজেন্ট স্লাগ লিখুন",
       "slugInvalid": "স্লাগ একটি অক্ষর দিয়ে শুরু করতে হবে এবং শুধুমাত্র ছোট হাতের অক্ষর, সংখ্যা এবং ড্যাশ ব্যবহার করতে হবে",
@@ -3717,10 +3721,12 @@
       "description": "কমান্ডের বিবরণ",
       "template": "টেমপ্লেট",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ব্যাখ্যা করুন",
       "subtask": "সাবটাস্ক হিসাবে চালান",
       "edit": "স্ল্যাশ কমান্ড সম্পাদনা করুন",
       "saveFailed": "কমান্ড সংরক্ষণ করা যায়নি",
+      "deleteFailed": "কমান্ড মুছে ফেলা যায়নি",
       "nameRequired": "একটি কমান্ডের নাম লিখুন",
       "nameInvalid": "নাম অবশ্যই ছোট হাতের অক্ষর দিয়ে শুরু করতে হবে এবং শুধুমাত্র ছোট হাতের অক্ষর, সংখ্যা এবং ড্যাশ ব্যবহার করতে হবে",
       "templateRequired": "একটি কমান্ড টেমপ্লেট লিখুন",
@@ -3867,7 +3873,7 @@
     "view": "ব্রিফিং পড়ুন",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "লাইভ স্ট্যাটাস দেখান",
+    "dismiss": "ব্রিফিং খারিজ করুন",
     "offline": "অফলাইন · সংরক্ষিত ব্রিফিং",
     "cached": "সংরক্ষিত রিপোর্ট · রিফ্রেশ করা যাচ্ছে না",
     "revised": "সংশোধিত · {{revision}}",

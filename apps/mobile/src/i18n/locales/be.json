@@ -111,7 +111,9 @@
     "online": "У сетцы",
     "open": "Адкрыць {{name}}",
     "openPullRequest": "Адкрыць запыт на зліццё",
+    "completed": "Завершана",
     "pending": "Чакае",
+    "running": "Працуе",
     "performance": "Прадукцыйнасць",
     "preferences": "Налады",
     "privacyPolicy": "Палітыка прыватнасці",
@@ -1574,8 +1576,6 @@
     "updateFailed": "Не атрымалася абнавіць агента праверкі кода.",
     "configSaveFailed": "Не атрымалася захаваць налады праверкі кода.",
     "status": {
-      "running": "Працуе",
-      "completed": "Завершана",
       "interrupted": "Перапынена"
     },
     "reviewStyle": {
@@ -1918,7 +1918,8 @@
     "settingsSave": {
       "saveChanges": "Захаваць змены",
       "unsavedTitle": "Незахаваныя змены",
-      "unsavedMessage": "Захаваць змены перад выхадам з гэтага экрана?"
+      "unsavedMessage": "Захаваць змены перад выхадам з гэтага экрана?",
+      "unsavedInvalidMessage": "Гэтыя змены пакуль нельга захаваць. Выпраўце іх, каб захаваць, або адкіньце, каб выйсці."
     },
     "auditReportButton": {
       "viewA11y": "Праглядзець справаздачу аўдыту"
@@ -1987,7 +1988,6 @@
       "installApp": "Усталяваць праграму GitHub",
       "reauthorizeButton": "Паўторна аўтарызаваць праграму GitHub",
       "reauthorizeDescription": "Агенту бяспекі патрэбны дазвол vulnerability_alerts для доступу да апавяшчэнняў Dependabot. Паўторна аўтарызуйце праграму GitHub, каб даць гэты дазвол.",
-      "reauthorizeFailed": "Не атрымалася пачаць паўторную аўтарызацыю. Паспрабуйце яшчэ раз.",
       "reauthorizeTitle": "Патрабуюцца дадатковыя дазволы",
       "setupFailed": "Не атрымалася пачаць наладжванне GitHub. Паспрабуйце яшчэ раз."
     },
@@ -2379,7 +2379,8 @@
       "matchesBadge_other": "супадзенняў: {{displayCount}}",
       "matchesBadge_few": "супадзенні: {{displayCount}}",
       "matchesBadge_many": "супадзенняў: {{displayCount}}",
-      "noOutput": "Няма вываду."
+      "noOutput": "Няма вываду.",
+      "translationFailed": "Пераклад не ўдаўся"
     },
     "readToolMarkdown": {
       "linesTruncated": "радкі {{start}}–{{end}} (скарочана)",
@@ -3736,7 +3737,7 @@
       "empty": "Сервераў MCP пакуль няма",
       "name": "Імя сервера",
       "type": "Тып сервера",
-      "localType": "Мясцовы",
+      "localType": "Лакальны",
       "remoteType": "Дыстанцыйнае",
       "command": "Камандны радок",
       "url": "URL",
@@ -3758,7 +3759,9 @@
       "jsonTooLarge": "Выкарыстайце не больш за 50 запісаў, ключы да 128 і значэнні да 4096 сімвалаў",
       "timeoutInvalid": "Тайм-аўт павінен складаць цэлую колькасць мілісекунд",
       "edit": "Рэдагаваць сервер MCP",
-      "saveFailed": "Не ўдалося захаваць сервер MCP"
+      "saveFailed": "Не ўдалося захаваць сервер MCP",
+      "deleteFailed": "Не ўдалося выдаліць сервер MCP",
+      "updateFailed": "Не ўдалося абнавіць сервер MCP"
     },
     "agents": {
       "title": "Профільныя агенты",
@@ -3785,6 +3788,7 @@
       "visibilitySubagent": "Субагент — можна выклікаць толькі ад іншых",
       "visibilityAll": "Усё — абодва",
       "saveFailed": "Не ўдалося захаваць агента",
+      "deleteFailed": "Не ўдалося выдаліць агента",
       "nameRequired": "Увядзіце імя агента",
       "slugRequired": "Увядзіце смоўж агента",
       "slugInvalid": "Смоўж павінен пачынацца з літары і выкарыстоўваць толькі малыя літары, лічбы і працяжнікі",
@@ -3799,10 +3803,12 @@
       "description": "Апісанне каманды",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Растлумачце $ARGUMENTS",
       "subtask": "Запуск як падзадача",
       "edit": "Рэдагаваць каманду касой рысы",
       "saveFailed": "Не ўдалося захаваць каманду",
+      "deleteFailed": "Не ўдалося выдаліць каманду",
       "nameRequired": "Увядзіце назву каманды",
       "nameInvalid": "Імя павінна пачынацца з малой літары і выкарыстоўваць толькі малыя літары, лічбы і працяжнікі",
       "templateRequired": "Увядзіце шаблон каманды",
@@ -3957,7 +3963,7 @@
     "view": "Чытаць зводку",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Паказаць бягучы стан",
+    "dismiss": "Адхіліць зводку",
     "offline": "Па-за сеткай · захаваная зводка",
     "cached": "Захаваная справаздача · абнаўленне недаступнае",
     "revised": "Абноўлена · {{revision}}",

@@ -111,7 +111,9 @@
     "online": "מקוון",
     "open": "פתיחת {{name}}",
     "openPullRequest": "PR פתוח",
+    "completed": "הושלם",
     "pending": "ממתין",
+    "running": "בהרצה",
     "performance": "ביצועים",
     "preferences": "העדפות",
     "privacyPolicy": "מדיניות פרטיות",
@@ -1024,8 +1026,6 @@
     "updateFailed": "עדכון סוקר הקוד נכשל.",
     "configSaveFailed": "שמירת הגדרות הסקירה נכשלה.",
     "status": {
-      "running": "בהרצה",
-      "completed": "הושלם",
       "interrupted": "הופסקה"
     },
     "reviewStyle": {
@@ -1390,7 +1390,6 @@
       "installApp": "התקנת אפליקציית GitHub",
       "reauthorizeButton": "חידוש ההרשאה לאפליקציית GitHub",
       "reauthorizeDescription": "סוכן האבטחה זקוק להרשאת vulnerability_alerts כדי לגשת להתראות Dependabot. חדש את ההרשאה לאפליקציית GitHub כדי לתת לו גישה.",
-      "reauthorizeFailed": "לא ניתן להתחיל את חידוש ההרשאה. נסה שוב.",
       "reauthorizeTitle": "נדרשות הרשאות נוספות",
       "setupFailed": "לא ניתן להתחיל את הגדרת GitHub. נסה שוב."
     },
@@ -1414,6 +1413,7 @@
     "settingsSave": {
       "saveChanges": "שמירת שינויים",
       "unsavedMessage": "לשמור את השינויים לפני היציאה מהמסך?",
+      "unsavedInvalidMessage": "לא ניתן עדיין לשמור את השינויים האלה. תקן אותם כדי לשמור, או ויתר עליהם כדי לצאת.",
       "unsavedTitle": "שינויים שלא נשמרו"
     },
     "setup": {
@@ -1816,7 +1816,8 @@
       "matchesBadge_one": "{{displayCount}} התאמה",
       "matchesBadge_other": "{{displayCount}} התאמות",
       "matchesBadge_two": "{{displayCount}} התאמות",
-      "noOutput": "אין פלט."
+      "noOutput": "אין פלט.",
+      "translationFailed": "התרגום נכשל"
     },
     "readToolMarkdown": {
       "linesTruncated": "שורות {{start}}–{{end}} (התוכן נחתך)",
@@ -3717,7 +3718,9 @@
       "jsonTooLarge": "השתמש בעד 50 ערכים, מפתחות עד 128 וערכים עד 4096 תווים",
       "timeoutInvalid": "הזמן הקצוב חייב להיות מספר שלם של אלפיות שניות",
       "edit": "ערוך שרת MCP",
-      "saveFailed": "לא ניתן לשמור את שרת MCP"
+      "saveFailed": "לא ניתן לשמור את שרת MCP",
+      "deleteFailed": "לא ניתן למחוק את שרת MCP",
+      "updateFailed": "לא ניתן לעדכן את שרת MCP"
     },
     "agents": {
       "title": "סוכני פרופיל",
@@ -3744,6 +3747,7 @@
       "visibilitySubagent": "סוכן משנה - ניתן להתקשרות מאחרים בלבד",
       "visibilityAll": "הכל - שניהם",
       "saveFailed": "לא ניתן היה להציל את הסוכן",
+      "deleteFailed": "לא ניתן למחוק את הסוכן",
       "nameRequired": "הזן שם סוכן",
       "slugRequired": "הזן שבלול סוכן",
       "slugInvalid": "Slug חייב להתחיל באות ולהשתמש רק באותיות קטנות, ספרות ומקפים",
@@ -3758,10 +3762,12 @@
       "description": "תיאור הפקודה",
       "template": "תבנית",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "הסבר $ARGUMENTS",
       "subtask": "הפעל כתת-מטלת",
       "edit": "ערוך פקודת נטוי",
       "saveFailed": "לא ניתן לשמור את הפקודה",
+      "deleteFailed": "לא ניתן למחוק את הפקודה",
       "nameRequired": "הזן שם פקודה",
       "nameInvalid": "השם חייב להתחיל באות קטנה ולהשתמש רק באותיות קטנות, ספרות ומקפים",
       "templateRequired": "הזן תבנית פקודה",
@@ -3912,7 +3918,7 @@
     "view": "קריאת התדריך",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "הצגת סטטוס חי",
+    "dismiss": "התעלמות מהתדריך",
     "offline": "לא מקוון · תדריך שמור",
     "cached": "דוח שמור · רענון לא זמין",
     "revised": "עודכן · {{revision}}",

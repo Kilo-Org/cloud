@@ -111,7 +111,9 @@
     "online": "在線上",
     "open": "開啟 {{name}}",
     "openPullRequest": "開啟提取要求",
+    "completed": "已完成",
     "pending": "待處理",
+    "running": "執行中",
     "performance": "效能",
     "preferences": "偏好設定",
     "privacyPolicy": "隱私權政策",
@@ -1021,8 +1023,6 @@
     "updateFailed": "無法更新審查員。",
     "configSaveFailed": "無法儲存審查設定。",
     "status": {
-      "running": "執行中",
-      "completed": "已完成",
       "interrupted": "已中斷"
     },
     "reviewStyle": {
@@ -1384,7 +1384,6 @@
       "installApp": "安裝 GitHub App",
       "reauthorizeButton": "重新授權 GitHub App",
       "reauthorizeDescription": "資安代理需要 vulnerability_alerts 權限才能存取 Dependabot 警報。請重新授權 GitHub App 以授予此權限。",
-      "reauthorizeFailed": "無法開始重新授權。請再試一次。",
       "reauthorizeTitle": "需要額外權限",
       "setupFailed": "無法開始 GitHub 設定。請再試一次。"
     },
@@ -1407,6 +1406,7 @@
     "settingsSave": {
       "saveChanges": "儲存變更",
       "unsavedMessage": "離開此畫面前，要儲存變更嗎？",
+      "unsavedInvalidMessage": "這些變更尚無法儲存。請修正後再儲存，或捨棄變更以離開。",
       "unsavedTitle": "未儲存的變更"
     },
     "setup": {
@@ -1800,7 +1800,8 @@
       "linesBadge_other": "{{displayCount}} 行",
       "matchesBadge_one": "{{displayCount}} 筆相符結果",
       "matchesBadge_other": "{{displayCount}} 筆相符結果",
-      "noOutput": "沒有輸出。"
+      "noOutput": "沒有輸出。",
+      "translationFailed": "翻譯失敗"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截斷）",
@@ -3676,7 +3677,9 @@
       "jsonTooLarge": "最多使用 50 個項目，鍵最多 128 個字元，值最多 4096 個字元",
       "timeoutInvalid": "超時必須是整數毫秒",
       "edit": "編輯 MCP 伺服器",
-      "saveFailed": "無法保存 MCP 伺服器"
+      "saveFailed": "無法保存 MCP 伺服器",
+      "deleteFailed": "無法刪除 MCP 伺服器",
+      "updateFailed": "無法更新 MCP 伺服器"
     },
     "agents": {
       "title": "設定檔代理",
@@ -3703,6 +3706,7 @@
       "visibilitySubagent": "子代理程式——只能從其他人調用",
       "visibilityAll": "全部 — 兩者",
       "saveFailed": "無法保存代理",
+      "deleteFailed": "無法刪除代理",
       "nameRequired": "輸入代理名稱",
       "slugRequired": "輸入代理 slug",
       "slugInvalid": "Slug 必須以字母開頭，且只能使用小寫字母、數字和破折號",
@@ -3717,10 +3721,12 @@
       "description": "命令說明",
       "template": "範本",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "解釋$ARGUMENTS",
       "subtask": "作為子任務運行",
       "edit": "編輯斜槓命令",
       "saveFailed": "無法保存命令",
+      "deleteFailed": "無法刪除命令",
       "nameRequired": "輸入命令名稱",
       "nameInvalid": "名稱必須以小寫字母開頭，且只能使用小寫字母、數字和破折號",
       "templateRequired": "輸入命令模板",
@@ -3867,7 +3873,7 @@
     "view": "閱讀簡報",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}，{{time}}",
-    "dismiss": "顯示即時狀態",
+    "dismiss": "忽略簡報",
     "offline": "離線 · 已儲存的簡報",
     "cached": "已儲存的報告 · 無法重新整理",
     "revised": "已修訂 · {{revision}}",

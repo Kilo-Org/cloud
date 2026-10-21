@@ -111,7 +111,9 @@
     "online": "Á netinu",
     "open": "Opna {{name}}",
     "openPullRequest": "Opna samrunabeiðni",
+    "completed": "Lokið",
     "pending": "Í bið",
+    "running": "Í gangi",
     "performance": "Afköst",
     "preferences": "Kjörstillingar",
     "privacyPolicy": "Persónuverndarstefna",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Ekki tókst að uppfæra kóðarýninn.",
     "configSaveFailed": "Ekki tókst að vista yfirferðarstillingar.",
     "status": {
-      "running": "Í gangi",
-      "completed": "Lokið",
       "interrupted": "Rofið"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Vista breytingar",
       "unsavedTitle": "Óvistaðar breytingar",
-      "unsavedMessage": "Viltu vista breytingarnar áður en þú ferð af þessum skjá?"
+      "unsavedMessage": "Viltu vista breytingarnar áður en þú ferð af þessum skjá?",
+      "unsavedInvalidMessage": "Ekki er hægt að vista þessar breytingar ennþá. Lagaðu þær til að vista eða fargaðu þeim til að fara."
     },
     "auditReportButton": {
       "viewA11y": "Skoða endurskoðunarskýrslu"
@@ -1941,7 +1942,6 @@
       "installApp": "Setja upp GitHub-forrit",
       "reauthorizeButton": "Endurnýja heimildir GitHub-forritsins",
       "reauthorizeDescription": "Öryggisvakinn þarf heimildina vulnerability_alerts til að fá aðgang að Dependabot-viðvörunum. Endurnýjaðu heimildir GitHub-forritsins til að veita þessa heimild.",
-      "reauthorizeFailed": "Ekki tókst að hefja endurnýjun heimilda. Reyndu aftur.",
       "reauthorizeTitle": "Viðbótarheimildir nauðsynlegar",
       "setupFailed": "Ekki tókst að hefja uppsetningu GitHub. Reyndu aftur."
     },
@@ -2315,7 +2315,8 @@
       "linesBadge_other": "{{displayCount}} línur",
       "matchesBadge_one": "{{displayCount}} samsvörun",
       "matchesBadge_other": "{{displayCount}} samsvaranir",
-      "noOutput": "Ekkert úttak."
+      "noOutput": "Ekkert úttak.",
+      "translationFailed": "Þýðing mistókst"
     },
     "readToolMarkdown": {
       "linesTruncated": "línur {{start}}–{{end}} (stytt)",
@@ -3676,7 +3677,9 @@
       "jsonTooLarge": "Notaðu að hámarki 50 færslur, lyklar upp að 128 og gildi upp að 4096 stafir",
       "timeoutInvalid": "Tímamörk verða að vera heil tala af millisekúndum",
       "edit": "Breyta MCP miðlara",
-      "saveFailed": "Gat ekki vistað MCP þjón"
+      "saveFailed": "Gat ekki vistað MCP þjón",
+      "deleteFailed": "Gat ekki eytt MCP þjóni",
+      "updateFailed": "Gat ekki uppfært MCP þjón"
     },
     "agents": {
       "title": "Umboðsmenn prófíla",
@@ -3703,6 +3706,7 @@
       "visibilitySubagent": "Subagent — aðeins hægt að hringja frá öðrum",
       "visibilityAll": "Allt - bæði",
       "saveFailed": "Ekki tókst að vista umboðsmann",
+      "deleteFailed": "Ekki tókst að eyða umboðsmanni",
       "nameRequired": "Sláðu inn nafn umboðsmanns",
       "slugRequired": "Sláðu inn umboðssnigl",
       "slugInvalid": "Snigl verður að byrja á bókstaf og nota aðeins lágstafi, tölustafi og strik",
@@ -3717,10 +3721,12 @@
       "description": "Skipunarlýsing",
       "template": "Sniðmát",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Útskýrðu $ARGUMENTS",
       "subtask": "Keyra sem undirverkefni",
       "edit": "Breyta skástrik skipun",
       "saveFailed": "Ekki tókst að vista skipunina",
+      "deleteFailed": "Ekki tókst að eyða skipuninni",
       "nameRequired": "Sláðu inn heiti skipunar",
       "nameInvalid": "Nafn verður að byrja á lágstöfum og nota aðeins lágstafi, tölustafi og bandstrik",
       "templateRequired": "Sláðu inn skipanasniðmát",
@@ -3867,7 +3873,7 @@
     "view": "Lesa yfirlit",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Sýna rauntímastöðu",
+    "dismiss": "Vísa yfirliti frá",
     "offline": "Ótengt · vistað yfirlit",
     "cached": "Vistuð skýrsla · ekki hægt að uppfæra",
     "revised": "Endurskoðað · {{revision}}",

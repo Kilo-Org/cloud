@@ -111,7 +111,9 @@
     "online": "Nakakonekta",
     "open": "Buksan ang {{name}}",
     "openPullRequest": "Buksan ang PR",
+    "completed": "Nakumpleto",
     "pending": "Nakabinbin",
+    "running": "Tumatakbo",
     "performance": "Pagganap",
     "preferences": "Mga kagustuhan",
     "privacyPolicy": "Patakaran sa pribasiya",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Hindi na-update ang tagasuri.",
     "configSaveFailed": "Hindi na-save ang mga setting ng pagsusuri.",
     "status": {
-      "running": "Tumatakbo",
-      "completed": "Nakumpleto",
       "interrupted": "Naputol"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "I-save ang mga pagbabago",
       "unsavedTitle": "Mga hindi na-save na pagbabago",
-      "unsavedMessage": "I-save ang mga pagbabago mo bago umalis sa screen na ito?"
+      "unsavedMessage": "I-save ang mga pagbabago mo bago umalis sa screen na ito?",
+      "unsavedInvalidMessage": "Hindi pa ma-save ang mga pagbabagong ito. Ayusin ang mga ito para ma-save, o itapon ang mga ito para umalis."
     },
     "auditReportButton": {
       "viewA11y": "Tingnan ang ulat ng audit"
@@ -1941,7 +1942,6 @@
       "installApp": "I-install ang GitHub App",
       "reauthorizeButton": "Pahintulutan muli ang GitHub App",
       "reauthorizeDescription": "Kailangan ng Security Agent ang pahintulot na vulnerability_alerts para ma-access ang mga alerto ng Dependabot. Pahintulutan muli ang GitHub App para ibigay ito.",
-      "reauthorizeFailed": "Hindi masimulan ang muling pagbibigay ng pahintulot. Pakisubukang muli.",
       "reauthorizeTitle": "Kailangan ng mga karagdagang pahintulot",
       "setupFailed": "Hindi masimulan ang setup ng GitHub. Pakisubukang muli."
     },
@@ -2315,7 +2315,8 @@
       "linesBadge_other": "{{displayCount}} na linya",
       "matchesBadge_one": "{{displayCount}} tugma",
       "matchesBadge_other": "{{displayCount}} tugma",
-      "noOutput": "Walang output."
+      "noOutput": "Walang output.",
+      "translationFailed": "Nabigo ang pagsasalin"
     },
     "readToolMarkdown": {
       "linesTruncated": "mga linyang {{start}}–{{end}} (pinaikli)",
@@ -3676,7 +3677,9 @@
       "jsonTooLarge": "Gumamit ng hindi hihigit sa 50 entry, mga key hanggang 128 at mga value hanggang 4096 character",
       "timeoutInvalid": "Ang timeout ay dapat na isang buong bilang ng mga millisecond",
       "edit": "I-edit ang MCP server",
-      "saveFailed": "Hindi ma-save ang MCP server"
+      "saveFailed": "Hindi ma-save ang MCP server",
+      "deleteFailed": "Hindi ma-delete ang MCP server",
+      "updateFailed": "Hindi ma-update ang MCP server"
     },
     "agents": {
       "title": "Mga ahente ng profile",
@@ -3703,6 +3706,7 @@
       "visibilitySubagent": "Subagent — matatawag lang mula sa iba",
       "visibilityAll": "Lahat - pareho",
       "saveFailed": "Hindi ma-save ang ahente",
+      "deleteFailed": "Hindi ma-delete ang ahente",
       "nameRequired": "Maglagay ng pangalan ng ahente",
       "slugRequired": "Maglagay ng agent slug",
       "slugInvalid": "Ang slug ay dapat magsimula sa isang titik at gumamit lamang ng maliliit na titik, digit, at gitling",
@@ -3717,10 +3721,12 @@
       "description": "Paglalarawan ng utos",
       "template": "Padron",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Ipaliwanag ang $ARGUMENTS",
       "subtask": "Patakbuhin bilang subtask",
       "edit": "I-edit ang slash command",
       "saveFailed": "Hindi ma-save ang command",
+      "deleteFailed": "Hindi ma-delete ang command",
       "nameRequired": "Maglagay ng command name",
       "nameInvalid": "Ang pangalan ay dapat magsimula sa maliit na titik at gumamit lamang ng maliliit na titik, digit, at gitling",
       "templateRequired": "Maglagay ng command template",
@@ -3867,7 +3873,7 @@
     "view": "Basahin ang briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Ipakita ang live na status",
+    "dismiss": "Balewalain ang briefing",
     "offline": "Offline · naka-save na briefing",
     "cached": "Naka-save na ulat · hindi ma-refresh",
     "revised": "Binago · {{revision}}",

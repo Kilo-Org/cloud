@@ -111,7 +111,9 @@
     "online": "Trực tuyến",
     "open": "Mở {{name}}",
     "openPullRequest": "Mở yêu cầu hợp nhất",
+    "completed": "Đã hoàn tất",
     "pending": "Đang chờ",
+    "running": "Đang chạy",
     "performance": "Hiệu năng",
     "preferences": "Tùy chọn",
     "privacyPolicy": "Chính sách quyền riêng tư",
@@ -1021,8 +1023,6 @@
     "updateFailed": "Không thể cập nhật Trình rà soát mã.",
     "configSaveFailed": "Không thể lưu cấu hình rà soát.",
     "status": {
-      "running": "Đang chạy",
-      "completed": "Đã hoàn tất",
       "interrupted": "Bị gián đoạn"
     },
     "reviewStyle": {
@@ -1384,7 +1384,6 @@
       "installApp": "Cài đặt ứng dụng GitHub",
       "reauthorizeButton": "Cấp quyền lại cho ứng dụng GitHub",
       "reauthorizeDescription": "Trợ lý bảo mật cần quyền vulnerability_alerts để truy cập cảnh báo Dependabot. Hãy cấp quyền lại cho ứng dụng GitHub để bổ sung quyền này.",
-      "reauthorizeFailed": "Không thể bắt đầu cấp quyền lại. Vui lòng thử lại.",
       "reauthorizeTitle": "Cần thêm quyền",
       "setupFailed": "Không thể bắt đầu thiết lập GitHub. Vui lòng thử lại."
     },
@@ -1407,6 +1406,7 @@
     "settingsSave": {
       "saveChanges": "Lưu thay đổi",
       "unsavedMessage": "Bạn có muốn lưu thay đổi trước khi rời màn hình này không?",
+      "unsavedInvalidMessage": "Những thay đổi này chưa thể lưu. Hãy sửa chúng để lưu, hoặc hủy bỏ chúng để rời đi.",
       "unsavedTitle": "Thay đổi chưa lưu"
     },
     "setup": {
@@ -1800,7 +1800,8 @@
       "linesBadge_other": "{{displayCount}} dòng",
       "matchesBadge_one": "{{displayCount}} kết quả khớp",
       "matchesBadge_other": "{{displayCount}} kết quả khớp",
-      "noOutput": "Không có đầu ra."
+      "noOutput": "Không có đầu ra.",
+      "translationFailed": "Dịch thất bại"
     },
     "readToolMarkdown": {
       "linesTruncated": "dòng {{start}}–{{end}} (đã cắt bớt)",
@@ -3654,7 +3655,7 @@
       "empty": "Chưa có máy chủ MCP",
       "name": "Tên máy chủ",
       "type": "Loại máy chủ",
-      "localType": "Địa phương",
+      "localType": "Cục bộ",
       "remoteType": "Xa",
       "command": "Dòng lệnh",
       "url": "URL",
@@ -3676,7 +3677,9 @@
       "jsonTooLarge": "Dùng tối đa 50 mục, khóa tối đa 128 và giá trị tối đa 4096 ký tự",
       "timeoutInvalid": "Thời gian chờ phải là số nguyên mili giây",
       "edit": "Chỉnh sửa máy chủ MCP",
-      "saveFailed": "Không thể lưu máy chủ MCP"
+      "saveFailed": "Không thể lưu máy chủ MCP",
+      "deleteFailed": "Không thể xóa máy chủ MCP",
+      "updateFailed": "Không thể cập nhật máy chủ MCP"
     },
     "agents": {
       "title": "Hồ sơ đại lý",
@@ -3703,6 +3706,7 @@
       "visibilitySubagent": "Subagent - chỉ có thể gọi được từ người khác",
       "visibilityAll": "Tất cả - cả hai",
       "saveFailed": "Không thể lưu đại lý",
+      "deleteFailed": "Không thể xóa đại lý",
       "nameRequired": "Nhập tên đại lý",
       "slugRequired": "Nhập sên đại lý",
       "slugInvalid": "Slug phải bắt đầu bằng một chữ cái và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
@@ -3717,10 +3721,12 @@
       "description": "Mô tả lệnh",
       "template": "Bản mẫu",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Giải thích $ARGUMENTS",
       "subtask": "Chạy dưới dạng nhiệm vụ phụ",
       "edit": "Chỉnh sửa lệnh gạch chéo",
       "saveFailed": "Không thể lưu lệnh",
+      "deleteFailed": "Không thể xóa lệnh",
       "nameRequired": "Nhập tên lệnh",
       "nameInvalid": "Tên phải bắt đầu bằng chữ cái viết thường và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
       "templateRequired": "Nhập mẫu lệnh",
@@ -3867,7 +3873,7 @@
     "view": "Đọc bản tin",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Hiện trạng thái trực tiếp",
+    "dismiss": "Bỏ qua bản tin",
     "offline": "Ngoại tuyến · bản tin đã lưu",
     "cached": "Báo cáo đã lưu · không thể làm mới",
     "revised": "Đã sửa đổi · {{revision}}",

@@ -157,7 +157,7 @@ export function ProfileMcpScreen({
       await deleteMcp.mutateAsync({ profileId, mcpServerId });
     } catch (error) {
       if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.mcp.saveFailed'));
+        toast.error(t('profiles.mcp.deleteFailed'));
       }
     }
   };
@@ -220,7 +220,7 @@ export function ProfileMcpScreen({
                   {
                     onError: error => {
                       if (!hasUsableMessage(error)) {
-                        toast.error(t('profiles.mcp.saveFailed'));
+                        toast.error(t('profiles.mcp.updateFailed'));
                       }
                     },
                   }

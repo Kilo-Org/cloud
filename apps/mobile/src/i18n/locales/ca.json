@@ -111,7 +111,9 @@
     "online": "En línia",
     "open": "Obre {{name}}",
     "openPullRequest": "PR oberta",
+    "completed": "Finalitzada",
     "pending": "Pendent",
+    "running": "En execució",
     "performance": "Rendiment",
     "preferences": "Preferències",
     "privacyPolicy": "Política de privadesa",
@@ -1555,8 +1557,6 @@
     "updateFailed": "No s'ha pogut actualitzar el revisor.",
     "configSaveFailed": "No s'ha pogut desar la configuració de la revisió.",
     "status": {
-      "running": "En execució",
-      "completed": "Finalitzada",
       "interrupted": "Interrompuda"
     },
     "reviewStyle": {
@@ -1895,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Desa els canvis",
       "unsavedTitle": "Canvis sense desar",
-      "unsavedMessage": "Vols desar els canvis abans de sortir d'aquesta pantalla?"
+      "unsavedMessage": "Vols desar els canvis abans de sortir d'aquesta pantalla?",
+      "unsavedInvalidMessage": "Aquests canvis encara no es poden desar. Corregeix-los per desar-los o descarta'ls per sortir."
     },
     "auditReportButton": {
       "viewA11y": "Consulta l'informe d'auditoria"
@@ -1964,7 +1965,6 @@
       "installApp": "Instal·la l'aplicació de GitHub",
       "reauthorizeButton": "Torna a autoritzar l'aplicació de GitHub",
       "reauthorizeDescription": "L'agent de seguretat necessita el permís vulnerability_alerts per accedir a les alertes de Dependabot. Torna a autoritzar l'aplicació de GitHub per concedir aquest permís.",
-      "reauthorizeFailed": "No s'ha pogut iniciar la reautorització. Torna-ho a provar.",
       "reauthorizeTitle": "Calen permisos addicionals",
       "setupFailed": "No s'ha pogut iniciar la configuració de GitHub. Torna-ho a provar."
     },
@@ -2347,7 +2347,8 @@
       "matchesBadge_one": "{{displayCount}} coincidència",
       "matchesBadge_other": "{{displayCount}} coincidències",
       "matchesBadge_many": "{{displayCount}} coincidències",
-      "noOutput": "No hi ha cap sortida."
+      "noOutput": "No hi ha cap sortida.",
+      "translationFailed": "La traducció ha fallat"
     },
     "readToolMarkdown": {
       "linesTruncated": "línies {{start}}–{{end}} (truncades)",
@@ -3717,7 +3718,9 @@
       "jsonTooLarge": "Utilitzeu com a màxim 50 entrades, claus de fins a 128 i valors de fins a 4096 caràcters",
       "timeoutInvalid": "El temps d'espera ha de ser un nombre sencer de mil·lisegons",
       "edit": "Edita el servidor MCP",
-      "saveFailed": "No s'ha pogut desar el servidor MCP"
+      "saveFailed": "No s'ha pogut desar el servidor MCP",
+      "deleteFailed": "No s'ha pogut suprimir el servidor MCP",
+      "updateFailed": "No s'ha pogut actualitzar el servidor MCP"
     },
     "agents": {
       "title": "Agents de perfil",
@@ -3744,6 +3747,7 @@
       "visibilitySubagent": "Subagent: només es pot trucar des d'altres",
       "visibilityAll": "Tots, tots dos",
       "saveFailed": "No s'ha pogut desar l'agent",
+      "deleteFailed": "No s'ha pogut suprimir l'agent",
       "nameRequired": "Introduïu un nom d'agent",
       "slugRequired": "Introduïu un llimac d'agent",
       "slugInvalid": "Slug ha de començar amb una lletra i utilitzar només lletres minúscules, dígits i guions",
@@ -3758,10 +3762,12 @@
       "description": "Descripció de l'ordre",
       "template": "Plantilla",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar com a subtasca",
       "edit": "Edita l'ordre de barra inclinada",
       "saveFailed": "No s'ha pogut desar l'ordre",
+      "deleteFailed": "No s'ha pogut suprimir l'ordre",
       "nameRequired": "Introduïu un nom d'ordre",
       "nameInvalid": "El nom ha de començar amb una lletra minúscula i utilitzar només lletres minúscules, dígits i guions",
       "templateRequired": "Introduïu una plantilla d'ordres",
@@ -3912,7 +3918,7 @@
     "view": "Llegeix el resum",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Mostra l'estat en directe",
+    "dismiss": "Descarta el resum",
     "offline": "Sense connexió · resum desat",
     "cached": "Informe desat · no es pot actualitzar",
     "revised": "Revisat · {{revision}}",

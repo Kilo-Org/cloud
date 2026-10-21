@@ -111,7 +111,9 @@
     "online": "An-tserasera",
     "open": "Sokafy ny {{name}}",
     "openPullRequest": "Sokafy ny PR",
+    "completed": "Vita",
     "pending": "Miandry",
+    "running": "Mandeha",
     "performance": "Fahombiazana",
     "preferences": "Safidy",
     "privacyPolicy": "Politika momba ny fiainana manokana",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Tsy nahomby ny fanavaozana ny mpanamarina.",
     "configSaveFailed": "Tsy nahomby ny fitahirizana ny fikiran'ny fanamarinana.",
     "status": {
-      "running": "Mandeha",
-      "completed": "Vita",
       "interrupted": "Tapaka"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Tehirizo ny fiovana",
       "unsavedTitle": "Fiovana tsy voatahiry",
-      "unsavedMessage": "Hotehirizina ve ny fanovanao alohan'ny hialana amin'ity efijery ity?"
+      "unsavedMessage": "Hotehirizina ve ny fanovanao alohan'ny hialana amin'ity efijery ity?",
+      "unsavedInvalidMessage": "Tsy afaka tehirizina ireo fiovana ireo aloha. Amboary izy ireo raha hotehirizina, na ario raha hialana."
     },
     "auditReportButton": {
       "viewA11y": "Jereo ny tatitra fanaraha-maso"
@@ -1941,7 +1942,6 @@
       "installApp": "Apetraho ny rindranasa GitHub",
       "reauthorizeButton": "Omeo alalana indray ny rindranasa GitHub",
       "reauthorizeDescription": "Mila ny alalana vulnerability_alerts ny Security Agent mba hijery ny fampandrenesan'ny Dependabot. Omeo alalana indray ny rindranasa GitHub mba hanomezana azy io alalana io.",
-      "reauthorizeFailed": "Tsy nety natomboka ny fanomezana alalana indray. Andramo indray azafady.",
       "reauthorizeTitle": "Ilaina ny alalana fanampiny",
       "setupFailed": "Tsy nety natomboka ny fametrahana ny GitHub. Andramo indray azafady."
     },
@@ -2315,7 +2315,8 @@
       "linesBadge_other": "Andalana {{displayCount}}",
       "matchesBadge_one": "Valiny mifanaraka {{displayCount}}",
       "matchesBadge_other": "Valiny mifanaraka {{displayCount}}",
-      "noOutput": "Tsy misy vokatra."
+      "noOutput": "Tsy misy vokatra.",
+      "translationFailed": "Tsy nahomby ny fandikana"
     },
     "readToolMarkdown": {
       "linesTruncated": "andalana {{start}}–{{end}} (nohafohezina)",
@@ -3676,7 +3677,9 @@
       "jsonTooLarge": "Ampiasao farafahabetsany 50 fidirana, fanalahidy hatramin'ny 128 ary sanda hatramin'ny 4096 tarehintsoratra",
       "timeoutInvalid": "Tokony ho milisegondra iray manontolo ny fotoana fiatoana",
       "edit": "Ahitsio MCP server",
-      "saveFailed": "Tsy afaka nitahiry mpizara MCP"
+      "saveFailed": "Tsy afaka nitahiry mpizara MCP",
+      "deleteFailed": "Tsy afaka namafa mpizara MCP",
+      "updateFailed": "Tsy afaka nanavao mpizara MCP"
     },
     "agents": {
       "title": "Mpampiasa mombamomba",
@@ -3703,6 +3706,7 @@
       "visibilitySubagent": "Subagent - azo antsoina amin'ny hafa ihany",
       "visibilityAll": "Rehetra - izy roa",
       "saveFailed": "Tsy afaka namonjy mpandraharaha",
+      "deleteFailed": "Tsy afaka namafa mpandraharaha",
       "nameRequired": "Ampidiro anarana mpandraharaha",
       "slugRequired": "Ampidiro ny slug mpandraharaha",
       "slugInvalid": "Ny slug dia tsy maintsy manomboka amin'ny litera ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
@@ -3717,10 +3721,12 @@
       "description": "Famaritana ny baiko",
       "template": "Endrika",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Hazavao ny $ARGUMENTS",
       "subtask": "Mihazakazaka toy ny subtask",
       "edit": "Ahitsio slash command",
       "saveFailed": "Tsy afaka mitahiry baiko",
+      "deleteFailed": "Tsy afaka namafa baiko",
       "nameRequired": "Ampidiro anarana baiko",
       "nameInvalid": "Ny anarana dia tsy maintsy manomboka amin'ny litera kely ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
       "templateRequired": "Ampidiro môdely baiko",
@@ -3867,7 +3873,7 @@
     "view": "Vakio ny tatitra",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Asehoy ny sata ankehitriny",
+    "dismiss": "Esory ny tatitra",
     "offline": "Tsy misy tambajotra · tatitra voatahiry",
     "cached": "Tatitra voatahiry · tsy azo havaozina",
     "revised": "Nohavaozina · {{revision}}",

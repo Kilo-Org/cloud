@@ -356,7 +356,6 @@ export async function fetchGitHubRepositoriesForUser(
       };
     }
 
-    // Return cached repos
     return {
       integrationInstalled: true,
       repositories: mapRepositories(cachedRepositories ?? [], integration),

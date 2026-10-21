@@ -57,7 +57,7 @@ function validateEasCli(workflow, mobilePackage, easConfig) {
   const lines = Object.values(workflow.jobs)
     .flatMap(job => job.steps ?? [])
     .flatMap(item => (item.run ?? '').split('\n'))
-    .filter(line => /\beas (?:env:|build|submit)\b/.test(line))
+    .filter(line => /\beas(?:-cli\b| (?:env:|build|submit)\b)/.test(line))
     .filter(line => !/^\s*echo\b/.test(line));
   assert.ok(lines.length > 0, 'the workflow must run the EAS CLI');
   for (const line of lines) {
@@ -576,6 +576,18 @@ const toolchainMutations = {
       /\beas build\b/.test(item.run ?? '')
     );
     build.run = build.run.replace('pnpm exec eas build', 'eas build');
+  },
+  'a workflow step bypasses the installed CLI': ({ workflow, mobilePackage }) => {
+    const build = workflow.jobs['build-and-submit'].steps.find(item =>
+      /\beas build\b/.test(item.run ?? '')
+    );
+    build.run = build.run.replace(
+      'pnpm exec eas build',
+      `pnpx eas-cli@${mobilePackage.devDependencies['eas-cli']} build`
+    );
+  },
+  'a mobile script bypasses the installed CLI': ({ mobilePackage }) => {
+    mobilePackage.scripts.build = `pnpx eas-cli@${mobilePackage.devDependencies['eas-cli']} ${mobilePackage.scripts.build}`;
   },
 };
 

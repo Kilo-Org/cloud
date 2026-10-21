@@ -322,9 +322,10 @@
     "tokens"
   ],
   "sv": [
+    "{{count}} open",
     "block",
-    "commit",
     "comment",
+    "commit",
     "copied",
     "merge",
     "open",

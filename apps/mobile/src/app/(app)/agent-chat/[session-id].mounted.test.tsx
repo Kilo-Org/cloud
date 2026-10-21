@@ -323,7 +323,7 @@ vi.mock('@expo/react-native-action-sheet', () => ({
 const globalContext = vi.hoisted(() => ({
   organizationId: 'global-org' as string | null,
   isLoaded: true,
-  error: null,
+  error: null as 'restore' | 'save' | null,
   retry: vi.fn(),
   setOrganizationId: vi.fn(),
 }));
@@ -622,6 +622,28 @@ describe('SessionDetailScreen invalid session-id', () => {
     expect(findByType(renderer.root, 'InvalidRouteState')).toHaveLength(0);
     // The doomed id never starts a metadata read, even with the gate's other
     // conditions (confirmed owner, no organization route) all true.
+    expect(queryEnabled()).toBe(false);
+  });
+
+  it('holds the composer behind the account retry when the account list cannot be restored', async () => {
+    // The composer mounts account-scoped reads (model catalog, repositories,
+    // profiles, create), so a scope that only the active account can decide
+    // does not fall back to Personal while the account list is what failed.
+    useLocalSearchParamsMock.mockReturnValue({
+      'session-id': '00000000-0000-0000-0000-000000000000',
+    });
+    globalContext.error = 'restore';
+    onTestFinished(() => {
+      globalContext.error = null;
+    });
+    const renderer = await mountRoute();
+
+    expect(findByType(renderer.root, 'NewSessionScreenBody')).toHaveLength(0);
+    expect(findByType(renderer.root, 'NewSessionModelProvider')).toHaveLength(0);
+    act(() => {
+      pressControl(retryControl(renderer));
+    });
+    expect(globalContext.retry).toHaveBeenCalled();
     expect(queryEnabled()).toBe(false);
   });
 });
@@ -995,33 +1017,6 @@ describe('SessionDetailScreen valid session-id', () => {
 
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
     expect(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry')).toBeUndefined();
-  });
-
-  it('retires the session when a replaced account is denied its metadata', async () => {
-    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
-    const renderer = await mountRoute();
-    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
-
-    // Account A rendered this session from a read that landed during the open,
-    // which arms the rendered-session guard for A's generation.
-    queryState.dataUpdatedAt = Date.now();
-    await updateRoute(renderer);
-    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
-
-    // Credentials are then replaced in place on the same route instance: the
-    // guard must not carry over and mask the successor's denial.
-    act(() => {
-      beginReplacement();
-      commitAccount('B');
-    });
-    queryState.data = null;
-    queryState.dataUpdatedAt = 0;
-    queryState.isError = true;
-    queryState.error = { data: { code: 'NOT_FOUND' } };
-    await updateRoute(renderer);
-
-    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
-    expect(propOf(findByType(renderer.root, 'QueryError')[0], 'variant')).toBe('not-found');
   });
 
   it('renders the session content with the parsed session-id and enables the query', async () => {

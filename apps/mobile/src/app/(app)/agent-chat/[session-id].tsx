@@ -123,22 +123,12 @@ export default function SessionDetailScreen() {
       beganOnRestoredIdentity: owner.userId === null && owner.restored,
     };
   }
-  // Keyed by session AND the account generation that armed it: a replaced
-  // account on the same route instance must not inherit the guard, or the
-  // successor's authoritative denial for this id would be masked.
-  const sessionRendered = useRef<{ sessionId: typeof rawSessionId; generation: number } | null>(
-    null
-  );
-  if (
-    sessionRendered.current !== null &&
-    (sessionRendered.current.sessionId !== rawSessionId ||
-      sessionRendered.current.generation !== owner.generation)
-  ) {
-    // A different session or a different account scope on this route instance
-    // restarts the rendered guard with the clock.
+  const sessionRendered = useRef<string | null>(null);
+  if (sessionRendered.current !== null && sessionRendered.current !== rawSessionId) {
+    // A reused route instance opening a different session restarts the
+    // rendered guard with the clock.
     sessionRendered.current = null;
   }
-
   // Narrow the metadata invalidation to this session's own query key. The whole
   // `cliSessionsV2` procedure prefix would also invalidate the stored
   // `cliSessionsV2.list` pages behind this pushed route, so returning to the app
@@ -159,8 +149,6 @@ export default function SessionDetailScreen() {
   // account's rows. Sign-in clears the prior hint before storing new credentials;
   // a fresh sign-in is not a restore, so the route must stay pending
   // (`identityPending`) until `user.getMe` answers.
-  // Declared before the metadata query so the retry callback can scope its
-  // NOT_FOUND skip to the hint that is actually in play.
   const restoredUserId = useRestoredAccountId(owner.authEpoch, owner.restored);
   const sessionQuery = useQuery(
     {
@@ -265,7 +253,8 @@ export default function SessionDetailScreen() {
     // here would land on the permanent "Not found" screen. Such an id renders
     // the New-session screen instead — the composer the user asked for — with
     // the route's organization context carried through, exactly as
-    // `agent-chat/new` renders it.
+    // `agent-chat/new` renders it: the same component, so the composer waits
+    // for the account scope there too.
     return <NewSessionRoute />;
   }
 
@@ -312,29 +301,28 @@ export default function SessionDetailScreen() {
     metadataErrorCode === 'NOT_FOUND' ||
     metadataErrorCode === 'UNAUTHORIZED' ||
     metadataErrorCode === 'FORBIDDEN';
-  // Arm the guard BEFORE the denial branch: a fresh read's data sits beside a
-  // background denial on the same render. A previous mount's cached row carries
-  // an earlier `dataUpdatedAt`, so it never arms; a credential replacement
-  // leaves it disarmed for the successor.
+  // Arm the rendered-session guard BEFORE the denial branch: a fresh read's
+  // data is already in place on the render that also carries a denial (a
+  // background refetch failing on the same render its cached data sits
+  // beside), and the guard must be armed from that data. A previous mount's
+  // cached row carries an earlier `dataUpdatedAt`, so it never arms.
   if (sessionQuery.data != null && sessionQuery.dataUpdatedAt >= openStart.current.startedAt) {
-    sessionRendered.current = { sessionId: rawSessionId, generation: owner.generation };
+    sessionRendered.current = rawSessionId;
   }
-  const sessionRenderedForOpen = sessionRendered.current?.sessionId === rawSessionId;
   // A failed background refresh does not invalidate owner-scoped cached
   // metadata. Keep its provider mounted; only an authoritative denial retires it.
   // A retryable metadata failure must not blank a session either: the device may
   // still hold its persisted transcript, so mount the session and let the SDK
   // paint the cached content and surface the retryable failure in place. Only a
-  // denial replaces the screen with the error — and only when this owner and
-  // open have not rendered the session yet (see the `sessionRendered` ref
-  // above), so a background-refetch denial never blanks a rendered session and
-  // a replaced account's denial is never masked.
+  // denial replaces the screen with the error — and only when this open has not
+  // rendered the session yet (see the `sessionRendered` ref above), so a
+  // background-refetch denial never blanks a rendered session.
   if (
     identityFailed ||
     (routeOrganizationId === undefined &&
       sessionQuery.isError &&
       metadataAccessDenied &&
-      !sessionRenderedForOpen)
+      sessionRendered.current !== rawSessionId)
   ) {
     // An identity failure stays retriable. An authoritative metadata denial
     // (NOT_FOUND / UNAUTHORIZED / FORBIDDEN) can't be recovered by retrying, so

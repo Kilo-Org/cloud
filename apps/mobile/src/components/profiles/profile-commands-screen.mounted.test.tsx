@@ -213,6 +213,34 @@ describe('ProfileCommandsScreen', () => {
     unmount();
   });
 
+  it('read-only: a member sees no add, reorder, or delete controls', async () => {
+    permissionState.canManage = false;
+    h.query.data = testProfile(['a', 'b']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen('org-1');
+
+    expect(findFields(renderer.root).map(field => field.props.disabled)).toEqual([true, true]);
+    expect(findAll(renderer.root, 'Pressable')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+
+    unmount();
+    permissionState.canManage = true;
+  });
+
+  it('read-only: a member sees no add CTA when the list is empty', async () => {
+    permissionState.canManage = false;
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen('org-1');
+
+    expect(findOne(renderer.root, 'EmptyState').props.action).toBeNull();
+
+    unmount();
+    permissionState.canManage = true;
+  });
+
   it('happy: deleting a row persists the remaining list', async () => {
     h.query.data = testProfile(['a', 'b']);
     h.query.isPending = false;

@@ -230,6 +230,12 @@ export type PreparationManager = {
   ): Promise<void>;
   release(sessionId: string): void;
   isPrepared(sessionId: string): boolean;
+  /**
+   * The prepared route's runtime identity, or null while the route is not yet
+   * attached. Live native reads use it to reach the exact runtime and directory
+   * the route was prepared for (spec §10).
+   */
+  preparedRoute(sessionId: string): { runtimeKey: string; directory: string } | null;
   isPreparing(): boolean;
   /** In-flight prepares, for the native status line. */
   preparingCount(): number;
@@ -1562,6 +1568,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       });
     },
     isPrepared: sessionId => prepared.has(sessionId),
+    preparedRoute: sessionId => {
+      const route = prepared.get(sessionId);
+      return route === undefined ? null : { runtimeKey: route.key, directory: route.directory };
+    },
     isPreparing: () => preparing.size > 0,
     preparingCount: () => preparing.size,
     sessionCount: () => prepared.size,

@@ -20,6 +20,7 @@ import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 import { trpcClient } from '@/lib/trpc';
 import {
   PERSONAL_SCOPE,
@@ -170,7 +171,19 @@ export default function ReposRoute() {
                         getGitHubIntegrationUrl(WEB_BASE_URL, orgScope, token),
                         { label: t('codeReviewer.repos.repositoryAccess') }
                       );
-                    } catch {
+                    } catch (error) {
+                      // A non-multi-installation organization that already has
+                      // an active GitHub App connection rejects the mint, so a
+                      // pre-minted token cannot exist. The settings page still
+                      // works without one: it mints its own state for the
+                      // signed-in web user.
+                      const code = readTrpcErrorField(error, 'code');
+                      if (code === 'FORBIDDEN' && orgScope) {
+                        await openExternalUrl(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope), {
+                          label: t('codeReviewer.repos.repositoryAccess'),
+                        });
+                        return;
+                      }
                       toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
                     }
                   } else if (platform === 'gitlab') {

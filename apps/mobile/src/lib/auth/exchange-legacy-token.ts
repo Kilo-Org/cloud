@@ -4,6 +4,7 @@ import { API_BASE_URL } from '@/lib/config';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
 import { parseTokenPair } from '@/lib/auth/native-auth-contract';
+import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import { AUTH_TOKEN_KEY, LEGACY_EXCHANGE_DONE_KEY } from '@/lib/storage-keys';
 
 export async function exchangeLegacyToken(): Promise<{
@@ -42,6 +43,9 @@ export async function exchangeLegacyToken(): Promise<{
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
+        // The exchange route stores the request user agent on the new device
+        // session row; without this the row records the HTTP client default.
+        ...buildClientMetadataHeaders(),
       },
     });
 

@@ -50,11 +50,39 @@ export function isRetryableContainerAvailabilityError(error: unknown): boolean {
   );
 }
 
+export function isCatalogLoadFailureResult(
+  result: Pick<CliRunResult, 'text' | 'stderrTail' | 'costUsd' | 'timedOut'>
+): boolean {
+  if (result.text.length > 0 || (result.costUsd ?? 0) !== 0 || result.timedOut) return false;
+  return /\bfailed to load (?:the )?(?:kilo )?model catalog\b/i.test(
+    stripVTControlCharacters(result.stderrTail)
+  );
+}
+
+/**
+ * The gateway rejected the requested model on one unbilled call. The same model has
+ * answered other cases, so this is a transient resolution failure, not retirement.
+ * The diagnostic names the model without its vendor prefix.
+ */
+export function isUnsupportedModelResult(
+  result: Pick<CliRunResult, 'text' | 'stderrTail' | 'costUsd' | 'timedOut'>,
+  requestedModel: string
+): boolean {
+  if (result.text.length > 0 || (result.costUsd ?? 0) !== 0 || result.timedOut) return false;
+  const diagnostic = stripVTControlCharacters(result.stderrTail);
+  const model = /(?:^|\n)\s*(?:Error:\s*)?Unsupported model:?\s*(\S+)/i
+    .exec(diagnostic)?.[1]
+    ?.replace(/[.,;:!?)\]]+$/, '');
+  const bare = requestedModel.slice(requestedModel.lastIndexOf('/') + 1);
+  return model === requestedModel || model === `kilo/${requestedModel}` || model === bare;
+}
+
 export function isExactModelUnavailableResult(
   result: Pick<CliRunResult, 'text' | 'stderrTail' | 'unavailableModelId' | 'costUsd' | 'timedOut'>,
   requestedModel: string
 ): boolean {
   if (result.text.length > 0 || (result.costUsd ?? 0) !== 0 || result.timedOut) return false;
+  if (isCatalogLoadFailureResult(result)) return false;
   if (
     result.unavailableModelId === requestedModel ||
     result.unavailableModelId === `kilo/${requestedModel}`
@@ -99,8 +127,10 @@ export async function runDeciderCaseViaCli(
     variant?: string | null;
     /** @deprecated Prefer `variant`. Same value; kept for call-site compatibility. */
     reasoningEffort?: string | null;
-    /** Where the container posts the outcome if this request's connection is lost. */
-    resultCallback?: { url: string; execution: PaidExecutionKey };
+    resultCallback?: {
+      url: string;
+      execution: PaidExecutionKey & { retried?: boolean; priorCostUsd?: number | null };
+    };
   }
 ): Promise<CliRunResult> {
   const { instanceName, model, benchCase, kiloToken, kiloApiUrl, orgId } = params;
@@ -155,7 +185,17 @@ export function parseContainerRunResponse(
     }
   });
   let unavailableModelId: string | undefined;
-  if (text.length === 0 && (costUsd ?? 0) === 0 && !body.timedOut) {
+  if (
+    text.length === 0 &&
+    (costUsd ?? 0) === 0 &&
+    !body.timedOut &&
+    !isCatalogLoadFailureResult({
+      text,
+      costUsd,
+      stderrTail: body.stderrTail ?? '',
+      timedOut: body.timedOut ?? false,
+    })
+  ) {
     for (const line of body.stdoutLines ?? []) {
       try {
         const event: unknown = JSON.parse(line);

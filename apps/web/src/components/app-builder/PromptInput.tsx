@@ -13,37 +13,29 @@ import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombob
 import type { Images } from '@/lib/images-schema';
 
 export type PromptInputProps = {
-  // Core functionality
   onSubmit: (value: string, images?: Images) => Promise<void>;
 
-  // Variants
   variant: 'landing' | 'chat';
 
-  // State
   disabled?: boolean;
   isSubmitting?: boolean;
 
-  // Interrupt functionality (for stopping streaming)
   onInterrupt?: () => void;
   isInterrupting?: boolean;
 
-  // Image upload
   messageUuid: string;
   organizationId?: string;
   maxImages?: number;
   onImagesChange?: (hasImages: boolean) => void;
 
-  // Model selection (optional)
   models?: ModelOption[];
   selectedModel?: string;
   onModelChange?: (modelId: string) => void;
   isLoadingModels?: boolean;
   modelsError?: string;
 
-  // Customization
   placeholder?: string;
 
-  // Warning state (e.g., images with non-vision model)
   warningMessage?: string;
 };
 
@@ -92,7 +84,6 @@ const BottomBar = memo(function BottomBar({
   const isSubmitDisabled = disabled || isSubmitting || hasUploadingImages;
   return (
     <div className={cn('flex items-center gap-2', isLanding ? 'p-4 pt-2' : 'p-3 pt-2')}>
-      {/* Attach button */}
       <Button
         type="button"
         variant="ghost"
@@ -105,10 +96,8 @@ const BottomBar = memo(function BottomBar({
         <span className={cn(isChat && 'sr-only')}>Attach</span>
       </Button>
 
-      {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Model selector (only shown when models are provided) */}
       {onModelChange && (
         <ModelCombobox
           variant="compact"
@@ -122,7 +111,6 @@ const BottomBar = memo(function BottomBar({
         />
       )}
 
-      {/* Submit button or warning indicator */}
       {warningMessage ? (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -228,12 +216,10 @@ export function PromptInput({
   const isLanding = variant === 'landing';
   const isChat = variant === 'chat';
 
-  // Notify parent when images change
   useEffect(() => {
     onImagesChange?.(images.length > 0);
   }, [images.length, onImagesChange]);
 
-  // Compute default placeholder based on variant
   const effectivePlaceholder =
     placeholder ?? (isLanding ? 'Describe the app you want to build...' : 'Describe changes...');
 
@@ -246,7 +232,6 @@ export function PromptInput({
     textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
   }, [isLanding]);
 
-  // Initial resize on mount and when localValue changes (for controlled sync)
   useEffect(() => {
     resizeTextarea();
   }, [resizeTextarea, localValue]);
@@ -271,13 +256,11 @@ export function PromptInput({
       if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
 
       if (isLanding) {
-        // Landing: Cmd/Ctrl+Enter to submit
         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
           e.preventDefault();
           void handleSubmit();
         }
       } else {
-        // Chat: Enter to submit, Shift+Enter for newline
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           void handleSubmit();
@@ -319,7 +302,6 @@ export function PromptInput({
       )}
       {...dragHandlers}
     >
-      {/* Drag overlay */}
       {isDragging && (
         <div
           className={cn(
@@ -336,7 +318,6 @@ export function PromptInput({
         </div>
       )}
 
-      {/* Textarea */}
       <div className={cn(isLanding ? 'p-4 pb-0' : 'p-3 pb-0', images.length > 0 && 'pb-2')}>
         <Textarea
           ref={textareaRef}
@@ -354,7 +335,6 @@ export function PromptInput({
         />
       </div>
 
-      {/* Image preview strip */}
       {images.length > 0 && (
         <div className={cn(isLanding ? 'px-4 pb-2' : 'px-3 pb-1')}>
           <ImagePreviewStrip
@@ -368,7 +348,6 @@ export function PromptInput({
         </div>
       )}
 
-      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -378,7 +357,6 @@ export function PromptInput({
         className="hidden"
       />
 
-      {/* Bottom bar with attach, model selector, and submit */}
       <BottomBar
         isLanding={isLanding}
         isChat={isChat}
@@ -397,7 +375,6 @@ export function PromptInput({
         isInterrupting={isInterrupting}
       />
 
-      {/* Hint text for chat variant */}
       {isChat && (
         <p className="px-3 pb-2 text-xs text-zinc-500">
           Press Enter to send, Shift+Enter for new line

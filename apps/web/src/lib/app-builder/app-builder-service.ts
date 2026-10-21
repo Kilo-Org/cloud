@@ -6,7 +6,10 @@ import {
   type InitiateSessionOutput,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import * as appBuilderClient from '@/lib/app-builder/app-builder-client';
-import { APP_BUILDER_APPEND_SYSTEM_PROMPT } from '@/lib/app-builder/constants';
+import {
+  APP_BUILDER_APPEND_SYSTEM_PROMPT,
+  APP_BUILDER_DISABLED,
+} from '@/lib/app-builder/constants';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   app_builder_projects,
@@ -71,6 +74,15 @@ export type {
 // ============================================================================
 
 const REQUIRED_WORKER_VERSION = 'v2' satisfies WorkerVersion;
+
+function assertAppBuilderEnabled(): void {
+  if (APP_BUILDER_DISABLED) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'App Builder is disabled.',
+    });
+  }
+}
 
 /**
  * Construct the git URL for an App Builder project.
@@ -249,6 +261,8 @@ function toSessionReason(reason: CreateSessionParams['reason']): string {
 async function createCloudAgentNextSession(
   params: CreateSessionParams
 ): Promise<InitiateSessionOutput> {
+  assertAppBuilderEnabled();
+
   const {
     projectId,
     currentSessionId,
@@ -390,6 +404,8 @@ import { getProjectWithOwnershipCheck } from '@/lib/app-builder/project-ownershi
 // ============================================================================
 
 export async function createProject(input: CreateProjectInput): Promise<CreateProjectResult> {
+  assertAppBuilderEnabled();
+
   const { owner, prompt, model, title, createdByUserId, authToken, images, mode } = input;
 
   const trimmedTitle = title?.trim();
@@ -820,6 +836,8 @@ export async function interruptSession(
 export async function startSessionForProject(
   input: StartSessionInput
 ): Promise<InitiateSessionOutput> {
+  assertAppBuilderEnabled();
+
   const { projectId, owner, authToken } = input;
 
   const project = await getProjectWithOwnershipCheck(projectId, owner);
@@ -864,6 +882,8 @@ export async function startSessionForProject(
 }
 
 export async function sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
+  assertAppBuilderEnabled();
+
   const { projectId, owner, message, authToken, images, model, forceNewSession } = input;
 
   const project = await getProjectWithOwnershipCheck(projectId, owner);

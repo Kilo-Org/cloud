@@ -3,15 +3,16 @@ import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk/v2/client';
+import { KILO_CLI_VERSION } from '../../../src/shared/kilo-cli-version.js';
 
 const binary = process.env.KILO_781_BINARY;
 const suite = binary ? describe : describe.skip;
 
-suite('pinned Kilo 7.8.1 ordered admission prerequisite', () => {
+suite('pinned Kilo ordered admission prerequisite', () => {
   it('allows a later prompt to overtake command preprocessing, so concurrent HTTP is not ordered admission', async () => {
     if (!binary) throw new Error('KILO_781_BINARY is required');
     const version = Bun.spawnSync([binary, '--version']);
-    expect(version.stdout.toString().trim()).toBe('7.8.1');
+    expect(version.stdout.toString().trim()).toBe(KILO_CLI_VERSION);
     const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-intake-781-'));
     const preprocessing = Promise.withResolvers<void>();
     const release = Promise.withResolvers<void>();
@@ -88,7 +89,9 @@ suite('pinned Kilo 7.8.1 ordered admission prerequisite', () => {
         url = /kilo server listening on (http:\/\/127\.0\.0\.1:\d+)/.exec(output)?.[1];
       }
       const client = createKiloClient({ baseUrl: url, directory: root });
-      expect((await client.global.health({ signal: timeout })).data?.version).toBe('7.8.1');
+      expect((await client.global.health({ signal: timeout })).data?.version).toBe(
+        KILO_CLI_VERSION
+      );
       const created = await client.session.create(
         { title: 'Ordered admission discriminator', directory: root },
         { signal: timeout }

@@ -381,7 +381,8 @@ const MetadataWorkspaceSchema = egressPolicySchema
   .refine(
     workspace =>
       workspace.sandboxProvider !== 'cloudflare-containers' ||
-      isIsolatedProviderWorkspace(workspace),
+      isIsolatedProviderWorkspace(workspace) ||
+      workspace.sandboxKind === 'code-review',
     'Cloudflare containers sandbox metadata requires an isolated sandbox'
   )
   .refine(
@@ -428,6 +429,8 @@ const MetadataCloneSchema = z
 export const CurrentSessionMetadataSchema = z
   .object({
     metadataSchemaVersion: z.literal(2),
+    allowSubagentSessions: z.boolean().optional(),
+    parentCloudAgentSessionId: z.string().min(1).optional(),
     identity: MetadataIdentitySchema,
     auth: MetadataAuthSchema,
     repository: MetadataRepositorySchema.optional(),

@@ -93,7 +93,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     // Needs-input raise detail: which answer the waiting agent wants, and the
     // PR that can be opened from the notification. Absent on status pushes.
     attentionKind: z.enum(['question', 'permission']).optional(),
-    prUrl: z.string().optional(),
+    prUrl: nonEmptyStringSchema.optional(),
     // The session's organization, so a tap can land the app in the context
     // the session belongs to. Optional so a push from an older producer in a
     // rolling deploy still validates; absent means Personal.
@@ -110,11 +110,31 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   // Spend alert push. Carries the owner scope and its id only — never an
   // amount, an email, or the configured threshold: this blob crosses the OS
   // lock screen, so the generic preview copy above must stay content-free.
-  z.object({
-    type: z.literal('spend_alert'),
-    scope: z.enum(['personal', 'organization']),
-    organizationId: nonEmptyStringSchema.optional(),
-  }),
+  // The tap routes by the scope, so the scope and its id must agree: an
+  // organization alert without its id would open the personal spend view, and
+  // a personal alert naming an organization would open one that did not send.
+  z
+    .object({
+      type: z.literal('spend_alert'),
+      scope: z.enum(['personal', 'organization']),
+      organizationId: nonEmptyStringSchema.optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (data.scope === 'organization' && data.organizationId === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['organizationId'],
+          message: 'an organization-scope alert names its organization',
+        });
+      }
+      if (data.scope === 'personal' && data.organizationId !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['organizationId'],
+          message: 'a personal-scope alert carries no organization id',
+        });
+      }
+    }),
   z.object({
     type: z.literal('security_finding'),
     findingId: nonEmptyStringSchema,

@@ -1,15 +1,3 @@
-/**
- * App Builder Landing
- *
- * Landing page component for starting new projects.
- * Features a large prompt input and model selector.
- * Uses local React state - no persistence needed across navigations.
- *
- * Routes calls to personal or organization router based on organizationId:
- * - organizationId undefined: trpc.appBuilder.*
- * - organizationId provided: trpc.organizations.appBuilder.*
- */
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -63,14 +51,10 @@ const MAX_RECENT_PROJECTS = 4;
  * - Truncating to 100 characters (avoids cutting words when possible)
  */
 function sanitizeProjectTitle(title: string): string {
-  // Replace line breaks with spaces
   const noLineBreaks = title.replace(/[\r\n]+/g, ' ');
-  // Truncate to 100 chars, avoiding cutting words midway
   if (noLineBreaks.length > 100) {
-    // Find the last space before or at position 100
     const truncated = noLineBreaks.substring(0, 100);
     const lastSpace = truncated.lastIndexOf(' ');
-    // If there's a space, cut there; otherwise cut at 100
     return (lastSpace > 0 ? truncated.substring(0, lastSpace) : truncated) + '...';
   }
   return noLineBreaks;
@@ -81,9 +65,6 @@ type AppBuilderLandingProps = {
   onProjectCreated: (projectId: string, prompt: string) => void;
 };
 
-/**
- * Project card component for displaying existing projects with delete functionality
- */
 function ProjectCard({
   project,
   href,
@@ -166,9 +147,6 @@ function ProjectCard({
 
 type Project = { id: string; title: string; last_message_at: string | null };
 
-/**
- * Project item in the AllProjectsSheet with delete functionality
- */
 function SheetProjectItem({
   project,
   href,
@@ -241,9 +219,6 @@ function SheetProjectItem({
 
 type ProjectViewMode = 'user' | 'all';
 
-/**
- * All Projects Sheet - shows all projects with search and optional toggle for org context
- */
 function AllProjectsSheet({
   userProjects,
   allProjects,
@@ -266,7 +241,6 @@ function AllProjectsSheet({
   const isOrgContext = !!organizationId;
   const projects = isOrgContext ? (viewMode === 'user' ? userProjects : allProjects) : allProjects;
 
-  // Delete mutations for personal and organization contexts
   const personalDeleteMutation = useMutation(trpc.appBuilder.deleteProject.mutationOptions());
   const orgDeleteMutation = useMutation(
     trpc.organizations.appBuilder.deleteProject.mutationOptions()
@@ -277,7 +251,6 @@ function AllProjectsSheet({
     try {
       if (organizationId) {
         await orgDeleteMutation.mutateAsync({ projectId, organizationId });
-        // Invalidate org projects queries
         await queryClient.invalidateQueries({
           queryKey: trpc.organizations.appBuilder.listProjects.queryKey({ organizationId }),
         });
@@ -286,7 +259,6 @@ function AllProjectsSheet({
         });
       } else {
         await personalDeleteMutation.mutateAsync({ projectId });
-        // Invalidate personal projects query
         await queryClient.invalidateQueries({
           queryKey: trpc.appBuilder.listProjects.queryKey(),
         });
@@ -374,10 +346,6 @@ function AllProjectsSheet({
   );
 }
 
-/**
- * Projects list section component - shows recent projects with "View All" option
- * For org context: shows user's projects on landing, with option to see all org projects in sheet
- */
 function ProjectsSection({
   userProjects,
   allProjects,
@@ -398,7 +366,6 @@ function ProjectsSection({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  // Delete mutations for personal and organization contexts
   const personalDeleteMutation = useMutation(trpc.appBuilder.deleteProject.mutationOptions());
   const orgDeleteMutation = useMutation(
     trpc.organizations.appBuilder.deleteProject.mutationOptions()
@@ -409,7 +376,6 @@ function ProjectsSection({
     try {
       if (organizationId) {
         await orgDeleteMutation.mutateAsync({ projectId, organizationId });
-        // Invalidate org projects queries
         await queryClient.invalidateQueries({
           queryKey: trpc.organizations.appBuilder.listProjects.queryKey({ organizationId }),
         });
@@ -418,7 +384,6 @@ function ProjectsSection({
         });
       } else {
         await personalDeleteMutation.mutateAsync({ projectId });
-        // Invalidate personal projects query
         await queryClient.invalidateQueries({
           queryKey: trpc.appBuilder.listProjects.queryKey(),
         });
@@ -518,9 +483,6 @@ function ProjectsSection({
   );
 }
 
-/**
- * Main landing component
- */
 export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuilderLandingProps) {
   const [model, setModel] = useState('');
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
@@ -531,7 +493,6 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
   const [messageUuid] = useState(() => uuidv4());
   const trpc = useTRPC();
 
-  // Fetch eligibility to check if user can use App Builder
   const personalEligibilityQuery = useQuery({
     ...trpc.appBuilder.checkEligibility.queryOptions(),
     enabled: !organizationId,
@@ -552,7 +513,6 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
   const hasLimitedAccess = !isEligibilityLoading && accessLevel === 'limited';
   const isBlocked = !isEligibilityLoading && accessLevel === 'blocked';
 
-  // Create project mutations - use the appropriate one based on context
   // Destructure mutateAsync for stable callback dependencies
   const { mutateAsync: personalCreateProject } = useMutation(
     trpc.appBuilder.createProject.mutationOptions()
@@ -561,12 +521,10 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
     trpc.organizations.appBuilder.createProject.mutationOptions()
   );
 
-  // Fetch existing projects - use the appropriate query based on context
   const personalProjectsQuery = useQuery({
     ...trpc.appBuilder.listProjects.queryOptions(),
     enabled: !organizationId,
   });
-  // For org context, fetch both all org projects and user's projects
   const orgAllProjectsQuery = useQuery({
     ...trpc.organizations.appBuilder.listProjects.queryOptions({
       organizationId: organizationId || '',
@@ -580,7 +538,6 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
     enabled: !!organizationId,
   });
 
-  // Select the right data based on context
   // For personal context: userProjects and allProjects are the same
   // For org context: userProjects = user's projects, allProjects = all org projects
   const userProjects = organizationId ? orgUserProjectsQuery.data : personalProjectsQuery.data;
@@ -589,17 +546,14 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
     ? orgUserProjectsQuery.isLoading || orgAllProjectsQuery.isLoading
     : personalProjectsQuery.isLoading;
 
-  // Fetch organization configuration and models
   const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
 
   const allModels = modelsData?.data || [];
 
-  // When user has limited access, only show free models
   const availableModels = useMemo(() => {
     let models = allModels;
 
-    // If user has limited access, filter to only free models
     if (hasLimitedAccess) {
       models = models.filter(m => {
         const promptPrice = parseFloat(m.pricing.prompt);
@@ -611,7 +565,6 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
     return models;
   }, [allModels, hasLimitedAccess]);
 
-  // Check if the selected model supports images (vision)
   const selectedModelData = useMemo(
     () => availableModels.find(m => m.id === model),
     [availableModels, model]
@@ -623,10 +576,8 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
     return inputModalities.includes('image') || inputModalities.includes('image_url');
   }, [selectedModelData]);
 
-  // Warning state: user uploaded images but model doesn't support them
   const hasImageWarning = hasImages && !modelSupportsImages;
 
-  // Format models for the combobox (ModelOption format: id, name, supportsVision)
   const modelOptions = useMemo<ModelOption[]>(
     () =>
       availableModels.map(m => {
@@ -645,7 +596,6 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
     [availableModels]
   );
 
-  // Set or reset model when defaults change (organization switch or initial load)
   useEffect(() => {
     // If no models are available, clear the selection to prevent invalid submissions
     if (modelOptions.length === 0) {
@@ -656,11 +606,8 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
       return;
     }
 
-    // If current model is not in the available models list, or if we don't have a model yet,
-    // reset to an allowed model
     const isCurrentModelAvailable = modelOptions.some(m => m.id === model);
     if (!isCurrentModelAvailable || !model || !isModelUserSelected) {
-      // Prefer the default model if it is available under org policy, otherwise use the first available.
       const defaultModel = defaultsData?.defaultModel;
       const isDefaultAllowed = defaultModel && modelOptions.some(m => m.id === defaultModel);
       const newModel = isDefaultAllowed ? defaultModel : modelOptions[0]?.id;
@@ -676,13 +623,10 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
     async (value: string, images?: Images) => {
       // Users can proceed even with limited access (they'll use free models)
       // But blocked users cannot proceed
-      // Also prevent submission if images are provided but model doesn't support them
       if (!value || isSubmitting || !model || isBlocked || (images && !modelSupportsImages)) return;
 
       setIsSubmitting(true);
       try {
-        // Create project with model and images (saves prompt and model to DB)
-        // Use the appropriate mutation based on context
         // PromptInput flow creates blank projects (no template)
         const result = organizationId
           ? await orgCreateProject({

@@ -9,6 +9,7 @@ import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Brain } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,6 +33,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   const trpc = useTRPC();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const paddingBottom = useTabBarBottomPadding();
   const ownerInput = reviewMemoryOwnerInput(scope);
   const permission = useReviewerPermission(scope);
 
@@ -180,7 +182,12 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
             </Text>
           </View>
         )}
-        ListFooterComponent={footer}
+        ListFooterComponent={
+          <>
+            {footer}
+            <View style={{ height: paddingBottom }} pointerEvents="none" />
+          </>
+        }
         onEndReached={() => {
           if (proposalsQuery.hasNextPage && !proposalsQuery.isFetchingNextPage) {
             void proposalsQuery.fetchNextPage();

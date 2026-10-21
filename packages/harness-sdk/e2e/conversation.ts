@@ -113,20 +113,24 @@ interface Timing {
 const timed = (session: SessionHandle, input: string, timings: Timing[]) =>
   Effect.retry(asking(session, input, timings), {
     while: (cause: unknown) => cause instanceof SessionBusyError,
-    schedule: Schedule.spaced('500 millis').pipe(Schedule.upTo('90 seconds')),
+    schedule: Schedule.spaced('500 millis').pipe(Schedule.upTo({ duration: '90 seconds' })),
   });
 
 const asking = (session: SessionHandle, input: string, timings: Timing[]) =>
   Effect.suspend(() => {
     const started = Date.now();
     let first = 0;
-    return Stream.runFold(session.ask(input), '', (held, event) => {
-      if (event.kind !== 'delta') {
-        return held;
+    return Stream.runFold(
+      session.ask(input),
+      () => '',
+      (held, event) => {
+        if (event.kind !== 'delta') {
+          return held;
+        }
+        first = first === 0 ? Date.now() - started : first;
+        return held + event.text;
       }
-      first = first === 0 ? Date.now() - started : first;
-      return held + event.text;
-    }).pipe(
+    ).pipe(
       Effect.tap(() => Effect.sync(() => void timings.push({ first, whole: Date.now() - started })))
     );
   });
@@ -141,7 +145,7 @@ const asking = (session: SessionHandle, input: string, timings: Timing[]) =>
  * The deadline is on the waiting and never around the reading — see the note in
  * `e2e/rounds.ts`, which is where that was measured.
  */
-const watching = (session: SessionHandle, within: Duration.DurationInput) =>
+const watching = (session: SessionHandle, within: Duration.Input) =>
   Effect.gen(function* () {
     const rounds: { answering: readonly string[]; text: string }[] = [];
     const refused: string[] = [];
@@ -181,15 +185,15 @@ const watching = (session: SessionHandle, within: Duration.DurationInput) =>
           ([waiting, running]) => waiting.length === 0 && running.length === 0,
           () => 'still working' as const
         ),
-        Schedule.spaced('500 millis').pipe(Schedule.upTo(within))
+        Schedule.spaced('500 millis').pipe(Schedule.upTo({ duration: within }))
       ).pipe(
         Effect.ignore,
         /* One more beat, because the last round's words arrive just after the
            line empties: the entry leaves the line when the round starts, not
            when it ends. Five seconds is longer than any round here takes to
            write its sentence, and it is spent once per model. */
-        Effect.zipRight(Effect.sleep('5 seconds')),
-        Effect.zipRight(Fiber.interrupt(fiber))
+        Effect.andThen(Effect.sleep('5 seconds')),
+        Effect.andThen(Fiber.interrupt(fiber))
       ),
     };
   });
@@ -222,7 +226,7 @@ const oneMore = (sessionId: string) =>
     const clone = yield* cloneSession(sessionId);
     return yield* Stream.runFold(
       clone.ask('Answer with the word: ok', { maxTokens: room }),
-      undefined as ModelUsage | undefined,
+      () => undefined as ModelUsage | undefined,
       (held, event) => (event.kind === 'done' ? event.usage : held)
     );
   });
@@ -420,7 +424,7 @@ const nothing: Conversation = {
 const held = (model: string): Promise<Conversation> =>
   Effect.runPromise(
     Effect.retry(converse(model), Schedule.once).pipe(
-      Effect.catchAll(cause =>
+      Effect.catch(cause =>
         Effect.succeed({ ...nothing, refused: [`the conversation failed: ${String(cause)}`] })
       )
     )

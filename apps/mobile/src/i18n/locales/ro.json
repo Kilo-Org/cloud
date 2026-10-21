@@ -35,6 +35,8 @@
     "connectGithub": "Conectează GitHub",
     "cost": "Costuri",
     "discard": "Renunță",
+    "discardChangesMessage": "Modificările tale vor fi pierdute.",
+    "discardChangesTitle": "Renunți la modificări?",
     "findings": "Probleme detectate",
     "mergeRequest": "merge request",
     "notConnected": "Neconectat",
@@ -109,7 +111,9 @@
     "online": "Conectat",
     "open": "Deschide {{name}}",
     "openPullRequest": "Deschidere PR",
+    "completed": "Finalizat",
     "pending": "În așteptare",
+    "running": "Rulează",
     "performance": "Performanță",
     "preferences": "Preferințe",
     "privacyPolicy": "Politica de confidențialitate",
@@ -673,7 +677,8 @@
       "description": "Conectează-ți contul GitHub pentru a revizui PR-uri pe mobil.",
       "gitlabDescription": "Conectează-ți contul GitLab pentru a revizui merge requesturi de pe mobil.",
       "bitbucketDescription": "Conectează Bitbucket la această organizație pentru a revizui PR-uri de pe mobil.",
-      "bitbucketOrgOnlyDescription": "Selectează o organizație în profilul tău pentru a-i revizui PR-urile Bitbucket."
+      "bitbucketOrgOnlyDescription": "Comută contul de mai sus pe o organizație pentru a revizui PR-urile Bitbucket ale acesteia.",
+      "contextLine": "Pentru {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -785,7 +790,9 @@
       "reviewNotSubmitted": "Această revizuire nu poate fi trimisă în forma actuală. Este posibil ca PR-ul să se fi modificat sau să fie propriul tău PR, pe care nu îl poți revizui.",
       "reviewNotSubmittedTerm": "Această revizuire nu poate fi trimisă în starea curentă. E posibil ca {{term}} să se fi modificat sau nu îți poți revizui propriul {{term}}.",
       "couldNotPostComment": "Nu s-a putut publica comentariul.",
-      "couldNotSubmitReview": "Nu s-a putut trimite revizuirea. Verifică conexiunea și încearcă din nou."
+      "couldNotSubmitReview": "Nu s-a putut trimite revizuirea. Verifică conexiunea și încearcă din nou.",
+      "rateLimited": "Prea multe cereri. Încearcă din nou mai târziu.",
+      "conflict": "S-a schimbat în timp ce lucrai la el. Reîncarcă-l și încearcă din nou."
     },
     "operation": {
       "couldNotReply": "Nu s-a putut trimite răspunsul.",
@@ -1432,6 +1439,9 @@
       "couldNotGetLatest": "Nu s-au putut obține cele mai recente date.",
       "byline": "{{repo}} #{{number}}, autor: {{author}}",
       "noFindings": "Nu există constatări.",
+      "findingsUnavailable": "Rezultatele nu sunt disponibile deoarece această revizuire a eșuat.",
+      "serviceUnavailable": "Nu s-a putut stabili conexiunea cu serviciul de revizuire a codului. Reîncearcă revizuirea când serviciul este disponibil.",
+      "reviewFailed": "Revizuirea a eșuat. Te rugăm să încerci din nou.",
       "showMore": "Afișează mai mult",
       "created": "Creată",
       "started": "Începută",
@@ -1547,8 +1557,6 @@
     "updateFailed": "Nu s-a putut actualiza agentul de revizuire a codului.",
     "configSaveFailed": "Nu s-a putut salva configurația revizuirii.",
     "status": {
-      "running": "Rulează",
-      "completed": "Finalizat",
       "interrupted": "Întreruptă"
     },
     "reviewStyle": {
@@ -1561,7 +1569,8 @@
       "bugs": "Erori",
       "style": "Stil",
       "testing": "Testare",
-      "documentation": "Documentație"
+      "documentation": "Documentație",
+      "unknown": "Altele ({{area}})"
     },
     "gateThreshold": {
       "warning": "Avertisment"
@@ -1674,7 +1683,14 @@
       "whereFound": "Locuri în care a fost identificată ({{displayCount}})",
       "fullReport": "Raport complet generat",
       "yes": "Da",
-      "no": "Nu"
+      "no": "Nu",
+      "action": {
+        "analyzeCodebase": "Analizează baza de cod",
+        "dismiss": "Respinge",
+        "manualReview": "Revizuire manuală",
+        "monitor": "Monitorizează",
+        "openPr": "Deschide pull request"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} constatări",
@@ -1879,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Salvează modificările",
       "unsavedTitle": "Modificări nesalvate",
-      "unsavedMessage": "Salvezi modificările înainte de a părăsi acest ecran?"
+      "unsavedMessage": "Salvezi modificările înainte de a părăsi acest ecran?",
+      "unsavedInvalidMessage": "Aceste modificări nu pot fi încă salvate. Corectează-le pentru a salva sau renunță la ele pentru a pleca."
     },
     "auditReportButton": {
       "viewA11y": "Vezi raportul de audit"
@@ -1896,7 +1913,24 @@
       "title": "Raport de audit",
       "unavailable": "Raport de audit indisponibil",
       "unavailableDescription": "Doar proprietarii organizației și responsabilii cu facturarea pot vedea rapoartele de audit. Cere unui proprietar sau unui responsabil cu facturarea să îți acorde acces.",
-      "queryFailed": "Interogarea pentru raport nu s-a finalizat. Încearcă din nou."
+      "queryFailed": "Interogarea pentru raport nu s-a finalizat. Încearcă din nou.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiză finalizată",
+        "findingAnalysisFailed": "Analiză eșuată",
+        "findingAutoDismissed": "Respins automat",
+        "findingCreated": "Importat",
+        "findingDeleted": "Șters",
+        "findingDismissed": "Respins",
+        "findingSeverityChanged": "Severitate modificată",
+        "findingStatusChange": "Stare modificată",
+        "findingSuperseded": "Înlocuit",
+        "remediationBlocked": "Remediere blocată",
+        "remediationCancelled": "Anulată",
+        "remediationFailed": "Remediere eșuată",
+        "remediationNoChangesNeeded": "Nu sunt necesare modificări",
+        "remediationPrOpened": "Pull request deschis",
+        "remediationQueued": "Remediere solicitată"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nu s-au putut încărca setările de notificare.",
@@ -1928,7 +1962,6 @@
       "installApp": "Instalează aplicația GitHub",
       "reauthorizeButton": "Autorizează din nou aplicația GitHub",
       "reauthorizeDescription": "Agentul de securitate are nevoie de permisiunea vulnerability_alerts pentru a accesa alertele Dependabot. Autorizează din nou aplicația GitHub pentru a acorda această permisiune.",
-      "reauthorizeFailed": "Nu s-a putut începe reautorizarea. Încearcă din nou.",
       "reauthorizeTitle": "Sunt necesare permisiuni suplimentare",
       "setupFailed": "Nu s-a putut începe configurarea GitHub. Încearcă din nou."
     },
@@ -2236,8 +2269,8 @@
       "prefillRepoUnavailable": "{{repo}} nu mai este disponibil. Alege un depozit mai jos.",
       "prefillModelUnavailable": "{{model}} nu mai este disponibil. Se folosește modelul tău implicit.",
       "couldNotReadPendingSessions": "Nu s-au putut citi sesiunile în așteptare. Încearcă din nou.",
-      "couldNotStartSessionNow": "Nu s-a putut porni sesiunea în acest moment. Încearcă din nou mai târziu.",
       "failedToCreate": "Nu s-a putut crea sesiunea.",
+      "checkOrganizationAccess": "Verifică accesul la această organizație și încearcă din nou.",
       "couldNotRefreshRepositories": "Nu s-au putut reîmprospăta depozitele. Încearcă din nou.",
       "discardDraftTitle": "Renunți la ciornă?",
       "discardDraftMessage": "Instrucțiunile tale se vor pierde.",
@@ -2311,7 +2344,8 @@
       "matchesBadge_one": "{{displayCount}} potrivire",
       "matchesBadge_other": "{{displayCount}} potriviri",
       "matchesBadge_few": "{{displayCount}} potriviri",
-      "noOutput": "Nicio ieșire."
+      "noOutput": "Nicio ieșire.",
+      "translationFailed": "Traducerea a eșuat"
     },
     "readToolMarkdown": {
       "linesTruncated": "liniile {{start}}–{{end}} (trunchiate)",
@@ -2769,6 +2803,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Sesiunile tale active nu pot fi afișate până la încărcarea datelor.",
     "currentDeviceUnidentified": "Nu s-a putut identifica dispozitivul curent.",
+    "kiloApp": "Aplicația Kilo",
     "noSessions": "Nicio sesiune activă",
     "noSessionsDescription": "Autentifică-te în aplicația Kilo pe alt dispozitiv, iar sesiunea va apărea aici.",
     "onlyKiloAppSignIns": "Doar autentificările din aplicația Kilo apar aici. Autentificările din editor și CLI nu sunt listate.",
@@ -2922,6 +2957,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Înainte să începem",
+    "summaryTitle": "Preferințe de partajare a datelor",
     "introDescription": "Kilo trimite mesajele tale furnizorilor de AI pentru a genera răspunsuri. Iată ce date partajăm și cu cine.",
     "required": "Necesar pentru utilizarea Kilo",
     "promptsTitle": "Instrucțiunile și conversațiile tale",
@@ -2930,7 +2966,6 @@
     "accountDescription": "ID-ul contului tău Kilo și metadatele cererilor, folosite pentru a te autentifica și a măsura utilizarea.",
     "diagnosticsTitle": "Date de diagnostic ale aplicației",
     "diagnosticsDescription": "Rapoarte despre închideri neașteptate și erori, din care eliminăm conținutul aplicației, folosite pentru a menține stabilitatea aplicației.",
-    "optional": "Opțional",
     "helpImprove": "Ajută la îmbunătățirea Kilo",
     "helpImproveDescription": "Partajează date anonime despre utilizarea aplicației și sursa instalării. Poți modifica oricând această opțiune în setări.",
     "seeFullDetails": "Vezi toate detaliile",
@@ -3015,11 +3050,22 @@
     "boundary": {
       "backToProfile": "Înapoi la profil",
       "loadErrorMessage": "Verifică conexiunea și încearcă din nou.",
+
+      "chooseAccount": "Selectează un cont",
       "loadErrorTitle": "Nu s-au putut încărca organizațiile tale.",
+      "noOrganization": "Nicio organizație",
+
+      "noOrganizationDescription": "Acest cont nu face parte dintr-o organizație. Creează sau alătură-te unei organizații pe site pentru a folosi funcții de organizație precum invitațiile pentru membri și alertele de sold scăzut.",
+
+      "openWebOrganizations": "Deschide organizațiile pe site",
+
       "organizationUnavailable": "Organizația nu este disponibilă.",
-      "selectDescription": "Alege o organizație din profilul tău pentru a continua.",
+      "selectDescriptionWithOrganizations": "Aparții unei sau mai multor organizații. Alege contul pe care ar trebui să îl folosească acest ecran.",
+
       "selectOrganization": "Selectează o organizație",
       "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua.",
+
+      "unavailableSessionsDescription": "Această organizație nu mai este disponibilă. Sesiunile ei nu pot fi încărcate.",
       "accessDeniedDescription": "Nu ai acces la această organizație."
     },
     "creditActivity": {
@@ -3510,6 +3556,9 @@
     "localModels": {
       "title": "Modele pe dispozitiv",
       "help": "Modelele pe dispozitiv rulează pe acest telefon. Solicitările și răspunsurile tale rămân pe dispozitiv.",
+      "switchTitle": "Treci la un model pe dispozitiv?",
+      "switchMessage": "Trecerea la {{name}} face ca prompturile și contextul acestei conversații să fie procesate pe acest telefon, nu pe un server la distanță.",
+      "switchConfirm": "Schimbă modelul",
       "systemPurpose": "Modelul integrat în sistemul acestui dispozitiv. Rulează pe dispozitiv.",
       "apple": "Apple Intelligence (pe dispozitiv)",
       "checking": "Se verifică disponibilitatea…",
@@ -3606,7 +3655,6 @@
     "personalDefaultDescription": "Se încarcă automat când niciun depozit nu are un profil fixat.",
     "organizationDefaultDescription": "Încărcat automat pentru membrii care nu au o valoare implicită personală.",
     "setAsDefault": "Setați ca implicit",
-    "removeDefault": "Eliminați implicit",
     "saveFailed": "Profilul nu a putut fi salvat",
     "deleteTitle": "Ștergeți profilul",
     "deleteMessage": "Acest lucru elimină definitiv profilul și setările acestuia. Acest lucru nu poate fi anulat.",
@@ -3632,11 +3680,13 @@
     "commandsTitle": "Configurați comenzi",
     "addCommand": "Adăugați comanda",
     "commandLabel": "Comanda",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "de ex. pnpm install",
     "commandsEmpty": "Încă nu există comenzi de configurare",
     "commandsSaveFailed": "Comenzile de configurare nu au putut fi salvate",
     "moveUp": "Mișcă-te în sus",
     "moveDown": "Deplasați-vă în jos",
+    "moveCommandUp": "Mută comanda {{position}} în sus",
+    "moveCommandDown": "Mută comanda {{position}} în jos",
     "skillsTitle": "Abilități",
     "addSkill": "Adăugați abilitate",
     "skillNameLabel": "Numele aptitudinii",
@@ -3676,7 +3726,9 @@
       "jsonTooLarge": "Folosiți cel mult 50 de intrări, chei de până la 128 și valori de până la 4096 de caractere",
       "timeoutInvalid": "Timeout trebuie să fie un număr întreg de milisecunde",
       "edit": "Editați serverul MCP",
-      "saveFailed": "Serverul MCP nu a putut fi salvat"
+      "saveFailed": "Serverul MCP nu a putut fi salvat",
+      "deleteFailed": "Serverul MCP nu a putut fi șters",
+      "updateFailed": "Serverul MCP nu a putut fi actualizat"
     },
     "agents": {
       "title": "Agenți de profil",
@@ -3703,10 +3755,11 @@
       "visibilitySubagent": "Subagent - apelabil numai de la alții",
       "visibilityAll": "Toate — ambele",
       "saveFailed": "Agentul nu a putut fi salvat",
+      "deleteFailed": "Agentul nu a putut fi șters",
       "nameRequired": "Introduceți un nume de agent",
       "slugRequired": "Introduceți un melc de agent",
       "slugInvalid": "Slug trebuie să înceapă cu o literă și să folosească numai litere mici, cifre și liniuțe",
-      "slugConflict": "Acest melc este rezervat de un agent încorporat",
+      "slugConflict": "Acel slug este deja folosit de un agent integrat sau de un alt agent din acest profil",
       "edit": "Editați agentul"
     },
     "slashCommands": {
@@ -3717,10 +3770,12 @@
       "description": "Descrierea comenzii",
       "template": "Șablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explicați $ARGUMENTS",
       "subtask": "Rulați ca subsarcină",
       "edit": "Comanda Editați slash",
       "saveFailed": "Comanda nu a putut fi salvată",
+      "deleteFailed": "Comanda nu a putut fi ștearsă",
       "nameRequired": "Introduceți un nume de comandă",
       "nameInvalid": "Numele trebuie să înceapă cu o literă mică și să folosească numai litere mici, cifre și liniuțe",
       "templateRequired": "Introduceți un șablon de comandă",
@@ -3852,5 +3907,69 @@
       "title": "Salvează în listă",
       "saved": "Salvat în {{list}}"
     }
+  },
+  "agentBriefing": {
+    "title": "Rezumatul de dimineață",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Este posibil să lipsească o parte din activitatea anterioară. ≥ înseamnă cel puțin această valoare; necunoscut nu înseamnă zero.",
+    "available": "Rezumate disponibile",
+    "history": "Istoricul rezumatelor",
+    "historyHint": "Rapoartele sunt păstrate 30 de zile, inclusiv cele închise.",
+    "settings": "Setări rezumat",
+    "empty": "Nicio activitate peste noapte",
+    "emptyHint": "Sesiunile tale de programare din cloud și CLI vor apărea aici după o noapte activă.",
+    "loadError": "Rezumatele nu au putut fi încărcate",
+    "sessions": "Active peste noapte",
+    "pullRequests": "PRs deschise",
+    "blockers": "Blocaje noi",
+    "spend": "Cheltuieli peste noapte",
+    "view": "Citește rezumatul",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Ignoră rezumatul",
+    "offline": "Offline · rezumat salvat",
+    "cached": "Raport salvat · reîmprospătare indisponibilă",
+    "revised": "Revizuit · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "Rezumat AI",
+    "summaryDisabled": "Raport structurat · AI este dezactivat pentru acest context",
+    "summaryPending": "Rezumatul AI este în curs. Va fi atașat aici când este gata.",
+    "summaryFailed": "Rezumatul AI a eșuat. O nouă încercare poate genera o altă taxă.",
+    "summaryUnavailable": "Rezumatul AI nu este disponibil. Raportul structurat este în continuare disponibil.",
+    "summaryOutdated": "Acest rezumat este anterior celei mai recente revizii a raportului.",
+    "summaryCharge": "AI a taxat {{cost}}",
+    "summaryChargePending": "Taxa AI așteaptă reconcilierea",
+    "generate": "Generează rezumatul",
+    "retrySummary": "Reîncearcă rezumatul plătit",
+    "sources": "Dovezi și artefacte",
+    "timezone": "Fusul orar al rezumatului",
+    "deviceTimezone": "Folosește fusul orar al dispozitivului",
+    "timezoneHint": "Fus orar IANA, de exemplu Europe/Berlin. Modificările programului se aplică nopților viitoare.",
+    "nightStart": "Începutul nopții",
+    "morningStart": "Sfârșitul nopții / începutul dimineții",
+    "morningEnd": "Sfârșitul dimineții",
+    "timeHint": "Cardul de pe ecranul principal revine la starea live când se termină dimineața, chiar și offline.",
+    "invalidSchedule": "Alege un fus orar valid și perioade de noapte și dimineață nesuprapuse și nevide.",
+    "notificationsHint": "O notificare generică pe dimineață, când primul raport este gata. Independent de rezumatele AI plătite.",
+    "notificationPermission": "Activează notificările dispozitivului în $t(common.notifications) pentru a primi rezumatul.",
+    "aiOptIn": "Rezumate AI plătite",
+    "aiHint": "Opțional, doar pentru acest context. Fragmente selectate și anonimizate și date structurate sunt trimise modelului tău, în limba aplicației. Taxele folosesc soldul acestui context.",
+    "defaultModel": "Folosește modelul implicit Kilo",
+    "duration": "Limită de timp (minute)",
+    "spendLimit": "Limită de cheltuieli (USD)",
+    "safeguardHint": "Limite finite per rezumat, nu un buget zilnic. Implicit: 10 minute și $2. Un raport se publică după cel mult cinci minute, iar generarea continuă în aceste limite.",
+    "invalidSafeguards": "Introdu limite de timp și de cheltuieli pozitive și finite.",
+    "estimate": "Estimare {{estimate}} · maxim {{maximum}}",
+    "estimateUnavailable": "Nu este disponibil un rezumat plătit pentru aceste setări.",
+    "confirmPaid": "Activezi rezumatele plătite pentru {{context}}?",
+    "confirmGeneration": "Generezi un rezumat plătit?",
+    "paidDisclosure": "Estimat {{estimate}}, până la {{maximum}}, cu o limită de {{minutes}} minute. Taxele se aplică și dacă generarea eșuează.",
+    "enable": "Activează rezumatele plătite",
+    "contextSettings": "Setări AI · {{context}}",
+    "allContexts": "Rezumatele personale și cele ale organizației rămân separate.",
+    "estimatePricingUnavailable": "Prețurile pentru acest model nu sunt disponibile.",
+    "estimateBalanceUnavailable": "Sold insuficient pentru un rezumat plătit.",
+    "estimateModelNotAllowed": "Acest model nu este permis aici.",
+    "estimateSpendLimitTooLow": "Creșteți limita de cheltuieli pentru a permite acest rezumat."
   }
 }

@@ -2,6 +2,26 @@ import { describe, expect, it } from 'vitest';
 
 import { pushDataSchema } from './push-data';
 
+describe('pushDataSchema agent_briefing', () => {
+  it('accepts only the privacy-minimal available-report list route', () => {
+    expect(
+      pushDataSchema.parse({
+        type: 'agent_briefing',
+        url: '/agent-briefing',
+        reportTitle: 'Private title',
+        organizationId: 'private-org',
+      })
+    ).toEqual({ type: 'agent_briefing', url: '/agent-briefing' });
+  });
+
+  it.each([undefined, '/sessions/private-session', 'https://example.com'])(
+    'rejects a missing or unrelated briefing route: %s',
+    url => {
+      expect(pushDataSchema.safeParse({ type: 'agent_briefing', url }).success).toBe(false);
+    }
+  );
+});
+
 const lifecycleEvents = [
   'analysis_completed',
   'analysis_failed',
@@ -85,6 +105,22 @@ describe('pushDataSchema spend_alert', () => {
     expect(
       pushDataSchema.safeParse({ type: 'spend_alert', scope: 'organization', organizationId: '' })
         .success
+    ).toBe(false);
+  });
+
+  it('rejects an organization-scope alert with no organizationId to route the tap', () => {
+    expect(pushDataSchema.safeParse({ type: 'spend_alert', scope: 'organization' }).success).toBe(
+      false
+    );
+  });
+
+  it('rejects a personal-scope alert that names an organization', () => {
+    expect(
+      pushDataSchema.safeParse({
+        type: 'spend_alert',
+        scope: 'personal',
+        organizationId: 'org-1',
+      }).success
     ).toBe(false);
   });
 });
@@ -214,6 +250,17 @@ describe('pushDataSchema cloud_agent_session', () => {
       cliSessionId: 'cli1',
       category: 'attention',
       prUrl: 42,
+    };
+    expect(pushDataSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('rejects an empty prUrl so the Open PR action never targets nothing', () => {
+    const payload = {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'permission',
+      prUrl: '',
     };
     expect(pushDataSchema.safeParse(payload).success).toBe(false);
   });

@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   getClosedWorktreeChatTabsStorageKey,
   getClosedWorktreeChatSessionIds,
+  getLoadingChatControlSession,
   getNextOpenChatSessionId,
   getOpenWorktreeChatSessionIds,
   getWorkspaceControlSession,
@@ -34,6 +35,16 @@ describe('getWorkspaceControlSession', () => {
     });
     expect(getOpenWorktreeChatSessionIds([chat.sessionId], state.closedSessionIds)).toEqual([]);
     expect(getWorkspaceControlSession('worktree-a', [chat], [])).toBe(chat);
+  });
+
+  it('drives loading controls only from the requested chat itself', () => {
+    const requested = { ...chat, sessionId: 'requested', cloudAgentSessionId: 'workspace_b' };
+    expect(getLoadingChatControlSession('requested', [chat, requested], [])).toBe(requested);
+    // A listed chat without a cloud session never borrows a sibling's controls.
+    const unlinked = { ...requested, cloudAgentSessionId: null };
+    expect(getLoadingChatControlSession('requested', [chat, unlinked], [])).toBeNull();
+    expect(getLoadingChatControlSession('unlisted', [chat], [])).toBeNull();
+    expect(getLoadingChatControlSession('requested', [requested], ['requested'])).toBeNull();
   });
 
   it('skips unprepared and deleting chats', () => {

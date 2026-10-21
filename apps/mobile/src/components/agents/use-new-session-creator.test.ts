@@ -692,8 +692,9 @@ describe('useNewSessionCreator onCreated', () => {
 
     expect(onCreated).not.toHaveBeenCalled();
     expect(routerReplace).not.toHaveBeenCalled();
-    expect(toastError).toHaveBeenCalledWith(i18n.t('agentChat.newSession.couldNotStartSessionNow'));
-    expect(toastError).not.toHaveBeenCalledWith('boom');
+    // The raw rejection text never reaches the toast: the failure shows the
+    // localized generic copy.
+    expect(toastError).toHaveBeenCalledWith('Something went wrong on our end. Please try again.');
   });
 
   it('does not prepare (and never fires onCreated) when the draft is empty', async () => {
@@ -1618,6 +1619,23 @@ describe('useRemoteSpawnDraftCleanup remote-spawn clear', () => {
     // No `markRemoteSpawnAttempted` call: the tap stopped before any spawn
     // attempt (denied admission, voice settle aborted, or a plain back
     // leave), so the unmount must preserve the typed prompt.
+    act(() => {
+      renderer?.unmount();
+    });
+    expect(vi.mocked(flushDraft)).toHaveBeenCalledWith('u1', 'agent-composer:new');
+    expect(vi.mocked(clearDraft)).not.toHaveBeenCalled();
+  });
+
+  it('flushes the draft when the screen unmounts after a failed remote spawn — the failure disarms the attempt marker', async () => {
+    const { renderer, resultRef } = mountRemoteSpawnDraftCleanup('u1');
+    act(() => {
+      resultRef.current?.markRemoteSpawnAttempted();
+    });
+    // The spawn failed: the dispatch's onSpawnFailed disarms the marker so
+    // the draft survives the failure and the leave to Home.
+    act(() => {
+      resultRef.current?.markRemoteSpawnFailed();
+    });
     act(() => {
       renderer?.unmount();
     });

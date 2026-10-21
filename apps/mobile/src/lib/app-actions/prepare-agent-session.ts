@@ -12,6 +12,7 @@
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 
 import { type AgentMode } from '@/components/agents/mode-normalize';
+import { cloudPrepareFailureMessage } from '@/components/agents/cloud-prepare-error-display';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import {
   getSelectedBranchOverride,
@@ -22,7 +23,6 @@ import {
   resolveRepoFingerprint,
   setRepositoryField,
 } from '@/components/agents/prepare-session-repository';
-import { prepareFailureMessage } from '@/components/agents/prepare-failure-copy';
 import { i18n } from '@/i18n';
 import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { trpcClient } from '@/lib/trpc';
@@ -219,7 +219,7 @@ export async function prepareAgentSession(
     return { ok: true, sessionId: result.kiloSessionId };
   } catch (error) {
     const retryable = isCloudPrepareRetryableError(error);
-    const message = prepareFailureMessage(error, retryable);
+    const message = cloudPrepareFailureMessage(error);
     // A typed terminal rejection ends the intent; a retryable one keeps the key.
     if (!retryable) {
       deps.rotateKey();

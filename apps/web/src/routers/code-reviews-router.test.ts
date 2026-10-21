@@ -2,6 +2,7 @@ const mockCancelReview = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
 const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
+const mockIsGitLabCredentialConnected = jest.fn();
 const mockGetBlobContent = jest.fn();
 const mockFetchSessionSnapshot = jest.fn();
 const mockEnsureBitbucketCodeReviewWorkspaceWebhook = jest.fn();
@@ -61,6 +62,7 @@ jest.mock('@/lib/bot-users/bot-user-service', () => {
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
+  isGitLabCredentialConnected: (...args: unknown[]) => mockIsGitLabCredentialConnected(...args),
 }));
 
 jest.mock('@/lib/r2/cli-sessions', () => ({
@@ -3798,6 +3800,10 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
   beforeEach(() => {
     mockGetValidGitLabToken.mockReset();
     mockSyncWebhooksForRepositories.mockReset();
+    // The status read consults the credential broker; a usable credential is
+    // the default so the P1-D-32 shape assertions below stay on the healthy
+    // path.
+    mockIsGitLabCredentialConnected.mockReset().mockResolvedValue(true);
   });
 
   afterEach(async () => {
@@ -3808,6 +3814,18 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
 
   afterAll(async () => {
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('reports not connected when the stored credential is unusable despite an active row', async () => {
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+    });
+    mockIsGitLabCredentialConnected.mockResolvedValue(false);
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitLabStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
   });
 
   it('returns the integration shape WITHOUT webhookSecret for the self caller', async () => {
@@ -4032,5 +4050,126 @@ describe('gitlab.regenerateWebhookSecret P1-D-32 (self-only, re-syncs)', () => {
     expect(result.webhookSync.errors).toHaveLength(1);
     expect(mockSyncWebhooksForRepositories).not.toHaveBeenCalled();
     expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+  });
+});
+
+describe('personalReviewAgent.getGitHubStatus connection rule', () => {
+  let testUser: User;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, testUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function seedGitHubIntegration(
+    overrides: Partial<typeof platform_integrations.$inferInsert> = {}
+  ) {
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: testUser.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: `inst-${crypto.randomUUID()}`,
+        github_app_type: 'standard',
+        github_connection_role: 'workflow',
+        integration_status: 'active',
+        repository_access: 'all',
+        platform_account_login: 'octocat',
+        installed_at: '2026-01-01T00:00:00Z',
+        ...overrides,
+      })
+      .returning();
+    return row;
+  }
+
+  it('reports the healthy active workflow installation as connected', async () => {
+    await seedGitHubIntegration();
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({
+      connected: true,
+      integration: {
+        accountLogin: 'octocat',
+        repositorySelection: 'all',
+        installedAt: '2026-01-01 00:00:00+00',
+        isValid: true,
+      },
+    });
+  });
+
+  it('reports a locally disconnected installation as not connected', async () => {
+    // Regression: the status must use the same health rule as the repository
+    // picker and Security Agent, so a disconnected installation cannot reach
+    // reviewer screens whose every repository call then fails.
+    await seedGitHubIntegration({ github_disconnected_at: '2026-02-01T00:00:00Z' });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports a suspended installation as not connected', async () => {
+    await seedGitHubIntegration({
+      integration_status: 'suspended',
+      suspended_at: '2026-02-01T00:00:00Z',
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports an installation awaiting reauthorization as not connected', async () => {
+    await seedGitHubIntegration({ auth_invalid_at: '2026-02-01T00:00:00Z' });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports not connected without any installation', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports connected when a healthy row coexists with a retained disconnected row', async () => {
+    // A locally disconnected row is retained, and reconnecting a different
+    // installation inserts another row. The status must resolve the healthy
+    // installation instead of an unordered first row.
+    await seedGitHubIntegration({ github_disconnected_at: '2026-02-01T00:00:00Z' });
+    await seedGitHubIntegration({
+      platform_installation_id: `inst-${crypto.randomUUID()}`,
+      platform_account_login: 'octocat-new',
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({
+      connected: true,
+      integration: {
+        accountLogin: 'octocat-new',
+        repositorySelection: 'all',
+        installedAt: '2026-01-01 00:00:00+00',
+        isValid: true,
+      },
+    });
   });
 });

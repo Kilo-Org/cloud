@@ -15,6 +15,7 @@ import { organizations } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { OrganizationSSODomainSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { organizationActionTarget, recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 
@@ -77,6 +78,12 @@ export const organizationSsoRouter = createTRPCRouter({
       },
       externalId: org.id,
     });
+    await recordAdminAction(opts.ctx, {
+      action: 'organization.sso.config.create',
+      target: organizationActionTarget(organizationId),
+      message: 'Created WorkOS SSO organization',
+      metadata: { workosOrganizationId: createdOrg.id },
+    });
     return createdOrg;
   }),
   getConfig: organizationMemberProcedure.input(OrgIdSchema).query(async opts => {
@@ -107,6 +114,12 @@ export const organizationSsoRouter = createTRPCRouter({
       throw new TRPCError({ code: 'NOT_FOUND', message: 'SSO configuration not found' });
     }
     await workos.organizations.deleteOrganization(workOSOrg.id);
+    await recordAdminAction(opts.ctx, {
+      action: 'organization.sso.config.delete',
+      target: organizationActionTarget(organizationId),
+      message: 'Deleted WorkOS SSO organization',
+      metadata: { workosOrganizationId: workOSOrg.id },
+    });
     return successResult({ message: 'SSO configuration deleted successfully' });
   }),
   generateAdminPortalLink: adminProcedure.input(AdminPortalSchema).mutation(async opts => {
@@ -125,6 +138,14 @@ export const organizationSsoRouter = createTRPCRouter({
     const link = await workos.portal.generateLink({
       organization: workOSOrg.id,
       intent,
+    });
+    // The link grants WorkOS admin-portal access; record that one was issued,
+    // never the link itself.
+    await recordAdminAction(opts.ctx, {
+      action: 'organization.sso.admin_portal_link.generate',
+      target: organizationActionTarget(organizationId),
+      message: `Generated WorkOS admin portal link (${linkType})`,
+      metadata: { workosOrganizationId: workOSOrg.id, linkType },
     });
     return { link: link.link };
   }),

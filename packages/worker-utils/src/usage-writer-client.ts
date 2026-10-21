@@ -9,6 +9,8 @@ export type UsageWriterConfig = {
   url?: string;
   secret?: string;
   protectionBypass?: string;
+  // Only the usage-ingest Queue consumer opts into this diagnostic marker.
+  source?: 'queue';
 };
 
 export type UsageWriteOutcome =
@@ -56,6 +58,7 @@ export async function recordUsage(
       headers: {
         'content-type': 'application/json',
         'x-internal-api-key': config.secret,
+        ...(config.source === 'queue' ? { 'x-usage-write-source': 'queue' } : {}),
         ...(config.protectionBypass
           ? { 'x-vercel-protection-bypass': config.protectionBypass }
           : {}),

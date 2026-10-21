@@ -2771,6 +2771,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Tvoje aktivne sesije nisu dostupne dok se podaci ne učitaju.",
     "currentDeviceUnidentified": "Nije moguće prepoznati trenutni uređaj.",
+    "kiloApp": "Aplikacija Kilo",
     "noSessions": "Nema aktivnih sesija",
     "noSessionsDescription": "Prijavi se u aplikaciju Kilo na drugom uređaju da se prikaže ovdje.",
     "onlyKiloAppSignIns": "Ovdje se prikazuju samo prijave u aplikaciju Kilo. Prijave iz uređivača koda i CLI-ja nisu navedene.",
@@ -2924,6 +2925,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Prije nego što počnemo",
+    "summaryTitle": "Postavke dijeljenja podataka",
     "introDescription": "Kilo šalje tvoje poruke pružaocima AI modela radi generisanja odgovora. U nastavku je navedeno šta se dijeli i s kim.",
     "required": "Obavezno za korištenje aplikacije Kilo",
     "promptsTitle": "Tvoji upiti i razgovori",
@@ -2932,7 +2934,6 @@
     "accountDescription": "ID tvog Kilo naloga i metapodaci zahtjeva koriste se za provjeru tvog identiteta i mjerenje potrošnje.",
     "diagnosticsTitle": "Dijagnostika aplikacije",
     "diagnosticsDescription": "Izvještaji o rušenjima i greškama, s uklonjenim sadržajem aplikacije, koriste se za održavanje stabilnosti aplikacije.",
-    "optional": "Opciono",
     "helpImprove": "Pomozi poboljšati Kilo",
     "helpImproveDescription": "Podijeli anonimne analitičke podatke o korištenju aplikacije i izvoru instalacije. Ovo možeš promijeniti u postavkama u bilo kojem trenutku.",
     "seeFullDetails": "Pogledaj sve detalje",

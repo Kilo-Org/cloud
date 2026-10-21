@@ -1971,7 +1971,7 @@
       "couldNotLoad": "Could not load Security Agent",
       "installApp": "Install GitHub App",
       "reauthorizeButton": "Re-authorize GitHub App",
-      "reauthorizeDescription": "Security Agent requires the vulnerability_alerts permission to access Dependabot alerts. Re-authorize the GitHub App to grant this permission.",
+      "reauthorizeDescription": "Security Agent needs permission to read Dependabot alerts. Re-authorize the GitHub App to grant this permission.",
       "reauthorizeFailed": "Could not start re-authorization. Please try again.",
       "reauthorizeTitle": "Additional permissions required",
       "setupFailed": "Could not start GitHub setup. Please try again."
@@ -2796,6 +2796,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Your active sessions are unavailable until this loads.",
     "currentDeviceUnidentified": "Current device could not be identified",
+    "kiloApp": "Kilo app",
     "noSessions": "No active sessions",
     "noSessionsDescription": "Sign in with the Kilo app on another device and it will show up here.",
     "onlyKiloAppSignIns": "Only Kilo app sign-ins appear here. Editor and CLI sign-ins are not listed.",
@@ -2814,7 +2815,7 @@
     "title": "Trusted hosts",
     "subtitle": "Hosts you trust to open without asking",
     "emptyTitle": "No trusted hosts",
-    "emptyDescription": "When you trust a link's host, it opens without asking again.",
+    "emptyDescription": "When you trust a link's host or an image host, it opens without asking again.",
     "imagesSectionTitle": "Trusted image hosts",
     "imagesSectionDescription": "Images from these hosts load without asking again.",
     "imagesSectionEmpty": "No trusted image hosts",
@@ -2960,6 +2961,7 @@
   },
   "consent": {
     "kilo": "Kilo",
+    "summaryTitle": "Data sharing preferences",
     "beforeWeGetStarted": "Before we get started",
     "introDescription": "Kilo sends your messages to AI providers to generate responses. Here's what's shared and with whom.",
     "required": "Required to use Kilo",
@@ -2969,7 +2971,6 @@
     "accountDescription": "Your Kilo account ID and request metadata, used to authenticate you and meter usage.",
     "diagnosticsTitle": "App diagnostics",
     "diagnosticsDescription": "Crash and error reports, with app content removed, used to keep the app stable.",
-    "optional": "Optional",
     "helpImprove": "Help improve Kilo",
     "helpImproveDescription": "Share anonymous product analytics and install source. You can change this any time in Settings.",
     "seeFullDetails": "See full details",

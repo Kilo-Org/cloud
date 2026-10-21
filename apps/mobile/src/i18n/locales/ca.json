@@ -2771,6 +2771,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Les teves sessions actives no estaran disponibles fins que s'hagin carregat les dades.",
     "currentDeviceUnidentified": "No s'ha pogut identificar el dispositiu actual.",
+    "kiloApp": "Aplicació de Kilo",
     "noSessions": "No hi ha sessions actives",
     "noSessionsDescription": "Inicia la sessió a l'aplicació de Kilo en un altre dispositiu i apareixerà aquí.",
     "onlyKiloAppSignIns": "Aquí només apareixen els inicis de sessió de l'aplicació de Kilo. No es mostren els de l'editor ni els del CLI.",
@@ -2924,6 +2925,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Abans de començar",
+    "summaryTitle": "Preferències de compartició de dades",
     "introDescription": "Kilo envia els teus missatges als proveïdors d'IA per generar respostes. A continuació es detalla què es comparteix i amb qui.",
     "required": "Obligatori per utilitzar Kilo",
     "promptsTitle": "Els teus missatges i converses",
@@ -2932,7 +2934,6 @@
     "accountDescription": "L'identificador del teu compte de Kilo i les metadades de les sol·licituds, que s'utilitzen per autenticar-te i mesurar l'ús.",
     "diagnosticsTitle": "Diagnòstics de l'aplicació",
     "diagnosticsDescription": "Informes d'errors i de fallades, sense contingut de l'aplicació, utilitzats per mantenir l'aplicació estable.",
-    "optional": "Opcional",
     "helpImprove": "Ajuda a millorar Kilo",
     "helpImproveDescription": "Comparteix dades anònimes d'ús del producte i l'origen de la instal·lació. Pots canviar-ho en qualsevol moment a la configuració.",
     "seeFullDetails": "Mostra tots els detalls",

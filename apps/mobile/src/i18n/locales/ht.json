@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Sesyon aktif ou yo pa disponib toutotan done yo poko chaje.",
     "currentDeviceUnidentified": "Nou pa t ka idantifye aparèy aktyèl la.",
+    "kiloApp": "Aplikasyon Kilo",
     "noSessions": "Pa gen sesyon aktif",
     "noSessionsDescription": "Konekte nan aplikasyon Kilo sou yon lòt aparèy pou li parèt isit la.",
     "onlyKiloAppSignIns": "Se sèlman koneksyon nan aplikasyon Kilo ki parèt isit la. Koneksyon nan editè a ak CLI pa nan lis la.",
@@ -2884,6 +2885,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Anvan nou kòmanse",
+    "summaryTitle": "Preferans pataje done",
     "introDescription": "Kilo voye mesaj ou yo bay founisè AI pou jenere repons. Men sa Kilo pataje ak moun ki resevwa li yo.",
     "required": "Obligatwa pou sèvi ak Kilo",
     "promptsTitle": "Enstriksyon ak konvèsasyon ou yo",
@@ -2892,7 +2894,6 @@
     "accountDescription": "ID kont Kilo ou a ak metadone demann yo sèvi pou verifye idantite ou epi mezire itilizasyon ou.",
     "diagnosticsTitle": "Diyagnostik aplikasyon",
     "diagnosticsDescription": "Rapò pann ak erè ede kenbe aplikasyon an estab. Yo pa gen kontni aplikasyon an ladan yo.",
-    "optional": "Opsyonèl",
     "helpImprove": "Ede amelyore Kilo",
     "helpImproveDescription": "Pataje done anonim sou itilizasyon aplikasyon an ak sous enstalasyon an. Ou ka chanje sa nenpòt lè nan Paramèt.",
     "seeFullDetails": "Gade tout detay yo",

@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Hindi makikita ang mga aktibo mong sesyon hangga't hindi ito na-load.",
     "currentDeviceUnidentified": "Hindi matukoy ang kasalukuyang device.",
+    "kiloApp": "Kilo app",
     "noSessions": "Walang aktibong sesyon",
     "noSessionsDescription": "Mag-sign in gamit ang Kilo app sa ibang device para makita ito rito.",
     "onlyKiloAppSignIns": "Ang mga sign-in sa Kilo app lang ang lumalabas dito. Hindi nakalista ang mga sign-in sa editor at CLI.",
@@ -2884,6 +2885,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Bago tayo magsimula",
+    "summaryTitle": "Kagustuhan sa pagbabahagi ng datos",
     "introDescription": "Ipinapadala ng Kilo ang mga mensahe mo sa mga tagapagbigay ng serbisyo ng AI para makabuo ng mga tugon. Narito ang ibinabahagi at kung sino ang tumatanggap nito.",
     "required": "Kinakailangan para magamit ang Kilo",
     "promptsTitle": "Ang iyong mga prompt at pag-uusap",
@@ -2892,7 +2894,6 @@
     "accountDescription": "Ang ID ng iyong akawnt sa Kilo at metadata ng kahilingan, na ginagamit para patunayan ang iyong pagkakakilanlan at sukatin ang paggamit.",
     "diagnosticsTitle": "Pagsusuri sa mga problema ng app",
     "diagnosticsDescription": "Mga ulat ng pag-crash at error na ginagamit para panatilihing maayos ang app. Inaalis ang nilalaman ng app sa mga ulat.",
-    "optional": "Opsyonal",
     "helpImprove": "Tumulong na mapabuti ang Kilo",
     "helpImproveDescription": "Ibahagi ang datos sa paggamit ng produkto na walang pagkakakilanlan mo, pati ang pinagmulan ng pag-install. Maaari mo itong baguhin anumang oras sa mga setting.",
     "seeFullDetails": "Tingnan ang lahat ng detalye",

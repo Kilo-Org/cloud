@@ -2,6 +2,7 @@ const mockCancelReview = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
 const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
+const mockIsGitLabCredentialConnected = jest.fn();
 const mockGetBlobContent = jest.fn();
 const mockFetchSessionSnapshot = jest.fn();
 const mockEnsureBitbucketCodeReviewWorkspaceWebhook = jest.fn();
@@ -61,6 +62,7 @@ jest.mock('@/lib/bot-users/bot-user-service', () => {
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
+  isGitLabCredentialConnected: (...args: unknown[]) => mockIsGitLabCredentialConnected(...args),
 }));
 
 jest.mock('@/lib/r2/cli-sessions', () => ({
@@ -3798,6 +3800,10 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
   beforeEach(() => {
     mockGetValidGitLabToken.mockReset();
     mockSyncWebhooksForRepositories.mockReset();
+    // The status read consults the credential broker; a usable credential is
+    // the default so the P1-D-32 shape assertions below stay on the healthy
+    // path.
+    mockIsGitLabCredentialConnected.mockReset().mockResolvedValue(true);
   });
 
   afterEach(async () => {
@@ -3808,6 +3814,18 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
 
   afterAll(async () => {
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('reports not connected when the stored credential is unusable despite an active row', async () => {
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+    });
+    mockIsGitLabCredentialConnected.mockResolvedValue(false);
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitLabStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
   });
 
   it('returns the integration shape WITHOUT webhookSecret for the self caller', async () => {

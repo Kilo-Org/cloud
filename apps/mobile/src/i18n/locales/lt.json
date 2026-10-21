@@ -2810,6 +2810,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Kol duomenys neįkelti, aktyvių sesijų peržiūrėti negalima.",
     "currentDeviceUnidentified": "Nepavyko atpažinti šio įrenginio.",
+    "kiloApp": "Kilo programėlė",
     "noSessions": "Nėra aktyvių sesijų",
     "noSessionsDescription": "Prisijunkite prie Kilo programėlės kitame įrenginyje, ir jis bus rodomas čia.",
     "onlyKiloAppSignIns": "Čia rodomi tik prisijungimai prie Kilo programėlės. Prisijungimai per redaktorių ir CLI nerodomi.",
@@ -2964,6 +2965,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Prieš pradedant",
+    "summaryTitle": "Duomenų bendrinimo nuostatos",
     "introDescription": "Kilo siunčia jūsų žinutes AI teikėjams, kad jie sugeneruotų atsakymus. Toliau nurodome, kokius duomenis perduodame ir kam.",
     "required": "Būtina norint naudotis Kilo",
     "promptsTitle": "Jūsų užklausos ir pokalbiai",
@@ -2972,7 +2974,6 @@
     "accountDescription": "Jūsų Kilo paskyros ID ir užklausų metaduomenys, naudojami jūsų tapatybei patvirtinti ir naudojimo apskaitai.",
     "diagnosticsTitle": "Programėlės diagnostika",
     "diagnosticsDescription": "Strigčių ir klaidų ataskaitos be programėlės turinio, naudojamos stabiliam programėlės veikimui užtikrinti.",
-    "optional": "Pasirenkama",
     "helpImprove": "Padėti tobulinti Kilo",
     "helpImproveDescription": "Bendrinkite anoniminius naudojimo duomenis ir įdiegimo šaltinį. Šią parinktį bet kada galite pakeisti nustatymuose.",
     "seeFullDetails": "Peržiūrėti visą informaciją",

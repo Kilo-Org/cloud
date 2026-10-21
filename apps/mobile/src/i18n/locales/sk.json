@@ -2810,6 +2810,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Tvoje aktívne relácie sa nedajú zobraziť, kým sa údaje nenačítajú.",
     "currentDeviceUnidentified": "Aktuálne zariadenie sa nepodarilo identifikovať.",
+    "kiloApp": "Aplikácia Kilo",
     "noSessions": "Žiadne aktívne relácie",
     "noSessionsDescription": "Prihlás sa do aplikácie Kilo na inom zariadení a zobrazí sa tu.",
     "onlyKiloAppSignIns": "Zobrazujú sa iba prihlásenia cez aplikáciu Kilo. Prihlásenia z editora a CLI nie sú uvedené.",
@@ -2964,6 +2965,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Skôr než začneme",
+    "summaryTitle": "Predvoľby zdieľania údajov",
     "introDescription": "Kilo odosiela tvoje správy poskytovateľom AI, ktorí vytvárajú odpovede. Nižšie nájdeš, čo zdieľame a s kým.",
     "required": "Nevyhnutné na používanie Kilo",
     "promptsTitle": "Tvoje zadania a konverzácie",
@@ -2972,7 +2974,6 @@
     "accountDescription": "ID tvojho účtu Kilo a metaúdaje požiadaviek, ktoré slúžia na overenie tvojej identity a meranie spotreby.",
     "diagnosticsTitle": "Diagnostika aplikácie",
     "diagnosticsDescription": "Hlásenia o pádoch a chybách bez obsahu aplikácie, ktoré pomáhajú udržiavať aplikáciu stabilnú.",
-    "optional": "Voliteľné",
     "helpImprove": "Pomôcť vylepšiť Kilo",
     "helpImproveDescription": "Zdieľaj anonymné údaje o používaní aplikácie a zdroj inštalácie. Túto voľbu môžeš kedykoľvek zmeniť v nastaveniach.",
     "seeFullDetails": "Zobraziť všetky podrobnosti",

@@ -2732,6 +2732,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Kāore ō wātū hohe e wātea kia oti rā anō te uta.",
     "currentDeviceUnidentified": "Kāore i taea te tautohu i te pūrere o nāianei.",
+    "kiloApp": "Taupānga Kilo",
     "noSessions": "Kāore he wātū hohe",
     "noSessionsDescription": "Takiuru mā te taupānga Kilo ki tētahi atu pūrere, ka puta taua pūrere ki konei.",
     "onlyKiloAppSignIns": "Ko ngā takiuru ki te taupānga Kilo anake ka puta ki konei. Kāore ngā takiuru ki te ētita me te CLI e rārangitia.",
@@ -2884,6 +2885,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "I mua i te tīmatanga",
+    "summaryTitle": "Ngā tautuhinga tuari raraunga",
     "introDescription": "Ka tukuna e Kilo ō karere ki ngā kaiwhakarato AI hei whakaputa whakautu. Anei ngā raraunga ka tuaritia me ngā kaiwhiwhi.",
     "required": "E hiahiatia ana hei whakamahi i a Kilo",
     "promptsTitle": "Ō tohutohu me ō kōrerorero",
@@ -2892,7 +2894,6 @@
     "accountDescription": "Te ID o tō pūkete Kilo me ngā raraungameta o ngā tono, hei manatoko i a koe, hei ine hoki i te whakamahinga.",
     "diagnosticsTitle": "Ngā tātaritanga hapa o te taupānga",
     "diagnosticsDescription": "Ngā pūrongo tukinga me ngā hapa, kua tangohia ngā ihirangi o te taupānga, hei whakapūmau i te taupānga.",
-    "optional": "He kōwhiringa",
     "helpImprove": "Āwhina ki te whakapai ake i a Kilo",
     "helpImproveDescription": "Tuaritia ngā tātaritanga whakamahinga kāore he ingoa, me te pūtake tāuta. Ka taea e koe te huri i tēnei i ngā tautuhinga ahakoa te wā.",
     "seeFullDetails": "Tirohia ngā taipitopito katoa",

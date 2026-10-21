@@ -8,6 +8,7 @@ import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizat
 import * as z from 'zod';
 import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@kilocode/web-shared/lib/config.server';
 import type { Owner } from '@/lib/integrations/core/types';
+import { feedbackPlainTextBlocks } from '@/lib/feedback/slack';
 
 const recentMessageSchema = z.object({
   role: z.string().max(50),
@@ -58,9 +59,7 @@ export const appBuilderFeedbackRouter = createTRPCRouter({
 
       // Best-effort Slack notification
       if (SLACK_USER_FEEDBACK_WEBHOOK_URL) {
-        const projectLink = `<https://app.kilo.ai/admin/app-builder/${input.project_id}|${input.project_id}>`;
-
-        const metadataLines = [`• project: ${projectLink}`];
+        const metadataLines = [`• project: ${project.id}`];
 
         const trimmedFeedback = input.feedback_text.trim();
         const feedbackText =
@@ -73,24 +72,14 @@ export const appBuilderFeedbackRouter = createTRPCRouter({
             text: 'New App Builder feedback',
             unfurl_links: false,
             unfurl_media: false,
-            blocks: [
-              {
-                type: 'section',
-                text: { type: 'mrkdwn', text: '*New App Builder feedback:* :hammer_and_wrench:' },
-              },
-              {
-                type: 'section',
-                text: { type: 'mrkdwn', text: metadataLines.join('\n') },
-              },
-              {
-                type: 'section',
-                text: { type: 'mrkdwn', text: '• feedback:' },
-              },
-              {
-                type: 'section',
-                text: { type: 'plain_text', text: feedbackText || '<empty>', emoji: false },
-              },
-            ],
+            blocks: feedbackPlainTextBlocks(
+              [
+                'New App Builder feedback:',
+                ...metadataLines,
+                '• feedback:',
+                feedbackText || '<empty>',
+              ].join('\n')
+            ),
           }),
         }).catch(error => {
           console.error('[AppBuilderFeedback] Failed to post to Slack webhook', error);

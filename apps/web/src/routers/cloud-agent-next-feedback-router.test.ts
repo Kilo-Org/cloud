@@ -2,12 +2,12 @@ import { cloudAgentNextFeedbackRouter } from './cloud-agent-next-feedback-router
 import type { User } from '@kilocode/db/schema';
 import type * as TRPC from '@trpc/server';
 
+const mockInsert = jest.fn(() => ({
+  values: () => ({ returning: async () => [{ id: 'feedback-id' }] }),
+}));
+
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  db: {
-    insert: () => ({
-      values: () => ({ returning: async () => [{ id: 'feedback-id' }] }),
-    }),
-  },
+  db: { insert: () => mockInsert() },
 }));
 
 jest.mock('@kilocode/web-shared/lib/trpc/init', () => {
@@ -31,6 +31,7 @@ describe('Cloud Agent feedback Slack notification', () => {
   });
 
   beforeEach(() => {
+    mockInsert.mockClear();
     fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response());
   });
 
@@ -39,16 +40,9 @@ describe('Cloud Agent feedback Slack notification', () => {
   });
 
   it.each([
-    [
-      'ses_35fc6b339ffeaf91IozzdnLtJ7',
-      '<https://app.kilo.ai/admin/session-traces?sessionId=ses_35fc6b339ffeaf91IozzdnLtJ7|ses_35fc6b339ffeaf91IozzdnLtJ7>',
-    ],
-    [
-      'ses_evil&x=1><https://attacker.invalid|<!channel>',
-      '<https://app.kilo.ai/admin/session-traces?sessionId=ses_evil%26x%3D1%3E%3Chttps%3A%2F%2Fattacker.invalid%7C%3C!channel%3E|ses_evil&amp;x=1&gt;&lt;https://attacker.invalid|&lt;!channel&gt;>',
-    ],
-    [undefined, '_unknown_'],
-  ])('keeps session %s inside the trusted admin link', async (sessionId, expectedLink) => {
+    ['ses_35fc6b339ffeaf91IozzdnLtJ7', 'ses_35fc6b339ffeaf91IozzdnLtJ7'],
+    [undefined, 'unknown'],
+  ])('renders session %s and feedback only as plain text', async (sessionId, expectedSession) => {
     const feedback = '``` <https://attacker.invalid|admin> <!channel> :smile:';
     await caller.create({ kilo_session_id: sessionId, feedback_text: feedback });
 
@@ -63,24 +57,53 @@ describe('Cloud Agent feedback Slack notification', () => {
           blocks: [
             {
               type: 'section',
-              text: { type: 'mrkdwn', text: '*New Cloud Agent feedback:* :robot_face:' },
-            },
-            {
-              type: 'section',
               text: {
-                type: 'mrkdwn',
-                text: `• session: ${expectedLink}\n• session type: _unknown_`,
-                verbatim: true,
+                type: 'plain_text',
+                text: `New Cloud Agent feedback:\n• session: ${expectedSession}\n• session type: unknown\n• feedback:\n${feedback}`,
+                emoji: false,
               },
-            },
-            { type: 'section', text: { type: 'mrkdwn', text: '• feedback:' } },
-            {
-              type: 'section',
-              text: { type: 'plain_text', text: feedback, emoji: false },
             },
           ],
         }),
       })
     );
   });
+
+  it.each([
+    { kilo_session_id: 'x><!channel> <!here> <https://attacker.invalid|Review session trace>' },
+    { kilo_session_id: 'ses_' + '<'.repeat(26) },
+    { kilo_session_id: 'ses_tooShort' },
+    { kilo_session_id: '' },
+    { cloud_agent_session_id: 'workspace_><!channel>' },
+    { cloud_agent_session_id: 'workspace_not-a-uuid' },
+    { cloud_agent_session_id: '' },
+  ])('rejects invalid session metadata %j before storage or Slack', async metadata => {
+    await expect(caller.create({ ...metadata, feedback_text: 'feedback' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'agent_12345678-1234-1234-1234-123456789abc',
+    'workspace_12345678-1234-1234-1234-123456789abc',
+  ])('accepts existing Cloud Agent ID format %s', async cloudAgentSessionId => {
+    await expect(
+      caller.create({ cloud_agent_session_id: cloudAgentSessionId, feedback_text: 'feedback' })
+    ).resolves.toEqual({ id: 'feedback-id' });
+  });
+
+  it.each(['cloud-agent', 'remote', 'read-only'] as const)(
+    'accepts %s feedback without requiring a Cloud Agent ID',
+    async sessionType => {
+      await expect(
+        caller.create({
+          kilo_session_id: 'ses_35fc6b339ffeaf91IozzdnLtJ7',
+          session_type: sessionType,
+          feedback_text: 'feedback',
+        })
+      ).resolves.toEqual({ id: 'feedback-id' });
+    }
+  );
 });

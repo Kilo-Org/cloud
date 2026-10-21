@@ -35,12 +35,12 @@ describe('feedback Slack notification', () => {
     jest.clearAllMocks();
   });
 
-  it('disables formatting, automatic links and unfurling for untrusted feedback and metadata', async () => {
+  it('puts every user field in plain-text blocks with a fixed notification fallback', async () => {
     const hostileText =
       '```\n<https://attacker.invalid|Trusted admin link> <!channel> <@U123>\n' +
       'https://attacker.invalid @here *bold* :smile: &lt;!everyone&gt;';
     const input = {
-      userId: 'oauth/feedback-user',
+      userId: 'oauth/feedback-user <!everyone>',
       feedbackText: `  ${hostileText}\n`,
       feedbackFor: '` <!here>',
       feedbackBatch: '` <#C123|general>',
@@ -63,20 +63,29 @@ describe('feedback Slack notification', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
-          text: [
-            'New user feedback:',
-            `• user: ${input.userId}`,
-            '• for: ` &lt;!here&gt;',
-            '• source: ` &lt;!subteam^S123&gt;',
-            '• batch: ` &lt;#C123|general&gt;',
-            '• raw feedback:',
-            '  ```\n&lt;https://attacker.invalid|Trusted admin link&gt; &lt;!channel&gt; &lt;@U123&gt;\n' +
-              'https://attacker.invalid @here *bold* :smile: &amp;lt;!everyone&amp;gt;\n',
-          ].join('\n'),
+          text: 'New user feedback',
           mrkdwn: false,
           parse: 'none',
           unfurl_links: false,
           unfurl_media: false,
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'plain_text',
+                text: [
+                  'New user feedback:',
+                  `• user: ${input.userId}`,
+                  `• for: ${input.feedbackFor}`,
+                  `• source: ${input.source}`,
+                  `• batch: ${input.feedbackBatch}`,
+                  '• raw feedback:',
+                  input.feedbackText,
+                ].join('\n'),
+                emoji: false,
+              },
+            },
+          ],
         }),
       })
     );
@@ -88,7 +97,7 @@ describe('feedback Slack notification', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
-        body: expect.stringContaining('• raw feedback:\\n&lt;empty&gt;'),
+        body: expect.stringContaining('• raw feedback:\\n<empty>'),
       })
     );
   });

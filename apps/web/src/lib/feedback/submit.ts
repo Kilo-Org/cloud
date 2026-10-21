@@ -5,6 +5,7 @@ import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { user_feedback } from '@kilocode/db/schema';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
 import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@kilocode/web-shared/lib/config.server';
+import { feedbackPlainTextBlocks } from '@/lib/feedback/slack';
 
 /**
  * Shared feedback submission service.
@@ -126,22 +127,16 @@ function notifySlack(input: SubmitUserFeedbackInput): void {
     input.feedbackText || '<empty>',
   ].filter((line): line is string => !!line);
 
-  // Slack parses angle-bracket links and mentions independently of Markdown.
-  const text = textLines
-    .join('\n')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
-
   fetch(SLACK_USER_FEEDBACK_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      text,
+      text: 'New user feedback',
       mrkdwn: false,
       parse: 'none',
       unfurl_links: false,
       unfurl_media: false,
+      blocks: feedbackPlainTextBlocks(textLines.join('\n')),
     }),
   }).catch(error => {
     console.error('[UserFeedback] Failed to post to Slack webhook', error);

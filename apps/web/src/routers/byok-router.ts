@@ -41,7 +41,7 @@ import {
   decryptByokRow,
   getModelGatewayUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import type { GatewayProviderOptions } from '@ai-sdk/gateway';
+import { GatewayAuthenticationError, type GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
@@ -51,6 +51,8 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
+const VERCEL_AI_GATEWAY_KEY_REJECTED_MESSAGE =
+  'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.';
 const MANAGED_KEY_READ_ONLY_MESSAGE =
   'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
@@ -469,9 +471,14 @@ export const byokRouter = createTRPCRouter({
         }
 
         if (provider === GatewayUserByokProviderIdSchema.enum['vercel-ai-gateway']) {
+          const userGateway = createGateway({ apiKey: decryptedKey.decryptedAPIKey });
           return {
             finalProvider: provider,
-            model: createGateway({ apiKey: decryptedKey.decryptedAPIKey })(model),
+            model: userGateway(model),
+            // generateText replaces a gateway authentication error with
+            // developer setup instructions; the credits lookup surfaces a
+            // rejected key as the gateway's own error instead.
+            verifyCredential: () => userGateway.getCredits(),
           };
         }
 
@@ -503,7 +510,8 @@ export const byokRouter = createTRPCRouter({
       }
 
       try {
-        const { finalProvider, model, providerOptions } = setup();
+        const { finalProvider, model, providerOptions, verifyCredential } = setup();
+        await verifyCredential?.();
         const output = await generateText({
           model,
           prompt: 'Say hi',
@@ -532,6 +540,12 @@ export const byokRouter = createTRPCRouter({
           providerId: decryptedKey.providerId,
           message,
         });
+        if (
+          decryptedKey.providerId === GatewayUserByokProviderIdSchema.enum['vercel-ai-gateway'] &&
+          GatewayAuthenticationError.isInstance(e)
+        ) {
+          return { success: false, message: VERCEL_AI_GATEWAY_KEY_REJECTED_MESSAGE };
+        }
         return {
           success: false,
           message: message ? `API key test failed: ${message}` : GENERIC_TEST_FAILURE_MESSAGE,

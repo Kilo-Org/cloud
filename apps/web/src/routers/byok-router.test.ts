@@ -784,6 +784,35 @@ describe('BYOK Router', () => {
         fetchSpy.mockRestore();
       }
     });
+
+    test('reports a rejected Vercel AI Gateway key without SDK setup instructions', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const key = await caller.byok.create({
+        provider_id: 'vercel-ai-gateway',
+        api_key: 'revoked-vercel-key',
+      });
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { message: 'Invalid API key', type: 'authentication_error' },
+          }),
+          { status: 401, headers: { 'content-type': 'application/json' } }
+        )
+      );
+
+      try {
+        await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
+          success: false,
+          message:
+            'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.',
+        });
+        const [url, init] = fetchSpy.mock.calls[0];
+        expect(String(url)).toMatch(/^https:\/\/ai-gateway\.vercel\.sh\//);
+        expect(new Headers(init?.headers).get('authorization')).toBe('Bearer revoked-vercel-key');
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
   });
 
   describe('deprecated codestral provider', () => {

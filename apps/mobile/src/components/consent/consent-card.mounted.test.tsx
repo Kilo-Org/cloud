@@ -185,10 +185,20 @@ describe('ConsentCard', () => {
     const renderer = mountCard('onboarding');
     const t = texts(renderer.root);
     expect(t).toContain('Required to use Kilo');
-    expect(t).toContain('Optional');
+    expect(t).toContain('Before we get started');
+    expect(t).toContain('Optional — you can change this any time in Settings');
+    expect(t).not.toContain('Data sharing preferences');
     expect(t).toContain('Help improve Kilo');
     expect(t).toContain('Accept and continue');
     expect(t).toContain('Decline');
+  });
+
+  it('renders review wording in review mode', () => {
+    const renderer = mountCard('review');
+    const t = texts(renderer.root);
+    expect(t).toContain('Data sharing preferences');
+    expect(t).toContain('Optional — you can change this any time in Settings');
+    expect(t).not.toContain('Before we get started');
   });
 
   it('defaults the optional switch to off', () => {

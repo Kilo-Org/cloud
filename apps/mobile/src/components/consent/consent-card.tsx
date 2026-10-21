@@ -231,7 +231,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           </View>
 
           <Text className="mt-6 text-2xl font-bold text-foreground">
-            {t('consent.beforeWeGetStarted')}
+            {mode === 'review' ? t('consent.summaryTitle') : t('consent.beforeWeGetStarted')}
           </Text>
           <Text className="mt-3 text-base text-muted-foreground">
             {t('consent.introDescription')}
@@ -260,7 +260,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           </View>
 
           <Text className="mt-6 text-sm font-semibold text-foreground">
-            {t('consent.optional')}
+            {t('consent.optionalChangeAnytime')}
           </Text>
 
           <View className="mt-3 flex-row items-start gap-3 rounded-lg border border-border p-4">

@@ -943,6 +943,9 @@
       "gateHidden": "Ẩn",
       "gateNone": "Không có",
       "noFindings": "Không phát hiện vấn đề nào.",
+      "findingsUnavailable": "Không có kết quả vì phiên rà soát này đã thất bại.",
+      "serviceUnavailable": "Không thể kết nối với dịch vụ rà soát mã. Hãy rà soát lại khi dịch vụ khả dụng.",
+      "reviewFailed": "Phiên rà soát đã thất bại. Vui lòng thử lại.",
       "retryMessage": "Thao tác này sẽ chạy lại lượt rà soát mã.",
       "retryReview": "Rà soát lại",
       "retryNeedsSettings": "Trợ lý rà soát mã đang tắt hoặc cài đặt của trợ lý cần được xử lý. Hãy sửa cài đặt, sau đó rà soát lại.",
@@ -1030,7 +1033,8 @@
       "bugs": "Lỗi",
       "style": "Phong cách viết mã",
       "testing": "Kiểm thử",
-      "documentation": "Tài liệu"
+      "documentation": "Tài liệu",
+      "unknown": "Khác ({{area}})"
     },
     "gateThreshold": {
       "warning": "Cảnh báo"
@@ -1697,6 +1701,7 @@
       "prefillModelUnavailable": "{{model}} không còn dùng được. Hiện đang dùng mô hình mặc định của bạn.",
       "couldNotReadPendingSessions": "Không thể đọc danh sách phiên đang chờ. Vui lòng thử lại.",
       "failedToCreate": "Không thể tạo phiên.",
+      "checkOrganizationAccess": "Vui lòng kiểm tra quyền truy cập của bạn vào tổ chức này rồi thử lại.",
       "couldNotRefreshRepositories": "Không thể làm mới danh sách kho mã. Vui lòng thử lại.",
       "discardDraftTitle": "Hủy bản nháp?",
       "discardDraftMessage": "Nội dung yêu cầu của bạn sẽ bị mất.",
@@ -2217,6 +2222,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Bạn chưa thể xem các phiên đang hoạt động cho đến khi tải xong dữ liệu.",
     "currentDeviceUnidentified": "Không thể xác định thiết bị hiện tại.",
+    "kiloApp": "Ứng dụng Kilo",
     "noSessions": "Không có phiên đang hoạt động",
     "noSessionsDescription": "Đăng nhập vào ứng dụng Kilo trên thiết bị khác để thiết bị đó xuất hiện tại đây.",
     "onlyKiloAppSignIns": "Chỉ các phiên đăng nhập qua ứng dụng Kilo xuất hiện tại đây. Các phiên đăng nhập qua trình soạn thảo mã và CLI không được liệt kê.",
@@ -2369,6 +2375,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Trước khi bắt đầu",
+    "summaryTitle": "Tùy chọn chia sẻ dữ liệu",
     "introDescription": "Kilo gửi tin nhắn của bạn đến các nhà cung cấp AI để tạo phản hồi. Dưới đây là thông tin về dữ liệu được chia sẻ và bên nhận dữ liệu.",
     "required": "Bắt buộc để sử dụng Kilo",
     "promptsTitle": "Yêu cầu và cuộc trò chuyện của bạn",
@@ -2377,7 +2384,6 @@
     "accountDescription": "ID tài khoản Kilo và siêu dữ liệu của yêu cầu, dùng để xác thực và tính mức sử dụng của bạn.",
     "diagnosticsTitle": "Chẩn đoán ứng dụng",
     "diagnosticsDescription": "Báo cáo sự cố và lỗi, đã loại bỏ nội dung ứng dụng, dùng để giữ ứng dụng ổn định.",
-    "optional": "Tùy chọn",
     "helpImprove": "Giúp cải thiện Kilo",
     "helpImproveDescription": "Chia sẻ dữ liệu phân tích sản phẩm ẩn danh và nguồn cài đặt ứng dụng. Bạn có thể thay đổi lựa chọn này bất cứ lúc nào trong Cài đặt.",
     "seeFullDetails": "Xem đầy đủ thông tin",
@@ -2501,7 +2507,8 @@
       "description": "Kết nối tài khoản GitHub của bạn để đánh giá PR trên thiết bị di động.",
       "gitlabDescription": "Kết nối tài khoản GitLab để xem merge request trên thiết bị di động.",
       "bitbucketDescription": "Kết nối Bitbucket với tổ chức này để xem PR trên thiết bị di động.",
-      "bitbucketOrgOnlyDescription": "Chọn một tổ chức trong hồ sơ của bạn để xem các PR Bitbucket của tổ chức đó."
+      "bitbucketOrgOnlyDescription": "Chuyển tài khoản ở trên sang một tổ chức để xem các PR Bitbucket của tổ chức đó.",
+      "contextLine": "Cho {{organization}}"
     },
     "connectionExpired": "Kết nối GitHub đã hết hạn.",
     "couldNotLoadPullRequest": "Không thể tải PR.",
@@ -2928,7 +2935,9 @@
       "reviewNotSubmitted": "Không thể gửi bản đánh giá này ở trạng thái hiện tại. Có thể PR đã thay đổi hoặc đây là PR của bạn nên bạn không thể tự đánh giá.",
       "reviewNotSubmittedTerm": "Không thể gửi đánh giá này ở trạng thái hiện tại. {{term}} có thể đã thay đổi, hoặc bạn không thể đánh giá {{term}} của chính mình.",
       "couldNotPostComment": "Không thể đăng bình luận.",
-      "couldNotSubmitReview": "Không thể gửi đánh giá. Kiểm tra kết nối và thử lại."
+      "couldNotSubmitReview": "Không thể gửi đánh giá. Kiểm tra kết nối và thử lại.",
+      "rateLimited": "Quá nhiều yêu cầu. Vui lòng thử lại sau.",
+      "conflict": "Mục này đã thay đổi trong khi bạn đang làm việc trên đó. Vui lòng tải lại và thử lại."
     },
     "operation": {
       "couldNotReply": "Không thể trả lời.",
@@ -3467,6 +3476,9 @@
     "localModels": {
       "title": "Mô hình trên thiết bị",
       "help": "Mô hình trên thiết bị chạy ngay trên điện thoại này. Lời nhắc và câu trả lời của bạn được giữ trên thiết bị.",
+      "switchTitle": "Chuyển sang mô hình trên thiết bị?",
+      "switchMessage": "Chuyển sang {{name}} sẽ xử lý lời nhắc và ngữ cảnh của cuộc trò chuyện này ngay trên điện thoại này, không phải trên máy chủ từ xa.",
+      "switchConfirm": "Chuyển mô hình",
       "systemPurpose": "Mô hình tích hợp sẵn trong hệ thống của thiết bị này. Mô hình chạy ngay trên thiết bị.",
       "apple": "Apple Intelligence (trên thiết bị)",
       "checking": "Đang kiểm tra khả dụng…",
@@ -3563,7 +3575,6 @@
     "personalDefaultDescription": "Tự động tải khi không có kho lưu trữ nào có hồ sơ được ghim.",
     "organizationDefaultDescription": "Tự động tải cho các thành viên không có mặc định cá nhân.",
     "setAsDefault": "Đặt làm mặc định",
-    "removeDefault": "Xóa làm mặc định",
     "saveFailed": "Không thể lưu hồ sơ",
     "deleteTitle": "Xóa hồ sơ",
     "deleteMessage": "Thao tác này sẽ xóa vĩnh viễn hồ sơ và cài đặt của nó. Điều này không thể hoàn tác được.",
@@ -3589,11 +3600,13 @@
     "commandsTitle": "Lệnh thiết lập",
     "addCommand": "Thêm lệnh",
     "commandLabel": "Yêu cầu",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "ví dụ: pnpm install",
     "commandsEmpty": "Chưa có lệnh thiết lập nào",
     "commandsSaveFailed": "Không thể lưu lệnh thiết lập",
     "moveUp": "Di chuyển lên",
     "moveDown": "Di chuyển xuống",
+    "moveCommandUp": "Di chuyển lệnh {{position}} lên",
+    "moveCommandDown": "Di chuyển lệnh {{position}} xuống",
     "skillsTitle": "Kỹ năng",
     "addSkill": "Thêm kỹ năng",
     "skillNameLabel": "Tên kỹ năng",
@@ -3663,7 +3676,7 @@
       "nameRequired": "Nhập tên đại lý",
       "slugRequired": "Nhập sên đại lý",
       "slugInvalid": "Slug phải bắt đầu bằng một chữ cái và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
-      "slugConflict": "Con sên đó được bảo lưu bởi một tác nhân tích hợp",
+      "slugConflict": "Slug đó đã được một tác nhân tích hợp sẵn hoặc tác nhân khác trong hồ sơ này sử dụng",
       "edit": "Chỉnh sửa đại lý"
     },
     "slashCommands": {

@@ -24,6 +24,15 @@ const SPACING_UNIT_DP = 4;
 
 const boundary = vi.hoisted(() => ({ role: 'owner' as string }));
 const routerPush = vi.hoisted(() => vi.fn());
+const membersQuery = vi.hoisted(() => ({
+  data: undefined as
+    | { parent_organization_id: null; settings: { minimum_balance?: number } }
+    | undefined,
+  isLoading: false,
+  isError: false,
+  isPaused: false,
+  refetch: vi.fn(),
+}));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
@@ -47,11 +56,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     },
     isResolving: false,
   }),
-  useOrgWithMembers: () => ({
-    data: { parent_organization_id: null, settings: {} },
-    isLoading: false,
-    isError: false,
-  }),
+  useOrgWithMembers: () => membersQuery,
   useOrgKiloPassSummary: () => ({ data: undefined, isError: false, refetch: vi.fn() }),
 }));
 
@@ -179,6 +184,10 @@ async function renderHub() {
 beforeEach(() => {
   boundary.role = 'owner';
   routerPush.mockClear();
+  membersQuery.data = { parent_organization_id: null, settings: {} };
+  membersQuery.isError = false;
+  membersQuery.isPaused = false;
+  membersQuery.refetch.mockClear();
 });
 
 describe('OrganizationHubScreen rename control', () => {
@@ -254,6 +263,48 @@ describe('OrganizationHubScreen rename control', () => {
 
     expect(findRenameControl(renderer.root)).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'KvRow').length).toBeGreaterThan(0);
+    unmount();
+  });
+});
+
+describe('Organization hub settings availability', () => {
+  it.each(['paused', 'failed'] as const)('retries unavailable settings when %s', async state => {
+    membersQuery.data = undefined;
+    membersQuery.isPaused = state === 'paused';
+    membersQuery.isError = state === 'failed';
+    const { renderer, unmount } = await renderHub();
+    const row = renderer.root
+      .findAllByType('ConfigureRow')
+      .find(node => node.props.icon === 'Bell');
+    if (!row) {
+      throw new Error('Low-balance row missing');
+    }
+    act(() => {
+      (row.props.onPress as () => void)();
+    });
+    expect(membersQuery.refetch).toHaveBeenCalledOnce();
+    expect(routerPush).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('opens configuration with cached settings during a paused refetch failure', async () => {
+    membersQuery.data = { parent_organization_id: null, settings: { minimum_balance: 15 } };
+    membersQuery.isError = true;
+    membersQuery.isPaused = true;
+    const { renderer, unmount } = await renderHub();
+    const row = renderer.root
+      .findAllByType('ConfigureRow')
+      .find(node => node.props.icon === 'Bell');
+    if (!row) {
+      throw new Error('Low-balance row missing');
+    }
+    act(() => {
+      (row.props.onPress as () => void)();
+    });
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/organization/low-balance-alert'
+    );
+    expect(membersQuery.refetch).not.toHaveBeenCalled();
     unmount();
   });
 });

@@ -1,3 +1,5 @@
+import { parsePartItemIdentity } from './compaction';
+
 /**
  * Inclusive message cut shared by session clone and session export.
  *
@@ -7,8 +9,9 @@
  * whole session, so files are rebuilt from the kept messages' summary diffs.
  *
  * The test reads only the ingest item identity (`message/{messageId}` for
- * messages, `{messageId}/{partId}` for parts), never the item body, so it works
- * the same for inline and R2-backed rows.
+ * messages, `part/{messageId}/{partId}` for parts, plus `{messageId}/{partId}`
+ * for parts stored before parts had their own namespace), never the item body,
+ * so it works the same for inline and R2-backed rows.
  */
 export function isItemWithinMessageCut(
   item: { itemType: string; itemId: string },
@@ -19,8 +22,12 @@ export function isItemWithinMessageCut(
       return true;
     case 'message':
       return item.itemId.slice('message/'.length) <= upToMessageId;
-    case 'part':
-      return item.itemId.split('/', 1)[0] <= upToMessageId;
+    case 'part': {
+      // An id this build cannot split still compares on its first segment, as it always has.
+      const messageId =
+        parsePartItemIdentity(item.itemId)?.messageId ?? item.itemId.split('/', 1)[0];
+      return messageId <= upToMessageId;
+    }
     default:
       return false;
   }

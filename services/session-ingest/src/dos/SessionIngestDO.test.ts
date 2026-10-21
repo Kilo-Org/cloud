@@ -99,6 +99,7 @@ describe('SessionIngestDO ingest ordering', () => {
       delete: vi.fn(() => ({
         where: vi.fn(() => ({
           run: vi.fn(() => operations.push('delete:closeReason')),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
         })),
       })),
     };
@@ -165,7 +166,10 @@ describe('SessionIngestDO ingest ordering', () => {
         })),
       })),
       delete: vi.fn(() => ({
-        where: vi.fn(() => ({ run: vi.fn() })),
+        where: vi.fn(() => ({
+          run: vi.fn(),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
+        })),
       })),
     };
     drizzleMocks.db = db;
@@ -233,7 +237,10 @@ describe('SessionIngestDO ingest ordering', () => {
         })),
       })),
       delete: vi.fn(() => ({
-        where: vi.fn(() => ({ run: vi.fn() })),
+        where: vi.fn(() => ({
+          run: vi.fn(),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
+        })),
       })),
     };
     drizzleMocks.db = db;
@@ -279,7 +286,12 @@ describe('SessionIngestDO ingest ordering', () => {
           onConflictDoUpdate: vi.fn(() => ({ run: vi.fn() })),
         })),
       })),
-      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+      delete: vi.fn(() => ({
+        where: vi.fn(() => ({
+          run: vi.fn(),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
+        })),
+      })),
     };
     drizzleMocks.db = db;
 
@@ -363,7 +375,12 @@ describe('SessionIngestDO session-ready push', () => {
           })),
         })),
       })),
-      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+      delete: vi.fn(() => ({
+        where: vi.fn(() => ({
+          run: vi.fn(),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
+        })),
+      })),
     };
     drizzleMocks.db = db;
 
@@ -596,7 +613,12 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
           })),
         })),
       })),
-      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+      delete: vi.fn(() => ({
+        where: vi.fn(() => ({
+          run: vi.fn(),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
+        })),
+      })),
     };
     drizzleMocks.db = db;
 
@@ -926,6 +948,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
             for (const key of collectBoundParams(condition))
               if (typeof key === 'string') meta.delete(key);
           }),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
         })),
       })),
     };
@@ -2058,7 +2081,12 @@ describe('SessionIngestDO live activity + cost persist', () => {
           })
         ),
       })),
-      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+      delete: vi.fn(() => ({
+        where: vi.fn(() => ({
+          run: vi.fn(),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
+        })),
+      })),
     };
     drizzleMocks.db = db;
 
@@ -2323,6 +2351,18 @@ describe('SessionIngestDO clone primitives', () => {
               meta.delete(key);
             }
           },
+          returning: () => ({
+            all: () => {
+              if (table !== ingestItems) return [];
+              const [itemId, itemType] = collectBoundParams(condition);
+              if (typeof itemId !== 'string' || itemType !== 'part') return [];
+              const removed = items.filter(
+                row => row.item_id === itemId && row.item_type === 'part'
+              );
+              for (const row of removed) items.splice(items.indexOf(row), 1);
+              return removed.map(row => ({ item_data_r2_key: row.item_data_r2_key }));
+            },
+          }),
         }),
       })),
     };

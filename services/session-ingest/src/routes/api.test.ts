@@ -1990,7 +1990,8 @@ describe('api routes', () => {
     // The ingest seam (`SessionItemSchema` needs `id` + `messageID` on a part)
     // and the Durable Object's own part reader (`readPartIdentity`) both define
     // a persisted part's identity without `sessionID`
-    // (services/session-ingest/src/util/compaction.ts stores `messageID/id`). A
+    // (services/session-ingest/src/util/compaction.ts keys a part by its message
+    // id and part id). A
     // stored part that omits `sessionID` is therefore well-formed persisted
     // data; its body still fails this read contract's union (every variant
     // declares `sessionID`). It must be dropped and counted, not pushed back

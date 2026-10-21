@@ -9,6 +9,22 @@ const storageKeySegmentSchema = z
     message: 'storage key segments must not contain / or U+0000',
   });
 
+/**
+ * Ids that are also the root of an item identity namespace (`message/<id>`, `part/<messageId>/<id>`,
+ * `agent_notification/<id>`). Every stored item type owns its own namespace, so an identity segment
+ * that names one of them is rejected at the ingest boundary.
+ */
+const RESERVED_IDENTITY_SEGMENTS: Record<string, true> = {
+  message: true,
+  part: true,
+  agent_notification: true,
+};
+
+const identitySegmentSchema = storageKeySegmentSchema.refine(
+  segment => !Object.hasOwn(RESERVED_IDENTITY_SEGMENTS, segment),
+  { message: 'storage key segments must not be a reserved identity namespace' }
+);
+
 export const SessionItemSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('kilo_meta'),
@@ -26,14 +42,14 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('message'),
     data: z.looseObject({
-      id: storageKeySegmentSchema,
+      id: identitySegmentSchema,
     }),
   }),
   z.object({
     type: z.literal('part'),
     data: z.looseObject({
       id: storageKeySegmentSchema,
-      messageID: storageKeySegmentSchema,
+      messageID: identitySegmentSchema,
     }),
   }),
   z.object({

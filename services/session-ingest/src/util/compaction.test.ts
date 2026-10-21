@@ -1,17 +1,66 @@
 import { describe, it, expect } from 'vitest';
 import type { SessionDataItem } from '../types/session-sync';
-import { getItemIdentity, getPartItemIdentityRange } from './compaction';
+import {
+  getItemIdentity,
+  getPartItemIdentityRange,
+  getPartItemIdentityRanges,
+  getPreviousPartItemIdentity,
+  getPreviousPartItemIdentityRange,
+  parsePartItemIdentity,
+} from './compaction';
 
 function item(type: string, data: Record<string, unknown> = {}): SessionDataItem {
   return { type, data } as SessionDataItem;
 }
 
 describe('getPartItemIdentityRange', () => {
-  it('returns the exact binary prefix range for message parts', () => {
+  it('returns the exact binary prefix range inside the part namespace', () => {
     expect(getPartItemIdentityRange('msg_parent')).toEqual({
+      start: 'part/msg_parent/',
+      end: 'part/msg_parent0',
+    });
+  });
+
+  it('returns the exact binary prefix range of the previous layout', () => {
+    expect(getPreviousPartItemIdentityRange('msg_parent')).toEqual({
       start: 'msg_parent/',
       end: 'msg_parent0',
     });
+  });
+
+  it('lists the current layout first and keeps the two ranges disjoint', () => {
+    const [current, previous] = getPartItemIdentityRanges('part');
+    expect(current).toEqual({ start: 'part/part/', end: 'part/part0' });
+    expect(previous).toEqual({ start: 'part/', end: 'part0' });
+    expect(getPartItemIdentityRanges('msg_parent')).toEqual([
+      { start: 'part/msg_parent/', end: 'part/msg_parent0' },
+      { start: 'msg_parent/', end: 'msg_parent0' },
+    ]);
+  });
+});
+
+describe('parsePartItemIdentity', () => {
+  it('splits an id stored under the current layout', () => {
+    expect(parsePartItemIdentity('part/msg_42/prt_1')).toEqual({
+      messageId: 'msg_42',
+      partId: 'prt_1',
+    });
+  });
+
+  it('splits an id stored under the previous layout', () => {
+    expect(parsePartItemIdentity('msg_42/prt_1')).toEqual({ messageId: 'msg_42', partId: 'prt_1' });
+  });
+
+  it('splits a previous-layout id whose message id is "part"', () => {
+    expect(parsePartItemIdentity('part/prt_1')).toEqual({ messageId: 'part', partId: 'prt_1' });
+  });
+
+  it('rejects ids with no part identity', () => {
+    expect(parsePartItemIdentity('part')).toBeNull();
+    expect(parsePartItemIdentity('msg_42')).toBeNull();
+    expect(parsePartItemIdentity('msg_42/nested/prt_1')).toBeNull();
+    expect(parsePartItemIdentity('part/msg_42/prt_1/extra')).toBeNull();
+    expect(parsePartItemIdentity('')).toBeNull();
   });
 });
 
@@ -30,11 +79,18 @@ describe('getItemIdentity', () => {
     });
   });
 
-  it('returns messageID/id for part item', () => {
+  it('returns part/{messageID}/{id} for part item', () => {
     expect(getItemIdentity(item('part', { id: 'p-1', messageID: 'msg-42' }))).toEqual({
-      item_id: 'msg-42/p-1',
+      item_id: 'part/msg-42/p-1',
       item_type: 'part',
     });
+  });
+
+  it('gives a part its own identity namespace', () => {
+    const partIdentity = getItemIdentity(item('part', { id: 'p-1', messageID: 'message' }));
+    const messageIdentity = getItemIdentity(item('message', { id: 'p-1' }));
+    expect(partIdentity.item_id).not.toBe(messageIdentity.item_id);
+    expect(getPreviousPartItemIdentity('message', 'p-1')).toBe(messageIdentity.item_id);
   });
 
   it('returns fixed id for session_diff item', () => {

@@ -5,7 +5,21 @@ import {
   type SessionLiveSummary,
 } from '@kilocode/session-ingest-contracts';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
-import { desc, eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull, sql } from 'drizzle-orm';
+import {
+  desc,
+  eq,
+  ne,
+  gt,
+  gte,
+  lt,
+  lte,
+  and,
+  or,
+  inArray,
+  isNull,
+  isNotNull,
+  sql,
+} from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
@@ -15,7 +29,12 @@ import { ingestItems, ingestMeta, agentNotificationDispatch } from '../db/sqlite
 import type { Env } from '../env';
 import type { IngestBatch } from '../types/session-sync';
 import type { SessionDataItem } from '../types/session-sync';
-import { getItemIdentity, getPartItemIdentityRange } from '../util/compaction';
+import {
+  comparePartIngestOrder,
+  getItemIdentity,
+  getPreviousPartItemIdentity,
+  mergePartIdentityRanges,
+} from '../util/compaction';
 import { isItemWithinMessageCut } from '../util/message-cut';
 import {
   extractNormalizedGitBranchFromItem,
@@ -634,6 +653,31 @@ export class SessionIngestDO extends DurableObject<Env> {
           },
         })
         .run();
+      if (item.type === 'part') {
+        // A part stored before parts had their own namespace keeps the same logical identity
+        // under `<messageID>/<partID>`. The row just written supersedes it, so remove it to leave
+        // one row per part; the item-type and timestamp guards keep the delete on a superseded
+        // copy of the same part.
+        const superseded = this.db
+          .delete(ingestItems)
+          .where(
+            and(
+              eq(
+                ingestItems.item_id,
+                getPreviousPartItemIdentity(item.data.messageID, item.data.id)
+              ),
+              eq(ingestItems.item_type, 'part'),
+              ingestedAt === undefined
+                ? undefined
+                : or(isNull(ingestItems.ingested_at), lte(ingestItems.ingested_at, ingestedAt))
+            )
+          )
+          .returning({ item_data_r2_key: ingestItems.item_data_r2_key })
+          .all();
+        for (const row of superseded) {
+          if (row.item_data_r2_key) orphanedR2Keys.push(row.item_data_r2_key);
+        }
+      }
       if (
         item.type === 'part' &&
         (item.data.type === 'text' || item.data.type === 'tool') &&
@@ -1136,22 +1180,28 @@ export class SessionIngestDO extends DurableObject<Env> {
 
   /** Builds a text excerpt for a completed assistant message from its already-ingested text parts. */
   private buildAssistantExcerptForMessage(messageId: string): string {
-    const range = getPartItemIdentityRange(messageId);
-    const rows = this.db
-      .select({
-        item_data: ingestItems.item_data,
-      })
-      .from(ingestItems)
-      .where(
-        and(
-          eq(ingestItems.item_type, 'part'),
-          gte(ingestItems.item_id, range.start),
-          lt(ingestItems.item_id, range.end),
-          isNull(ingestItems.item_data_r2_key)
-        )
-      )
-      .orderBy(ingestItems.ingested_at, ingestItems.id)
-      .all();
+    const rows = mergePartIdentityRanges(
+      messageId,
+      range =>
+        this.db
+          .select({
+            id: ingestItems.id,
+            ingested_at: ingestItems.ingested_at,
+            item_data: ingestItems.item_data,
+          })
+          .from(ingestItems)
+          .where(
+            and(
+              eq(ingestItems.item_type, 'part'),
+              gte(ingestItems.item_id, range.start),
+              lt(ingestItems.item_id, range.end),
+              isNull(ingestItems.item_data_r2_key)
+            )
+          )
+          .orderBy(ingestItems.ingested_at, ingestItems.id)
+          .all(),
+      comparePartIngestOrder
+    );
 
     // Parts offloaded to R2 (oversized items) store '{}' inline; skip them rather
     // than fetching from R2 — this is a best-effort excerpt, not a full transcript.
@@ -1268,33 +1318,38 @@ export class SessionIngestDO extends DurableObject<Env> {
               controller.enqueue(encoder.encode('{"info":'));
               await enqueueItemData(controller, msgRow, r2, encoder);
 
-              // parts for this message: item_id = '{msgId}/{partId}'
+              // parts for this message live under `part/{msgId}/{partId}`, or `{msgId}/{partId}`
+              // when stored before parts had their own namespace
               const msgId = msgRow.item_id.slice('message/'.length);
-              const partRange = getPartItemIdentityRange(msgId);
               controller.enqueue(encoder.encode(',"parts":['));
               let partCursor: IngestOrderCursor | undefined;
               let firstPart = true;
 
               while (true) {
-                const partBatch = db
-                  .select({
-                    id: ingestItems.id,
-                    ingested_at: ingestItems.ingested_at,
-                    item_data: ingestItems.item_data,
-                    item_data_r2_key: ingestItems.item_data_r2_key,
-                  })
-                  .from(ingestItems)
-                  .where(
-                    and(
-                      eq(ingestItems.item_type, 'part'),
-                      gte(ingestItems.item_id, partRange.start),
-                      lt(ingestItems.item_id, partRange.end),
-                      partCursor ? afterIngestOrderCursor(partCursor) : undefined
-                    )
-                  )
-                  .orderBy(ingestItems.ingested_at, ingestItems.id)
-                  .limit(CURSOR_BATCH)
-                  .all();
+                const partBatch = mergePartIdentityRanges(
+                  msgId,
+                  range =>
+                    db
+                      .select({
+                        id: ingestItems.id,
+                        ingested_at: ingestItems.ingested_at,
+                        item_data: ingestItems.item_data,
+                        item_data_r2_key: ingestItems.item_data_r2_key,
+                      })
+                      .from(ingestItems)
+                      .where(
+                        and(
+                          eq(ingestItems.item_type, 'part'),
+                          gte(ingestItems.item_id, range.start),
+                          lt(ingestItems.item_id, range.end),
+                          partCursor ? afterIngestOrderCursor(partCursor) : undefined
+                        )
+                      )
+                      .orderBy(ingestItems.ingested_at, ingestItems.id)
+                      .limit(CURSOR_BATCH)
+                      .all(),
+                  comparePartIngestOrder
+                );
 
                 if (partBatch.length === 0) break;
                 partCursor = ingestOrderCursor(partBatch[partBatch.length - 1]);

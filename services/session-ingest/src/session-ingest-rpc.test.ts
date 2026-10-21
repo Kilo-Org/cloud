@@ -655,7 +655,7 @@ describe('createSessionForCloudAgent clone path', () => {
   });
 
   const sourcePartItem = (): CloneItem => ({
-    itemId: 'msg_user_01/prt_user_01',
+    itemId: 'part/msg_user_01/prt_user_01',
     itemType: 'part',
     itemData: JSON.stringify({
       id: 'prt_user_01',
@@ -991,7 +991,9 @@ describe('createSessionForCloudAgent clone path', () => {
       sessionID: destinationSessionId,
     });
 
-    const stagedPart = dest.state.stagedRows.find(row => row.itemId === 'msg_user_01/prt_user_01');
+    const stagedPart = dest.state.stagedRows.find(
+      row => row.itemId === 'part/msg_user_01/prt_user_01'
+    );
     expect(JSON.parse(stagedPart!.itemData)).toMatchObject({
       id: 'prt_user_01',
       messageID: 'msg_user_01',

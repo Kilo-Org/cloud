@@ -30,6 +30,20 @@ describe('isItemWithinMessageCut', () => {
     );
   });
 
+  it('keeps parts stored under the part namespace by their message ID', () => {
+    expect(
+      isItemWithinMessageCut({ itemType: 'part', itemId: 'part/msg_0002/prt_0009' }, cut)
+    ).toBe(true);
+    expect(
+      isItemWithinMessageCut({ itemType: 'part', itemId: 'part/msg_0003/prt_0001' }, cut)
+    ).toBe(false);
+  });
+
+  it('compares an unparsable part identity on its first segment, as it always has', () => {
+    expect(isItemWithinMessageCut({ itemType: 'part', itemId: 'msg_0001' }, cut)).toBe(true);
+    expect(isItemWithinMessageCut({ itemType: 'part', itemId: 'prt_orphan' }, cut)).toBe(false);
+  });
+
   it('always drops the session diff and other item types', () => {
     expect(isItemWithinMessageCut({ itemType: 'session_diff', itemId: 'session_diff' }, cut)).toBe(
       false

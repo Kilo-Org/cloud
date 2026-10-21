@@ -1674,7 +1674,7 @@
       "noOpenFindings": "គ្មានបញ្ហាដែលរកឃើញនៅបើក ដែលត្រូវការយកចិត្តទុកដាក់",
       "deadlineToday": "ដល់ថ្ងៃកំណត់ថ្ងៃនេះ",
       "daysOverdue": "ហួសកំណត់ {{displayCount}} ថ្ងៃ",
-      "withinDeadline": "ក្នុងរយៈពេលកំណត់",
+      "withinDeadline": "ក្នុងកាលកំណត់",
       "criticalOverdue": "កម្រិតធ្ងន់ធ្ងរបំផុតដែលហួសកំណត់",
       "highOverdue": "កម្រិតខ្ពស់ដែលហួសកំណត់",
       "mediumLowOverdue": "កម្រិតមធ្យម និងទាបដែលហួសកំណត់",
@@ -1986,7 +1986,7 @@
       "noChangesNeeded": "មិនចាំបាច់ផ្លាស់ប្តូរ",
       "originAutomaticPolicy": "គោលការណ៍ស្វ័យប្រវត្តិ",
       "originIncludeExistingPolicy": "គោលការណ៍រួមបញ្ចូលបញ្ហាដែលរកឃើញស្រាប់",
-      "originManual": "ដោយខ្លួនឯង",
+      "originManual": "ខ្លួនឯង",
       "validationCheck": "ការត្រួតពិនិត្យសុពលភាព {{number}}"
     },
     "remediationUnavailable": {

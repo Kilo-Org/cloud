@@ -3398,7 +3398,12 @@
       "serverChecking": "Kontrola tohto servera…",
       "serverToolCount": "{{count}} nástrojov",
       "serverUnreachable": "Nepodarilo sa pripojiť k tomuto serveru",
-      "serverOff": "Tento server je vypnutý"
+      "serverOff": "Tento server je vypnutý",
+      "app": {
+        "label": "Rozhranie nástroja",
+        "failed": "Rozhranie tohto nástroja sa nepodarilo načítať.",
+        "empty": "Rozhranie tohto nástroja nemá čo zobraziť."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Overenie",

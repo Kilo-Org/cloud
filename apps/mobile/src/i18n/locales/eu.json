@@ -3316,7 +3316,12 @@
       "serverChecking": "Zerbitzari hau egiaztatzen…",
       "serverToolCount": "{{count}} tresna",
       "serverUnreachable": "Ezin izan da zerbitzari honetara iritsi",
-      "serverOff": "Zerbitzari hau desgaituta dago"
+      "serverOff": "Zerbitzari hau desgaituta dago",
+      "app": {
+        "label": "Tresnaren interfazea",
+        "failed": "Ezin izan da tresna honen interfazea kargatu.",
+        "empty": "Tresna honen interfazeak ez du ezer erakusteko."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentifikazioa",

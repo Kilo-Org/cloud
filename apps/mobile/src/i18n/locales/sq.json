@@ -3316,7 +3316,12 @@
       "serverChecking": "Duke kontrolluar këtë server…",
       "serverToolCount": "{{count}} mjete",
       "serverUnreachable": "Nuk u arrit ky server",
-      "serverOff": "Ky server është i fikur"
+      "serverOff": "Ky server është i fikur",
+      "app": {
+        "label": "Ndërfaqja e mjetit",
+        "failed": "Ndërfaqja e këtij mjeti nuk mund të ngarkohej.",
+        "empty": "Ndërfaqja e këtij mjeti nuk ka gjë për të shfaqur."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Vërtetimi",

@@ -3316,7 +3316,12 @@
       "serverChecking": "Seerverii kana sakatta'aa jira…",
       "serverToolCount": "meeshaalee {{count}}",
       "serverUnreachable": "Seerverii kana bira ga'uun hin danda'amne",
-      "serverOff": "Seerveriin kun dhaameera"
+      "serverOff": "Seerveriin kun dhaameera",
+      "app": {
+        "label": "Walqunnamtii meeshaa",
+        "failed": "Walqunnamtiin meeshaa kanaa hin dandeenye baafachuu.",
+        "empty": "Walqunnamtiin meeshaa kanaa waan agarsiisuu hin qabu."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Mirkaneessa",

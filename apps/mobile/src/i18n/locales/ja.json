@@ -3316,7 +3316,12 @@
       "serverChecking": "このサーバーを確認しています…",
       "serverToolCount": "{{count}} 個のツール",
       "serverUnreachable": "このサーバーに接続できませんでした",
-      "serverOff": "このサーバーはオフです"
+      "serverOff": "このサーバーはオフです",
+      "app": {
+        "label": "ツールインターフェース",
+        "failed": "このツールのインターフェースを読み込めませんでした。",
+        "empty": "このツールのインターフェースには表示するものがありません。"
+      }
     },
     "mcpOAuth": {
       "authMethod": "認証",

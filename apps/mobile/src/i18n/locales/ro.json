@@ -3357,7 +3357,12 @@
       "serverChecking": "Se verifică acest server…",
       "serverToolCount": "{{count}} instrumente",
       "serverUnreachable": "Nu s-a putut contacta acest server",
-      "serverOff": "Acest server este oprit"
+      "serverOff": "Acest server este oprit",
+      "app": {
+        "label": "Interfața instrumentului",
+        "failed": "Interfața acestui instrument nu a putut fi încărcată.",
+        "empty": "Interfața acestui instrument nu are nimic de afișat."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentificare",

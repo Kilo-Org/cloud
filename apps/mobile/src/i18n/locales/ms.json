@@ -3316,7 +3316,12 @@
       "serverChecking": "Menyemak pelayan ini…",
       "serverToolCount": "{{count}} alat",
       "serverUnreachable": "Tidak dapat menghubungi pelayan ini",
-      "serverOff": "Pelayan ini dimatikan"
+      "serverOff": "Pelayan ini dimatikan",
+      "app": {
+        "label": "Antara muka alat",
+        "failed": "Antara muka alat ini tidak dapat dimuatkan.",
+        "empty": "Antara muka alat ini tiada apa-apa untuk dipaparkan."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Pengesahan",

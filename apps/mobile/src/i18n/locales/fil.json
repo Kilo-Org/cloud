@@ -3316,7 +3316,12 @@
       "serverChecking": "Sinusuri ang server na ito…",
       "serverToolCount": "{{count}} tool",
       "serverUnreachable": "Hindi maabot ang server na ito",
-      "serverOff": "Naka-off ang server na ito"
+      "serverOff": "Naka-off ang server na ito",
+      "app": {
+        "label": "Interface ng tool",
+        "failed": "Hindi na-load ang interface ng tool na ito.",
+        "empty": "Walang maipapakita ang interface ng tool na ito."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Pagpapatunay",

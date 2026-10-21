@@ -3398,7 +3398,12 @@
       "serverChecking": "Sprawdzanie tego serwera…",
       "serverToolCount": "{{count}} narzędzi",
       "serverUnreachable": "Nie udało się połączyć z tym serwerem",
-      "serverOff": "Ten serwer jest wyłączony"
+      "serverOff": "Ten serwer jest wyłączony",
+      "app": {
+        "label": "Interfejs narzędzia",
+        "failed": "Nie udało się załadować interfejsu tego narzędzia.",
+        "empty": "Interfejs tego narzędzia nie ma nic do pokazania."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Uwierzytelnianie",

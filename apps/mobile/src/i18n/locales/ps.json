@@ -3316,7 +3316,12 @@
       "serverChecking": "دا سرور ګڼل کیږي…",
       "serverToolCount": "{{count}} وسیلې",
       "serverUnreachable": "دې سرور ته رسېدل ممکن نه شول",
-      "serverOff": "دا سرور بند دی"
+      "serverOff": "دا سرور بند دی",
+      "app": {
+        "label": "د وسیزې انټرفیس",
+        "failed": "د دې وسیزې انټرفیس لوډ نه شو.",
+        "empty": "د دې وسیزې انټرفیس کې د ښودلو لپاره هیڅ نشته."
+      }
     },
     "mcpOAuth": {
       "authMethod": "تصدیق",

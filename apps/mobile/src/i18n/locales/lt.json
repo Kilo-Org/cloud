@@ -3398,7 +3398,12 @@
       "serverChecking": "Tikrinamas šis serveris…",
       "serverToolCount": "{{count}} įrankiai",
       "serverUnreachable": "Nepavyko pasiekti šio serverio",
-      "serverOff": "Šis serveris išjungtas"
+      "serverOff": "Šis serveris išjungtas",
+      "app": {
+        "label": "Įrankio sąsaja",
+        "failed": "Nepavyko įkelti šio įrankio sąsajos.",
+        "empty": "Šio įrankio sąsajoje nėra ką rodyti."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentifikavimas",

@@ -1,8 +1,12 @@
 import { Effect } from 'effect';
 import { type Tool } from '@kilocode/harness-sdk';
 import {
+  type RemoteMcpApp,
+  type RemoteMcpAppContext,
+  type RemoteMcpCallAnswered,
   type RemoteMcpClientDeps,
   RemoteMcpError,
+  type RemoteMcpOfferedTool,
   remoteMcpTools,
 } from '@kilocode/harness-sdk/plugins/remote-mcp';
 
@@ -12,11 +16,20 @@ import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-s
 import { credentialDeps, serverValue } from './remote-mcp-credentials';
 import {
   connectingOf,
+  discoveryOf,
   type RemoteMcpDiscovery,
   type RemoteMcpServerState,
+  type RemoteMcpToolView,
   remoteServerStates,
   remoteServerToolsFor,
+  remoteServerViewsFor,
 } from './remote-mcp-state';
+import {
+  openViewBridge,
+  readViewDocument,
+  type RemoteMcpViewDocument,
+  type RemoteMcpViewSource,
+} from './remote-mcp-views';
 import {
   getRemoteMcpServersHasLoaded,
   listRemoteMcpServers,
@@ -24,6 +37,7 @@ import {
   subscribeRemoteMcpServers,
   whenRemoteMcpServersLoaded,
 } from './remote-mcp-store';
+import { publishRemoteMcpViews } from './remote-mcp-surface';
 import { type ChatPlace } from './scope';
 
 /**
@@ -108,15 +122,45 @@ function depsFor(
     fetch,
     discoverTimeoutMs: timeoutMs,
     onCallFailure: lostConnection(server, started),
+    onCallResult: rememberCallResult,
     ...credentialDeps(server),
   };
 }
 
+/**
+ * The whole answer a call received, kept for the row that draws it.
+ *
+ * A transcript holds the text the model read; a view renders the server's own
+ * content and structured result, which the harness hands over here because the
+ * text does not carry them. Only the most recent answers are kept: a reopened
+ * transcript draws its views from the text alone, and nothing waits on one
+ * that scrolled away.
+ */
+const callResults = new Map<string, RemoteMcpCallAnswered>();
+const MAX_CALL_RESULTS = 50;
+
+function rememberCallResult(answered: RemoteMcpCallAnswered): void {
+  callResults.delete(answered.callId);
+  callResults.set(answered.callId, answered);
+  if (callResults.size > MAX_CALL_RESULTS) {
+    const oldest = callResults.keys().next().value;
+    if (oldest !== undefined) {
+      callResults.delete(oldest);
+    }
+  }
+}
+
+/** What a call answered, for the view that renders it; the text alone when it is gone. */
+export function mcpCallResultOf(callId: string): RemoteMcpCallAnswered | undefined {
+  return callResults.get(callId);
+}
+
 /** What a failed discovery or call leaves: an OAuth server that refused needs a person. */
 function failureOf(server: StoredRemoteMcpServer, error: RemoteMcpError): RemoteMcpDiscovery {
+  const nothing = { tools: [], views: new Map<string, RemoteMcpToolView>(), serverTools: [] };
   return server.auth.type === 'oauth' && error.kind === 'unauthorized'
-    ? { tools: [], failed: true, signIn: true }
-    : { tools: [], failed: true };
+    ? { ...nothing, failed: true, signIn: true }
+    : { ...nothing, failed: true };
 }
 
 /**
@@ -151,7 +195,7 @@ async function discover(
     remoteMcpTools(serverValue(server), depsFor(server, timeoutMs, started)).pipe(
       Effect.match({
         onFailure: (error: RemoteMcpError) => ({ ok: false as const, error }),
-        onSuccess: (tools: readonly Tool[]) => ({ ok: true as const, tools }),
+        onSuccess: (tools: readonly RemoteMcpOfferedTool[]) => ({ ok: true as const, tools }),
       }),
       Effect.catchAllCause(cause =>
         Effect.succeed({
@@ -175,7 +219,7 @@ async function discover(
   }
   discovered.set(
     server.id,
-    outcome.ok ? { tools: outcome.tools } : failureOf(server, outcome.error)
+    outcome.ok ? discoveryOf(server.id, outcome.tools) : failureOf(server, outcome.error)
   );
   publish();
 }
@@ -188,9 +232,10 @@ function currentStates(): RemoteMcpServerState[] {
   );
 }
 
-/** Replaces the snapshot and wakes every watcher. */
+/** Replaces the snapshot, the view lookup and wakes every watcher. */
 function publish(): void {
   snapshot = currentStates();
+  publishRemoteMcpViews(remoteServerViewsFor(listRemoteMcpServers(), discovered));
   for (const listener of listeners) {
     listener();
   }
@@ -235,7 +280,12 @@ function reusable(found: RemoteMcpDiscovery | undefined): boolean {
  */
 function failOffline(servers: readonly StoredRemoteMcpServer[]): readonly RemoteMcpServerState[] {
   for (const server of servers) {
-    discovered.set(server.id, { tools: [], failed: true });
+    discovered.set(server.id, {
+      tools: [],
+      views: new Map(),
+      serverTools: [],
+      failed: true,
+    });
   }
   publish();
   return snapshot;
@@ -274,6 +324,7 @@ export async function ensureRemoteMcp(
     generation += 1;
     cacheKey = key;
     discovered = new Map();
+    callResults.clear();
     pending.clear();
     publish();
   }
@@ -330,6 +381,36 @@ export function remoteServerToolNames(): readonly string[] {
   return remoteServerTools().map(tool => tool.definition.name);
 }
 
+/** The source a view is read and driven from: the server, its deps and its tools. */
+function viewSourceOf(view: RemoteMcpToolView): RemoteMcpViewSource | undefined {
+  const server = listRemoteMcpServers().find(held => held.id === view.serverId && held.enabled);
+  const found = server === undefined ? undefined : discovered.get(server.id);
+  if (server === undefined || found === undefined || found.failed === true) {
+    return undefined;
+  }
+  const deps = depsFor(server, AUTOMATIC_TIMEOUT_MS, generation);
+  return { server: serverValue(server), deps, tools: found.serverTools };
+}
+
+/** The document a tool's view is drawn from, held to the policy it declared. */
+export async function readRemoteMcpView(view: RemoteMcpToolView): Promise<RemoteMcpViewDocument> {
+  const source = viewSourceOf(view);
+  const document =
+    source === undefined
+      ? ({ kind: 'unavailable' } as const)
+      : await readViewDocument(source, view);
+  return document;
+}
+
+/** The bridge for one tool's view, over the same client a model's calls use. */
+export function openRemoteMcpApp(
+  view: RemoteMcpToolView,
+  options: { readonly context?: RemoteMcpAppContext; readonly openLink?: (uri: string) => void }
+): RemoteMcpApp | undefined {
+  const source = viewSourceOf(view);
+  return source === undefined ? undefined : openViewBridge(source, options);
+}
+
 /** Watches the snapshot, the way a screen subscribes to a chat. */
 export function subscribeRemoteMcp(listener: () => void): () => void {
   listeners.add(listener);
@@ -346,6 +427,7 @@ export function forgetRemoteMcp(): void {
   generation += 1;
   cacheKey = undefined;
   discovered = new Map();
+  callResults.clear();
   pending.clear();
   inFlight = undefined;
   publish();

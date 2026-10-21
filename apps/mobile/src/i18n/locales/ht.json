@@ -3316,7 +3316,12 @@
       "serverChecking": "N ap tcheke sèvè sa a…",
       "serverToolCount": "{{count}} zouti",
       "serverUnreachable": "Nou pa t kapab rive jwenn sèvè sa a",
-      "serverOff": "Sèvè sa a etenn"
+      "serverOff": "Sèvè sa a etenn",
+      "app": {
+        "label": "Entèfas zouti a",
+        "failed": "Entèfas zouti sa a pa ka chaje.",
+        "empty": "Entèfas zouti sa a pa gen anyen pou montre."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Otantifikasyon",

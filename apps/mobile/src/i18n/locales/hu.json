@@ -3316,7 +3316,12 @@
       "serverChecking": "Szerver ellenőrzése…",
       "serverToolCount": "{{count}} eszköz",
       "serverUnreachable": "Nem sikerült elérni ezt a szervert",
-      "serverOff": "Ez a szerver ki van kapcsolva"
+      "serverOff": "Ez a szerver ki van kapcsolva",
+      "app": {
+        "label": "Eszköz felülete",
+        "failed": "Az eszköz felületét nem sikerült betölteni.",
+        "empty": "Az eszköz felületén nincs mit megjeleníteni."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Hitelesítés",

@@ -3316,7 +3316,12 @@
       "serverChecking": "Ana duba wannan sabar…",
       "serverToolCount": "kayan aiki {{count}}",
       "serverUnreachable": "Ba a iya isa wannan sabar ba",
-      "serverOff": "An kashe wannan sabar"
+      "serverOff": "An kashe wannan sabar",
+      "app": {
+        "label": "Mahaɗin kayan aiki",
+        "failed": "An kasa loda mahaɗin kayan aiki.",
+        "empty": "Mahaɗin kayan aiki bai nuna komai ba."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Tantancewa",

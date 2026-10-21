@@ -3316,7 +3316,12 @@
       "serverChecking": "正在检查此服务器…",
       "serverToolCount": "{{count}} 个工具",
       "serverUnreachable": "无法连接此服务器",
-      "serverOff": "此服务器已关闭"
+      "serverOff": "此服务器已关闭",
+      "app": {
+        "label": "工具界面",
+        "failed": "无法加载此工具的界面。",
+        "empty": "此工具的界面没有可显示的内容。"
+      }
     },
     "mcpOAuth": {
       "authMethod": "身份验证",

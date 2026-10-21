@@ -3316,7 +3316,12 @@
       "serverChecking": "Dieser Server wird geprüft…",
       "serverToolCount": "{{count}} Tools",
       "serverUnreachable": "Dieser Server konnte nicht erreicht werden",
-      "serverOff": "Dieser Server ist ausgeschaltet"
+      "serverOff": "Dieser Server ist ausgeschaltet",
+      "app": {
+        "label": "Tool-Oberfläche",
+        "failed": "Die Oberfläche dieses Tools konnte nicht geladen werden.",
+        "empty": "Die Oberfläche dieses Tools hat nichts anzuzeigen."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Authentifizierung",

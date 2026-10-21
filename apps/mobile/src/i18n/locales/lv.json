@@ -3357,7 +3357,12 @@
       "serverChecking": "Pārbauda šo serveri…",
       "serverToolCount": "{{count}} rīki",
       "serverUnreachable": "Neizdevās sasniegt šo serveri",
-      "serverOff": "Šis serveris ir izslēgts"
+      "serverOff": "Šis serveris ir izslēgts",
+      "app": {
+        "label": "Rīka saskarne",
+        "failed": "Neizdevās ielādēt šī rīka saskarni.",
+        "empty": "Šī rīka saskarnē nav ko parādīt."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentifikācija",

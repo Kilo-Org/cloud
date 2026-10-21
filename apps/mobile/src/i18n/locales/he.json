@@ -3357,7 +3357,12 @@
       "serverChecking": "בודק את השרת הזה…",
       "serverToolCount": "{{count}} כלים",
       "serverUnreachable": "לא ניתן היה להגיע לשרת הזה",
-      "serverOff": "השרת הזה כבוי"
+      "serverOff": "השרת הזה כבוי",
+      "app": {
+        "label": "ממשק הכלי",
+        "failed": "לא הייתה אפשרות לטעון את הממשק של הכלי הזה.",
+        "empty": "אין מה להציג בממשק של הכלי הזה."
+      }
     },
     "mcpOAuth": {
       "authMethod": "אימות",

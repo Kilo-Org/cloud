@@ -3357,7 +3357,12 @@
       "serverChecking": "A verificar este servidor…",
       "serverToolCount": "{{count}} ferramentas",
       "serverUnreachable": "Não foi possível contactar este servidor",
-      "serverOff": "Este servidor está desativado"
+      "serverOff": "Este servidor está desativado",
+      "app": {
+        "label": "Interface da ferramenta",
+        "failed": "Não foi possível carregar a interface desta ferramenta.",
+        "empty": "A interface desta ferramenta não tem nada para mostrar."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autenticação",

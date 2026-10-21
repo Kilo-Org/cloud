@@ -3316,7 +3316,12 @@
       "serverChecking": "اس سرور کی جانچ ہو رہی ہے…",
       "serverToolCount": "{{count}} ٹولز",
       "serverUnreachable": "اس سرور تک نہیں پہنچ سکا",
-      "serverOff": "یہ سرور بند ہے"
+      "serverOff": "یہ سرور بند ہے",
+      "app": {
+        "label": "ٹول کا انٹرفیس",
+        "failed": "اس ٹول کا انٹرفیس لوڈ نہیں ہو سکا۔",
+        "empty": "اس ٹول کے انٹرفیس میں دکھانے کے لیے کچھ نہیں ہے۔"
+      }
     },
     "mcpOAuth": {
       "authMethod": "تصدیق",

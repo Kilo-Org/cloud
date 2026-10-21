@@ -3316,7 +3316,12 @@
       "serverChecking": "Đang kiểm tra máy chủ này…",
       "serverToolCount": "{{count}} công cụ",
       "serverUnreachable": "Không thể kết nối với máy chủ này",
-      "serverOff": "Máy chủ này đang tắt"
+      "serverOff": "Máy chủ này đang tắt",
+      "app": {
+        "label": "Giao diện công cụ",
+        "failed": "Không thể tải giao diện của công cụ này.",
+        "empty": "Giao diện của công cụ này không có gì để hiển thị."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Xác thực",

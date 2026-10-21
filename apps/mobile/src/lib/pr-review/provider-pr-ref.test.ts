@@ -106,8 +106,16 @@ describe('parseProviderPrRoute', () => {
 
   it('decodes percent-escaped segments', () => {
     expect(
-      parseProviderPrRoute({ platform: 'gitlab', identity: ['group', 'my%20repo', '5'] })
-    ).toMatchObject({ projectPath: 'group/my repo', mrIid: 5 });
+      parseProviderPrRoute({ platform: 'gitlab', identity: ['group', 'my%2Drepo', '5'] })
+    ).toMatchObject({ projectPath: 'group/my-repo', mrIid: 5 });
+  });
+
+  it('rejects a GitLab path segment the server never names a project with', () => {
+    for (const segment of ['.', '..', '-', 'my%20repo', 'a%23b', 'a%3Fb']) {
+      expect(
+        parseProviderPrRoute({ platform: 'gitlab', identity: ['group', segment, '5'] })
+      ).toBeNull();
+    }
   });
 
   it('rejects an unknown platform', () => {

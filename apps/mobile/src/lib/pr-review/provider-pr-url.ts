@@ -134,7 +134,12 @@ function gitLabRefAtMarker(
   };
 }
 
-function isGitLabPathSegment(segment: string): boolean {
+/**
+ * Whether a single segment can name a GitLab project path component. Shared
+ * with the route parser in `provider-pr-ref`, so a pasted URL and a deep link
+ * accept exactly the same project paths.
+ */
+export function isGitLabPathSegment(segment: string): boolean {
   // '.', '..' and the bare '-' separator are shapes the server never names a
   // project with; accepting them would let `/repo/-/merge_requests/1` read as
   // the project `repo/-`.

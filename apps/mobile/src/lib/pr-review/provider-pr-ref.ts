@@ -26,7 +26,7 @@ import {
 import { type Href } from 'expo-router';
 import { createContext, createElement, type ReactNode, useContext, useMemo } from 'react';
 
-import { splitHttpUrl } from '@/lib/pr-review/provider-pr-url';
+import { isGitLabPathSegment, splitHttpUrl } from '@/lib/pr-review/provider-pr-url';
 import { parseParam, parsePositiveIntParam } from '@/lib/route-params';
 
 export { providerPrRefKey, type GitHubPrRef, type ProviderPrPlatform, type ProviderPrRef };
@@ -226,7 +226,9 @@ function providerPrHref(ref: ProviderPrRef, suffix: string): Href {
  *
  * GitLab and Bitbucket both need at least a two-segment project path plus
  * the number; Bitbucket is exactly `workspace/repo/id` because its API has
- * no nesting.
+ * no nesting. A GitLab project path must also be the segment shape GitLab
+ * names projects with — the same check the paste resolver applies — so a
+ * hand-built link cannot put `..` or a stray separator into a query.
  */
 export function parseProviderPrRoute(params: {
   platform: string | string[] | undefined;
@@ -258,6 +260,9 @@ export function parseProviderPrRoute(params: {
     return platform === 'github'
       ? githubPrRef(first, second, number)
       : { platform: 'bitbucket', workspace: first, repoSlug: second, prId: number };
+  }
+  if (!path.every(segment => isGitLabPathSegment(segment))) {
+    return null;
   }
   const instanceHint = gitlabInstanceHint(parseParam(params.instance));
   return { platform: 'gitlab', projectPath: path.join('/'), mrIid: number, instanceHint };

@@ -194,7 +194,7 @@
   "ja": ["analysis failed", "copied", "merged", "open", "open pull request", "queued", "reactions"],
   "ka": ["files", "open", "open pull request", "reactions", "tokens"],
   "kk": ["open", "open pull request"],
-  "km": ["github connection expired", "review"],
+  "km": ["github connection expired", "open pull request", "review"],
   "kn": ["commit", "merge", "open", "open pull request", "review"],
   "ko": ["open", "open pull request", "plan", "session exited"],
   "lo": ["review"],

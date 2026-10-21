@@ -38,6 +38,16 @@ git diff --check
 
 - Install with `npx expo install <package>` (or `--dev`), never `pnpm add`.
 - After dependency changes, run `pnpx expo-doctor` and fix every issue.
+- `jotai` stays on 2.x for now, and the four pins move together: `apps/mobile`,
+  `apps/web`, `apps/extension` and `packages/cloud-agent-sdk`. The SDK creates
+  the session atoms and each app reads them through its own jotai hooks, so a
+  partial bump fails `typecheck`: a 2.x `Atom` is not assignable to the 3.x
+  type because its `read` options still require `setSelf`, which 3.x removed
+  (mobile alone reports 153 such errors). `apps/web` cannot move first while
+  `jotai-minidb@0.0.8` (the latest release) imports `atomFamily` from
+  `jotai/vanilla/utils` and calls `setSelf`; both are gone in 3.x. Revisit as
+  soon as `jotai-minidb` ships a release that supports `jotai` 3; 3.0.1 already
+  clears `minimumReleaseAge`.
 - `@kilocode/kilo-chat-hooks` is copied, not symlinked. After editing it:
 
   ```bash
@@ -171,7 +181,12 @@ Copy lives in `src/i18n/locales/en.json`. The other 86 catalogs are reviewed
 against the screens their keys render on, so a key's name and its context are
 what a translator has to work from.
 
-- Add and edit copy in `en.json` only. Never hand-edit another catalog.
+- Add and edit copy in `en.json` only. Never hand-edit another catalog. The one
+  exception is a value-level correction of a confirmed mistranslation in an
+  existing non-English entry (a wrong word, not a style preference): fix the
+  value in place, keep the key name, placeholders, and English copy unchanged,
+  verify the corrected string on the screen that renders it, and say so in the
+  pull request. Do not rewrite surrounding entries.
 - Search `en.json` for the string before you add a key. If the copy already
   exists, reuse that key. `pnpm check:i18n` fails when two keys hold the same copy.
 - Put copy used by more than one section under `common.`.

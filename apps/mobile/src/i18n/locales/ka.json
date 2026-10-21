@@ -35,6 +35,8 @@
     "connectGithub": "GitHub-თან დაკავშირება",
     "cost": "ღირებულება",
     "discard": "გაუქმება",
+    "discardChangesMessage": "თქვენი ცვლილებები დაიკარგება.",
+    "discardChangesTitle": "გააუქმოთ ცვლილებები?",
     "findings": "გამოვლენილი პრობლემები",
     "mergeRequest": "შერწყმის მოთხოვნა",
     "notConnected": "არ არის დაკავშირებული",
@@ -109,7 +111,9 @@
     "online": "ქსელშია",
     "open": "{{name}}-ის გახსნა",
     "openPullRequest": "ღია PR",
+    "completed": "დასრულებულია",
     "pending": "მოლოდინშია",
+    "running": "მუშაობს",
     "performance": "წარმადობა",
     "preferences": "პარამეტრები",
     "privacyPolicy": "კონფიდენციალურობის პოლიტიკა",
@@ -661,7 +665,8 @@
       "description": "მობილურზე შერწყმის მოთხოვნების განსახილველად დააკავშირე შენი GitHub ანგარიში.",
       "gitlabDescription": "დააკავშირეთ თქვენი GitLab ანგარიში, შერწყმის მოთხოვნების მობილურში განსახილველად.",
       "bitbucketDescription": "დააკავშირეთ Bitbucket ამ ორგანიზაციას, PR-ების მობილურში განსახილველად.",
-      "bitbucketOrgOnlyDescription": "აირჩიეთ ორგანიზაცია თქვენს პროფილში, მისი Bitbucket PR-ების განსახილველად."
+      "bitbucketOrgOnlyDescription": "ზემოთ მყოფი ანგარიში გადართეთ ორგანიზაციაზე, მისი Bitbucket-ის PR-ების განსახილველად.",
+      "contextLine": "{{organization}}-სთვის"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "ამ განხილვის არსებული სახით გაგზავნა შეუძლებელია. შესაძლოა, PR შეიცვალა ან საკუთარ შერწყმის მოთხოვნას განიხილავ, რაც დაუშვებელია.",
       "reviewNotSubmittedTerm": "ეს მიმოხილვა უცვლელად ვერ გაიგზავნება. შესაძლოა {{term}} შეიცვალა, ან საკუთარ {{term}}-ს ვერ მიმოახილეთ.",
       "couldNotPostComment": "კომენტარის გამოქვეყნება ვერ მოხერხდა.",
-      "couldNotSubmitReview": "განხილვის გაგზავნა ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე."
+      "couldNotSubmitReview": "განხილვის გაგზავნა ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
+      "rateLimited": "მოთხოვნების რაოდენობა ძალიან დიდია. სცადეთ მოგვიანებით.",
+      "conflict": "შენს მუშაობის დროს ეს შეიცვალა. ხელახლა ჩატვირთე და კვლავ სცადე."
     },
     "operation": {
       "couldNotReply": "პასუხის გაგზავნა ვერ მოხერხდა.",
@@ -1531,8 +1538,6 @@
     "updateFailed": "კოდის შემმოწმებლის განახლება ვერ მოხერხდა.",
     "configSaveFailed": "შემოწმების პარამეტრების შენახვა ვერ მოხერხდა.",
     "status": {
-      "running": "მუშაობს",
-      "completed": "დასრულებულია",
       "interrupted": "შეწყვეტილია"
     },
     "reviewStyle": {
@@ -1545,7 +1550,8 @@
       "bugs": "ხარვეზები",
       "style": "სტილი",
       "testing": "ტესტირება",
-      "documentation": "დოკუმენტაცია"
+      "documentation": "დოკუმენტაცია",
+      "unknown": "სხვა ({{area}})"
     },
     "gateThreshold": {
       "warning": "გაფრთხილება"
@@ -1657,7 +1663,14 @@
       "whereFound": "აღმოჩენის ადგილები ({{displayCount}})",
       "fullReport": "შექმნილი სრული ანგარიში",
       "yes": "კი",
-      "no": "არა"
+      "no": "არა",
+      "action": {
+        "analyzeCodebase": "კოდების ბაზის ანალიზი",
+        "dismiss": "უარყოფა",
+        "manualReview": "ხელით გადახედვა",
+        "monitor": "მონიტორინგი",
+        "openPr": "პულ-რექვესტის გახსნა"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} მიგნება",
@@ -1859,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "ცვლილებების შენახვა",
       "unsavedTitle": "შეუნახავი ცვლილებები",
-      "unsavedMessage": "შეინახოს ცვლილებები ამ ეკრანიდან გასვლამდე?"
+      "unsavedMessage": "შეინახოს ცვლილებები ამ ეკრანიდან გასვლამდე?",
+      "unsavedInvalidMessage": "ამ ცვლილებების შენახვა ჯერ არ შეიძლება. შეასწორე ისინი შესანახად, ან გააუქმე დატოვებისთვის."
     },
     "auditReportButton": {
       "viewA11y": "აუდიტის ანგარიშის ნახვა"
@@ -1876,7 +1890,24 @@
       "title": "აუდიტის ანგარიში",
       "unavailable": "აუდიტის ანგარიში მიუწვდომელია",
       "unavailableDescription": "აუდიტის ანგარიშების ნახვა მხოლოდ ორგანიზაციის მფლობელებსა და ბილინგის მენეჯერებს შეუძლიათ. სთხოვე მფლობელს ან ბილინგის მენეჯერს, მოგანიჭოს წვდომა.",
-      "queryFailed": "ანგარიშის მოთხოვნის დამუშავება ვერ დასრულდა. სცადე ხელახლა."
+      "queryFailed": "ანგარიშის მოთხოვნის დამუშავება ვერ დასრულდა. სცადე ხელახლა.",
+      "eventActions": {
+        "findingAnalysisCompleted": "ანალიზი დასრულდა",
+        "findingAnalysisFailed": "ანალიზი ვერ შესრულდა",
+        "findingAutoDismissed": "ავტომატურად უარყოფილია",
+        "findingCreated": "შემოტანილია",
+        "findingDeleted": "წაიშალა",
+        "findingDismissed": "უარყოფილია",
+        "findingSeverityChanged": "სიმძიმე შეიცვალა",
+        "findingStatusChange": "სტატუსი შეიცვალა",
+        "findingSuperseded": "ჩანაცვლებულია",
+        "remediationBlocked": "გამოსწორება დაიბლოკა",
+        "remediationCancelled": "გაუქმდა",
+        "remediationFailed": "გამოსწორება ვერ შესრულდა",
+        "remediationNoChangesNeeded": "ცვლილებები არ არის საჭირო",
+        "remediationPrOpened": "პულ-რექვესტი გაიხსნა",
+        "remediationQueued": "გამოსწორება მოთხოვნილია"
+      }
     },
     "notifications": {
       "couldNotLoad": "შეტყობინებების პარამეტრების ჩატვირთვა ვერ მოხერხდა.",
@@ -1908,7 +1939,6 @@
       "installApp": "GitHub აპის დაყენება",
       "reauthorizeButton": "GitHub აპის ხელახალი ავტორიზაცია",
       "reauthorizeDescription": "უსაფრთხოების აგენტს Dependabot-ის გაფრთხილებებზე წვდომისთვის vulnerability_alerts ნებართვა სჭირდება. ამ ნებართვის მისანიჭებლად ხელახლა გაიარე GitHub აპის ავტორიზაცია.",
-      "reauthorizeFailed": "ხელახალი ავტორიზაციის დაწყება ვერ მოხერხდა. სცადე ხელახლა.",
       "reauthorizeTitle": "საჭიროა დამატებითი ნებართვები",
       "setupFailed": "GitHub-ის გამართვის დაწყება ვერ მოხერხდა. სცადე ხელახლა."
     },
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} აღარ არის ხელმისაწვდომი. გამოიყენება თქვენი ნაგულისხმევი მოდელი.",
       "couldNotReadPendingSessions": "მომლოდინე სესიების წაკითხვა ვერ მოხერხდა. სცადეთ ხელახლა.",
       "failedToCreate": "სესიის შექმნა ვერ მოხერხდა.",
+      "checkOrganizationAccess": "შეამოწმეთ წვდომა ამ ორგანიზაციაზე და სცადეთ ხელახლა.",
       "couldNotRefreshRepositories": "რეპოზიტორიების განახლება ვერ მოხერხდა. სცადეთ ხელახლა.",
       "discardDraftTitle": "წაიშალოს მონახაზი?",
       "discardDraftMessage": "თქვენი მოთხოვნა დაიკარგება.",
@@ -2281,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} სტრიქონი",
       "matchesBadge_one": "{{displayCount}} დამთხვევა",
       "matchesBadge_other": "{{displayCount}} დამთხვევა",
-      "noOutput": "გამოსავალი არ არის."
+      "noOutput": "გამოსავალი არ არის.",
+      "translationFailed": "თარგმანი ვერ შესრულდა"
     },
     "readToolMarkdown": {
       "linesTruncated": "სტრიქონები {{start}}–{{end}} (შემოკლებულია)",
@@ -3688,6 +3720,7 @@
       "description": "ბრძანების აღწერა",
       "template": "შაბლონი",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "ახსენით $ARGUMENTS",
       "subtask": "გაშვება როგორც ქვეამოცანა",
       "edit": "დახრილი ბრძანების რედაქტირება",
@@ -3838,7 +3871,7 @@
     "view": "მიმოხილვის წაკითხვა",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "მიმდინარე სტატუსის ჩვენება",
+    "dismiss": "მიმოხილვის უგულებელყოფა",
     "offline": "ოფლაინ · შენახული მიმოხილვა",
     "cached": "შენახული ანგარიში · განახლება მიუწვდომელია",
     "revised": "შესწორებული · {{revision}}",

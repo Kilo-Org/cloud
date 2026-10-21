@@ -35,6 +35,8 @@
     "connectGithub": "Připojit GitHub",
     "cost": "Náklady",
     "discard": "Zahodit",
+    "discardChangesMessage": "Vaše změny budou ztraceny.",
+    "discardChangesTitle": "Zahodit změny?",
     "findings": "Zjištění",
     "mergeRequest": "merge request",
     "notConnected": "Nepřipojeno",
@@ -109,7 +111,9 @@
     "online": "Připojeno",
     "open": "Otevřít {{name}}",
     "openPullRequest": "Otevřít PR",
+    "completed": "Dokončeno",
     "pending": "Čeká",
+    "running": "Běží",
     "performance": "Výkon",
     "preferences": "Předvolby",
     "privacyPolicy": "Zásady ochrany osobních údajů",
@@ -685,7 +689,8 @@
       "description": "Připoj svůj účet GitHub a kontroluj PR na mobilu.",
       "gitlabDescription": "Připoj svůj účet GitLab a kontroluj merge requesty na mobilu.",
       "bitbucketDescription": "Připoj Bitbucket k této organizaci a kontroluj PR na mobilu.",
-      "bitbucketOrgOnlyDescription": "Vyber organizaci ve svém profilu a kontroluj její Bitbucket PR."
+      "bitbucketOrgOnlyDescription": "Přepni účet nahoře na organizaci a kontroluj její PR na Bitbucketu.",
+      "contextLine": "Pro {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -801,7 +806,9 @@
       "reviewNotSubmitted": "Tuto revizi nelze v aktuálním stavu odeslat. PR se možná změnil nebo se pokoušíš o revizi vlastního PR, což není povolené.",
       "reviewNotSubmittedTerm": "Tuto revizi nelze v aktuálním stavu odeslat. {{term}} se možná změnil nebo nemůžeš revidovat vlastní {{term}}.",
       "couldNotPostComment": "Komentář se nepodařilo odeslat.",
-      "couldNotSubmitReview": "Revizi se nepodařilo odeslat. Zkontroluj připojení a zkus to znovu."
+      "couldNotSubmitReview": "Revizi se nepodařilo odeslat. Zkontroluj připojení a zkus to znovu.",
+      "rateLimited": "Příliš mnoho požadavků. Zkuste to prosím později znovu.",
+      "conflict": "Tato položka se změnila, zatímco jste na ní pracovali. Znovu ji načtěte a zkuste to znovu."
     },
     "operation": {
       "couldNotReply": "Odpověď se nepodařilo odeslat.",
@@ -1569,8 +1576,6 @@
     "updateFailed": "Agenta pro kontrolu kódu se nepodařilo aktualizovat.",
     "configSaveFailed": "Nastavení kontrol kódu se nepodařilo uložit.",
     "status": {
-      "running": "Běží",
-      "completed": "Dokončeno",
       "interrupted": "Přerušeno"
     },
     "reviewStyle": {
@@ -1583,7 +1588,8 @@
       "bugs": "Chyby",
       "style": "Styl",
       "testing": "Testování",
-      "documentation": "Dokumentace"
+      "documentation": "Dokumentace",
+      "unknown": "Jiné ({{area}})"
     },
     "gateThreshold": {
       "warning": "Varování"
@@ -1697,7 +1703,14 @@
       "whereFound": "Místa výskytu ({{displayCount}})",
       "fullReport": "Úplná vygenerovaná zpráva",
       "yes": "Ano",
-      "no": "Ne"
+      "no": "Ne",
+      "action": {
+        "analyzeCodebase": "Analyzovat kódovou základnu",
+        "dismiss": "Zamítnout",
+        "manualReview": "Ruční kontrola",
+        "monitor": "Sledovat",
+        "openPr": "Otevřít pull request"
+      }
     },
     "dashboard": {
       "findingsCount": "Počet nálezů: {{displayCount}}",
@@ -1905,7 +1918,8 @@
     "settingsSave": {
       "saveChanges": "Uložit změny",
       "unsavedTitle": "Neuložené změny",
-      "unsavedMessage": "Uložit změny před opuštěním této obrazovky?"
+      "unsavedMessage": "Uložit změny před opuštěním této obrazovky?",
+      "unsavedInvalidMessage": "Tyto změny zatím nelze uložit. Oprav je, abys je mohl uložit, nebo je zahoď, abys mohl odejít."
     },
     "auditReportButton": {
       "viewA11y": "Zobrazit zprávu o auditu"
@@ -1922,7 +1936,24 @@
       "title": "Zpráva o auditu",
       "unavailable": "Zpráva o auditu není k dispozici",
       "unavailableDescription": "Zprávy o auditu mohou zobrazovat pouze vlastníci organizace a správci fakturace. Požádejte vlastníka nebo správce fakturace o udělení přístupu.",
-      "queryFailed": "Načítání zprávy se nedokončilo. Zkuste to znovu."
+      "queryFailed": "Načítání zprávy se nedokončilo. Zkuste to znovu.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analýza dokončena",
+        "findingAnalysisFailed": "Analýza selhala",
+        "findingAutoDismissed": "Automaticky zamítnuto",
+        "findingCreated": "Importováno",
+        "findingDeleted": "Smazáno",
+        "findingDismissed": "Zamítnuto",
+        "findingSeverityChanged": "Změněna závažnost",
+        "findingStatusChange": "Změněn stav",
+        "findingSuperseded": "Nahrazeno",
+        "remediationBlocked": "Náprava zablokována",
+        "remediationCancelled": "Zrušeno",
+        "remediationFailed": "Náprava selhala",
+        "remediationNoChangesNeeded": "Nejsou potřeba žádné změny",
+        "remediationPrOpened": "Pull request otevřen",
+        "remediationQueued": "Náprava vyžádána"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nastavení oznámení se nepodařilo načíst.",
@@ -1954,7 +1985,6 @@
       "installApp": "Nainstalovat aplikaci GitHub",
       "reauthorizeButton": "Znovu autorizovat aplikaci GitHub",
       "reauthorizeDescription": "Bezpečnostní agent potřebuje k přístupu k upozorněním Dependabot oprávnění vulnerability_alerts. Udělte ho opětovnou autorizací aplikace GitHub.",
-      "reauthorizeFailed": "Opětovnou autorizaci se nepodařilo zahájit. Zkuste to znovu.",
       "reauthorizeTitle": "Jsou vyžadována další oprávnění",
       "setupFailed": "Nastavení GitHubu se nepodařilo spustit. Zkuste to znovu."
     },
@@ -2268,6 +2298,7 @@
       "prefillModelUnavailable": "{{model}} již není k dispozici. Používá se váš výchozí model.",
       "couldNotReadPendingSessions": "Čekající relace se nepodařilo načíst. Zkuste to znovu.",
       "failedToCreate": "Relaci se nepodařilo vytvořit.",
+      "checkOrganizationAccess": "Zkontrolujte svůj přístup k této organizaci a zkuste to znovu.",
       "couldNotRefreshRepositories": "Seznam repozitářů se nepodařilo obnovit. Zkuste to znovu.",
       "discardDraftTitle": "Zahodit koncept?",
       "discardDraftMessage": "Vaše zadání se smaže.",
@@ -2345,7 +2376,8 @@
       "matchesBadge_other": "shody: {{displayCount}}",
       "matchesBadge_few": "shody: {{displayCount}}",
       "matchesBadge_many": "shod: {{displayCount}}",
-      "noOutput": "Žádný výstup."
+      "noOutput": "Žádný výstup.",
+      "translationFailed": "Překlad se nezdařil"
     },
     "readToolMarkdown": {
       "linesTruncated": "řádky {{start}}–{{end}} (zkráceno)",
@@ -3707,7 +3739,7 @@
       "empty": "Zatím žádné servery MCP",
       "name": "Název serveru",
       "type": "Typ serveru",
-      "localType": "Místní",
+      "localType": "Lokální",
       "remoteType": "Vzdálený",
       "command": "Příkazový řádek",
       "url": "URL",
@@ -3770,6 +3802,7 @@
       "description": "Popis příkazu",
       "template": "Šablona",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Vysvětlete $ARGUMENTS",
       "subtask": "Spustit jako dílčí úkol",
       "edit": "Příkaz upravit lomítko",
@@ -3928,7 +3961,7 @@
     "view": "Číst přehled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Zobrazit živý stav",
+    "dismiss": "Zamítnout přehled",
     "offline": "Offline · uložený přehled",
     "cached": "Uložený report · obnovení nedostupné",
     "revised": "Upraveno · {{revision}}",

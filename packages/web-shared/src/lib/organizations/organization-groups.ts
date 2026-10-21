@@ -347,6 +347,16 @@ export async function listOrganizationGroupsForManager(
     .from(organization_group_memberships)
     .where(eq(organization_group_memberships.organization_id, organizationId));
 
+  const memberIdsByGroupId = new Map<string, string[]>();
+  for (const membership of memberships) {
+    const memberIds = memberIdsByGroupId.get(membership.groupId);
+    if (memberIds) {
+      memberIds.push(membership.userId);
+    } else {
+      memberIdsByGroupId.set(membership.groupId, [membership.userId]);
+    }
+  }
+
   return groups.map(group => ({
     ...group,
     policies: parseOrganizationGroupPolicies(group.policies, {
@@ -354,7 +364,7 @@ export async function listOrganizationGroupsForManager(
       groupId: group.id,
       source: 'group',
     }),
-    memberIds: memberships.filter(row => row.groupId === group.id).map(row => row.userId),
+    memberIds: memberIdsByGroupId.get(group.id) ?? [],
   }));
 }
 

@@ -35,6 +35,8 @@
     "connectGithub": "GitHub ချိတ်ဆက်ပါ",
     "cost": "ကုန်ကျစရိတ်",
     "discard": "ပယ်ဖျက်ပါ",
+    "discardChangesMessage": "သင်၏ အပြောင်းအလဲများ ဆုံးရှုံးသွားပါလိမ့်မည်။",
+    "discardChangesTitle": "အပြောင်းအလဲများကို ပယ်ဖျက်မလား?",
     "findings": "တွေ့ရှိချက်များ",
     "mergeRequest": "merge request",
     "notConnected": "မချိတ်ဆက်ထား",
@@ -109,7 +111,9 @@
     "online": "အွန်လိုင်း",
     "open": "{{name}} ကို ဖွင့်ပါ",
     "openPullRequest": "PR ဖွင့်",
+    "completed": "ပြီးစီးပြီ",
     "pending": "စောင့်ဆိုင်းနေ",
+    "running": "လည်ပတ်နေ",
     "performance": "စွမ်းဆောင်ရည်",
     "preferences": "စိတ်ကြိုက်ဆက်တင်များ",
     "privacyPolicy": "ကိုယ်ရေးအချက်အလက် မူဝါဒ",
@@ -661,7 +665,8 @@
       "description": "ဖုန်းပေါ်တွင် PR များကို သုံးသပ်ရန် သင့် GitHub အကောင့်ကို ချိတ်ဆက်ပါ။",
       "gitlabDescription": "ဖုန်းပေါ်တွင် merge request များကို သုံးသပ်ရန် သင့် GitLab အကောင့်ကို ချိတ်ဆက်ပါ။",
       "bitbucketDescription": "ဖုန်းပေါ်တွင် PR များကို သုံးသပ်ရန် ဤအဖွဲ့ကို Bitbucket နှင့် ချိတ်ဆက်ပါ။",
-      "bitbucketOrgOnlyDescription": "၎င်း၏ Bitbucket PR များကို သုံးသပ်ရန် သင့်ပရိုဖိုင်တွင် အဖွဲ့တစ်ခုကို ရွေးချယ်ပါ။"
+      "bitbucketOrgOnlyDescription": "၎င်း၏ Bitbucket PR များကို သုံးသပ်ရန် အပေါ်ရှိ အကောင့်ကို အဖွဲ့တစ်ခုသို့ ပြောင်းပါ။",
+      "contextLine": "{{organization}} အတွက်"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "ဒီသုံးသပ်မှုကို လက်ရှိအတိုင်း တင်၍မရပါ။ PR ပြောင်းလဲသွားခြင်း သို့မဟုတ် ကိုယ်ပိုင် PR ကို သုံးသပ်ခွင့်မရှိခြင်းကြောင့် ဖြစ်နိုင်ပါသည်။",
       "reviewNotSubmittedTerm": "ဤသုံးသပ်ချက်ကို ဤအတိုင်း တင်သွင်း၍မရပါ။ {{term}} ပြောင်းလဲသွားခြင်း ဖြစ်နိုင်သည်၊ သို့မဟုတ် သင့်ကိုယ်ပိုင် {{term}} ကို သုံးသပ်၍မရပါ။",
       "couldNotPostComment": "မှတ်ချက်ကို တင်၍မရပါ။",
-      "couldNotSubmitReview": "သုံးသပ်မှုကို တင်၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။"
+      "couldNotSubmitReview": "သုံးသပ်မှုကို တင်၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။",
+      "rateLimited": "တောင်းခံမှုများလွန်းနေပါသည်။ နောက်ပိုင်းတွင် ထပ်ကြိုးစားပါ။",
+      "conflict": "သင် ပြင်ဆင်နေစဉ် ဤအရာ ပြောင်းလဲသွားပါသည်။ ပြန်လည်ရယူပြီး ထပ်ကြိုးစားပါ။"
     },
     "operation": {
       "couldNotReply": "အကြောင်းမပြန်နိုင်ပါ။",
@@ -1531,8 +1538,6 @@
     "updateFailed": "ကုဒ်စစ်ဆေးသူကို အပ်ဒိတ်လုပ်၍ မရပါ။",
     "configSaveFailed": "စစ်ဆေးမှုဆက်တင်များကို သိမ်း၍ မရပါ။",
     "status": {
-      "running": "လည်ပတ်နေ",
-      "completed": "ပြီးစီးပြီ",
       "interrupted": "ကြားတွင် ရပ်သွား"
     },
     "reviewStyle": {
@@ -1545,7 +1550,8 @@
       "bugs": "ကုဒ်အမှားများ",
       "style": "ကုဒ်ရေးဟန်",
       "testing": "စမ်းသပ်ခြင်း",
-      "documentation": "လမ်းညွှန်စာတမ်းများ"
+      "documentation": "လမ်းညွှန်စာတမ်းများ",
+      "unknown": "အခြား ({{area}})"
     },
     "gateThreshold": {
       "warning": "သတိပေးချက်"
@@ -1657,7 +1663,14 @@
       "whereFound": "တွေ့ရှိသည့်နေရာများ ({{displayCount}})",
       "fullReport": "ထုတ်ပေးထားသော အစီရင်ခံစာအပြည့်အစုံ",
       "yes": "ဟုတ်သည်",
-      "no": "မဟုတ်ပါ"
+      "no": "မဟုတ်ပါ",
+      "action": {
+        "analyzeCodebase": "ကုဒ်ဘေ့စ်ကို ခွဲခြမ်းစိတ်ဖြာပါ",
+        "dismiss": "ပယ်ဖျက်ပါ",
+        "manualReview": "လူအားဖြင့် ပြန်လည်စစ်ဆေးခြင်း",
+        "monitor": "စောင့်ကြည့်ပါ",
+        "openPr": "PR ဖွင့်ပါ"
+      }
     },
     "dashboard": {
       "findingsCount": "တွေ့ရှိချက် {{displayCount}} ခု",
@@ -1859,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "အပြောင်းအလဲများ သိမ်းရန်",
       "unsavedTitle": "မသိမ်းဆည်းရသေးသော အပြောင်းအလဲများ",
-      "unsavedMessage": "ဤမျက်နှာပြင်မှ မထွက်မီ အပြောင်းအလဲများကို သိမ်းမလား။"
+      "unsavedMessage": "ဤမျက်နှာပြင်မှ မထွက်မီ အပြောင်းအလဲများကို သိမ်းမလား။",
+      "unsavedInvalidMessage": "ဤအပြောင်းအလဲများကို ယခုတော့ မသိမ်းဆည်းနိုင်သေးပါ။ သိမ်းဆည်းရန် ၎င်းတို့ကို ပြင်ဆင်ပါ၊ သို့မဟုတ် ထွက်ရန် ၎င်းတို့ကို ပယ်ဖျက်ပါ။"
     },
     "auditReportButton": {
       "viewA11y": "စစ်ဆေးမှုအစီရင်ခံစာ ကြည့်ရှုပါ"
@@ -1876,7 +1890,24 @@
       "title": "စစ်ဆေးမှုအစီရင်ခံစာ",
       "unavailable": "စစ်ဆေးမှုအစီရင်ခံစာ မရရှိနိုင်",
       "unavailableDescription": "အဖွဲ့အစည်းပိုင်ရှင်များနှင့် ငွေပေးချေမှုမန်နေဂျာများသာ စစ်ဆေးမှုအစီရင်ခံစာများကို ကြည့်ရှုနိုင်သည်။ သင့်ကို ဝင်ရောက်ခွင့်ပေးရန် ပိုင်ရှင် သို့မဟုတ် ငွေပေးချေမှုမန်နေဂျာကို တောင်းဆိုပါ။",
-      "queryFailed": "အစီရင်ခံစာဒေတာ ရယူမှု မပြီးဆုံးပါ။ ထပ်ကြိုးစားပါ။"
+      "queryFailed": "အစီရင်ခံစာဒေတာ ရယူမှု မပြီးဆုံးပါ။ ထပ်ကြိုးစားပါ။",
+      "eventActions": {
+        "findingAnalysisCompleted": "ခွဲခြမ်းစိတ်ဖြာမှု ပြီးမြောက်ခဲ့သည်",
+        "findingAnalysisFailed": "ခွဲခြမ်းစိတ်ဖြာမှု မအောင်မြင်ခဲ့ပါ",
+        "findingAutoDismissed": "အလိုအလျောက် ပယ်ဖျက်ခဲ့သည်",
+        "findingCreated": "တင်သွင်းပြီး",
+        "findingDeleted": "ဖျက်ခဲ့သည်",
+        "findingDismissed": "ပယ်ဖျက်ခဲ့သည်",
+        "findingSeverityChanged": "ပြင်းထန်မှု ပြောင်းလဲခဲ့သည်",
+        "findingStatusChange": "အခြေအနေ ပြောင်းလဲခဲ့သည်",
+        "findingSuperseded": "အစားထိုးခံခဲ့ရသည်",
+        "remediationBlocked": "ပြင်ဆင်မှု ပိတ်ပင်ခံခဲ့ရသည်",
+        "remediationCancelled": "ဖျက်သိမ်းခဲ့သည်",
+        "remediationFailed": "ပြင်ဆင်မှု မအောင်မြင်ခဲ့ပါ",
+        "remediationNoChangesNeeded": "အပြောင်းအလဲ မလိုအပ်ပါ",
+        "remediationPrOpened": "PR ဖွင့်ခဲ့သည်",
+        "remediationQueued": "ပြင်ဆင်မှု တောင်းဆိုခဲ့သည်"
+      }
     },
     "notifications": {
       "couldNotLoad": "အသိပေးချက်ဆက်တင်များကို ရယူ၍ မရပါ။",
@@ -1908,7 +1939,6 @@
       "installApp": "GitHub အက်ပ် ထည့်သွင်းရန်",
       "reauthorizeButton": "GitHub အက်ပ်ကို ပြန်လည်ခွင့်ပြုရန်",
       "reauthorizeDescription": "Dependabot သတိပေးချက်များကို ရယူရန် လုံခြုံရေးအေးဂျင့်သည် vulnerability_alerts ခွင့်ပြုချက် လိုအပ်သည်။ ဤခွင့်ပြုချက်ကို ပေးရန် GitHub အက်ပ်ကို ပြန်လည်ခွင့်ပြုပါ။",
-      "reauthorizeFailed": "ပြန်လည်ခွင့်ပြုခြင်းကို စတင်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။",
       "reauthorizeTitle": "ထပ်ဆောင်း ခွင့်ပြုချက်များ လိုအပ်သည်",
       "setupFailed": "GitHub ပြင်ဆင်မှုကို စတင်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။"
     },
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} ကို အသုံးပြု၍မရတော့ပါ။ သင့်မူလမော်ဒယ်ကို အသုံးပြုနေပါသည်။",
       "couldNotReadPendingSessions": "စောင့်ဆိုင်းနေသော စက်ရှင်များကို ဖတ်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။",
       "failedToCreate": "စက်ရှင်ကို ဖန်တီး၍မရပါ။",
+      "checkOrganizationAccess": "ဤအဖွဲ့အစည်းဆီသို့ သင့်၏ ဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ။",
       "couldNotRefreshRepositories": "ကုဒ်သိုလှောင်ခန်းစာရင်းကို ပြန်လည်ရယူ၍မရပါ။ ထပ်ကြိုးစားပါ။",
       "discardDraftTitle": "မူကြမ်းကို ပယ်ဖျက်မလား။",
       "discardDraftMessage": "သင့်ညွှန်ကြားချက် ပျောက်သွားပါမည်။",
@@ -2281,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} ကြောင်း",
       "matchesBadge_one": "ကိုက်ညီမှု {{displayCount}} ခု",
       "matchesBadge_other": "ကိုက်ညီမှု {{displayCount}} ခု",
-      "noOutput": "အထွက် မရှိပါ။"
+      "noOutput": "အထွက် မရှိပါ။",
+      "translationFailed": "ဘာသာပြန်မှု မအောင်မြင်ပါ"
     },
     "readToolMarkdown": {
       "linesTruncated": "စာကြောင်း {{start}}–{{end}} (အပြည့်အစုံမဟုတ်)",
@@ -3688,6 +3720,7 @@
       "description": "Command ဖော်ပြချက်",
       "template": "ပုံစံခွက်",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ကိုရှင်းပြပါ။",
       "subtask": "လုပ်ငန်းခွဲအဖြစ် လုပ်ဆောင်ပါ။",
       "edit": "မျဥ်းစောင်းအမိန့်ကို တည်းဖြတ်ပါ။",
@@ -3838,7 +3871,7 @@
     "view": "အကျဉ်းချုပ် ဖတ်ပါ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "တိုက်ရိုက်အခြေအနေ ပြပါ",
+    "dismiss": "အကျဉ်းချုပ် ပယ်ချပါ",
     "offline": "အော့ဖ်လိုင်း · သိမ်းထားသော အကျဉ်းချုပ်",
     "cached": "သိမ်းထားသော အစီရင်ခံစာ · ပြန်လည်ဆန်းသစ်၍ မရပါ",
     "revised": "ပြင်ဆင်ပြီး · {{revision}}",

@@ -35,6 +35,8 @@
     "connectGithub": "Poveži GitHub",
     "cost": "Trošak",
     "discard": "Odbaci",
+    "discardChangesMessage": "Vaše promjene će biti izgubljene.",
+    "discardChangesTitle": "Odbaci promjene?",
     "findings": "Nalazi",
     "mergeRequest": "merge request",
     "notConnected": "Nije povezano",
@@ -109,7 +111,9 @@
     "online": "Na mreži",
     "open": "Otvori {{name}}",
     "openPullRequest": "Otvori zahtjev za spajanje",
+    "completed": "Završeno",
     "pending": "Na čekanju",
+    "running": "U toku",
     "performance": "Performanse",
     "preferences": "Postavke",
     "privacyPolicy": "Politika privatnosti",
@@ -673,7 +677,8 @@
       "description": "Poveži svoj GitHub račun da pregledaš zahtjeve za spajanje na mobitelu.",
       "gitlabDescription": "Poveži svoj GitLab račun da pregledaš merge requeste na mobitelu.",
       "bitbucketDescription": "Poveži Bitbucket s ovom organizacijom da pregledaš zahtjeve za spajanje na mobitelu.",
-      "bitbucketOrgOnlyDescription": "Odaberi organizaciju u svom profilu da pregledaš njene zahtjeve za spajanje na Bitbucketu."
+      "bitbucketOrgOnlyDescription": "Prebaci račun iznad na organizaciju da pregledaš njene zahtjeve za spajanje na Bitbucketu.",
+      "contextLine": "Za {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -785,7 +790,9 @@
       "reviewNotSubmitted": "Ovaj pregled se ne može poslati u trenutnom obliku. PR je možda promijenjen ili pokušavaš pregledati vlastiti zahtjev za spajanje.",
       "reviewNotSubmittedTerm": "Ovaj pregled se ne može poslati u trenutnom obliku. {{term}} je možda promijenjen ili ne možeš pregledati vlastiti {{term}}.",
       "couldNotPostComment": "Objavljivanje komentara nije uspjelo.",
-      "couldNotSubmitReview": "Slanje pregleda nije uspjelo. Provjeri vezu i pokušaj ponovo."
+      "couldNotSubmitReview": "Slanje pregleda nije uspjelo. Provjeri vezu i pokušaj ponovo.",
+      "rateLimited": "Previše zahtjeva. Pokušaj ponovo kasnije.",
+      "conflict": "Ovo se promijenilo dok ste radili na njemu. Ponovo ga učitajte i pokušajte ponovo."
     },
     "operation": {
       "couldNotReply": "Nije moguće poslati odgovor.",
@@ -1550,8 +1557,6 @@
     "updateFailed": "Nije moguće ažurirati agenta za pregled koda.",
     "configSaveFailed": "Nije moguće sačuvati postavke pregleda.",
     "status": {
-      "running": "U toku",
-      "completed": "Završeno",
       "interrupted": "Prekinuto"
     },
     "reviewStyle": {
@@ -1564,7 +1569,8 @@
       "bugs": "Greške",
       "style": "Stil",
       "testing": "Testiranje",
-      "documentation": "Dokumentacija"
+      "documentation": "Dokumentacija",
+      "unknown": "Ostalo ({{area}})"
     },
     "gateThreshold": {
       "warning": "Upozorenje"
@@ -1677,7 +1683,14 @@
       "whereFound": "Mjesta pronalaska ({{displayCount}})",
       "fullReport": "Cjelovit generirani izvještaj",
       "yes": "Da",
-      "no": "Ne"
+      "no": "Ne",
+      "action": {
+        "analyzeCodebase": "Analiziraj bazu koda",
+        "dismiss": "Odbaci",
+        "manualReview": "Ručna provjera",
+        "monitor": "Prati",
+        "openPr": "Otvori pull request"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} nalaza",
@@ -1882,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Sačuvaj izmjene",
       "unsavedTitle": "Nesačuvane izmjene",
-      "unsavedMessage": "Sačuvati izmjene prije napuštanja ovog ekrana?"
+      "unsavedMessage": "Sačuvati izmjene prije napuštanja ovog ekrana?",
+      "unsavedInvalidMessage": "Ove izmjene se još ne mogu sačuvati. Ispravi ih da bi sačuvao ili ih odbaci da bi otišao."
     },
     "auditReportButton": {
       "viewA11y": "Pogledaj revizijski izvještaj"
@@ -1899,7 +1913,24 @@
       "title": "Revizijski izvještaj",
       "unavailable": "Revizijski izvještaj nije dostupan",
       "unavailableDescription": "Samo vlasnici organizacije i upravitelji naplate mogu pregledavati revizijske izvještaje. Zatraži pristup od vlasnika ili upravitelja naplate.",
-      "queryFailed": "Upit za izvještaj nije završen. Pokušaj ponovo."
+      "queryFailed": "Upit za izvještaj nije završen. Pokušaj ponovo.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiza dovršena",
+        "findingAnalysisFailed": "Analiza nije uspjela",
+        "findingAutoDismissed": "Automatski odbačeno",
+        "findingCreated": "Uvezeno",
+        "findingDeleted": "Obrisano",
+        "findingDismissed": "Odbačeno",
+        "findingSeverityChanged": "Ozbiljnost promijenjena",
+        "findingStatusChange": "Status promijenjen",
+        "findingSuperseded": "Zamijenjeno",
+        "remediationBlocked": "Otklanjanje blokirano",
+        "remediationCancelled": "Otkazano",
+        "remediationFailed": "Otklanjanje nije uspjelo",
+        "remediationNoChangesNeeded": "Nisu potrebne izmjene",
+        "remediationPrOpened": "Pull request otvoren",
+        "remediationQueued": "Zatraženo otklanjanje"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nije moguće učitati postavke obavijesti.",
@@ -1931,7 +1962,6 @@
       "installApp": "Instaliraj GitHub aplikaciju",
       "reauthorizeButton": "Ponovo autoriziraj GitHub aplikaciju",
       "reauthorizeDescription": "Sigurnosni agent zahtijeva dozvolu vulnerability_alerts za pristup upozorenjima iz Dependabota. Ponovo autoriziraj GitHub aplikaciju da dodijeliš ovu dozvolu.",
-      "reauthorizeFailed": "Nije moguće započeti ponovnu autorizaciju. Pokušaj ponovo.",
       "reauthorizeTitle": "Potrebne dodatne dozvole",
       "setupFailed": "Nije moguće započeti podešavanje GitHuba. Pokušaj ponovo."
     },
@@ -2240,6 +2270,7 @@
       "prefillModelUnavailable": "{{model}} više nije dostupan. Koristi se tvoj zadani model.",
       "couldNotReadPendingSessions": "Nije moguće učitati sesije na čekanju. Pokušaj ponovo.",
       "failedToCreate": "Nije moguće kreirati sesiju.",
+      "checkOrganizationAccess": "Provjeri svoj pristup ovoj organizaciji i pokušaj ponovo.",
       "couldNotRefreshRepositories": "Nije moguće osvježiti repozitorije. Pokušaj ponovo.",
       "discardDraftTitle": "Odbaciti nacrt?",
       "discardDraftMessage": "Tvoj upit će biti izgubljen.",
@@ -2313,7 +2344,8 @@
       "matchesBadge_one": "{{displayCount}} podudaranje",
       "matchesBadge_other": "{{displayCount}} podudaranja",
       "matchesBadge_few": "{{displayCount}} podudaranja",
-      "noOutput": "Nema izlaza."
+      "noOutput": "Nema izlaza.",
+      "translationFailed": "Prijevod nije uspio"
     },
     "readToolMarkdown": {
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",
@@ -3729,6 +3761,7 @@
       "description": "Opis komande",
       "template": "Predložak",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Objasnite $ARGUMENTS",
       "subtask": "Pokreni kao podzadatak",
       "edit": "Uredi naredbu kose crte",
@@ -3883,7 +3916,7 @@
     "view": "Pročitaj pregled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Prikaži trenutni status",
+    "dismiss": "Odbaci pregled",
     "offline": "Van mreže · sačuvani pregled",
     "cached": "Sačuvani izvještaj · osvježavanje nedostupno",
     "revised": "Revidirano · {{revision}}",

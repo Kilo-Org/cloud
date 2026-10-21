@@ -35,6 +35,8 @@
     "connectGithub": "Yhdistä GitHub-tili",
     "cost": "Kustannus",
     "discard": "Hylkää",
+    "discardChangesMessage": "Muutokset menetetään.",
+    "discardChangesTitle": "Hylätäänkö muutokset?",
     "findings": "Havainnot",
     "mergeRequest": "yhdistämispyyntö",
     "notConnected": "Ei yhdistetty",
@@ -109,7 +111,9 @@
     "online": "Verkossa",
     "open": "Avaa {{name}}",
     "openPullRequest": "Avaa muutospyyntö",
+    "completed": "Valmis",
     "pending": "Odottaa",
+    "running": "Käynnissä",
     "performance": "Suorituskyky",
     "preferences": "Asetukset",
     "privacyPolicy": "Tietosuojakäytäntö",
@@ -309,7 +313,7 @@
     "fileNavigator": {
       "couldNotLoadFiles": "Tiedostoja ei voitu ladata.",
       "retryLoadingFiles": "Yritä ladata tiedostoja uudelleen",
-      "filterPlaceholder": "Tiedostopolku",
+      "filterPlaceholder": "Suodata tiedostot polun mukaan",
       "viewedCount": "{{viewed}}/{{total}} katsottu",
       "viewedOfListed": "Luettelon tiedostoista {{viewed}}/{{total}} katsottu",
       "loadingFiles": "Ladataan {{loaded}}/{{total}}…",
@@ -328,7 +332,7 @@
       "unmarkViewed": "Poista katsotuksi merkintä: {{path}}",
       "collapseFile": "Kutista tiedosto",
       "expandFile": "Laajenna tiedosto",
-      "diffTooLarge": "Muutosvertailu on liian suuri näytettäväksi.",
+      "diffTooLarge": "Muutosvertailu on liian suuri näytettäväksi",
       "noPreview": "Tälle tiedostolle ei ole esikatselua",
       "openOnGitHub": "Avaa GitHubissa",
       "openDiffOnGitHub": "Avaa tämän tiedoston muutosvertailu GitHubissa",
@@ -343,7 +347,7 @@
     },
     "hunkRows": {
       "hunkHeader": "Muutoslohkon otsikko {{header}}",
-      "contextUnavailable": "Ympäröiviä rivejä ei ole saatavilla tälle viitteelle.",
+      "contextUnavailable": "Ympäröiviä rivejä ei ole saatavilla tälle viitteelle",
       "retryLoadingContext": "Yritä ladata ympäröivät rivit uudelleen",
       "failedToLoadContext": "Ympäröivien rivien lataus epäonnistui – yritä uudelleen napauttamalla",
       "loadingContext": "Ladataan ympäröiviä rivejä…",
@@ -366,17 +370,17 @@
       "fileLoadedCount_one": "{{displayCount}} tiedosto ladattu",
       "fileLoadedCount": "{{displayCount}} tiedostoa ladattu",
       "fileLoadedCount_other": "{{displayCount}} tiedostoa ladattu",
-      "fileLoadedOfTotalCount_one": "{{displayCount}} tiedosto ladattu, yhteensä {{total}}",
+      "fileLoadedOfTotalCount_one": "{{displayCount}}/{{total}} tiedostoa ladattu",
       "fileLoadedOfTotalCount": "{{displayCount}}/{{total}} tiedostoa ladattu",
       "fileLoadedOfTotalCount_other": "{{displayCount}}/{{total}} tiedostoa ladattu",
       "filesStillLoading": "Tiedostoja ladataan vielä. Päivitä vetämällä alaspäin.",
-      "goToOverview": "Siirry yleiskatsaukseen",
+      "goToOverview": "Siirry Yleiskatsaukseen",
       "goToOverviewTab": "Siirry Yleiskatsaus-välilehdelle",
       "expandAllLines_one": "Näytä kaikki {{displayCount}} rivi",
       "expandAllLines_other": "Näytä kaikki {{displayCount}} riviä",
       "expandLines_one": "Näytä {{displayCount}} rivi ({{start}}–{{end}})",
       "expandLines_other": "Näytä {{displayCount}} riviä ({{start}}–{{end}})",
-      "expandLinesOfContext_one": "Näytä {{displayCount}} ympäröivää rivi",
+      "expandLinesOfContext_one": "Näytä {{displayCount}} ympäröivä rivi",
       "expandLinesOfContext_other": "Näytä {{displayCount}} ympäröivää riviä",
       "expandMoreLines_one": "Näytä vielä {{displayCount}} rivi ({{start}}–{{end}})",
       "expandMoreLines_other": "Näytä vielä {{displayCount}} riviä ({{start}}–{{end}})",
@@ -384,7 +388,7 @@
       "loadedOfTotalFiles_other": "{{loaded}}/{{total}} tiedostoa ladattu"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "tiedoston lopusta puuttuu rivinvaihto.",
+      "noNewlineAtEndOfFile": "⚠️ tiedoston lopusta puuttuu rivinvaihto",
       "emptyDiffColumn": "tyhjä muutosvertailun sarake",
       "oldNew": "Vanha: {{old}} | Uusi: {{new}}",
       "oldOnly": "Vain vanha: {{text}}",
@@ -588,7 +592,7 @@
     "couldNotLoadPullRequest": "Muutospyyntöä ei voitu ladata.",
     "description": "Kuvaus",
     "noDescriptionProvided": "Kuvausta ei ole annettu.",
-    "review": "Tarkistus",
+    "review": "Katselmointi",
     "reviewPullRequest": "Katselmoi muutospyyntö",
     "headLine": "{{counts}} · uusin muutostallennus {{sha}}",
     "entry": {
@@ -628,7 +632,7 @@
       "loading": "Ladataan saapuneita",
       "noReviewRequests": "Ei katselmointipyyntöjä",
       "noReviewRequestsDescription": "Katselmointiasi odottavat muutospyynnöt näkyvät tässä. Voit myös liittää minkä tahansa PR-linkin yllä olevaan kenttään.",
-      "couldNotLoad": "Saapuneita ei voitu ladata."
+      "couldNotLoad": "Saapuneita ei voitu ladata"
     },
     "composer": {
       "commentBodyPlaceholder": "Kommentti",
@@ -661,7 +665,8 @@
       "description": "Yhdistä GitHub-tilisi, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
       "gitlabDescription": "Yhdistä GitLab-tilisi, niin voit katselmoida yhdistämispyyntöjä mobiililaitteella.",
       "bitbucketDescription": "Yhdistä Bitbucket tähän organisaatioon, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
-      "bitbucketOrgOnlyDescription": "Valitse profiilissasi organisaatio, niin voit katselmoida sen Bitbucket-muutospyyntöjä."
+      "bitbucketOrgOnlyDescription": "Vaihda yllä oleva tili organisaatioon, niin voit katselmoida sen Bitbucket-muutospyyntöjä.",
+      "contextLine": "{{organization}}-organisaatiolle"
     },
     "screen": {
       "title": "#{{number}}",
@@ -676,22 +681,22 @@
       "pendingComment": "lähettämätöntä kommenttia",
       "pendingComment_other": "lähettämätöntä kommenttia",
       "submitCountOfTotal": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
-      "submitReview": "Lähetä tarkistus",
-      "partialPostedMessage": "Julkaistiin {{displayFreshCount}} kommenttia. {{displayStaleCount}} kommenttia viittaa vanhempaan muutostallennukseen ja jäi lähetysjonoon.",
+      "submitReview": "Lähetä katselmointi",
+      "partialPostedMessage": "Julkaistuja kommentteja: {{displayFreshCount}}. Vanhempaan muutostallennukseen viittaavia kommentteja jäi lähetysjonoon: {{displayStaleCount}}.",
       "blockedRequestChanges": "Lisää yhteenveto tai vähintään yksi kommentti, jotta voit pyytää muutoksia.",
       "blockedComment": "Lisää yhteenveto tai vähintään yksi kommentti, jotta voit lähettää kommentoivan katselmoinnin."
     },
     "reconnectNotice": {
-      "title": "GitHub-yhteys on vanhentunut.",
+      "title": "GitHub-yhteys on vanhentunut",
       "message": "GitHub-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen.",
-      "gitlabTitle": "GitLab-yhteys on vanhentunut.",
-      "bitbucketTitle": "Bitbucket-yhteys on vanhentunut.",
+      "gitlabTitle": "GitLab-yhteys on vanhentunut",
+      "bitbucketTitle": "Bitbucket-yhteys on vanhentunut",
       "providerMessage": "{{provider}}-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen."
     },
     "eventChips": {
       "comment": "Kommentoi",
       "requestChanges": "Pyydä muutoksia",
-      "label": "Katselmoinnin tulos"
+      "label": "Katselmointitapahtuma"
     },
     "overview": {
       "stateMerged": "Yhdistetty",
@@ -724,10 +729,10 @@
     "pendingComment": {
       "editOutdatedA11y": "Muokkaa vanhentunutta lähettämätöntä kommenttia: {{location}}",
       "editA11y": "Muokkaa lähettämätöntä kommenttia: {{location}}",
-      "staleHint": "pR on muuttunut tämän kommentin kirjoittamisen jälkeen.",
+      "staleHint": "PR on muuttunut tämän kommentin kirjoittamisen jälkeen.",
       "deleteA11y": "Poista lähettämätön kommentti: {{location}}",
       "deletedAnnouncement": "Lähettämätön kommentti poistettu",
-      "noCommentsQueued": "Lähetysjonossa ei ole kommentteja. Katselmointi lähetetään vain yllä valitulla tuloksella.",
+      "noCommentsQueued": "Lähetysjonossa ei ole kommentteja. Katselmointi lähetetään vain yllä valitulla tapahtumalla.",
       "staleQueueHint": "Vanhempaan muutostallennukseen liittyviä kommentteja ei lähetetä. Ne jäävät lähetysjonoon, jossa voit muokata tai poistaa ne.",
       "allQueuedHint": "Kaikki kommentit lähetetään yhdessä erässä.",
       "summaryPlaceholder": "Katselmoinnin yhteenveto (valinnainen)",
@@ -755,7 +760,7 @@
       "truncationBanner_one": "Näytetään {{limit}} ensimmäistä tiedostoa kaikkiaan {{total}} muutetusta tiedostosta GitHubin API-rajoituksen vuoksi.",
       "truncationBanner_other": "Näytetään {{limit}} ensimmäistä tiedostoa kaikkiaan {{total}} muutetusta tiedostosta GitHubin API-rajoituksen vuoksi."
     },
-    "linkPasteClipboardEmpty": "Leikepöytä on tyhjä.",
+    "linkPasteClipboardEmpty": "Leikepöytä on tyhjä",
     "linkPasteNotAPullRequest": "Tämä ei ole muutospyynnön tai yhdistämispyynnön linkki",
     "announce": {
       "commentPosted": "Kommentti julkaistu",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "Tätä katselmointia ei voi lähettää sellaisenaan. PR on voinut muuttua tai kyseessä on oma muutospyyntösi, jota et voi katselmoida.",
       "reviewNotSubmittedTerm": "Tätä katselmointia ei voi lähettää sellaisenaan. {{term}} on voinut muuttua, tai kyseessä on oma {{term}}, jota et voi katselmoida.",
       "couldNotPostComment": "Kommenttia ei voitu julkaista.",
-      "couldNotSubmitReview": "Katselmointia ei voitu lähettää. Tarkista yhteys ja yritä uudelleen."
+      "couldNotSubmitReview": "Katselmointia ei voitu lähettää. Tarkista yhteys ja yritä uudelleen.",
+      "rateLimited": "Liian monta pyyntöä. Yritä myöhemmin uudelleen.",
+      "conflict": "Tämä muuttui, kun työstit sitä. Lataa se uudelleen ja yritä uudelleen."
     },
     "operation": {
       "couldNotReply": "Vastaaminen epäonnistui.",
@@ -1531,8 +1538,6 @@
     "updateFailed": "Koodikatselmoijan päivitys epäonnistui.",
     "configSaveFailed": "Katselmointiasetusten tallennus epäonnistui.",
     "status": {
-      "running": "Käynnissä",
-      "completed": "Valmis",
       "interrupted": "Keskeytynyt"
     },
     "reviewStyle": {
@@ -1545,7 +1550,8 @@
       "bugs": "Ohjelmavirheet",
       "style": "Tyyli",
       "testing": "Testaus",
-      "documentation": "Dokumentaatio"
+      "documentation": "Dokumentaatio",
+      "unknown": "Muu ({{area}})"
     },
     "gateThreshold": {
       "warning": "Varoitus"
@@ -1657,7 +1663,14 @@
       "whereFound": "Havainnon sijainnit ({{displayCount}})",
       "fullReport": "Luotu raportti kokonaisuudessaan",
       "yes": "Kyllä",
-      "no": "Ei"
+      "no": "Ei",
+      "action": {
+        "analyzeCodebase": "Analysoi koodikanta",
+        "dismiss": "Ohita",
+        "manualReview": "Manuaalinen tarkistus",
+        "monitor": "Valvo",
+        "openPr": "Avaa PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} havaintoa",
@@ -1859,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Tallenna muutokset",
       "unsavedTitle": "Tallentamattomia muutoksia",
-      "unsavedMessage": "Tallennetaanko muutokset ennen tältä näytöltä poistumista?"
+      "unsavedMessage": "Tallennetaanko muutokset ennen tältä näytöltä poistumista?",
+      "unsavedInvalidMessage": "Näitä muutoksia ei voi vielä tallentaa. Korjaa ne tallentaaksesi tai hylkää ne poistuaksesi."
     },
     "auditReportButton": {
       "viewA11y": "Näytä tarkastusraportti"
@@ -1876,7 +1890,24 @@
       "title": "Tarkastusraportti",
       "unavailable": "Tarkastusraporttia ei ole saatavilla",
       "unavailableDescription": "Vain organisaation omistajat ja laskutusvastaavat voivat tarkastella tarkastusraportteja. Pyydä käyttöoikeus omistajalta tai laskutusvastaavalta.",
-      "queryFailed": "Raportin haku jäi kesken. Yritä uudelleen."
+      "queryFailed": "Raportin haku jäi kesken. Yritä uudelleen.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyysi valmistui",
+        "findingAnalysisFailed": "Analyysi epäonnistui",
+        "findingAutoDismissed": "Ohitettu automaattisesti",
+        "findingCreated": "Tuotu",
+        "findingDeleted": "Poistettu",
+        "findingDismissed": "Ohitettu",
+        "findingSeverityChanged": "Vakavuus muuttui",
+        "findingStatusChange": "Tila muuttui",
+        "findingSuperseded": "Korvattu",
+        "remediationBlocked": "Korjaus estetty",
+        "remediationCancelled": "Peruutettu",
+        "remediationFailed": "Korjaus epäonnistui",
+        "remediationNoChangesNeeded": "Muutoksia ei tarvita",
+        "remediationPrOpened": "PR avattu",
+        "remediationQueued": "Korjausta pyydetty"
+      }
     },
     "notifications": {
       "couldNotLoad": "Ilmoitusasetuksia ei voitu ladata.",
@@ -1908,7 +1939,6 @@
       "installApp": "Asenna GitHub-sovellus",
       "reauthorizeButton": "Valtuuta GitHub-sovellus uudelleen",
       "reauthorizeDescription": "Tietoturva-agentti tarvitsee vulnerability_alerts-käyttöoikeuden Dependabot-hälytysten lukemiseen. Myönnä käyttöoikeus valtuuttamalla GitHub-sovellus uudelleen.",
-      "reauthorizeFailed": "Uudelleenvaltuutusta ei voitu aloittaa. Yritä uudelleen.",
       "reauthorizeTitle": "Lisäkäyttöoikeuksia tarvitaan",
       "setupFailed": "GitHubin käyttöönottoa ei voitu aloittaa. Yritä uudelleen."
     },
@@ -2212,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} ei ole enää käytettävissä. Käytetään oletusmalliasi.",
       "couldNotReadPendingSessions": "Odottavia istuntoja ei voitu lukea. Yritä uudelleen.",
       "failedToCreate": "Istunnon luonti epäonnistui.",
+      "checkOrganizationAccess": "Tarkista oikeutesi tähän organisaatioon ja yritä uudelleen.",
       "couldNotRefreshRepositories": "Repositorioita ei voitu päivittää. Yritä uudelleen.",
       "discardDraftTitle": "Hylätäänkö luonnos?",
       "discardDraftMessage": "Kehotteesi poistetaan.",
@@ -2281,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} riviä",
       "matchesBadge_one": "{{displayCount}} osuma",
       "matchesBadge_other": "{{displayCount}} osumaa",
-      "noOutput": "Ei tulostetta."
+      "noOutput": "Ei tulostetta.",
+      "translationFailed": "Käännös epäonnistui"
     },
     "readToolMarkdown": {
       "linesTruncated": "rivit {{start}}–{{end}} (katkaistu)",
@@ -3688,6 +3720,7 @@
       "description": "Komennon kuvaus",
       "template": "Malli",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Selitä $ARGUMENTS",
       "subtask": "Suorita alitehtävänä",
       "edit": "Muokkaa vinoviivakomentoa",
@@ -3838,7 +3871,7 @@
     "view": "Lue katsaus",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Näytä reaaliaikainen tila",
+    "dismiss": "Sivuuta katsaus",
     "offline": "Offline · tallennettu katsaus",
     "cached": "Tallennettu raportti · päivitys ei käytettävissä",
     "revised": "Päivitetty · {{revision}}",

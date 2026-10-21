@@ -139,8 +139,6 @@ export type CliArgs =
   | { command: 'build'; udid: string }
   | { command: 'prune' };
 
-// ── Fingerprint ──────────────────────────────────────────────────────
-
 // Build the option bag used to compute the native project hash. Only
 // the Expo `extra` section is skipped beyond the library defaults —
 // versions, schemes, bundle ID, plugins, assets, permissions, and
@@ -193,8 +191,6 @@ export function buildCompatibilityKey(dimensions: CompatibilityDimensions): stri
   return createHash('sha256').update(JSON.stringify(ordered)).digest('hex');
 }
 
-// ── Cache root ───────────────────────────────────────────────────────
-
 export type ResolveCacheRootArgs = {
   home: string;
   platform: NodeJS.Platform;
@@ -211,8 +207,6 @@ export function resolveCacheRoot(args: ResolveCacheRootArgs): string {
   }
   return path.join(args.home, '.cache/Kilo/mobile-ios-builds');
 }
-
-// ── Artifact checksum ───────────────────────────────────────────────
 
 // Deterministic directory hash. Walks the directory recursively,
 // reading each file in order, and feeds its relative path + contents
@@ -287,8 +281,6 @@ function hashFileChunks(filePath: string, hash: ReturnType<typeof createHash>): 
   });
 }
 
-// ── Manifest validation ──────────────────────────────────────────────
-
 // Strict manifest check. Returns true iff every field is present and
 // well-typed. Bundle ID, key, and build mode must match the
 // requested values. The producer worktree is recorded for audit but
@@ -316,8 +308,6 @@ export function isValidManifest(
   if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString() !== o.createdAt) return false;
   return true;
 }
-
-// ── Cache lookup ─────────────────────────────────────────────────────
 
 // Returns the cached entry iff the manifest is well-formed, the
 // bundle id matches, and the artifact checksum is current. On any
@@ -351,8 +341,6 @@ export async function lookupCache(args: LookupCacheArgs): Promise<LookupCacheRes
   }
   return { manifest, appPath };
 }
-
-// ── Producer lock ────────────────────────────────────────────────────
 
 // Run `producer` under a fingerprint-specific host lock. Exactly one
 // concurrent caller becomes the producer; the rest wait for the
@@ -667,8 +655,6 @@ function defaultProcessIdentity(pid: number): string | undefined {
   }
 }
 
-// ── Simulator claim validation ───────────────────────────────────────
-
 // Read-only validation of a claim recorded by the simulator
 // wrapper. Accepts the caller's current worktree as the exclusive
 // owner; any other recorded worktree is rejected.
@@ -705,16 +691,12 @@ export function validateSimulatorClaim(
   }
 }
 
-// ── Install command ──────────────────────────────────────────────────
-
 export function buildInstallCommand(udid: string, appPath: string): BuildInstallCommand {
   return {
     command: 'xcrun',
     args: ['simctl', 'install', udid, appPath],
   };
 }
-
-// ── Pruning ──────────────────────────────────────────────────────────
 
 export async function pruneCache(args: PruneCacheArgs): Promise<PruneResult> {
   const entriesRoot = path.join(args.env.cacheRoot, 'entries');
@@ -801,8 +783,6 @@ function removeLockArtifacts(lockDir: string): void {
   }
 }
 
-// ── CLI ──────────────────────────────────────────────────────────────
-
 export function parseCliArgs(argv: readonly string[]): CliArgs {
   const [command, ...rest] = argv;
   if (command === 'fingerprint') {
@@ -819,8 +799,6 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   }
   throw new Error('Usage: pnpm dev:mobile:ios [fingerprint|build <udid>|prune]');
 }
-
-// ── Xcode workspace and build command ───────────────────────────────
 
 // Check that the generated native project exists. Expo generates
 // `apps/mobile/ios/Kilo.xcworkspace` via `npx expo prebuild --platform
@@ -899,8 +877,6 @@ export function locateProducedApp(derivedDataPath: string): string {
   return app;
 }
 
-// ── Build flow types ────────────────────────────────────────────────
-
 // All side-effecting boundaries the build flow needs. Tests inject
 // stubs; production wires real implementations.
 export type BuildDeps = {
@@ -956,8 +932,6 @@ export type RunPruneDeps = {
   isLockActive?: (record: LockRecord) => boolean;
   write: (chunk: string) => void;
 };
-
-// ── Publish flow ────────────────────────────────────────────────────
 
 // Build, verify, and atomically publish a cache entry. Called as the
 // sole producer inside the fingerprint lock. On entry, the cache is
@@ -1067,8 +1041,6 @@ export async function publishCacheEntry(args: {
     }
   }
 }
-
-// ── Build orchestration ─────────────────────────────────────────────
 
 // Run the full `build <udid>` flow. On a cache hit, install without
 // building. On a miss, enter the fingerprint lock; the sole producer
@@ -1229,8 +1201,6 @@ export async function runBuild(udid: string, deps: BuildDeps): Promise<void> {
   deps.install(udid, revalidated.appPath);
 }
 
-// ── Fingerprint orchestration ───────────────────────────────────────
-
 // Print sanitized compatibility dimensions and the cache key. No
 // environment values, no source lists, no secrets. Uses the injected
 // `fingerprint` function (which in production calls
@@ -1257,14 +1227,10 @@ export async function runFingerprint(deps: RunFingerprintDeps): Promise<void> {
   deps.write(`${JSON.stringify(sanitized, null, 2)}\n`);
 }
 
-// ── Prune orchestration ─────────────────────────────────────────────
-
 export async function runPrune(deps: RunPruneDeps): Promise<void> {
   const result = await pruneCache({ env: deps.env, isLockActive: deps.isLockActive });
   deps.write(`${JSON.stringify(result, null, 2)}\n`);
 }
-
-// ── Main entry point ─────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   const parsed = parseCliArgs(process.argv.slice(2));

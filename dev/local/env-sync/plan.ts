@@ -30,10 +30,6 @@ import {
   generateDevVars,
 } from './parse';
 
-// ---------------------------------------------------------------------------
-// Auto-created local secrets
-// ---------------------------------------------------------------------------
-
 const FLY_TOKEN_ENV_KEY = 'FLY_API_TOKEN';
 const FLY_ORG_SLUG_ENV_KEY = 'FLY_ORG_SLUG';
 const DEFAULT_FLY_ORG_SLUG = 'kilo-dev';
@@ -71,10 +67,6 @@ function maybeAddEnvLocalAutoCreate(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Source key derivation (for cross-worker consistency checks)
-// ---------------------------------------------------------------------------
-
 function getEnvLocalSourceKey(key: string, annotation: Annotation): string | undefined {
   switch (annotation.type) {
     case 'from':
@@ -90,10 +82,6 @@ function getEnvLocalSourceKey(key: string, annotation: Annotation): string | und
       return undefined;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Discovery
-// ---------------------------------------------------------------------------
 
 const SKIP_DIRS = new Set([
   'node_modules',
@@ -130,10 +118,6 @@ function findDevVarsExamples(repoRoot: string): string[] {
   return results.sort();
 }
 
-// ---------------------------------------------------------------------------
-// Wrangler env detection from package.json dev script
-// ---------------------------------------------------------------------------
-
 function detectWranglerEnv(repoRoot: string, workerDir: string): string | undefined {
   const pkgPath = path.join(repoRoot, workerDir, 'package.json');
   if (!fs.existsSync(pkgPath)) return undefined;
@@ -147,10 +131,6 @@ function detectWranglerEnv(repoRoot: string, workerDir: string): string | undefi
     return undefined;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Wrangler config: extract vars and secrets_store_secrets bindings
-// ---------------------------------------------------------------------------
 
 type JsonObject = Record<string, unknown>;
 
@@ -373,10 +353,6 @@ function extractSecretsStoreBindings(repoRoot: string, workerDir: string): Secre
   return bindings;
 }
 
-// ---------------------------------------------------------------------------
-// Local secrets store check (via wrangler CLI)
-// ---------------------------------------------------------------------------
-
 const execFileAsync = promisify(execFile);
 
 type SecretsStoreQuery = {
@@ -552,10 +528,6 @@ function collectLocalSecretSources(
   return sources;
 }
 
-// ---------------------------------------------------------------------------
-// Plan computation
-// ---------------------------------------------------------------------------
-
 function computePlan(
   repoRoot: string,
   serviceFilter?: Set<string>,
@@ -581,7 +553,6 @@ function computePlan(
   const envLocal = parseEnvFile(fs.readFileSync(envLocalPath, 'utf-8'));
   const allWorkerDirs = findDevVarsExamples(repoRoot);
 
-  // Build dir→useLanIp lookup
   const dirUsesLanIp = new Map<string, boolean>();
   for (const [, svc] of services) {
     if (svc.useLanIp) {
@@ -610,7 +581,6 @@ function computePlan(
     workerDirs = allWorkerDirs;
   }
 
-  // --- .dev.vars changes ---
   const devVarsChanges: DevVarsFileChange[] = [];
   const envLocalAutoCreates: EnvLocalAutoCreate[] = [];
   const execWarnings: ExecWarning[] = [];
@@ -747,7 +717,6 @@ function computePlan(
     }
   }
 
-  // --- .env.development.local changes ---
   const envDevLocalChanges: EnvDevLocalChange[] = [];
   // apps/ai-gateway runs with the web app's env files (see its scripts/dev.sh).
   const processEnvDevLocal =
@@ -799,7 +768,6 @@ function computePlan(
     }
   }
 
-  // --- Secrets store warnings ---
   const secretStoreWarnings: SecretStoreWarning[] = [];
   const secretStoreAutoCreates: SecretStoreAutoCreate[] = [];
   // Cache keyed by workerDir+storeId — wrangler scopes secret visibility per worker locally
@@ -853,7 +821,6 @@ function computePlan(
     }
   }
 
-  // --- Cross-worker shared secret consistency ---
   const sharedSecretMap = new Map<
     string,
     { workerDir: string; workerKey: string; value: string }[]

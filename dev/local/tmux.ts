@@ -3,18 +3,10 @@ import * as path from 'node:path';
 
 import { hasRunningService } from './process-tree';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 type WindowInfo = {
   index: number;
   name: string;
 };
-
-// ---------------------------------------------------------------------------
-// Worktree root (cached)
-// ---------------------------------------------------------------------------
 
 let cachedWorktreeRoot: string | undefined;
 
@@ -31,10 +23,6 @@ function worktreeEnvironment(
 ): Record<string, string> {
   return { ...env, PWD: repoRoot };
 }
-
-// ---------------------------------------------------------------------------
-// Session management
-// ---------------------------------------------------------------------------
 
 function getSessionName(): string {
   const root = getWorktreeRoot();
@@ -141,10 +129,6 @@ function killSession(sessionName: string): void {
 function attachSession(sessionName: string): void {
   execFileSync('tmux', ['attach-session', '-t', sessionName], { stdio: 'inherit' });
 }
-
-// ---------------------------------------------------------------------------
-// Window management
-// ---------------------------------------------------------------------------
 
 function createWindow(
   sessionName: string,
@@ -264,10 +248,6 @@ function renameWindow(sessionName: string, windowTarget: string | number, newNam
     stdio: 'ignore',
   });
 }
-
-// ---------------------------------------------------------------------------
-// Pane management
-// ---------------------------------------------------------------------------
 
 function splitWindowHorizontal(sessionName: string, windowTarget: string | number): void {
   execSync(`tmux split-window -h -t ${sessionName}:${windowTarget}`, { stdio: 'ignore' });
@@ -566,10 +546,6 @@ function enablePaneBorders(sessionName: string, windowTarget: string | number): 
   }
 }
 
-// ---------------------------------------------------------------------------
-// Pane logging
-// ---------------------------------------------------------------------------
-
 function pipePane(
   sessionName: string,
   windowTarget: string | number,
@@ -592,10 +568,6 @@ function closePipePane(sessionName: string, windowTarget: string | number, pane:
   }
 }
 
-// ---------------------------------------------------------------------------
-// Utility
-// ---------------------------------------------------------------------------
-
 function isTmuxAvailable(): boolean {
   try {
     execSync('which tmux', { stdio: 'ignore' });
@@ -613,10 +585,6 @@ function isInsideTmux(): boolean {
 function escapeForShell(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`;
 }
-
-// ---------------------------------------------------------------------------
-// Exports
-// ---------------------------------------------------------------------------
 
 export {
   getSessionName,

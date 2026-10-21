@@ -37,10 +37,6 @@ import {
 } from './runner';
 import { isPortlessServiceHealthy, readCapturedTunnelUrl } from './tunnel-health';
 
-// ---------------------------------------------------------------------------
-// Types & constants
-// ---------------------------------------------------------------------------
-
 type ServiceStatus = 'up' | 'down' | 'starting';
 type GroupStatus = 'on' | 'off' | 'partial';
 
@@ -75,10 +71,6 @@ const alwaysOnGroupIds = new Set(getAlwaysOnGroupIds());
 const groupsById = new Map(getGroups().map(g => [g.id, g]));
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
-// ---------------------------------------------------------------------------
-// Sidebar item list builder
-// ---------------------------------------------------------------------------
-
 function buildSidebarItems(enabledGroups: Set<string>): SidebarItem[] {
   const items: SidebarItem[] = [];
   for (const group of getGroups()) {
@@ -94,10 +86,6 @@ function buildSidebarItems(enabledGroups: Set<string>): SidebarItem[] {
   }
   return items;
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function computeGroupStatus(groupId: string, statuses: Map<string, ServiceStatus>): GroupStatus {
   const members = getGroupServiceNames(groupId);
@@ -199,10 +187,6 @@ function getServicesNeededByEnabledGroups(enabledGroups: Set<string>): Set<strin
   if (groupIds.length === 0) return new Set();
   return new Set(resolveGroups(groupIds));
 }
-
-// ---------------------------------------------------------------------------
-// Components
-// ---------------------------------------------------------------------------
 
 const GroupHeader = React.memo(function GroupHeader({
   group,
@@ -308,7 +292,6 @@ function Dashboard({
   const { stdout } = useStdout();
   const rows = stdout?.rows ?? 24;
 
-  // --- State ---
   const [enabledGroups, setEnabledGroups] = useState<Set<string>>(
     () => new Set(initialEnabledGroupIds)
   );
@@ -335,7 +318,6 @@ function Dashboard({
   const startTimeRef = useRef(Date.now());
   const togglingRef = useRef(false);
 
-  // --- Mouse refs (read current values in the stable stdin listener) ---
   const mouseStateRef = useRef({
     sidebarItems: [] as SidebarItem[],
     enabledGroups: new Set<string>(),
@@ -346,7 +328,6 @@ function Dashboard({
     showService: (_serviceName: string) => {},
   });
 
-  // --- Restore sidebar width after terminal resize / tab switch ---
   // The dashboard runs in pane 0, so it receives SIGWINCH whenever tmux
   // proportionally resizes it (e.g. on client resize or terminal tab switch).
   // If the width drifts from SIDEBAR_WIDTH, force it back via resize-pane.
@@ -368,7 +349,6 @@ function Dashboard({
     };
   }, []);
 
-  // --- Derived ---
   const sidebarItems = useMemo(() => buildSidebarItems(enabledGroups), [enabledGroups]);
 
   const showServiceView = useCallback((serviceName: string) => {
@@ -387,7 +367,6 @@ function Dashboard({
     }
   }, []);
 
-  // --- Status polling ---
   useEffect(() => {
     const refresh = async () => {
       if (refreshInFlight.current) return;
@@ -486,7 +465,6 @@ function Dashboard({
     return () => clearInterval(timer);
   }, [runningServices]);
 
-  // --- Toggle group ON ---
   const toggleGroupOn = useCallback(
     (groupId: string) => {
       if (togglingRef.current) return;
@@ -642,7 +620,6 @@ function Dashboard({
     [runningServices, showGroupView]
   );
 
-  // --- Toggle group OFF ---
   const toggleGroupOff = useCallback(
     (groupId: string) => {
       if (togglingRef.current) return;
@@ -672,7 +649,6 @@ function Dashboard({
         }
       }
 
-      // Stop services
       for (const name of toStop) {
         try {
           stopServiceInTmux(sessionName, name);
@@ -719,7 +695,6 @@ function Dashboard({
     showService: showServiceView,
   };
 
-  // --- Keyboard ---
   useInput((input, key) => {
     if (key.upArrow) {
       setSelectedIdx(prev => {
@@ -832,7 +807,6 @@ function Dashboard({
     }
   });
 
-  // --- Mouse tracking ---
   useEffect(() => {
     // Enable SGR extended mouse tracking so tmux forwards clicks to us
     process.stdout.write('\x1b[?1000h\x1b[?1006h');
@@ -916,7 +890,6 @@ function Dashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- Scrolling ---
   const headerCount = 2;
   const footerCount = stackIssues.length > 0 ? 2 : 1;
   const visibleCount = Math.max(1, rows - headerCount - footerCount);
@@ -987,10 +960,6 @@ function Dashboard({
     </Box>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Entry point
-// ---------------------------------------------------------------------------
 
 const serviceNames: string[] = JSON.parse(process.argv[2] ?? '[]');
 const initialViewed = process.argv[3] ?? '';

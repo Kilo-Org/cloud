@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { CLOUD_AGENT_NEXT_AUDIENCE, KILO_API_AUDIENCE } from './internal-service-token-audiences';
 
+export const PARENT_SESSION_CALLBACK_URL = 'session:parent';
+export const ParentSessionCallbackTargetSchema = z
+  .object({ url: z.literal(PARENT_SESSION_CALLBACK_URL) })
+  .strict()
+  .describe('Notify the spawning parent session when this child finishes. Omit for no callback.');
+
 export const CloudAgentSpawnProcedureSchema = z.enum([
   'cloudAgentNext.prepareSession',
   'organizations.cloudAgentNext.prepareSession',
@@ -70,6 +76,7 @@ const scopedPrepareSessionSchema = z
     autoInitiate: z.literal(true),
     operationKey: z.uuid().optional(),
     allowSubagentSessions: z.boolean().optional(),
+    callbackTarget: ParentSessionCallbackTargetSchema.optional(),
     organizationId: z.string().min(1).optional(),
   })
   .strict();

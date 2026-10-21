@@ -124,6 +124,16 @@ describe('Cloud Agent authority contract', () => {
       validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', launch, now + 3600)
     ).toEqual(launch);
   });
+  it('accepts only the parent callback destination without widening spawn authority', () => {
+    const request = { ...launch, callbackTarget: { url: 'session:parent' } };
+    expect(
+      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', request)
+    ).toEqual(request);
+    expect(cloudAgentAuthorityInputSchema(scope)).toHaveProperty(
+      'properties.callbackTarget.properties.url.const',
+      'session:parent'
+    );
+  });
   it.each([
     { parentCloudAgentSessionId: 'workspace_sibling' },
     { parentCloudAgentSessionId: scope.parentSessionId },
@@ -148,6 +158,10 @@ describe('Cloud Agent authority contract', () => {
     { runtimeAgents: [] },
     { runtimeSkills: [] },
     { callbackTarget: {} },
+    { callbackTarget: { url: 'https://example.com/callback' } },
+    { callbackTarget: { url: 'session:workspace_sibling' } },
+    { callbackTarget: { url: 'session:parent', headers: { Authorization: 'private' } } },
+    { callbackTarget: { url: 'session:parent', sessionId: 'workspace_sibling' } },
     { sandboxAllocation: {} },
     { futureEscapeField: true },
   ])('rejects widened raw launch %j', overrides => {

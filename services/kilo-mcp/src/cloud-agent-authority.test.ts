@@ -78,6 +78,7 @@ describe('Cloud Agent MCP authority', () => {
     { githubRepo: 'Other-Owner/Another_Repo', model: 'other-provider/another-model' },
     { allowSubagentSessions: true },
     { allowSubagentSessions: false },
+    { callbackTarget: { url: 'session:parent' } },
     {
       variant: 'high',
       upstreamBranch: 'feature/child-task',

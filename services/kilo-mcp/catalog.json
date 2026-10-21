@@ -6670,6 +6670,20 @@
                 "allowSubagentSessions": {
                   "type": "boolean"
                 },
+                "callbackTarget": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "const": "session:parent"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
+                },
                 "githubRepo": {
                   "type": "string",
                   "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -7165,6 +7179,20 @@
                 },
                 "allowSubagentSessions": {
                   "type": "boolean"
+                },
+                "callbackTarget": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "const": "session:parent"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
                 },
                 "githubRepo": {
                   "type": "string",
@@ -18276,6 +18304,20 @@
                     "allowSubagentSessions": {
                       "type": "boolean"
                     },
+                    "callbackTarget": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "const": "session:parent"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
+                    },
                     "githubRepo": {
                       "type": "string",
                       "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -18771,6 +18813,20 @@
                     },
                     "allowSubagentSessions": {
                       "type": "boolean"
+                    },
+                    "callbackTarget": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "const": "session:parent"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
                     },
                     "githubRepo": {
                       "type": "string",

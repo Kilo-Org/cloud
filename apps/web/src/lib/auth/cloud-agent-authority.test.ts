@@ -475,6 +475,15 @@ describe('scope-preserving control token exchange', () => {
 });
 
 describe('ordinary opt-in schema', () => {
+  it('preserves the parent callback through personal and organization web prepare schemas', () => {
+    const input = { ...launch, callbackTarget: { url: 'session:parent' } };
+    expect(personalPrepareSessionNextSchema.parse(input).callbackTarget).toEqual(
+      input.callbackTarget
+    );
+    expect(
+      organizationPrepareSessionNextSchema.parse({ ...input, organizationId }).callbackTarget
+    ).toEqual(input.callbackTarget);
+  });
   it.each([true, false])('preserves boolean opt-in %s through prepare parsing', flag => {
     expect(
       personalPrepareSessionNextSchema.parse({ ...launch, allowSubagentSessions: flag })

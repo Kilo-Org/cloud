@@ -122,6 +122,25 @@ function assertCredentialConfinement(workflow, completeByJob) {
   }
 }
 
+/**
+ * Change detection must match a written name list. Piping `git diff` into
+ * `grep -q` lets grep exit on its first match; git then takes SIGPIPE and
+ * `pipefail` reports the pipeline as a failure, which reads as "no changes"
+ * and silently skips the pipeline.
+ */
+function assertNoPipedDiff(step, jobName) {
+  assert.doesNotMatch(
+    step.run ?? '',
+    /git diff --name-only[^\n]*\|[^\n]*grep/,
+    `${jobName}: change detection matches a written name list, not a piped diff`
+  );
+  assert.match(
+    step.run ?? '',
+    />\s*"\$changed"/,
+    `${jobName}: change detection writes the name list before matching it`
+  );
+}
+
 function validate(workflow) {
   assert.deepEqual(
     Object.keys(workflow.jobs),
@@ -176,6 +195,7 @@ function validate(workflow) {
   for (const fragment of catalogPathFragments) {
     assert.match(gate.run ?? '', fragment, `change-detection step must recognise ${fragment}`);
   }
+  assertNoPipedDiff(gate, prepareJobName);
   const gateIndex = prepare.steps.indexOf(gate);
   for (const step of prepare.steps.slice(gateIndex + 1)) {
     assert.match(
@@ -414,6 +434,7 @@ function validate(workflow) {
       `merge change-detection step must recognise ${fragment}`
     );
   }
+  assertNoPipedDiff(mergeDetect, mergeJobName);
   const mergeGateIndex = merge.steps.indexOf(mergeDetect);
   for (const step of merge.steps.slice(mergeGateIndex + 1)) {
     assert.match(
@@ -745,6 +766,26 @@ for (const [name, defect] of [
   [
     'change-detection gate removed',
     workflow => dropStep(workflow, prepareJobName, step => step.id === 'catalog_changes'),
+  ],
+  [
+    'change detection pipes the name list into grep',
+    workflow => {
+      const step = workflow.jobs[prepareJobName].steps.find(item => item.id === 'catalog_changes');
+      step.run = step.run.replace(
+        'git diff --name-only "$base" HEAD > "$changed"',
+        'git diff --name-only "$base" HEAD | grep -Ev \'^$\' > "$changed"'
+      );
+    },
+  ],
+  [
+    'merge change detection matches a piped diff',
+    workflow => {
+      const step = workflow.jobs[mergeJobName].steps.find(item => item.id === 'merge_changes');
+      step.run = step.run.replace(
+        'git diff --name-only "$before" HEAD > "$changed"',
+        'git diff --name-only "$before" HEAD | grep -Ev \'^$\' > "$changed"'
+      );
+    },
   ],
   [
     'change-detection drops a catalog path',

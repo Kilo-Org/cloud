@@ -100,12 +100,17 @@ jobs:
             echo "catalog=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if git diff --name-only "$base" HEAD \
-            | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
+          # Materialize the name list first: `git diff | grep -q` lets grep exit
+          # on its first match, git then takes SIGPIPE, and `pipefail` turns the
+          # pipeline into a failure that reads as "no changes".
+          changed="$(mktemp)"
+          git diff --name-only "$base" HEAD > "$changed"
+          if grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$' "$changed"; then
             echo "catalog=true" >> "$GITHUB_OUTPUT"
           else
             echo "catalog=false" >> "$GITHUB_OUTPUT"
           fi
+          rm -f "$changed"
 
       - name: Setup pnpm
         if: steps.catalog_changes.outputs.catalog == 'true'
@@ -633,12 +638,17 @@ jobs:
             echo "catalog=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if git diff --name-only "$before" HEAD \
-            | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
+          # Materialize the name list first: `git diff | grep -q` lets grep exit
+          # on its first match, git then takes SIGPIPE, and `pipefail` turns the
+          # pipeline into a failure that reads as "no changes".
+          changed="$(mktemp)"
+          git diff --name-only "$before" HEAD > "$changed"
+          if grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$' "$changed"; then
             echo "catalog=true" >> "$GITHUB_OUTPUT"
           else
             echo "catalog=false" >> "$GITHUB_OUTPUT"
           fi
+          rm -f "$changed"
 
       - name: Setup pnpm
         if: steps.merge_changes.outputs.catalog == 'true'

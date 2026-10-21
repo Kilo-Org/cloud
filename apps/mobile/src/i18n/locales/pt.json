@@ -35,6 +35,8 @@
     "connectGithub": "Ligar ao GitHub",
     "cost": "Custo",
     "discard": "Descartar",
+    "discardChangesMessage": "As suas alterações serão perdidas.",
+    "discardChangesTitle": "Descartar alterações?",
     "findings": "Ocorrências",
     "mergeRequest": "merge request",
     "notConnected": "Sem ligação",
@@ -109,7 +111,9 @@
     "online": "Em linha",
     "open": "Abrir {{name}}",
     "openPullRequest": "Abrir PR",
+    "completed": "Concluída",
     "pending": "Pendente",
+    "running": "Em execução",
     "performance": "Desempenho",
     "preferences": "Preferências",
     "privacyPolicy": "Política de privacidade",
@@ -673,7 +677,8 @@
       "description": "Liga a tua conta do GitHub para rever PRs no telemóvel.",
       "gitlabDescription": "Liga a tua conta do GitLab para rever merge requests no telemóvel.",
       "bitbucketDescription": "Liga o Bitbucket a esta organização para rever PRs no telemóvel.",
-      "bitbucketOrgOnlyDescription": "Seleciona uma organização no teu perfil para rever os PRs dessa organização no Bitbucket."
+      "bitbucketOrgOnlyDescription": "Muda a conta acima para uma organização para rever os respetivos PRs no Bitbucket.",
+      "contextLine": "Para {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -785,7 +790,9 @@
       "reviewNotSubmitted": "Não é possível enviar esta revisão no estado atual. O PR pode ter mudado ou podes estar a tentar rever o teu próprio PR.",
       "reviewNotSubmittedTerm": "Não é possível enviar esta revisão no estado atual. O {{term}} pode ter mudado ou não podes rever o teu próprio {{term}}.",
       "couldNotPostComment": "Não foi possível publicar o comentário.",
-      "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifica a tua ligação e tenta novamente."
+      "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifica a tua ligação e tenta novamente.",
+      "rateLimited": "Demasiados pedidos. Tente novamente mais tarde.",
+      "conflict": "Isto mudou enquanto trabalhavas nele. Recarrega-o e tenta novamente."
     },
     "operation": {
       "couldNotReply": "Não foi possível responder.",
@@ -1432,6 +1439,9 @@
       "couldNotGetLatest": "Não foi possível obter os dados mais recentes.",
       "byline": "{{repo}} #{{number}} por {{author}}",
       "noFindings": "Não foram detetadas ocorrências.",
+      "findingsUnavailable": "Os resultados não estão disponíveis porque esta revisão falhou.",
+      "serviceUnavailable": "Não foi possível estabelecer ligação ao serviço de revisão de código. Repita a revisão quando o serviço estiver disponível.",
+      "reviewFailed": "A revisão falhou. Tente novamente.",
       "showMore": "Mostrar mais",
       "created": "Criada",
       "started": "Iniciada",
@@ -1547,8 +1557,6 @@
     "updateFailed": "Não foi possível atualizar o revisor.",
     "configSaveFailed": "Não foi possível guardar a configuração da revisão.",
     "status": {
-      "running": "Em execução",
-      "completed": "Concluída",
       "interrupted": "Interrompida"
     },
     "reviewStyle": {
@@ -1561,7 +1569,8 @@
       "bugs": "Erros",
       "style": "Estilo",
       "testing": "Testes",
-      "documentation": "Documentação"
+      "documentation": "Documentação",
+      "unknown": "Outro ({{area}})"
     },
     "gateThreshold": {
       "warning": "Aviso"
@@ -1674,7 +1683,14 @@
       "whereFound": "Locais onde foi detetada ({{displayCount}})",
       "fullReport": "Relatório completo gerado",
       "yes": "Sim",
-      "no": "Não"
+      "no": "Não",
+      "action": {
+        "analyzeCodebase": "Analisar base de código",
+        "dismiss": "Ignorar",
+        "manualReview": "Revisão manual",
+        "monitor": "Monitorizar",
+        "openPr": "Abrir pull request"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} ocorrências",
@@ -1879,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Guardar alterações",
       "unsavedTitle": "Alterações não guardadas",
-      "unsavedMessage": "Guardar as alterações antes de sair deste ecrã?"
+      "unsavedMessage": "Guardar as alterações antes de sair deste ecrã?",
+      "unsavedInvalidMessage": "Estas alterações ainda não podem ser guardadas. Corrija-as para guardar ou descarte-as para sair."
     },
     "auditReportButton": {
       "viewA11y": "Ver relatório de auditoria"
@@ -1896,7 +1913,24 @@
       "title": "Relatório de auditoria",
       "unavailable": "Relatório de auditoria indisponível",
       "unavailableDescription": "Apenas os proprietários da organização e os gestores de faturação podem ver relatórios de auditoria. Pede a um deles que te dê acesso.",
-      "queryFailed": "A consulta do relatório não foi concluída. Tenta novamente."
+      "queryFailed": "A consulta do relatório não foi concluída. Tenta novamente.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Análise concluída",
+        "findingAnalysisFailed": "Falha na análise",
+        "findingAutoDismissed": "Ignorado automaticamente",
+        "findingCreated": "Importado",
+        "findingDeleted": "Eliminado",
+        "findingDismissed": "Ignorado",
+        "findingSeverityChanged": "Severidade alterada",
+        "findingStatusChange": "Estado alterado",
+        "findingSuperseded": "Substituído",
+        "remediationBlocked": "Correção bloqueada",
+        "remediationCancelled": "Cancelada",
+        "remediationFailed": "Falha na correção",
+        "remediationNoChangesNeeded": "Não são necessárias alterações",
+        "remediationPrOpened": "Pull request aberto",
+        "remediationQueued": "Correção pedida"
+      }
     },
     "notifications": {
       "couldNotLoad": "Não foi possível carregar as definições de notificações.",
@@ -1928,7 +1962,6 @@
       "installApp": "Instalar aplicação do GitHub",
       "reauthorizeButton": "Renovar autorização da aplicação do GitHub",
       "reauthorizeDescription": "O agente de segurança precisa da permissão vulnerability_alerts para aceder aos alertas do Dependabot. Volta a autorizar a aplicação do GitHub para conceder esta permissão.",
-      "reauthorizeFailed": "Não foi possível iniciar a renovação da autorização. Tenta novamente.",
       "reauthorizeTitle": "Permissões adicionais necessárias",
       "setupFailed": "Não foi possível iniciar a configuração do GitHub. Tenta novamente."
     },
@@ -2237,6 +2270,7 @@
       "prefillModelUnavailable": "{{model}} já não está disponível. Está a ser usado o seu modelo predefinido.",
       "couldNotReadPendingSessions": "Não foi possível ler as sessões pendentes. Tente novamente.",
       "failedToCreate": "Não foi possível criar a sessão.",
+      "checkOrganizationAccess": "Verifique o seu acesso a esta organização e tente novamente.",
       "couldNotRefreshRepositories": "Não foi possível atualizar os repositórios. Tente novamente.",
       "discardDraftTitle": "Eliminar rascunho?",
       "discardDraftMessage": "O seu pedido será eliminado.",
@@ -2310,7 +2344,8 @@
       "matchesBadge_one": "{{displayCount}} correspondência",
       "matchesBadge_other": "{{displayCount}} correspondências",
       "matchesBadge_many": "{{displayCount}} correspondências",
-      "noOutput": "Sem saída."
+      "noOutput": "Sem saída.",
+      "translationFailed": "Falha na tradução"
     },
     "readToolMarkdown": {
       "linesTruncated": "linhas {{start}}–{{end}} (truncadas)",
@@ -2768,6 +2803,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "As suas sessões ativas só ficam disponíveis após o carregamento.",
     "currentDeviceUnidentified": "Não foi possível identificar o dispositivo atual.",
+    "kiloApp": "Aplicação Kilo",
     "noSessions": "Sem sessões ativas",
     "noSessionsDescription": "Inicie sessão na aplicação Kilo noutro dispositivo. A sessão aparecerá aqui.",
     "onlyKiloAppSignIns": "Apenas os inícios de sessão na aplicação Kilo aparecem aqui. Os inícios de sessão no editor e na CLI não são listados.",
@@ -2921,6 +2957,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Antes de começarmos",
+    "summaryTitle": "Preferências de partilha de dados",
     "introDescription": "O Kilo envia as suas mensagens a fornecedores de IA para gerar respostas. Saiba que dados são partilhados e com quem.",
     "required": "Necessário para usar o Kilo",
     "promptsTitle": "Os seus pedidos e conversas",
@@ -2929,7 +2966,6 @@
     "accountDescription": "O ID da sua conta Kilo e os metadados dos pedidos, usados para autenticar a sua identidade e medir a utilização.",
     "diagnosticsTitle": "Diagnósticos da aplicação",
     "diagnosticsDescription": "Relatórios de falhas e erros, sem conteúdo da aplicação, usados para manter a aplicação estável.",
-    "optional": "Opcional",
     "helpImprove": "Ajudar a melhorar o Kilo",
     "helpImproveDescription": "Partilhe dados anónimos de utilização do produto e a origem da instalação. Pode alterar esta opção a qualquer momento nas definições.",
     "seeFullDetails": "Ver todos os detalhes",
@@ -3509,6 +3545,9 @@
     "localModels": {
       "title": "Modelos no dispositivo",
       "help": "Os modelos no dispositivo são executados neste telemóvel. Os seus pedidos e respostas ficam no dispositivo.",
+      "switchTitle": "Mudar para um modelo no dispositivo?",
+      "switchMessage": "Ao mudar para {{name}}, as instruções e o contexto desta conversa serão processados neste telemóvel, não num servidor remoto.",
+      "switchConfirm": "Mudar de modelo",
       "systemPurpose": "O modelo integrado no sistema deste dispositivo. É executado no dispositivo.",
       "apple": "Apple Intelligence (no dispositivo)",
       "checking": "A verificar disponibilidade…",
@@ -3605,7 +3644,6 @@
     "personalDefaultDescription": "Carregado automaticamente quando nenhum repositório tem um perfil fixado.",
     "organizationDefaultDescription": "Carregado automaticamente para membros que não têm predefinição pessoal.",
     "setAsDefault": "Definir como predefinido",
-    "removeDefault": "Remover predefinição",
     "saveFailed": "Não foi possível guardar o perfil",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Elimina permanentemente o perfil e as respetivas definições. Esta ação não pode ser anulada.",
@@ -3631,11 +3669,13 @@
     "commandsTitle": "Comandos de configuração",
     "addCommand": "Adicionar comando",
     "commandLabel": "Comando",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "p. ex. pnpm install",
     "commandsEmpty": "Ainda não há comandos de configuração",
     "commandsSaveFailed": "Não foi possível guardar os comandos de configuração",
     "moveUp": "Mover para cima",
     "moveDown": "Mover para baixo",
+    "moveCommandUp": "Mover o comando {{position}} para cima",
+    "moveCommandDown": "Mover o comando {{position}} para baixo",
     "skillsTitle": "Competências",
     "addSkill": "Adicionar competência",
     "skillNameLabel": "Nome da competência",
@@ -3705,7 +3745,7 @@
       "nameRequired": "Introduza um nome de agente",
       "slugRequired": "Introduza um slug de agente",
       "slugInvalid": "O slug deve começar por uma letra e usar apenas letras minúsculas, dígitos e hífenes",
-      "slugConflict": "Esse slug está reservado por um agente incorporado",
+      "slugConflict": "Esse slug já é usado por um agente integrado ou por outro agente neste perfil",
       "edit": "Editar agente"
     },
     "slashCommands": {
@@ -3716,6 +3756,7 @@
       "description": "Descrição do comando",
       "template": "Modelo",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar como subtarefa",
       "edit": "Editar comando de barra",
@@ -3870,7 +3911,7 @@
     "view": "Ler resumo",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Mostrar estado em direto",
+    "dismiss": "Ignorar resumo",
     "offline": "Offline · resumo guardado",
     "cached": "Relatório guardado · atualização indisponível",
     "revised": "Revisto · {{revision}}",

@@ -35,6 +35,8 @@
     "connectGithub": "Collega GitHub",
     "cost": "Costo",
     "discard": "Scarta",
+    "discardChangesMessage": "Le tue modifiche andranno perse.",
+    "discardChangesTitle": "Scartare le modifiche?",
     "findings": "Problemi rilevati",
     "mergeRequest": "merge request",
     "notConnected": "Non collegato",
@@ -109,7 +111,9 @@
     "online": "In linea",
     "open": "Apri {{name}}",
     "openPullRequest": "Apri la PR",
+    "completed": "Completata",
     "pending": "In attesa",
+    "running": "In esecuzione",
     "performance": "Prestazioni",
     "preferences": "Preferenze",
     "privacyPolicy": "Informativa sulla privacy",
@@ -915,6 +919,9 @@
       "gateHidden": "Nascosto",
       "gateNone": "Nessuno",
       "noFindings": "Non ci sono segnalazioni.",
+      "findingsUnavailable": "I risultati non sono disponibili perché questa revisione non è riuscita.",
+      "serviceUnavailable": "Impossibile contattare il servizio di revisione del codice. Ripeti la revisione quando il servizio sarà disponibile.",
+      "reviewFailed": "La revisione non è riuscita. Riprova.",
       "retryMessage": "Questa azione rieseguirà la revisione del codice.",
       "retryReview": "Ripeti la revisione",
       "retryNeedsSettings": "Il Revisore di codice è disattivato o le sue impostazioni richiedono attenzione. Correggi le impostazioni, poi ripeti questa revisione.",
@@ -988,8 +995,6 @@
     "updateFailed": "Impossibile aggiornare il revisore.",
     "configSaveFailed": "Impossibile salvare la configurazione della revisione.",
     "status": {
-      "running": "In esecuzione",
-      "completed": "Completata",
       "interrupted": "Interrotta"
     },
     "reviewStyle": {
@@ -1002,7 +1007,8 @@
       "bugs": "Bug",
       "style": "Stile",
       "testing": "Test",
-      "documentation": "Documentazione"
+      "documentation": "Documentazione",
+      "unknown": "Altro ({{area}})"
     },
     "gateThreshold": {
       "warning": "Avviso"
@@ -1081,7 +1087,14 @@
       "triageReasoning": "Motivazioni della valutazione preliminare",
       "watchInCloudAgent": "Segui in Cloud Agent",
       "whereFound": "Punti di rilevamento ({{displayCount}})",
-      "yes": "Sì"
+      "yes": "Sì",
+      "action": {
+        "analyzeCodebase": "Analizza codebase",
+        "dismiss": "Ignora",
+        "manualReview": "Revisione manuale",
+        "monitor": "Monitora",
+        "openPr": "Apri richiesta di pull"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Modello di analisi",
@@ -1103,7 +1116,24 @@
       "summary": "Riepilogo del report",
       "title": "Report di audit",
       "unavailable": "Report di audit non disponibile",
-      "unavailableDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono visualizzare i report di audit. Chiedi a un proprietario o a un responsabile della fatturazione di concederti l'accesso."
+      "unavailableDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono visualizzare i report di audit. Chiedi a un proprietario o a un responsabile della fatturazione di concederti l'accesso.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analisi completata",
+        "findingAnalysisFailed": "Analisi non riuscita",
+        "findingAutoDismissed": "Ignorato automaticamente",
+        "findingCreated": "Importato",
+        "findingDeleted": "Eliminato",
+        "findingDismissed": "Ignorato",
+        "findingSeverityChanged": "Gravità modificata",
+        "findingStatusChange": "Stato modificato",
+        "findingSuperseded": "Sostituito",
+        "remediationBlocked": "Correzione bloccata",
+        "remediationCancelled": "Annullato",
+        "remediationFailed": "Correzione non riuscita",
+        "remediationNoChangesNeeded": "Nessuna modifica necessaria",
+        "remediationPrOpened": "Richiesta di pull aperta",
+        "remediationQueued": "Correzione richiesta"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Visualizza il report di audit"
@@ -1326,7 +1356,6 @@
       "installApp": "Installa l'app GitHub",
       "reauthorizeButton": "Riautorizza l'app GitHub",
       "reauthorizeDescription": "Security Agent richiede l'autorizzazione vulnerability_alerts per accedere agli avvisi di Dependabot. Riautorizza l'app GitHub per concederla.",
-      "reauthorizeFailed": "Impossibile avviare la riautorizzazione. Riprova.",
       "reauthorizeTitle": "Servono autorizzazioni aggiuntive",
       "setupFailed": "Impossibile avviare la configurazione di GitHub. Riprova."
     },
@@ -1350,6 +1379,7 @@
     "settingsSave": {
       "saveChanges": "Salva le modifiche",
       "unsavedMessage": "Salvare le modifiche prima di uscire da questa schermata?",
+      "unsavedInvalidMessage": "Queste modifiche non possono ancora essere salvate. Correggile per salvare o scartale per uscire.",
       "unsavedTitle": "Modifiche non salvate"
     },
     "setup": {
@@ -1678,6 +1708,7 @@
       "prefillModelUnavailable": "{{model}} non è più disponibile. Verrà usato il tuo modello predefinito.",
       "couldNotReadPendingSessions": "Impossibile leggere le sessioni in sospeso. Riprova.",
       "failedToCreate": "Impossibile creare la sessione.",
+      "checkOrganizationAccess": "Verifica il tuo accesso a questa organizzazione, poi riprova.",
       "couldNotRefreshRepositories": "Impossibile aggiornare i repository. Riprova.",
       "discardDraftTitle": "Eliminare la bozza?",
       "discardDraftMessage": "Il tuo prompt andrà perso.",
@@ -1751,7 +1782,8 @@
       "matchesBadge_one": "{{displayCount}} corrispondenza",
       "matchesBadge_other": "{{displayCount}} corrispondenze",
       "matchesBadge_many": "{{displayCount}} corrispondenze",
-      "noOutput": "Nessun output."
+      "noOutput": "Nessun output.",
+      "translationFailed": "Traduzione non riuscita"
     },
     "readToolMarkdown": {
       "linesTruncated": "righe {{start}}–{{end}} (troncate)",
@@ -2240,6 +2272,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Le tue sessioni attive saranno disponibili al termine del caricamento.",
     "currentDeviceUnidentified": "Impossibile identificare il dispositivo attuale.",
+    "kiloApp": "App Kilo",
     "noSessions": "Nessuna sessione attiva",
     "noSessionsDescription": "Accedi con l'app Kilo su un altro dispositivo e apparirà qui.",
     "onlyKiloAppSignIns": "Qui compaiono solo gli accessi tramite l'app Kilo. Gli accessi tramite editor e CLI non sono elencati.",
@@ -2393,6 +2426,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Prima di iniziare",
+    "summaryTitle": "Preferenze di condivisione dei dati",
     "introDescription": "Kilo invia i tuoi messaggi ai fornitori di modelli AI per generare risposte. Ecco cosa viene condiviso e con chi.",
     "required": "Necessario per usare Kilo",
     "promptsTitle": "I tuoi prompt e le tue conversazioni",
@@ -2401,7 +2435,6 @@
     "accountDescription": "L'ID del tuo account Kilo e i metadati delle richieste, usati per autenticarti e misurare l'utilizzo.",
     "diagnosticsTitle": "Diagnostica dell'app",
     "diagnosticsDescription": "Segnalazioni di arresti anomali ed errori, prive dei contenuti dell'app, usate per mantenerla stabile.",
-    "optional": "Facoltativo",
     "helpImprove": "Aiuta a migliorare Kilo",
     "helpImproveDescription": "Condividi dati anonimi sull'utilizzo del prodotto e sull'origine dell'installazione. Puoi modificare questa scelta in qualsiasi momento nelle impostazioni.",
     "seeFullDetails": "Vedi tutti i dettagli",
@@ -2527,7 +2560,8 @@
       "description": "Connetti il tuo account GitHub per revisionare le pull request dall'app.",
       "gitlabDescription": "Connetti il tuo account GitLab per revisionare le merge request dall'app.",
       "bitbucketDescription": "Connetti Bitbucket a questa organizzazione per revisionare le pull request dall'app.",
-      "bitbucketOrgOnlyDescription": "Seleziona un'organizzazione nel tuo profilo per revisionarne le pull request di Bitbucket."
+      "bitbucketOrgOnlyDescription": "Passa l'account qui sopra a un'organizzazione per revisionarne le pull request Bitbucket.",
+      "contextLine": "Per {{organization}}"
     },
     "connectionExpired": "La connessione a GitHub è scaduta.",
     "couldNotLoadPullRequest": "Impossibile caricare la pull request.",
@@ -2969,7 +3003,9 @@
       "reviewNotSubmitted": "Impossibile inviare questa revisione così com'è. La PR potrebbe essere stata modificata oppure potresti esserne l'autore: non puoi revisionare le tue pull request.",
       "reviewNotSubmittedTerm": "Impossibile inviare questa revisione così com'è. {{term}} potrebbe essere cambiato, oppure non puoi revisionare il tuo {{term}}.",
       "couldNotPostComment": "Impossibile pubblicare il commento.",
-      "couldNotSubmitReview": "Impossibile inviare la revisione. Controlla la connessione e riprova."
+      "couldNotSubmitReview": "Impossibile inviare la revisione. Controlla la connessione e riprova.",
+      "rateLimited": "Troppe richieste. Riprova più tardi.",
+      "conflict": "Questo è stato modificato mentre ci stavi lavorando. Ricaricalo e riprova."
     },
     "operation": {
       "couldNotReply": "Non è stato possibile inviare la risposta.",
@@ -3509,6 +3545,9 @@
     "localModels": {
       "title": "Modelli sul dispositivo",
       "help": "I modelli sul dispositivo vengono eseguiti su questo telefono. I tuoi prompt e le risposte restano sul dispositivo.",
+      "switchTitle": "Passare a un modello sul dispositivo?",
+      "switchMessage": "Il passaggio a {{name}} fa sì che i messaggi e il contesto di questa conversazione vengano elaborati su questo telefono, non su un server remoto.",
+      "switchConfirm": "Cambia modello",
       "systemPurpose": "Il modello integrato nel sistema di questo dispositivo. Viene eseguito sul dispositivo.",
       "apple": "Apple Intelligence (sul dispositivo)",
       "checking": "Verifica disponibilità…",
@@ -3605,7 +3644,6 @@
     "personalDefaultDescription": "Caricato automaticamente quando nessun repository ha un profilo bloccato.",
     "organizationDefaultDescription": "Caricamento automatico per i membri che non hanno impostazioni predefinite personali.",
     "setAsDefault": "Imposta come predefinito",
-    "removeDefault": "Rimuovi come predefinito",
     "saveFailed": "Impossibile salvare il profilo",
     "deleteTitle": "Elimina profilo",
     "deleteMessage": "Ciò rimuove permanentemente il profilo e le sue impostazioni. Questa operazione non può essere annullata.",
@@ -3631,11 +3669,13 @@
     "commandsTitle": "Comandi di impostazione",
     "addCommand": "Aggiungi comando",
     "commandLabel": "Comando",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "es. pnpm install",
     "commandsEmpty": "Nessun comando di configurazione ancora",
     "commandsSaveFailed": "Impossibile salvare i comandi di configurazione",
     "moveUp": "Vai su",
     "moveDown": "Spostati giù",
+    "moveCommandUp": "Sposta il comando {{position}} in alto",
+    "moveCommandDown": "Sposta il comando {{position}} in basso",
     "skillsTitle": "Competenze",
     "addSkill": "Aggiungi abilità",
     "skillNameLabel": "Nome dell'abilità",
@@ -3682,11 +3722,11 @@
       "add": "Aggiungi agente",
       "empty": "Nessun agente ancora",
       "name": "Nome dell'agente",
-      "slug": "Lumaca dell'agente",
+      "slug": "Slug dell'agente",
       "description": "Descrizione dell'agente",
       "model": "Sostituzione del modello",
       "modelPlaceholder": "Utilizza l'impostazione predefinita della sessione",
-      "prompt": "Richiesta di sistema",
+      "prompt": "Prompt di sistema",
       "steps": "Passi massimi",
       "stepsPlaceholder": "es. 50",
       "temperature": "Temperatura",
@@ -3705,7 +3745,7 @@
       "nameRequired": "Inserisci il nome di un agente",
       "slugRequired": "Inserisci uno slug dell'agente",
       "slugInvalid": "Lo slug deve iniziare con una lettera e utilizzare solo lettere minuscole, cifre e trattini",
-      "slugConflict": "Questo slug è riservato da un agente integrato",
+      "slugConflict": "Quello slug è già usato da un agente integrato o da un altro agente in questo profilo",
       "edit": "Modifica agente"
     },
     "slashCommands": {
@@ -3716,6 +3756,7 @@
       "description": "Descrizione del comando",
       "template": "Modello",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Spiega $ARGUMENTS",
       "subtask": "Esegui come attività secondaria",
       "edit": "Comando Modifica barra",
@@ -3870,7 +3911,7 @@
     "view": "Leggi briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Mostra stato live",
+    "dismiss": "Ignora il briefing",
     "offline": "Offline · briefing salvato",
     "cached": "Report salvato · aggiornamento non disponibile",
     "revised": "Revisionato · {{revision}}",

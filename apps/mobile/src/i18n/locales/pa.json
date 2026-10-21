@@ -35,6 +35,8 @@
     "connectGithub": "GitHub ਨਾਲ ਜੋੜੋ",
     "cost": "ਲਾਗਤ",
     "discard": "ਰੱਦ ਕਰੋ",
+    "discardChangesMessage": "ਤੁਹਾਡੇ ਬਦਲਾਅ ਖਤਮ ਹੋ ਜਾਣਗੇ।",
+    "discardChangesTitle": "ਬਦਲਾਅ ਰੱਦ ਕਰੋ?",
     "findings": "ਜਾਂਚ ਦੇ ਨਤੀਜੇ",
     "mergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ",
     "notConnected": "ਜੁੜਿਆ ਨਹੀਂ",
@@ -109,7 +111,9 @@
     "online": "ਔਨਲਾਈਨ",
     "open": "{{name}} ਖੋਲ੍ਹੋ",
     "openPullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੋ",
+    "completed": "ਮੁਕੰਮਲ",
     "pending": "ਉਡੀਕ ਵਿੱਚ",
+    "running": "ਚੱਲ ਰਿਹਾ ਹੈ",
     "performance": "ਕਾਰਗੁਜ਼ਾਰੀ",
     "preferences": "ਤਰਜੀਹਾਂ",
     "privacyPolicy": "ਗੋਪਨੀਯਤਾ ਨੀਤੀ",
@@ -661,7 +665,8 @@
       "description": "ਮੋਬਾਈਲ 'ਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਆਪਣਾ GitHub ਖਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
       "gitlabDescription": "ਮੋਬਾਈਲ ਉੱਤੇ ਮਰਜ਼ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਆਪਣਾ GitLab ਖਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
       "bitbucketDescription": "ਮੋਬਾਈਲ ਉੱਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਇਸ ਸੰਗਠਨ ਨੂੰ Bitbucket ਨਾਲ ਕਨੈਕਟ ਕਰੋ।",
-      "bitbucketOrgOnlyDescription": "ਆਪਣੀ ਪ੍ਰੋਫਾਈਲ ਵਿੱਚ ਕੋਈ ਸੰਗਠਨ ਚੁਣੋ ਤਾਂ ਜੋ ਉਸ ਦੀਆਂ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾ ਸਕੇ।"
+      "bitbucketOrgOnlyDescription": "ਇਸ ਦੇ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਉੱਪਰ ਦਿੱਤੇ ਖਾਤੇ ਨੂੰ ਇੱਕ ਸੰਗਠਨ ਵਿੱਚ ਬਦਲੋ।",
+      "contextLine": "{{organization}} ਲਈ"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "ਇਸ ਸਮੀਖਿਆ ਨੂੰ ਇਸ ਦੇ ਮੌਜੂਦਾ ਰੂਪ ਵਿੱਚ ਜਮ੍ਹਾਂ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ। ਹੋ ਸਕਦਾ ਹੈ ਕਿ PR ਬਦਲ ਗਈ ਹੋਵੇ ਜਾਂ ਇਹ ਤੁਹਾਡੀ ਆਪਣੀ ਪੁੱਲ ਰਿਕਵੈਸਟ ਹੋਵੇ, ਜਿਸ ਦੀ ਸਮੀਖਿਆ ਤੁਸੀਂ ਨਹੀਂ ਕਰ ਸਕਦੇ।",
       "reviewNotSubmittedTerm": "ਇਹ ਸਮੀਖਿਆ ਇਵੇਂ ਸਬਮਿਟ ਨਹੀਂ ਹੋ ਸਕਦੀ। ਹੋ ਸਕਦਾ ਹੈ {{term}} ਬਦਲ ਗਈ ਹੋਵੇ, ਜਾਂ ਤੁਸੀਂ ਆਪਣੀ ਖ਼ੁਦ ਦੀ {{term}} ਦੀ ਸਮੀਖਿਆ ਨਹੀਂ ਕਰ ਸਕਦੇ।",
       "couldNotPostComment": "ਟਿੱਪਣੀ ਪੋਸਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
-      "couldNotSubmitReview": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਨਹੀਂ ਹੋ ਸਕੀ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      "couldNotSubmitReview": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਨਹੀਂ ਹੋ ਸਕੀ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "rateLimited": "ਬਹੁਤ ਸਾਰੀਆਂ ਬੇਨਤੀਆਂ। ਕਿਰਪਾ ਕਰਕੇ ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "conflict": "ਜਦੋਂ ਤੁਸੀਂ ਇਸ 'ਤੇ ਕੰਮ ਕਰ ਰਹੇ ਸੀ, ਉਦੋਂ ਇਹ ਬਦਲ ਗਿਆ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਇਸਨੂੰ ਦੁਬਾਰਾ ਲੋਡ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "operation": {
       "couldNotReply": "ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ ਜਾ ਸਕਿਆ।",
@@ -1413,6 +1420,9 @@
       "couldNotGetLatest": "ਤਾਜ਼ਾ ਜਾਣਕਾਰੀ ਨਹੀਂ ਮਿਲ ਸਕੀ।",
       "byline": "{{repo}} #{{number}} — {{author}} ਦੁਆਰਾ",
       "noFindings": "ਕੋਈ ਸਮੱਸਿਆ ਨਹੀਂ ਮਿਲੀ।",
+      "findingsUnavailable": "ਇਹ ਸਮੀਖਿਆ ਅਸਫਲ ਹੋਣ ਕਾਰਨ ਨਤੀਜੇ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
+      "serviceUnavailable": "ਕੋਡ ਸਮੀਖਿਆ ਸੇਵਾ ਨਾਲ ਸੰਪਰਕ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਸੇਵਾ ਉਪਲਬਧ ਹੋਣ 'ਤੇ ਸਮੀਖਿਆ ਦੁਬਾਰਾ ਕਰੋ।",
+      "reviewFailed": "ਸਮੀਖਿਆ ਅਸਫਲ ਹੋ ਗਈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "showMore": "ਹੋਰ ਦਿਖਾਓ",
       "created": "ਬਣਾਇਆ ਗਿਆ",
       "started": "ਸ਼ੁਰੂ ਕੀਤਾ ਗਿਆ",
@@ -1528,8 +1538,6 @@
     "updateFailed": "ਸਮੀਖਿਅਕ ਅੱਪਡੇਟ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
     "configSaveFailed": "ਸਮੀਖਿਆ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਸੇਵ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
     "status": {
-      "running": "ਚੱਲ ਰਿਹਾ ਹੈ",
-      "completed": "ਮੁਕੰਮਲ",
       "interrupted": "ਵਿਚਕਾਰ ਰੁਕਿਆ"
     },
     "reviewStyle": {
@@ -1542,7 +1550,8 @@
       "bugs": "ਬੱਗ",
       "style": "ਸ਼ੈਲੀ",
       "testing": "ਟੈਸਟਿੰਗ",
-      "documentation": "ਦਸਤਾਵੇਜ਼"
+      "documentation": "ਦਸਤਾਵੇਜ਼",
+      "unknown": "ਹੋਰ ({{area}})"
     },
     "gateThreshold": {
       "warning": "ਚੇਤਾਵਨੀ"
@@ -1654,7 +1663,14 @@
       "whereFound": "ਮਿਲਣ ਦੀਆਂ ਥਾਵਾਂ ({{displayCount}})",
       "fullReport": "ਤਿਆਰ ਕੀਤੀ ਪੂਰੀ ਰਿਪੋਰਟ",
       "yes": "ਹਾਂ",
-      "no": "ਨਹੀਂ"
+      "no": "ਨਹੀਂ",
+      "action": {
+        "analyzeCodebase": "ਕੋਡਬੇਸ ਦਾ ਵਿਸ਼ਲੇਸ਼ਣ ਕਰੋ",
+        "dismiss": "ਅਣਡਿੱਠਾ ਕਰੋ",
+        "manualReview": "ਮੈਨੂਅਲ ਸਮੀਖਿਆ",
+        "monitor": "ਨਿਗਰਾਨੀ ਕਰੋ",
+        "openPr": "ਪੁੱਲ ਰਿਕੁਐਸਟ ਖੋਲ੍ਹੋ"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} ਸਮੱਸਿਆਵਾਂ",
@@ -1856,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "ਤਬਦੀਲੀਆਂ ਸੇਵ ਕਰੋ",
       "unsavedTitle": "ਸੇਵ ਨਾ ਕੀਤੀਆਂ ਤਬਦੀਲੀਆਂ",
-      "unsavedMessage": "ਇਸ ਸਕ੍ਰੀਨ ਤੋਂ ਜਾਣ ਤੋਂ ਪਹਿਲਾਂ ਤਬਦੀਲੀਆਂ ਸੇਵ ਕਰਨੀਆਂ ਹਨ?"
+      "unsavedMessage": "ਇਸ ਸਕ੍ਰੀਨ ਤੋਂ ਜਾਣ ਤੋਂ ਪਹਿਲਾਂ ਤਬਦੀਲੀਆਂ ਸੇਵ ਕਰਨੀਆਂ ਹਨ?",
+      "unsavedInvalidMessage": "ਇਹ ਤਬਦੀਲੀਆਂ ਹਾਲੇ ਸੇਵ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕਦੀਆਂ। ਸੇਵ ਕਰਨ ਲਈ ਇਹਨਾਂ ਨੂੰ ਠੀਕ ਕਰੋ, ਜਾਂ ਜਾਣ ਲਈ ਇਹਨਾਂ ਨੂੰ ਰੱਦ ਕਰੋ।"
     },
     "auditReportButton": {
       "viewA11y": "ਆਡਿਟ ਰਿਪੋਰਟ ਦੇਖੋ"
@@ -1873,7 +1890,24 @@
       "title": "ਆਡਿਟ ਰਿਪੋਰਟ",
       "unavailable": "ਆਡਿਟ ਰਿਪੋਰਟ ਉਪਲਬਧ ਨਹੀਂ",
       "unavailableDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਬਿਲਿੰਗ ਪ੍ਰਬੰਧਕ ਆਡਿਟ ਰਿਪੋਰਟਾਂ ਦੇਖ ਸਕਦੇ ਹਨ। ਕਿਸੇ ਮਾਲਕ ਜਾਂ ਬਿਲਿੰਗ ਪ੍ਰਬੰਧਕ ਨੂੰ ਤੁਹਾਨੂੰ ਪਹੁੰਚ ਦੇਣ ਲਈ ਕਹੋ।",
-      "queryFailed": "ਰਿਪੋਰਟ ਦੀ ਕੁਐਰੀ ਪੂਰੀ ਨਹੀਂ ਹੋਈ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      "queryFailed": "ਰਿਪੋਰਟ ਦੀ ਕੁਐਰੀ ਪੂਰੀ ਨਹੀਂ ਹੋਈ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "eventActions": {
+        "findingAnalysisCompleted": "ਵਿਸ਼ਲੇਸ਼ਣ ਪੂਰਾ ਹੋਇਆ",
+        "findingAnalysisFailed": "ਵਿਸ਼ਲੇਸ਼ਣ ਅਸਫਲ ਰਿਹਾ",
+        "findingAutoDismissed": "ਆਟੋਮੈਟਿਕ ਤੌਰ 'ਤੇ ਅਣਡਿੱਠਾ ਕੀਤਾ ਗਿਆ",
+        "findingCreated": "ਆਯਾਤ ਕੀਤਾ ਗਿਆ",
+        "findingDeleted": "ਮਿਟਾਇਆ ਗਿਆ",
+        "findingDismissed": "ਅਣਡਿੱਠਾ ਕੀਤਾ ਗਿਆ",
+        "findingSeverityChanged": "ਗੰਭੀਰਤਾ ਬਦਲੀ ਗਈ",
+        "findingStatusChange": "ਸਥਿਤੀ ਬਦਲੀ ਗਈ",
+        "findingSuperseded": "ਬਦਲਿਆ ਗਿਆ",
+        "remediationBlocked": "ਸੁਧਾਰ ਰੋਕਿਆ ਗਿਆ",
+        "remediationCancelled": "ਰੱਦ ਕੀਤਾ ਗਿਆ",
+        "remediationFailed": "ਸੁਧਾਰ ਅਸਫਲ ਰਿਹਾ",
+        "remediationNoChangesNeeded": "ਕੋਈ ਬਦਲਾਅ ਲੋੜੀਂਦਾ ਨਹੀਂ",
+        "remediationPrOpened": "ਪੁੱਲ ਰਿਕੁਐਸਟ ਖੋਲ੍ਹਿਆ ਗਿਆ",
+        "remediationQueued": "ਸੁਧਾਰ ਦੀ ਬੇਨਤੀ ਕੀਤੀ ਗਈ"
+      }
     },
     "notifications": {
       "couldNotLoad": "ਸੂਚਨਾਵਾਂ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
@@ -1905,7 +1939,6 @@
       "installApp": "GitHub ਐਪ ਸਥਾਪਤ ਕਰੋ",
       "reauthorizeButton": "GitHub ਐਪ ਨੂੰ ਮੁੜ ਇਜਾਜ਼ਤ ਦਿਓ",
       "reauthorizeDescription": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਨੂੰ Dependabot ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਤੱਕ ਪਹੁੰਚ ਲਈ vulnerability_alerts ਇਜਾਜ਼ਤ ਦੀ ਲੋੜ ਹੈ। ਇਹ ਇਜਾਜ਼ਤ ਦੇਣ ਲਈ GitHub ਐਪ ਨੂੰ ਮੁੜ ਇਜਾਜ਼ਤ ਦਿਓ।",
-      "reauthorizeFailed": "ਮੁੜ ਇਜਾਜ਼ਤ ਦੇਣ ਦੀ ਪ੍ਰਕਿਰਿਆ ਸ਼ੁਰੂ ਨਹੀਂ ਹੋ ਸਕੀ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "reauthorizeTitle": "ਹੋਰ ਇਜਾਜ਼ਤਾਂ ਲੋੜੀਂਦੀਆਂ ਹਨ",
       "setupFailed": "GitHub ਸੈੱਟਅੱਪ ਸ਼ੁਰੂ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
@@ -2209,6 +2242,7 @@
       "prefillModelUnavailable": "{{model}} ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਤੁਹਾਡਾ ਪੂਰਵ-ਨਿਰਧਾਰਤ ਮਾਡਲ ਵਰਤਿਆ ਜਾ ਰਿਹਾ ਹੈ।",
       "couldNotReadPendingSessions": "ਉਡੀਕ ਵਿੱਚ ਪਏ ਸੈਸ਼ਨ ਪੜ੍ਹੇ ਨਹੀਂ ਜਾ ਸਕੇ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "failedToCreate": "ਸੈਸ਼ਨ ਨਹੀਂ ਬਣਾਇਆ ਜਾ ਸਕਿਆ।",
+      "checkOrganizationAccess": "ਇਸ ਸੰਗਠਨ ਲਈ ਆਪਣੀ ਪਹੁੰਚ ਜਾਂਚੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "couldNotRefreshRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਰਿਫਰੈਸ਼ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "discardDraftTitle": "ਕੀ ਡਰਾਫਟ ਰੱਦ ਕਰਨਾ ਹੈ?",
       "discardDraftMessage": "ਤੁਹਾਡਾ ਪ੍ਰੌਂਪਟ ਮਿਟ ਜਾਵੇਗਾ।",
@@ -2278,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} ਲਾਈਨਾਂ",
       "matchesBadge_one": "{{displayCount}} ਮੇਲ",
       "matchesBadge_other": "{{displayCount}} ਮੇਲ",
-      "noOutput": "ਕੋਈ ਆਉਟਪੁੱਟ ਨਹੀਂ ਹੈ।"
+      "noOutput": "ਕੋਈ ਆਉਟਪੁੱਟ ਨਹੀਂ ਹੈ।",
+      "translationFailed": "ਅਨੁਵਾਦ ਅਸਫਲ ਰਿਹਾ"
     },
     "readToolMarkdown": {
       "linesTruncated": "ਲਾਈਨਾਂ {{start}}–{{end}} (ਪੂਰੀ ਸਮੱਗਰੀ ਨਹੀਂ ਦਿਖਾਈ ਗਈ)",
@@ -2729,6 +2764,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "ਜਦੋਂ ਤੱਕ ਇਹ ਲੋਡ ਨਹੀਂ ਹੁੰਦਾ, ਤੁਹਾਡੇ ਸਰਗਰਮ ਸੈਸ਼ਨ ਉਪਲਬਧ ਨਹੀਂ ਹੋਣਗੇ।",
     "currentDeviceUnidentified": "ਮੌਜੂਦਾ ਡਿਵਾਈਸ ਦੀ ਪਛਾਣ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
+    "kiloApp": "Kilo ਐਪ",
     "noSessions": "ਕੋਈ ਸਰਗਰਮ ਸੈਸ਼ਨ ਨਹੀਂ",
     "noSessionsDescription": "ਕਿਸੇ ਹੋਰ ਡਿਵਾਈਸ 'ਤੇ Kilo ਐਪ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ। ਉਸ ਦਾ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਵੇਗਾ।",
     "onlyKiloAppSignIns": "ਇੱਥੇ ਸਿਰਫ਼ Kilo ਐਪ ਰਾਹੀਂ ਕੀਤੇ ਸਾਈਨ ਇਨ ਦਿਖਾਈ ਦਿੰਦੇ ਹਨ। ਐਡੀਟਰ ਅਤੇ CLI ਰਾਹੀਂ ਕੀਤੇ ਸਾਈਨ ਇਨ ਇਸ ਸੂਚੀ ਵਿੱਚ ਨਹੀਂ ਹਨ।",
@@ -2881,6 +2917,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "ਸ਼ੁਰੂ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ",
+    "summaryTitle": "ਡੇਟਾ ਸਾਂਝਾਕਰਨ ਤਰਜੀਹਾਂ",
     "introDescription": "Kilo ਜਵਾਬ ਤਿਆਰ ਕਰਨ ਲਈ ਤੁਹਾਡੇ ਸੁਨੇਹੇ AI ਪ੍ਰਦਾਤਾਵਾਂ ਨੂੰ ਭੇਜਦਾ ਹੈ। ਇੱਥੇ ਦੱਸਿਆ ਗਿਆ ਹੈ ਕਿ ਕੀ ਸਾਂਝਾ ਕੀਤਾ ਜਾਂਦਾ ਹੈ ਅਤੇ ਕਿਸ ਨਾਲ।",
     "required": "Kilo ਵਰਤਣ ਲਈ ਲੋੜੀਂਦਾ",
     "promptsTitle": "ਤੁਹਾਡੇ ਪ੍ਰੌਂਪਟ ਅਤੇ ਗੱਲਬਾਤਾਂ",
@@ -2889,7 +2926,6 @@
     "accountDescription": "ਤੁਹਾਡੇ Kilo ਖਾਤੇ ਦਾ ID ਅਤੇ ਬੇਨਤੀ ਦਾ ਮੈਟਾਡੇਟਾ, ਜੋ ਤੁਹਾਡੀ ਪਛਾਣ ਦੀ ਪੁਸ਼ਟੀ ਕਰਨ ਅਤੇ ਵਰਤੋਂ ਮਾਪਣ ਲਈ ਵਰਤਿਆ ਜਾਂਦਾ ਹੈ।",
     "diagnosticsTitle": "ਐਪ ਦੀਆਂ ਸਮੱਸਿਆਵਾਂ ਦੀ ਜਾਂਚ",
     "diagnosticsDescription": "ਐਪ ਨੂੰ ਸਥਿਰ ਰੱਖਣ ਲਈ ਕਰੈਸ਼ ਅਤੇ ਗਲਤੀਆਂ ਦੀਆਂ ਰਿਪੋਰਟਾਂ ਵਰਤੀਆਂ ਜਾਂਦੀਆਂ ਹਨ। ਇਨ੍ਹਾਂ ਵਿੱਚੋਂ ਐਪ ਦੀ ਸਮੱਗਰੀ ਹਟਾ ਦਿੱਤੀ ਜਾਂਦੀ ਹੈ।",
-    "optional": "ਵਿਕਲਪਿਕ",
     "helpImprove": "Kilo ਨੂੰ ਸੁਧਾਰਨ ਵਿੱਚ ਮਦਦ ਕਰੋ",
     "helpImproveDescription": "ਆਪਣੀ ਪਛਾਣ ਦੱਸੇ ਬਿਨਾਂ ਐਪ ਦੀ ਵਰਤੋਂ ਦੇ ਅੰਕੜੇ ਅਤੇ ਇੰਸਟਾਲ ਕਰਨ ਦੇ ਸਰੋਤ ਦੀ ਜਾਣਕਾਰੀ ਸਾਂਝੀ ਕਰੋ। ਤੁਸੀਂ ਇਹ ਚੋਣ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਕਿਸੇ ਵੀ ਸਮੇਂ ਬਦਲ ਸਕਦੇ ਹੋ।",
     "seeFullDetails": "ਪੂਰੇ ਵੇਰਵੇ ਵੇਖੋ",
@@ -3468,6 +3504,9 @@
     "localModels": {
       "title": "ਡਿਵਾਈਸ 'ਤੇ ਚੱਲਣ ਵਾਲੇ ਮਾਡਲ",
       "help": "ਡਿਵਾਈਸ 'ਤੇ ਚੱਲਣ ਵਾਲੇ ਮਾਡਲ ਇਸ ਫ਼ੋਨ 'ਤੇ ਹੀ ਚੱਲਦੇ ਹਨ। ਤੁਹਾਡੇ ਪ੍ਰੌਂਪਟ ਅਤੇ ਜਵਾਬ ਡਿਵਾਈਸ 'ਤੇ ਹੀ ਰਹਿੰਦੇ ਹਨ।",
+      "switchTitle": "ਡਿਵਾਈਸ 'ਤੇ ਚੱਲਣ ਵਾਲੇ ਮਾਡਲ 'ਤੇ ਬਦਲਣਾ ਹੈ?",
+      "switchMessage": "{{name}} 'ਤੇ ਬਦਲਣ ਨਾਲ ਇਸ ਗੱਲਬਾਤ ਦੇ ਪ੍ਰੋਂਪਟ ਅਤੇ ਸੰਦਰਭ ਕਿਸੇ ਦੂਰਲੇ ਸਰਵਰ 'ਤੇ ਨਹੀਂ, ਸਗੋਂ ਇਸ ਫ਼ੋਨ 'ਤੇ ਹੀ ਪ੍ਰੋਸੈੱਸ ਕੀਤੇ ਜਾਣਗੇ।",
+      "switchConfirm": "ਮਾਡਲ ਬਦਲੋ",
       "systemPurpose": "ਇਸ ਡਿਵਾਈਸ ਦੇ ਸਿਸਟਮ ਵਿੱਚ ਬਣਿਆ ਮਾਡਲ। ਇਹ ਡਿਵਾਈਸ 'ਤੇ ਹੀ ਚੱਲਦਾ ਹੈ।",
       "apple": "Apple Intelligence (ਡਿਵਾਈਸ 'ਤੇ)",
       "checking": "ਉਪਲਬਧਤਾ ਜਾਂਚੀ ਜਾ ਰਹੀ ਹੈ…",
@@ -3564,7 +3603,6 @@
     "personalDefaultDescription": "ਜਦੋਂ ਕਿਸੇ ਰਿਪੋਜ਼ਟਰੀ ਵਿੱਚ ਪਿੰਨ ਕੀਤਾ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ ਹੁੰਦਾ ਹੈ ਤਾਂ ਆਟੋ-ਲੋਡ ਹੁੰਦਾ ਹੈ।",
     "organizationDefaultDescription": "ਉਹਨਾਂ ਮੈਂਬਰਾਂ ਲਈ ਸਵੈ-ਲੋਡ ਕੀਤਾ ਗਿਆ ਜਿਨ੍ਹਾਂ ਕੋਲ ਕੋਈ ਨਿੱਜੀ ਡਿਫੌਲਟ ਨਹੀਂ ਹੈ।",
     "setAsDefault": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਵਜੋਂ ਸੈੱਟ ਕਰੋ",
-    "removeDefault": "ਡਿਫੌਲਟ ਵਜੋਂ ਹਟਾਓ",
     "saveFailed": "ਪ੍ਰੋਫਾਈਲ ਨੂੰ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
     "deleteTitle": "ਪ੍ਰੋਫਾਈਲ ਮਿਟਾਓ",
     "deleteMessage": "ਇਹ ਪ੍ਰੋਫਾਈਲ ਅਤੇ ਇਸਦੀਆਂ ਸੈਟਿੰਗਾਂ ਨੂੰ ਸਥਾਈ ਤੌਰ 'ਤੇ ਹਟਾਉਂਦਾ ਹੈ। ਇਸ ਨੂੰ ਅਣਕੀਤਾ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
@@ -3590,11 +3628,13 @@
     "commandsTitle": "ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ",
     "addCommand": "ਕਮਾਂਡ ਸ਼ਾਮਲ ਕਰੋ",
     "commandLabel": "ਹੁਕਮ",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "ਉਦਾ. pnpm install",
     "commandsEmpty": "ਹਾਲੇ ਤੱਕ ਕੋਈ ਸੈੱਟਅੱਪ ਕਮਾਂਡ ਨਹੀਂ ਹੈ",
     "commandsSaveFailed": "ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਨੂੰ ਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
     "moveUp": "ਉੱਪਰ ਜਾਓ",
     "moveDown": "ਹੇਠਾਂ ਚਲੇ ਜਾਓ",
+    "moveCommandUp": "ਕਮਾਂਡ {{position}} ਉੱਪਰ ਭੇਜੋ",
+    "moveCommandDown": "ਕਮਾਂਡ {{position}} ਹੇਠਾਂ ਭੇਜੋ",
     "skillsTitle": "ਹੁਨਰ",
     "addSkill": "ਹੁਨਰ ਸ਼ਾਮਲ ਕਰੋ",
     "skillNameLabel": "ਹੁਨਰ ਦਾ ਨਾਮ",
@@ -3664,7 +3704,7 @@
       "nameRequired": "ਇੱਕ ਏਜੰਟ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ",
       "slugRequired": "ਇੱਕ ਏਜੰਟ ਸਲੱਗ ਦਾਖਲ ਕਰੋ",
       "slugInvalid": "ਸਲੱਗ ਨੂੰ ਇੱਕ ਅੱਖਰ ਨਾਲ ਸ਼ੁਰੂ ਕਰਨਾ ਚਾਹੀਦਾ ਹੈ ਅਤੇ ਸਿਰਫ਼ ਛੋਟੇ ਅੱਖਰਾਂ, ਅੰਕਾਂ ਅਤੇ ਡੈਸ਼ਾਂ ਦੀ ਵਰਤੋਂ ਕਰਨੀ ਚਾਹੀਦੀ ਹੈ",
-      "slugConflict": "ਉਹ ਸਲੱਗ ਇੱਕ ਬਿਲਟ-ਇਨ ਏਜੰਟ ਦੁਆਰਾ ਰਾਖਵੀਂ ਹੈ",
+      "slugConflict": "ਉਹ ਸਲੱਗ ਪਹਿਲਾਂ ਹੀ ਕਿਸੇ ਬਿਲਟ-ਇਨ ਏਜੰਟ ਜਾਂ ਇਸ ਪ੍ਰੋਫਾਈਲ ਵਿੱਚ ਕਿਸੇ ਹੋਰ ਏਜੰਟ ਵੱਲੋਂ ਵਰਤਿਆ ਜਾ ਰਿਹਾ ਹੈ",
       "edit": "ਏਜੰਟ ਦਾ ਸੰਪਾਦਨ ਕਰੋ"
     },
     "slashCommands": {
@@ -3675,6 +3715,7 @@
       "description": "ਕਮਾਂਡ ਦਾ ਵੇਰਵਾ",
       "template": "ਟੈਂਪਲੇਟ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ਦੀ ਵਿਆਖਿਆ ਕਰੋ",
       "subtask": "ਸਬਟਾਸਕ ਵਜੋਂ ਚਲਾਓ",
       "edit": "ਸਲੈਸ਼ ਕਮਾਂਡ ਨੂੰ ਸੋਧੋ",
@@ -3825,7 +3866,7 @@
     "view": "ਬ੍ਰੀਫਿੰਗ ਪੜ੍ਹੋ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "ਲਾਈਵ ਸਥਿਤੀ ਦਿਖਾਓ",
+    "dismiss": "ਬ੍ਰੀਫਿੰਗ ਖਾਰਜ ਕਰੋ",
     "offline": "ਆਫਲਾਈਨ · ਸੰਭਾਲੀ ਬ੍ਰੀਫਿੰਗ",
     "cached": "ਸੰਭਾਲੀ ਰਿਪੋਰਟ · ਤਾਜ਼ਾ ਕਰਨਾ ਉਪਲਬਧ ਨਹੀਂ",
     "revised": "ਸੋਧੀ ਗਈ · {{revision}}",

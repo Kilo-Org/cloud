@@ -143,6 +143,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const initialComposerFocusedRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
   const creationGuardRef = useRef<FirstChatCreationGuard | null>(null);
@@ -202,6 +203,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   useEffect(() => {
     if (discardedPrompt !== null) clearDiscardedPrompt();
   }, [clearDiscardedPrompt, discardedPrompt]);
+  useEffect(() => {
+    if (initialComposerFocusedRef.current) return;
+    initialComposerFocusedRef.current = true;
+    if (!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
+    textareaRef.current?.focus({ preventScroll: true });
+  }, []);
   const [selectedRepo, setSelectedRepo] = useState('');
   const [selectedGitHubIntegrationId, setSelectedGitHubIntegrationId] = useState<
     string | undefined

@@ -102,7 +102,14 @@ describe('useRecordLastRoute (mounted)', () => {
     expect(getLastRouteSnapshot()?.href).toBe('/agent-chat/ses_gone');
 
     routerState.pathname = '/profiles/p1/variables';
-    routerState.segments = ['(app)', '(tabs)', '(3_profile)', 'profiles', '[profileId]', 'variables'];
+    routerState.segments = [
+      '(app)',
+      '(tabs)',
+      '(3_profile)',
+      'profiles',
+      '[profileId]',
+      'variables',
+    ];
     routerState.globalHref = '/profiles/p1/variables?organizationId=o1&initial=false';
     rerenderProbe();
     await act(async () => {
@@ -117,7 +124,14 @@ describe('useRecordLastRoute (mounted)', () => {
 
   it('records nothing for a route that never resolved past its pattern', async () => {
     routerState.pathname = '/profiles/[profileId]/variables';
-    routerState.segments = ['(app)', '(tabs)', '(3_profile)', 'profiles', '[profileId]', 'variables'];
+    routerState.segments = [
+      '(app)',
+      '(tabs)',
+      '(3_profile)',
+      'profiles',
+      '[profileId]',
+      'variables',
+    ];
     routerState.globalHref = '/profiles/[profileId]/variables?initial=false';
     await mountProbe('u1');
 

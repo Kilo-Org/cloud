@@ -27,9 +27,9 @@ describe('lastRouteHrefFrom', () => {
   });
 
   it('keeps the query the screen was opened with', () => {
-    expect(lastRouteHrefFrom('/profiles/p1/variables?organizationId=o1', '/profiles/p1/variables')).toBe(
-      '/profiles/p1/variables?organizationId=o1'
-    );
+    expect(
+      lastRouteHrefFrom('/profiles/p1/variables?organizationId=o1', '/profiles/p1/variables')
+    ).toBe('/profiles/p1/variables?organizationId=o1');
   });
 
   it("drops expo-router's launch flag and an emptied query", () => {
@@ -37,7 +37,10 @@ describe('lastRouteHrefFrom', () => {
       '/agent-chat/ses_1'
     );
     expect(
-      lastRouteHrefFrom('/profiles/p1/variables?initial=false&organizationId=o1', '/profiles/p1/variables')
+      lastRouteHrefFrom(
+        '/profiles/p1/variables?initial=false&organizationId=o1',
+        '/profiles/p1/variables'
+      )
     ).toBe('/profiles/p1/variables?organizationId=o1');
   });
 
@@ -47,7 +50,9 @@ describe('lastRouteHrefFrom', () => {
 
   it('returns null when neither names a concrete route', () => {
     expect(lastRouteHrefFrom('', '')).toBeNull();
-    expect(lastRouteHrefFrom('/profiles/[profileId]/variables', '/profiles/[profileId]/variables')).toBeNull();
+    expect(
+      lastRouteHrefFrom('/profiles/[profileId]/variables', '/profiles/[profileId]/variables')
+    ).toBeNull();
   });
 });
 

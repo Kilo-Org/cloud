@@ -209,10 +209,7 @@ describe('subscribeLastRoute (the restart read)', () => {
     // Written before hrefs were concrete: the segment list carried the
     // `[profileId]` route pattern, and restoring it opens a screen whose data
     // reads cannot resolve.
-    store.set(
-      KEY,
-      recordFor('/(app)/(tabs)/(3_profile)/profiles/[profileId]/variables', 'u1')
-    );
+    store.set(KEY, recordFor('/(app)/(tabs)/(3_profile)/profiles/[profileId]/variables', 'u1'));
     await _hydrateLastRouteForTests();
 
     expect(getLastRouteSnapshot()).toBeNull();

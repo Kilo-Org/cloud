@@ -63,7 +63,7 @@ import {
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
 import { logRuntimeProxyRequestFailed } from './runtime-credential-proxy-diagnostics.js';
-import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
+import { deriveKiloSandboxTargets, deriveLoopbackFacadeTargets } from './kilo/kilo-targets.js';
 import {
   inferRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyScopeIngestRoute,
@@ -509,8 +509,11 @@ async function forwardRuntimeCredentialProxy(
     return c.text('Credential unavailable', 503);
   }
   if (!credential) return c.text('Unauthorized', 401);
-  const targets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
-  if (!targets.success) return c.text('Not found', 404);
+  const derivedTargets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
+  const targets = derivedTargets.success
+    ? derivedTargets.targets
+    : deriveLoopbackFacadeTargets(c.env);
+  if (!targets) return c.text('Not found', 404);
 
   const search = new URL(c.req.url).search;
   const scopeView = route === 'ingest' ? credential.scopeView : undefined;
@@ -519,7 +522,7 @@ async function forwardRuntimeCredentialProxy(
   let upstream: URL | null;
   if (scopeView !== undefined) {
     const adopted = resolveRuntimeCredentialProxyScopeIngestRoute({
-      targets: targets.targets,
+      targets: targets,
       route,
       method: c.req.method,
       pathname: path,
@@ -538,7 +541,7 @@ async function forwardRuntimeCredentialProxy(
     }
   } else {
     const scopedUpstream = resolveRuntimeCredentialProxyScopedIngestRoute({
-      targets: targets.targets,
+      targets: targets,
       route,
       method: c.req.method,
       pathname: path,
@@ -552,7 +555,7 @@ async function forwardRuntimeCredentialProxy(
     upstream =
       scopedUpstream ??
       runtimeCredentialProxyUpstream(
-        targets.targets,
+        targets,
         route,
         c.req.method,
         path,
@@ -740,6 +743,8 @@ async function routeAuthenticatedKiloFacade(c: Context<HonoContext>): Promise<Re
   if (!authResult.success) {
     return c.text(authResult.error, 401);
   }
+  if (authResult.cloudAgentAuthority)
+    return c.text('Cloud Agent authority only permits preparation', 403);
   return routeToUserKiloFacade(c, authResult.userId, authResult.token);
 }
 
@@ -1178,6 +1183,7 @@ app.use(
       env: c.env,
       userId: c.get('userId'),
       authToken: c.get('authToken'),
+      cloudAgentAuthority: c.get('cloudAgentAuthority'),
       botId: c.get('botId'),
       validatedSessionAccess: c.get('validatedSessionAccess'),
       request: c.req.raw,

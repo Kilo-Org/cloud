@@ -380,6 +380,9 @@ function materializationStage(error: unknown): PrepareFrameMaterializationStage 
  * binding exists; tests inject a fake peer instead.
  */
 export type ControlPlaneSessionPeer = {
+  issueCloudAgentMcpGrant?(): Promise<
+    { url: string; token: string; expiresAt: number } | undefined
+  >;
   onRoute(update: ControlPlaneRouteUpdate): Promise<void>;
   onEvents(notification: ControlPlaneEventsNotification): Promise<void>;
   onOutcome(outcome: ControlPlaneOutcome): Promise<void>;
@@ -2753,15 +2756,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
     } catch {
       return 'failed';
     }
+    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(route.sessionId);
     if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';
     const next: RouteRecord = { ...route, grant: issued.grant, spec: issued.spec };
     this.publishRouteGrant(next);
     // Git/alias material is independent of the runtime-proxy handle, so a
     // re-issue still sends the frame even when the handle string did not change.
     // The canonical handoff runs separately in `runDeliver` maintenance.
-    const payload: ControlPlaneSessionCredentialsPayload = {
+    const payload = controlPlaneSessionCredentialsPayloadSchema.parse({
       ...sessionCredentialsPayloadFromGrant(issued.grant, route.sessionId),
-    };
+      ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
+    });
     if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
       await this.markRouteCredentialsSent(route.sessionId, issued.grant);
     }
@@ -3752,6 +3757,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     attemptId: string,
     expectedFence: ControlRuntimeCredentialProxyFence | null
   ): Promise<void> {
+    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(sessionId);
     const state = await this.readAllocation();
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return;
@@ -3773,7 +3779,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const sent = this.trySendFrame(socket, {
       type: 'session.prepare',
       spec,
-      credentials: this.prepareCredentials(latest.grant, sessionId),
+      credentials: controlPlaneSessionCredentialsPayloadSchema.parse({
+        ...this.prepareCredentials(latest.grant, sessionId),
+        ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
+      }),
     });
     if (sent) await this.markRouteCredentialsSent(sessionId, latest.grant);
   }
@@ -3967,6 +3976,26 @@ export class SandboxControlV2 extends DurableObject<Env> {
   ): Promise<{ exp: number; sessionId: string } | null> {
     const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle);
     return claims === null ? null : { exp: claims.exp, sessionId: claims.sessionId };
+  }
+
+  private async tryIssueCloudAgentMcpGrant(
+    sessionId: string
+  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
+    try {
+      const ownerId = await this.requireOwner();
+      const peer = ownerId === null ? null : this.sessionPeerFor(ownerId, sessionId);
+      if (peer?.issueCloudAgentMcpGrant === undefined) return undefined;
+      return await withTimeout(
+        peer.issueCloudAgentMcpGrant(),
+        this.grantIssueTimeoutMs(),
+        'Cloud Agent MCP grant issuance timed out'
+      );
+    } catch {
+      logger
+        .withFields({ sandboxId: this.sandboxId, sessionId })
+        .warn('Optional Cloud Agent MCP grant unavailable; continuing without it');
+      return undefined;
+    }
   }
 
   /** Mint one runtime proxy handle for `fence`, bounded by the grant timeout. */

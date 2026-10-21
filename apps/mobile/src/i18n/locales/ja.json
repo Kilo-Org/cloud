@@ -25,6 +25,7 @@
     "error": "エラー: {{error}}",
     "back": "戻る",
     "somethingWentWrong": "問題が発生しました。",
+    "actionNotRecorded": "この操作を記録できませんでした。しばらくしてからもう一度お試しください。",
     "couldNotOpen": "{{label}}を開けませんでした。",
     "link": "リンク",
     "takingLonger": "通常より時間がかかっています。この画面を閉じて、後で確認できます。",
@@ -35,6 +36,8 @@
     "connectGithub": "GitHubと連携",
     "cost": "コスト",
     "discard": "破棄",
+    "discardChangesMessage": "変更内容は失われます。",
+    "discardChangesTitle": "変更を破棄しますか？",
     "findings": "検出事項",
     "mergeRequest": "マージリクエスト",
     "notConnected": "未連携",
@@ -109,7 +112,9 @@
     "online": "オンライン",
     "open": "{{name}}を開く",
     "openPullRequest": "プルリクエストを開く",
+    "completed": "完了",
     "pending": "保留中",
+    "running": "実行中",
     "performance": "性能",
     "preferences": "設定",
     "privacyPolicy": "プライバシーポリシー",
@@ -990,8 +995,9 @@
       "noProposals": "提案はありません",
       "noProposalsDescription": "Kiloがメンテナーの返信を分析すると、レビューメモリの提案がここに表示されます。",
       "off": "レビューメモリはオフです。",
+      "on": "レビューメモリはオンです。",
       "offDescription": "有効にすると、Kiloがメンテナーの返信から学習し、REVIEW.mdに記載する指針を提案します。",
-      "readOnlyDescription": "レビューメモリを有効にできるのは組織のオーナーと請求管理者のみです。",
+      "readOnlyDescription": "レビューメモリを変更できるのは組織のオーナーと請求管理者のみです。",
       "title": "レビューメモリ"
     },
     "scopeList": {
@@ -1019,8 +1025,6 @@
     "updateFailed": "レビュアーを更新できませんでした。",
     "configSaveFailed": "レビュー設定を保存できませんでした。",
     "status": {
-      "running": "実行中",
-      "completed": "完了",
       "interrupted": "中断"
     },
     "reviewStyle": {
@@ -1033,7 +1037,8 @@
       "bugs": "バグ",
       "style": "スタイル",
       "testing": "テスト",
-      "documentation": "ドキュメント"
+      "documentation": "ドキュメント",
+      "unknown": "その他（{{area}}）"
     },
     "gateThreshold": {
       "warning": "警告"
@@ -1112,7 +1117,14 @@
       "triageReasoning": "トリアージの判断根拠",
       "watchInCloudAgent": "クラウドエージェントで確認",
       "whereFound": "検出場所（{{displayCount}}）",
-      "yes": "はい"
+      "yes": "はい",
+      "action": {
+        "analyzeCodebase": "コードベースを分析",
+        "dismiss": "却下",
+        "manualReview": "手動レビュー",
+        "monitor": "監視",
+        "openPr": "プルリクエストを作成"
+      }
     },
     "analysisSettings": {
       "analysisModel": "分析モデル",
@@ -1123,6 +1135,9 @@
       "triageModel": "トリアージモデル"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo管理者",
+      "actorMaskedUser": "マスク済みユーザー",
+      "actorSystem": "Kiloシステム",
       "couldNotLoad": "監査レポートを読み込めませんでした。",
       "events": "イベント",
       "generated": "{{generatedAt}}に生成しました。",
@@ -1134,7 +1149,24 @@
       "summary": "レポートの概要",
       "title": "監査レポート",
       "unavailable": "監査レポートを利用できません",
-      "unavailableDescription": "監査レポートを表示できるのは、組織のオーナーと請求管理者のみです。アクセス権の付与をオーナーまたは請求管理者に依頼してください。"
+      "unavailableDescription": "監査レポートを表示できるのは、組織のオーナーと請求管理者のみです。アクセス権の付与をオーナーまたは請求管理者に依頼してください。",
+      "eventActions": {
+        "findingAnalysisCompleted": "分析が完了しました",
+        "findingAnalysisFailed": "分析に失敗しました",
+        "findingAutoDismissed": "自動的に却下されました",
+        "findingCreated": "インポート済み",
+        "findingDeleted": "削除されました",
+        "findingDismissed": "却下されました",
+        "findingSeverityChanged": "重要度が変更されました",
+        "findingStatusChange": "ステータスが変更されました",
+        "findingSuperseded": "置き換えられました",
+        "remediationBlocked": "修復がブロックされました",
+        "remediationCancelled": "キャンセルされました",
+        "remediationFailed": "修復に失敗しました",
+        "remediationNoChangesNeeded": "変更は不要",
+        "remediationPrOpened": "プルリクエストがオープンされました",
+        "remediationQueued": "修復リクエスト済み"
+      }
     },
     "auditReportButton": {
       "viewA11y": "監査レポートを表示"
@@ -1354,7 +1386,6 @@
       "installApp": "GitHub Appをインストール",
       "reauthorizeButton": "GitHub Appを再承認",
       "reauthorizeDescription": "セキュリティエージェントがDependabotアラートにアクセスするには、vulnerability_alerts権限が必要です。GitHub Appを再承認して、この権限を付与してください。",
-      "reauthorizeFailed": "再承認を開始できませんでした。もう一度お試しください。",
       "reauthorizeTitle": "追加の権限が必要です",
       "setupFailed": "GitHubのセットアップを開始できませんでした。もう一度お試しください。"
     },
@@ -1377,6 +1408,7 @@
     "settingsSave": {
       "saveChanges": "変更を保存",
       "unsavedMessage": "この画面を離れる前に変更を保存しますか？",
+      "unsavedInvalidMessage": "これらの変更はまだ保存できません。保存するには修正し、離れるには破棄してください。",
       "unsavedTitle": "未保存の変更"
     },
     "setup": {
@@ -1415,7 +1447,12 @@
       "syncMayNotHaveCompleted": "同期が完了していない可能性があります。再試行して状態の整合性を確認するか、破棄してください。",
       "syncInProgress": "セキュリティの同期はすでに実行中です。もう一度お試しください。",
       "dismissalInProgress": "この検出結果の却下はすでに処理中です。もう一度お試しください。",
-      "couldNotReadPendingSyncs": "保留中の同期情報を読み込めませんでした。もう一度お試しください。"
+      "couldNotReadPendingSyncs": "保留中の同期情報を読み込めませんでした。もう一度お試しください。",
+      "ambiguous": "操作の結果を確認できませんでした。再試行する前にセキュリティレビューをご確認ください。",
+      "settleFailed": "操作は完了しましたが、結果を記録できませんでした。もう一度お試しください。",
+      "replayFailed": "この操作は完了しませんでした。もう一度お試しください。",
+      "actionFailed": "この操作を完了できませんでした。もう一度お試しください。",
+      "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。"
     },
     "analysisState": {
       "queued": "分析の順番待ち",
@@ -1700,6 +1737,7 @@
       "prefillModelUnavailable": "{{model}}は利用できなくなりました。デフォルトモデルを使用します。",
       "couldNotReadPendingSessions": "保留中のセッションを読み取れませんでした。もう一度お試しください。",
       "failedToCreate": "セッションを作成できませんでした。",
+      "checkOrganizationAccess": "この組織へのアクセス権を確認して、もう一度お試しください。",
       "couldNotRefreshRepositories": "リポジトリを更新できませんでした。もう一度お試しください。",
       "discardDraftTitle": "下書きを破棄しますか？",
       "discardDraftMessage": "入力したプロンプトが削除されます。",
@@ -1769,7 +1807,8 @@
       "linesBadge_other": "{{displayCount}}行",
       "matchesBadge_one": "{{displayCount}}件",
       "matchesBadge_other": "{{displayCount}}件",
-      "noOutput": "出力はありません。"
+      "noOutput": "出力はありません。",
+      "translationFailed": "翻訳に失敗しました"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}～{{end}}行目（一部省略）",
@@ -2228,7 +2267,7 @@
     "thisDevice": "このデバイス",
     "viewProfile": "プロフィールを表示",
     "signOutThisDevice": "このデバイスからサインアウト",
-    "signOutThisSession": "このセッションからサインアウト",
+    "signOutSessionLabel": "{{device}}からサインアウト、サインイン：{{signedIn}}",
     "sessionSignedOut": "セッションからサインアウトしました。",
     "signOutThisDeviceTitle": "このデバイスからサインアウトしますか？",
     "signOutThisSessionTitle": "このセッションからサインアウトしますか？",
@@ -2506,7 +2545,8 @@
       "description": "モバイルでプルリクエストをレビューするには、GitHubアカウントを接続してください。",
       "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
       "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
-      "bitbucketOrgOnlyDescription": "プロフィールで組織を選択すると、そのBitbucketプルリクエストをレビューできます。"
+      "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
+      "contextLine": "{{organization}}用"
     },
     "connectionExpired": "GitHubとの連携が期限切れになりました。",
     "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした。",
@@ -2933,7 +2973,9 @@
       "reviewNotSubmitted": "このレビューはこのままでは送信できません。PRが更新されていないか、自分が作成したプルリクエストではないか確認してください。",
       "reviewNotSubmittedTerm": "このレビューはそのまま送信できません。{{term}}が変更されたか、自分の{{term}}はレビューできません。",
       "couldNotPostComment": "コメントを投稿できませんでした。",
-      "couldNotSubmitReview": "レビューを送信できませんでした。接続を確認して、もう一度お試しください。"
+      "couldNotSubmitReview": "レビューを送信できませんでした。接続を確認して、もう一度お試しください。",
+      "rateLimited": "リクエストが多すぎます。しばらくしてからもう一度お試しください。",
+      "conflict": "作業中にこれが変更されました。読み込み直してもう一度お試しください。"
     },
     "operation": {
       "couldNotReply": "返信できませんでした。",
@@ -2941,7 +2983,6 @@
       "mergeResultDefaultError": "GitHubでマージが完了しませんでした。",
       "mergeResultNotCompleted": "{{term}}はマージされませんでした。状態を確認して再試行してください。",
       "ambiguous": "操作の結果を確認できませんでした。再試行する前にPRを確認してください。",
-      "persistenceFailed": "この操作を記録できませんでした。しばらくしてからもう一度お試しください。",
       "forbidden": "この操作を行う権限がありません。"
     },
     "capabilities": {
@@ -2970,11 +3011,22 @@
     "boundary": {
       "backToProfile": "プロフィールに戻る",
       "loadErrorMessage": "接続を確認して、もう一度お試しください。",
+
+      "chooseAccount": "アカウントを選択",
       "loadErrorTitle": "組織を読み込めませんでした。",
+      "noOrganization": "組織なし",
+
+      "noOrganizationDescription": "このアカウントは組織に属していません。メンバーの招待や残高不足のアラートなどの組織機能を使用するには、ウェブで組織を作成するか参加してください。",
+
+      "openWebOrganizations": "ウェブで組織を開く",
+
       "organizationUnavailable": "組織を利用できません。",
-      "selectDescription": "続行するには、プロフィールから組織を選択してください。",
+      "selectDescriptionWithOrganizations": "あなたは1つ以上の組織に所属しています。この画面で使用するアカウントを選択してください。",
+
       "selectOrganization": "組織を選択",
       "unavailableDescription": "この組織は利用できなくなりました。続行するには、プロフィールから組織を選択してください。",
+
+      "unavailableSessionsDescription": "この組織は利用できなくなりました。セッションを読み込めません。",
       "accessDeniedDescription": "この組織にアクセスする権限がありません。"
     },
     "creditActivity": {
@@ -3033,7 +3085,11 @@
       "separateEmailsHint": "複数のメールアドレスはカンマで区切ってください。",
       "thresholdLabel": "通知する残高の下限（USD）",
       "title": "残高アラート",
-      "emailsError": "有効なメールアドレスを1つ以上入力してください。複数ある場合はカンマで区切ってください。",
+      "emailsInvalid": "無効なメールアドレスがあります。",
+      "emailsRequired": "メールアドレスを1つ以上入力してください。",
+      "saveEmailsError": "一部のメールアドレスが受け付けられませんでした。確認して、もう一度お試しください。",
+      "saveError": "残高アラートを保存できませんでした。",
+      "thresholdPlaceholder": "金額を入力",
       "thresholdError": "0より大きい金額を入力してください。"
     },
     "memberLimit": {
@@ -3044,6 +3100,7 @@
       "removeLimit": "上限を解除",
       "title": "1日の利用上限額",
       "blankError": "金額を入力するか、下の「上限を解除」をタップしてください。",
+      "blankWithoutLimitError": "0から{{max}}までの1日の上限額を入力してください。",
       "rangeError": "0から{{max}}までの金額を入力してください。"
     },
     "members": {
@@ -3584,7 +3641,6 @@
     "keyTooLong": "キーは256文字以内で入力してください",
     "keyDuplicate": "このキーはすでにプロファイルに存在します",
     "valueLabel": "価値",
-    "secretLabel": "秘密",
     "secrets": {
       "markSecret": "シークレットとしてマークする",
       "masked": "隠された値",
@@ -3621,7 +3677,7 @@
       "empty": "MCP サーバーはまだありません",
       "name": "サーバー名",
       "type": "サーバーの種類",
-      "localType": "地元",
+      "localType": "ローカル",
       "remoteType": "リモート",
       "command": "コマンドライン",
       "url": "URL",
@@ -3643,7 +3699,9 @@
       "jsonTooLarge": "最大50件のエントリ（キーは128文字、値は4096文字まで）を使用してください",
       "timeoutInvalid": "タイムアウトはミリ秒単位の整数でなければなりません",
       "edit": "MCPサーバーの編集",
-      "saveFailed": "MCP サーバーを保存できませんでした"
+      "saveFailed": "MCP サーバーを保存できませんでした",
+      "deleteFailed": "MCP サーバーを削除できませんでした",
+      "updateFailed": "MCP サーバーを更新できませんでした"
     },
     "agents": {
       "title": "プロファイルエージェント",
@@ -3670,6 +3728,7 @@
       "visibilitySubagent": "サブエージェント — 他からのみ呼び出し可能",
       "visibilityAll": "すべて — 両方",
       "saveFailed": "エージェントを保存できませんでした",
+      "deleteFailed": "エージェントを削除できませんでした",
       "nameRequired": "エージェント名を入力してください",
       "slugRequired": "エージェントスラッグを入力してください",
       "slugInvalid": "スラグは文字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
@@ -3684,10 +3743,12 @@
       "description": "コマンドの説明",
       "template": "テンプレート",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS の説明",
       "subtask": "サブタスクとして実行",
       "edit": "スラッシュコマンドの編集",
       "saveFailed": "コマンドを保存できませんでした",
+      "deleteFailed": "コマンドを削除できませんでした",
       "nameRequired": "コマンド名を入力してください",
       "nameInvalid": "名前は小文字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
       "templateRequired": "コマンドテンプレートを入力してください",
@@ -3834,7 +3895,7 @@
     "view": "ブリーフィングを読む",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}、{{time}}",
-    "dismiss": "ライブ状況を表示",
+    "dismiss": "ブリーフィングを却下",
     "offline": "オフライン · 保存済みブリーフィング",
     "cached": "保存済みレポート · 更新できません",
     "revised": "改訂 · {{revision}}",

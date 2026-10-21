@@ -25,6 +25,7 @@
     "error": "errorea: {{error}}",
     "back": "Atzera",
     "somethingWentWrong": "Zerbait gaizki joan da.",
+    "actionNotRecorded": "Ezin izan dugu ekintza hau erregistratu. Saiatu berriro geroago.",
     "couldNotOpen": "Ezin izan da {{label}} ireki.",
     "link": "esteka",
     "takingLonger": "Uste baino denbora gehiago behar da. Hau itxi eta geroago berriro begira dezakezu.",
@@ -35,6 +36,8 @@
     "connectGithub": "Konektatu GitHub",
     "cost": "Kostua",
     "discard": "Baztertu",
+    "discardChangesMessage": "Zure aldaketak galduko dira.",
+    "discardChangesTitle": "Baztertu aldaketak?",
     "findings": "Antzemandako arazoak",
     "mergeRequest": "merge-eskaera",
     "notConnected": "Konektatu gabe",
@@ -109,7 +112,9 @@
     "online": "Konektatuta",
     "open": "Ireki {{name}}",
     "openPullRequest": "Ireki bateratze-eskaera",
+    "completed": "Amaituta",
     "pending": "Zain",
+    "running": "Martxan",
     "performance": "Errendimendua",
     "preferences": "Hobespenak",
     "privacyPolicy": "Pribatutasun-politika",
@@ -661,7 +666,8 @@
       "description": "Konektatu zure GitHub kontua bateratze-eskaerak mugikorrean berrikusteko.",
       "gitlabDescription": "Konektatu zure GitLab kontua merge-eskaerak mugikorrean berrikusteko.",
       "bitbucketDescription": "Konektatu Bitbucket erakunde honetara bateratze-eskaerak mugikorrean berrikusteko.",
-      "bitbucketOrgOnlyDescription": "Hautatu erakunde bat zure profilean haren Bitbucket-eko bateratze-eskaerak berrikusteko."
+      "bitbucketOrgOnlyDescription": "Aldatu goiko kontua erakunde batera haren Bitbucket bateratze-eskaerak berrikusteko.",
+      "contextLine": "{{organization}}-rako"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +775,9 @@
       "reviewNotSubmitted": "Berrikuspen hau ezin da dagoen bezala bidali. Baliteke PRa aldatu izana edo zure bateratze-eskaera berrikusten aritzea, eta hori ez dago baimenduta.",
       "reviewNotSubmittedTerm": "Berrikuspen hau ezin da oraingo egoeran bidali. Baliteke {{term}} aldatu izana, edo ezin duzu zure {{term}} propioa berrikusi.",
       "couldNotPostComment": "Ezin izan da iruzkina argitaratu.",
-      "couldNotSubmitReview": "Ezin izan da berrikuspena bidali. Egiaztatu konexioa eta saiatu berriro."
+      "couldNotSubmitReview": "Ezin izan da berrikuspena bidali. Egiaztatu konexioa eta saiatu berriro.",
+      "rateLimited": "Eskari gehiegi. Saiatu geroago berriro.",
+      "conflict": "Hau aldatu egin da lanean ari zinen bitartean. Birkargatu eta saiatu berriro."
     },
     "operation": {
       "couldNotReply": "Ezin izan da erantzun.",
@@ -777,7 +785,6 @@
       "mergeResultDefaultError": "GitHub-ek ez du bateratzea amaitu.",
       "mergeResultNotCompleted": "{{term}} ez da bateratu. Egiaztatu egoera eta saiatu berriro.",
       "ambiguous": "Ezin izan da berretsi — egiaztatu PR-a berriro saiatu aurretik.",
-      "persistenceFailed": "Ezin izan dugu ekintza hau erregistratu. Saiatu berriro geroago.",
       "forbidden": "Ez dago baimenduta."
     },
     "capabilities": {
@@ -1449,8 +1456,9 @@
       "loading": "Berrikuspen-memoria kargatzen",
       "couldNotLoad": "Ezin izan da berrikuspen-memoria kargatu.",
       "off": "Berrikuspen-memoria desgaituta dago.",
+      "on": "Berrikuspen-memoria gaituta dago.",
       "offDescription": "Gaitu aukera hau Kilok mantentzaileen erantzunetatik ikas dezan eta REVIEW.md fitxategirako jarraibideak proposa ditzan.",
-      "readOnlyDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik gaitu dezakete berrikuspen-memoria.",
+      "readOnlyDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik alda dezakete berrikuspen-memoria.",
       "enable": "Gaitu berrikuspen-memoria",
       "loadingProposals": "Proposamenak kargatzen",
       "couldNotLoadProposals": "Ezin izan dira proposamenak kargatu.",
@@ -1531,8 +1539,6 @@
     "updateFailed": "Ezin izan da berrikuslea eguneratu.",
     "configSaveFailed": "Ezin izan da berrikuspenaren konfigurazioa gorde.",
     "status": {
-      "running": "Martxan",
-      "completed": "Amaituta",
       "interrupted": "Etenda"
     },
     "reviewStyle": {
@@ -1545,7 +1551,8 @@
       "bugs": "Akatsak",
       "style": "Estiloa",
       "testing": "Probak",
-      "documentation": "Dokumentazioa"
+      "documentation": "Dokumentazioa",
+      "unknown": "Besteak ({{area}})"
     },
     "gateThreshold": {
       "warning": "Abisua"
@@ -1657,7 +1664,14 @@
       "whereFound": "Non aurkitu den ({{displayCount}})",
       "fullReport": "Sortutako txosten osoa",
       "yes": "Bai",
-      "no": "Ez"
+      "no": "Ez",
+      "action": {
+        "analyzeCodebase": "Analizatu kode-oinarria",
+        "dismiss": "Baztertu",
+        "manualReview": "Eskuzko berrikuspena",
+        "monitor": "Monitorizatu",
+        "openPr": "Ireki PRa"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} aurkikuntza",
@@ -1859,12 +1873,16 @@
     "settingsSave": {
       "saveChanges": "Gorde aldaketak",
       "unsavedTitle": "Gorde gabeko aldaketak",
-      "unsavedMessage": "Aldaketak gorde nahi dituzu pantaila honetatik irten aurretik?"
+      "unsavedMessage": "Aldaketak gorde nahi dituzu pantaila honetatik irten aurretik?",
+      "unsavedInvalidMessage": "Aldaketa hauek ezin dira oraindik gorde. Zuzendu itzazu gordetzeko, edo baztertu irteteko."
     },
     "auditReportButton": {
       "viewA11y": "Ikusi auditoria-txostena"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administratzailea",
+      "actorMaskedUser": "Ezkutuko erabiltzailea",
+      "actorSystem": "Kilo sistema",
       "couldNotLoad": "Ezin izan da auditoria-txostena kargatu.",
       "events": "Gertaerak",
       "generated": "Txostena sortu da: {{generatedAt}}.",
@@ -1876,7 +1894,24 @@
       "title": "Auditoria-txostena",
       "unavailable": "Auditoria-txostena ez dago erabilgarri",
       "unavailableDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik ikus ditzakete auditoria-txostenak. Eskatu jabe bati edo fakturazio-kudeatzaile bati sarbidea emateko.",
-      "queryFailed": "Txostenaren kontsulta ez da amaitu. Saiatu berriro."
+      "queryFailed": "Txostenaren kontsulta ez da amaitu. Saiatu berriro.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analisia amaitu da",
+        "findingAnalysisFailed": "Analisiak huts egin du",
+        "findingAutoDismissed": "Automatikoki baztertua",
+        "findingCreated": "Inportatuta",
+        "findingDeleted": "Ezabatua",
+        "findingDismissed": "Baztertua",
+        "findingSeverityChanged": "Larritasuna aldatu da",
+        "findingStatusChange": "Egoera aldatu da",
+        "findingSuperseded": "Ordezkatua",
+        "remediationBlocked": "Konponketa blokeatu da",
+        "remediationCancelled": "Baliogabetua",
+        "remediationFailed": "Konponketak huts egin du",
+        "remediationNoChangesNeeded": "Ez da aldaketarik behar",
+        "remediationPrOpened": "PRa ireki da",
+        "remediationQueued": "Konponketa eskatu da"
+      }
     },
     "notifications": {
       "couldNotLoad": "Ezin izan dira jakinarazpen-ezarpenak kargatu.",
@@ -1908,7 +1943,6 @@
       "installApp": "Instalatu GitHub aplikazioa",
       "reauthorizeButton": "Baimendu berriro GitHub aplikazioa",
       "reauthorizeDescription": "Segurtasun-agenteak vulnerability_alerts baimena behar du Dependabot-en abisuak atzitzeko. Baimendu berriro GitHub aplikazioa baimen hori emateko.",
-      "reauthorizeFailed": "Ezin izan da berriro baimentzeko prozesua hasi. Saiatu berriro.",
       "reauthorizeTitle": "Baimen gehigarriak behar dira",
       "setupFailed": "Ezin izan da GitHub konfiguratzeko prozesua hasi. Saiatu berriro."
     },
@@ -1927,7 +1961,12 @@
       "syncMayNotHaveCompleted": "Baliteke sinkronizazioa amaitu gabe geratu izana. Saiatu berriro haren egoera eguneratzeko, edo baztertu.",
       "syncInProgress": "Segurtasun-sinkronizazio bat jada martxan dago. Saiatu berriro.",
       "dismissalInProgress": "Baztertze hau jada martxan dago. Saiatu berriro.",
-      "couldNotReadPendingSyncs": "Ezin izan dira zain dauden sinkronizazioak irakurri. Saiatu berriro."
+      "couldNotReadPendingSyncs": "Ezin izan dira zain dauden sinkronizazioak irakurri. Saiatu berriro.",
+      "ambiguous": "Ezin izan da berretsi — egiaztatu segurtasun-azterketa berriro saiatu aurretik.",
+      "settleFailed": "Ekintza burutu da, baina ezin izan dugu emaitza erregistratu. Saiatu berriro.",
+      "replayFailed": "Ekintza hau ez da burutu. Saiatu berriro.",
+      "actionFailed": "Ezin izan da ekintza hau burutu. Saiatu berriro.",
+      "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik."
     },
     "analysisState": {
       "queued": "Azterketa ilaran",
@@ -2212,6 +2251,7 @@
       "prefillModelUnavailable": "{{model}} jada ez dago erabilgarri. Zure modelo lehenetsia erabiltzen ari da.",
       "couldNotReadPendingSessions": "Ezin izan dira zain dauden saioak irakurri. Saiatu berriro.",
       "failedToCreate": "Ezin izan da saioa sortu.",
+      "checkOrganizationAccess": "Egiaztatu zure sarbidea erakunde honetara eta saiatu berriro.",
       "couldNotRefreshRepositories": "Ezin izan da biltegien zerrenda freskatu. Saiatu berriro.",
       "discardDraftTitle": "Baztertu zirriborroa?",
       "discardDraftMessage": "Zure eskaera galduko da.",
@@ -2281,7 +2321,8 @@
       "linesBadge_other": "{{displayCount}} lerro",
       "matchesBadge_one": "{{displayCount}} bat etortze",
       "matchesBadge_other": "{{displayCount}} bat etortze",
-      "noOutput": "Irteerarik ez."
+      "noOutput": "Irteerarik ez.",
+      "translationFailed": "Itzulpena huts egin du"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} lerroak (moztuta)",
@@ -2740,7 +2781,7 @@
     "thisDevice": "Gailu hau",
     "viewProfile": "Ikusi profila",
     "signOutThisDevice": "Itxi saioa gailu honetan",
-    "signOutThisSession": "Itxi saio hau",
+    "signOutSessionLabel": "Itxi saioa: {{device}}, saio-hasiera: {{signedIn}}",
     "sessionSignedOut": "Saioa itxi da.",
     "signOutThisDeviceTitle": "Itxi saioa gailu honetan?",
     "signOutThisSessionTitle": "Itxi saio hau?",
@@ -2978,11 +3019,22 @@
     "boundary": {
       "backToProfile": "Itzuli profilera",
       "loadErrorMessage": "Egiaztatu konexioa eta saiatu berriro.",
+
+      "chooseAccount": "Hautatu kontu bat",
       "loadErrorTitle": "Ezin izan dira zure erakundeak kargatu.",
+      "noOrganization": "Erakunderik ez",
+
+      "noOrganizationDescription": "Kontu hau ez da erakunde baten parte. Sortu edo batu erakunde bat webgunean, kideen gonbidapenak eta saldo baxuaren abisuak bezalako erakunde-funtzioak erabiltzeko.",
+
+      "openWebOrganizations": "Ireki erakundeak webgunean",
+
       "organizationUnavailable": "Erakundea ez dago erabilgarri.",
-      "selectDescription": "Aukeratu erakunde bat zure profiletik jarraitzeko.",
+      "selectDescriptionWithOrganizations": "Erakunde bateko edo gehiagoko kide zara. Hautatu pantaila honek erabili behar duen kontua.",
+
       "selectOrganization": "Hautatu erakunde bat",
       "unavailableDescription": "Erakunde hau jada ez dago erabilgarri. Aukeratu bat zure profiletik jarraitzeko.",
+
+      "unavailableSessionsDescription": "Erakunde hau jada ez dago erabilgarri. Ezin dira kargatu haren saioak.",
       "accessDeniedDescription": "Ez duzu erakunde honetarako sarbiderik."
     },
     "creditActivity": {
@@ -3034,7 +3086,11 @@
       "separateEmailsHint": "Bereizi helbide elektronikoak komaz.",
       "thresholdLabel": "Alerta atalase honen azpitik (USD)",
       "title": "Saldo baxuko alerta",
-      "emailsError": "Sartu baliozko helbide elektroniko bat gutxienez. Bat baino gehiago sartuz gero, bereizi komaz.",
+      "emailsInvalid": "Helbide elektroniko bat edo gehiago ez dira baliozkoak.",
+      "emailsRequired": "Sartu helbide elektroniko bat gutxienez.",
+      "saveEmailsError": "Helbide elektroniko batzuk ez dira onartuak izan. Berrikusi eta saiatu berriro.",
+      "saveError": "Ezin izan da saldo baxuko alerta gorde.",
+      "thresholdPlaceholder": "Sartu zenbateko bat",
       "thresholdError": "Sartu 0 baino handiagoa den zenbateko bat."
     },
     "memberLimit": {
@@ -3045,6 +3101,7 @@
       "removeLimit": "Kendu muga",
       "title": "Eguneko erabilera-muga",
       "blankError": "Sartu zenbateko bat edo sakatu beheko Kendu muga botoia.",
+      "blankWithoutLimitError": "Sartu eguneroko muga bat 0 eta {{max}} artean.",
       "rangeError": "Sartu 0 eta {{max}} arteko zenbateko bat."
     },
     "members": {
@@ -3584,7 +3641,6 @@
     "keyTooLong": "Gakoak 256 karaktere edo gutxiago izan behar ditu",
     "keyDuplicate": "Gako hau jada badago profilean",
     "valueLabel": "Balioa",
-    "secretLabel": "Sekretua",
     "secrets": {
       "markSecret": "Markatu sekretu gisa",
       "masked": "Ezkutuko balioa",
@@ -3643,7 +3699,9 @@
       "jsonTooLarge": "Erabili gehienez 50 sarrera, gakoak 128 arte eta balioak 4096 karaktere arte",
       "timeoutInvalid": "Denbora-mugak milisegundo kopuru osoa izan behar du",
       "edit": "Editatu MCP zerbitzaria",
-      "saveFailed": "Ezin izan da MCP zerbitzaria gorde"
+      "saveFailed": "Ezin izan da MCP zerbitzaria gorde",
+      "deleteFailed": "Ezin izan da MCP zerbitzaria ezabatu",
+      "updateFailed": "Ezin izan da MCP zerbitzaria eguneratu"
     },
     "agents": {
       "title": "Profileko agenteak",
@@ -3670,6 +3728,7 @@
       "visibilitySubagent": "Azpi-agentea - besteengandik bakarrik dei daiteke",
       "visibilityAll": "Guztiak - biak",
       "saveFailed": "Ezin izan da agentea gorde",
+      "deleteFailed": "Ezin izan da agentea ezabatu",
       "nameRequired": "Sartu agentearen izena",
       "slugRequired": "Sartu agente bare bat",
       "slugInvalid": "Slug-ek letra batekin hasi behar du eta letra xeheak, zifrak eta marratxoak soilik erabili behar ditu",
@@ -3684,10 +3743,12 @@
       "description": "Komandoaren deskribapena",
       "template": "Txantiloia",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Azaldu $ARGUMENTS",
       "subtask": "Exekutatu azpizeregin gisa",
       "edit": "Editatu barra komandoa",
       "saveFailed": "Ezin izan da gorde komandoa",
+      "deleteFailed": "Ezin izan da komandoa ezabatu",
       "nameRequired": "Sartu komando-izen bat",
       "nameInvalid": "Izenak letra xehe batekin hasi behar du eta letra xeheak, zifrak eta marra baino ez ditu erabili",
       "templateRequired": "Sartu komando txantiloia",
@@ -3834,7 +3895,7 @@
     "view": "Irakurri laburpena",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Erakutsi zuzeneko egoera",
+    "dismiss": "Baztertu laburpena",
     "offline": "Lineaz kanpo · gordetako laburpena",
     "cached": "Gordetako txostena · ezin da freskatu",
     "revised": "Berrikusia · {{revision}}",

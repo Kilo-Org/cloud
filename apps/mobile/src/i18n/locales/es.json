@@ -25,6 +25,7 @@
     "error": "fallo: {{error}}",
     "back": "Atrás",
     "somethingWentWrong": "Se ha producido un error.",
+    "actionNotRecorded": "No se pudo registrar esta acción. Inténtalo de nuevo más tarde.",
     "couldNotOpen": "No se pudo abrir {{label}}.",
     "link": "enlace",
     "takingLonger": "Esto está tardando más de lo esperado. Puedes cerrarlo y comprobarlo de nuevo.",
@@ -35,6 +36,8 @@
     "connectGithub": "Conectar GitHub",
     "cost": "Coste",
     "discard": "Descartar",
+    "discardChangesMessage": "Tus cambios se perderán.",
+    "discardChangesTitle": "¿Descartar cambios?",
     "findings": "Hallazgos",
     "mergeRequest": "merge request",
     "notConnected": "Sin conexión",
@@ -109,7 +112,9 @@
     "online": "En línea",
     "open": "Abrir {{name}}",
     "openPullRequest": "PR abierta",
+    "completed": "Completado",
     "pending": "Pendiente",
+    "running": "En ejecución",
     "performance": "Rendimiento",
     "preferences": "Preferencias",
     "privacyPolicy": "Política de privacidad",
@@ -993,8 +998,9 @@
       "noProposals": "Sin propuestas",
       "noProposalsDescription": "Las propuestas de la memoria de revisión aparecen aquí después de que Kilo analice las respuestas de los responsables del mantenimiento.",
       "off": "La memoria de revisión está desactivada.",
+      "on": "La memoria de revisión está activada.",
       "offDescription": "Actívala para que Kilo aprenda de las respuestas de los responsables del mantenimiento y proponga directrices para REVIEW.md.",
-      "readOnlyDescription": "Solo los propietarios de la organización y los administradores de facturación pueden activar la memoria de revisión.",
+      "readOnlyDescription": "Solo los propietarios de la organización y los administradores de facturación pueden cambiar la memoria de revisión.",
       "title": "Memoria de revisiones"
     },
     "scopeList": {
@@ -1022,8 +1028,6 @@
     "updateFailed": "No se pudo actualizar el revisor.",
     "configSaveFailed": "No se pudo guardar la configuración de revisión.",
     "status": {
-      "running": "En ejecución",
-      "completed": "Completado",
       "interrupted": "Interrumpida"
     },
     "reviewStyle": {
@@ -1036,7 +1040,8 @@
       "bugs": "Errores",
       "style": "Estilo",
       "testing": "Pruebas",
-      "documentation": "Documentación"
+      "documentation": "Documentación",
+      "unknown": "Otro ({{area}})"
     },
     "gateThreshold": {
       "warning": "Advertencia"
@@ -1115,7 +1120,14 @@
       "triageReasoning": "Justificación de la evaluación inicial",
       "watchInCloudAgent": "Ver en el agente en la nube",
       "whereFound": "Dónde se encontró ({{displayCount}})",
-      "yes": "Sí"
+      "yes": "Sí",
+      "action": {
+        "analyzeCodebase": "Analizar el código",
+        "dismiss": "Descartar",
+        "manualReview": "Revisión manual",
+        "monitor": "Supervisar",
+        "openPr": "Abrir PR"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Modelo de análisis",
@@ -1126,6 +1138,9 @@
       "triageModel": "Modelo de evaluación inicial"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrador de Kilo",
+      "actorMaskedUser": "Usuario enmascarado",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "No se pudo cargar el informe de auditoría.",
       "events": "Eventos",
       "generated": "El informe se generó el {{generatedAt}}.",
@@ -1137,7 +1152,24 @@
       "summary": "Resumen del informe",
       "title": "Informe de auditoría",
       "unavailable": "Informe de auditoría no disponible",
-      "unavailableDescription": "Solo los propietarios de la organización y los administradores de facturación pueden ver los informes de auditoría. Pide a un propietario o a un administrador de facturación que te dé acceso."
+      "unavailableDescription": "Solo los propietarios de la organización y los administradores de facturación pueden ver los informes de auditoría. Pide a un propietario o a un administrador de facturación que te dé acceso.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Análisis completado",
+        "findingAnalysisFailed": "Error en el análisis",
+        "findingAutoDismissed": "Descartado automáticamente",
+        "findingCreated": "Importado",
+        "findingDeleted": "Eliminado",
+        "findingDismissed": "Descartado",
+        "findingSeverityChanged": "Se ha cambiado la gravedad",
+        "findingStatusChange": "Se ha cambiado el estado",
+        "findingSuperseded": "Sustituido",
+        "remediationBlocked": "Corrección bloqueada",
+        "remediationCancelled": "Cancelado",
+        "remediationFailed": "Error en la corrección",
+        "remediationNoChangesNeeded": "No se necesitan cambios",
+        "remediationPrOpened": "Se ha abierto un PR",
+        "remediationQueued": "Corrección solicitada"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Ver el informe de auditoría"
@@ -1360,7 +1392,6 @@
       "installApp": "Instalar la aplicación de GitHub",
       "reauthorizeButton": "Volver a autorizar la aplicación de GitHub",
       "reauthorizeDescription": "El agente de seguridad necesita el permiso vulnerability_alerts para acceder a las alertas de Dependabot. Vuelve a autorizar la aplicación de GitHub para conceder este permiso.",
-      "reauthorizeFailed": "No se pudo iniciar la reautorización. Inténtalo de nuevo.",
       "reauthorizeTitle": "Se requieren permisos adicionales",
       "setupFailed": "No se pudo iniciar la configuración de GitHub. Inténtalo de nuevo."
     },
@@ -1384,6 +1415,7 @@
     "settingsSave": {
       "saveChanges": "Guardar cambios",
       "unsavedMessage": "¿Guardar los cambios antes de salir de esta pantalla?",
+      "unsavedInvalidMessage": "Estos cambios aún no se pueden guardar. Corrígelos para guardarlos o descártalos para salir.",
       "unsavedTitle": "Cambios sin guardar"
     },
     "setup": {
@@ -1422,7 +1454,12 @@
       "syncMayNotHaveCompleted": "Es posible que una sincronización no se haya completado. Reinténtala para actualizar su estado o descártala.",
       "syncInProgress": "Ya hay una sincronización de seguridad en curso. Inténtalo de nuevo.",
       "dismissalInProgress": "Este descarte ya está en curso. Inténtalo de nuevo.",
-      "couldNotReadPendingSyncs": "No se pudieron leer las sincronizaciones pendientes. Inténtalo de nuevo."
+      "couldNotReadPendingSyncs": "No se pudieron leer las sincronizaciones pendientes. Inténtalo de nuevo.",
+      "ambiguous": "No se pudo confirmar el resultado. Comprueba la revisión de seguridad antes de volver a intentarlo.",
+      "settleFailed": "La acción se completó, pero no pudimos registrar el resultado. Inténtalo de nuevo.",
+      "replayFailed": "Esta acción no se completó. Inténtalo de nuevo.",
+      "actionFailed": "No se pudo completar esta acción. Inténtalo de nuevo.",
+      "actionBlocked": "No se pudo completar esta acción. Hay que solucionar el problema antes de poder reintentarlo."
     },
     "analysisState": {
       "queued": "Análisis en cola",
@@ -1712,6 +1749,7 @@
       "prefillModelUnavailable": "{{model}} ya no está disponible. Se está usando tu modelo predeterminado.",
       "couldNotReadPendingSessions": "No se pudieron leer las sesiones pendientes. Inténtalo de nuevo.",
       "failedToCreate": "No se pudo crear la sesión.",
+      "checkOrganizationAccess": "Comprueba tu acceso a esta organización e inténtalo de nuevo.",
       "couldNotRefreshRepositories": "No se pudieron actualizar los repositorios. Inténtalo de nuevo.",
       "discardDraftTitle": "¿Descartar borrador?",
       "discardDraftMessage": "Se perderán tus instrucciones.",
@@ -1785,7 +1823,8 @@
       "matchesBadge_one": "{{displayCount}} coincidencia",
       "matchesBadge_other": "{{displayCount}} coincidencias",
       "matchesBadge_many": "{{displayCount}} coincidencias",
-      "noOutput": "No hay salida."
+      "noOutput": "No hay salida.",
+      "translationFailed": "Error al traducir"
     },
     "readToolMarkdown": {
       "linesTruncated": "líneas {{start}}–{{end}} (truncadas)",
@@ -2205,7 +2244,7 @@
       "invalidLink": "Este enlace no se puede abrir.",
       "hostConfirmTitle": "¿Abrir enlace externo?",
       "hostConfirmMessage": "Este enlace abre {{host}} en tu navegador.",
-      "open": "Apertura",
+      "open": "Abrir",
       "trustThisHost": "Confiar en este dominio"
     },
     "folderPicker": {
@@ -2251,7 +2290,7 @@
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver perfil",
     "signOutThisDevice": "Cerrar sesión en este dispositivo",
-    "signOutThisSession": "Cerrar esta sesión",
+    "signOutSessionLabel": "Cerrar sesión en {{device}}, inicio de sesión: {{signedIn}}",
     "sessionSignedOut": "Sesión cerrada.",
     "signOutThisDeviceTitle": "¿Cerrar sesión en este dispositivo?",
     "signOutThisSessionTitle": "¿Cerrar esta sesión?",
@@ -2531,7 +2570,8 @@
       "description": "Conecta tu cuenta de GitHub para revisar PR en el móvil.",
       "gitlabDescription": "Conecta tu cuenta de GitLab para revisar merge requests en el móvil.",
       "bitbucketDescription": "Conecta Bitbucket a esta organización para revisar PR en el móvil.",
-      "bitbucketOrgOnlyDescription": "Selecciona una organización en tu perfil para revisar sus PR de Bitbucket."
+      "bitbucketOrgOnlyDescription": "Cambia la cuenta de arriba a una organización para revisar sus PR en Bitbucket.",
+      "contextLine": "Para {{organization}}"
     },
     "connectionExpired": "La conexión con GitHub ha caducado.",
     "couldNotLoadPullRequest": "No se pudo cargar la PR.",
@@ -2653,7 +2693,7 @@
       "openAccessibility": "Abrir una PR o un merge request",
       "clearLink": "Borrar el enlace",
       "pasteLink": "Pegar el enlace de PR o de merge request",
-      "open": "Apertura"
+      "open": "Abrir"
     },
     "eventChips": {
       "comment": "Comentario",
@@ -2973,7 +3013,9 @@
       "reviewNotSubmitted": "Esta revisión no se puede enviar en su estado actual. Puede que la PR haya cambiado o que no tengas permiso para revisar tu propia PR.",
       "reviewNotSubmittedTerm": "Esta revisión no se puede enviar en su estado actual. Puede que {{term}} haya cambiado o que no tengas permiso para revisar tu propio {{term}}.",
       "couldNotPostComment": "No se pudo publicar el comentario.",
-      "couldNotSubmitReview": "No se pudo enviar la revisión. Comprueba tu conexión e inténtalo de nuevo."
+      "couldNotSubmitReview": "No se pudo enviar la revisión. Comprueba tu conexión e inténtalo de nuevo.",
+      "rateLimited": "Demasiadas solicitudes. Inténtalo de nuevo más tarde.",
+      "conflict": "Esto cambió mientras trabajabas en ello. Vuelve a cargarlo e inténtalo de nuevo."
     },
     "operation": {
       "couldNotReply": "No se pudo responder.",
@@ -2981,7 +3023,6 @@
       "mergeResultDefaultError": "GitHub no completó la fusión.",
       "mergeResultNotCompleted": "No se ha fusionado {{term}}. Comprueba su estado e inténtalo de nuevo.",
       "ambiguous": "No se pudo confirmar el resultado. Comprueba la PR antes de volver a intentarlo.",
-      "persistenceFailed": "No se pudo registrar esta acción. Inténtalo de nuevo más tarde.",
       "forbidden": "No tienes permiso para realizar esta acción."
     },
     "capabilities": {
@@ -3010,11 +3051,22 @@
     "boundary": {
       "backToProfile": "Volver al perfil",
       "loadErrorMessage": "Comprueba tu conexión e inténtalo de nuevo.",
+
+      "chooseAccount": "Elegir una cuenta",
       "loadErrorTitle": "No se pudieron cargar tus organizaciones.",
+      "noOrganization": "Sin organización",
+
+      "noOrganizationDescription": "Esta cuenta no forma parte de una organización. Crea una o únete a una en la web para usar funciones de organización como invitaciones de miembros y alertas de saldo bajo.",
+
+      "openWebOrganizations": "Abrir organizaciones en la web",
+
       "organizationUnavailable": "La organización no está disponible.",
-      "selectDescription": "Elige una organización de tu perfil para continuar.",
+      "selectDescriptionWithOrganizations": "Perteneces a una o más organizaciones. Elige la cuenta que debe usar esta pantalla.",
+
       "selectOrganization": "Seleccionar una organización",
       "unavailableDescription": "Esta organización ya no está disponible. Elige una de tu perfil para continuar.",
+
+      "unavailableSessionsDescription": "Esta organización ya no está disponible. No se pueden cargar sus sesiones.",
       "accessDeniedDescription": "No tienes acceso a esta organización."
     },
     "creditActivity": {
@@ -3073,7 +3125,11 @@
       "separateEmailsHint": "Separa las direcciones de correo con comas.",
       "thresholdLabel": "Avisar si el saldo es inferior a (USD)",
       "title": "Alerta de saldo bajo",
-      "emailsError": "Introduce al menos una dirección de correo válida. Si introduces varias, sepáralas con comas.",
+      "emailsInvalid": "Una o más direcciones de correo no son válidas.",
+      "emailsRequired": "Introduce al menos una dirección de correo.",
+      "saveEmailsError": "Algunas direcciones de correo no se han aceptado. Compruébalas e inténtalo de nuevo.",
+      "saveError": "No se ha podido guardar la alerta de saldo bajo.",
+      "thresholdPlaceholder": "Introduce un importe",
       "thresholdError": "Introduce un importe mayor que 0."
     },
     "memberLimit": {
@@ -3084,6 +3140,7 @@
       "removeLimit": "Eliminar límite",
       "title": "Límite de uso diario",
       "blankError": "Introduce un importe o elimina el límite con el botón de abajo.",
+      "blankWithoutLimitError": "Introduce un límite diario entre 0 y {{max}}.",
       "rangeError": "Introduce un importe entre 0 y {{max}}."
     },
     "members": {
@@ -3625,7 +3682,6 @@
     "keyTooLong": "La clave debe tener 256 caracteres o menos",
     "keyDuplicate": "Esta clave ya existe en el perfil",
     "valueLabel": "Valor",
-    "secretLabel": "Secreto",
     "secrets": {
       "markSecret": "Marcar como secreto",
       "masked": "Valor oculto",
@@ -3684,18 +3740,20 @@
       "jsonTooLarge": "Usa como máximo 50 entradas, claves de hasta 128 y valores de hasta 4096 caracteres",
       "timeoutInvalid": "El tiempo de espera debe ser un número entero de milisegundos.",
       "edit": "Editar servidor MCP",
-      "saveFailed": "No se pudo guardar el servidor MCP"
+      "saveFailed": "No se pudo guardar el servidor MCP",
+      "deleteFailed": "No se pudo eliminar el servidor MCP",
+      "updateFailed": "No se pudo actualizar el servidor MCP"
     },
     "agents": {
       "title": "Agentes de perfil",
       "add": "Agregar agente",
       "empty": "Aún no hay agentes",
       "name": "Nombre del agente",
-      "slug": "babosa agente",
+      "slug": "Slug del agente",
       "description": "Descripción del agente",
       "model": "Anulación de modelo",
       "modelPlaceholder": "Usar sesión predeterminada",
-      "prompt": "Aviso del sistema",
+      "prompt": "Prompt del sistema",
       "steps": "Pasos máximos",
       "stepsPlaceholder": "p. ej. 50",
       "temperature": "Temperatura",
@@ -3711,6 +3769,7 @@
       "visibilitySubagent": "Subagente: solo puede ser invocado por otros",
       "visibilityAll": "Todos - ambos",
       "saveFailed": "No se pudo guardar al agente",
+      "deleteFailed": "No se pudo eliminar al agente",
       "nameRequired": "Ingrese el nombre de un agente",
       "slugRequired": "Introduzca una babosa de agente",
       "slugInvalid": "Slug debe comenzar con una letra y usar solo letras minúsculas, dígitos y guiones.",
@@ -3725,10 +3784,12 @@
       "description": "Descripción del comando",
       "template": "Plantilla",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explique $ARGUMENTS",
       "subtask": "Ejecutar como subtarea",
       "edit": "Editar comando de barra diagonal",
       "saveFailed": "No se pudo guardar el comando",
+      "deleteFailed": "No se pudo eliminar el comando",
       "nameRequired": "Introduzca un nombre de comando",
       "nameInvalid": "El nombre debe comenzar con una letra minúscula y usar solo letras minúsculas, dígitos y guiones.",
       "templateRequired": "Ingrese una plantilla de comando",
@@ -3879,7 +3940,7 @@
     "view": "Leer resumen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Ver estado en vivo",
+    "dismiss": "Descartar resumen",
     "offline": "Sin conexión · resumen guardado",
     "cached": "Informe guardado · no se puede actualizar",
     "revised": "Revisado · {{revision}}",

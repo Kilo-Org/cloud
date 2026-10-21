@@ -86,7 +86,7 @@ const store: AttentionStore = (globalScope[STORE_KEY] ??= {
 
 // ── Encrypted KV (lazy) ─────────────────────────────────────────────────────
 
-/** The two encrypted-KV calls this module uses, kept structural so the lazy
+/** The encrypted-KV calls this module uses, kept structural so the lazy
  * import never pulls the native SQLCipher chain into this module's types. */
 type AttentionKv = {
   getItem: (scope: string, k: string) => Promise<string | null>;
@@ -230,7 +230,6 @@ function bumpRevision(): void {
   }
 }
 
-/** Notify subscribers and persist the new entries map. */
 function commit(): void {
   bumpRevision();
   persistEntries();

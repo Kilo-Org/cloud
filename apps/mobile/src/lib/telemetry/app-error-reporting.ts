@@ -37,6 +37,7 @@ const JsonTextSchema = z.string();
 const TelemetryDescriptionSchema = z.looseObject({
   fingerprint: z.array(z.string()).min(1),
   level: z.enum(['warning', 'error']).optional(),
+  report: z.enum(['event', 'none']).optional(),
   tags: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
   contexts: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
   extra: z.record(z.string(), z.unknown()).optional(),
@@ -191,6 +192,12 @@ export function reportAppError(error: unknown, context: AppErrorContext): void {
       return;
     }
     const declared = declaredTelemetryDescription(error);
+    if (declared?.report === 'none') {
+      // The network layer owns this answer (an error-status response, or a
+      // transport failure it keeps as a breadcrumb): a second record here would
+      // duplicate it.
+      return;
+    }
     captureTelemetry({
       error,
       level: declared?.level ?? 'error',

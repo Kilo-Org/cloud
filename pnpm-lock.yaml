@@ -1290,9 +1290,6 @@ importers:
       lucide-react:
         specifier: 0.552.0
         version: 0.552.0(react@19.2.6)
-      mailgun.js:
-        specifier: 12.7.1
-        version: 12.7.1
       monaco-editor:
         specifier: 0.55.1
         version: 0.55.1

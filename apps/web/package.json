@@ -146,7 +146,6 @@
     "jsonwebtoken": "catalog:",
     "linkify-it": "5.0.2",
     "lucide-react": "0.552.0",
-    "mailgun.js": "12.7.1",
     "monaco-editor": "0.55.1",
     "motion": "12.36.0",
     "next": "16.3.8",

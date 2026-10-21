@@ -25,6 +25,7 @@
     "error": "오류: {{error}}",
     "back": "뒤로",
     "somethingWentWrong": "문제가 발생했습니다.",
+    "actionNotRecorded": "이 작업을 기록하지 못했습니다. 나중에 다시 시도하세요.",
     "couldNotOpen": "{{label}}을(를) 열지 못했습니다.",
     "link": "링크",
     "takingLonger": "예상보다 시간이 더 걸리고 있습니다. 이 화면을 닫고 나중에 다시 확인할 수 있습니다.",
@@ -994,8 +995,9 @@
       "noProposals": "제안 없음",
       "noProposalsDescription": "Kilo가 유지보수 담당자의 답변을 분석하면 리뷰 메모리 제안이 여기에 표시됩니다.",
       "off": "리뷰 메모리가 꺼져 있습니다.",
+      "on": "리뷰 메모리가 켜져 있습니다.",
       "offDescription": "리뷰 메모리를 활성화하면 Kilo가 유지보수 담당자의 답변을 학습하여 REVIEW.md 지침을 제안합니다.",
-      "readOnlyDescription": "조직 소유자와 결제 관리자만 리뷰 메모리를 활성화할 수 있습니다.",
+      "readOnlyDescription": "조직 소유자와 결제 관리자만 리뷰 메모리를 변경할 수 있습니다.",
       "title": "리뷰 메모리"
     },
     "scopeList": {
@@ -1133,6 +1135,9 @@
       "triageModel": "분류 모델"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo 관리자",
+      "actorMaskedUser": "마스킹된 사용자",
+      "actorSystem": "Kilo 시스템",
       "couldNotLoad": "감사 보고서를 불러올 수 없습니다.",
       "events": "이벤트",
       "generated": "{{generatedAt}}에 생성되었습니다.",
@@ -1442,7 +1447,12 @@
       "syncMayNotHaveCompleted": "동기화가 완료되지 않았을 수 있습니다. 다시 시도하여 상태를 확인하거나 요청을 취소하세요.",
       "syncInProgress": "보안 동기화가 이미 진행 중입니다. 다시 시도하세요.",
       "dismissalInProgress": "이 문제의 무시 처리가 이미 진행 중입니다. 다시 시도하세요.",
-      "couldNotReadPendingSyncs": "대기 중인 동기화 정보를 불러올 수 없습니다. 다시 시도하세요."
+      "couldNotReadPendingSyncs": "대기 중인 동기화 정보를 불러올 수 없습니다. 다시 시도하세요.",
+      "ambiguous": "작업 결과를 확인하지 못했습니다. 다시 시도하기 전에 보안 검토를 확인하세요.",
+      "settleFailed": "작업이 완료되었지만 결과를 기록하지 못했습니다. 다시 시도하세요.",
+      "replayFailed": "이 작업은 완료되지 않았습니다. 다시 시도하세요.",
+      "actionFailed": "이 작업을 완료하지 못했습니다. 다시 시도하세요.",
+      "actionBlocked": "이 작업을 완료하지 못했습니다. 문제를 먼저 해결해야 재시도할 수 있습니다."
     },
     "analysisState": {
       "queued": "분석 대기 중",
@@ -2257,7 +2267,7 @@
     "thisDevice": "이 기기",
     "viewProfile": "프로필 보기",
     "signOutThisDevice": "이 기기 로그아웃",
-    "signOutThisSession": "이 세션 로그아웃",
+    "signOutSessionLabel": "{{device}} 기기 로그아웃, {{signedIn}}에 로그인함",
     "sessionSignedOut": "세션이 로그아웃되었습니다.",
     "signOutThisDeviceTitle": "이 기기에서 로그아웃할까요?",
     "signOutThisSessionTitle": "이 세션에서 로그아웃할까요?",
@@ -2973,7 +2983,6 @@
       "mergeResultDefaultError": "GitHub가 병합을 완료하지 않았습니다.",
       "mergeResultNotCompleted": "{{term}}이(가) 병합되지 않았습니다. 상태를 확인하고 다시 시도하세요.",
       "ambiguous": "작업 결과를 확인하지 못했습니다. 다시 시도하기 전에 PR을 확인하세요.",
-      "persistenceFailed": "이 작업을 기록하지 못했습니다. 나중에 다시 시도하세요.",
       "forbidden": "이 작업을 수행할 권한이 없습니다."
     },
     "capabilities": {
@@ -3076,7 +3085,11 @@
       "separateEmailsHint": "이메일 주소를 여러 개 입력할 때는 쉼표로 구분하세요.",
       "thresholdLabel": "알림 기준 잔액(USD 미만)",
       "title": "잔액 부족 알림",
-      "emailsError": "올바른 이메일 주소를 하나 이상 입력하세요. 여러 주소는 쉼표로 구분하세요.",
+      "emailsInvalid": "올바르지 않은 이메일 주소가 하나 이상 있습니다.",
+      "emailsRequired": "이메일 주소를 하나 이상 입력하세요.",
+      "saveEmailsError": "일부 이메일 주소가 승인되지 않았습니다. 확인 후 다시 시도하세요.",
+      "saveError": "잔액 부족 알림을 저장하지 못했습니다.",
+      "thresholdPlaceholder": "금액을 입력하세요.",
       "thresholdError": "0보다 큰 금액을 입력하세요."
     },
     "memberLimit": {
@@ -3087,6 +3100,7 @@
       "removeLimit": "한도 해제",
       "title": "일일 사용 한도",
       "blankError": "금액을 입력하거나 아래의 한도 해제를 누르세요.",
+      "blankWithoutLimitError": "0에서 {{max}} 사이의 일일 한도를 입력하세요.",
       "rangeError": "0에서 {{max}} 사이의 금액을 입력하세요."
     },
     "members": {
@@ -3626,7 +3640,6 @@
     "keyTooLong": "키는 256자 이하여야 합니다",
     "keyDuplicate": "이 키는 이미 프로필에 있습니다.",
     "valueLabel": "값",
-    "secretLabel": "비밀",
     "secrets": {
       "markSecret": "비밀로 표시",
       "masked": "숨겨진 가치",

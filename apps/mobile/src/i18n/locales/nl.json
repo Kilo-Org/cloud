@@ -25,6 +25,7 @@
     "error": "fout: {{error}}",
     "back": "Terug",
     "somethingWentWrong": "Er is iets misgegaan.",
+    "actionNotRecorded": "We konden deze actie niet vastleggen. Probeer het later opnieuw.",
     "couldNotOpen": "{{label}} kon niet worden geopend.",
     "link": "koppeling",
     "takingLonger": "Dit duurt langer dan verwacht. Je kunt dit sluiten en later opnieuw controleren.",
@@ -994,8 +995,9 @@
       "noProposals": "Geen voorstellen",
       "noProposalsDescription": "Hier verschijnen voorstellen uit het reviewgeheugen nadat Kilo antwoorden van beheerders heeft geanalyseerd.",
       "off": "Het reviewgeheugen is uitgeschakeld.",
+      "on": "Het reviewgeheugen is ingeschakeld.",
       "offDescription": "Schakel het reviewgeheugen in zodat Kilo leert van antwoorden van beheerders en richtlijnen voor REVIEW.md voorstelt.",
-      "readOnlyDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen reviewgeheugen inschakelen.",
+      "readOnlyDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen reviewgeheugen wijzigen.",
       "title": "Geheugen voor beoordelingen"
     },
     "scopeList": {
@@ -1133,6 +1135,9 @@
       "triageModel": "Model voor de eerste beoordeling"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-beheerder",
+      "actorMaskedUser": "Gemaskeerde gebruiker",
+      "actorSystem": "Kilo-systeem",
       "couldNotLoad": "Het auditrapport kon niet worden geladen.",
       "events": "Gebeurtenissen",
       "generated": "Dit rapport is gegenereerd op {{generatedAt}}.",
@@ -1442,7 +1447,12 @@
       "syncMayNotHaveCompleted": "Een synchronisatie is mogelijk niet voltooid. Probeer het opnieuw om de status bij te werken of verwerp de synchronisatie.",
       "syncInProgress": "Er wordt al een beveiligingssynchronisatie uitgevoerd. Probeer het opnieuw.",
       "dismissalInProgress": "Deze afwijzing wordt al verwerkt. Probeer het opnieuw.",
-      "couldNotReadPendingSyncs": "De openstaande synchronisaties konden niet worden gelezen. Probeer het opnieuw."
+      "couldNotReadPendingSyncs": "De openstaande synchronisaties konden niet worden gelezen. Probeer het opnieuw.",
+      "ambiguous": "Het resultaat kon niet worden bevestigd. Controleer de beveiligingscontrole voordat je het opnieuw probeert.",
+      "settleFailed": "De actie is voltooid, maar we konden het resultaat niet vastleggen. Probeer het opnieuw.",
+      "replayFailed": "Deze actie is niet voltooid. Probeer het opnieuw.",
+      "actionFailed": "Deze actie kon niet worden voltooid. Probeer het opnieuw.",
+      "actionBlocked": "Deze actie kon niet worden voltooid. Het probleem moet eerst worden opgelost."
     },
     "analysisState": {
       "queued": "Analyse in de wachtrij",
@@ -2257,7 +2267,7 @@
     "thisDevice": "Dit apparaat",
     "viewProfile": "Profiel bekijken",
     "signOutThisDevice": "Dit apparaat afmelden",
-    "signOutThisSession": "Deze sessie afmelden",
+    "signOutSessionLabel": "{{device}} afmelden, aangemeld {{signedIn}}",
     "sessionSignedOut": "Sessie afgemeld.",
     "signOutThisDeviceTitle": "Dit apparaat afmelden?",
     "signOutThisSessionTitle": "Deze sessie afmelden?",
@@ -2973,7 +2983,6 @@
       "mergeResultDefaultError": "GitHub heeft het samenvoegen niet voltooid.",
       "mergeResultNotCompleted": "De {{term}} is niet samengevoegd. Controleer de status en probeer het opnieuw.",
       "ambiguous": "Het resultaat kon niet worden bevestigd. Controleer de PR voordat je het opnieuw probeert.",
-      "persistenceFailed": "We konden deze actie niet vastleggen. Probeer het later opnieuw.",
       "forbidden": "Je hebt geen toestemming voor deze actie."
     },
     "capabilities": {
@@ -3076,7 +3085,11 @@
       "separateEmailsHint": "Scheid meerdere e-mailadressen met komma's.",
       "thresholdLabel": "Waarschuwen onder (USD)",
       "title": "Waarschuwing voor laag saldo",
-      "emailsError": "Voer minstens één geldig e-mailadres in. Scheid meerdere adressen met komma's.",
+      "emailsInvalid": "Een of meer e-mailadressen zijn ongeldig.",
+      "emailsRequired": "Voer minstens één e-mailadres in.",
+      "saveEmailsError": "Sommige e-mailadressen zijn niet geaccepteerd. Controleer ze en probeer het opnieuw.",
+      "saveError": "De waarschuwing voor laag saldo kon niet worden opgeslagen.",
+      "thresholdPlaceholder": "Voer een bedrag in",
       "thresholdError": "Voer een bedrag groter dan 0 in."
     },
     "memberLimit": {
@@ -3087,6 +3100,7 @@
       "removeLimit": "Limiet verwijderen",
       "title": "Dagelijkse gebruikslimiet",
       "blankError": "Voer een bedrag in of tik hieronder op Limiet verwijderen.",
+      "blankWithoutLimitError": "Voer een dagelijkse limiet tussen 0 en {{max}} in.",
       "rangeError": "Voer een bedrag tussen 0 en {{max}} in."
     },
     "members": {
@@ -3626,7 +3640,6 @@
     "keyTooLong": "De sleutel mag maximaal 256 tekens bevatten",
     "keyDuplicate": "Deze sleutel bestaat al in het profiel",
     "valueLabel": "Waarde",
-    "secretLabel": "Geheim",
     "secrets": {
       "markSecret": "Markeer als geheim",
       "masked": "Verborgen waarde",

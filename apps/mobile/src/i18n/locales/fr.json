@@ -25,6 +25,7 @@
     "error": "erreur : {{error}}",
     "back": "Retour",
     "somethingWentWrong": "Une erreur s'est produite.",
+    "actionNotRecorded": "Nous n'avons pas pu enregistrer cette action. Veuillez réessayer plus tard.",
     "couldNotOpen": "Impossible d'ouvrir {{label}}.",
     "link": "lien",
     "takingLonger": "Cela prend plus de temps que prévu. Vous pouvez fermer cet écran et revenir vérifier plus tard.",
@@ -966,8 +967,9 @@
       "noProposals": "Aucune proposition",
       "noProposalsDescription": "Les propositions de la mémoire de revue apparaissent ici après l'analyse des réponses des responsables du dépôt par Kilo.",
       "off": "La mémoire de revue est désactivée.",
+      "on": "La mémoire de revue est activée.",
       "offDescription": "Activez-la pour permettre à Kilo d'apprendre des réponses des responsables du dépôt et de proposer des consignes pour REVIEW.md.",
-      "readOnlyDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent activer la mémoire de revue.",
+      "readOnlyDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent modifier la mémoire de revue.",
       "title": "Mémoire des revues"
     },
     "scopeList": {
@@ -1105,6 +1107,9 @@
       "triageModel": "Modèle de triage"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrateur Kilo",
+      "actorMaskedUser": "Utilisateur masqué",
+      "actorSystem": "Système Kilo",
       "couldNotLoad": "Impossible de charger le rapport d'audit.",
       "events": "Événements",
       "generated": "Ce rapport a été généré le {{generatedAt}}.",
@@ -1418,7 +1423,12 @@
       "syncMayNotHaveCompleted": "Une synchronisation n'a peut-être pas abouti. Réessayez pour mettre son état à jour, ou abandonnez.",
       "syncInProgress": "Une synchronisation des données de sécurité est déjà en cours. Réessayez.",
       "dismissalInProgress": "L'exclusion de ce signalement est déjà en cours. Réessayez.",
-      "couldNotReadPendingSyncs": "Impossible de lire les synchronisations en attente. Réessayez."
+      "couldNotReadPendingSyncs": "Impossible de lire les synchronisations en attente. Réessayez.",
+      "ambiguous": "Impossible de confirmer le résultat. Vérifiez la révision de sécurité avant de réessayer.",
+      "settleFailed": "L'action a été effectuée, mais nous n'avons pas pu enregistrer le résultat. Réessayez.",
+      "replayFailed": "Cette action n'a pas abouti. Réessayez.",
+      "actionFailed": "Impossible d'effectuer cette action. Réessayez.",
+      "actionBlocked": "Impossible d'effectuer cette action. Le problème doit être résolu avant de pouvoir réessayer."
     },
     "analysisState": {
       "queued": "Analyse en file d'attente",
@@ -2212,7 +2222,7 @@
     "thisDevice": "Cet appareil",
     "viewProfile": "Voir le profil",
     "signOutThisDevice": "Déconnecter cet appareil",
-    "signOutThisSession": "Déconnecter cette session",
+    "signOutSessionLabel": "Déconnecter {{device}}, connexion : {{signedIn}}",
     "sessionSignedOut": "Session déconnectée.",
     "signOutThisDeviceTitle": "Déconnecter cet appareil ?",
     "signOutThisSessionTitle": "Déconnecter cette session ?",
@@ -3013,7 +3023,6 @@
       "mergeResultDefaultError": "GitHub n'a pas terminé la fusion.",
       "mergeResultNotCompleted": "La fusion de {{term}} n'a pas abouti. Vérifiez son état et réessayez.",
       "ambiguous": "Impossible de confirmer le résultat. Vérifiez la PR avant de réessayer.",
-      "persistenceFailed": "Nous n'avons pas pu enregistrer cette action. Veuillez réessayer plus tard.",
       "forbidden": "Cette action n'est pas autorisée."
     },
     "capabilities": {
@@ -3116,7 +3125,11 @@
       "separateEmailsHint": "Séparez les adresses e-mail par des virgules.",
       "thresholdLabel": "Seuil d'alerte (USD)",
       "title": "Alerte de solde faible",
-      "emailsError": "Saisissez au moins une adresse e-mail valide. Séparez les adresses par des virgules.",
+      "emailsInvalid": "Une ou plusieurs adresses e-mail ne sont pas valides.",
+      "emailsRequired": "Saisissez au moins une adresse e-mail.",
+      "saveEmailsError": "Certaines adresses e-mail n'ont pas été acceptées. Vérifiez-les et réessayez.",
+      "saveError": "Impossible d'enregistrer l'alerte de solde faible.",
+      "thresholdPlaceholder": "Saisissez un montant",
       "thresholdError": "Saisissez un montant supérieur à 0."
     },
     "memberLimit": {
@@ -3127,6 +3140,7 @@
       "removeLimit": "Supprimer la limite",
       "title": "Limite d'utilisation quotidienne",
       "blankError": "Saisissez un montant ou touchez Supprimer la limite ci-dessous.",
+      "blankWithoutLimitError": "Saisissez une limite quotidienne comprise entre 0 et {{max}}.",
       "rangeError": "Saisissez un montant compris entre 0 et {{max}}."
     },
     "members": {
@@ -3667,7 +3681,6 @@
     "keyTooLong": "La clé doit contenir 256 caractères ou moins",
     "keyDuplicate": "Cette clé existe déjà dans le profil",
     "valueLabel": "Valeur",
-    "secretLabel": "Secrète",
     "secrets": {
       "markSecret": "Marquer comme secret",
       "masked": "Valeur cachée",

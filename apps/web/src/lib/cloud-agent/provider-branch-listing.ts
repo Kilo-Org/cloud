@@ -2,13 +2,13 @@
  * Provider branch listing for the new-session flow.
  *
  * One entry point per repository identity, three providers: GitHub via
- * `githubAppsService.listBranches`, GitLab via
- * `gitlabService.listGitLabBranches`, Bitbucket Cloud via the s3 review
- * layer's authorized requests (`/refs/branches` + the repository object's
- * `mainbranch`). The
- * server resolves the integration and the credentials itself — no caller
- * supplies an integration id, a token, or a host, and the repository
- * identity is re-checked against the integration's own cache on every call.
+ * `githubAppsService.listBranches`, GitLab via `authorizeProject` plus
+ * `fetchGitLabBranches`, Bitbucket Cloud via the s3 review layer's
+ * authorized requests (`/refs/branches` + the repository object's
+ * `mainbranch`). The server resolves the integration and the credentials
+ * itself — no caller supplies an integration id, a token, or a host, and the
+ * repository identity is re-checked against the integration's own cache on
+ * every call.
  *
  * Bitbucket Cloud is organization-context only: a personal call returns the
  * explicit org-only unavailable state (FORBIDDEN with the shared copy from

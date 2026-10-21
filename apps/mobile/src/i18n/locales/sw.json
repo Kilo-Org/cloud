@@ -25,6 +25,7 @@
     "error": "hitilafu: {{error}}",
     "back": "Rudi",
     "somethingWentWrong": "Hitilafu imetokea.",
+    "actionNotRecorded": "Hatukuweza kurekodi kitendo hiki. Tafadhali jaribu tena baadaye.",
     "couldNotOpen": "Imeshindikana kufungua {{label}}.",
     "link": "kiungo",
     "takingLonger": "Hii inachukua muda mrefu kuliko ilivyotarajiwa. Unaweza kuifunga na kuangalia tena.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub haikukamilisha muunganisho.",
       "mergeResultNotCompleted": "{{term}} haikuunganishwa. Angalia hali yake na ujaribu tena.",
       "ambiguous": "Imeshindikana kuthibitisha matokeo — angalia PR kabla ya kujaribu tena.",
-      "persistenceFailed": "Hatukuweza kurekodi kitendo hiki. Tafadhali jaribu tena baadaye.",
       "forbidden": "Kitendo hiki hakiruhusiwi."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "Inapakia kumbukumbu ya ukaguzi",
       "couldNotLoad": "Imeshindikana kupakia kumbukumbu ya ukaguzi.",
       "off": "Kumbukumbu ya ukaguzi imezimwa.",
+      "on": "Kumbukumbu ya ukaguzi imewashwa.",
       "offDescription": "Iwashe ili Kilo ijifunze kutoka kwa majibu ya watunzaji wa mradi na ipendekeze mwongozo wa REVIEW.md.",
-      "readOnlyDescription": "Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kuwasha kumbukumbu ya ukaguzi.",
+      "readOnlyDescription": "Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kubadilisha kumbukumbu ya ukaguzi.",
       "enable": "Washa kumbukumbu ya ukaguzi",
       "loadingProposals": "Inapakia mapendekezo",
       "couldNotLoadProposals": "Imeshindikana kupakia mapendekezo.",
@@ -1879,6 +1880,9 @@
       "viewA11y": "Tazama ripoti ya ukaguzi"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Msimamizi wa Kilo",
+      "actorMaskedUser": "Mtumiaji aliyefichwa",
+      "actorSystem": "Mfumo wa Kilo",
       "couldNotLoad": "Imeshindikana kupakia ripoti ya ukaguzi.",
       "events": "Matukio",
       "generated": "Ripoti imetengenezwa {{generatedAt}}.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "Huenda usawazishaji haujakamilika. Jaribu tena ili kupatanisha hali yake au uuondoe.",
       "syncInProgress": "Usawazishaji wa usalama tayari unaendelea. Tafadhali jaribu tena.",
       "dismissalInProgress": "Uondoaji huu tayari unaendelea. Tafadhali jaribu tena.",
-      "couldNotReadPendingSyncs": "Imeshindikana kusoma usawazishaji unaosubiri. Jaribu tena."
+      "couldNotReadPendingSyncs": "Imeshindikana kusoma usawazishaji unaosubiri. Jaribu tena.",
+      "ambiguous": "Imeshindikana kuthibitisha matokeo — angalia ukaguzi wa usalama kabla ya kujaribu tena.",
+      "settleFailed": "Kitendo kimekamilika, lakini hatukuweza kurekodi matokeo yake. Tafadhali jaribu tena.",
+      "replayFailed": "Kitendo hiki hakikukamilika. Tafadhali jaribu tena.",
+      "actionFailed": "Imeshindikana kukamilisha kitendo hiki. Tafadhali jaribu tena.",
+      "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza."
     },
     "analysisState": {
       "queued": "Uchambuzi uko kwenye foleni",
@@ -2772,7 +2781,7 @@
     "thisDevice": "Kifaa hiki",
     "viewProfile": "Tazama wasifu",
     "signOutThisDevice": "Toka kwenye akaunti kwenye kifaa hiki",
-    "signOutThisSession": "Ondoka kwenye kikao hiki",
+    "signOutSessionLabel": "Toka kwenye akaunti kwenye {{device}}, Kuingia: {{signedIn}}",
     "sessionSignedOut": "Kikao kimeondolewa kwenye akaunti.",
     "signOutThisDeviceTitle": "Ungependa kutoka kwenye akaunti kwenye kifaa hiki?",
     "signOutThisSessionTitle": "Ungependa kuondoka kwenye kikao hiki?",
@@ -3077,7 +3086,11 @@
       "separateEmailsHint": "Tenganisha anwani za barua pepe kwa koma.",
       "thresholdLabel": "Arifu salio likiwa chini ya (USD)",
       "title": "Arifa ya salio la chini",
-      "emailsError": "Weka angalau anwani moja halali ya barua pepe. Tenganisha anwani kwa koma.",
+      "emailsInvalid": "Anwani moja au zaidi za barua pepe si halali.",
+      "emailsRequired": "Weka angalau anwani moja ya barua pepe.",
+      "saveEmailsError": "Baadhi ya anwani za barua pepe hazikukubaliwa. Angalia zisha ndiyo ujaribu tena.",
+      "saveError": "Arifa ya salio la chini haikuweza kuhifadhiwa.",
+      "thresholdPlaceholder": "Weka kiasi",
       "thresholdError": "Weka kiasi kikubwa kuliko 0."
     },
     "memberLimit": {
@@ -3088,6 +3101,7 @@
       "removeLimit": "Ondoa kikomo",
       "title": "Kikomo cha matumizi ya kila siku",
       "blankError": "Weka kiasi au uguse Ondoa kikomo hapa chini.",
+      "blankWithoutLimitError": "Weka kikomo cha kila siku kati ya 0 na {{max}}.",
       "rangeError": "Weka kiasi kati ya 0 na {{max}}."
     },
     "members": {
@@ -3626,7 +3640,6 @@
     "keyTooLong": "Ufunguo lazima uwe na vibambo 256 au chini yake",
     "keyDuplicate": "Ufunguo huu tayari upo katika wasifu",
     "valueLabel": "Thamani",
-    "secretLabel": "Siri",
     "secrets": {
       "markSecret": "Weka alama kuwa siri",
       "masked": "Thamani iliyofichwa",

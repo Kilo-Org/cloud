@@ -3718,7 +3718,6 @@
     "keyTooLong": "Ključ ima lahko največ 256 znakov",
     "keyDuplicate": "Ta ključ že obstaja v profilu",
     "valueLabel": "Vrednost",
-    "secretLabel": "Skrivnost",
     "secrets": {
       "markSecret": "Označi kot skrivnost",
       "masked": "Skrita vrednost",

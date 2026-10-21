@@ -3636,7 +3636,6 @@
     "keyTooLong": "Der Schlüssel darf höchstens 256 Zeichen lang sein",
     "keyDuplicate": "Dieser Schlüssel ist bereits im Profil vorhanden",
     "valueLabel": "Wert",
-    "secretLabel": "Geheimnis",
     "secrets": {
       "markSecret": "Als geheim markieren",
       "masked": "Versteckter Wert",

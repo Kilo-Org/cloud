@@ -3636,7 +3636,6 @@
     "keyTooLong": "کلید باید 256 توري یا لږ وي",
     "keyDuplicate": "دا کلید دمخه په پروفایل کې شته",
     "valueLabel": "ارزښت",
-    "secretLabel": "پټه",
     "secrets": {
       "markSecret": "د پټ په توګه نښه کړئ",
       "masked": "پټ ارزښت",

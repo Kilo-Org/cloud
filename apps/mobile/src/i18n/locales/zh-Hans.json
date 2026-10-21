@@ -3636,7 +3636,6 @@
     "keyTooLong": "键不能超过 256 个字符",
     "keyDuplicate": "此键已存在于配置文件中",
     "valueLabel": "值",
-    "secretLabel": "秘密",
     "secrets": {
       "markSecret": "标记为秘密",
       "masked": "隐藏值",

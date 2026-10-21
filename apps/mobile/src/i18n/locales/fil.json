@@ -3636,7 +3636,6 @@
     "keyTooLong": "Ang susi ay dapat 256 na character o mas kaunti",
     "keyDuplicate": "Umiiral na ang key na ito sa profile",
     "valueLabel": "Halaga",
-    "secretLabel": "Lihim",
     "secrets": {
       "markSecret": "Markahan bilang sikreto",
       "masked": "Nakatagong halaga",

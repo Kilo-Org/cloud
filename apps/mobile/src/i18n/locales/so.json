@@ -3636,7 +3636,6 @@
     "keyTooLong": "Furaha waa inuu ahaadaa 256 xaraf ama ka yar",
     "keyDuplicate": "Furahan hore ayuu ugu jiraa borofiilka",
     "valueLabel": "Qiimaha",
-    "secretLabel": "Sirta",
     "secrets": {
       "markSecret": "Ku calaamadee sir",
       "masked": "Qiimaha qarsoon",

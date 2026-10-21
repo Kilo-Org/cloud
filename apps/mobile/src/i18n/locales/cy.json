@@ -3800,7 +3800,6 @@
     "keyTooLong": "Rhaid i'r allwedd fod yn 256 nod neu lai",
     "keyDuplicate": "Mae'r allwedd hon eisoes yn bodoli yn y proffil",
     "valueLabel": "Gwerth",
-    "secretLabel": "Cyfrinach",
     "secrets": {
       "markSecret": "Marciwch fel cyfrinach",
       "masked": "Gwerth cudd",

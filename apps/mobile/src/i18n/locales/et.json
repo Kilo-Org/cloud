@@ -3636,7 +3636,6 @@
     "keyTooLong": "Võti võib olla kuni 256 tähemärki",
     "keyDuplicate": "See võti on profiilis juba olemas",
     "valueLabel": "Väärtus",
-    "secretLabel": "Saladus",
     "secrets": {
       "markSecret": "Märgi salajaseks",
       "masked": "Varjatud väärtus",

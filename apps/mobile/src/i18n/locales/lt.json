@@ -3718,7 +3718,6 @@
     "keyTooLong": "Raktas gali būti ne ilgesnis kaip 256 simboliai",
     "keyDuplicate": "Šis raktas jau yra profilyje",
     "valueLabel": "Vertė",
-    "secretLabel": "Paslaptis",
     "secrets": {
       "markSecret": "Pažymėti kaip paslaptį",
       "masked": "Paslėpta vertė",

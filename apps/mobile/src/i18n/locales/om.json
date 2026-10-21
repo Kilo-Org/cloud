@@ -3636,7 +3636,6 @@
     "keyTooLong": "Furtuun 256 arfii ykn isaa gadi ta'uu qaba",
     "keyDuplicate": "Furtuun kun duraanuu piroofaayilii keessa jira",
     "valueLabel": "Gatii",
-    "secretLabel": "Icitii",
     "secrets": {
       "markSecret": "Akka iccitiitti Mallatteessi",
       "masked": "Gatii dhokataa",

@@ -3677,7 +3677,6 @@
     "keyTooLong": "Cheia trebuie să aibă 256 de caractere sau mai puțin",
     "keyDuplicate": "Această cheie există deja în profil",
     "valueLabel": "Valoare",
-    "secretLabel": "Secret",
     "secrets": {
       "markSecret": "Marcați ca secret",
       "masked": "Valoare ascunsă",

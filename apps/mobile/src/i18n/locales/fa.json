@@ -3636,7 +3636,6 @@
     "keyTooLong": "کلید باید 256 نویسه یا کمتر باشد",
     "keyDuplicate": "این کلید از قبل در نمایه وجود دارد",
     "valueLabel": "ارزش",
-    "secretLabel": "راز",
     "secrets": {
       "markSecret": "علامت گذاری به عنوان راز",
       "masked": "ارزش پنهان",

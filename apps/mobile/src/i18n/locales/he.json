@@ -3677,7 +3677,6 @@
     "keyTooLong": "המפתח חייב להכיל 256 תווים או פחות",
     "keyDuplicate": "המפתח הזה כבר קיים בפרופיל",
     "valueLabel": "עֵרֶך",
-    "secretLabel": "סוֹד",
     "secrets": {
       "markSecret": "סמן כסוד",
       "masked": "ערך נסתר",

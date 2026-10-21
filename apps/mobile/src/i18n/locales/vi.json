@@ -3636,7 +3636,6 @@
     "keyTooLong": "Khóa phải có 256 ký tự hoặc ít hơn",
     "keyDuplicate": "Khóa này đã tồn tại trong hồ sơ",
     "valueLabel": "Giá trị",
-    "secretLabel": "Bí mật",
     "secrets": {
       "markSecret": "Đánh dấu là bí mật",
       "masked": "Giá trị ẩn",

@@ -3677,7 +3677,6 @@
     "keyTooLong": "La clave debe tener 256 caracteres o menos",
     "keyDuplicate": "Esta clave ya existe en el perfil",
     "valueLabel": "Valor",
-    "secretLabel": "Secreto",
     "secrets": {
       "markSecret": "Marcar como secreto",
       "masked": "Valor oculto",

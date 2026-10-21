@@ -3636,7 +3636,6 @@
     "keyTooLong": "Kunci harus 256 karakter atau kurang",
     "keyDuplicate": "Kunci ini sudah ada di profil",
     "valueLabel": "Nilai",
-    "secretLabel": "Rahasia",
     "secrets": {
       "markSecret": "Tandai sebagai rahasia",
       "masked": "Nilai tersembunyi",

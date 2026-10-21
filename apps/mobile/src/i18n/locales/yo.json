@@ -3636,7 +3636,6 @@
     "keyTooLong": "Bọtini gbọdọ̀ jẹ́ 256 àmì tàbí kéré sí i",
     "keyDuplicate": "Bọtini yii ti wà tẹ́lẹ̀ nínú profaili",
     "valueLabel": "Iye",
-    "secretLabel": "Asiri",
     "secrets": {
       "markSecret": "Samisi bi asiri",
       "masked": "Iye farasin",

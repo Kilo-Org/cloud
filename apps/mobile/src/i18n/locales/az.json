@@ -3636,7 +3636,6 @@
     "keyTooLong": "Açar 256 simvol və ya daha az olmalıdır",
     "keyDuplicate": "Bu açar artıq profildə mövcuddur",
     "valueLabel": "Dəyər",
-    "secretLabel": "Gizli",
     "secrets": {
       "markSecret": "Gizli olaraq qeyd edin",
       "masked": "Gizli dəyər",

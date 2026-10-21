@@ -3636,7 +3636,6 @@
     "keyTooLong": "Ukhiye kufanele ube yizinhlamvu ezingu-256 noma ngaphansi",
     "keyDuplicate": "Lolu khi selukhona kuphrofayela",
     "valueLabel": "Inani",
-    "secretLabel": "Imfihlo",
     "secrets": {
       "markSecret": "Maka njengokuyimfihlo",
       "masked": "Inani elifihliwe",

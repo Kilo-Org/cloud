@@ -3677,7 +3677,6 @@
     "keyTooLong": "Atslēgai jābūt 256 rakstzīmēm vai mazāk",
     "keyDuplicate": "Šī atslēga jau ir profilā",
     "valueLabel": "Vērtība",
-    "secretLabel": "Noslēpums",
     "secrets": {
       "markSecret": "Atzīmēt kā noslēpumu",
       "masked": "Slēptā vērtība",

@@ -3636,7 +3636,6 @@
     "keyTooLong": "キーは256文字以内で入力してください",
     "keyDuplicate": "このキーはすでにプロファイルに存在します",
     "valueLabel": "価値",
-    "secretLabel": "秘密",
     "secrets": {
       "markSecret": "シークレットとしてマークする",
       "masked": "隠された値",

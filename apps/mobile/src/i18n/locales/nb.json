@@ -3636,7 +3636,6 @@
     "keyTooLong": "Nøkkelen kan ha høyst 256 tegn",
     "keyDuplicate": "Denne nøkkelen finnes allerede i profilen",
     "valueLabel": "Verdi",
-    "secretLabel": "Hemmelig",
     "secrets": {
       "markSecret": "Merk som hemmelig",
       "masked": "Skjult verdi",

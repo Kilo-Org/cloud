@@ -38,6 +38,19 @@ describe('confirmStartAgent', () => {
     );
   });
 
+  it('names the repository and the session the request targets', () => {
+    void confirmStartAgent({
+      action: 'StartAgent',
+      prompt: 'fix the build',
+      repository: 'o/r',
+      sessionId: 'ses_1',
+    });
+    const message = mocks.alert.mock.calls.at(-1)?.[1] as string | undefined;
+    expect(message).toContain(i18n.t('appActions.start.confirmMessage', { prompt: 'fix the build' }));
+    expect(message).toContain(`${i18n.t('common.repository')}: o/r`);
+    expect(message).toContain(`${i18n.t('agentChat.session.title')}: ses_1`);
+  });
+
   it('answers false for Cancel and true for the start button', async () => {
     const cancelled = confirmStartAgent(REQUEST);
     const cancel = lastAlert().buttons.find(button => button.style === 'cancel');

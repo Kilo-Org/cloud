@@ -106,16 +106,16 @@ describe('registerAppActionDispatcher', () => {
   });
 
   it('asks the user for a StartAgent the platform entry point delivers, then runs it', async () => {
-    // The Android entry point declares that any app can reach it, so the
-    // handler asks before the action path runs.
+    // The Android entry point declares that it confirms, so the handler asks
+    // before the action path runs.
     mocks.startAgentNeedsConfirmation.mockReturnValue(true);
     mocks.confirmStartAgent.mockResolvedValue(true);
     mocks.startAgent.mockResolvedValue({
-      ok: false,
+      ok: true,
       action: 'StartAgent',
-      retryable: false,
-      code: 'empty-prompt',
-      message: i18n.t('appActions.start.promptRequired'),
+      sessionId: 'ses_7',
+      href: '/(app)/agent-chat/ses_7',
+      message: 'Agent started',
     });
     const registered: ((payload: unknown) => Promise<AppActionResult>)[] = [];
     mocks.registerNativeAppActionDispatcher.mockImplementation(
@@ -125,18 +125,45 @@ describe('registerAppActionDispatcher', () => {
       }
     );
     await registerAppActionDispatcher();
-    await expect(registered[0]?.({ action: 'start-agent', prompt: '   ' })).resolves.toEqual({
+    await expect(
+      registered[0]?.({ action: 'start-agent', prompt: 'fix the build', repository: 'o/r' })
+    ).resolves.toEqual({
+      ok: true,
+      action: 'StartAgent',
+      sessionId: 'ses_7',
+      href: '/(app)/agent-chat/ses_7',
+      message: 'Agent started',
+    });
+    expect(mocks.confirmStartAgent).toHaveBeenCalledExactlyOnceWith({
+      action: 'StartAgent',
+      prompt: 'fix the build',
+      repository: 'o/r',
+    });
+    expect(mocks.startAgent).toHaveBeenCalledExactlyOnceWith({
+      prompt: 'fix the build',
+      repository: 'o/r',
+    });
+  });
+
+  it('refuses a promptless StartAgent without asking the user', async () => {
+    mocks.startAgentNeedsConfirmation.mockReturnValue(true);
+    const registered: ((payload: unknown) => Promise<AppActionResult>)[] = [];
+    mocks.registerNativeAppActionDispatcher.mockImplementation(
+      (handler: (payload: unknown) => Promise<AppActionResult>) => {
+        registered.push(handler);
+        return { handle: handler, buffered: [] };
+      }
+    );
+    await registerAppActionDispatcher();
+    await expect(registered[0]?.({ action: 'StartAgent', prompt: '   ' })).resolves.toEqual({
       ok: false,
       action: 'StartAgent',
       retryable: false,
       code: 'empty-prompt',
       message: i18n.t('appActions.start.promptRequired'),
     });
-    expect(mocks.confirmStartAgent).toHaveBeenCalledExactlyOnceWith({
-      action: 'StartAgent',
-      prompt: '   ',
-    });
-    expect(mocks.startAgent).toHaveBeenCalledExactlyOnceWith({ prompt: '   ' });
+    expect(mocks.confirmStartAgent).not.toHaveBeenCalled();
+    expect(mocks.startAgent).not.toHaveBeenCalled();
   });
 
   it('starts nothing when the user declines a StartAgent the entry point delivers', async () => {

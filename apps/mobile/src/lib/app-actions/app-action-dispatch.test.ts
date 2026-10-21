@@ -106,6 +106,70 @@ describe('dispatchAppActionRequest', () => {
     expect(startAgent).toHaveBeenCalledExactlyOnceWith({ prompt: 'go' });
   });
 
+  it('asks for a session-only request, which is the continue form', async () => {
+    // A request that names a session and no prompt is the documented
+    // continue/clone form; it is confirmed and run like any other StartAgent.
+    const result: AppActionResult = {
+      ok: true,
+      action: 'StartAgent',
+      sessionId: 'ses_12',
+      href: '/(app)/agent-chat/ses_12',
+      message: 'Agent started',
+    };
+    const startAgent = vi.fn().mockResolvedValue(result);
+    const confirmStartAgent = vi.fn().mockResolvedValue(true);
+    await expect(
+      dispatchAppActionRequest(
+        { action: 'StartAgent', prompt: '', sessionId: 'ses_1' },
+        { startAgent, confirmStartAgent }
+      )
+    ).resolves.toEqual(result);
+    expect(confirmStartAgent).toHaveBeenCalledExactlyOnceWith({
+      action: 'StartAgent',
+      prompt: '',
+      sessionId: 'ses_1',
+    });
+    expect(startAgent).toHaveBeenCalledExactlyOnceWith({ prompt: '', sessionId: 'ses_1' });
+  });
+
+  it('refuses a promptless request without asking', async () => {
+    const startAgent = vi.fn();
+    const confirmStartAgent = vi.fn();
+    await expect(
+      dispatchAppActionRequest(
+        { action: 'StartAgent', prompt: '   ' },
+        { startAgent, confirmStartAgent }
+      )
+    ).resolves.toEqual({
+      ok: false,
+      action: 'StartAgent',
+      code: 'empty-prompt',
+      retryable: false,
+      message: i18n.t('appActions.start.promptRequired'),
+    });
+    expect(confirmStartAgent).not.toHaveBeenCalled();
+    expect(startAgent).not.toHaveBeenCalled();
+  });
+
+  it('reports a confirmation that could not be shown as a retryable failure', async () => {
+    const startAgent = vi.fn();
+    const confirmStartAgent = vi.fn().mockRejectedValue(new Error('no activity'));
+    await expect(
+      dispatchAppActionRequest(
+        { action: 'StartAgent', prompt: 'fix the build' },
+        { startAgent, confirmStartAgent }
+      )
+    ).resolves.toEqual({
+      ok: false,
+      action: 'StartAgent',
+      code: 'start-failed',
+      retryable: true,
+      message: i18n.t('agentChat.session.serviceUnavailable'),
+    });
+    expect(startAgent).not.toHaveBeenCalled();
+    expect(mocks.captureException).toHaveBeenCalledOnce();
+  });
+
   it('reports a StartAgent failure without parking a session', async () => {
     const failure: AppActionResult = {
       ok: false,

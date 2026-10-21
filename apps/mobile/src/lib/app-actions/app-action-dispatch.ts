@@ -127,8 +127,29 @@ export async function dispatchAppActionRequest(
   options: AppActionDispatchOptions = {}
 ): Promise<AppActionResult> {
   if (request.action === 'StartAgent') {
+    // The same classification `start-agent.ts` applies, made before the
+    // question: a request that names neither a prompt nor a session cannot
+    // start, so the user is not asked to approve it.
+    if (request.prompt.trim().length === 0 && (request.sessionId ?? '').trim().length === 0) {
+      return {
+        ok: false,
+        action: 'StartAgent',
+        code: 'empty-prompt',
+        retryable: false,
+        message: i18n.t('appActions.start.promptRequired'),
+      };
+    }
     if (options.requireStartAgentConfirmation !== false) {
-      const confirmed = await deps.confirmStartAgent(request);
+      const confirmed = await askToConfirmStartAgent(deps, request);
+      if (confirmed === null) {
+        return {
+          ok: false,
+          action: 'StartAgent',
+          code: 'start-failed',
+          retryable: true,
+          message: i18n.t('agentChat.session.serviceUnavailable'),
+        };
+      }
       if (!confirmed) {
         // Nothing runs and nothing is parked: the account is untouched, and the
         // surface that asked reports that the user declined.
@@ -170,6 +191,23 @@ export async function dispatchAppActionRequest(
     ...(request.action === 'OpenSession' ? { sessionId: request.sessionId } : {}),
     message: '',
   };
+}
+
+/**
+ * Ask through the dependency, reporting an unanswerable question as `null`: the
+ * dialog can fail to appear (a cold start with no activity to attach it to), and
+ * the caller still has to receive a classified outcome.
+ */
+async function askToConfirmStartAgent(
+  deps: AppActionDispatcherDeps,
+  request: StartAgentRequest
+): Promise<boolean | null> {
+  try {
+    return await deps.confirmStartAgent(request);
+  } catch (error) {
+    await captureAppActionError(error, 'confirm_start_agent');
+    return null;
+  }
 }
 
 /** The create, with the outcome a caller can always be given. */

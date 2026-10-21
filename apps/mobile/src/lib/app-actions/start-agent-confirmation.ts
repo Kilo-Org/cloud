@@ -9,6 +9,22 @@ import { i18n } from '@/i18n';
 import { type StartAgentRequest } from './app-action-contract';
 
 /**
+ * The dialog message: what starts, plus the target the request names, so the
+ * user sees the repository the run will work in and the session it continues.
+ */
+function confirmationMessage(request: StartAgentRequest): string {
+  const message = i18n.t('appActions.start.confirmMessage', { prompt: request.prompt });
+  const details: string[] = [];
+  if (request.repository !== undefined) {
+    details.push(`${i18n.t('common.repository')}: ${request.repository}`);
+  }
+  if (request.sessionId !== undefined) {
+    details.push(`${i18n.t('agentChat.session.title')}: ${request.sessionId}`);
+  }
+  return details.length === 0 ? message : `${message}\n\n${details.join('\n')}`;
+}
+
+/**
  * Ask the user to confirm `request`, resolving true when they chose to start
  * it.
  */
@@ -16,7 +32,7 @@ export function confirmStartAgent(request: StartAgentRequest): Promise<boolean> 
   const { promise, resolve } = Promise.withResolvers<boolean>();
   Alert.alert(
     i18n.t('appActions.start.confirmTitle'),
-    i18n.t('appActions.start.confirmMessage', { prompt: request.prompt }),
+    confirmationMessage(request),
     [
       {
         text: i18n.t('common.cancel'),

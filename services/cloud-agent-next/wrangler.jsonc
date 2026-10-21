@@ -396,10 +396,6 @@
       "new_sqlite_classes": ["SandboxContainers"],
       "tag": "v11",
     },
-    {
-      "tag": "v12",
-      "deleted_classes": ["CloudAgentSession"],
-    },
   ],
   /**
    * Hyperdrive Bindings

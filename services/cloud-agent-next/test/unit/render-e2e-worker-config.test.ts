@@ -41,6 +41,10 @@ const REMOVED_CONTAINER_CLASSES = [
   'SandboxContainers',
 ];
 
+// Exported without a binding until a `deleted_classes` migration removes its
+// stored instances.
+const RETIRED_UNBOUND_DO_CLASSES = ['CloudAgentSession'];
+
 const KEPT_DO_CLASSES = [
   'StreamTicketNonceDO',
   'UserKiloFacade',
@@ -202,6 +206,7 @@ describe('buildE2eWorkerConfig', () => {
       for (const className of migration.new_sqlite_classes ?? []) migratedClasses.add(className);
       for (const className of migration.deleted_classes ?? []) migratedClasses.delete(className);
     }
+    for (const className of RETIRED_UNBOUND_DO_CLASSES) migratedClasses.delete(className);
     expect([...migratedClasses].sort()).toEqual([...bindingClasses].sort());
   });
 

@@ -8,6 +8,7 @@ import type { SessionIngestBinding } from '../session-ingest-binding.js';
 import type { NotificationsBinding } from '../notifications-binding.js';
 import type { GitTokenService } from '../types.js';
 import type { SecretBinding } from '../auth.js';
+import type { RuntimeSkillInput } from '../shared/runtime-profile.js';
 
 /**
  * Local MCP server configuration (runs a command).
@@ -50,16 +51,7 @@ export type MCPRemoteServerConfig = {
  */
 export type MCPServerConfig = MCPLocalServerConfig | MCPRemoteServerConfig;
 
-/**
- * Runtime skill injected from the web app's merged profile stack. `rawMarkdown`
- * is materialized to `${SESSION_HOME}/.kilocode/skills/<name>/SKILL.md`; each
- * entry in `files` is written under the same directory.
- */
-export type RuntimeSkill = {
-  name: string;
-  rawMarkdown: string;
-  files?: Record<string, string>;
-};
+export type RuntimeSkill = RuntimeSkillInput;
 
 /**
  * Runtime agent injected from the web app's merged profile stack. Stored in

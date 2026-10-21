@@ -659,7 +659,8 @@ describe('mergeProfileConfiguration', () => {
     });
 
     expect(result.skills?.map(s => s.name).sort()).toEqual(['alpha', 'beta']);
-    expect(result.skills?.find(s => s.name === 'alpha')?.rawMarkdown).toContain('override body');
+    const alpha = result.skills?.find(s => s.name === 'alpha');
+    expect(alpha && 'rawMarkdown' in alpha ? alpha.rawMarkdown : null).toContain('override body');
   });
 
   test('includes only enabled instructions, merged by name across profile layers', async () => {
@@ -797,10 +798,14 @@ describe('mergeProfileConfiguration', () => {
         'profile-only',
         'shared',
       ]);
-      expect(result.skills?.find(s => s.name === 'shared')?.rawMarkdown).toBe(
+      const shared = result.skills?.find(s => s.name === 'shared');
+      expect(shared && 'rawMarkdown' in shared ? shared.rawMarkdown : null).toBe(
         'inline body for shared'
       );
-      expect(result.skills?.find(s => s.name === 'inline-only')?.files).toEqual({ 'a.md': 'a' });
+      const inlineOnly = result.skills?.find(s => s.name === 'inline-only');
+      expect(inlineOnly && 'files' in inlineOnly ? inlineOnly.files : null).toEqual({
+        'a.md': 'a',
+      });
     });
 
     test('inline runtimeAgents layer on top of profile — inline wins on slug', async () => {

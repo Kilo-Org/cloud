@@ -181,6 +181,7 @@ export type PrepareDeps = {
     onOutput?: (stream: ProcessOutputStream, output: string) => void,
     signal?: AbortSignal
   ) => Promise<ExecResult>;
+  runSkillInstall?: typeof runProcess;
   /** Starts the default setup command, e.g. inside the setup cgroup. */
   spawnSetup?: ProcessSpawn;
   restore?: typeof restoreSession;
@@ -222,6 +223,7 @@ type PreparedRoute = {
 type PreparingRoute = {
   promise: Promise<void>;
   released: boolean;
+  skillInstallController?: AbortController;
   /** `runtimeKey(spec)` captured before the first await, for last-route release. */
   runtimeKey: string;
   /** A credentials frame that arrived before the route was prepared. */
@@ -1372,9 +1374,19 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       if (recovery && !replacementWorkspace) {
         log(`local worktree recovery session=${sessionId} skipped reason=surviving_workspace`);
       }
+      const installsSkills = spec.runtimeSkills?.some(skill => skill.source !== undefined);
+      currentStep = installsSkills ? 'setup' : 'kilo_runtime';
+      owner.skillInstallController = new AbortController();
+      await materializeRuntimeProfile(home, spec, {
+        run: deps.runSkillInstall,
+        signal: owner.skillInstallController.signal,
+        onProgress: detail => {
+          if (!owner.released) emitProgress(sessionId, 'setup', detail);
+        },
+      });
+      if (owner.released) return;
       currentStep = 'kilo_runtime';
       emitProgress(sessionId, 'kilo_runtime');
-      await materializeRuntimeProfile(home, spec);
       const started = await withRuntimeStartRetry(
         key,
         () =>
@@ -1563,7 +1575,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     },
     release(sessionId) {
       const preparation = preparing.get(sessionId);
-      if (preparation) preparation.released = true;
+      if (preparation) {
+        preparation.released = true;
+        preparation.skillInstallController?.abort();
+      }
       const route = prepared.get(sessionId);
       if (!route) return;
       prepared.delete(sessionId);

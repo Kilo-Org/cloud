@@ -68,7 +68,7 @@ export type ProfileSkillResponse = {
   id: string;
   name: string;
   description: string | null;
-  sourceType: 'marketplace' | 'custom';
+  sourceType: 'marketplace' | 'custom' | 'skills-sh';
   sourceUrl: string | null;
   rawMarkdown: string;
   /** Companion files (excluding SKILL.md). Relative path → content. */

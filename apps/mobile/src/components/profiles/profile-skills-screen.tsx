@@ -44,13 +44,14 @@ function hasUsableMessage(error: unknown): boolean {
 
 /**
  * One skill row: the name in mono, its source type, the enabled switch,
- * and edit/delete controls. The row carries no container
+ * and delete plus edit for local skills. The row carries no container
  * `accessibilityLabel`, so the switch's label stays the only element a screen
  * reader matches by the skill's name.
  */
 function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const canEdit = skill.sourceType !== 'skills-sh';
   return (
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
@@ -62,14 +63,16 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
         </Text>
       </View>
       <Switch value={skill.enabled} accessibilityLabel={skill.name} onValueChange={onToggle} />
-      <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel={t('profiles.skillEditTitle')}
-        onPress={onEdit}
-      >
-        <Pencil size={18} color={colors.mutedForeground} />
-      </Pressable>
+      {canEdit && (
+        <Pressable
+          className="h-11 w-11 items-center justify-center active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel={t('profiles.skillEditTitle')}
+          onPress={onEdit}
+        >
+          <Pencil size={18} color={colors.mutedForeground} />
+        </Pressable>
+      )}
       <Pressable
         className="h-11 w-11 items-center justify-center active:opacity-70"
         accessibilityRole="button"

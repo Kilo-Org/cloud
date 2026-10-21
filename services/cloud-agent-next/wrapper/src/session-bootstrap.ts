@@ -1280,7 +1280,10 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
         `bootstrap branch preparation ready kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName}`
       );
 
-      await writeRuntimeSkills(request.workspace.sessionHome, request.materialized.runtimeSkills);
+      await writeRuntimeSkills(request.workspace.sessionHome, request.materialized.runtimeSkills, {
+        signal,
+        onProgress: detail => progress?.('setup_commands', detail),
+      });
 
       progress?.(
         'kilo_session',

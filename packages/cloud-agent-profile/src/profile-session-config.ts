@@ -42,11 +42,7 @@ export class ProfileNotFoundError extends Error {
   }
 }
 
-export type MergedSkillForSession = {
-  name: string;
-  rawMarkdown: string;
-  files: Record<string, string>;
-};
+export type MergedSkillForSession = SkillForSession;
 
 export type MergedAgentForSession = AgentForSession;
 
@@ -60,11 +56,9 @@ export type MergedInstructionForSession = InstructionForSession;
  * this type stays loose so the package does not depend on service-side
  * schemas.
  */
-export type InlineSkillInput = {
-  name: string;
-  rawMarkdown: string;
-  files?: Record<string, string>;
-};
+export type InlineSkillInput =
+  | { name: string; rawMarkdown: string; files?: Record<string, string> }
+  | { name: string; source: string };
 
 /**
  * Permissive shape for an inline runtime agent. `config` aliases the
@@ -240,11 +234,11 @@ function inlineToLayer(args: MergeProfileConfigurationArgs): Layer | null {
     secrets: { ...(encryptedSecrets ?? {}) },
     commands: setupCommands ? [...setupCommands] : [],
     mcpServers: mcpServers ? clientRecordToMcpServers(mcpServers) : [],
-    skills: (runtimeSkills ?? []).map(s => ({
-      name: s.name,
-      rawMarkdown: s.rawMarkdown,
-      files: s.files ?? {},
-    })),
+    skills: (runtimeSkills ?? []).map(s =>
+      'source' in s
+        ? { name: s.name, source: s.source }
+        : { name: s.name, rawMarkdown: s.rawMarkdown, files: s.files ?? {} }
+    ),
     agents: runtimeAgents ? [...runtimeAgents] : [],
     // Inline kilo commands are not supported — there is no `runtimeKiloCommands`
     // argument. Commands from resolved profiles flow through the DB query path
@@ -284,11 +278,15 @@ function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
       mcpByName.set(server.name, server);
     }
     for (const skill of layer.skills) {
-      skillByName.set(skill.name, {
-        name: skill.name,
-        rawMarkdown: skill.rawMarkdown,
-        files: skill.files,
-      });
+      if ('source' in skill) {
+        skillByName.set(skill.name, { name: skill.name, source: skill.source });
+      } else {
+        skillByName.set(skill.name, {
+          name: skill.name,
+          rawMarkdown: skill.rawMarkdown,
+          files: skill.files,
+        });
+      }
     }
     for (const agent of layer.agents) {
       agentBySlug.set(agent.slug, agent);

@@ -1008,4 +1008,19 @@ describe('profile runtime delivery', () => {
       }).success
     ).toBe(false);
   });
+
+  it('preserves skills.sh references through metadata and wrapper registration', () => {
+    const runtimeSkills = [{ name: 'find-skills', source: 'vercel-labs/skills' }];
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({ profile: { runtimeSkills } }),
+      selection
+    );
+    expect(registration.spec.runtimeSkills).toEqual(runtimeSkills);
+    expect(
+      controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      }).spec.runtimeSkills
+    ).toEqual(runtimeSkills);
+  });
 });

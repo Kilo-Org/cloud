@@ -767,6 +767,12 @@ const controlPlaneHelloFrameSchema = z
      * A secret-bearing prepare is not sent to a wrapper that did not advertise it.
      */
     redactsNamedSecrets: z.literal(true).optional(),
+    /**
+     * Optional capability: the wrapper installs skills.sh `{name, source}`
+     * references during setup. A prepare containing a source reference is not
+     * sent to a wrapper that did not advertise it.
+     */
+    installsSkillsSh: z.literal(true).optional(),
   })
   .strict();
 

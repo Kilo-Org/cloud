@@ -865,6 +865,7 @@ export async function writeRuntimeSkills(
 
   const summaries: { name: string; bytes: number; hash: string; fileCount: number }[] = [];
   for (const skill of skills) {
+    if (skill.source !== undefined) continue;
     const skillDir = `${baseDir}/${skill.name}`;
     const skillPath = `${skillDir}/SKILL.md`;
     await timedExec(sandbox, `mkdir -p ${skillDir}`, 'session.writeRuntimeSkills.mkdir');

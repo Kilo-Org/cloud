@@ -346,6 +346,7 @@ const wrapperSocketAttachmentSchema = z.object({
   wrapperId: z.string().optional(),
   heartbeatAck: z.literal(true).optional(),
   redactsNamedSecrets: z.literal(true).optional(),
+  installsSkillsSh: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
 });
 type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
@@ -353,6 +354,7 @@ type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
 /** Separates an old wrapper from a decrypt/parse failure; both fail the attempt. */
 type PrepareFrameMaterializationStage =
   | 'wrapper_redaction_unsupported'
+  | 'wrapper_skills_sh_unsupported'
   | 'frame_materialization_failed';
 
 class PrepareFrameMaterializationError extends Error {
@@ -3503,11 +3505,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.readAttachment(socket)?.redactsNamedSecrets === true;
   }
 
+  private wrapperInstallsSkillsSh(socket: WebSocket): boolean {
+    return this.readAttachment(socket)?.installsSkillsSh === true;
+  }
+
   /**
    * A failure throws rather than sending a frame the wrapper would drop while the
    * route waits out its preparation deadline.
    */
   private materializePrepareFrame(route: RouteRecord, socket: WebSocket): ControlPlaneRouteSpec {
+    if (
+      route.spec.runtimeSkills?.some(skill => 'source' in skill) &&
+      !this.wrapperInstallsSkillsSh(socket)
+    ) {
+      throw new PrepareFrameMaterializationError('wrapper_skills_sh_unsupported');
+    }
     const encryptedSecrets = route.credentialSource?.encryptedSecrets;
     try {
       const frameEnv = buildFrameEnv({
@@ -4873,6 +4885,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           : {}),
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
         ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
+        ...(frame.installsSkillsSh ? { installsSkillsSh: true } : {}),
       });
       // Welcome first, then route effects: a re-prepared route resends
       // `session.prepare`, which must not arrive before the welcome.

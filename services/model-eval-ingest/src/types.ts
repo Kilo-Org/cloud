@@ -24,12 +24,26 @@ export const PromotionRecordSchema = z.object({
   promoted_at: z.number().int().nonnegative(),
   promoted_by_email: z.string().min(1),
   promotion_note: z.string().nullable(),
+  benchmark_release: z.string().nullable().optional(),
+  benchmark_revision: z.string().nullable().optional(),
+  benchmark_scope: z.string().nullable().optional(),
+  included_task_count: z.number().int().nonnegative().nullable().optional(),
+  suite_task_count: z.number().int().nonnegative().nullable().optional(),
+  dataset_digest: z.string().nullable().optional(),
 });
 
 export type PromotionRecord = z.infer<typeof PromotionRecordSchema>;
 
 export type KiloBenchEval = {
   taskSource: string;
+  displayName?: string;
+  datasetName?: string;
+  benchmarkRelease?: string;
+  benchmarkRevision?: string;
+  datasetDigest?: string;
+  scope?: string;
+  includedTaskCount?: number;
+  suiteTaskCount?: number;
   overallScore: number;
   totalScore: number;
   avgCostUsd: number | null;
@@ -54,6 +68,12 @@ export type KiloBenchBenchmarks = {
 
 export type LatestPromotion = {
   taskSource: string;
+  benchmarkRelease?: string | null;
+  benchmarkRevision?: string | null;
+  benchmarkScope?: string | null;
+  includedTaskCount?: number | null;
+  suiteTaskCount?: number | null;
+  datasetDigest?: string | null;
   totalScore: number;
   overallScore: number;
   avgCostMicrodollars: number | null;

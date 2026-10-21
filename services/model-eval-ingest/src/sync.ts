@@ -16,6 +16,37 @@ import {
 } from './types.js';
 
 const PROMOTION_PULL_LIMIT = 1000;
+
+/** Raw task sources whose promotions auto-create and link model_stats rows. */
+export const AUTO_LINK_TASK_SOURCES: ReadonlySet<string> = new Set([
+  'terminal-bench',
+  'terminal-bench/terminal-bench',
+]);
+const AUTO_LINK_TASK_SOURCE_LIST = [...AUTO_LINK_TASK_SOURCES];
+
+/**
+ * Cache key for a promotion's eval. Hub-revisioned datasets (e.g. Terminal-Bench
+ * `terminal-bench/terminal-bench@4`) are kept apart per revision; legacy rows without a
+ * revision keep their bare task_source key. The dataset digest is never part of the key.
+ */
+export function evalKey(row: { taskSource: string; benchmarkRevision?: string | null }): string {
+  return row.benchmarkRevision ? `${row.taskSource}@${row.benchmarkRevision}` : row.taskSource;
+}
+
+export function evalDisplayName(row: LatestPromotion): string | undefined {
+  if (row.taskSource !== 'terminal-bench/terminal-bench') return undefined;
+  const parts: string[] = [];
+  if (row.benchmarkRelease) parts.push(`v${row.benchmarkRelease}`);
+  if (row.benchmarkScope) {
+    const scope = row.benchmarkScope === 'cpu-only' ? 'CPU-only' : row.benchmarkScope;
+    const coverage =
+      row.includedTaskCount != null && row.suiteTaskCount != null
+        ? ` ${row.includedTaskCount}/${row.suiteTaskCount}`
+        : '';
+    parts.push(`${scope}${coverage}`);
+  }
+  return parts.length > 0 ? `Terminal-Bench (${parts.join(' · ')})` : 'Terminal-Bench';
+}
 const MICRODOLLARS_PER_DOLLAR = 1_000_000;
 
 export function usdToMicrodollars(value: number | null): number | null {
@@ -69,6 +100,12 @@ function storedPromotionValues({ promotion, modelStatsId }: PromotionInsert) {
     promoted_at: new Date(promotion.promoted_at).toISOString(),
     promoted_by_email: promotion.promoted_by_email,
     promotion_note: promotion.promotion_note,
+    benchmark_release: promotion.benchmark_release ?? null,
+    benchmark_revision: promotion.benchmark_revision ?? null,
+    benchmark_scope: promotion.benchmark_scope ?? null,
+    included_task_count: promotion.included_task_count ?? null,
+    suite_task_count: promotion.suite_task_count ?? null,
+    dataset_digest: promotion.dataset_digest ?? null,
   };
 }
 
@@ -109,7 +146,7 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
         .from(model_eval_ingestions)
         .where(
           and(
-            eq(model_eval_ingestions.task_source, 'terminal-bench'),
+            inArray(model_eval_ingestions.task_source, AUTO_LINK_TASK_SOURCE_LIST),
             isNull(model_eval_ingestions.model_stats_id)
           )
         );
@@ -182,7 +219,7 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
           .where(
             and(
               eq(model_eval_ingestions.model, model),
-              eq(model_eval_ingestions.task_source, 'terminal-bench'),
+              inArray(model_eval_ingestions.task_source, AUTO_LINK_TASK_SOURCE_LIST),
               isNull(model_eval_ingestions.model_stats_id)
             )
           )
@@ -248,6 +285,12 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
           totalCacheReadTokens: model_eval_ingestions.total_cache_read_tokens,
           nErrored: model_eval_ingestions.n_errored,
           promotedAt: model_eval_ingestions.promoted_at,
+          benchmarkRelease: model_eval_ingestions.benchmark_release,
+          benchmarkRevision: model_eval_ingestions.benchmark_revision,
+          benchmarkScope: model_eval_ingestions.benchmark_scope,
+          includedTaskCount: model_eval_ingestions.included_task_count,
+          suiteTaskCount: model_eval_ingestions.suite_task_count,
+          datasetDigest: model_eval_ingestions.dataset_digest,
         })
         .from(model_eval_ingestions)
         .where(
@@ -264,8 +307,9 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
 
       const latestByTaskSource = new Map<string, LatestPromotion>();
       for (const row of rows) {
-        if (!latestByTaskSource.has(row.taskSource)) {
-          latestByTaskSource.set(row.taskSource, row);
+        const key = evalKey(row);
+        if (!latestByTaskSource.has(key)) {
+          latestByTaskSource.set(key, row);
         }
       }
 
@@ -297,8 +341,18 @@ export function buildKiloBenchBenchmarks(rows: LatestPromotion[]): KiloBenchBenc
   for (const row of rows) {
     totalScore += row.totalScore;
     nTotalTrials += row.nTotalTrials;
-    evals[row.taskSource] = {
-      taskSource: row.taskSource,
+    const key = evalKey(row);
+    const displayName = evalDisplayName(row);
+    evals[key] = {
+      taskSource: key,
+      ...(displayName !== undefined && { displayName }),
+      ...(key !== row.taskSource && { datasetName: row.taskSource }),
+      ...(row.benchmarkRelease != null && { benchmarkRelease: row.benchmarkRelease }),
+      ...(row.benchmarkRevision != null && { benchmarkRevision: row.benchmarkRevision }),
+      ...(row.datasetDigest != null && { datasetDigest: row.datasetDigest }),
+      ...(row.benchmarkScope != null && { scope: row.benchmarkScope }),
+      ...(row.includedTaskCount != null && { includedTaskCount: row.includedTaskCount }),
+      ...(row.suiteTaskCount != null && { suiteTaskCount: row.suiteTaskCount }),
       overallScore: row.overallScore,
       totalScore: row.totalScore,
       avgCostUsd: microdollarsToUsd(row.avgCostMicrodollars),
@@ -352,7 +406,7 @@ export async function syncPromotionsFromBench(
   const tuplesToRecompute = new Map<string, PromotionTuple>();
   const fetchedModels = [...new Set(promotions.map(promotion => promotion.model))];
   const terminalModels = promotions
-    .filter(promotion => promotion.task_source === 'terminal-bench')
+    .filter(promotion => AUTO_LINK_TASK_SOURCES.has(promotion.task_source))
     .map(promotion => promotion.model);
   const orphanedModels = await store.listOrphanedTerminalBenchModels();
   const models = [...new Set([...fetchedModels, ...orphanedModels])];

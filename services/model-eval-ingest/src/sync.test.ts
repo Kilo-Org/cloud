@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AUTO_LINK_TASK_SOURCES,
+  evalKey,
   roundAverage,
   syncPromotionsFromBench,
   usdToMicrodollars,
@@ -39,7 +41,8 @@ class MemoryPromotionStore implements PromotionStore {
       ...new Set(
         [...this.rows.values()]
           .filter(
-            row => row.promotion.task_source === 'terminal-bench' && row.modelStatsId === null
+            row =>
+              AUTO_LINK_TASK_SOURCES.has(row.promotion.task_source) && row.modelStatsId === null
           )
           .map(row => row.promotion.model)
       ),
@@ -74,7 +77,8 @@ class MemoryPromotionStore implements PromotionStore {
   ): Promise<PromotionTuple[]> {
     const tuples = new Map<string, PromotionTuple>();
     for (const row of this.rows.values()) {
-      if (row.promotion.task_source !== 'terminal-bench' || row.modelStatsId !== null) continue;
+      if (!AUTO_LINK_TASK_SOURCES.has(row.promotion.task_source) || row.modelStatsId !== null)
+        continue;
       const target = targets.get(row.promotion.model);
       if (!target) continue;
       row.modelStatsId = target.id;
@@ -127,9 +131,19 @@ class MemoryPromotionStore implements PromotionStore {
 
     const latestByTask = new Map<string, LatestPromotion>();
     for (const promotion of rows) {
-      if (latestByTask.has(promotion.task_source)) continue;
-      latestByTask.set(promotion.task_source, {
+      const key = evalKey({
         taskSource: promotion.task_source,
+        benchmarkRevision: promotion.benchmark_revision,
+      });
+      if (latestByTask.has(key)) continue;
+      latestByTask.set(key, {
+        taskSource: promotion.task_source,
+        benchmarkRelease: promotion.benchmark_release,
+        benchmarkRevision: promotion.benchmark_revision,
+        benchmarkScope: promotion.benchmark_scope,
+        includedTaskCount: promotion.included_task_count,
+        suiteTaskCount: promotion.suite_task_count,
+        datasetDigest: promotion.dataset_digest,
         totalScore: promotion.total_score,
         overallScore: promotion.overall_score,
         avgCostMicrodollars: usdToMicrodollars(promotion.avg_cost_usd),
@@ -395,7 +409,68 @@ describe('syncPromotionsFromBench', () => {
     expect(JSON.stringify(cache)).not.toContain('promoter@example.com');
     expect(JSON.stringify(cache)).not.toContain('new-terminal');
   });
+
+  it('keeps legacy terminal-bench unchanged alongside a revision-keyed Terminal-Bench promotion', async () => {
+    const legacyOnly = createStore();
+    await syncPromotionsFromBench(
+      new MemoryBenchDashboard([promotion({ bench_eval_name: 'legacy-terminal' })]),
+      legacyOnly
+    );
+    const legacyEval = legacyOnly.cache.get('model-stats-1')?.evals['terminal-bench'];
+
+    const store = createStore();
+    await syncPromotionsFromBench(
+      new MemoryBenchDashboard([
+        promotion({ bench_eval_name: 'legacy-terminal' }),
+        tb4Promotion({ bench_eval_name: 'tb4-terminal', overall_score: 0.6 }),
+      ]),
+      store
+    );
+
+    const cache = store.cache.get('model-stats-1');
+    expect(cache?.evals['terminal-bench']).toEqual(legacyEval);
+    expect(cache?.evals['terminal-bench/terminal-bench@4']).toMatchObject({
+      taskSource: 'terminal-bench/terminal-bench@4',
+      datasetName: 'terminal-bench/terminal-bench',
+      displayName: 'Terminal-Bench (v4.0.0 · CPU-only 63/66)',
+      benchmarkRelease: '4.0.0',
+      benchmarkRevision: '4',
+      scope: 'cpu-only',
+      includedTaskCount: 63,
+      suiteTaskCount: 66,
+      datasetDigest: 'sha256:abc',
+      overallScore: 0.6,
+    });
+  });
+
+  it('creates and links a model stats target for a Terminal-Bench revision promotion', async () => {
+    const store = new MemoryPromotionStore([]);
+    const bench = new MemoryBenchDashboard([
+      tb4Promotion({ bench_eval_name: 'tb4-new-model', model: 'kilo/moonshotai/kimi-k2.7-code' }),
+    ]);
+
+    const result = await syncPromotionsFromBench(bench, store);
+
+    expect(result).toEqual({ inserted: 1, alreadyHad: 0, cacheRecomputes: 1, fetched: 1 });
+    expect(store.rows.get('tb4-new-model')?.modelStatsId).toBe('created:moonshotai/kimi-k2.7-code');
+    expect(
+      store.cache.get('created:moonshotai/kimi-k2.7-code')?.evals['terminal-bench/terminal-bench@4']
+    ).toBeDefined();
+  });
 });
+
+function tb4Promotion(overrides: Partial<PromotionRecord>): PromotionRecord {
+  return promotion({
+    task_source: 'terminal-bench/terminal-bench',
+    benchmark_release: '4.0.0',
+    benchmark_revision: '4',
+    benchmark_scope: 'cpu-only',
+    included_task_count: 63,
+    suite_task_count: 66,
+    dataset_digest: 'sha256:abc',
+    ...overrides,
+  });
+}
 
 function createStore(): MemoryPromotionStore {
   return new MemoryPromotionStore([{ id: 'model-stats-1', model: 'kilo/openai/gpt-5.5' }]);

@@ -35,6 +35,8 @@
     "connectGithub": "Yhdistä GitHub-tili",
     "cost": "Kustannus",
     "discard": "Hylkää",
+    "discardChangesMessage": "Muutokset menetetään.",
+    "discardChangesTitle": "Hylätäänkö muutokset?",
     "findings": "Havainnot",
     "mergeRequest": "yhdistämispyyntö",
     "notConnected": "Ei yhdistetty",
@@ -1661,7 +1663,14 @@
       "whereFound": "Havainnon sijainnit ({{displayCount}})",
       "fullReport": "Luotu raportti kokonaisuudessaan",
       "yes": "Kyllä",
-      "no": "Ei"
+      "no": "Ei",
+      "action": {
+        "analyzeCodebase": "Analysoi koodikanta",
+        "dismiss": "Ohita",
+        "manualReview": "Manuaalinen tarkistus",
+        "monitor": "Valvo",
+        "openPr": "Avaa PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} havaintoa",
@@ -1880,7 +1889,24 @@
       "title": "Tarkastusraportti",
       "unavailable": "Tarkastusraporttia ei ole saatavilla",
       "unavailableDescription": "Vain organisaation omistajat ja laskutusvastaavat voivat tarkastella tarkastusraportteja. Pyydä käyttöoikeus omistajalta tai laskutusvastaavalta.",
-      "queryFailed": "Raportin haku jäi kesken. Yritä uudelleen."
+      "queryFailed": "Raportin haku jäi kesken. Yritä uudelleen.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyysi valmistui",
+        "findingAnalysisFailed": "Analyysi epäonnistui",
+        "findingAutoDismissed": "Ohitettu automaattisesti",
+        "findingCreated": "Tuotu",
+        "findingDeleted": "Poistettu",
+        "findingDismissed": "Ohitettu",
+        "findingSeverityChanged": "Vakavuus muuttui",
+        "findingStatusChange": "Tila muuttui",
+        "findingSuperseded": "Korvattu",
+        "remediationBlocked": "Korjaus estetty",
+        "remediationCancelled": "Peruutettu",
+        "remediationFailed": "Korjaus epäonnistui",
+        "remediationNoChangesNeeded": "Muutoksia ei tarvita",
+        "remediationPrOpened": "PR avattu",
+        "remediationQueued": "Korjausta pyydetty"
+      }
     },
     "notifications": {
       "couldNotLoad": "Ilmoitusasetuksia ei voitu ladata.",

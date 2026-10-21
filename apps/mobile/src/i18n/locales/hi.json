@@ -35,6 +35,8 @@
     "connectGithub": "GitHub जोड़ें",
     "cost": "लागत",
     "discard": "छोड़ दें",
+    "discardChangesMessage": "आपके परिवर्तन खो जाएँगे.",
+    "discardChangesTitle": "परिवर्तनों को छोड़ दें?",
     "findings": "मिली समस्याएँ",
     "mergeRequest": "मर्ज रिक्वेस्ट",
     "notConnected": "जुड़ा नहीं",
@@ -50,7 +52,7 @@
     "connected": "जुड़ा हुआ",
     "couldNotLoadModels": "मॉडल लोड नहीं हो सके।",
     "couldNotLoadRepositories": "रिपॉज़िटरी लोड नहीं हो सकीं।",
-    "critical": "गंभीर",
+    "critical": "अति गंभीर",
     "delete": "हटाएँ",
     "deleted": "हटाई गई",
     "details": "विवरण",
@@ -1113,7 +1115,14 @@
       "triageReasoning": "प्राथमिक जाँच का तर्क",
       "watchInCloudAgent": "क्लाउड एजेंट में देखें",
       "whereFound": "समस्या मिलने की जगहें ({{displayCount}})",
-      "yes": "हाँ"
+      "yes": "हाँ",
+      "action": {
+        "analyzeCodebase": "कोडबेस का विश्लेषण करें",
+        "dismiss": "खारिज करें",
+        "manualReview": "मैन्युअल समीक्षा",
+        "monitor": "निगरानी करें",
+        "openPr": "पुल रिक्वेस्ट खोलें"
+      }
     },
     "analysisSettings": {
       "analysisModel": "विश्लेषण का मॉडल",
@@ -1135,7 +1144,24 @@
       "summary": "रिपोर्ट का सारांश",
       "title": "ऑडिट रिपोर्ट",
       "unavailable": "ऑडिट रिपोर्ट अनुपलब्ध",
-      "unavailableDescription": "केवल संगठन के मालिक और बिलिंग मैनेजर ही ऑडिट रिपोर्ट देख सकते हैं। किसी मालिक या बिलिंग मैनेजर से आपको अनुमति देने के लिए कहें।"
+      "unavailableDescription": "केवल संगठन के मालिक और बिलिंग मैनेजर ही ऑडिट रिपोर्ट देख सकते हैं। किसी मालिक या बिलिंग मैनेजर से आपको अनुमति देने के लिए कहें।",
+      "eventActions": {
+        "findingAnalysisCompleted": "विश्लेषण पूर्ण हुआ",
+        "findingAnalysisFailed": "विश्लेषण विफल रहा",
+        "findingAutoDismissed": "स्वतः खारिज किया गया",
+        "findingCreated": "आयातित",
+        "findingDeleted": "हटाया गया",
+        "findingDismissed": "खारिज किया गया",
+        "findingSeverityChanged": "गंभीरता बदली गई",
+        "findingStatusChange": "स्थिति बदली गई",
+        "findingSuperseded": "बदला गया",
+        "remediationBlocked": "सुधार अवरुद्ध हुआ",
+        "remediationCancelled": "रद्द किया गया",
+        "remediationFailed": "सुधार विफल रहा",
+        "remediationNoChangesNeeded": "कोई बदलाव आवश्यक नहीं",
+        "remediationPrOpened": "पुल रिक्वेस्ट खोली गई",
+        "remediationQueued": "सुधार का अनुरोध भेजा गया"
+      }
     },
     "auditReportButton": {
       "viewA11y": "ऑडिट रिपोर्ट देखें"
@@ -1223,7 +1249,7 @@
       "withinDeadlineDetail": "{{total}} में से {{within}} समय सीमा के भीतर",
       "noDeadlineData": "अभी किसी समस्या के लिए SLA की समय सीमा तय नहीं है",
       "deadlinePassed": "समय सीमा बीत गई",
-      "deadlinePassedDetail": "{{critical}} गंभीर, {{high}} उच्च",
+      "deadlinePassedDetail": "{{critical}} अति गंभीर, {{high}} उच्च",
       "dueThisWeek": "अंतिम तारीख इस सप्ताह",
       "dueThisWeekDetail": "{{exploitable}} समस्याओं का फ़ायदा उठाकर हमला संभव होने की पुष्टि",
       "noDeadline": "कोई समय सीमा नहीं",

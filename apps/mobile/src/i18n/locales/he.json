@@ -35,6 +35,8 @@
     "connectGithub": "חיבור ל-GitHub",
     "cost": "עלות",
     "discard": "ויתור על השינויים",
+    "discardChangesMessage": "השינויים שלך יאבדו.",
+    "discardChangesTitle": "ויתור על השינויים?",
     "findings": "ממצאים",
     "mergeRequest": "בקשת מיזוג",
     "notConnected": "לא מחובר",
@@ -1116,7 +1118,14 @@
       "triageReasoning": "נימוקי המיון הראשוני",
       "watchInCloudAgent": "צפייה בסוכן הענן",
       "whereFound": "מיקומי הממצא ({{displayCount}})",
-      "yes": "כן"
+      "yes": "כן",
+      "action": {
+        "analyzeCodebase": "נתח את בסיס הקוד",
+        "dismiss": "דחייה",
+        "manualReview": "בדיקה ידנית",
+        "monitor": "מעקב",
+        "openPr": "פתיחת בקשת משיכה"
+      }
     },
     "analysisSettings": {
       "analysisModel": "מודל לניתוח",
@@ -1138,7 +1147,24 @@
       "summary": "סיכום הדוח",
       "title": "דוח ביקורת",
       "unavailable": "דוח הביקורת אינו זמין",
-      "unavailableDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לצפות בדוחות ביקורת. בקש מאחד מבעלי הארגון או ממנהל החיוב לתת לך גישה."
+      "unavailableDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לצפות בדוחות ביקורת. בקש מאחד מבעלי הארגון או ממנהל החיוב לתת לך גישה.",
+      "eventActions": {
+        "findingAnalysisCompleted": "הניתוח הושלם",
+        "findingAnalysisFailed": "הניתוח נכשל",
+        "findingAutoDismissed": "נדחה אוטומטית",
+        "findingCreated": "יובא",
+        "findingDeleted": "נמחק",
+        "findingDismissed": "נדחה",
+        "findingSeverityChanged": "החומרה שונתה",
+        "findingStatusChange": "הסטטוס שונה",
+        "findingSuperseded": "הוחלף",
+        "remediationBlocked": "התיקון נחסם",
+        "remediationCancelled": "בוטל",
+        "remediationFailed": "התיקון נכשל",
+        "remediationNoChangesNeeded": "לא נדרשים שינויים",
+        "remediationPrOpened": "נפתחה בקשת משיכה",
+        "remediationQueued": "התקבלה בקשה לתיקון"
+      }
     },
     "auditReportButton": {
       "viewA11y": "צפייה בדוח הביקורת"

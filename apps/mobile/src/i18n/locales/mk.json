@@ -35,6 +35,8 @@
     "connectGithub": "Поврзи GitHub",
     "cost": "Трошок",
     "discard": "Отфрли",
+    "discardChangesMessage": "Вашите промени ќе бидат изгубени.",
+    "discardChangesTitle": "Отфрли промени?",
     "findings": "Наоди",
     "mergeRequest": "merge барање",
     "notConnected": "Неповрзано",
@@ -1661,7 +1663,14 @@
       "whereFound": "Места на откривање ({{displayCount}})",
       "fullReport": "Целосен генериран извештај",
       "yes": "Да",
-      "no": "Не"
+      "no": "Не",
+      "action": {
+        "analyzeCodebase": "Анализирај го кодот",
+        "dismiss": "Отфрли",
+        "manualReview": "Мануелна ревизија",
+        "monitor": "Мониторирај",
+        "openPr": "Отвори PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} наоди",
@@ -1880,7 +1889,24 @@
       "title": "Извештај за ревизија",
       "unavailable": "Извештајот за ревизија е недостапен",
       "unavailableDescription": "Само сопствениците на организацијата и менаџерите за наплата можат да гледаат извештаи за ревизија. Побарај од сопственик или менаџер за наплата да ти даде пристап.",
-      "queryFailed": "Барањето за извештајот не заврши. Обиди се повторно."
+      "queryFailed": "Барањето за извештајот не заврши. Обиди се повторно.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Завршена анализа",
+        "findingAnalysisFailed": "Неуспешна анализа",
+        "findingAutoDismissed": "Автоматски отфрлено",
+        "findingCreated": "Импортирано",
+        "findingDeleted": "Избришано",
+        "findingDismissed": "Отфрлено",
+        "findingSeverityChanged": "Променета сериозност",
+        "findingStatusChange": "Променет статус",
+        "findingSuperseded": "Заменето",
+        "remediationBlocked": "Блокирано санирање",
+        "remediationCancelled": "Откажано",
+        "remediationFailed": "Неуспешно санирање",
+        "remediationNoChangesNeeded": "Не се потребни промени",
+        "remediationPrOpened": "Отворен PR",
+        "remediationQueued": "Побарано санирање"
+      }
     },
     "notifications": {
       "couldNotLoad": "Не успеа вчитувањето на поставките за известувања.",

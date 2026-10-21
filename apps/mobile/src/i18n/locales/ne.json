@@ -35,6 +35,8 @@
     "connectGithub": "GitHub जडान गर्नुहोस्",
     "cost": "लागत",
     "discard": "खारेज गर्नुहोस्",
+    "discardChangesMessage": "तपाईंका परिवर्तनहरू हराउनेछन्।",
+    "discardChangesTitle": "परिवर्तनहरू खारेज गर्नुहोस्?",
     "findings": "भेटिएका समस्या",
     "mergeRequest": "मर्ज रिक्वेस्ट",
     "notConnected": "जडान छैन",
@@ -1661,7 +1663,14 @@
       "whereFound": "फेला परेका स्थानहरू ({{displayCount}})",
       "fullReport": "तयार गरिएको पूर्ण प्रतिवेदन",
       "yes": "हो",
-      "no": "होइन"
+      "no": "होइन",
+      "action": {
+        "analyzeCodebase": "कोडबेस विश्लेषण गर्नुहोस्",
+        "dismiss": "खारेज गर्नुहोस्",
+        "manualReview": "म्यानुअल समीक्षा",
+        "monitor": "निगरानी गर्नुहोस्",
+        "openPr": "पुल रिक्वेस्ट खोल्नुहोस्"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} सुरक्षा समस्या",
@@ -1880,7 +1889,24 @@
       "title": "अडिट प्रतिवेदन",
       "unavailable": "अडिट प्रतिवेदन उपलब्ध छैन",
       "unavailableDescription": "संस्थाका मालिक र बिलिङ प्रबन्धकहरूले मात्र अडिट प्रतिवेदन हेर्न सक्छन्। पहुँचका लागि संस्थाका मालिक वा बिलिङ प्रबन्धकलाई अनुरोध गर्नुहोस्।",
-      "queryFailed": "प्रतिवेदनको क्वेरी पूरा भएन। फेरि प्रयास गर्नुहोस्।"
+      "queryFailed": "प्रतिवेदनको क्वेरी पूरा भएन। फेरि प्रयास गर्नुहोस्।",
+      "eventActions": {
+        "findingAnalysisCompleted": "विश्लेषण पूरा भयो",
+        "findingAnalysisFailed": "विश्लेषण असफल भयो",
+        "findingAutoDismissed": "स्वतः खारेज गरियो",
+        "findingCreated": "आयात गरियो",
+        "findingDeleted": "मेटियो",
+        "findingDismissed": "खारेज गरियो",
+        "findingSeverityChanged": "गम्भीरता परिवर्तन भयो",
+        "findingStatusChange": "स्थिति परिवर्तन भयो",
+        "findingSuperseded": "प्रतिस्थापित भयो",
+        "remediationBlocked": "सुधार रोकियो",
+        "remediationCancelled": "रद्द गरियो",
+        "remediationFailed": "सुधार असफल भयो",
+        "remediationNoChangesNeeded": "कुनै परिवर्तन आवश्यक छैन",
+        "remediationPrOpened": "पुल रिक्वेस्ट खोलियो",
+        "remediationQueued": "सुधारको अनुरोध गरिएको"
+      }
     },
     "notifications": {
       "couldNotLoad": "सूचनाका सेटिङहरू लोड गर्न सकिएन।",

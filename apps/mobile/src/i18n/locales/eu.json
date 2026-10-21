@@ -35,6 +35,8 @@
     "connectGithub": "Konektatu GitHub",
     "cost": "Kostua",
     "discard": "Baztertu",
+    "discardChangesMessage": "Zure aldaketak galduko dira.",
+    "discardChangesTitle": "Baztertu aldaketak?",
     "findings": "Antzemandako arazoak",
     "mergeRequest": "merge-eskaera",
     "notConnected": "Konektatu gabe",
@@ -1661,7 +1663,14 @@
       "whereFound": "Non aurkitu den ({{displayCount}})",
       "fullReport": "Sortutako txosten osoa",
       "yes": "Bai",
-      "no": "Ez"
+      "no": "Ez",
+      "action": {
+        "analyzeCodebase": "Analizatu kode-oinarria",
+        "dismiss": "Baztertu",
+        "manualReview": "Eskuzko berrikuspena",
+        "monitor": "Monitorizatu",
+        "openPr": "Ireki PRa"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} aurkikuntza",
@@ -1880,7 +1889,24 @@
       "title": "Auditoria-txostena",
       "unavailable": "Auditoria-txostena ez dago erabilgarri",
       "unavailableDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik ikus ditzakete auditoria-txostenak. Eskatu jabe bati edo fakturazio-kudeatzaile bati sarbidea emateko.",
-      "queryFailed": "Txostenaren kontsulta ez da amaitu. Saiatu berriro."
+      "queryFailed": "Txostenaren kontsulta ez da amaitu. Saiatu berriro.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analisia amaitu da",
+        "findingAnalysisFailed": "Analisiak huts egin du",
+        "findingAutoDismissed": "Automatikoki baztertua",
+        "findingCreated": "Inportatuta",
+        "findingDeleted": "Ezabatua",
+        "findingDismissed": "Baztertua",
+        "findingSeverityChanged": "Larritasuna aldatu da",
+        "findingStatusChange": "Egoera aldatu da",
+        "findingSuperseded": "Ordezkatua",
+        "remediationBlocked": "Konponketa blokeatu da",
+        "remediationCancelled": "Baliogabetua",
+        "remediationFailed": "Konponketak huts egin du",
+        "remediationNoChangesNeeded": "Ez da aldaketarik behar",
+        "remediationPrOpened": "PRa ireki da",
+        "remediationQueued": "Konponketa eskatu da"
+      }
     },
     "notifications": {
       "couldNotLoad": "Ezin izan dira jakinarazpen-ezarpenak kargatu.",

@@ -35,6 +35,8 @@
     "connectGithub": "بەستنەوەی GitHub",
     "cost": "تێچوون",
     "discard": "وازهێنان",
+    "discardChangesMessage": "گۆڕانکارییەکانت لەدەست دەچن.",
+    "discardChangesTitle": "وازهێنان لە گۆڕانکارییەکان؟",
     "findings": "دۆزینەوەکان",
     "mergeRequest": "داواکاری تێکەڵکردن",
     "notConnected": "نەبەستراوەتەوە",
@@ -1661,7 +1663,14 @@
       "whereFound": "شوێنی دۆزینەوە ({{displayCount}})",
       "fullReport": "ڕاپۆرتی تەواوی دروستکراو",
       "yes": "بەڵێ",
-      "no": "نەخێر"
+      "no": "نەخێر",
+      "action": {
+        "analyzeCodebase": "شیکردنەوەی بنکەی کۆد",
+        "dismiss": "پشتگوێ خستن",
+        "manualReview": "پێداچوونەوەی دەستی",
+        "monitor": "چاودێری",
+        "openPr": "کردنەوەی PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} دۆزینەوە",
@@ -1880,7 +1889,24 @@
       "title": "ڕاپۆرتی وردبینی",
       "unavailable": "ڕاپۆرتی وردبینی بەردەست نییە",
       "unavailableDescription": "تەنها خاوەنەکانی ڕێکخراو و بەڕێوەبەرانی پارەدان دەتوانن ڕاپۆرتەکانی وردبینی ببینن. داوا لە خاوەنێک یان بەڕێوەبەرێکی پارەدان بکە مۆڵەتی دەستگەیشتنت پێ بدات.",
-      "queryFailed": "داواکاریی ڕاپۆرت تەواو نەبوو. دووبارە هەوڵ بدە."
+      "queryFailed": "داواکاریی ڕاپۆرت تەواو نەبوو. دووبارە هەوڵ بدە.",
+      "eventActions": {
+        "findingAnalysisCompleted": "شیکاری تەواو بوو",
+        "findingAnalysisFailed": "شیکاری سەرکەوتوو نەبوو",
+        "findingAutoDismissed": "بە ئۆتۆماتیکی پشتگوێ خرا",
+        "findingCreated": "هاوردە کرا",
+        "findingDeleted": "سڕدرایەوە",
+        "findingDismissed": "پشتگوێ خرا",
+        "findingSeverityChanged": "توندی گۆڕدرا",
+        "findingStatusChange": "دۆخ گۆڕدرا",
+        "findingSuperseded": "جێگرەوە کرا",
+        "remediationBlocked": "چارەسەر بلۆک کرا",
+        "remediationCancelled": "هەڵوەشایەوە",
+        "remediationFailed": "چارەسەر سەرکەوتوو نەبوو",
+        "remediationNoChangesNeeded": "پێویستی بە گۆڕانکاری نییە",
+        "remediationPrOpened": "PR کراوەتەوە",
+        "remediationQueued": "چارەسەر داواکرا"
+      }
     },
     "notifications": {
       "couldNotLoad": "نەتوانرا ڕێکخستنەکانی ئاگادارکردنەوە بار بکرێن.",

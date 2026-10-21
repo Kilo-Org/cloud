@@ -35,6 +35,8 @@
     "connectGithub": "GitHub-u qoş",
     "cost": "Xərc",
     "discard": "Ləğv et",
+    "discardChangesMessage": "Dəyişiklikləriniz itiriləcək.",
+    "discardChangesTitle": "Dəyişiklikləri ləğv et?",
     "findings": "Aşkarlanan problemlər",
     "mergeRequest": "merge sorğusu",
     "notConnected": "Qoşulmayıb",
@@ -1661,7 +1663,14 @@
       "whereFound": "Aşkar edildiyi yerlər ({{displayCount}})",
       "fullReport": "Hazırlanmış tam hesabat",
       "yes": "Bəli",
-      "no": "Xeyr"
+      "no": "Xeyr",
+      "action": {
+        "analyzeCodebase": "Kod bazasını təhlil et",
+        "dismiss": "Rədd et",
+        "manualReview": "Əl ilə kod yoxlaması",
+        "monitor": "İzlə",
+        "openPr": "PR aç"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} tapıntı",
@@ -1880,7 +1889,24 @@
       "title": "Audit hesabatı",
       "unavailable": "Audit hesabatı mövcud deyil",
       "unavailableDescription": "Audit hesabatlarına yalnız təşkilat sahibləri və ödəniş menecerləri baxa bilər. Giriş icazəsi üçün təşkilat sahibinə və ya ödəniş menecerinə müraciət et.",
-      "queryFailed": "Hesabat sorğusu tamamlanmadı. Yenidən cəhd et."
+      "queryFailed": "Hesabat sorğusu tamamlanmadı. Yenidən cəhd et.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiz tamamlandı",
+        "findingAnalysisFailed": "Təhlil uğursuz oldu",
+        "findingAutoDismissed": "Avtomatik rədd edildi",
+        "findingCreated": "İdxal edildi",
+        "findingDeleted": "Silindi",
+        "findingDismissed": "Rədd edilib",
+        "findingSeverityChanged": "Ağırlıq dərəcəsi dəyişdirildi",
+        "findingStatusChange": "Status dəyişdirildi",
+        "findingSuperseded": "Əvəz edilib",
+        "remediationBlocked": "Düzəliş bloklandı",
+        "remediationCancelled": "Ləğv edildi",
+        "remediationFailed": "Düzəliş uğursuz oldu",
+        "remediationNoChangesNeeded": "Dəyişiklik lazım deyil",
+        "remediationPrOpened": "PR açıldı",
+        "remediationQueued": "Düzəliş tələb edildi"
+      }
     },
     "notifications": {
       "couldNotLoad": "Bildiriş parametrlərini yükləmək mümkün olmadı.",

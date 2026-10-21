@@ -90,6 +90,8 @@ type Execution = ExecutionPauses & {
   activity: SessionActivity;
   parts: Map<string, Part>;
   interactions: Map<string, SessionInteraction>;
+  /** Newest Kilo completion timestamp this execution already credited or retired. */
+  evidenceThrough?: number;
   stop?: AbortController;
 };
 type Session = {
@@ -97,9 +99,8 @@ type Session = {
   directory: string;
   parentID?: string;
   revision: number;
+  /** Live assistant messages only; completed terminal history is retired. */
   roles: Map<string, string>;
-  /** Assistant messages Kilo reported complete; snapshots need not re-read them. */
-  completed: Set<string>;
   execution?: Execution;
 };
 
@@ -135,7 +136,6 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
       directory,
       revision: -1,
       roles: new Map(),
-      completed: new Set(),
     };
     sessions.set(id, next);
     return next;
@@ -170,18 +170,43 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
   function finish(record: Session): void {
     record.execution = undefined;
     record.roles.clear();
-    record.completed.clear();
     if (snapshot !== undefined) tombstones.set(record.id, revision);
   }
 
-  function remember(record: Session, id: string, role: string, completed: boolean): boolean {
+  function remember(record: Session, id: string, role: string): boolean {
+    // User messages neither carry execution evidence nor need retention.
+    if (role !== 'assistant') return true;
     if (record.roles.size >= MAX_MESSAGE_ROLES && !record.roles.has(id)) {
       options.onObservationFailure('activity_capacity');
       return false;
     }
     record.roles.set(id, role);
-    if (completed) record.completed.add(id);
     return true;
+  }
+
+  /**
+   * A completed assistant is terminal: its role and non-running parts cannot produce
+   * more progress. Retaining only pinned live tools keeps long serial generations
+   * inside the role and part bounds without discarding in-flight state.
+   */
+  function retireMessage(record: Session, id: string): void {
+    const execution = record.execution;
+    let pinned = false;
+    if (execution) {
+      for (const [partId, part] of execution.parts) {
+        if (part.messageID !== id) continue;
+        if (part.kind === 'tool' && (part.status === 'running' || part.status === 'pending')) {
+          pinned = true;
+          continue;
+        }
+        execution.parts.delete(partId);
+      }
+    }
+    if (!pinned) record.roles.delete(id);
+  }
+
+  function creditCompleted(execution: Execution, completedAt: number): void {
+    execution.evidenceThrough = Math.max(execution.evidenceThrough ?? completedAt, completedAt);
   }
 
   function prune(): void {
@@ -379,8 +404,19 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
       typeof info?.id === 'string' &&
       typeof info.role === 'string'
     ) {
-      const time = isRecord(info.time) ? info.time : {};
-      if (!remember(record, info.id, info.role, time.completed !== undefined)) return;
+      if (info.role === 'assistant') {
+        const time = isRecord(info.time) ? info.time : {};
+        if (typeof time.completed === 'number') {
+          // Live parts were already observed for this role, so completion itself adds
+          // no progress; it only fences out later replay of the same terminal history.
+          const execution = record.execution;
+          if (execution && record.roles.get(info.id) === 'assistant')
+            creditCompleted(execution, time.completed);
+          retireMessage(record, info.id);
+        } else if (!remember(record, info.id, info.role)) {
+          return;
+        }
+      }
     } else if (event.type === 'message.part.updated') {
       if (observePart(record, properties.part) !== 'unchanged') progress(record);
     } else if (
@@ -474,7 +510,41 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
         const partIds = new Set<string>();
         for (const message of item.messages) {
           const { id, role, time } = message.info;
-          if (!remember(record, id, role, time?.completed !== undefined)) return;
+          if (role !== 'assistant') continue;
+          const completedAt = typeof time?.completed === 'number' ? time.completed : undefined;
+          const live = record.roles.get(id) === 'assistant';
+          const pinnedLive = message.parts.some(
+            part =>
+              isRecord(part) &&
+              part.type === 'tool' &&
+              isRecord(part.state) &&
+              ['running', 'pending'].includes(String(part.state.status))
+          );
+          if (completedAt !== undefined && !live && !pinnedLive) {
+            // Terminal history is not replayed as progress. A completion newer than
+            // this execution's retired frontier still proves work happened during a
+            // feed gap, so credit that source timestamp exactly once.
+            const recovered = message.parts.some(
+              part =>
+                isRecord(part) &&
+                (part.type === 'tool' ||
+                  ((part.type === 'text' || part.type === 'reasoning') &&
+                    typeof part.text === 'string' &&
+                    part.text.length > 0))
+            );
+            if (
+              recovered &&
+              knownExecution &&
+              completedAt >= execution.startedAt &&
+              completedAt > (execution.evidenceThrough ?? Number.NEGATIVE_INFINITY)
+            ) {
+              creditCompleted(execution, completedAt);
+              progress(record);
+            }
+            retireMessage(record, id);
+            continue;
+          }
+          if (!remember(record, id, role)) return;
           for (const part of message.parts) {
             if (isRecord(part) && typeof part.id === 'string') partIds.add(part.id);
             const change = observePart(record, part);
@@ -495,6 +565,10 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
               message.info.time !== undefined &&
               message.info.time.created >= execution.startedAt;
             if (change === 'changed' || newEvidence) progress(record);
+          }
+          if (completedAt !== undefined) {
+            creditCompleted(execution, completedAt);
+            retireMessage(record, id);
           }
         }
         // The adapter includes each known in-flight message, so missing parts have ended.
@@ -617,8 +691,8 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
               {
                 id: record.id,
                 directory: record.directory,
-                // Only in-flight messages: re-reading completed history makes every
-                // snapshot slower as a long execution accumulates steps.
+                // Only live messages: completed history is retired rather than re-read,
+                // so a long serial execution's snapshot does not grow with its steps.
                 messageIds: [
                   ...new Set([
                     ...[...record.execution.parts.values()].map(part => part.messageID),
@@ -626,7 +700,7 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
                       role === 'assistant' ? [id] : []
                     ),
                   ]),
-                ].filter(id => !record.completed.has(id)),
+                ],
               },
             ]
           : []

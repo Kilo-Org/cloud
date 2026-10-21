@@ -96,6 +96,7 @@ import {
   controlPlaneRegistrationRouteSpecSchema,
   controlPlaneRouteUpdateSchema,
   controlPlaneRouteViewSchema,
+  controlPlaneSessionControlResultSchema,
   controlPlaneSetupEventSchema,
   type ControlPlaneAnswerPayload,
   type ControlPlaneAnswerReply,
@@ -111,6 +112,8 @@ import {
   type ControlPlanePromptPayload,
   type ControlPlaneRouteUpdate,
   type ControlPlaneRouteView,
+  type ControlPlaneSessionControlInput,
+  type ControlPlaneSessionControlResult,
   type ControlPlaneSessionRefPayload,
   type ControlPlaneSetupEvent,
   type ControlPlaneStatusResult,
@@ -153,6 +156,22 @@ import {
   type SessionMessage,
   type SessionMessageState,
 } from './messages.js';
+import {
+  ACCEPTED_OWNERSHIP_KEY,
+  acceptCoveredMessages,
+  advanceAcceptedOwnership,
+  applyCleanupOutcome,
+  coverageOwnedMessageIds,
+  dropRetiredCleanup as dropCleanupForAllocation,
+  emptyAcceptedOwnership,
+  extendAcceptedCoverage,
+  hasUnresolvedCleanup,
+  nextAcceptedOwnershipAt,
+  parseAcceptedOwnership,
+  pruneAcceptedOwnership,
+  selectCleanupRetries,
+  type AcceptedOwnership,
+} from './accepted-ownership.js';
 import { answerMessageIntent } from './answers.js';
 import { messageFailureText } from './failure-messages.js';
 import {
@@ -369,6 +388,8 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   status(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneStatusResult>;
   prepare(input: ControlPlanePrepareInputWithSelection): Promise<ControlPlaneRouteView>;
   deliver(payload: ControlPlaneDeliverPayload): Promise<ControlPlaneDeliverResult>;
+  /** Correlated current-turn coverage/abandon; never wakes or prepares. */
+  sessionControl(input: ControlPlaneSessionControlInput): Promise<ControlPlaneControlResult>;
   abort(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneDispatchResult>;
   answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult>;
   release(payload: ControlPlaneSessionRefPayload): Promise<void>;
@@ -559,6 +580,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private wipeLocator: WipeLocator | null = null;
   private runtimeAuthorization: RuntimeAuthorization | undefined;
   private messages: SessionMessage[] = [];
+  private acceptedOwnership: AcceptedOwnership = emptyAcceptedOwnership();
   private route: ControlPlaneRouteView = { state: 'unknown' };
   private transportRecoveryAt: number | null = null;
   private pendingInteractions: PendingInteractions | undefined;
@@ -765,6 +787,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const rootStatus = rootStatusSchema.safeParse(await this.ctx.storage.get(ROOT_STATUS_KEY));
     this.rootStatus = rootStatus.success ? rootStatus.data : undefined;
     this.messages = await this.loadMessages();
+    this.acceptedOwnership = parseAcceptedOwnership(
+      await this.ctx.storage.get<unknown>(ACCEPTED_OWNERSHIP_KEY)
+    );
     this.route = await this.loadRoute();
     const recoveryAt = z
       .number()
@@ -1878,13 +1903,45 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   async alarm(): Promise<void> {
     await this.initialized;
     if (this.registration === null) return;
-    await this.enqueue(async () => {
+    const work = await this.enqueue(async () => {
       // The alarm can wake an evicted instance; storage is authoritative.
       this.messages = await this.loadMessages();
       // Retry any report/callback obligation a previous attempt could not send.
       await this.repairOutboxes();
       const now = Date.now();
-      const due = dueBackstopMessages(this.messages, now, this.sessionTimers());
+      const acceptedIds = new Set(
+        this.messages
+          .filter(message => message.state === 'accepted')
+          .map(message => message.messageId)
+      );
+      // A crash between cleanup persistence and no_outcome settlement leaves an
+      // accepted row with no coverage entry. Replay the durable cleanup set
+      // before retiring it, even if the route is already gone.
+      const cleanupIds = new Set(
+        this.acceptedOwnership.cleanup.flatMap(cleanup => cleanup.messageIds)
+      );
+      const replay = [...acceptedIds].filter(messageId => cleanupIds.has(messageId));
+      if (replay.length > 0) await this.settleMessages(replay, 'failed', 'no_outcome');
+      const stale = Object.keys(this.acceptedOwnership.entries).filter(
+        messageId => !acceptedIds.has(messageId)
+      );
+      const reconciled = pruneAcceptedOwnership(this.acceptedOwnership, stale);
+      if (reconciled !== this.acceptedOwnership) await this.persistAcceptedOwnership(reconciled);
+      const advanced = advanceAcceptedOwnership(this.acceptedOwnership, now, this.sessionTimers());
+      if (advanced.state !== this.acceptedOwnership)
+        await this.persistAcceptedOwnership(advanced.state);
+      await this.dropRetiredCleanup();
+      // Persist the cleanup obligation before the no_outcome settlement, so an
+      // eviction cannot leave a zombie native turn with no cleaning owner.
+      for (const expired of advanced.expired) {
+        await this.settleMessages(expired.messageIds, 'failed', 'no_outcome');
+      }
+      const due = dueBackstopMessages(
+        this.messages,
+        now,
+        this.sessionTimers(),
+        coverageOwnedMessageIds(this.acceptedOwnership)
+      );
       if (due.length > 0) {
         if (due.some(entry => entry.message.state === 'queued')) {
           await this.captureQueuedRouteContainer(this.route);
@@ -1903,13 +1960,127 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         await this.clearTransportRecovery();
         await this.recoverQueued(this.transportPass(false));
       }
+      const cleanup = selectCleanupRetries(this.acceptedOwnership, now, this.sessionTimers());
+      if (cleanup.state !== this.acceptedOwnership)
+        await this.persistAcceptedOwnership(cleanup.state);
+      await this.armAlarm();
+      return { probes: advanced.probes, cleanups: cleanup.batches };
+    });
+    // All wrapper I/O is off the serial queue. Each call is bounded by the
+    // probe timeout plus the caller margin, never the 2 s transport pass.
+    const [probes, cleanups] = await Promise.all([
+      this.runSessionControlBatches(work.probes, 'coverage'),
+      this.runSessionControlBatches(work.cleanups, 'abandon'),
+    ]);
+    if (probes.length === 0 && cleanups.length === 0) return;
+    await this.enqueue(async () => {
+      let state = this.acceptedOwnership;
+      for (const { batch, result } of probes) {
+        if (result?.type !== 'coverage') continue;
+        state = extendAcceptedCoverage(
+          state,
+          batch,
+          result.coveredMessageIds,
+          this.sessionTimers()
+        );
+      }
+      const now = Date.now();
+      for (const { batch, result } of cleanups) {
+        state = applyCleanupOutcome(
+          state,
+          batch,
+          result?.type === 'abandon' ? result.outcome : 'failed',
+          now,
+          this.sessionTimers()
+        );
+      }
+      if (state !== this.acceptedOwnership) await this.persistAcceptedOwnership(state);
+      if (
+        (this.route.state === 'ready' || this.route.state === 'reconnecting') &&
+        this.messages.some(message => message.state === 'queued') &&
+        !hasUnresolvedCleanup(this.acceptedOwnership, this.route.container?.allocationId)
+      ) {
+        // The cleanup gate held these; the obligation is gone, so resume now
+        // instead of waiting for the queued backstop.
+        await this.deliverQueued();
+      }
       await this.armAlarm();
     });
   }
 
   /**
+   * Runs one coverage or abandon batch set against the current Sandbox peer.
+   * Every batch uses the same bounded deadline, and a missing/erroring result
+   * is reported as no cover / failed cleanup rather than renewing any obligation.
+   */
+  private async runSessionControlBatches<
+    TBatch extends { allocationId: string; messageIds: string[] },
+  >(
+    batches: readonly TBatch[],
+    action: 'coverage' | 'abandon'
+  ): Promise<Array<{ batch: TBatch; result: ControlPlaneSessionControlResult | null }>> {
+    if (batches.length === 0) return [];
+    const peer = this.sandboxPeer();
+    if (peer === null) return batches.map(batch => ({ batch, result: null }));
+    const deadlineAt = Date.now() + this.sessionTimers().acceptedProbeTimeoutMs + 2_000;
+    return Promise.all(
+      batches.map(async batch => {
+        try {
+          const result = await withDORetry(
+            () => this.sandboxPeer() ?? peer,
+            stub =>
+              stub.sessionControl({
+                action,
+                sessionId: this.sessionId,
+                allocationId: batch.allocationId,
+                messageIds: batch.messageIds,
+              }),
+            'session.control',
+            { ...DEFAULT_DO_RETRY_CONFIG, scope: { deadlineAt } }
+          );
+          if (!result.ok) return { batch, result: null };
+          const parsed = controlPlaneSessionControlResultSchema.safeParse(result.result);
+          return { batch, result: parsed.success ? parsed.data : null };
+        } catch {
+          return { batch, result: null };
+        }
+      })
+    );
+  }
+
+  /**
+   * Cleanup can only be abandoned by the allocation that owned the expired
+   * turn. Once the route left that allocation there is no reachable zombie, so
+   * the obligation is retired instead of retried forever.
+   */
+  private async dropRetiredCleanup(): Promise<void> {
+    if (this.acceptedOwnership.cleanup.length === 0) return;
+    let state = this.acceptedOwnership;
+    for (const cleanup of [...state.cleanup]) {
+      if (!this.cleanupAllocationRetired(cleanup.allocationId)) continue;
+      state = dropCleanupForAllocation(state, cleanup.allocationId);
+    }
+    if (state !== this.acceptedOwnership) {
+      this.acceptedOwnership = state;
+      await this.ctx.storage.put(ACCEPTED_OWNERSHIP_KEY, state);
+    }
+  }
+
+  private cleanupAllocationRetired(allocationId: string): boolean {
+    if (
+      this.route.state === 'unknown' ||
+      this.route.state === 'failed' ||
+      this.route.state === 'preparing'
+    )
+      return true;
+    const current = this.route.container?.allocationId;
+    return current !== undefined && current !== allocationId;
+  }
+
+  /**
    * The one place that sets the alarm. It wakes for the earliest backstop
-   * deadline, transport recovery, the next report or callback obligation.
+   * deadline, transport recovery, the next report/callback obligation, or a
+   * coverage/probe/cleanup obligation.
    * Outbox due times retry failed reporting even once no message is open.
    */
   private async armAlarm(): Promise<void> {
@@ -1918,7 +2089,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     const candidates = [
       this.transportRecoveryAt,
-      nextBackstopAt(this.messages, this.sessionTimers()),
+      nextBackstopAt(
+        this.messages,
+        this.sessionTimers(),
+        coverageOwnedMessageIds(this.acceptedOwnership)
+      ),
+      nextAcceptedOwnershipAt(this.acceptedOwnership),
       this.reportOutbox.nextDueAt() ?? null,
       this.messageCallbacks.nextCallbackDueAt() ?? null,
     ].filter((value): value is number => value !== null);
@@ -2357,6 +2533,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.wipeLocator = null;
     this.runtimeAuthorization = undefined;
     this.messages = [];
+    this.acceptedOwnership = emptyAcceptedOwnership();
     this.route = { state: 'unknown' };
     this.transportRecoveryAt = null;
     this.pendingInteractions = undefined;
@@ -2604,12 +2781,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (await this.failRetiredQueuedMessages()) return;
     const queued = this.messages.filter(message => message.state === 'queued');
     if (queued.length === 0) return;
+    const routeContainer = this.route.state === 'unknown' ? undefined : this.route.container;
+    // An unresolved abandon on the current allocation must finish before a new
+    // prompt can start a turn the old native execution could still own. The new
+    // intent stays queued and the cleanup alarm continues.
+    if (hasUnresolvedCleanup(this.acceptedOwnership, routeContainer?.allocationId)) {
+      await this.armAlarm();
+      return;
+    }
     const peer = this.sandboxPeer();
     if (peer === null) {
       await this.scheduleTransportRecovery(pass);
       return;
     }
-    const routeContainer = this.route.state === 'unknown' ? undefined : this.route.container;
     let result: ControlPlaneDeliverResult;
     try {
       result = await withDORetry(
@@ -2629,13 +2813,33 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.scheduleTransportRecovery(pass);
       return;
     }
-    if (result === 'sent') {
+    const sent = result === 'sent' || (typeof result === 'object' && result.type === 'sent');
+    if (sent) {
       const now = Date.now();
       const reduction = acceptMessages(
         this.messages,
         queued.map(message => message.messageId),
         now
       );
+      if (
+        typeof result === 'object' &&
+        result.type === 'sent' &&
+        result.coverage &&
+        routeContainer?.allocationId !== undefined
+      ) {
+        // Ownership is durable before the accepted rows. A crash in between
+        // leaves an orphan entry the alarm prunes while the message stays
+        // queued, so it never becomes a coverage-mode age fallback.
+        await this.persistAcceptedOwnership(
+          acceptCoveredMessages(
+            this.acceptedOwnership,
+            reduction.changed.map(message => message.messageId),
+            routeContainer.allocationId,
+            now,
+            this.sessionTimers()
+          )
+        );
+      }
       this.messages = reduction.messages;
       await this.persistMessages(reduction.changed);
       for (const message of reduction.changed) {
@@ -3022,6 +3226,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     );
     this.messages = reduction.messages;
     await this.persistMessages(reduction.changed);
+    const pruned = pruneAcceptedOwnership(
+      this.acceptedOwnership,
+      reduction.changed.map(message => message.messageId)
+    );
+    if (pruned !== this.acceptedOwnership) await this.persistAcceptedOwnership(pruned);
     if (reduction.changed.some(message => previousStates.get(message.messageId) === 'accepted'))
       await this.settleRootStatus();
     for (const message of reduction.changed) {
@@ -3338,6 +3547,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         .values(row)
         .onConflictDoUpdate({ target: controlPlaneMessages.message_id, set: row });
     }
+  }
+
+  private async persistAcceptedOwnership(state: AcceptedOwnership): Promise<void> {
+    this.acceptedOwnership = state;
+    await this.ctx.storage.put(ACCEPTED_OWNERSHIP_KEY, state);
   }
 
   private sessionTimers() {

@@ -5,6 +5,8 @@ import {
 import { SELF } from 'cloudflare:test';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
+  CONTROL_PLANE_TURN_COVERAGE_HEADER,
+  CONTROL_PLANE_TURN_COVERAGE_VERSION,
   controlPlaneWrapperFrameSchema,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
@@ -14,6 +16,7 @@ export type FakeWrapperConnectInput = {
   credential: string;
   path?: string;
   runtimeContract?: 'legacy' | 'worktree';
+  turnCoverage?: boolean;
 };
 
 export type FakeWrapperHelloInput = {
@@ -79,6 +82,9 @@ export class FakeWrapper {
         ...(input.runtimeContract === 'legacy'
           ? {}
           : { [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION }),
+        ...(input.turnCoverage
+          ? { [CONTROL_PLANE_TURN_COVERAGE_HEADER]: CONTROL_PLANE_TURN_COVERAGE_VERSION }
+          : {}),
       },
     });
     if (response.status !== 101 || !response.webSocket) {

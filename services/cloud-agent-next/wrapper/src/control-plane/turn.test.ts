@@ -235,6 +235,7 @@ function createHarness(
   options: {
     runCondense?: TurnManagerDeps['runCondense'];
     runAutoCommit?: TurnManagerDeps['runAutoCommit'];
+    recoverAbandonedAbort?: TurnKiloRuntime['recoverAbandonedAbort'];
     materializeAttachments?: (
       message: { prompt?: string; parts?: unknown[] },
       deps?: { signal?: AbortSignal }
@@ -314,6 +315,7 @@ function createHarness(
       ensure: async () => clients.get(key)!.client,
       sessionState: id => states.get(id),
       refreshActivity: async () => undefined,
+      recoverAbandonedAbort: options.recoverAbandonedAbort,
       isRetiredClient: client => retiredClients.has(client),
       isSuspected: () => flags.get(key)?.suspected ?? false,
       isRestarting: () => flags.get(key)?.restarting ?? false,
@@ -3380,5 +3382,292 @@ describe('native session outcome transitions', () => {
     );
     h.setState(KILO_SESSION, undefined);
     expect(h.manager.activeTurnCount()).toBe(1);
+  });
+});
+
+describe('turn coverage and fenced abandonment', () => {
+  const coverage = async (h: ReturnType<typeof createHarness>, ids: string[]) =>
+    await h.manager.sessionControl({ action: 'coverage', sessionId: SESSION_ID, messageIds: ids });
+
+  it('covers pending delivery, then only an exact current turn owned by native execution', async () => {
+    const materialized = Promise.withResolvers<{ prompt: string }>();
+    const h = createHarness({ materializeAttachments: () => materialized.promise });
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    // Not handed to Kilo yet: its bounded delivery deadline owns it.
+    expect(await coverage(h, ['m1', 'unknown'])).toEqual({
+      type: 'coverage',
+      coveredMessageIds: ['m1'],
+    });
+
+    // Handed over and observed, but with no live native execution: observation
+    // alone must not cover a retained zombie turn.
+    materialized.resolve({ prompt: 'hello' });
+    await settle();
+    expect(await coverage(h, ['m1'])).toEqual({ type: 'coverage', coveredMessageIds: [] });
+
+    h.setState(KILO_SESSION, runningState);
+    expect(await coverage(h, ['m1'])).toEqual({
+      type: 'coverage',
+      coveredMessageIds: ['m1'],
+    });
+
+    // A waiting native execution (for example a silent tool) still owns it.
+    h.setState(KILO_SESSION, { ...runningState, activity: 'waiting' });
+    expect(await coverage(h, ['m1'])).toEqual({
+      type: 'coverage',
+      coveredMessageIds: ['m1'],
+    });
+  });
+
+  it('still covers a live execution long past the legacy 125-minute and near 12-hour ages', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.setState(KILO_SESSION, runningState);
+    h.setClock(126 * 60_000);
+    expect(await coverage(h, ['m1'])).toEqual({
+      type: 'coverage',
+      coveredMessageIds: ['m1'],
+    });
+    h.setClock(12 * 60 * 60_000 - 1_000);
+    expect(await coverage(h, ['m1'])).toEqual({
+      type: 'coverage',
+      coveredMessageIds: ['m1'],
+    });
+  });
+
+  it('covers a serialized follower behind a supervised command while its native owner lives', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.client(routeSpec()).setCommandImpl(() => new Promise(() => undefined));
+    h.setState(KILO_SESSION, runningState);
+    h.manager.submit(SESSION_ID, commandPayload('m1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+
+    expect(await coverage(h, ['m2'])).toEqual({
+      type: 'coverage',
+      coveredMessageIds: ['m2'],
+    });
+  });
+
+  it('covers an actual finalization step, and abandons only when every current prompt is named', async () => {
+    let release: ((result: { wasAborted: boolean; success: boolean }) => void) | undefined;
+    const h = createHarness({
+      runCondense: () => new Promise(resolve => (release = resolve)),
+    });
+    h.registerRoute(routeSpec());
+    h.manager.submit(
+      SESSION_ID,
+      promptPayload('m1', { finalization: { condenseOnComplete: true } })
+    );
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(await coverage(h, ['m1'])).toEqual({
+      type: 'coverage',
+      coveredMessageIds: ['m1'],
+    });
+
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    // A partial request names only the older prompt: defer, never clean m2.
+    expect(
+      await h.manager.sessionControl({
+        action: 'abandon',
+        sessionId: SESSION_ID,
+        messageIds: ['m1'],
+      })
+    ).toEqual({ type: 'abandon', outcome: 'deferred', cleanedMessageIds: [] });
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+
+    expect(
+      await h.manager.sessionControl({
+        action: 'abandon',
+        sessionId: SESSION_ID,
+        messageIds: ['m1', 'm2'],
+      })
+    ).toEqual({
+      type: 'abandon',
+      outcome: 'abandoned',
+      cleanedMessageIds: ['m1', 'm2'],
+    });
+    release?.({ wasAborted: false, success: true });
+    await settle();
+    // Fenced cleanup never emits an outcome for the abandoned (or a newer) prompt.
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+    expect(await coverage(h, ['m1', 'm2'])).toEqual({ type: 'coverage', coveredMessageIds: [] });
+  });
+
+  it('reports absent for unknown ids and covers nothing when no turn exists', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    expect(await coverage(h, ['m1'])).toEqual({ type: 'coverage', coveredMessageIds: [] });
+    expect(
+      await h.manager.sessionControl({
+        action: 'abandon',
+        sessionId: SESSION_ID,
+        messageIds: ['m1'],
+      })
+    ).toEqual({ type: 'abandon', outcome: 'absent', cleanedMessageIds: [] });
+  });
+
+  it('targets native cancellation only for the abandoned live execution and emits no outcome', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.setState(KILO_SESSION, runningState);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+
+    expect(
+      await h.manager.sessionControl({
+        action: 'abandon',
+        sessionId: SESSION_ID,
+        messageIds: ['m1'],
+      })
+    ).toEqual({ type: 'abandon', outcome: 'abandoned', cleanedMessageIds: ['m1'] });
+    await settle();
+    expect(h.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+  });
+
+  it('accumulates fenced abandon matches across chunks for a turn with more than 64 prompts', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.client(routeSpec()).setCommandImpl(() => new Promise(() => undefined));
+    h.setState(KILO_SESSION, runningState);
+    h.manager.submit(SESSION_ID, commandPayload('m0', 'compact'));
+    await settle();
+    for (let index = 1; index <= 64; index += 1) {
+      h.manager.submit(SESSION_ID, promptPayload(`m${index}`));
+    }
+    await settle();
+
+    const firstChunk = Array.from({ length: 64 }, (_, index) => `m${index}`);
+    expect(
+      await h.manager.sessionControl({
+        action: 'abandon',
+        sessionId: SESSION_ID,
+        messageIds: firstChunk,
+      })
+    ).toEqual({ type: 'abandon', outcome: 'deferred', cleanedMessageIds: [] });
+    expect(
+      await h.manager.sessionControl({
+        action: 'abandon',
+        sessionId: SESSION_ID,
+        messageIds: ['m64'],
+      })
+    ).toEqual({ type: 'abandon', outcome: 'abandoned', cleanedMessageIds: ['m64'] });
+    await settle();
+    expect(h.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+  });
+
+  it('holds a newer prompt behind the abandoned native abort and never resets it', async () => {
+    const abortGate = Promise.withResolvers<boolean>();
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.client(routeSpec()).setAbortImpl(() => abortGate.promise);
+    h.setState(KILO_SESSION, runningState);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+
+    const abandoned = h.manager.sessionControl({
+      action: 'abandon',
+      sessionId: SESSION_ID,
+      messageIds: ['m1'],
+    });
+    await settle();
+    expect(h.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
+
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    // The newer prompt must not dispatch into the abort that is still in flight.
+    expect(h.client(routeSpec()).prompts.map(call => call.messageId)).toEqual(['m1']);
+    h.setState(KILO_SESSION, undefined);
+    h.manager.observeKiloEvent(
+      kiloEvent('session.turn.close', { sessionID: KILO_SESSION, reason: 'interrupted' })
+    );
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+
+    abortGate.resolve(true);
+    expect(await abandoned).toEqual({
+      type: 'abandon',
+      outcome: 'abandoned',
+      cleanedMessageIds: ['m1'],
+    });
+    await settle();
+    expect(h.client(routeSpec()).prompts.map(call => call.messageId)).toEqual(['m1', 'm2']);
+    expect(h.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+  });
+
+  it('cancels a released root without cancelling its shared-runtime sibling or a fresh prompt', async () => {
+    const h = createHarness();
+    const sibling = routeSpec({ sessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' });
+    const abortGate = Promise.withResolvers<boolean>();
+    h.registerRoute(routeSpec());
+    h.registerRoute(sibling);
+    h.setState(KILO_SESSION, runningState);
+    h.setState(sibling.kiloSessionId, { ...runningState, sessionId: sibling.kiloSessionId });
+    h.client(routeSpec()).setAbortImpl(() => abortGate.promise);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    h.manager.submit(sibling.sessionId, promptPayload('sibling'));
+    await settle();
+
+    h.manager.release(SESSION_ID);
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    expect(h.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
+    expect(h.client(routeSpec()).prompts.map(call => call.messageId)).toEqual(['m1', 'sibling']);
+
+    abortGate.resolve(true);
+    await settle();
+    expect(h.client(routeSpec()).prompts.map(call => call.messageId)).toEqual([
+      'm1',
+      'sibling',
+      'm2',
+    ]);
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+    expect(
+      await h.manager.sessionControl({
+        action: 'coverage',
+        sessionId: sibling.sessionId,
+        messageIds: ['sibling'],
+      })
+    ).toEqual({ type: 'coverage', coveredMessageIds: ['sibling'] });
+  });
+
+  it('never redispatches expired messages when an unconfirmed abort requires runtime recovery', async () => {
+    const h = createHarness({
+      recoverAbandonedAbort: async () => {
+        h.manager.onRuntimeRestart({
+          key: runtimeKey(routeSpec()),
+          directory: DIRECTORY,
+          reason: 'hang',
+        });
+        return true;
+      },
+    });
+    h.registerRoute(routeSpec());
+    h.setState(KILO_SESSION, { ...runningState, progressed: false });
+    h.client(routeSpec()).setAbortImpl(async () => false);
+    h.manager.submit(SESSION_ID, promptPayload('expired'));
+    await settle();
+
+    expect(
+      await h.manager.sessionControl({
+        action: 'abandon',
+        sessionId: SESSION_ID,
+        messageIds: ['expired'],
+      })
+    ).toMatchObject({ type: 'abandon', outcome: 'deferred' });
+    await settle();
+    expect(h.client(routeSpec()).prompts.map(call => call.messageId)).toEqual(['expired']);
   });
 });

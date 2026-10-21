@@ -27,6 +27,14 @@ export const CONTROL_PLANE_PROTOCOL_VERSION = 3;
  */
 export const CONTROL_PLANE_ALLOCATION_ID_ENV = 'CONTROL_PLANE_ALLOCATION_ID';
 
+/**
+ * Wrapper -> Sandbox DO capability header. A socket that advertises turn
+ * coverage makes deliver report explicit acceptance coverage, so the Session DO
+ * can own a short-lived coverage obligation instead of the legacy age backstop.
+ */
+export const CONTROL_PLANE_TURN_COVERAGE_HEADER = 'x-kilo-turn-coverage';
+export const CONTROL_PLANE_TURN_COVERAGE_VERSION = '1';
+
 export const CONTROL_PLANE_GIT_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
 export type ControlPlaneGitPlatform = (typeof CONTROL_PLANE_GIT_PLATFORMS)[number];
 
@@ -103,6 +111,7 @@ export type ControlPlaneSetupEvent = z.infer<typeof controlPlaneSetupEventSchema
 export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'preparation_timeout',
   'workspace_setup_failed',
+  'credentials_expired',
   'agent_unavailable',
   'billing_blocked',
   'billing_unavailable',
@@ -669,7 +678,16 @@ export const controlPlaneDeliverPayloadSchema = z
   })
   .strict();
 
-export const controlPlaneDeliverResultSchema = z.enum(['sent', 'not_ready']);
+/**
+ * `sent` stays a bare string for a wrapper that did not advertise turn
+ * coverage. A coverage-capable wrapper reports the capability explicitly so the
+ * Session DO can start a coverage obligation at the same acceptance point.
+ */
+export const controlPlaneDeliverResultSchema = z.union([
+  z.literal('sent'),
+  z.literal('not_ready'),
+  z.object({ type: z.literal('sent'), coverage: z.literal(true) }).strict(),
+]);
 
 export const controlPlaneSessionRefPayloadSchema = z
   .object({ sessionId: z.string().min(1) })
@@ -790,6 +808,28 @@ const controlPlaneHeartbeatFrameSchema = z
     type: z.literal('heartbeat'),
     active: z.boolean(),
     degraded: z.boolean(),
+  })
+  .strict();
+
+/**
+ * Wrapper -> Sandbox DO diagnostics authorization renewal. `grant` is the
+ * original launch grant, kept as signed identity proof; it may be expired.
+ * The DO can renew only on the current authenticated socket for the same
+ * allocation.
+ */
+const controlLogRefreshFrameSchema = z
+  .object({
+    type: z.literal('logs.refresh'),
+    grant: z.string().min(1).max(4096),
+  })
+  .strict();
+
+/** Sandbox DO -> wrapper rotated diagnostics authorization. */
+const controlLogCredentialsFrameSchema = z
+  .object({
+    type: z.literal('logs.credentials'),
+    grant: z.string().min(1).max(4096),
+    expiresAt: z.number().int().positive(),
   })
   .strict();
 
@@ -934,6 +974,102 @@ export const controlPlaneControlSessionSchema = z
 export const controlPlaneControlResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), result: z.unknown() }).strict(),
   z.object({ ok: z.literal(false), error: controlPlaneRequestErrorSchema }).strict(),
+]);
+
+/**
+ * One correlated turn-coverage/abandon request covers at most this many message
+ * ids. The Session DO chunks a larger accepted set, so a long healthy serial
+ * batch never makes one request unbounded.
+ */
+export const CONTROL_PLANE_SESSION_CONTROL_BATCH_LIMIT = 64;
+
+/** Bound on one coverage/abandon request inside the Sandbox DO. */
+export const CONTROL_PLANE_SESSION_CONTROL_TIMEOUT_MS = 10_000;
+
+export const controlPlaneSessionControlActionSchema = z.enum(['coverage', 'abandon']);
+export type ControlPlaneSessionControlAction = z.infer<
+  typeof controlPlaneSessionControlActionSchema
+>;
+
+const sessionControlMessageIdsSchema = z
+  .array(z.string().min(1).max(128))
+  .min(1)
+  .max(CONTROL_PLANE_SESSION_CONTROL_BATCH_LIMIT);
+
+/** Session DO -> Sandbox DO -> wrapper: exact current-turn membership query or fenced cleanup. */
+export const controlPlaneSessionControlInputSchema = z
+  .object({
+    action: controlPlaneSessionControlActionSchema,
+    sessionId: z.string().min(1),
+    allocationId: z.string().min(1).max(128),
+    messageIds: sessionControlMessageIdsSchema,
+  })
+  .strict();
+export type ControlPlaneSessionControlInput = z.infer<typeof controlPlaneSessionControlInputSchema>;
+
+/** The wrapper's exact coverage answer. An empty list is authoritative no-cover. */
+export const controlPlaneSessionCoverageResultSchema = z
+  .object({
+    type: z.literal('coverage'),
+    coveredMessageIds: z
+      .array(z.string().min(1).max(128))
+      .max(CONTROL_PLANE_SESSION_CONTROL_BATCH_LIMIT),
+  })
+  .strict();
+
+/**
+ * `abandoned` means every current turn prompt in the request was cancelled and
+ * the retained turn reset; `deferred` means newer prompts still own the turn;
+ * `absent` is confirmed no matching prompt. Cleaned ids are the ones actually
+ * removed, never a newer prompt.
+ */
+export const controlPlaneSessionAbandonResultSchema = z
+  .object({
+    type: z.literal('abandon'),
+    outcome: z.enum(['abandoned', 'deferred', 'absent']),
+    cleanedMessageIds: z
+      .array(z.string().min(1).max(128))
+      .max(CONTROL_PLANE_SESSION_CONTROL_BATCH_LIMIT),
+  })
+  .strict();
+
+export const controlPlaneSessionControlResultSchema = z.discriminatedUnion('type', [
+  controlPlaneSessionCoverageResultSchema,
+  controlPlaneSessionAbandonResultSchema,
+]);
+export type ControlPlaneSessionControlResult = z.infer<
+  typeof controlPlaneSessionControlResultSchema
+>;
+
+/** One Session DO -> Sandbox DO -> wrapper correlated control frame. */
+const controlPlaneSessionControlFrameSchema = z
+  .object({
+    type: z.literal('session.control'),
+    requestId: z.string().min(1).max(128),
+    action: controlPlaneSessionControlActionSchema,
+    sessionId: z.string().min(1),
+    allocationId: z.string().min(1).max(128),
+    messageIds: sessionControlMessageIdsSchema,
+  })
+  .strict();
+
+const controlPlaneSessionControlResultFrameSchema = z.discriminatedUnion('ok', [
+  z
+    .object({
+      type: z.literal('session.control.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(true),
+      result: controlPlaneSessionControlResultSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('session.control.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(false),
+      error: controlPlaneRequestErrorSchema,
+    })
+    .strict(),
 ]);
 
 /**
@@ -1188,6 +1324,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneShutdownFrameSchema,
   controlPlaneHeartbeatFrameSchema,
   z.object({ type: z.literal('heartbeat_ack') }).strict(),
+  controlLogRefreshFrameSchema,
+  controlLogCredentialsFrameSchema,
   controlPlaneSessionPrepareFrameSchema,
   controlPlaneSessionProgressFrameSchema,
   controlPlaneSessionReadyFrameSchema,
@@ -1214,6 +1352,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneTerminalResultFrameSchema,
   controlPlaneKiloRequestFrameSchema,
   controlPlaneKiloResultFrameSchema,
+  controlPlaneSessionControlFrameSchema,
+  controlPlaneSessionControlResultFrameSchema,
 ]);
 
 export type ControlPlaneRouteGit = z.infer<typeof controlPlaneRouteGitSchema>;
@@ -1240,6 +1380,8 @@ export type ControlPlaneHelloFrame = z.infer<typeof controlPlaneHelloFrameSchema
 export type ControlPlaneWelcomeFrame = z.infer<typeof controlPlaneWelcomeFrameSchema>;
 export type ControlPlaneShutdownFrame = z.infer<typeof controlPlaneShutdownFrameSchema>;
 export type ControlPlaneHeartbeatFrame = z.infer<typeof controlPlaneHeartbeatFrameSchema>;
+export type ControlLogRefreshFrame = z.infer<typeof controlLogRefreshFrameSchema>;
+export type ControlLogCredentialsFrame = z.infer<typeof controlLogCredentialsFrameSchema>;
 export type ControlPlaneSessionPrepareFrame = z.infer<typeof controlPlaneSessionPrepareFrameSchema>;
 export type ControlPlaneSessionProgressFrame = z.infer<
   typeof controlPlaneSessionProgressFrameSchema
@@ -1305,4 +1447,8 @@ export type ControlPlaneNativeOperation = z.infer<typeof controlPlaneNativeOpera
 export type ControlPlaneKiloRequestInput = z.infer<typeof controlPlaneKiloRequestInputSchema>;
 export type ControlPlaneKiloRequestFrame = z.infer<typeof controlPlaneKiloRequestFrameSchema>;
 export type ControlPlaneKiloResultFrame = z.infer<typeof controlPlaneKiloResultFrameSchema>;
+export type ControlPlaneSessionControlFrame = z.infer<typeof controlPlaneSessionControlFrameSchema>;
+export type ControlPlaneSessionControlResultFrame = z.infer<
+  typeof controlPlaneSessionControlResultFrameSchema
+>;
 export type ControlPlaneWrapperFrame = z.infer<typeof controlPlaneWrapperFrameSchema>;

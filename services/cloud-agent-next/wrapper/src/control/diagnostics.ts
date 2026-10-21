@@ -11,6 +11,7 @@ import {
   type ControlLogUploadResult,
   type ControlUploadFailureSample,
 } from '../../../src/shared/control-diagnostics.js';
+import type { ControlLogUploadCredentialSource } from './log-upload-auth.js';
 
 export type ControlDiagnostics = {
   onDiagnostic: ControlDiagnosticReporter;
@@ -23,6 +24,8 @@ export type ControlDiagnostics = {
 type Options = {
   uploadUrl?: string;
   uploadGrant?: string;
+  /** Shared rotating credential; takes precedence over the static grant. */
+  auth?: ControlLogUploadCredentialSource;
   fetch?: (url: string, init: RequestInit) => Promise<Response>;
   now?: () => number;
   intervalMs?: number;
@@ -239,7 +242,12 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
 
   async function performFlush(): Promise<void> {
     const batch = nextBatch();
-    if (!batch || !options.uploadUrl || !options.uploadGrant || stopped) return;
+    const credentials = options.auth
+      ? options.auth.current()
+      : options.uploadGrant
+        ? { token: options.uploadGrant, expiresAt: Number.POSITIVE_INFINITY }
+        : undefined;
+    if (!batch || !options.uploadUrl || !credentials || stopped) return;
     const timeout = new AbortController();
     const signal = AbortSignal.any([timeout.signal, stop.signal]);
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -258,7 +266,7 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
         upload(`${options.uploadUrl}/${batch.id}`, {
           method: 'PUT',
           headers: {
-            Authorization: `Bearer ${options.uploadGrant}`,
+            Authorization: `Bearer ${credentials.token}`,
             'Content-Type': 'application/json',
           },
           body: batch.body,
@@ -271,11 +279,18 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
       result = statusCode === 204 ? 'accepted' : 'http_rejection';
       if (statusCode === 204 && pending === batch) pending = undefined;
       if (statusCode === 401 || statusCode === 403) {
-        stopped = true;
-        accepting = false;
-        if (timer) clearInterval(timer);
-        pending = undefined;
-        records.length = 0;
+        if (options.auth) {
+          // Keep the batch pending; the next periodic attempt uses the rotated
+          // credential. Never hold the finalize budget behind a renewal: the
+          // auth owner reports failures on its own schedule.
+          void options.auth.rejected(credentials.token).catch(() => undefined);
+        } else {
+          stopped = true;
+          accepting = false;
+          if (timer) clearInterval(timer);
+          pending = undefined;
+          records.length = 0;
+        }
       }
       void response.body?.cancel().catch(() => undefined);
     } catch {
@@ -300,9 +315,13 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
     }
   }
 
+  function hasCredentials(): boolean {
+    return options.auth !== undefined || options.uploadGrant !== undefined;
+  }
+
   function flush(): Promise<void> {
     if (active) return active;
-    if (stopped || !options.uploadUrl || !options.uploadGrant) return Promise.resolve();
+    if (stopped || !options.uploadUrl || !hasCredentials()) return Promise.resolve();
     active = performFlush()
       .catch(() => undefined)
       .finally(() => {
@@ -312,7 +331,7 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
   }
 
   function start(): void {
-    if (timer || stopped || !options.uploadUrl || !options.uploadGrant) return;
+    if (timer || stopped || !options.uploadUrl || !hasCredentials()) return;
     runSnapshot();
     void flush();
     timer = setInterval(() => {
@@ -334,12 +353,7 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
       }, timeoutMs);
       try {
         await active;
-        while (
-          !stopped &&
-          options.uploadUrl &&
-          options.uploadGrant &&
-          (pending || records.length)
-        ) {
+        while (!stopped && options.uploadUrl && hasCredentials() && (pending || records.length)) {
           await flush();
           if (pending) break;
         }

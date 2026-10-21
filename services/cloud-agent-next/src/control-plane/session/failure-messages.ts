@@ -10,6 +10,8 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   runtime_supervisor_missing: 'Runtime supervisor is missing',
   preparation_timeout: 'Environment preparation timed out',
   workspace_setup_failed: 'Workspace setup failed',
+  credentials_expired:
+    'Session credentials expired and could not be renewed. Send a new message to continue.',
   agent_unavailable: 'The agent became unavailable',
   billing_blocked: 'Sandbox billing requires additional credits',
   billing_unavailable:

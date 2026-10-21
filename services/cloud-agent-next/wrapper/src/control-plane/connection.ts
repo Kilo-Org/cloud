@@ -4,6 +4,8 @@ import {
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
+  CONTROL_PLANE_TURN_COVERAGE_HEADER,
+  CONTROL_PLANE_TURN_COVERAGE_VERSION,
   controlPlaneWrapperFrameSchema,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
@@ -373,6 +375,7 @@ export function createControlPlaneConnection(
         headers: {
           Authorization: `Bearer ${options.credential}`,
           [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION,
+          [CONTROL_PLANE_TURN_COVERAGE_HEADER]: CONTROL_PLANE_TURN_COVERAGE_VERSION,
         },
       });
     } catch (error) {

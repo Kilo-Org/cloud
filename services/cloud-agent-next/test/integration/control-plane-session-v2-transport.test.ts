@@ -1,7 +1,14 @@
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
+import {
+  ACCEPTED_OWNERSHIP_KEY,
+  emptyAcceptedOwnership,
+  parseAcceptedOwnership,
+  type AcceptedOwnership,
+} from '../../src/control-plane/session/accepted-ownership.js';
 import { controlPlaneMessages } from '../../src/control-plane/session/sqlite-schema.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
@@ -68,6 +75,50 @@ async function rows(stub: DurableObjectStub<SandboxSessionV2>) {
   return runInDurableObject(stub, (_instance, state) =>
     drizzle(state.storage).select().from(controlPlaneMessages)
   );
+}
+
+async function ownership(stub: DurableObjectStub<SandboxSessionV2>): Promise<AcceptedOwnership> {
+  return runInDurableObject(stub, async (_instance, state) =>
+    parseAcceptedOwnership(await state.storage.get<unknown>(ACCEPTED_OWNERSHIP_KEY))
+  );
+}
+
+async function setOwnership(
+  stub: DurableObjectStub<SandboxSessionV2>,
+  state: AcceptedOwnership
+): Promise<void> {
+  await runInDurableObject(stub, async (instance, storage) => {
+    instance.acceptedOwnership = state;
+    await storage.storage.put(ACCEPTED_OWNERSHIP_KEY, state);
+  });
+}
+
+async function setAcceptedAt(
+  stub: DurableObjectStub<SandboxSessionV2>,
+  messageId: string,
+  acceptedAt: number
+): Promise<void> {
+  await runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    await db
+      .update(controlPlaneMessages)
+      .set({ accepted_at: acceptedAt })
+      .where(eq(controlPlaneMessages.message_id, messageId));
+  });
+}
+
+const COVERAGE_CONTAINER = {
+  provider: 'cloudflare' as const,
+  sandboxId: 'sbx-coverage',
+  allocationId: 'allocation-coverage',
+};
+
+function readyWithContainer(peer: FakeSandboxPeer): void {
+  peer.prepareView = {
+    state: 'ready',
+    attemptId: peer.attemptId,
+    container: COVERAGE_CONTAINER,
+  };
 }
 
 async function recoveryAt(stub: DurableObjectStub<SandboxSessionV2>) {
@@ -606,4 +657,218 @@ describe('SandboxSessionV2 queued transport recovery', () => {
       expect([reports.length, callbacks.length]).toEqual(counts);
     }
   );
+
+  it('fails coverage-mode work after three minutes when the socket died after sent', async () => {
+    const { stub, peer } = await setup();
+    readyWithContainer(peer);
+    peer.deliverResult = { type: 'sent', coverage: true };
+    await stub.send(prompt('m1'));
+    expect((await rows(stub))[0]?.state).toBe('accepted');
+    const accepted = (await ownership(stub)).entries.m1;
+    expect(accepted).toMatchObject({ allocationId: 'allocation-coverage' });
+
+    // A lost socket: the one real probe fails, and only the cadence deadline
+    // expires the turn. A delayed alarm runs the whole path end to end.
+    peer.sessionControlError = new Error('wrapper disconnected');
+    const now = Date.now();
+    await setOwnership(stub, {
+      ...emptyAcceptedOwnership(),
+      entries: {
+        m1: { ...accepted!, coveredUntil: now - 1, nextProbeAt: now - 1 },
+      },
+    });
+    await runInDurableObject(stub, instance => instance.alarm());
+
+    const row = (await rows(stub))[0];
+    expect(row).toMatchObject({ state: 'failed', reason: 'no_outcome' });
+    const after = await ownership(stub);
+    expect(after.entries).toEqual({});
+    // The expiry was persisted as cleanup before settlement; the failed
+    // abandon keeps it for a bounded retry instead of losing the zombie.
+    expect(peer.sessionControlCalls).toContainEqual({
+      action: 'abandon',
+      sessionId: expect.any(String),
+      allocationId: 'allocation-coverage',
+      messageIds: ['m1'],
+    });
+    expect(after.cleanup).toEqual([
+      expect.objectContaining({ allocationId: 'allocation-coverage', messageIds: ['m1'] }),
+    ]);
+
+    // The socket recovers: the next cleanup retry is confirmed absent.
+    peer.sessionControlError = null;
+    await setOwnership(stub, {
+      ...after,
+      cleanup: after.cleanup.map(cleanup => ({ ...cleanup, retryAt: Date.now() - 1 })),
+    });
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect((await ownership(stub)).cleanup).toEqual([]);
+  });
+
+  it('keeps a covered turn past the legacy accepted age while probes extend it', async () => {
+    const { stub, peer } = await setup();
+    readyWithContainer(peer);
+    peer.deliverResult = { type: 'sent', coverage: true };
+    await stub.send(prompt('m1'));
+    const now = Date.now();
+    const oldEnoughToExceedLegacyBackstop =
+      now - CONTROL_PLANE_TIMERS.session.acceptedBackstopMs - 1;
+    await setAcceptedAt(stub, 'm1', oldEnoughToExceedLegacyBackstop);
+    const entry = (await ownership(stub)).entries.m1!;
+    await setOwnership(stub, {
+      ...emptyAcceptedOwnership(),
+      entries: {
+        m1: {
+          ...entry,
+          acceptedAt: oldEnoughToExceedLegacyBackstop,
+          coveredUntil: now + 60_000,
+          nextProbeAt: now - 1,
+        },
+      },
+    });
+    peer.sessionControlResult = { type: 'coverage', coveredMessageIds: ['m1'] };
+
+    await runInDurableObject(stub, instance => instance.alarm());
+
+    expect((await rows(stub))[0]?.state).toBe('accepted');
+    const after = (await ownership(stub)).entries.m1;
+    expect(after?.coveredUntil).toBeGreaterThanOrEqual(
+      now + CONTROL_PLANE_TIMERS.session.acceptedCoverageMs
+    );
+    expect(after?.acceptedAt).toBe(oldEnoughToExceedLegacyBackstop);
+  });
+
+  it('does not extend coverage when the probe fails and retries on the probe cadence', async () => {
+    const { stub, peer } = await setup();
+    readyWithContainer(peer);
+    peer.deliverResult = { type: 'sent', coverage: true };
+    await stub.send(prompt('m1'));
+    const now = Date.now();
+    const entry = (await ownership(stub)).entries.m1!;
+    const coveredUntil = now + 60_000;
+    await setOwnership(stub, {
+      ...emptyAcceptedOwnership(),
+      entries: { m1: { ...entry, coveredUntil, nextProbeAt: now - 1 } },
+    });
+    peer.sessionControlError = new Error('unrelated busy');
+
+    await runInDurableObject(stub, instance => instance.alarm());
+
+    expect((await rows(stub))[0]?.state).toBe('accepted');
+    const after = (await ownership(stub)).entries.m1;
+    expect(after?.coveredUntil).toBe(coveredUntil);
+    expect(after?.nextProbeAt).toBeGreaterThanOrEqual(
+      now + CONTROL_PLANE_TIMERS.session.acceptedProbeMs
+    );
+  });
+
+  it('leaves an old accepted row on the legacy age backstop when it has no coverage entry', async () => {
+    const { stub, peer } = await setup();
+    readyWithContainer(peer);
+    peer.deliverResult = { type: 'sent', coverage: true };
+    await stub.send(prompt('m1'));
+    await setOwnership(stub, emptyAcceptedOwnership());
+    await setAcceptedAt(
+      stub,
+      'm1',
+      Date.now() - CONTROL_PLANE_TIMERS.session.acceptedBackstopMs - 1
+    );
+    await runInDurableObject(stub, instance => instance.alarm());
+
+    expect((await rows(stub))[0]).toMatchObject({ state: 'failed', reason: 'no_outcome' });
+    expect(peer.sessionControlCalls).toEqual([]);
+  });
+
+  it('persists coverage through eviction and a repeated admission never moves its deadline', async () => {
+    const { stub, peer } = await setup();
+    readyWithContainer(peer);
+    peer.deliverResult = { type: 'sent', coverage: true };
+    await stub.send(prompt('m1'));
+    const before = (await ownership(stub)).entries.m1!;
+    await evictAllDurableObjects();
+    expect((await ownership(stub)).entries.m1).toEqual(before);
+    await stub.send(prompt('m1'));
+    expect((await ownership(stub)).entries.m1).toEqual(before);
+  });
+
+  it('replays durable cleanup for a still-accepted row before retiring it, even after route loss', async () => {
+    const { stub, peer } = await setup();
+    readyWithContainer(peer);
+    peer.deliverResult = { type: 'sent', coverage: true };
+    await stub.send(prompt('m1'));
+    const now = Date.now();
+    await setOwnership(stub, {
+      ...emptyAcceptedOwnership(),
+      cleanup: [
+        {
+          allocationId: 'allocation-coverage',
+          messageIds: ['m1'],
+          retryAt: now + 60_000,
+        },
+      ],
+    });
+    await evictAllDurableObjects();
+    // Simulate a route that retired without settling this accepted row.
+    await runInDurableObject(stub, instance => {
+      instance.route = {
+        state: 'failed',
+        attemptId: peer.attemptId,
+        reason: 'agent_unavailable',
+      };
+    });
+
+    await runInDurableObject(stub, instance => instance.alarm());
+
+    expect((await rows(stub))[0]).toMatchObject({ state: 'failed', reason: 'no_outcome' });
+    expect((await ownership(stub)).cleanup).toEqual([]);
+  });
+
+  it('finishes multi-batch cleanup without leaving the delivery gate closed forever', async () => {
+    const { stub, peer } = await setup();
+    readyWithContainer(peer);
+    peer.deliverResult = 'not_ready';
+    await stub.send(prompt('seed'));
+    const now = Date.now();
+    const cleanupIds = Array.from({ length: 65 }, (_, index) => `x${index}`);
+    await setOwnership(stub, {
+      ...emptyAcceptedOwnership(),
+      cleanup: [
+        {
+          allocationId: 'allocation-coverage',
+          messageIds: cleanupIds,
+          retryAt: now - 1,
+        },
+      ],
+    });
+    await stub.send(prompt('queued-during-cleanup'));
+    const deliveredBefore = peer.deliverCalls.length;
+
+    peer.sessionControlResults = [
+      { type: 'abandon', outcome: 'deferred', cleanedMessageIds: [] },
+      { type: 'abandon', outcome: 'abandoned', cleanedMessageIds: ['x64'] },
+    ];
+    await runInDurableObject(stub, instance => instance.alarm());
+
+    expect(peer.sessionControlCalls.map(call => call.messageIds.length)).toEqual([64, 1]);
+    const firstPass = await ownership(stub);
+    expect(firstPass.cleanup).toHaveLength(1);
+    expect(firstPass.cleanup[0]?.messageIds).toHaveLength(64);
+    expect(peer.deliverCalls).toHaveLength(deliveredBefore);
+
+    await setOwnership(stub, {
+      ...firstPass,
+      cleanup: firstPass.cleanup.map(cleanup => ({ ...cleanup, retryAt: Date.now() - 1 })),
+    });
+    peer.sessionControlResults = [];
+    peer.deliverResult = { type: 'sent', coverage: true };
+    await runInDurableObject(stub, instance => instance.alarm());
+
+    expect((await ownership(stub)).cleanup).toEqual([]);
+    const states = (await rows(stub)).map(row => row.state);
+    expect(states).toEqual(['accepted', 'accepted']);
+    expect(peer.deliverCalls.at(-1)?.messages.map(message => message.messageId)).toEqual([
+      'seed',
+      'queued-during-cleanup',
+    ]);
+  });
 });

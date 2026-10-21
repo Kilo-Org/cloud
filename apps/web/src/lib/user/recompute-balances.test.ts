@@ -456,39 +456,49 @@ describe('recomputeUserBalances', () => {
       created_at: oldDate,
     });
 
-    // Exa charged usage: $3 personal (no org), two requests
+    // Exa charged usage: $2.50 personal (no org), three requests, the last one
+    // billed only where its cost exceeded the remaining free allowance.
     await db.insert(exa_usage_log).values([
       {
         kilo_user_id: user.id,
         path: '/search',
         cost_microdollars: 2_000_000,
+        charged_microdollars: 2_000_000,
         charged_to_balance: true,
       },
       {
         kilo_user_id: user.id,
         path: '/search',
         cost_microdollars: 1_000_000,
+        charged_microdollars: 400_000,
+        charged_to_balance: true,
+      },
+      {
+        kilo_user_id: user.id,
+        path: '/search',
+        cost_microdollars: 500_000,
+        charged_microdollars: 100_000,
         charged_to_balance: true,
       },
     ]);
 
-    // Set user to match the combined usage ($2 LLM + $3 Exa = $5)
+    // Set user to match the combined usage ($2 LLM + $2.50 Exa = $4.50)
     await db
       .update(kilocode_users)
       .set({
         total_microdollars_acquired: 100_000_000,
-        microdollars_used: 5_000_000,
+        microdollars_used: 4_500_000,
       })
       .where(eq(kilocode_users.id, user.id));
 
     const result = await recomputeUserBalances({ userId: user.id });
     expect(result.success).toBe(true);
 
-    // Recomputed microdollars_used should be LLM ($2) + Exa ($3) = $5
+    // Recomputed microdollars_used comes from the billed amounts, not the costs
     const updatedUser = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
-    expect(updatedUser!.microdollars_used).toBe(5_000_000);
+    expect(updatedUser!.microdollars_used).toBe(4_500_000);
   });
 
   test('should exclude org Exa charged usage from personal recompute', async () => {
@@ -510,6 +520,7 @@ describe('recomputeUserBalances', () => {
       organization_id: orgId,
       path: '/search',
       cost_microdollars: 5_000_000,
+      charged_microdollars: 5_000_000,
       charged_to_balance: true,
     });
 

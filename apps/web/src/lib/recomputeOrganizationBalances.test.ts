@@ -345,6 +345,7 @@ describe('recomputeOrganizationBalances', () => {
         organization_id: orgId,
         path: '/search',
         cost_microdollars: 2_000_000,
+        charged_microdollars: 2_000_000,
         charged_to_balance: true,
       },
       {
@@ -352,6 +353,7 @@ describe('recomputeOrganizationBalances', () => {
         organization_id: orgId,
         path: '/search',
         cost_microdollars: 1_000_000,
+        charged_microdollars: 1_000_000,
         charged_to_balance: true,
       },
     ]);

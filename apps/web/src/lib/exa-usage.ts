@@ -131,6 +131,7 @@ export async function recordExaUsage(params: {
       organization_id: organizationId ?? null,
       path,
       cost_microdollars: costMicrodollars,
+      charged_microdollars: chargedAmount,
       charged_to_balance: chargedToBalance,
       feature_id: featureId ?? null,
       type: type ?? null,

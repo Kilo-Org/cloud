@@ -33,7 +33,7 @@ export type MigrationResult = Result<UserBalanceUpdates, string>;
  *
  * Postconditions:
  * - microdollars_used = sum(personal microdollar_usage.cost)
- *   + sum(personal exa_usage_log.cost_microdollars where charged_to_balance)
+ *   + sum(personal exa_usage_log.charged_microdollars where charged_to_balance)
  *   + sum(compute_usage_charge.amount_microdollars where user_id matches)
  * - total_microdollars_acquired = sum(credit_transactions) [including any new adjustment]
  * - All expiring credit transactions have expiration_baseline_microdollars_used set
@@ -96,7 +96,7 @@ async function fetchUserBalanceData(userId: string) {
   // usage — required for correct credit-expiration baselines.
   const exaUsage = await db
     .select({
-      cost: exa_usage_log.cost_microdollars,
+      cost: exa_usage_log.charged_microdollars,
       created_at: exa_usage_log.created_at,
     })
     .from(exa_usage_log)

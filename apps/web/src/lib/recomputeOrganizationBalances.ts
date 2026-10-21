@@ -73,7 +73,7 @@ export async function recomputeOrganizationBalances(args: {
   // usage — required for correct credit-expiration baselines.
   const exaUsage = await db
     .select({
-      cost: exa_usage_log.cost_microdollars,
+      cost: exa_usage_log.charged_microdollars,
       created_at: exa_usage_log.created_at,
     })
     .from(exa_usage_log)

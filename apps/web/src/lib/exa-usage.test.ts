@@ -207,6 +207,8 @@ describe('Exa Usage Tracking', () => {
         .from(exa_usage_log)
         .where(eq(exa_usage_log.kilo_user_id, user.id));
       expect(logRow.charged_to_balance).toBe(true);
+      expect(logRow.cost_microdollars).toBe(2000);
+      expect(logRow.charged_microdollars).toBe(1000);
 
       const [updated] = await db
         .select({ microdollars_used: kilocode_users.microdollars_used })

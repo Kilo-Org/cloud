@@ -10250,6 +10250,7 @@ export const exa_usage_log = pgTable(
     organization_id: uuid(),
     path: text().notNull(),
     cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    charged_microdollars: bigint({ mode: 'number' }).notNull().default(0),
     charged_to_balance: boolean().notNull().default(false),
     feature_id: text(),
     type: text(),

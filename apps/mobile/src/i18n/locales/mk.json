@@ -35,6 +35,8 @@
     "connectGithub": "Поврзи GitHub",
     "cost": "Трошок",
     "discard": "Отфрли",
+    "discardChangesMessage": "Вашите промени ќе бидат изгубени.",
+    "discardChangesTitle": "Отфрли промени?",
     "findings": "Наоди",
     "mergeRequest": "merge барање",
     "notConnected": "Неповрзано",
@@ -109,7 +111,9 @@
     "online": "Онлајн",
     "open": "Отвори {{name}}",
     "openPullRequest": "Отворен PR",
+    "completed": "Завршено",
     "pending": "На чекање",
+    "running": "Во тек",
     "performance": "Перформанси",
     "preferences": "Лични поставки",
     "privacyPolicy": "Политика за приватност",
@@ -661,7 +665,8 @@
       "description": "Поврзи ја твојата сметка на GitHub за да прегледуваш барања за спојување од телефонот.",
       "gitlabDescription": "Поврзете ја вашата GitLab сметка за преглед на merge барања на мобилно.",
       "bitbucketDescription": "Поврзете Bitbucket со оваа организација за преглед на барања за спојување на мобилно.",
-      "bitbucketOrgOnlyDescription": "Изберете организација во вашиот профил за да ги прегледате нејзините Bitbucket барања за спојување."
+      "bitbucketOrgOnlyDescription": "Префрлете ја сметката погоре на организација за преглед на нејзините барања за спојување на Bitbucket.",
+      "contextLine": "За {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "Овој преглед не може да се испрати во сегашната состојба. Можеби PR е променет или се обидуваш да прегледаш сопствено барање за спојување.",
       "reviewNotSubmittedTerm": "Овој преглед не може да се поднесе во сегашна состојба. {{term}} можеби се променил или не можете да го прегледате вашето сопствено {{term}}.",
       "couldNotPostComment": "Не успеа објавувањето на коментарот.",
-      "couldNotSubmitReview": "Не успеа испраќањето на прегледот. Провери ја врската и обиди се повторно."
+      "couldNotSubmitReview": "Не успеа испраќањето на прегледот. Провери ја врската и обиди се повторно.",
+      "rateLimited": "Премногу барања. Обиди се повторно подоцна.",
+      "conflict": "Ова се промени додека работеше на него. Вчитај го повторно и обиди се повторно."
     },
     "operation": {
       "couldNotReply": "Одговорот не се испрати.",
@@ -1413,6 +1420,9 @@
       "couldNotGetLatest": "Не можеа да се преземат најновите податоци.",
       "byline": "{{repo}} #{{number}} од {{author}}",
       "noFindings": "Нема наоди.",
+      "findingsUnavailable": "Резултатите не се достапни бидејќи овој преглед беше неуспешен.",
+      "serviceUnavailable": "Не успеа поврзувањето со услугата за преглед на код. Повтори го прегледот кога услугата ќе биде достапна.",
+      "reviewFailed": "Прегледот беше неуспешен. Обиди се повторно.",
       "showMore": "Прикажи повеќе",
       "created": "Создадено",
       "started": "Започнато",
@@ -1529,8 +1539,6 @@
     "updateFailed": "Не успеа ажурирањето на прегледувачот на код.",
     "configSaveFailed": "Не успеа зачувувањето на поставките за преглед.",
     "status": {
-      "running": "Во тек",
-      "completed": "Завршено",
       "interrupted": "Прекинато"
     },
     "reviewStyle": {
@@ -1543,7 +1551,8 @@
       "bugs": "Грешки",
       "style": "Стил",
       "testing": "Тестирање",
-      "documentation": "Документација"
+      "documentation": "Документација",
+      "unknown": "Друго ({{area}})"
     },
     "gateThreshold": {
       "warning": "Предупредување"
@@ -1655,7 +1664,14 @@
       "whereFound": "Места на откривање ({{displayCount}})",
       "fullReport": "Целосен генериран извештај",
       "yes": "Да",
-      "no": "Не"
+      "no": "Не",
+      "action": {
+        "analyzeCodebase": "Анализирај го кодот",
+        "dismiss": "Отфрли",
+        "manualReview": "Мануелна ревизија",
+        "monitor": "Мониторирај",
+        "openPr": "Отвори PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} наоди",
@@ -1857,7 +1873,8 @@
     "settingsSave": {
       "saveChanges": "Зачувај ги промените",
       "unsavedTitle": "Незачувани промени",
-      "unsavedMessage": "Да се зачуваат промените пред да го напуштиш овој екран?"
+      "unsavedMessage": "Да се зачуваат промените пред да го напуштиш овој екран?",
+      "unsavedInvalidMessage": "Овие промени сè уште не можат да се зачуваат. Исправи ги за да зачуваш или отфрли ги за да го напуштиш."
     },
     "auditReportButton": {
       "viewA11y": "Прегледај го извештајот за ревизија"
@@ -1874,7 +1891,24 @@
       "title": "Извештај за ревизија",
       "unavailable": "Извештајот за ревизија е недостапен",
       "unavailableDescription": "Само сопствениците на организацијата и менаџерите за наплата можат да гледаат извештаи за ревизија. Побарај од сопственик или менаџер за наплата да ти даде пристап.",
-      "queryFailed": "Барањето за извештајот не заврши. Обиди се повторно."
+      "queryFailed": "Барањето за извештајот не заврши. Обиди се повторно.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Завршена анализа",
+        "findingAnalysisFailed": "Неуспешна анализа",
+        "findingAutoDismissed": "Автоматски отфрлено",
+        "findingCreated": "Импортирано",
+        "findingDeleted": "Избришано",
+        "findingDismissed": "Отфрлено",
+        "findingSeverityChanged": "Променета сериозност",
+        "findingStatusChange": "Променет статус",
+        "findingSuperseded": "Заменето",
+        "remediationBlocked": "Блокирано санирање",
+        "remediationCancelled": "Откажано",
+        "remediationFailed": "Неуспешно санирање",
+        "remediationNoChangesNeeded": "Не се потребни промени",
+        "remediationPrOpened": "Отворен PR",
+        "remediationQueued": "Побарано санирање"
+      }
     },
     "notifications": {
       "couldNotLoad": "Не успеа вчитувањето на поставките за известувања.",
@@ -1906,7 +1940,6 @@
       "installApp": "Инсталирај ја апликацијата на GitHub",
       "reauthorizeButton": "Повторно овласти ја апликацијата на GitHub",
       "reauthorizeDescription": "На безбедносниот агент му треба дозволата vulnerability_alerts за пристап до предупредувањата од Dependabot. Повторно овласти ја апликацијата на GitHub за да ја доделиш оваа дозвола.",
-      "reauthorizeFailed": "Не можеше да се започне повторното овластување. Обиди се повторно.",
       "reauthorizeTitle": "Потребни се дополнителни дозволи",
       "setupFailed": "Не можеше да се започне поставувањето на GitHub. Обиди се повторно."
     },
@@ -2210,6 +2243,7 @@
       "prefillModelUnavailable": "{{model}} веќе не е достапен. Се користи твојот стандарден модел.",
       "couldNotReadPendingSessions": "Не успеа вчитувањето на сесиите што чекаат. Обиди се повторно.",
       "failedToCreate": "Не успеа создавањето на сесијата.",
+      "checkOrganizationAccess": "Провери го пристапот до оваа организација и обиди се повторно.",
       "couldNotRefreshRepositories": "Не успеа освежувањето на репозиториумите. Обиди се повторно.",
       "discardDraftTitle": "Да се отфрли нацртот?",
       "discardDraftMessage": "Твоето упатство ќе се изгуби.",
@@ -2279,7 +2313,8 @@
       "linesBadge_other": "{{displayCount}} редови",
       "matchesBadge_one": "{{displayCount}} совпаѓање",
       "matchesBadge_other": "{{displayCount}} совпаѓања",
-      "noOutput": "Нема излез."
+      "noOutput": "Нема излез.",
+      "translationFailed": "Преводот не успеа"
     },
     "readToolMarkdown": {
       "linesTruncated": "редови {{start}}–{{end}} (скратено)",
@@ -2730,6 +2765,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Твоите активни сесии не се достапни додека не заврши вчитувањето.",
     "currentDeviceUnidentified": "Не успеа препознавањето на тековниот уред.",
+    "kiloApp": "Апликација Kilo",
     "noSessions": "Нема активни сесии",
     "noSessionsDescription": "Најави се во апликацијата Kilo на друг уред и тој ќе се прикаже тука.",
     "onlyKiloAppSignIns": "Тука се прикажуваат само најавувањата во апликацијата Kilo. Најавувањата преку уредувачот и CLI не се наведени.",
@@ -2882,6 +2918,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Пред да започнеме",
+    "summaryTitle": "Поставки за споделување податоци",
     "introDescription": "Kilo ги испраќа твоите пораки до давателите на AI модели за да создадат одговори. Подолу е наведено што се споделува и со кого.",
     "required": "Потребно за користење на Kilo",
     "promptsTitle": "Твоите упатства и разговори",
@@ -2890,7 +2927,6 @@
     "accountDescription": "Идентификаторот на твојата сметка на Kilo и метаподатоците за барањата се користат за потврда на идентитетот и мерење на користењето.",
     "diagnosticsTitle": "Дијагностика на апликацијата",
     "diagnosticsDescription": "Извештаите за падови и грешки, без содржината од апликацијата, помагаат апликацијата да остане стабилна.",
-    "optional": "Изборно",
     "helpImprove": "Помогни да го подобриме Kilo",
     "helpImproveDescription": "Сподели анонимни аналитички податоци за производот и изворот на инсталацијата. Ова можеш да го смениш во секое време во поставките.",
     "seeFullDetails": "Види ги сите детали",
@@ -3469,6 +3505,9 @@
     "localModels": {
       "title": "Модели на уредот",
       "help": "Моделите на уредот работат на овој телефон. Вашите барања и одговори остануваат на уредот.",
+      "switchTitle": "Да се префрли на модел на уредот?",
+      "switchMessage": "Со префрлањето на {{name}}, барањата и контекстот од овој разговор ќе се обработуваат на овој телефон, а не на оддалечен сервер.",
+      "switchConfirm": "Смени модел",
       "systemPurpose": "Моделот вграден во системот на овој уред. Работи на уредот.",
       "apple": "Apple Intelligence (на уредот)",
       "checking": "Се проверува достапноста…",
@@ -3565,7 +3604,6 @@
     "personalDefaultDescription": "Автоматски се вчитува кога ниту едно складиште нема закачен профил.",
     "organizationDefaultDescription": "Автоматски се вчита за членови кои немаат личен стандард.",
     "setAsDefault": "Поставете како стандардно",
-    "removeDefault": "Отстрани како стандардно",
     "saveFailed": "Не може да се зачува профилот",
     "deleteTitle": "Избришете го профилот",
     "deleteMessage": "Ова трајно ги отстранува профилот и неговите поставки. Ова не може да се врати.",
@@ -3591,11 +3629,13 @@
     "commandsTitle": "Команди за поставување",
     "addCommand": "Додадете команда",
     "commandLabel": "Команда",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "пр. pnpm install",
     "commandsEmpty": "Сè уште нема команди за поставување",
     "commandsSaveFailed": "Не може да се зачуваат командите за поставување",
     "moveUp": "Движете се нагоре",
     "moveDown": "Движете се надолу",
+    "moveCommandUp": "Премести команда {{position}} нагоре",
+    "moveCommandDown": "Премести команда {{position}} надолу",
     "skillsTitle": "Вештини",
     "addSkill": "Додадете вештина",
     "skillNameLabel": "Име на вештина",
@@ -3665,7 +3705,7 @@
       "nameRequired": "Внесете име на агент",
       "slugRequired": "Внесете голтка агент",
       "slugInvalid": "Slug мора да започнува со буква и да користи само мали букви, цифри и цртички",
-      "slugConflict": "Таа голтка е резервирана од вграден агент",
+      "slugConflict": "Тој slug веќе го користи вграден агент или друг агент во овој профил",
       "edit": "Уредување агент"
     },
     "slashCommands": {
@@ -3676,6 +3716,7 @@
       "description": "Опис на командата",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Објасни $ARGUMENTS",
       "subtask": "Стартувај како подзадача",
       "edit": "Уреди команда коса црта",
@@ -3826,7 +3867,7 @@
     "view": "Прочитај преглед",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Прикажи статус во живо",
+    "dismiss": "Отфрли го прегледот",
     "offline": "Офлајн · зачуван преглед",
     "cached": "Зачуван извештај · освежувањето е недостапно",
     "revised": "Ревидирано · {{revision}}",

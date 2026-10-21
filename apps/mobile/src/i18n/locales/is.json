@@ -35,6 +35,8 @@
     "connectGithub": "Tengja GitHub",
     "cost": "Kostnaður",
     "discard": "Farga",
+    "discardChangesMessage": "Breytingar þínar munu glatast.",
+    "discardChangesTitle": "Farga breytingum?",
     "findings": "Niðurstöður",
     "mergeRequest": "merge request",
     "notConnected": "Ekki tengt",
@@ -109,7 +111,9 @@
     "online": "Á netinu",
     "open": "Opna {{name}}",
     "openPullRequest": "Opna samrunabeiðni",
+    "completed": "Lokið",
     "pending": "Í bið",
+    "running": "Í gangi",
     "performance": "Afköst",
     "preferences": "Kjörstillingar",
     "privacyPolicy": "Persónuverndarstefna",
@@ -661,7 +665,8 @@
       "description": "Tengdu GitHub-reikninginn þinn til að yfirfara sameiningarbeiðnir í símanum.",
       "gitlabDescription": "Tengdu GitLab-reikninginn þinn til að yfirfara merge requests í símanum.",
       "bitbucketDescription": "Tengdu Bitbucket við þessa stofnun til að yfirfara sameiningarbeiðnir í símanum.",
-      "bitbucketOrgOnlyDescription": "Veldu stofnun í notandasniðinu þínu til að yfirfara sameiningarbeiðnir hennar á Bitbucket."
+      "bitbucketOrgOnlyDescription": "Skiptu reikningnum hér að ofan yfir í stofnun til að yfirfara sameiningarbeiðnir hennar á Bitbucket.",
+      "contextLine": "Fyrir {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +774,9 @@
       "reviewNotSubmitted": "Ekki er hægt að senda þessa yfirferð í núverandi mynd. PR-beiðnin gæti hafa breyst eða þú ert að yfirfara eigin sameiningarbeiðni, sem er ekki leyfilegt.",
       "reviewNotSubmittedTerm": "Ekki er hægt að senda þessa yfirferð í núverandi mynd. {{term}} gæti hafa breyst, eða þú mátt ekki yfirfara þína eigin {{term}}.",
       "couldNotPostComment": "Ekki tókst að birta athugasemd.",
-      "couldNotSubmitReview": "Ekki tókst að senda yfirferð. Athugaðu tenginguna og reyndu aftur."
+      "couldNotSubmitReview": "Ekki tókst að senda yfirferð. Athugaðu tenginguna og reyndu aftur.",
+      "rateLimited": "Of margar beiðnir. Reyndu aftur seinna.",
+      "conflict": "Þessu var breytt á meðan þú varst að vinna í því. Hlaðaðu því aftur inn og reyndu aftur."
     },
     "operation": {
       "couldNotReply": "Tókst ekki að svara.",
@@ -1413,6 +1420,9 @@
       "couldNotGetLatest": "Ekki tókst að sækja nýjustu gögnin.",
       "byline": "{{repo}} #{{number}} eftir {{author}}",
       "noFindings": "Engin frávik fundust.",
+      "findingsUnavailable": "Niðurstöður eru ekki tiltækar þar sem þessi yfirferð mistókst.",
+      "serviceUnavailable": "Ekki náðist samband við kóðayfirferðarþjónustuna. Reyndu yfirferðina aftur þegar þjónustan er tiltæk.",
+      "reviewFailed": "Yfirferðin mistókst. Vinsamlegast reyndu aftur.",
       "showMore": "Sýna meira",
       "created": "Búin til",
       "started": "Hófst",
@@ -1529,8 +1539,6 @@
     "updateFailed": "Ekki tókst að uppfæra kóðarýninn.",
     "configSaveFailed": "Ekki tókst að vista yfirferðarstillingar.",
     "status": {
-      "running": "Í gangi",
-      "completed": "Lokið",
       "interrupted": "Rofið"
     },
     "reviewStyle": {
@@ -1543,7 +1551,8 @@
       "bugs": "Gallar",
       "style": "Stíll",
       "testing": "Prófanir",
-      "documentation": "Skjölun"
+      "documentation": "Skjölun",
+      "unknown": "Annað ({{area}})"
     },
     "gateThreshold": {
       "warning": "Viðvörun"
@@ -1655,7 +1664,14 @@
       "whereFound": "Staðsetningar fráviks ({{displayCount}})",
       "fullReport": "Sjálfvirk skýrsla í heild",
       "yes": "Já",
-      "no": "Nei"
+      "no": "Nei",
+      "action": {
+        "analyzeCodebase": "Greina kóðagrunn",
+        "dismiss": "Hunsa",
+        "manualReview": "Handvirk endurskoðun",
+        "monitor": "Fylgjast með",
+        "openPr": "Opna togbeiðni"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} frávik",
@@ -1857,7 +1873,8 @@
     "settingsSave": {
       "saveChanges": "Vista breytingar",
       "unsavedTitle": "Óvistaðar breytingar",
-      "unsavedMessage": "Viltu vista breytingarnar áður en þú ferð af þessum skjá?"
+      "unsavedMessage": "Viltu vista breytingarnar áður en þú ferð af þessum skjá?",
+      "unsavedInvalidMessage": "Ekki er hægt að vista þessar breytingar ennþá. Lagaðu þær til að vista eða fargaðu þeim til að fara."
     },
     "auditReportButton": {
       "viewA11y": "Skoða endurskoðunarskýrslu"
@@ -1874,7 +1891,24 @@
       "title": "Endurskoðunarskýrsla",
       "unavailable": "Endurskoðunarskýrsla ekki tiltæk",
       "unavailableDescription": "Aðeins eigendur fyrirtækisins og greiðslustjórar geta skoðað endurskoðunarskýrslur. Biddu eiganda eða greiðslustjóra um að veita þér aðgang.",
-      "queryFailed": "Fyrirspurn um skýrsluna lauk ekki. Reyndu aftur."
+      "queryFailed": "Fyrirspurn um skýrsluna lauk ekki. Reyndu aftur.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Greining lokið",
+        "findingAnalysisFailed": "Greining mistókst",
+        "findingAutoDismissed": "Sjálfvirkt hunsað",
+        "findingCreated": "Flutt inn",
+        "findingDeleted": "Eytt",
+        "findingDismissed": "Hunsað",
+        "findingSeverityChanged": "Mikilvægi breytt",
+        "findingStatusChange": "Staða breytt",
+        "findingSuperseded": "Skipt út",
+        "remediationBlocked": "Úrbætur hindraðar",
+        "remediationCancelled": "Hætt við",
+        "remediationFailed": "Úrbætur mistókust",
+        "remediationNoChangesNeeded": "Engar breytingar nauðsynlegar",
+        "remediationPrOpened": "Togbeiðni opnuð",
+        "remediationQueued": "Óskað eftir úrbótum"
+      }
     },
     "notifications": {
       "couldNotLoad": "Ekki tókst að sækja tilkynningastillingar.",
@@ -1906,7 +1940,6 @@
       "installApp": "Setja upp GitHub-forrit",
       "reauthorizeButton": "Endurnýja heimildir GitHub-forritsins",
       "reauthorizeDescription": "Öryggisvakinn þarf heimildina vulnerability_alerts til að fá aðgang að Dependabot-viðvörunum. Endurnýjaðu heimildir GitHub-forritsins til að veita þessa heimild.",
-      "reauthorizeFailed": "Ekki tókst að hefja endurnýjun heimilda. Reyndu aftur.",
       "reauthorizeTitle": "Viðbótarheimildir nauðsynlegar",
       "setupFailed": "Ekki tókst að hefja uppsetningu GitHub. Reyndu aftur."
     },
@@ -2210,6 +2243,7 @@
       "prefillModelUnavailable": "{{model}} er ekki lengur tiltækt. Sjálfgefna líkanið þitt er notað í staðinn.",
       "couldNotReadPendingSessions": "Ekki tókst að lesa lotur í bið. Reyndu aftur.",
       "failedToCreate": "Ekki tókst að búa til lotu.",
+      "checkOrganizationAccess": "Athugaðu aðganginn þinn að þessari stofnun, og reyndu aftur.",
       "couldNotRefreshRepositories": "Ekki tókst að endurnýja kóðasöfnin. Reyndu aftur.",
       "discardDraftTitle": "Farga drögum?",
       "discardDraftMessage": "Skilaboðin þín glatast.",
@@ -2279,7 +2313,8 @@
       "linesBadge_other": "{{displayCount}} línur",
       "matchesBadge_one": "{{displayCount}} samsvörun",
       "matchesBadge_other": "{{displayCount}} samsvaranir",
-      "noOutput": "Ekkert úttak."
+      "noOutput": "Ekkert úttak.",
+      "translationFailed": "Þýðing mistókst"
     },
     "readToolMarkdown": {
       "linesTruncated": "línur {{start}}–{{end}} (stytt)",
@@ -2730,6 +2765,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Virku loturnar þínar eru ekki tiltækar fyrr en upplýsingarnar hafa hlaðist.",
     "currentDeviceUnidentified": "Ekki tókst að bera kennsl á þetta tæki.",
+    "kiloApp": "Kilo-forrit",
     "noSessions": "Engar virkar lotur",
     "noSessionsDescription": "Skráðu þig inn í Kilo-forritið á öðru tæki til að það birtist hér.",
     "onlyKiloAppSignIns": "Aðeins innskráningar í Kilo-forritið birtast hér. Innskráningar í kóðaritil og CLI eru ekki á listanum.",
@@ -2882,6 +2918,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Áður en við byrjum",
+    "summaryTitle": "Kjörstillingar fyrir deilingu gagna",
     "introDescription": "Kilo sendir skilaboðin þín til veitenda gervigreindarlíkana til að mynda svör. Hér sérðu hvaða gögnum er deilt og með hverjum.",
     "required": "Nauðsynlegt til að nota Kilo",
     "promptsTitle": "Skilaboð þín og samtöl",
@@ -2890,7 +2927,6 @@
     "accountDescription": "Auðkenni Kilo-reikningsins þíns og lýsigögn beiðna, sem eru notuð til að auðkenna þig og mæla notkun.",
     "diagnosticsTitle": "Greiningargögn forritsins",
     "diagnosticsDescription": "Hrun- og villuskýrslur sem eru notaðar til að tryggja stöðugleika forritsins. Efni úr forritinu hefur verið fjarlægt úr þeim.",
-    "optional": "Valfrjálst",
     "helpImprove": "Hjálpa til við að bæta Kilo",
     "helpImproveDescription": "Deildu nafnlausum notkunargögnum og upplýsingum um hvaðan uppsetningin kom. Þú getur breytt þessu hvenær sem er í stillingum.",
     "seeFullDetails": "Sjá allar upplýsingar",
@@ -3469,6 +3505,9 @@
     "localModels": {
       "title": "Líkön í tækinu",
       "help": "Líkön í tækinu keyra á þessum síma. Fyrirmæli þín og svör verða eftir í tækinu.",
+      "switchTitle": "Skipta yfir í líkan í tækinu?",
+      "switchMessage": "Ef þú skiptir yfir í {{name}} verða fyrirmæli og samhengi þessa samtals unnin á þessum síma, ekki á fjarlægum netþjóni.",
+      "switchConfirm": "Skipta um líkan",
       "systemPurpose": "Líkanið sem er innbyggt í kerfi þessa tækis. Það keyrir í tækinu.",
       "apple": "Apple Intelligence (í tækinu)",
       "checking": "Athugar framboð…",
@@ -3565,7 +3604,6 @@
     "personalDefaultDescription": "Sjálfvirkt hlaðið þegar engin geymsla er með festan prófíl.",
     "organizationDefaultDescription": "Sjálfvirkt hlaðið fyrir meðlimi sem hafa engin persónuleg vanskil.",
     "setAsDefault": "Stillt sem sjálfgefið",
-    "removeDefault": "Fjarlægja sem sjálfgefið",
     "saveFailed": "Ekki tókst að vista prófílinn",
     "deleteTitle": "Eyða prófíl",
     "deleteMessage": "Þetta fjarlægir prófílinn og stillingar hans varanlega. Þetta er ekki hægt að afturkalla.",
@@ -3591,11 +3629,13 @@
     "commandsTitle": "Uppsetningarskipanir",
     "addCommand": "Bæta við skipun",
     "commandLabel": "Skipun",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "t.d. pnpm install",
     "commandsEmpty": "Engar uppsetningarskipanir ennþá",
     "commandsSaveFailed": "Gat ekki vistað uppsetningarskipanir",
     "moveUp": "Færðu þig upp",
     "moveDown": "Færðu þig niður",
+    "moveCommandUp": "Færa skipun {{position}} upp",
+    "moveCommandDown": "Færa skipun {{position}} niður",
     "skillsTitle": "Færni",
     "addSkill": "Bættu við færni",
     "skillNameLabel": "Nafn kunnáttu",
@@ -3665,7 +3705,7 @@
       "nameRequired": "Sláðu inn nafn umboðsmanns",
       "slugRequired": "Sláðu inn umboðssnigl",
       "slugInvalid": "Snigl verður að byrja á bókstaf og nota aðeins lágstafi, tölustafi og strik",
-      "slugConflict": "Sá snigill er frátekinn af innbyggðum umboðsmanni",
+      "slugConflict": "Þetta slug er þegar í notkun hjá innbyggðum umboðsmanni eða öðrum umboðsmanni í þessu prófíli",
       "edit": "Breyta umboðsmanni"
     },
     "slashCommands": {
@@ -3676,6 +3716,7 @@
       "description": "Skipunarlýsing",
       "template": "Sniðmát",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Útskýrðu $ARGUMENTS",
       "subtask": "Keyra sem undirverkefni",
       "edit": "Breyta skástrik skipun",
@@ -3826,7 +3867,7 @@
     "view": "Lesa yfirlit",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Sýna rauntímastöðu",
+    "dismiss": "Vísa yfirliti frá",
     "offline": "Ótengt · vistað yfirlit",
     "cached": "Vistuð skýrsla · ekki hægt að uppfæra",
     "revised": "Endurskoðað · {{revision}}",

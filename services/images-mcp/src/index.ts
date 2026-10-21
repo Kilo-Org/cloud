@@ -3,15 +3,19 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { toFetchResponse, toReqRes } from 'fetch-to-node';
 import { z } from 'zod';
 import { validateToken, type ImageMCPTokenClaims } from './auth/jwt';
+import { MAX_REQUEST_BODY_BYTES, MAX_TOOL_INPUT_ELEMENTS } from './mcp-limits';
 import { createR2Client } from './r2/client';
 import { transferImage } from './tools/transfer-image';
 import { getImage } from './tools/get-image';
 
 function createMCPServer(env: Env, claims: ImageMCPTokenClaims): McpServer {
-  const server = new McpServer({
-    name: 'app-builder-images',
-    version: '1.0.0',
-  });
+  const server = new McpServer(
+    {
+      name: 'app-builder-images',
+      version: '1.0.0',
+    },
+    { maxToolInputElements: MAX_TOOL_INPUT_ELEMENTS }
+  );
 
   const r2 = createR2Client({
     accessKeyId: env.R2_ACCESS_KEY_ID,
@@ -124,7 +128,10 @@ export default {
     const server = createMCPServer(env, claims);
 
     // Use stateless StreamableHTTP transport (no session persistence needed)
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      maxRequestBodySize: MAX_REQUEST_BODY_BYTES,
+    });
     await server.connect(transport);
 
     // Convert Fetch Request to Node-compatible req/res for the MCP SDK

@@ -25,6 +25,12 @@ describe('the policy a view runs under', () => {
     expect(contentSecurityPolicy({})).not.toContain('https://');
   });
 
+  it('falls back to nothing when the metadata is not the shape the spec defines', () => {
+    expect(contentSecurityPolicy({ ui: { csp: { connectDomains: 'https://api.example' } } })).toBe(
+      contentSecurityPolicy(undefined)
+    );
+  });
+
   it('keeps only the origins the resource named, for what it named them for', () => {
     const policy = contentSecurityPolicy({
       ui: {

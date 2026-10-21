@@ -82,7 +82,10 @@ const tokensFor = (origins: readonly string[]): string =>
  * expects a view to have.
  */
 export function contentSecurityPolicy(meta: Readonly<Record<string, unknown>> | undefined): string {
-  const csp = ViewMetaSchema.parse(meta)?.ui?.csp;
+  // Metadata that is not the shape the specification defines gets the
+  // default policy rather than an error: a resource with no readable policy is
+  // a resource with nothing it may load.
+  const csp = ViewMetaSchema.safeParse(meta).data?.ui?.csp;
   const resources = originsOf(csp?.resourceDomains);
   const connections = originsOf(csp?.connectDomains);
   const frames = originsOf(csp?.frameDomains);

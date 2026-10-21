@@ -5104,6 +5104,14 @@ describe('createSessionManager', () => {
       expect(
         atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
       ).toBeNull();
+
+      // Retryable: the cursor survives, so a retry re-fetches the same page.
+      await mgr.loadOlderChildMessages(kiloId('child-retryable'));
+      const childCalls = fetchSnapshotPage.mock.calls.filter(([id]) => id === 'child-retryable');
+      expect(childCalls[childCalls.length - 1]).toEqual([
+        kiloId('child-retryable'),
+        { cursor: 'cursor-A' },
+      ]);
     });
 
     it('loadOlderChildMessages maps a thrown later-page fetch to a retryable older error', async () => {
@@ -5171,8 +5179,8 @@ describe('createSessionManager', () => {
       >(config.store, mgr.atoms.childSessionHydrationState);
       expect(state('child-invalid')).toEqual({
         status: 'ready',
-        cursor: 'cursor-A',
-        hasOlder: true,
+        cursor: null,
+        hasOlder: false,
         isLoadingOlder: false,
         olderError: { kind: 'invalid_data' },
         omittedItemCount: 0,
@@ -5182,6 +5190,15 @@ describe('createSessionManager', () => {
       expect(
         atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
       ).toBeNull();
+
+      // Terminal: the child must not issue another page fetch.
+      const fetchesBefore = fetchSnapshotPage.mock.calls.filter(
+        ([id]) => id === 'child-invalid'
+      ).length;
+      await mgr.loadOlderChildMessages(kiloId('child-invalid'));
+      expect(fetchSnapshotPage.mock.calls.filter(([id]) => id === 'child-invalid').length).toBe(
+        fetchesBefore
+      );
     });
 
     it('loadOlderChildMessages surfaces too_large as a non-retryable older error', async () => {
@@ -5210,8 +5227,8 @@ describe('createSessionManager', () => {
       >(config.store, mgr.atoms.childSessionHydrationState);
       expect(state('child-large')).toEqual({
         status: 'ready',
-        cursor: 'cursor-A',
-        hasOlder: true,
+        cursor: null,
+        hasOlder: false,
         isLoadingOlder: false,
         olderError: { kind: 'too_large' },
         omittedItemCount: 0,
@@ -5221,6 +5238,57 @@ describe('createSessionManager', () => {
       expect(
         atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
       ).toBeNull();
+
+      // Terminal: the child must not issue another page fetch.
+      const fetchesBefore = fetchSnapshotPage.mock.calls.filter(
+        ([id]) => id === 'child-large'
+      ).length;
+      await mgr.loadOlderChildMessages(kiloId('child-large'));
+      expect(fetchSnapshotPage.mock.calls.filter(([id]) => id === 'child-large').length).toBe(
+        fetchesBefore
+      );
+    });
+
+    it('loadOlderChildMessages treats a worker-404 later page as terminal', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async (id, options) => {
+        if (id === 'ses-root') return makePage({ kiloSessionId: id, nextCursor: null });
+        if (!options.cursor) return makePage({ kiloSessionId: id, nextCursor: 'cursor-A' });
+        return null;
+      });
+
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-gone'));
+      await mgr.loadOlderChildMessages(kiloId('child-gone'));
+
+      const state = atomValue<
+        (childSessionId: string) => {
+          status: string;
+          cursor?: string | null;
+          hasOlder?: boolean;
+          isLoadingOlder?: boolean;
+          olderError?: unknown;
+          omittedItemCount?: number;
+        }
+      >(config.store, mgr.atoms.childSessionHydrationState);
+      expect(state('child-gone')).toEqual({
+        status: 'ready',
+        cursor: null,
+        hasOlder: false,
+        isLoadingOlder: false,
+        olderError: { kind: 'invalid_data' },
+        omittedItemCount: 0,
+      });
+
+      const fetchesBefore = fetchSnapshotPage.mock.calls.filter(
+        ([id]) => id === 'child-gone'
+      ).length;
+      await mgr.loadOlderChildMessages(kiloId('child-gone'));
+      expect(fetchSnapshotPage.mock.calls.filter(([id]) => id === 'child-gone').length).toBe(
+        fetchesBefore
+      );
     });
 
     it('loadOlderChildMessages accumulates omittedItemCount across pages', async () => {

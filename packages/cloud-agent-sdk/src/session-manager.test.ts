@@ -3194,6 +3194,55 @@ describe('createSessionManager', () => {
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(1);
     });
 
+    it('does not record a draft when the server confirmed the prompt after the user switched away', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // An earlier prompt failed and is recorded as this chat's draft.
+      mockSession.send.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+      await expect(
+        mgr.send({ payload: { type: 'prompt', prompt: 'Earlier failure', mode: 'code' } })
+      ).resolves.toBe(false);
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe(
+        'Earlier failure'
+      );
+
+      let rejectSend: (error: Error) => void;
+      mockSession.send.mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectSend = reject;
+          })
+      );
+      const sendPromise = mgr.send({
+        payload: { type: 'prompt', prompt: 'Delivered', mode: 'code' },
+      });
+      const storageAtSend = mockSession.storage;
+      if (!storageAtSend) throw new Error('expected session storage');
+      const messageId = storageAtSend.getMessageIds().at(-1);
+      expect(messageId).toBeDefined();
+
+      await mgr.switchSession(kiloId('ses-2'));
+      // The server accepted the second prompt before the response was lost.
+      storageAtSend.upsertMessage(
+        stubUserMessage({
+          id: messageId!,
+          sessionID: 'ses-1',
+          time: { created: 3 },
+          agent: 'test-agent',
+          model: { providerID: 'test-provider', modelID: 'test-model' },
+        })
+      );
+
+      rejectSend!(new Error('ECONNRESET'));
+      await expect(sendPromise).resolves.toBe(false);
+
+      // The delivered prompt consumes the draft: returning offers nothing to resend.
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
+    });
+
     it('uses cloud-agent model override on send and clears it on switchSession', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

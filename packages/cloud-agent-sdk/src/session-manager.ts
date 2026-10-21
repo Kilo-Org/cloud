@@ -3070,24 +3070,35 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       const stillOnSendingChat = activeSessionId === kiloSessionId;
       const mountedStorage = store.get(sessionStorageAtom);
       const mountedRow = mountedStorage?.getMessageInfo(messageId);
+      const sendingRow = optimisticStorage?.getMessageInfo(messageId);
       // A confirmed record under this id is server history: the server accepted
-      // the prompt and only the response was lost, so the transcript already
-      // shows it and there is nothing to retry. Only the unconfirmed row is this
-      // send's to remove, wherever it is rendered.
+      // the prompt and only the response was lost, so there is nothing to retry.
+      // The record lands in the storage that sent the prompt, and in the mounted
+      // one when the chat was reopened in the meantime.
       const delivered =
-        stillOnSendingChat && mountedRow?.role === 'user' && mountedRow.synthetic !== true;
-      if (optimisticStorage && optimisticStorage !== mountedStorage) {
+        (sendingRow?.role === 'user' && sendingRow.synthetic !== true) ||
+        (stillOnSendingChat && mountedRow?.role === 'user' && mountedRow.synthetic !== true);
+      if (optimisticStorage && optimisticStorage !== mountedStorage && !delivered) {
         optimisticStorage.deleteMessage(messageId);
       }
       if (mountedStorage && mountedRow?.role === 'user' && mountedRow.synthetic === true) {
         mountedStorage.deleteMessage(messageId);
       }
       remoteOptimisticIds.delete(messageId);
-      if (insertedOptimisticRow && kiloSessionId && !delivered) {
-        recordFailedPrompt(kiloSessionId, messageText);
-        forgetCachedOptimisticRow(kiloSessionId, messageId);
+      if (insertedOptimisticRow && kiloSessionId) {
+        if (delivered) {
+          failedPromptBySession.delete(kiloSessionId);
+        } else {
+          recordFailedPrompt(kiloSessionId, messageText);
+          forgetCachedOptimisticRow(kiloSessionId, messageId);
+        }
       }
-      if (!stillOnSendingChat || delivered) return false;
+      if (!stillOnSendingChat) return false;
+      if (delivered) {
+        store.set(failedPromptAtom, null);
+        store.set(billingFailureAtom, null);
+        return false;
+      }
       store.set(failedPromptAtom, messageText);
       store.set(billingFailureAtom, parseCustomerBillingFailure(err));
       const detail = formatErrorDetail(err);

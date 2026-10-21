@@ -1,6 +1,17 @@
 import { describe, expect, it } from '@jest/globals';
+import {
+  buildClassifierRequest,
+  DEFAULT_CLASSIFIER_MODEL,
+} from '@kilocode/auto-routing-contracts/classifier';
 import { choice, noul, score } from '@typesafe-ai/sdk';
-import { systemOneRequestSchema, systemOneResponseSchema, TYPESAFE_MODEL } from './schemas';
+import {
+  systemOneRequestSchema,
+  systemOneResponseSchema,
+  SYSTEM_ONE_MAX_QUESTIONS,
+  SYSTEM_ONE_MAX_QUESTIONS_BYTES,
+  SYSTEM_ONE_MAX_STATE_BYTES,
+  TYPESAFE_MODEL,
+} from './schemas';
 
 describe('systemOneRequestSchema', () => {
   it('accepts SDK question helpers with structured entries and strips routing overrides', () => {
@@ -103,6 +114,82 @@ describe('systemOneRequestSchema', () => {
     ],
   ])('rejects %s', (_name, request) => {
     expect(systemOneRequestSchema.safeParse(request).success).toBe(false);
+  });
+
+  it('accepts the auto-routing classifier payload the gateway itself sends', () => {
+    const request = buildClassifierRequest(
+      {
+        apiKind: 'chat_completions',
+        requestedModel: DEFAULT_CLASSIFIER_MODEL,
+        systemPromptPrefix: 'System prompt.',
+        userPromptPrefix: 'User prompt.',
+        latestUserPromptPrefix: null,
+        messageCount: 3,
+        hasTools: true,
+        stream: false,
+        providerHints: { provider: null, providerOptions: null },
+      },
+      DEFAULT_CLASSIFIER_MODEL
+    );
+
+    expect(systemOneRequestSchema.safeParse(request).success).toBe(true);
+  });
+
+  it('bounds the serialized state and question sizes at the configured limits', () => {
+    const state = (bytes: number) => 'x'.repeat(bytes - 2);
+    expect(
+      systemOneRequestSchema.safeParse({
+        state: state(SYSTEM_ONE_MAX_STATE_BYTES),
+        questions: { q: { type: 'noul' } },
+      }).success
+    ).toBe(true);
+    const oversizedState = systemOneRequestSchema.safeParse({
+      state: state(SYSTEM_ONE_MAX_STATE_BYTES + 1),
+      questions: { q: { type: 'noul' } },
+    });
+    expect(oversizedState.success).toBe(false);
+    expect(oversizedState.error?.issues).toEqual([
+      expect.objectContaining({ path: ['state'], code: 'custom' }),
+    ]);
+
+    const questionsWithBytes = (bytes: number) => {
+      const empty = JSON.stringify({ q: { type: 'noul', instructions: '' } });
+      return { q: { type: 'noul', instructions: 'x'.repeat(bytes - empty.length) } };
+    };
+    expect(
+      systemOneRequestSchema.safeParse({
+        state: null,
+        questions: questionsWithBytes(SYSTEM_ONE_MAX_QUESTIONS_BYTES),
+      }).success
+    ).toBe(true);
+    const oversizedQuestions = systemOneRequestSchema.safeParse({
+      state: null,
+      questions: questionsWithBytes(SYSTEM_ONE_MAX_QUESTIONS_BYTES + 1),
+    });
+    expect(oversizedQuestions.success).toBe(false);
+    expect(oversizedQuestions.error?.issues).toEqual([
+      expect.objectContaining({ path: ['questions'], code: 'custom' }),
+    ]);
+  });
+
+  it('bounds the number of questions', () => {
+    const questionsOfLength = (length: number) =>
+      Object.fromEntries(Array.from({ length }, (_, index) => [`q${index}`, { type: 'noul' }]));
+
+    expect(
+      systemOneRequestSchema.safeParse({
+        state: null,
+        questions: questionsOfLength(SYSTEM_ONE_MAX_QUESTIONS),
+      }).success
+    ).toBe(true);
+    const tooMany = systemOneRequestSchema.safeParse({
+      state: null,
+      questions: questionsOfLength(SYSTEM_ONE_MAX_QUESTIONS + 1),
+    });
+    expect(tooMany.success).toBe(false);
+    expect(tooMany.error?.issues).toEqual([
+      expect.objectContaining({ path: ['questions'], code: 'custom' }),
+    ]);
   });
 });
 

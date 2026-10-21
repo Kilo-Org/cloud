@@ -1,5 +1,10 @@
 import type { StoredModel } from '@kilocode/db';
-import { enforceRequestCostLimit, textRequestPriceCeiling } from './request-cost-limit';
+import {
+  enforceRequestCostLimit,
+  systemOneRequestCostBound,
+  textRequestPriceCeiling,
+} from './request-cost-limit';
+import { SYSTEM_ONE_MAX_QUESTIONS, SYSTEM_ONE_MAX_STATE_BYTES } from './typesafe/schemas';
 import { addCacheBreakpoints } from './providers/openrouter/request-helpers';
 import type { GatewayRequest } from './providers/openrouter/types';
 import { getVercelModelIdOverrides } from './providers/vercel/mapModelIdToVercel';
@@ -234,5 +239,67 @@ describe('request cost admission', () => {
   });
   it('does not alter ordinary gateway requests without a spending safeguard', async () => {
     await expect(enforceRequestCostLimit(null, model.id, {}, 0)).resolves.toBeNull();
+  });
+});
+
+describe('System One request cost bound', () => {
+  const jev: StoredModel = {
+    id: 'typesafe/jev-1.13',
+    name: 'TypeSafe: Jev 1.13',
+    endpoints: [{ pricing: { prompt: '0.000000042', completion: '0' } }],
+  };
+  const questions = { relevant: { type: 'noul' as const } };
+
+  function boundOf(
+    metadata: StoredModel,
+    state: unknown,
+    askedQuestions: Record<string, unknown> = questions
+  ) {
+    return systemOneRequestCostBound(metadata, { state, questions: askedQuestions });
+  }
+
+  it('prices additional state bytes only at the input ceiling', () => {
+    expect(
+      boundOf(model, { text: 'x'.repeat(11_000) }) - boundOf(model, { text: 'x'.repeat(1000) })
+    ).toBe(40_000);
+  });
+
+  it('prices additional questions bytes at the input and output ceilings', () => {
+    const question = (parts: number) => ({
+      q: { type: 'noul' as const, instructions: { text: 'x'.repeat(parts) } },
+    });
+    const questionBytes = (value: object) => Buffer.byteLength(JSON.stringify(value), 'utf8');
+    const delta = questionBytes(question(2000)) - questionBytes(question(1000));
+
+    expect(boundOf(model, null, question(2000)) - boundOf(model, null, question(1000))).toBe(
+      delta * 10
+    );
+  });
+
+  it('includes the per-request fee for a request with no measurable tokens', () => {
+    const flat: StoredModel = {
+      id: 'typesafe/flat',
+      name: 'Flat',
+      endpoints: [{ pricing: { prompt: '0', completion: '0', request: '0.02' } }],
+    };
+
+    expect(boundOf(flat, null, { q: { type: 'noul' } })).toBe(20_000);
+  });
+
+  it('keeps a maximum-size request inside a small funded balance at current catalog prices', () => {
+    const maxState = 'x'.repeat(SYSTEM_ONE_MAX_STATE_BYTES);
+    const maxQuestions = Object.fromEntries(
+      Array.from({ length: SYSTEM_ONE_MAX_QUESTIONS }, (_, index) => [
+        `q${index}`,
+        { type: 'noul', instructions: 'x'.repeat(1800) },
+      ])
+    );
+
+    expect(boundOf(jev, maxState, maxQuestions)).toBeLessThan(20_000);
+  });
+
+  it('refuses to bound a model without usable pricing', () => {
+    expect(() => boundOf({ ...model, endpoints: [] }, null)).toThrow(/pric/);
+    expect(() => boundOf({ ...model, endpoints: [{}] }, null)).toThrow(/pric/);
   });
 });

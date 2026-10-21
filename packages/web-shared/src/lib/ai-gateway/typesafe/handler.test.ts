@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { TypeSafeClient, choice, noul, score } from '@typesafe-ai/sdk';
 import type { User } from '@kilocode/db/schema';
+import type { StoredModel } from '@kilocode/db';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { after, NextRequest, NextResponse } from 'next/server';
 import type * as NextServer from 'next/server';
@@ -25,6 +26,7 @@ import {
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
+  getOpenRouterModelsMetadataFromDatabase,
   getOpenRouterSystemOneModelsFromDatabase,
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -33,6 +35,8 @@ import { logMicrodollarUsageAndReportToBouncer } from '@kilocode/web-shared/lib/
 import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   systemOneRequestSchema,
+  SYSTEM_ONE_MAX_QUESTIONS,
+  SYSTEM_ONE_MAX_STATE_BYTES,
   TYPESAFE_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/typesafe/schemas';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
@@ -61,6 +65,7 @@ jest.mock(
   })
 );
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(),
   getOpenRouterSystemOneModelsFromDatabase: jest.fn(),
   resolveOpenRouterModelAlias: jest.fn(),
 }));
@@ -103,6 +108,18 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => (
 const routeUrl = 'http://localhost:3000/api/gateway/typesafe/v1/systemone';
 const OTHER_SYSTEM_ONE_MODEL = 'respan/span-01-lite:free';
 const SYSTEM_ONE_ALIAS = '~typesafe/jev-latest';
+const pricedSystemOneModels: Record<string, StoredModel> = {
+  [TYPESAFE_MODEL]: {
+    id: TYPESAFE_MODEL,
+    name: 'TypeSafe: Jev 1.13',
+    endpoints: [{ pricing: { prompt: '0.000000042', completion: '0' } }],
+  },
+  [OTHER_SYSTEM_ONE_MODEL]: {
+    id: OTHER_SYSTEM_ONE_MODEL,
+    name: 'Respan: Span-01 Lite (free)',
+    endpoints: [{ pricing: { prompt: '0', completion: '0' } }],
+  },
+};
 const user = {
   id: 'oauth/test-user',
   google_user_email: 'test@example.com',
@@ -208,6 +225,7 @@ describe('handleSystemOneRequest', () => {
     jest
       .mocked(getOpenRouterSystemOneModelsFromDatabase)
       .mockResolvedValue(new Set([TYPESAFE_MODEL, OTHER_SYSTEM_ONE_MODEL, SYSTEM_ONE_ALIAS]));
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(pricedSystemOneModels);
     jest
       .mocked(resolveOpenRouterModelAlias)
       .mockImplementation(async modelId =>
@@ -559,15 +577,21 @@ describe('handleSystemOneRequest', () => {
     }
   );
 
-  it('leaves model validation to OpenRouter without System One model metadata', async () => {
+  it('fails closed without catalog pricing instead of forwarding a model OpenRouter might serve', async () => {
     jest.mocked(getOpenRouterSystemOneModelsFromDatabase).mockResolvedValue(new Set());
 
     const response = await handleSystemOneRequest(
       makeRequest({ ...requestBody, model: 'vendor/unlisted-decide' })
     );
 
-    expect(response.status).toBe(200);
-    expect(upstreamRequest().body.model).toBe('vendor/unlisted-decide');
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error_type: 'temporarily_unavailable' });
+    expect(errorExceptInTest).toHaveBeenCalledWith(
+      'System One request cost estimate unavailable',
+      expect.anything()
+    );
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(deferredUsageCallbacks()).toHaveLength(0);
   });
 
   it.each([
@@ -853,5 +877,91 @@ describe('handleSystemOneRequest', () => {
         bouncer: expect.objectContaining({ spendWatch: true, requestId: decideParams.requestId }),
       })
     );
+  });
+
+  it('admits a request when the balance covers its estimated maximum cost', async () => {
+    jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 0.001 });
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses before upstream when the balance does not cover the estimated maximum cost', async () => {
+    jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 0.000001 });
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(402);
+    expect(await response.json()).toEqual({
+      message: expect.stringContaining('balance'),
+      error_type: 'insufficient_credits',
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(startBouncerDecide).not.toHaveBeenCalled();
+    expect(deferredUsageCallbacks()).toHaveLength(0);
+  });
+
+  it('prices an alias through the target model instead of its own catalog entry', async () => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      ...pricedSystemOneModels,
+      [SYSTEM_ONE_ALIAS]: {
+        id: SYSTEM_ONE_ALIAS,
+        name: 'TypeSafe: Jev Latest',
+        alias_target: { slug: TYPESAFE_MODEL },
+        endpoints: [],
+      },
+    });
+    jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 0.001 });
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: SYSTEM_ONE_ALIAS })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses an alias when only its own unpriced catalog entry exists', async () => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      [SYSTEM_ONE_ALIAS]: {
+        id: SYSTEM_ONE_ALIAS,
+        name: 'TypeSafe: Jev Latest',
+        alias_target: { slug: TYPESAFE_MODEL },
+        endpoints: [],
+      },
+    });
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: SYSTEM_ONE_ALIAS })
+    );
+
+    expect(response.status).toBe(503);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['an oversized state', { ...requestBody, state: 'x'.repeat(SYSTEM_ONE_MAX_STATE_BYTES) }],
+    [
+      'too many questions',
+      {
+        ...requestBody,
+        questions: Object.fromEntries(
+          Array.from({ length: SYSTEM_ONE_MAX_QUESTIONS + 1 }, (_, index) => [
+            `q${index}`,
+            { type: 'noul' },
+          ])
+        ),
+      },
+    ],
+  ])('rejects %s before balance checks or upstream work', async (_name, body) => {
+    const response = await handleSystemOneRequest(makeRequest(body));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error_type: 'invalid_request' });
+    expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(deferredUsageCallbacks()).toHaveLength(0);
   });
 });

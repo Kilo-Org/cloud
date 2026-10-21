@@ -197,10 +197,11 @@ function expectErrorRedirect(response: Response, error: string) {
   expect(`${redirectUrl.pathname}${redirectUrl.search}`).toBe(`/code-reviews?error=${error}`);
 }
 
-function expectConfirmationRedirect(response: Response) {
+function expectConfirmationRedirect(response: Response, error?: string) {
   const redirectUrl = getRedirectUrl(response);
+  const query = error ? `?error=${error}` : '';
   expect(`${redirectUrl.pathname}${redirectUrl.search}`).toBe(
-    `/cloud-agent-fork/review/${REVIEW_ID}/confirm`
+    `/cloud-agent-fork/review/${REVIEW_ID}/confirm${query}`
   );
 }
 
@@ -271,23 +272,26 @@ describe('/cloud-agent-fork/review/[reviewId]', () => {
       });
 
       expect(response.status).toBe(303);
-      expectConfirmationRedirect(response);
+      expectConfirmationRedirect(response, 'invalid_origin');
       expect(mockCreateTRPCContext).not.toHaveBeenCalled();
       expect(mockCodeReviewsGet).not.toHaveBeenCalled();
       expectNoSessionCreation();
     });
 
-    it('returns the confirmation page unless Sec-Fetch-Site reports this origin', async () => {
-      const response = await submitFixSession(REVIEW_ID, {
-        origin: null,
-        secFetchSite: 'cross-site',
-      });
+    it.each(['cross-site', 'same-site'] as const)(
+      'returns the confirmation page unless Sec-Fetch-Site reports this origin (%s)',
+      async secFetchSite => {
+        const response = await submitFixSession(REVIEW_ID, {
+          origin: null,
+          secFetchSite,
+        });
 
-      expect(response.status).toBe(303);
-      expectConfirmationRedirect(response);
-      expect(mockCreateTRPCContext).not.toHaveBeenCalled();
-      expectNoSessionCreation();
-    });
+        expect(response.status).toBe(303);
+        expectConfirmationRedirect(response, 'invalid_origin');
+        expect(mockCreateTRPCContext).not.toHaveBeenCalled();
+        expectNoSessionCreation();
+      }
+    );
 
     it('accepts Sec-Fetch-Site as the origin signal when the Origin header is absent', async () => {
       const response = await submitFixSession(REVIEW_ID, {

@@ -104,4 +104,12 @@ describe('confirm fix session page', () => {
     expect(limited).toContain('Try again later');
     expect(normal).not.toContain('Try again later');
   });
+
+  it('asks the reader to reload when the submission could not be confirmed', async () => {
+    const rejected = renderedText(await renderPage('invalid_origin'));
+    const normal = renderedText(await renderPage());
+
+    expect(rejected).toContain('Reload the page and try again');
+    expect(normal).not.toContain('Reload the page and try again');
+  });
 });

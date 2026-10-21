@@ -69,8 +69,7 @@ function isSameOriginSubmission(request: NextRequest): boolean {
     return originHost === (request.headers.get('host') ?? request.nextUrl.host);
   }
 
-  const secFetchSite = request.headers.get('sec-fetch-site');
-  return secFetchSite === 'same-origin' || secFetchSite === 'same-site';
+  return request.headers.get('sec-fetch-site') === 'same-origin';
 }
 
 export async function GET(_request: NextRequest, context: RouteContext) {
@@ -91,7 +90,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   if (!isSameOriginSubmission(request)) {
-    return relativeRedirect(confirmationPath(reviewId), 303);
+    return relativeRedirect(`${confirmationPath(reviewId)}?error=invalid_origin`, 303);
   }
 
   let ctx: Awaited<ReturnType<typeof createTRPCContext>>;

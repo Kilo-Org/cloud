@@ -33,13 +33,20 @@ export default async function ConfirmFixSessionPage({
     <KiloCardLayout title="Start a fix session">
       <p className="text-muted-foreground text-sm">
         Kilo starts a cloud agent session that applies this review&apos;s comments to the pull
-        request, commits each fix, and pushes the commits to the branch. The session uses your Kilo
-        credits.
+        request, commits each fix, and pushes the commits to the branch. The session uses Kilo
+        credits: the organization&apos;s balance for organization reviews, otherwise yours.
       </p>
       {error === 'rate_limited' ? (
         <Alert variant="destructive">
           <AlertDescription>
             You have started several fix sessions in the last hour. Try again later.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {error === 'invalid_origin' ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Kilo could not confirm this request came from here. Reload the page and try again.
           </AlertDescription>
         </Alert>
       ) : null}

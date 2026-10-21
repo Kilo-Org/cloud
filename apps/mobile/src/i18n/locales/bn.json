@@ -35,6 +35,8 @@
     "connectGithub": "GitHub সংযুক্ত করুন",
     "cost": "খরচ",
     "discard": "বাতিল করুন",
+    "discardChangesMessage": "আপনার পরিবর্তনগুলো হারিয়ে যাবে।",
+    "discardChangesTitle": "পরিবর্তনগুলো বাতিল করবেন?",
     "findings": "শনাক্ত সমস্যা",
     "mergeRequest": "মার্জ রিকোয়েস্ট",
     "notConnected": "সংযুক্ত নয়",
@@ -1661,7 +1663,14 @@
       "whereFound": "যেখানে এটি পাওয়া গেছে ({{displayCount}})",
       "fullReport": "তৈরি করা সম্পূর্ণ রিপোর্ট",
       "yes": "হ্যাঁ",
-      "no": "না"
+      "no": "না",
+      "action": {
+        "analyzeCodebase": "কোডবেস বিশ্লেষণ করুন",
+        "dismiss": "অগ্রাহ্য করুন",
+        "manualReview": "ম্যানুয়াল পর্যালোচনা",
+        "monitor": "নজর রাখুন",
+        "openPr": "পুল রিকোয়েস্ট খুলুন"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}}টি ত্রুটি",
@@ -1880,7 +1889,24 @@
       "title": "অডিট রিপোর্ট",
       "unavailable": "অডিট রিপোর্ট পাওয়া যাচ্ছে না",
       "unavailableDescription": "শুধুমাত্র সংস্থার মালিক এবং বিলিং ম্যানেজাররা অডিট রিপোর্ট দেখতে পারেন। দেখার অনুমতির জন্য কোনো মালিক বা বিলিং ম্যানেজারকে অনুরোধ করুন।",
-      "queryFailed": "রিপোর্টের তথ্য আনার কাজ শেষ হয়নি। আবার চেষ্টা করুন।"
+      "queryFailed": "রিপোর্টের তথ্য আনার কাজ শেষ হয়নি। আবার চেষ্টা করুন।",
+      "eventActions": {
+        "findingAnalysisCompleted": "বিশ্লেষণ সম্পন্ন হয়েছে",
+        "findingAnalysisFailed": "বিশ্লেষণ ব্যর্থ হয়েছে",
+        "findingAutoDismissed": "স্বয়ংক্রিয়ভাবে অগ্রাহ্য করা হয়েছে",
+        "findingCreated": "ইমপোর্ট করা হয়েছে",
+        "findingDeleted": "মোছা হয়েছে",
+        "findingDismissed": "খারিজ",
+        "findingSeverityChanged": "তীব্রতা পরিবর্তিত হয়েছে",
+        "findingStatusChange": "স্ট্যাটাস পরিবর্তিত হয়েছে",
+        "findingSuperseded": "প্রতিস্থাপিত",
+        "remediationBlocked": "সমাধানের কাজ আটকে আছে",
+        "remediationCancelled": "বাতিল",
+        "remediationFailed": "সমাধান ব্যর্থ হয়েছে",
+        "remediationNoChangesNeeded": "কোনো পরিবর্তনের প্রয়োজন নেই",
+        "remediationPrOpened": "PR খোলা হয়েছে",
+        "remediationQueued": "সমাধানের অনুরোধ করা হয়েছে"
+      }
     },
     "notifications": {
       "couldNotLoad": "বিজ্ঞপ্তির সেটিংস লোড করা যায়নি।",

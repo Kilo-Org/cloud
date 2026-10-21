@@ -35,6 +35,8 @@
     "connectGithub": "Cysylltu â GitHub",
     "cost": "Y gost",
     "discard": "Gwaredu",
+    "discardChangesMessage": "Bydd eich newidiadau'n cael eu colli.",
+    "discardChangesTitle": "Gwaredu newidiadau?",
     "findings": "Canfyddiadau",
     "mergeRequest": "cais uno",
     "notConnected": "Heb gysylltu",
@@ -1741,7 +1743,14 @@
       "whereFound": "Lle canfuwyd hyn ({{displayCount}})",
       "fullReport": "Adroddiad llawn a gynhyrchwyd",
       "yes": "Ie",
-      "no": "Na"
+      "no": "Na",
+      "action": {
+        "analyzeCodebase": "Dadansoddi'r cod",
+        "dismiss": "Diystyru",
+        "manualReview": "Adolygiad â llaw",
+        "monitor": "Monitro",
+        "openPr": "Agor PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} canfyddiad",
@@ -1972,7 +1981,24 @@
       "title": "Adroddiad archwilio",
       "unavailable": "Nid yw'r adroddiad archwilio ar gael",
       "unavailableDescription": "Dim ond perchnogion y sefydliad a rheolwyr bilio sy'n gallu gweld adroddiadau archwilio. Gofynnwch i berchennog neu reolwr bilio roi mynediad i chi.",
-      "queryFailed": "Ni chwblhawyd yr ymholiad am yr adroddiad. Ceisiwch eto."
+      "queryFailed": "Ni chwblhawyd yr ymholiad am yr adroddiad. Ceisiwch eto.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Cwblhawyd yr analisis",
+        "findingAnalysisFailed": "Methodd yr analisis",
+        "findingAutoDismissed": "Diystyrwyd yn awtomatig",
+        "findingCreated": "Mewnforiwyd",
+        "findingDeleted": "Dilëwyd",
+        "findingDismissed": "Diystyrwyd",
+        "findingSeverityChanged": "Newidiwyd y difrifoldeb",
+        "findingStatusChange": "Newidiwyd y statws",
+        "findingSuperseded": "Disodlwyd",
+        "remediationBlocked": "Cafodd y cywiro ei rwystro",
+        "remediationCancelled": "Cafodd y cywiro ei ddiddymu",
+        "remediationFailed": "Methodd y cywiro",
+        "remediationNoChangesNeeded": "Dim newidiadau angenrheidiol",
+        "remediationPrOpened": "Agorwyd y PR",
+        "remediationQueued": "Gofynnwyd am gywiro"
+      }
     },
     "notifications": {
       "couldNotLoad": "Ni ellid llwytho'r gosodiadau hysbysu.",

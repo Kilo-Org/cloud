@@ -35,6 +35,8 @@
     "connectGithub": "GitHub hesabını bağla",
     "cost": "Maliyet",
     "discard": "Vazgeç",
+    "discardChangesMessage": "Değişiklikleriniz kaybedilecek.",
+    "discardChangesTitle": "Değişikliklerden vazgeç?",
     "findings": "Bulgular",
     "mergeRequest": "birleştirme isteği",
     "notConnected": "Bağlı değil",
@@ -1113,7 +1115,14 @@
       "triageReasoning": "Ön değerlendirme gerekçesi",
       "watchInCloudAgent": "Bulut ajanında izle",
       "whereFound": "Bulunduğu yerler ({{displayCount}})",
-      "yes": "Evet"
+      "yes": "Evet",
+      "action": {
+        "analyzeCodebase": "Kod tabanını analiz et",
+        "dismiss": "Yok say",
+        "manualReview": "El ile inceleme",
+        "monitor": "İzle",
+        "openPr": "Çekme isteği aç"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Analiz modeli",
@@ -1135,7 +1144,24 @@
       "summary": "Rapor özeti",
       "title": "Denetim raporu",
       "unavailable": "Denetim raporu kullanılamıyor",
-      "unavailableDescription": "Denetim raporlarını yalnızca kuruluş sahipleri ve faturalandırma yöneticileri görüntüleyebilir. Bir kuruluş sahibinden veya faturalandırma yöneticisinden sana erişim vermesini iste."
+      "unavailableDescription": "Denetim raporlarını yalnızca kuruluş sahipleri ve faturalandırma yöneticileri görüntüleyebilir. Bir kuruluş sahibinden veya faturalandırma yöneticisinden sana erişim vermesini iste.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiz tamamlandı",
+        "findingAnalysisFailed": "Analiz başarısız oldu",
+        "findingAutoDismissed": "Otomatik yok sayıldı",
+        "findingCreated": "İçe aktarıldı",
+        "findingDeleted": "Silindi",
+        "findingDismissed": "Yok sayıldı",
+        "findingSeverityChanged": "Önem derecesi değişti",
+        "findingStatusChange": "Durum değişti",
+        "findingSuperseded": "Yenisiyle değiştirildi",
+        "remediationBlocked": "Düzeltme engellendi",
+        "remediationCancelled": "İptal edildi",
+        "remediationFailed": "Düzeltme başarısız oldu",
+        "remediationNoChangesNeeded": "Değişiklik gerekmedi",
+        "remediationPrOpened": "Çekme isteği açıldı",
+        "remediationQueued": "Düzeltme istendi"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Denetim raporunu görüntüle"

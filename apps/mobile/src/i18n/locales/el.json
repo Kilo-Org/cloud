@@ -35,6 +35,8 @@
     "connectGithub": "Σύνδεση με το GitHub",
     "cost": "Κόστος",
     "discard": "Απόρριψη",
+    "discardChangesMessage": "Οι αλλαγές σας θα χαθούν.",
+    "discardChangesTitle": "Απόρριψη αλλαγών;",
     "findings": "Ευρήματα",
     "mergeRequest": "αίτημα συγχώνευσης",
     "notConnected": "Χωρίς σύνδεση",
@@ -1661,7 +1663,14 @@
       "whereFound": "Σημεία εντοπισμού ({{displayCount}})",
       "fullReport": "Πλήρης παραγόμενη αναφορά",
       "yes": "Ναι",
-      "no": "Όχι"
+      "no": "Όχι",
+      "action": {
+        "analyzeCodebase": "Ανάλυση κώδικα",
+        "dismiss": "Απόρριψη",
+        "manualReview": "Χειροκίνητος έλεγχος",
+        "monitor": "Παρακολούθηση",
+        "openPr": "Άνοιγμα PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} ευρήματα",
@@ -1880,7 +1889,24 @@
       "title": "Αναφορά ελέγχου",
       "unavailable": "Η αναφορά ελέγχου δεν είναι διαθέσιμη",
       "unavailableDescription": "Μόνο οι ιδιοκτήτες του οργανισμού και οι διαχειριστές χρέωσης μπορούν να δουν αναφορές ελέγχου. Ζήτησε από έναν ιδιοκτήτη ή διαχειριστή χρέωσης να σου δώσει πρόσβαση.",
-      "queryFailed": "Το ερώτημα για την αναφορά δεν ολοκληρώθηκε. Δοκίμασε ξανά."
+      "queryFailed": "Το ερώτημα για την αναφορά δεν ολοκληρώθηκε. Δοκίμασε ξανά.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Η ανάλυση ολοκληρώθηκε",
+        "findingAnalysisFailed": "Η ανάλυση απέτυχε",
+        "findingAutoDismissed": "Απορρίφθηκε αυτόματα",
+        "findingCreated": "Εισήχθη",
+        "findingDeleted": "Διαγράφηκε",
+        "findingDismissed": "Απορρίφθηκε",
+        "findingSeverityChanged": "Άλλαξε η σοβαρότητα",
+        "findingStatusChange": "Άλλαξε η κατάσταση",
+        "findingSuperseded": "Αντικαταστάθηκε",
+        "remediationBlocked": "Η αποκατάσταση αποκλείστηκε",
+        "remediationCancelled": "Ακυρώθηκε",
+        "remediationFailed": "Η αποκατάσταση απέτυχε",
+        "remediationNoChangesNeeded": "Δεν απαιτούνται αλλαγές",
+        "remediationPrOpened": "Άνοιξε PR",
+        "remediationQueued": "Ζητήθηκε αποκατάσταση"
+      }
     },
     "notifications": {
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των ρυθμίσεων ειδοποιήσεων.",

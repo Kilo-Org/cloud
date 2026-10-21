@@ -35,6 +35,8 @@
     "connectGithub": "GitHub ബന്ധിപ്പിക്കുക",
     "cost": "ചെലവ്",
     "discard": "ഉപേക്ഷിക്കുക",
+    "discardChangesMessage": "നിങ്ങളുടെ മാറ്റങ്ങൾ നഷ്ടപ്പെടും.",
+    "discardChangesTitle": "മാറ്റങ്ങൾ ഉപേക്ഷിക്കണോ?",
     "findings": "കണ്ടെത്തലുകൾ",
     "mergeRequest": "മെർജ് റിക്വസ്റ്റ്",
     "notConnected": "ബന്ധിപ്പിച്ചിട്ടില്ല",
@@ -1661,7 +1663,14 @@
       "whereFound": "ഇത് കണ്ടെത്തിയ ഇടങ്ങൾ ({{displayCount}})",
       "fullReport": "തയ്യാറാക്കിയ പൂർണ്ണ റിപ്പോർട്ട്",
       "yes": "അതെ",
-      "no": "ഇല്ല"
+      "no": "ഇല്ല",
+      "action": {
+        "analyzeCodebase": "കോഡ്ബേസ് വിശകലനം ചെയ്യുക",
+        "dismiss": "തള്ളുക",
+        "manualReview": "കൈകൊണ്ടുള്ള സംശോധന",
+        "monitor": "നിരീക്ഷിക്കുക",
+        "openPr": "PR തുറക്കുക"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} കണ്ടെത്തലുകൾ",
@@ -1880,7 +1889,24 @@
       "title": "ഓഡിറ്റ് റിപ്പോർട്ട്",
       "unavailable": "ഓഡിറ്റ് റിപ്പോർട്ട് ലഭ്യമല്ല",
       "unavailableDescription": "ഓർഗനൈസേഷൻ ഉടമകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ ഓഡിറ്റ് റിപ്പോർട്ടുകൾ കാണാൻ കഴിയൂ. അനുമതി നൽകാൻ ഒരു ഉടമയോടോ ബില്ലിംഗ് മാനേജറോടോ ആവശ്യപ്പെടുക.",
-      "queryFailed": "റിപ്പോർട്ടിനായുള്ള ഡാറ്റാ അന്വേഷണം പൂർത്തിയായില്ല. വീണ്ടും ശ്രമിക്കുക."
+      "queryFailed": "റിപ്പോർട്ടിനായുള്ള ഡാറ്റാ അന്വേഷണം പൂർത്തിയായില്ല. വീണ്ടും ശ്രമിക്കുക.",
+      "eventActions": {
+        "findingAnalysisCompleted": "വിശകലനം പൂർത്തിയായി",
+        "findingAnalysisFailed": "വിശകലനം പരാജയപ്പെട്ടു",
+        "findingAutoDismissed": "സ്വയമേവ തള്ളിക്കളഞ്ഞു",
+        "findingCreated": "ഇറക്കുമതി ചെയ്തു",
+        "findingDeleted": "ഇല്ലാതാക്കി",
+        "findingDismissed": "തള്ളിക്കളഞ്ഞു",
+        "findingSeverityChanged": "തീവ്രത മാറി",
+        "findingStatusChange": "നില മാറി",
+        "findingSuperseded": "മാറ്റിസ്ഥാപിച്ചു",
+        "remediationBlocked": "പരിഹാരം തടഞ്ഞു",
+        "remediationCancelled": "റദ്ദാക്കി",
+        "remediationFailed": "പരിഹാരം പരാജയപ്പെട്ടു",
+        "remediationNoChangesNeeded": "മാറ്റങ്ങളൊന്നും ആവശ്യമില്ല",
+        "remediationPrOpened": "PR തുറന്നു",
+        "remediationQueued": "പരിഹാരം അഭ്യർത്ഥിച്ചു"
+      }
     },
     "notifications": {
       "couldNotLoad": "അറിയിപ്പ് ക്രമീകരണങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",

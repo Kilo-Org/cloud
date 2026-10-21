@@ -35,6 +35,8 @@
     "connectGithub": "GitHub உடன் இணைக்கவும்",
     "cost": "செலவு",
     "discard": "கைவிடவும்",
+    "discardChangesMessage": "உங்கள் மாற்றங்கள் இழக்கப்படும்.",
+    "discardChangesTitle": "மாற்றங்களைக் கைவிடவும்",
     "findings": "கண்டறிந்த சிக்கல்கள்",
     "mergeRequest": "இணைப்புக் கோரிக்கை",
     "notConnected": "இணைக்கப்படவில்லை",
@@ -1661,7 +1663,14 @@
       "whereFound": "கண்டறியப்பட்ட இடங்கள் ({{displayCount}})",
       "fullReport": "உருவாக்கப்பட்ட முழு அறிக்கை",
       "yes": "ஆம்",
-      "no": "இல்லை"
+      "no": "இல்லை",
+      "action": {
+        "analyzeCodebase": "குறியீட்டுத் தளத்தை பகுப்பாய்வு செய்யவும்",
+        "dismiss": "நிராகரி",
+        "manualReview": "கைமுறை மதிப்பாய்வு",
+        "monitor": "கண்காணி",
+        "openPr": "PR ஐத் திறக்கவும்"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} சிக்கல்கள்",
@@ -1880,7 +1889,24 @@
       "title": "தணிக்கை அறிக்கை",
       "unavailable": "தணிக்கை அறிக்கை கிடைக்கவில்லை",
       "unavailableDescription": "நிறுவன உரிமையாளர்களும் கட்டண மேலாளர்களும் மட்டுமே தணிக்கை அறிக்கைகளைப் பார்க்க முடியும். அணுகலை வழங்குமாறு நிறுவன உரிமையாளரிடமோ கட்டண மேலாளரிடமோ கேட்கவும்.",
-      "queryFailed": "அறிக்கை வினவல் முடிவடையவில்லை. மீண்டும் முயற்சிக்கவும்."
+      "queryFailed": "அறிக்கை வினவல் முடிவடையவில்லை. மீண்டும் முயற்சிக்கவும்.",
+      "eventActions": {
+        "findingAnalysisCompleted": "பகுப்பாய்வு முடிந்தது",
+        "findingAnalysisFailed": "பகுப்பாய்வு தோல்வியடைந்தது",
+        "findingAutoDismissed": "தானாக நிராகரிக்கப்பட்டது",
+        "findingCreated": "இறக்குமதி செய்யப்பட்டது",
+        "findingDeleted": "நீக்கப்பட்டது",
+        "findingDismissed": "நிராகரிக்கப்பட்டது",
+        "findingSeverityChanged": "தீவிரத்தன்மை மாற்றப்பட்டது",
+        "findingStatusChange": "நிலை மாற்றப்பட்டது",
+        "findingSuperseded": "மாற்றியமைக்கப்பட்டது",
+        "remediationBlocked": "சரிசெய்தல் தடுக்கப்பட்டது",
+        "remediationCancelled": "ரத்து செய்யப்பட்டது",
+        "remediationFailed": "சரிசெய்தல் தோல்வியடைந்தது",
+        "remediationNoChangesNeeded": "மாற்றங்கள் தேவையில்லை",
+        "remediationPrOpened": "PR திறக்கப்பட்டது",
+        "remediationQueued": "சரிசெய்தல் கோரப்பட்டது"
+      }
     },
     "notifications": {
       "couldNotLoad": "அறிவிப்பு அமைப்புகளை ஏற்ற முடியவில்லை.",

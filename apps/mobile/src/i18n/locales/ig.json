@@ -35,6 +35,8 @@
     "connectGithub": "Jikọọ GitHub",
     "cost": "Ọnụ ahịa",
     "discard": "Tụfuo",
+    "discardChangesMessage": "Mgbanwe gị ga-efu.",
+    "discardChangesTitle": "Tụfuo mgbanwe?",
     "findings": "Ihe achọpụtara",
     "mergeRequest": "arịrịọ njikọta",
     "notConnected": "Ejikọghị",
@@ -1661,7 +1663,14 @@
       "whereFound": "Ebe a chọtara nke a ({{displayCount}})",
       "fullReport": "Akụkọ zuru ezu e mepụtara",
       "yes": "Ee",
-      "no": "Mba"
+      "no": "Mba",
+      "action": {
+        "analyzeCodebase": "Nyochaa usoro koodu",
+        "dismiss": "Wepụ",
+        "manualReview": "Nyocha aka",
+        "monitor": "Lekọta",
+        "openPr": "Meghee arịrịọ ndọtị"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} ihe achọpụtara",
@@ -1880,7 +1889,24 @@
       "title": "Akụkọ nyocha",
       "unavailable": "Akụkọ nyocha adịghị",
       "unavailableDescription": "Naanị ndị nwe nzukọ na ndị njikwa ịkwụ ụgwọ nwere ike ile akụkọ nyocha. Rịọ onye nwe nzukọ ma ọ bụ onye njikwa ịkwụ ụgwọ ka o nye gị ikike ịnweta ha.",
-      "queryFailed": "A rụchaghị arịrịọ akụkọ ahụ. Nwaa ọzọ."
+      "queryFailed": "A rụchaghị arịrịọ akụkọ ahụ. Nwaa ọzọ.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Emechaala nyocha",
+        "findingAnalysisFailed": "Nyocha dara",
+        "findingAutoDismissed": "Ewepụrụ na-akpaghị aka",
+        "findingCreated": "Bubatara",
+        "findingDeleted": "E hichapụla",
+        "findingDismissed": "Ewepụrụ",
+        "findingSeverityChanged": "Oke njọ gbanwere",
+        "findingStatusChange": "Ọnọdụ gbanwere",
+        "findingSuperseded": "Nọchiri ya",
+        "remediationBlocked": "Egbochiri ndozi",
+        "remediationCancelled": "A kagbuola",
+        "remediationFailed": "Ndozi dara",
+        "remediationNoChangesNeeded": "Ọ dịghị mgbanwe achọrọ",
+        "remediationPrOpened": "Emeghere arịrịọ ndọtị",
+        "remediationQueued": "A rịọrọ ndozi"
+      }
     },
     "notifications": {
       "couldNotLoad": "Enweghị ike ibudata ntọala ngosi ọkwa.",

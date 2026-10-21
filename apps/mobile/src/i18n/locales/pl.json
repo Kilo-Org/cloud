@@ -35,6 +35,8 @@
     "connectGithub": "Połącz konto GitHub",
     "cost": "Koszt",
     "discard": "Odrzuć",
+    "discardChangesMessage": "Twoje zmiany zostaną utracone.",
+    "discardChangesTitle": "Odrzuć zmiany?",
     "findings": "Wykryte problemy",
     "mergeRequest": "merge request",
     "notConnected": "Brak połączenia",
@@ -1119,7 +1121,14 @@
       "triageReasoning": "Uzasadnienie wstępnej oceny",
       "watchInCloudAgent": "Śledź w agencie w chmurze",
       "whereFound": "Miejsca wykrycia ({{displayCount}})",
-      "yes": "Tak"
+      "yes": "Tak",
+      "action": {
+        "analyzeCodebase": "Przeanalizuj bazę kodu",
+        "dismiss": "Odrzuć",
+        "manualReview": "Ręczny przegląd",
+        "monitor": "Monitoruj",
+        "openPr": "Otwórz pull request"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Model analizy",
@@ -1141,7 +1150,24 @@
       "summary": "Podsumowanie raportu",
       "title": "Raport audytu",
       "unavailable": "Raport audytu niedostępny",
-      "unavailableDescription": "Tylko właściciele organizacji i administratorzy rozliczeń mogą przeglądać raporty audytu. Poproś właściciela lub administratora rozliczeń o przyznanie dostępu."
+      "unavailableDescription": "Tylko właściciele organizacji i administratorzy rozliczeń mogą przeglądać raporty audytu. Poproś właściciela lub administratora rozliczeń o przyznanie dostępu.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Ukończono analizę",
+        "findingAnalysisFailed": "Analiza nie powiodła się",
+        "findingAutoDismissed": "Odrzucono automatycznie",
+        "findingCreated": "Zaimportowano",
+        "findingDeleted": "Usunięto",
+        "findingDismissed": "Odrzucono",
+        "findingSeverityChanged": "Zmieniono ważność",
+        "findingStatusChange": "Zmieniono stan",
+        "findingSuperseded": "Zastąpiono",
+        "remediationBlocked": "Zablokowano naprawę",
+        "remediationCancelled": "Anulowano",
+        "remediationFailed": "Naprawa nie powiodła się",
+        "remediationNoChangesNeeded": "Brak wymaganych zmian",
+        "remediationPrOpened": "Otwarto pull request",
+        "remediationQueued": "Zlecono naprawę"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Wyświetl raport audytu"

@@ -35,6 +35,8 @@
     "connectGithub": "Hubungkan GitHub",
     "cost": "Biaya",
     "discard": "Buang",
+    "discardChangesMessage": "Perubahan Anda akan hilang.",
+    "discardChangesTitle": "Buang perubahan?",
     "findings": "Temuan",
     "mergeRequest": "merge request",
     "notConnected": "Tidak terhubung",
@@ -1113,7 +1115,14 @@
       "triageReasoning": "Dasar penilaian triase",
       "watchInCloudAgent": "Pantau di Agen cloud",
       "whereFound": "Lokasi temuan ({{displayCount}})",
-      "yes": "Ya"
+      "yes": "Ya",
+      "action": {
+        "analyzeCodebase": "Analisis basis kode",
+        "dismiss": "Abaikan",
+        "manualReview": "Tinjauan manual",
+        "monitor": "Pantau",
+        "openPr": "Buka PR"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Model analisis",
@@ -1135,7 +1144,24 @@
       "summary": "Ringkasan laporan",
       "title": "Laporan audit",
       "unavailable": "Laporan audit tidak tersedia",
-      "unavailableDescription": "Hanya pemilik organisasi dan manajer penagihan yang dapat melihat laporan audit. Minta akses kepada pemilik organisasi atau manajer penagihan."
+      "unavailableDescription": "Hanya pemilik organisasi dan manajer penagihan yang dapat melihat laporan audit. Minta akses kepada pemilik organisasi atau manajer penagihan.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analisis selesai",
+        "findingAnalysisFailed": "Analisis gagal",
+        "findingAutoDismissed": "Diabaikan otomatis",
+        "findingCreated": "Diimpor",
+        "findingDeleted": "Dihapus",
+        "findingDismissed": "Diabaikan",
+        "findingSeverityChanged": "Keparahan diubah",
+        "findingStatusChange": "Status diubah",
+        "findingSuperseded": "Digantikan",
+        "remediationBlocked": "Perbaikan diblokir",
+        "remediationCancelled": "Dibatalkan",
+        "remediationFailed": "Perbaikan gagal",
+        "remediationNoChangesNeeded": "Tidak perlu perubahan",
+        "remediationPrOpened": "PR dibuka",
+        "remediationQueued": "Perbaikan diminta"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Lihat laporan audit"

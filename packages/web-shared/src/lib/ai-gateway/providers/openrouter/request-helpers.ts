@@ -203,23 +203,25 @@ function containsCacheControl(value: unknown): boolean {
     }
     const current = pending.pop();
     visited += 1;
+    let children: readonly unknown[];
     if (Array.isArray(current)) {
-      for (const item of current) {
-        pending.push(item);
+      children = current;
+    } else if (isObjectRecord(current)) {
+      if (
+        Object.hasOwn(current, 'cache_control') ||
+        Object.hasOwn(current, 'prompt_cache_breakpoint')
+      ) {
+        return true;
       }
+      children = Object.values(current);
+    } else {
       continue;
     }
-    if (!isObjectRecord(current)) {
-      continue;
-    }
-    if (
-      Object.hasOwn(current, 'cache_control') ||
-      Object.hasOwn(current, 'prompt_cache_breakpoint')
-    ) {
+    if (visited + pending.length + children.length > CACHE_CONTROL_NODE_BUDGET) {
       return true;
     }
-    for (const nested of Object.values(current)) {
-      pending.push(nested);
+    for (const child of children) {
+      pending.push(child);
     }
   }
   return false;

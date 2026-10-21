@@ -699,16 +699,22 @@ describe('addCacheBreakpoints', () => {
       deepest = { nested: deepest };
     }
 
-    const request = {
+    const request: GatewayRequest = {
       kind: 'chat_completions',
       body: {
         model: 'test-model',
         messages: [
           { role: 'system', content: 'You are helpful.' },
-          { role: 'user', content: [{ type: 'text', text: 'Latest prompt' }, deepest] },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Latest prompt' },
+              deepest as unknown as OpenAI.ChatCompletionContentPart,
+            ],
+          },
         ],
       },
-    } as unknown as GatewayRequest;
+    };
 
     addCacheBreakpoints(request);
 
@@ -738,15 +744,19 @@ describe('addCacheBreakpoints', () => {
       })),
     ];
 
-    const request = {
+    const request: GatewayRequest = {
       kind: 'responses',
-      body: { model: 'test-model', input },
-    } as unknown as GatewayRequest;
+      body: {
+        model: 'test-model',
+        input: input as unknown as OpenAI.Responses.ResponseInputItem[],
+      },
+    };
 
     addCacheBreakpoints(request);
 
-    expect(request.body.input?.at(0)).toEqual(marker);
-    expect(request.body.input?.at(-1)).toEqual({
+    if (!Array.isArray(request.body.input)) throw new Error('expected responses input array');
+    expect(request.body.input.at(0)).toEqual(marker);
+    expect(request.body.input.at(-1)).toEqual({
       type: 'message',
       role: 'user',
       content: 'Prompt 4999',
@@ -763,16 +773,22 @@ describe('addCacheBreakpoints', () => {
       sixth: `sixth-${index}`,
     }));
 
-    const request = {
+    const request: GatewayRequest = {
       kind: 'chat_completions',
       body: {
         model: 'test-model',
         messages: [
           { role: 'system', content: 'You are helpful.' },
-          { role: 'user', content: [{ type: 'text', text: 'Latest prompt' }, { filler }] },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Latest prompt' },
+              { filler } as unknown as OpenAI.ChatCompletionContentPart,
+            ],
+          },
         ],
       },
-    } as unknown as GatewayRequest;
+    };
 
     addCacheBreakpoints(request);
 

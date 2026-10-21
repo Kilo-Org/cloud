@@ -577,21 +577,22 @@ function CloudSidebarLayoutContent({
     [openChatTab, organizationId, pathname, router]
   );
 
+  const focusComposerForSession = useCallback((sessionId: string) => {
+    const request: ComposerFocusRequest = {
+      sessionId,
+      onHandled: () => setComposerFocusRequest(current => (current === request ? null : current)),
+    };
+    setComposerFocusRequest(request);
+  }, []);
+
   const selectSession = useCallback(
     (sessionId: string) => {
       startTransition(() => {
-        if (sessionId !== currentSessionId) {
-          const request: ComposerFocusRequest = {
-            sessionId,
-            onHandled: () =>
-              setComposerFocusRequest(current => (current === request ? null : current)),
-          };
-          setComposerFocusRequest(request);
-        }
+        if (sessionId !== currentSessionId) focusComposerForSession(sessionId);
         openSessionInternal(sessionId);
       });
     },
-    [currentSessionId, openSessionInternal]
+    [currentSessionId, focusComposerForSession, openSessionInternal]
   );
 
   const openWorktree = useCallback(
@@ -696,12 +697,14 @@ function CloudSidebarLayoutContent({
           openWorktreeChats.map(session => session.sessionId)
         );
       }
+      focusComposerForSession(kiloSessionId);
       openSessionInternal(kiloSessionId);
       return true;
     },
     [
       cachedSessions,
       createLocalSession,
+      focusComposerForSession,
       openSessionInternal,
       openWorktreeChats,
       organizationId,

@@ -616,6 +616,8 @@ export type Env = {
   CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
   /** Comma-separated user or org IDs whose Code Reviewer sessions run on the call-home control plane. `*` includes personal. */
   CODE_REVIEW_CONTROL_PLANE_IDS?: string;
+  /** Comma-separated user or org IDs whose Code Reviewer sessions use the Cloudflare Containers runtime. `*` includes personal. */
+  CODE_REVIEW_CONTAINERS_ORG_IDS?: string;
   RUNTIME_ISOLATION_ENABLED?: string;
   /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
   SANDBOX_SELECTION_IDS?: string;

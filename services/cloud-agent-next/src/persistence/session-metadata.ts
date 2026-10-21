@@ -381,7 +381,8 @@ const MetadataWorkspaceSchema = egressPolicySchema
   .refine(
     workspace =>
       workspace.sandboxProvider !== 'cloudflare-containers' ||
-      isIsolatedProviderWorkspace(workspace),
+      isIsolatedProviderWorkspace(workspace) ||
+      workspace.sandboxKind === 'code-review',
     'Cloudflare containers sandbox metadata requires an isolated sandbox'
   )
   .refine(

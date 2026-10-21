@@ -9,6 +9,8 @@ import {
   ensureOrganizationAccess,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
@@ -43,7 +45,10 @@ import {
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
-import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
+import {
+  getValidGitLabToken,
+  isGitLabCredentialConnected,
+} from '@/lib/integrations/gitlab-service';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   clearCodeReviewActionRequiredState,
@@ -497,10 +502,34 @@ export const organizationReviewAgentRouter = createTRPCRouter({
   /**
    * Gets the GitLab OAuth integration status for organization
    */
-  getGitLabStatus: organizationMemberProcedure.query(async ({ input }) => {
+  getGitLabStatus: organizationMemberProcedure.query(async ({ input, ctx }) => {
     const integration = await getIntegrationForOrganization(input.organizationId, PLATFORM.GITLAB);
 
     if (!isPlatformIntegrationHealthy(integration)) {
+      return {
+        connected: false,
+        integration: null,
+      };
+    }
+
+    // The row being healthy says nothing about the stored credential. Ask the
+    // token service to resolve it, exactly as a review read would, so an
+    // expired or revoked credential reports as not connected instead of
+    // sending the settings surface into review-only content.
+    //
+    // The broker authorizes only a direct member of the integration's
+    // organization, so this consult runs for direct members only. Kilo admins
+    // and parent-organization role holders (no membership row) keep the
+    // row-based answer — the broker would refuse them as not_connected and
+    // fake a broken connection for a healthy organization.
+    const isDirectMember = await isOrganizationMember(db, input.organizationId, ctx.user.id);
+    if (
+      isDirectMember &&
+      !(await isGitLabCredentialConnected(integration, {
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+      }))
+    ) {
       return {
         connected: false,
         integration: null,

@@ -1,7 +1,17 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
-import { eq, and, desc, gte, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
+import { eq, and, desc, gte, isNotNull, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
+import {
+  activeOrganizationJoinCondition,
+  organizationMembershipJoinCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationMembershipJoinCondition,
+  parentOrganizationsTable,
+  parentOrganizationMembershipsTable,
+  personalOrInheritedOrganizationCondition,
+} from '@kilocode/worker-utils';
+import { queryAccessibleKiloSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import {
   createSessionForCloudAgentSchema,
   cloudAgentWorktreeDeletionSchema,
@@ -81,22 +91,16 @@ function databaseTimestampToMilliseconds(value: string): number {
   return timestamp;
 }
 
-function organizationMembershipJoinCondition(kiloUserId: string) {
-  return and(
-    eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
-    eq(organization_memberships.kilo_user_id, kiloUserId)
-  );
+function organizationMembershipJoin(kiloUserId: string) {
+  return organizationMembershipJoinCondition(kiloUserId, cli_sessions_v2.organization_id);
 }
 
-function organizationJoinCondition() {
-  return eq(organizations.id, cli_sessions_v2.organization_id);
+function organizationJoin() {
+  return activeOrganizationJoinCondition(cli_sessions_v2.organization_id);
 }
 
 function personalOrAccessibleOrganizationCondition() {
-  return or(
-    isNull(cli_sessions_v2.organization_id),
-    and(isNotNull(organization_memberships.id), isNull(organizations.deleted_at))
-  );
+  return personalOrInheritedOrganizationCondition(cli_sessions_v2.organization_id);
 }
 
 function safeGitUrl(value: string | null): string | null {
@@ -540,7 +544,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     const parsed = listCloudAgentRootSessionsSchema.parse(params);
     const cursor = parsed.cursor ? decodeCloudAgentRootSessionsCursor(parsed.cursor) : undefined;
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
-    const conditions = [
+    const conditions: (SQL | undefined)[] = [
       eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId),
       isNull(cli_sessions_v2.parent_session_id),
       isNotNull(cli_sessions_v2.cloud_agent_session_id),
@@ -578,8 +582,13 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         updatedAt: cli_sessions_v2.updated_at,
       })
       .from(cli_sessions_v2)
-      .leftJoin(organization_memberships, organizationMembershipJoinCondition(parsed.kiloUserId))
-      .leftJoin(organizations, organizationJoinCondition())
+      .leftJoin(organization_memberships, organizationMembershipJoin(parsed.kiloUserId))
+      .leftJoin(organizations, organizationJoin())
+      .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+      .leftJoin(
+        parentOrganizationMembershipsTable,
+        parentOrganizationMembershipJoinCondition(parsed.kiloUserId)
+      )
       .where(and(...conditions))
       .orderBy(desc(cli_sessions_v2.updated_at), desc(cli_sessions_v2.session_id))
       .limit(parsed.limit + 1);
@@ -647,8 +656,13 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     const rows = await db
       .select({ cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id })
       .from(cli_sessions_v2)
-      .leftJoin(organization_memberships, organizationMembershipJoinCondition(params.kiloUserId))
-      .leftJoin(organizations, organizationJoinCondition())
+      .leftJoin(organization_memberships, organizationMembershipJoin(params.kiloUserId))
+      .leftJoin(organizations, organizationJoin())
+      .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+      .leftJoin(
+        parentOrganizationMembershipsTable,
+        parentOrganizationMembershipJoinCondition(params.kiloUserId)
+      )
       .where(
         and(
           eq(cli_sessions_v2.session_id, params.kiloSessionId),
@@ -675,25 +689,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     kiloSessionId: string;
   }): Promise<{ kiloSessionId: string; organizationId: string | null } | null> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
-    const rows = await db
-      .select({
-        sessionId: cli_sessions_v2.session_id,
-        organizationId: cli_sessions_v2.organization_id,
-      })
-      .from(cli_sessions_v2)
-      .leftJoin(organization_memberships, organizationMembershipJoinCondition(params.kiloUserId))
-      .leftJoin(organizations, organizationJoinCondition())
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, params.kiloSessionId),
-          eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
-          personalOrAccessibleOrganizationCondition()
-        )
-      )
-      .limit(1);
-    return rows[0]
-      ? { kiloSessionId: rows[0].sessionId, organizationId: rows[0].organizationId }
-      : null;
+    return queryAccessibleKiloSession(db, params);
   }
 
   /**

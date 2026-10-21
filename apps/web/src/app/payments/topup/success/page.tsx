@@ -51,11 +51,13 @@ export default function TopUpSuccessPage() {
         if (cancelled) return undefined;
 
         console.info(`Attempt ${attempt + 1} to fetch credit transaction ID`);
-        const result = await fetchTopUpTransactionForStripeSession(sessionId);
-        if (result.status === 'found') return result.transaction;
+        // A failed round trip leaves the answer unknown, so keep retrying within
+        // the same bound instead of stranding the page on the loader.
+        const result = await fetchTopUpTransactionForStripeSession(sessionId).catch(() => null);
+        if (result?.status === 'found') return result.transaction;
         // The checkout cannot be resolved for this caller, so another attempt
         // repeats the same answer.
-        if (result.status === 'unavailable') return undefined;
+        if (result?.status === 'unavailable') return undefined;
         return findCreditTransaction(attempt + 1);
       };
 

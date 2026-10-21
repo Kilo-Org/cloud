@@ -1,4 +1,4 @@
-import type Stripe from 'stripe';
+import Stripe from 'stripe';
 
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions, organization_memberships, organizations } from '@kilocode/db/schema';
@@ -193,9 +193,30 @@ describe('fetchTopUpTransactionForStripeSession', () => {
     });
     expect(stripeMock.checkout.sessions.retrieve).not.toHaveBeenCalled();
 
-    stripeMock.checkout.sessions.retrieve.mockRejectedValue(new Error('No such checkout.session'));
+    stripeMock.checkout.sessions.retrieve.mockRejectedValue(
+      new Stripe.errors.StripeInvalidRequestError({
+        type: 'invalid_request_error',
+        code: 'resource_missing',
+        message: 'No such checkout.session',
+      })
+    );
     await expect(fetchTopUpTransactionForStripeSession('cs_test_unknown')).resolves.toEqual({
       status: 'unavailable',
+    });
+  });
+
+  it('keeps retrying when Stripe cannot answer for this checkout', async () => {
+    const caller = await insertTestUser();
+    mockedGetUserFromAuth.mockResolvedValue({ user: caller, authFailedResponse: null });
+    stripeMock.checkout.sessions.retrieve.mockRejectedValue(
+      new Stripe.errors.StripeConnectionError({
+        type: 'api_error',
+        message: 'An error occurred with our connection to Stripe.',
+      })
+    );
+
+    await expect(fetchTopUpTransactionForStripeSession('cs_test_1')).resolves.toEqual({
+      status: 'pending',
     });
   });
 

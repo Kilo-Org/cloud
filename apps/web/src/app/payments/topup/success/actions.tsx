@@ -9,11 +9,17 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureMessage } from '@sentry/nextjs';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import type Stripe from 'stripe';
+import Stripe from 'stripe';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { getAndClearPaymentReturnUrl } from '@/lib/payment-return-url';
 
 const STRIPE_CHECKOUT_SESSION_ID_PATTERN = /^cs_[A-Za-z0-9_]{1,255}$/;
+
+const PERMANENT_STRIPE_LOOKUP_FAILURES = [
+  Stripe.errors.StripeInvalidRequestError,
+  Stripe.errors.StripeAuthenticationError,
+  Stripe.errors.StripePermissionError,
+];
 
 /** The redirect-relevant fields of the ledger row, and nothing else. */
 export type TopUpTransactionSummary = {
@@ -74,7 +80,12 @@ export async function fetchTopUpTransactionForStripeSession(
       tags: { source: 'payments/topup/success/actions' },
       extra: { errorName: error instanceof Error ? error.name : 'UnknownError' },
     });
-    return { status: 'unavailable' };
+    // A transport failure, a 429 or a Stripe-side 5xx says nothing about this
+    // checkout, so the page keeps retrying those while the payment settles.
+    const repeatsIdentically = PERMANENT_STRIPE_LOOKUP_FAILURES.some(
+      failure => error instanceof failure
+    );
+    return { status: repeatsIdentically ? 'unavailable' : 'pending' };
   }
 
   if (session.payment_status !== 'paid') {

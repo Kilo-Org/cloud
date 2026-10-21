@@ -263,17 +263,17 @@ export async function handleLlmProxyRequest(
   let requestBodyParsed: GatewayRequest;
   try {
     if (path === '/chat/completions') {
-      const body: OpenRouterChatCompletionRequest = JSON.parse(requestBodyText);
+      const body = JSON.parse(requestBodyText) as OpenRouterChatCompletionRequest;
       // Inject or merge stream_options.include_usage = true (only when streaming)
       if (body.stream) {
         body.stream_options = { ...(body.stream_options || {}), include_usage: true };
       }
       requestBodyParsed = { kind: 'chat_completions', body };
     } else if (path === '/messages') {
-      const body: GatewayMessagesRequest = JSON.parse(requestBodyText);
+      const body = JSON.parse(requestBodyText) as GatewayMessagesRequest;
       requestBodyParsed = { kind: 'messages', body };
     } else {
-      const body: GatewayResponsesRequest = JSON.parse(requestBodyText);
+      const body = JSON.parse(requestBodyText) as GatewayResponsesRequest;
       requestBodyParsed = { kind: 'responses', body };
     }
   } catch (e) {

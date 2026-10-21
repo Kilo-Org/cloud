@@ -259,7 +259,7 @@ async function resolveUserFromAuth(
       return authError(401, 'Invalid API token', '?', { credentialsRejected: true });
     }
     const decodedPayload = decoded !== null && typeof decoded !== 'string' ? decoded : null;
-    const decodedRuntimeAuthorization = decodedPayload?.runtimeAuthorization;
+    const decodedRuntimeAuthorization: unknown = decodedPayload?.runtimeAuthorization;
     const runtimeAuthorization = CloudAgentNextRuntimeAuthorizationClaimSchema.safeParse(
       decodedRuntimeAuthorization
     );

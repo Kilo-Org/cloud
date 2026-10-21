@@ -1155,7 +1155,7 @@ export function processOpenRouterUsage(
 }
 
 export async function parseMicrodollarUsageFromStream(
-  stream: ReadableStream,
+  stream: ReadableStream<Uint8Array>,
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
@@ -1199,7 +1199,7 @@ export async function parseMicrodollarUsageFromStream(
         return;
       }
 
-      const json: ChatCompletionChunk = JSON.parse(event.data);
+      const json = JSON.parse(event.data) as ChatCompletionChunk;
 
       if (!json) {
         captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {

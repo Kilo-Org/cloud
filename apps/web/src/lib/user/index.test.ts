@@ -1041,6 +1041,30 @@ describe('User', () => {
         expect(result).toEqual({ success: false, error: 'EMAIL-ALREADY-USED' });
       });
 
+      it('refuses a case variant of a legacy account without a normalized email', async () => {
+        await insertTestUser({
+          id: 'email-signup-disabled-legacy',
+          google_user_email: 'Legacy.Case@Example.com',
+          normalized_email: null,
+        });
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          emailArgs('legacy.case@example.com'),
+          undefined,
+          true,
+          headers()
+        );
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-ALREADY-USED' });
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, 'legacy.case@example.com'),
+          })
+        ).toBeUndefined();
+      });
+
       it('still creates a new OAuth account', async () => {
         process.env.EMAIL_SIGNUPS_ENABLED = 'false';
 

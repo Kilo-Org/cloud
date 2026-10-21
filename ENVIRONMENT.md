@@ -73,7 +73,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` - Cloudflare Turnstile public site key; used in `apps/web/src/components/auth/sign-in/TurnstileView.tsx`. [PUBLIC]
 - `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile secret key; used in test files. `[SECRET]`
-- `EMAIL_SIGNUPS_ENABLED` - Set to exact `true` to allow new accounts via email (web magic link and mobile email code). Unset or any other value refuses them. Existing users keep email sign-in either way, and OAuth, passkey, and SSO sign-ups are unaffected. `apps/web/.env.test` sets it to `true`. Takes effect on redeploy. [SERVER]
+- `EMAIL_SIGNUPS_ENABLED` - Set to exact `true` to allow new accounts via email (web magic link and mobile email code). Unset or any other value refuses them. Existing users keep email sign-in either way, and OAuth, passkey, and SSO sign-ups are unaffected. Jest's global setup (`apps/web/src/tests/setup/globalSetup.ts`) defaults it to `true`; keep it out of tracked dotenv files so `pnpm web:env set` can set it. Takes effect on redeploy. [SERVER]
 - `NEXT_PUBLIC_STYTCH_PROJECT_ENV` - Stytch public project environment identifier; used in `apps/web/src/components/auth/StytchClient.tsx`. [PUBLIC]
 - `NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN` - Stytch public token for client SDKs; used in `apps/web/src/components/auth/StytchClient.tsx`. [PUBLIC]
 - `STYTCH_PROJECT_ID` - Stytch project ID for secret-side SDK calls. `[SECRET]`

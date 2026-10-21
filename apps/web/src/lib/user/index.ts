@@ -607,25 +607,25 @@ export async function createOrUpdateUser(
     }
   }
 
-  // A normalized match keeps its EMAIL-ALREADY-USED outcome from the insert transaction below.
-  if (
-    args.provider === 'email' &&
-    isEmailSignupDisabled() &&
-    !(await findUserByNormalizedEmail(args.google_user_email))
-  ) {
+  const normalizedEmail = normalizeEmail(args.google_user_email);
+  const operationId = signupOperationId(normalizedEmail);
+
+  // Never fall through to the insert: its dedup misses legacy rows with a NULL
+  // normalized_email that findUserByNormalizedEmail matches case-insensitively.
+  if (args.provider === 'email' && isEmailSignupDisabled()) {
+    const matchingUser = await findUserByNormalizedEmail(args.google_user_email);
     console.info('[auth] Signup creation outcome', {
+      operationId,
       outcome: 'rejected',
-      reason: 'email_signup_disabled',
+      reason: matchingUser ? 'email_already_used' : 'email_signup_disabled',
     });
-    return failureResult('EMAIL-SIGNUP-DISABLED');
+    return failureResult(matchingUser ? 'EMAIL-ALREADY-USED' : 'EMAIL-SIGNUP-DISABLED');
   }
 
   if (turnstile_guid && (await findUserById(turnstile_guid)))
     throw new Error('Abuser warning: turnstile guid reuse detected ' + turnstile_guid);
 
   const signupIp = getSignupIp(requestHeaders);
-  const normalizedEmail = normalizeEmail(args.google_user_email);
-  const operationId = signupOperationId(normalizedEmail);
   if (verifyNewAccountAdmission && !(await verifyNewAccountAdmission())) {
     console.info('[auth] Signup creation outcome', {
       operationId,

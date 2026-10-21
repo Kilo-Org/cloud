@@ -16,16 +16,10 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
 }));
 
 // This suite proves a system token cannot be exchanged. A real device proof
-// needs a live App Attest or Play Integrity verdict, so the admission gate is
-// stubbed as passing and the credential policy is what the assertion exercises.
+// needs a live App Attest or Play Integrity verdict, so only the verifier is
+// stubbed; the helper sends a complete proof shape.
 jest.mock('@/lib/auth/native-admission', () => ({
   ...jest.requireActual('@/lib/auth/native-admission'),
-  requireAdmissionPayload: () => ({
-    platform: 'android',
-    kind: 'assertion',
-    challenge: 'challenge',
-    payload: 'integrity-token',
-  }),
   verifyAdmissionAsync: async () => ({ ok: true, platform: 'android', keyId: '' }),
 }));
 

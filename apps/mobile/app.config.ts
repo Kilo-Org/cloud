@@ -504,6 +504,11 @@ const config: ExpoConfig = {
     // by capability — iOS's UIAlertController already follows the system
     // appearance and takes no app-token override (see the plugin's doc comment).
     './plugins/withAndroidAlertDialogTheme',
+    // Overrides androidx.compose.ui's `close_sheet` accessibility string — the
+    // label Material3 gives the dismiss scrim of every native sheet — with the
+    // app's own `common.close` for all 87 languages. Android-only: the resource
+    // exists only in the androidx compose artifacts.
+    './plugins/withAndroidSheetCloseLabel',
     './plugins/withAndroidExpoModuleRepos',
     // Writes the app target's single `Localizable.strings` per language: the
     // four App Intent actions and their parameters resolve their

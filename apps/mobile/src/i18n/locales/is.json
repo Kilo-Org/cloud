@@ -3725,6 +3725,8 @@
     "empty": "Inneignarpakkar eru ekki tiltækir núna.",
     "noMatchingProducts": "App Store skilaði engum samsvarandi inneignarpökkum.",
     "noMatchingProductsPlay": "Google Play skilaði engum samsvarandi inneignarpökkum.",
+    "storeTimedOut": "App Store svaraði ekki tímanlega. Reyndu aftur.",
+    "storeTimedOutPlay": "Google Play svaraði ekki tímanlega. Reyndu aftur.",
     "purchaseOwnedByAnotherAccount": "Inneignin á þessum Apple Account-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana.",
     "purchaseOwnedByAnotherAccountPlay": "Inneignin á þessum Google Play-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana."
   },

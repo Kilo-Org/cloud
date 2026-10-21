@@ -3725,6 +3725,8 @@
     "empty": "Кредит пакеттері қазір қолжетімсіз.",
     "noMatchingProducts": "App Store сәйкес кредит пакеттерін қайтармады.",
     "noMatchingProductsPlay": "Google Play сәйкес кредит пакеттерін қайтармады.",
+    "storeTimedOut": "App Store уақытында жауап бермеді. Қайталап көру",
+    "storeTimedOutPlay": "Google Play уақытында жауап бермеді. Қайталап көру",
     "purchaseOwnedByAnotherAccount": "Осы Apple Account тіркелгісіндегі кредиттер басқа Kilo тіркелгісіне тиесілі. Оларды пайдалану үшін сол Kilo тіркелгісіне кіріңіз.",
     "purchaseOwnedByAnotherAccountPlay": "Бұл Google Play аккаунтындағы кредиттер басқа Kilo аккаунтына тиесілі. Оларды пайдалану үшін сол Kilo аккаунтына кіріңіз."
   },

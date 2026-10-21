@@ -3725,6 +3725,8 @@
     "empty": "Fakitin kuɗin amfani ba su nan a yanzu.",
     "noMatchingProducts": "App Store bai dawo da wani fakitin kuɗin amfani da ya dace ba.",
     "noMatchingProductsPlay": "Google Play bai dawo da wani fakitin kuɗin amfani da ya dace ba.",
+    "storeTimedOut": "App Store bai amsa a kan lokaci ba. Sake gwadawa.",
+    "storeTimedOutPlay": "Google Play bai amsa a kan lokaci ba. Sake gwadawa.",
     "purchaseOwnedByAnotherAccount": "Kuɗin amfani da ke kan wannan Apple Account na wani asusun Kilo ne daban. Shiga wancan asusun Kilo don amfani da shi.",
     "purchaseOwnedByAnotherAccountPlay": "Kuɗin amfani da ke kan wannan Google Play account na wani asusun Kilo ne daban. Shiga wannan asusun Kilo don amfani da shi."
   },

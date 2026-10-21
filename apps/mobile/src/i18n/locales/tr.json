@@ -3725,6 +3725,8 @@
     "empty": "Kredi paketleri şu anda kullanılamıyor.",
     "noMatchingProducts": "App Store eşleşen kredi paketi döndürmedi.",
     "noMatchingProductsPlay": "Google Play eşleşen kredi paketi döndürmedi.",
+    "storeTimedOut": "App Store zamanında yanıt vermedi. Tekrar dene.",
+    "storeTimedOutPlay": "Google Play zamanında yanıt vermedi. Tekrar dene.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account üzerindeki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum aç.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındaki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum açın."
   },

@@ -3725,6 +3725,8 @@
     "empty": "بسته‌های اعتبار در حال حاضر در دسترس نیستند.",
     "noMatchingProducts": "App Store هیچ بسته اعتبار منطبقی برنگرداند.",
     "noMatchingProductsPlay": "Google Play هیچ بسته اعتبار منطبقی برنگرداند.",
+    "storeTimedOut": "App Store در زمان مشخص پاسخ نداد. تلاش مجدد",
+    "storeTimedOutPlay": "Google Play در زمان مشخص پاسخ نداد. تلاش مجدد",
     "purchaseOwnedByAnotherAccount": "اعتبار این Apple Account متعلق به حساب دیگری در Kilo است. برای استفاده از آن وارد همان حساب Kilo شوید.",
     "purchaseOwnedByAnotherAccountPlay": "اعتبار این حساب Google Play متعلق به یک حساب Kilo دیگر است. برای استفاده از آن وارد آن حساب Kilo شوید."
   },

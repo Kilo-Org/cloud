@@ -3725,6 +3725,8 @@
     "empty": "Kredietpakkette is tans nie beskikbaar nie.",
     "noMatchingProducts": "Geen passende kredietpakkette is deur App Store terugbesorg nie.",
     "noMatchingProductsPlay": "Geen passende kredietpakkette is deur Google Play terugbesorg nie.",
+    "storeTimedOut": "App Store het nie betyds gereageer nie. Probeer weer.",
+    "storeTimedOutPlay": "Google Play het nie betyds gereageer nie. Probeer weer.",
     "purchaseOwnedByAnotherAccount": "Die krediete op hierdie Apple Account behoort aan 'n ander Kilo-rekening. Meld by daardie Kilo-rekening aan om dit te gebruik.",
     "purchaseOwnedByAnotherAccountPlay": "Die krediete op hierdie Google Play-rekening behoort aan 'n ander Kilo-rekening. Teken in by daardie Kilo-rekening om dit te gebruik."
   },

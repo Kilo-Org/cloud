@@ -3807,6 +3807,8 @@
     "empty": "Balíky kreditov teraz nie sú k dispozícii.",
     "noMatchingProducts": "App Store nevrátil žiadne zodpovedajúce balíky kreditov.",
     "noMatchingProductsPlay": "Google Play nevrátil žiadne zodpovedajúce balíky kreditov.",
+    "storeTimedOut": "App Store nereagoval včas. Skúste to znova.",
+    "storeTimedOutPlay": "Google Play nereagoval včas. Skúste to znova.",
     "purchaseOwnedByAnotherAccount": "Kredity na tomto účte Apple Account patria inému účtu Kilo. Ak ich chcete použiť, prihláste sa do príslušného účtu Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účte Google Play patria inému účtu Kilo. Prihláste sa do tohto účtu Kilo, aby ste ich použili."
   },

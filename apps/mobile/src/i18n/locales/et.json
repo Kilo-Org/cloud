@@ -3725,6 +3725,8 @@
     "empty": "Krediidipaketid pole praegu saadaval.",
     "noMatchingProducts": "App Store ei tagastanud ühtegi sobivat krediidipaketti.",
     "noMatchingProductsPlay": "Google Play ei tagastanud ühtegi sobivat krediidipaketti.",
+    "storeTimedOut": "App Store ei vastanud õigeaegselt. Proovi uuesti.",
+    "storeTimedOutPlay": "Google Play ei vastanud õigeaegselt. Proovi uuesti.",
     "purchaseOwnedByAnotherAccount": "Selle Apple Accountiga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse vastavale Kilo kontole.",
     "purchaseOwnedByAnotherAccountPlay": "Selle Google Play kontoga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse sellesse Kilo kontosse."
   },

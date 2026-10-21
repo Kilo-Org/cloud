@@ -3766,6 +3766,8 @@
     "empty": "Pachetele de credite nu sunt disponibile momentan.",
     "noMatchingProducts": "App Store nu a returnat pachete de credite corespunzătoare.",
     "noMatchingProductsPlay": "Google Play nu a returnat pachete de credite corespunzătoare.",
+    "storeTimedOut": "App Store nu a răspuns la timp. Încearcă din nou.",
+    "storeTimedOutPlay": "Google Play nu a răspuns la timp. Încearcă din nou.",
     "purchaseOwnedByAnotherAccount": "Creditele asociate acestui Apple Account aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi.",
     "purchaseOwnedByAnotherAccountPlay": "Creditele de pe acest cont Google Play aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi."
   },

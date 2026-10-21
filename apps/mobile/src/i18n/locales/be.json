@@ -3807,6 +3807,8 @@
     "empty": "Наборы крэдытаў зараз недаступныя.",
     "noMatchingProducts": "App Store не вярнуў адпаведных набораў крэдытаў.",
     "noMatchingProductsPlay": "Google Play не вярнуў адпаведных набораў крэдытаў.",
+    "storeTimedOut": "App Store не адказаў своечасова. Паспрабаваць яшчэ раз.",
+    "storeTimedOutPlay": "Google Play не адказаў своечасова. Паспрабаваць яшчэ раз.",
     "purchaseOwnedByAnotherAccount": "Крэдыты на гэтым Apple Account належаць іншаму ўліковаму запісу Kilo. Увайдзіце ў той уліковы запіс Kilo, каб імі карыстацца.",
     "purchaseOwnedByAnotherAccountPlay": "Крэдыты на гэтым Google Play належаць іншаму ўліковаму запісу Kilo. Увайдзіце ў той уліковы запіс Kilo, каб імі карыстацца."
   },

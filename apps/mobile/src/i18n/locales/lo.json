@@ -3725,6 +3725,8 @@
     "empty": "ແພັກເຄຣດິດບໍ່ສາມາດໃຊ້ໄດ້ໃນຕອນນີ້.",
     "noMatchingProducts": "App Store ບໍ່ໄດ້ສົ່ງແພັກເຄຣດິດທີ່ກົງກັນຄືນ.",
     "noMatchingProductsPlay": "Google Play ບໍ່ໄດ້ສົ່ງແພັກເຄຣດິດທີ່ກົງກັນຄືນ.",
+    "storeTimedOut": "App Store ບໍ່ໄດ້ຕອບສະໜອງທັນເວລາ. ລອງອີກຄັ້ງ.",
+    "storeTimedOutPlay": "Google Play ບໍ່ໄດ້ຕອບສະໜອງທັນເວລາ. ລອງອີກຄັ້ງ.",
     "purchaseOwnedByAnotherAccount": "ເຄຣດິດໃນ Apple Account ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ.",
     "purchaseOwnedByAnotherAccountPlay": "ເຄຣດິດໃນບັນຊີ Google Play ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ."
   },

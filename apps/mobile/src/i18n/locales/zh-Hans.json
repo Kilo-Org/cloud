@@ -3725,6 +3725,8 @@
     "empty": "目前无法获取额度包。",
     "noMatchingProducts": "App Store 未返回匹配的额度包。",
     "noMatchingProductsPlay": "Google Play 未返回匹配的额度包。",
+    "storeTimedOut": "App Store 未及时响应。请再试一次。",
+    "storeTimedOutPlay": "Google Play 未及时响应。请再试一次。",
     "purchaseOwnedByAnotherAccount": "此 Apple Account 上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 账户上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。"
   },

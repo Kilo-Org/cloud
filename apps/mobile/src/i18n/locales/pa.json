@@ -3725,6 +3725,8 @@
     "empty": "ਕ੍ਰੈਡਿਟ ਪੈਕ ਇਸ ਸਮੇਂ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
     "noMatchingProducts": "App Store ਨੇ ਕੋਈ ਮੇਲ ਖਾਂਦਾ ਕ੍ਰੈਡਿਟ ਪੈਕ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ।",
     "noMatchingProductsPlay": "Google Play ਨੇ ਕੋਈ ਮੇਲ ਖਾਂਦਾ ਕ੍ਰੈਡਿਟ ਪੈਕ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ।",
+    "storeTimedOut": "App Store ਨੇ ਸਮੇਂ ਸਿਰ ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "storeTimedOutPlay": "Google Play ਨੇ ਸਮੇਂ ਸਿਰ ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "purchaseOwnedByAnotherAccount": "ਇਸ Apple Account ਵਾਲੇ ਕ੍ਰੈਡਿਟ ਕਿਸੇ ਹੋਰ Kilo ਖਾਤੇ ਨਾਲ ਸਬੰਧਤ ਹਨ। ਇਹਨਾਂ ਨੂੰ ਵਰਤਣ ਲਈ ਉਸ Kilo ਖਾਤੇ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ।",
     "purchaseOwnedByAnotherAccountPlay": "ਇਸ Google Play ਖਾਤੇ 'ਤੇ ਕ੍ਰੈਡਿਟ ਇੱਕ ਵੱਖਰੇ Kilo ਖਾਤੇ ਨਾਲ ਸਬੰਧਤ ਹਨ। ਇਹਨਾਂ ਨੂੰ ਵਰਤਣ ਲਈ ਉਸ Kilo ਖਾਤੇ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ।"
   },

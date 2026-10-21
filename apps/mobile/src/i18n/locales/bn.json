@@ -3725,6 +3725,8 @@
     "empty": "ক্রেডিট প্যাক এখন পাওয়া যাচ্ছে না।",
     "noMatchingProducts": "App Store কোনো মিলে যাওয়া ক্রেডিট প্যাক ফেরত দেয়নি।",
     "noMatchingProductsPlay": "Google Play কোনো মিলে যাওয়া ক্রেডিট প্যাক ফেরত দেয়নি।",
+    "storeTimedOut": "App Store সময়মতো সাড়া দেয়নি। আবার চেষ্টা করুন।",
+    "storeTimedOutPlay": "Google Play সময়মতো সাড়া দেয়নি। আবার চেষ্টা করুন।",
     "purchaseOwnedByAnotherAccount": "এই Apple Account-এর ক্রেডিট অন্য একটি Kilo অ্যাকাউন্টের। সেগুলো ব্যবহার করতে সেই Kilo অ্যাকাউন্টে সাইন-ইন করুন।",
     "purchaseOwnedByAnotherAccountPlay": "এই Google Play অ্যাকাউন্টের ক্রেডিট একটি ভিন্ন Kilo অ্যাকাউন্টের। সেগুলো ব্যবহার করতে সেই Kilo অ্যাকাউন্টে সাইন ইন করুন।"
   },

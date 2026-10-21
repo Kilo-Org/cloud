@@ -3766,6 +3766,8 @@
     "empty": "Paketi kredita trenutačno nisu dostupni.",
     "noMatchingProducts": "App Store nije vratio odgovarajuće pakete kredita.",
     "noMatchingProductsPlay": "Google Play nije vratio odgovarajuće pakete kredita.",
+    "storeTimedOut": "App Store nije odgovorio na vrijeme. Pokušaj ponovno.",
+    "storeTimedOutPlay": "Google Play nije odgovorio na vrijeme. Pokušaj ponovno.",
     "purchaseOwnedByAnotherAccount": "Krediti na ovom računu Apple Account pripadaju drugom Kilo računu. Prijavi se na taj Kilo račun da ih koristiš.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play računu pripadaju drugom Kilo računu. Prijavite se na taj Kilo račun da biste ih koristili."
   },

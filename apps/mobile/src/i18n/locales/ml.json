@@ -3725,6 +3725,8 @@
     "empty": "ക്രെഡിറ്റ് പാക്കുകൾ ഇപ്പോൾ ലഭ്യമല്ല.",
     "noMatchingProducts": "App Store പൊരുത്തപ്പെടുന്ന ക്രെഡിറ്റ് പാക്കുകൾ തിരികെ നൽകിയില്ല.",
     "noMatchingProductsPlay": "Google Play പൊരുത്തപ്പെടുന്ന ക്രെഡിറ്റ് പാക്കുകൾ തിരികെ നൽകിയില്ല.",
+    "storeTimedOut": "App Store സമയത്തിനുള്ളിൽ പ്രതികരിച്ചില്ല. വീണ്ടും ശ്രമിക്കുക.",
+    "storeTimedOutPlay": "Google Play സമയത്തിനുള്ളിൽ പ്രതികരിച്ചില്ല. വീണ്ടും ശ്രമിക്കുക.",
     "purchaseOwnedByAnotherAccount": "ഈ Apple Account-ലെ ക്രെഡിറ്റുകൾ മറ്റൊരു Kilo അക്കൗണ്ടിന്റേതാണ്. അവ ഉപയോഗിക്കാൻ ആ Kilo അക്കൗണ്ടിൽ സൈൻ ഇൻ ചെയ്യുക.",
     "purchaseOwnedByAnotherAccountPlay": "ഈ Google Play അക്കൗണ്ടിലെ ക്രെഡിറ്റുകൾ മറ്റൊരു Kilo അക്കൗണ്ടിന്റേതാണ്. അവ ഉപയോഗിക്കാൻ ആ Kilo അക്കൗണ്ടിൽ സൈൻ ഇൻ ചെയ്യുക."
   },

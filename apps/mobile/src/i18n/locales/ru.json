@@ -3807,6 +3807,8 @@
     "empty": "Пакеты кредитов сейчас недоступны.",
     "noMatchingProducts": "App Store не вернул подходящие пакеты кредитов.",
     "noMatchingProductsPlay": "Google Play не вернул подходящие пакеты кредитов.",
+    "storeTimedOut": "App Store не ответил вовремя. Попробовать снова.",
+    "storeTimedOutPlay": "Google Play не ответил вовремя. Попробовать снова.",
     "purchaseOwnedByAnotherAccount": "Кредиты в этом Apple Account связаны с другим аккаунтом Kilo. Войдите в тот аккаунт Kilo, чтобы их использовать.",
     "purchaseOwnedByAnotherAccountPlay": "Кредиты на этом Google Play аккаунте принадлежат другому аккаунту Kilo. Войдите в тот аккаунт Kilo, чтобы их использовать."
   },

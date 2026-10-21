@@ -3725,6 +3725,8 @@
     "empty": "Kredit paketlari hozircha mavjud emas.",
     "noMatchingProducts": "App Store mos keladigan kredit paketlarini qaytarmadi.",
     "noMatchingProductsPlay": "Google Play mos keladigan kredit paketlarini qaytarmadi.",
+    "storeTimedOut": "App Store o'z vaqtida javob bermadi. Qayta urinish.",
+    "storeTimedOutPlay": "Google Play o'z vaqtida javob bermadi. Qayta urinish.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring."
   },

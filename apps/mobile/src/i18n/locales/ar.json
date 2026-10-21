@@ -3889,6 +3889,8 @@
     "empty": "حزم الرصيد غير متاحة الآن.",
     "noMatchingProducts": "لم يُرجِع App Store أي حزم رصيد مطابقة.",
     "noMatchingProductsPlay": "لم يُرجِع Google Play أي حزم رصيد مطابقة.",
+    "storeTimedOut": "لم يستجب App Store في الوقت المناسب. إعادة المحاولة.",
+    "storeTimedOutPlay": "لم يستجب Google Play في الوقت المناسب. إعادة المحاولة.",
     "purchaseOwnedByAnotherAccount": "الرصيد على حساب Apple Account هذا يخص حساب Kilo آخر. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه.",
     "purchaseOwnedByAnotherAccountPlay": "الرصيد على حساب Google Play هذا يخص حساب Kilo مختلف. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه."
   },

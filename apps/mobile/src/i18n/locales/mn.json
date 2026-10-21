@@ -3725,6 +3725,8 @@
     "empty": "Кредит багцууд одоогоор боломжгүй байна.",
     "noMatchingProducts": "App Store тохирох кредит багц буцаагаагүй.",
     "noMatchingProductsPlay": "Google Play тохирох кредит багц буцаагаагүй.",
+    "storeTimedOut": "App Store хугацаандаа хариу өгөөгүй. Дахин оролдох",
+    "storeTimedOutPlay": "Google Play хугацаандаа хариу өгөөгүй. Дахин оролдох",
     "purchaseOwnedByAnotherAccount": "Энэ Apple Account дээрх кредит нь өөр Kilo бүртгэлд харьяалагдана. Ашиглахын тулд тухайн Kilo бүртгэлдээ нэвтэрнэ үү.",
     "purchaseOwnedByAnotherAccountPlay": "Энэ Google Play бүртгэл дээрх кредит нь өөр Kilo бүртгэлд харьяалагдана. Ашиглахын тулд тухайн Kilo бүртгэлдээ нэвтэрнэ үү."
   },

@@ -3725,6 +3725,8 @@
     "empty": "Pakiti za salio hazipatikani kwa sasa.",
     "noMatchingProducts": "App Store haikurudisha pakiti za salio zinazolingana.",
     "noMatchingProductsPlay": "Google Play haikurudisha pakiti za salio zinazolingana.",
+    "storeTimedOut": "App Store haikujibu kwa wakati. Jaribu tena.",
+    "storeTimedOutPlay": "Google Play haikujibu kwa wakati. Jaribu tena.",
     "purchaseOwnedByAnotherAccount": "Salio katika Apple Account hii ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia.",
     "purchaseOwnedByAnotherAccountPlay": "Salio kwenye Akaunti hii ya Google Play ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia."
   },

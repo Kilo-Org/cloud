@@ -3725,6 +3725,8 @@
     "empty": "கிரெடிட் பேக்குகள் இப்போது கிடைக்கவில்லை.",
     "noMatchingProducts": "App Store பொருந்தும் கிரெடிட் பேக்குகளை வழங்கவில்லை.",
     "noMatchingProductsPlay": "Google Play பொருந்தும் கிரெடிட் பேக்குகளை வழங்கவில்லை.",
+    "storeTimedOut": "App Store நேரத்திற்குள் பதிலளிக்கவில்லை. மீண்டும் முயற்சிக்கவும்.",
+    "storeTimedOutPlay": "Google Play நேரத்திற்குள் பதிலளிக்கவில்லை. மீண்டும் முயற்சிக்கவும்.",
     "purchaseOwnedByAnotherAccount": "இந்த Apple Account-இல் உள்ள கிரெடிட்கள் வேறொரு Kilo கணக்கைச் சேர்ந்தவை. அவற்றைப் பயன்படுத்த அந்த Kilo கணக்கில் உள்நுழையவும்.",
     "purchaseOwnedByAnotherAccountPlay": "இந்த Google Play கணக்கில் உள்ள கிரெடிட்கள் வேறொரு Kilo கணக்கைச் சேர்ந்தவை. அவற்றைப் பயன்படுத்த அந்த Kilo கணக்கில் உள்நுழையவும்."
   },

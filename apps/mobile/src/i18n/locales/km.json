@@ -3725,6 +3725,8 @@
     "empty": "កញ្ចប់ឥណទានមិនអាចប្រើបាននៅពេលនេះទេ។",
     "noMatchingProducts": "App Store មិនបានត្រឡប់កញ្ចប់ឥណទានដែលត្រូវគ្នាទេ។",
     "noMatchingProductsPlay": "Google Play មិនបានត្រឡប់កញ្ចប់ឥណទានដែលត្រូវគ្នាទេ។",
+    "storeTimedOut": "App Store មិនបានឆ្លើយតបទាន់ពេលទេ។ ព្យាយាមម្តងទៀត",
+    "storeTimedOutPlay": "Google Play មិនបានឆ្លើយតបទាន់ពេលទេ។ ព្យាយាមម្តងទៀត",
     "purchaseOwnedByAnotherAccount": "ឥណទាននៅលើ Apple Account នេះជារបស់គណនី Kilo ផ្សេង។ ចូលគណនី Kilo នោះដើម្បីប្រើវា។",
     "purchaseOwnedByAnotherAccountPlay": "ឥណទាននៅលើគណនី Google Play នេះជារបស់គណនី Kilo ផ្សេង។ ចូលគណនី Kilo នោះដើម្បីប្រើវា។"
   },

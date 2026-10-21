@@ -3725,6 +3725,8 @@
     "empty": "A kreditcsomagok jelenleg nem érhetők el.",
     "noMatchingProducts": "Az App Store nem adott vissza megfelelő kreditcsomagot.",
     "noMatchingProductsPlay": "A Google Play nem adott vissza megfelelő kreditcsomagot.",
+    "storeTimedOut": "Az App Store nem válaszolt időben. Próbáld újra.",
+    "storeTimedOutPlay": "A Google Play nem válaszolt időben. Próbáld újra.",
     "purchaseOwnedByAnotherAccount": "Az ehhez az Apple Account-fiókhoz tartozó kreditek egy másik Kilo-fiókhoz kapcsolódnak. A használatukhoz jelentkezz be abba a Kilo-fiókba.",
     "purchaseOwnedByAnotherAccountPlay": "Az ezen Google Play-fiókon lévő kreditek egy másik Kilo-fiókhoz tartoznak. A használatukhoz jelentkezz be abba a Kilo-fiókba."
   },

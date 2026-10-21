@@ -172,7 +172,7 @@ describe('POST /api/cloud-agent/sessions/stream-ticket', () => {
     });
   });
 
-  it('refuses an organization session requested in personal scope', async () => {
+  it('requires the organization context for an organization session', async () => {
     signInAs(owner);
 
     const response = await postTicket({
@@ -185,7 +185,7 @@ describe('POST /api/cloud-agent/sessions/stream-ticket', () => {
     });
   });
 
-  it('refuses an organization session to a caller without a current membership', async () => {
+  it('requires a current membership for an organization session', async () => {
     signInAs(departed);
 
     const personalScope = await postTicket({
@@ -203,7 +203,7 @@ describe('POST /api/cloud-agent/sessions/stream-ticket', () => {
     );
   });
 
-  it("refuses another user's personal session", async () => {
+  it('requires the creator for a personal session', async () => {
     signInAs(member);
 
     const response = await postTicket({ cloudAgentSessionId: PERSONAL_CLOUD_AGENT_SESSION_ID });

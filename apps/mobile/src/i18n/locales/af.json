@@ -111,7 +111,9 @@
     "online": "Aanlyn",
     "open": "Maak {{name}} oop",
     "openPullRequest": "Oop trekversoek",
+    "completed": "Voltooi",
     "pending": "Hangend",
+    "running": "Aktief",
     "performance": "Werkverrigting",
     "preferences": "Voorkeure",
     "privacyPolicy": "Privaatheidsbeleid",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Die Kodehersiener kon nie bygewerk word nie.",
     "configSaveFailed": "Die hersieningsinstellings kon nie gestoor word nie.",
     "status": {
-      "running": "Aktief",
-      "completed": "Voltooi",
       "interrupted": "Onderbreek"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Stoor veranderinge",
       "unsavedTitle": "Ongestoorde veranderinge",
-      "unsavedMessage": "Stoor jou veranderinge voordat jy hierdie skerm verlaat?"
+      "unsavedMessage": "Stoor jou veranderinge voordat jy hierdie skerm verlaat?",
+      "unsavedInvalidMessage": "Hierdie veranderinge kan nog nie gestoor word nie. Maak dit reg om te stoor, of gooi dit weg om te verlaat."
     },
     "auditReportButton": {
       "viewA11y": "Bekyk ouditverslag"
@@ -1938,7 +1939,6 @@
       "installApp": "Installeer die GitHub-app",
       "reauthorizeButton": "Magtig die GitHub-app weer",
       "reauthorizeDescription": "Die Sekuriteitsagent benodig die vulnerability_alerts-toestemming vir toegang tot Dependabot-waarskuwings. Magtig die GitHub-app weer om hierdie toestemming te verleen.",
-      "reauthorizeFailed": "Die hernuwing van magtiging kon nie begin word nie. Probeer asseblief weer.",
       "reauthorizeTitle": "Bykomende toestemmings vereis",
       "setupFailed": "Kon nie GitHub-opstelling begin nie. Probeer asseblief weer."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} reëls",
       "matchesBadge_one": "{{displayCount}} treffer",
       "matchesBadge_other": "{{displayCount}} treffers",
-      "noOutput": "Geen uitset nie."
+      "noOutput": "Geen uitset nie.",
+      "translationFailed": "Vertaling het misluk"
     },
     "readToolMarkdown": {
       "linesTruncated": "reëls {{start}}–{{end}} (afgekap)",
@@ -3715,6 +3716,7 @@
       "description": "Opdrag beskrywing",
       "template": "Sjabloon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Verduidelik $ARGUMENTS",
       "subtask": "Hardloop as subtaak",
       "edit": "Wysig skuinsstreep opdrag",
@@ -3865,7 +3867,7 @@
     "view": "Lees verslag",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Wys regstreekse status",
+    "dismiss": "Verwerp verslag",
     "offline": "Vanlyn · gestoorde verslag",
     "cached": "Gestoorde verslag · verfris nie beskikbaar nie",
     "revised": "Hersien · {{revision}}",

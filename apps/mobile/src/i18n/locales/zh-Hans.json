@@ -111,7 +111,9 @@
     "online": "在线",
     "open": "打开 {{name}}",
     "openPullRequest": "开启拉取请求",
+    "completed": "已完成",
     "pending": "待处理",
+    "running": "运行中",
     "performance": "性能",
     "preferences": "偏好设置",
     "privacyPolicy": "隐私政策",
@@ -1021,8 +1023,6 @@
     "updateFailed": "更新代码审查器失败。",
     "configSaveFailed": "保存审查配置失败。",
     "status": {
-      "running": "运行中",
-      "completed": "已完成",
       "interrupted": "已中断"
     },
     "reviewStyle": {
@@ -1381,7 +1381,6 @@
       "installApp": "安装 GitHub 应用",
       "reauthorizeButton": "重新授权 GitHub 应用",
       "reauthorizeDescription": "安全智能体需要 vulnerability_alerts 权限才能访问 Dependabot 警报。请重新授权 GitHub 应用以授予此权限。",
-      "reauthorizeFailed": "无法开始重新授权。请重试。",
       "reauthorizeTitle": "需要额外权限",
       "setupFailed": "无法启动 GitHub 配置流程。请重试。"
     },
@@ -1404,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "保存更改",
       "unsavedMessage": "离开此页面前，要保存更改吗？",
+      "unsavedInvalidMessage": "这些更改暂时无法保存。请修正后再保存，或放弃更改以离开。",
       "unsavedTitle": "未保存的更改"
     },
     "setup": {
@@ -1797,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}} 行",
       "matchesBadge_one": "{{displayCount}} 项匹配",
       "matchesBadge_other": "{{displayCount}} 项匹配",
-      "noOutput": "没有输出。"
+      "noOutput": "没有输出。",
+      "translationFailed": "翻译失败"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截断）",
@@ -3715,6 +3716,7 @@
       "description": "命令说明",
       "template": "模板",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "解释$ARGUMENTS",
       "subtask": "作为子任务运行",
       "edit": "编辑斜杠命令",
@@ -3865,7 +3867,7 @@
     "view": "阅读简报",
     "viewWithPreview": "$t(agentBriefing.view)。{{preview}}",
     "scheduleTimeLabel": "{{label}}，{{time}}",
-    "dismiss": "显示实时状态",
+    "dismiss": "忽略简报",
     "offline": "离线 · 已保存的简报",
     "cached": "已保存的报告 · 无法刷新",
     "revised": "已修订 · {{revision}}",

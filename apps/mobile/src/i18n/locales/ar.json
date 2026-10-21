@@ -111,7 +111,9 @@
     "online": "متصل",
     "open": "فتح {{name}}",
     "openPullRequest": "فتح طلب السحب",
+    "completed": "تم الاكتمال",
     "pending": "قيد الانتظار",
+    "running": "قيد التشغيل",
     "performance": "الأداء",
     "preferences": "التفضيلات",
     "privacyPolicy": "سياسة الخصوصية",
@@ -1033,8 +1035,6 @@
     "updateFailed": "تعذّر تحديث المراجع.",
     "configSaveFailed": "تعذّر حفظ إعدادات المراجعة.",
     "status": {
-      "running": "قيد التشغيل",
-      "completed": "تم الاكتمال",
       "interrupted": "متوقفة"
     },
     "reviewStyle": {
@@ -1405,7 +1405,6 @@
       "installApp": "تثبيت تطبيق GitHub",
       "reauthorizeButton": "إعادة تفويض تطبيق GitHub",
       "reauthorizeDescription": "يتطلب وكيل الأمان صلاحية vulnerability_alerts للوصول إلى تنبيهات Dependabot. أعد تفويض تطبيق GitHub لمنح هذه الصلاحية.",
-      "reauthorizeFailed": "تعذّر بدء إعادة التفويض. حاول مرة أخرى.",
       "reauthorizeTitle": "يلزم الحصول على صلاحيات إضافية",
       "setupFailed": "تعذّر بدء إعداد GitHub. حاول مرة أخرى."
     },
@@ -1432,6 +1431,7 @@
     "settingsSave": {
       "saveChanges": "حفظ التغييرات",
       "unsavedMessage": "هل تريد حفظ تغييراتك قبل مغادرة هذه الشاشة؟",
+      "unsavedInvalidMessage": "لا يمكن حفظ هذه التغييرات بعد. أصلحها للحفظ، أو تجاهلها للمغادرة.",
       "unsavedTitle": "تغييرات غير محفوظة"
     },
     "setup": {
@@ -1861,7 +1861,8 @@
       "matchesBadge_two": "تطابقان: {{displayCount}}",
       "matchesBadge_few": "تطابقات: {{displayCount}}",
       "matchesBadge_many": "تطابقًا: {{displayCount}}",
-      "noOutput": "لا توجد مخرجات."
+      "noOutput": "لا توجد مخرجات.",
+      "translationFailed": "فشلت الترجمة"
     },
     "readToolMarkdown": {
       "linesTruncated": "الأسطر {{start}}–{{end}} (مقتطعة)",
@@ -3879,6 +3880,7 @@
       "description": "وصف الأمر",
       "template": "نموذج",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "شرح $ARGUMENTS",
       "subtask": "تشغيل كمهمة فرعية",
       "edit": "تحرير أمر الشرطة المائلة",
@@ -4045,7 +4047,7 @@
     "view": "قراءة الملخص",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "عرض الحالة المباشرة",
+    "dismiss": "استبعاد الملخص",
     "offline": "غير متصل · ملخص محفوظ",
     "cached": "تقرير محفوظ · التحديث غير متاح",
     "revised": "منقّح · {{revision}}",

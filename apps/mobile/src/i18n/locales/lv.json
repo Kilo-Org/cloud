@@ -111,7 +111,9 @@
     "online": "Tiešsaistē",
     "open": "Atvērt {{name}}",
     "openPullRequest": "Atvērt izmaiņu pieprasījumu",
+    "completed": "Pabeigts",
     "pending": "Gaida",
+    "running": "Darbojas",
     "performance": "Veiktspēja",
     "preferences": "Lietotāja iestatījumi",
     "privacyPolicy": "Privātuma politika",
@@ -1555,8 +1557,6 @@
     "updateFailed": "Neizdevās atjaunināt koda pārskatītāju.",
     "configSaveFailed": "Neizdevās saglabāt koda pārskatīšanas iestatījumus.",
     "status": {
-      "running": "Darbojas",
-      "completed": "Pabeigts",
       "interrupted": "Pārtraukta"
     },
     "reviewStyle": {
@@ -1895,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Saglabāt izmaiņas",
       "unsavedTitle": "Nesaglabātas izmaiņas",
-      "unsavedMessage": "Saglabāt izmaiņas pirms šī ekrāna aizvēršanas?"
+      "unsavedMessage": "Saglabāt izmaiņas pirms šī ekrāna aizvēršanas?",
+      "unsavedInvalidMessage": "Šīs izmaiņas vēl nevar saglabāt. Izlabojiet tās, lai saglabātu, vai atmetiet, lai aizietu."
     },
     "auditReportButton": {
       "viewA11y": "Skatīt audita ziņojumu"
@@ -1961,7 +1962,6 @@
       "installApp": "Instalēt GitHub lietotni",
       "reauthorizeButton": "Atkārtoti autorizēt GitHub lietotni",
       "reauthorizeDescription": "Drošības aģentam vajadzīga atļauja vulnerability_alerts, lai piekļūtu Dependabot brīdinājumiem. Atkārtoti autorizē GitHub lietotni, lai piešķirtu šo atļauju.",
-      "reauthorizeFailed": "Neizdevās sākt atkārtotu autorizāciju. Lūdzu, mēģini vēlreiz.",
       "reauthorizeTitle": "Nepieciešamas papildu atļaujas",
       "setupFailed": "Neizdevās sākt GitHub iestatīšanu. Lūdzu, mēģini vēlreiz."
     },
@@ -2344,7 +2344,8 @@
       "matchesBadge_one": "{{displayCount}} atbilstība",
       "matchesBadge_other": "{{displayCount}} atbilstības",
       "matchesBadge_zero": "{{displayCount}} atbilstību",
-      "noOutput": "Nav izvades."
+      "noOutput": "Nav izvades.",
+      "translationFailed": "Tulkojums neizdevās"
     },
     "readToolMarkdown": {
       "linesTruncated": "rindas {{start}}–{{end}} (saturs saīsināts)",
@@ -3756,6 +3757,7 @@
       "description": "Komandas apraksts",
       "template": "Veidne",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Izskaidrojiet $ARGUMENTS",
       "subtask": "Palaist kā apakšuzdevumu",
       "edit": "Rediģēt slīpsvītras komandu",
@@ -3910,7 +3912,7 @@
     "view": "Lasīt kopsavilkumu",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Rādīt tiešsaistes statusu",
+    "dismiss": "Noraidīt kopsavilkumu",
     "offline": "Bezsaistē · saglabāts kopsavilkums",
     "cached": "Saglabāta atskaite · atsvaidzināšana nav pieejama",
     "revised": "Pārskatīts · {{revision}}",

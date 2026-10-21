@@ -5,8 +5,11 @@ import {
   assertNativeBurst,
   classifyPermissionReply,
   injectColdPrimaryFault,
+  interruptedTurnSettled,
   isLiveRuntimeUnavailable,
   nativeBurstFixture,
+  requiredCheckStatus,
+  type MessageEntry,
 } from '../../e2e/native-facade-acceptance.js';
 import {
   createFakeLlmState,
@@ -544,5 +547,77 @@ describe('native burst deterministic fake fixture', () => {
     expect(Buffer.byteLength(nativeBurstFixture.text)).toBe(10 * 1024);
     expect(done).toHaveBeenCalledOnce();
     expect(end).toHaveBeenCalledOnce();
+  });
+});
+
+describe('required criterion reporting', () => {
+  it('fails a required criterion instead of downgrading it to blocked', () => {
+    expect(
+      requiredCheckStatus('cold persisted reads/pagination and native no-wake responses', true)
+    ).toBe('fail');
+  });
+
+  it('keeps an optional environment-dependent check blockable', () => {
+    expect(requiredCheckStatus('permission always branch', true)).toBe('blocked');
+  });
+
+  it('never reports a pass for a check that threw', () => {
+    expect(requiredCheckStatus('setup: funded bearer session bootstrap', true)).toBe('fail');
+    expect(requiredCheckStatus('unknown optional probe', false)).toBe('fail');
+  });
+});
+
+describe('interrupted turn settlement', () => {
+  const userMessage: MessageEntry = { info: { ...user }, parts: [] };
+
+  it('settles when the user message exists, nothing completed, and the session is idle', () => {
+    expect(interruptedTurnSettled([userMessage], { type: 'idle' }, user.id)).toBe(true);
+  });
+
+  it('does not settle while the session is still busy', () => {
+    expect(interruptedTurnSettled([userMessage], { type: 'busy' }, user.id)).toBe(false);
+  });
+
+  it('does not settle on a missing status without post-abort idle evidence', () => {
+    expect(interruptedTurnSettled([userMessage], undefined, user.id)).toBe(false);
+    expect(interruptedTurnSettled([], undefined, user.id)).toBe(false);
+  });
+
+  it.each([
+    { type: 'session.idle', properties: { sessionID } },
+    { type: 'session.status', properties: { sessionID, status: { type: 'idle' } } },
+  ])('settles on a matching post-abort idle event despite a missing native status entry', event => {
+    expect(interruptedTurnSettled([], undefined, user.id, { sessionID, events: [event] })).toBe(
+      true
+    );
+  });
+
+  it('does not settle on another session idle event or a busy event', () => {
+    expect(
+      interruptedTurnSettled([], undefined, user.id, {
+        sessionID,
+        events: [{ type: 'session.idle', properties: { sessionID: 'ses_sibling' } }],
+      })
+    ).toBe(false);
+    expect(
+      interruptedTurnSettled([], undefined, user.id, {
+        sessionID,
+        events: [{ type: 'session.status', properties: { sessionID, status: { type: 'busy' } } }],
+      })
+    ).toBe(false);
+  });
+
+  it('does not settle when a reply for the aborted turn completed', () => {
+    expect(
+      interruptedTurnSettled(
+        [userMessage, { info: { ...assistant }, parts: [] }],
+        { type: 'idle' },
+        user.id
+      )
+    ).toBe(false);
+  });
+
+  it('settles when Kilo reverted the aborted user row but the session is idle', () => {
+    expect(interruptedTurnSettled([], { type: 'idle' }, user.id)).toBe(true);
   });
 });

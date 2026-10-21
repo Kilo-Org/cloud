@@ -111,7 +111,9 @@
     "online": "Çevrimiçi",
     "open": "{{name}} öğesini aç",
     "openPullRequest": "Açık çekme isteği",
+    "completed": "Tamamlandı",
     "pending": "Bekliyor",
+    "running": "Çalışıyor",
     "performance": "Performans",
     "preferences": "Tercihler",
     "privacyPolicy": "Gizlilik politikası",
@@ -1021,8 +1023,6 @@
     "updateFailed": "Kod inceleyici güncellenemedi.",
     "configSaveFailed": "İnceleme ayarları kaydedilemedi.",
     "status": {
-      "running": "Çalışıyor",
-      "completed": "Tamamlandı",
       "interrupted": "Kesintiye uğradı"
     },
     "reviewStyle": {
@@ -1381,7 +1381,6 @@
       "installApp": "GitHub uygulamasını yükle",
       "reauthorizeButton": "GitHub uygulamasını yeniden yetkilendir",
       "reauthorizeDescription": "Güvenlik ajanının Dependabot uyarılarına erişebilmesi için vulnerability_alerts izni gerekir. Bu izni vermek için GitHub uygulamasını yeniden yetkilendir.",
-      "reauthorizeFailed": "Yeniden yetkilendirme başlatılamadı. Lütfen tekrar dene.",
       "reauthorizeTitle": "Ek izinler gerekiyor",
       "setupFailed": "GitHub kurulumu başlatılamadı. Lütfen tekrar dene."
     },
@@ -1404,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "Değişiklikleri kaydet",
       "unsavedMessage": "Bu ekrandan ayrılmadan önce değişikliklerini kaydetmek ister misin?",
+      "unsavedInvalidMessage": "Bu değişiklikler henüz kaydedilemez. Kaydetmek için bunları düzelt veya ayrılmak için vazgeç.",
       "unsavedTitle": "Kaydedilmemiş değişiklikler"
     },
     "setup": {
@@ -1797,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}} satır",
       "matchesBadge_one": "{{displayCount}} eşleşme",
       "matchesBadge_other": "{{displayCount}} eşleşme",
-      "noOutput": "Çıktı yok."
+      "noOutput": "Çıktı yok.",
+      "translationFailed": "Çeviri başarısız oldu"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}. satırlar (kısaltıldı)",
@@ -3715,6 +3716,7 @@
       "description": "Komut açıklaması",
       "template": "Şablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS'ı açıklayın",
       "subtask": "Alt görev olarak çalıştır",
       "edit": "Eğik çizgi komutunu düzenle",
@@ -3865,7 +3867,7 @@
     "view": "Özeti oku",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Canlı durumu göster",
+    "dismiss": "Özeti yok say",
     "offline": "Çevrimdışı · kayıtlı özet",
     "cached": "Kayıtlı rapor · yenileme kullanılamıyor",
     "revised": "Revize edildi · {{revision}}",

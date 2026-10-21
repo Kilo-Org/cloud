@@ -111,7 +111,9 @@
     "online": "Võrgus",
     "open": "Ava {{name}}",
     "openPullRequest": "Ava tõmbetaotlus",
+    "completed": "Lõpetatud",
     "pending": "Ootel",
+    "running": "Töötab",
     "performance": "Jõudlus",
     "preferences": "Eelistused",
     "privacyPolicy": "Privaatsuspoliitika",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Koodiülevaataja uuendamine ebaõnnestus.",
     "configSaveFailed": "Ülevaatuse seadete salvestamine ebaõnnestus.",
     "status": {
-      "running": "Töötab",
-      "completed": "Lõpetatud",
       "interrupted": "Katkestatud"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Salvesta muudatused",
       "unsavedTitle": "Salvestamata muudatused",
-      "unsavedMessage": "Kas salvestada muudatused enne sellelt ekraanilt lahkumist?"
+      "unsavedMessage": "Kas salvestada muudatused enne sellelt ekraanilt lahkumist?",
+      "unsavedInvalidMessage": "Neid muudatusi ei saa veel salvestada. Paranda need salvestamiseks või loobu neist lahkumiseks."
     },
     "auditReportButton": {
       "viewA11y": "Vaata auditiaruannet"
@@ -1938,7 +1939,6 @@
       "installApp": "Paigalda GitHubi rakendus",
       "reauthorizeButton": "Volita GitHubi rakendus uuesti",
       "reauthorizeDescription": "Turvaagent vajab õigust vulnerability_alerts, et pääseda ligi Dependaboti hoiatustele. Selle õiguse andmiseks volita GitHubi rakendus uuesti.",
-      "reauthorizeFailed": "Uuesti volitamist ei õnnestunud alustada. Proovi uuesti.",
       "reauthorizeTitle": "Vaja on täiendavaid õigusi",
       "setupFailed": "GitHubi seadistamist ei õnnestunud alustada. Proovi uuesti."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} rida",
       "matchesBadge_one": "{{displayCount}} vastet",
       "matchesBadge_other": "{{displayCount}} vastet",
-      "noOutput": "Väljund puudub."
+      "noOutput": "Väljund puudub.",
+      "translationFailed": "Tõlge ebaõnnestus"
     },
     "readToolMarkdown": {
       "linesTruncated": "read {{start}}–{{end}} (kärbitud)",
@@ -3715,6 +3716,7 @@
       "description": "Käsu kirjeldus",
       "template": "Mall",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Selgitage $ARGUMENTS",
       "subtask": "Käivita alamülesandena",
       "edit": "Muuda kaldkriipsu käsku",
@@ -3865,7 +3867,7 @@
     "view": "Loe ülevaadet",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Näita reaalajas olekut",
+    "dismiss": "Jäta ülevaade kõrvale",
     "offline": "Võrguühenduseta · salvestatud ülevaade",
     "cached": "Salvestatud aruanne · värskendamine pole saadaval",
     "revised": "Muudetud · {{revision}}",

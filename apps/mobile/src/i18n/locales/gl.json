@@ -111,7 +111,9 @@
     "online": "En liña",
     "open": "Abrir {{name}}",
     "openPullRequest": "Apertura da solicitude de cambios",
+    "completed": "Rematado",
     "pending": "Pendente",
+    "running": "En execución",
     "performance": "Rendemento",
     "preferences": "Preferencias",
     "privacyPolicy": "Política de privacidade",
@@ -605,7 +607,7 @@
       "openAccessibility": "Abrir solicitude de integración ou de fusión",
       "clearLink": "Limpar a ligazón",
       "pasteLink": "Pegar a ligazón á solicitude de integración ou de fusión",
-      "open": "Apertura"
+      "open": "Abrir"
     },
     "checks": {
       "title": "Comprobacións",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Non se puido actualizar o revisor.",
     "configSaveFailed": "Non se puido gardar a configuración da revisión.",
     "status": {
-      "running": "En execución",
-      "completed": "Rematado",
       "interrupted": "Interrompida"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Gardar cambios",
       "unsavedTitle": "Cambios sen gardar",
-      "unsavedMessage": "Queres gardar os cambios antes de saír desta pantalla?"
+      "unsavedMessage": "Queres gardar os cambios antes de saír desta pantalla?",
+      "unsavedInvalidMessage": "Estes cambios aínda non se poden gardar. Corríxeos para gardalos ou descártaos para saír."
     },
     "auditReportButton": {
       "viewA11y": "Ver informe de auditoría"
@@ -1938,7 +1939,6 @@
       "installApp": "Instalar a aplicación de GitHub",
       "reauthorizeButton": "Volver autorizar a aplicación de GitHub",
       "reauthorizeDescription": "O axente de seguridade require o permiso vulnerability_alerts para acceder aos avisos de Dependabot. Volve autorizar a aplicación de GitHub para conceder este permiso.",
-      "reauthorizeFailed": "Non se puido iniciar a reautorización. Téntao de novo.",
       "reauthorizeTitle": "Requírense permisos adicionais",
       "setupFailed": "Non se puido iniciar a configuración de GitHub. Téntao de novo."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} liñas",
       "matchesBadge_one": "{{displayCount}} coincidencia",
       "matchesBadge_other": "{{displayCount}} coincidencias",
-      "noOutput": "Non hai saída."
+      "noOutput": "Non hai saída.",
+      "translationFailed": "Fallou a tradución"
     },
     "readToolMarkdown": {
       "linesTruncated": "liñas {{start}}–{{end}} (contido truncado)",
@@ -2726,7 +2727,7 @@
       "invalidLink": "Non se pode abrir esta ligazón.",
       "hostConfirmTitle": "Abrir a ligazón externa?",
       "hostConfirmMessage": "Esta ligazón abre {{host}} no teu navegador.",
-      "open": "Apertura",
+      "open": "Abrir",
       "trustThisHost": "Confiar neste dominio"
     },
     "folderPicker": {
@@ -3681,11 +3682,11 @@
       "add": "Engadir axente",
       "empty": "Aínda non hai axentes",
       "name": "Nome do axente",
-      "slug": "Axente babosa",
+      "slug": "Slug do axente",
       "description": "Descrición do axente",
       "model": "Anulación do modelo",
       "modelPlaceholder": "Usar sesión predeterminada",
-      "prompt": "Aviso do sistema",
+      "prompt": "Prompt do sistema",
       "steps": "Pasos máximos",
       "stepsPlaceholder": "p. ex. 50",
       "temperature": "Temperatura",
@@ -3715,6 +3716,7 @@
       "description": "Descrición do comando",
       "template": "Modelo",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar como subtarefa",
       "edit": "Comando de edición de barra",
@@ -3865,7 +3867,7 @@
     "view": "Ler resumo",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Amosar estado en directo",
+    "dismiss": "Descartar o resumo",
     "offline": "Sen conexión · resumo gardado",
     "cached": "Informe gardado · non se pode actualizar",
     "revised": "Revisado · {{revision}}",

@@ -111,7 +111,9 @@
     "online": "Dị n'ịntanetị",
     "open": "Mepee {{name}}",
     "openPullRequest": "Meghe arịrịọ ijikọ koodu",
+    "completed": "Emechara",
     "pending": "Na-echere",
+    "running": "Na-arụ ọrụ",
     "performance": "Arụmọrụ",
     "preferences": "Mmasị",
     "privacyPolicy": "Amụma nzuzo",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Enweghị ike imelite onye nyocha.",
     "configSaveFailed": "Enweghị ike ichekwa nhazi nyocha.",
     "status": {
-      "running": "Na-arụ ọrụ",
-      "completed": "Emechara",
       "interrupted": "A kwụsịrị tupu ọ gwụchaa"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Chekwaa mgbanwe",
       "unsavedTitle": "Mgbanwe echekwaghị",
-      "unsavedMessage": "Chekwaa mgbanwe gị tupu ịhapụ ihuenyo a?"
+      "unsavedMessage": "Chekwaa mgbanwe gị tupu ịhapụ ihuenyo a?",
+      "unsavedInvalidMessage": "Enweghị ike ichekwa mgbanwe ndị a ugbu a. Dozie ha iji chekwaa, ma ọ bụ tụfuo ha iji pụọ."
     },
     "auditReportButton": {
       "viewA11y": "Lee akụkọ nyocha"
@@ -1938,7 +1939,6 @@
       "installApp": "Wụnye ngwa GitHub",
       "reauthorizeButton": "Nye ngwa GitHub ikike ọzọ",
       "reauthorizeDescription": "Onye nnọchi anya nchebe chọrọ ikike vulnerability_alerts iji nweta ọkwa Dependabot. Nye ngwa GitHub ikike ọzọ iji nye ikike a.",
-      "reauthorizeFailed": "Enweghị ike ịmalite inye ikike ọzọ. Biko nwaa ọzọ.",
       "reauthorizeTitle": "Achọrọ ikike ndị ọzọ",
       "setupFailed": "Enweghị ike ịmalite nhazi GitHub. Biko nwaa ọzọ."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "ahịrị {{displayCount}}",
       "matchesBadge_one": "ndakọrịta {{displayCount}}",
       "matchesBadge_other": "ndakọrịta {{displayCount}}",
-      "noOutput": "Enweghị mpụta."
+      "noOutput": "Enweghị mpụta.",
+      "translationFailed": "Ọsịsa agaghị"
     },
     "readToolMarkdown": {
       "linesTruncated": "ahịrị {{start}}–{{end}} (ebipụrụ akụkụ)",
@@ -3715,6 +3716,7 @@
       "description": "Nkọwa iwu",
       "template": "Ụdị",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Kọwaa $ARGUMENTS",
       "subtask": "Gbaa ọsọ dị ka obere ọrụ",
       "edit": "Dezie slash iwu",
@@ -3865,7 +3867,7 @@
     "view": "Gụọ nkọwa",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Gosi ọnọdụ ugbu a",
+    "dismiss": "Leghara nkọwa anya",
     "offline": "Enweghị ịntanetị · nkọwa echekwara",
     "cached": "Akụkọ echekwara · enweghị ike imeghari",
     "revised": "Edoziri · {{revision}}",

@@ -111,7 +111,9 @@
     "online": "Желіде",
     "open": "{{name}} ашу",
     "openPullRequest": "Біріктіру сұрауын ашу",
+    "completed": "Аяқталды",
     "pending": "Күтілуде",
+    "running": "Орындалуда",
     "performance": "Өнімділік",
     "preferences": "Параметрлер",
     "privacyPolicy": "Құпиялылық саясаты",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Код тексерушісін жаңарту мүмкін болмады.",
     "configSaveFailed": "Тексеру баптауларын сақтау мүмкін болмады.",
     "status": {
-      "running": "Орындалуда",
-      "completed": "Аяқталды",
       "interrupted": "Үзілді"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Өзгерістерді сақтау",
       "unsavedTitle": "Сақталмаған өзгерістер",
-      "unsavedMessage": "Осы экраннан шықпас бұрын өзгерістеріңізді сақтайсыз ба?"
+      "unsavedMessage": "Осы экраннан шықпас бұрын өзгерістеріңізді сақтайсыз ба?",
+      "unsavedInvalidMessage": "Бұл өзгерістерді әзірге сақтау мүмкін емес. Сақтау үшін оларды түзетіңіз, немесе шығу үшін бас тартыңыз."
     },
     "auditReportButton": {
       "viewA11y": "Аудит есебін қарау"
@@ -1938,7 +1939,6 @@
       "installApp": "GitHub қолданбасын орнату",
       "reauthorizeButton": "GitHub қолданбасына қайта рұқсат беру",
       "reauthorizeDescription": "Қауіпсіздік агентіне Dependabot ескертулерін алу үшін vulnerability_alerts рұқсаты қажет. Бұл рұқсатты беру үшін GitHub қолданбасына қайта рұқсат беріңіз.",
-      "reauthorizeFailed": "Қайта рұқсат беруді бастау мүмкін болмады. Қайталап көріңіз.",
       "reauthorizeTitle": "Қосымша рұқсаттар қажет",
       "setupFailed": "GitHub-ты баптауды бастау мүмкін болмады. Қайталап көріңіз."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} жол",
       "matchesBadge_one": "{{displayCount}} сәйкестік",
       "matchesBadge_other": "{{displayCount}} сәйкестік",
-      "noOutput": "Шығыс жоқ."
+      "noOutput": "Шығыс жоқ.",
+      "translationFailed": "Аударма сәтсіз болды"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} жолдары (қысқартылған)",
@@ -3715,6 +3716,7 @@
       "description": "Команда сипаттамасы",
       "template": "Үлгі",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS түсіндіріңіз",
       "subtask": "Қосымша тапсырма ретінде іске қосыңыз",
       "edit": "Қиғаш сызықты өңдеу пәрмені",
@@ -3865,7 +3867,7 @@
     "view": "Шолуды оқу",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Ағымдағы күйді көрсету",
+    "dismiss": "Шолуды елемеу",
     "offline": "Желіден тыс · сақталған шолу",
     "cached": "Сақталған есеп · жаңарту қолжетімсіз",
     "revised": "Өзгертілген · {{revision}}",

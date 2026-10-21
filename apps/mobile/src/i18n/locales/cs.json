@@ -111,7 +111,9 @@
     "online": "Připojeno",
     "open": "Otevřít {{name}}",
     "openPullRequest": "Otevřít PR",
+    "completed": "Dokončeno",
     "pending": "Čeká",
+    "running": "Běží",
     "performance": "Výkon",
     "preferences": "Předvolby",
     "privacyPolicy": "Zásady ochrany osobních údajů",
@@ -1574,8 +1576,6 @@
     "updateFailed": "Agenta pro kontrolu kódu se nepodařilo aktualizovat.",
     "configSaveFailed": "Nastavení kontrol kódu se nepodařilo uložit.",
     "status": {
-      "running": "Běží",
-      "completed": "Dokončeno",
       "interrupted": "Přerušeno"
     },
     "reviewStyle": {
@@ -1918,7 +1918,8 @@
     "settingsSave": {
       "saveChanges": "Uložit změny",
       "unsavedTitle": "Neuložené změny",
-      "unsavedMessage": "Uložit změny před opuštěním této obrazovky?"
+      "unsavedMessage": "Uložit změny před opuštěním této obrazovky?",
+      "unsavedInvalidMessage": "Tyto změny zatím nelze uložit. Oprav je, abys je mohl uložit, nebo je zahoď, abys mohl odejít."
     },
     "auditReportButton": {
       "viewA11y": "Zobrazit zprávu o auditu"
@@ -1984,7 +1985,6 @@
       "installApp": "Nainstalovat aplikaci GitHub",
       "reauthorizeButton": "Znovu autorizovat aplikaci GitHub",
       "reauthorizeDescription": "Bezpečnostní agent potřebuje k přístupu k upozorněním Dependabot oprávnění vulnerability_alerts. Udělte ho opětovnou autorizací aplikace GitHub.",
-      "reauthorizeFailed": "Opětovnou autorizaci se nepodařilo zahájit. Zkuste to znovu.",
       "reauthorizeTitle": "Jsou vyžadována další oprávnění",
       "setupFailed": "Nastavení GitHubu se nepodařilo spustit. Zkuste to znovu."
     },
@@ -2376,7 +2376,8 @@
       "matchesBadge_other": "shody: {{displayCount}}",
       "matchesBadge_few": "shody: {{displayCount}}",
       "matchesBadge_many": "shod: {{displayCount}}",
-      "noOutput": "Žádný výstup."
+      "noOutput": "Žádný výstup.",
+      "translationFailed": "Překlad se nezdařil"
     },
     "readToolMarkdown": {
       "linesTruncated": "řádky {{start}}–{{end}} (zkráceno)",
@@ -3734,7 +3735,7 @@
       "empty": "Zatím žádné servery MCP",
       "name": "Název serveru",
       "type": "Typ serveru",
-      "localType": "Místní",
+      "localType": "Lokální",
       "remoteType": "Vzdálený",
       "command": "Příkazový řádek",
       "url": "URL",
@@ -3797,6 +3798,7 @@
       "description": "Popis příkazu",
       "template": "Šablona",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Vysvětlete $ARGUMENTS",
       "subtask": "Spustit jako dílčí úkol",
       "edit": "Příkaz upravit lomítko",
@@ -3955,7 +3957,7 @@
     "view": "Číst přehled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Zobrazit živý stav",
+    "dismiss": "Zamítnout přehled",
     "offline": "Offline · uložený přehled",
     "cached": "Uložený report · obnovení nedostupné",
     "revised": "Upraveno · {{revision}}",

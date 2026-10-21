@@ -111,7 +111,9 @@
     "online": "Ar-lein",
     "open": "Agor {{name}}",
     "openPullRequest": "Agor cais tynnu",
+    "completed": "Wedi'i gwblhau",
     "pending": "Yn aros",
+    "running": "Yn rhedeg",
     "performance": "Perfformiad",
     "preferences": "Dewisiadau",
     "privacyPolicy": "Polisi preifatrwydd",
@@ -1612,8 +1614,6 @@
     "updateFailed": "Ni ellid diweddaru'r adolygydd.",
     "configSaveFailed": "Ni ellid cadw gosodiadau'r adolygiad.",
     "status": {
-      "running": "Yn rhedeg",
-      "completed": "Wedi'i gwblhau",
       "interrupted": "Wedi'i atal"
     },
     "reviewStyle": {
@@ -1964,7 +1964,8 @@
     "settingsSave": {
       "saveChanges": "Cadw newidiadau",
       "unsavedTitle": "Newidiadau heb eu cadw",
-      "unsavedMessage": "Cadw eich newidiadau cyn gadael y sgrin hon?"
+      "unsavedMessage": "Cadw eich newidiadau cyn gadael y sgrin hon?",
+      "unsavedInvalidMessage": "Ni ellir cadw'r newidiadau hyn eto. Trwsiwch nhw i gadw, neu eu gwaredu i adael."
     },
     "auditReportButton": {
       "viewA11y": "Gweld adroddiad archwilio"
@@ -2030,7 +2031,6 @@
       "installApp": "Gosod ap GitHub",
       "reauthorizeButton": "Ailawdurdodi ap GitHub",
       "reauthorizeDescription": "Mae angen y caniatâd vulnerability_alerts ar yr Asiant diogelwch i gael mynediad at rybuddion Dependabot. Ailawdurdodwch ap GitHub i roi'r caniatâd hwn.",
-      "reauthorizeFailed": "Ni ellid dechrau ailawdurdodi. Ceisiwch eto.",
       "reauthorizeTitle": "Angen caniatadau ychwanegol",
       "setupFailed": "Ni ellid dechrau sefydlu GitHub. Ceisiwch eto."
     },
@@ -2440,7 +2440,8 @@
       "matchesBadge_two": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_few": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_many": "{{displayCount}} cyfatebiaeth",
-      "noOutput": "Dim allbwn."
+      "noOutput": "Dim allbwn.",
+      "translationFailed": "Methodd y cyfieithiad"
     },
     "readToolMarkdown": {
       "linesTruncated": "llinellau {{start}}–{{end}} (wedi'u cwtogi)",
@@ -3879,6 +3880,7 @@
       "description": "Disgrifiad gorchymyn",
       "template": "Templed",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Eglurwch $ARGUMENTS",
       "subtask": "Rhedeg fel is-dasg",
       "edit": "Golygu gorchymyn slaes",
@@ -4045,7 +4047,7 @@
     "view": "Darllen y briff",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Dangos statws byw",
+    "dismiss": "Diystyru'r briff",
     "offline": "All-lein · briff wedi'i gadw",
     "cached": "Adroddiad wedi'i gadw · methu adnewyddu",
     "revised": "Diwygiwyd · {{revision}}",

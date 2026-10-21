@@ -242,7 +242,10 @@
     "plan",
     "reactions",
     "review",
-    "tokens"
+    "tokens",
+    "{{count}} open",
+    "archived ({{count}})",
+    "completed ({{count}})"
   ],
   "fil": [
     "cancelled",

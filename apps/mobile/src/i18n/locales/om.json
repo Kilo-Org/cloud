@@ -111,7 +111,9 @@
     "online": "Toora irra",
     "open": "{{name}} bani",
     "openPullRequest": "Gaaffii walitti makuu bani",
+    "completed": "Xumurame",
     "pending": "Eeggachaa jira",
+    "running": "Hojii irra jira",
     "performance": "Raawwii",
     "preferences": "Filannoowwan",
     "privacyPolicy": "Imaammata eegumsa dhuunfaa",
@@ -1536,8 +1538,6 @@
     "updateFailed": "Sakatta'aa haaromsuun hin danda'amne.",
     "configSaveFailed": "Qindaa'ina sakatta'aa olkaa'uun hin danda'amne.",
     "status": {
-      "running": "Hojii irra jira",
-      "completed": "Xumurame",
       "interrupted": "Addaan cite"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Jijjiiramoota olkaa'i",
       "unsavedTitle": "Jijjiiramoota hin olkaa'amne",
-      "unsavedMessage": "Fuula kana keessaa ba'uu dura jijjiiramoota kee olkaa'uu?"
+      "unsavedMessage": "Fuula kana keessaa ba'uu dura jijjiiramoota kee olkaa'uu?",
+      "unsavedInvalidMessage": "Jijjiiramoonni kunniin ammattiin olkaa'amuu hin danda'an. Olkaa'uuf isaan sirreessi, yookaan ba'uuf isaan dhiisi."
     },
     "auditReportButton": {
       "viewA11y": "Gabaasa qorannoo ilaali"
@@ -1938,7 +1939,6 @@
       "installApp": "Aplikeeshinii GitHub fe'i",
       "reauthorizeButton": "Aplikeeshinii GitHub irra deebi'ii hayyami",
       "reauthorizeDescription": "Gargaaraan nageenyaa akeekkachiisa Dependabot argachuuf hayyama vulnerability_alerts barbaada. Hayyama kana kennuuf aplikeeshinii GitHub irra deebi'ii hayyami.",
-      "reauthorizeFailed": "Irra deebi'anii hayyamuu jalqabuun hin danda'amne. Irra deebi'ii yaali.",
       "reauthorizeTitle": "Hayyamoonni dabalataa barbaachisu",
       "setupFailed": "Qophii GitHub jalqabuun hin danda'amne. Irra deebi'ii yaali."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "Sarara {{displayCount}}",
       "matchesBadge_one": "Walsimsiisota {{displayCount}}",
       "matchesBadge_other": "Walsimsiisota {{displayCount}}",
-      "noOutput": "Bu'aan hin jiru."
+      "noOutput": "Bu'aan hin jiru.",
+      "translationFailed": "Hiikkaachuun kufe"
     },
     "readToolMarkdown": {
       "linesTruncated": "sararoota {{start}}–{{end}} (gabaabbate)",
@@ -3715,6 +3716,7 @@
       "description": "Ibsa ajajaa",
       "template": "Unkaa",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ibsi",
       "subtask": "Akka hojii xiqqaatti fiigi",
       "edit": "Ajaja slash gulaali",
@@ -3865,7 +3867,7 @@
     "view": "Gabaasa dubbisi",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Haala yeroo ammaa agarsiisi",
+    "dismiss": "Gabaasa dhiisi",
     "offline": "Toora ala · gabaasa kuufame",
     "cached": "Gabaasa kuufame · haaromsuun hin danda'amu",
     "revised": "Fooyya'e · {{revision}}",

@@ -111,7 +111,9 @@
     "online": "Ar líne",
     "open": "Oscail {{name}}",
     "openPullRequest": "Oscail an t-iarratas tarraingthe",
+    "completed": "Críochnaithe",
     "pending": "Ar feitheamh",
+    "running": "Ag rith",
     "performance": "Feidhmíocht",
     "preferences": "Roghanna",
     "privacyPolicy": "Beartas príobháideachta",
@@ -1593,8 +1595,6 @@
     "updateFailed": "Níorbh fhéidir an t-athbhreithneoir a nuashonrú.",
     "configSaveFailed": "Níorbh fhéidir cumraíocht an athbhreithnithe a shábháil.",
     "status": {
-      "running": "Ag rith",
-      "completed": "Críochnaithe",
       "interrupted": "Idirbhriste"
     },
     "reviewStyle": {
@@ -1941,7 +1941,8 @@
     "settingsSave": {
       "saveChanges": "Sábháil athruithe",
       "unsavedTitle": "Athruithe gan sábháil",
-      "unsavedMessage": "Ar mhaith leat d'athruithe a shábháil sula bhfágann tú an scáileán seo?"
+      "unsavedMessage": "Ar mhaith leat d'athruithe a shábháil sula bhfágann tú an scáileán seo?",
+      "unsavedInvalidMessage": "Ní féidir na hathruithe seo a shábháil fós. Ceartaigh iad le sábháil, nó caith uait iad le fágáil."
     },
     "auditReportButton": {
       "viewA11y": "Féach ar an tuarascáil iniúchta"
@@ -2007,7 +2008,6 @@
       "installApp": "Suiteáil an aip GitHub",
       "reauthorizeButton": "Athúdaraigh an aip GitHub",
       "reauthorizeDescription": "Teastaíonn an cead vulnerability_alerts ón nGníomhaire slándála chun rochtain a fháil ar fholáirimh Dependabot. Athúdaraigh an aip GitHub chun an cead seo a thabhairt.",
-      "reauthorizeFailed": "Níorbh fhéidir an t-athúdarú a thosú. Bain triail as arís le do thoil.",
       "reauthorizeTitle": "Teastaíonn ceadanna breise",
       "setupFailed": "Níorbh fhéidir socrú GitHub a thosú. Bain triail as arís le do thoil."
     },
@@ -2408,7 +2408,8 @@
       "matchesBadge_two": "{{displayCount}} toradh",
       "matchesBadge_few": "{{displayCount}} toradh",
       "matchesBadge_many": "{{displayCount}} toradh",
-      "noOutput": "Níl aon aschur ann."
+      "noOutput": "Níl aon aschur ann.",
+      "translationFailed": "Theip ar an aistriúchán"
     },
     "readToolMarkdown": {
       "linesTruncated": "línte {{start}}–{{end}} (teasctha)",
@@ -3838,6 +3839,7 @@
       "description": "Cur síos ar ordú",
       "template": "Teimpléad",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Mínigh $ARGUMENTS",
       "subtask": "Rith mar fhothasc",
       "edit": "Cuir ordú slais in eagar",
@@ -4000,7 +4002,7 @@
     "view": "Léigh an achoimre",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Taispeáin stádas beo",
+    "dismiss": "Cuir an achoimre as an áireamh",
     "offline": "As líne · achoimre shábháilte",
     "cached": "Tuarascáil shábháilte · ní féidir athnuachan",
     "revised": "Athbhreithnithe · {{revision}}",

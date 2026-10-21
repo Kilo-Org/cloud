@@ -111,7 +111,9 @@
     "online": "ଅନଲାଇନ୍",
     "open": "{{name}} ଖୋଲନ୍ତୁ",
     "openPullRequest": "ଖୋଲା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
+    "completed": "ସମାପ୍ତ",
     "pending": "ଅପେକ୍ଷାରତ",
+    "running": "ଚାଲୁଛି",
     "performance": "କାର୍ଯ୍ୟଦକ୍ଷତା",
     "preferences": "ପସନ୍ଦ",
     "privacyPolicy": "ଗୋପନୀୟତା ନୀତି",
@@ -1536,8 +1538,6 @@
     "updateFailed": "କୋଡ୍ ସମୀକ୍ଷକ ଅପଡେଟ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "configSaveFailed": "ସମୀକ୍ଷା ସେଟିଂସ୍ ସଂରକ୍ଷଣ ହୋଇପାରିଲା ନାହିଁ।",
     "status": {
-      "running": "ଚାଲୁଛି",
-      "completed": "ସମାପ୍ତ",
       "interrupted": "ବ୍ୟାହତ"
     },
     "reviewStyle": {
@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରନ୍ତୁ",
       "unsavedTitle": "ସଂରକ୍ଷିତ ହୋଇନଥିବା ପରିବର୍ତ୍ତନ",
-      "unsavedMessage": "ଏହି ସ୍କ୍ରିନରୁ ବାହାରିବା ପୂର୍ବରୁ ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରିବେ?"
+      "unsavedMessage": "ଏହି ସ୍କ୍ରିନରୁ ବାହାରିବା ପୂର୍ବରୁ ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରିବେ?",
+      "unsavedInvalidMessage": "ଏହି ପରିବର୍ତ୍ତନଗୁଡ଼ିକ ଏବେ ସଂରକ୍ଷଣ କରାଯାଇପାରିବ ନାହିଁ। ସଂରକ୍ଷଣ କରିବାକୁ ସେଗୁଡ଼ିକୁ ସଜାଡ଼ନ୍ତୁ, କିମ୍ବା ବାହାରିଯିବାକୁ ସେଗୁଡ଼ିକୁ ଛାଡ଼ିଦିଅନ୍ତୁ।"
     },
     "auditReportButton": {
       "viewA11y": "ଅଡିଟ୍ ରିପୋର୍ଟ ଦେଖନ୍ତୁ"
@@ -1938,7 +1939,6 @@
       "installApp": "GitHub ଆପ୍ ସଂସ୍ଥାପନ କରନ୍ତୁ",
       "reauthorizeButton": "GitHub ଆପ୍‌କୁ ପୁଣି ଅନୁମତି ଦିଅନ୍ତୁ",
       "reauthorizeDescription": "Dependabot ସତର୍କତା ଦେଖିବାକୁ ସୁରକ୍ଷା ଏଜେଣ୍ଟକୁ vulnerability_alerts ଅନୁମତି ଆବଶ୍ୟକ। ଏହି ଅନୁମତି ଦେବାକୁ GitHub ଆପ୍‌କୁ ପୁଣି ଅନୁମତି ଦିଅନ୍ତୁ।",
-      "reauthorizeFailed": "ପୁଣି ଅନୁମତି ଦେବା ପ୍ରକ୍ରିୟା ଆରମ୍ଭ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "reauthorizeTitle": "ଅତିରିକ୍ତ ଅନୁମତି ଆବଶ୍ୟକ",
       "setupFailed": "GitHub ସେଟଅପ୍ ଆରମ୍ଭ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}}ଟି ଧାଡ଼ି",
       "matchesBadge_one": "{{displayCount}}ଟି ମେଳ",
       "matchesBadge_other": "{{displayCount}}ଟି ମେଳ",
-      "noOutput": "କୌଣସି ଆଉଟପୁଟ୍ ନାହିଁ।"
+      "noOutput": "କୌଣସି ଆଉଟପୁଟ୍ ନାହିଁ।",
+      "translationFailed": "ଅନୁବାଦ ବିଫଳ ହେଲା"
     },
     "readToolMarkdown": {
       "linesTruncated": "ଧାଡ଼ି {{start}}–{{end}} (କାଟି ଦିଆଯାଇଛି)",
@@ -3715,6 +3716,7 @@
       "description": "ନିର୍ଦ୍ଦେଶ ବର୍ଣ୍ଣନା",
       "template": "ଟେମ୍ପଲେଟ୍।",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ବ୍ୟାଖ୍ୟା କର।",
       "subtask": "ସବଟାସ୍କ ଭାବରେ ଚଲାନ୍ତୁ।",
       "edit": "ସ୍ଲାସ୍ କମାଣ୍ଡ୍ ଏଡିଟ୍ କରନ୍ତୁ।",
@@ -3865,7 +3867,7 @@
     "view": "ସାରାଂଶ ପଢନ୍ତୁ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "ଲାଇଭ ସ୍ଥିତି ଦେଖାନ୍ତୁ",
+    "dismiss": "ସାରାଂଶ ଖାରଜ କରନ୍ତୁ",
     "offline": "ଅଫଲାଇନ · ସଂରକ୍ଷିତ ସାରାଂଶ",
     "cached": "ସଂରକ୍ଷିତ ରିପୋର୍ଟ · ରିଫ୍ରେସ ଉପଲବ୍ଧ ନାହିଁ",
     "revised": "ସଂଶୋଧିତ · {{revision}}",

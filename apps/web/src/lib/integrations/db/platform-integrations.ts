@@ -1092,6 +1092,64 @@ export async function getIntegrationForOwner(
   return integration || null;
 }
 
+/** Connection-status shape consumed by the reviewer status surfaces. */
+export type GitHubConnectionStatus = {
+  connected: boolean;
+  integration: {
+    accountLogin: string | null;
+    repositorySelection: string | null;
+    installedAt: string | null;
+    isValid: boolean;
+  } | null;
+};
+
+/**
+ * One connection rule for the GitHub reviewer surfaces: the owner's workflow
+ * installation (org owners resolve to their healthy primary row) counts as
+ * connected only when the integration is healthy, matching what the
+ * repository picker, Security Agent, and every operational caller require.
+ *
+ * A user can hold more than one workflow row (a locally disconnected row is
+ * retained on disconnect, and reconnecting a different installation inserts
+ * another), so the user lookup orders healthy rows first — the same rule
+ * `getInstallation` applies — instead of trusting an unordered `limit(1)`.
+ */
+export async function getGitHubConnectionStatusForOwner(
+  owner: Owner
+): Promise<GitHubConnectionStatus> {
+  const integration =
+    owner.type === 'org'
+      ? await getPrimaryGitHubIntegrationForOrganization(owner.id)
+      : ((
+          await db
+            .select()
+            .from(platform_integrations)
+            .where(
+              and(
+                eq(platform_integrations.owned_by_user_id, owner.id),
+                eq(platform_integrations.platform, PLATFORM.GITHUB),
+                eq(platform_integrations.github_connection_role, 'workflow')
+              )
+            )
+            .orderBy(desc(platformIntegrationHealthSql()), desc(platform_integrations.updated_at))
+            .limit(1)
+        )[0] ?? null);
+
+  if (!isPlatformIntegrationHealthy(integration)) {
+    return { connected: false, integration: null };
+  }
+
+  return {
+    connected: true,
+    integration: {
+      accountLogin: integration.platform_account_login,
+      repositorySelection: integration.repository_access,
+      installedAt: integration.installed_at,
+      isValid: !integration.suspended_at,
+    },
+  };
+}
+
 /**
  * Gets all platform integrations for an owner (user or organization)
  */

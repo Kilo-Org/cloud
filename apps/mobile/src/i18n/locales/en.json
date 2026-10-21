@@ -1971,7 +1971,7 @@
       "couldNotLoad": "Could not load Security Agent",
       "installApp": "Install GitHub App",
       "reauthorizeButton": "Re-authorize GitHub App",
-      "reauthorizeDescription": "Security Agent requires the vulnerability_alerts permission to access Dependabot alerts. Re-authorize the GitHub App to grant this permission.",
+      "reauthorizeDescription": "Security Agent needs permission to read Dependabot alerts. Re-authorize the GitHub App to grant this permission.",
       "reauthorizeFailed": "Could not start re-authorization. Please try again.",
       "reauthorizeTitle": "Additional permissions required",
       "setupFailed": "Could not start GitHub setup. Please try again."
@@ -2814,7 +2814,7 @@
     "title": "Trusted hosts",
     "subtitle": "Hosts you trust to open without asking",
     "emptyTitle": "No trusted hosts",
-    "emptyDescription": "When you trust a link's host, it opens without asking again.",
+    "emptyDescription": "When you trust a link's host or an image host, it opens without asking again.",
     "imagesSectionTitle": "Trusted image hosts",
     "imagesSectionDescription": "Images from these hosts load without asking again.",
     "imagesSectionEmpty": "No trusted image hosts",

@@ -965,12 +965,12 @@ describe('User', () => {
       const headers = () => new Headers({ 'x-forwarded-for': '203.0.113.90' });
 
       afterEach(() => {
-        delete process.env.EMAIL_SIGNUPS_DISABLED;
+        process.env.EMAIL_SIGNUPS_ENABLED = 'true';
       });
 
       it('refuses a new email account before Bouncer, Stripe, or user creation', async () => {
         const email = 'email-signup-disabled-new@example.com';
-        process.env.EMAIL_SIGNUPS_DISABLED = 'true';
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
 
         const result = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
 
@@ -988,7 +988,7 @@ describe('User', () => {
         const email = 'email-signup-disabled-existing@example.com';
         const created = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
         expect(created.success).toBe(true);
-        process.env.EMAIL_SIGNUPS_DISABLED = 'true';
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
 
         const signedIn = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
 
@@ -1011,7 +1011,7 @@ describe('User', () => {
         );
         expect(created.success).toBe(true);
         if (!created.success) return;
-        process.env.EMAIL_SIGNUPS_DISABLED = 'true';
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
 
         const signedIn = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
 
@@ -1029,7 +1029,7 @@ describe('User', () => {
           headers()
         );
         expect(created.success).toBe(true);
-        process.env.EMAIL_SIGNUPS_DISABLED = 'true';
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
 
         const result = await createOrUpdateUser(
           emailArgs('email.signup.disabled.alias@gmail.com'),
@@ -1042,7 +1042,7 @@ describe('User', () => {
       });
 
       it('still creates a new OAuth account', async () => {
-        process.env.EMAIL_SIGNUPS_DISABLED = 'true';
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
 
         const result = await createOrUpdateUser(
           {

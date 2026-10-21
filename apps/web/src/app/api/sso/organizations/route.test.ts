@@ -161,11 +161,11 @@ describe('POST /api/sso/organizations', () => {
 
   describe('while email signups are disabled', () => {
     beforeEach(() => {
-      process.env.EMAIL_SIGNUPS_DISABLED = 'true';
+      process.env.EMAIL_SIGNUPS_ENABLED = 'false';
       mockIsNewAccountEligibleForMagicLink.mockResolvedValue(false);
     });
     afterEach(() => {
-      delete process.env.EMAIL_SIGNUPS_DISABLED;
+      process.env.EMAIL_SIGNUPS_ENABLED = 'true';
     });
 
     it('offers a new address only non-email providers and flags the pause', async () => {

@@ -85,12 +85,16 @@ describe('isNewAccountEligibleForMagicLink', () => {
     expect(mockIsEmailBlacklistedByDomainAsync).not.toHaveBeenCalled();
   });
 
-  it('rejects every new address while email signups are disabled', async () => {
-    process.env.EMAIL_SIGNUPS_DISABLED = 'true';
-    try {
-      await expect(isNewAccountEligibleForMagicLink('new@example.com')).resolves.toBe(false);
-    } finally {
-      delete process.env.EMAIL_SIGNUPS_DISABLED;
+  it.each([undefined, '', 'false', 'TRUE'])(
+    'rejects every new address unless EMAIL_SIGNUPS_ENABLED is exactly true: %s',
+    async value => {
+      if (value === undefined) delete process.env.EMAIL_SIGNUPS_ENABLED;
+      else process.env.EMAIL_SIGNUPS_ENABLED = value;
+      try {
+        await expect(isNewAccountEligibleForMagicLink('new@example.com')).resolves.toBe(false);
+      } finally {
+        process.env.EMAIL_SIGNUPS_ENABLED = 'true';
+      }
     }
-  });
+  );
 });

@@ -118,7 +118,7 @@ export async function isNewAccountEligibleForMagicLink(email: string): Promise<b
  * blocked by TLD or signup email rules.
  *
  * For NEW users (signup), enforces:
- * - Email signup is not disabled (EMAIL_SIGNUPS_DISABLED)
+ * - Email signup is enabled (EMAIL_SIGNUPS_ENABLED)
  * - Email must be lowercase
  * - Email cannot contain a + character
  *

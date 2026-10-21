@@ -99,10 +99,10 @@ describe('POST /api/auth/magic-link', () => {
 
   describe('while email signups are disabled', () => {
     beforeEach(() => {
-      process.env.EMAIL_SIGNUPS_DISABLED = 'true';
+      process.env.EMAIL_SIGNUPS_ENABLED = 'false';
     });
     afterEach(() => {
-      delete process.env.EMAIL_SIGNUPS_DISABLED;
+      process.env.EMAIL_SIGNUPS_ENABLED = 'true';
     });
 
     it('refuses a new user before creating a token', async () => {

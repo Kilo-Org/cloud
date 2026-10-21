@@ -26,6 +26,8 @@ let queryClient = new QueryClient();
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 let previousOnline = true;
 let mintFailed = false;
+let deniedProcedures = new Set<string>();
+const DENIAL_MESSAGE = 'You do not have access to this organization';
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -72,6 +74,9 @@ vi.mock('@/components/security-agent/security-agent-setup', () => ({
 }));
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: 'PlatformErrorScreen',
+}));
+vi.mock('@/components/organization/scope-access-denied-screen', () => ({
+  ScopeAccessDeniedScreen: 'ScopeAccessDeniedScreen',
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
@@ -123,12 +128,25 @@ beforeEach(() => {
   permissionData = { hasIntegration: true, hasPermissions: true, reauthorizeUrl: null };
   configData = structuredClone(securityConfigFixture);
   mintFailed = false;
+  deniedProcedures = new Set();
   repositoriesData = [{ id: 1 }];
   roles = [{ organizationId: 'org_123', role: 'owner' }];
   transport.mockReset().mockImplementation(async input => {
     await Promise.resolve();
     if (mintFailed && procedureFor(input) === 'mintInstallState') {
       throw new Error('Setup failed');
+    }
+    if (deniedProcedures.has(procedureFor(input))) {
+      return Response.json(
+        {
+          error: {
+            message: DENIAL_MESSAGE,
+            code: -32_003,
+            data: { code: 'UNAUTHORIZED', httpStatus: 401, path: procedureFor(input) },
+          },
+        },
+        { status: 401 }
+      );
     }
     const data: Record<string, unknown> = {
       getPermissionStatus: permissionData,
@@ -254,6 +272,62 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
   );
 });
 
+describe('ScopeEntryScreen organization access', () => {
+  it('shows the no-access state instead of the setup when the organization is no longer a membership', async () => {
+    // Settled list without org_123 while the agent procedures still answer for
+    // the cached scope — the state that used to open the first-run setup.
+    roles = [{ organizationId: 'org_other', role: 'owner' }];
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+    const root = await mount('org_123');
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(1);
+    expect(host(root, 'ScopeAccessDeniedScreen')[0]?.props.kind).toBe('denied');
+    expect(host(root, 'SecurityAgentSetup')).toHaveLength(0);
+    expect(host(root, 'DashboardScreen')).toHaveLength(0);
+    // No install-state token is minted for a scope the reader cannot use.
+    expect(
+      transport.mock.calls.some(([input]) => procedureFor(input) === 'mintInstallState')
+    ).toBe(false);
+  });
+
+  it('keeps cached organization data out of view when the procedures report a denial', async () => {
+    const trpc = createTRPCOptionsProxy<MobileRouter>({ client: trpcClient, queryClient });
+    queryClient.setQueryData(
+      trpc.organizations.securityAgent.getConfig.queryKey({ organizationId: 'org_123' }),
+      configData
+    );
+    deniedProcedures = new Set(['getConfig', 'getPermissionStatus', 'getRepositories']);
+    const root = await mount('org_123');
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(1);
+    expect(host(root, 'DashboardScreen')).toHaveLength(0);
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+  });
+
+  it('shows the organization landing again when Retry finds the membership restored', async () => {
+    roles = [];
+    permissionData = { hasIntegration: true, hasPermissions: true, reauthorizeUrl: null };
+    configData.isEnabled = true;
+    const root = await mount('org_123');
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(1);
+
+    roles = [{ organizationId: 'org_123', role: 'owner' }];
+    const onRetry = host(root, 'ScopeAccessDeniedScreen')[0]?.props.onRetry as () => void;
+    act(onRetry);
+    await advanceBy();
+    await advanceBy();
+    await advanceBy();
+
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(0);
+    expect(host(root, 'DashboardScreen')).toHaveLength(1);
+  });
+
+  it('keeps the load-error screen for the personal scope when its procedures fail', async () => {
+    deniedProcedures = new Set(['getPermissionStatus', 'getConfig', 'getRepositories']);
+    const root = await mount('personal');
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(0);
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+  });
+});
+
 describe.each([
   ['standalone', SettingsOverviewScreen],
   ['inline', ScopeEntryScreen],
@@ -289,10 +363,13 @@ describe.each([
     }
   );
 
-  it.each(['member', 'absent'])(
-    'keeps the %s organization role restricted after Retry',
-    async role => {
-      roles = role === 'absent' ? [] : [{ organizationId: 'org_123', role }];
+  // A member without a billing role keeps the restricted settings; an account
+  // with no membership at all is the no-access state (covered by the
+  // organization-access block above), not a settings screen.
+  it(
+    'keeps a member organization role restricted after Retry',
+    async () => {
+      roles = [{ organizationId: 'org_123', role: 'member' }];
       onlineManager.setOnline(false);
       const root = await mount('org_123', Screen);
       await retry(root);

@@ -45,8 +45,17 @@ async function sendToBedrock(base_url: string) {
 
   expect(result.type).toBe('success');
   expect(fetchMock).toHaveBeenCalledTimes(1);
-  const [url, init] = fetchMock.mock.calls[0];
-  return { url: String(url), headers: new Headers(init?.headers), body: String(init?.body) };
+  const [request, init] = fetchMock.mock.calls[0];
+  const body = init?.body;
+  if (typeof body !== 'string') {
+    throw new Error(`expected a string request body, received ${typeof body}`);
+  }
+  return {
+    url:
+      request instanceof URL ? request.href : typeof request === 'string' ? request : request.url,
+    headers: new Headers(init?.headers),
+    body,
+  };
 }
 
 function parseAuthorization(authorization: string) {

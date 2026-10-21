@@ -782,6 +782,38 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(chunk.choices[0].delta).toEqual({ content: 'hi' });
     });
 
+    test('drops null delta tool call type', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call-1","type":"function","function":{"name":"read","arguments":""}}]}}]}\n\n' +
+          'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":null,"type":null,"function":{"name":null,"arguments":"{}"}}]}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const [first, continuation] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: { tool_calls: Array<Record<string, unknown>> } }>;
+      }>;
+
+      expect(first.choices[0].delta.tool_calls[0]).toEqual({
+        index: 0,
+        id: 'call-1',
+        type: 'function',
+        function: { name: 'read', arguments: '' },
+      });
+      expect(continuation.choices[0].delta.tool_calls[0]).toEqual({
+        index: 0,
+        id: null,
+        function: { name: null, arguments: '{}' },
+      });
+    });
+
     test('maps Gemini thought content and signatures to reasoning_details', async () => {
       const upstream = sseResponse(
         'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"first thought","extra_content":{"google":{"thought":true}}}},{"index":1,"delta":{"content":"answer","extra_content":{"google":{"thought":false}}}},{"index":2,"delta":{"tool_calls":[{"id":"call-1","type":"function","function":{"name":"lookup","arguments":"{}"},"extra_content":{"trace_id":"trace-1","google":{"thought_signature":"opaque-signature"}}}]}}]}\n\n' +

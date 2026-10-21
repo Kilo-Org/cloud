@@ -29,6 +29,7 @@ describe('previewReturnPath', () => {
     ['dot segments resolving to a double-slash path', '/a/..//evil.example'],
     ['single dot resolving to a double-slash path', '/.//evil.example'],
     ['encoded dot resolving to a double-slash path', '/%2e//evil.example'],
+    ['encoded dot segments resolving to a double-slash path', '/a/%2e%2e//evil.example'],
   ])('lands on / for a %s', (_name, raw) => {
     expect(previewReturnPath(raw)).toBe('/');
   });
@@ -40,6 +41,11 @@ describe('previewReturnPath', () => {
 
   it('keeps a path whose dot segments normalize inside one slash', () => {
     expect(previewReturnPath('/a/../b')).toBe('/b');
+  });
+
+  it('keeps encoded slashes as literal path text', () => {
+    expect(previewReturnPath('/a%2F%2Fevil.example')).toBe('/a%2F%2Fevil.example');
+    expect(previewReturnPath('/%2F%2Fevil.example')).toBe('/%2F%2Fevil.example');
   });
 });
 

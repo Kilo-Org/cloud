@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "परिवर्तनहरू सेभ गर्नुहोस्",
       "unsavedTitle": "सेभ नगरिएका परिवर्तनहरू",
-      "unsavedMessage": "यो स्क्रिन छोड्नुअघि परिवर्तनहरू सेभ गर्ने?"
+      "unsavedMessage": "यो स्क्रिन छोड्नुअघि परिवर्तनहरू सेभ गर्ने?",
+      "unsavedInvalidMessage": "यी परिवर्तनहरू अझै सेभ गर्न सकिँदैन। सेभ गर्न यिनलाई सुधार्नुहोस्, वा छोडेर जान यिनलाई खारेज गर्नुहोस्।"
     },
     "auditReportButton": {
       "viewA11y": "अडिट प्रतिवेदन हेर्नुहोस्"
@@ -1938,7 +1939,6 @@
       "installApp": "GitHub एप स्थापना गर्नुहोस्",
       "reauthorizeButton": "GitHub एपलाई फेरि अनुमति दिनुहोस्",
       "reauthorizeDescription": "Dependabot का चेतावनीहरूमा पहुँच पाउन सुरक्षा एजेन्टलाई vulnerability_alerts अनुमति चाहिन्छ। यो अनुमति दिन GitHub एपलाई फेरि अनुमति प्रदान गर्नुहोस्।",
-      "reauthorizeFailed": "फेरि अनुमति दिने प्रक्रिया सुरु गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
       "reauthorizeTitle": "थप अनुमतिहरू आवश्यक छन्",
       "setupFailed": "GitHub सेटअप सुरु गर्न सकिएन। फेरि प्रयास गर्नुहोस्।"
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} पङ्क्ति",
       "matchesBadge_one": "{{displayCount}} नतिजा",
       "matchesBadge_other": "{{displayCount}} नतिजा",
-      "noOutput": "कुनै आउटपुट छैन।"
+      "noOutput": "कुनै आउटपुट छैन।",
+      "translationFailed": "अनुवाद असफल भयो"
     },
     "readToolMarkdown": {
       "linesTruncated": "पङ्क्ति {{start}}–{{end}} (केही अंश काटिएको)",

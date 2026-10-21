@@ -1381,7 +1381,6 @@
       "installApp": "GitHub Appをインストール",
       "reauthorizeButton": "GitHub Appを再承認",
       "reauthorizeDescription": "セキュリティエージェントがDependabotアラートにアクセスするには、vulnerability_alerts権限が必要です。GitHub Appを再承認して、この権限を付与してください。",
-      "reauthorizeFailed": "再承認を開始できませんでした。もう一度お試しください。",
       "reauthorizeTitle": "追加の権限が必要です",
       "setupFailed": "GitHubのセットアップを開始できませんでした。もう一度お試しください。"
     },
@@ -1404,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "変更を保存",
       "unsavedMessage": "この画面を離れる前に変更を保存しますか？",
+      "unsavedInvalidMessage": "これらの変更はまだ保存できません。保存するには修正し、離れるには破棄してください。",
       "unsavedTitle": "未保存の変更"
     },
     "setup": {
@@ -1797,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}}行",
       "matchesBadge_one": "{{displayCount}}件",
       "matchesBadge_other": "{{displayCount}}件",
-      "noOutput": "出力はありません。"
+      "noOutput": "出力はありません。",
+      "translationFailed": "翻訳に失敗しました"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}～{{end}}行目（一部省略）",
@@ -3651,7 +3652,7 @@
       "empty": "MCP サーバーはまだありません",
       "name": "サーバー名",
       "type": "サーバーの種類",
-      "localType": "地元",
+      "localType": "ローカル",
       "remoteType": "リモート",
       "command": "コマンドライン",
       "url": "URL",

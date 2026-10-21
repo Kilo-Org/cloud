@@ -1918,7 +1918,8 @@
     "settingsSave": {
       "saveChanges": "Uložiť zmeny",
       "unsavedTitle": "Neuložené zmeny",
-      "unsavedMessage": "Uložiť zmeny pred opustením tejto obrazovky?"
+      "unsavedMessage": "Uložiť zmeny pred opustením tejto obrazovky?",
+      "unsavedInvalidMessage": "Tieto zmeny zatiaľ nemožno uložiť. Oprav ich, aby si ich mohol uložiť, alebo ich zahoď, aby si mohol odísť."
     },
     "auditReportButton": {
       "viewA11y": "Zobraziť správu o audite"
@@ -1984,7 +1985,6 @@
       "installApp": "Nainštalovať aplikáciu GitHub",
       "reauthorizeButton": "Znova autorizovať aplikáciu GitHub",
       "reauthorizeDescription": "Bezpečnostný agent vyžaduje oprávnenie vulnerability_alerts na prístup k upozorneniam zo služby Dependabot. Znova autorizujte aplikáciu GitHub, aby ste jej udelili toto oprávnenie.",
-      "reauthorizeFailed": "Opätovnú autorizáciu sa nepodarilo spustiť. Skúste to znova.",
       "reauthorizeTitle": "Vyžadujú sa ďalšie oprávnenia",
       "setupFailed": "Nastavenie pripojenia k platforme GitHub sa nepodarilo spustiť. Skúste to znova."
     },
@@ -2376,7 +2376,8 @@
       "matchesBadge_other": "zhody: {{displayCount}}",
       "matchesBadge_few": "zhody: {{displayCount}}",
       "matchesBadge_many": "zhôd: {{displayCount}}",
-      "noOutput": "Žiadny výstup."
+      "noOutput": "Žiadny výstup.",
+      "translationFailed": "Preklad sa nepodaril"
     },
     "readToolMarkdown": {
       "linesTruncated": "riadky {{start}}–{{end}} (skrátené)",
@@ -3733,7 +3734,7 @@
       "empty": "Zatiaľ žiadne servery MCP",
       "name": "Názov servera",
       "type": "Typ servera",
-      "localType": "Miestne",
+      "localType": "Lokálne",
       "remoteType": "Diaľkové ovládanie",
       "command": "Príkazový riadok",
       "url": "URL",

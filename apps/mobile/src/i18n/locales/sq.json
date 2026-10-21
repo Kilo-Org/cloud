@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Ruaj ndryshimet",
       "unsavedTitle": "Ndryshime të paruajtura",
-      "unsavedMessage": "Dëshiron t'i ruash ndryshimet përpara se të dalësh nga ky ekran?"
+      "unsavedMessage": "Dëshiron t'i ruash ndryshimet përpara se të dalësh nga ky ekran?",
+      "unsavedInvalidMessage": "Këto ndryshime ende nuk mund të ruhen. Rregulloji që t'i ruash, ose mos i ruaj që të dalësh."
     },
     "auditReportButton": {
       "viewA11y": "Shiko raportin e auditimit"
@@ -1938,7 +1939,6 @@
       "installApp": "Instalo aplikacionin GitHub",
       "reauthorizeButton": "Riautorizo aplikacionin GitHub",
       "reauthorizeDescription": "Agjenti i sigurisë kërkon lejen vulnerability_alerts për të pasur qasje në njoftimet e Dependabot. Riautorizo aplikacionin GitHub për t'ia dhënë këtë leje.",
-      "reauthorizeFailed": "Nuk u nis riautorizimi. Provo përsëri.",
       "reauthorizeTitle": "Kërkohen leje shtesë",
       "setupFailed": "Nuk u nis konfigurimi i GitHub. Provo përsëri."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} rreshta",
       "matchesBadge_one": "{{displayCount}} përputhje",
       "matchesBadge_other": "{{displayCount}} përputhje",
-      "noOutput": "Nuk ka dalje."
+      "noOutput": "Nuk ka dalje.",
+      "translationFailed": "Përkthimi dështoi"
     },
     "readToolMarkdown": {
       "linesTruncated": "rreshtat {{start}}–{{end}} (përmbajtje e shkurtuar)",

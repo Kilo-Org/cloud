@@ -1381,7 +1381,6 @@
       "installApp": "安裝 GitHub App",
       "reauthorizeButton": "重新授權 GitHub App",
       "reauthorizeDescription": "資安代理需要 vulnerability_alerts 權限才能存取 Dependabot 警報。請重新授權 GitHub App 以授予此權限。",
-      "reauthorizeFailed": "無法開始重新授權。請再試一次。",
       "reauthorizeTitle": "需要額外權限",
       "setupFailed": "無法開始 GitHub 設定。請再試一次。"
     },
@@ -1404,6 +1403,7 @@
     "settingsSave": {
       "saveChanges": "儲存變更",
       "unsavedMessage": "離開此畫面前，要儲存變更嗎？",
+      "unsavedInvalidMessage": "這些變更尚無法儲存。請修正後再儲存，或捨棄變更以離開。",
       "unsavedTitle": "未儲存的變更"
     },
     "setup": {
@@ -1797,7 +1797,8 @@
       "linesBadge_other": "{{displayCount}} 行",
       "matchesBadge_one": "{{displayCount}} 筆相符結果",
       "matchesBadge_other": "{{displayCount}} 筆相符結果",
-      "noOutput": "沒有輸出。"
+      "noOutput": "沒有輸出。",
+      "translationFailed": "翻譯失敗"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截斷）",

@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "ცვლილებების შენახვა",
       "unsavedTitle": "შეუნახავი ცვლილებები",
-      "unsavedMessage": "შეინახოს ცვლილებები ამ ეკრანიდან გასვლამდე?"
+      "unsavedMessage": "შეინახოს ცვლილებები ამ ეკრანიდან გასვლამდე?",
+      "unsavedInvalidMessage": "ამ ცვლილებების შენახვა ჯერ არ შეიძლება. შეასწორე ისინი შესანახად, ან გააუქმე დატოვებისთვის."
     },
     "auditReportButton": {
       "viewA11y": "აუდიტის ანგარიშის ნახვა"
@@ -1938,7 +1939,6 @@
       "installApp": "GitHub აპის დაყენება",
       "reauthorizeButton": "GitHub აპის ხელახალი ავტორიზაცია",
       "reauthorizeDescription": "უსაფრთხოების აგენტს Dependabot-ის გაფრთხილებებზე წვდომისთვის vulnerability_alerts ნებართვა სჭირდება. ამ ნებართვის მისანიჭებლად ხელახლა გაიარე GitHub აპის ავტორიზაცია.",
-      "reauthorizeFailed": "ხელახალი ავტორიზაციის დაწყება ვერ მოხერხდა. სცადე ხელახლა.",
       "reauthorizeTitle": "საჭიროა დამატებითი ნებართვები",
       "setupFailed": "GitHub-ის გამართვის დაწყება ვერ მოხერხდა. სცადე ხელახლა."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} სტრიქონი",
       "matchesBadge_one": "{{displayCount}} დამთხვევა",
       "matchesBadge_other": "{{displayCount}} დამთხვევა",
-      "noOutput": "გამოსავალი არ არის."
+      "noOutput": "გამოსავალი არ არის.",
+      "translationFailed": "თარგმანი ვერ შესრულდა"
     },
     "readToolMarkdown": {
       "linesTruncated": "სტრიქონები {{start}}–{{end}} (შემოკლებულია)",

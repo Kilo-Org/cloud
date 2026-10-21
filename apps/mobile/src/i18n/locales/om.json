@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Jijjiiramoota olkaa'i",
       "unsavedTitle": "Jijjiiramoota hin olkaa'amne",
-      "unsavedMessage": "Fuula kana keessaa ba'uu dura jijjiiramoota kee olkaa'uu?"
+      "unsavedMessage": "Fuula kana keessaa ba'uu dura jijjiiramoota kee olkaa'uu?",
+      "unsavedInvalidMessage": "Jijjiiramoonni kunniin ammattiin olkaa'amuu hin danda'an. Olkaa'uuf isaan sirreessi, yookaan ba'uuf isaan dhiisi."
     },
     "auditReportButton": {
       "viewA11y": "Gabaasa qorannoo ilaali"
@@ -1938,7 +1939,6 @@
       "installApp": "Aplikeeshinii GitHub fe'i",
       "reauthorizeButton": "Aplikeeshinii GitHub irra deebi'ii hayyami",
       "reauthorizeDescription": "Gargaaraan nageenyaa akeekkachiisa Dependabot argachuuf hayyama vulnerability_alerts barbaada. Hayyama kana kennuuf aplikeeshinii GitHub irra deebi'ii hayyami.",
-      "reauthorizeFailed": "Irra deebi'anii hayyamuu jalqabuun hin danda'amne. Irra deebi'ii yaali.",
       "reauthorizeTitle": "Hayyamoonni dabalataa barbaachisu",
       "setupFailed": "Qophii GitHub jalqabuun hin danda'amne. Irra deebi'ii yaali."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "Sarara {{displayCount}}",
       "matchesBadge_one": "Walsimsiisota {{displayCount}}",
       "matchesBadge_other": "Walsimsiisota {{displayCount}}",
-      "noOutput": "Bu'aan hin jiru."
+      "noOutput": "Bu'aan hin jiru.",
+      "translationFailed": "Hiikkaachuun kufe"
     },
     "readToolMarkdown": {
       "linesTruncated": "sararoota {{start}}–{{end}} (gabaabbate)",

@@ -1387,7 +1387,6 @@
       "installApp": "התקנת אפליקציית GitHub",
       "reauthorizeButton": "חידוש ההרשאה לאפליקציית GitHub",
       "reauthorizeDescription": "סוכן האבטחה זקוק להרשאת vulnerability_alerts כדי לגשת להתראות Dependabot. חדש את ההרשאה לאפליקציית GitHub כדי לתת לו גישה.",
-      "reauthorizeFailed": "לא ניתן להתחיל את חידוש ההרשאה. נסה שוב.",
       "reauthorizeTitle": "נדרשות הרשאות נוספות",
       "setupFailed": "לא ניתן להתחיל את הגדרת GitHub. נסה שוב."
     },
@@ -1411,6 +1410,7 @@
     "settingsSave": {
       "saveChanges": "שמירת שינויים",
       "unsavedMessage": "לשמור את השינויים לפני היציאה מהמסך?",
+      "unsavedInvalidMessage": "לא ניתן עדיין לשמור את השינויים האלה. תקן אותם כדי לשמור, או ויתר עליהם כדי לצאת.",
       "unsavedTitle": "שינויים שלא נשמרו"
     },
     "setup": {
@@ -1813,7 +1813,8 @@
       "matchesBadge_one": "{{displayCount}} התאמה",
       "matchesBadge_other": "{{displayCount}} התאמות",
       "matchesBadge_two": "{{displayCount}} התאמות",
-      "noOutput": "אין פלט."
+      "noOutput": "אין פלט.",
+      "translationFailed": "התרגום נכשל"
     },
     "readToolMarkdown": {
       "linesTruncated": "שורות {{start}}–{{end}} (התוכן נחתך)",

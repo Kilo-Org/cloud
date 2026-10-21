@@ -70,15 +70,4 @@ describe('buildDiffLineAccessibilityLabel', () => {
       buildDiffLineAccessibilityLabel(makeLine({ type: 'del', oldLine: 2, text: '   \t  ' }))
     ).toBe('Deleted line 2: (empty)');
   });
-
-  // Regression guard: if a future refactor decouples the label from the
-  // parsed type, screen readers could report "Added" for a deleted line
-  // — which would be worse than the color-only fallback it replaces.
-  it('is derived from the parsed type — same input yields the same label, type drives the word', () => {
-    const added = makeLine({ type: 'add', newLine: 1, text: 'x' });
-    const deleted = makeLine({ type: 'del', oldLine: 1, text: 'x' });
-    expect(buildDiffLineAccessibilityLabel(added)).toBe(buildDiffLineAccessibilityLabel(added));
-    expect(buildDiffLineAccessibilityLabel(added).startsWith('Added')).toBe(true);
-    expect(buildDiffLineAccessibilityLabel(deleted).startsWith('Deleted')).toBe(true);
-  });
 });

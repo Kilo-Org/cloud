@@ -1872,7 +1872,8 @@
     "settingsSave": {
       "saveChanges": "Vista breytingar",
       "unsavedTitle": "Óvistaðar breytingar",
-      "unsavedMessage": "Viltu vista breytingarnar áður en þú ferð af þessum skjá?"
+      "unsavedMessage": "Viltu vista breytingarnar áður en þú ferð af þessum skjá?",
+      "unsavedInvalidMessage": "Ekki er hægt að vista þessar breytingar ennþá. Lagaðu þær til að vista eða fargaðu þeim til að fara."
     },
     "auditReportButton": {
       "viewA11y": "Skoða endurskoðunarskýrslu"
@@ -1938,7 +1939,6 @@
       "installApp": "Setja upp GitHub-forrit",
       "reauthorizeButton": "Endurnýja heimildir GitHub-forritsins",
       "reauthorizeDescription": "Öryggisvakinn þarf heimildina vulnerability_alerts til að fá aðgang að Dependabot-viðvörunum. Endurnýjaðu heimildir GitHub-forritsins til að veita þessa heimild.",
-      "reauthorizeFailed": "Ekki tókst að hefja endurnýjun heimilda. Reyndu aftur.",
       "reauthorizeTitle": "Viðbótarheimildir nauðsynlegar",
       "setupFailed": "Ekki tókst að hefja uppsetningu GitHub. Reyndu aftur."
     },
@@ -2312,7 +2312,8 @@
       "linesBadge_other": "{{displayCount}} línur",
       "matchesBadge_one": "{{displayCount}} samsvörun",
       "matchesBadge_other": "{{displayCount}} samsvaranir",
-      "noOutput": "Ekkert úttak."
+      "noOutput": "Ekkert úttak.",
+      "translationFailed": "Þýðing mistókst"
     },
     "readToolMarkdown": {
       "linesTruncated": "línur {{start}}–{{end}} (stytt)",

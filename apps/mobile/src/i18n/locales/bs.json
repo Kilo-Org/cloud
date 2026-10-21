@@ -1895,7 +1895,8 @@
     "settingsSave": {
       "saveChanges": "Sačuvaj izmjene",
       "unsavedTitle": "Nesačuvane izmjene",
-      "unsavedMessage": "Sačuvati izmjene prije napuštanja ovog ekrana?"
+      "unsavedMessage": "Sačuvati izmjene prije napuštanja ovog ekrana?",
+      "unsavedInvalidMessage": "Ove izmjene se još ne mogu sačuvati. Ispravi ih da bi sačuvao ili ih odbaci da bi otišao."
     },
     "auditReportButton": {
       "viewA11y": "Pogledaj revizijski izvještaj"
@@ -1961,7 +1962,6 @@
       "installApp": "Instaliraj GitHub aplikaciju",
       "reauthorizeButton": "Ponovo autoriziraj GitHub aplikaciju",
       "reauthorizeDescription": "Sigurnosni agent zahtijeva dozvolu vulnerability_alerts za pristup upozorenjima iz Dependabota. Ponovo autoriziraj GitHub aplikaciju da dodijeliš ovu dozvolu.",
-      "reauthorizeFailed": "Nije moguće započeti ponovnu autorizaciju. Pokušaj ponovo.",
       "reauthorizeTitle": "Potrebne dodatne dozvole",
       "setupFailed": "Nije moguće započeti podešavanje GitHuba. Pokušaj ponovo."
     },
@@ -2344,7 +2344,8 @@
       "matchesBadge_one": "{{displayCount}} podudaranje",
       "matchesBadge_other": "{{displayCount}} podudaranja",
       "matchesBadge_few": "{{displayCount}} podudaranja",
-      "noOutput": "Nema izlaza."
+      "noOutput": "Nema izlaza.",
+      "translationFailed": "Prijevod nije uspio"
     },
     "readToolMarkdown": {
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",

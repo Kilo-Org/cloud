@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -14,6 +14,7 @@ import {
 } from '@/components/profiles/repo-bindings-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, GitBranch, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,6 +26,8 @@ import {
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /** The mutation hook toasts `error.message`; the screen supplies a fallback otherwise. */
 function hasUsableMessage(error: unknown): boolean {
@@ -76,7 +79,7 @@ function RepoBindingRow({
         {repoPlatformBadge(platform)}
       </Text>
       <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('profiles.repoBindings.remove')}
         disabled={isRemoving}
@@ -190,7 +193,7 @@ export function RepoBindingsScreen({ organizationId }: Readonly<{ organizationId
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profiles.repoBindings.title')} />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -283,7 +286,7 @@ export function RepoBindingsScreen({ organizationId }: Readonly<{ organizationId
             <Text>{t('profiles.repoBindings.add')}</Text>
           </Button>
         )}
-      </ScrollView>
+      </TabScreenScrollView>
 
       {repoPickerOpen ? (
         <RepoPickerSheet

@@ -172,6 +172,13 @@ export type ProfileOrganization = {
   role: OrganizationRole;
 };
 
+/** One row of the profile query: the org, the caller's membership, and its current seat status. */
+type ProfileOrganizationRow = {
+  organization: Organization;
+  membership: typeof organization_memberships.$inferSelect;
+  latestSeatPurchaseStatus: OrganizationSeatsPurchase['subscription_status'] | null;
+};
+
 export type GetProfileOrganizationsOptions = {
   // When true, omit organizations whose free trial has hard-expired without an
   // active entitlement (the "Access Blocked" state). These orgs are locked to
@@ -200,7 +207,7 @@ export async function getProfileOrganizations(
       )`
     : sql<OrganizationSeatsPurchase['subscription_status'] | null>`NULL`;
 
-  const results = await db
+  const results: ProfileOrganizationRow[] = await db
     .select({
       organization: organizations,
       membership: organization_memberships,

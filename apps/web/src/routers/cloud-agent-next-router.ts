@@ -168,8 +168,9 @@ async function createCloudAgentControlToken(user: User, headersList?: Headers): 
  * - New message format (Message + Part[])
  * - New modes ('plan' | 'build')
  *
- * All mutations return immediately with execution info; streaming is handled
- * separately via WebSocket connection.
+ * Mutations return immediately. `initiateFromPreparedSession` and
+ * `sendMessage` include execution info; streaming is handled separately via
+ * the WebSocket connection.
  */
 export const cloudAgentNextRouter = createTRPCRouter({
   getSandboxSelectionOptions: baseProcedure
@@ -210,7 +211,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
 
       const { gitlabProject, githubRepo, publicRepoUrl, attachments, images, ...restInput } = input;
 
-      // Determine git source: GitLab uses gitUrl, GitHub uses githubRepo.
       // Tokens are resolved inside cloud-agent-next via GIT_TOKEN_SERVICE.
       // Profile resolution (repo binding + default + explicit override) also
       // happens in cloud-agent-next; we just forward profileId and any inline
@@ -537,7 +537,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(cloudAgentGetImageUploadUrlSchema)
     .mutation(async ({ ctx, input }) => {
       return generateImageUploadUrl({
-        service: 'cloud-agent',
         userId: ctx.user.id,
         messageUuid: input.messageUuid,
         imageId: input.imageId,
@@ -713,15 +712,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
       return await client.getPendingInteractions(input.cloudAgentSessionId);
     }),
 
-  getComputeBillingStatus: baseProcedure
-    .input(baseGetSessionNextSchema)
-    .query(async ({ ctx, input }) => {
-      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
-      return await createCloudAgentNextClient(
-        await createCloudAgentControlToken(ctx.user, ctx.headersList)
-      ).getComputeBillingStatus(input.cloudAgentSessionId);
-    }),
-
   checkEligibility: baseProcedure.query(async ({ ctx }) => {
     const { balance } = await getBalanceForUser(ctx.user);
     return buildCloudAgentNextEligibility(balance);
@@ -753,6 +743,10 @@ export const cloudAgentNextRouter = createTRPCRouter({
         integrationInstalled: z.boolean(),
         syncedAt: z.string().nullish(),
         errorMessage: z.string().optional(),
+        unavailableReason: z
+          .enum(['suspended', 'disconnected', 'reauth_required', 'not_configured'])
+          .optional(),
+        partial: z.boolean().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -767,6 +761,8 @@ export const cloudAgentNextRouter = createTRPCRouter({
         integrationInstalled: result.integrationInstalled,
         syncedAt: result.syncedAt,
         errorMessage: result.errorMessage,
+        unavailableReason: result.unavailableReason,
+        partial: result.partial,
       };
     }),
 

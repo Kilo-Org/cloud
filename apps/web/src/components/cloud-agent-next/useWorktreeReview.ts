@@ -307,7 +307,7 @@ export function useWorktreeReview({
           path,
           expectedRevision: revision,
         });
-    return queryClient.fetchQuery(options);
+    return queryClient.query(options);
   };
 
   const applyWorktreeReviewRebase = (

@@ -1,0 +1,8 @@
+version: 1
+
+setupCommands:
+  - pnpm install --frozen-lockfile
+
+verificationCommands:
+  - pnpm --filter web run lint
+  - pnpm run test:web-rewrites

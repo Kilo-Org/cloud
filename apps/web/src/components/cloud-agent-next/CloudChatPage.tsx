@@ -978,7 +978,7 @@ export default function CloudChatPage({
   const fetchRouteReady = useCallback(
     async (kiloSessionId: string): Promise<boolean | undefined> => {
       try {
-        const data = await queryClient.fetchQuery({
+        const data = await queryClient.query({
           ...trpc.cliSessionsV2.getWithRuntimeState.queryOptions({ session_id: kiloSessionId }),
           staleTime: 0,
           retry: false,

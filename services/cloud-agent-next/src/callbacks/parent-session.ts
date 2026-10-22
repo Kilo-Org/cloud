@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { PARENT_SESSION_CALLBACK_URL } from '@kilocode/worker-utils/cloud-agent-authority';
 import { requireCurrentSessionAccess } from '../session-access.js';
-import { fetchSessionMetadata } from '../session-service.js';
+import { fetchSessionMetadata } from '../session/metadata.js';
 import { isCanonicalMessageId } from '../session/message-id.js';
 import { preflightAndQueuePromptMessage } from '../session/queue-message.js';
 import type { Env } from '../types.js';

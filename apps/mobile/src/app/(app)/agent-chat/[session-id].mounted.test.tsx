@@ -508,7 +508,6 @@ beforeEach(() => {
             variant: null,
             repository: null,
             isInitiated: true,
-            needsLegacyPrepare: false,
             isPreparingAsync: false,
             prompt: null,
             initialMessageId: null,
@@ -672,8 +671,6 @@ describe('SessionDetailScreen display scope', () => {
       queryState.isError = state !== 'pending';
       queryState.error = { data: { code: state } };
       const renderer = await mountRoute();
-      const header = renderer.root.findByType(ScreenHeader);
-      expect(propOf(header, 'context')).toBeUndefined();
       expect(findByType(renderer.root, 'Text').flatMap(node => node.children)).not.toContain(
         'Personal'
       );

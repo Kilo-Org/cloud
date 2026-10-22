@@ -468,12 +468,16 @@ export const githubAppsRouter = createTRPCRouter({
         return {
           hasPending: false,
           pendingOrganizationId: null,
+          pendingIntegrationId: null,
         };
       }
 
       return {
         hasPending: true,
         pendingOrganizationId: pendingInstallation.owned_by_organization_id,
+        // Names the exact pending row this response describes, so a cancel is
+        // pinned to it instead of to whichever pending row matches the owner.
+        pendingIntegrationId: pendingInstallation.id,
       };
     }),
 
@@ -552,43 +556,36 @@ export const githubAppsRouter = createTRPCRouter({
       return githubAppsService.listBranches(owner, input.integrationId, input.repositoryFullName);
     }),
 
-  // Cancel pending installation
+  // Cancel one pending installation request, named by its integration id so a
+  // user with several pending requests cancels the one the client displayed.
   cancelPendingInstallation: baseProcedure
     .input(
-      z
-        .object({
-          organizationId: z.string().uuid().optional(),
-          integrationId: z.string().uuid().optional(),
-        })
-        .optional()
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        integrationId: z.string().uuid(),
+      })
     )
     .mutation(async ({ ctx, input }) => {
-      let role: Awaited<ReturnType<typeof ensureOrganizationAccess>> | null = null;
-      if (input?.organizationId) {
-        role = await ensureOrganizationAccess(ctx, input.organizationId);
-        if (!input.integrationId) {
-          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Integration ID is required' });
-        }
+      const role = input.organizationId
+        ? await ensureOrganizationAccess(ctx, input.organizationId)
+        : null;
+      const owner = resolveOwner(ctx, input.organizationId);
+      const integration = await getGitHubIntegrationById(owner, input.integrationId);
+      if (!integration) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Pending installation not found' });
       }
-      const owner = resolveOwner(ctx, input?.organizationId);
-      if (input?.integrationId) {
-        const integration = await getGitHubIntegrationById(owner, input.integrationId);
-        if (!integration) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Pending installation not found' });
-        }
-        const canCancel =
-          !input.organizationId ||
-          ctx.user.is_admin ||
-          role === 'owner' ||
-          role === 'admin' ||
-          integration.kilo_requester_user_id === ctx.user.id;
-        if (!canCancel) {
-          throw new TRPCError({ code: 'FORBIDDEN', message: 'Cannot cancel this request' });
-        }
+      const canCancel =
+        !input.organizationId ||
+        ctx.user.is_admin ||
+        role === 'owner' ||
+        role === 'admin' ||
+        integration.kilo_requester_user_id === ctx.user.id;
+      if (!canCancel) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Cannot cancel this request' });
       }
-      const result = await githubAppsService.cancelPendingInstallation(owner, input?.integrationId);
+      const result = await githubAppsService.cancelPendingInstallation(owner, input.integrationId);
 
-      if (input?.organizationId) {
+      if (input.organizationId) {
         await createAuditLog({
           organization_id: input.organizationId,
           action: 'organization.settings.change',

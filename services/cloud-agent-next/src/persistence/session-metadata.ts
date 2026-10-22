@@ -22,7 +22,7 @@ import {
   sandboxKindSchema,
   type SandboxKind,
 } from '../sandbox-placement.js';
-import { sessionPlaneFromId } from '../session-plane.js';
+import { isControlSession } from '../session-identity.js';
 import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { agentSandboxProviderSchema, type AgentSandboxProvider } from '../types.js';
@@ -458,19 +458,19 @@ export const CurrentSessionMetadataSchema = z
   .refine(
     metadata =>
       !sandboxAllocationRequiresControlPlane(metadata.workspace?.sandboxAllocation) ||
-      sessionPlaneFromId(metadata.identity.sessionId) === 'control',
+      isControlSession(metadata.identity.sessionId),
     'Sandbox allocations for this provider require a control-plane session'
   )
   .refine(
     metadata =>
       metadata.workspace?.sandboxKind === undefined ||
-      sessionPlaneFromId(metadata.identity.sessionId) === 'control',
+      isControlSession(metadata.identity.sessionId),
     'Sandbox kind requires a control-plane session'
   )
   .refine(
     metadata =>
       metadata.workspace?.sandboxProvider !== 'cloudflare-containers' ||
-      sessionPlaneFromId(metadata.identity.sessionId) === 'control',
+      isControlSession(metadata.identity.sessionId),
     'Cloudflare containers sandbox metadata requires a control-plane session'
   );
 
@@ -482,7 +482,7 @@ export function getControlPlaneCredentialContainment(
   repository: SessionMetadata['repository'],
   enabled = true
 ): CredentialContainment | undefined {
-  if (sessionPlaneFromId(sessionId) !== 'control') return undefined;
+  if (!isControlSession(sessionId)) return undefined;
   return {
     github: enabled && repository?.type === 'github',
     gitlab: enabled && repository?.type === 'gitlab',

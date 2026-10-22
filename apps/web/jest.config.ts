@@ -41,7 +41,6 @@ const config: Config = {
   testPathIgnorePatterns: [
     '<rootDir>/../../.kilocode/',
     '<rootDir>/../../services/cloud-agent-next/',
-    '<rootDir>/../../services/app-builder/',
     '<rootDir>/../../services/webhook-agent-ingest/',
     '<rootDir>/../../services/session-ingest/',
     '<rootDir>/../../services/gastown/',

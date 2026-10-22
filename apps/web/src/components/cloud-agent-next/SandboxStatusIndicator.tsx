@@ -213,7 +213,7 @@ export function SandboxStatusIndicator({
     const cloudAgentSessionId = cloudAgentSessionIdRef.current;
     const key = ['cloud-agent-sandbox-observation', organizationId ?? null, scopeId];
     const getTicket = () =>
-      queryClient.fetchQuery({
+      queryClient.query({
         queryKey: [...key, cloudAgentSessionId, 'stream-ticket', observation.freshAfter],
         staleTime: 0,
         gcTime: 0,

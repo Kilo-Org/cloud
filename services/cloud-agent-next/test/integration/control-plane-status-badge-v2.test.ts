@@ -7,7 +7,7 @@ import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-d
 import { allocation as allocationTable } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';

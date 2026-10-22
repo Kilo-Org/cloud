@@ -34,7 +34,7 @@ import { hasModernRuntimeAuthorization } from '../../session/runtime-authorizati
 import { getWorktreeCredentialContainment } from '../../sandbox-control/credential-containment.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../../runtime-credential-proxy.js';
 import { getControlPlaneSessionDirectory } from '../../workspace.js';
-import { getCommandGuardPolicy, getCommandGuardPermissions } from '../../session-service.js';
+import { getCommandGuardPolicy, getCommandGuardPermissions } from '../../session/command-guard.js';
 import { codeReviewIdFromCallbackTarget } from '../../router/schemas.js';
 import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import type { ControlPlaneSessionRegistration } from './session-do.js';
@@ -246,8 +246,8 @@ export function buildControlPlaneSessionRegistration(
     if (!validated.success) throw new McpAttachValidationError(validated.reason);
   }
   // A read-only Bitbucket review runs with worker-owned env only, so its
-  // encrypted profile secrets, agents and commands are withheld, mirroring the
-  // legacy plane and the withheld MCP snapshot. Its runtime skills stay: they
+  // encrypted profile secrets, agents, commands and MCP are withheld.
+  // Its runtime skills stay: they
   // carry the trusted review skill that the Code Reviewer attaches.
   const readOnlyBitbucketReview = isReadOnlyBitbucketReview(metadata);
   const encryptedSecrets = readOnlyBitbucketReview ? undefined : metadata.profile?.encryptedSecrets;

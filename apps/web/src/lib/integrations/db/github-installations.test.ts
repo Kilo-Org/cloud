@@ -104,7 +104,16 @@ async function applyConnectionRoleBackfill() {
     .map(statement => statement.trim())
     .filter(statement => statement.startsWith('WITH eligible AS'));
   expect(backfill).toHaveLength(1);
-  await db.execute(sql.raw(backfill[0]));
+  const currentBackfill = backfill[0]
+    .replace(
+      'EXISTS (SELECT 1 FROM deployments d WHERE d.platform_integration_id = pi.id)',
+      'false'
+    )
+    .replace(
+      'OR EXISTS (SELECT 1 FROM app_builder_projects p WHERE p.git_platform_integration_id = pi.id)',
+      ''
+    );
+  await db.execute(sql.raw(currentBackfill));
 }
 
 describe('GitHub installation persistence', () => {

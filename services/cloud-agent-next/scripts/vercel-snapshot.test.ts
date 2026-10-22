@@ -17,10 +17,6 @@ import {
 describe('Vercel snapshot operator pure logic', () => {
   const artifacts = [
     {
-      installName: 'kilocode-wrapper.js',
-      sha256: 'a622b10ddc23c8c9e9ec39d4833ae9b7b772ef40cb430425cb1689b76ec3490c',
-    },
-    {
       installName: 'kilo-restore-session.js',
       sha256: '8ade8fb1988ac5066301d3c85f471bce8de4c8e4bb0e4b16efbd959317de7535',
     },
@@ -49,7 +45,6 @@ describe('Vercel snapshot operator pure logic', () => {
   const manifest = createRuntimeManifest({
     runtimeBuildId: 'cloud-agent-2026-06-10.1',
     wrapperVersion: '2.3.0',
-    wrapperBytes: new TextEncoder().encode('wrapper'),
     controlPlaneWrapperBytes: new TextEncoder().encode('control-plane-wrapper'),
     controlPlaneSupervisorBytes: new TextEncoder().encode('supervisor'),
     artifacts,
@@ -61,7 +56,6 @@ describe('Vercel snapshot operator pure logic', () => {
       wrapperVersion: '2.3.0',
       runtime: 'node24',
       bunVersion: '1.3.14',
-      wrapperSha256: 'a622b10ddc23c8c9e9ec39d4833ae9b7b772ef40cb430425cb1689b76ec3490c',
       controlPlaneWrapperSha256: '042faca14bb0e2ccbb0d1f7c3617f91df4254711df5d8fb54e66e64e39264908',
       controlPlaneSupervisorSha256:
         '0834c2d60725ac5902257b3b78dd161ad26d1c0290dbf1e47cc14add5b8c8142',
@@ -149,9 +143,9 @@ describe('Vercel snapshot operator pure logic', () => {
     });
   });
 
-  it('defaults wrapper path, wrapper version, and a dated build id', () => {
+  it('defaults the wrapper dist directory, wrapper version, and a dated build id', () => {
     const input = resolveSnapshotInputs({});
-    expect(input.wrapperPath).toMatch(/wrapper\/dist\/wrapper\.js$/);
+    expect(input.buildRoot).toMatch(/cloud-agent-next\/wrapper$/);
     expect(input.controlPlaneWrapperPath).toMatch(/wrapper\/dist\/control-plane-wrapper\.js$/);
     expect(input.controlPlaneSupervisorPath).toMatch(/wrapper\/control-plane-supervisor\.sh$/);
     expect(input.wrapperVersion).toBe(WRAPPER_VERSION);
@@ -163,7 +157,7 @@ describe('Vercel snapshot operator pure logic', () => {
 
   it('derives the full artifact inventory from the shared distribution contract', () => {
     const input = resolveSnapshotInputs({});
-    expect(input.artifactPaths['kilocode-wrapper.js']).toBe(input.wrapperPath);
+    expect(input.artifactPaths['kilocode-wrapper.js']).toBeUndefined();
     expect(input.artifactPaths['kilocode-control-plane-wrapper.js']).toBe(
       input.controlPlaneWrapperPath
     );
@@ -182,7 +176,7 @@ describe('Vercel snapshot operator pure logic', () => {
 
   it('moves the whole dist inventory with a --wrapper override', () => {
     const input = resolveSnapshotInputs({ wrapper: '/elsewhere/build/wrapper.js' });
-    expect(input.wrapperPath).toBe('/elsewhere/build/wrapper.js');
+    expect(input.buildRoot).toBe('/elsewhere');
     expect(input.controlPlaneWrapperPath).toBe('/elsewhere/build/control-plane-wrapper.js');
     expect(input.controlPlaneSupervisorPath).toBe('/elsewhere/control-plane-supervisor.sh');
     expect(input.artifactPaths['kilo-restore-session.js']).toBe(

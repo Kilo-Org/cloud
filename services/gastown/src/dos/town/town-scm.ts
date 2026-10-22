@@ -68,10 +68,18 @@ export async function resolveGitHubToken(ctx: SCMContext): Promise<GitHubTokenRe
   const sourceLabel = townConfig.git_auth?.platform_integration_id
     ? 'town platform integration'
     : 'rig platform integration';
-  if (integrationId && ctx.env.GIT_TOKEN_SERVICE) {
+  const integrationOwner = townIntegrationOwner(townConfig);
+  if (integrationId && !integrationOwner) {
+    tried.push(`${sourceLabel} (town has no owner)`);
+    return { ok: false, tried };
+  }
+  if (integrationId && integrationOwner && ctx.env.GIT_TOKEN_SERVICE) {
     tried.push(sourceLabel);
     try {
-      const fresh = await ctx.env.GIT_TOKEN_SERVICE.getTokenForIntegration(integrationId);
+      const fresh = await ctx.env.GIT_TOKEN_SERVICE.getTokenForIntegration({
+        integrationId,
+        ...integrationOwner,
+      });
       if (fresh.success) {
         return { ok: true, token: fresh.token, source: sourceLabel };
       }
@@ -101,6 +109,23 @@ export async function resolveGitHubToken(ctx: SCMContext): Promise<GitHubTokenRe
   tried.push('town.git_auth.github_token');
 
   return { ok: false, tried };
+}
+
+/**
+ * The identity a town's platform integration must belong to, read from the
+ * ownership fields set when the town was created: the owning user for a
+ * personal town, or the owning org plus its creator for an org town.
+ */
+function townIntegrationOwner(
+  townConfig: TownConfig
+): { userId: string } | { userId: string; orgId: string } | null {
+  if (townConfig.owner_type === 'org') {
+    const orgId = townConfig.organization_id ?? townConfig.owner_id;
+    const userId = townConfig.owner_user_id;
+    return orgId && userId ? { userId, orgId } : null;
+  }
+  const userId = townConfig.owner_id ?? townConfig.owner_user_id;
+  return userId ? { userId } : null;
 }
 
 export async function resolveGitHubTokenString(ctx: SCMContext): Promise<string | null> {

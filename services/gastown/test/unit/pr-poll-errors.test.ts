@@ -60,7 +60,10 @@ describe('resolveGitHubToken', () => {
       platformIntegrationId: 'integration-123',
       env: { GIT_TOKEN_SERVICE: { getToken: async () => null } } as unknown as SCMContext['env'],
       getTownConfig: async () =>
-        ({ git_auth: { platform_integration_id: 'integration-123' } }) as TownConfig,
+        ({
+          owner_user_id: 'user-owner',
+          git_auth: { platform_integration_id: 'integration-123' },
+        }) as TownConfig,
     });
     const result = await resolveGitHubToken(ctx);
     expect(result.ok).toBe(false);
@@ -73,7 +76,7 @@ describe('resolveGitHubToken', () => {
     const ctx = mockSCMContext({
       platformIntegrationId: 'rig-integration-456',
       env: { GIT_TOKEN_SERVICE: { getToken: async () => null } } as unknown as SCMContext['env'],
-      getTownConfig: async () => ({}) as TownConfig,
+      getTownConfig: async () => ({ owner_user_id: 'user-owner' }) as TownConfig,
     });
     const result = await resolveGitHubToken(ctx);
     expect(result.ok).toBe(false);
@@ -87,7 +90,10 @@ describe('resolveGitHubToken', () => {
       platformIntegrationId: 'integration-789',
       env: {} as SCMContext['env'],
       getTownConfig: async () =>
-        ({ git_auth: { platform_integration_id: 'integration-789' } }) as TownConfig,
+        ({
+          owner_user_id: 'user-owner',
+          git_auth: { platform_integration_id: 'integration-789' },
+        }) as TownConfig,
     });
     const result = await resolveGitHubToken(ctx);
     expect(result.ok).toBe(false);

@@ -1,17 +1,22 @@
-import { describe, it, expect, jest } from '@jest/globals';
+import { beforeAll, describe, it, expect } from '@jest/globals';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { ai_gateway_config } from '@kilocode/db/schema';
+import {
+  mapModelIdToVercel,
+  mapResolvedModelIdToVercelWithoutOverrides,
+  readVercelModelIdOverrides,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 
-const mockLimit = jest.fn<() => Promise<Array<{ models: unknown }>>>().mockResolvedValue([]);
+const overrides = [
+  { openrouter_model_id: 'meta/muse-wonder', vercel_model_id: 'meta/muse-wonder-1.0' },
+  { openrouter_model_id: 'gpt-4o', vercel_model_id: 'openai/gpt-4o' },
+  { openrouter_model_id: 'qwen/qwen3-14b', vercel_model_id: 'alibaba/qwen-3-14b' },
+];
 
-jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  readDb: {
-    select: jest.fn(() => ({
-      from: jest.fn(() => ({
-        orderBy: jest.fn(() => ({ limit: mockLimit })),
-      })),
-    })),
-  },
-}));
-import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+beforeAll(async () => {
+  await cleanupDbForTest();
+  await db.insert(ai_gateway_config).values({ vercel_model_id_overrides: { overrides } });
+});
 
 describe('mapModelIdToVercel', () => {
   describe('catalog aliases', () => {
@@ -22,64 +27,29 @@ describe('mapModelIdToVercel', () => {
     });
   });
 
-  describe('hardcoded OpenRouter → Vercel mapping', () => {
-    it.each([
-      ['mistralai/codestral-2508', 'mistral/codestral'],
-      ['mistralai/devstral-2512', 'mistral/devstral-2'],
-      ['mistralai/mistral-embed-2312', 'mistral/mistral-embed'],
-      ['mistralai/codestral-embed-2505', 'mistral/codestral-embed'],
-      ['mistralai/ministral-14b-2512', 'mistral/ministral-14b'],
-      ['mistralai/ministral-3b-2512', 'mistral/ministral-3b'],
-      ['mistralai/ministral-8b-2512', 'mistral/ministral-8b'],
-      ['mistralai/mistral-large-2512', 'mistral/mistral-large-3'],
-      ['mistralai/mistral-large-4-0', 'mistral/mistral-large-4'],
-      ['mistralai/mistral-medium-3-5', 'mistral/mistral-medium-3.5'],
-      ['mistralai/mistral-small-2603', 'mistral/mistral-small'],
-      ['qwen/qwen3-14b', 'alibaba/qwen-3-14b'],
-      ['qwen/qwen3-235b-a22b', 'alibaba/qwen-3-235b'],
-      ['qwen/qwen3-30b-a3b', 'alibaba/qwen-3-30b'],
-      ['qwen/qwen3-32b', 'alibaba/qwen-3-32b'],
-      ['anthropic/claude-haiku-4-5', 'anthropic/claude-haiku-4.5'],
-      ['anthropic/claude-sonnet-4-5', 'anthropic/claude-sonnet-4.5'],
-      ['anthropic/claude-sonnet-4-6', 'anthropic/claude-sonnet-4.6'],
-      ['anthropic/claude-sonnet-5-20260630', 'anthropic/claude-sonnet-5'],
-      ['claude-sonnet-4.5', 'anthropic/claude-sonnet-4.5'],
-      ['claude-sonnet-5', 'anthropic/claude-sonnet-5'],
-      ['deepseek-v4-flash', 'deepseek/deepseek-v4-flash'],
-      ['deepseek-v4-flash-0731', 'deepseek/deepseek-v4-flash-0731'],
-      ['deepseek-v4-pro', 'deepseek/deepseek-v4-pro'],
-      ['gemini-2.5-flash-lite', 'google/gemini-2.5-flash-lite'],
-      ['minimax-m3', 'minimax/minimax-m3'],
-      ['minimax/minimax-m2.5-20260211', 'minimax/minimax-m2.5'],
-      ['kimi-k3', 'moonshotai/kimi-k3'],
-      ['meta/muse-wonder', 'meta/muse-wonder-1.0'],
-      ['gpt-4.1-mini', 'openai/gpt-4.1-mini'],
-      ['gpt-4o', 'openai/gpt-4o'],
-      ['gpt-4o-mini', 'openai/gpt-4o-mini'],
-      ['gpt-5.2', 'openai/gpt-5.2'],
-      ['gpt-5.4', 'openai/gpt-5.4'],
-      ['gpt-5.4-mini', 'openai/gpt-5.4-mini'],
-      ['gpt-5.5', 'openai/gpt-5.5'],
-      ['gpt-5.6-luna', 'openai/gpt-5.6-luna'],
-      ['gpt-5.6-sol', 'openai/gpt-5.6-sol'],
-      ['gpt-5.6-terra', 'openai/gpt-5.6-terra'],
-    ])('maps %s to %s', async (input, expected) => {
-      await expect(mapModelIdToVercel(input)).resolves.toBe(expected);
+  describe('model ID overrides', () => {
+    it('reads the stored overrides', async () => {
+      expect(await readVercelModelIdOverrides()).toEqual(
+        new Map(overrides.map(o => [o.openrouter_model_id, o.vercel_model_id]))
+      );
     });
 
-    it.each([
-      'gpt-4o-2024-08-06',
-      'claude-fable-5',
-      'claude-sonnet-4',
-      'inclusionai/ling-3.1-flash:free',
-      'minimax-m2.5',
-      'gpt-5.2-codex',
-      'step-3.5-flash',
-      'mimo-v2.5',
-      'glm-5.1',
-      'glm-5.2',
-    ])('does not retain a mapping for %s', async modelId => {
-      await expect(mapModelIdToVercel(modelId)).resolves.toBe(modelId);
+    it.each(overrides.map(o => [o.openrouter_model_id, o.vercel_model_id]))(
+      'maps %s to %s',
+      async (input, expected) => {
+        await expect(mapModelIdToVercel(input)).resolves.toBe(expected);
+      }
+    );
+
+    it('takes precedence over the built-in prefix rewrite', async () => {
+      expect(mapResolvedModelIdToVercelWithoutOverrides('qwen/qwen3-14b')).toBe(
+        'alibaba/qwen3-14b'
+      );
+      await expect(mapModelIdToVercel('qwen/qwen3-14b')).resolves.toBe('alibaba/qwen-3-14b');
+    });
+
+    it('falls back to the built-in rules for models without an override', async () => {
+      await expect(mapModelIdToVercel('gpt-4o-mini')).resolves.toBe('gpt-4o-mini');
     });
   });
 
@@ -90,8 +60,13 @@ describe('mapModelIdToVercel', () => {
       );
     });
 
+    it('rewrites the bytedance-seed/ prefix to bytedance/', async () => {
+      await expect(mapModelIdToVercel('bytedance-seed/seed-1.6')).resolves.toBe(
+        'bytedance/seed-1.6'
+      );
+    });
+
     it('rewrites the mistralai/ prefix to mistral/', async () => {
-      // not covered by the hardcoded mapping
       await expect(mapModelIdToVercel('mistralai/some-new-model')).resolves.toBe(
         'mistral/some-new-model'
       );

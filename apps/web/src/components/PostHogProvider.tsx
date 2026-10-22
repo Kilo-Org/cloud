@@ -6,11 +6,10 @@ import { useSession } from 'next-auth/react';
 import { Suspense, useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
-  isSessionSharePath,
-  sanitizeAnalyticsPathname,
+  isSharedSessionPath,
   sanitizeAnalyticsUrl,
-  sanitizeAnalyticsUrlValue,
 } from '@kilocode/web-shared/lib/sanitize-analytics-url';
+import { sanitizePostHogEvent } from '@/lib/posthog-event-sanitizer';
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -31,23 +30,8 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       disable_web_experiments: false,
       capture_pageview: false, // We capture pageviews manually
       capture_pageleave: true, // Enable pageleave capture
-      disable_session_recording: isSessionSharePath(window.location.pathname),
-      before_send: event => {
-        if (!event?.properties) return event;
-        return {
-          ...event,
-          properties: {
-            ...event.properties,
-            $current_url: sanitizeAnalyticsUrlValue(event.properties.$current_url),
-            $pathname:
-              typeof event.properties.$pathname === 'string'
-                ? sanitizeAnalyticsPathname(event.properties.$pathname)
-                : event.properties.$pathname,
-            $referrer: sanitizeAnalyticsUrlValue(event.properties.$referrer),
-            $referring_domain: sanitizeAnalyticsUrlValue(event.properties.$referring_domain),
-          },
-        };
-      },
+      disable_session_recording: isSharedSessionPath(window.location.pathname),
+      before_send: event => sanitizePostHogEvent(event),
       loaded: function (ph) {
         if (!isProduction) {
           // Opt out of capturing in non-production environments
@@ -92,7 +76,7 @@ function PostHogPageView() {
 
   useEffect(() => {
     if (!pathname || !posthog) return;
-    if (isSessionSharePath(pathname)) {
+    if (isSharedSessionPath(pathname)) {
       posthog.stopSessionRecording();
       return;
     }

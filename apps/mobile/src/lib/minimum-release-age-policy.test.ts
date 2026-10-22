@@ -35,6 +35,8 @@ const BASE_EXCLUDE_ENTRIES = [
   'openclaw',
 ] as const;
 
+const CLOUDFLARE_SANDBOX_EXACT_EXCLUDE_ENTRIES = ['@cloudflare/sandbox@0.12.12'] as const;
+
 // The DO-managed Cloudflare containers runtime needs wrangler 4.134.0+, and
 // 4.135.0 exact-pins its own workerd/miniflare runtime, so each is exempted by
 // exact version. Approved early-access exception; remove this group when 4.135.0
@@ -102,11 +104,9 @@ describe('minimum release age policy contract', () => {
   });
 
   it('excludes exactly the base list plus the container-runtime and mobile exact versions', () => {
-    // Order as written: tsx, the container-runtime exemptions, then the
-    // remaining base entries, then the mobile exemptions — the base list with
-    // nothing dropped or changed.
     const expected = [
       BASE_EXCLUDE_ENTRIES[0],
+      ...CLOUDFLARE_SANDBOX_EXACT_EXCLUDE_ENTRIES,
       ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
       ...BASE_EXCLUDE_ENTRIES.slice(1),
       ...MOBILE_EXACT_EXCLUDE_ENTRIES,
@@ -116,6 +116,7 @@ describe('minimum release age policy contract', () => {
 
   it('scopes every new exclusion to one exact package@version', () => {
     expect(newExclusions).toEqual([
+      ...CLOUDFLARE_SANDBOX_EXACT_EXCLUDE_ENTRIES,
       ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
       ...MOBILE_EXACT_EXCLUDE_ENTRIES,
     ]);

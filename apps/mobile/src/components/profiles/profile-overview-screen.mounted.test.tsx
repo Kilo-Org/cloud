@@ -229,8 +229,10 @@ describe('ProfileOverviewScreen', () => {
   it('retains edited metadata after a failed save and clears the error after an explicit retry', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
+    const error = new Error('Unavailable');
+    error.message = '';
     h.mutations.update.mutateAsync
-      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockRejectedValueOnce(error)
       .mockResolvedValueOnce({ success: true });
 
     const { renderer, queryClient, unmount } = await mountScreen();
@@ -239,6 +241,7 @@ describe('ProfileOverviewScreen', () => {
     changeText(renderer.root, 'Profile description', 'Retained description');
     await pressSave(renderer.root);
     await waitFor(() => findAll(renderer.root, 'AccessibleStatus').length === 1);
+    expect(h.error).toHaveBeenCalledTimes(1);
 
     // An unrelated profile refetch must not replace the failed draft.
     h.query.data = testProfile({ vars: [{ key: 'NEW' }] });

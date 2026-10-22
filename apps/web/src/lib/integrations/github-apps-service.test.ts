@@ -275,6 +275,32 @@ describe('pending installation selection', () => {
     }
   });
 
+  it('breaks equal pending creation times by descending integration id', async () => {
+    const user = await insertTestUser();
+    const [lowerId, higherId] = [crypto.randomUUID(), crypto.randomUUID()].sort();
+    const createdAt = '2026-02-01T00:00:00.000Z';
+    try {
+      await db.insert(platform_integrations).values([
+        {
+          ...pendingRow({ userId: user.id, accountId: 'lower-id', createdAt }),
+          id: lowerId,
+        },
+        {
+          ...pendingRow({ userId: user.id, accountId: 'higher-id', createdAt }),
+          id: higherId,
+        },
+      ]);
+
+      await expect(checkUserPendingInstallation(user.id)).resolves.toMatchObject({ id: higherId });
+
+      await cancelPendingInstallation({ type: 'user', id: user.id }, higherId);
+
+      await expect(checkUserPendingInstallation(user.id)).resolves.toMatchObject({ id: lowerId });
+    } finally {
+      await cleanupUser(user.id);
+    }
+  });
+
   it('cancels exactly the named pending request and refuses any other id', async () => {
     const user = await insertTestUser();
     const otherUser = await insertTestUser();

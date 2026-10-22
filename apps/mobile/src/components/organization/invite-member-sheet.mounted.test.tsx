@@ -27,17 +27,25 @@ const invite = vi.hoisted(() => ({
   isError: false,
   error: { message: 'Seat limit reached' },
 }));
-// The route's focus effect: a mounted sheet registers it on every render, and
-// the test re-runs the latest one to present the sheet again.
-const focus = vi.hoisted(() => ({ effect: null as null | (() => void) }));
+// The route's focus effects: the sheet registers its form reset and its Back
+// handler on every render, and the test re-runs them to present the sheet
+// again. `useCallback` keeps each identity stable, so a render adds nothing.
+const focus = vi.hoisted(() => ({ effects: [] as (() => void)[] }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn() }),
   useFocusEffect: (effect: () => void) => {
-    focus.effect = effect;
+    if (!focus.effects.includes(effect)) {
+      focus.effects.push(effect);
+    }
   },
 }));
-vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  ScrollView: 'ScrollView',
+  Pressable: 'Pressable',
+  BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
+}));
 vi.mock('@/components/organization/organization-boundary', () => ({
   OrganizationBoundary: 'OrganizationBoundary',
 }));
@@ -49,8 +57,11 @@ vi.mock('@/components/organization/invited-member-row-state', () => ({
   getInviteSuccessMessage: () => '',
 }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+}));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: 'RadioGroup',
   radioItemA11y: () => ({}),
@@ -81,14 +92,14 @@ beforeEach(() => {
   invite.isError = false;
   invite.mutate.mockClear();
   invite.reset.mockClear();
-  focus.effect = null;
+  focus.effects = [];
 });
 
 type FieldProps = {
   onBlur: (event: unknown) => void;
   onChangeText: (value: string) => void;
 };
-type ButtonProps = { disabled?: boolean; onPress: () => void };
+type HeaderProps = { doneDisabled?: boolean; disabled?: boolean; onDone: () => void };
 
 /** The props of the one host element of `type`: a second one means the screen changed shape. */
 function hostProps(rendered: RenderWithProvidersResult, type: string): Record<string, unknown> {
@@ -105,8 +116,8 @@ function fieldProps(rendered: RenderWithProvidersResult): FieldProps {
   return hostProps(rendered, 'Input') as FieldProps;
 }
 
-function buttonProps(rendered: RenderWithProvidersResult): ButtonProps {
-  return hostProps(rendered, 'Button') as ButtonProps;
+function headerProps(rendered: RenderWithProvidersResult): HeaderProps {
+  return hostProps(rendered, 'SheetHeader') as HeaderProps;
 }
 
 /** The field's inline error: the first AccessibleStatus is the one FormField renders. */
@@ -126,12 +137,19 @@ function inviteMessage(rendered: RenderWithProvidersResult): unknown {
   return statuses[1]?.props.message as unknown;
 }
 
+/** Run every focus effect the mounted sheet registered: a re-presented sheet. */
+function refocus() {
+  act(() => {
+    for (const effect of focus.effects) {
+      effect();
+    }
+  });
+}
+
 /** Mount, then run the first focus — a fresh mount's state is already clean. */
 async function openSheet(): Promise<RenderWithProvidersResult> {
   const rendered = await renderWithProviders(createElement(InviteMemberSheet));
-  act(() => {
-    focus.effect?.();
-  });
+  refocus();
   expect(invite.reset).not.toHaveBeenCalled();
   return rendered;
 }
@@ -148,23 +166,19 @@ describe('InviteMemberSheet reopen', () => {
       fieldProps(rendered).onChangeText('dev@example.com');
     });
     expect(errorMessage(rendered)).toBeNull();
-    expect(buttonProps(rendered).disabled).toBe(false);
+    expect(headerProps(rendered).doneDisabled).toBe(false);
 
-    act(() => {
-      focus.effect?.();
-    });
+    refocus();
 
     expect(errorMessage(rendered)).toBeNull();
-    expect(buttonProps(rendered).disabled).toBe(true);
+    expect(headerProps(rendered).doneDisabled).toBe(true);
     expect(invite.reset).toHaveBeenCalledOnce();
     rendered.unmount();
   });
 
   it('validates the empty field again after the reset', async () => {
     const rendered = await openSheet();
-    act(() => {
-      focus.effect?.();
-    });
+    refocus();
 
     act(() => {
       fieldProps(rendered).onBlur({});
@@ -180,7 +194,7 @@ describe('InviteMemberSheet reopen', () => {
       fieldProps(rendered).onChangeText('dev@example.com');
     });
     act(() => {
-      buttonProps(rendered).onPress();
+      headerProps(rendered).onDone();
     });
     expect(invite.mutate).toHaveBeenCalledOnce();
 
@@ -191,12 +205,10 @@ describe('InviteMemberSheet reopen', () => {
     act(() => {
       fieldProps(rendered).onChangeText('dev@example.com');
     });
-    act(() => {
-      focus.effect?.();
-    });
+    refocus();
 
     expect(invite.reset).not.toHaveBeenCalled();
-    expect(buttonProps(rendered).disabled).toBe(true);
+    expect(headerProps(rendered).doneDisabled).toBe(true);
 
     // The earlier attempt fails after the reopen: its error belongs to the
     // previous form, not to the one on screen now.
@@ -219,7 +231,7 @@ describe('InviteMemberSheet reopen', () => {
       fieldProps(rendered).onChangeText('dev@example.com');
     });
     act(() => {
-      buttonProps(rendered).onPress();
+      headerProps(rendered).onDone();
     });
     invite.isError = true;
     act(() => {
@@ -237,7 +249,7 @@ describe('InviteMemberSheet reopen', () => {
     const rendered = await openSheet();
 
     act(() => {
-      buttonProps(rendered).onPress();
+      headerProps(rendered).onDone();
     });
 
     expect(invite.mutate).not.toHaveBeenCalled();

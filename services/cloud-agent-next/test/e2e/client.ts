@@ -187,6 +187,9 @@ export async function trpcCall<T>(
     // skips dev billing checks. Both e2e profiles send it, because the fake
     // LLM performs no billable inference.
     headers['x-skip-balance-check'] = 'true';
+    if (config.internalApiSecret) {
+      headers['x-internal-api-key'] = config.internalApiSecret;
+    }
   }
   if (opts?.internalApiSecret) {
     headers['x-internal-api-key'] = opts.internalApiSecret;

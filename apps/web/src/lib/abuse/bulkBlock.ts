@@ -2,7 +2,6 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { successResult, type CustomResult } from '@kilocode/web-shared/lib/maybe-result';
-import { revokeGatewayGrantsForBlockedUsers } from '@/lib/mcp-gateway/blocking-service';
 
 export type BulkBlockResponse = CustomResult<
   { updatedCount: number },
@@ -67,10 +66,6 @@ export async function bulkBlockUsers(
     // which `unblockBulkBlockedUsers` could later clear as the wrong group.
     .where(and(inArray(kilocode_users.id, valid), isNull(kilocode_users.blocked_reason)))
     .returning({ id: kilocode_users.id });
-
-  if (updated.length > 0) {
-    await revokeGatewayGrantsForBlockedUsers(updated.map(u => u.id));
-  }
 
   // A short update count means some of the selected users were concurrently
   // blocked between the read and the guarded update. Surface that as a

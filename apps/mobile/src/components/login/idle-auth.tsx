@@ -34,6 +34,12 @@ import { cn } from '@/lib/utils';
 // passkey row included), so the three provider options read as one group.
 export const PROVIDER_GLYPH_SLOT_CLASS = 'h-[18px] w-[18px] items-center justify-center';
 
+/** The two links the legal sentence exposes as custom accessibility actions. */
+const LEGAL_LINK_ACTIONS = [
+  { name: 'openTerms', labelKey: 'login.terms', url: TERMS_URL },
+  { name: 'openPrivacy', labelKey: 'common.privacyPolicy', url: PRIVACY_URL },
+] as const;
+
 export function IdleAuth({
   start,
   initialEmail = '',
@@ -51,7 +57,7 @@ export function IdleAuth({
 }>) {
   const {
     busy,
-    emailError,
+    emailErrorKey,
     clearEmailError,
     googleConfigured,
     signInWithApple,
@@ -65,6 +71,13 @@ export function IdleAuth({
   } = useNativeAuth();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  // The wrapper's label: the translated parts joined the way the row renders
+  // them. `termsConnector` carries its own leading/trailing spaces and the
+  // suffix is the sentence's period; the join below reproduces the visible
+  // "prefix Terms , connector Privacy ." spacing with single word spaces.
+  const legalSentence =
+    `${t('login.termsPrefix')} ${t('login.terms')}${t('login.termsConnector')}` +
+    `${t('common.privacyPolicy')}${t('login.termsSuffix')}`;
   const [view, setView] = useState<'main' | 'otp'>('main');
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [browserAuthStarting, setBrowserAuthStarting] = useState(false);
@@ -97,10 +110,10 @@ export function IdleAuth({
   // Both SSO recovery and an address rejected during resend need controls on
   // the main view, rather than leaving their feedback hidden behind OTP entry.
   useEffect(() => {
-    if (ssoRecovery || emailError) {
+    if (ssoRecovery || emailErrorKey) {
       setView('main');
     }
-  }, [emailError, ssoRecovery]);
+  }, [emailErrorKey, ssoRecovery]);
 
   // Restore an SSO-recovery banner that survived an RTL language reload.
   useEffect(() => {
@@ -348,7 +361,9 @@ export function IdleAuth({
 
       <FormField
         label={t('login.emailAddress')}
-        error={emailError}
+        // The hook stores a catalog key, not a message: translating here keeps
+        // the inline error in the active language after the picker switches it.
+        error={emailErrorKey ? t(emailErrorKey) : undefined}
         placeholder={t('login.emailPlaceholder')}
         keyboardType="email-address"
         autoCapitalize="none"
@@ -387,7 +402,33 @@ export function IdleAuth({
       >
         <Text>{t('common.continue')}</Text>
       </Button>
-      <View className={cn('flex-row flex-wrap items-center justify-center', INLINE_LINK_ROW_CLASS)}>
+      {/* The sentence is one accessible element: Android's screen reader does
+            not keep the row's visual order once the line wraps (in pt-BR the
+            tree read the Privacy link before Terms), so the wrapper carries the
+            whole visible-order sentence as its label and exposes each link as a
+            custom accessibility action. The children keep their classes and
+            hit slops — the row's layout and the links' 44pt touch targets are
+            unchanged — and `no-hide-descendants` (plus
+            `accessibilityElementsHidden` for iOS) removes the flattened links
+            from the tree, leaving the wrapper the only focusable node. */}
+      <View
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel={legalSentence}
+        accessibilityActions={LEGAL_LINK_ACTIONS.map(action => ({
+          name: action.name,
+          label: t(action.labelKey),
+        }))}
+        onAccessibilityAction={event => {
+          const action = LEGAL_LINK_ACTIONS.find(
+            item => item.name === event.nativeEvent.actionName
+          );
+          if (action) {
+            void WebBrowser.openBrowserAsync(action.url);
+          }
+        }}
+        className={cn('flex-row flex-wrap items-center justify-center', INLINE_LINK_ROW_CLASS)}
+      >
         {/* The sentence is a row of nodes, not one Text with nested handlers: an
             inline link's own box is what the control-size audit measures, so
             each link carries the shared inline-link box and its own per-side
@@ -403,8 +444,16 @@ export function IdleAuth({
             stay clear of the Continue button above and the ghost button
             below. */}
 
-        <Text className="text-xs text-muted-foreground">{t('login.termsPrefix')} </Text>
+        <Text
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+          className="text-xs text-muted-foreground"
+        >
+          {t('login.termsPrefix')}{' '}
+        </Text>
         <Pressable
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
           className={INLINE_LINK_BOX_CLASS}
           hitSlop={inlineLinkHitSlop('start')}
           accessibilityRole="link"
@@ -413,10 +462,16 @@ export function IdleAuth({
         >
           <Text className="text-xs text-primary underline">{t('login.terms')}</Text>
         </Pressable>
-        <Text className={cn('text-xs text-muted-foreground', INLINE_LINK_CONNECTOR_CLASS)}>
+        <Text
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+          className={cn('text-xs text-muted-foreground', INLINE_LINK_CONNECTOR_CLASS)}
+        >
           {t('login.termsConnector')}
         </Text>
         <Pressable
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
           className={INLINE_LINK_BOX_CLASS}
           hitSlop={inlineLinkHitSlop('end')}
           accessibilityRole="link"
@@ -425,7 +480,13 @@ export function IdleAuth({
         >
           <Text className="text-xs text-primary underline">{t('common.privacyPolicy')}</Text>
         </Pressable>
-        <Text className="text-xs text-muted-foreground">{t('login.termsSuffix')}</Text>
+        <Text
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+          className="text-xs text-muted-foreground"
+        >
+          {t('login.termsSuffix')}
+        </Text>
       </View>
       <Button
         // A text action that opens the browser sign-in options. It wears the

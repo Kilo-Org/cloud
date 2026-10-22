@@ -142,3 +142,20 @@ export function resolveRemoteSubmitOutcome({
     showInstanceDisconnectedNote: shouldReset,
   };
 }
+
+/**
+ * The inline failure a settled spawn outcome renders above Start (the
+ * dispatch no longer toasts it). `null` means the outcome carries its own
+ * dedicated inline surface (a delivered clone/import reason) or navigated.
+ * Pure so the retryable/terminal split is unit-testable without React.
+ */
+export function resolveRemoteSpawnFailure({
+  outcome,
+}: {
+  outcome: Extract<CreateSessionOutcome, { status: 'retryable' | 'nonRetryable' }>;
+}): { retryable: boolean; message: string } | null {
+  if (outcome.status === 'nonRetryable') {
+    return { retryable: false, message: remoteSpawnNonRetryableToast() };
+  }
+  return { retryable: true, message: remoteSpawnRetryableToast() };
+}

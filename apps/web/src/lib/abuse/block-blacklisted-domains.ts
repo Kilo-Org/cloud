@@ -1,6 +1,6 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
-import { and, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 
 /**
  * Builds a WHERE condition that matches users whose `email_domain` is on the
@@ -9,21 +9,34 @@ import { and, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
  *
  * Operates on the indexed `email_domain` column rather than a LIKE scan of
  * `google_user_email`, so counts and updates stay fast on a large users table.
+ *
+ * Both domain lists are bound as single array parameters. An imported list can
+ * hold tens of thousands of entries, which would otherwise exceed PostgreSQL's
+ * 65,535-bind-parameter limit.
  */
 export function blacklistedDomainCondition(domains: string[]): SQL {
-  const normalized = domains.map(d => d.toLowerCase().trim()).filter(Boolean);
+  const normalized = [...new Set(domains.map(d => d.toLowerCase().trim()).filter(Boolean))];
   if (normalized.length === 0) {
     // Always-false guard so the caller doesn't have to special-case an empty
     // blacklist. `or()` with no args returns undefined, which would accidentally
     // drop the condition entirely.
     return sql`false`;
   }
-  const conditions: SQL[] = [
-    inArray(kilocode_users.email_domain, normalized),
-    ...normalized.map(d => sql`${kilocode_users.email_domain} LIKE ${`%.${d}`}`),
-  ];
-  const combined = or(...conditions);
+  const subdomainPatterns = normalized.map(d => `%.${d}`);
+  const combined = or(
+    sql`${kilocode_users.email_domain} = ANY(${sql.param(normalized)}::text[])`,
+    sql`${kilocode_users.email_domain} LIKE ANY(${sql.param(subdomainPatterns)}::text[])`
+  );
   return combined ?? sql`false`;
+}
+
+/**
+ * Users who can be blocked by a domain backfill. Admins are excluded: a
+ * blocked admin fails authorization before the admin check, so an automatic
+ * domain block would lock the acting admin out with no way to undo it.
+ */
+export function blockableUserCondition(): SQL {
+  return eq(kilocode_users.is_admin, false);
 }
 
 export type BlockBlacklistedDomainsBackfillResponse = {
@@ -56,7 +69,7 @@ export async function backfillBlockBlacklistedDomainsBatch(params: {
     const rows = await db
       .select({ id: kilocode_users.id })
       .from(kilocode_users)
-      .where(and(isNull(kilocode_users.blocked_reason), condition))
+      .where(and(isNull(kilocode_users.blocked_reason), blockableUserCondition(), condition))
       .limit(BATCH_SIZE);
 
     if (rows.length === 0) {
@@ -82,7 +95,8 @@ export async function backfillBlockBlacklistedDomainsBatch(params: {
             kilocode_users.id,
             rows.map(r => r.id)
           ),
-          isNull(kilocode_users.blocked_reason)
+          isNull(kilocode_users.blocked_reason),
+          blockableUserCondition()
         )
       )
       .returning({ id: kilocode_users.id });

@@ -7,6 +7,7 @@ import { getBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domain
 import {
   backfillBlockBlacklistedDomainsBatch,
   blacklistedDomainCondition,
+  blockableUserCondition,
   type BlockBlacklistedDomainsBackfillResponse,
 } from '@/lib/abuse/block-blacklisted-domains';
 
@@ -28,7 +29,13 @@ export async function GET(): Promise<
   const [result] = await db
     .select({ count: sql<number>`count(*)`.mapWith(Number) })
     .from(kilocode_users)
-    .where(and(isNull(kilocode_users.blocked_reason), blacklistedDomainCondition(domains)));
+    .where(
+      and(
+        isNull(kilocode_users.blocked_reason),
+        blockableUserCondition(),
+        blacklistedDomainCondition(domains)
+      )
+    );
 
   return NextResponse.json({ unblocked: result?.count ?? 0 });
 }

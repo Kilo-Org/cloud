@@ -103,8 +103,8 @@ function EditTab() {
             <CardDescription>
               Email domains that are blocked from registration and access. Enter one domain per line
               (or paste a pipe-separated list). Subdomains are automatically blocked (e.g. blocking
-              example.com also blocks subdomain.example.com). Adding a domain also blocks any
-              existing accounts on it that are not already blocked.
+              example.com also blocks subdomain.example.com). Adding a domain also blocks existing
+              non-admin accounts on it that are not already blocked.
             </CardDescription>
           </div>
           <Badge variant="secondary" className="px-3 py-1">

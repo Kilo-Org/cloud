@@ -27,11 +27,15 @@ const SuspiciousDomainsInputSchema = z
 // actually caught users, ordered by count.
 const STATS_ROW_LIMIT = 200;
 
+async function readConfigOrThrow(): Promise<BlacklistDomainsConfig> {
+  const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
+  if (!raw) return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
+  return BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
+}
+
 async function readConfig(): Promise<BlacklistDomainsConfig> {
   try {
-    const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
-    if (!raw) return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
-    return BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
+    return await readConfigOrThrow();
   } catch {
     return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
   }
@@ -49,11 +53,18 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     ];
 
     // Diff against the list the admin started from so only newly added domains
-    // trigger a backfill. Existing users on domains that were already listed
-    // have either been backfilled already or are handled by the manual backfill.
-    const previous = await readConfig();
-    const previousDomains = new Set(previous.domains.map(d => d.toLowerCase().trim()));
-    const addedDomains = normalizedDomains.filter(domain => !previousDomains.has(domain));
+    // trigger a backfill. A failed read must not look like an empty list: that
+    // would turn a one-domain save into a backfill of every listed domain. Skip
+    // the automatic run in that case and let the manual backfill handle it.
+    let addedDomains: string[] | null;
+    try {
+      const previous = await readConfigOrThrow();
+      const previousDomains = new Set(previous.domains.map(d => d.toLowerCase().trim()));
+      addedDomains = normalizedDomains.filter(domain => !previousDomains.has(domain));
+    } catch (error) {
+      captureException(error, { tags: { source: 'blacklist_domains_previous_config_read' } });
+      addedDomains = null;
+    }
 
     const config: BlacklistDomainsConfig = {
       domains: normalizedDomains,
@@ -72,8 +83,8 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     // The list is already live for auth checks at this point, so a backfill
     // failure must not fail the save. Report it and point the admin at the
     // manual backfill instead.
-    const backfill = { blocked: 0, remaining: false, failed: false };
-    if (addedDomains.length > 0) {
+    const backfill = { blocked: 0, remaining: false, failed: addedDomains === null };
+    if (addedDomains && addedDomains.length > 0) {
       try {
         const result = await backfillBlockBlacklistedDomainsBatch({
           actorId: ctx.user.id,

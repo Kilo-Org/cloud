@@ -477,4 +477,16 @@ describe('admin.blacklistDomains.set', () => {
     expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: true });
     expect(mockedRedisSet).toHaveBeenCalled();
   });
+
+  it('does not backfill the whole list when the previous config cannot be read', async () => {
+    mockedRedisGet.mockRejectedValue(new Error('redis unavailable'));
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+
+    expect(result.domains).toEqual(['mailinator.com']);
+    expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: true });
+    expect(mockedBackfill).not.toHaveBeenCalled();
+    expect(mockedRedisSet).toHaveBeenCalled();
+  });
 });

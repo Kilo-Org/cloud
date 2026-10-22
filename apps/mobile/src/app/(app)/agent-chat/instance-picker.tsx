@@ -6,7 +6,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
@@ -19,6 +18,7 @@ import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { instancePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import {
   dedupeInstanceLabels,
   type LabeledInstance,
@@ -46,8 +46,12 @@ type PickerListItem =
 export default function InstancePickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
   const { t, i18n } = useTranslation();
+  // The sheet rides the full detent over the gesture-nav bar, so its content
+  // clears the bar with the non-tab detail floor, not the raw inset: devices
+  // that report a zero bottom inset still keep the bottom action visible and
+  // tappable.
+  const bottomClearance = useDetailScreenBottomPadding();
   const [bridge, setBridge] = useState(() => instancePickerSlot.get(UNFENCED_ROUTE_KEY));
   const bridgeRef = useRef(bridge);
   useRouteRegistry(UNFENCED_ROUTE_KEY);
@@ -239,7 +243,7 @@ export default function InstancePickerScreen() {
         onDone={closePicker}
         scrollable={false}
       >
-        <View className="bg-background" style={{ paddingBottom: bottom }}>
+        <View className="bg-background" style={{ paddingBottom: bottomClearance }}>
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
             <View key={i} className="px-4 py-3">
               <Skeleton className="h-5 w-2/3 rounded-md" />
@@ -304,7 +308,7 @@ export default function InstancePickerScreen() {
         data={listItems}
         keyExtractor={item => item.key}
         getItemType={item => item.type}
-        contentContainerStyle={{ paddingBottom: bottom }}
+        contentContainerStyle={{ paddingBottom: bottomClearance }}
         ListHeaderComponent={
           <Pressable
             className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"

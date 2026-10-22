@@ -1,3 +1,4 @@
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
@@ -9,7 +10,7 @@ import type {
   ControlPlaneSessionRegistration,
   SandboxSessionV2,
 } from '../../src/control-plane/session/session-do.js';
-import { events } from '../../src/db/sqlite-schema.js';
+import { events } from '../../src/control-plane/session/sqlite-schema.js';
 import type {
   ProviderAdapter,
   ProviderCreateIntent,
@@ -34,7 +35,6 @@ type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
 const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace }).SANDBOX_CONTROL;
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
 
-const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
 const USER_ID = 'user_123';
 const ORG_ID = 'org_123';
 let sequence = 0;
@@ -110,7 +110,7 @@ function metadata(input: {
     },
     auth: {
       kiloSessionId: input.kiloSessionId,
-      kilocodeToken: input.kiloToken ?? NATIVE_KILO_TOKEN,
+      kilocodeToken: input.kiloToken ?? runtimeAuthorizedKiloToken(),
     },
     agent: { mode: 'code', model: 'test/model' },
     repository: input.repository ?? {
@@ -181,6 +181,7 @@ async function installSandbox(
       KILO_OPENROUTER_BASE: 'https://control.test',
       KILO_SESSION_INGEST_URL: 'https://control.test',
     });
+    installFakeRuntimeProxyPeer(instance);
     Object.assign(instance, { createProviderAdapter: () => provider, provider });
   });
   return sandboxStub;
@@ -220,6 +221,73 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 worker RPC surface', () => {
+  it('detects native subscription loss after eviction even without a later event', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const nativeId = kiloSessionId();
+    let stub = sessions.getByName(sessionId);
+    await expect(
+      stub.registerSessionFromMetadata({
+        metadata: metadata({
+          sessionId,
+          kiloSessionId: nativeId,
+          sandboxId,
+          sandboxProvider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist: [],
+        }),
+        sandboxSelection: {
+          provider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist: [],
+        },
+      })
+    ).resolves.toEqual({ success: true });
+    const subscription = await stub.subscribeNativeEvents({
+      kiloSessionId: nativeId,
+      attachmentId: 'before-eviction',
+    });
+    expect(subscription.registered).toBe(true);
+    await expect(
+      stub.refreshNativeEvents({
+        kiloSessionId: nativeId,
+        attachmentId: 'before-eviction',
+        generation: subscription.continuity.generation,
+      })
+    ).resolves.toBe(true);
+    await evictAllDurableObjects();
+    stub = sessions.getByName(sessionId);
+    await expect(
+      stub.refreshNativeEvents({
+        kiloSessionId: nativeId,
+        attachmentId: 'before-eviction',
+        generation: subscription.continuity.generation,
+      })
+    ).resolves.toBe(false);
+    const replacement = await stub.subscribeNativeEvents({
+      kiloSessionId: nativeId,
+      attachmentId: 'after-eviction',
+    });
+    expect(replacement.continuity.generation).toBeGreaterThan(subscription.continuity.generation);
+    expect(replacement.continuity.sequence).toBe(0);
+    await stub.releaseNativeEvents({ attachmentId: 'before-eviction' });
+    await expect(
+      stub.refreshNativeEvents({
+        kiloSessionId: nativeId,
+        attachmentId: 'after-eviction',
+        generation: replacement.continuity.generation,
+      })
+    ).resolves.toBe(true);
+    await stub.releaseNativeEvents({ attachmentId: 'after-eviction' });
+    await expect(
+      stub.refreshNativeEvents({
+        kiloSessionId: nativeId,
+        attachmentId: 'after-eviction',
+        generation: replacement.continuity.generation,
+      })
+    ).resolves.toBe(false);
+  });
+
   it.each([undefined, [], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
     'retains registration policy after eviction and rejects changed replays %j',
     async ({ egressAllowlist }) => {
@@ -467,8 +535,8 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     });
     expect(provider.createCalls).toBe(1);
 
-    // The registered route spec carries the issued credential handle/scope, and
-    // M1: modern authorization requests per-session runtime isolation.
+    // The stored route keeps isolation for legacy wrappers. Preparation removes
+    // it on the wire only after this allocation negotiates a shared runtime.
     const row = await readSandboxRouteRow(sandboxStub, sessionId);
     expect(row.state).toBe('preparing');
     expect(row.spec.runtimeIsolation).toBe('per-session');

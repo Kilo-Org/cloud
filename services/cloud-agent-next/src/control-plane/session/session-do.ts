@@ -1,12 +1,23 @@
 import { DurableObject } from 'cloudflare:workers';
-import { DEFAULT_DO_RETRY_CONFIG } from '@kilocode/worker-utils';
+import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
 import {
   renewRuntimeAuthorization,
+  RuntimeAuthorizationExpiredError,
+  RuntimeAuthorizationRevokedError,
   unsealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
+import {
+  authorizeCloudAgentChild,
+  issueCloudAgentMcpGrant,
+  assertCloudAgentParentAuthority,
+} from '../../cloud-agent-authority.js';
+import {
+  CloudAgentAuthoritySchema,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
@@ -21,7 +32,7 @@ import { resolveSecret } from '../../auth.js';
 import type { CallbackTarget } from '../../callbacks/index.js';
 import type { DurableAdmissionAck } from '../../execution/types.js';
 import { logger } from '../../logger.js';
-import type { WrapperPty } from '../../kilo/wrapper-client.js';
+import type { WrapperPty } from '../../terminal/types.js';
 import type { OperationResult } from '../../persistence/types.js';
 import {
   CurrentSessionMetadataSchema,
@@ -35,6 +46,7 @@ import {
   issuePersistedRuntimeProxyGrant,
   resolvePersistedRuntimeProxyCredential,
 } from '../../runtime-credential-proxy-rpc.js';
+import type { ScopeHandleResolution } from '../sandbox/accepted-handles.js';
 import {
   getRuntimeAuthorizationRecoveryState as readRuntimeAuthorizationRecoveryState,
   RUNTIME_AUTHORIZATION_KEY,
@@ -58,21 +70,27 @@ import type {
 import type { LatestAssistantMessage } from '../../session/types.js';
 import { createEventQueries, type EventQueries } from '../../session/queries/index.js';
 import { createPreparationProgressRecorder } from '../../session/preparation-progress.js';
-import { sessionIdFromDoName } from '../../session-plane.js';
+import { sessionIdFromDoName } from '../../session-identity.js';
 import {
   finalizePreparationAttempt,
   getPreparationSnapshots,
+  listPreparationAttempts,
   readPreparationAttempt,
   readPreparationSteps,
   type PreparationOutcome,
 } from '../../session/preparation-history.js';
-import type { CommandsAvailableData, SessionStatus } from '../../shared/protocol.js';
+import type {
+  CommandsAvailableData,
+  PreparationAttempt,
+  SessionStatus,
+} from '../../shared/protocol.js';
 import {
   CONTROL_PLANE_SETUP_EVENTS,
   CONTROL_PLANE_WRAPPER_FINALIZING_EVENT,
   controlPlaneAnswerPayloadSchema,
   controlPlaneCredentialSourceSchema,
   controlPlaneEventsNotificationSchema,
+  controlPlaneNativeOperationSchema,
   controlPlaneOutcomeSchema,
   controlPlanePromptPayloadSchema,
   controlPlaneRegistrationRouteSpecSchema,
@@ -86,6 +104,8 @@ import {
   type ControlPlaneDeliverResult,
   type ControlPlaneDispatchResult,
   type ControlPlaneEventsNotification,
+  type ControlPlaneKiloRequestInput,
+  type ControlPlaneNativeOperation,
   type ControlPlaneOutcome,
   type ControlPlanePreparationStep,
   type ControlPlanePromptPayload,
@@ -99,11 +119,23 @@ import {
 } from '../../shared/control-plane-protocol.js';
 import { resolveControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
-import type { EventId, SessionId } from '../../types/ids.js';
+import type { SessionId } from '../../types/ids.js';
 import type { Env } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
-import type { StoredEvent } from '../../websocket/types.js';
-import { createStreamHandler, type QueuedMessageSnapshot } from '../../websocket/stream.js';
+import type { StreamEvent, StoredEvent } from '../../websocket/types.js';
+import {
+  createStreamHandler,
+  formatStreamEvent,
+  type QueuedMessageSnapshot,
+} from '../../websocket/stream.js';
+import {
+  isDeliverableNativeEvent,
+  isMaterializedNativeEvent,
+  NATIVE_DELIVERY_LIMITS,
+  toNativePublicEvent,
+  type NativeEventSubscription,
+} from '../../kilo-facade/native-event-source.js';
+import { createNativeEventOutbox } from './native-outbox.js';
 import { sandboxControlPeerNamespace } from '../peer-bindings.js';
 import migrations from './drizzle/migrations';
 import {
@@ -126,8 +158,15 @@ import { messageFailureText } from './failure-messages.js';
 import {
   createControlPlaneWorktreeChanges,
   type ControlPlaneWorktreeChanges,
+  type SharedWorktreeChangesPeer,
 } from './worktree-changes.js';
+import {
+  worktreeChangesReadySchema,
+  type WorktreeChangesReady,
+} from '../worktree-changes-ready.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
+import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
+import type { PreviewTargetResult, ResolvedPreviewTarget } from '../sandbox/preview-target.js';
 import { readWorktreeChildSessions } from './worktree-child-sessions.js';
 import {
   buildControlPlaneMessageReport,
@@ -141,13 +180,17 @@ import {
   writeReportAnchor,
   type ReportOutbox,
 } from '../../sandbox-session/report-outbox.js';
-import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import {
+  CloudAgentRunContainerSchema,
+  type CloudAgentRunContainer,
+} from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type {
   GetWorktreeChangesOutput,
   GetWorktreeFileOutput,
   RefreshWorktreeChangesOutput,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
-import { controlPlaneMessages } from './sqlite-schema.js';
+import { controlPlaneMessages, events } from './sqlite-schema.js';
+import { parseWipeLocator, runTransactionalWipe, type WipeLocator } from './transactional-wipe.js';
 import {
   buildControlPlaneSessionRegistration,
   controlPlaneSessionCreateInputSchema,
@@ -160,7 +203,11 @@ import {
   type ControlPlanePrepareInputWithSelection,
   type ControlPlaneSandboxSelection,
 } from './sandbox-selection.js';
-import type { ControlRuntimeCredentialProxyFence } from '../sandbox/sandbox-do.js';
+import type {
+  ControlRuntimeCredentialProxyFence,
+  ControlRuntimeCredentialProxyFenceScope,
+} from '../sandbox/sandbox-do.js';
+import type { ScopeGrantView } from '../sandbox/scope-view.js';
 import { diagnosticCause, logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 
 /** Where a committed message transition came from (legacy diagnostic field). */
@@ -175,6 +222,7 @@ const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
 const ROOT_STATUS_KEY = 'session_root_status';
+const NATIVE_DELIVERY_GENERATION_KEY = 'native_delivery_generation';
 
 /**
  * Kilo's last root `session.status` type; `settled` once an accepted message settled after it,
@@ -186,6 +234,8 @@ const rootStatusEventSchema = z.object({
   sessionID: z.string(),
   status: z.object({ type: z.string() }),
 });
+/** Tombstone written by the transactional wipe; survives with the generation. */
+export const WIPE_LOCATOR_KEY = 'control_plane_wipe_locator';
 
 /** Wrapper setup-command lifecycle events the Session DO renders itself. */
 const SETUP_EVENT_TYPES: ReadonlySet<string> = new Set([
@@ -249,6 +299,7 @@ function persistedRouteView(
     state: 'preparing',
     attemptId: view.attemptId,
     ...(step === undefined ? {} : { step }),
+    ...(view.container === undefined ? {} : { container: view.container }),
   };
 }
 
@@ -313,7 +364,7 @@ export type ControlPlaneSessionSnapshot =
  * Session DO -> Sandbox DO (spec §10). Resolved from the production
  * `SANDBOX_CONTROL` binding; tests may inject a fake through `sandboxPeerFor`.
  */
-export type ControlPlaneSandboxPeer = {
+export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   status(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneStatusResult>;
   prepare(input: ControlPlanePrepareInputWithSelection): Promise<ControlPlaneRouteView>;
   deliver(payload: ControlPlaneDeliverPayload): Promise<ControlPlaneDeliverResult>;
@@ -326,11 +377,28 @@ export type ControlPlaneSandboxPeer = {
     sessionId: string;
     kiloSessionId: string;
     directory: string;
-  }): Promise<ControlRuntimeCredentialProxyFence | null>;
+    handle: string;
+  }): Promise<ControlRuntimeCredentialProxyFenceScope | null>;
+  /**
+   * Asks the Sandbox DO to serve the handle on behalf of a surviving member of
+   * the scope when this Session DO cannot resolve it locally.
+   */
+  resolveScopeHandle(input: { handle: string }): Promise<ScopeHandleResolution>;
+  /** The locator a wiped issuer uses to keep resolving through a survivor. */
+  getAcceptedHandleIssuerLocator(issuerSessionId: string): Promise<{
+    scopeId: string;
+    allocationId: string;
+    wrapperInstanceId: string;
+    expiresAt: number;
+  } | null>;
   /** B10: forwards one worktree-change request to the wrapper. */
   worktreeCapture(input: ControlPlaneWorktreeCaptureInput): Promise<ControlPlaneControlResult>;
   /** B10: forwards one terminal request to the wrapper. */
   terminal(input: ControlPlaneTerminalInput): Promise<ControlPlaneControlResult>;
+  /** B10: forwards one allowlisted native read to the live wrapper. */
+  kiloRequest(input: ControlPlaneKiloRequestInput): Promise<ControlPlaneControlResult>;
+  /** Resolves the preview provider coordinates for this sandbox (off the op queue). */
+  previewTarget(sessionId: string): Promise<PreviewTargetResult>;
   /** B10: the wrapper identity bound to the connected allocation. */
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
@@ -338,11 +406,41 @@ export type ControlPlaneSandboxPeer = {
   fetch(request: Request): Promise<Response>;
 };
 
+/** Native attach snapshot handed to the per-user Kilo facade (spec §10). */
+export type NativeSnapshot = {
+  oversized: boolean;
+  fence: number | null;
+  events: StreamEvent[];
+  continuation?: NativeSnapshotCursor;
+  sessionStatus?: SessionStatus;
+  questions?: unknown[];
+  permissions?: unknown[];
+};
+
+export type NativeSnapshotCursor = {
+  fence: number | null;
+  phase: 'log' | 'updates' | 'removals';
+  fromId: number;
+};
+
+export const CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES = NATIVE_DELIVERY_LIMITS.eventBytes;
+
 type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
 
 type TransportPass = { deadlineAt: number; scheduleRecovery: boolean };
 
+function parseStoredRunContainer(raw: string | null): CloudAgentRunContainer | undefined {
+  if (raw == null) return undefined;
+  try {
+    const parsed = CloudAgentRunContainerSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function rowToMessage(row: SessionMessageRow): SessionMessage {
+  const container = parseStoredRunContainer(row.container);
   return {
     messageId: row.message_id,
     intent: controlPlanePromptPayloadSchema.parse(JSON.parse(row.intent)),
@@ -351,6 +449,7 @@ function rowToMessage(row: SessionMessageRow): SessionMessage {
     acceptedAt: row.accepted_at,
     settledAt: row.settled_at,
     reason: row.reason,
+    ...(container === undefined ? {} : { container }),
   };
 }
 
@@ -363,6 +462,7 @@ function messageToRow(message: SessionMessage): SessionMessageRow {
     accepted_at: message.acceptedAt,
     settled_at: message.settledAt,
     reason: message.reason,
+    container: message.container === undefined ? null : JSON.stringify(message.container),
   };
 }
 
@@ -454,12 +554,34 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private readonly operations: { tail: Promise<unknown> } = { tail: Promise.resolve() };
   private registration: ControlPlaneSessionRegistration | null = null;
   private metadata: SessionMetadata | null = null;
+  /** Present only after the transactional wipe of an issuer with accepted handles. */
+  private wipeLocator: WipeLocator | null = null;
   private runtimeAuthorization: RuntimeAuthorization | undefined;
   private messages: SessionMessage[] = [];
   private route: ControlPlaneRouteView = { state: 'unknown' };
   private transportRecoveryAt: number | null = null;
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
+  private nativeDeliveryGeneration = 0;
+  private readonly nativeOutbox = createNativeEventOutbox({
+    identity: () => {
+      const kiloUserId = this.metadata?.identity.userId;
+      const kiloSessionId = this.registration?.spec.kiloSessionId;
+      if (kiloUserId === undefined || kiloSessionId === undefined) return null;
+      return { kiloUserId, kiloSessionId, cloudAgentSessionId: this.sessionId };
+    },
+    generation: () => this.nativeDeliveryGeneration,
+    send: (batch, deadlineAt) =>
+      withDORetry(
+        () => this.env.USER_KILO_FACADE.get(this.env.USER_KILO_FACADE.idFromName(batch.kiloUserId)),
+        facade => facade.publishNativeEventBatch({ ...batch, deadlineAt }),
+        'publishNativeEventBatch',
+        { ...DEFAULT_DO_RETRY_CONFIG, scope: { deadlineAt } }
+      ),
+    waitUntil: work => this.ctx.waitUntil(work),
+    diagnostic: reason =>
+      logger.withFields({ sessionId: this.sessionId, reason }).warn('Native event continuity lost'),
+  });
   private rootStatus: RootStatus | undefined;
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
@@ -469,6 +591,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private readonly worktreeChanges: ControlPlaneWorktreeChanges;
   /** Terminal records and the browser/wrapper bridge (plan B10). */
   private readonly terminals: ControlPlaneTerminals;
+  /** Preview eligibility and target resolution through the Sandbox DO. */
+  private readonly preview: ControlPlanePreview;
   /** Generation of the in-flight preparation, for the worktree-change hooks. */
   private worktreePreparationGeneration: number | undefined;
   /**
@@ -497,7 +621,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.eventQueries = createEventQueries(this.db, ctx.storage.sql);
     this.reportOutbox = createReportOutbox({
       storage: ctx.storage,
-      getQueue: () => this.env.CLOUD_AGENT_REPORT_QUEUE as Queue<CloudAgentQueueReport> | undefined,
+      getQueue: () => this.env.CLOUD_AGENT_REPORT_QUEUE,
     });
     this.messageCallbacks = createMessageCallbacks({
       storage: ctx.storage,
@@ -523,6 +647,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       broadcast: event => this.broadcast(event),
       getMetadata: () => this.metadata,
       getDirectory: () => this.registration?.spec.directory,
+      getSharedPeer: sandboxId => this.sandboxPeerFor(sandboxId),
       capture: (sandboxId, input) => this.captureWorktreeChanges(sandboxId, input),
       waitUntil: promise => this.ctx.waitUntil(promise),
     });
@@ -533,7 +658,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       getDirectory: () => this.registration?.spec.directory,
       getWrapperId: () => this.currentWrapperId(),
       isRouteReady: () => this.route.state === 'ready',
+      getSandboxStatus: () => this.getSandboxStatus(),
       request: (sandboxId, input) => this.terminalRequest(sandboxId, input),
+    });
+    this.preview = createControlPlanePreview({
+      getMetadata: () => this.metadata,
+      resolveTarget: sandboxId => this.previewTargetFor(sandboxId),
     });
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
@@ -550,6 +680,18 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       };
     }
     return peer.terminal(input);
+  }
+
+  private async previewTargetFor(sandboxId: string): Promise<PreviewTargetResult> {
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) {
+      return { status: 'not_running' };
+    }
+    return withDORetry(
+      () => this.sandboxPeerFor(sandboxId) ?? peer,
+      stub => stub.previewTarget(this.sessionId),
+      'previewTarget'
+    );
   }
 
   private async currentWrapperId(): Promise<string | undefined> {
@@ -576,8 +718,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return peer.worktreeCapture(input);
   }
 
-  // --- init and storage cutover ----------------------------------------------
-
   private async initializeStorage(): Promise<void> {
     const generation = await this.ctx.storage.get<unknown>(GENERATION_KEY);
     if (generation !== GENERATION) {
@@ -586,9 +726,18 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.ctx.storage.deleteAll();
       await this.ctx.storage.put(GENERATION_KEY, GENERATION);
       await migrate(this.db, migrations);
+      this.nativeDeliveryGeneration = 1;
+      await this.ctx.storage.put(NATIVE_DELIVERY_GENERATION_KEY, this.nativeDeliveryGeneration);
       return;
     }
     await migrate(this.db, migrations);
+    const nativeGeneration = z
+      .number()
+      .int()
+      .nonnegative()
+      .safeParse(await this.ctx.storage.get<unknown>(NATIVE_DELIVERY_GENERATION_KEY));
+    this.nativeDeliveryGeneration = (nativeGeneration.success ? nativeGeneration.data : 0) + 1;
+    await this.ctx.storage.put(NATIVE_DELIVERY_GENERATION_KEY, this.nativeDeliveryGeneration);
     const raw = await this.ctx.storage.get<unknown>(REGISTRATION_KEY);
     const parsed = controlPlaneSessionRegistrationSchema.safeParse(raw);
     this.registration = parsed.success ? parsed.data : null;
@@ -622,9 +771,20 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       .nonnegative()
       .safeParse(await this.ctx.storage.get<unknown>(TRANSPORT_RECOVERY_KEY));
     this.transportRecoveryAt = recoveryAt.success ? recoveryAt.data : null;
+    const parsedLocator = parseWipeLocator(
+      await this.ctx.storage.get<unknown>(WIPE_LOCATOR_KEY),
+      Date.now()
+    );
+    if (parsedLocator.locator === null) {
+      this.wipeLocator = null;
+    } else if (parsedLocator.expired) {
+      // The handle lease passed: lazily drop the tombstone.
+      await this.ctx.storage.delete(WIPE_LOCATOR_KEY);
+      this.wipeLocator = null;
+    } else {
+      this.wipeLocator = parsedLocator.locator;
+    }
   }
-
-  // --- registration -----------------------------------------------------------
 
   async registerSession(input: ControlPlaneSessionRegistration): Promise<{ ok: true }> {
     await this.initialized;
@@ -770,6 +930,59 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return this.metadata;
   }
 
+  async getCloudAgentSpawnRuntimeToken(authority: CloudAgentAuthority): Promise<string> {
+    await this.initialized;
+    const scope = CloudAgentAuthoritySchema.parse(authority);
+    const authorization = RuntimeAuthorizationSchema.parse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    assertCloudAgentParentAuthority(this.metadata, authorization, scope);
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    const issued = await renewRuntimeAuthorization({
+      authorization,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+    });
+    const current = RuntimeAuthorizationSchema.parse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    assertCloudAgentParentAuthority(this.metadata, current, scope);
+    return issued.token;
+  }
+
+  async authorizeCloudAgentChild(input: {
+    authority: CloudAgentAuthority;
+    childSessionId: string;
+  }): Promise<{ token: string; seal: string }> {
+    await this.initialized;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    return authorizeCloudAgentChild({
+      ...input,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+      metadata: () => this.getMetadata(),
+      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+  }
+
+  async issueCloudAgentMcpGrant(): Promise<
+    { url: string; token: string; expiresAt: number } | undefined
+  > {
+    await this.initialized;
+    if (this.metadata?.allowSubagentSessions !== true) return undefined;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    return issueCloudAgentMcpGrant({
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+      metadata: () => this.getMetadata(),
+      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      mcpUrl: this.env.CLOUD_AGENT_MCP_URL_OVERRIDE,
+    });
+  }
+
   /**
    * H4/R1: mints and persists the runtime credential proxy handle for a connected
    * route. The Sandbox DO reads its own allocation fence and passes it in, so this
@@ -813,37 +1026,121 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     token: string;
     organizationId?: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+    scopeView?: ScopeGrantView;
   } | null> {
     await this.initialized;
-    return resolvePersistedRuntimeProxyCredential({
-      env: this.env,
-      storage: this.ctx.storage,
-      handle,
-      metadata: () => this.getMetadata(),
-      authorization: async () => {
-        const parsed = RuntimeAuthorizationSchema.safeParse(
-          await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
-        );
-        return parsed.success ? parsed.data : null;
-      },
-      fence: async () => {
-        const metadata = await this.getMetadata();
-        const kiloSessionId = metadata?.auth.kiloSessionId;
-        const sandboxId = metadata?.workspace?.sandboxId;
-        const directory = this.registration?.spec.directory ?? metadata?.workspace?.workspacePath;
-        if (!metadata || !kiloSessionId || !sandboxId || !directory) return null;
-        const peer = this.sandboxPeerFor(sandboxId);
-        return peer === null
-          ? null
-          : peer.getRuntimeCredentialProxyFence({
-              ownerId: metadata.identity.userId,
-              sessionId: metadata.identity.sessionId,
-              kiloSessionId,
-              directory,
-            });
-      },
-      token: () => this.getRuntimeToken(),
-    });
+    let local: {
+      token: string;
+      organizationId?: string;
+      runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+    } | null = null;
+    let localScopeView: ScopeGrantView | undefined;
+    let localError: unknown = null;
+    try {
+      local = await resolvePersistedRuntimeProxyCredential({
+        env: this.env,
+        storage: this.ctx.storage,
+        handle,
+        metadata: () => this.getMetadata(),
+        authorization: async () => {
+          const parsed = RuntimeAuthorizationSchema.safeParse(
+            await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+          );
+          return parsed.success ? parsed.data : null;
+        },
+        fence: async () => {
+          const metadata = await this.getMetadata();
+          const kiloSessionId = metadata?.auth.kiloSessionId;
+          const sandboxId = metadata?.workspace?.sandboxId;
+          const directory = this.registration?.spec.directory ?? metadata?.workspace?.workspacePath;
+          if (!metadata || !kiloSessionId || !sandboxId || !directory) return null;
+          const peer = this.sandboxPeerFor(sandboxId);
+          if (peer === null) {
+            localScopeView = undefined;
+            return null;
+          }
+          const resolution = await peer.getRuntimeCredentialProxyFence({
+            ownerId: metadata.identity.userId,
+            sessionId: metadata.identity.sessionId,
+            kiloSessionId,
+            directory,
+            handle,
+          });
+          if (resolution?.scopeViewUnavailable !== undefined) {
+            localScopeView = undefined;
+            throw new Error(resolution.scopeViewUnavailable);
+          }
+          localScopeView = resolution?.scopeView;
+          return resolution;
+        },
+        token: () => this.getRuntimeToken(),
+      });
+    } catch (error) {
+      // A revoked/expired authorization threw. Fall through to scope resolution
+      // so a surviving member can still serve; if none can, the original outcome
+      // (a 503) is preserved below.
+      localError = error;
+    }
+    if (local)
+      return localScopeView === undefined ? local : { ...local, scopeView: localScopeView };
+    if (!this.hasSharedScope()) {
+      // Legacy/non-worktree sessions never have a scope grant, so an ordinary
+      // 401 must not pay for a Sandbox DO round trip.
+      if (localError !== null) throw localError;
+      return null;
+    }
+    const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(handle);
+    if (fromScope) return fromScope;
+    if (localError !== null) throw localError;
+    return null;
+  }
+
+  /** Whether this Session DO can have a canonical scope grant in the sandbox. */
+  private hasSharedScope(): boolean {
+    if (this.wipeLocator !== null) return true;
+    const worktreeId = this.metadata?.workspace?.worktreeId;
+    return typeof worktreeId === 'string' && worktreeId.length > 0;
+  }
+
+  /**
+   * Asks the Sandbox DO to serve the handle through a surviving member of the
+   * canonical scope when this Session DO cannot serve it locally (revoked or
+   * expired grant, no metadata, fence gone, wipe). `denied` is a 401 as today;
+   * any failure to reach a decision within the total bound throws so the facade
+   * returns its existing retryable 503 `Credential unavailable`.
+   */
+  private async resolveRuntimeCredentialProxyGrantFromScope(handle: string): Promise<{
+    token: string;
+    organizationId?: string;
+    runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+    scopeView: ScopeGrantView;
+  } | null> {
+    const peer = this.scopeResolutionPeer();
+    if (peer === null) return null;
+    let outcome: ScopeHandleResolution;
+    try {
+      outcome = await withTimeout(
+        withDORetry(
+          () => this.scopeResolutionPeer() ?? peer,
+          current => current.resolveScopeHandle({ handle }),
+          'resolveScopeHandle'
+        ),
+        this.sessionTimers().scopeResolutionMs,
+        'Scope handle resolution timed out'
+      );
+    } catch {
+      throw new Error('Runtime credential proxy scope resolution unavailable');
+    }
+    if (outcome.type === 'unavailable') {
+      throw new Error('Runtime credential proxy scope resolution unavailable');
+    }
+    if (outcome.type === 'denied') return null;
+    return {
+      token: outcome.token,
+      ...(outcome.organizationId === undefined ? {} : { organizationId: outcome.organizationId }),
+      runtimeAuthorization: outcome.runtimeAuthorization,
+      scopeView: outcome.scopeView,
+    };
   }
 
   /** C1c model preflight: renew and return the backing runtime token. */
@@ -876,6 +1173,110 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
+  /**
+   * Renews this session's backing runtime token and returns it with the
+   * organization and runtime-authorization identity the Sandbox DO needs for
+   * attestation. Unlike `resolveRuntimeCredentialProxyGrant` it never matches a
+   * presented handle against its own stored grant; the Sandbox DO has already
+   * authorized the scope. It self-validates the expected scope and returns null
+   * on mismatch, so a member whose metadata/registration drifted is skipped.
+   */
+  /** Whether this Session DO is the scope identity the input names. */
+  private runtimeProxyScopeMatches(input: {
+    sandboxId: string;
+    directory: string;
+    kiloSessionId: string;
+  }): boolean {
+    const metadata = this.metadata;
+    if (metadata === null) return false;
+    const directory = this.registration?.spec.directory ?? metadata.workspace?.workspacePath;
+    const sandboxId = metadata.workspace?.sandboxId;
+    return (
+      sandboxId === input.sandboxId &&
+      directory === input.directory &&
+      metadata.auth.kiloSessionId === input.kiloSessionId
+    );
+  }
+
+  async issueRuntimeProxyBackingToken(input: {
+    sandboxId: string;
+    directory: string;
+    kiloSessionId: string;
+  }): Promise<{
+    token: string;
+    organizationId?: string;
+    runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+  } | null> {
+    await this.initialized;
+    if (!this.runtimeProxyScopeMatches(input)) return null;
+    let token: string | null;
+    try {
+      token = await this.getRuntimeToken();
+    } catch (error) {
+      // Revoked/expired is a known denial for this member; anything else is a
+      // real failure the Sandbox DO treats as `unavailable`.
+      if (
+        error instanceof RuntimeAuthorizationRevokedError ||
+        error instanceof RuntimeAuthorizationExpiredError
+      ) {
+        return null;
+      }
+      throw error;
+    }
+    if (!token) return null;
+    const authorization = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    if (!authorization.success) return null;
+    const current = authorization.data;
+    if (current.state !== 'active' || Date.parse(current.delegationExpiresAt) <= Date.now()) {
+      return null;
+    }
+    const organizationId = this.metadata?.identity.orgId;
+    return {
+      token,
+      ...(organizationId === undefined ? {} : { organizationId }),
+      runtimeAuthorization: {
+        userId: current.userId,
+        authorizationId: current.id,
+        resourceId: current.resourceId,
+      },
+    };
+  }
+
+  /**
+   * A read-only view of this member's live delegation expiry, for the Sandbox
+   * DO's handoff selection. It applies the same scope self-validation as
+   * `issueRuntimeProxyBackingToken` but never renews the backing token, and it
+   * returns null when the authorization is absent, inactive, or already expired.
+   */
+  async getRuntimeProxyDelegationExpiresAt(input: {
+    sandboxId: string;
+    directory: string;
+    kiloSessionId: string;
+  }): Promise<number | null> {
+    await this.initialized;
+    if (!this.runtimeProxyScopeMatches(input)) return null;
+    const authorization = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    if (!authorization.success || authorization.data.state !== 'active') return null;
+    const expiresAt = Date.parse(authorization.data.delegationExpiresAt);
+    return Number.isFinite(expiresAt) && expiresAt > Date.now() ? expiresAt : null;
+  }
+
+  /**
+   * The Sandbox DO that can still answer for a wiped issuer: registration first,
+   * then live metadata, then the wipe locator.
+   */
+  private scopeResolutionPeer(): ControlPlaneSandboxPeer | null {
+    const sandboxId =
+      this.registration?.sandboxId ??
+      this.metadata?.workspace?.sandboxId ??
+      this.wipeLocator?.sandboxId;
+    return sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+  }
+
   private admissionAck(messageId: string): DurableAdmissionAck {
     const message = this.messages.find(candidate => candidate.messageId === messageId);
     return {
@@ -896,6 +1297,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return (
       existing.identity.userId === metadata.identity.userId &&
       (existing.identity.orgId ?? null) === (metadata.identity.orgId ?? null) &&
+      (existing.allowSubagentSessions ?? false) === (metadata.allowSubagentSessions ?? false) &&
+      existing.parentCloudAgentSessionId === metadata.parentCloudAgentSessionId &&
       sameRepository(existing.repository, metadata.repository) &&
       this.registration.sandboxId === metadata.workspace?.sandboxId &&
       (existing.workspace?.egressMode ?? 'unrestricted') ===
@@ -952,8 +1355,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return { type: 'ok', authorization };
   }
 
-  // --- message flow -----------------------------------------------------------
-
   async send(intent: ControlPlanePromptPayload): Promise<ControlPlaneSendResult> {
     await this.initialized;
     if (this.registration === null) return { type: 'session-not-found' };
@@ -998,8 +1399,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     await this.armAlarm();
     if (!this.messages.some(message => message.state === 'queued')) return 'ok';
-    if (this.route.state === 'ready') await this.deliverQueued(pass);
-    else {
+    if (this.route.state === 'ready') {
+      await this.persistQueuedContainer(this.route.container);
+      await this.deliverQueued(pass);
+    } else {
       const view = await this.prepareSandbox(pass);
       if (view !== null) await this.applyView(view, pass);
     }
@@ -1049,23 +1452,26 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (this.registration === null) return 'not_connected';
     const parsed = controlPlaneAnswerPayloadSchema.parse(payload);
     return this.enqueue(async () => {
+      const target = pendingInteractionTarget(parsed.reply);
+      if (!this.hasPendingInteraction(target.collection, target.id)) return 'not_connected';
       // A live turn takes the answer directly (spec §5). The route is named by
       // this DO, never by the caller, so a wrong id cannot reach a sibling.
       if (this.messages.some(message => message.state === 'accepted')) {
         const peer = this.sandboxPeer();
         if (peer === null) return 'not_connected';
+        let result: ControlPlaneDispatchResult;
         try {
-          return await peer.answer({ sessionId: this.sessionId, reply: parsed.reply });
+          result = await peer.answer({ sessionId: this.sessionId, reply: parsed.reply });
         } catch {
           return 'not_connected';
         }
+        if (result === 'sent') await this.resolvePendingInteraction(parsed.reply);
+        return result;
       }
       // The asking turn already settled: the answer becomes a new message that
       // continues the chat (spec §5), admitted through the send path. Only a
       // question/permission this session still waits on may do so, so a retry,
       // an unknown id or an already-answered one cannot admit another turn.
-      const target = pendingInteractionTarget(parsed.reply);
-      if (!this.hasPendingInteraction(target.collection, target.id)) return 'not_connected';
       const intent = answerMessageIntent(
         this.messages,
         parsed.reply,
@@ -1080,10 +1486,213 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
+  /**
+   * Worker-facing live native read (spec §10). The route identity comes from
+   * this DO's own registration, never from the caller, so a request cannot name
+   * a sibling session or a stale runtime. A route that is not ready returns
+   * `not_ready` without preparing or waking the sandbox, and the Sandbox DO
+   * binds the request to the current wrapper socket as the generation fence.
+   */
+  async kiloRequest(operation: ControlPlaneNativeOperation): Promise<ControlPlaneControlResult> {
+    await this.initialized;
+    const parsed = controlPlaneNativeOperationSchema.parse(operation);
+    if (this.registration === null) {
+      return {
+        ok: false,
+        error: { code: 'not_found', message: 'Session not found', retryable: false },
+      };
+    }
+    if (this.route.state !== 'ready') {
+      return {
+        ok: false,
+        error: { code: 'not_ready', message: 'Live runtime is not ready', retryable: true },
+      };
+    }
+    const peer = this.sandboxPeer();
+    if (peer === null) {
+      return {
+        ok: false,
+        error: { code: 'not_ready', message: 'Sandbox is not available', retryable: true },
+      };
+    }
+    const upstreamBranch = this.metadata?.repository?.upstreamBranch;
+    return peer.kiloRequest({
+      session: {
+        sessionId: this.sessionId,
+        kiloSessionId: this.registration.spec.kiloSessionId,
+        directory: this.registration.spec.directory,
+      },
+      operation:
+        parsed.name === 'session.diff'
+          ? {
+              name: 'session.diff',
+              ...(upstreamBranch === undefined || upstreamBranch.startsWith('refs/')
+                ? {}
+                : { baseRef: `refs/remotes/origin/${upstreamBranch}` }),
+            }
+          : parsed,
+    });
+  }
+
+  /**
+   * Native attach snapshot for the per-user Kilo facade (spec §10). Returns the
+   * durable event log from the client's cursor, then the materialized
+   * message/part rows, so the result is complete through `fence`. It never
+   * wakes compute: it reads only this DO's storage. A transcript that cannot
+   * fit one page continues from an exclusive row cursor in the current phase.
+   */
+  async nativeSnapshot(input: {
+    fromId?: number;
+    continuation?: NativeSnapshotCursor;
+  }): Promise<NativeSnapshot> {
+    await this.initialized;
+    if (this.registration === null) return { oversized: false, fence: null, events: [] };
+    const kiloSessionId = this.registration.spec.kiloSessionId;
+    const fence =
+      input.continuation === undefined
+        ? this.eventQueries.getLatestEventId()
+        : input.continuation.fence;
+    const events: StreamEvent[] = [];
+    const encoder = new TextEncoder();
+    const details = {
+      sessionStatus: this.deriveSessionStatus(),
+      questions: this.pendingInteractions?.questions ?? [],
+      permissions: this.pendingInteractions?.permissions ?? [],
+    };
+    const snapshot = { oversized: false, fence, events, ...details };
+    const detailsBytes = encoder.encode(JSON.stringify(snapshot)).byteLength;
+    const envelopeBytes = Math.max(
+      detailsBytes,
+      encoder.encode(
+        JSON.stringify({
+          oversized: false,
+          fence,
+          events,
+          continuation: { fence, phase: 'removals', fromId: Number.MAX_SAFE_INTEGER },
+        })
+      ).byteLength
+    );
+    let eventsBytes = 0;
+    const push = (event: StreamEvent): boolean => {
+      const native = toNativePublicEvent(event, kiloSessionId);
+      if (
+        native !== null &&
+        encoder.encode(JSON.stringify(native)).byteLength > NATIVE_DELIVERY_LIMITS.eventBytes
+      )
+        return false;
+      const eventBytes =
+        encoder.encode(JSON.stringify(event)).byteLength + (events.length > 0 ? 1 : 0);
+      const size = envelopeBytes + eventsBytes + eventBytes;
+      if (
+        size > CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES &&
+        (events.length > 0 || size > NATIVE_DELIVERY_LIMITS.batchBytes)
+      )
+        return false;
+      events.push(event);
+      eventsBytes += eventBytes;
+      return true;
+    };
+    const phases = ['log', 'updates', 'removals'] as const;
+    const startPhase = input.continuation?.phase ?? 'log';
+    for (const phase of phases.slice(phases.indexOf(startPhase))) {
+      let fromId = phase === startPhase ? (input.continuation?.fromId ?? input.fromId ?? 0) : 0;
+      for (const event of this.eventQueries.iterateByFilters({
+        fromId,
+        toId: fence ?? 0,
+        ...(phase === 'log' ? {} : { materialized: phase }),
+      })) {
+        const formatted = formatStreamEvent(event, this.sessionId);
+        if (!push(formatted)) {
+          if (events.length === 0) return { oversized: true, fence, events: [] };
+          return { oversized: false, fence, events, continuation: { fence, phase, fromId } };
+        }
+        fromId = event.id;
+      }
+    }
+    return detailsBytes + eventsBytes > NATIVE_DELIVERY_LIMITS.batchBytes
+      ? { oversized: true, fence, events: [] }
+      : snapshot;
+  }
+
+  /**
+   * The per-user Kilo facade subscribes to this session's native events. The
+   * fence is the delivery watermark at subscribe time: the facade's snapshot is
+   * complete through it, and later events arrive as pushes.
+   */
+  async subscribeNativeEvents(input: {
+    kiloSessionId: string;
+    attachmentId: string;
+  }): Promise<NativeEventSubscription> {
+    await this.initialized;
+    if (this.registration === null || this.registration.spec.kiloSessionId !== input.kiloSessionId)
+      return {
+        registered: false,
+        fence: null,
+        kiloSessionId: input.kiloSessionId,
+        continuity: { generation: this.nativeDeliveryGeneration, sequence: 0 },
+      };
+    const continuity = this.nativeOutbox.subscribe(input.attachmentId);
+    return {
+      registered: true,
+      fence: this.eventQueries.getLatestEventId(),
+      kiloSessionId: input.kiloSessionId,
+      continuity,
+    };
+  }
+
+  async refreshNativeEvents(input: {
+    kiloSessionId: string;
+    attachmentId: string;
+    generation: number;
+  }): Promise<boolean> {
+    await this.initialized;
+    return (
+      this.registration?.spec.kiloSessionId === input.kiloSessionId &&
+      this.nativeOutbox.refresh(input.attachmentId, input.generation)
+    );
+  }
+
+  async releaseNativeEvents(input: { attachmentId: string }): Promise<void> {
+    await this.initialized;
+    this.nativeOutbox.release(input.attachmentId);
+  }
+
+  private publishNativeEvent(stored: StoredEvent): void {
+    const kiloSessionId = this.registration?.spec.kiloSessionId;
+    if (kiloSessionId === undefined || this.metadata?.identity.userId === undefined) return;
+    const event = formatStreamEvent(stored, this.sessionId);
+    if (!isDeliverableNativeEvent(event, true)) return;
+    const native = toNativePublicEvent(event, kiloSessionId);
+    if (native === null) return;
+    this.nativeOutbox.enqueue({
+      eventId: stored.id,
+      materialized: isMaterializedNativeEvent(event),
+      event: native,
+    });
+  }
+
   /** The pending questions and permissions this session waits on (C1 adapter). */
   async getPendingInteractions(): Promise<{ questions: unknown[]; permissions: unknown[] }> {
     await this.initialized;
     return this.readPendingInteractions() ?? { questions: [], permissions: [] };
+  }
+
+  /**
+   * Drops every pending question and permission. A new runtime generation can
+   * no longer satisfy an old request, and the stream snapshot is rebuilt from
+   * this state, so keeping it would offer the client an unanswerable prompt.
+   */
+  private async clearPendingInteractions(): Promise<void> {
+    const current = this.pendingInteractions;
+    if (current === undefined) return;
+    if (current.questions.length === 0 && current.permissions.length === 0) return;
+    const next: PendingInteractions = {
+      revision: current.revision + 1,
+      questions: [] as unknown[],
+      permissions: [] as unknown[],
+    };
+    this.pendingInteractions = next;
+    await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
   }
 
   private hasPendingInteraction(collection: PendingInteractionCollection, id: string): boolean {
@@ -1105,8 +1714,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
   }
 
-  // --- notifications (spec §10) ----------------------------------------------
-
   async onRoute(update: ControlPlaneRouteUpdate): Promise<void> {
     await this.initialized;
     if (this.registration === null) return;
@@ -1114,6 +1721,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       // A delete queued ahead of this notification wiped the session.
       if (this.registration === null) return;
+      if (parsed.state === 'lost' && parsed.attemptId === this.currentAttemptId()) {
+        await this.captureQueuedRouteContainer(parsed);
+      }
       if (
         this.messages.some(message => message.state === 'queued') &&
         (this.route.state === 'failed' ||
@@ -1239,14 +1849,23 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  // --- worktree changes (B10) -------------------------------------------------
+  async onWorktreeChangesReady(notification: WorktreeChangesReady): Promise<boolean> {
+    await this.initialized;
+    const parsed = worktreeChangesReadySchema.parse(notification);
+    return this.enqueue(async () => {
+      if (this.metadata?.workspace?.worktreeId !== parsed.worktreeId) return false;
+      this.worktreeChanges.ready(parsed.revision);
+      return true;
+    });
+  }
 
   async getWorktreeChanges(): Promise<GetWorktreeChangesOutput> {
     await this.initialized;
     return this.worktreeChanges.get();
   }
 
-  getWorktreeFile(input: unknown): GetWorktreeFileOutput {
+  async getWorktreeFile(input: unknown): Promise<GetWorktreeFileOutput> {
+    await this.initialized;
     return this.worktreeChanges.getFile(input);
   }
 
@@ -1254,8 +1873,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     return this.worktreeChanges.refresh();
   }
-
-  // --- backstop alarm ---------------------------------------------------------
 
   async alarm(): Promise<void> {
     await this.initialized;
@@ -1268,6 +1885,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       const now = Date.now();
       const due = dueBackstopMessages(this.messages, now, this.sessionTimers());
       if (due.length > 0) {
+        if (due.some(entry => entry.message.state === 'queued')) {
+          await this.captureQueuedRouteContainer(this.route);
+        }
         const byReason = new Map<string, string[]>();
         for (const entry of due) {
           const ids = byReason.get(entry.reason) ?? [];
@@ -1308,8 +1928,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.ctx.storage.setAlarm(Math.min(...candidates));
   }
 
-  // --- reads ------------------------------------------------------------------
-
   async getSession(): Promise<ControlPlaneSessionSnapshot> {
     await this.initialized;
     if (this.registration === null) return { type: 'session-not-found' };
@@ -1344,6 +1962,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     } catch {
       return unavailableStatusSnapshot();
     }
+  }
+
+  /** The preparation attempts the stream replays, for the first transcript page. */
+  async getPreparationAttempts(): Promise<PreparationAttempt[]> {
+    await this.initialized;
+    if (this.registration === null) return [];
+    return listPreparationAttempts(this.eventQueries);
   }
 
   async getMessageResult(messageId: string): Promise<MessageResultRPCResponse> {
@@ -1479,7 +2104,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   /**
    * C1c security: closes this session's stream sockets when its owner leaves an
    * organization (legacy `closeOrgStreams`). Reads the org from the same
-   * persisted metadata both planes use and only closes on a match.
+   * persisted session metadata and only closes on a match.
    */
   async closeOrgStreams(organizationId: string): Promise<number> {
     await this.initialized;
@@ -1493,12 +2118,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return closed;
   }
 
-  // --- delete and worktree deletion ------------------------------------------
-
   /**
    * C1c: updates a prepared session's callback target (legacy `tryUpdate`,
    * retained for `services/code-review-infra`). Stores the same grouped
-   * metadata both planes persist.
+   * persisted session metadata.
    */
   async tryUpdate(updates: { callbackTarget?: CallbackTarget | null }): Promise<OperationResult> {
     await this.initialized;
@@ -1657,13 +2280,80 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * events, no outbox, and the V2 migrations re-applied. The generation key is
    * restored so a later instance runs the normal V2 init rather than the
    * old-plane wipe.
+   *
+   * An issuer whose handle was accepted on a shared scope keeps a locator
+   * tombstone so the facade can still resolve that handle through a survivor;
+   * every other session keeps the original `deleteAll` wipe unchanged.
    */
   private async resetSessionStorage(): Promise<void> {
+    const locator = await this.acceptedHandleLocatorForWipe();
+    if (locator === null) {
+      await this.resetSessionStorageByDeleteAll();
+      return;
+    }
+    await this.resetSessionStorageWithLocator(locator);
+  }
+
+  private async resetSessionStorageByDeleteAll(): Promise<void> {
     await this.ctx.storage.deleteAll();
     await this.ctx.storage.put(GENERATION_KEY, GENERATION);
     await migrate(this.db, migrations);
+    this.clearSessionInMemoryState();
+  }
+
+  /**
+   * Tombstone-first transactional wipe: write the locator, delete the two
+   * application tables through Drizzle, delete every other KV key, and restore
+   * the generation in one synchronous transaction. The schema and the
+   * `__drizzle_migrations` bookkeeping survive, so no re-migration is needed.
+   * A throw rolls the whole transaction back, leaving the live session intact.
+   * The alarm is cleared outside the transaction after the in-memory reset.
+   */
+  private async resetSessionStorageWithLocator(locator: WipeLocator): Promise<void> {
+    runTransactionalWipe({
+      storage: this.ctx.storage,
+      locatorKey: WIPE_LOCATOR_KEY,
+      generationKey: GENERATION_KEY,
+      generation: GENERATION,
+      locator,
+      deleteApplicationTables: () => {
+        this.db.delete(controlPlaneMessages).run();
+        this.db.delete(events).run();
+      },
+    });
+    this.clearSessionInMemoryState();
+    this.wipeLocator = locator;
+    await this.ctx.storage.deleteAlarm();
+  }
+
+  /**
+   * The tombstone a wipe must keep, or null when the session issued no accepted
+   * handle (or has no Sandbox to ask). A transport failure propagates so
+   * `deleteSession` aborts before wiping and is retried, rather than wiping an
+   * issuer whose accepted handle survivors still need to resolve.
+   */
+  private async acceptedHandleLocatorForWipe(): Promise<WipeLocator | null> {
+    const sandboxId =
+      this.registration?.sandboxId ??
+      this.metadata?.workspace?.sandboxId ??
+      this.wipeLocator?.sandboxId;
+    if (sandboxId === undefined) return null;
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) return null;
+    const context = await withDORetry(
+      () => this.sandboxPeerFor(sandboxId) ?? peer,
+      current => current.getAcceptedHandleIssuerLocator(this.sessionId),
+      'getAcceptedHandleIssuerLocator'
+    );
+    if (context === null) return null;
+    return { version: 1, sandboxId, ...context };
+  }
+
+  private clearSessionInMemoryState(): void {
+    this.nativeOutbox.close();
     this.registration = null;
     this.metadata = null;
+    this.wipeLocator = null;
     this.runtimeAuthorization = undefined;
     this.messages = [];
     this.route = { state: 'unknown' };
@@ -1674,8 +2364,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.worktreePreparationGeneration = undefined;
     this.preparationRecorders.clear();
   }
-
-  // --- terminals (B10) --------------------------------------------------------
 
   /** Worker-facing terminal RPC (spec §10); routing/handler wiring is C1. */
   async terminalCreate(input: {
@@ -1701,7 +2389,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return this.terminals.close(input);
   }
 
-  // --- stream -----------------------------------------------------------------
+  /**
+   * Worker-facing preview resolver (spec §10). Runs on the RPC path, not the
+   * operation queue, so a preview never waits behind queued messages. It owns
+   * only eligibility and routing; the provider coordinates come from the
+   * Sandbox DO's off-queue `previewTarget` read.
+   */
+  async resolvePreviewTarget(): Promise<ResolvedPreviewTarget> {
+    await this.initialized;
+    return this.preview.resolve();
+  }
 
   async fetch(request: Request): Promise<Response> {
     await this.initialized;
@@ -1776,13 +2473,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  // --- route view -------------------------------------------------------------
-
   private async applyView(view: ControlPlaneRouteView, pass = this.transportPass()): Promise<void> {
     // The route view is the source of the preparation row: the previous
     // persisted view names the attempt that is open, so a transition closes it
     // even if this process lost its in-memory recorder map to eviction.
     const previous = this.route;
+    if (view.state === 'failed') await this.captureQueuedRouteContainer(view);
     const previousAttemptId = previous.state === 'unknown' ? undefined : previous.attemptId;
     const nextAttemptId = view.state === 'unknown' ? undefined : view.attemptId;
     if (
@@ -1852,6 +2548,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         return;
       }
       case 'ready': {
+        // Persist before the post-attach capture is scheduled, so the deliver RPC
+        // is not delayed behind a storage write and the prompt still goes first.
+        await this.persistQueuedContainer(route.container);
         // The attempt's preparation is done before its messages are delivered.
         if (this.worktreePreparationGeneration !== undefined) {
           this.worktreeChanges.attached(this.worktreePreparationGeneration);
@@ -1909,6 +2608,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.scheduleTransportRecovery(pass);
       return;
     }
+    const routeContainer = this.route.state === 'unknown' ? undefined : this.route.container;
     let result: ControlPlaneDeliverResult;
     try {
       result = await withDORetry(
@@ -1917,6 +2617,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           stub.deliver({
             sessionId: this.sessionId,
             messages: queued.map(message => message.intent),
+            ...(routeContainer?.allocationId === undefined
+              ? {}
+              : { allocationId: routeContainer.allocationId }),
           }),
         'session.deliver',
         this.sandboxRpcConfig(pass)
@@ -1963,6 +2666,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.applyView(view, pass);
   }
 
+  private async persistQueuedContainer(
+    container: CloudAgentRunContainer | undefined
+  ): Promise<void> {
+    if (container === undefined) return;
+    const captured = this.messages
+      .filter(message => message.state === 'queued')
+      .map(message => ({ ...message, container }));
+    if (captured.length === 0) return;
+    await this.persistMessages(captured);
+    const byId = new Map(captured.map(message => [message.messageId, message]));
+    this.messages = this.messages.map(message => byId.get(message.messageId) ?? message);
+  }
+
+  private async captureQueuedRouteContainer(view: ControlPlaneRouteUpdate): Promise<void> {
+    if (view.state === 'unknown') return;
+    const previous = this.route;
+    if (previous.state === 'failed' && previous.attemptId === view.attemptId) return;
+    // A terminal view may describe a replacement, not the allocation that attempted this work.
+    const container =
+      previous.state === 'unknown' || previous.state === 'failed'
+        ? view.container
+        : (previous.container ??
+          (previous.attemptId === view.attemptId ? view.container : undefined));
+    await this.persistQueuedContainer(container);
+  }
+
   private async failRetiredQueuedMessages(): Promise<boolean> {
     if (this.metadata === null || !hasRetiredDevcontainerRuntime(this.metadata)) return false;
     await this.settleMessages(
@@ -1986,9 +2715,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     try {
       return await withDORetry(
         () => this.sandboxPeer() ?? peer,
-        stub =>
+        async stub =>
           stub.prepare({
-            spec: { ...registration.spec, worktreeRecovery: this.worktreeChanges.recovery() },
+            spec: { ...registration.spec, worktreeRecovery: await this.worktreeChanges.recovery() },
             credentials: registration.credentials,
             ...(registration.sandboxSelection
               ? { sandboxSelection: registration.sandboxSelection }
@@ -2121,8 +2850,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const namespace = sandboxControlPeerNamespace<ControlPlaneSandboxPeer>(this.env);
     return namespace === undefined ? null : namespace.getByName(sandboxId);
   }
-
-  // --- preparation progress ---------------------------------------------------
 
   /**
    * The preparation attempt id is the route attempt id (spec §10); the trigger
@@ -2258,8 +2985,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private currentAttemptId(): string | null {
     return this.route.state === 'unknown' ? null : this.route.attemptId;
   }
-
-  // --- settlement and message events -----------------------------------------
 
   private async settleMessages(
     messageIds: readonly string[],
@@ -2467,7 +3192,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     timestamp: number = Date.now()
   ): void {
     this.broadcast({
-      id: 0 as EventId,
+      id: 0,
       execution_id: '',
       session_id: this.sessionId,
       stream_event_type: streamEventType,
@@ -2478,9 +3203,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   private broadcast(event: StoredEvent): void {
     this.streamHandler().broadcastEvent(event);
+    this.publishNativeEvent(event);
   }
-
-  // --- connected-event projections -------------------------------------------
 
   private deriveCloudStatus(): {
     type: 'preparing' | 'ready' | 'finalizing' | 'error';
@@ -2569,8 +3293,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         };
   }
 
-  // --- storage ----------------------------------------------------------------
-
   private async loadMessages(): Promise<SessionMessage[]> {
     const rows = await this.db
       .select()
@@ -2594,6 +3316,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         'failed',
         'agent_restarted'
       );
+      // A replaced attempt retires its questions and permissions with its
+      // runtime: a stale interaction id must not be answerable on the new one.
+      await this.clearPendingInteractions();
     }
     await this.ctx.storage.put(ROUTE_KEY, view);
     this.route = view;

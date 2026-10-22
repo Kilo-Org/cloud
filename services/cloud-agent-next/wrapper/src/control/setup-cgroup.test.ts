@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import {
   closeSync,
   constants,
+  fstatSync,
   mkdtempSync,
   openSync,
   readFileSync,
@@ -10,6 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { setImmediate } from 'node:timers/promises';
 import { runProcess, type ProcessSpawn } from '../utils.js';
 import { applySetupLimits, createSetupSpawn, spawnInCgroup } from './setup-cgroup.js';
 
@@ -70,6 +72,29 @@ describe('spawnInCgroup', () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout.trim()).toBe('done');
     expect(readFileSync(marker, 'utf8')).toBe('ran\n');
+  });
+
+  it('leaves descriptors it does not own open once the child is collected', async () => {
+    const { procsPath, spawnSetup } = fakeLeaf();
+    await runSetup('echo ok', spawnSetup);
+
+    const sentinels = Array.from({ length: 8 }, () => openSync(procsPath, constants.O_RDONLY));
+    descriptors.push(...sentinels);
+    // Bun closes a collected subprocess's pipes on a later event-loop turn.
+    for (let round = 0; round < 5; round++) {
+      Bun.gc(true);
+      await setImmediate();
+    }
+
+    const closed = sentinels.filter(descriptor => {
+      try {
+        fstatSync(descriptor);
+        return false;
+      } catch {
+        return true;
+      }
+    });
+    expect(closed).toEqual([]);
   });
 });
 

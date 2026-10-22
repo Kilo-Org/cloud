@@ -13,6 +13,10 @@ import {
   type OpenRouterModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import * as z from 'zod';
+import {
+  organizationModelsPath,
+  type OrganizationModelAudience,
+} from '@kilocode/app-shared/organizations';
 
 interface OpenRouterProvider {
   name: string;
@@ -100,13 +104,17 @@ export function useOpenRouterProviders() {
   });
 }
 
-export function useModelSelectorList(organizationId: string | undefined, enabled = true) {
+export function useModelSelectorList(
+  organizationId: string | undefined,
+  enabled = true,
+  audience: OrganizationModelAudience = 'member'
+) {
   const query = useQuery({
-    queryKey: ['openrouter-models', organizationId],
+    queryKey: ['openrouter-models', organizationId, audience],
     enabled,
     queryFn: async (): Promise<OpenRouterModelsResponse> => {
       const response = await fetch(
-        organizationId ? `/api/organizations/${organizationId}/models` : '/api/openrouter/models'
+        organizationId ? organizationModelsPath(organizationId, audience) : '/api/openrouter/models'
       );
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);

@@ -7,7 +7,7 @@
 // code block consistent.
 //
 // The palette is keyed by the SURFACE the code is painted on, not by the app
-// color scheme: a dark-theme user bubble is bright lime (#E8F27A) while a
+// color scheme: a dark-theme user bubble is bright yellow (#FFDD00) while a
 // light-theme kilo-chat user bubble is dark olive (#4F5A10), so the app scheme
 // is the wrong signal for either one. `tokenSchemeForSurface` classifies the
 // real code-card background — the bubble tinted by the palette's 10% ink
@@ -15,7 +15,7 @@
 // bright cards, `dark` holds light ink for dim cards.
 //
 // Every `light` value clears 4.5:1 on the light code cards (assistant muted
-// #F0EEE6, card #FFFFFF, and the lime user/kilo-chat surfaces including the
+// #F0EEE6, card #FFFFFF, and the yellow user/kilo-chat surfaces including the
 // 10%-ink code tint), and every `dark` value clears 4.5:1 on the dark code
 // cards (assistant muted #1F1F24, card #17171A, and the light-theme kilo-chat
 // code card, where the 10% white ink tint lifts the olive primary #4F5A10 to
@@ -24,22 +24,22 @@
 // must also keep clearing the tinted diff tiles asserted by
 // `src/lib/hooks/use-theme-colors.contrast.test.ts`.
 export const TOKEN_DARK_LIGHT = {
-  keyword: { light: '#7B2CBF', dark: '#EFE0FF' },
+  keyword: { light: '#772BB9', dark: '#EFE0FF' },
   builtin: { light: '#0F4FB8', dark: '#D2E9FF' },
-  literal: { light: '#7B2CBF', dark: '#EFE0FF' },
+  literal: { light: '#772BB9', dark: '#EFE0FF' },
   number: { light: '#7A4A00', dark: '#FFE1BC' },
-  string: { light: '#1E6639', dark: '#C0F2D6' },
+  string: { light: '#1D6136', dark: '#C0F2D6' },
   comment: { light: '#57534C', dark: '#EAE6DE' },
   type: { light: '#0F4FB8', dark: '#D2E9FF' },
   function: { light: '#0F4FB8', dark: '#D2E9FF' },
   variable: { light: '#14130F', dark: '#F2F0EB' },
   property: { light: '#0F4FB8', dark: '#D2E9FF' },
   tag: { light: '#8C3527', dark: '#FFDFD2' },
-  selector: { light: '#7B2CBF', dark: '#EFE0FF' },
+  selector: { light: '#772BB9', dark: '#EFE0FF' },
   attribute: { light: '#0F4FB8', dark: '#D2E9FF' },
   operator: { light: '#57534C', dark: '#EAE6DE' },
   meta: { light: '#57534C', dark: '#EAE6DE' },
-  add: { light: '#1E6639', dark: '#C0F2D6' },
+  add: { light: '#1D6136', dark: '#C0F2D6' },
   del: { light: '#8C3527', dark: '#FFDFD2' },
 } satisfies Record<string, { light: string; dark: string }>;
 
@@ -57,7 +57,7 @@ export type TokenScheme = 'onLight' | 'onDark';
  * WCAG's own light/dark boundary (0.179) sits lower, but no code card lands
  * between the two supported surfaces (the brightest dim card is the
  * light-theme kilo-chat primary at ~0.09; the dimmest bright card is the
- * lime at ~0.82), so 0.5 keeps the classifier unambiguous.
+ * yellow at ~0.73), so 0.5 keeps the classifier unambiguous.
  */
 const LIGHT_SURFACE_LUMINANCE = 0.5;
 

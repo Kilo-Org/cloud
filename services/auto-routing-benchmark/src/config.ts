@@ -1,10 +1,14 @@
-import type { BenchmarkConfig, BenchmarkPlatformModel } from '@kilocode/auto-routing-contracts';
+import type {
+  AutoRouter,
+  BenchmarkConfig,
+  BenchmarkPlatformModel,
+  ProductionTokenProfile,
+} from '@kilocode/auto-routing-contracts';
 import {
-  getConfigRows,
-  replaceConfig,
-  type ConfigAutoDeciderModelRow,
-  type ConfigDeciderModelRow,
-} from './db';
+  parseStoredPolicyComputed,
+  parseStoredPolicyOverrides,
+} from '@kilocode/auto-routing-contracts';
+import { getConfigRows, replaceConfig, type ConfigDeciderModelRow } from './db';
 
 // Retain nullable legacy columns for rolling deploys, but never read saved efforts.
 export function toDeciderModelRows(models: BenchmarkPlatformModel[]): ConfigDeciderModelRow[] {
@@ -20,76 +24,65 @@ export function toDeciderModelRows(models: BenchmarkPlatformModel[]): ConfigDeci
 // one, and runs cannot start until a config exists.
 export function mapConfigRows(
   configRow: {
+    router?: AutoRouter;
+    accuracy_noise_band?: number;
+    frontier_min_accuracy_delta?: number;
     min_accuracy: number;
     switch_cost_factor: number;
     best_accuracy_switch_threshold: number;
-    max_concurrency: number;
-    user_max_concurrency: number;
+    production_token_profile?: ProductionTokenProfile | null;
+    switch_horizon_turns?: number | null;
+    low_confidence_threshold?: number | null;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
     classifier_repetitions: number;
     decider_repetitions: number;
     classifier_max_p95_latency_ms: number | null;
-    auto_decider_min_cost_usd: number;
-    auto_decider_max_cost_usd: number;
+    // Stored JSON; entries that fail their key's schema are ignored on read.
+    policy_overrides?: unknown;
+    policy_computed?: unknown;
     updated_at: string;
     updated_by: string | null;
   } | null,
   classifierModels: string[],
-  deciderModelRows: ConfigDeciderModelRow[],
-  autoDeciderModelRows: ConfigAutoDeciderModelRow[] = [],
-  excludedAutoDeciderModels: string[] = []
+  deciderModelRows: ConfigDeciderModelRow[]
 ): BenchmarkConfig | null {
-  const excludedAuto = new Set(excludedAutoDeciderModels);
-  const manualDeciderModels = deciderModelRows.map(r => ({ id: r.model }));
-  const manualIds = new Set(manualDeciderModels.map(model => model.id));
-  const autoDeciderModels = autoDeciderModelRows.map(r => ({
-    id: r.model,
-    avgAttemptCostUsd: r.avg_attempt_cost_usd,
-  }));
-  const effectiveAutoDeciderModels = autoDeciderModels
-    .filter(model => !excludedAuto.has(model.id))
-    .filter(model => !manualIds.has(model.id))
-    .map(model => ({ id: model.id }));
-  const deciderModels = [...manualDeciderModels, ...effectiveAutoDeciderModels];
+  const deciderModels = deciderModelRows.map(r => ({ id: r.model }));
 
   if (configRow === null || classifierModels.length === 0 || deciderModels.length === 0) {
     return null;
   }
 
   return {
+    router: configRow.router ?? 'efficient',
+    accuracyNoiseBand: configRow.accuracy_noise_band ?? 0.05,
+    frontierMinAccuracyDelta: configRow.frontier_min_accuracy_delta ?? 0,
     classifierModels,
     deciderModels,
-    manualDeciderModels,
-    autoDeciderModels,
-    excludedAutoDeciderModels,
     minAccuracy: configRow.min_accuracy,
     switchCostFactor: configRow.switch_cost_factor,
     bestAccuracySwitchThreshold: configRow.best_accuracy_switch_threshold,
-    maxConcurrency: configRow.max_concurrency,
-    userMaxConcurrency: configRow.user_max_concurrency,
+    productionTokenProfile: configRow.production_token_profile ?? null,
+    switchHorizonTurns: configRow.switch_horizon_turns ?? null,
+    lowConfidenceThreshold: configRow.low_confidence_threshold ?? null,
     benchmarkUserId: configRow.benchmark_user_id,
     benchmarkOrgId: configRow.benchmark_org_id,
     classifierRepetitions: configRow.classifier_repetitions,
     deciderRepetitions: configRow.decider_repetitions,
     classifierMaxP95LatencyMs: configRow.classifier_max_p95_latency_ms,
-    autoDeciderMinCostUsd: configRow.auto_decider_min_cost_usd,
-    autoDeciderMaxCostUsd: configRow.auto_decider_max_cost_usd,
+    policyOverrides: parseStoredPolicyOverrides(configRow.policy_overrides),
+    policyComputed: parseStoredPolicyComputed(configRow.policy_computed),
     updatedAt: configRow.updated_at,
     updatedBy: configRow.updated_by,
   };
 }
 
-export async function getBenchmarkConfig(db: D1Database): Promise<BenchmarkConfig | null> {
-  const { config, classifierModels, deciderModels, autoDeciderModels, excludedAutoDeciderModels } =
-    await getConfigRows(db);
-  return mapConfigRows(
-    config,
-    classifierModels,
-    deciderModels,
-    autoDeciderModels,
-    excludedAutoDeciderModels
-  );
+export async function getBenchmarkConfig(
+  db: D1Database,
+  router: AutoRouter = 'efficient'
+): Promise<BenchmarkConfig | null> {
+  const { config, classifierModels, deciderModels } = await getConfigRows(db, router);
+  return mapConfigRows(config, classifierModels, deciderModels);
 }
 
 export async function saveBenchmarkConfig(
@@ -99,32 +92,35 @@ export async function saveBenchmarkConfig(
 ): Promise<BenchmarkConfig> {
   const updatedAt = new Date().toISOString();
   const stamped: BenchmarkConfig = { ...config, updatedAt, updatedBy };
+  const existing = await getBenchmarkConfig(db, config.router);
 
-  const manualDeciderModels = config.manualDeciderModels ?? config.deciderModels;
-  const deciderModelRows = toDeciderModelRows(manualDeciderModels);
+  const deciderModelRows = toDeciderModelRows(config.deciderModels);
 
   await replaceConfig(
     db,
     {
       min_accuracy: config.minAccuracy,
+      accuracy_noise_band: config.accuracyNoiseBand,
+      frontier_min_accuracy_delta: config.frontierMinAccuracyDelta,
       switch_cost_factor: config.switchCostFactor,
       best_accuracy_switch_threshold: config.bestAccuracySwitchThreshold,
-      max_concurrency: config.maxConcurrency,
-      user_max_concurrency: config.userMaxConcurrency,
+      production_token_profile: config.productionTokenProfile,
+      switch_horizon_turns: config.switchHorizonTurns,
+      low_confidence_threshold: config.lowConfidenceThreshold,
       benchmark_user_id: config.benchmarkUserId,
       benchmark_org_id: config.benchmarkOrgId,
       classifier_repetitions: config.classifierRepetitions,
       decider_repetitions: config.deciderRepetitions,
       classifier_max_p95_latency_ms: config.classifierMaxP95LatencyMs,
-      auto_decider_min_cost_usd: config.autoDeciderMinCostUsd,
-      auto_decider_max_cost_usd: config.autoDeciderMaxCostUsd,
+      policy_overrides: config.policyOverrides ?? null,
       updated_at: updatedAt,
       updated_by: updatedBy,
     },
     config.classifierModels,
     deciderModelRows,
-    config.excludedAutoDeciderModels ?? []
+    config.router
   );
 
-  return stamped;
+  // The computed map is server-owned: an admin save must not clear it.
+  return { ...stamped, policyComputed: existing?.policyComputed ?? null };
 }

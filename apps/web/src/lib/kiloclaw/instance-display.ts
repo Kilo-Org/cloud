@@ -1,3 +1,7 @@
+import { formatBytes } from '@/lib/utils';
+
+export { formatBytes };
+
 export function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
@@ -5,14 +9,6 @@ export function formatUptime(seconds: number): string {
   if (days > 0) return `${days}d ${hours}h ${mins}m`;
   if (hours > 0) return `${hours}h ${mins}m`;
   return `${mins}m`;
-}
-
-export function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const value = bytes / 1024 ** i;
-  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
 function formatPercent(rawPercent: number): string {

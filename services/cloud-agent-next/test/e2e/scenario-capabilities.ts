@@ -131,26 +131,32 @@ export type CallbackObservation = { open(signal?: AbortSignal): Promise<Callback
 export type GatesObservation = { parkedStreamsSupported: true };
 
 /**
- * The control-plane V2 (`workspace_*` new plane) is routed and launched. Plan
- * B11 writes scenarios against it before the C1 cutover, so the local profile
- * advertises this capability only when the operator opts in with
- * `E2E_CONTROL_PLANE_V2=1`. Without it every V2 scenario reports `unsupported`
- * with the missing-capability reason instead of failing against the legacy
- * plane.
- *
- * The flag alone is not proof: a `workspace_*` id prefix is produced by the
- * legacy plane too. Every V2 scenario additionally declares `controlPlaneRuntime`
- * and proves the owned container runs the new-plane wrapper before asserting
- * anything, so an opted-in run against a still-legacy plane fails loudly instead
- * of false-passing.
+ * The local profile supports control-plane sessions without enrollment.
+ * Scenarios also require `controlPlaneRuntime` to verify the owned wrapper.
  */
 export type ControlPlaneV2Observation = { ready: true };
+
+/**
+ * A running owned-container HTTP fixture, started by
+ * `ControlPlaneRuntimeObservation.startPreviewFixture`. `port` is the
+ * loopback port the fixture bound inside the container; `stop` is idempotent
+ * and best-effort (a container already gone is not an error), but callers must
+ * still invoke it in a `finally`.
+ */
+export type PreviewFixtureHandle = {
+  port: number;
+  stop(): Promise<void>;
+};
 
 /**
  * Local-Docker proof that the session's owned container runs the new plane.
  * `proveNewPlane` captures the new-plane control wrapper uniquely in the owned
  * container; a legacy container has no such process and the call throws. The
  * returned identity is the same physical handle the fault operations use.
+ *
+ * `controlPlaneRuntime` itself is provided only by the local Docker profile; the
+ * deployed/local-HTTP profiles omit the observation entirely, so a scenario that
+ * needs its members is only ever dispatched where the profile provides them.
  */
 export type ControlPlaneRuntimeObservation = {
   proveNewPlane(allocation: SandboxFaultAllocation): Promise<{ instanceId: string; pid: number }>;
@@ -170,6 +176,19 @@ export type ControlPlaneRuntimeObservation = {
   gitRemoteUrl(allocation: SandboxFaultAllocation): Promise<string | null>;
   /** Count of summary (compaction) messages in the live Kilo history. */
   summaryCount(allocation: SandboxFaultAllocation): Promise<number>;
+  /**
+   * Start the preview HTTP fixture inside the owned container and wait until it
+   * answers on `127.0.0.1`. Optional so profiles that do not implement
+   * owned-container fixtures remain assignable; the local Docker profile
+   * provides it and `preview-http` refuses to run without it.
+   */
+  startPreviewFixture?(
+    this: void,
+    allocation: SandboxFaultAllocation,
+    options?: { port?: number }
+  ): Promise<PreviewFixtureHandle>;
+  /** The loopback port of the session's `kilo serve` in the owned container. */
+  kiloServerPort?(this: void, allocation: SandboxFaultAllocation): Promise<number>;
 };
 
 /**
@@ -251,10 +270,8 @@ export type SandboxFaultTarget = {
    */
   expectedWrapperInstanceId: string;
   /**
-   * Which control-wrapper basename to capture and guard. Absent means the
-   * legacy `kilocode-control-wrapper.js`; the new-plane scenarios set
-   * `kilocode-control-plane-wrapper.js`, because a new-plane container has no
-   * legacy wrapper process (and vice versa).
+   * Optional explicit wrapper basename. Only
+   * `kilocode-control-plane-wrapper.js` is accepted.
    */
   wrapperProcessBasename?: string;
 };
@@ -384,7 +401,7 @@ export type SandboxFaultObservation = {
      * exists, before a separate capture would lose the attach window.
      */
     expectedWrapperInstanceId?: string;
-    /** Absent means the legacy wrapper basename. */
+    /** Optional explicit control-plane wrapper basename. */
     wrapperProcessBasename?: string;
     waitForAttachMs: number;
   }): Promise<{

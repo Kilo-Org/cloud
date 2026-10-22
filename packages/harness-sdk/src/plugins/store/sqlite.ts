@@ -106,14 +106,12 @@ const selectTurns = async (db: Db, sessionId: string): Promise<readonly Turn[]> 
     db.select().from(parts).where(eq(parts.sessionId, sessionId)).orderBy(asc(parts.id)),
   ]);
   const held = byTurn(assertParts(partRows));
-  return assertTurns(turnRows).map(
-    (turn): Turn => ({
-      id: turn.id,
-      sessionId: turn.sessionId,
-      role: turn.role,
-      parts: held.get(turn.id) ?? [],
-    })
-  );
+  return assertTurns(turnRows).map((turn): Turn => ({
+    id: turn.id,
+    sessionId: turn.sessionId,
+    role: turn.role,
+    parts: held.get(turn.id) ?? [],
+  }));
 };
 
 /**
@@ -135,7 +133,7 @@ const storeOn = (connection: Connection): SessionStoreService => {
     read: sessionId =>
       attempt('read', async () => {
         const rows = await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1);
-        return Option.map(Option.fromNullable(assertSessions(rows)[0]), asStoredSession);
+        return Option.map(Option.fromNullishOr(assertSessions(rows)[0]), asStoredSession);
       }),
 
     append: exchange => attempt('append', () => insertExchange(connection, db, exchange)),

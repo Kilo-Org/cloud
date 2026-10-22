@@ -93,6 +93,7 @@ const chunksOf = (
  */
 interface Tally {
   usage: ModelUsage;
+  model: string | undefined;
   stop: StopReason;
   /** The call being read, until the frame that closes it. See `collect`. */
   open: OpenCall | undefined;
@@ -171,6 +172,7 @@ const read = (wire: Wire, tally: Tally, event: unknown): readonly ModelEvent[] =
     tally.usage = raise(tally.usage, spent);
   }
   tally.stop = wire.toStop(event) ?? tally.stop;
+  tally.model = wire.toModel?.(event) ?? tally.model;
   const parts = wire.toParts?.(event);
   if (parts !== undefined) {
     return collectParts(tally, parts);
@@ -233,6 +235,7 @@ const lastOf = (tally: Tally): Stream.Stream<ModelEvent> =>
       kind: 'done',
       usage: tally.usage,
       stop: reasonOf(tally.stop, tally.called),
+      ...(tally.model === undefined ? {} : { model: tally.model }),
     };
     return Stream.fromIterable([...ended, done]);
   });
@@ -249,13 +252,14 @@ const modelStream = (
   selected: Effect.Effect<Wire, ModelError>,
   send: (wire: Wire, handle: AbortHandle | undefined) => Effect.Effect<HttpResponse, ModelError>
 ): Stream.Stream<ModelEvent, ModelError> =>
-  Stream.unwrapScoped(
+  Stream.unwrap(
     Effect.gen(function* () {
       const handle = yield* Effect.acquireRelease(abortHandle(), held =>
         Effect.sync(() => held?.abort())
       );
       const tally: Tally = {
         usage: zeroUsage,
+        model: undefined,
         stop: 'unknown',
         open: undefined,
         indexed: undefined,
@@ -266,8 +270,10 @@ const modelStream = (
 
       return Stream.fromEffect(send(wire, handle)).pipe(
         Stream.flatMap(response => chunksOf(response, handle)),
-        Stream.mapConcat(chunk => frames(chunk)),
-        Stream.mapConcatEffect(data => eventsOf(wire, tally, data)),
+        Stream.map(chunk => frames(chunk)),
+        Stream.flattenIterable,
+        Stream.mapEffect(data => eventsOf(wire, tally, data)),
+        Stream.flattenIterable,
         Stream.concat(lastOf(tally))
       );
     })

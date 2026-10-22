@@ -45,7 +45,7 @@ const settingsResponse = {
   mode: 'cost_per_accuracy',
   configuredMode: null,
   defaultMode: 'cost_per_accuracy',
-  configuredPool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+  configuredPool: [{ model: 'google/gemini-2.5-flash' }],
   poolStatuses: [
     {
       entry: { model: 'google/gemini-2.5-flash', variant: null },
@@ -182,8 +182,8 @@ describe('auto routing admin client', () => {
       ownerType: 'org',
       ownerId: 'org-1',
       mode: 'best_accuracy',
-      pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
-      retryEntries: [{ model: 'google/gemini-2.5-flash', variant: null }],
+      pool: [{ model: 'google/gemini-2.5-flash' }],
+      retryEntries: [{ model: 'google/gemini-2.5-flash' }],
     });
 
     expect(mockFetch).toHaveBeenCalledWith(
@@ -198,8 +198,8 @@ describe('auto routing admin client', () => {
           ownerType: 'org',
           ownerId: 'org-1',
           mode: 'best_accuracy',
-          pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
-          retryEntries: [{ model: 'google/gemini-2.5-flash', variant: null }],
+          pool: [{ model: 'google/gemini-2.5-flash' }],
+          retryEntries: [{ model: 'google/gemini-2.5-flash' }],
         }),
       }
     );
@@ -221,7 +221,7 @@ describe('auto routing admin client', () => {
         ownerType: 'user',
         ownerId: 'user-1',
         mode: null,
-        pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        pool: [{ model: 'google/gemini-2.5-flash' }],
       })
     ).resolves.toEqual({
       status: 429,

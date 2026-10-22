@@ -911,9 +911,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           existingConfig?.config.remediation_model_slug ??
           analysisModelSlug;
 
-        // Enqueue backlog findings when include_existing becomes active — either
-        // because it was just toggled ON, or because auto-analysis was re-enabled
-        // while include_existing was already ON.
         const wasAutoAnalysisOn = existingConfig?.config.auto_analysis_enabled ?? false;
         const isAutoAnalysisOn =
           input.autoAnalysisEnabled ?? existingConfig?.config.auto_analysis_enabled ?? false;
@@ -1338,6 +1335,21 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           limit: input.limit,
           offset: input.offset,
         });
+
+        const foreignFindingIds = findings
+          .filter(finding => !deps.verifyFindingOwnership(finding, ctx, input))
+          .map(finding => finding.id);
+        if (foreignFindingIds.length > 0) {
+          console.error('Security finding list returned rows outside the requested owner scope', {
+            ownerType: owner.type,
+            ownerId: owner.id,
+            foreignFindingIds,
+          });
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Unable to list security findings',
+          });
+        }
 
         const concurrencyCheck = await canStartAnalysis(securityOwner);
         const [configWithStatus, integration] = await Promise.all([

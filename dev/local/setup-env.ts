@@ -3,6 +3,8 @@ import * as path from 'node:path';
 import * as readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 
+import { LOCAL_ENVELOPE_KEY_SPECS, planEnvelopeProvisioning } from './envelope-keys';
+
 // ---------------------------------------------------------------------------
 // ANSI color constants
 // ---------------------------------------------------------------------------
@@ -233,6 +235,18 @@ async function main(): Promise<void> {
 
   const exampleContent = fs.readFileSync(examplePath, 'utf-8');
   const exampleValues = parseExampleFile(exampleContent);
+  // Read the current envelope material back too: re-running setup must not
+  // rotate a keypair, because a new one cannot decrypt the credentials the
+  // Worker already stored under the old one. The private half may live only in
+  // the Worker's .dev.vars (the layout its .dev.vars.example documents), so
+  // that file is the second source before falling back to the example.
+  const previousEnvValues = fs.existsSync(envLocalPath)
+    ? parseExampleFile(fs.readFileSync(envLocalPath, 'utf-8'))
+    : new Map<string, string>();
+  const gitTokenServiceDevVarsPath = path.join(repoRoot, 'services/git-token-service/.dev.vars');
+  const previousWorkerValues = fs.existsSync(gitTokenServiceDevVarsPath)
+    ? parseExampleFile(fs.readFileSync(gitTokenServiceDevVarsPath, 'utf-8'))
+    : new Map<string, string>();
 
   // -----------------------------------------------------------------------
   // Step 1: Check for existing .env.local
@@ -297,6 +311,42 @@ async function main(): Promise<void> {
     } else {
       collected.set(key, answer);
     }
+  }
+
+  // -----------------------------------------------------------------------
+  // Step 4: Provision the local credential-envelope keypairs
+  // -----------------------------------------------------------------------
+
+  // The provider envelopes are not simple secrets: the web app needs the key ID
+  // and public half, and git-token-service needs the private half, so they are
+  // generated as a pair instead of one `openssl rand` value.
+  for (const spec of LOCAL_ENVELOPE_KEY_SPECS) {
+    // An empty value means "not configured here", so it must fall through to the
+    // next source: `??` alone would stop at the empty `.env.local` slot and
+    // ignore the private half that lives only in the worker's file.
+    const existing = (key: string) =>
+      [previousEnvValues, previousWorkerValues, collected, exampleValues]
+        .map(source => source.get(key))
+        .find(value => value);
+    const provisioning = planEnvelopeProvisioning(spec, existing);
+    const { keypair } = provisioning;
+    // Step 6 rebuilds the file from the example and writes back only collected
+    // keys, so every status has to record the pair it decided on — including
+    // the half-configured one, whose existing values must not be erased.
+    collected.set(spec.keyIdEnv, keypair.keyId);
+    collected.set(spec.publicKeyEnv, keypair.publicKey);
+    collected.set(spec.privateKeyEnv, keypair.privateKey);
+    if (provisioning.status === 'incomplete') {
+      console.log(
+        `  ${YELLOW}⚠ ${spec.keyIdEnv} carries ${provisioning.configured} of 3 values; keeping them${RESET}`
+      );
+      continue;
+    }
+    console.log(
+      provisioning.status === 'keep'
+        ? `  ${DIM}Keeping the existing ${keypair.keyId} keypair${RESET}`
+        : `  ${GREEN}✓ Generated ${keypair.keyId}${RESET}`
+    );
   }
 
   // -----------------------------------------------------------------------

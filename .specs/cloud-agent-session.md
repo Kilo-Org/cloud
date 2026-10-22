@@ -406,8 +406,8 @@ asks questions, and opens more chats -- and the chat stays usable throughout.
 
 ## Out of Scope
 
-Cloud administration surfaces beyond the existing chat sidebar (MCP Gateway,
-triggers, webhooks), profile and organization administration, the mobile app,
+Cloud administration surfaces beyond the existing chat sidebar (triggers,
+webhooks), profile and organization administration, the mobile app,
 and the CLI.
 The bounded provider, sandbox type, debug metadata, and known lifecycle dates in
 Sandbox Status are a narrow exception to runtime opacity. They do not permit

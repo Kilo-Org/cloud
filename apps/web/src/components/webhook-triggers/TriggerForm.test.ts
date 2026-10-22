@@ -2,9 +2,21 @@ import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals'
 import { createRequire } from 'node:module';
 import React, { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import {
+  getSandboxAllocationRequest,
+  type SandboxAllocation,
+  type SandboxSelectionCapabilities,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import type { TriggerForm as TriggerFormComponent, TriggerFormProps } from './TriggerForm';
 
 jest.mock('sonner', () => ({ toast: { error: jest.fn(), success: jest.fn() } }));
+jest.mock('next-auth/react', () => ({
+  useSession: () => ({
+    data: {
+      user: { id: 'oauth/github/creator', name: 'test-creator', email: 'creator@example.com' },
+    },
+  }),
+}));
 jest.mock('lucide-react', () => new Proxy({}, { get: () => () => null }));
 jest.mock('@/components/ui/card', () => ({
   Card: ({ children }: { children: React.ReactNode }) => createElement('div', {}, children),
@@ -30,11 +42,32 @@ jest.mock('@/components/ui/label', () => ({
     createElement('label', props, children),
 }));
 jest.mock('@/components/ui/switch', () => ({ Switch: () => null }));
-jest.mock('@/components/ui/checkbox', () => ({ Checkbox: () => null }));
+jest.mock('@/components/ui/checkbox', () => ({
+  Checkbox: ({
+    onCheckedChange,
+    ...props
+  }: React.InputHTMLAttributes<HTMLInputElement> & {
+    onCheckedChange?: (checked: boolean) => void;
+  }) =>
+    createElement('input', {
+      ...props,
+      type: 'checkbox',
+      onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
+        onCheckedChange?.(event.target.checked),
+    }),
+}));
 type SelectInjectedProps = {
   onValueChange?: (value: string) => void;
   selectDisabled?: boolean;
 };
+
+function withSelectProps(children: React.ReactNode, props: SelectInjectedProps): React.ReactNode {
+  return React.Children.map(children, child =>
+    React.isValidElement<SelectInjectedProps & { children?: React.ReactNode }>(child)
+      ? React.cloneElement(child, props)
+      : child
+  );
+}
 
 jest.mock('@/components/ui/select', () => ({
   Select: ({
@@ -51,31 +84,17 @@ jest.mock('@/components/ui/select', () => ({
     createElement(
       'div',
       { 'data-container-allocation': value, 'data-disabled': String(disabled) },
-      React.Children.map(children, child => {
-        if (!React.isValidElement<SelectInjectedProps>(child)) return child;
-        return React.cloneElement(child, { onValueChange, selectDisabled: disabled });
-      })
+      withSelectProps(children, { onValueChange, selectDisabled: disabled })
     ),
   SelectTrigger: ({ children }: { children: React.ReactNode }) =>
     createElement(React.Fragment, {}, children),
   SelectValue: () => null,
-  SelectContent: ({
-    children,
-    onValueChange,
-    selectDisabled,
-  }: {
-    children: React.ReactNode;
-    onValueChange?: (value: string) => void;
-    selectDisabled?: boolean;
-  }) =>
-    createElement(
-      React.Fragment,
-      {},
-      React.Children.map(children, child => {
-        if (!React.isValidElement<SelectInjectedProps>(child)) return child;
-        return React.cloneElement(child, { onValueChange, selectDisabled });
-      })
-    ),
+  SelectContent: ({ children, ...props }: { children: React.ReactNode } & SelectInjectedProps) =>
+    createElement(React.Fragment, {}, withSelectProps(children, props)),
+  SelectGroup: ({ children, ...props }: { children: React.ReactNode } & SelectInjectedProps) =>
+    createElement(React.Fragment, {}, withSelectProps(children, props)),
+  SelectLabel: ({ children }: { children: React.ReactNode }) =>
+    createElement('div', { 'data-select-group-label': true }, children),
   SelectItem: ({
     children,
     value,
@@ -93,6 +112,7 @@ jest.mock('@/components/ui/select', () => ({
       'button',
       {
         type: 'button',
+        'data-select-item': value,
         disabled: disabled || selectDisabled,
         onClick: () => onValueChange?.(value),
       },
@@ -116,7 +136,20 @@ jest.mock('@/components/cloud-agent/ProfileSelector', () => ({ ProfileSelector: 
 jest.mock('@/components/cloud-agent/RepoProfileBindingsDialog', () => ({
   RepoProfileBindingsDialog: () => null,
 }));
-jest.mock('@/components/shared/RepositoryCombobox', () => ({ RepositoryCombobox: () => null }));
+jest.mock('@/components/shared/RepositoryCombobox', () => ({
+  RepositoryCombobox: ({
+    onValueChange,
+    disabled,
+  }: {
+    onValueChange: (value: string) => void;
+    disabled?: boolean;
+  }) =>
+    createElement(
+      'button',
+      { type: 'button', disabled, onClick: () => onValueChange('kilo/other') },
+      'select-repository'
+    ),
+}));
 jest.mock('@/components/shared/ModeCombobox', () => ({ ModeCombobox: () => null }));
 jest.mock('@/components/shared/ModelCombobox', () => ({
   ModelCombobox: ({
@@ -279,11 +312,27 @@ function expectSubmittedVariantToBeOmitted(onSubmit: jest.Mock<TriggerFormProps[
   expect(Object.hasOwn(submission, 'variant')).toBe(false);
 }
 
-function selectContainerAllocation(
-  container: HTMLElement,
-  value: 'automatic' | 'isolated-standard'
-) {
-  click(container, value === 'automatic' ? 'Automatic' : 'Dedicated Standard');
+function sandboxCapabilities(
+  overrides: Partial<SandboxSelectionCapabilities> = {}
+): SandboxSelectionCapabilities {
+  return {
+    enabled: true,
+    defaultDestination: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
+    effectiveDestination: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
+    options: [
+      { allocation: getSandboxAllocationRequest('cloudflare-containers-standard-3') },
+      { allocation: getSandboxAllocationRequest('cloudflare-containers-standard-4') },
+      { allocation: getSandboxAllocationRequest('vercel-small') },
+      { allocation: getSandboxAllocationRequest('vercel-large') },
+    ],
+    ...overrides,
+  };
+}
+
+function selectSandbox(container: HTMLElement, value: SandboxAllocation | 'automatic') {
+  const item = container.querySelector<HTMLButtonElement>(`[data-select-item="${value}"]`);
+  if (!item) throw new Error(`sandbox option not found: ${value}`);
+  act(() => item.click());
 }
 
 function expectSubmittedSandboxAllocationToBeOmitted(
@@ -328,6 +377,58 @@ describe('TriggerForm variants', () => {
     act(() => root?.render(createElement(TriggerForm, allProps)));
     return { container: dom.container, onSubmit, allProps };
   }
+
+  it('does not offer creator mode for personal triggers', () => {
+    const { container } = render({ mode: 'create' });
+    expect(container.textContent).not.toContain('Organization bot');
+    expect(container.textContent).not.toContain('test-creator');
+  });
+
+  it('requires authentication when selecting creator mode for an organization webhook', () => {
+    const { container, onSubmit } = render({ mode: 'create', organizationId: 'org-1' });
+    expect(
+      container.querySelector('[data-container-allocation="organization-bot"]')
+    ).not.toBeNull();
+    click(container, 'test-creator');
+    expect(container.querySelector('#webhookAuthHeader')).not.toBeNull();
+    submit(container);
+    expect(onSubmit).not.toHaveBeenCalled();
+    const header = container.querySelector<HTMLInputElement>('#webhookAuthHeader');
+    const secret = container.querySelector<HTMLInputElement>('#webhookAuthSecret');
+    if (!header || !secret) throw new Error('authentication inputs missing');
+    changeValue(header, 'x-secret');
+    changeValue(secret, 'short-secret');
+    submit(container);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('at least 16 characters');
+    changeValue(secret, 'shared-secret-0123456789');
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runAsCreator: true,
+        webhookAuth: { enabled: true, header: 'x-secret', secret: 'shared-secret-0123456789' },
+      })
+    );
+  });
+
+  it('shows saved creator mode as immutable when editing', () => {
+    const { container, onSubmit } = render({
+      organizationId: 'org-1',
+      initialData: {
+        ...initialData('high', 'scheduled'),
+        executionUserId: 'oauth/github/creator',
+      },
+    });
+    expect(
+      container
+        .querySelector('[data-container-allocation="creator"]')
+        ?.getAttribute('data-disabled')
+    ).toBe('true');
+    expect(container.textContent).toContain('test-creator');
+    click(container, 'Organization bot');
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ runAsCreator: true }));
+  });
 
   it.each(['webhook', 'scheduled'] as const)(
     'omits unset legacy %s edit variants, including after catalogue metadata arrives',
@@ -440,7 +541,7 @@ describe('TriggerForm variants', () => {
   });
 });
 
-describe('TriggerForm container allocation', () => {
+describe('TriggerForm sandbox allocation', () => {
   let root: Root | undefined;
   let cleanup: (() => void) | undefined;
 
@@ -464,57 +565,80 @@ describe('TriggerForm container allocation', () => {
       models,
       onSubmit,
       canSetSandboxAllocation: true,
+      sandboxSelection: sandboxCapabilities(),
       ...props,
     };
     act(() => root?.render(createElement(TriggerForm, allProps)));
     return { container: dom.container, onSubmit, allProps };
   }
 
-  it('omits Automatic and submits Dedicated Standard in create mode', async () => {
-    const mounted = render({ mode: 'create', initialData: initialData() });
+  it.each(['webhook', 'scheduled'] as const)(
+    'omits Automatic and submits a grouped sandbox choice in %s create mode',
+    async activationMode => {
+      const mounted = render({
+        mode: 'create',
+        initialData: initialData(undefined, activationMode),
+      });
+      expect(
+        mounted.container
+          .querySelector('[data-container-allocation]')
+          ?.getAttribute('data-container-allocation')
+      ).toBe('automatic');
+      submit(mounted.container);
+      await act(async () => Promise.resolve());
+      expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
+
+      selectSandbox(mounted.container, 'cloudflare-containers-standard-4');
+      expect(
+        mounted.container
+          .querySelector('[data-container-allocation]')
+          ?.getAttribute('data-container-allocation')
+      ).toBe('cloudflare-containers-standard-4');
+      submit(mounted.container);
+      await act(async () => Promise.resolve());
+      expect(mounted.onSubmit).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          activationMode,
+          sandboxAllocation: 'cloudflare-containers-standard-4',
+        })
+      );
+
+      selectSandbox(mounted.container, 'automatic');
+      submit(mounted.container);
+      await act(async () => Promise.resolve());
+      expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
+    }
+  );
+
+  it('omits an unchanged edit allocation and supports set, clear, and restoring the saved value', async () => {
+    const saved = {
+      ...initialData(),
+      sandboxAllocation: 'vercel-large' as const,
+    };
+    const mounted = render({ initialData: saved });
+
     submit(mounted.container);
     await act(async () => Promise.resolve());
     expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
 
-    selectContainerAllocation(mounted.container, 'isolated-standard');
+    selectSandbox(mounted.container, 'cloudflare-containers-standard-3');
     submit(mounted.container);
     await act(async () => Promise.resolve());
     expect(mounted.onSubmit).toHaveBeenLastCalledWith(
-      expect.objectContaining({ sandboxAllocation: 'isolated-standard' })
-    );
-  });
-
-  it('omits unchanged edit allocation and supports set, clear, and restoring the saved value', async () => {
-    const unset = render({ initialData: initialData() });
-    submit(unset.container);
-    await act(async () => Promise.resolve());
-    expectSubmittedSandboxAllocationToBeOmitted(unset.onSubmit);
-
-    selectContainerAllocation(unset.container, 'isolated-standard');
-    submit(unset.container);
-    await act(async () => Promise.resolve());
-    expect(unset.onSubmit).toHaveBeenLastCalledWith(
-      expect.objectContaining({ sandboxAllocation: 'isolated-standard' })
+      expect.objectContaining({ sandboxAllocation: 'cloudflare-containers-standard-3' })
     );
 
-    act(() => root?.unmount());
-    const saved = { ...initialData(), sandboxAllocation: 'isolated-standard' as const };
-    const mounted = render({ initialData: saved });
+    selectSandbox(mounted.container, 'vercel-large');
     submit(mounted.container);
     await act(async () => Promise.resolve());
     expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
 
-    selectContainerAllocation(mounted.container, 'automatic');
+    selectSandbox(mounted.container, 'automatic');
     submit(mounted.container);
     await act(async () => Promise.resolve());
     expect(mounted.onSubmit).toHaveBeenLastCalledWith(
       expect.objectContaining({ sandboxAllocation: null })
     );
-
-    selectContainerAllocation(mounted.container, 'isolated-standard');
-    submit(mounted.container);
-    await act(async () => Promise.resolve());
-    expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
   });
 
   it('hides fresh allocation from ineligible users but preserves a saved allocation and clearing it', async () => {
@@ -524,10 +648,10 @@ describe('TriggerForm container allocation', () => {
     act(() => root?.unmount());
     const saved = render({
       canSetSandboxAllocation: false,
-      initialData: { ...initialData(), sandboxAllocation: 'isolated-standard' },
+      initialData: { ...initialData(), sandboxAllocation: 'vercel-large' },
     });
     expect(saved.container.querySelector('[data-container-allocation]')).not.toBeNull();
-    selectContainerAllocation(saved.container, 'automatic');
+    selectSandbox(saved.container, 'automatic');
     submit(saved.container);
     await act(async () => Promise.resolve());
     expect(saved.onSubmit).toHaveBeenLastCalledWith(
@@ -535,9 +659,9 @@ describe('TriggerForm container allocation', () => {
     );
   });
 
-  it('blocks a pending allocation selection after eligibility is revoked until Automatic is restored', async () => {
+  it('blocks a pending selection after eligibility is revoked until Automatic is restored', async () => {
     const mounted = render({ mode: 'create' });
-    selectContainerAllocation(mounted.container, 'isolated-standard');
+    selectSandbox(mounted.container, 'cloudflare-containers-standard-3');
     act(() =>
       root?.render(
         createElement(TriggerForm, { ...mounted.allProps, canSetSandboxAllocation: false })
@@ -547,42 +671,253 @@ describe('TriggerForm container allocation', () => {
     expect(mounted.onSubmit).not.toHaveBeenCalled();
 
     expect(mounted.container.querySelector('[data-container-allocation]')).not.toBeNull();
-    selectContainerAllocation(mounted.container, 'automatic');
+    selectSandbox(mounted.container, 'automatic');
     submit(mounted.container);
     await act(async () => Promise.resolve());
     expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
   });
 
-  it('blocks a new Dedicated Standard selection while capabilities are loading', () => {
-    const mounted = render({ mode: 'create', isLoadingCapabilities: true });
+  it('marks a pending selection unavailable when capabilities stop offering it', async () => {
+    const mounted = render({ mode: 'create' });
+    selectSandbox(mounted.container, 'cloudflare-containers-standard-3');
+    act(() =>
+      root?.render(
+        createElement(TriggerForm, {
+          ...mounted.allProps,
+          sandboxSelection: sandboxCapabilities({
+            options: [
+              { allocation: getSandboxAllocationRequest('cloudflare-containers-standard-4') },
+            ],
+          }),
+        })
+      )
+    );
+
+    const unavailable = mounted.container.querySelector<HTMLButtonElement>(
+      '[data-select-item="cloudflare-containers-standard-3"]'
+    );
+    expect(unavailable).not.toBeNull();
+    expect(unavailable).toHaveProperty('disabled', true);
+    expect(unavailable?.textContent).toContain('(unavailable)');
+    expect(mounted.container.textContent).toContain(
+      'Selected sandbox is not available. Choose another sandbox or Automatic.'
+    );
+
+    submit(mounted.container);
+    expect(mounted.onSubmit).not.toHaveBeenCalled();
+
+    selectSandbox(mounted.container, 'cloudflare-containers-standard-4');
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expect(mounted.onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sandboxAllocation: 'cloudflare-containers-standard-4' })
+    );
+  });
+
+  it('blocks a pending selection while capabilities are loading and disables the select', async () => {
+    const mounted = render({ mode: 'create' });
+    selectSandbox(mounted.container, 'cloudflare-containers-standard-4');
+    act(() =>
+      root?.render(createElement(TriggerForm, { ...mounted.allProps, isLoadingCapabilities: true }))
+    );
+
+    const select = mounted.container.querySelector('[data-container-allocation]');
+    expect(select?.getAttribute('data-disabled')).toBe('true');
+    const selectedItem = mounted.container.querySelector<HTMLButtonElement>(
+      '[data-select-item="cloudflare-containers-standard-4"]'
+    );
+    expect(selectedItem).toHaveProperty('disabled', true);
+
+    submit(mounted.container);
+    expect(mounted.onSubmit).not.toHaveBeenCalled();
+
     act(() =>
       root?.render(
         createElement(TriggerForm, { ...mounted.allProps, isLoadingCapabilities: false })
       )
     );
-    selectContainerAllocation(mounted.container, 'isolated-standard');
-    act(() =>
-      root?.render(createElement(TriggerForm, { ...mounted.allProps, isLoadingCapabilities: true }))
-    );
     submit(mounted.container);
-    expect(mounted.onSubmit).not.toHaveBeenCalled();
+    await act(async () => Promise.resolve());
+    expect(mounted.onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sandboxAllocation: 'cloudflare-containers-standard-4' })
+    );
   });
 
-  it('resets from refreshed initial data and disables while capabilities load', () => {
-    const mounted = render({});
-    selectContainerAllocation(mounted.container, 'isolated-standard');
+  it.each([false, true])(
+    'does not mark a saved sandbox unavailable without capabilities (loading=%s)',
+    async isLoadingCapabilities => {
+      const mounted = render({
+        initialData: { ...initialData(), sandboxAllocation: 'vercel-large' },
+        sandboxSelection: undefined,
+        isLoadingCapabilities,
+      });
+
+      expect(mounted.container.textContent).not.toContain('(unavailable)');
+      expect(mounted.container.textContent).not.toContain('no longer offered');
+      if (isLoadingCapabilities) {
+        expect(mounted.container.textContent).toContain('Loading sandbox options');
+      }
+      submit(mounted.container);
+      await act(async () => Promise.resolve());
+      expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
+
+      act(() =>
+        root?.render(
+          createElement(TriggerForm, {
+            ...mounted.allProps,
+            sandboxSelection: sandboxCapabilities(),
+            isLoadingCapabilities: false,
+          })
+        )
+      );
+      expect(mounted.container.textContent).not.toContain('no longer offered');
+    }
+  );
+
+  it('does not mark a saved sandbox unavailable while capabilities are refreshing', () => {
+    const mounted = render({
+      initialData: { ...initialData(), sandboxAllocation: 'vercel-large' },
+      sandboxSelection: sandboxCapabilities({ options: [] }),
+      isLoadingCapabilities: true,
+    });
+
+    expect(mounted.container.textContent).not.toContain('(unavailable)');
+    expect(mounted.container.textContent).not.toContain('no longer offered');
+  });
+
+  it.each([undefined, 'vercel-large'] as const)(
+    'shows a capability error and retry while preserving saved allocation %s',
+    async sandboxAllocation => {
+      const onRetryCapabilities = jest.fn();
+      const mounted = render({
+        initialData: { ...initialData(), sandboxAllocation },
+        canSetSandboxAllocation: false,
+        sandboxSelection: undefined,
+        hasCapabilitiesError: true,
+        onRetryCapabilities,
+      });
+
+      expect(mounted.container.textContent).toContain('Sandbox options could not be loaded.');
+      expect(mounted.container.textContent).not.toContain('(unavailable)');
+      expect(mounted.container.textContent).not.toContain('no longer offered');
+      click(mounted.container, 'Retry sandbox options');
+      expect(onRetryCapabilities).toHaveBeenCalledTimes(1);
+
+      submit(mounted.container);
+      await act(async () => Promise.resolve());
+      expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
+
+      if (sandboxAllocation) {
+        selectSandbox(mounted.container, 'automatic');
+        submit(mounted.container);
+        await act(async () => Promise.resolve());
+        expect(mounted.onSubmit).toHaveBeenLastCalledWith(
+          expect.objectContaining({ sandboxAllocation: null })
+        );
+      }
+    }
+  );
+
+  it('blocks a changed allocation after a failed capability refresh with cached options', () => {
+    const mounted = render({ mode: 'create' });
+    selectSandbox(mounted.container, 'vercel-large');
     act(() =>
-      root?.render(
-        createElement(TriggerForm, {
-          ...mounted.allProps,
-          initialData: { ...initialData(), sandboxAllocation: null },
-          isLoadingCapabilities: true,
-        })
-      )
+      root?.render(createElement(TriggerForm, { ...mounted.allProps, hasCapabilitiesError: true }))
     );
-    const select = mounted.container.querySelector('[data-container-allocation]');
-    expect(select?.getAttribute('data-container-allocation')).toBe('automatic');
-    expect(select?.getAttribute('data-disabled')).toBe('true');
+
+    submit(mounted.container);
+    expect(mounted.onSubmit).not.toHaveBeenCalled();
+    expect(mounted.container.textContent).toContain('Sandbox options could not be loaded.');
+  });
+
+  it('filters choices unavailable for the provider or repository while keeping eligible groups', async () => {
+    const mounted = render({
+      mode: 'create',
+      sandboxSelection: sandboxCapabilities({
+        options: [
+          { allocation: getSandboxAllocationRequest('cloudflare-containers-standard-3') },
+          {
+            allocation: getSandboxAllocationRequest('cloudflare-containers-standard-4'),
+            unavailableReason: 'Capacity unavailable',
+          },
+          {
+            allocation: getSandboxAllocationRequest('vercel-small'),
+            repositoryUnavailableReason: 'Vercel sandboxes support GitHub repositories only',
+          },
+          {
+            allocation: getSandboxAllocationRequest('vercel-large'),
+            unavailableReason: 'Vercel is unavailable',
+          },
+        ],
+      }),
+    });
+
+    expect(
+      mounted.container.querySelector('[data-select-item="cloudflare-containers-standard-3"]')
+    ).not.toBeNull();
+    expect(
+      mounted.container.querySelector('[data-select-item="cloudflare-containers-standard-4"]')
+    ).toBeNull();
+    expect(mounted.container.querySelector('[data-select-item="vercel-small"]')).toBeNull();
+    expect(mounted.container.querySelector('[data-select-item="vercel-large"]')).toBeNull();
+    expect(mounted.container.textContent).toContain('Cloudflare Containers');
+    expect(mounted.container.textContent).not.toContain('Vercel');
+
+    selectSandbox(mounted.container, 'cloudflare-containers-standard-3');
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expect(mounted.onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sandboxAllocation: 'cloudflare-containers-standard-3' })
+    );
+  });
+
+  it('keeps a saved legacy sandbox displayed, disabled, and unchanged on submit', async () => {
+    const mounted = render({
+      initialData: { ...initialData(), sandboxAllocation: 'isolated-standard' },
+    });
+
+    const legacy = mounted.container.querySelector<HTMLButtonElement>(
+      '[data-select-item="isolated-standard"]'
+    );
+    expect(legacy).not.toBeNull();
+    expect(legacy).toHaveProperty('disabled', true);
+    expect(legacy?.textContent).toContain('Dedicated Standard (legacy)');
+    expect(legacy?.textContent).toContain('(unavailable)');
+    expect(
+      mounted.container
+        .querySelector('[data-container-allocation]')
+        ?.getAttribute('data-container-allocation')
+    ).toBe('isolated-standard');
+    expect(mounted.container.textContent).toContain('The saved sandbox is no longer offered.');
+
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
+  });
+
+  it('never offers legacy in create mode and cannot restore it after clearing an edit', async () => {
+    const create = render({ mode: 'create' });
+    expect(create.container.querySelector('[data-select-item="isolated-standard"]')).toBeNull();
+
+    act(() => root?.unmount());
+    const cleared = render({
+      initialData: { ...initialData(), sandboxAllocation: 'isolated-standard' },
+    });
+    selectSandbox(cleared.container, 'automatic');
+    submit(cleared.container);
+    await act(async () => Promise.resolve());
+    expect(cleared.onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sandboxAllocation: null })
+    );
+    expect(cleared.container.querySelector('[data-select-item="isolated-standard"]')).toBeNull();
+  });
+
+  it('notifies the parent when a repository is selected in create mode', () => {
+    const onRepositoryChange = jest.fn<(repository: string) => void>();
+    const mounted = render({ mode: 'create', onRepositoryChange });
+
+    click(mounted.container, 'select-repository');
+    expect(onRepositoryChange).toHaveBeenCalledWith('kilo/other');
   });
 });
 
@@ -614,6 +949,7 @@ describe('TriggerForm save and invoke', () => {
           onSubmit,
           onSaveAndInvoke,
           canSetSandboxAllocation: true,
+          sandboxSelection: sandboxCapabilities(),
           ...props,
         })
       )
@@ -629,7 +965,7 @@ describe('TriggerForm save and invoke', () => {
     }
     changeValue(prompt as HTMLTextAreaElement, 'Use the current prompt');
     click(mounted.container, 'none');
-    selectContainerAllocation(mounted.container, 'isolated-standard');
+    selectSandbox(mounted.container, 'cloudflare-containers-standard-4');
     click(mounted.container, 'Save and invoke now');
     await act(async () => Promise.resolve());
 
@@ -637,7 +973,7 @@ describe('TriggerForm save and invoke', () => {
       expect.objectContaining({
         promptTemplate: 'Use the current prompt',
         variant: 'none',
-        sandboxAllocation: 'isolated-standard',
+        sandboxAllocation: 'cloudflare-containers-standard-4',
       })
     );
   });

@@ -10,6 +10,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  merge_group:
   workflow_call:
 
 concurrency:
@@ -44,17 +45,11 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      - name: Install root dependencies
-        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
-
-      # The stacked-CI admission wiring must be checked on every PR, before the
-      # suite is gated.
-      - name: Check stacked CI admission
-        run: node --test scripts/stacked-ci.test.mjs
-
       # The suite jobs always report (required checks); only the suite's own
       # paths justify the heavy work. The patterns are pinned by
-      # scripts/stacked-ci.test.mjs.
+      # scripts/stacked-ci.test.mjs, which ci.yml's `ci-wiring` job runs.
+      # A lockfile change matches the patterns first, so the detector below
+      # never parses the lockfile and needs no installed dependencies.
       - name: Detect mobile-relevant changes
         id: detect
         run: |
@@ -64,7 +59,9 @@ jobs:
           # `github.event.before`. If neither object is available, run the
           # suite rather than skip it: a false "no changes" would break the
           # required checks' promise, while a redundant run is harmless.
-          base="${{ github.event.pull_request.base.sha }}"
+          # A merge queue entry diffs against the group's base: the PRs in the
+          # group passed the suite on their own branches.
+          base="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
           if ! git rev-parse --verify "${base}^{commit}" > /dev/null 2>&1; then
             base="${{ github.event.before }}"
           fi
@@ -74,6 +71,13 @@ jobs:
           fi
           if git diff --name-only "$base" HEAD \
             | grep -Eq '^apps/mobile/|^packages/trpc/|^apps/web/src/routers/|^packages/web-shared/src/routers/|^packages/app-shared/|^packages/kilo-chat/|^packages/kilo-chat-hooks/|^packages/event-service/|^packages/notifications/|^packages/cloud-agent-sdk/|^pnpm-lock\.yaml$|^\.github/workflows/kilo-app-ci\.yml$|^\.github/workflows/ci\.yml$|^scripts/stacked-ci\.test\.mjs$'; then
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
+          # The app also reads every workspace it depends on, directly or
+          # through a relative import, and its tests may read other
+          # workspaces' files as data. A detection error runs the suite.
+          elif ! affected=$(node scripts/affected-workspaces.mjs "$(git rev-parse "${base}^{commit}")") \
+            || ! selected=$(jq -r '.full or (.packages + .test_only_packages | index("kilo-app") != null)' <<< "$affected") \
+            || [ "$selected" != false ]; then
             echo "mobile=true" >> "$GITHUB_OUTPUT"
           else
             echo "mobile=false" >> "$GITHUB_OUTPUT"
@@ -86,23 +90,31 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build trpc types
-        run: pnpm --filter @kilocode/trpc run build
+      - name: Cache compiler plugins
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: node_modules/.cache/ttsc/plugins
+          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
 
       - name: Build harness SDK
         run: pnpm --filter @kilocode/harness-sdk run build
@@ -122,23 +134,31 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build trpc types
-        run: pnpm --filter @kilocode/trpc run build
+      - name: Cache compiler plugins
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: node_modules/.cache/ttsc/plugins
+          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
 
       - name: Build harness SDK
         run: pnpm --filter @kilocode/harness-sdk run build
@@ -153,31 +173,29 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build trpc types
-        run: pnpm --filter @kilocode/trpc run build
-
-      - name: Build harness SDK
-        run: pnpm --filter @kilocode/harness-sdk run build
-
+      # Neither check reads types or built packages: the i18n oxlint config
+      # is not type-aware.
       - name: Check i18n catalogs and leftover copy
         run: pnpm --filter kilo-app run check:i18n
       - name: Check for silently-dropped NativeWind classes
         run: pnpm --filter kilo-app run check:classes
+      - name: Test the NativeWind class checker
+        run: node --test tools/nativewind/check-classes.test.mjs
 
   format-check:
     needs: mobile-changes
@@ -186,17 +204,17 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -215,20 +233,28 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Cache compiler plugins
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: node_modules/.cache/ttsc/plugins
+          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
 
       - name: Build harness SDK
         run: pnpm --filter @kilocode/harness-sdk run build
@@ -236,33 +262,74 @@ jobs:
       - name: Check unused exports
         run: pnpm --filter kilo-app run check:unused
 
-  test:
+  # Eight shards run the mobile Vitest suite in parallel; the `test` job below
+  # reports the combined result under the required check name.
+  #
+  # The shard's `Test` step is CPU-bound and the jobs start together, so the
+  # runner size sets the wall clock of the whole row: measured on a work VM the
+  # step drops from 84 s to 36 s per shard (2 vCPU -> 4 vCPU), against a ~15 s
+  # fixed setup that does not change. Four vCPU pays for itself: the mobile row
+  # gets shorter while its vCPU-seconds rise by about 2%.
+  #
+  # The label is `vars.RUNNER_MEDIUM_LABEL` (blacksmith-4vcpu-ubuntu-2404, 4 vCPU
+  # and 16 GB; a shard peaks at 0.6 GB). Repo variables are not exposed to fork
+  # pull requests, so the job falls back to `ubuntu-latest` there.
+  mobile-test:
     needs: mobile-changes
     if: needs.mobile-changes.outputs.mobile == 'true'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    name: mobile-test (${{ matrix.shard }}/8)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build trpc types
-        run: pnpm --filter @kilocode/trpc run build
+      - name: Cache compiler plugins
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: node_modules/.cache/ttsc/plugins
+          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
 
+      # The tests import the harness SDK build at run time. The tRPC build
+      # holds only type declarations, which Vitest does not read.
       - name: Build harness SDK
         run: pnpm --filter @kilocode/harness-sdk run build
 
       - name: Test
-        run: pnpm --filter kilo-app run test
+        run: pnpm --filter kilo-app run test --shard=${{ matrix.shard }}/8
+
+  # Required check. Skipped shards (no mobile change) pass; a failed or
+  # cancelled shard fails this job.
+  test:
+    needs: [mobile-changes, mobile-test]
+    if: ${{ !cancelled() }}
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Check test results
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if jq -e 'any(.[]; . == "failure" or . == "cancelled")' <<< "$RESULTS" > /dev/null; then
+            exit 1
+          fi

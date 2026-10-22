@@ -2,12 +2,14 @@ import { describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import { db, pool } from '@kilocode/web-shared/lib/drizzle';
 import { security_findings, agent_configs, platform_integrations } from '@kilocode/db/schema';
+import type { SecurityFindingAnalysis } from '@kilocode/db/schema-types';
 import { eq, and } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   upsertSecurityFinding,
   supersedeDuplicateFindings,
   getLastSyncTime,
+  listSecurityFindings,
 } from './security-findings';
 import type { DependabotAlertRaw, ParsedSecurityFinding, SecurityReviewOwner } from '../core/types';
 
@@ -78,6 +80,35 @@ function makeFinding(overrides: Partial<ParsedSecurityFinding> = {}): ParsedSecu
     cvss_score: 7.5,
     dependency_scope: 'runtime',
     ...overrides,
+  };
+}
+
+function completedAnalysis(suggestedAction: 'dismiss' | 'manual_review'): SecurityFindingAnalysis {
+  return {
+    analyzedAt: '2026-01-15T00:00:00.000Z',
+    triage: {
+      suggestedAction,
+      confidence: 'high',
+      needsSandboxAnalysis: false,
+      needsSandboxReasoning: 'Test analysis',
+      triageAt: '2026-01-15T00:00:00.000Z',
+    },
+  };
+}
+
+function unknownSandboxAnalysis(): SecurityFindingAnalysis {
+  return {
+    analyzedAt: '2026-01-15T00:00:00.000Z',
+    sandboxAnalysis: {
+      isExploitable: 'unknown',
+      exploitabilityReasoning: 'Test analysis',
+      usageLocations: [],
+      suggestedFix: 'Update dependency',
+      suggestedAction: 'manual_review',
+      summary: 'Test analysis',
+      rawMarkdown: 'Test analysis',
+      analysisAt: '2026-01-15T00:00:00.000Z',
+    },
   };
 }
 
@@ -464,6 +495,97 @@ describe('upsertSecurityFinding', () => {
       .where(eq(security_findings.id, first.findingId));
     expect(row?.platformIntegrationId).toBe(integrationId);
   });
+});
+
+describe('listSecurityFindings', () => {
+  it('returns only findings owned by the requested owner, even for a shared repository', async () => {
+    const userA = await insertTestUser();
+    const userB = await insertTestUser();
+    const sharedRepo = `shared-org/repo-${randomUUID()}`;
+
+    const own = await upsertSecurityFinding({
+      ...makeFinding({ source_id: '1' }),
+      owner: { userId: userA.id },
+      repoFullName: sharedRepo,
+    });
+    await upsertSecurityFinding({
+      ...makeFinding({ source_id: '2' }),
+      owner: { userId: userB.id },
+      repoFullName: sharedRepo,
+    });
+
+    const unfiltered = await listSecurityFindings({ owner: { userId: userA.id } });
+    expect(unfiltered.findings.map(finding => finding.id)).toEqual([own.findingId]);
+    expect(unfiltered.totalCount).toBe(1);
+
+    const byRepo = await listSecurityFindings({
+      owner: { userId: userA.id },
+      repoFullName: sharedRepo,
+    });
+    expect(byRepo.findings.map(finding => finding.id)).toEqual([own.findingId]);
+    expect(byRepo.totalCount).toBe(1);
+  });
+
+  it.each([
+    ['safe_to_dismiss', 'dismiss'],
+    ['needs_review', 'manual_review'],
+  ] as const)(
+    'keeps %s scoped before applying the unknown sandbox result',
+    async (outcomeFilter, suggestedAction) => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const ownRepo = `test-org/${outcomeFilter}-${randomUUID()}`;
+      const foreignRepo = `test-org/foreign-${randomUUID()}`;
+
+      const own = await upsertSecurityFinding({
+        ...makeFinding({ source_id: `own-${outcomeFilter}` }),
+        owner: { userId: user.id },
+        repoFullName: ownRepo,
+      });
+      const foreign = await upsertSecurityFinding({
+        ...makeFinding({
+          source_id: `foreign-${outcomeFilter}`,
+          severity: 'low',
+          status: 'fixed',
+        }),
+        owner: { userId: otherUser.id },
+        repoFullName: foreignRepo,
+      });
+
+      await db
+        .update(security_findings)
+        .set({ analysis_status: 'completed', analysis: completedAnalysis(suggestedAction) })
+        .where(eq(security_findings.id, own.findingId));
+      await db
+        .update(security_findings)
+        .set({ analysis_status: 'completed', analysis: unknownSandboxAnalysis() })
+        .where(eq(security_findings.id, foreign.findingId));
+
+      const result = await listSecurityFindings({
+        owner: { userId: user.id },
+        repoFullName: ownRepo,
+        status: 'open',
+        severity: 'high',
+        outcomeFilter,
+      });
+
+      expect(result.findings.map(finding => finding.id)).toEqual([own.findingId]);
+      expect(result.totalCount).toBe(1);
+
+      const emptyPage = await listSecurityFindings({
+        owner: { userId: user.id },
+        repoFullName: ownRepo,
+        status: 'open',
+        severity: 'high',
+        outcomeFilter,
+        limit: 1,
+        offset: 1,
+      });
+
+      expect(emptyPage.findings).toEqual([]);
+      expect(emptyPage.totalCount).toBe(1);
+    }
+  );
 });
 
 describe('supersedeDuplicateFindings', () => {

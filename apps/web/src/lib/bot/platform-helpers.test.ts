@@ -12,9 +12,8 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
     })),
   },
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
-  isOrganizationMember: (organizationId: string, kiloUserId: string) =>
-    mockIsOrganizationMember(organizationId, kiloUserId),
+jest.mock('@kilocode/worker-utils/account-access', () => ({
+  isOrganizationMember: (...args: unknown[]) => mockIsOrganizationMember(...args),
 }));
 
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -118,7 +117,7 @@ describe('platform helpers', () => {
       mockIsOrganizationMember.mockResolvedValue(true);
 
       await expect(canKiloUserAccessPlatformIntegration(integration, 'user-1')).resolves.toBe(true);
-      expect(mockIsOrganizationMember).toHaveBeenCalledWith('org-1', 'user-1');
+      expect(mockIsOrganizationMember).toHaveBeenCalledWith(expect.anything(), 'org-1', 'user-1');
     });
 
     it('denies integrations without ownership data', async () => {

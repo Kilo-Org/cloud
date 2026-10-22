@@ -5,12 +5,12 @@ import type {
   OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import {
-  permissiveJsonSchemaValidator,
   remoteMcpClient,
   type RemoteMcpClient,
   type RemoteMcpClientDeps,
   type RemoteMcpTool,
 } from './client.js';
+import { type RemoteMcpResource } from './resource.js';
 import {
   remoteMcpSignIn,
   type RemoteMcpSignInDeps,
@@ -21,11 +21,13 @@ import {
   explain,
   mcpToolName,
   RemoteMcpError,
+  uiResourceUriOf,
   type RemoteMcpAuth,
   type RemoteMcpFailure,
   type RemoteMcpServer,
 } from './server.js';
 import { remoteMcpTools } from './tools.js';
+import { permissiveJsonSchemaValidator } from './validator.js';
 
 /**
  * Remote MCP servers, over the transport the specification defines.
@@ -53,6 +55,7 @@ export type {
   RemoteMcpClient,
   RemoteMcpClientDeps,
   RemoteMcpFailure,
+  RemoteMcpResource,
   RemoteMcpServer,
   RemoteMcpSignInDeps,
   RemoteMcpSignInProvider,
@@ -67,4 +70,5 @@ export {
   remoteMcpClient,
   remoteMcpSignIn,
   remoteMcpTools,
+  uiResourceUriOf,
 };

@@ -1,18 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { type Component, type RefObject } from 'react';
+import { type RefObject } from 'react';
+import { type HostInstance } from 'react-native';
 
 import { announceForA11y, requestA11yFocus } from './announce';
 
 const accessibilityMock = vi.hoisted(() => ({
   announceForAccessibility: vi.fn(),
-  setAccessibilityFocus: vi.fn(),
+  sendAccessibilityEvent: vi.fn(),
 }));
-
-const findNodeHandleMock = vi.hoisted(() => vi.fn<(node: unknown) => number | null>(() => 42));
 
 vi.mock('react-native', () => ({
   AccessibilityInfo: accessibilityMock,
-  findNodeHandle: findNodeHandleMock,
 }));
 
 describe('announceForA11y', () => {
@@ -22,15 +20,6 @@ describe('announceForA11y', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-  });
-
-  it('forwards non-empty messages to AccessibilityInfo', () => {
-    announceForA11y('Agent needs your input');
-
-    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledTimes(1);
-    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledWith(
-      'Agent needs your input'
-    );
   });
 
   it('trims surrounding whitespace before announcing', () => {
@@ -61,8 +50,7 @@ describe('announceForA11y', () => {
 
 describe('requestA11yFocus', () => {
   beforeEach(() => {
-    accessibilityMock.setAccessibilityFocus.mockClear();
-    findNodeHandleMock.mockClear();
+    accessibilityMock.sendAccessibilityEvent.mockClear();
   });
 
   afterEach(() => {
@@ -70,39 +58,34 @@ describe('requestA11yFocus', () => {
   });
 
   it('returns false when the ref has no mounted node', () => {
-    findNodeHandleMock.mockReturnValueOnce(null);
-    const ref: RefObject<Component | null> = { current: null };
+    const ref: RefObject<HostInstance | null> = { current: null };
 
     const requested = requestA11yFocus(ref);
 
     expect(requested).toBe(false);
-    expect(accessibilityMock.setAccessibilityFocus).not.toHaveBeenCalled();
+    expect(accessibilityMock.sendAccessibilityEvent).not.toHaveBeenCalled();
   });
 
-  it('dispatches the focus request and returns true when a node handle is found', () => {
-    findNodeHandleMock.mockReturnValueOnce(123);
-    const ref: RefObject<Component | null> = {
-      current: { node: 'placeholder' } as unknown as Component,
-    };
+  it('reports dispatch without requiring native focus confirmation', () => {
+    const node: Partial<HostInstance> = {};
+    const ref: RefObject<HostInstance | null> = { current: node as HostInstance };
 
     const requested = requestA11yFocus(ref);
 
     expect(requested).toBe(true);
-    expect(accessibilityMock.setAccessibilityFocus).toHaveBeenCalledWith(123);
+    expect(accessibilityMock.sendAccessibilityEvent).toHaveBeenCalledWith(node, 'focus');
   });
 
-  it('returns false and does not throw when the native call throws', () => {
-    findNodeHandleMock.mockReturnValue(123);
-    accessibilityMock.setAccessibilityFocus.mockImplementationOnce(() => {
+  it('returns false when the native request throws', () => {
+    accessibilityMock.sendAccessibilityEvent.mockImplementationOnce(() => {
       throw new Error('native focus request failed');
     });
-    const ref: RefObject<Component | null> = {
-      current: { node: 'placeholder' } as unknown as Component,
-    };
+    const node: Partial<HostInstance> = {};
+    const ref: RefObject<HostInstance | null> = { current: node as HostInstance };
 
     const requested = requestA11yFocus(ref);
 
     expect(requested).toBe(false);
-    expect(accessibilityMock.setAccessibilityFocus).toHaveBeenCalledWith(123);
+    expect(accessibilityMock.sendAccessibilityEvent).toHaveBeenCalledWith(node, 'focus');
   });
 });

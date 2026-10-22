@@ -15,7 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { SmilePlus } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Pressable, View, type ViewInstance } from 'react-native';
 
 import { ReactionPickerSheet } from '@/components/pr-review/discussion/reaction-picker-sheet';
 import { Text } from '@/components/ui/text';
@@ -64,7 +64,7 @@ export function ReactionsRow({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const [pickerOpen, setPickerOpen] = useState(false);
-  const addReactionRef = useRef<View>(null);
+  const addReactionRef = useRef<ViewInstance>(null);
   const focusTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pills = selectReactionPills(reactions);
   const isDisabled = Boolean(disabled);

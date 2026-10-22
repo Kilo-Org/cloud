@@ -41,6 +41,9 @@ export const briefingSummarySchema = z.object({
 });
 export const briefingReportSchema = z.object({
   id: z.string(),
+  kind: z.enum(['scheduled', 'one_off']),
+  createdAt: z.string().datetime(),
+  timezone: z.string(),
   context: briefingContextSchema,
   localDate: z.string(),
   nightStartAt: z.string().datetime(),
@@ -78,6 +81,15 @@ export const briefingReportSchema = z.object({
   summary: briefingSummarySchema,
   expiresAt: z.string().datetime(),
 });
+export const briefingEstimateSchema = z.object({
+  model: z.string(),
+  estimatedCostMicrodollars: z.number(),
+  maximumCostMicrodollars: z.number(),
+  maxDurationSeconds: z.number(),
+  estimateToken: z.string(),
+  canGenerate: z.boolean(),
+  unavailableReason: briefingSummaryErrorSchema.nullable(),
+});
 export const briefingContextPreferencesSchema = z.object({
   context: briefingContextSchema,
   aiEnabled: z.boolean(),
@@ -99,6 +111,7 @@ export type BriefingContext = z.infer<typeof briefingContextSchema>;
 export type BriefingSource = z.infer<typeof briefingSourceSchema>;
 export type BriefingSummary = z.infer<typeof briefingSummarySchema>;
 export type BriefingReport = z.infer<typeof briefingReportSchema>;
+export type BriefingEstimate = z.infer<typeof briefingEstimateSchema>;
 export type BriefingPreferences = z.infer<typeof briefingPreferencesSchema>;
 export type BriefingContextPreferences = z.infer<typeof briefingContextPreferencesSchema>;
 export const DEFAULT_BRIEFING_SCHEDULE = {

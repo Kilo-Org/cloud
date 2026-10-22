@@ -12,7 +12,7 @@ const { getMetadata, assertAccess, queuePrompt } = vi.hoisted(() => ({
   assertAccess: vi.fn(),
   queuePrompt: vi.fn(),
 }));
-vi.mock('../session-service.js', () => ({ fetchSessionMetadata: getMetadata }));
+vi.mock('../session/metadata.js', () => ({ fetchSessionMetadata: getMetadata }));
 vi.mock('../session-access.js', () => ({ requireCurrentSessionAccess: assertAccess }));
 vi.mock('../session/queue-message.js', () => ({ preflightAndQueuePromptMessage: queuePrompt }));
 

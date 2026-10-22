@@ -11,7 +11,7 @@
 import { X } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, type Text as RNText, View } from 'react-native';
+import { Pressable, type TextInstance, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Sheet } from '@/components/ui/sheet';
@@ -45,12 +45,9 @@ export function ReactionPickerSheet({
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  const titleRef = useRef<RNText | null>(null);
-  // Latch once the request left with a mounted title: on Android the title's
-  // first layout can arrive before its ref is attached, so the attempt resolves
-  // no handle, returns false, and a later signal has to retry. A dispatched
-  // request says nothing about whether the platform honoured it, so there is
-  // nothing left to retry once it has.
+  const titleRef = useRef<TextInstance | null>(null);
+  // Android can deliver layout before attaching the title ref. Retry from the
+  // ref callback when no request was dispatched; this latch is not focus proof.
   const titleFocusRequestedRef = useRef(false);
   const titleLaidOutRef = useRef(false);
   const focusTitle = useCallback(() => {
@@ -62,7 +59,7 @@ export function ReactionPickerSheet({
     }
   }, []);
   const attachTitle = useCallback(
-    (node: RNText | null) => {
+    (node: TextInstance | null) => {
       titleRef.current = node;
       if (node !== null && titleLaidOutRef.current) {
         focusTitle();

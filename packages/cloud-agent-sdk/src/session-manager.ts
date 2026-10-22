@@ -1358,6 +1358,23 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       pendingInterruptClearTimer = null;
     }
   }
+
+  /**
+   * Start the suppression window for the guard currently armed. Overlapping
+   * interrupt calls re-arm the same guard, so the previous expiry is dropped
+   * here rather than left running: its callback would otherwise end a newer
+   * call's window early.
+   */
+  function armPendingInterruptExpiry(): void {
+    if (pendingInterruptClearTimer !== null) {
+      clearTimeout(pendingInterruptClearTimer);
+      pendingInterruptClearTimer = null;
+    }
+    pendingInterruptClearTimer = scheduleUnrefdTimer(
+      clearPendingInterrupt,
+      INTERRUPT_ABORT_SUPPRESSION_MS
+    );
+  }
   /**
    * Message ids already in local storage when a reconnect replay starts while
    * `/clear` is active. Those are live post-clear turns for this visit and
@@ -3298,10 +3315,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         pendingInterruptSession = session;
         await session.interrupt();
         if (pendingInterruptSession === session) {
-          pendingInterruptClearTimer = scheduleUnrefdTimer(
-            clearPendingInterrupt,
-            INTERRUPT_ABORT_SUPPRESSION_MS
-          );
+          armPendingInterruptExpiry();
         }
       }
       if (currentSession === session) {

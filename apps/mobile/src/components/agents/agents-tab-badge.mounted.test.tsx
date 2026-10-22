@@ -196,7 +196,9 @@ describe('Agents needs-input badge and shared live count', () => {
         );
         await hydration;
       });
-      expectCounts(result.renderer, suppresses ? 1 : status === 'question' ? 2 : 1, 2);
+      // The row the dropped ack named is answered only when the ack survived.
+      const answeredCount = suppresses || status !== 'question' ? 1 : 2;
+      expectCounts(result.renderer, answeredCount, 2);
       expect(__peekSessionAttentionForTests('personal-0')).toEqual(
         suppresses ? { raiseId: 'question' } : undefined
       );

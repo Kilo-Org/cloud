@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive suite: the fake dispatcher, the ack contracts, and the failure paths share the same harness */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

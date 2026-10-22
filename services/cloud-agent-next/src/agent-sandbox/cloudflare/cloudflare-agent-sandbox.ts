@@ -64,6 +64,7 @@ import {
 } from '../../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
 import { withDORetry } from '../../utils/do-retry.js';
+import { isWrapperLogFileName, readWrapperLogsForRoots } from './wrapper-log-reader.js';
 
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
@@ -502,38 +503,11 @@ export class CloudflareAgentSandbox implements AgentSandbox {
   async readWrapperLogs(): Promise<WrapperLogs | null> {
     const sandbox = await this.getSandbox({ sleepAfter: SANDBOX_SLEEP_AFTER_SECONDS });
     const session = await sandbox.getSession(this.existingWrapperSessionName());
-    const logPaths: string[] = [];
-    const wrapperFiles = await session.listFiles('/tmp').catch(() => undefined);
-    if (wrapperFiles?.success) {
-      for (const file of wrapperFiles.files) {
-        if (
-          file.type === 'file' &&
-          file.name.startsWith('kilocode-wrapper-') &&
-          file.name.endsWith('.log')
-        ) {
-          logPaths.push(file.absolutePath);
-        }
-      }
-    }
     const sessionHome = getSessionHomePath(this.metadata.identity.sessionId);
-    const cliFiles = await session
-      .listFiles(`${sessionHome}/.local/share/kilo/log`, { recursive: true })
-      .catch(() => undefined);
-    if (cliFiles?.success) {
-      for (const file of cliFiles.files) {
-        if (file.type === 'file') logPaths.push(file.absolutePath);
-      }
-    }
-    const files: Record<string, string> = {};
-    const contents = await Promise.allSettled(
-      logPaths.map(async path => ({
-        path,
-        content: (await session.readFile(path, { encoding: 'utf-8' })).content,
-      }))
-    );
-    for (const content of contents) {
-      if (content.status === 'fulfilled') files[content.value.path] = content.value.content;
-    }
+    const readout = await readWrapperLogsForRoots(session, [
+      { path: '/tmp', include: isWrapperLogFileName, descend: false },
+      { path: `${sessionHome}/.local/share/kilo/log` },
+    ]);
     let processes: WrapperLogs['processes'];
     try {
       processes = (await sandbox.listProcesses()).map(process => ({
@@ -544,7 +518,13 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     } catch {
       processes = undefined;
     }
-    return { files, processes };
+    return {
+      files: readout.files,
+      processes,
+      truncated: readout.truncated,
+      skipped: readout.skipped,
+      omittedFileCount: readout.omittedFileCount,
+    };
   }
 
   async keepAlive(): Promise<void> {

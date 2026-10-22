@@ -107,9 +107,33 @@ export type TerminalClientResult =
   | { status: 'unhealthy' }
   | { status: 'capability-unavailable'; message: string };
 
+/**
+ * Why a discovered log candidate is absent from `WrapperLogs.files`.
+ *
+ * - `not-regular-file` — the entry is a symlink or another non-regular type.
+ * - `file-limit` — the readout already returned its file allowance.
+ * - `byte-limit` — the readout already returned its total byte allowance.
+ * - `read-failed` — the sandbox could not return the file.
+ */
+export type WrapperLogSkipReason = 'not-regular-file' | 'file-limit' | 'byte-limit' | 'read-failed';
+
+/** Byte accounting for one log file returned as the end of its content. */
+export type WrapperLogTruncation = {
+  /** Bytes of the file that `files` carries. */
+  returnedBytes: number;
+  /** Bytes at the start of the file that `files` omits. */
+  omittedBytes: number;
+};
+
 export type WrapperLogs = {
   files: Record<string, string>;
   processes?: Array<{ pid: number; command: string; status: string }>;
+  /** Files returned as their newest bytes, keyed by path. */
+  truncated?: Record<string, WrapperLogTruncation>;
+  /** Discovered candidates that were not returned, keyed by path. */
+  skipped?: Record<string, WrapperLogSkipReason>;
+  /** Further candidates that the file allowance dropped before they were named. */
+  omittedFileCount?: number;
 };
 
 export type EnsureWrapperRequest = {

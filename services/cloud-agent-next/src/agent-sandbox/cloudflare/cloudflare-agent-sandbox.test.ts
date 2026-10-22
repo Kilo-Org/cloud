@@ -1077,3 +1077,111 @@ describe('CloudflareAgentSandbox', () => {
     expect(destroy).toHaveBeenCalledOnce();
   });
 });
+
+describe('readWrapperLogs', () => {
+  const SESSION_HOME = '/home/agent_cloudflare';
+  const CLI_LOG_DIR = `${SESSION_HOME}/.local/share/kilo/log`;
+
+  function entry(absolutePath: string, type: string, size: number, modifiedAt: string) {
+    return { name: absolutePath.split('/').pop() ?? '', absolutePath, type, size, modifiedAt };
+  }
+
+  it('returns the newest log content with the readout metadata', async () => {
+    const wrapperLog = '/tmp/kilocode-wrapper-agent_cloudflare-1.log';
+    const listFiles = vi.fn(async (path: string) => {
+      if (path === '/tmp') {
+        return {
+          success: true,
+          files: [
+            entry(wrapperLog, 'file', 12, '2026-10-22T00:00:02Z'),
+            entry('/tmp/unrelated.txt', 'file', 3, '2026-10-22T00:00:02Z'),
+          ],
+        };
+      }
+      if (path === CLI_LOG_DIR) {
+        return {
+          success: true,
+          files: [entry(`${CLI_LOG_DIR}/kilo.log`, 'file', 9, '2026-10-22T00:00:01Z')],
+        };
+      }
+      return { success: false, files: [] };
+    });
+    const readFile = vi.fn(async (path: string) => ({ content: `content of ${path}` }));
+    const exec = vi.fn();
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          getSession: vi.fn().mockResolvedValue({ listFiles, readFile, exec }),
+          listProcesses: vi.fn().mockResolvedValue([
+            {
+              id: '4242',
+              command: 'kilocode-wrapper.js --agent-session agent_cloudflare',
+              status: 'running',
+            },
+          ]),
+        }) as unknown as SandboxInstance,
+      configureBilling: vi.fn().mockResolvedValue(undefined),
+      isBillingBlocked: vi.fn().mockResolvedValue(false),
+    });
+
+    const logs = await sandbox.readWrapperLogs();
+
+    expect(listFiles.mock.calls.map(([path]) => path)).toEqual(['/tmp', CLI_LOG_DIR]);
+    expect(logs).toEqual({
+      files: {
+        [wrapperLog]: `content of ${wrapperLog}`,
+        [`${CLI_LOG_DIR}/kilo.log`]: `content of ${CLI_LOG_DIR}/kilo.log`,
+      },
+      processes: [
+        {
+          pid: 4242,
+          command: 'kilocode-wrapper.js --agent-session agent_cloudflare',
+          status: 'running',
+        },
+      ],
+      truncated: {},
+      skipped: {},
+      omittedFileCount: 0,
+    });
+    expect(exec).not.toHaveBeenCalled();
+  });
+
+  it('reads an oversized wrapper log as its newest bytes', async () => {
+    const path = '/tmp/kilocode-wrapper-agent_cloudflare-1.log';
+    const size = 4 * 1024 * 1024;
+    const exec = vi.fn().mockResolvedValue({ success: true, stdout: 'tail content', stderr: '' });
+    const readFile = vi.fn();
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          getSession: vi.fn().mockResolvedValue({
+            listFiles: vi.fn(async (listed: string) =>
+              listed === '/tmp'
+                ? { success: true, files: [entry(path, 'file', size, '2026-10-22T00:00:02Z')] }
+                : { success: false, files: [] }
+            ),
+            readFile,
+            exec,
+          }),
+          listProcesses: vi.fn().mockRejectedValue(new Error('container stopped')),
+        }) as unknown as SandboxInstance,
+      configureBilling: vi.fn().mockResolvedValue(undefined),
+      isBillingBlocked: vi.fn().mockResolvedValue(false),
+    });
+
+    const logs = await sandbox.readWrapperLogs();
+
+    expect(exec).toHaveBeenCalledWith(
+      `tail -c ${256 * 1024} -- '${path}'`,
+      expect.objectContaining({ timeout: 15_000 })
+    );
+    expect(readFile).not.toHaveBeenCalled();
+    expect(logs).toEqual({
+      files: { [path]: 'tail content' },
+      processes: undefined,
+      truncated: { [path]: { returnedBytes: 256 * 1024, omittedBytes: size - 256 * 1024 } },
+      skipped: {},
+      omittedFileCount: 0,
+    });
+  });
+});

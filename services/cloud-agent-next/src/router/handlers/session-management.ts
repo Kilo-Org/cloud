@@ -1005,9 +1005,11 @@ export function createSessionManagementHandlers() {
       }),
 
     /**
-     * Get all log files and running processes for a session's sandbox.
+     * Get the newest log files and running processes for a session's sandbox.
      *
-     * Discovers wrapper logs from /tmp and CLI logs from the session home directory.
+     * Discovers wrapper logs from /tmp and CLI logs from the session home directory,
+     * then returns the newest content within the readout budget: `truncated`, `skipped`
+     * and `omittedFileCount` report what the budget left out.
      * Useful for debugging wrapper startup and CLI issues.
      */
     getWrapperLogs: internalApiProtectedProcedure
@@ -1078,12 +1080,18 @@ export function createSessionManagementHandlers() {
 
           logger.info('Successfully retrieved session logs', {
             fileCount: Object.keys(logs.files).length,
+            truncatedCount: Object.keys(logs.truncated ?? {}).length,
+            skippedCount: Object.keys(logs.skipped ?? {}).length,
+            omittedFileCount: logs.omittedFileCount ?? 0,
           });
 
           return {
             sessionId,
             files: logs.files,
             processes: logs.processes,
+            truncated: logs.truncated ?? {},
+            skipped: logs.skipped ?? {},
+            omittedFileCount: logs.omittedFileCount ?? 0,
           };
         });
       }),

@@ -44,9 +44,10 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
   const { repositories, recents, groups } = useNewSessionRepos({ organizationId: scope });
   const { models, isLoading: isLoadingModels } = useAvailableModels(scope);
 
-  const nameRef = useRef(list?.name ?? '');
-  const emojiRef = useRef(list?.emoji ?? '');
-  const [hasName, setHasName] = useState(Boolean(list?.name.trim()));
+  // Controlled, so an update that fails and rolls the cached list back leaves
+  // the user's edits in the fields instead of the stored name.
+  const [name, setName] = useState(list?.name ?? '');
+  const [emoji, setEmoji] = useState(list?.emoji ?? '');
   const [gitUrl, setGitUrl] = useState(list?.gitUrl ?? null);
   const [mode, setMode] = useState(list?.mode ?? null);
   const [model, setModel] = useState(list?.model ?? null);
@@ -54,11 +55,12 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
   const [saveFailed, setSaveFailed] = useState(false);
   const savingRef = useRef(false);
   const saving = create.isPending || update.isPending;
+  const hasName = name.trim().length > 0;
 
   const { requestClose, dialog } = useSheetDismissGuard({
     isDirty: () =>
-      nameRef.current !== (list?.name ?? '') ||
-      emojiRef.current !== (list?.emoji ?? '') ||
+      name !== (list?.name ?? '') ||
+      emoji !== (list?.emoji ?? '') ||
       gitUrl !== (list?.gitUrl ?? null) ||
       mode !== (list?.mode ?? null) ||
       model !== (list?.model ?? null) ||
@@ -87,14 +89,14 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
   );
 
   async function save() {
-    const name = nameRef.current.trim();
-    if (name.length === 0 || savingRef.current) {
+    const trimmedName = name.trim();
+    if (trimmedName.length === 0 || savingRef.current) {
       return;
     }
-    const emoji = emojiRef.current.trim();
+    const trimmedEmoji = emoji.trim();
     const fields = {
-      name,
-      emoji: emoji.length > 0 ? emoji : null,
+      name: trimmedName,
+      emoji: trimmedEmoji.length > 0 ? trimmedEmoji : null,
       gitUrl,
       mode,
       model,
@@ -135,10 +137,8 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
             <View className="w-20 gap-2">
               <FieldLabel>{t('todos.listSettings.emoji')}</FieldLabel>
               <Input
-                defaultValue={list?.emoji ?? ''}
-                onChangeText={text => {
-                  emojiRef.current = text;
-                }}
+                value={emoji}
+                onChangeText={setEmoji}
                 maxLength={TODO_LIST_EMOJI_MAX_LENGTH}
                 accessibilityLabel={t('todos.listSettings.emoji')}
                 className="rounded-lg border border-border bg-secondary text-base text-foreground"
@@ -147,13 +147,9 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
             <View className="min-w-0 flex-1 gap-2">
               <FieldLabel>{t('todos.listSettings.name')}</FieldLabel>
               <Input
-                defaultValue={list?.name ?? ''}
+                value={name}
                 autoFocus={!list}
-                onChangeText={text => {
-                  nameRef.current = text;
-                  const next = text.trim().length > 0;
-                  setHasName(current => (current === next ? current : next));
-                }}
+                onChangeText={setName}
                 onSubmitEditing={() => {
                   void save();
                 }}

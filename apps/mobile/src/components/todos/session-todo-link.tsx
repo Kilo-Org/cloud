@@ -143,7 +143,9 @@ function SessionTodoCandidatesSheet({
         <Text accessibilityRole="header" className="px-5 pb-2 text-base font-semibold">
           {t('todos.linkToTodo')}
         </Text>
-        <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }}>{body}</ScrollView>
+        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottom + 16 }}>
+          {body}
+        </ScrollView>
       </View>
     </Sheet>
   );

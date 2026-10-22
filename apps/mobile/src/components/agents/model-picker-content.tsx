@@ -317,6 +317,7 @@ export function ModelPickerContent() {
         // bar. Ending the viewport above the bar is the same frame inset
         // `session-list-screen` uses for its FAB band.
         <FlashList<ModelPickerRow>
+          nestedScrollEnabled
           ref={listRef}
           maintainVisibleContentPosition={{ disabled: true }}
           style={[listStyle, { backgroundColor: colors.background, marginBottom: bottom }]}

@@ -25,6 +25,17 @@ Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
 
+## Sheet list gestures and actions
+
+Vertical scroll containers inside native route sheets and `Sheet` surfaces enable
+`nestedScrollEnabled` so Android scrolls the list before handing a downward drag
+to the sheet at the top. Keep self-scrolling picker lists outside the shell's
+`ScrollView`.
+
+Shared `SheetHeader` actions use explicit 48px minimum width and height, not
+rem-based sizes: native rem is 14dp. Labels retain their intrinsic size as text
+scales; the title takes the remaining space.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.

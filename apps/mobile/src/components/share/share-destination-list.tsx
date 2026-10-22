@@ -211,6 +211,7 @@ export function ShareDestinationList({
 
     body = (
       <FlashList<ShareDestinationRow>
+        nestedScrollEnabled
         style={listStyle}
         data={state.kind === 'happy' ? filtered : []}
         keyExtractor={keyExtractor}

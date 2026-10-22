@@ -109,7 +109,9 @@ export function TodoLinkSessionSheet({
         <Text accessibilityRole="header" className="px-5 pb-3 text-base font-semibold">
           {t('todos.linkSession.title')}
         </Text>
-        <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }}>{body}</ScrollView>
+        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottom + 16 }}>
+          {body}
+        </ScrollView>
       </View>
     </Sheet>
   );

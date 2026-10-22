@@ -192,7 +192,7 @@ export function SessionFilterModal({
         <Text accessibilityRole="header" className="text-center text-base font-semibold">
           {t('agentChat.sessionFilter.title')}
         </Text>
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        <ScrollView nestedScrollEnabled className="flex-1" showsVerticalScrollIndicator={false}>
           <View className="gap-4">
             {/* The rows are derived from the live sessions, so a list whose
                 rows all have an unknown origin (`liveSessionPlatformBucket`

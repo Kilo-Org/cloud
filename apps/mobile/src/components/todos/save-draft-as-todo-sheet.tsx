@@ -157,7 +157,9 @@ export function SaveDraftAsTodoSheet({
         <Text accessibilityRole="header" className="px-5 pb-2 text-base font-semibold">
           {t('todos.saveSheet.title')}
         </Text>
-        <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }}>{body}</ScrollView>
+        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottom + 16 }}>
+          {body}
+        </ScrollView>
       </View>
     </Sheet>
   );

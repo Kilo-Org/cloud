@@ -83,7 +83,7 @@ function ContextPickerSheetBody({
         >
           {title}
         </Text>
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        <ScrollView nestedScrollEnabled className="flex-1" showsVerticalScrollIndicator={false}>
           <RadioGroup label={title}>
             {options.map((label, index) => {
               if (index === cancelButtonIndex) {

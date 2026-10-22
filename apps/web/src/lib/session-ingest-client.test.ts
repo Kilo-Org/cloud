@@ -324,6 +324,29 @@ describe('shareSession', () => {
     mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
+  it.each([
+    [{}, { duration: '7d', include_new_messages: false }],
+    [
+      { duration: 'forever', include_new_messages: true },
+      { duration: 'forever', include_new_messages: true },
+    ],
+  ] as const)('sends validated share options %s', async (options, expected) => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ success: true, share_token: 'test-link' }))
+    );
+    await shareSession('ses_abc123', 'user_123', options);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify(expected),
+        headers: {
+          Authorization: 'Bearer mock-jwt-token',
+          'Content-Type': 'application/json',
+        },
+      })
+    );
+  });
+
   it('returns share_token on success', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
@@ -362,7 +385,9 @@ describe('shareSession', () => {
 
     expect(mockFetch).toHaveBeenCalledWith(
       expect.any(String),
-      expect.objectContaining({ headers: { Authorization: 'Bearer mock-jwt-token' } })
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer mock-jwt-token', 'Content-Type': 'application/json' },
+      })
     );
   });
 

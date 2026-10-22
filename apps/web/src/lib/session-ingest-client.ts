@@ -13,6 +13,8 @@ import type { User } from '@kilocode/db/schema';
 import {
   kiloSdkMessageHistorySchema,
   sessionDiffReadSchema,
+  sessionShareOptionsSchema,
+  type SessionShareOptions,
   type KiloSdkMessageHistory,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
@@ -407,7 +409,8 @@ export class SessionShareTooLargeError extends Error {
  */
 export async function shareSession(
   sessionId: string,
-  userId: string
+  userId: string,
+  options: Partial<SessionShareOptions> = {}
 ): Promise<{ share_token: string }> {
   if (!SESSION_INGEST_WORKER_URL) {
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
@@ -421,7 +424,8 @@ export async function shareSession(
 
   const response = await fetchSessionIngest(url, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(sessionShareOptionsSchema.parse(options)),
   });
 
   if (response.status === 413) {

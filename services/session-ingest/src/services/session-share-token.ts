@@ -7,7 +7,13 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  getSessionShareExpiresAt,
+  sessionIdSchema,
+  sessionShareDurationSchema,
+  sessionShareOptionsSchema,
+  type SessionShareOptions,
+} from '@kilocode/session-ingest-contracts';
 import {
   activeOrganizationJoinCondition,
   organizationMembershipJoinCondition,
@@ -23,48 +29,51 @@ import type { Env } from '../env';
 
 export const SESSION_SHARE_TOKEN_ISSUER = 'kilo-session-ingest';
 export const SESSION_SHARE_TOKEN_AUDIENCE = 'kilo-session-share';
-export const SESSION_SHARE_TOKEN_VERSION = 1;
-
-/** Default lifetime of a public share capability. */
-export const SESSION_SHARE_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
-/** Hard ceiling for any token this service accepts, including older tokens. */
-export const SESSION_SHARE_TOKEN_MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
+export const SESSION_SHARE_TOKEN_VERSION = 2;
 
 const integerSecondsSchema = z.number().int().nonnegative().refine(Number.isSafeInteger);
 const integerMillisecondsSchema = z.number().int().nonnegative().refine(Number.isSafeInteger);
 
-const sessionShareTokenPayloadSchema = z
+const commonClaims = {
+  iss: z.literal(SESSION_SHARE_TOKEN_ISSUER),
+  aud: z.literal(SESSION_SHARE_TOKEN_AUDIENCE),
+  sub: sessionIdSchema,
+  jti: z.uuid(),
+  iat: integerSecondsSchema,
+};
+
+// Original links remain permanent live shares, subject to the current generation.
+const legacySessionShareTokenPayloadSchema = z
+  .object({ ...commonClaims, version: z.literal(1) })
+  .strict();
+
+const currentSessionShareTokenPayloadSchema = z
   .object({
-    iss: z.literal(SESSION_SHARE_TOKEN_ISSUER),
-    aud: z.literal(SESSION_SHARE_TOKEN_AUDIENCE),
+    ...commonClaims,
     version: z.literal(SESSION_SHARE_TOKEN_VERSION),
-    sub: sessionIdSchema,
-    jti: z.uuid(),
-    iat: integerSecondsSchema,
-    exp: integerSecondsSchema,
-    // Millisecond boundary captured when the capability is minted. Only ingest
-    // items persisted strictly before this instant are exposed publicly.
+    duration: sessionShareDurationSchema,
+    include_new_messages: z.boolean(),
+    exp: integerSecondsSchema.optional(),
     shared_at: integerMillisecondsSchema,
   })
   .strict()
-  .refine(payload => payload.exp > payload.iat, {
-    message: 'exp must be after iat',
-  })
-  .refine(payload => payload.exp - payload.iat <= SESSION_SHARE_TOKEN_MAX_TTL_SECONDS, {
-    message: 'exp exceeds the maximum share lifetime',
-  })
+  .refine(
+    payload => {
+      const expiresAt = getSessionShareExpiresAt(payload.duration, payload.iat);
+      return expiresAt === null ? payload.exp === undefined : payload.exp === expiresAt;
+    },
+    {
+      message: 'exp must match the selected duration',
+    }
+  )
   .refine(payload => Math.floor(payload.shared_at / 1000) === payload.iat, {
     message: 'shared_at must match iat',
   });
 
-const sessionShareTokenSigningPayloadSchema = z
-  .object({
-    version: z.literal(SESSION_SHARE_TOKEN_VERSION),
-    sub: sessionIdSchema,
-    jti: z.uuid(),
-    shared_at: integerMillisecondsSchema,
-  })
-  .strict();
+const sessionShareTokenPayloadSchema = z.discriminatedUnion('version', [
+  legacySessionShareTokenPayloadSchema,
+  currentSessionShareTokenPayloadSchema,
+]);
 
 export type SessionShareTokenPayload = z.infer<typeof sessionShareTokenPayloadSchema>;
 
@@ -82,8 +91,8 @@ export type ResolvedSessionShare = {
   gitUrl: string | null;
   gitBranch: string | null;
   createdAt: string;
-  /** Ingest items persisted strictly before this instant are public. */
-  contentCutoffMs: number;
+  /** Null exposes current content; otherwise only earlier ingest items are public. */
+  contentCutoffMs: number | null;
 };
 
 export type SessionShareTokenEnv = {
@@ -120,26 +129,31 @@ async function getSessionShareSecret(env: SessionShareTokenEnv): Promise<string>
 
 export async function signSessionShareToken(
   env: SessionShareTokenEnv,
-  params: { sessionId: string; publicId: string },
+  params: { sessionId: string; publicId: string } & Partial<SessionShareOptions>,
   options: SessionShareTokenOptions = {}
 ): Promise<string> {
   const secret = await getSessionShareSecret(env);
   const nowMs = getNowMs(options);
   const issuedAt = Math.floor(nowMs / 1000);
-  const expiresAt = issuedAt + SESSION_SHARE_TOKEN_TTL_SECONDS;
-  const payload = sessionShareTokenSigningPayloadSchema.parse({
+  const shareOptions = sessionShareOptionsSchema.parse({
+    duration: params.duration,
+    include_new_messages: params.include_new_messages,
+  });
+  const expiresAt = getSessionShareExpiresAt(shareOptions.duration, issuedAt);
+  const payload = currentSessionShareTokenPayloadSchema.parse({
+    iss: SESSION_SHARE_TOKEN_ISSUER,
+    aud: SESSION_SHARE_TOKEN_AUDIENCE,
+    iat: issuedAt,
     version: SESSION_SHARE_TOKEN_VERSION,
     sub: params.sessionId,
     jti: params.publicId,
     shared_at: nowMs,
+    ...shareOptions,
+    ...(expiresAt === null ? {} : { exp: expiresAt }),
   });
 
   return new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
-    .setIssuer(SESSION_SHARE_TOKEN_ISSUER)
-    .setAudience(SESSION_SHARE_TOKEN_AUDIENCE)
-    .setIssuedAt(issuedAt)
-    .setExpirationTime(expiresAt)
     .sign(new TextEncoder().encode(secret));
 }
 
@@ -218,5 +232,7 @@ export async function resolveSessionShareToken(
     .limit(1);
 
   const row = rows[0];
-  return row ? { ...row, publicId: payload.jti, contentCutoffMs: payload.shared_at } : null;
+  const contentCutoffMs =
+    payload.version === 1 || payload.include_new_messages ? null : payload.shared_at;
+  return row ? { ...row, publicId: payload.jti, contentCutoffMs } : null;
 }

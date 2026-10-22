@@ -470,9 +470,21 @@ describe('public session route', () => {
     }
   });
 
-  it('returns 404 for a legacy non-expiring capability on both endpoints', async () => {
-    const { db } = makeDbFakes();
+  it('preserves original links as permanent live shares until revoked or replaced', async () => {
+    const { db, selectResult, selectCondition } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    selectResult.mockResolvedValue([
+      {
+        sessionId: 'ses_12345678901234567890123456',
+        kiloUserId: 'usr_123',
+        title: 'Shared title',
+        createdAt: '2026-08-19T10:00:00.000Z',
+      },
+    ]);
+    const stub = {
+      getAllStream: vi.fn(async () => new Response('{"messages":["later message"]}').body!),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
     const legacyToken = await new SignJWT({
       version: 1,
       sub: 'ses_12345678901234567890123456',
@@ -481,24 +493,65 @@ describe('public session route', () => {
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuer('kilo-session-ingest')
       .setAudience('kilo-session-share')
-      .setIssuedAt()
+      .setIssuedAt(1)
       .sign(new TextEncoder().encode('session-share-secret-for-tests-32-bytes'));
-
-    const content = await app.request(
-      `/session/${encodeURIComponent(legacyToken)}`,
-      {},
-      defaultEnv
+    const path = `/session/${encodeURIComponent(legacyToken)}`;
+    const content = await app.request(path, {}, defaultEnv);
+    expect(content.status).toBe(200);
+    expect(await content.json()).toEqual({ messages: ['later message'] });
+    expect((await app.request(`${path}/metadata`, {}, defaultEnv)).status).toBe(200);
+    const condition = selectCondition();
+    if (!(condition instanceof SQL)) throw new Error('Expected generation condition');
+    expect(new PgDialect().sqlToQuery(condition).params).toContain(
+      '11111111-1111-4111-8111-111111111111'
     );
-    const metadata = await app.request(
-      `/session/${encodeURIComponent(legacyToken)}/metadata`,
-      {},
-      defaultEnv
-    );
-
-    expect(content.status).toBe(404);
-    expect(metadata.status).toBe(404);
-    expect(getWorkerDb).not.toHaveBeenCalled();
+    selectResult.mockResolvedValue([]);
+    expect((await app.request(path, {}, defaultEnv)).status).toBe(404);
+    expect((await app.request(`${path}/metadata`, {}, defaultEnv)).status).toBe(404);
+    expect(stub.getAllStream).toHaveBeenCalledTimes(1);
   });
+
+  it.each([false, true])(
+    'serves a new permanent link with include_new_messages=%s',
+    async include_new_messages => {
+      const { db, selectResult } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      selectResult.mockResolvedValue([
+        {
+          sessionId: 'ses_12345678901234567890123456',
+          kiloUserId: 'usr_123',
+        },
+      ]);
+      const stub = {
+        getAllStream: vi.fn(async () => new Response('{"mode":"live"}').body!),
+        getSharedSessionStream: vi.fn(async () => new Response('{"mode":"snapshot"}').body!),
+      };
+      vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
+      const sharedAt = new Date('2020-01-01T00:00:00.000Z');
+      const token = await signSessionShareToken(
+        defaultEnv,
+        {
+          sessionId: 'ses_12345678901234567890123456',
+          publicId: '11111111-1111-4111-8111-111111111111',
+          duration: 'forever',
+          include_new_messages,
+        },
+        { now: () => sharedAt }
+      );
+      const response = await app.request(`/session/${encodeURIComponent(token)}`, {}, defaultEnv);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ mode: include_new_messages ? 'live' : 'snapshot' });
+      if (include_new_messages) {
+        expect(stub.getSharedSessionStream).not.toHaveBeenCalled();
+      } else {
+        expect(stub.getAllStream).not.toHaveBeenCalled();
+        expect(stub.getSharedSessionStream).toHaveBeenCalledWith({
+          publicId: '11111111-1111-4111-8111-111111111111',
+          ingestedBeforeMs: sharedAt.getTime(),
+        });
+      }
+    }
+  );
 
   it('returns 404 for a revoked capability on both content and metadata endpoints', async () => {
     const { db, selectResult } = makeDbFakes();

@@ -87,10 +87,12 @@ app.get('/session/:shareToken', async c => {
         sessionId: sharedSession.sessionId,
       }),
     s =>
-      s.getSharedSessionStream({
-        publicId: sharedSession.publicId,
-        ingestedBeforeMs: sharedSession.contentCutoffMs,
-      }),
+      sharedSession.contentCutoffMs === null
+        ? s.getAllStream()
+        : s.getSharedSessionStream({
+            publicId: sharedSession.publicId,
+            ingestedBeforeMs: sharedSession.contentCutoffMs,
+          }),
     'SessionIngestDO.getSharedSessionStream'
   );
 

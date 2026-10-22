@@ -5,6 +5,8 @@ import {
   decodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   MAX_SESSION_DIFF_READ_BYTES,
+  getSessionShareExpiresAt,
+  sessionShareDurationSchema,
 } from '@kilocode/session-ingest-contracts';
 import {
   KILO_SDK_HISTORY_BOUNDED_MESSAGE_SCAN_ROW_WORK_CAP,
@@ -458,6 +460,102 @@ describe('SessionIngestDO integration', () => {
         await stub.clear();
         await env.SESSION_INGEST_R2.delete(key);
       }
+    });
+
+    it.each(sessionShareDurationSchema.options)(
+      'stores snapshot retention for %s',
+      async duration => {
+        const sessionId = `ses_retention_${duration}_${crypto.randomUUID()}`;
+        const publicId = crypto.randomUUID();
+        const stub = getStub(kiloUserId, sessionId);
+        await stub.ingest(
+          [{ type: 'session', data: { title: 'Shared title' } }],
+          kiloUserId,
+          sessionId,
+          1,
+          1000
+        );
+        const capturedAt = await stub.captureShareInfo(publicId, duration);
+        const expiresAt = getSessionShareExpiresAt(duration, Math.floor(capturedAt / 1000));
+        await runInDurableObject(stub, async (_instance, state) => {
+          const [row] = [
+            ...state.storage.sql.exec<{ value: string }>(
+              'SELECT value FROM ingest_meta WHERE key = ?',
+              `shareInfo:${publicId}`
+            ),
+          ];
+          expect(JSON.parse(row.value)).toMatchObject({
+            capturedAt,
+            expiresAt: expiresAt === null ? null : expiresAt * 1000,
+          });
+        });
+      }
+    );
+
+    it('keeps permanent snapshot info after 30 days and removes expired finite snapshots', async () => {
+      const sessionId = 'ses_permanent_snapshot_retention_001';
+      const permanentId = crypto.randomUUID();
+      const expiredId = crypto.randomUUID();
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest(
+        [{ type: 'session', data: { title: 'Original title' } }],
+        kiloUserId,
+        sessionId,
+        1,
+        1000
+      );
+      await stub.captureShareInfo(permanentId, 'forever');
+      await runInDurableObject(stub, async (_instance, state) => {
+        const capturedAt = Date.now() - 365 * 24 * 60 * 60 * 1000;
+        state.storage.sql.exec(
+          'UPDATE ingest_meta SET value = ? WHERE key = ?',
+          JSON.stringify({
+            capturedAt,
+            expiresAt: null,
+            info: JSON.stringify({ title: 'Original title' }),
+          }),
+          `shareInfo:${permanentId}`
+        );
+        state.storage.sql.exec(
+          'INSERT INTO ingest_meta (key, value) VALUES (?, ?)',
+          `shareInfo:${expiredId}`,
+          JSON.stringify({
+            capturedAt,
+            expiresAt: Date.now() - 1,
+            info: '{}',
+          })
+        );
+      });
+      await stub.captureShareInfo(crypto.randomUUID());
+      const shared = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId: permanentId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      );
+      expect(shared.info).toEqual({ title: 'Original title' });
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect([
+          ...state.storage.sql.exec(
+            'SELECT key FROM ingest_meta WHERE key = ?',
+            `shareInfo:${expiredId}`
+          ),
+        ]).toEqual([]);
+        expect([
+          ...state.storage.sql.exec(
+            'SELECT key FROM ingest_meta WHERE key = ?',
+            `shareInfo:${permanentId}`
+          ),
+        ]).toHaveLength(1);
+      });
+      await stub.deleteShareInfo(permanentId);
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect([
+          ...state.storage.sql.exec(
+            'SELECT key FROM ingest_meta WHERE key = ?',
+            `shareInfo:${permanentId}`
+          ),
+        ]).toEqual([]);
+      });
     });
 
     it('prunes expired share info snapshots when a new share is captured', async () => {

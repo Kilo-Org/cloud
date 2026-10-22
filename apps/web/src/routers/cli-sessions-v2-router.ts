@@ -50,6 +50,7 @@ import {
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   cloudAgentWorktreeIdSchema,
   isDefaultSessionTitle,
+  sessionShareOptionsSchema,
   projectPrivateWorktreePaths,
   validateKiloSdkMessagesCursor,
   type SessionDiffRead,
@@ -820,9 +821,10 @@ const RenameSessionInputSchema = z.object({
   title: z.string().trim().min(1).max(200),
 });
 
-const ShareSessionInputSchema = z.object({
+const UnshareSessionInputSchema = z.object({
   session_id: sessionIdField,
 });
+const ShareSessionInputSchema = UnshareSessionInputSchema.extend(sessionShareOptionsSchema.shape);
 
 function addCreatedOnPlatformConditions(
   whereConditions: SQL[],
@@ -2328,11 +2330,11 @@ export const cliSessionsV2Router = createTRPCRouter({
    * previous link.
    */
   share: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
-    const { session_id } = input;
+    const { session_id, ...shareOptions } = input;
     await getSessionWithAccessCheck(session_id, ctx);
 
     try {
-      const result = await shareSessionIngest(session_id, ctx.user.id);
+      const result = await shareSessionIngest(session_id, ctx.user.id, shareOptions);
       return { share_token: result.share_token };
     } catch (error) {
       if (error instanceof SessionShareTooLargeError) {
@@ -2356,7 +2358,7 @@ export const cliSessionsV2Router = createTRPCRouter({
    * Owner-only, matching the session-ingest worker. A missing or inaccessible
    * session is NOT_FOUND. Worker 404 is mapped the same way.
    */
-  unshare: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
+  unshare: baseProcedure.input(UnshareSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id } = input;
     await getSessionWithAccessCheck(session_id, ctx);
 

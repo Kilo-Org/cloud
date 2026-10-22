@@ -1,6 +1,10 @@
 import { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { Hono } from 'hono';
+import {
+  getSessionShareExpiresAt,
+  sessionShareDurationSchema,
+} from '@kilocode/session-ingest-contracts';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { api } from './api';
@@ -136,7 +140,7 @@ function r2StagingStub(env: Parameters<typeof getSessionIngestDO>[0]) {
 
 function shareIngestStub() {
   return {
-    captureShareInfo: vi.fn(async (_publicId: string) => undefined),
+    captureShareInfo: vi.fn(async (_publicId: string, _duration: string) => Date.now()),
     deleteShareInfo: vi.fn(async (_publicId: string) => undefined),
   };
 }
@@ -678,6 +682,7 @@ describe('api routes', () => {
         snapshots.add(publicId);
         captured.resolve(publicId);
         await resumeCapture.promise;
+        return Date.now();
       },
       deleteShareInfo: async (publicId: string) => {
         snapshots.delete(publicId);
@@ -2595,6 +2600,79 @@ describe('api routes', () => {
     expect(ingestStub.clear).toHaveBeenCalledTimes(1);
   });
 
+  it.each(
+    sessionShareDurationSchema.options.flatMap(duration =>
+      [false, true].map(include_new_messages => ({ duration, include_new_messages }))
+    )
+  )('creates a share with $duration / $include_new_messages', async shareOptions => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: null }]);
+    fns.executeResult.mockImplementation(async query => {
+      if (!(query instanceof SQL)) throw new Error('Expected share query');
+      return { rows: [{ public_id: new PgDialect().sqlToQuery(query).params[0] }] };
+    });
+    const ingestStub = shareIngestStub();
+    const capturedAt = Date.now() - 10000;
+    ingestStub.captureShareInfo.mockResolvedValue(capturedAt);
+    vi.mocked(getSessionIngestDO).mockReturnValue(ingestStub as never);
+    const response = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(shareOptions),
+      }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { share_token: string };
+    const token = await verifySessionShareToken(makeTestEnv(), body.share_token);
+    expect(token).toMatchObject(shareOptions);
+    if (token?.version !== 2) throw new Error('Expected current token');
+    expect(token.exp).toBe(getSessionShareExpiresAt(shareOptions.duration, token.iat) ?? undefined);
+    if (shareOptions.include_new_messages) {
+      expect(ingestStub.captureShareInfo).not.toHaveBeenCalled();
+    } else {
+      expect(ingestStub.captureShareInfo).toHaveBeenCalledWith(token.jti, shareOptions.duration);
+      expect(token.shared_at).toBe(capturedAt);
+    }
+  });
+
+  it.each([
+    '{"duration":"100d"}',
+    '{"duration":null}',
+    '{"include_new_messages":"true"}',
+    'null',
+    '{',
+  ])('rejects invalid share options before mutation: %s', async body => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const response = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', {
+        method: 'POST',
+        body,
+      }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(400);
+    expect(fns.transaction).not.toHaveBeenCalled();
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized share options before reading JSON or mutating state', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const response = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', {
+        method: 'POST',
+        body: JSON.stringify({ padding: 'x'.repeat(2048) }),
+      }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(413);
+    expect(fns.transaction).not.toHaveBeenCalled();
+  });
+
   it('POST /session/:sessionId/share rotates the generation and returns a JWT', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
@@ -2630,7 +2708,7 @@ describe('api routes', () => {
     expect(sharedPublicId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
-    expect(ingestStub.captureShareInfo).toHaveBeenCalledWith(sharedPublicId);
+    expect(ingestStub.captureShareInfo).toHaveBeenCalledWith(sharedPublicId, '7d');
     await expect(verifySessionShareToken(makeTestEnv(), body.share_token)).resolves.toMatchObject({
       sub: 'ses_12345678901234567890123456',
       jti: sharedPublicId,
@@ -2680,8 +2758,8 @@ describe('api routes', () => {
 
       expect(issuedPublicIds).toHaveLength(2);
       expect(issuedPublicIds[0]).not.toBe(issuedPublicIds[1]);
-      expect(ingestStub.captureShareInfo).toHaveBeenNthCalledWith(1, issuedPublicIds[0]);
-      expect(ingestStub.captureShareInfo).toHaveBeenNthCalledWith(2, issuedPublicIds[1]);
+      expect(ingestStub.captureShareInfo).toHaveBeenNthCalledWith(1, issuedPublicIds[0], '7d');
+      expect(ingestStub.captureShareInfo).toHaveBeenNthCalledWith(2, issuedPublicIds[1], '7d');
       await expect(
         verifySessionShareToken(makeTestEnv(), first.share_token)
       ).resolves.toMatchObject({
@@ -2740,7 +2818,10 @@ describe('api routes', () => {
     expect(json).not.toHaveProperty('public_id');
     expect(ingestStub.captureShareInfo).toHaveBeenCalledTimes(1);
     expect(ingestStub.captureShareInfo).toHaveBeenCalledWith(
-      expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+      expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+      ),
+      '7d'
     );
   });
 

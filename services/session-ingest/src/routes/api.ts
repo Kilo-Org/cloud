@@ -1,4 +1,5 @@
 import { Hono, type Context } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import { sql, eq, and, inArray, isNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
@@ -11,6 +12,7 @@ import {
   persistedKiloSdkMessageHistorySchema,
   sessionDiffReadSchema,
   sessionIdSchema,
+  sessionShareOptionsSchema,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
@@ -768,11 +770,18 @@ api.get('/session/:sessionId/messages', async c => {
   );
 });
 
-api.post('/session/:sessionId/share', async c => {
+api.post('/session/:sessionId/share', bodyLimit({ maxSize: 1024 }), async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
+  }
+
+  const shareOptions = sessionShareOptionsSchema.safeParse(
+    c.req.raw.body === null ? {} : await c.req.json().catch(() => null)
+  );
+  if (!shareOptions.success) {
+    return c.json({ success: false, error: 'Invalid share options' }, 400);
   }
 
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
@@ -795,12 +804,15 @@ api.post('/session/:sessionId/share', async c => {
 
   // Freeze the public info and mint the capability before mutating the row so
   // a snapshot or signing failure leaves the previous generation untouched.
+  let sharedAt = Date.now();
   try {
-    await withDORetry(
-      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
-      stub => stub.captureShareInfo(publicId),
-      'SessionIngestDO.captureShareInfo'
-    );
+    if (!shareOptions.data.include_new_messages) {
+      sharedAt = await withDORetry(
+        () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+        stub => stub.captureShareInfo(publicId, shareOptions.data.duration),
+        'SessionIngestDO.captureShareInfo'
+      );
+    }
   } catch (error) {
     await removeSnapshot();
     if (error instanceof Error && error.message === SHARE_INFO_TOO_LARGE_ERROR) {
@@ -814,19 +826,23 @@ api.post('/session/:sessionId/share', async c => {
 
   let shareToken: string;
   try {
-    shareToken = await signSessionShareToken(c.env, {
-      sessionId: parsed.data,
-      publicId,
-    });
+    shareToken = await signSessionShareToken(
+      c.env,
+      {
+        sessionId: parsed.data,
+        publicId,
+        ...shareOptions.data,
+      },
+      { now: () => new Date(sharedAt) }
+    );
   } catch (error) {
     await removeSnapshot();
     throw error;
   }
 
   // Every share rotates `public_id`, which invalidates the predecessor even
-  // while its signature is still valid. The capability's `shared_at` is
-  // captured after the info snapshot, so the info cannot include session
-  // updates that happen after the share boundary.
+  // while its signature is still valid. Snapshot links use the capture timestamp
+  // as their signed cutoff and expiry origin.
   const sharedSession = await db
     .transaction(async tx => {
       const [previous] = await tx

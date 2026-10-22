@@ -2,13 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { jwtVerify, SignJWT } from 'jose';
 import { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { sessionShareDurationSchema } from '@kilocode/session-ingest-contracts';
 
 import { getWorkerDb } from '@kilocode/db/client';
 import {
   SESSION_SHARE_TOKEN_AUDIENCE,
   SESSION_SHARE_TOKEN_ISSUER,
-  SESSION_SHARE_TOKEN_MAX_TTL_SECONDS,
-  SESSION_SHARE_TOKEN_TTL_SECONDS,
   SESSION_SHARE_TOKEN_VERSION,
   resolveSessionShareToken,
   signSessionShareToken,
@@ -20,6 +19,9 @@ import {
 vi.mock('@kilocode/db/client', () => ({
   getWorkerDb: vi.fn(),
 }));
+
+const SESSION_SHARE_TOKEN_TTL_SECONDS = 604800;
+const SESSION_SHARE_TOKEN_MAX_TTL_SECONDS = 2592000;
 
 const SECRET = 'session-share-secret-for-tests-32-bytes';
 const SESSION_ID = 'ses_12345678901234567890123456';
@@ -56,6 +58,8 @@ function validPayload(overrides: Record<string, unknown> = {}): Record<string, u
     iat: NOW_SECONDS,
     exp: NOW_SECONDS + SESSION_SHARE_TOKEN_TTL_SECONDS,
     shared_at: NOW_MS,
+    duration: '7d',
+    include_new_messages: false,
     ...overrides,
   };
 }
@@ -63,6 +67,67 @@ function validPayload(overrides: Record<string, unknown> = {}): Record<string, u
 describe('session share tokens', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+  });
+
+  it.each(
+    sessionShareDurationSchema.options.flatMap(duration =>
+      [false, true].map(include_new_messages => ({ duration, include_new_messages }))
+    )
+  )('enforces selected options $duration / $include_new_messages', async shareOptions => {
+    const token = await signSessionShareToken(
+      makeEnv(),
+      {
+        sessionId: SESSION_ID,
+        publicId: PUBLIC_ID,
+        ...shareOptions,
+      },
+      FIXED_CLOCK
+    );
+    const durationSeconds = {
+      '1h': 3600,
+      '1d': 86400,
+      '7d': 604800,
+      '30d': 2592000,
+      forever: null,
+    };
+    const seconds = durationSeconds[shareOptions.duration];
+    const expectedExpiry = seconds === null ? null : NOW_SECONDS + seconds;
+    const payload = await verifySessionShareToken(makeEnv(), token, FIXED_CLOCK);
+    expect(payload).toMatchObject(shareOptions);
+    if (payload?.version !== SESSION_SHARE_TOKEN_VERSION) throw new Error('Expected current token');
+    expect(payload.exp).toBe(expectedExpiry ?? undefined);
+    if (expectedExpiry !== null) {
+      await expect(
+        verifySessionShareToken(makeEnv(), token, {
+          now: () => new Date(expectedExpiry * 1000),
+        })
+      ).resolves.toBeNull();
+    } else {
+      await expect(
+        verifySessionShareToken(makeEnv(), token, {
+          now: () => new Date(NOW_MS + 365 * 24 * 60 * 60 * 1000),
+        })
+      ).resolves.toMatchObject(shareOptions);
+    }
+  });
+
+  it('keeps original links valid without an expiry or snapshot cutoff', async () => {
+    const token = await signPayload({
+      iss: SESSION_SHARE_TOKEN_ISSUER,
+      aud: SESSION_SHARE_TOKEN_AUDIENCE,
+      version: 1,
+      sub: SESSION_ID,
+      jti: PUBLIC_ID,
+      iat: NOW_SECONDS,
+    });
+    await expect(
+      verifySessionShareToken(makeEnv(), token, {
+        now: () => new Date(NOW_MS + 365 * 24 * 60 * 60 * 1000),
+      })
+    ).resolves.toMatchObject({ version: 1, jti: PUBLIC_ID });
+    await expect(
+      verifySessionShareToken(makeEnv(String(NOW_SECONDS + 1)), token, FIXED_CLOCK)
+    ).resolves.toBeNull();
   });
 
   it('signs a finite lifetime and the exact purpose-bound claims', async () => {
@@ -87,6 +152,8 @@ describe('session share tokens', () => {
       iat: NOW_SECONDS,
       exp: NOW_SECONDS + SESSION_SHARE_TOKEN_TTL_SECONDS,
       shared_at: NOW_MS,
+      duration: '7d',
+      include_new_messages: false,
     });
     await expect(verifySessionShareToken(makeEnv(), token, FIXED_CLOCK)).resolves.toEqual(payload);
   });
@@ -96,7 +163,8 @@ describe('session share tokens', () => {
     ['non-HS256 algorithm', async () => signPayload(validPayload(), { alg: 'HS384' })],
     ['wrong issuer', async () => signPayload(validPayload({ iss: 'another-service' }))],
     ['wrong audience', async () => signPayload(validPayload({ aud: 'ordinary-kilo-token' }))],
-    ['unknown version', async () => signPayload(validPayload({ version: 2 }))],
+    ['legacy version with current claims', async () => signPayload(validPayload({ version: 1 }))],
+    ['unknown version', async () => signPayload(validPayload({ version: 3 }))],
     ['malformed subject', async () => signPayload(validPayload({ sub: 'ses_bad' }))],
     ['malformed generation id', async () => signPayload(validPayload({ jti: 'not-a-uuid' }))],
     ['empty generation id', async () => signPayload(validPayload({ jti: '' }))],
@@ -117,7 +185,7 @@ describe('session share tokens', () => {
       },
     ],
     [
-      'legacy token without exp',
+      'finite token without exp',
       async () => {
         const payload = validPayload();
         delete payload.exp;
@@ -125,7 +193,7 @@ describe('session share tokens', () => {
       },
     ],
     [
-      'legacy token without shared_at',
+      'current token without shared_at',
       async () => {
         const payload = validPayload();
         delete payload.shared_at;
@@ -142,6 +210,27 @@ describe('session share tokens', () => {
       'shared_at outside the issued second',
       async () => signPayload(validPayload({ shared_at: NOW_MS + 1000 })),
     ],
+    [
+      'missing duration',
+      async () => {
+        const payload = validPayload();
+        delete payload.duration;
+        return signPayload(payload);
+      },
+    ],
+    [
+      'missing message mode',
+      async () => {
+        const payload = validPayload();
+        delete payload.include_new_messages;
+        return signPayload(payload);
+      },
+    ],
+    [
+      'invalid message mode',
+      async () => signPayload(validPayload({ include_new_messages: 'true' })),
+    ],
+    ['forever with an expiry', async () => signPayload(validPayload({ duration: 'forever' }))],
     ['unexpected payload claim', async () => signPayload(validPayload({ token: 'ordinary' }))],
   ])('rejects %s tokens', async (_description, createToken) => {
     await expect(

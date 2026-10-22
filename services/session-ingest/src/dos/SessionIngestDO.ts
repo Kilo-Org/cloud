@@ -1,7 +1,10 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
+  getSessionShareExpiresAt,
   sessionIdSchema,
+  sessionShareDurationSchema,
   sessionLiveSummarySchema,
+  type SessionShareDuration,
   type SessionLiveSummary,
 } from '@kilocode/session-ingest-contracts';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
@@ -85,6 +88,13 @@ import {
   persistBriefingEvidence,
   type BriefingIngestEvent,
 } from '../ingest/briefing-evidence';
+import {
+  SHARE_INFO_KEY_PREFIX,
+  shareInfoKey,
+  readShareInfo,
+  projectSharedSessionInfo,
+  type ShareInfoMetaKey,
+} from './session-share-info';
 
 type LiveThrottleMetaKey =
   | 'lastActivityValueMs'
@@ -115,30 +125,7 @@ type IngestMetaKey =
   | AlarmMetaKey
   | ShareInfoMetaKey;
 
-const SHARE_INFO_KEY_PREFIX = 'shareInfo:';
-const SHARE_INFO_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 export const SHARE_INFO_TOO_LARGE_ERROR = 'Share snapshot is too large';
-
-type ShareInfoMetaKey = `${typeof SHARE_INFO_KEY_PREFIX}${string}`;
-
-function shareInfoKey(publicId: string): ShareInfoMetaKey {
-  return `${SHARE_INFO_KEY_PREFIX}${publicId}`;
-}
-
-/**
- * Freeze the session info a public share exposes. The cumulative diff is not
- * part of the public share, so drop it from the snapshot while keeping the
- * bounded summary counts and every field the import path reads.
- */
-function projectSharedSessionInfo(value: Record<string, unknown>): string {
-  const info = { ...value };
-  if (typeof info.summary === 'object' && info.summary !== null && !Array.isArray(info.summary)) {
-    const summary = { ...(info.summary as Record<string, unknown>) };
-    delete summary.diffs;
-    info.summary = summary;
-  }
-  return JSON.stringify(info);
-}
 
 type ExtractableMetaKey =
   | 'title'
@@ -1243,10 +1230,10 @@ export class SessionIngestDO extends DurableObject<Env> {
   /**
    * Freeze the session info a public share exposes. Snapshots are keyed by the
    * public generation so a later share cannot replace an earlier snapshot while
-   * its capability is still valid. Snapshots older than the maximum accepted
-   * token lifetime are removed.
+   * its capability is still valid. Snapshot retention matches the link lifetime.
    */
-  async captureShareInfo(publicId: string): Promise<void> {
+  async captureShareInfo(publicId: string, duration: SessionShareDuration = '7d'): Promise<number> {
+    const shareDuration = sessionShareDurationSchema.parse(duration);
     if (this.isDeleted()) throw new Error('Session deleted');
     const snapshot = await readKiloSdkSessionSnapshot(this.db, this.env.SESSION_INGEST_R2);
     if (snapshot.kind === 'too_large') throw new Error(SHARE_INFO_TOO_LARGE_ERROR);
@@ -1256,7 +1243,9 @@ export class SessionIngestDO extends DurableObject<Env> {
     if (this.isDeleted()) throw new Error('Session deleted');
     const info = snapshot.kind === 'value' ? projectSharedSessionInfo(snapshot.info) : '{}';
     const now = Date.now();
-    const value = JSON.stringify({ capturedAt: now, info });
+    const expiresAtSeconds = getSessionShareExpiresAt(shareDuration, Math.floor(now / 1000));
+    const expiresAt = expiresAtSeconds === null ? null : expiresAtSeconds * 1000;
+    const value = JSON.stringify({ capturedAt: now, expiresAt, info });
     if (new TextEncoder().encode(value).byteLength > MAX_INGEST_ITEM_BYTES) {
       throw new Error(SHARE_INFO_TOO_LARGE_ERROR);
     }
@@ -1267,6 +1256,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       .onConflictDoUpdate({ target: ingestMeta.key, set: { value } })
       .run();
     this.pruneShareInfo(now);
+    return now;
   }
 
   async deleteShareInfo(publicId: string): Promise<void> {
@@ -1277,20 +1267,13 @@ export class SessionIngestDO extends DurableObject<Env> {
   }
 
   private pruneShareInfo(now: number): void {
-    const cutoff = now - SHARE_INFO_RETENTION_MS;
     const rows = this.db
       .select({ key: ingestMeta.key, value: ingestMeta.value })
       .from(ingestMeta)
       .where(like(ingestMeta.key, `${SHARE_INFO_KEY_PREFIX}%`))
       .all();
     for (const row of rows) {
-      let capturedAt: unknown;
-      try {
-        capturedAt = (JSON.parse(row.value ?? '') as { capturedAt?: unknown }).capturedAt;
-      } catch {
-        capturedAt = undefined;
-      }
-      if (typeof capturedAt !== 'number' || capturedAt < cutoff) {
+      if (readShareInfo(row.value, now) === null) {
         this.db.delete(ingestMeta).where(eq(ingestMeta.key, row.key)).run();
       }
     }
@@ -1320,19 +1303,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       .from(ingestMeta)
       .where(eq(ingestMeta.key, shareInfoKey(publicId)))
       .get();
-    if (!row?.value) return null;
-    try {
-      const parsed = JSON.parse(row.value) as { capturedAt?: unknown; info?: unknown };
-      if (
-        typeof parsed.capturedAt !== 'number' ||
-        parsed.capturedAt < Date.now() - SHARE_INFO_RETENTION_MS
-      ) {
-        return null;
-      }
-      return typeof parsed.info === 'string' ? parsed.info : null;
-    } catch {
-      return null;
-    }
+    return readShareInfo(row?.value ?? null, Date.now());
   }
 
   private buildSessionExportStream(options: {

@@ -26,7 +26,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as OperationKeyModule from '@/lib/operation-key';
-import { OPERATION_IN_PROGRESS_MESSAGE } from '@/lib/operation-key';
+import { OPERATION_IN_PROGRESS_MESSAGE } from '@/lib/operation-markers';
 import type * as ReactQuery from '@tanstack/react-query';
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
 import type * as ProviderPrRefModule from '@/lib/pr-review/provider-pr-ref';
@@ -170,9 +170,9 @@ vi.mock('sonner-native', () => ({
 }));
 
 // Rolldown (Vitest's bundler) cannot parse React Native's Flow source.
-// The s6 provider helpers live in `use-pr-review-mutations`, which imports
-// `announcingToast` -> `announce.ts` -> `react-native`. Mock only the
-// symbols `announce.ts` imports so the module graph loads under Node.
+// `use-review-discussion-mutations` imports `announce`, which imports
+// `react-native`. Mock only the symbols `announce.ts` imports so the module
+// graph loads under Node.
 vi.mock('react-native', () => ({
   AccessibilityInfo: {
     announceForAccessibility: vi.fn(),

@@ -21,8 +21,9 @@ import {
 } from '@/lib/security-agent-ledger';
 import { buildLocalizedMetrics, DashboardScreen } from './dashboard-screen';
 
-// The ledger module imports the operation-key helpers, whose expo-crypto root
-// import loads a native binding this node project does not have.
+// The security mutation hooks hoist an operation key through
+// `@/lib/operation-key`, whose expo-crypto root import loads a native binding
+// this node project does not have.
 vi.mock('expo-crypto', () => ({ randomUUID: () => '00000000-0000-4000-8000-000000000000' }));
 
 const PERSISTENCE_FAILED_MESSAGE = vi.hoisted(

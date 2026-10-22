@@ -20,6 +20,11 @@ const SuspiciousDomainsInputSchema = z
   })
   .optional();
 
+// The admin table renders one row per entry. An imported blocklist can hold
+// tens of thousands of entries, so the procedure returns only the domains that
+// actually caught users, ordered by count.
+const STATS_ROW_LIMIT = 200;
+
 async function readConfig(): Promise<BlacklistDomainsConfig> {
   try {
     const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
@@ -71,7 +76,7 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
       .where(isNotNull(kilocode_users.email_domain))
       .groupBy(kilocode_users.email_domain);
 
-    return computeBlacklistStats(domains, emailDomainCounts);
+    return computeBlacklistStats(domains, emailDomainCounts, STATS_ROW_LIMIT);
   }),
 
   suspicious: adminProcedure.input(SuspiciousDomainsInputSchema).query(async ({ input }) => {
@@ -141,10 +146,15 @@ export type BlacklistStats = {
  * Walks each email_domain once and credits every blacklist entry that is one of
  * its label-boundary suffixes. The entry-major alternative (test every entry
  * against every group) is quadratic and does not survive a large imported list.
+ *
+ * `limit` caps the returned rows after sorting; `totalDomains` and
+ * `totalBlockedUsers` still describe the whole list so the caller can say what
+ * it is not showing.
  */
 export function computeBlacklistStats(
   blacklistedDomains: string[],
-  emailDomainCounts: readonly EmailDomainCount[]
+  emailDomainCounts: readonly EmailDomainCount[],
+  limit?: number
 ): BlacklistStats {
   const lookup = new Set(blacklistedDomains.map(domain => domain.toLowerCase()));
   const counts = new Map<string, number>();
@@ -169,7 +179,7 @@ export function computeBlacklistStats(
   domainCounts.sort((a, b) => b.blockedCount - a.blockedCount);
 
   return {
-    domains: domainCounts,
+    domains: limit === undefined ? domainCounts : domainCounts.slice(0, limit),
     totalDomains: blacklistedDomains.length,
     totalBlockedUsers: domainCounts.reduce((sum, d) => sum + d.blockedCount, 0),
   };

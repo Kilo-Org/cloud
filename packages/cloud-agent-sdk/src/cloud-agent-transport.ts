@@ -9,7 +9,11 @@ import { createConnection, type Connection } from './cloud-agent-connection';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import { normalize, isChatEvent } from './normalizer';
 import type { ServiceEvent } from './normalizer';
-import { partSettledAt } from './part-utils';
+import {
+  replaySnapshotPage,
+  sessionSnapshotFailureMessage,
+  snapshotPageFromSnapshot,
+} from './snapshot-page';
 import type {
   CloudAgentSessionId,
   KiloSessionId,
@@ -86,14 +90,6 @@ type SnapshotRead =
 function snapshotReadFailureMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return 'Session history temporarily unavailable';
-}
-
-function typedSnapshotFailureMessage(outcome: {
-  kind: 'retryable_failure' | 'invalid_data' | 'too_large';
-}): string {
-  if (outcome.kind === 'retryable_failure') return 'Session history temporarily unavailable';
-  if (outcome.kind === 'too_large') return 'Session history too large to load';
-  return 'Session history is unavailable';
 }
 
 function createCloudAgentTransport(config: CloudAgentTransportConfig): TransportFactory {
@@ -173,34 +169,6 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       connection = null;
     }
 
-    function replayPage(page: SessionSnapshotPage): void {
-      sink.onServiceEvent({ type: 'session.created', info: page.info });
-
-      for (const msg of page.messages) {
-        sink.onChatEvent({ type: 'message.updated', info: msg.info });
-
-        for (const part of msg.parts) {
-          const settledAt = partSettledAt(part);
-          sink.onChatEvent({
-            type: 'message.part.updated',
-            part,
-            ...(settledAt === undefined ? {} : { time: settledAt }),
-          });
-        }
-      }
-    }
-
-    function snapshotToPage(snapshot: SessionSnapshot): SessionSnapshotPage {
-      // The legacy full-snapshot path is retained for callers that haven't
-      // migrated to the paginated endpoint yet. Same shape; same effect.
-      return {
-        info: snapshot.info,
-        messages: snapshot.messages,
-        nextCursor: null,
-        omittedItemCount: 0,
-      };
-    }
-
     function replayInitialPage(page: SessionSnapshotPage): void {
       // Seed lastEventId from the page's event-log watermark. A present
       // watermark sets the cursor to 0 so the WebSocket connect uses
@@ -215,7 +183,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         initialPageRecorded = true;
         config.onInitialPageLoaded?.(page);
       }
-      replayPage(page);
+      replaySnapshotPage(sink, page);
     }
 
     /**
@@ -238,7 +206,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       try {
         return {
           kind: 'page',
-          page: snapshotToPage(await config.fetchSnapshot(config.kiloSessionId)),
+          page: snapshotPageFromSnapshot(await config.fetchSnapshot(config.kiloSessionId)),
         };
       } catch (error) {
         return { kind: 'rejected', error };
@@ -273,7 +241,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       reportSnapshotFailure(
         read.kind === 'rejected'
           ? snapshotReadFailureMessage(read.error)
-          : typedSnapshotFailureMessage(read.outcome),
+          : sessionSnapshotFailureMessage(read.outcome.kind),
         expectedGeneration
       );
       return false;
@@ -325,7 +293,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       // A terminal typed history failure is reported here, once per open, and
       // still connects: the websocket remains useful for live events.
       if (read.kind === 'typed' && read.outcome.kind !== 'retryable_failure') {
-        reportSnapshotFailure(typedSnapshotFailureMessage(read.outcome), expectedGeneration);
+        reportSnapshotFailure(sessionSnapshotFailureMessage(read.outcome.kind), expectedGeneration);
       }
       if (!applySnapshotRead(read, replayInitialPage, expectedGeneration)) {
         scheduleSnapshotRetry(replayInitialPage, expectedGeneration, 0);

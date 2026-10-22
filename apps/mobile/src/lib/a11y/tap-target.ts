@@ -18,6 +18,23 @@ export const MIN_TAP_TARGET_DP = 28;
 export const TOUCH_TARGET_DP = 44;
 
 /**
+ * Android's minimum touch-target size (`<Button>` 48dp rule, the size the
+ * control-size audit reports from the node's own view rect). `hitSlop` widens
+ * the touch region but not the rect, so an icon-only control meets this only
+ * with a real 48dp box.
+ */
+export const ICON_TARGET_DP = 48;
+
+/**
+ * The box an interactive icon-only control renders: its own node carries the
+ * whole {@link ICON_TARGET_DP} target. Explicit px, because NativeWind's rem
+ * is 14pt here — `h-11` measures 38.5pt on device, under Android's 48dp
+ * minimum. Icon glyphs inside stay at their designed size; the box only
+ * centres them on the larger target.
+ */
+export const ICON_TARGET_BOX_CLASS = 'h-[48px] w-[48px] items-center justify-center';
+
+/**
  * The box every icon-only control renders. Its own node carries the target, as
  * a control-size audit measures, and 32pt clears the audit's
  * {@link MIN_TAP_TARGET_DP} floor while fitting the agents header row's

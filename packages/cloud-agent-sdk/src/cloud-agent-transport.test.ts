@@ -2,7 +2,7 @@
  * Tests for CloudAgentTransport — verifies event normalization, routing to
  * chat/service sinks, and lifecycle generation tracking.
  */
-import type { CloudAgentEvent } from './event-types';
+import type { CloudAgentEvent } from './schemas';
 import { createEventHelpers } from './__fixtures__/helpers';
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { SessionStatus } from './schemas';

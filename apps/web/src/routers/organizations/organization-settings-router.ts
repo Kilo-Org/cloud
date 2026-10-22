@@ -5,7 +5,7 @@ import {
   updateOrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationBillingMutationProcedure,
@@ -270,10 +270,6 @@ const ConfigureOrganizationDefaultBehaviorInputSchema = OrganizationIdInputSchem
 
 const UpdateDataCollectionInputSchema = OrganizationIdInputSchema.extend({
   dataCollection: z.enum(['allow', 'deny']).nullable(),
-});
-
-const UpdateCodeIndexingEnabledInputSchema = OrganizationIdInputSchema.extend({
-  code_indexing_enabled: z.boolean(),
 });
 
 const UpdateProjectsUIEnabledInputSchema = OrganizationIdInputSchema.extend({
@@ -765,44 +761,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
           message: `Projects UI: ${projects_ui_enabled ? 'enabled' : 'disabled'}`,
-          organization_id: organizationId,
-        });
-      }
-
-      return {
-        settings: updatedSettings,
-      };
-    }),
-
-  updateCodeIndexingFeatureFlag: adminProcedure
-    .input(UpdateCodeIndexingEnabledInputSchema)
-    .output(SettingsResponseSchema)
-    .mutation(async ({ input, ctx }) => {
-      const { organizationId, code_indexing_enabled } = input;
-
-      const existingOrg = await getOrganizationById(organizationId);
-      if (!existingOrg) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Organization not found',
-        });
-      }
-
-      // Merge with existing settings
-      const currentSettings = existingOrg.settings || {};
-      const updatedSettings = await updateOrganizationSettings(organizationId, {
-        ...currentSettings,
-        code_indexing_enabled,
-      });
-
-      // Create audit log if the value changed
-      if (currentSettings.code_indexing_enabled !== code_indexing_enabled) {
-        await createAuditLog({
-          action: 'organization.settings.change',
-          actor_email: ctx.user.google_user_email,
-          actor_id: ctx.user.id,
-          actor_name: ctx.user.google_user_name,
-          message: `[Admin] Code indexing: ${code_indexing_enabled ? 'enabled' : 'disabled'}`,
           organization_id: organizationId,
         });
       }

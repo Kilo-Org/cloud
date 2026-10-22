@@ -26,7 +26,7 @@ import { logger } from '../../src/logger.js';
 import type { AgentSandboxProvider, Env } from '../../src/types.js';
 import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/provider.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlanePromptPayload,

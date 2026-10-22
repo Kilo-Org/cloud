@@ -31,7 +31,11 @@ import {
   resizable,
   shapes,
 } from '@expo/ui/swift-ui/modifiers';
-import { createLiveActivity, type LiveActivityComponent } from 'expo-widgets';
+import {
+  createLiveActivity,
+  type LiveActivityComponent,
+  type LiveActivityFactory,
+} from 'expo-widgets';
 
 import { type SessionLiveActivityContentState } from '@kilocode/notifications';
 
@@ -1078,13 +1082,14 @@ export type SessionLiveActivityProps = ContentState;
  */
 export const sessionLiveActivityLayout = layout;
 
-export const SessionLiveActivity = registerLayout();
+let activityFactory: LiveActivityFactory<ContentState> | null = null;
 
-/**
- * Re-bake the stored layout in the active language. The name identifies the
- * native type, so the fresh factory is discarded and `SessionLiveActivity`
- * stays the handle (see `refreshActiveAgentsLiveActivityCopy`).
- */
+export function getSessionLiveActivity(): LiveActivityFactory<ContentState> {
+  activityFactory ??= registerLayout();
+  return activityFactory;
+}
+
+/** Re-bake the stored layout in the active language. */
 export function refreshSessionLiveActivityCopy(): void {
-  registerLayout();
+  activityFactory = registerLayout();
 }

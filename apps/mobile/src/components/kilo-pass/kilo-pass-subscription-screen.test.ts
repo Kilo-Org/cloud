@@ -119,6 +119,13 @@ describe('KiloPassSubscriptionScreen', () => {
     const renderer = await renderScreen();
     expect(allText(renderer)).toContain('This Kilo Pass is managed on web');
     expect(allText(renderer)).toContain('Manage');
+    const button = renderer.root.find(node => String(node.type) === 'Button');
+    // The label must be a Text element, not a bare string: Pressable is a
+    // View, and a View draws no text, so a bare string leaves a blank button.
+    const label = button.find(node => String(node.type) === 'Text');
+    expect(label.children).toEqual(['Manage']);
+    // The lone centered CTA carries the 48dp Android target.
+    expect((button.props.className as string).split(' ')).toContain('min-h-[48px]');
     renderer.unmount();
   });
 });

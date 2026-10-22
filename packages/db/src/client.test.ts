@@ -56,14 +56,14 @@ describe('getWorkerDb', () => {
   });
 
   it('lets a caller replace the int8 parsers for its own pool', () => {
-    const types = { getTypeParser: jest.fn() };
+    const customTypes = { getTypeParser: jest.fn() };
 
-    getWorkerDb(workerConnectionString, { types });
+    getWorkerDb(workerConnectionString, { types: customTypes });
 
     expect(pg.Pool).toHaveBeenLastCalledWith({
       connectionString: workerConnectionString,
       max: 1,
-      types,
+      types: customTypes,
     });
   });
 });
@@ -78,14 +78,14 @@ describe('createDrizzleClient', () => {
   });
 
   it('lets a caller replace the int8 parsers for its own pool', () => {
-    const types = { getTypeParser: jest.fn() };
+    const customTypes = { getTypeParser: jest.fn() };
 
     createDrizzleClient({
       connectionString: 'postgres://primary.example/db',
-      poolConfig: { types },
+      poolConfig: { types: customTypes },
     });
 
-    expect(pg.Pool).toHaveBeenLastCalledWith(expect.objectContaining({ types }));
+    expect(pg.Pool).toHaveBeenLastCalledWith(expect.objectContaining({ types: customTypes }));
   });
 });
 

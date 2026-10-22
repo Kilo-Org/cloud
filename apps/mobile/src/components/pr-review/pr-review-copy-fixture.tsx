@@ -2,7 +2,7 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createTRPCClient, httpLink } from '@trpc/client';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,7 +13,6 @@ import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-na
 import { PrMergeSheet, providerPrNounKey } from '@/components/pr-review/merge/pr-merge-sheet';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
 import { ScreenHeader } from '@/components/screen-header';
-import { applyLanguagePreference } from '@/i18n/apply-language';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import {
   pendingReviewDraftKey,
@@ -24,6 +23,7 @@ import { TRPCProvider } from '@/lib/trpc';
 
 // In a development build, open dev/pr-review-copy-fixture/{checks,navigator,files,merge}
 // through the app's native link scheme.
+// Uses the app's selected language without changing its preference.
 // Real review consumers read owned fake DTOs across an asynchronous tRPC boundary.
 // Reads never invoke global fetch. The mutation cache rejects before any mutation
 // function runs, including production hooks that use the singleton tRPC client.
@@ -155,9 +155,6 @@ export function PrReviewCopyFixture() {
       })
   );
   const [client] = useState(createFixtureClient);
-  useEffect(() => {
-    void applyLanguagePreference('el', 'el');
-  }, []);
   const header = (
     <ScreenHeader title={t('prReview.fileNavigator.title')} eyebrow="sample/review-copy#1" />
   );

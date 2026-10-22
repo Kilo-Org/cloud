@@ -7,11 +7,8 @@
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
-import {
-  knownSessionStatus,
-  PREPARATION_OUTPUT_TAIL_MAX_BYTES,
-  sessionCommitDataSchema,
-} from './schemas';
+import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
+import { knownSessionStatus, sessionCommitDataSchema } from './schemas';
 import type {
   SessionInfo,
   SessionActivity,

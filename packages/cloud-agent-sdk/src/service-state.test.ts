@@ -1,11 +1,8 @@
 import { createServiceState } from './service-state';
 import type { ServiceStateConfig } from './service-state';
 import type { Session, QuestionInfo } from '@kilocode/app-shared/opencode';
-import {
-  autocommitCompletedDataSchema,
-  preparingDataSchema,
-  PREPARATION_OUTPUT_TAIL_MAX_BYTES,
-} from './schemas';
+import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
+import { autocommitCompletedDataSchema, preparingDataSchema } from './schemas';
 import type { SessionCommit, SessionGoal } from './types';
 
 function makeConfig(overrides?: Partial<ServiceStateConfig>): ServiceStateConfig {

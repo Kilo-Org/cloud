@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
+import { PREPARATION_OUTPUT_MAX_LENGTH, PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
 import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 
@@ -374,14 +375,6 @@ export const REMOTE_COMMAND_MAX_STRING_LENGTH = 2_000;
 export const REMOTE_COMMAND_MAX_HINTS = 32;
 export const REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
 
-/** Longest single preparation output delta the client accepts, in characters. */
-export const PREPARATION_OUTPUT_MAX_LENGTH = 65_536;
-/**
- * Most recent step-output bytes the client retains per step. Mirrors the
- * server-side tail in `services/cloud-agent-next/src/session/preparation-history.ts`,
- * which keeps the last 65,536 UTF-8 bytes of a running setup command.
- */
-export const PREPARATION_OUTPUT_TAIL_MAX_BYTES = 65_536;
 /** Most message IDs a `session.queue.changed` snapshot may carry. */
 export const SESSION_QUEUE_MAX_IDS = 1_000;
 /** Most questions a `question.asked` event may carry. */

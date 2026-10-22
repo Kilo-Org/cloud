@@ -2,10 +2,14 @@ import { act, createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
-import { getTabBarIconForwardHeight, getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
+import {
+  getEffectiveTabBarHeight,
+  getTabBarIconForwardHeight,
+  getTabBarOverlayHeight,
+} from '@/lib/tab-bar-layout';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import { TabScreenScrollView, useTabBarBottomPadding } from './tab-screen';
+import { SheetScrollView, TabScreenScrollView, useTabBarBottomPadding } from './tab-screen';
 
 /** Mirrors `TAB_SCREEN_BOTTOM_GAP` in `tab-screen.tsx`. */
 const TAB_SCREEN_BOTTOM_GAP = 16;
@@ -137,6 +141,64 @@ describe('TabScreenScrollView', () => {
     expect(childTypes).toEqual(['Content', 'View']);
     const [spacer] = findByType('View');
     expect(spacer?.props.style).toEqual({ height: 16 });
+    unmount();
+  });
+});
+
+describe('SheetScrollView', () => {
+  it('ends a sheet body at the tab bar top so no control is parked under the bar', async () => {
+    // A route sheet opened from a tab reaches the window bottom, and the bar is
+    // drawn over it: the daily-limit sheet's Save button sat inside the bar's
+    // band and a tap on it selected a tab. The viewport has to stop at the bar's
+    // top edge, so the sheet's last control can never be drawn or tapped there.
+    layout.platform = 'android';
+    layout.bottom = 16;
+    layout.fontScale = 1.5;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        SheetScrollView,
+        { style: { backgroundColor: '#000' } },
+        createElement('Content')
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+
+    expect(scroll?.props.style).toEqual([
+      { backgroundColor: '#000' },
+      {
+        marginBottom: getEffectiveTabBarHeight({
+          bottomInset: 16,
+          platform: 'android',
+          fontScale: 1.5,
+        }),
+      },
+    ]);
+    // The 16pt breathing room rides on a trailing spacer, as on a tab screen.
+    const childTypes = scroll?.children.map(child =>
+      typeof child === 'string' ? child : child.type
+    );
+    expect(childTypes).toEqual(['Content', 'View']);
+    unmount();
+  });
+
+  it('drops the band while the IME is up, so the sheet keeps its own native inset', async () => {
+    // `tabBarHideOnKeyboard` hides the bar with the keyboard, so reserving its
+    // band again would leave a dead strip above the IME in a half-detent sheet.
+    layout.platform = 'android';
+    layout.bottom = 16;
+    layout.fontScale = 1;
+    keyboard.occlusion = 300;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        SheetScrollView,
+        { automaticallyAdjustKeyboardInsets: true },
+        createElement('Content')
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+
+    expect(scroll?.props.style).toEqual([undefined, { marginBottom: 0 }]);
+    expect(scroll?.props.automaticallyAdjustKeyboardInsets).toBe(true);
     unmount();
   });
 });

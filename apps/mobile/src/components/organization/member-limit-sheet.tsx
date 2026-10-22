@@ -2,13 +2,14 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { limitError, parseLimit } from '@/components/organization/member-limit-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
+import { SheetScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
@@ -128,14 +129,17 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
 
   if (isResolving || orgWithMembers.isLoading) {
     return (
-      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
+      <SheetScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+      >
         <View className="gap-1">
           <Text className="text-center text-lg font-semibold text-foreground">
             {t('organization.memberLimit.title')}
           </Text>
         </View>
         <Skeleton className="h-11 rounded-lg" />
-      </ScrollView>
+      </SheetScrollView>
     );
   }
 
@@ -174,7 +178,7 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   }
 
   return (
-    <ScrollView
+    <SheetScrollView
       className="flex-1 bg-background"
       contentContainerClassName="px-6 gap-6 pb-8 pt-4"
       automaticallyAdjustKeyboardInsets
@@ -190,6 +194,6 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
       </View>
 
       <MemberLimitForm memberId={memberId} organizationId={organizationId} member={member} />
-    </ScrollView>
+    </SheetScrollView>
   );
 }

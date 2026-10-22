@@ -34,6 +34,37 @@ export function useTabBarBottomPadding() {
   return useTabBarHeight() + TAB_SCREEN_BOTTOM_GAP;
 }
 
+/**
+ * The scroll body of a route formSheet that is presented while the tabs
+ * navigator is behind it (the organization sheets open from the Profile tab).
+ *
+ * A sheet surface reaches the window bottom, and the tab bar is an absolute
+ * overlay of the tabs layout drawn after the tab content, so it paints over the
+ * sheet's last rows and hit-tests before them: the daily-limit sheet's Save
+ * button sat inside the bar's band in both orientations, and a tap on it
+ * selected the Agents tab instead of saving (explorer finding, organization
+ * member limit). Same rule as `TabScreenScrollView`: the viewport ends at the
+ * bar's top edge, so a sheet control is never parked under it, and the 16pt
+ * trailing spacer is the last control's breathing room without stealing a row
+ * of the viewport.
+ *
+ * While the keyboard is up the bar is hidden (`tabBarHideOnKeyboard`), so the
+ * band is dropped rather than stacked: the sheet's own native IME inset
+ * (`automaticallyAdjustKeyboardInsets`) owns the bottom then, exactly as the
+ * tab screens replace the band with the IME's occlusion.
+ */
+export function SheetScrollView({ children, style, ...props }: ScrollViewProps) {
+  const tabBarHeight = useTabBarHeight();
+  const keyboardOcclusion = useKeyboardState(state => state.height);
+  const frameMargin = keyboardOcclusion > 0 ? 0 : tabBarHeight;
+  return (
+    <ScrollView {...props} style={[style, { marginBottom: frameMargin }]}>
+      {children}
+      <View style={{ height: TAB_SCREEN_BOTTOM_GAP }} pointerEvents="none" />
+    </ScrollView>
+  );
+}
+
 export function TabScreenScrollView({
   children,
   style,

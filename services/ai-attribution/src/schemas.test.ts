@@ -28,6 +28,7 @@ jest.mock('./util/admin-auth', () => ({
 
 import type { HonoContext } from './ai-attribution.worker';
 import {
+  AdminAttributionsQueryParams,
   AttributionsTrackRequestBody,
   MAX_TRACK_BODY_BYTES,
   MAX_TRACK_LINE_ENTRIES,
@@ -49,7 +50,8 @@ const validPayload = () => ({
   lines_removed: [],
 });
 
-const limit = jest.fn(async () => ({ success: true }));
+const orgLimit = jest.fn(async () => ({ success: true }));
+const userLimit = jest.fn(async () => ({ success: true }));
 
 describe('AttributionsTrackRequestBody', () => {
   it('accepts a valid small payload', () => {
@@ -150,40 +152,57 @@ describe('AttributionsTrackRequestBody', () => {
     expect(() => AttributionsTrackRequestBody.parse({ ...validPayload(), branch: '' })).toThrow();
   });
 
-  it('rejects an absolute file_path or project_id', () => {
-    expect(() =>
-      AttributionsTrackRequestBody.parse({ ...validPayload(), file_path: '/etc/passwd' })
-    ).toThrow();
-    expect(() =>
-      AttributionsTrackRequestBody.parse({ ...validPayload(), project_id: '/abs/project' })
-    ).toThrow();
+  it('normalizes a path to one canonical form', () => {
+    const parsePath = (file_path: string) =>
+      AttributionsTrackRequestBody.parse({ ...validPayload(), file_path }).file_path;
+
+    expect(parsePath('./src/index.ts')).toBe('src/index.ts');
+    expect(parsePath('src//lib/./index.ts')).toBe('src/lib/index.ts');
+    expect(parsePath('src\\lib\\index.ts')).toBe('src/lib/index.ts');
+    expect(parsePath('src/lib/../index.ts')).toBe('src/index.ts');
+    expect(parsePath('../../outside/file.ts')).toBe('outside/file.ts');
   });
 
-  it('rejects a traversal file_path or project_id', () => {
-    expect(() =>
-      AttributionsTrackRequestBody.parse({ ...validPayload(), file_path: '../outside/file.ts' })
-    ).toThrow();
-    expect(() =>
-      AttributionsTrackRequestBody.parse({ ...validPayload(), file_path: 'src/../../file.ts' })
-    ).toThrow();
-    expect(() =>
-      AttributionsTrackRequestBody.parse({ ...validPayload(), project_id: '../project' })
-    ).toThrow();
+  it('gives one file one canonical identity', () => {
+    const parse = (file_path: string) =>
+      AttributionsTrackRequestBody.parse({ ...validPayload(), file_path }).file_path;
+
+    expect(parse('/home/dev/project/src/index.ts')).toBe(
+      parse('src/../../../home/dev/project/src/index.ts')
+    );
   });
 
-  it('rejects empty path segments', () => {
+  it('rejects an empty path and control characters', () => {
     expect(() =>
-      AttributionsTrackRequestBody.parse({ ...validPayload(), file_path: 'src//file.ts' })
+      AttributionsTrackRequestBody.parse({ ...validPayload(), file_path: '' })
     ).toThrow();
-  });
-
-  it('rejects backslashes and control characters in paths', () => {
     expect(() =>
-      AttributionsTrackRequestBody.parse({ ...validPayload(), file_path: 'src\\file.ts' })
+      AttributionsTrackRequestBody.parse({ ...validPayload(), file_path: './' })
     ).toThrow();
     expect(() =>
       AttributionsTrackRequestBody.parse({ ...validPayload(), project_id: 'pro\u0000ject' })
     ).toThrow();
+  });
+
+  it('bounds the accepted path length', () => {
+    const segments = Array.from({ length: 5000 }, () => '.').join('/');
+
+    expect(() =>
+      AttributionsTrackRequestBody.parse({ ...validPayload(), file_path: segments })
+    ).toThrow();
+  });
+
+  it('fits a whole-file rewrite at the entry cap inside the body budget', () => {
+    // One array at the cap is what a whole-file write sends; the byte budget
+    // stays the tighter bound for a request that fills both arrays.
+    const lines = Array.from({ length: MAX_TRACK_LINE_ENTRIES }, (_, i) => ({
+      line_number: i,
+      line_hash: 'a'.repeat(40),
+    }));
+    const body = JSON.stringify({ ...validPayload(), lines_added: lines, lines_removed: [] });
+
+    expect(Buffer.byteLength(body)).toBeLessThan(MAX_TRACK_BODY_BYTES);
+    expect(() => AttributionsTrackRequestBody.parse(JSON.parse(body))).not.toThrow();
   });
 
   it('rejects a long task_id', () => {
@@ -193,11 +212,39 @@ describe('AttributionsTrackRequestBody', () => {
   });
 });
 
+describe('AdminAttributionsQueryParams', () => {
+  it('uses the same path schema as tracking', () => {
+    const tracked = AttributionsTrackRequestBody.parse({
+      ...validPayload(),
+      file_path: './src/lib/../index.ts',
+    });
+    const queried = AdminAttributionsQueryParams.parse({
+      organization_id: 'org-123',
+      project_id: 'my-project',
+      file_path: 'src/index.ts',
+    });
+
+    expect(queried.file_path).toBe(tracked.file_path);
+    expect(queried.project_id).toBe(tracked.project_id);
+  });
+
+  it('rejects an empty path', () => {
+    expect(() =>
+      AdminAttributionsQueryParams.parse({
+        organization_id: 'org-123',
+        project_id: 'my-project',
+        file_path: './',
+      })
+    ).toThrow();
+  });
+});
+
 describe('attribution tracking request validation', () => {
   const env = () =>
     ({
       ENVIRONMENT: 'development',
-      ATTRIBUTION_TRACK_RATE_LIMITER: { limit },
+      ATTRIBUTION_TRACK_ORG_RATE_LIMITER: { limit: orgLimit },
+      ATTRIBUTION_TRACK_USER_RATE_LIMITER: { limit: userLimit },
       NEXTAUTH_SECRET: { get: async () => 'secret' },
     }) as unknown as HonoContext['Bindings'];
 
@@ -208,7 +255,8 @@ describe('attribution tracking request validation', () => {
   };
 
   beforeEach(() => {
-    limit.mockClear().mockResolvedValue({ success: true });
+    orgLimit.mockClear().mockResolvedValue({ success: true });
+    userLimit.mockClear().mockResolvedValue({ success: true });
     trackAttribution.mockClear().mockReturnValue({ id: 1 });
   });
 
@@ -274,8 +322,8 @@ describe('attribution tracking request validation', () => {
     expect(trackAttribution).not.toHaveBeenCalled();
   });
 
-  it('returns 429 when the rate limit is at capacity for the org and user', async () => {
-    limit.mockResolvedValueOnce({ success: false });
+  it('returns 429 when the user counter is at capacity', async () => {
+    userLimit.mockResolvedValueOnce({ success: false });
 
     const response = await trackRequest({
       method: 'POST',
@@ -285,7 +333,42 @@ describe('attribution tracking request validation', () => {
 
     expect(response.status).toBe(429);
     expect(trackAttribution).not.toHaveBeenCalled();
-    expect(limit).toHaveBeenCalledWith({ key: `${ORGANIZATION_ID}:${USER_ID}` });
+  });
+
+  it('counts each request on the organization and user limiters', async () => {
+    await trackRequest({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(validPayload()),
+    });
+
+    expect(orgLimit).toHaveBeenCalledWith({ key: ORGANIZATION_ID });
+    expect(userLimit).toHaveBeenCalledWith({ key: USER_ID });
+  });
+
+  it('returns 429 from the organization limiter alone', async () => {
+    orgLimit.mockResolvedValueOnce({ success: false });
+
+    const response = await trackRequest({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(validPayload()),
+    });
+
+    expect(response.status).toBe(429);
+    expect(trackAttribution).not.toHaveBeenCalled();
+  });
+
+  it('counts the request on both limiters when one rejects', async () => {
+    orgLimit.mockResolvedValueOnce({ success: false });
+
+    await trackRequest({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(validPayload()),
+    });
+
+    expect(userLimit).toHaveBeenCalledTimes(1);
   });
 
   it('forwards a valid payload to the Durable Object', async () => {

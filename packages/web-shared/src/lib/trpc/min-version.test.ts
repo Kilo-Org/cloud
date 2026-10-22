@@ -130,13 +130,42 @@ describe('getMinimumVersions', () => {
     await expect(getMinimumVersions()).resolves.toEqual(row);
   });
 
-  test('caches the read for the TTL, including a "no row" result', async () => {
+  test('caches a "no row" read for the shorter no-row window', async () => {
     limitMock.mockResolvedValue([]);
+    const start = Date.now();
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(start);
+    try {
+      await expect(getMinimumVersions()).resolves.toBeNull();
 
-    await expect(getMinimumVersions()).resolves.toBeNull();
-    await expect(getMinimumVersions()).resolves.toBeNull();
+      nowSpy.mockReturnValue(start + 30_000 - 1);
+      await expect(getMinimumVersions()).resolves.toBeNull();
+      expect(limitMock).toHaveBeenCalledTimes(1);
 
-    expect(limitMock).toHaveBeenCalledTimes(1);
+      nowSpy.mockReturnValue(start + 30_000 + 1);
+      await expect(getMinimumVersions()).resolves.toBeNull();
+      expect(limitMock).toHaveBeenCalledTimes(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  test('bounds a read that never settles', async () => {
+    jest.useFakeTimers();
+    try {
+      limitMock.mockReturnValue(new Promise(() => {}));
+
+      const pending = getMinimumVersions().catch((caught: unknown) => caught);
+      await jest.advanceTimersByTimeAsync(60_000);
+
+      const error = await pending;
+      if (!error || typeof error !== 'object' || !('code' in error)) {
+        throw new Error('expected getMinimumVersions to reject with a TRPCError');
+      }
+      expect(error.code).toBe('SERVICE_UNAVAILABLE');
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test('shares one read between concurrent cold callers', async () => {

@@ -212,6 +212,10 @@ const auditContextMiddleware = t.middleware(({ path, type, next }) =>
 // `getMinimumVersions` rejects with a retryable SERVICE_UNAVAILABLE when the
 // read failed and nothing is cached, and that rejection passes through here
 // unchanged, so only a version verdict becomes a FORBIDDEN app update here.
+// Runs before `sentryMiddleware`: both outcomes are expected gate verdicts, and
+// the read failure is already reported once per backoff window, so the tRPC
+// Sentry middleware must not capture one event per request during an outage
+// (its capture reaches `beforeSend`, which only drops tRPC 4xx errors).
 const minimumVersionMiddleware = t.middleware(async ({ ctx, next }) => {
   if (!isMobileClient(ctx.headersList)) return next();
   const minimums = await getMinimumVersions();
@@ -242,9 +246,9 @@ export const baseProcedure = t.procedure
   .use(cloudAgentAuthorityMiddleware)
   .use(timingMiddleware)
   .use(controlPlaneBudgetMiddleware)
+  .use(minimumVersionMiddleware)
   .use(sentryMiddleware)
-  .use(auditContextMiddleware)
-  .use(minimumVersionMiddleware);
+  .use(auditContextMiddleware);
 
 // Admin-only procedure. The creditManager/superadmin/sessionViewer procedures in
 // lib/trpc/admin-procedures chain on this, so emitting here covers the whole

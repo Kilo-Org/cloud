@@ -17,7 +17,7 @@ type MutationOptions = {
 };
 
 let captured: MutationOptions | null = null;
-const fetchQuery = vi.fn();
+const queryMock = vi.fn();
 const invalidateQueries = vi.fn();
 const toastError = vi.fn();
 
@@ -33,7 +33,7 @@ vi.mock('@tanstack/react-query', () => ({
     captured = options;
     return { mutate: vi.fn(), mutateAsync: vi.fn() };
   },
-  useQueryClient: () => ({ fetchQuery, invalidateQueries }),
+  useQueryClient: () => ({ query: queryMock, invalidateQueries }),
 }));
 
 vi.mock('sonner-native', () => ({
@@ -75,7 +75,7 @@ function capturedMutationFn(): (input: CheckProviderConnectionInput) => Promise<
 
 beforeEach(() => {
   captured = null;
-  fetchQuery.mockReset();
+  queryMock.mockReset();
   invalidateQueries.mockReset();
   toastError.mockReset();
   useCheckProviderConnection();
@@ -87,14 +87,14 @@ afterEach(() => {
 
 describe('useCheckProviderConnection', () => {
   it('reports a Bitbucket personal scope as not connected without a query', async () => {
-    fetchQuery.mockResolvedValue({ connected: true });
+    queryMock.mockResolvedValue({ connected: true });
 
     await expect(
       capturedMutationFn()({ platform: 'bitbucket', organizationId: null })
     ).resolves.toEqual({
       connected: false,
     });
-    expect(fetchQuery).not.toHaveBeenCalled();
+    expect(queryMock).not.toHaveBeenCalled();
     expect(invalidateQueries).not.toHaveBeenCalled();
   });
 
@@ -104,16 +104,16 @@ describe('useCheckProviderConnection', () => {
     ).resolves.toEqual({
       connected: false,
     });
-    expect(fetchQuery).not.toHaveBeenCalled();
+    expect(queryMock).not.toHaveBeenCalled();
   });
 
   it('checks the Bitbucket readiness of the selected organization', async () => {
-    fetchQuery.mockResolvedValueOnce({ connected: true });
+    queryMock.mockResolvedValueOnce({ connected: true });
 
     await expect(
       capturedMutationFn()({ platform: 'bitbucket', organizationId: 'org-7' })
     ).resolves.toEqual({ connected: true });
-    expect(fetchQuery).toHaveBeenCalledWith(
+    expect(queryMock).toHaveBeenCalledWith(
       expect.objectContaining({
         queryKey: ['bitbucket-readiness', 'org-7'],
         staleTime: 0,
@@ -123,7 +123,7 @@ describe('useCheckProviderConnection', () => {
   });
 
   it('keeps the Bitbucket invalidation off a disconnected readiness answer', async () => {
-    fetchQuery.mockResolvedValueOnce({ connected: false });
+    queryMock.mockResolvedValueOnce({ connected: false });
 
     await expect(
       capturedMutationFn()({ platform: 'bitbucket', organizationId: 'org-7' })
@@ -132,28 +132,28 @@ describe('useCheckProviderConnection', () => {
   });
 
   it('checks the personal GitLab status when no organization is selected', async () => {
-    fetchQuery.mockResolvedValueOnce({ connected: false });
+    queryMock.mockResolvedValueOnce({ connected: false });
 
     await expect(
       capturedMutationFn()({ platform: 'gitlab', organizationId: null })
     ).resolves.toEqual({
       connected: false,
     });
-    expect(fetchQuery).toHaveBeenCalledWith(
+    expect(queryMock).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: ['personal-gitlab'], staleTime: 0 })
     );
     expect(invalidateQueries).not.toHaveBeenCalled();
   });
 
   it('checks the organization GitLab status and invalidates the provider queries', async () => {
-    fetchQuery.mockResolvedValueOnce({ connected: true });
+    queryMock.mockResolvedValueOnce({ connected: true });
 
     await expect(
       capturedMutationFn()({ platform: 'gitlab', organizationId: 'org-9' })
     ).resolves.toEqual({
       connected: true,
     });
-    expect(fetchQuery).toHaveBeenCalledWith(
+    expect(queryMock).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: ['org-gitlab', 'org-9'], staleTime: 0 })
     );
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['providerReview'] });

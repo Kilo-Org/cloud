@@ -33,9 +33,9 @@ export function useCheckProviderConnection() {
   const fetchProviderStatus = (input: CheckProviderConnectionInput) => {
     // The two providers answer with different status shapes, so each arm
     // fetches its own options — a union of the two queryOptions types is
-    // not assignable to a single fetchQuery call.
+    // not assignable to a single query call.
     if (input.platform === 'gitlab') {
-      return queryClient.fetchQuery({
+      return queryClient.query({
         ...(input.organizationId
           ? trpc.organizations.reviewAgent.getGitLabStatus.queryOptions({
               organizationId: input.organizationId,
@@ -47,7 +47,7 @@ export function useCheckProviderConnection() {
     if (!input.organizationId) {
       return Promise.resolve({ connected: false });
     }
-    return queryClient.fetchQuery({
+    return queryClient.query({
       ...trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({
         organizationId: input.organizationId,
       }),

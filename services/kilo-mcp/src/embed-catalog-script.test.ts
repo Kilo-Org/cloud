@@ -4,10 +4,12 @@ import type { Catalog } from '../src/types';
 import {
   CfApiError,
   EMBED_BATCH_SIZE,
+  PRUNE_BATCH_SIZE,
   embedAndUpsert,
   ensureIndex,
   loadCatalog,
   parseCatalog,
+  pruneStaleVectors,
 } from '../scripts/embed-catalog.ts';
 
 const ENV = {
@@ -86,6 +88,13 @@ function fetchFake(routes: Array<(call: RecordedCall) => unknown | undefined>): 
     };
   };
   return { fetchImpl, calls };
+}
+
+/** Narrows a parsed delete_by_ids body so the test reads `ids` without a cast. */
+function hasIds(value: unknown): value is { ids: string[] } {
+  if (typeof value !== 'object' || value === null || !('ids' in value)) return false;
+  const { ids } = value;
+  return Array.isArray(ids) && ids.every(id => typeof id === 'string');
 }
 
 describe('ensureIndex', () => {
@@ -217,6 +226,92 @@ describe('embedAndUpsert', () => {
     await expect(embedAndUpsert({ ...ENV, catalog: catalogOf(2), fetchImpl })).rejects.toThrow(
       'returned 0 vectors for a batch of 2'
     );
+  });
+});
+
+describe('pruneStaleVectors', () => {
+  const deleteUrl = `https://api.cloudflare.com/client/v4/accounts/${ENV.CLOUDFLARE_ACCOUNT_ID}/vectorize/v2/indexes/${ENV.VECTORIZE_INDEX_NAME}/delete_by_ids`;
+
+  it('deletes the vectors whose procedure path the catalog no longer has', async () => {
+    const { fetchImpl, calls } = fetchFake([
+      call =>
+        call.url.includes('/list')
+          ? { vectors: [{ id: 'proc0.list' }, { id: 'removed.query' }], isTruncated: false }
+          : undefined,
+      call => (call.url.endsWith('/delete_by_ids') ? { mutationId: 'm1' } : undefined),
+    ]);
+    const outcome = await pruneStaleVectors({ ...ENV, catalog: catalogOf(1), fetchImpl });
+    expect(outcome).toEqual({ deleted: ['removed.query'] });
+    const deletes = calls.filter(call => call.url.endsWith('/delete_by_ids'));
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]!.url).toBe(deleteUrl);
+    expect(deletes[0]!.method).toBe('POST');
+    expect(JSON.parse(deletes[0]!.body!)).toEqual({ ids: ['removed.query'] });
+  });
+
+  it('follows the list cursor until the last page', async () => {
+    let pages = 0;
+    const { fetchImpl } = fetchFake([
+      call => {
+        if (!call.url.includes('/list')) return undefined;
+        pages += 1;
+        if (pages === 1) {
+          expect(call.url).not.toContain('cursor=');
+          return { vectors: [{ id: 'proc0.list' }], isTruncated: true, nextCursor: 'page2' };
+        }
+        expect(call.url).toContain('cursor=page2');
+        return { vectors: [{ id: 'removed.query' }], isTruncated: false };
+      },
+      call => (call.url.endsWith('/delete_by_ids') ? {} : undefined),
+    ]);
+    const outcome = await pruneStaleVectors({ ...ENV, catalog: catalogOf(1), fetchImpl });
+    expect(pages).toBe(2);
+    expect(outcome.deleted).toEqual(['removed.query']);
+  });
+
+  it('does not call delete when the index matches the catalog', async () => {
+    const { fetchImpl, calls } = fetchFake([
+      call =>
+        call.url.includes('/list')
+          ? { vectors: [{ id: 'proc0.list' }], isTruncated: false }
+          : undefined,
+      call => (call.url.endsWith('/delete_by_ids') ? {} : undefined),
+    ]);
+    const outcome = await pruneStaleVectors({ ...ENV, catalog: catalogOf(1), fetchImpl });
+    expect(outcome).toEqual({ deleted: [] });
+    expect(calls.filter(call => call.url.endsWith('/delete_by_ids'))).toHaveLength(0);
+  });
+
+  it('prunes nothing when the catalog is empty, so a bad artifact cannot empty the index', async () => {
+    const { fetchImpl, calls } = fetchFake([
+      call => (call.url.includes('/list') ? { vectors: [{ id: 'proc0.list' }] } : undefined),
+    ]);
+    const outcome = await pruneStaleVectors({ ...ENV, catalog: {}, fetchImpl });
+    expect(outcome).toEqual({ deleted: [] });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('batches deletes at PRUNE_BATCH_SIZE ids', async () => {
+    const staleIds = Array.from({ length: PRUNE_BATCH_SIZE + 2 }, (_, i) => `gone${i}.list`);
+    const { fetchImpl, calls } = fetchFake([
+      call =>
+        call.url.includes('/list')
+          ? {
+              vectors: [{ id: 'proc0.list' }, ...staleIds.map(id => ({ id }))],
+              isTruncated: false,
+            }
+          : undefined,
+      call => (call.url.endsWith('/delete_by_ids') ? {} : undefined),
+    ]);
+    const outcome = await pruneStaleVectors({ ...ENV, catalog: catalogOf(1), fetchImpl });
+    const deletes = calls.filter(call => call.url.endsWith('/delete_by_ids'));
+    expect(deletes).toHaveLength(2);
+    const firstBatch: unknown = JSON.parse(deletes[0]!.body!);
+    const lastBatch: unknown = JSON.parse(deletes[1]!.body!);
+    if (!hasIds(firstBatch) || !hasIds(lastBatch)) throw new Error('delete body has no ids array');
+    expect(firstBatch.ids).toHaveLength(PRUNE_BATCH_SIZE);
+    expect(lastBatch.ids).toEqual(staleIds.slice(-2));
+    expect(outcome.deleted).toEqual(staleIds);
   });
 });
 

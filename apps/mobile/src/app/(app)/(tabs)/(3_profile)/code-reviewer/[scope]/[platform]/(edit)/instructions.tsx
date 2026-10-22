@@ -52,6 +52,7 @@ function InstructionsEditor({
       </Text>
       <TextInput
         className="min-h-32 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
+        accessibilityLabel={t('codeReviewer.instructions.title')}
         multiline
         textAlignVertical="top"
         inputAccessoryViewID={INSTRUCTIONS_DONE_ACCESSORY_ID}

@@ -37,6 +37,7 @@ const textInputs = vi.hoisted(() => ({
     value?: string;
     defaultValue?: string;
     placeholder?: string;
+    accessibilityLabel?: string;
     onChangeText: (text: string) => void;
     multiline?: boolean;
   }[],
@@ -186,9 +187,12 @@ beforeEach(() => {
   invalidate = () => undefined;
 });
 
-afterEach(() => {
+afterEach(async () => {
   act(() => {
     TestRenderer.act(() => undefined);
+  });
+  await act(async () => {
+    await i18n.changeLanguage('en');
   });
 });
 
@@ -390,5 +394,24 @@ describe('InstructionsRoute editor', () => {
 
     expect(textInputs.inputs).toHaveLength(0);
     expect(findByHostType(renderer, 'Skeleton')).toHaveLength(2);
+  });
+
+  it('names the editor with the localized instructions title', () => {
+    config.data = { customInstructions: STORED };
+    mount();
+
+    expect(latestInput().accessibilityLabel).toBe(i18n.t('codeReviewer.instructions.title'));
+  });
+
+  it('reads the editor name from the active catalog', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('ar');
+    });
+    config.data = { customInstructions: STORED };
+    mount();
+
+    const input = latestInput();
+    expect(input.accessibilityLabel).toBe(i18n.t('codeReviewer.instructions.title'));
+    expect(input.accessibilityLabel).not.toBe('Custom instructions');
   });
 });

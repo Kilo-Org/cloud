@@ -26,10 +26,18 @@ function matchesRule(rule: PreferredProviderOrderRule, requestedModel: string): 
   );
 }
 
+/** Index of the first rule matching the model, or -1 when no rule matches. */
+export function findPreferredProviderOrderRuleIndex(
+  config: PreferredProviderOrderConfig,
+  requestedModel: string
+): number {
+  return config.rules.findIndex(rule => matchesRule(rule, requestedModel));
+}
+
 export function resolvePreferredProviderOrder(
   config: PreferredProviderOrderConfig,
   requestedModel: string
 ): string[] {
-  const rule = config.rules.find(rule => matchesRule(rule, requestedModel));
+  const rule = config.rules[findPreferredProviderOrderRuleIndex(config, requestedModel)];
   return rule ? [...rule.providers] : [];
 }

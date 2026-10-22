@@ -5,6 +5,7 @@ import {
 } from '@kilocode/db/schema-types';
 import {
   PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG,
+  findPreferredProviderOrderRuleIndex,
   resolvePreferredProviderOrder,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 
@@ -63,6 +64,14 @@ describe('resolvePreferredProviderOrder', () => {
   it('returns a copy that callers can mutate', () => {
     resolvePreferredProviderOrder(config, 'vendor/model-x').push('provider-z');
     expect(config.rules[0].providers).toEqual(['provider-a', 'provider-b']);
+  });
+
+  it.each([
+    ['vendor/model-x', 0],
+    ['vendor/model-x-lite', 1],
+    ['other/model-z-lite', -1],
+  ])('finds the first matching rule index for %s', (model, index) => {
+    expect(findPreferredProviderOrderRuleIndex(config, model)).toBe(index);
   });
 });
 

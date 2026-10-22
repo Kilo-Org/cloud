@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Editor from '@monaco-editor/react';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,7 +13,11 @@ import {
   PreferredProviderOrderConfigSchema,
   type PreferredProviderOrderConfig,
 } from '@kilocode/db/schema-types';
-import { resolvePreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
+import {
+  findPreferredProviderOrderRuleIndex,
+  resolvePreferredProviderOrder,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
+import { ProviderOrderRoutingDiagram } from '@/app/admin/gateway/ProviderOrderRoutingDiagram';
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
 
@@ -36,36 +41,6 @@ function parseConfig(json: string): { config: PreferredProviderOrderConfig } | {
   return { config: result.data };
 }
 
-function ModelPreview({ json }: { json: string }) {
-  const [model, setModel] = useState('');
-  const trimmed = model.trim();
-  const parsed = trimmed ? parseConfig(json) : null;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor="provider-order-preview" className="text-sm font-medium">
-        Preview a model ID
-      </label>
-      <Input
-        id="provider-order-preview"
-        value={model}
-        onChange={event => setModel(event.target.value)}
-        placeholder="anthropic/claude-sonnet-4.5"
-        className="max-w-md font-mono"
-      />
-      {parsed && (
-        <p className="text-muted-foreground text-sm" aria-live="polite">
-          {'error' in parsed ? (
-            'Fix the JSON to preview.'
-          ) : (
-            <PreviewResult providers={resolvePreferredProviderOrder(parsed.config, trimmed)} />
-          )}
-        </p>
-      )}
-    </div>
-  );
-}
-
 function PreviewResult({ providers }: { providers: string[] }) {
   if (providers.length === 0) {
     return <>No preferred provider order; the gateway leaves provider selection to upstream.</>;
@@ -74,6 +49,66 @@ function PreviewResult({ providers }: { providers: string[] }) {
     <>
       Preferred order: <code>{providers.join(' → ')}</code>
     </>
+  );
+}
+
+function RoutingCard({
+  json,
+  source,
+}: {
+  json: string;
+  source: 'stored' | 'built-in' | 'unsaved';
+}) {
+  const [model, setModel] = useState('');
+  const trimmed = model.trim();
+  const parsed = useMemo(() => parseConfig(json), [json]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle>Current routing</CardTitle>
+          <Badge variant={source === 'unsaved' ? 'beta' : 'secondary'}>
+            {source === 'stored' && 'Stored configuration'}
+            {source === 'built-in' && 'Built-in rules'}
+            {source === 'unsaved' && 'Unsaved changes'}
+          </Badge>
+        </div>
+        <CardDescription>
+          The first rule whose substrings match the requested model ID sets the provider order.
+          Enter a model ID to highlight the rule it matches.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <label htmlFor="provider-order-preview" className="text-sm font-medium">
+            Preview a model ID
+          </label>
+          <Input
+            id="provider-order-preview"
+            value={model}
+            onChange={event => setModel(event.target.value)}
+            placeholder="anthropic/claude-sonnet-4.5"
+            className="max-w-md font-mono"
+          />
+          {trimmed && 'config' in parsed && (
+            <p className="text-muted-foreground text-sm" aria-live="polite">
+              <PreviewResult providers={resolvePreferredProviderOrder(parsed.config, trimmed)} />
+            </p>
+          )}
+        </div>
+        {'error' in parsed ? (
+          <p className="text-muted-foreground text-sm">Fix the JSON to see the routing.</p>
+        ) : (
+          <ProviderOrderRoutingDiagram
+            config={parsed.config}
+            matchedRuleIndex={
+              trimmed ? findPreferredProviderOrderRuleIndex(parsed.config, trimmed) : null
+            }
+          />
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -139,7 +174,7 @@ export function PreferredProviderOrderContent() {
   const hasStoredConfig = Boolean(data?.config);
 
   return (
-    <div className="flex w-full flex-col gap-y-6">
+    <div className="grid w-full gap-6 xl:grid-cols-2 xl:items-start">
       <Card>
         <CardHeader>
           <CardTitle>Provider Order</CardTitle>
@@ -224,10 +259,13 @@ export function PreferredProviderOrderContent() {
               </Button>
             )}
           </div>
-
-          <ModelPreview json={json} />
         </CardContent>
       </Card>
+
+      <RoutingCard
+        json={json}
+        source={hasChanges ? 'unsaved' : hasStoredConfig ? 'stored' : 'built-in'}
+      />
     </div>
   );
 }

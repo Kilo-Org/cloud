@@ -185,12 +185,13 @@ describe('C15 deviceSessionId compatibility', () => {
       apiTokenPepper: 'pepper_abc',
       version: KILO_TOKEN_VERSION,
       env: 'development',
-      deviceSessionId: 'session-xyz-456',
+      deviceSessionId: '11111111-1111-4111-8111-111111111111',
     });
 
     const result = await validateKiloToken(token, TEST_SECRET, 'development');
     expect(result).toEqual({
       success: true,
+      deviceSessionId: '11111111-1111-4111-8111-111111111111',
       userId: 'user_123',
       token,
       pepper: 'pepper_abc',

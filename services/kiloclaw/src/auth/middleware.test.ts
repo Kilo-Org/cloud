@@ -5,9 +5,16 @@ import type { AppEnv } from '../types';
 import { authMiddleware, internalApiMiddleware } from './middleware';
 import { KILO_TOKEN_VERSION, KILOCLAW_AUTH_COOKIE } from '../config';
 import { KILOCLAW_AUDIENCE } from '@kilocode/worker-utils';
+import { findActiveDeviceSession } from '@kilocode/worker-utils/device-session-auth';
+import type * as DeviceSessionAuth from '@kilocode/worker-utils/device-session-auth';
 import { findPepperByUserId, getWorkerDb } from '../db';
 
 let downstreamExecutions = 0;
+
+vi.mock('@kilocode/worker-utils/device-session-auth', async importOriginal => ({
+  ...(await importOriginal<typeof DeviceSessionAuth>()),
+  findActiveDeviceSession: vi.fn(),
+}));
 
 vi.mock('../db', () => ({
   getWorkerDb: vi.fn(() => ({})),
@@ -399,6 +406,7 @@ describe('C15 deviceSessionId compatibility', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(findActiveDeviceSession).mockResolvedValue(true);
     downstreamExecutions = 0;
     app = createTestApp();
   });
@@ -408,7 +416,7 @@ describe('C15 deviceSessionId compatibility', () => {
       kiloUserId: 'user_123',
       apiTokenPepper: pepperFor('user_123'),
       version: KILO_TOKEN_VERSION,
-      deviceSessionId: 'session-abc-789',
+      deviceSessionId: '11111111-1111-4111-8111-111111111111',
     });
 
     const res = await app.request(
@@ -466,5 +474,81 @@ describe('internalApiMiddleware', () => {
     expect(res.status).toBe(200);
     const body = await jsonBody(res);
     expect(body.ok).toBe(true);
+  });
+});
+
+describe('authMiddleware device context', () => {
+  const deviceSessionId = '11111111-1111-4111-8111-111111111111';
+
+  beforeEach(() => {
+    vi.mocked(findActiveDeviceSession).mockReset();
+    downstreamExecutions = 0;
+  });
+
+  it.each(['bearer', 'cookie'])(
+    'checks signed device claims from %s authentication',
+    async source => {
+      const app = createTestApp();
+      const token = await signToken({
+        kiloUserId: 'user_123',
+        apiTokenPepper: pepperFor('user_123'),
+        version: KILO_TOKEN_VERSION,
+        deviceSessionId,
+      });
+      const headers = new Headers();
+      if (source === 'bearer') {
+        headers.set('Authorization', `Bearer ${token}`);
+      } else {
+        headers.set('Cookie', `${KILOCLAW_AUTH_COOKIE}=${token}`);
+      }
+      vi.mocked(findActiveDeviceSession).mockResolvedValue(true);
+      expect(
+        (await app.request('/protected/whoami', { headers }, ENV_WITH_HYPERDRIVE)).status
+      ).toBe(200);
+      expect(findActiveDeviceSession).toHaveBeenCalledWith(
+        'postgresql://fake',
+        deviceSessionId,
+        'user_123'
+      );
+      vi.mocked(findActiveDeviceSession).mockResolvedValue(false);
+      expect(
+        (await app.request('/protected/whoami', { headers }, ENV_WITH_HYPERDRIVE)).status
+      ).toBe(401);
+      expect(downstreamExecutions).toBe(1);
+    }
+  );
+
+  it('returns a retryable response for a device lookup failure', async () => {
+    const token = await signToken({
+      kiloUserId: 'user_123',
+      apiTokenPepper: pepperFor('user_123'),
+      version: KILO_TOKEN_VERSION,
+      deviceSessionId,
+    });
+    vi.mocked(findActiveDeviceSession).mockRejectedValue(new Error('Query read timeout'));
+    const response = await createTestApp().request(
+      '/protected/whoami',
+      { headers: { Authorization: `Bearer ${token}` } },
+      ENV_WITH_HYPERDRIVE
+    );
+    expect(response.status).toBe(503);
+    expect(downstreamExecutions).toBe(0);
+  });
+
+  it('rejects malformed device claims before querying', async () => {
+    const token = await signToken({
+      kiloUserId: 'user_123',
+      apiTokenPepper: pepperFor('user_123'),
+      version: KILO_TOKEN_VERSION,
+      deviceSessionId: 'malformed',
+    });
+    const response = await createTestApp().request(
+      '/protected/whoami',
+      { headers: { Authorization: `Bearer ${token}` } },
+      ENV_WITH_HYPERDRIVE
+    );
+    expect(response.status).toBe(401);
+    expect(findActiveDeviceSession).not.toHaveBeenCalled();
+    expect(downstreamExecutions).toBe(0);
   });
 });

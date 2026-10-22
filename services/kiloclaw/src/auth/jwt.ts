@@ -1,10 +1,17 @@
 import { SignJWT } from 'jose';
+import { deviceSessionIdSchema } from '@kilocode/worker-utils/device-session-auth';
 import { KILOCLAW_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
 import { KILO_TOKEN_VERSION, KILOCLAW_AUTH_COOKIE_MAX_AGE } from '../config';
 
 export type ValidateResult =
-  | { success: true; userId: string; token: string; pepper: string | null }
+  | {
+      success: true;
+      userId: string;
+      token: string;
+      pepper: string | null;
+      deviceSessionId?: string;
+    }
   | { success: false; error: string };
 
 /**
@@ -12,7 +19,7 @@ export type ValidateResult =
  *
  * Checks: signature, expiration (built into jose), version === 3 (via shared schema),
  * KILOCLAW_AUDIENCE when an audience is present (legacy audience-less tokens are accepted),
- * and optional env match against the worker's WORKER_ENV.
+ * optional env match against the worker's WORKER_ENV, and device-session claim format.
  */
 export async function validateKiloToken(
   token: string,
@@ -34,11 +41,19 @@ export async function validateKiloToken(
     return { success: false, error: 'Invalid token' };
   }
 
+  if (
+    payload.deviceSessionId !== undefined &&
+    !deviceSessionIdSchema.safeParse(payload.deviceSessionId).success
+  ) {
+    return { success: false, error: 'Invalid token' };
+  }
+
   return {
     success: true,
     userId: payload.kiloUserId,
     token,
     pepper: payload.apiTokenPepper ?? null,
+    ...(payload.deviceSessionId === undefined ? {} : { deviceSessionId: payload.deviceSessionId }),
   };
 }
 

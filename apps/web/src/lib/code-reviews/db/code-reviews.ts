@@ -24,7 +24,6 @@ import {
   ne,
   inArray,
   sql,
-  sum,
   gte,
   lte,
   isNull,
@@ -857,7 +856,9 @@ export async function updateCodeReviewAttemptForCallback(
         .limit(1);
     }
 
-    const latestAttempt = await getLatestCodeReviewAttempt(params.codeReviewId);
+    const latestAttempt = matchingAttempt
+      ? undefined
+      : await getLatestCodeReviewAttempt(params.codeReviewId);
     if (
       !matchingAttempt &&
       params.sessionId &&
@@ -2418,45 +2419,46 @@ export async function getSessionUsageFromBilling(
       reviewCompletedAt ? lte(microdollar_usage_metadata.created_at, reviewCompletedAt) : undefined
     );
 
-    // 1. Session-wide totals (all models combined)
-    const [totals] = await db
+    // Group once per model so the top model and the session totals come from the same
+    // scan; the window sums regroup the per-model sums into the session totals.
+    const [usage] = await db
       .select({
-        totalTokensIn: sum(microdollar_usage.input_tokens).mapWith(Number),
-        totalTokensOut: sum(microdollar_usage.output_tokens).mapWith(Number),
-        totalCacheHitTokens: sum(microdollar_usage.cache_hit_tokens).mapWith(Number),
-        totalCacheWriteTokens: sum(microdollar_usage.cache_write_tokens).mapWith(Number),
-        totalCostMusd: sum(microdollar_usage.cost).mapWith(Number),
+        model: microdollar_usage.model,
+        totalTokensIn: sql<number>`sum(sum(${microdollar_usage.input_tokens})) over ()`.mapWith(
+          Number
+        ),
+        totalTokensOut: sql<number>`sum(sum(${microdollar_usage.output_tokens})) over ()`.mapWith(
+          Number
+        ),
+        totalCacheHitTokens:
+          sql<number>`sum(sum(${microdollar_usage.cache_hit_tokens})) over ()`.mapWith(Number),
+        totalCacheWriteTokens:
+          sql<number>`sum(sum(${microdollar_usage.cache_write_tokens})) over ()`.mapWith(Number),
+        totalCostMusd: sql<number>`sum(sum(${microdollar_usage.cost})) over ()`.mapWith(Number),
       })
-      .from(microdollar_usage)
-      .innerJoin(microdollar_usage_metadata, joinCondition)
-      .where(sessionFilter);
-
-    if (totals?.totalTokensIn == null) return null;
-
-    // 2. Pick the model with the most tokens (the primary review model)
-    const [topModel] = await db
-      .select({ model: microdollar_usage.model })
       .from(microdollar_usage)
       .innerJoin(microdollar_usage_metadata, joinCondition)
       .where(sessionFilter)
       .groupBy(microdollar_usage.model)
       .orderBy(
-        sql`sum(${microdollar_usage.input_tokens} + ${microdollar_usage.output_tokens}) desc`
+        sql`sum(${microdollar_usage.input_tokens} + ${microdollar_usage.output_tokens}) desc`,
+        asc(microdollar_usage.model)
       )
       .limit(1);
 
-    if (!topModel?.model) return null;
+    if (usage?.totalTokensIn == null) return null;
+    if (!usage.model) return null;
 
-    const cachedTokens = (totals.totalCacheHitTokens ?? 0) + (totals.totalCacheWriteTokens ?? 0);
+    const cachedTokens = (usage.totalCacheHitTokens ?? 0) + (usage.totalCacheWriteTokens ?? 0);
 
     return {
-      model: topModel.model,
-      totalTokensIn: totals.totalTokensIn,
-      totalTokensOut: totals.totalTokensOut ?? 0,
-      tokensIn: Math.max(0, totals.totalTokensIn - cachedTokens),
-      tokensOut: totals.totalTokensOut ?? 0,
+      model: usage.model,
+      totalTokensIn: usage.totalTokensIn,
+      totalTokensOut: usage.totalTokensOut ?? 0,
+      tokensIn: Math.max(0, usage.totalTokensIn - cachedTokens),
+      tokensOut: usage.totalTokensOut ?? 0,
       cachedTokens,
-      totalCostMusd: totals.totalCostMusd ?? 0,
+      totalCostMusd: usage.totalCostMusd ?? 0,
     };
   } catch (error) {
     captureException(error, {

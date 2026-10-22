@@ -1726,6 +1726,111 @@ describe('findPreviousCompletedReview', () => {
     expect(updatedFirstAttempt?.error_message).toBe('Container shutdown: SIGTERM');
   });
 
+  it('updates the attempt matched by session id even when a newer attempt exists', async () => {
+    const reviewId = await createReview('sha-matched-session-attempt');
+    const matchedAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent_matched_session',
+    });
+    const newerAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      retryOfAttemptId: matchedAttempt.id,
+      retryReason: 'manual_retrigger',
+      status: 'running',
+      sessionId: 'agent_newer_session',
+    });
+
+    const result = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent_matched_session',
+      errorMessage: 'matched session callback',
+      terminalReason: 'sandbox_error',
+    });
+
+    expect(result.id).toBe(matchedAttempt.id);
+    expect(result.status).toBe('failed');
+    expect(result.error_message).toBe('matched session callback');
+
+    const unchangedNewer = await getCodeReviewAttemptForReview(reviewId, newerAttempt.id);
+    expect(unchangedNewer?.status).toBe('running');
+    expect(unchangedNewer?.error_message).toBeNull();
+  });
+
+  it('updates the attempt matched by cli session id when no session id matches', async () => {
+    const reviewId = await createReview('sha-matched-cli-attempt');
+    const matchedAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent_cli_match',
+      cliSessionId: 'ses_cli_match',
+    });
+    await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'pending',
+    });
+
+    const result = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent_unknown_session',
+      cliSessionId: 'ses_cli_match',
+      errorMessage: 'cli session callback',
+    });
+
+    expect(result.id).toBe(matchedAttempt.id);
+    expect(result.status).toBe('failed');
+    expect(result.error_message).toBe('cli session callback');
+  });
+
+  it('returns the latest attempt unchanged when the callback session differs from it', async () => {
+    const reviewId = await createReview('sha-mismatched-session-callback');
+    const latestAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent_latest_session',
+    });
+
+    const result = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent_stale_session',
+      errorMessage: 'stale callback',
+    });
+
+    expect(result.id).toBe(latestAttempt.id);
+    expect(result.status).toBe('running');
+
+    const storedAttempt = await getCodeReviewAttemptForReview(reviewId, latestAttempt.id);
+    expect(storedAttempt?.status).toBe('running');
+    expect(storedAttempt?.error_message).toBeNull();
+  });
+
+  it('creates an attempt when the callback session matches no existing attempt', async () => {
+    const reviewId = await createReview('sha-unmatched-callback-create');
+
+    const result = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent_first_callback',
+      cliSessionId: 'ses_first_callback',
+      executionId: 'exec_first_callback',
+      errorMessage: 'container exited',
+      terminalReason: 'sandbox_error',
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.session_id).toBe('agent_first_callback');
+    expect(result.cli_session_id).toBe('ses_first_callback');
+    expect(result.execution_id).toBe('exec_first_callback');
+    expect(result.error_message).toBe('container exited');
+    expect(result.terminal_reason).toBe('sandbox_error');
+
+    const attempts = await listCodeReviewAttempts(reviewId);
+    expect(attempts.map(attempt => attempt.id)).toEqual([result.id]);
+  });
+
   it('does not reopen a terminal attempt without session ids', async () => {
     const reviewId = await createReview('sha-terminal-attempt');
     const failedAttempt = await createCodeReviewAttempt({
@@ -1970,6 +2075,132 @@ describe('getSessionUsageFromBilling', () => {
       cachedTokens: 700,
       totalCostMusd: 100,
     });
+  });
+
+  type UsageRow = {
+    model: string | null;
+    input: number;
+    output: number;
+    cacheHit: number;
+    cacheWrite: number;
+    cost: number;
+    createdAt: string;
+  };
+
+  async function insertSessionUsage(sessionId: string, rows: UsageRow[]) {
+    const ids = rows.map(() => crypto.randomUUID());
+    usageIds.push(...ids);
+
+    await db.insert(microdollar_usage).values(
+      rows.map((row, index) => ({
+        id: ids[index]!,
+        kilo_user_id: 'code-review-usage-test',
+        cost: row.cost,
+        input_tokens: row.input,
+        output_tokens: row.output,
+        cache_write_tokens: row.cacheWrite,
+        cache_hit_tokens: row.cacheHit,
+        created_at: row.createdAt,
+        model: row.model,
+      }))
+    );
+    await db.insert(microdollar_usage_metadata).values(
+      rows.map((row, index) => ({
+        id: ids[index]!,
+        message_id: `msg_${ids[index]}`,
+        session_id: sessionId,
+        created_at: row.createdAt,
+      }))
+    );
+  }
+
+  it('sums every model in the window and reports the model with the most tokens', async () => {
+    const sessionId = `ses_usage_multi_model_${crypto.randomUUID()}`;
+    await insertSessionUsage(sessionId, [
+      {
+        model: 'anthropic/claude-sonnet-4.6',
+        input: 1000,
+        output: 100,
+        cacheHit: 600,
+        cacheWrite: 100,
+        cost: 100,
+        createdAt: '2026-06-18T10:00:00.000Z',
+      },
+      {
+        model: 'openai/gpt-4o',
+        input: 2000,
+        output: 200,
+        cacheHit: 1200,
+        cacheWrite: 200,
+        cost: 200,
+        createdAt: '2026-06-18T10:30:00.000Z',
+      },
+    ]);
+
+    await expect(
+      getSessionUsageFromBilling(sessionId, '2026-06-18T09:00:00.000Z', '2026-06-18T11:00:00.000Z')
+    ).resolves.toEqual({
+      model: 'openai/gpt-4o',
+      totalTokensIn: 3000,
+      totalTokensOut: 300,
+      tokensIn: 900,
+      tokensOut: 300,
+      cachedTokens: 2100,
+      totalCostMusd: 300,
+    });
+  });
+
+  it('resolves a top-model tie to the same model every time', async () => {
+    const sessionId = `ses_usage_tie_${crypto.randomUUID()}`;
+    await insertSessionUsage(sessionId, [
+      {
+        model: 'zeta/tied-model',
+        input: 500,
+        output: 50,
+        cacheHit: 0,
+        cacheWrite: 0,
+        cost: 10,
+        createdAt: '2026-06-18T10:00:00.000Z',
+      },
+      {
+        model: 'alpha/tied-model',
+        input: 500,
+        output: 50,
+        cacheHit: 0,
+        cacheWrite: 0,
+        cost: 10,
+        createdAt: '2026-06-18T10:30:00.000Z',
+      },
+    ]);
+
+    const usage = await getSessionUsageFromBilling(
+      sessionId,
+      '2026-06-18T09:00:00.000Z',
+      '2026-06-18T11:00:00.000Z'
+    );
+
+    expect(usage?.model).toBe('alpha/tied-model');
+    expect(usage?.totalTokensIn).toBe(1000);
+    expect(usage?.totalCostMusd).toBe(20);
+  });
+
+  it('returns null when the window holds no usage', async () => {
+    const sessionId = `ses_usage_empty_${crypto.randomUUID()}`;
+    await insertSessionUsage(sessionId, [
+      {
+        model: 'anthropic/claude-sonnet-4.6',
+        input: 1000,
+        output: 100,
+        cacheHit: 600,
+        cacheWrite: 100,
+        cost: 100,
+        createdAt: '2026-06-18T12:00:00.000Z',
+      },
+    ]);
+
+    await expect(
+      getSessionUsageFromBilling(sessionId, '2026-06-18T09:00:00.000Z', '2026-06-18T11:00:00.000Z')
+    ).resolves.toBeNull();
   });
 });
 

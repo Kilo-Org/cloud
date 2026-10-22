@@ -66,15 +66,17 @@ describe('live-activity preference store', () => {
     expect(getLiveActivityEnabled()).toBe(true);
   });
 
-  it('mirrors every write into the sink switch', async () => {
+  it('mirrors every stored write into the sink switch', async () => {
     getItemAsync.mockResolvedValue(null);
     const { setLiveActivityEnabled } = await import('./use-live-activity-preference');
     const sink = await import('@/lib/glanceable/live-activity-switch');
 
     setLiveActivityEnabled(false);
+    await flushMicrotasks();
     expect(sink.getLiveActivityEnabled()).toBe(false);
 
     setLiveActivityEnabled(true);
+    await flushMicrotasks();
     expect(sink.getLiveActivityEnabled()).toBe(true);
   });
 

@@ -1,13 +1,19 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
-import { agentRows, type AgentSource } from '@/components/profiles/profile-agents-model';
+import {
+  AGENT_VISIBILITY_LABEL_KEYS,
+  agentRows,
+  type AgentSource,
+  type AgentVisibility,
+} from '@/components/profiles/profile-agents-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Bot, Pencil, Trash2 } from '@/components/ui/icons';
@@ -19,6 +25,8 @@ import {
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_AGENTS: AgentProfileDetail['agents'] = [];
@@ -28,10 +36,16 @@ function hasUsableMessage(error: unknown): boolean {
   return error instanceof Error && error.message.trim().length > 0;
 }
 
+/** A tRPC CONFLICT from the agent mutations is the per-profile slug unique index. */
+function isSlugConflict(error: unknown): boolean {
+  const code = (error as { data?: { code?: unknown } } | null | undefined)?.data?.code;
+  return code === 'CONFLICT';
+}
+
 type AgentRowViewProps = Readonly<{
   name: string;
   slug: string;
-  visibility: string;
+  visibility: AgentVisibility;
   description: string;
   model: string;
   onEdit: () => void;
@@ -62,7 +76,7 @@ function AgentRowView({
             {slug}
           </Text>
           <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-            {visibility}
+            {t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}
           </Text>
         </View>
         {model.length > 0 ? (
@@ -77,7 +91,7 @@ function AgentRowView({
         ) : null}
       </View>
       <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('profiles.agents.edit')}
         onPress={onEdit}
@@ -85,7 +99,7 @@ function AgentRowView({
         <Pencil size={18} color={colors.mutedForeground} />
       </Pressable>
       <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('common.delete')}
         onPress={onDelete}
@@ -120,9 +134,14 @@ export function ProfileAgentsScreen({
   const rows = agentRows(agents);
   // `null` = closed, `{ source: null }` = add, `{ source }` = edit that agent.
   const [form, setForm] = useState<{ source: AgentSource | null } | null>(null);
+  // A save the server rejected on the slug shows the inline conflict message
+  // instead of only a toast: the sheet stays open on the typed values, so the
+  // user can rename without retyping the form.
+  const [serverSlugConflict, setServerSlugConflict] = useState(false);
 
   const startAdd = () => {
     setForm({ source: null });
+    setServerSlugConflict(false);
   };
 
   const closeForm = () => {
@@ -138,6 +157,10 @@ export function ProfileAgentsScreen({
         ? createAgent.mutateAsync({ profileId, ...payload })
         : updateAgent.mutateAsync({ profileId, agentId: target.id, ...payload }));
     } catch (error) {
+      if (isSlugConflict(error)) {
+        setServerSlugConflict(true);
+        return;
+      }
       if (!hasUsableMessage(error)) {
         toast.error(t('profiles.agents.saveFailed'));
       }
@@ -151,7 +174,7 @@ export function ProfileAgentsScreen({
       await deleteAgent.mutateAsync({ profileId, agentId });
     } catch (error) {
       if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.agents.saveFailed'));
+        toast.error(t('profiles.agents.deleteFailed'));
       }
     }
   };
@@ -212,6 +235,7 @@ export function ProfileAgentsScreen({
               model={row.model}
               onEdit={() => {
                 setForm({ source });
+                setServerSlugConflict(false);
               }}
               onDelete={() => {
                 confirmDelete(source);
@@ -229,7 +253,7 @@ export function ProfileAgentsScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profiles.agents.title')} />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -237,13 +261,17 @@ export function ProfileAgentsScreen({
         showsVerticalScrollIndicator={false}
       >
         {content}
-      </ScrollView>
+      </TabScreenScrollView>
 
       {form !== null ? (
         <AgentFormSheet
           agent={form.source}
+          existingSlugs={agents
+            .filter(candidate => candidate.id !== form.source?.id)
+            .map(candidate => candidate.slug)}
           organizationId={organizationId}
           isSaving={createAgent.isPending || updateAgent.isPending}
+          slugConflictFromServer={serverSlugConflict}
           onClose={closeForm}
           onSave={payload => {
             void saveAgent(form.source, payload);

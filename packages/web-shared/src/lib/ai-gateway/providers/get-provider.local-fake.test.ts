@@ -58,7 +58,6 @@ function providerInput(requestedModel: string) {
     } satisfies GatewayRequest,
     user,
     organizationId: undefined,
-    taskId: undefined,
   };
 }
 
@@ -71,7 +70,6 @@ function responsesInput(requestedModel: string) {
     } satisfies GatewayRequest,
     user,
     organizationId: undefined,
-    taskId: undefined,
     clientIp: null,
     machineId: null,
   };
@@ -117,6 +115,7 @@ describe('getProvider local fake deterministic routing', () => {
       kind: 'provider',
       bypassAccessCheck: true,
       userByok: null,
+      isFree: true,
       provider: {
         id: 'custom',
         apiUrl: 'http://localhost:8811/api/openrouter',
@@ -136,6 +135,7 @@ describe('getProvider local fake deterministic routing', () => {
       kind: 'provider',
       provider: OPENROUTER,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
 
@@ -148,6 +148,7 @@ describe('getProvider local fake deterministic routing', () => {
       kind: 'provider',
       provider: OPENROUTER,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
     vercel.restore();
@@ -157,6 +158,7 @@ describe('getProvider local fake deterministic routing', () => {
       kind: 'provider',
       provider: OPENROUTER,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
     missingUrl.restore();
@@ -190,12 +192,12 @@ describe('getProvider local fake deterministic routing', () => {
           kind: 'provider',
           provider,
           userByok: null,
+          isFree: true,
           bypassAccessCheck: false,
         });
         expect(shouldRouteToVercel).toHaveBeenCalledWith(
           modelId,
           input.request,
-          user.id,
           expect.any(Function)
         );
       }
@@ -209,17 +211,14 @@ describe('getProvider exclusive model routing', () => {
     jest.mocked(getModelUserByokProviders).mockReset().mockResolvedValue([]);
   });
 
-  test.each(kiloExclusiveModels)(
-    'routes $public_id to its provider unless disabled',
-    async model => {
-      const result = await getProvider(providerInput(model.public_id));
-      expect(result.kind).toBe('provider');
-      if (result.kind !== 'provider') throw new Error('Expected a provider');
-      expect(result.provider).toBe(model.status === 'disabled' ? OPENROUTER : model.provider);
-      expect(result.userByok).toBeNull();
-      expect(result.bypassAccessCheck).toBe(false);
-    }
-  );
+  test.each(kiloExclusiveModels)('routes $public_id to its provider', async model => {
+    const result = await getProvider(providerInput(model.public_id));
+    expect(result.kind).toBe('provider');
+    if (result.kind !== 'provider') throw new Error('Expected a provider');
+    expect(result.provider).toBe(model.provider);
+    expect(result.userByok).toBeNull();
+    expect(result.bypassAccessCheck).toBe(false);
+  });
 
   test.each(kiloExclusiveModels.filter(({ provider }) => provider === MARTIAN))(
     'does not divert $public_id to Vercel or BYOK',
@@ -349,6 +348,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       kind: 'provider',
       provider: VERCEL_AI_GATEWAY,
       userByok: [{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }],
+      isFree: false,
       bypassAccessCheck: false,
     });
     env.restore();
@@ -367,6 +367,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       kind: 'provider',
       provider: VERCEL_AI_GATEWAY,
       userByok: credentials,
+      isFree: false,
       bypassAccessCheck: false,
     });
     expect(jest.mocked(getBYOKforUser).mock.calls[0]?.slice(1)).toEqual([user.id, ['anthropic']]);
@@ -384,6 +385,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       kind: 'provider',
       provider: OPENROUTER,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
     expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
@@ -405,6 +407,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       kind: 'provider',
       provider: VERCEL_AI_GATEWAY,
       userByok: [{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }],
+      isFree: false,
       bypassAccessCheck: false,
     });
     env.restore();

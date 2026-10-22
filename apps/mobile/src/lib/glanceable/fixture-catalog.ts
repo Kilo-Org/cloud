@@ -1,4 +1,5 @@
 import { type GlanceableAgentsSnapshotStatus } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type SessionLiveOutcomeKind } from '@kilocode/notifications';
 
 import { APPROVAL_ROWS, combinationRows, many, mixedRows, roundWake } from './fixture-rows';
 import { SESSION_CARD_FIXTURES } from './session-fixture-catalog';
@@ -26,7 +27,7 @@ type SessionCardFacts = {
   plan?: { done: number; total: number; current: string | null };
   changes?: { files: number; added: number; removed: number };
   permissionCommand?: string;
-  outcome?: 'pr_opened' | 'changes' | 'none';
+  outcome?: SessionLiveOutcomeKind;
   failure?: 'provider' | 'tool' | 'cancelled' | 'other';
   /** Minutes since the last activity the server saw. */
   activityAgo?: number;

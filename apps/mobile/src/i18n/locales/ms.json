@@ -25,6 +25,7 @@
     "error": "ralat: {{error}}",
     "back": "Kembali",
     "somethingWentWrong": "Berlaku ralat.",
+    "actionNotRecorded": "Kami tidak dapat merekodkan tindakan ini. Sila cuba lagi kemudian.",
     "couldNotOpen": "Tidak dapat membuka {{label}}.",
     "link": "pautan",
     "takingLonger": "Proses ini mengambil masa lebih lama daripada jangkaan. Anda boleh menutup skrin ini dan menyemak semula kemudian.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub tidak menyelesaikan penggabungan.",
       "mergeResultNotCompleted": "{{term}} tidak digabungkan. Semak keadaannya dan cuba lagi.",
       "ambiguous": "Tidak dapat mengesahkan hasil tindakan. Semak PR sebelum mencuba lagi.",
-      "persistenceFailed": "Kami tidak dapat merekodkan tindakan ini. Sila cuba lagi kemudian.",
       "forbidden": "Tindakan ini tidak dibenarkan."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "Memuatkan memori semakan",
       "couldNotLoad": "Tidak dapat memuatkan memori semakan.",
       "off": "Memori semakan dinyahdayakan.",
+      "on": "Memori semakan didayakan.",
       "offDescription": "Dayakannya supaya Kilo dapat belajar daripada balasan penyelenggara dan mencadangkan panduan untuk REVIEW.md.",
-      "readOnlyDescription": "Hanya pemilik organisasi dan pengurus pengebilan boleh mendayakan memori semakan.",
+      "readOnlyDescription": "Hanya pemilik organisasi dan pengurus pengebilan boleh mengubah memori semakan.",
       "enable": "Dayakan memori semakan",
       "loadingProposals": "Memuatkan cadangan",
       "couldNotLoadProposals": "Tidak dapat memuatkan cadangan.",
@@ -1879,6 +1880,9 @@
       "viewA11y": "Lihat laporan audit"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Pentadbir Kilo",
+      "actorMaskedUser": "Pengguna disamarkan",
+      "actorSystem": "Sistem Kilo",
       "couldNotLoad": "Tidak dapat memuatkan laporan audit.",
       "events": "Peristiwa",
       "generated": "Laporan dijana pada {{generatedAt}}.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "Penyegerakan mungkin belum selesai. Cuba lagi untuk menyelaraskan statusnya atau buang rekodnya.",
       "syncInProgress": "Penyegerakan keselamatan sedang berjalan. Sila cuba lagi.",
       "dismissalInProgress": "Proses mengetepikan penemuan ini sedang berjalan. Sila cuba lagi.",
-      "couldNotReadPendingSyncs": "Tidak dapat membaca penyegerakan yang belum selesai. Cuba lagi."
+      "couldNotReadPendingSyncs": "Tidak dapat membaca penyegerakan yang belum selesai. Cuba lagi.",
+      "ambiguous": "Tidak dapat mengesahkan hasil tindakan. Semak semakan keselamatan sebelum mencuba lagi.",
+      "settleFailed": "Tindakan telah selesai, tetapi kami tidak dapat merekodkan hasilnya. Sila cuba lagi.",
+      "replayFailed": "Tindakan ini tidak selesai. Sila cuba lagi.",
+      "actionFailed": "Tindakan ini tidak dapat disiapkan. Sila cuba lagi.",
+      "actionBlocked": "Tindakan ini tidak dapat disiapkan. Masalah ini perlu diselesaikan terlebih dahulu."
     },
     "analysisState": {
       "queued": "Analisis dalam baris gilir",
@@ -2773,7 +2782,7 @@
     "viewProfile": "Lihat profil",
     "webBrowser": "Pelayar web",
     "signOutThisDevice": "Log keluar daripada peranti ini",
-    "signOutThisSession": "Log keluar daripada sesi ini",
+    "signOutSessionLabel": "Log keluar daripada {{device}}, log masuk {{signedIn}}",
     "sessionSignedOut": "Sesi dilog keluar.",
     "signOutThisDeviceTitle": "Log keluar daripada peranti ini?",
     "signOutThisSessionTitle": "Log keluar daripada sesi ini?",
@@ -3010,11 +3019,23 @@
     "boundary": {
       "backToProfile": "Kembali ke profil",
       "loadErrorMessage": "Semak sambungan anda dan cuba lagi.",
+
+      "chooseAccount": "Pilih akaun",
       "loadErrorTitle": "Tidak dapat memuatkan organisasi anda.",
+      "membershipLostNotice": "Anda tidak lagi mempunyai akses kepada organisasi ini. Ditukar kepada {{target}}.",
+      "noOrganization": "Tiada organisasi",
+
+      "noOrganizationDescription": "Akaun ini bukan sebahagian daripada organisasi. Cipta atau sertai organisasi di laman web untuk menggunakan ciri organisasi seperti jemputan ahli dan amaran baki rendah.",
+
+      "openWebOrganizations": "Buka organisasi di laman web",
+
       "organizationUnavailable": "Organisasi tidak tersedia.",
-      "selectDescription": "Pilih organisasi daripada profil anda untuk meneruskan.",
+      "selectDescriptionWithOrganizations": "Anda tergolong dalam satu atau lebih organisasi. Pilih akaun yang patut digunakan oleh skrin ini.",
+
       "selectOrganization": "Pilih organisasi",
       "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih satu daripada profil anda untuk meneruskan.",
+
+      "unavailableSessionsDescription": "Organisasi ini tidak lagi tersedia. Sesi untuk organisasi ini tidak dapat dimuatkan.",
       "accessDeniedDescription": "Anda tidak mempunyai akses kepada organisasi ini."
     },
     "creditActivity": {
@@ -3066,7 +3087,11 @@
       "separateEmailsHint": "Pisahkan alamat e-mel dengan koma.",
       "thresholdLabel": "Amaran jika baki kurang daripada (USD)",
       "title": "Amaran baki rendah",
-      "emailsError": "Masukkan sekurang-kurangnya satu alamat e-mel yang sah. Pisahkan alamat e-mel dengan koma.",
+      "emailsInvalid": "Satu atau lebih alamat e-mel tidak sah.",
+      "emailsRequired": "Masukkan sekurang-kurangnya satu alamat e-mel.",
+      "saveEmailsError": "Sesetengah alamat e-mel tidak diterima. Semak dan cuba lagi.",
+      "saveError": "Tidak dapat menyimpan amaran baki rendah.",
+      "thresholdPlaceholder": "Masukkan amaun",
       "thresholdError": "Masukkan amaun yang lebih besar daripada 0."
     },
     "memberLimit": {
@@ -3077,6 +3102,7 @@
       "removeLimit": "Buang had",
       "title": "Had penggunaan harian",
       "blankError": "Masukkan amaun atau ketik Buang had di bawah.",
+      "blankWithoutLimitError": "Masukkan had harian antara 0 dan {{max}}.",
       "rangeError": "Masukkan amaun antara 0 dan {{max}}."
     },
     "members": {
@@ -3544,6 +3570,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Mulakan ejen memerlukan gesaan. Tambah gesaan dan jalankannya semula.",
+      "repositoryRequired": "Mulakan ejen memerlukan repositori. Buka Kilo dan pilih satu, kemudian jalankannya semula.",
       "repositoryUnknown": "Kilo tidak mengenali {{repository}} sebagai repositori GitHub atau GitLab. Pilih repositori lain dalam Kilo.",
       "repositoryUnsupported": "{{repository}} ialah repositori Bitbucket — Mulakan ejen belum boleh menggunakannya. Pilih repositori lain dalam Kilo."
     }
@@ -3615,7 +3642,6 @@
     "keyTooLong": "Kunci mestilah 256 aksara atau kurang",
     "keyDuplicate": "Kunci ini sudah ada dalam profil",
     "valueLabel": "Nilai",
-    "secretLabel": "Rahsia",
     "secrets": {
       "markSecret": "Tandakan sebagai rahsia",
       "masked": "Nilai tersembunyi",
@@ -3674,7 +3700,9 @@
       "jsonTooLarge": "Gunakan paling banyak 50 entri, kunci sehingga 128 dan nilai sehingga 4096 aksara",
       "timeoutInvalid": "Tamat masa mestilah bilangan keseluruhan milisaat",
       "edit": "Edit pelayan MCP",
-      "saveFailed": "Tidak dapat menyimpan pelayan MCP"
+      "saveFailed": "Tidak dapat menyimpan pelayan MCP",
+      "deleteFailed": "Tidak dapat memadam pelayan MCP",
+      "updateFailed": "Tidak dapat mengemas kini pelayan MCP"
     },
     "agents": {
       "title": "Ejen profil",
@@ -3701,6 +3729,7 @@
       "visibilitySubagent": "Subagen — hanya boleh dipanggil daripada orang lain",
       "visibilityAll": "Semua - kedua-duanya",
       "saveFailed": "Tidak dapat menyelamatkan ejen",
+      "deleteFailed": "Tidak dapat memadam ejen",
       "nameRequired": "Masukkan nama ejen",
       "slugRequired": "Masukkan slug ejen",
       "slugInvalid": "Slug mesti bermula dengan huruf dan hanya menggunakan huruf kecil, digit dan sempang",
@@ -3720,6 +3749,7 @@
       "subtask": "Jalankan sebagai subtugas",
       "edit": "Edit arahan slash",
       "saveFailed": "Tidak dapat menyimpan arahan",
+      "deleteFailed": "Tidak dapat memadam arahan",
       "nameRequired": "Masukkan nama arahan",
       "nameInvalid": "Nama mesti bermula dengan huruf kecil dan hanya menggunakan huruf kecil, angka dan sempang",
       "templateRequired": "Masukkan templat arahan",

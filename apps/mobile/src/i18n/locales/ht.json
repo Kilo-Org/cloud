@@ -25,6 +25,7 @@
     "error": "erè: {{error}}",
     "back": "Tounen",
     "somethingWentWrong": "Gen yon pwoblèm.",
+    "actionNotRecorded": "Nou pa t ka anrejistre aksyon sa a. Tanpri eseye ankò pita.",
     "couldNotOpen": "Pa t ka louvri {{label}}.",
     "link": "lyen",
     "takingLonger": "Sa ap pran plis tan pase sa nou te prevwa. Ou ka fèmen ekran sa a epi tcheke ankò.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub pa t fini fizyon an.",
       "mergeResultNotCompleted": "Yo pa t fizyone {{term}} lan. Tcheke estati li epi eseye ankò.",
       "ambiguous": "Pa t ka konfime — tcheke PR a anvan ou eseye ankò.",
-      "persistenceFailed": "Nou pa t ka anrejistre aksyon sa a. Tanpri eseye ankò pita.",
       "forbidden": "Aksyon sa a entèdi."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "Ap chaje memwa revizyon an",
       "couldNotLoad": "Nou pa t ka chaje memwa revizyon an.",
       "off": "Memwa revizyon an dezaktive.",
+      "on": "Memwa revizyon an aktive.",
       "offDescription": "Aktive li pou Kilo aprann nan repons moun ki responsab antretyen kòd la epi pwopoze direktiv pou REVIEW.md.",
-      "readOnlyDescription": "Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka aktive memwa revizyon an.",
+      "readOnlyDescription": "Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka chanje memwa revizyon an.",
       "enable": "Aktive memwa revizyon an",
       "loadingProposals": "Ap chaje pwopozisyon yo",
       "couldNotLoadProposals": "Nou pa t ka chaje pwopozisyon yo.",
@@ -1879,6 +1880,9 @@
       "viewA11y": "Gade rapò odit la"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administratè Kilo",
+      "actorMaskedUser": "Itilizatè maske",
+      "actorSystem": "Sistèm Kilo",
       "couldNotLoad": "Nou pa t ka chaje rapò odit la.",
       "events": "Evènman",
       "generated": "Rapò a pwodui {{generatedAt}}.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "Yon senkronizasyon ka pa t fini. Eseye ankò pou mete eta li ajou, oswa abandone li.",
       "syncInProgress": "Yon senkronizasyon sekirite deja an pwosesis. Tanpri eseye ankò.",
       "dismissalInProgress": "Rejè sa a deja an pwosesis. Tanpri eseye ankò.",
-      "couldNotReadPendingSyncs": "Nou pa t ka li senkronizasyon ki an atant yo. Eseye ankò."
+      "couldNotReadPendingSyncs": "Nou pa t ka li senkronizasyon ki an atant yo. Eseye ankò.",
+      "ambiguous": "Pa t ka konfime — tcheke revizyon sekirite a anvan ou eseye ankò.",
+      "settleFailed": "Aksyon an fini, men nou pa t ka anrejistre rezilta a. Tanpri eseye ankò.",
+      "replayFailed": "Aksyon sa a pa fini. Tanpri eseye ankò.",
+      "actionFailed": "Pa t ka fini aksyon sa a. Tanpri eseye ankò.",
+      "actionBlocked": "Pa t ka fini aksyon sa a. Fòk ou repare pwoblèm nan anvan ou ka eseye ankò."
     },
     "analysisState": {
       "queued": "Analiz nan ke",
@@ -2772,7 +2781,7 @@
     "thisDevice": "Aparèy sa a",
     "viewProfile": "Gade pwofil la",
     "signOutThisDevice": "Dekonekte aparèy sa a",
-    "signOutThisSession": "Dekonekte sesyon sa a",
+    "signOutSessionLabel": "Dekonekte {{device}}, konekte {{signedIn}}",
     "sessionSignedOut": "Sesyon an dekonekte.",
     "signOutThisDeviceTitle": "Dekonekte aparèy sa a?",
     "signOutThisSessionTitle": "Dekonekte sesyon sa a?",
@@ -3010,11 +3019,23 @@
     "boundary": {
       "backToProfile": "Tounen nan pwofil la",
       "loadErrorMessage": "Tcheke koneksyon ou epi eseye ankò.",
+
+      "chooseAccount": "Chwazi yon kont",
       "loadErrorTitle": "Nou pa t ka chaje òganizasyon ou yo.",
+      "membershipLostNotice": "Ou pa gen aksè nan òganizasyon sa a ankò. Chanje pou {{target}}.",
+      "noOrganization": "Pa gen òganizasyon",
+
+      "noOrganizationDescription": "Kont sa a pa fè pati yon òganizasyon. Kreye oswa rantre nan yon òganizasyon sou sit entènèt la pou itilize fonksyon òganizasyon tankou envitasyon manm ak alèt sou balans ki ba.",
+
+      "openWebOrganizations": "Louvri òganizasyon sou sit entènèt la",
+
       "organizationUnavailable": "Òganizasyon an pa disponib.",
-      "selectDescription": "Chwazi yon òganizasyon nan pwofil ou pou kontinye.",
+      "selectDescriptionWithOrganizations": "Ou fè pati youn oswa plizyè òganizasyon. Chwazi kont ki ekran sa a dwe itilize a.",
+
       "selectOrganization": "Chwazi yon òganizasyon",
       "unavailableDescription": "Òganizasyon sa a pa disponib ankò. Chwazi yon lòt nan pwofil ou a pou kontinye.",
+
+      "unavailableSessionsDescription": "Òganizasyon sa a pa disponib ankò. Sezyon yo pa ka chaje.",
       "accessDeniedDescription": "Ou pa gen aksè nan òganizasyon sa a."
     },
     "creditActivity": {
@@ -3066,7 +3087,11 @@
       "separateEmailsHint": "Si ou antre plizyè adrès imel, separe yo ak vigil.",
       "thresholdLabel": "Voye alèt si balans lan pi ba pase (USD)",
       "title": "Alèt pou balans ki ba",
-      "emailsError": "Antre omwen yon adrès imel ki valab. Si gen plizyè, separe yo ak vigil.",
+      "emailsInvalid": "Gen yon oswa plizyè adrès imel ki pa valab.",
+      "emailsRequired": "Antre omwen yon adrès imel.",
+      "saveEmailsError": "Gen kèk adrès imel ki pa te aksepte. Verifye yo epi eseye ankò.",
+      "saveError": "Nou pa te ka anrejistre alèt pou balans ki ba.",
+      "thresholdPlaceholder": "Antre yon montan",
       "thresholdError": "Antre yon montan ki pi gran pase 0."
     },
     "memberLimit": {
@@ -3077,6 +3102,7 @@
       "removeLimit": "Retire limit la",
       "title": "Limit itilizasyon chak jou",
       "blankError": "Antre yon montan, oswa peze Retire limit la anba a.",
+      "blankWithoutLimitError": "Antre yon limit chak jou ant 0 ak {{max}}.",
       "rangeError": "Antre yon montan ant 0 ak {{max}}."
     },
     "members": {
@@ -3544,6 +3570,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Kòmanse ajan bezwen yon enstriksyon. Ajoute yon enstriksyon epi kouri li ankò.",
+      "repositoryRequired": "Kòmanse ajan bezwen yon depo. Ouvri Kilo epi chwazi youn, apre sa kouri li ankò.",
       "repositoryUnknown": "Kilo pa rekonèt {{repository}} kòm yon depo GitHub oswa GitLab. Chwazi yon lòt depo nan Kilo.",
       "repositoryUnsupported": "{{repository}} se yon depo Bitbucket — Kòmanse ajan poko ka itilize li. Chwazi yon lòt depo nan Kilo."
     }
@@ -3615,7 +3642,6 @@
     "keyTooLong": "Kle a dwe gen 256 karaktè oswa mwens",
     "keyDuplicate": "Kle sa a deja egziste nan pwofil la",
     "valueLabel": "Valè",
-    "secretLabel": "Sekrè",
     "secrets": {
       "markSecret": "Make kòm sekrè",
       "masked": "Valè kache",
@@ -3674,7 +3700,9 @@
       "jsonTooLarge": "Sèvi ak pa plis pase 50 antre, kle jiska 128 ak valè jiska 4096 karaktè",
       "timeoutInvalid": "Timeout dwe yon kantite antye milisgond",
       "edit": "Edit sèvè MCP",
-      "saveFailed": "Pa t 'kapab sove sèvè MCP"
+      "saveFailed": "Pa t 'kapab sove sèvè MCP",
+      "deleteFailed": "Pa t 'kapab efase sèvè MCP",
+      "updateFailed": "Pa t 'kapab mete sèvè MCP ajou"
     },
     "agents": {
       "title": "Ajan pwofil yo",
@@ -3701,6 +3729,7 @@
       "visibilitySubagent": "Subagent - sèlman rele nan men lòt moun",
       "visibilityAll": "Tout - tou de",
       "saveFailed": "Pa t 'kapab sove ajan",
+      "deleteFailed": "Pa t 'kapab efase ajan",
       "nameRequired": "Antre yon non ajan",
       "slugRequired": "Antre yon slug ajan",
       "slugInvalid": "Slug dwe kòmanse ak yon lèt epi sèvi ak sèlman lèt miniskil, chif, ak tire",
@@ -3720,6 +3749,7 @@
       "subtask": "Kouri kòm subtach",
       "edit": "Edit lòd koupe",
       "saveFailed": "Pa t 'kapab sove lòd",
+      "deleteFailed": "Pa t 'kapab efase lòd",
       "nameRequired": "Antre yon non kòmand",
       "nameInvalid": "Non yo dwe kòmanse ak yon lèt miniskil epi itilize sèlman lèt miniskil, chif ak tire",
       "templateRequired": "Antre yon modèl lòd",

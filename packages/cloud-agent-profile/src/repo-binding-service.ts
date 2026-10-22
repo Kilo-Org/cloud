@@ -35,9 +35,6 @@ export async function bindProfileToRepo(
   });
 }
 
-/**
- * Remove the profile binding for a repository.
- */
 export async function unbindRepo(
   db: ProfileDatabase,
   owner: ProfileOwner,
@@ -84,9 +81,6 @@ export async function getBindingForRepo(
   return binding?.profileId ?? null;
 }
 
-/**
- * List all repo-profile bindings for the given owner.
- */
 export async function listBindings(
   db: ProfileDatabase,
   owner: ProfileOwner

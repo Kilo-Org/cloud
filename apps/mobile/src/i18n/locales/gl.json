@@ -25,6 +25,7 @@
     "error": "erro: {{error}}",
     "back": "Atrás",
     "somethingWentWrong": "Produciuse un erro.",
+    "actionNotRecorded": "Non puidemos rexistrar esta acción. Téntao de novo máis tarde.",
     "couldNotOpen": "Non se puido abrir {{label}}.",
     "link": "ligazón",
     "takingLonger": "Isto leva máis tempo do esperado. Podes pechalo e comprobalo de novo.",
@@ -35,6 +36,8 @@
     "connectGithub": "Conectar GitHub",
     "cost": "Custo",
     "discard": "Descartar",
+    "discardChangesMessage": "Perderanse os teus cambios.",
+    "discardChangesTitle": "Descartar os cambios?",
     "findings": "Problemas detectados",
     "mergeRequest": "solicitude de fusión",
     "notConnected": "Sen conexión",
@@ -109,7 +112,9 @@
     "online": "En liña",
     "open": "Abrir {{name}}",
     "openPullRequest": "Apertura da solicitude de cambios",
+    "completed": "Rematado",
     "pending": "Pendente",
+    "running": "En execución",
     "performance": "Rendemento",
     "preferences": "Preferencias",
     "privacyPolicy": "Política de privacidade",
@@ -586,6 +591,8 @@
     "installKiloGitHubApp": "Instalar a aplicación de Kilo para GitHub",
     "checkConnection": "Comprobar a conexión",
     "couldNotLoadPullRequest": "Non se puido cargar a solicitude de integración.",
+    "reviewServiceUnavailable": "O servizo non está dispoñible",
+    "reviewServiceUnavailableDescription": "O servizo non está dispoñible temporalmente. Téntao de novo en breves.",
     "description": "Descrición",
     "noDescriptionProvided": "Non se engadiu ningunha descrición.",
     "review": "Revisión",
@@ -603,7 +610,7 @@
       "openAccessibility": "Abrir solicitude de integración ou de fusión",
       "clearLink": "Limpar a ligazón",
       "pasteLink": "Pegar a ligazón á solicitude de integración ou de fusión",
-      "open": "Apertura"
+      "open": "Abrir"
     },
     "checks": {
       "title": "Comprobacións",
@@ -661,7 +668,8 @@
       "description": "Conecta a túa conta de GitHub para revisar solicitudes de integración no móbil.",
       "gitlabDescription": "Conecta a túa conta de GitLab para revisar solicitudes de fusión no móbil.",
       "bitbucketDescription": "Conecta Bitbucket a esta organización para revisar solicitudes de integración no móbil.",
-      "bitbucketOrgOnlyDescription": "Selecciona unha organización no teu perfil para revisar as súas solicitudes de integración de Bitbucket."
+      "bitbucketOrgOnlyDescription": "Cambia a conta de arriba a unha organización para revisar as súas solicitudes de integración en Bitbucket.",
+      "contextLine": "Para {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -756,6 +764,7 @@
       "truncationBanner_other": "Amósanse os primeiros {{limit}} de {{total}} ficheiros modificados polo límite da API de GitHub."
     },
     "linkPasteClipboardEmpty": "O portapapeis está baleiro.",
+    "linkPasteDenied": "Denegouse o acceso para pegar. Permite pegar e vólvao intentar.",
     "linkPasteNotAPullRequest": "Non é unha ligazón a unha solicitude de integración ou de fusión",
     "announce": {
       "commentPosted": "Comentario publicado",
@@ -769,7 +778,9 @@
       "reviewNotSubmitted": "Esta revisión non se pode enviar tal e como está. Pode que a PR cambiase ou que esteas a revisar a túa propia solicitude de integración, o que non está permitido.",
       "reviewNotSubmittedTerm": "Esta revisión non se pode enviar tal como está. Pode que a {{term}} cambiase ou que non poidas revisar a túa propia {{term}}.",
       "couldNotPostComment": "Non se puido publicar o comentario.",
-      "couldNotSubmitReview": "Non se puido enviar a revisión. Comproba a conexión e téntao de novo."
+      "couldNotSubmitReview": "Non se puido enviar a revisión. Comproba a conexión e téntao de novo.",
+      "rateLimited": "Demasiadas solicitudes. Téntao de novo máis tarde.",
+      "conflict": "Isto cambiou mentres estabas a traballar nel. Volve cargalo e téntao de novo."
     },
     "operation": {
       "couldNotReply": "Non se puido responder.",
@@ -777,7 +788,6 @@
       "mergeResultDefaultError": "GitHub non completou a fusión.",
       "mergeResultNotCompleted": "A {{term}} non se fusionou. Comproba o seu estado e inténtao de novo.",
       "ambiguous": "Non se puido confirmar. Comproba a PR antes de tentalo de novo.",
-      "persistenceFailed": "Non puidemos rexistrar esta acción. Téntao de novo máis tarde.",
       "forbidden": "Non tes permiso para realizar esta acción."
     },
     "capabilities": {
@@ -1449,8 +1459,9 @@
       "loading": "Cargando a memoria de revisión",
       "couldNotLoad": "Non se puido cargar a memoria de revisión.",
       "off": "A memoria de revisión está desactivada.",
+      "on": "A memoria de revisión está activada.",
       "offDescription": "Actívaa para que Kilo aprenda das respostas dos responsables do mantemento e propoña pautas para REVIEW.md.",
-      "readOnlyDescription": "Só os propietarios da organización e os xestores de facturación poden activar a memoria de revisión.",
+      "readOnlyDescription": "Só os propietarios da organización, os administradores e os xestores de facturación poden cambiar a memoria de revisión.",
       "enable": "Activar a memoria de revisión",
       "loadingProposals": "Cargando propostas",
       "couldNotLoadProposals": "Non se puideron cargar as propostas.",
@@ -1470,7 +1481,10 @@
       "starting": "Iniciando a revisión…",
       "start": "Iniciar a revisión"
     },
-    "notConnectedReadOnly": "{{platform}} non está conectado. Só os propietarios da organización e os xestores de facturación poden conectalo.",
+    "notConnectedReadOnly": "{{platform}} non está conectado. Só os propietarios da organización e os administradores poden conectalo.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} non está conectado. Pídelle ao propietario, ao administrador ou ao xestor de facturación da organización que o conecte."
+    },
     "webhookSetup": "A configuración do webhook está incompleta.",
     "webhookSetupDescription": "Algúns repositorios poden non recibir revisións automáticas.",
     "autoReviews": "Revisións automáticas",
@@ -1478,7 +1492,7 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Respecta as instrucións do ficheiro REVIEW.md de cada repositorio",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket non está conectado. Só os propietarios da organización e os xestores de facturación poden conectalo.",
+      "notConnectedReadOnly": "Bitbucket non está conectado. Só os propietarios da organización, os administradores e os xestores de facturación poden conectalo.",
       "setupIncomplete": "A configuración está incompleta. Remátaa en kilo.ai.",
       "setup": "Configuración de Bitbucket"
     },
@@ -1531,8 +1545,6 @@
     "updateFailed": "Non se puido actualizar o revisor.",
     "configSaveFailed": "Non se puido gardar a configuración da revisión.",
     "status": {
-      "running": "En execución",
-      "completed": "Rematado",
       "interrupted": "Interrompida"
     },
     "reviewStyle": {
@@ -1545,7 +1557,8 @@
       "bugs": "Erros",
       "style": "Estilo",
       "testing": "Probas",
-      "documentation": "Documentación"
+      "documentation": "Documentación",
+      "unknown": "Outro ({{area}})"
     },
     "gateThreshold": {
       "warning": "Aviso"
@@ -1657,7 +1670,14 @@
       "whereFound": "Localizacións do achado ({{displayCount}})",
       "fullReport": "Informe xerado completo",
       "yes": "Si",
-      "no": "Non"
+      "no": "Non",
+      "action": {
+        "analyzeCodebase": "Analizar a base de código",
+        "dismiss": "Rexeitar",
+        "manualReview": "Revisión manual",
+        "monitor": "Monitorizar",
+        "openPr": "Abrir PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} achados",
@@ -1732,7 +1752,7 @@
       "couldNotLoad": "Non se puido cargar este problema detectado.",
       "couldNotCheckPermissions": "Non se puideron comprobar os permisos para descartar achados.",
       "cannotDismissTitle": "Non se pode descartar este achado",
-      "cannotDismissDescription": "Só os propietarios da organización e os xestores de facturación poden descartar achados.",
+      "cannotDismissDescription": "Só os propietarios da organización, os administradores e os xestores de facturación poden descartar achados.",
       "alreadyResolvedDescription": "Este achado xa está resolto e non se pode descartar."
     },
     "findingDetails": {
@@ -1774,7 +1794,7 @@
       "automationAllOff": "Todo desactivado",
       "automationCount": "{{displayCount}} de 3 activados",
       "notificationsCount": "{{displayCount}} de 2 activadas",
-      "disabledNoManage": "O axente de seguridade está desactivado. Só os propietarios da organización e os xestores de facturación poden activalo.",
+      "disabledNoManage": "O axente de seguridade está desactivado. Só os propietarios da organización, os administradores e os xestores de facturación poden activalo.",
       "disabledNoRepo": "Selecciona polo menos un repositorio antes de activar o axente de seguridade.",
       "disabledPrompt": "Activa o axente de seguridade para sincronizar os avisos de Dependabot, escoller repositorios e configurar a automatización."
     },
@@ -1823,7 +1843,7 @@
       "invalidDayCount": "o prazo debe ser de 1 a 365 días, sen decimais.",
       "remediationDeadlineA11y": "Prazo de corrección para a gravidade {{label}}, en días",
       "enterWholeNumber": "Introduce un número enteiro entre 1 e 365",
-      "permissionNote": "Só os propietarios da organización e os xestores de facturación poden cambiar esta configuración.",
+      "permissionNote": "Só os propietarios da organización, os administradores e os xestores de facturación poden cambiar esta configuración.",
       "enableTracking": "Activar o seguimento do SLA",
       "enableTrackingSubtitle": "Establece prazos de corrección segundo a gravidade do achado.",
       "deadlinesHeading": "Prazos de corrección (días)"
@@ -1859,12 +1879,16 @@
     "settingsSave": {
       "saveChanges": "Gardar cambios",
       "unsavedTitle": "Cambios sen gardar",
-      "unsavedMessage": "Queres gardar os cambios antes de saír desta pantalla?"
+      "unsavedMessage": "Queres gardar os cambios antes de saír desta pantalla?",
+      "unsavedInvalidMessage": "Estes cambios aínda non se poden gardar. Corríxeos para gardalos ou descártaos para saír."
     },
     "auditReportButton": {
       "viewA11y": "Ver informe de auditoría"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrador de Kilo",
+      "actorMaskedUser": "Usuario enmascarado",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "Non se puido cargar o informe de auditoría.",
       "events": "Eventos",
       "generated": "O informe xerouse o {{generatedAt}}.",
@@ -1875,8 +1899,25 @@
       "summary": "Resumo do informe",
       "title": "Informe de auditoría",
       "unavailable": "Informe de auditoría non dispoñible",
-      "unavailableDescription": "Só os propietarios da organización e os xestores de facturación poden ver os informes de auditoría. Pídelle a un propietario ou xestor de facturación que che conceda acceso.",
-      "queryFailed": "A consulta do informe non rematou. Téntao de novo."
+      "unavailableDescription": "Só os propietarios da organización, os administradores e os xestores de facturación poden ver os informes de auditoría. Pídelle a un propietario, administrador ou xestor de facturación que che conceda acceso.",
+      "queryFailed": "A consulta do informe non rematou. Téntao de novo.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Análise completada",
+        "findingAnalysisFailed": "Produciuse un erro na análise",
+        "findingAutoDismissed": "Rexeitado automaticamente",
+        "findingCreated": "Importado",
+        "findingDeleted": "Eliminado",
+        "findingDismissed": "Rexeitado",
+        "findingSeverityChanged": "Cambiouse a gravidade",
+        "findingStatusChange": "Cambiouse o estado",
+        "findingSuperseded": "Substituído",
+        "remediationBlocked": "Corrección bloqueada",
+        "remediationCancelled": "Cancelada",
+        "remediationFailed": "Produciuse un erro na corrección",
+        "remediationNoChangesNeeded": "Non se precisan cambios",
+        "remediationPrOpened": "PR aberto",
+        "remediationQueued": "Corrección solicitada"
+      }
     },
     "notifications": {
       "couldNotLoad": "Non se puido cargar a configuración das notificacións.",
@@ -1908,7 +1949,6 @@
       "installApp": "Instalar a aplicación de GitHub",
       "reauthorizeButton": "Volver autorizar a aplicación de GitHub",
       "reauthorizeDescription": "O axente de seguridade require o permiso vulnerability_alerts para acceder aos avisos de Dependabot. Volve autorizar a aplicación de GitHub para conceder este permiso.",
-      "reauthorizeFailed": "Non se puido iniciar a reautorización. Téntao de novo.",
       "reauthorizeTitle": "Requírense permisos adicionais",
       "setupFailed": "Non se puido iniciar a configuración de GitHub. Téntao de novo."
     },
@@ -1927,7 +1967,12 @@
       "syncMayNotHaveCompleted": "É posible que unha sincronización non rematase. Téntaa de novo para actualizar o seu estado ou descártaa.",
       "syncInProgress": "Xa hai unha sincronización de seguridade en curso. Téntao de novo.",
       "dismissalInProgress": "Este descarte xa está en curso. Téntao de novo.",
-      "couldNotReadPendingSyncs": "Non se puideron ler as sincronizacións pendentes. Téntao de novo."
+      "couldNotReadPendingSyncs": "Non se puideron ler as sincronizacións pendentes. Téntao de novo.",
+      "ambiguous": "Non se puido confirmar. Comproba a revisión de seguridade antes de tentalo de novo.",
+      "settleFailed": "A acción completouse, pero non puidemos rexistrar o resultado. Téntao de novo.",
+      "replayFailed": "Esta acción non se completou. Téntao de novo.",
+      "actionFailed": "Non se puido completar esta acción. Téntao de novo.",
+      "actionBlocked": "Non se puido completar esta acción. Tes que resolver o problema antes de tentalo de novo."
     },
     "analysisState": {
       "queued": "Análise na cola",
@@ -2186,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Non se ve ningún repositorio. Comproba o acceso aos repositorios de GitLab e despois actualiza a lista.",
       "noRepositoriesVisibleBitbucket": "Non se ve ningún repositorio. Comproba o acceso aos repositorios de Bitbucket e despois actualiza a lista.",
       "bitbucketOrganizationsOnly": "Bitbucket só está dispoñible para organizacións.",
+      "githubNeedsAttention": "Hai que volver conectar GitHub",
+      "githubNeedsAttentionDescription": "Volve conectar a aplicación de GitHub de Kilo e despois actualiza para cargar os seus repositorios.",
+      "partialRepositories": "Algúns repositorios de GitHub non se cargaron.",
       "branchPickerTitle": "Seleccionar rama",
       "branchDefault": "Predeterminada",
       "branchAccessibility": "Rama: {{label}}",
@@ -2204,6 +2252,8 @@
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sesión",
       "selectRepositoryToStart": "Selecciona un repositorio para comezar.",
+      "enterPromptToStart": "Engade un prompt para comezar.",
+      "enterPromptOrFileToStart": "Engade un prompt ou un ficheiro para comezar.",
       "connectProviderToStart": "Conecta un provedor para comezar.",
       "promptPlaceholder": "En que che gustaría traballar?",
       "couldNotLoadModels": "Non se puideron cargar os modelos.",
@@ -2212,6 +2262,7 @@
       "prefillModelUnavailable": "{{model}} xa non está dispoñible. Usarase o teu modelo predeterminado.",
       "couldNotReadPendingSessions": "Non se puideron ler as sesións pendentes. Téntao de novo.",
       "failedToCreate": "Non se puido crear a sesión.",
+      "checkOrganizationAccess": "Comproba o teu acceso a esta organización e téntao de novo.",
       "couldNotRefreshRepositories": "Non se puideron actualizar os repositorios. Téntao de novo.",
       "discardDraftTitle": "Descartar o borrador?",
       "discardDraftMessage": "Perderase a túa instrución.",
@@ -2281,7 +2332,8 @@
       "linesBadge_other": "{{displayCount}} liñas",
       "matchesBadge_one": "{{displayCount}} coincidencia",
       "matchesBadge_other": "{{displayCount}} coincidencias",
-      "noOutput": "Non hai saída."
+      "noOutput": "Non hai saída.",
+      "translationFailed": "Fallou a tradución"
     },
     "readToolMarkdown": {
       "linesTruncated": "liñas {{start}}–{{end}} (contido truncado)",
@@ -2695,7 +2747,7 @@
       "invalidLink": "Non se pode abrir esta ligazón.",
       "hostConfirmTitle": "Abrir a ligazón externa?",
       "hostConfirmMessage": "Esta ligazón abre {{host}} no teu navegador.",
-      "open": "Apertura",
+      "open": "Abrir",
       "trustThisHost": "Confiar neste dominio"
     },
     "folderPicker": {
@@ -2732,6 +2784,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Non se poden mostrar as túas sesións activas ata que se carguen os datos.",
     "currentDeviceUnidentified": "Non se puido identificar o dispositivo actual.",
+    "kiloApp": "Aplicación de Kilo",
     "noSessions": "Non hai sesións activas",
     "noSessionsDescription": "Inicia sesión coa aplicación de Kilo noutro dispositivo e aparecerá aquí.",
     "onlyKiloAppSignIns": "Aquí só aparecen os inicios de sesión da aplicación de Kilo. Non se inclúen os do editor nin os do CLI.",
@@ -2739,7 +2792,7 @@
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver o perfil",
     "signOutThisDevice": "Pechar a sesión deste dispositivo",
-    "signOutThisSession": "Pechar esta sesión",
+    "signOutSessionLabel": "Pechar a sesión de {{device}}, inicio de sesión: {{signedIn}}",
     "sessionSignedOut": "Sesión pechada.",
     "signOutThisDeviceTitle": "Pechar a sesión deste dispositivo?",
     "signOutThisSessionTitle": "Pechar esta sesión?",
@@ -2977,11 +3030,23 @@
     "boundary": {
       "backToProfile": "Volver ao perfil",
       "loadErrorMessage": "Comproba a túa conexión e téntao de novo.",
+
+      "chooseAccount": "Seleccionar unha conta",
       "loadErrorTitle": "Non se puideron cargar as túas organizacións.",
+      "membershipLostNotice": "Xa non tes acceso a esta organización. Cambiado a {{target}}.",
+      "noOrganization": "Sen organización",
+
+      "noOrganizationDescription": "Esta conta non forma parte dunha organización. Crea unha ou únete a unha na web para usar funcións de organización como as invitacións de membros e as alertas de saldo baixo.",
+
+      "openWebOrganizations": "Abrir as organizacións na web",
+
       "organizationUnavailable": "A organización non está dispoñible.",
-      "selectDescription": "Escolle unha organización desde o teu perfil para continuar.",
+      "selectDescriptionWithOrganizations": "Pertences a unha ou máis organizacións. Escolle a conta que debe usar esta pantalla.",
+
       "selectOrganization": "Seleccionar unha organización",
       "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar.",
+
+      "unavailableSessionsDescription": "Esta organización xa non está dispoñible. Non se poden cargar as súas sesións.",
       "accessDeniedDescription": "Non tes acceso a esta organización."
     },
     "creditActivity": {
@@ -3033,7 +3098,11 @@
       "separateEmailsHint": "Se introduces varios enderezos de correo, sepáraos con comas.",
       "thresholdLabel": "Alertar por baixo de (USD)",
       "title": "Alerta de saldo baixo",
-      "emailsError": "Introduce polo menos un enderezo de correo válido. Se introduces varios, sepáraos con comas.",
+      "emailsInvalid": "Un ou máis enderezos de correo non son válidos.",
+      "emailsRequired": "Introduce polo menos un enderezo de correo.",
+      "saveEmailsError": "Algúns enderezos de correo non foron aceptados. Compróbaos e téntao de novo.",
+      "saveError": "Non se puido gardar a alerta de saldo baixo.",
+      "thresholdPlaceholder": "Introduce unha cantidade",
       "thresholdError": "Introduce unha cantidade maior que 0."
     },
     "memberLimit": {
@@ -3044,12 +3113,13 @@
       "removeLimit": "Eliminar límite",
       "title": "Límite de uso diario",
       "blankError": "Introduce unha cantidade ou elimina o límite coa opción que aparece abaixo.",
+      "blankWithoutLimitError": "Introduce un límite diario entre 0 e {{max}}.",
       "rangeError": "Introduce unha cantidade entre 0 e {{max}}."
     },
     "members": {
       "changeRole": "Cambiar rol",
       "emptyDescriptionCanInvite": "Invita os teus compañeiros de equipo para comezar a colaborar nesta organización.",
-      "emptyDescriptionCannotInvite": "Pídelle a un propietario ou a un xestor de facturación que invite os teus compañeiros de equipo.",
+      "emptyDescriptionCannotInvite": "Pídelle a un propietario, administrador ou xestor de facturación que invite os teus compañeiros de equipo.",
       "emptyTitle": "Aínda non hai membros",
       "invitedDate": "Invitación enviada o {{date}}",
       "limitPerDay": "{{amount}}/día",
@@ -3313,7 +3383,8 @@
       "settingsToolsOn": "Activado — as ferramentas de configuración envíanse ao modelo",
       "settingsToolsOff": "Desactivado — non se envía ningunha ferramenta de configuración ao modelo",
       "serverChecking": "Comprobando este servidor…",
-      "serverToolCount": "{{count}} ferramentas",
+      "serverToolCount_one": "{{count}} ferramenta",
+      "serverToolCount_other": "{{count}} ferramentas",
       "serverUnreachable": "Non se puido contactar con este servidor",
       "serverOff": "Este servidor está desactivado"
     },
@@ -3460,6 +3531,8 @@
       "quantizationsHelp": "Os ficheiros máis pequenos usan menos memoria e almacenamento. Os máis grandes adoitan dar mellores respostas.",
       "quantDetail": "Descarga de {{size}} · uns {{memory}} de memoria",
       "downloadQuant": "Descargar {{quant}}",
+      "downloadModelA11y": "Descargar {{name}}",
+      "detailsA11y": "Detalles: {{name}}",
       "loadingModel": "Cargando os detalles do modelo",
       "couldNotLoadModel": "Non se puido cargar este modelo",
       "noFiles": "Non hai ficheiros que esta app poida executar",
@@ -3511,6 +3584,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Iniciar un axente necesita unha instrución. Engade unha instrución e execútao de novo.",
+      "repositoryRequired": "Iniciar un axente necesita un repositorio. Abre Kilo e elixe un, e execútao de novo.",
       "repositoryUnknown": "Kilo non recoñece {{repository}} como un repositorio de GitHub ou GitLab. Escolle outro repositorio en Kilo.",
       "repositoryUnsupported": "{{repository}} é un repositorio de Bitbucket — Iniciar un axente aínda non pode usalo. Escolle outro repositorio en Kilo."
     }
@@ -3548,10 +3622,13 @@
     "emptyDescription": "Crea un perfil para reutilizar as variables de ambiente, os comandos de configuración e as habilidades nas sesións.",
     "loadFailed": "Non se puideron cargar os perfís",
     "counts": {
-      "vars": "{{count}} variables",
+      "vars_one": "{{count}} variable",
+      "vars_other": "{{count}} variables",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} habilidades",
-      "commands": "{{count}} comandos",
+      "skills_one": "{{count}} habilidade",
+      "skills_other": "{{count}} habilidades",
+      "commands_one": "{{count}} comando",
+      "commands_other": "{{count}} comandos",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}h",
       "commandsShort": "{{count}}c"
@@ -3582,7 +3659,6 @@
     "keyTooLong": "A chave debe ter 256 caracteres ou menos",
     "keyDuplicate": "Esta chave xa existe no perfil",
     "valueLabel": "Valor",
-    "secretLabel": "Segredo",
     "secrets": {
       "markSecret": "Marcar como segredo",
       "masked": "Valor oculto",
@@ -3611,6 +3687,8 @@
     "skillNameInvalid": "O nome da habilidade debe comezar cunha letra ou un díxitos e usar só letras minúsculas, díxitos e guións",
     "skillContentRequired": "Requírese contido de habilidade",
     "skillSaveFailed": "Non se puido gardar a habilidade",
+    "skillSourceCustom": "Personalizada",
+    "skillSourceMarketplace": "Mercado",
     "skillsHint": "Pega un SKILL.md e o seu nome énchese; engade unha habilidade desde o teu teléfono sen arrastrar e soltar.",
     "skillEditTitle": "Editar habilidade",
     "mcp": {
@@ -3626,7 +3704,7 @@
       "environment": "Ambiente (JSON)",
       "headers": "Cabeceiras (JSON)",
       "timeout": "Tempo de espera",
-      "secretCount": "Conta secreta",
+      "secretCount": "Conta secreta: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3641,18 +3719,20 @@
       "jsonTooLarge": "Usa como máximo 50 entradas, chaves de ata 128 e valores de ata 4096 caracteres",
       "timeoutInvalid": "O tempo de espera debe ser dun número enteiro de milisegundos",
       "edit": "Editar servidor MCP",
-      "saveFailed": "Non se puido gardar o servidor MCP"
+      "saveFailed": "Non se puido gardar o servidor MCP",
+      "deleteFailed": "Non se puido eliminar o servidor MCP",
+      "updateFailed": "Non se puido actualizar o servidor MCP"
     },
     "agents": {
       "title": "Axentes de perfil",
       "add": "Engadir axente",
       "empty": "Aínda non hai axentes",
       "name": "Nome do axente",
-      "slug": "Axente babosa",
+      "slug": "Slug do axente",
       "description": "Descrición do axente",
       "model": "Anulación do modelo",
       "modelPlaceholder": "Usar sesión predeterminada",
-      "prompt": "Aviso do sistema",
+      "prompt": "Prompt do sistema",
       "steps": "Pasos máximos",
       "stepsPlaceholder": "p. ex. 50",
       "temperature": "Temperatura",
@@ -3667,7 +3747,11 @@
       "visibilityPrimary": "Primario: móstrase no selector",
       "visibilitySubagent": "Subaxente: só se pode chamar desde outros",
       "visibilityAll": "Todos - ambos",
+      "modePrimary": "Só primario",
+      "modeSubagent": "Só subaxente",
+      "modeAll": "Todos",
       "saveFailed": "Non se puido gardar o axente",
+      "deleteFailed": "Non se puido eliminar o axente",
       "nameRequired": "Introduza un nome de axente",
       "slugRequired": "Introduza unha babosa de axente",
       "slugInvalid": "Slug debe comezar cunha letra e usar só letras minúsculas, díxitos e guións",
@@ -3682,10 +3766,12 @@
       "description": "Descrición do comando",
       "template": "Modelo",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar como subtarefa",
       "edit": "Comando de edición de barra",
       "saveFailed": "Non se puido gardar o comando",
+      "deleteFailed": "Non se puido eliminar o comando",
       "nameRequired": "Introduza un nome de comando",
       "nameInvalid": "O nome debe comezar cunha letra minúscula e usar só letras minúsculas, díxitos e guións",
       "templateRequired": "Introduza un modelo de comando",
@@ -3724,6 +3810,8 @@
     "empty": "Os paquetes de créditos non están dispoñibles agora mesmo.",
     "noMatchingProducts": "A App Store non devolveu ningún paquete de créditos coincidente.",
     "noMatchingProductsPlay": "Google Play non devolveu ningún paquete de créditos coincidente.",
+    "storeTimedOut": "A App Store non respondeu a tempo. Téntao de novo.",
+    "storeTimedOutPlay": "Google Play non respondeu a tempo. Téntao de novo.",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Apple Account pertencen a outra conta de Kilo. Inicia sesión nesa conta de Kilo para usalos.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos desta conta de Google Play pertencen a outra conta de Kilo. Inicia sesión nesa conta de Kilo para usalos."
   },
@@ -3832,7 +3920,7 @@
     "view": "Ler resumo",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Amosar estado en directo",
+    "dismiss": "Descartar o resumo",
     "offline": "Sen conexión · resumo gardado",
     "cached": "Informe gardado · non se pode actualizar",
     "revised": "Revisado · {{revision}}",
@@ -3873,6 +3961,33 @@
     "enable": "Activar resumos de pago",
     "contextSettings": "Configuración de AI · {{context}}",
     "allContexts": "Os resumos persoais e da organización mantéñense separados.",
+    "create": "Crear resumo",
+    "oneOff": "Puntual",
+    "createdAt": "Creado {{time}}",
+    "chooseContext": "Escolle un contexto",
+    "period": "Período do resumo",
+    "last24Hours": "Últimas 24 horas",
+    "last7Days": "Últimos 7 días",
+    "customPeriod": "Período personalizado",
+    "periodStart": "Inicio do período",
+    "periodEnd": "Fin do período",
+    "periodHint": "Escolle ata 31 días. A cobertura histórica pode ser incompleta.",
+    "periodSessions": "Con actividade no período",
+    "periodSpend": "Gasto do período",
+    "invalidPeriod": "Escolle un inicio anterior ao final.",
+    "futurePeriod": "O período non pode rematar no futuro.",
+    "periodTooLong": "Escolle un período de 31 días ou menos.",
+    "invalidLocalTime": "Esta hora local non existe no fuso horario do resumo. Escolle outra hora.",
+    "reviewBriefing": "Revisar resumo",
+    "reviewAgain": "Preparar unha nova revisión",
+    "payer": "Con cargo a {{context}}",
+    "emptyPeriod": "Non se atopou actividade neste período. Non se xerará ningún resumo con AI nin se aplicará ningún cargo.",
+    "emptyHistory": "Non hai resumos gardados",
+    "historicalStateHint": "O estado da sesión reflicte o final do período seleccionado, non o estado actual en tempo real.",
+    "oneOffHint": "A AI recibe evidencias seleccionadas cos datos sensibles ocultos no idioma da túa aplicación. Este informe puntual non cambia a túa programación matinal nin as túas preferencias de AI.",
+    "createOffline": "Conéctate á internet para revisar ou crear un resumo. As solicitudes de pago nunca se poñen en cola sen conexión.",
+    "estimateInputTooLarge": "Este período contén demasiadas evidencias para o modelo seleccionado.",
+    "estimatePermissionUnavailable": "Non tes permiso para usar o saldo deste contexto.",
     "estimatePricingUnavailable": "Non está dispoñible o prezo deste modelo.",
     "estimateBalanceUnavailable": "Non hai saldo abondo para un resumo de pago.",
     "estimateModelNotAllowed": "Este modelo non está permitido aquí.",

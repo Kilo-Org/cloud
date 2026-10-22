@@ -889,8 +889,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
   const result = await executor.execute<{
     usage_id: string;
     usage_created_at: string;
-    new_microdollars_used: number | null;
-    kilo_pass_threshold: number | null;
+    new_microdollars_used: string | null;
+    kilo_pass_threshold: string | null;
   }>(sql`
           WITH microdollar_usage_ins AS (
             INSERT INTO microdollar_usage (
@@ -1154,7 +1154,7 @@ export function processOpenRouterUsage(
 }
 
 export async function parseMicrodollarUsageFromStream(
-  stream: ReadableStream,
+  stream: ReadableStream<Uint8Array>,
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
@@ -1198,7 +1198,7 @@ export async function parseMicrodollarUsageFromStream(
         return;
       }
 
-      const json: ChatCompletionChunk = JSON.parse(event.data);
+      const json = JSON.parse(event.data) as ChatCompletionChunk;
 
       if (!json) {
         captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {

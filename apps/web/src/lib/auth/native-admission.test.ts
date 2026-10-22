@@ -21,21 +21,22 @@ jest.mock('./native-admission-google', () => ({
   verifyPlayIntegrity: jest.fn(),
 }));
 
-import { describe, test, expect, beforeEach, jest as jestGlobal } from '@jest/globals';
+import { describe, test, expect, beforeEach, afterEach, jest as jestGlobal } from '@jest/globals';
 import {
-  checkNativeAdmission,
+  requireAdmissionPayload,
+  countAdmissionCondition,
+  pendingAdmissionCountsForTests,
   resetAdmissionCountersForTests,
   validateAdmissionPayload,
   issueAdmissionChallenge,
   verifyAdmissionAsync,
   persistAttestedKey,
-  shouldRefuseAsyncFailure,
+  DEV_SENTINEL_PAYLOAD,
   ChallengeRateLimitError,
   KeyCollisionError,
   type AdmissionPayload,
 } from './native-admission';
 import { captureMessage } from '@sentry/nextjs';
-import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { checkRateLimit } from '@vercel/firewall';
 import { verifyAppleAttestation, verifyAppleAssertion } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
@@ -75,15 +76,10 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 }));
 
 const mockCaptureMessage = jest.mocked(captureMessage);
-const mockWarnExceptInTest = jest.mocked(warnExceptInTest);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockVerifyAppleAttestation = jest.mocked(verifyAppleAttestation);
 const mockVerifyAppleAssertion = jest.mocked(verifyAppleAssertion);
 const mockVerifyPlayIntegrity = jest.mocked(verifyPlayIntegrity);
-
-const setMode = (mode: string) => {
-  process.env.NATIVE_ADMISSION_MODE = mode;
-};
 
 // Helper to create a minimal NextRequest-like object for issueAdmissionChallenge
 function makeRequest(): any {
@@ -332,56 +328,12 @@ describe('validateAdmissionPayload', () => {
   });
 });
 
-// ── Mode behavior ──────────────────────────────────────────────────────────
+// ── Proof requirement ──────────────────────────────────────────────────────
 
-describe('checkNativeAdmission', () => {
-  beforeEach(() => {
-    delete process.env.NATIVE_ADMISSION_MODE;
-    delete process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL;
-    jest.clearAllMocks();
-  });
-
-  describe('mode: off', () => {
-    test('admits everything', () => {
-      setMode('off');
-      expect(checkNativeAdmission({})).toEqual({ admission: { ok: true }, verifyAsync: false });
-    });
-
-    test('admits with malformed admission', () => {
-      setMode('off');
-      expect(checkNativeAdmission({ admission: 'garbage' })).toEqual({
-        admission: { ok: true },
-        verifyAsync: false,
-      });
-    });
-  });
-
-  describe('mode: report', () => {
-    test('admits when no admission field is present', () => {
-      setMode('report');
-      expect(checkNativeAdmission({})).toEqual({ admission: { ok: true }, verifyAsync: false });
-    });
-
-    test('admits with malformed admission and counts the condition', () => {
-      setMode('report');
-      jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000);
-      resetAdmissionCountersForTests();
-      try {
-        expect(checkNativeAdmission({ admission: 'garbage' })).toEqual({
-          admission: { ok: true },
-          verifyAsync: false,
-        });
-        expect(mockCaptureMessage).not.toHaveBeenCalled();
-      } finally {
-        jestGlobal.restoreAllMocks();
-      }
-    });
-
-    test('sets verifyAsync true for valid admission payload', () => {
-      setMode('report');
-      const result = checkNativeAdmission({
-        provider: 'apple',
-        idToken: 'abc',
+describe('requireAdmissionPayload', () => {
+  test('returns the sanitized payload for a well-formed ios attestation', () => {
+    expect(
+      requireAdmissionPayload({
         admission: {
           platform: 'ios',
           kind: 'attestation',
@@ -389,307 +341,49 @@ describe('checkNativeAdmission', () => {
           payload: 'base64data',
           keyId: 'key123',
         },
-      });
-      expect(result).toEqual({ admission: { ok: true }, verifyAsync: true });
+      })
+    ).toEqual({
+      platform: 'ios',
+      kind: 'attestation',
+      challenge: 'ch123',
+      payload: 'base64data',
+      keyId: 'key123',
     });
   });
 
-  describe('mode: non-canonical values', () => {
-    test('folds case and whitespace around enforce', () => {
-      setMode(' Enforce ');
-      expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
-        admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' },
-        verifyAsync: false,
-      });
-    });
-
-    test('folds case around off', () => {
-      setMode('OFF');
-      expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
-        admission: { ok: true },
-        verifyAsync: false,
-      });
-    });
-
-    test('treats an unrecognized value as enforce for both the refusal and the verification', () => {
-      setMode('enforce-strict');
-      expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
-        admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' },
-        verifyAsync: false,
-      });
-      expect(
-        checkNativeAdmission({
-          provider: 'google',
-          serverAuthCode: 'auth123',
-          googleClientId: 'client123',
-          admission: {
-            platform: 'android',
-            kind: 'assertion',
-            challenge: 'ch123',
-            payload: 'integrityToken',
-          },
-        })
-      ).toEqual({ admission: { ok: true }, verifyAsync: true });
-    });
-  });
-
-  describe('mode: undefined (unset)', () => {
-    test('admits everything (off is the default)', () => {
-      expect(checkNativeAdmission({})).toEqual({ admission: { ok: true }, verifyAsync: false });
-    });
-
-    test('admits with present-invalid admission (empty mode behaves as off)', () => {
-      expect(checkNativeAdmission({ admission: 'garbage' })).toEqual({
-        admission: { ok: true },
-        verifyAsync: false,
-      });
-    });
-  });
-
-  describe('mode: enforce', () => {
-    beforeEach(() => {
-      setMode('enforce');
-    });
-
-    test('refuses a request without a valid admission payload', () => {
-      const result = checkNativeAdmission({ provider: 'google', idToken: 'abc' });
-      expect(result).toEqual({
-        admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' },
-        verifyAsync: false,
-      });
-      expect(mockCaptureMessage).not.toHaveBeenCalled();
-    });
-
-    test('admits a request inside the legacy grace window', () => {
-      jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000);
-      process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = new Date(1_000_000 + 60_000).toISOString();
-      try {
-        expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
-          admission: { ok: true },
-          verifyAsync: false,
-        });
-      } finally {
-        jestGlobal.restoreAllMocks();
-      }
-    });
-
-    test.each(['1970-01-01t00:17:00z', '1970-01-01T01:17:00+01:00', '1970-01-01T00:17:00.000Z'])(
-      'accepts the full instant spelling %s',
-      value => {
-        jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000);
-        process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = value;
-        try {
-          expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
-            admission: { ok: true },
-            verifyAsync: false,
-          });
-        } finally {
-          jestGlobal.restoreAllMocks();
-        }
-      }
-    );
-
-    test('refuses a request at the legacy grace deadline', () => {
-      jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000);
-      process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = new Date(1_000_000).toISOString();
-      try {
-        expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
-          admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' },
-          verifyAsync: false,
-        });
-      } finally {
-        jestGlobal.restoreAllMocks();
-      }
-    });
-
-    test.each(['not-a-date', '2026', '11/01/2026', '2026-11-01'])(
-      'refuses a request when the grace deadline is %s rather than a full instant',
-      value => {
-        process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = value;
-        expect(checkNativeAdmission({ provider: 'google', idToken: 'abc' })).toEqual({
-          admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' },
-          verifyAsync: false,
-        });
-      }
-    );
-
-    test('well-formed ios attestation passes sync check', () => {
-      const result = checkNativeAdmission({
-        provider: 'apple',
-        idToken: 'abc',
-        admission: {
-          platform: 'ios',
-          kind: 'attestation',
-          challenge: 'ch123',
-          payload: 'base64data',
-          keyId: 'key123',
-        },
-      });
-      expect(result).toEqual({ admission: { ok: true }, verifyAsync: true });
-    });
-
-    test('well-formed ios assertion passes sync check', () => {
-      const result = checkNativeAdmission({
-        provider: 'apple',
-        idToken: 'abc',
-        admission: {
-          platform: 'ios',
-          kind: 'assertion',
-          challenge: 'ch123',
-          payload: 'base64data',
-          keyId: 'key123',
-        },
-      });
-      expect(result).toEqual({ admission: { ok: true }, verifyAsync: true });
-    });
-
-    test('well-formed android assertion passes sync check', () => {
-      const result = checkNativeAdmission({
-        provider: 'google',
-        serverAuthCode: 'auth123',
-        googleClientId: 'client123',
+  test('returns the sanitized payload for a well-formed android assertion', () => {
+    expect(
+      requireAdmissionPayload({
         admission: {
           platform: 'android',
           kind: 'assertion',
           challenge: 'ch123',
           payload: 'integrityToken',
         },
-      });
-      expect(result).toEqual({ admission: { ok: true }, verifyAsync: true });
+      })
+    ).toEqual({
+      platform: 'android',
+      kind: 'assertion',
+      challenge: 'ch123',
+      payload: 'integrityToken',
+      keyId: undefined,
     });
+  });
 
-    test('malformed admission is refused', () => {
-      const result = checkNativeAdmission({
-        provider: 'google',
-        idToken: 'abc',
-        admission: { some: 'data' },
-      });
-      expect(result).toEqual({
-        admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' },
-        verifyAsync: false,
-      });
-    });
+  test('returns undefined when the field is absent', () => {
+    expect(requireAdmissionPayload({ provider: 'google', idToken: 'abc' })).toBeUndefined();
+  });
+
+  test('returns undefined for a malformed payload', () => {
+    expect(requireAdmissionPayload({ admission: 'garbage' })).toBeUndefined();
+    expect(requireAdmissionPayload({ admission: { some: 'data' } })).toBeUndefined();
+    expect(
+      requireAdmissionPayload({ admission: { platform: 'ios', kind: 'assertion' } })
+    ).toBeUndefined();
   });
 });
 
 // ── Challenge issuance ─────────────────────────────────────────────────────
-
-describe('admission condition aggregation', () => {
-  beforeEach(() => {
-    delete process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL;
-    jest.clearAllMocks();
-    resetAdmissionCountersForTests();
-  });
-
-  test('counts occurrences and emits one structured line per interval with the running count', () => {
-    setMode('enforce');
-    process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = new Date(5_000_000).toISOString();
-    jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000);
-    try {
-      checkNativeAdmission({ provider: 'google', idToken: 'a' });
-      checkNativeAdmission({ provider: 'google', idToken: 'b' });
-      checkNativeAdmission({ provider: 'google', idToken: 'c' });
-      // Still inside the same interval: nothing flushed yet.
-      expect(mockWarnExceptInTest).not.toHaveBeenCalled();
-
-      // Next interval boundary flushes the accumulated count.
-      jestGlobal.spyOn(Date, 'now').mockReturnValue(1_000_000 + 60_001);
-      checkNativeAdmission({ provider: 'google', idToken: 'd' });
-
-      expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
-      const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
-      expect(line).toMatchObject({
-        event: 'native_admission_aggregate',
-        metric: 'native_admission_legacy_grace_admit',
-        count: 3,
-        intervalMs: 60_000,
-      });
-    } finally {
-      jestGlobal.restoreAllMocks();
-    }
-  });
-
-  test('counts expired-legacy refusals under their own metric', () => {
-    setMode('enforce');
-    process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = new Date(1_000_000).toISOString();
-    jestGlobal.spyOn(Date, 'now').mockReturnValue(2_000_000);
-    try {
-      checkNativeAdmission({ provider: 'google', idToken: 'a' });
-      jestGlobal.spyOn(Date, 'now').mockReturnValue(2_000_000 + 60_001);
-      checkNativeAdmission({ provider: 'google', idToken: 'b' });
-
-      const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
-      expect(line).toMatchObject({
-        event: 'native_admission_aggregate',
-        metric: 'native_admission_legacy_grace_expired',
-        count: 1,
-      });
-    } finally {
-      jestGlobal.restoreAllMocks();
-    }
-  });
-
-  test('report-mode invalid shapes aggregate under their own metric', () => {
-    setMode('report');
-    jestGlobal.spyOn(Date, 'now').mockReturnValue(2_000_000);
-    try {
-      checkNativeAdmission({ admission: 'garbage' });
-      checkNativeAdmission({ admission: null });
-
-      jestGlobal.spyOn(Date, 'now').mockReturnValue(2_000_000 + 60_001);
-      checkNativeAdmission({ admission: 'garbage' });
-
-      const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
-      expect(line).toMatchObject({
-        event: 'native_admission_aggregate',
-        metric: 'native_admission_invalid_shape',
-        count: 2,
-      });
-    } finally {
-      jestGlobal.restoreAllMocks();
-    }
-  });
-
-  test('final window flushes on later traffic even without a new counted condition', () => {
-    setMode('enforce');
-    process.env.NATIVE_ADMISSION_LEGACY_GRACE_UNTIL = new Date(9_000_000).toISOString();
-    jestGlobal.spyOn(Date, 'now').mockReturnValue(3_000_000);
-    try {
-      checkNativeAdmission({ provider: 'google', idToken: 'a' });
-      // Window elapses; the next request has an admission field, so nothing
-      // new is counted, but the pending window must still flush.
-      jestGlobal.spyOn(Date, 'now').mockReturnValue(3_000_000 + 60_001);
-      checkNativeAdmission({
-        provider: 'google',
-        idToken: 'b',
-        admission: {
-          platform: 'android',
-          kind: 'assertion',
-          challenge: 'ch1',
-          payload: 'base64data',
-          keyId: 'key1',
-        },
-      });
-
-      expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
-      const line = JSON.parse(mockWarnExceptInTest.mock.calls[0][0] as string);
-      expect(line).toMatchObject({
-        event: 'native_admission_aggregate',
-        metric: 'native_admission_legacy_grace_admit',
-        count: 1,
-        windowStart: new Date(3_000_000).toISOString(),
-      });
-    } finally {
-      jestGlobal.restoreAllMocks();
-    }
-  });
-
-  test('per-request captureMessage stays silent for expected conditions', () => {
-    setMode('enforce');
-    checkNativeAdmission({ provider: 'google', idToken: 'a' });
-    expect(mockCaptureMessage).not.toHaveBeenCalled();
-  });
-});
 
 describe('issueAdmissionChallenge', () => {
   beforeEach(() => {
@@ -1218,36 +912,113 @@ describe('persistAttestedKey', () => {
   });
 });
 
-// ── Async refusal mode ─────────────────────────────────────────────────────
+// ── Expected-condition telemetry ───────────────────────────────────────────
 
-describe('shouldRefuseAsyncFailure', () => {
+describe('countAdmissionCondition', () => {
+  beforeEach(() => {
+    // Earlier tests in this file call the gate at real wall-clock time, which
+    // opens a window far in the future of this test's mocked clock.
+    resetAdmissionCountersForTests();
+  });
+
+  afterEach(() => {
+    resetAdmissionCountersForTests();
+    jestGlobal.restoreAllMocks();
+  });
+
+  test('folds refusals into one window instead of one event per request', () => {
+    const now = jestGlobal.spyOn(Date, 'now');
+    now.mockReturnValue(1_000_000);
+
+    countAdmissionCondition('native_admission_refused');
+    countAdmissionCondition('native_admission_refused');
+
+    // Both refusals are counted in the open window, and neither became an
+    // event of its own.
+    expect(pendingAdmissionCountsForTests()).toEqual({ native_admission_refused: 2 });
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    // The next interval flushes the window and starts a fresh count.
+    now.mockReturnValue(1_061_000);
+    countAdmissionCondition('native_admission_refused');
+
+    expect(pendingAdmissionCountsForTests()).toEqual({ native_admission_refused: 1 });
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+});
+
+// ── Non-production sentinel ────────────────────────────────────────────────
+
+describe('dev sentinel', () => {
+  const admission: AdmissionPayload = {
+    platform: 'android',
+    kind: 'assertion',
+    challenge: 'ch123',
+    payload: DEV_SENTINEL_PAYLOAD,
+  };
+  const originalNodeEnv = process.env.NODE_ENV;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    mockVerifyPlayIntegrity.mockResolvedValue({ ok: true, packageName: 'com.kilocode.app' });
+    const setMock = jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ challenge: 'ch123' }]),
+      }),
+    });
+    jest.mocked(db.update).mockReturnValue({ set: setMock } as any);
   });
 
-  test('returns false in off mode', () => {
-    setMode('off');
-    expect(shouldRefuseAsyncFailure()).toBe(false);
+  afterEach(() => {
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: originalNodeEnv,
+      writable: true,
+      configurable: true,
+    });
+    delete process.env.NATIVE_ADMISSION_DEV_SENTINEL;
   });
 
-  test('returns false in report mode', () => {
-    setMode('report');
-    expect(shouldRefuseAsyncFailure()).toBe(false);
+  const setNodeEnv = (value: string) => {
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value,
+      writable: true,
+      configurable: true,
+    });
+  };
+
+  test('accepts the sentinel outside production when the switch is on', async () => {
+    setNodeEnv('development');
+    process.env.NATIVE_ADMISSION_DEV_SENTINEL = 'true';
+
+    expect(await verifyAdmissionAsync(admission)).toEqual({
+      ok: true,
+      platform: 'android',
+      keyId: '',
+    });
+    expect(mockVerifyPlayIntegrity).not.toHaveBeenCalled();
   });
 
-  test('returns true in enforce mode', () => {
-    setMode('enforce');
-    expect(shouldRefuseAsyncFailure()).toBe(true);
+  test('ignores the sentinel in production', async () => {
+    setNodeEnv('production');
+    process.env.NATIVE_ADMISSION_DEV_SENTINEL = 'true';
+
+    await verifyAdmissionAsync(admission);
+    expect(mockVerifyPlayIntegrity).toHaveBeenCalledTimes(1);
   });
 
-  test('returns false when mode is unset', () => {
-    delete process.env.NATIVE_ADMISSION_MODE;
-    expect(shouldRefuseAsyncFailure()).toBe(false);
+  test('ignores the sentinel when the switch is off', async () => {
+    setNodeEnv('development');
+
+    await verifyAdmissionAsync(admission);
+    expect(mockVerifyPlayIntegrity).toHaveBeenCalledTimes(1);
   });
 
-  test('returns true for an unrecognized mode, matching the strict branch', () => {
-    setMode('enforce-strict');
-    expect(shouldRefuseAsyncFailure()).toBe(true);
+  test('sends no other payload to the sentinel branch', async () => {
+    setNodeEnv('development');
+    process.env.NATIVE_ADMISSION_DEV_SENTINEL = 'true';
+
+    await verifyAdmissionAsync({ ...admission, payload: 'a-real-integrity-token' });
+    expect(mockVerifyPlayIntegrity).toHaveBeenCalledTimes(1);
   });
 });
 

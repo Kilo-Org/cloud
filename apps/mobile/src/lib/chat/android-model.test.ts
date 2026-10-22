@@ -1,5 +1,5 @@
 import { type ModelClientService, type ModelRequest } from '@kilocode/harness-sdk';
-import { Effect, Either, Schedule, Stream } from 'effect';
+import { Effect, Result, Schedule, Stream } from 'effect';
 import { type TFunction } from 'i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -127,9 +127,9 @@ describe('Android Gemini Nano', () => {
       android.availability.mockResolvedValue({ ...android.available, status });
       const { client, kilo } = router();
       const result = await Effect.runPromise(
-        Effect.either(Stream.runCollect(client.stream(question)))
+        Effect.result(Stream.runCollect(client.stream(question)))
       );
-      expect(Either.isLeft(result) && backendFailureKey(result.left)).toBe(
+      expect(Result.isFailure(result) && backendFailureKey(result.failure)).toBe(
         'modelChat.localModels.unavailable'
       );
       expect(android.generate).not.toHaveBeenCalled();

@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- the registry suite pins one question at a time, the moves onto another model or tool set, and the MCP discovery around an open on one fake SDK harness. */
 import { type ModelEvent, type ModelUsage, type PartDraft, type Turn } from '@kilocode/harness-sdk';
-import { Effect, Layer, Stream } from 'effect';
+import { Effect, Layer, Queue, Stream } from 'effect';
 import { type StoredChatBackend } from './backend-store';
 import { backendTargetId } from './backend-target';
 import { asMessages } from './turns';
@@ -129,13 +129,13 @@ const handleFor = (id: string) => {
         asked.push(said);
         return Stream.fail(new Error('custom answer failed'));
       }
-      return Stream.asyncPush<ModelEvent>(emit =>
+      return Stream.callback<ModelEvent>(queue =>
         Effect.sync(() => {
           asked.push(said);
           emitEvent = event => {
-            emit.single(event);
+            Queue.offerUnsafe(queue, event);
           };
-          emit.single({ kind: 'delta', text: 'ok' });
+          Queue.offerUnsafe(queue, { kind: 'delta', text: 'ok' });
           finish = () => {
             const held = totals.get(id);
             totals.set(id, {
@@ -145,8 +145,8 @@ const handleFor = (id: string) => {
               cacheWriteTokens: 0,
               cost: (held?.cost ?? 0) + (CALL.cost ?? 0),
             });
-            emit.single({ kind: 'done', usage: CALL, stop: 'end' });
-            emit.end();
+            Queue.offerUnsafe(queue, { kind: 'done', usage: CALL, stop: 'end' });
+            Queue.endUnsafe(queue);
           };
           return Effect.void;
         })

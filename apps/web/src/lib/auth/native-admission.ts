@@ -61,7 +61,12 @@ function rollAdmissionWindowIfNeeded(now: number): void {
   }
 }
 
-function countAdmissionCondition(metric: string): void {
+/**
+ * Count an expected, traffic-scaled admission outcome. Refusals are the normal
+ * shape of hostile traffic, so they aggregate per window instead of emitting
+ * one event each. Unexpected provider faults keep their per-event message.
+ */
+export function countAdmissionCondition(metric: string): void {
   const now = Date.now();
   rollAdmissionWindowIfNeeded(now);
   admissionCounters.set(metric, (admissionCounters.get(metric) ?? 0) + 1);
@@ -73,15 +78,16 @@ export function resetAdmissionCountersForTests(): void {
   admissionCountersWindowStart = 0;
 }
 
-// ── Types ──────────────────────────────────────────────────────────────────
+/** Exported for tests: the counts accumulated in the open window. */
+export function pendingAdmissionCountsForTests(): Record<string, number> {
+  return Object.fromEntries(admissionCounters);
+}
 
-export type NativeAdmissionMode = 'off' | 'report' | 'enforce';
+// ── Types ──────────────────────────────────────────────────────────────────
 
 export type AdmissionPlatform = 'ios' | 'android';
 
 export type AdmissionKind = 'attestation' | 'assertion';
-
-export type NativeAdmissionResult = { ok: true } | { ok: false; errorCode: 'ADMISSION_REQUIRED' };
 
 // ── Wire contract ──────────────────────────────────────────────────────────
 
@@ -185,126 +191,37 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
   };
 }
 
-// ── Admission gate (sync) ──────────────────────────────────────────────────
-
-/** ISO-8601 close of the native admission compatibility window. */
-const LEGACY_GRACE_UNTIL_ENV = 'NATIVE_ADMISSION_LEGACY_GRACE_UNTIL';
-
-type LegacyGraceState = 'active' | 'expired' | 'invalid' | 'unset';
+// ── Admission gate ─────────────────────────────────────────────────────────
 
 /**
- * A full ISO-8601 instant with an explicit offset: `2026-11-01T00:00:00Z`.
- * Date.parse alone accepts many other forms (`2026`, `11/01/2026`), whose
- * meaning depends on the reader's locale and could close the window on a day
- * nobody intended. RFC 3339 allows the `t`/`z` designators in either case, so
- * the pattern matches them case-insensitively.
+ * The proof a native request must carry. Token issuance is attested-device
+ * only: a missing or malformed `admission` field is refused, never admitted.
+ * There is no legacy, report, or disabled mode — the only exception is the
+ * non-production sentinel below, which no production request can reach.
  */
-const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/i;
-
-/**
- * Normalize the configured mode. The setting is a raw env string, so case and
- * surrounding whitespace are folded. An unrecognized value takes the strict
- * branch instead of silently turning the control off, and matches the strict
- * branch that a malformed payload already gets in every unrecognized mode.
- */
-function readAdmissionMode(): NativeAdmissionMode {
-  const raw = getEnvVariable('NATIVE_ADMISSION_MODE').trim().toLowerCase();
-  if (raw === '' || raw === 'off') return 'off';
-  if (raw === 'report') return 'report';
-  return 'enforce';
+export function requireAdmissionPayload(
+  body: Record<string, unknown>
+): AdmissionPayload | undefined {
+  // Roll the telemetry window on any native auth request, so the final window
+  // of a sparse traffic pattern still flushes.
+  rollAdmissionWindowIfNeeded(Date.now());
+  return validateAdmissionPayload(body['admission']);
 }
 
 /**
- * State of the native admission compatibility window.
- *
- * The setting is a cutover instant, not a switch: the window is open only
- * before it, so it cannot stay open by accident. Unset, unparseable and past
- * values all leave it closed.
+ * Proof a non-production device sends when it cannot attest at all (simulator,
+ * emulator without Play Services). Accepted only when the process is not
+ * production and `NATIVE_ADMISSION_DEV_SENTINEL` is `true`; the branch skips
+ * the platform verifier and persists no key.
  */
-function evaluateLegacyGrace(now: number): LegacyGraceState {
-  const raw = getEnvVariable(LEGACY_GRACE_UNTIL_ENV).trim();
-  if (!raw) return 'unset';
-  if (!ISO_INSTANT.test(raw)) return 'invalid';
-  const until = Date.parse(raw);
-  if (Number.isNaN(until)) return 'invalid';
-  return now < until ? 'active' : 'expired';
-}
+export const DEV_SENTINEL_PAYLOAD = 'native-admission-dev-sentinel';
 
-/**
- * Evaluate admission for a native auth request body.
- *
- * Mode behaviour (the configured value is trimmed, case-folded, and an
- * unrecognized value is treated as 'enforce'):
- * - 'off':      admit everything.
- * - 'report':   evaluate and log, always admit.
- * - 'enforce':  require a valid admission payload. Requests inside the
- *               compatibility window (NATIVE_ADMISSION_LEGACY_GRACE_UNTIL) are
- *               admitted; the requirement applies once it closes. A malformed
- *               payload is refused. Provider fault = 5xx via throw.
- *
- * Returns whether async verification is needed ('report' and 'enforce' modes
- * with a valid admission payload).
- */
-export function checkNativeAdmission(body: Record<string, unknown>): {
-  admission: NativeAdmissionResult;
-  /** True when async crypto verification is needed (enforce or report). */
-  verifyAsync: boolean;
-} {
-  const mode = readAdmissionMode();
-
-  const now = Date.now();
-
-  // Roll the telemetry window on any native auth request, so the final
-  // window of a sparse traffic pattern still flushes.
-  rollAdmissionWindowIfNeeded(now);
-
-  // off mode (or unset) always admits with no async verification
-  if (!mode || mode === 'off') {
-    return { admission: { ok: true }, verifyAsync: false };
-  }
-
-  const hasAdmission = 'admission' in body && body['admission'] !== undefined;
-
-  if (!hasAdmission) {
-    if (mode === 'report') {
-      return { admission: { ok: true }, verifyAsync: false };
-    }
-    const grace = evaluateLegacyGrace(now);
-    if (grace === 'active') {
-      countAdmissionCondition('native_admission_legacy_grace_admit');
-      return { admission: { ok: true }, verifyAsync: false };
-    }
-    countAdmissionCondition(
-      grace === 'invalid'
-        ? 'native_admission_legacy_grace_invalid'
-        : grace === 'expired'
-          ? 'native_admission_legacy_grace_expired'
-          : 'native_admission_legacy_refused'
-    );
-    return { admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' }, verifyAsync: false };
-  }
-
-  // Validate the admission payload shape synchronously.
-  const admission = validateAdmissionPayload(body['admission']);
-  if (!admission) {
-    if (mode === 'report') {
-      countAdmissionCondition('native_admission_invalid_shape');
-      return { admission: { ok: true }, verifyAsync: false };
-    }
-    return { admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' }, verifyAsync: false };
-  }
-
-  // Valid payload — async verification needed for enforce and report modes.
-  return { admission: { ok: true }, verifyAsync: mode === 'enforce' || mode === 'report' };
-}
-
-/**
- * Whether to refuse admission when the async verify fails.
- * Only true under enforce mode; report mode evaluates but always admits.
- */
-export function shouldRefuseAsyncFailure(): boolean {
-  const mode = readAdmissionMode();
-  return mode === 'enforce';
+function isDevSentinel(admission: AdmissionPayload): boolean {
+  return (
+    process.env.NODE_ENV !== 'production' &&
+    getEnvVariable('NATIVE_ADMISSION_DEV_SENTINEL') === 'true' &&
+    admission.payload === DEV_SENTINEL_PAYLOAD
+  );
 }
 
 // ── Async attestation / assertion verification ─────────────────────────────
@@ -355,6 +272,12 @@ export async function verifyAdmissionAsync(
 
   if (!consumed) {
     return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+  }
+
+  if (isDevSentinel(admission)) {
+    // Android shape on purpose: no key id means nothing is persisted and the
+    // device session is created without an attested-key binding.
+    return { ok: true, platform: 'android', keyId: '' };
   }
 
   // Route to platform-specific verifier

@@ -42,6 +42,7 @@ function resolve(
     env?: Env;
     repositoryType?: 'github' | 'gitlab' | 'bitbucket';
     capability?: 'review' | 'remediation';
+    environmentAllocation?: string;
   } = {}
 ) {
   return resolveSavedSandboxAllocation({
@@ -50,6 +51,7 @@ function resolve(
     owner,
     repositoryType: args.repositoryType ?? 'github',
     ...(args.capability ? { capability: args.capability } : {}),
+    ...(args.environmentAllocation ? { environmentAllocation: args.environmentAllocation } : {}),
   });
 }
 
@@ -59,6 +61,27 @@ beforeEach(() => {
 });
 
 describe('resolveSavedSandboxAllocation', () => {
+  it('prefers the eligible environment allocation over the repository override', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      repositoryAllocation: 'cloudflare-single',
+      contextAllocation: 'cloudflare-single',
+    });
+
+    await expect(
+      resolve({ env: enrolledEnv, environmentAllocation: 'cloudflare-containers-standard-4' })
+    ).resolves.toBe('cloudflare-containers-standard-4');
+  });
+
+  it('falls back to the repository override when the environment allocation is unavailable', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      repositoryAllocation: 'cloudflare-single',
+    });
+
+    await expect(
+      resolve({ env: withoutVercelEnv, environmentAllocation: 'vercel-large' })
+    ).resolves.toBe('cloudflare-single');
+  });
+
   it('prefers the eligible repository override over the context default', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({
       repositoryAllocation: 'cloudflare-containers-standard-4',
@@ -186,6 +209,19 @@ describe('withSavedSandboxAllocation', () => {
     expect(first.savedSandboxAllocation).toBeNull();
     expect(second).toBe(first);
     expect(getSandboxAllocationCandidatesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies the environment allocation that preflight carried', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-single',
+    });
+
+    const resolved = await withSavedSandboxAllocation(
+      request({ environmentSandboxAllocation: 'cloudflare-containers-standard-4' }),
+      args
+    );
+
+    expect(requestedSandboxAllocation(resolved)).toBe('cloudflare-containers-standard-4');
   });
 
   it("keeps the client's choice and never reads settings", async () => {

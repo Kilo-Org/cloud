@@ -573,7 +573,6 @@ const PrepareSessionSharedFields = {
     .uuid()
     .optional()
     .describe('Profile ID to resolve (repo binding + default still apply on top)'),
-
   ...AttachmentFieldsSchema,
   createdOnPlatform: z
     .string()

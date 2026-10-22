@@ -1,3 +1,4 @@
+import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script';
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
@@ -445,7 +446,7 @@ const PrepareSessionSharedFields = {
 
   // Optional configuration
   envVars: z.record(z.string().max(256), z.string().max(256)).optional(),
-  setupCommands: z.array(z.string().max(500)).max(20).optional(),
+  setupCommands: setupCommandsSchema.optional(),
   mcpServers: z.record(z.string(), mcpServerConfigNextSchema).optional(),
   runtimeSkills: z.array(runtimeSkillInputSchema).max(50).optional(),
   runtimeAgents: z.array(runtimeAgentInputSchema).max(20).optional(),

@@ -1,3 +1,4 @@
+import { setupCommandsSchema } from './setup-script.js';
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
@@ -317,7 +318,7 @@ export const controlPlaneRouteSpecSchema = z
      * only the encrypted envelopes.
      */
     mcp: sessionAttachMcpServersSchema.optional(),
-    setupCommands: z.array(z.string().max(500)).max(20).optional(),
+    setupCommands: setupCommandsSchema.optional(),
     runtimeSkills: RuntimeSkillsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),

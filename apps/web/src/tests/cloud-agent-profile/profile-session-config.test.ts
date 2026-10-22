@@ -14,6 +14,7 @@ import {
   agent_environment_profile_skills,
   agent_environment_profile_agents,
   agent_environment_profile_instructions,
+  cloud_agent_environments,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -168,6 +169,8 @@ async function addInstruction(
 
 describe('mergeProfileConfiguration', () => {
   afterEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(cloud_agent_environments);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(agent_environment_profile_repo_bindings);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -444,6 +447,96 @@ describe('mergeProfileConfiguration', () => {
     expect(result.encryptedSecrets).toEqual({
       BASE_SECRET: JSON.parse(baseEnvelope),
       SHARED_SECRET: JSON.parse(overrideEnvelope), // override wins
+    });
+  });
+
+  describe('environment layer', () => {
+    test('applies the environment under repo binding, selected profile, and manual args', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+
+      const repoProfileId = await createProfile(owner, 'repo-profile');
+      await addVar(repoProfileId, 'SHARED', 'from-repo');
+      await addVar(repoProfileId, 'REPO_ONLY', 'repo-val');
+      await addCommands(repoProfileId, ['repo-cmd']);
+      await bindRepo(owner, 'org/repo', 'github', repoProfileId);
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+        environment: {
+          envVars: { SHARED: 'from-env', REPO: 'from-env' },
+          setupCommands: ['env-cmd'],
+        },
+        envVars: { SHARED: 'from-manual' },
+        setupCommands: ['manual-cmd'],
+      });
+
+      expect(result.envVars).toEqual({
+        REPO: 'from-env',
+        REPO_ONLY: 'repo-val',
+        SHARED: 'from-manual',
+      });
+      // The environment owns setup: the bound profile's command does not run.
+      expect(result.setupCommands).toEqual(['env-cmd', 'manual-cmd']);
+    });
+
+    test('an empty environment still replaces profile setup commands, not profile vars', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const repoProfileId = await createProfile(owner, 'repo-profile');
+      await addCommands(repoProfileId, ['repo-cmd']);
+      await bindRepo(owner, 'org/repo', 'github', repoProfileId);
+      const defaultProfileId = await createProfile(owner, 'default', { isDefault: true });
+      await addVar(defaultProfileId, 'FROM_DEFAULT', 'default-val');
+      await addCommands(defaultProfileId, ['default-cmd']);
+
+      const withEnvironment = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+        environment: {},
+      });
+      expect(withEnvironment.setupCommands).toBeUndefined();
+      expect(withEnvironment.envVars).toEqual({ FROM_DEFAULT: 'default-val' });
+
+      const withoutEnvironment = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+      });
+      expect(withoutEnvironment.setupCommands).toEqual(['repo-cmd', 'default-cmd']);
+    });
+
+    test('a profile plaintext var deletes an environment secret of the same key', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const profileId = await createProfile(owner, 'default', { isDefault: true });
+      await addVar(profileId, 'API_KEY', 'plain-from-profile');
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        environment: { encryptedSecrets: { API_KEY: fakeEnvelopeObject } },
+      });
+
+      expect(result.envVars).toEqual({ API_KEY: 'plain-from-profile' });
+      expect(result.encryptedSecrets).toBeUndefined();
+    });
+
+    test('a profile secret deletes an environment plaintext var of the same key', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const profileId = await createProfile(owner, 'default', { isDefault: true });
+      await addVar(profileId, 'API_KEY', fakeEnvelope, true);
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        environment: { envVars: { API_KEY: 'plain-from-env' } },
+      });
+
+      expect(result.envVars).toBeUndefined();
+      expect(result.encryptedSecrets).toEqual({ API_KEY: fakeEnvelopeObject });
     });
   });
 

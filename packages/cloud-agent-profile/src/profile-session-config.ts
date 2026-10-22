@@ -1,4 +1,3 @@
-import * as z from 'zod';
 import type { WorkerDb } from '@kilocode/db';
 import { agent_environment_profiles } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
@@ -25,15 +24,8 @@ import {
 } from './profile-instructions-service';
 import { resolveProfileLayers } from './profile-resolution';
 import { buildOwnershipCondition } from './profile-utils';
+import { encryptedEnvelopeSchema, type EnvironmentSessionLayer } from './environment-contracts';
 import type { ProfileOwner } from './types';
-
-// Schema to validate encrypted envelope structure from database
-const encryptedEnvelopeSchema = z.object({
-  encryptedData: z.string(),
-  encryptedDEK: z.string(),
-  algorithm: z.literal('rsa-aes-256-gcm'),
-  version: z.literal(1),
-});
 
 export class ProfileNotFoundError extends Error {
   constructor(public profileId: string) {
@@ -86,6 +78,11 @@ export type MergeProfileConfigurationArgs = {
   repoFullName?: string;
   platform?: 'github' | 'gitlab';
   /**
+   * Repository environment applied as the bottom layer: environment <
+   * repo-binding < selected/default < inline.
+   */
+  environment?: EnvironmentSessionLayer;
+  /**
    * Inline values supplied alongside the profile stack. They form a single
    * implicit "inline layer" applied on top of the resolved profile layers,
    * so each collection follows the same precedence: repo-binding base <
@@ -98,6 +95,17 @@ export type MergeProfileConfigurationArgs = {
   runtimeSkills?: InlineSkillInput[];
   runtimeAgents?: InlineAgentInput[];
 };
+
+/** The inline layer the caller can supply without resolving any profile. */
+export type EnvironmentInlineArgs = Pick<
+  MergeProfileConfigurationArgs,
+  | 'envVars'
+  | 'setupCommands'
+  | 'encryptedSecrets'
+  | 'mcpServers'
+  | 'runtimeSkills'
+  | 'runtimeAgents'
+>;
 
 export type MergeProfileConfigurationResult = {
   envVars?: Record<string, string>;
@@ -223,7 +231,7 @@ function clientRecordToMcpServers(
   });
 }
 
-function inlineToLayer(args: MergeProfileConfigurationArgs): Layer | null {
+function inlineToLayer(args: EnvironmentInlineArgs): Layer | null {
   const { envVars, encryptedSecrets, setupCommands, mcpServers, runtimeSkills, runtimeAgents } =
     args;
   const hasInline =
@@ -257,8 +265,31 @@ function inlineToLayer(args: MergeProfileConfigurationArgs): Layer | null {
   };
 }
 
+function environmentToLayer(environment: EnvironmentSessionLayer | undefined): Layer | null {
+  if (!environment) return null;
+  const hasContent =
+    Object.keys(environment.envVars ?? {}).length > 0 ||
+    Object.keys(environment.encryptedSecrets ?? {}).length > 0 ||
+    (environment.setupCommands?.length ?? 0) > 0;
+  if (!hasContent) return null;
+
+  return {
+    envVars: { ...(environment.envVars ?? {}) },
+    secrets: { ...(environment.encryptedSecrets ?? {}) },
+    commands: environment.setupCommands ? [...environment.setupCommands] : [],
+    mcpServers: [],
+    skills: [],
+    agents: [],
+    kiloCommands: [],
+    instructions: [],
+  };
+}
+
 /**
  * Reduce layers into a single result. Precedence: later layer wins per key.
+ * A later layer's key deletes the opposite representation of the same key from
+ * earlier layers, so an environment secret cannot outlive a higher plaintext
+ * override (and the reverse). Within one layer the secret representation wins.
  *
  * Disabled MCP servers (`enabled === false`) are skipped — they neither
  * contribute nor shadow an enabled entry of the same name in an earlier
@@ -276,7 +307,12 @@ function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
   const instructionByName = new Map<string, MergedInstructionForSession>();
 
   for (const layer of layers) {
-    Object.assign(envVars, layer.envVars);
+    for (const key of Object.keys(layer.envVars)) delete secrets[key];
+    for (const key of Object.keys(layer.secrets)) delete envVars[key];
+    for (const [key, value] of Object.entries(layer.envVars)) {
+      if (Object.hasOwn(layer.secrets, key)) continue;
+      envVars[key] = value;
+    }
     Object.assign(secrets, layer.secrets);
     commands.push(...layer.commands);
     for (const server of layer.mcpServers) {
@@ -381,14 +417,22 @@ export async function mergeProfileConfiguration(
           { isolationLevel: 'repeatable read', accessMode: 'read only' }
         );
 
-  // Stack layers in precedence order: repo-binding base < explicit/default
-  // top < inline. The inline layer is built from the args and treated as
-  // just one more profile so the merge logic does not branch on its source.
+  // Stack layers in precedence order: environment < repo-binding base <
+  // explicit/default top < inline. The inline layer is built from the args and
+  // treated as just one more profile so the merge logic does not branch on its
+  // source.
   const layers: Layer[] = [];
-  const baseData = base ? profileData.find(d => d.profileId === base.profileId) : null;
-  const topData = top ? profileData.find(d => d.profileId === top.profileId) : null;
-  if (baseData) layers.push(profileToLayer(baseData));
-  if (topData) layers.push(profileToLayer(topData));
+  const environmentLayer = environmentToLayer(args.environment);
+  if (environmentLayer) layers.push(environmentLayer);
+  for (const layer of [base, top]) {
+    const data = layer ? profileData.find(d => d.profileId === layer.profileId) : undefined;
+    if (!data) continue;
+    const profileLayer = profileToLayer(data);
+    // The repository environment owns setup: profile setup commands do not run
+    // beside it, so a setup moved into the environment never runs twice.
+    // Profile variables still apply over it.
+    layers.push(args.environment ? { ...profileLayer, commands: [] } : profileLayer);
+  }
   const inline = inlineToLayer(args);
   if (inline) layers.push(inline);
 

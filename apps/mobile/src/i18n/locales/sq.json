@@ -2243,6 +2243,8 @@
       "commitAndPush": "Regjistro dhe dërgo",
       "startSession": "Nis seancën",
       "selectRepositoryToStart": "Zgjidh një depo për të filluar.",
+      "enterPromptToStart": "Shto një kërkesë për të filluar.",
+      "enterPromptOrFileToStart": "Shto një kërkesë ose një skedar për të filluar.",
       "connectProviderToStart": "Lidh një ofrues për të filluar.",
       "promptPlaceholder": "Me çfarë do të punosh?",
       "couldNotLoadModels": "Nuk u ngarkuan modelet.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Zgjidh një llogari",
       "loadErrorTitle": "Nuk u ngarkuan organizatat e tua.",
+      "membershipLostNotice": "Nuk ke më qasje në këtë organizatë. U kalua te {{target}}.",
       "noOrganization": "Asnjë organizatë",
 
       "noOrganizationDescription": "Kjo llogari nuk është pjesë e një organizate. Krijo ose bashkohu me një organizatë në ueb për të përdorur veçoritë e organizatës si ftesat për anëtarët dhe alarmet për balancë të ulët.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Fillo agjentin kërkon një kërkesë. Shto një kërkesë dhe ekzekutoje përsëri.",
+      "repositoryRequired": "Fillo agjentin kërkon një depo. Hap Kilo dhe zgjidh një depo, pastaj ekzekutoje përsëri.",
       "repositoryUnknown": "Kilo nuk e njeh {{repository}} si depo GitHub ose GitLab. Zgjidh një depo tjetër në Kilo.",
       "repositoryUnsupported": "{{repository}} është një depo Bitbucket — Fillo agjentin nuk mund ta përdorë ende. Zgjidh një depo tjetër në Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Paketat e krediteve nuk janë të disponueshme tani.",
     "noMatchingProducts": "App Store nuk ktheu paketa kreditesh që përputhen.",
     "noMatchingProductsPlay": "Google Play nuk ktheu paketa kreditesh që përputhen.",
+    "storeTimedOut": "App Store nuk u përgjigj në kohë. Provo përsëri.",
+    "storeTimedOutPlay": "Google Play nuk u përgjigj në kohë. Provoni përsëri.",
     "purchaseOwnedByAnotherAccount": "Kreditet në këtë Apple Account i përkasin një llogarie tjetër Kilo. Hyr në atë llogari Kilo për t'i përdorur.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditet në këtë llogari Google Play i përkasin një llogarie tjetër Kilo. Hyni në atë llogari Kilo për t'i përdorur."
   },

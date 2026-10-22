@@ -1729,6 +1729,8 @@
       "commitAndPush": "커밋 및 푸시",
       "startSession": "세션 시작",
       "selectRepositoryToStart": "시작하려면 저장소를 선택하세요.",
+      "enterPromptToStart": "시작하려면 프롬프트를 추가하세요.",
+      "enterPromptOrFileToStart": "시작하려면 프롬프트 또는 파일을 추가하세요.",
       "connectProviderToStart": "시작하려면 서비스를 연결하세요.",
       "promptPlaceholder": "어떤 작업을 할까요?",
       "couldNotLoadModels": "모델을 불러올 수 없습니다.",
@@ -3014,6 +3016,7 @@
 
       "chooseAccount": "계정 선택",
       "loadErrorTitle": "조직 목록을 불러올 수 없습니다.",
+      "membershipLostNotice": "이 조직에 더 이상 접근할 수 없습니다. {{target}}(으)로 전환되었습니다.",
       "noOrganization": "조직 없음",
 
       "noOrganizationDescription": "이 계정은 조직에 속해 있지 않습니다. 멤버 초대 및 잔액 부족 알림과 같은 조직 기능을 사용하려면 웹에서 조직을 만들거나 참여하세요.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "에이전트를 시작하려면 프롬프트가 필요합니다. 프롬프트를 추가하고 다시 실행하세요.",
+      "repositoryRequired": "에이전트를 시작하려면 저장소가 필요합니다. Kilo를 열고 저장소를 선택한 다음 다시 실행하세요.",
       "repositoryUnknown": "Kilo는 {{repository}}을(를) GitHub 또는 GitLab 저장소로 인식하지 않습니다. Kilo에서 다른 저장소를 선택하세요.",
       "repositoryUnsupported": "{{repository}}은(는) Bitbucket 저장소입니다 — 에이전트 시작은 아직 이를 사용할 수 없습니다. Kilo에서 다른 저장소를 선택하세요."
     }
@@ -3786,6 +3790,8 @@
     "empty": "현재 크레딧 팩을 사용할 수 없습니다.",
     "noMatchingProducts": "App Store에서 일치하는 크레딧 팩을 반환하지 않았습니다.",
     "noMatchingProductsPlay": "Google Play에서 일치하는 크레딧 팩을 반환하지 않았습니다.",
+    "storeTimedOut": "App Store에서 제시간에 응답하지 않았습니다. 다시 시도",
+    "storeTimedOutPlay": "Google Play에서 제시간에 응답하지 않았습니다. 다시 시도",
     "purchaseOwnedByAnotherAccount": "이 Apple Account의 크레딧은 다른 Kilo 계정에 속해 있습니다. 사용하려면 해당 Kilo 계정에 로그인하세요.",
     "purchaseOwnedByAnotherAccountPlay": "이 Google Play 계정의 크레딧은 다른 Kilo 계정에 속합니다. 사용하려면 해당 Kilo 계정으로 로그인하세요."
   },

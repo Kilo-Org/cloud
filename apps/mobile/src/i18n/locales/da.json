@@ -2243,6 +2243,8 @@
       "commitAndPush": "Commit og push",
       "startSession": "Start en session",
       "selectRepositoryToStart": "Vælg et kodelager for at starte.",
+      "enterPromptToStart": "Tilføj en prompt for at starte.",
+      "enterPromptOrFileToStart": "Tilføj en prompt eller en fil for at starte.",
       "connectProviderToStart": "Tilslut en udbyder for at starte.",
       "promptPlaceholder": "Hvad vil du gerne arbejde med?",
       "couldNotLoadModels": "Kunne ikke indlæse modellerne.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Vælg en konto",
       "loadErrorTitle": "Kunne ikke indlæse dine organisationer.",
+      "membershipLostNotice": "Du har ikke længere adgang til denne organisation. Skiftet til {{target}}.",
       "noOrganization": "Ingen organisation",
 
       "noOrganizationDescription": "Denne konto er ikke en del af en organisation. Opret eller tilslut dig en organisation på hjemmesiden for at bruge organisationsfunktioner som medlemsinvitationer og advarsler om lav saldo.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Start agenten kræver en forespørgsel. Tilføj en forespørgsel, og kør den igen.",
+      "repositoryRequired": "Start agenten kræver et kodelager. Åbn Kilo, vælg et, og kør den igen.",
       "repositoryUnknown": "Kilo genkender ikke {{repository}} som et GitHub- eller GitLab-kodelager. Vælg et andet kodelager i Kilo.",
       "repositoryUnsupported": "{{repository}} er et Bitbucket-kodelager — Start agenten kan endnu ikke bruge det. Vælg et andet kodelager i Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Kreditpakker er ikke tilgængelige lige nu.",
     "noMatchingProducts": "App Store returnerede ingen matchende kreditpakker.",
     "noMatchingProductsPlay": "Google Play returnerede ingen matchende kreditpakker.",
+    "storeTimedOut": "App Store svarede ikke i tide. Prøv igen.",
+    "storeTimedOutPlay": "Google Play svarede ikke i tide. Prøv igen.",
     "purchaseOwnedByAnotherAccount": "Kreditterne på denne Apple-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditterne på denne Google Play-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem."
   },

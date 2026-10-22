@@ -2243,6 +2243,8 @@
       "commitAndPush": "Təsdiqlə və göndər",
       "startSession": "Sessiyanı başlat",
       "selectRepositoryToStart": "Başlamaq üçün repozitoriya seç.",
+      "enterPromptToStart": "Başlamaq üçün prompt əlavə et.",
+      "enterPromptOrFileToStart": "Başlamaq üçün prompt və ya fayl əlavə et.",
       "connectProviderToStart": "Başlamaq üçün provayder qoş.",
       "promptPlaceholder": "Nə üzərində işləmək istəyirsən?",
       "couldNotLoadModels": "Modelləri yükləmək mümkün olmadı.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Hesab seç",
       "loadErrorTitle": "Təşkilatlarını yükləmək mümkün olmadı.",
+      "membershipLostNotice": "Bu təşkilata artıq giriş icazən yoxdur. Keçid edildi: {{target}}.",
       "noOrganization": "Təşkilat yoxdur",
 
       "noOrganizationDescription": "Bu hesab heç bir təşkilatın üzvü deyil. Üzv dəvətləri və aşağı balans xəbərdarlıqları kimi təşkilat funksiyalarından istifadə etmək üçün saytda təşkilat yarat və ya ona qoşul.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agenti başlatmaq üçün sorğu lazımdır. Sorğu əlavə et və yenidən işə sal.",
+      "repositoryRequired": "Agenti başlatmaq üçün repozitoriya lazımdır. Kilo-nu aç və bir repozitoriya seç, sonra yenidən işə sal.",
       "repositoryUnknown": "Kilo {{repository}} adını GitHub və ya GitLab repozitoriyası kimi tanımır. Kilo-da başqa repozitoriya seç.",
       "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasıdır — Agenti başlat hələ ondan istifadə edə bilmir. Kilo-da başqa repozitoriya seç."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Kredit paketləri hazırda əlçatan deyil.",
     "noMatchingProducts": "App Store tərəfindən uyğun kredit paketi qaytarılmadı.",
     "noMatchingProductsPlay": "Google Play tərəfindən uyğun kredit paketi qaytarılmadı.",
+    "storeTimedOut": "App Store vaxtında cavab vermədi. Yenidən cəhd et.",
+    "storeTimedOutPlay": "Google Play vaxtında cavab vermədi. Yenidən cəhd et.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil ol.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil olun."
   },

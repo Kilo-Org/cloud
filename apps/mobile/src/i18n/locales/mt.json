@@ -2327,6 +2327,8 @@
       "commitAndPush": "Irreġistra u tella'",
       "startSession": "Ibda s-sessjoni",
       "selectRepositoryToStart": "Agħżel repożitorju biex tibda.",
+      "enterPromptToStart": "Żid prompt biex tibda.",
+      "enterPromptOrFileToStart": "Żid prompt jew fajl biex tibda.",
       "connectProviderToStart": "Ikkonnettja fornitur biex tibda.",
       "promptPlaceholder": "Fuq xiex tixtieq taħdem?",
       "couldNotLoadModels": "Ma setgħux jitgħabbew il-mudelli.",
@@ -3142,6 +3144,7 @@
 
       "chooseAccount": "Agħżel kont",
       "loadErrorTitle": "Ma setgħux jitgħabbew l-organizzazzjonijiet tiegħek.",
+      "membershipLostNotice": "M'għandekx iktar aċċess għal din l-organizzazzjoni. Inbidel għal {{target}}.",
       "noOrganization": "L-ebda organizzazzjoni",
 
       "noOrganizationDescription": "Dan il-kont mhuwiex parti minn organizzazzjoni. Oħloq jew ingħaqad ma' organizzazzjoni fuq il-web biex tuża karatteristiċi tal-organizzazzjoni bħal stedini għall-membri u twissijiet dwar bilanċ baxx.",
@@ -3692,6 +3695,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Ibda aġent jeħtieġ istruzzjoni. Żid istruzzjoni u erġa' ħaddmu.",
+      "repositoryRequired": "Ibda aġent jeħtieġ repożitorju. Iftaħ Kilo u agħżel wieħed, imbagħad erġa' ħaddmu.",
       "repositoryUnknown": "Kilo ma jagħrafx lil {{repository}} bħala repożitorju GitHub jew GitLab. Agħżel repożitorju ieħor fil-Kilo.",
       "repositoryUnsupported": "{{repository}} huwa repożitorju Bitbucket — Ibda aġent għadu ma jistax jużah. Agħżel repożitorju ieħor fil-Kilo."
     }
@@ -3909,6 +3913,8 @@
     "empty": "Il-pakketti tal-krediti mhumiex disponibbli bħalissa.",
     "noMatchingProducts": "L-App Store ma rritornax pakketti tal-krediti li jaqblu.",
     "noMatchingProductsPlay": "Google Play ma rritornax pakketti tal-krediti li jaqblu.",
+    "storeTimedOut": "L-App Store ma wieġebx f'ħinha. Erġa' pprova.",
+    "storeTimedOutPlay": "Google Play ma wieġebx f'ħinha. Erġa' pprova.",
     "purchaseOwnedByAnotherAccount": "Il-krediti fuq dan l-Apple Account jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom.",
     "purchaseOwnedByAnotherAccountPlay": "Il-krediti fuq dan il-kont ta' Google Play jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom."
   },

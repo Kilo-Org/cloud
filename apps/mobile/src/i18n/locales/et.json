@@ -2243,6 +2243,8 @@
       "commitAndPush": "Kinnista ja saada",
       "startSession": "Alusta seanssi",
       "selectRepositoryToStart": "Alustamiseks vali hoidla.",
+      "enterPromptToStart": "Alustamiseks lisa prompt.",
+      "enterPromptOrFileToStart": "Alustamiseks lisa prompt või fail.",
       "connectProviderToStart": "Alustamiseks ühenda teenusepakkuja.",
       "promptPlaceholder": "Mille kallal tahaksid töötada?",
       "couldNotLoadModels": "Mudeleid ei õnnestunud laadida.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Vali konto",
       "loadErrorTitle": "Sinu organisatsioone ei õnnestunud laadida.",
+      "membershipLostNotice": "Sul puudub enam juurdepääs sellele organisatsioonile. Vahetatud {{target}}-le.",
       "noOrganization": "Organisatsioon puudub",
 
       "noOrganizationDescription": "See konto ei kuulu ühtegi organisatsiooni. Organisatsiooni funktsioonide, nagu liikmekutsed ja väikese saldo hoiatused, kasutamiseks loo organisatsioon või liitu sellega veebis.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agendi käivitamiseks on vaja viipa. Lisa viip ja käivita see uuesti.",
+      "repositoryRequired": "Agendi käivitamiseks on vaja hoidlat. Ava Kilo, vali hoidla ja käivita see uuesti.",
       "repositoryUnknown": "Kilo ei tunne {{repository}} ära GitHubi ega GitLabi hoidlana. Vali Kilos teine hoidla.",
       "repositoryUnsupported": "{{repository}} on Bitbucketi hoidla — Käivita agent ei saa seda veel kasutada. Vali Kilos teine hoidla."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Krediidipaketid pole praegu saadaval.",
     "noMatchingProducts": "App Store ei tagastanud ühtegi sobivat krediidipaketti.",
     "noMatchingProductsPlay": "Google Play ei tagastanud ühtegi sobivat krediidipaketti.",
+    "storeTimedOut": "App Store ei vastanud õigeaegselt. Proovi uuesti.",
+    "storeTimedOutPlay": "Google Play ei vastanud õigeaegselt. Proovi uuesti.",
     "purchaseOwnedByAnotherAccount": "Selle Apple Accountiga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse vastavale Kilo kontole.",
     "purchaseOwnedByAnotherAccountPlay": "Selle Google Play kontoga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse sellesse Kilo kontosse."
   },

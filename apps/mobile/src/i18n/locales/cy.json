@@ -2355,6 +2355,8 @@
       "commitAndPush": "Cyflwyno a gwthio",
       "startSession": "Dechrau sesiwn",
       "selectRepositoryToStart": "Dewiswch ystorfa i ddechrau.",
+      "enterPromptToStart": "Ychwanegwch annogiad i ddechrau.",
+      "enterPromptOrFileToStart": "Ychwanegwch annogiad neu ffeil i ddechrau.",
       "connectProviderToStart": "Cysylltwch â darparwr i ddechrau.",
       "promptPlaceholder": "Ar beth hoffech chi weithio?",
       "couldNotLoadModels": "Methu llwytho'r modelau.",
@@ -3182,6 +3184,7 @@
 
       "chooseAccount": "Dewiswch gyfrif",
       "loadErrorTitle": "Methu llwytho'ch sefydliadau.",
+      "membershipLostNotice": "Nid oes gennych fynediad i'r sefydliad hwn mwyach. Wedi newid i {{target}}.",
       "noOrganization": "Dim sefydliad",
 
       "noOrganizationDescription": "Nid yw'r cyfrif hwn yn rhan o sefydliad. Crëwch un neu ymunwch ag un ar y we i ddefnyddio nodweddion sefydliad fel gwahoddiadau i aelodau a rhybuddion balans isel.",
@@ -3733,6 +3736,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Mae angen anogiad i ddechrau asiant. Ychwanega anogiad a'i redeg eto.",
+      "repositoryRequired": "Mae angen ystorfa i ddechrau asiant. Agora Kilo a dewis un, yna ei redeg eto.",
       "repositoryUnknown": "Nid yw Kilo'n adnabod {{repository}} fel ystorfa GitHub neu GitLab. Dewiswch ystorfa arall yn Kilo.",
       "repositoryUnsupported": "Ystorfa Bitbucket yw {{repository}} — Nid yw Dechrau asiant yn gallu ei defnyddio eto. Dewiswch ystorfa arall yn Kilo."
     }
@@ -3950,6 +3954,8 @@
     "empty": "Nid yw pecynnau credydau ar gael ar hyn o bryd.",
     "noMatchingProducts": "Ni ddychwelodd yr App Store unrhyw becynnau credydau cyfatebol.",
     "noMatchingProductsPlay": "Ni ddychwelodd Google Play unrhyw becynnau credydau cyfatebol.",
+    "storeTimedOut": "Ni ymatebodd yr App Store mewn amser. Rhoi cynnig eto.",
+    "storeTimedOutPlay": "Ni ymatebodd Google Play mewn amser. Rhoi cynnig eto.",
     "purchaseOwnedByAnotherAccount": "Mae'r credydau ar yr Apple Account hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio.",
     "purchaseOwnedByAnotherAccountPlay": "Mae'r credydau ar y cyfrif Google Play hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio."
   },

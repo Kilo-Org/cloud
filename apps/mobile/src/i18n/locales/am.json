@@ -2243,6 +2243,8 @@
       "commitAndPush": "መዝግበው ይላኩ",
       "startSession": "ክፍለ ጊዜውን ያስጀምሩ",
       "selectRepositoryToStart": "ለመጀመር ማከማቻ ይምረጡ።",
+      "enterPromptToStart": "ለመጀመር ትዕዛዝ ያክሉ።",
+      "enterPromptOrFileToStart": "ለመጀመር ትዕዛዝ ወይም ፋይል ያክሉ።",
       "connectProviderToStart": "ለመጀመር አቅራቢ ያገናኙ።",
       "promptPlaceholder": "በምን ላይ መስራት ይፈልጋሉ?",
       "couldNotLoadModels": "ሞዴሎችን መጫን አልተቻለም።",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "መለያ ይምረጡ",
       "loadErrorTitle": "ድርጅቶችዎን መጫን አልተቻለም።",
+      "membershipLostNotice": "ይህን ድርጅት ከእንግዲህ የመድረስ ፈቃድ የለዎትም። ወደ {{target}} ተቀይሯል።",
       "noOrganization": "ድርጅት የለም",
 
       "noOrganizationDescription": "ይህ መለያ የድርጅት አካል አይደለም። እንደ አባል ግብዣዎች እና ዝቅተኛ ቀሪ ሂሳብ ማንቂያዎች ያሉ የድርጅት ባህሪያትን ለመጠቀም በድር ላይ አንዱን ይፍጠሩ ወይም ይቀላቀሉ።",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "ወኪል ለመጀመር ጥያቄ ያስፈልጋል። ጥያቄ ያክሉ እና እንደገና ያሂዱ።",
+      "repositoryRequired": "ወኪል ለመጀመር ማከማቻ ያስፈልጋል። Kilo ይክፈቱ እና አንዱን ይምረጡ፣ ከዚያ እንደገና ያሂዱ።",
       "repositoryUnknown": "Kilo {{repository}}ን እንደ GitHub ወይም GitLab ማከማቻ አያውቅም። በKilo ውስጥ ሌላ ማከማቻ ይምረጡ።",
       "repositoryUnsupported": "{{repository}} የBitbucket ማከማቻ ነው — ወኪል ይጀምሩ ገና ሊጠቀምበት አይችልም። በKilo ውስጥ ሌላ ማከማቻ ይምረጡ።"
     }
@@ -3786,6 +3790,8 @@
     "empty": "የክሬዲት ጥቅሎች አሁን አይገኙም።",
     "noMatchingProducts": "ከApp Store ምንም ተመሳሳይ የክሬዲት ጥቅሎች አልተመለሱም።",
     "noMatchingProductsPlay": "ከGoogle Play ምንም ተመሳሳይ የክሬዲት ጥቅሎች አልተመለሱም።",
+    "storeTimedOut": "App Store በወቅቱ አልሰራም። እንደገና ይሞክሩ።",
+    "storeTimedOutPlay": "Google Play በወቅቱ አልሰራም። እንደገና ይሞክሩ።",
     "purchaseOwnedByAnotherAccount": "በዚህ Apple Account ላይ ያለው ክሬዲት የሌላ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።",
     "purchaseOwnedByAnotherAccountPlay": "በዚህ Google Play መለያ ላይ ያለው ክሬዲት የተለየ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።"
   },

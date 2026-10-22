@@ -2243,6 +2243,8 @@
       "commitAndPush": "Véglegesítés és feltöltés",
       "startSession": "Munkamenet indítása",
       "selectRepositoryToStart": "Válassz egy adattárat az indításhoz.",
+      "enterPromptToStart": "Adj hozzá egy promptot az indításhoz.",
+      "enterPromptOrFileToStart": "Adj hozzá egy promptot vagy egy fájlt az indításhoz.",
       "connectProviderToStart": "Csatlakoztass egy szolgáltatót az indításhoz.",
       "promptPlaceholder": "Min szeretnél dolgozni?",
       "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",
@@ -2410,7 +2412,7 @@
       "thought": "Gondolat",
       "showDetails": "Részletek megjelenítése",
       "pending": "Függőben…",
-      "running": "Fut…"
+      "running": "Folyamatban…"
     },
     "messageErrorBoundary": {
       "failedToRender": "Nem sikerült megjeleníteni a tartalmat."
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Fiók kiválasztása",
       "loadErrorTitle": "Nem sikerült betölteni a szervezeteidet.",
+      "membershipLostNotice": "Már nincs hozzáférésed ehhez a szervezethez. Átváltva a következőre: {{target}}.",
       "noOrganization": "Nincs szervezet",
 
       "noOrganizationDescription": "Ez a fiók nem tagja egyetlen szervezetnek sem. Hozz létre vagy csatlakozz egy szervezethez a weboldalon, hogy használhasd a szervezetfunkciókat, például a tagmeghívókat és az alacsony egyenlegre vonatkozó figyelmeztetéseket.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Az ügynök indításához utasítás szükséges. Adj hozzá utasítást, és futtasd újra.",
+      "repositoryRequired": "Az ügynök indításához adattár szükséges. Nyisd meg a Kilo alkalmazást, válassz egyet, majd futtasd újra.",
       "repositoryUnknown": "A Kilo nem ismeri fel a {{repository}} nevet GitHub- vagy GitLab-adattárként. Válassz másik adattárat a Kiloban.",
       "repositoryUnsupported": "A {{repository}} egy Bitbucket-adattár — az ügynök indítása még nem tudja használni. Válassz másik adattárat a Kiloban."
     }
@@ -3786,6 +3790,8 @@
     "empty": "A kreditcsomagok jelenleg nem érhetők el.",
     "noMatchingProducts": "Az App Store nem adott vissza megfelelő kreditcsomagot.",
     "noMatchingProductsPlay": "A Google Play nem adott vissza megfelelő kreditcsomagot.",
+    "storeTimedOut": "Az App Store nem válaszolt időben. Próbáld újra.",
+    "storeTimedOutPlay": "A Google Play nem válaszolt időben. Próbáld újra.",
     "purchaseOwnedByAnotherAccount": "Az ehhez az Apple Account-fiókhoz tartozó kreditek egy másik Kilo-fiókhoz kapcsolódnak. A használatukhoz jelentkezz be abba a Kilo-fiókba.",
     "purchaseOwnedByAnotherAccountPlay": "Az ezen Google Play-fiókon lévő kreditek egy másik Kilo-fiókhoz tartoznak. A használatukhoz jelentkezz be abba a Kilo-fiókba."
   },

@@ -1753,6 +1753,8 @@
       "commitAndPush": "Закоммитить и отправить",
       "startSession": "Начать сеанс",
       "selectRepositoryToStart": "Выберите репозиторий, чтобы начать.",
+      "enterPromptToStart": "Добавьте промпт, чтобы начать.",
+      "enterPromptOrFileToStart": "Добавьте промпт или файл, чтобы начать.",
       "connectProviderToStart": "Подключите сервис, чтобы начать.",
       "promptPlaceholder": "Над чем хотите поработать?",
       "couldNotLoadModels": "Не удалось загрузить модели.",
@@ -3094,6 +3096,7 @@
 
       "chooseAccount": "Выберите аккаунт",
       "loadErrorTitle": "Не удалось загрузить список ваших организаций.",
+      "membershipLostNotice": "У вас больше нет доступа к этой организации. Переключено на {{target}}.",
       "noOrganization": "Нет организации",
 
       "noOrganizationDescription": "Этот аккаунт не входит в организацию. Создайте организацию или присоединитесь к ней в веб-версии, чтобы использовать функции организации, такие как приглашения участников и оповещения о низком балансе.",
@@ -3651,6 +3654,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Для запуска агента нужен запрос. Добавьте запрос и запустите снова.",
+      "repositoryRequired": "Для запуска агента нужен репозиторий. Откройте Kilo и выберите его, затем запустите снова.",
       "repositoryUnknown": "Kilo не распознаёт {{repository}} как репозиторий GitHub или GitLab. Выберите другой репозиторий в Kilo.",
       "repositoryUnsupported": "{{repository}} — репозиторий Bitbucket, и Запустить агента пока не может его использовать. Выберите другой репозиторий в Kilo."
     }
@@ -3868,6 +3872,8 @@
     "empty": "Пакеты кредитов сейчас недоступны.",
     "noMatchingProducts": "App Store не вернул подходящие пакеты кредитов.",
     "noMatchingProductsPlay": "Google Play не вернул подходящие пакеты кредитов.",
+    "storeTimedOut": "App Store не ответил вовремя. Попробовать снова.",
+    "storeTimedOutPlay": "Google Play не ответил вовремя. Попробовать снова.",
     "purchaseOwnedByAnotherAccount": "Кредиты в этом Apple Account связаны с другим аккаунтом Kilo. Войдите в тот аккаунт Kilo, чтобы их использовать.",
     "purchaseOwnedByAnotherAccountPlay": "Кредиты на этом Google Play аккаунте принадлежат другому аккаунту Kilo. Войдите в тот аккаунт Kilo, чтобы их использовать."
   },

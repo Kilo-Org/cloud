@@ -2271,6 +2271,8 @@
       "commitAndPush": "Consigna i envia",
       "startSession": "Inicia la sessió",
       "selectRepositoryToStart": "Selecciona un repositori per començar.",
+      "enterPromptToStart": "Afegeix un prompt per començar.",
+      "enterPromptOrFileToStart": "Afegeix un prompt o un fitxer per començar.",
       "connectProviderToStart": "Connecta un proveïdor per començar.",
       "promptPlaceholder": "En què vols treballar?",
       "couldNotLoadModels": "No s'han pogut carregar els models.",
@@ -3062,6 +3064,7 @@
 
       "chooseAccount": "Selecciona un compte",
       "loadErrorTitle": "No s'han pogut carregar les teves organitzacions.",
+      "membershipLostNotice": "Ja no tens accés a aquesta organització. Canviat a {{target}}.",
       "noOrganization": "Sense organització",
 
       "noOrganizationDescription": "Aquest compte no forma part de cap organització. Crea'n una o uneix-te'n a una al web per utilitzar funcions d'organització com les invitacions de membres i les alertes de saldo baix.",
@@ -3610,6 +3613,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Per iniciar un agent cal un missatge. Afegeix un missatge i torna-ho a executar.",
+      "repositoryRequired": "Per iniciar un agent cal un repositori. Obre Kilo i tria'n-neu un, i torna-ho a executar.",
       "repositoryUnknown": "Kilo no reconeix {{repository}} com a repositori de GitHub o GitLab. Tria un altre repositori a Kilo.",
       "repositoryUnsupported": "{{repository}} és un repositori de Bitbucket — Inicia un agent encara no el pot utilitzar. Tria un altre repositori a Kilo."
     }
@@ -3827,6 +3831,8 @@
     "empty": "Els paquets de crèdits no estan disponibles ara mateix.",
     "noMatchingProducts": "L'App Store no ha retornat cap paquet de crèdits coincident.",
     "noMatchingProductsPlay": "Google Play no ha retornat cap paquet de crèdits coincident.",
+    "storeTimedOut": "L'App Store no ha respost a temps. Torna-ho a provar.",
+    "storeTimedOutPlay": "Google Play no ha respost a temps. Torna-ho a provar.",
     "purchaseOwnedByAnotherAccount": "Els crèdits d'aquest Apple Account pertanyen a un altre compte de Kilo. Inicia la sessió en aquell compte de Kilo per utilitzar-los.",
     "purchaseOwnedByAnotherAccountPlay": "Els crèdits d'aquest compte de Google Play pertanyen a un compte de Kilo diferent. Inicia la sessió en aquest compte de Kilo per utilitzar-los."
   },

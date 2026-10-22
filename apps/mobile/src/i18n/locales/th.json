@@ -2243,6 +2243,8 @@
       "commitAndPush": "คอมมิตและพุช",
       "startSession": "เริ่มเซสชัน",
       "selectRepositoryToStart": "เลือกคลังโค้ดเพื่อเริ่มต้น",
+      "enterPromptToStart": "เพิ่มพรอมป์ตเพื่อเริ่มต้น",
+      "enterPromptOrFileToStart": "เพิ่มพรอมป์ตหรือไฟล์เพื่อเริ่มต้น",
       "connectProviderToStart": "เชื่อมต่อผู้ให้บริการเพื่อเริ่มต้น",
       "promptPlaceholder": "อยากทำงานอะไร?",
       "couldNotLoadModels": "ไม่สามารถโหลดโมเดลได้",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "เลือกบัญชี",
       "loadErrorTitle": "โหลดองค์กรของคุณไม่สำเร็จ",
+      "membershipLostNotice": "คุณไม่มีสิทธิ์เข้าถึงองค์กรนี้อีกต่อไป เปลี่ยนเป็น {{target}} แล้ว",
       "noOrganization": "ไม่มีองค์กร",
 
       "noOrganizationDescription": "บัญชีนี้ไม่ได้เป็นส่วนหนึ่งขององค์กร สร้างหรือเข้าร่วมองค์กรบนเว็บเพื่อใช้ฟีเจอร์ขององค์กร เช่น คำเชิญสมาชิกและการแจ้งเตือนยอดคงเหลือต่ำ",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "การเริ่มเอเจนต์ต้องมีพรอมต์ เพิ่มพรอมต์แล้วลองอีกครั้ง",
+      "repositoryRequired": "การเริ่มเอเจนต์ต้องมีคลังโค้ด เปิด Kilo แล้วเลือกคลังโค้ด จากนั้นลองอีกครั้ง",
       "repositoryUnknown": "Kilo ไม่รู้จัก {{repository}} ว่าเป็นคลังโค้ด GitHub หรือ GitLab เลือกคลังโค้ดอื่นใน Kilo",
       "repositoryUnsupported": "{{repository}} เป็นคลังโค้ด Bitbucket — เริ่มเอเจนต์ยังใช้คลังโค้ดนี้ไม่ได้ เลือกคลังโค้ดอื่นใน Kilo"
     }
@@ -3786,6 +3790,8 @@
     "empty": "แพ็กเกจเครดิตไม่พร้อมใช้งานในขณะนี้",
     "noMatchingProducts": "App Store ไม่ได้ส่งแพ็กเกจเครดิตที่ตรงกันกลับมา",
     "noMatchingProductsPlay": "Google Play ไม่ได้ส่งแพ็กเกจเครดิตที่ตรงกันกลับมา",
+    "storeTimedOut": "App Store ไม่ได้ตอบสนองภายในเวลาที่กำหนด ลองอีกครั้ง",
+    "storeTimedOutPlay": "Google Play ไม่ได้ตอบสนองภายในเวลาที่กำหนด ลองอีกครั้ง",
     "purchaseOwnedByAnotherAccount": "เครดิตใน Apple Account นี้เป็นของบัญชี Kilo อื่น ลงชื่อเข้าใช้บัญชี Kilo นั้นเพื่อใช้งาน",
     "purchaseOwnedByAnotherAccountPlay": "เครดิตในบัญชี Google Play นี้เป็นของบัญชี Kilo อื่น ลงชื่อเข้าใช้บัญชี Kilo นั้นเพื่อใช้งาน"
   },

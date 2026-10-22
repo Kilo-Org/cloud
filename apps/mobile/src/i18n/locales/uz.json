@@ -2243,6 +2243,8 @@
       "commitAndPush": "Kommit va yuborish",
       "startSession": "Sessiyani boshlash",
       "selectRepositoryToStart": "Boshlash uchun repozitoriya tanlang.",
+      "enterPromptToStart": "Boshlash uchun so'rov qo'shing.",
+      "enterPromptOrFileToStart": "Boshlash uchun so'rov yoki fayl qo'shing.",
       "connectProviderToStart": "Boshlash uchun provayderni ulang.",
       "promptPlaceholder": "Nima ustida ishlashni xohlaysiz?",
       "couldNotLoadModels": "Modellarni yuklab bo'lmadi.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Hisobni tanlang",
       "loadErrorTitle": "Tashkilotlaringizni yuklab bo'lmadi.",
+      "membershipLostNotice": "Sizda ushbu tashkilotga kirish huquqi endi yo'q. {{target}} ga o'tkazildi.",
       "noOrganization": "Tashkilot yo'q",
 
       "noOrganizationDescription": "Bu hisob hech qanday tashkilotga tegishli emas. A'zolarni taklif qilish va kam balans haqidagi ogohlantirishlar kabi tashkilot funksiyalaridan foydalanish uchun saytda tashkilot yarating yoki unga qo'shiling.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agentni ishga tushirish uchun so'rov kerak. So'rov qo'shing va qayta ishga tushiring.",
+      "repositoryRequired": "Agentni ishga tushirish uchun repozitoriya kerak. Kilo'ni oching, bir repozitoriy tanlang va qayta ishga tushiring.",
       "repositoryUnknown": "Kilo {{repository}} ni GitHub yoki GitLab repozitoriyasi deb tanimaydi. Kilo'da boshqa repozitoriy tanlang.",
       "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasi — Agentni ishga tushirish hali undan foydalana olmaydi. Kilo'da boshqa repozitoriy tanlang."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Kredit paketlari hozircha mavjud emas.",
     "noMatchingProducts": "App Store mos keladigan kredit paketlarini qaytarmadi.",
     "noMatchingProductsPlay": "Google Play mos keladigan kredit paketlarini qaytarmadi.",
+    "storeTimedOut": "App Store o'z vaqtida javob bermadi. Qayta urinish.",
+    "storeTimedOutPlay": "Google Play o'z vaqtida javob bermadi. Qayta urinish.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring."
   },

@@ -2243,6 +2243,8 @@
       "commitAndPush": "Комитни и изпрати",
       "startSession": "Започни сесия",
       "selectRepositoryToStart": "Избери хранилище, за да започнеш.",
+      "enterPromptToStart": "Добави заявка, за да започнеш.",
+      "enterPromptOrFileToStart": "Добави заявка или файл, за да започнеш.",
       "connectProviderToStart": "Свържи доставчик, за да започнеш.",
       "promptPlaceholder": "Върху какво искаш да работиш?",
       "couldNotLoadModels": "Не успяхме да заредим моделите.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Избери акаунт",
       "loadErrorTitle": "Не успяхме да заредим организациите ти.",
+      "membershipLostNotice": "Вече нямаш достъп до тази организация. Превключено към {{target}}.",
       "noOrganization": "Няма организация",
 
       "noOrganizationDescription": "Този акаунт не е част от организация. Създай или се присъедини към организация в сайта, за да използваш функции на организацията като покани за членове и известия за нисък баланс.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "За да стартираш агент, е нужна подкана. Добави подкана и го стартирай отново.",
+      "repositoryRequired": "За да стартираш агент, е нужно хранилище. Отвори Kilo и избери едно, после го стартирай отново.",
       "repositoryUnknown": "Kilo не разпознава {{repository}} като хранилище в GitHub или GitLab. Избери друго хранилище в Kilo.",
       "repositoryUnsupported": "{{repository}} е хранилище в Bitbucket — Стартирай агент още не може да го използва. Избери друго хранилище в Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Пакетите с кредити в момента не са налични.",
     "noMatchingProducts": "App Store не върна съвпадащи пакети с кредити.",
     "noMatchingProductsPlay": "Google Play не върна съвпадащи пакети с кредити.",
+    "storeTimedOut": "App Store не отговори навреме. Опитай отново.",
+    "storeTimedOutPlay": "Google Play не отговори навреме. Опитай отново.",
     "purchaseOwnedByAnotherAccount": "Кредитите в този Apple Account принадлежат на друг акаунт в Kilo. Влез в съответния акаунт в Kilo, за да ги използваш.",
     "purchaseOwnedByAnotherAccountPlay": "Кредитите на този Google Play акаунт принадлежат на друг Kilo акаунт. Влезте в този Kilo акаунт, за да ги използвате."
   },

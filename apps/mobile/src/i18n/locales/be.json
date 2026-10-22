@@ -2299,6 +2299,8 @@
       "commitAndPush": "Закаміціць і адправіць",
       "startSession": "Пачаць сеанс",
       "selectRepositoryToStart": "Выберыце рэпазіторый, каб пачаць.",
+      "enterPromptToStart": "Дадайце запыт, каб пачаць.",
+      "enterPromptOrFileToStart": "Дадайце запыт ці файл, каб пачаць.",
       "connectProviderToStart": "Падключыце платформу, каб пачаць.",
       "promptPlaceholder": "Над чым будзем працаваць?",
       "couldNotLoadModels": "Не ўдалося загрузіць мадэлі.",
@@ -3102,6 +3104,7 @@
 
       "chooseAccount": "Выберыце ўліковы запіс",
       "loadErrorTitle": "Не ўдалося загрузіць вашы арганізацыі.",
+      "membershipLostNotice": "У вас больш няма доступу да гэтай арганізацыі. Пераключана на {{target}}.",
       "noOrganization": "Няма арганізацыі",
 
       "noOrganizationDescription": "Гэты ўліковы запіс не ўваходзіць у арганізацыю. Стварыце арганізацыю або далучыцеся да яе на сайце, каб выкарыстоўваць функцыі арганізацыі, такія як запрашэнні ўдзельнікаў і апавяшчэнні аб нізкім балансе.",
@@ -3651,6 +3654,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Каб запусціць агента, патрэбен запыт. Дадайце запыт і запусціце зноў.",
+      "repositoryRequired": "Каб запусціць агента, патрэбны рэпазіторый. Адкрыйце Kilo і выберыце рэпазіторый, затым запусціце зноў.",
       "repositoryUnknown": "Kilo не распазнае {{repository}} як рэпазіторый GitHub або GitLab. Выберыце іншы рэпазіторый у Kilo.",
       "repositoryUnsupported": "{{repository}} — гэта рэпазіторый Bitbucket, і Запусціць агента пакуль не можа яго выкарыстоўваць. Выберыце іншы рэпазіторый у Kilo."
     }
@@ -3868,6 +3872,8 @@
     "empty": "Наборы крэдытаў зараз недаступныя.",
     "noMatchingProducts": "App Store не вярнуў адпаведных набораў крэдытаў.",
     "noMatchingProductsPlay": "Google Play не вярнуў адпаведных набораў крэдытаў.",
+    "storeTimedOut": "App Store не адказаў своечасова. Паспрабаваць яшчэ раз.",
+    "storeTimedOutPlay": "Google Play не адказаў своечасова. Паспрабаваць яшчэ раз.",
     "purchaseOwnedByAnotherAccount": "Крэдыты на гэтым Apple Account належаць іншаму ўліковаму запісу Kilo. Увайдзіце ў той уліковы запіс Kilo, каб імі карыстацца.",
     "purchaseOwnedByAnotherAccountPlay": "Крэдыты на гэтым Google Play належаць іншаму ўліковаму запісу Kilo. Увайдзіце ў той уліковы запіс Kilo, каб імі карыстацца."
   },

@@ -2299,6 +2299,8 @@
       "commitAndPush": "Vytvoriť commit a odoslať",
       "startSession": "Spustiť reláciu",
       "selectRepositoryToStart": "Vyberte repozitár, aby ste mohli začať.",
+      "enterPromptToStart": "Pridajte prompt, aby ste mohli začať.",
+      "enterPromptOrFileToStart": "Pridajte prompt alebo súbor, aby ste mohli začať.",
       "connectProviderToStart": "Pripojte poskytovateľa, aby ste mohli začať.",
       "promptPlaceholder": "Na čom chceš pracovať?",
       "couldNotLoadModels": "Modely sa nepodarilo načítať.",
@@ -3102,6 +3104,7 @@
 
       "chooseAccount": "Vyber účet",
       "loadErrorTitle": "Tvoje organizácie sa nepodarilo načítať.",
+      "membershipLostNotice": "Už nemáš prístup k tejto organizácii. Prepnuté na {{target}}.",
       "noOrganization": "Žiadna organizácia",
 
       "noOrganizationDescription": "Tento účet nie je súčasťou organizácie. Vytvor organizáciu alebo sa k nej pripoj na webe, aby si mohol používať funkcie organizácie, ako sú pozvánky pre členov a upozornenia na nízky zostatok.",
@@ -3651,6 +3654,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Na spustenie agenta je potrebné zadanie. Pridaj zadanie a spusť ho znova.",
+      "repositoryRequired": "Spustenie agenta vyžaduje repozitár. Otvor Kilo a vyber repozitár, potom ho spusť znova.",
       "repositoryUnknown": "Kilo nerozpoznáva {{repository}} ako repozitár na GitHube alebo GitLabe. Vyber iný repozitár v Kile.",
       "repositoryUnsupported": "{{repository}} je repozitár na Bitbuckete — Spustiť agenta ho zatiaľ nemôže použiť. Vyber iný repozitár v Kile."
     }
@@ -3868,6 +3872,8 @@
     "empty": "Balíky kreditov teraz nie sú k dispozícii.",
     "noMatchingProducts": "App Store nevrátil žiadne zodpovedajúce balíky kreditov.",
     "noMatchingProductsPlay": "Google Play nevrátil žiadne zodpovedajúce balíky kreditov.",
+    "storeTimedOut": "App Store nereagoval včas. Skúste to znova.",
+    "storeTimedOutPlay": "Google Play nereagoval včas. Skúste to znova.",
     "purchaseOwnedByAnotherAccount": "Kredity na tomto účte Apple Account patria inému účtu Kilo. Ak ich chcete použiť, prihláste sa do príslušného účtu Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účte Google Play patria inému účtu Kilo. Prihláste sa do tohto účtu Kilo, aby ste ich použili."
   },

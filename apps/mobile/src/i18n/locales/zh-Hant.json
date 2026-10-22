@@ -1729,6 +1729,8 @@
       "commitAndPush": "提交並推送",
       "startSession": "開始工作階段",
       "selectRepositoryToStart": "選取儲存庫以開始。",
+      "enterPromptToStart": "新增提示詞以開始。",
+      "enterPromptOrFileToStart": "新增提示詞或檔案以開始。",
       "connectProviderToStart": "連結平台以開始。",
       "promptPlaceholder": "你想處理什麼？",
       "couldNotLoadModels": "無法載入模型。",
@@ -3014,6 +3016,7 @@
 
       "chooseAccount": "選取帳戶",
       "loadErrorTitle": "無法載入你的組織清單。",
+      "membershipLostNotice": "你已無法存取此組織。已切換至 {{target}}。",
       "noOrganization": "沒有組織",
 
       "noOrganizationDescription": "此帳戶不屬於任何組織。請在網頁版建立或加入組織，以使用成員邀請和低餘額提醒等組織功能。",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "啟動代理程式需要提示詞。請新增提示詞後重新執行。",
+      "repositoryRequired": "啟動代理程式需要存放庫。請開啟 Kilo 並選擇一個存放庫，然後重新執行。",
       "repositoryUnknown": "Kilo 無法將 {{repository}} 辨識為 GitHub 或 GitLab 存放庫。請在 Kilo 中選擇其他存放庫。",
       "repositoryUnsupported": "{{repository}} 是 Bitbucket 存放庫——啟動代理程式暫時無法使用它。請在 Kilo 中選擇其他存放庫。"
     }
@@ -3786,6 +3790,8 @@
     "empty": "目前無法取得點數包。",
     "noMatchingProducts": "App Store 未傳回相符的點數包。",
     "noMatchingProductsPlay": "Google Play 未傳回相符的點數包。",
+    "storeTimedOut": "App Store 未及時回應。請再試一次。",
+    "storeTimedOutPlay": "Google Play 未及時回應。請再試一次。",
     "purchaseOwnedByAnotherAccount": "此 Apple 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。"
   },

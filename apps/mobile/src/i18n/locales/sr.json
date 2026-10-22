@@ -2271,6 +2271,8 @@
       "commitAndPush": "Komituj i pošalji",
       "startSession": "Pokreni sesiju",
       "selectRepositoryToStart": "Izaberi repozitorijum da započneš.",
+      "enterPromptToStart": "Dodaj upit da započneš.",
+      "enterPromptOrFileToStart": "Dodaj upit ili datoteku da započneš.",
       "connectProviderToStart": "Poveži platformu da započneš.",
       "promptPlaceholder": "Na čemu želiš da radiš?",
       "couldNotLoadModels": "Učitavanje modela nije uspelo.",
@@ -3062,6 +3064,7 @@
 
       "chooseAccount": "Izaberi nalog",
       "loadErrorTitle": "Učitavanje tvojih organizacija nije uspelo.",
+      "membershipLostNotice": "Više nemaš pristup ovoj organizaciji. Prebačeno na {{target}}.",
       "noOrganization": "Nema organizacije",
 
       "noOrganizationDescription": "Ovaj nalog nije deo organizacije. Napravi ili se pridruži organizaciji na vebu da bi koristio funkcije organizacije kao što su pozivnice za članove i upozorenja o niskom saldu.",
@@ -3610,6 +3613,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Za pokretanje agenta potreban je upit. Dodaj upit i pokreni ga ponovo.",
+      "repositoryRequired": "Za pokretanje agenta potreban je repozitorijum. Otvori Kilo i izaberi repozitorijum, zatim ga pokreni ponovo.",
       "repositoryUnknown": "Kilo ne prepoznaje {{repository}} kao GitHub ili GitLab repozitorijum. Izaberi drugi repozitorijum u Kilo.",
       "repositoryUnsupported": "{{repository}} je Bitbucket repozitorijum — Pokreni agenta ga još ne može koristiti. Izaberi drugi repozitorijum u Kilo."
     }
@@ -3827,6 +3831,8 @@
     "empty": "Paketi kredita trenutno nisu dostupni.",
     "noMatchingProducts": "App Store nije vratio odgovarajuće pakete kredita.",
     "noMatchingProductsPlay": "Google Play nije vratio odgovarajuće pakete kredita.",
+    "storeTimedOut": "App Store nije odgovorio na vreme. Pokušaj ponovo.",
+    "storeTimedOutPlay": "Google Play nije odgovorio na vreme. Pokušajte ponovo.",
     "purchaseOwnedByAnotherAccount": "Krediti na ovom nalogu Apple Account pripadaju drugom Kilo nalogu. Prijavi se na taj Kilo nalog da ih koristiš.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play nalogu pripadaju drugom Kilo nalogu. Prijavite se na taj Kilo nalog da biste ih koristili."
   },

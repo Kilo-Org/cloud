@@ -1741,6 +1741,8 @@
       "commitAndPush": "קומיט ודחיפה",
       "startSession": "התחלת סשן",
       "selectRepositoryToStart": "בחר מאגר כדי להתחיל.",
+      "enterPromptToStart": "הוסף פרומפט כדי להתחיל.",
+      "enterPromptOrFileToStart": "הוסף פרומפט או קובץ כדי להתחיל.",
       "connectProviderToStart": "חבר ספק כדי להתחיל.",
       "promptPlaceholder": "על מה תרצה לעבוד?",
       "couldNotLoadModels": "לא ניתן היה לטעון את המודלים.",
@@ -3054,6 +3056,7 @@
 
       "chooseAccount": "בחירת חשבון",
       "loadErrorTitle": "לא ניתן היה לטעון את הארגונים שלך.",
+      "membershipLostNotice": "אין לך גישה לארגון זה עוד. הוחלף ל-{{target}}.",
       "noOrganization": "אין ארגון",
 
       "noOrganizationDescription": "החשבון הזה אינו חלק מארגון. צור ארגון או הצטרף לאחד באתר כדי להשתמש בתכונות של ארגון כמו הזמנת חברים והתראות על יתרה נמוכה.",
@@ -3610,6 +3613,7 @@
   "appActions": {
     "start": {
       "promptRequired": "כדי להפעיל סוכן נדרשת הנחיה. הוסף הנחיה והפעל שוב.",
+      "repositoryRequired": "כדי להפעיל סוכן נדרש מאגר. פתח את Kilo ובחר מאגר, ואז הפעל שוב.",
       "repositoryUnknown": "Kilo לא מזהה את {{repository}} כמאגר GitHub או GitLab. בחר מאגר אחר ב-Kilo.",
       "repositoryUnsupported": "{{repository}} הוא מאגר Bitbucket — הפעל סוכן עדיין לא יכול להשתמש בו. בחר מאגר אחר ב-Kilo."
     }
@@ -3827,6 +3831,8 @@
     "empty": "חבילות קרדיטים אינן זמינות כעת.",
     "noMatchingProducts": "App Store לא החזיר חבילות קרדיטים תואמות.",
     "noMatchingProductsPlay": "Google Play לא החזיר חבילות קרדיטים תואמות.",
+    "storeTimedOut": "App Store לא הגיב בזמן. ניסיון נוסף.",
+    "storeTimedOutPlay": "Google Play לא הגיב בזמן. ניסיון נוסף.",
     "purchaseOwnedByAnotherAccount": "הקרדיטים בחשבון Apple Account הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם.",
     "purchaseOwnedByAnotherAccountPlay": "הקרדיטים בחשבון Google Play הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם."
   },

@@ -2299,6 +2299,8 @@
       "commitAndPush": "Įrašyti ir išsiųsti",
       "startSession": "Pradėti sesiją",
       "selectRepositoryToStart": "Norėdami pradėti, pasirinkite saugyklą.",
+      "enterPromptToStart": "Norėdami pradėti, pridėkite promptą.",
+      "enterPromptOrFileToStart": "Norėdami pradėti, pridėkite promptą arba failą.",
       "connectProviderToStart": "Norėdami pradėti, prijunkite paslaugų teikėją.",
       "promptPlaceholder": "Ką norėtumėte atlikti?",
       "couldNotLoadModels": "Nepavyko įkelti modelių.",
@@ -3102,6 +3104,7 @@
 
       "chooseAccount": "Pasirinkite paskyrą",
       "loadErrorTitle": "Nepavyko įkelti jūsų organizacijų.",
+      "membershipLostNotice": "Jūs nebeturite prieigos prie šios organizacijos. Perjungta į {{target}}.",
       "noOrganization": "Nėra organizacijos",
 
       "noOrganizationDescription": "Ši paskyra nepriklauso jokiai organizacijai. Kad galėtumėte naudoti organizacijos funkcijas, tokias kaip narių kvietimai ir įspėjimai apie mažą likutį, sukurkite organizaciją arba prisijunkite prie jos naršyklėje.",
@@ -3651,6 +3654,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Norint paleisti agentą, reikia užklausos. Pridėk užklausą ir paleisk iš naujo.",
+      "repositoryRequired": "Norint paleisti agentą, reikia saugyklos. Atsidaryk Kilo ir pasirink saugyklą, tada paleisk iš naujo.",
       "repositoryUnknown": "Kilo neatpažįsta {{repository}} kaip GitHub ar GitLab saugyklos. Pasirink kitą saugyklą Kilo programoje.",
       "repositoryUnsupported": "{{repository}} yra Bitbucket saugykla — Paleisti agentą jos dar negali naudoti. Pasirink kitą saugyklą Kilo programoje."
     }
@@ -3868,6 +3872,8 @@
     "empty": "Kreditų paketai šiuo metu neprieinami.",
     "noMatchingProducts": "App Store negrąžino jokių atitinkančių kreditų paketų.",
     "noMatchingProductsPlay": "Google Play negrąžino jokių atitinkančių kreditų paketų.",
+    "storeTimedOut": "App Store neatsakė laiku. Bandyti dar kartą.",
+    "storeTimedOutPlay": "Google Play neatsakė laiku. Bandyti dar kartą.",
     "purchaseOwnedByAnotherAccount": "Šios Apple Account paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros.",
     "purchaseOwnedByAnotherAccountPlay": "Šios Google Play paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros."
   },

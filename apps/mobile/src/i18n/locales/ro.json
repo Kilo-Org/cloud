@@ -2271,6 +2271,8 @@
       "commitAndPush": "Fă commit și trimite",
       "startSession": "Începe sesiunea",
       "selectRepositoryToStart": "Selectează un depozit pentru a începe.",
+      "enterPromptToStart": "Adaugă un prompt pentru a începe.",
+      "enterPromptOrFileToStart": "Adaugă un prompt sau un fișier pentru a începe.",
       "connectProviderToStart": "Conectează un furnizor pentru a începe.",
       "promptPlaceholder": "La ce vrei să lucrezi?",
       "couldNotLoadModels": "Nu s-au putut încărca modelele.",
@@ -3062,6 +3064,7 @@
 
       "chooseAccount": "Selectează un cont",
       "loadErrorTitle": "Nu s-au putut încărca organizațiile tale.",
+      "membershipLostNotice": "Nu mai ai acces la această organizație. S-a comutat la {{target}}.",
       "noOrganization": "Nicio organizație",
 
       "noOrganizationDescription": "Acest cont nu face parte dintr-o organizație. Creează sau alătură-te unei organizații pe site pentru a folosi funcții de organizație precum invitațiile pentru membri și alertele de sold scăzut.",
@@ -3610,6 +3613,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Pornește un agent necesită o instrucțiune. Adaugă o instrucțiune și rulează-l din nou.",
+      "repositoryRequired": "Pornește un agent necesită un depozit. Deschide Kilo și alege unul, apoi rulează-l din nou.",
       "repositoryUnknown": "Kilo nu recunoaște {{repository}} ca depozit GitHub sau GitLab. Alege alt depozit în Kilo.",
       "repositoryUnsupported": "{{repository}} este un depozit Bitbucket — Pornește un agent nu îl poate folosi încă. Alege alt depozit în Kilo."
     }
@@ -3827,6 +3831,8 @@
     "empty": "Pachetele de credite nu sunt disponibile momentan.",
     "noMatchingProducts": "App Store nu a returnat pachete de credite corespunzătoare.",
     "noMatchingProductsPlay": "Google Play nu a returnat pachete de credite corespunzătoare.",
+    "storeTimedOut": "App Store nu a răspuns la timp. Încearcă din nou.",
+    "storeTimedOutPlay": "Google Play nu a răspuns la timp. Încearcă din nou.",
     "purchaseOwnedByAnotherAccount": "Creditele asociate acestui Apple Account aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi.",
     "purchaseOwnedByAnotherAccountPlay": "Creditele de pe acest cont Google Play aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi."
   },

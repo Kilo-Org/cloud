@@ -2243,6 +2243,8 @@
       "commitAndPush": "Комитирај и испрати",
       "startSession": "Започни сесија",
       "selectRepositoryToStart": "Изберете репозиториум за да започнете.",
+      "enterPromptToStart": "Додадете упат за да започнете.",
+      "enterPromptOrFileToStart": "Додадете упат или датотека за да започнете.",
       "connectProviderToStart": "Поврзете платформа за да започнете.",
       "promptPlaceholder": "На што сакаш да работиш?",
       "couldNotLoadModels": "Не успеа вчитувањето на моделите.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Избери сметка",
       "loadErrorTitle": "Не успеа вчитувањето на твоите организации.",
+      "membershipLostNotice": "Веќе немаш пристап до оваа организација. Префрлено на {{target}}.",
       "noOrganization": "Нема организација",
 
       "noOrganizationDescription": "Оваа сметка не е дел од организација. Создај или придружи се на организација на веб-страницата за да ги користиш функциите на организацијата, како покани за членови и предупредувања за низок баланс.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "За да стартираш агент, потребно е упатство. Додај упатство и стартувај го повторно.",
+      "repositoryRequired": "За да стартираш агент, потребен е репозиториум. Отвори Kilo и избери еден, па стартувај повторно.",
       "repositoryUnknown": "Kilo не го препознава {{repository}} како GitHub или GitLab репозиториум. Избери друг репозиториум во Kilo.",
       "repositoryUnsupported": "{{repository}} е Bitbucket репозиториум — Стартирај агент сè уште не може да го користи. Избери друг репозиториум во Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Пакетите со кредити во моментов не се достапни.",
     "noMatchingProducts": "App Store не врати соодветни пакети со кредити.",
     "noMatchingProductsPlay": "Google Play не врати соодветни пакети со кредити.",
+    "storeTimedOut": "App Store не одговори на време. Обиди се повторно.",
+    "storeTimedOutPlay": "Google Play не одговори на време. Обиди се повторно.",
     "purchaseOwnedByAnotherAccount": "Кредитите на оваа Apple Account припаѓаат на друга сметка на Kilo. Најави се на таа сметка на Kilo за да ги користиш.",
     "purchaseOwnedByAnotherAccountPlay": "Кредитите на оваа Google Play сметка припаѓаат на друга Kilo сметка. Најавете се на таа Kilo сметка за да ги користите."
   },

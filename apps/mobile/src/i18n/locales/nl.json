@@ -1729,6 +1729,8 @@
       "commitAndPush": "Committen en pushen",
       "startSession": "Sessie starten",
       "selectRepositoryToStart": "Selecteer een repository om te starten.",
+      "enterPromptToStart": "Voeg een prompt toe om te starten.",
+      "enterPromptOrFileToStart": "Voeg een prompt of een bestand toe om te starten.",
       "connectProviderToStart": "Koppel een platform om te starten.",
       "promptPlaceholder": "Waar wil je aan werken?",
       "couldNotLoadModels": "De modellen konden niet worden geladen.",
@@ -3014,6 +3016,7 @@
 
       "chooseAccount": "Een account kiezen",
       "loadErrorTitle": "Je organisaties konden niet worden geladen.",
+      "membershipLostNotice": "Je hebt geen toegang meer tot deze organisatie. Overgeschakeld naar {{target}}.",
       "noOrganization": "Geen organisatie",
 
       "noOrganizationDescription": "Dit account maakt geen deel uit van een organisatie. Maak er een aan of word lid van een organisatie op de website om organisatiefuncties zoals liduitnodigingen en waarschuwingen bij een laag saldo te gebruiken.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agent starten vereist een prompt. Voeg een prompt toe en voer de actie opnieuw uit.",
+      "repositoryRequired": "Agent starten vereist een repository. Open Kilo en kies er een, voer de actie daarna opnieuw uit.",
       "repositoryUnknown": "Kilo herkent {{repository}} niet als GitHub- of GitLab-repository. Kies een andere repository in Kilo.",
       "repositoryUnsupported": "{{repository}} is een Bitbucket-repository — Agent starten kan die nog niet gebruiken. Kies een andere repository in Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Creditpakketten zijn momenteel niet beschikbaar.",
     "noMatchingProducts": "De App Store heeft geen overeenkomende creditpakketten geretourneerd.",
     "noMatchingProductsPlay": "Google Play heeft geen overeenkomende creditpakketten geretourneerd.",
+    "storeTimedOut": "De App Store reageerde niet op tijd. Opnieuw proberen.",
+    "storeTimedOutPlay": "Google Play reageerde niet op tijd. Opnieuw proberen.",
     "purchaseOwnedByAnotherAccount": "De credits op deze Apple Account horen bij een ander Kilo-account. Meld je aan bij dat Kilo-account om ze te gebruiken.",
     "purchaseOwnedByAnotherAccountPlay": "De credits op dit Google Play-account horen bij een ander Kilo-account. Meld je aan bij dat Kilo-account om ze te gebruiken."
   },

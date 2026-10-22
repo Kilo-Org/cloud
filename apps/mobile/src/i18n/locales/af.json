@@ -2243,6 +2243,8 @@
       "commitAndPush": "Lê vas en stoot op",
       "startSession": "Begin sessie",
       "selectRepositoryToStart": "Kies 'n bewaarplek om te begin.",
+      "enterPromptToStart": "Voeg 'n opdrag by om te begin.",
+      "enterPromptOrFileToStart": "Voeg 'n opdrag of 'n lêer by om te begin.",
       "connectProviderToStart": "Koppel 'n verskaffer om te begin.",
       "promptPlaceholder": "Waaraan wil jy werk?",
       "couldNotLoadModels": "Die modelle kon nie gelaai word nie.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Kies 'n rekening",
       "loadErrorTitle": "Jou organisasies kon nie gelaai word nie.",
+      "membershipLostNotice": "Jy het nie meer toegang tot hierdie organisasie nie. Oorgeskakel na {{target}}.",
       "noOrganization": "Geen organisasie",
 
       "noOrganizationDescription": "Hierdie rekening is nie deel van 'n organisasie nie. Skep of sluit by een aan op die web om organisasiefunksies soos lede-uitnodigings en waarskuwings oor lae saldo te gebruik.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Begin agent benodig 'n opdrag. Voeg 'n opdrag by en voer dit weer uit.",
+      "repositoryRequired": "Begin agent benodig 'n bewaarplek. Maak Kilo oop en kies een, voer dit dan weer uit.",
       "repositoryUnknown": "Kilo herken nie {{repository}} as 'n GitHub- of GitLab-bewaarplek nie. Kies 'n ander bewaarplek in Kilo.",
       "repositoryUnsupported": "{{repository}} is 'n Bitbucket-bewaarplek — Begin agent kan dit nog nie gebruik nie. Kies 'n ander bewaarplek in Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Kredietpakkette is tans nie beskikbaar nie.",
     "noMatchingProducts": "Geen passende kredietpakkette is deur App Store terugbesorg nie.",
     "noMatchingProductsPlay": "Geen passende kredietpakkette is deur Google Play terugbesorg nie.",
+    "storeTimedOut": "App Store het nie betyds gereageer nie. Probeer weer.",
+    "storeTimedOutPlay": "Google Play het nie betyds gereageer nie. Probeer weer.",
     "purchaseOwnedByAnotherAccount": "Die krediete op hierdie Apple Account behoort aan 'n ander Kilo-rekening. Meld by daardie Kilo-rekening aan om dit te gebruik.",
     "purchaseOwnedByAnotherAccountPlay": "Die krediete op hierdie Google Play-rekening behoort aan 'n ander Kilo-rekening. Teken in by daardie Kilo-rekening om dit te gebruik."
   },

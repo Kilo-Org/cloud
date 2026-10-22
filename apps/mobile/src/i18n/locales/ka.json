@@ -2243,6 +2243,8 @@
       "commitAndPush": "კომიტი და ატვირთვა",
       "startSession": "სესიის დაწყება",
       "selectRepositoryToStart": "დასაწყებად აირჩიეთ რეპოზიტორია.",
+      "enterPromptToStart": "დასაწყებად დაამატეთ პრომპტი.",
+      "enterPromptOrFileToStart": "დასაწყებად დაამატეთ პრომპტი ან ფაილი.",
       "connectProviderToStart": "დასაწყებად დააკავშირეთ პროვაიდერი.",
       "promptPlaceholder": "რაზე გსურთ მუშაობა?",
       "couldNotLoadModels": "მოდელების ჩატვირთვა ვერ მოხერხდა.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "ანგარიშის არჩევა",
       "loadErrorTitle": "თქვენი ორგანიზაციების ჩატვირთვა ვერ მოხერხდა.",
+      "membershipLostNotice": "თქვენ აღარ გაქვთ წვდომა ამ ორგანიზაციაზე. გადავერთეთ {{target}}-ზე.",
       "noOrganization": "ორგანიზაცია არ არის",
 
       "noOrganizationDescription": "ეს ანგარიში არ არის ორგანიზაციის ნაწილი. ორგანიზაციის ფუნქციების, როგორიცაა წევრების მოწვევა და დაბალი ბალანსის შეტყობინებები, გამოსაყენებლად შექმენით ორგანიზაცია ან შეუერთდით მას ვებსაიტზე.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "აგენტის გაშვებას მოთხოვნა სჭირდება. დაამატე მოთხოვნა და კვლავ გაუშვი.",
+      "repositoryRequired": "აგენტის გაშვებას რეპოზიტორია სჭირდება. გახსენი Kilo, აირჩიე რეპოზიტორია და კვლავ გაუშვი.",
       "repositoryUnknown": "Kilo {{repository}}-ს GitHub-ის ან GitLab-ის რეპოზიტორიად არ ცნობს. აირჩიე სხვა რეპოზიტორია Kilo-ში.",
       "repositoryUnsupported": "{{repository}} Bitbucket-ის რეპოზიტორიაა — აგენტის გაშვება ჯერ ვერ გამოიყენებს მას. აირჩიე სხვა რეპოზიტორია Kilo-ში."
     }
@@ -3786,6 +3790,8 @@
     "empty": "კრედიტების პაკეტები ამჟამად მიუწვდომელია.",
     "noMatchingProducts": "App Store-მა შესაბამისი კრედიტის პაკეტები არ დააბრუნა.",
     "noMatchingProductsPlay": "Google Play-მა შესაბამისი კრედიტის პაკეტები არ დააბრუნა.",
+    "storeTimedOut": "App Store-მა დროულად არ უპასუხა. ხელახლა ცდა",
+    "storeTimedOutPlay": "Google Play-მა დროულად არ უპასუხა. ხელახლა ცდა",
     "purchaseOwnedByAnotherAccount": "ამ Apple Account-ზე არსებული კრედიტები სხვა Kilo ანგარიშს ეკუთვნის. მათ გამოსაყენებლად შედი იმ Kilo ანგარიშში.",
     "purchaseOwnedByAnotherAccountPlay": "ამ Google Play ანგარიშზე არსებული კრედიტები სხვა Kilo ანგარიშს ეკუთვნის. მათ გამოსაყენებლად შედით იმ Kilo ანგარიშში."
   },

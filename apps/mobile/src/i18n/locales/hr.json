@@ -2271,6 +2271,8 @@
       "commitAndPush": "Potvrdi i pošalji",
       "startSession": "Započni sesiju",
       "selectRepositoryToStart": "Odaberi repozitorij za početak.",
+      "enterPromptToStart": "Dodaj upit za početak.",
+      "enterPromptOrFileToStart": "Dodaj upit ili datoteku za početak.",
       "connectProviderToStart": "Poveži pružatelja za početak.",
       "promptPlaceholder": "Na čemu želiš raditi?",
       "couldNotLoadModels": "Nije moguće učitati modele.",
@@ -3062,6 +3064,7 @@
 
       "chooseAccount": "Odaberi račun",
       "loadErrorTitle": "Nije moguće učitati tvoje organizacije.",
+      "membershipLostNotice": "Više nemaš pristup ovoj organizaciji. Prebačeno na {{target}}.",
       "noOrganization": "Nema organizacije",
 
       "noOrganizationDescription": "Ovaj račun nije dio organizacije. Stvori ili se pridruži organizaciji na webu da bi koristio značajke organizacije kao što su pozivnice za članove i upozorenja o niskom saldu.",
@@ -3610,6 +3613,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Za pokretanje agenta potreban je upit. Dodaj upit i pokreni ga ponovno.",
+      "repositoryRequired": "Za pokretanje agenta potreban je repozitorij. Otvori Kilo i odaberi jedan, a zatim ga pokreni ponovno.",
       "repositoryUnknown": "Kilo ne prepoznaje {{repository}} kao GitHub ili GitLab repozitorij. Odaberi drugi repozitorij u Kilu.",
       "repositoryUnsupported": "{{repository}} je Bitbucketov repozitorij — Pokreni agenta ga još ne može koristiti. Odaberi drugi repozitorij u Kilu."
     }
@@ -3827,6 +3831,8 @@
     "empty": "Paketi kredita trenutačno nisu dostupni.",
     "noMatchingProducts": "App Store nije vratio odgovarajuće pakete kredita.",
     "noMatchingProductsPlay": "Google Play nije vratio odgovarajuće pakete kredita.",
+    "storeTimedOut": "App Store nije odgovorio na vrijeme. Pokušaj ponovno.",
+    "storeTimedOutPlay": "Google Play nije odgovorio na vrijeme. Pokušaj ponovno.",
     "purchaseOwnedByAnotherAccount": "Krediti na ovom računu Apple Account pripadaju drugom Kilo računu. Prijavi se na taj Kilo račun da ih koristiš.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play računu pripadaju drugom Kilo računu. Prijavite se na taj Kilo račun da biste ih koristili."
   },

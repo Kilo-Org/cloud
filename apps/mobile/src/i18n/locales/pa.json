@@ -2243,6 +2243,8 @@
       "commitAndPush": "ਕਮਿਟ ਤੇ ਪੁਸ਼ ਕਰੋ",
       "startSession": "ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ",
       "selectRepositoryToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣੋ।",
+      "enterPromptToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰਾਂਪਟ ਜੋੜੋ।",
+      "enterPromptOrFileToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰਾਂਪਟ ਜਾਂ ਫਾਈਲ ਜੋੜੋ।",
       "connectProviderToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰਦਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
       "promptPlaceholder": "ਤੁਸੀਂ ਕਿਸ 'ਤੇ ਕੰਮ ਕਰਨਾ ਚਾਹੋਗੇ?",
       "couldNotLoadModels": "ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ।",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "ਇੱਕ ਖਾਤਾ ਚੁਣੋ",
       "loadErrorTitle": "ਤੁਹਾਡੀਆਂ ਸੰਸਥਾਵਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
+      "membershipLostNotice": "ਤੁਹਾਡੀ ਇਸ ਸੰਸਥਾ ਤੱਕ ਹੁਣ ਪਹੁੰਚ ਨਹੀਂ ਹੈ। {{target}} ਤੇ ਸਵਿਚ ਹੋਇਆ।",
       "noOrganization": "ਕੋਈ ਸੰਸਥਾ ਨਹੀਂ",
 
       "noOrganizationDescription": "ਇਹ ਖਾਤਾ ਕਿਸੇ ਸੰਸਥਾ ਦਾ ਹਿੱਸਾ ਨਹੀਂ ਹੈ। ਮੈਂਬਰ ਸੱਦੇ ਅਤੇ ਘੱਟ ਬੈਲੰਸ ਚੇਤਾਵਨੀਆਂ ਵਰਗੀਆਂ ਸੰਸਥਾ ਸੁਵਿਧਾਵਾਂ ਦੀ ਵਰਤੋਂ ਕਰਨ ਲਈ ਵੈੱਬ 'ਤੇ ਸੰਸਥਾ ਬਣਾਓ ਜਾਂ ਇੱਕ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ।",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "ਏਜੰਟ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਪ੍ਰੌਂਪਟ ਲੋੜੀਂਦਾ ਹੈ। ਇੱਕ ਪ੍ਰੌਂਪਟ ਸ਼ਾਮਲ ਕਰੋ ਅਤੇ ਇਸਨੂੰ ਦੁਬਾਰਾ ਚਲਾਓ।",
+      "repositoryRequired": "ਏਜੰਟ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਰਿਪੋਜ਼ਿਟਰੀ ਲੋੜੀਂਦੀ ਹੈ। Kilo ਖੋਲ੍ਹੋ ਅਤੇ ਇੱਕ ਚੁਣੋ, ਫਿਰ ਇਸਨੂੰ ਦੁਬਾਰਾ ਚਲਾਓ।",
       "repositoryUnknown": "Kilo, {{repository}} ਨੂੰ GitHub ਜਾਂ GitLab ਰਿਪੋਜ਼ਿਟਰੀ ਵਜੋਂ ਨਹੀਂ ਪਛਾਣਦਾ। Kilo ਵਿੱਚ ਕੋਈ ਹੋਰ ਰਿਪੋਜ਼ਿਟਰੀ ਚੁਣੋ।",
       "repositoryUnsupported": "{{repository}} ਇੱਕ Bitbucket ਰਿਪੋਜ਼ਿਟਰੀ ਹੈ — ਏਜੰਟ ਸ਼ੁਰੂ ਕਰੋ ਅਜੇ ਇਸਨੂੰ ਵਰਤ ਨਹੀਂ ਸਕਦਾ। Kilo ਵਿੱਚ ਕੋਈ ਹੋਰ ਰਿਪੋਜ਼ਿਟਰੀ ਚੁਣੋ।"
     }
@@ -3786,6 +3790,8 @@
     "empty": "ਕ੍ਰੈਡਿਟ ਪੈਕ ਇਸ ਸਮੇਂ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
     "noMatchingProducts": "App Store ਨੇ ਕੋਈ ਮੇਲ ਖਾਂਦਾ ਕ੍ਰੈਡਿਟ ਪੈਕ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ।",
     "noMatchingProductsPlay": "Google Play ਨੇ ਕੋਈ ਮੇਲ ਖਾਂਦਾ ਕ੍ਰੈਡਿਟ ਪੈਕ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ।",
+    "storeTimedOut": "App Store ਨੇ ਸਮੇਂ ਸਿਰ ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "storeTimedOutPlay": "Google Play ਨੇ ਸਮੇਂ ਸਿਰ ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "purchaseOwnedByAnotherAccount": "ਇਸ Apple Account ਵਾਲੇ ਕ੍ਰੈਡਿਟ ਕਿਸੇ ਹੋਰ Kilo ਖਾਤੇ ਨਾਲ ਸਬੰਧਤ ਹਨ। ਇਹਨਾਂ ਨੂੰ ਵਰਤਣ ਲਈ ਉਸ Kilo ਖਾਤੇ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ।",
     "purchaseOwnedByAnotherAccountPlay": "ਇਸ Google Play ਖਾਤੇ 'ਤੇ ਕ੍ਰੈਡਿਟ ਇੱਕ ਵੱਖਰੇ Kilo ਖਾਤੇ ਨਾਲ ਸਬੰਧਤ ਹਨ। ਇਹਨਾਂ ਨੂੰ ਵਰਤਣ ਲਈ ਉਸ Kilo ਖਾਤੇ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ।"
   },

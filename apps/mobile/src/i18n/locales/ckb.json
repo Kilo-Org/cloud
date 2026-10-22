@@ -2243,6 +2243,8 @@
       "commitAndPush": "کۆمیت و ناردن",
       "startSession": "دەستپێکردنی سێشن",
       "selectRepositoryToStart": "بۆ دەستپێکردن کۆگایەک هەڵبژێرە.",
+      "enterPromptToStart": "بۆ دەستپێکردن پرۆمپتێک زیاد بکە.",
+      "enterPromptOrFileToStart": "بۆ دەستپێکردن پرۆمپتێک یان فایلێک زیاد بکە.",
       "connectProviderToStart": "بۆ دەستپێکردن پەیوەندی بە دابینکەرێک بکە.",
       "promptPlaceholder": "حەز دەکەیت لەسەر چی کار بکەیت؟",
       "couldNotLoadModels": "نەتوانرا مۆدێلەکان بار بکرێن.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "هەژمارێک هەڵبژێرە",
       "loadErrorTitle": "نەتوانرا ڕێکخراوەکانت بار بکرێن.",
+      "membershipLostNotice": "چیتر مۆڵەتی دەستگەیشتن بەم ڕێکخراوەت نییە. گۆڕدرا بۆ {{target}}.",
       "noOrganization": "ڕێکخراو نییە",
 
       "noOrganizationDescription": "ئەم هەژمارە بەشێک نییە لە ڕێکخراوێک. لە وێبدا ڕێکخراوێک دروست بکە یان پەیوەندی پێوە بکە بۆ بەکارهێنانی تایبەتمەندییەکانی ڕێکخراو وەک بانگهێشتی ئەندامان و ئاگادارکەرەوەکانی باڵانسی کەم.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "بۆ دەستپێکردنی بریکار داواکاری پێویستە. داواکارییەک زیاد بکە و دووبارە بیخە کار.",
+      "repositoryRequired": "بۆ دەستپێکردنی بریکار کۆگایەک پێویستە. Kilo بکەرەوە و کۆگایەک هەڵبژێرە، پاشان دووبارە بیخە کار.",
       "repositoryUnknown": "Kilo {{repository}} وەک کۆگای GitHub یان GitLab ناناسێت. لە Kilo کۆگایەکی تر هەڵبژێرە.",
       "repositoryUnsupported": "{{repository}} کۆگای Bitbucket ە — بریکار دەستپێبکە هێشتا ناتوانێت بەکاری بهێنێت. لە Kilo کۆگایەکی تر هەڵبژێرە."
     }
@@ -3786,6 +3790,8 @@
     "empty": "پاکێتەکانی کرێدیت ئێستا بەردەست نین.",
     "noMatchingProducts": "هیچ پاکێتی کرێدیتی گونجاوی لەلایەن App Storeەوە نەگەڕێندرایەوە.",
     "noMatchingProductsPlay": "هیچ پاکێتی کرێدیتی گونجاوی لەلایەن Google Playەوە نەگەڕێندرایەوە.",
+    "storeTimedOut": "App Store لە کاتی خۆیدا وەڵامی نەداوە. دووبارە هەوڵ بدەوە.",
+    "storeTimedOutPlay": "Google Play لە کاتی خۆیدا وەڵامی نەداوە. دووبارە هەوڵ بدەوە.",
     "purchaseOwnedByAnotherAccount": "کرێدیتەکانی سەر ئەم Apple Accountە هی هەژمارێکی تری Kiloیە. بچۆ ناو ئەو هەژمارەی Kilo بۆ بەکارهێنانیان.",
     "purchaseOwnedByAnotherAccountPlay": "کرێدیتەکانی سەر ئەم هەژمارەی Google Play سەر بە هەژمارەیەکی دیکەی Kilo یە. بچۆ ژوورەوە لەو هەژمارەی Kilo بۆ بەکارهێنانیان."
   },

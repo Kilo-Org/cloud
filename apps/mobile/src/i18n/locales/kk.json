@@ -2243,6 +2243,8 @@
       "commitAndPush": "Коммит жасап, жіберу",
       "startSession": "Сессияны бастау",
       "selectRepositoryToStart": "Бастау үшін репозиторий таңдаңыз.",
+      "enterPromptToStart": "Бастау үшін сұрау қосыңыз.",
+      "enterPromptOrFileToStart": "Бастау үшін сұрау немесе файл қосыңыз.",
       "connectProviderToStart": "Бастау үшін провайдерді қосыңыз.",
       "promptPlaceholder": "Немен жұмыс істегіңіз келеді?",
       "couldNotLoadModels": "Модельдерді жүктеу мүмкін болмады.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Аккаунт таңдау",
       "loadErrorTitle": "Ұйымдарыңызды жүктеу мүмкін болмады.",
+      "membershipLostNotice": "Бұл ұйымға енді кіру рұқсатыңыз жоқ. {{target}}-ға ауыстырылды.",
       "noOrganization": "Ұйым жоқ",
 
       "noOrganizationDescription": "Бұл аккаунт ұйымның бөлігі емес. Мүшелерді шақыру және төмен баланс туралы ескертулер сияқты ұйым мүмкіндіктерін пайдалану үшін браузерде ұйым құрыңыз немесе оған қосылыңыз.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Агентті іске қосу үшін сұрау қажет. Сұрау қосып, қайта іске қосыңыз.",
+      "repositoryRequired": "Агентті іске қосу үшін репозиторий қажет. Kilo бағдарламасын ашыңыз, репозиторий таңдап, қайта іске қосыңыз.",
       "repositoryUnknown": "Kilo {{repository}} ны GitHub немесе GitLab репозиторийі ретінде танымайды. Kilo ішінен басқа репозиторий таңдаңыз.",
       "repositoryUnsupported": "{{repository}} — Bitbucket репозиторийі. Агентті іске қосу оны әзірге пайдалана алмайды. Kilo ішінен басқа репозиторий таңдаңыз."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Кредит пакеттері қазір қолжетімсіз.",
     "noMatchingProducts": "App Store сәйкес кредит пакеттерін қайтармады.",
     "noMatchingProductsPlay": "Google Play сәйкес кредит пакеттерін қайтармады.",
+    "storeTimedOut": "App Store уақытында жауап бермеді. Қайталап көру",
+    "storeTimedOutPlay": "Google Play уақытында жауап бермеді. Қайталап көру",
     "purchaseOwnedByAnotherAccount": "Осы Apple Account тіркелгісіндегі кредиттер басқа Kilo тіркелгісіне тиесілі. Оларды пайдалану үшін сол Kilo тіркелгісіне кіріңіз.",
     "purchaseOwnedByAnotherAccountPlay": "Бұл Google Play аккаунтындағы кредиттер басқа Kilo аккаунтына тиесілі. Оларды пайдалану үшін сол Kilo аккаунтына кіріңіз."
   },

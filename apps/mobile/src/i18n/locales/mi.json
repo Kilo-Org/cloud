@@ -2243,6 +2243,8 @@
       "commitAndPush": "Whakapūmau, pana",
       "startSession": "Tīmataria te wātū",
       "selectRepositoryToStart": "Kōwhiria he putunga waehere hei tīmata.",
+      "enterPromptToStart": "Tāpirihia he tono hei tīmata.",
+      "enterPromptOrFileToStart": "Tāpirihia he tono, he kōnae rānei hei tīmata.",
       "connectProviderToStart": "Honoa he kaiwhakarato hei tīmata.",
       "promptPlaceholder": "He aha tāu e hiahia ana ki te mahi?",
       "couldNotLoadModels": "Kāore i taea te uta i ngā tauira.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Kōwhiria tētahi pūkete",
       "loadErrorTitle": "Kāore i taea te uta i ō rōpū.",
+      "membershipLostNotice": "Kāore ō whakaaetanga uru ki tēnei rōpū anō. I whakawhiti ki {{target}}.",
       "noOrganization": "Kāore he rōpū",
 
       "noOrganizationDescription": "Kāore tēnei pūkete i roto i tētahi rōpū. Waihangatia, uru atu rānei ki tētahi rōpū i runga i te paetukutuku kia whakamahi ai i ngā āhuatanga rōpū pēnei i ngā pōwhiri mema me ngā whakatūpato mō te toenga iti.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Me whai tohutohu te Tīmata i te kaiāwhina. Tāpirihia he tohutohu ka whakahaere anō.",
+      "repositoryRequired": "Me pūranga waehere te Tīmata i te kaiāwhina. Whakatuwheratia a Kilo ka kōwhiria tētahi, ka whakahaere anō.",
       "repositoryUnknown": "Kāore a Kilo e āhukahuka i a {{repository}} hei pūranga waehere GitHub, GitLab rānei. Kōwhiria tētahi atu pūranga waehere i roto i a Kilo.",
       "repositoryUnsupported": "He pūranga waehere Bitbucket a {{repository}} — Kāore anō a Tīmata i te kaiāwhina e taea te whakamahi. Kōwhiria tētahi atu pūranga waehere i roto i a Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Kāore ngā pākete whiwhinga e wātea ana i tēnei wā.",
     "noMatchingProducts": "Kāore te App Store i whakahoki i ētahi pākete whiwhinga ōrite.",
     "noMatchingProductsPlay": "Kāore Google Play i whakahoki i ētahi pākete whiwhinga ōrite.",
+    "storeTimedOut": "Kāore te App Store i whakautu i te wā. Whakamātau anō.",
+    "storeTimedOutPlay": "Kāore a Google Play i whakautu i te wā. Whakamātau anō.",
     "purchaseOwnedByAnotherAccount": "Nō tētahi atu pūkete Kilo ngā whiwhinga o tēnei Apple Account. Whakauru ki taua pūkete Kilo hei whakamahi.",
     "purchaseOwnedByAnotherAccountPlay": "Nō tētahi atu pūkete Kilo ngā whiwhinga o tēnei pūkete Google Play. Whakauru ki taua pūkete Kilo hei whakamahi."
   },

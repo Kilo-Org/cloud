@@ -2307,6 +2307,8 @@
       "commitAndPush": "Commit and push",
       "startSession": "Start session",
       "selectRepositoryToStart": "Select a repository to start.",
+      "enterPromptToStart": "Add a prompt to start.",
+      "enterPromptOrFileToStart": "Add a prompt or a file to start.",
       "connectProviderToStart": "Connect a provider to start.",
       "promptPlaceholder": "What would you like to work on?",
       "couldNotLoadModels": "Couldn't load models",
@@ -3099,6 +3101,7 @@
       "chooseAccount": "Choose an account",
       "loadErrorMessage": "Check your connection and try again.",
       "loadErrorTitle": "Couldn't load your organizations",
+      "membershipLostNotice": "You no longer have access to this organization. Switched to {{target}}.",
       "noOrganization": "No organization",
       "noOrganizationDescription": "This account is not part of an organization. Create or join one on the web to use organization features like member invites and low-balance alerts.",
       "openWebOrganizations": "Open organizations on web",
@@ -3627,6 +3630,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Start agent needs a prompt. Add a prompt and run it again.",
+      "repositoryRequired": "Start agent needs a repository. Open Kilo and choose one, then run it again.",
       "repositoryUnknown": "Kilo doesn't recognize {{repository}} as a GitHub or GitLab repository. Choose another repository in Kilo.",
       "repositoryUnsupported": "{{repository}} is a Bitbucket repository — Start agent can't use it yet. Choose another repository in Kilo."
     }
@@ -3850,6 +3854,8 @@
     "empty": "Credit packs are unavailable right now.",
     "noMatchingProducts": "No matching credit packs were returned by App Store.",
     "noMatchingProductsPlay": "No matching credit packs were returned by Google Play.",
+    "storeTimedOut": "App Store didn't respond in time. Try again.",
+    "storeTimedOutPlay": "Google Play didn't respond in time. Try again.",
     "purchaseOwnedByAnotherAccount": "The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.",
     "purchaseOwnedByAnotherAccountPlay": "The credits on this Google Play account belong to a different Kilo account. Sign in to that Kilo account to use them."
   },

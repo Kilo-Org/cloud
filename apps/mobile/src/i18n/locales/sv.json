@@ -2243,6 +2243,8 @@
       "commitAndPush": "Committa och pusha",
       "startSession": "Starta session",
       "selectRepositoryToStart": "Välj ett kodarkiv för att starta.",
+      "enterPromptToStart": "Lägg till en uppmaning för att starta.",
+      "enterPromptOrFileToStart": "Lägg till en uppmaning eller en fil för att starta.",
       "connectProviderToStart": "Anslut en leverantör för att starta.",
       "promptPlaceholder": "Vad vill du arbeta med?",
       "couldNotLoadModels": "Det gick inte att läsa in modellerna.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Välj ett konto",
       "loadErrorTitle": "Det gick inte att läsa in dina organisationer.",
+      "membershipLostNotice": "Du har inte längre åtkomst till den här organisationen. Växlade till {{target}}.",
       "noOrganization": "Ingen organisation",
 
       "noOrganizationDescription": "Det här kontot tillhör ingen organisation. Skapa eller gå med i en organisation på webben för att använda organisationsfunktioner som medlemsinbjudningar och varningar om lågt saldo.",
@@ -3568,6 +3571,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Starta agenten kräver en prompt. Lägg till en prompt och kör den igen.",
+      "repositoryRequired": "Starta agenten kräver ett kodarkiv. Öppna Kilo och välj ett, kör den sedan igen.",
       "repositoryUnknown": "Kilo känner inte igen {{repository}} som ett GitHub- eller GitLab-kodarkiv. Välj ett annat kodarkiv i Kilo.",
       "repositoryUnsupported": "{{repository}} är ett Bitbucket-kodarkiv — Starta agenten kan ännu inte använda det. Välj ett annat kodarkiv i Kilo."
     }
@@ -3791,6 +3795,8 @@
     "empty": "Kreditpaket är inte tillgängliga just nu.",
     "noMatchingProducts": "App Store returnerade inga matchande kreditpaket.",
     "noMatchingProductsPlay": "Google Play returnerade inga matchande kreditpaket.",
+    "storeTimedOut": "App Store svarade inte i tid. Försök igen.",
+    "storeTimedOutPlay": "Google Play svarade inte i tid. Försök igen.",
     "purchaseOwnedByAnotherAccount": "Krediterna på detta Apple-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem.",
     "purchaseOwnedByAnotherAccountPlay": "Krediterna på detta Google Play-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem."
   },

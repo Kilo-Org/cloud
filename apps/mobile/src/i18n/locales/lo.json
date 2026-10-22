@@ -2243,6 +2243,8 @@
       "commitAndPush": "ບັນທຶກແລະສົ່ງຂຶ້ນ",
       "startSession": "ເລີ່ມເຊດຊັນ",
       "selectRepositoryToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເລືອກຄັງໂຄດ.",
+      "enterPromptToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເພີ່ມຄຳສັ່ງ.",
+      "enterPromptOrFileToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເພີ່ມຄຳສັ່ງ ຫຼືໄຟລ໌.",
       "connectProviderToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເຊື່ອມຕໍ່ຜູ້ໃຫ້ບໍລິການ.",
       "promptPlaceholder": "ຢາກເຮັດວຽກຫຍັງ?",
       "couldNotLoadModels": "ບໍ່ສາມາດໂຫຼດໂມເດວໄດ້.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "ເລືອກບັນຊີ",
       "loadErrorTitle": "ບໍ່ສາມາດໂຫຼດລາຍຊື່ອົງກອນຂອງທ່ານໄດ້.",
+      "membershipLostNotice": "ທ່ານບໍ່ມີສິດເຂົ້າເຖິງອົງກອນນີ້ອີກແລ້ວ. ປ່ຽນໄປ {{target}} ແລ້ວ.",
       "noOrganization": "ບໍ່ມີອົງກອນ",
 
       "noOrganizationDescription": "ບັນຊີນີ້ບໍ່ແມ່ນສ່ວນໜຶ່ງຂອງອົງກອນ. ສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນໃນເວັບ ເພື່ອໃຊ້ຄຸນສົມບັດຂອງອົງກອນ ເຊັ່ນ ການເຊີນສະມາຊິກ ແລະ ການແຈ້ງເຕືອນຍອດເງິນຕ່ຳ.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "ການເລີ່ມເອເຈນຕ້ອງການຂໍ້ຄວາມ. ເພີ່ມຂໍ້ຄວາມແລ້ວລອງອີກຄັ້ງ.",
+      "repositoryRequired": "ການເລີ່ມເອເຈນຕ້ອງການຄັງໂຄ້ດ. ເປີດ Kilo ແລະເລືອກຄັງໂຄ້ດໜຶ່ງ, ແລ້ວລອງອີກຄັ້ງ.",
       "repositoryUnknown": "Kilo ບໍ່ຮູ້ຈັກ {{repository}} ວ່າເປັນຄັງໂຄ້ດ GitHub ຫຼື GitLab. ເລືອກຄັງໂຄ້ດອື່ນໃນ Kilo.",
       "repositoryUnsupported": "{{repository}} ເປັນຄັງໂຄ້ດ Bitbucket — ເລີ່ມເອເຈນຍັງໃຊ້ມັນບໍ່ໄດ້. ເລືອກຄັງໂຄ້ດອື່ນໃນ Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "ແພັກເຄຣດິດບໍ່ສາມາດໃຊ້ໄດ້ໃນຕອນນີ້.",
     "noMatchingProducts": "App Store ບໍ່ໄດ້ສົ່ງແພັກເຄຣດິດທີ່ກົງກັນຄືນ.",
     "noMatchingProductsPlay": "Google Play ບໍ່ໄດ້ສົ່ງແພັກເຄຣດິດທີ່ກົງກັນຄືນ.",
+    "storeTimedOut": "App Store ບໍ່ໄດ້ຕອບສະໜອງທັນເວລາ. ລອງອີກຄັ້ງ.",
+    "storeTimedOutPlay": "Google Play ບໍ່ໄດ້ຕອບສະໜອງທັນເວລາ. ລອງອີກຄັ້ງ.",
     "purchaseOwnedByAnotherAccount": "ເຄຣດິດໃນ Apple Account ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ.",
     "purchaseOwnedByAnotherAccountPlay": "ເຄຣດິດໃນບັນຊີ Google Play ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ."
   },

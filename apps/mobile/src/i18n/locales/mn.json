@@ -2243,6 +2243,8 @@
       "commitAndPush": "Коммит хийж илгээх",
       "startSession": "Сессийг эхлүүлэх",
       "selectRepositoryToStart": "Эхлэхийн тулд кодын сангаа сонгоно уу.",
+      "enterPromptToStart": "Эхлэхийн тулд заавар нэмнэ үү.",
+      "enterPromptOrFileToStart": "Эхлэхийн тулд заавар эсвэл файл нэмнэ үү.",
       "connectProviderToStart": "Эхлэхийн тулд үйлчилгээ үзүүлэгчийг холбоно уу.",
       "promptPlaceholder": "Юун дээр ажиллах вэ?",
       "couldNotLoadModels": "Загваруудыг ачаалж чадсангүй.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Бүртгэл сонгох",
       "loadErrorTitle": "Таны байгууллагуудыг ачаалж чадсангүй.",
+      "membershipLostNotice": "Та энэ байгууллагад хандах эрхгүй боллоо. {{target}} руу шилжлээ.",
       "noOrganization": "Байгууллага байхгүй",
 
       "noOrganizationDescription": "Энэ бүртгэл нь байгууллагын гишүүн биш. Гишүүдийн урилга, бага үлдэгдлийн мэдэгдэл зэрэг байгууллагын функцуудыг ашиглахын тулд вэб сайтад байгууллага үүсгэх эсвэл нэгдээрэй.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Агент эхлүүлэхэд заавар шаардлагатай. Заавар нэмээд дахин ажиллуулна уу.",
+      "repositoryRequired": "Агент эхлүүлэхэд кодын сан шаардлагатай. Kilo-г нээгээд нэгийг сонгоод дахин ажиллуулна уу.",
       "repositoryUnknown": "Kilo {{repository}}-г GitHub эсвэл GitLab кодын сан гэж хүлээн зөвшөөрөхгүй. Kilo дотор өөр кодын сан сонгоно уу.",
       "repositoryUnsupported": "{{repository}} нь Bitbucket кодын сан — Агент эхлүүлэх үүнийг одоохондоо ашиглаж чадахгүй. Kilo дотор өөр кодын сан сонгоно уу."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Кредит багцууд одоогоор боломжгүй байна.",
     "noMatchingProducts": "App Store тохирох кредит багц буцаагаагүй.",
     "noMatchingProductsPlay": "Google Play тохирох кредит багц буцаагаагүй.",
+    "storeTimedOut": "App Store хугацаандаа хариу өгөөгүй. Дахин оролдох",
+    "storeTimedOutPlay": "Google Play хугацаандаа хариу өгөөгүй. Дахин оролдох",
     "purchaseOwnedByAnotherAccount": "Энэ Apple Account дээрх кредит нь өөр Kilo бүртгэлд харьяалагдана. Ашиглахын тулд тухайн Kilo бүртгэлдээ нэвтэрнэ үү.",
     "purchaseOwnedByAnotherAccountPlay": "Энэ Google Play бүртгэл дээрх кредит нь өөр Kilo бүртгэлд харьяалагдана. Ашиглахын тулд тухайн Kilo бүртгэлдээ нэвтэрнэ үү."
   },

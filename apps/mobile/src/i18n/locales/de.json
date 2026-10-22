@@ -1729,6 +1729,8 @@
       "commitAndPush": "Committen und pushen",
       "startSession": "Sitzung starten",
       "selectRepositoryToStart": "Wähle ein Repository aus, um zu starten.",
+      "enterPromptToStart": "Füge einen Prompt hinzu, um zu starten.",
+      "enterPromptOrFileToStart": "Füge einen Prompt oder eine Datei hinzu, um zu starten.",
       "connectProviderToStart": "Verbinde einen Anbieter, um zu starten.",
       "promptPlaceholder": "Woran möchtest du arbeiten?",
       "couldNotLoadModels": "Die Modelle konnten nicht geladen werden.",
@@ -3014,6 +3016,7 @@
 
       "chooseAccount": "Konto auswählen",
       "loadErrorTitle": "Deine Organisationen konnten nicht geladen werden.",
+      "membershipLostNotice": "Du hast keinen Zugriff mehr auf diese Organisation. Gewechselt zu {{target}}.",
       "noOrganization": "Keine Organisation",
 
       "noOrganizationDescription": "Dieses Konto gehört keiner Organisation an. Erstelle eine Organisation oder tritt einer auf der Website bei, um Organisationsfunktionen wie Mitgliedseinladungen und Warnungen bei niedrigem Guthaben zu nutzen.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agent starten benötigt einen Prompt. Füge einen Prompt hinzu und führe die Aktion erneut aus.",
+      "repositoryRequired": "Agent starten benötigt ein Repository. Öffne Kilo, wähle eines und führe die Aktion erneut aus.",
       "repositoryUnknown": "Kilo erkennt {{repository}} nicht als GitHub- oder GitLab-Repository. Wähle ein anderes Repository in Kilo.",
       "repositoryUnsupported": "{{repository}} ist ein Bitbucket-Repository — Agent starten kann es noch nicht verwenden. Wähle ein anderes Repository in Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Guthaben-Pakete sind derzeit nicht verfügbar.",
     "noMatchingProducts": "Der App Store hat keine passenden Guthaben-Pakete zurückgegeben.",
     "noMatchingProductsPlay": "Google Play hat keine passenden Guthaben-Pakete zurückgegeben.",
+    "storeTimedOut": "Der App Store hat nicht rechtzeitig geantwortet. Erneut versuchen.",
+    "storeTimedOutPlay": "Google Play hat nicht rechtzeitig geantwortet. Erneut versuchen.",
     "purchaseOwnedByAnotherAccount": "Das Guthaben dieses Apple Accounts gehört zu einem anderen Kilo-Konto. Melde dich bei dem zugehörigen Kilo-Konto an, um es zu nutzen.",
     "purchaseOwnedByAnotherAccountPlay": "Das Guthaben auf diesem Google-Konto gehört zu einem anderen Kilo-Konto. Melde dich bei diesem Kilo-Konto an, um es zu nutzen."
   },

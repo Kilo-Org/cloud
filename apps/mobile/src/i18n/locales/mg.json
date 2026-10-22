@@ -2243,6 +2243,8 @@
       "commitAndPush": "Raketo sy alefaso",
       "startSession": "Atombohy ny fotoam-piasana",
       "selectRepositoryToStart": "Safidio ny tahirin-kaody hanombohana.",
+      "enterPromptToStart": "Ampio baiko hanombohana.",
+      "enterPromptOrFileToStart": "Ampio baiko na rakitra hanombohana.",
       "connectProviderToStart": "Ampifandraiso ny mpanome tolotra hanombohana.",
       "promptPlaceholder": "Inona no tianao hiasana?",
       "couldNotLoadModels": "Tsy voaray ny modely.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Misafidiana kaonty",
       "loadErrorTitle": "Tsy voaray ny fikambananao.",
+      "membershipLostNotice": "Tsy manana alalana hiditra amin'ity fikambanana ity intsony ianao. Nafindra tany amin'ny {{target}}.",
       "noOrganization": "Tsy misy fikambanana",
 
       "noOrganizationDescription": "Ity kaonty ity dia tsy anisan'ny fikambanana. Mamorona na midira ao amin'ny fikambanana ao amin'ny tranonkala mba hampiasa ny endriky ny fikambanana toy ny fanasana mpikambana sy ny fampitandremana momba ny fifandanjana ambany.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Ny Atombohy ny mpanampy dia mila toromarika. Manampia toromarika ary avereno indray izy.",
+      "repositoryRequired": "Ny Atombohy ny mpanampy dia mila tahirin-kaody. Sokafy ny Kilo ary mifidiana iray, avy eo avereno indray izy.",
       "repositoryUnknown": "Tsy fantatr'i Kilo ny {{repository}} ho tahirin-kaody GitHub na GitLab. Mifidiana tahirin-kaody hafa ao amin'ny Kilo.",
       "repositoryUnsupported": "Tahirin-kaody Bitbucket ny {{repository}} — Tsy mbola afaka mampiasa azy ny Atombohy ny mpanampy. Mifidiana tahirin-kaody hafa ao amin'ny Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Tsy misy ny fonosana kireditra amin'izao fotoana izao.",
     "noMatchingProducts": "Tsy nisy fonosana kireditra mifanaraka naverin'ny App Store.",
     "noMatchingProductsPlay": "Tsy nisy fonosana kireditra mifanaraka naverin'ny Google Play.",
+    "storeTimedOut": "Tsy namaly tamin'ny fotoana ilay App Store. Andramo indray.",
+    "storeTimedOutPlay": "Tsy namaly tamin'ny fotoana ilay Google Play. Andramo indray.",
     "purchaseOwnedByAnotherAccount": "Ny kireditra amin'ity Apple Account ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy.",
     "purchaseOwnedByAnotherAccountPlay": "Ny kireditra amin'ity kaonty Google Play ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy."
   },

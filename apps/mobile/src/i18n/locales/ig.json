@@ -2243,6 +2243,8 @@
       "commitAndPush": "Chekwaa ma bulite",
       "startSession": "Malite nnọkọ",
       "selectRepositoryToStart": "Họrọ ebe nchekwa koodu iji malite.",
+      "enterPromptToStart": "Tinye iwu iji malite.",
+      "enterPromptOrFileToStart": "Tinye iwu ma ọ bụ faịlụ iji malite.",
       "connectProviderToStart": "Jikọọ onye na-enye ọrụ iji malite.",
       "promptPlaceholder": "Gịnị ka ị chọrọ ịrụ ọrụ na ya?",
       "couldNotLoadModels": "Enweghị ike ibudata ihe nlereanya.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Họrọ akaụntụ",
       "loadErrorTitle": "Enweghị ike ibudata ụlọ ọrụ gị.",
+      "membershipLostNotice": "Ị nweghịzi ikike ịbanye n'ụlọ ọrụ a. A gbanwere gaa na {{target}}.",
       "noOrganization": "Enweghị ụlọ ọrụ",
 
       "noOrganizationDescription": "Akaụntụ a esonyeghị na ụlọ ọrụ. Mepụta ma ọ bụ sonye na ụlọ ọrụ na webụ iji jiri atụmatụ ụlọ ọrụ dị ka ịkpọ ndị otu oku na ịdọ aka ná ntị gbasara obere ego n'akaụntụ.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Malite onye enyemaka chọrọ ntụziaka. Tinye ntụziaka wee mee ya ọzọ.",
+      "repositoryRequired": "Malite onye enyemaka chọrọ ebe nchekwa koodu. Mepee Kilo ma họrọ otu, ka emesịa mee ya ọzọ.",
       "repositoryUnknown": "Kilo anaghị amata {{repository}} dị ka ebe nchekwa koodu GitHub ma ọ bụ GitLab. Họrọ ebe nchekwa koodu ọzọ na Kilo.",
       "repositoryUnsupported": "{{repository}} bụ ebe nchekwa koodu Bitbucket — Malite onye enyemaka enweghị ike iji ya ugbu a. Họrọ ebe nchekwa koodu ọzọ na Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Ngwugwu ego ojiji adịghị ugbu a.",
     "noMatchingProducts": "App Store eweghachighị ngwugwu ego ojiji dabara adaba.",
     "noMatchingProductsPlay": "Google Play eweghachighị ngwugwu ego ojiji dabara adaba.",
+    "storeTimedOut": "App Store azaghịghị n'oge. Nwaa ọzọ.",
+    "storeTimedOutPlay": "Google Play azaghịghị n'oge. Nwaa ọzọ.",
     "purchaseOwnedByAnotherAccount": "Ego ojiji dị na Apple Account a bụ nke akaụntụ Kilo ọzọ. Banye na akaụntụ Kilo ahụ iji jiri ya.",
     "purchaseOwnedByAnotherAccountPlay": "Ego ojiji dị na akaụntụ Google Play a bụ nke akaụntụ Kilo ọzọ. Banye na akaụntụ Kilo ahụ iji jiri ya."
   },

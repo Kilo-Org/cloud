@@ -2271,6 +2271,8 @@
       "commitAndPush": "Fiksēt un nosūtīt",
       "startSession": "Sākt sesiju",
       "selectRepositoryToStart": "Lai sāktu, izvēlies repozitoriju.",
+      "enterPromptToStart": "Lai sāktu, pievieno promptu.",
+      "enterPromptOrFileToStart": "Lai sāktu, pievieno promptu vai failu.",
       "connectProviderToStart": "Lai sāktu, pievieno pakalpojuma sniedzēju.",
       "promptPlaceholder": "Pie kā vēlētos strādāt?",
       "couldNotLoadModels": "Neizdevās ielādēt modeļus.",
@@ -3062,6 +3064,7 @@
 
       "chooseAccount": "Izvēlies kontu",
       "loadErrorTitle": "Neizdevās ielādēt tavas organizācijas.",
+      "membershipLostNotice": "Tev vairs nav piekļuves šai organizācijai. Pārslēgts uz {{target}}.",
       "noOrganization": "Nav organizācijas",
 
       "noOrganizationDescription": "Šis konts nav daļa no organizācijas. Lai izmantotu organizācijas funkcijas, piemēram, dalībnieku uzaicinājumus un brīdinājumus par zemu atlikumu, izveido vai pievienojies organizācijai tīmeklī.",
@@ -3610,6 +3613,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Lai sāktu aģentu, nepieciešama uzvedne. Pievieno uzvedni un palaid to vēlreiz.",
+      "repositoryRequired": "Lai sāktu aģentu, nepieciešama repozitorija. Atver Kilo un izvēlies vienu, pēc tam palaid to vēlreiz.",
       "repositoryUnknown": "Kilo neatpazīst {{repository}} kā GitHub vai GitLab repozitoriju. Izvēlies citu repozitoriju Kilo.",
       "repositoryUnsupported": "{{repository}} ir Bitbucket repozitorijs — Sākt aģentu to vēl nevar izmantot. Izvēlies citu repozitoriju Kilo."
     }
@@ -3827,6 +3831,8 @@
     "empty": "Kredītu paketes šobrīd nav pieejamas.",
     "noMatchingProducts": "App Store neatgrieza nevienu atbilstošu kredītu paketi.",
     "noMatchingProductsPlay": "Google Play neatgrieza nevienu atbilstošu kredītu paketi.",
+    "storeTimedOut": "App Store neatbildēja laicīgi. Mēģināt vēlreiz.",
+    "storeTimedOutPlay": "Google Play neatbildēja laicīgi. Mēģināt vēlreiz.",
     "purchaseOwnedByAnotherAccount": "Kredīti šajā Apple Account kontā pieder citam Kilo kontam. Lai tos izmantotu, pieraksties attiecīgajā Kilo kontā.",
     "purchaseOwnedByAnotherAccountPlay": "Kredīti šajā Google Play kontā pieder citam Kilo kontam. Lai tos izmantotu, piesakieties tajā Kilo kontā."
   },

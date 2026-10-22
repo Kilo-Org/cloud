@@ -2243,6 +2243,8 @@
       "commitAndPush": "Diiwaangeli oo dir",
       "startSession": "Bilow kalfadhiga",
       "selectRepositoryToStart": "Dooro kayd si aad u bilowdo.",
+      "enterPromptToStart": "Ku dar fariin si aad u bilowdo.",
+      "enterPromptOrFileToStart": "Ku dar fariin ama fayl si aad u bilowdo.",
       "connectProviderToStart": "Ku xidh bixiye si aad u bilowdo.",
       "promptPlaceholder": "Maxaad rabtaa inaad ka shaqayso?",
       "couldNotLoadModels": "Moodeellada lama soo shubi karin.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Dooro akoon",
       "loadErrorTitle": "Ururradaada lama soo shubi karin.",
+      "membershipLostNotice": "Mar dambe ma lihid oggolaansho aad ku gasho ururkan. Waxaa lagu beddelay {{target}}.",
       "noOrganization": "Ma jiro urur",
 
       "noOrganizationDescription": "Akoonkani qayb kama aha urur. Samee ama ku biir urur bogga internetka si aad u isticmaasho sifooyinka ururka sida casumaadka xubnaha iyo digniinaha hadhaaga hooseeya.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Bilow wakiilka wuxuu u baahan yahay tilmaan. Ku dar tilmaan kadibna mar kale orod.",
+      "repositoryRequired": "Bilow wakiilka wuxuu u baahan yahay kayd. Fur Kilo oo ku dooro mid, kadibna mar kale orod.",
       "repositoryUnknown": "Kilo kama aqoonsado {{repository}} kayd GitHub ama GitLab ah. Dooro kayd kale gudaha Kilo.",
       "repositoryUnsupported": "{{repository}} waa kayd Bitbucket — Bilow wakiilka weli ma isticmaali karo. Dooro kayd kale gudaha Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Xirmooyinka lacagta adeeg hadda lama heli karo.",
     "noMatchingProducts": "App Store ma soo celin xirmooyin lacag adeeg oo u dhigma.",
     "noMatchingProductsPlay": "Google Play ma soo celin xirmooyin lacag adeeg oo u dhigma.",
+    "storeTimedOut": "App Store wakhtigii ma jawaabin. Mar kale isku day.",
+    "storeTimedOutPlay": "Google Play wakhtigii ma jawaabin. Mar kale isku day.",
     "purchaseOwnedByAnotherAccount": "Lacagta adeeg ee ku jirta Apple Account-kan waxaa leh akoon kale oo Kilo ah. Isticmaalka, soo gal akoonkaas Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Lacagta adeeg ee ku yaal xisaabtan Google Play waxaa leh koonto Kilo oo kale. Isticmaalka, ku saxiix bax koontada Kilo-ga ah."
   },

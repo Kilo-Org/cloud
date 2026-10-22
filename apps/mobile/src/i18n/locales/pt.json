@@ -2271,6 +2271,8 @@
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sessão",
       "selectRepositoryToStart": "Seleciona um repositório para começar.",
+      "enterPromptToStart": "Adiciona um prompt para começar.",
+      "enterPromptOrFileToStart": "Adiciona um prompt ou um ficheiro para começar.",
       "connectProviderToStart": "Liga um fornecedor para começar.",
       "promptPlaceholder": "Em que quer trabalhar?",
       "couldNotLoadModels": "Não foi possível carregar os modelos.",
@@ -3062,6 +3064,7 @@
 
       "chooseAccount": "Selecionar uma conta",
       "loadErrorTitle": "Não foi possível carregar as suas organizações.",
+      "membershipLostNotice": "Já não tem acesso a esta organização. Mudou para {{target}}.",
       "noOrganization": "Sem organização",
 
       "noOrganizationDescription": "Esta conta não faz parte de uma organização. Crie ou ingresse em uma organização na web para usar recursos de organização como convites de membros e alertas de saldo baixo.",
@@ -3610,6 +3613,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Iniciar agente precisa de um pedido. Adiciona um pedido e executa-o novamente.",
+      "repositoryRequired": "Iniciar agente precisa de um repositório. Abre o Kilo e escolhe um, depois executa-o novamente.",
       "repositoryUnknown": "O Kilo não reconhece {{repository}} como um repositório GitHub ou GitLab. Escolhe outro repositório no Kilo.",
       "repositoryUnsupported": "{{repository}} é um repositório Bitbucket — Iniciar agente ainda não o pode usar. Escolhe outro repositório no Kilo."
     }
@@ -3827,6 +3831,8 @@
     "empty": "Os pacotes de créditos estão indisponíveis de momento.",
     "noMatchingProducts": "A App Store não devolveu nenhum pacote de créditos correspondente.",
     "noMatchingProductsPlay": "O Google Play não devolveu nenhum pacote de créditos correspondente.",
+    "storeTimedOut": "A App Store não respondeu a tempo. Tenta novamente.",
+    "storeTimedOutPlay": "O Google Play não respondeu a tempo. Tenta novamente.",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Apple Account pertencem a outra conta Kilo. Inicia sessão nessa conta Kilo para os usares.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos desta conta do Google Play pertencem a uma conta Kilo diferente. Inicie sessão nessa conta Kilo para os usar."
   },

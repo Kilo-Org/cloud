@@ -2243,6 +2243,8 @@
       "commitAndPush": "کامیت و پوش",
       "startSession": "شروع نشست",
       "selectRepositoryToStart": "برای شروع یک مخزن انتخاب کنید.",
+      "enterPromptToStart": "برای شروع یک پرامپت اضافه کنید.",
+      "enterPromptOrFileToStart": "برای شروع یک پرامپت یا فایل اضافه کنید.",
       "connectProviderToStart": "برای شروع یک ارائه‌دهنده را متصل کنید.",
       "promptPlaceholder": "می‌خواهید روی چه چیزی کار کنید؟",
       "couldNotLoadModels": "بارگذاری مدل‌ها ممکن نشد.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "انتخاب حساب",
       "loadErrorTitle": "بارگذاری سازمان‌های شما ممکن نشد.",
+      "membershipLostNotice": "شما دیگر به این سازمان دسترسی ندارید. به {{target}} تغییر یافت.",
       "noOrganization": "بدون سازمان",
 
       "noOrganizationDescription": "این حساب بخشی از هیچ سازمانی نیست. برای استفاده از ویژگی‌های سازمان مانند دعوت اعضا و هشدارهای موجودی کم، در وب یک سازمان ایجاد کنید یا به یکی بپیوندید.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "برای شروع عامل، یک پیام لازم است. یک پیام اضافه کنید و دوباره اجرا کنید.",
+      "repositoryRequired": "برای شروع عامل، یک مخزن لازم است. Kilo را باز کنید و یکی را انتخاب کنید، سپس دوباره اجرا کنید.",
       "repositoryUnknown": "Kilo مخزن {{repository}} را به عنوان مخزن GitHub یا GitLab نمی‌شناسد. در Kilo مخزن دیگری انتخاب کنید.",
       "repositoryUnsupported": "{{repository}} یک مخزن Bitbucket است — شروع عامل هنوز نمی‌تواند از آن استفاده کند. در Kilo مخزن دیگری انتخاب کنید."
     }
@@ -3786,6 +3790,8 @@
     "empty": "بسته‌های اعتبار در حال حاضر در دسترس نیستند.",
     "noMatchingProducts": "App Store هیچ بسته اعتبار منطبقی برنگرداند.",
     "noMatchingProductsPlay": "Google Play هیچ بسته اعتبار منطبقی برنگرداند.",
+    "storeTimedOut": "App Store در زمان مشخص پاسخ نداد. تلاش مجدد",
+    "storeTimedOutPlay": "Google Play در زمان مشخص پاسخ نداد. تلاش مجدد",
     "purchaseOwnedByAnotherAccount": "اعتبار این Apple Account متعلق به حساب دیگری در Kilo است. برای استفاده از آن وارد همان حساب Kilo شوید.",
     "purchaseOwnedByAnotherAccountPlay": "اعتبار این حساب Google Play متعلق به یک حساب Kilo دیگر است. برای استفاده از آن وارد آن حساب Kilo شوید."
   },

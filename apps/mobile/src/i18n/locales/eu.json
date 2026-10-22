@@ -2243,6 +2243,8 @@
       "commitAndPush": "Egin commit eta igo",
       "startSession": "Hasi saioa",
       "selectRepositoryToStart": "Hautatu biltegi bat hasteko.",
+      "enterPromptToStart": "Gehitu eskaera bat hasteko.",
+      "enterPromptOrFileToStart": "Gehitu eskaera bat edo fitxategi bat hasteko.",
       "connectProviderToStart": "Konektatu hornitzaile bat hasteko.",
       "promptPlaceholder": "Zertan lan egin nahi zenuke?",
       "couldNotLoadModels": "Ezin izan dira modeloak kargatu.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Hautatu kontu bat",
       "loadErrorTitle": "Ezin izan dira zure erakundeak kargatu.",
+      "membershipLostNotice": "Ez duzu jada erakunde honetarako sarbiderik. Aldatu da {{target}}-ra.",
       "noOrganization": "Erakunderik ez",
 
       "noOrganizationDescription": "Kontu hau ez da erakunde baten parte. Sortu edo batu erakunde bat webgunean, kideen gonbidapenak eta saldo baxuaren abisuak bezalako erakunde-funtzioak erabiltzeko.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agentea hasteko eskaera behar da. Gehitu eskaera bat eta exekutatu berriro.",
+      "repositoryRequired": "Agentea hasteko biltegi bat behar da. Ireki Kilo, aukeratu bat eta exekutatu berriro.",
       "repositoryUnknown": "Kilok ez du {{repository}} GitHub edo GitLab biltegi gisa ezagutzen. Aukeratu beste biltegi bat Kilon.",
       "repositoryUnsupported": "{{repository}} Bitbucket biltegia da — Hasi agentea oraindik ezin du erabili. Aukeratu beste biltegi bat Kilon."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Kreditu-paketeak ez daude orain erabilgarri.",
     "noMatchingProducts": "App Store-k ez du bat datorren kreditu-paketerik itzuli.",
     "noMatchingProductsPlay": "Google Play-k ez du bat datorren kreditu-paketerik itzuli.",
+    "storeTimedOut": "App Store-k ez du denboran erantzun. Saiatu berriro.",
+    "storeTimedOutPlay": "Google Play-k ez du denboran erantzun. Saiatu berriro.",
     "purchaseOwnedByAnotherAccount": "Apple Account honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan.",
     "purchaseOwnedByAnotherAccountPlay": "Google Play kontu honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan."
   },

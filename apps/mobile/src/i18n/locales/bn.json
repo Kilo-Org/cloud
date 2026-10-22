@@ -2243,6 +2243,8 @@
       "commitAndPush": "কমিট ও পুশ করুন",
       "startSession": "সেশন শুরু করুন",
       "selectRepositoryToStart": "শুরু করতে একটি রিপোজিটরি বেছে নিন।",
+      "enterPromptToStart": "শুরু করতে একটি প্রম্পট যোগ করুন।",
+      "enterPromptOrFileToStart": "শুরু করতে একটি প্রম্পট বা ফাইল যোগ করুন।",
       "connectProviderToStart": "শুরু করতে একটি প্রোভাইডার সংযুক্ত করুন।",
       "promptPlaceholder": "আপনি কী নিয়ে কাজ করতে চান?",
       "couldNotLoadModels": "মডেল লোড করা যায়নি।",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "একটি অ্যাকাউন্ট নির্বাচন করুন",
       "loadErrorTitle": "আপনার সংস্থাগুলো লোড করা যায়নি।",
+      "membershipLostNotice": "এই সংস্থায় আপনার আর অ্যাক্সেস নেই। স্যুইচ করা হয়েছে {{target}}-এ।",
       "noOrganization": "কোনো সংস্থা নেই",
 
       "noOrganizationDescription": "এই অ্যাকাউন্টটি কোনো সংস্থার অংশ নয়। সদস্য আমন্ত্রণ এবং কম ব্যালেন্স সতর্কতার মতো সংস্থার বৈশিষ্ট্য ব্যবহার করতে ওয়েবে একটি সংস্থা তৈরি করুন বা যোগ দিন।",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "এজেন্ট চালু করতে একটি প্রম্পট প্রয়োজন। একটি প্রম্পট যোগ করুন এবং আবার চালান।",
+      "repositoryRequired": "এজেন্ট চালু করতে একটি রিপোজিটরি প্রয়োজন। Kilo খুলুন এবং একটি রিপোজিটরি বেছে নিন, তারপর আবার চালান।",
       "repositoryUnknown": "Kilo {{repository}}-কে GitHub বা GitLab রিপোজিটরি হিসেবে চেনে না। Kilo-তে অন্য একটি রিপোজিটরি বেছে নিন।",
       "repositoryUnsupported": "{{repository}} একটি Bitbucket রিপোজিটরি — এজেন্ট চালু করুন এখনও এটি ব্যবহার করতে পারে না। Kilo-তে অন্য একটি রিপোজিটরি বেছে নিন।"
     }
@@ -3786,6 +3790,8 @@
     "empty": "ক্রেডিট প্যাক এখন পাওয়া যাচ্ছে না।",
     "noMatchingProducts": "App Store কোনো মিলে যাওয়া ক্রেডিট প্যাক ফেরত দেয়নি।",
     "noMatchingProductsPlay": "Google Play কোনো মিলে যাওয়া ক্রেডিট প্যাক ফেরত দেয়নি।",
+    "storeTimedOut": "App Store সময়মতো সাড়া দেয়নি। আবার চেষ্টা করুন।",
+    "storeTimedOutPlay": "Google Play সময়মতো সাড়া দেয়নি। আবার চেষ্টা করুন।",
     "purchaseOwnedByAnotherAccount": "এই Apple Account-এর ক্রেডিট অন্য একটি Kilo অ্যাকাউন্টের। সেগুলো ব্যবহার করতে সেই Kilo অ্যাকাউন্টে সাইন-ইন করুন।",
     "purchaseOwnedByAnotherAccountPlay": "এই Google Play অ্যাকাউন্টের ক্রেডিট একটি ভিন্ন Kilo অ্যাকাউন্টের। সেগুলো ব্যবহার করতে সেই Kilo অ্যাকাউন্টে সাইন ইন করুন।"
   },

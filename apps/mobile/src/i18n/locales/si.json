@@ -2243,6 +2243,8 @@
       "commitAndPush": "කමිට් කර පුෂ් කරන්න",
       "startSession": "සැසිය ආරම්භ කරන්න",
       "selectRepositoryToStart": "ආරම්භ කිරීමට ගබඩාවක් තෝරන්න.",
+      "enterPromptToStart": "ආරම්භ කිරීමට ප්‍රොම්ප්ට් එකක් එකතු කරන්න.",
+      "enterPromptOrFileToStart": "ආරම්භ කිරීමට ප්‍රොම්ප්ට් එකක් හෝ ගොනුවක් එකතු කරන්න.",
       "connectProviderToStart": "ආරම්භ කිරීමට සැපයුම්කරුවෙකු සම්බන්ධ කරන්න.",
       "promptPlaceholder": "ඔබට කිරීමට අවශ්‍ය කාර්යය කුමක්ද?",
       "couldNotLoadModels": "මාදිලි පූරණය කළ නොහැකි විය.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "ගිණුමක් තෝරන්න",
       "loadErrorTitle": "ඔබේ සංවිධාන පූරණය කළ නොහැකි විය.",
+      "membershipLostNotice": "ඔබට මෙම සංවිධානයට තවදුරටත් ප්‍රවේශ වීමට අවසර නොමැත. {{target}} වෙත මාරු විය.",
       "noOrganization": "සංවිධානයක් නැත",
 
       "noOrganizationDescription": "මෙම ගිණුම සංවිධානයක කොටසක් නොවේ. සාමාජික ආරාධනා සහ අඩු ශේෂ ඇඟවීම් වැනි සංවිධාන විශේෂාංග භාවිත කිරීමට වෙබ් අඩවියේ සංවිධානයක් සාදන්න හෝ එකකට එකතු වන්න.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "නියෝජිතයා දියත් කිරීමට ඉල්ලීමක් අවශ්‍යයි. ඉල්ලීමක් එක් කර නැවත ධාවනය කරන්න.",
+      "repositoryRequired": "නියෝජිතයා දියත් කිරීමට කේත ගබඩාවක් අවශ්‍යයි. Kilo විවෘත කර එකක් තෝරන්න, ඉන්පසු නැවත ධාවනය කරන්න.",
       "repositoryUnknown": "Kilo, {{repository}} GitHub හෝ GitLab කේත ගබඩාවක් ලෙසවත් හඳුනා නොගනී. Kilo තුළ තවත් කේත ගබඩාවක් තෝරන්න.",
       "repositoryUnsupported": "{{repository}} යනු Bitbucket කේත ගබඩාවකි — නියෝජිතයා දියත් කරන්නට තවම එය භාවිත කළ නොහැක. Kilo තුළ තවත් කේත ගබඩාවක් තෝරන්න."
     }
@@ -3786,6 +3790,8 @@
     "empty": "ක්‍රෙඩිට් පැකේජ දැනට නොමැත.",
     "noMatchingProducts": "App Store ගැළපෙන ක්‍රෙඩිට් පැකේජ ආපසු ලබා දුන්නේ නැත.",
     "noMatchingProductsPlay": "Google Play ගැළපෙන ක්‍රෙඩිට් පැකේජ ආපසු ලබා දුන්නේ නැත.",
+    "storeTimedOut": "App Store නියමිත වේලාව තුළ ප්‍රතිචාර නොදැක්වීය. නැවත උත්සාහ කරන්න.",
+    "storeTimedOutPlay": "Google Play නියමිත වේලාව තුළ ප්‍රතිචාර නොදැක්වීය. නැවත උත්සාහ කරන්න.",
     "purchaseOwnedByAnotherAccount": "මෙම Apple Account හි ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පිවිසෙන්න.",
     "purchaseOwnedByAnotherAccountPlay": "මෙම Google Play ගිණුමේ ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පුරනය වන්න."
   },

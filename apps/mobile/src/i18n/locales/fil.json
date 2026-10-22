@@ -2243,6 +2243,8 @@
       "commitAndPush": "I-commit at i-push",
       "startSession": "Simulan ang sesyon",
       "selectRepositoryToStart": "Pumili ng imbakan ng code para magsimula.",
+      "enterPromptToStart": "Magdagdag ng prompt para magsimula.",
+      "enterPromptOrFileToStart": "Magdagdag ng prompt o file para magsimula.",
       "connectProviderToStart": "Ikonekta ang isang provider para magsimula.",
       "promptPlaceholder": "Ano ang gusto mong gawin?",
       "couldNotLoadModels": "Hindi ma-load ang mga modelo.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Pumili ng account",
       "loadErrorTitle": "Hindi ma-load ang iyong mga organisasyon.",
+      "membershipLostNotice": "Wala ka nang access sa organisasyong ito. Lumipat sa {{target}}.",
       "noOrganization": "Walang organisasyon",
 
       "noOrganizationDescription": "Ang account na ito ay hindi bahagi ng isang organisasyon. Gumawa o sumali sa isang organisasyon sa web upang magamit ang mga feature ng organisasyon tulad ng mga imbitasyon ng miyembro at mga alerto sa mababang balanse.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Nangangailangan ng prompt ang Simulan ang agent. Magdagdag ng prompt at patakbuhin itong muli.",
+      "repositoryRequired": "Nangangailangan ng repositoryo ang Simulan ang agent. Buksan ang Kilo at pumili ng isa, pagkatapos ay patakbuhin itong muli.",
       "repositoryUnknown": "Hindi kinikilala ng Kilo ang {{repository}} bilang GitHub o GitLab na repositoryo. Pumili ng ibang repositoryo sa Kilo.",
       "repositoryUnsupported": "Ang {{repository}} ay isang Bitbucket na repositoryo — Hindi pa ito magagamit ng Simulan ang agent. Pumili ng ibang repositoryo sa Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Hindi available ang mga credit pack sa ngayon.",
     "noMatchingProducts": "Walang katugmang credit pack na ibinalik ang App Store.",
     "noMatchingProductsPlay": "Walang katugmang credit pack na ibinalik ang Google Play.",
+    "storeTimedOut": "Hindi tumugon sa oras ang App Store. Subukan muli.",
+    "storeTimedOutPlay": "Hindi tumugon sa oras ang Google Play. Subukan muli.",
     "purchaseOwnedByAnotherAccount": "Ang kredito sa Apple Account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito.",
     "purchaseOwnedByAnotherAccountPlay": "Ang kredito sa Google Play account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito."
   },

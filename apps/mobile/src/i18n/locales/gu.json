@@ -2243,6 +2243,8 @@
       "commitAndPush": "કમિટ અને પુશ કરો",
       "startSession": "સત્ર શરૂ કરો",
       "selectRepositoryToStart": "શરૂ કરવા માટે રિપોઝિટરી પસંદ કરો.",
+      "enterPromptToStart": "શરૂ કરવા માટે એક પ્રોમ્પ્ટ ઉમેરો.",
+      "enterPromptOrFileToStart": "શરૂ કરવા માટે પ્રોમ્પ્ટ કે ફાઇલ ઉમેરો.",
       "connectProviderToStart": "શરૂ કરવા માટે સેવા પ્રદાતા જોડો.",
       "promptPlaceholder": "તમે શેના પર કામ કરવા માંગો છો?",
       "couldNotLoadModels": "મોડલ લોડ કરી શકાયાં નહીં.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "એકાઉન્ટ પસંદ કરો",
       "loadErrorTitle": "તમારી સંસ્થાઓ લોડ કરી શકાઈ નહીં.",
+      "membershipLostNotice": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ હવે નથી. {{target}} પર સ્વિચ કર્યું.",
       "noOrganization": "કોઈ સંસ્થા નથી",
 
       "noOrganizationDescription": "આ એકાઉન્ટ કોઈ સંસ્થાનો ભાગ નથી. સભ્ય આમંત્રણો અને ઓછી બેલેન્સ ચેતવણીઓ જેવી સંસ્થા સુવિધાઓનો ઉપયોગ કરવા માટે વેબ પર સંસ્થા બનાવો અથવા એકમાં જોડાઓ.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "એજન્ટ શરૂ કરવા માટે પ્રોમ્પ્ટ જરૂરી છે. પ્રોમ્પ્ટ ઉમેરો અને ફરી ચલાવો.",
+      "repositoryRequired": "એજન્ટ શરૂ કરવા માટે રિપોઝિટરી જરૂરી છે. Kilo ખોલો અને એક પસંદ કરો, પછી તેને ફરી ચલાવો.",
       "repositoryUnknown": "Kilo {{repository}} ને GitHub કે GitLab રિપોઝિટરી તરીકે ઓળખતું નથી. Kilo માં બીજી રિપોઝિટરી પસંદ કરો.",
       "repositoryUnsupported": "{{repository}} એ Bitbucket રિપોઝિટરી છે — એજન્ટ શરૂ કરો હજી તેનો ઉપયોગ કરી શકતું નથી. Kilo માં બીજી રિપોઝિટરી પસંદ કરો."
     }
@@ -3786,6 +3790,8 @@
     "empty": "ક્રેડિટ પેક અત્યારે ઉપલબ્ધ નથી.",
     "noMatchingProducts": "App Store એ કોઈ મેળ ખાતું ક્રેડિટ પેક પરત કર્યું નથી.",
     "noMatchingProductsPlay": "Google Play એ કોઈ મેળ ખાતું ક્રેડિટ પેક પરત કર્યું નથી.",
+    "storeTimedOut": "App Store એ સમયસર પ્રતિસાદ આપ્યો નથી. ફરી પ્રયત્ન કરો.",
+    "storeTimedOutPlay": "Google Play એ સમયસર પ્રતિસાદ આપ્યો નથી. ફરી પ્રયત્ન કરો.",
     "purchaseOwnedByAnotherAccount": "આ Apple Account પરની ક્રેડિટ બીજા Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો.",
     "purchaseOwnedByAnotherAccountPlay": "આ Google Play ખાતા પરની ક્રેડિટ અલગ Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો."
   },

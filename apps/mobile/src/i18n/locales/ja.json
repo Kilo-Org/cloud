@@ -1729,6 +1729,8 @@
       "commitAndPush": "コミットしてプッシュ",
       "startSession": "セッションを開始",
       "selectRepositoryToStart": "開始するにはリポジトリを選択してください。",
+      "enterPromptToStart": "開始するにはプロンプトを追加してください。",
+      "enterPromptOrFileToStart": "開始するにはプロンプトまたはファイルを追加してください。",
       "connectProviderToStart": "開始するにはプロバイダーを接続してください。",
       "promptPlaceholder": "何に取り組みますか？",
       "couldNotLoadModels": "モデルを読み込めませんでした。",
@@ -3014,6 +3016,7 @@
 
       "chooseAccount": "アカウントを選択",
       "loadErrorTitle": "組織を読み込めませんでした。",
+      "membershipLostNotice": "この組織にアクセスできなくなりました。{{target}}に切り替えました。",
       "noOrganization": "組織なし",
 
       "noOrganizationDescription": "このアカウントは組織に属していません。メンバーの招待や残高不足のアラートなどの組織機能を使用するには、ウェブで組織を作成するか参加してください。",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "エージェントを開始するにはプロンプトが必要です。プロンプトを追加して、もう一度実行してください。",
+      "repositoryRequired": "エージェントを開始するにはリポジトリが必要です。Kilo を開き、リポジトリを選択して、もう一度実行してください。",
       "repositoryUnknown": "Kilo は {{repository}} を GitHub または GitLab のリポジトリとして認識しません。Kilo で別のリポジトリを選択してください。",
       "repositoryUnsupported": "{{repository}} は Bitbucket のリポジトリです — エージェントを開始はまだこれを使用できません。Kilo で別のリポジトリを選択してください。"
     }
@@ -3786,6 +3790,8 @@
     "empty": "現在、クレジットパックを利用できません。",
     "noMatchingProducts": "App Storeから一致するクレジットパックが返されませんでした。",
     "noMatchingProductsPlay": "Google Playから一致するクレジットパックが返されませんでした。",
+    "storeTimedOut": "App Storeが時間内に応答しませんでした。再試行",
+    "storeTimedOutPlay": "Google Playが時間内に応答しませんでした。再試行",
     "purchaseOwnedByAnotherAccount": "このApple Accountのクレジットは、別のKiloアカウントに紐付いています。使用するには、そのKiloアカウントにサインインしてください。",
     "purchaseOwnedByAnotherAccountPlay": "このGoogle Playアカウントのクレジットは別のKiloアカウントに属しています。使用するにはそのKiloアカウントにサインインしてください。"
   },

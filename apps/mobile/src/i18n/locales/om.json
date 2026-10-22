@@ -2243,6 +2243,8 @@
       "commitAndPush": "Galmeessiitii ol ergi",
       "startSession": "Turtii jalqabi",
       "selectRepositoryToStart": "Jalqabuuf kuusaa koodii filadhu.",
+      "enterPromptToStart": "Jalqabuuf gaaffii dabaladhu.",
+      "enterPromptOrFileToStart": "Jalqabuuf gaaffii ykn faayilii dabaladhu.",
       "connectProviderToStart": "Jalqabuuf waltajjii walqabsiisi.",
       "promptPlaceholder": "Maal irratti hojjechuu barbaadda?",
       "couldNotLoadModels": "Moodeloota fe'uu hin danda'amne.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Herrega filadhu",
       "loadErrorTitle": "Dhaabbilee kee fe'uu hin danda'amne.",
+      "membershipLostNotice": "Dhaabbata kana bira ga'uuf kana booda hayyama hin qabdu. Gara {{target}} tti jijjiirame.",
       "noOrganization": "Dhaabbanni hin jiru",
 
       "noOrganizationDescription": "Herregni kun dhaabbata tokko keessaa hin qoodu. Faayidaalee dhaabbataa akka affeerraa miseensotaa fi akeekkachiisa haala maallaqaa gadii fayyadamuf marsariitii irratti dhaabbata uumi yookaan tokkotti makami.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Eejensa jalqabuuf gaaffii barbaachisa. Gaaffii itti dabaliitii irra deebi'ii hojjedhu.",
+      "repositoryRequired": "Eejensa jalqabuuf kuusaa koodii barbaachisa. Kilo banaa'iitii tokko filadhu, sana booda irra deebi'ii hojjedhu.",
       "repositoryUnknown": "Kilo {{repository}} kuusaa koodii GitHub yookaan GitLab jedhee hin beeku. Kilo keessatti kuusaa koodii bira filadhu.",
       "repositoryUnsupported": "{{repository}} kuusaa koodii Bitbucket ti — Eejensa jalqabi ammallee isa fayyadamuu hin danda'u. Kilo keessatti kuusaa koodii bira filadhu."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Paakeejii kireeditii yeroo ammaa hin argamu.",
     "noMatchingProducts": "App Store paakeejii kireeditii walsimu hin deebisne.",
     "noMatchingProductsPlay": "Google Play paakeejii kireeditii walsimu hin deebisne.",
+    "storeTimedOut": "App Store yeroo kessatti hin deebine. Irra deebi'ii yaali.",
+    "storeTimedOutPlay": "Google Play yeroo kessatti hin deebine. Irra deebi'ii yaali.",
     "purchaseOwnedByAnotherAccount": "Kireeditiin Apple Account kana irratti jiru kan herrega Kilo biraati. Fayyadamuuf herrega Kilo sanatti seeni.",
     "purchaseOwnedByAnotherAccountPlay": "Kireeditiin akaawuntii Google Play kana irratti jiru akaawuntii Kilo adda tokko kan ta'e dha. Fayyadamuuf akaawuntii Kilo sana seeni."
   },

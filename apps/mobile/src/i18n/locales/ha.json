@@ -2243,6 +2243,8 @@
       "commitAndPush": "Adana ka tura",
       "startSession": "Fara zama",
       "selectRepositoryToStart": "Zaɓi ma'ajiya don farawa.",
+      "enterPromptToStart": "Ƙara umarni don farawa.",
+      "enterPromptOrFileToStart": "Ƙara umarni ko fayil don farawa.",
       "connectProviderToStart": "Haɗa mai ba da sabis don farawa.",
       "promptPlaceholder": "Me kake so ka yi aiki a kai?",
       "couldNotLoadModels": "An kasa loda samfura.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Zaɓi asusu",
       "loadErrorTitle": "An kasa loda ƙungiyoyinka.",
+      "membershipLostNotice": "Ba ka da izinin shiga wannan ƙungiyar a yanzu. An sauya zuwa {{target}}.",
       "noOrganization": "Babu ƙungiya",
 
       "noOrganizationDescription": "Wannan asusun ba ya cikin wata ƙungiya. Ƙirƙiri ko shiga wata ƙungiya a yanar gizo don amfani da fasalolin ƙungiya kamar gayyata membobi da faɗakarwar ƙarancin ma'auni.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Fara wakili na buƙatar umarni. Ƙara umarni sannan ka sake gudanar da shi.",
+      "repositoryRequired": "Fara wakili na buƙatar ma'ajiya. Buɗe Kilo ka zaɓi ɗaya, sannan ka sake gudanar da shi.",
       "repositoryUnknown": "Kilo ba ya gane {{repository}} a matsayin ma'ajiyar GitHub ko GitLab. Zaɓi wata ma'ajiya a cikin Kilo.",
       "repositoryUnsupported": "{{repository}} ma'ajiyar Bitbucket ce — Fara wakili ba zai iya amfani da ita ba tukuna. Zaɓi wata ma'ajiya a cikin Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Fakitin kuɗin amfani ba su nan a yanzu.",
     "noMatchingProducts": "App Store bai dawo da wani fakitin kuɗin amfani da ya dace ba.",
     "noMatchingProductsPlay": "Google Play bai dawo da wani fakitin kuɗin amfani da ya dace ba.",
+    "storeTimedOut": "App Store bai amsa a kan lokaci ba. Sake gwadawa.",
+    "storeTimedOutPlay": "Google Play bai amsa a kan lokaci ba. Sake gwadawa.",
     "purchaseOwnedByAnotherAccount": "Kuɗin amfani da ke kan wannan Apple Account na wani asusun Kilo ne daban. Shiga wancan asusun Kilo don amfani da shi.",
     "purchaseOwnedByAnotherAccountPlay": "Kuɗin amfani da ke kan wannan Google Play account na wani asusun Kilo ne daban. Shiga wannan asusun Kilo don amfani da shi."
   },

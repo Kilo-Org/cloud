@@ -2243,6 +2243,8 @@
       "commitAndPush": "کمٹ اور پش کریں",
       "startSession": "سیشن شروع کریں",
       "selectRepositoryToStart": "شروع کرنے کے لیے ایک ریپوزٹری منتخب کریں۔",
+      "enterPromptToStart": "شروع کرنے کے لیے ایک پرومپٹ شامل کریں۔",
+      "enterPromptOrFileToStart": "شروع کرنے کے لیے ایک پرومپٹ یا فائل شامل کریں۔",
       "connectProviderToStart": "شروع کرنے کے لیے ایک فراہم کنندہ منسلک کریں۔",
       "promptPlaceholder": "آپ کس چیز پر کام کرنا چاہیں گے؟",
       "couldNotLoadModels": "ماڈلز لوڈ نہیں ہو سکے۔",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "ایک اکاؤنٹ منتخب کریں",
       "loadErrorTitle": "آپ کی تنظیمیں لوڈ نہیں ہو سکیں۔",
+      "membershipLostNotice": "آپ کو اب اس تنظیم تک رسائی حاصل نہیں ہے۔ {{target}} پر منتقل کر دیا گیا۔",
       "noOrganization": "کوئی تنظیم نہیں",
 
       "noOrganizationDescription": "یہ اکاؤنٹ کسی تنظیم کا حصہ نہیں ہے۔ ممبر دعوتیں اور کم بیلنس انتباہات جیسی تنظیمی خصوصیات استعمال کرنے کے لیے ویب پر ایک تنظیم بنائیں یا اس میں شامل ہوں۔",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "ایجنٹ شروع کرنے کے لیے پرامپٹ درکار ہے۔ ایک پرامپٹ شامل کریں اور اسے دوبارہ چلائیں۔",
+      "repositoryRequired": "ایجنٹ شروع کرنے کے لیے ریپوزٹری درکار ہے۔ Kilo کھولیں، کوئی ریپوزٹری منتخب کریں، پھر اسے دوبارہ چلائیں۔",
       "repositoryUnknown": "Kilo، {{repository}} کو GitHub یا GitLab ریپوزٹری کے طور پر نہیں پہچانتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔",
       "repositoryUnsupported": "{{repository}} ایک Bitbucket ریپوزٹری ہے — ایجنٹ شروع کریں ابھی اسے استعمال نہیں کر سکتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔"
     }
@@ -3786,6 +3790,8 @@
     "empty": "کریڈٹ پیک اس وقت دستیاب نہیں ہیں۔",
     "noMatchingProducts": "App Store نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
     "noMatchingProductsPlay": "Google Play نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
+    "storeTimedOut": "App Store نے وقت پر جواب نہیں دیا۔ دوبارہ کوشش کریں۔",
+    "storeTimedOutPlay": "Google Play نے وقت پر جواب نہیں دیا۔ دوبارہ کوشش کریں۔",
     "purchaseOwnedByAnotherAccount": "اس Apple Account کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اسی Kilo اکاؤنٹ میں سائن ان کریں۔",
     "purchaseOwnedByAnotherAccountPlay": "اس Google Play اکاؤنٹ کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اس Kilo اکاؤنٹ میں سائن ان کریں۔"
   },

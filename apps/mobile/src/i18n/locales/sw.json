@@ -2243,6 +2243,8 @@
       "commitAndPush": "Hifadhi na utume",
       "startSession": "Anza kikao",
       "selectRepositoryToStart": "Chagua hazina ili kuanza.",
+      "enterPromptToStart": "Ongeza maelekezo ili kuanza.",
+      "enterPromptOrFileToStart": "Ongeza maelekezo au faili ili kuanza.",
       "connectProviderToStart": "Unganisha mtoa huduma ili kuanza.",
       "promptPlaceholder": "Ungependa kufanya kazi gani?",
       "couldNotLoadModels": "Imeshindikana kupakia modeli.",
@@ -3022,6 +3024,7 @@
 
       "chooseAccount": "Chagua akaunti",
       "loadErrorTitle": "Imeshindikana kupakia mashirika yako.",
+      "membershipLostNotice": "Huna tena ruhusa ya kufikia shirika hili. Imebadilishwa kwenda {{target}}.",
       "noOrganization": "Hakuna shirika",
 
       "noOrganizationDescription": "Akaunti hii si sehemu ya shirika. Unda au jiunge na shirika kwenye wavuti ili kutumia vipengele vya shirika kama vile mialiko ya wanachama na arifa za salio la chini.",
@@ -3569,6 +3572,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Anzisha wakala inahitaji maagizo. Ongeza maagizo na uiendeshe tena.",
+      "repositoryRequired": "Anzisha wakala inahitaji hazina. Fungua Kilo na uchague moja, kisha uiendeshe tena.",
       "repositoryUnknown": "Kilo haitambui {{repository}} kama hazina ya GitHub au GitLab. Chagua hazina nyingine katika Kilo.",
       "repositoryUnsupported": "{{repository}} ni hazina ya Bitbucket — Anzisha wakala bado haiwezi kuitumia. Chagua hazina nyingine katika Kilo."
     }
@@ -3786,6 +3790,8 @@
     "empty": "Pakiti za salio hazipatikani kwa sasa.",
     "noMatchingProducts": "App Store haikurudisha pakiti za salio zinazolingana.",
     "noMatchingProductsPlay": "Google Play haikurudisha pakiti za salio zinazolingana.",
+    "storeTimedOut": "App Store haikujibu kwa wakati. Jaribu tena.",
+    "storeTimedOutPlay": "Google Play haikujibu kwa wakati. Jaribu tena.",
     "purchaseOwnedByAnotherAccount": "Salio katika Apple Account hii ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia.",
     "purchaseOwnedByAnotherAccountPlay": "Salio kwenye Akaunti hii ya Google Play ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia."
   },

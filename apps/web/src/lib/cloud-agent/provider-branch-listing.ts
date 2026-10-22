@@ -2,13 +2,13 @@
  * Provider branch listing for the new-session flow.
  *
  * One entry point per repository identity, three providers: GitHub via
- * `githubAppsService.listBranches`, GitLab via
- * `gitlabService.listGitLabBranches`, Bitbucket Cloud via the s3 review
- * layer's authorized requests (`/refs/branches` + the repository object's
- * `mainbranch`). The
- * server resolves the integration and the credentials itself — no caller
- * supplies an integration id, a token, or a host, and the repository
- * identity is re-checked against the integration's own cache on every call.
+ * `githubAppsService.listBranches`, GitLab via `authorizeProject` plus
+ * `fetchGitLabBranches`, Bitbucket Cloud via the s3 review layer's
+ * authorized requests (`/refs/branches` + the repository object's
+ * `mainbranch`). The server resolves the integration and the credentials
+ * itself — no caller supplies an integration id, a token, or a host, and the
+ * repository identity is re-checked against the integration's own cache on
+ * every call.
  *
  * Bitbucket Cloud is organization-context only: a personal call returns the
  * explicit org-only unavailable state (FORBIDDEN with the shared copy from
@@ -277,17 +277,37 @@ function gitlabErrorToTrpcError(error: GitLabReviewError): TRPCError {
 /**
  * Map a GitLab branches HTTP refusal onto the router error states. Only the
  * status is carried over; the adapter's message stays out of the copy.
+ *
+ * The token belongs to the connection, so a refused credential (401) and, for
+ * an organization-owned connection, a 403 are the connection's: both take the
+ * reconnect state the review-layer mapper above returns for the same
+ * classes, so one call cannot answer two different things depending on which
+ * step refused. A personal connection's 403 stays a permission refusal.
  */
-function gitlabBranchesErrorToTrpcError(error: GitLabBranchesFetchError): TRPCError {
+function gitlabBranchesErrorToTrpcError(
+  error: GitLabBranchesFetchError,
+  owner: GitLabReviewOwner
+): TRPCError {
   switch (error.status) {
     case 401:
-    case 403:
       return new TRPCError({
-        code: 'FORBIDDEN',
-        message:
-          'Your GitLab connection does not allow listing branches of this project. Reconnect GitLab if the connection has expired.',
+        code: 'PRECONDITION_FAILED',
+        message: 'Your GitLab connection is no longer valid. Reconnect GitLab and try again.',
         cause: error,
       });
+    case 403:
+      return owner.type === 'organization'
+        ? new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message:
+              'Your GitLab connection does not allow listing branches of this project. Reconnect GitLab if the connection has expired.',
+            cause: error,
+          })
+        : new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Your GitLab role does not allow listing branches of this project.',
+            cause: error,
+          });
     case 404:
       return new TRPCError({
         code: 'NOT_FOUND',
@@ -329,7 +349,8 @@ async function listGitLabBranches(
     return toListing(branches.map(branch => ({ name: branch.name, isDefault: branch.default })));
   } catch (error) {
     if (error instanceof GitLabReviewError) throw gitlabErrorToTrpcError(error);
-    if (error instanceof GitLabBranchesFetchError) throw gitlabBranchesErrorToTrpcError(error);
+    if (error instanceof GitLabBranchesFetchError)
+      throw gitlabBranchesErrorToTrpcError(error, reviewOwner);
     throw error;
   }
 }

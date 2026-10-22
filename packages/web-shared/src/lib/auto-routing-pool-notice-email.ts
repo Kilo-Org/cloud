@@ -1,5 +1,5 @@
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
-import { escapeHtml, RawHtml, renderTemplate, subjects } from '@kilocode/web-shared/lib/email';
+import { escapeHtml, RawHtml, renderTemplate } from '@kilocode/web-shared/lib/email';
 import type { SendResult } from '@kilocode/web-shared/lib/email';
 import {
   getEmailVerificationRecipient,
@@ -12,6 +12,17 @@ export type AutoRoutingPoolNoticeRouter = {
   modelId: string;
   organization: { id: string; name: string } | null;
 };
+
+function ordinalDay(day: number): string {
+  if (day >= 11 && day <= 13) return `${day}th`;
+  return `${day}${['th', 'st', 'nd', 'rd'][day % 10] ?? 'th'}`;
+}
+
+export function autoRoutingPoolNoticeSubject(cutoverAt: string): string {
+  const date = new Date(cutoverAt);
+  const month = new Intl.DateTimeFormat('en-US', { month: 'long', timeZone: 'UTC' }).format(date);
+  return `Change Required: Your Auto model pool has a new model ID on ${month} ${ordinalDay(date.getUTCDate())}, ${date.getUTCFullYear()}`;
+}
 
 export async function sendAutoRoutingPoolNoticeEmail(params: {
   to: string;
@@ -30,21 +41,22 @@ export async function sendAutoRoutingPoolNoticeEmail(params: {
     const settingsUrl = router.organization
       ? `${NEXTAUTH_URL}/organizations/${encodeURIComponent(router.organization.id)}/providers-and-models`
       : `${NEXTAUTH_URL}/profile`;
-    return `<li style="margin: 0 0 12px"><strong>${escapeHtml(label)}</strong><br /><code>${escapeHtml(router.modelId)}</code><br /><a href="${escapeHtml(settingsUrl)}" style="color: #1a1a1a; text-decoration: underline">Manage this pool</a></li>`;
+    return `<li style="margin: 0 0 12px"><strong>${escapeHtml(label)}:</strong> <code>${escapeHtml(router.modelId)}</code> · <a href="${escapeHtml(settingsUrl)}" style="color: #1a1a1a; text-decoration: underline">Manage</a></li>`;
   });
-  const cutoverAt = new Intl.DateTimeFormat('en-US', {
+  const cutoverAt = `${new Intl.DateTimeFormat('en-US', {
     dateStyle: 'full',
-    timeStyle: 'long',
+    timeStyle: 'short',
+    hourCycle: 'h23',
     timeZone: 'UTC',
-  }).format(new Date(params.cutoverAt));
+  }).format(new Date(params.cutoverAt))} UTC`;
   const html = renderTemplate('autoRoutingPoolNotice', {
-    cutover_at: `${cutoverAt} (${params.cutoverAt})`,
+    cutover_at: cutoverAt,
     routers: new RawHtml(routers.join('')),
     year: String(new Date().getFullYear()),
   });
   const sent = await sendViaMailgun({
     to: params.to,
-    subject: subjects.autoRoutingPoolNotice,
+    subject: autoRoutingPoolNoticeSubject(params.cutoverAt),
     html,
     category: 'autoRoutingPoolNotice',
   });

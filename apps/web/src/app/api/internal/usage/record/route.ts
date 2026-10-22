@@ -74,6 +74,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const { core, metadata, prior_microdollar_usage, posthog_distinct_id, bouncer_usage_event } =
     parsed.data;
+  const source = request.headers.get('x-usage-write-source');
 
   // Redelivery is handled inside the write, not by a lookup here.
   const result = await saveUsageRelatedDataLocally(
@@ -81,7 +82,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     metadata,
     prior_microdollar_usage,
     posthog_distinct_id,
-    bouncer_usage_event ?? null
+    bouncer_usage_event ?? null,
+    {
+      entrypoint: 'writer_endpoint',
+      writer_caller: source === 'queue' || source === 'region_handoff' ? source : 'unknown',
+    }
   );
   timer.mark('write');
 

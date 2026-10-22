@@ -174,31 +174,8 @@
         "@typescript-eslint/no-unsafe-return": "error",
         "@typescript-eslint/no-unsafe-unary-minus": "error",
         "@typescript-eslint/restrict-plus-operands": "error",
-        "@typescript-eslint/restrict-template-expressions": "error",
+        "@typescript-eslint/restrict-template-expressions": ["error", { "allowNever": true }],
         "@typescript-eslint/unbound-method": "error"
-      }
-    },
-    {
-      "files": ["packages/web-shared/**/*.ts"],
-      "rules": {
-        "@typescript-eslint/no-empty-object-type": "off",
-        "@typescript-eslint/await-thenable": "off",
-        "@typescript-eslint/no-base-to-string": "off",
-        "@typescript-eslint/no-duplicate-type-constituents": "off",
-        "@typescript-eslint/no-for-in-array": "off",
-        "@typescript-eslint/no-implied-eval": "off",
-        "@typescript-eslint/no-redundant-type-constituents": "off",
-        "@typescript-eslint/no-unnecessary-type-assertion": "off",
-        "@typescript-eslint/no-unsafe-argument": "off",
-        "@typescript-eslint/no-unsafe-assignment": "off",
-        "@typescript-eslint/no-unsafe-call": "off",
-        "@typescript-eslint/no-unsafe-enum-comparison": "off",
-        "@typescript-eslint/no-unsafe-member-access": "off",
-        "@typescript-eslint/no-unsafe-return": "off",
-        "@typescript-eslint/no-unsafe-unary-minus": "off",
-        "@typescript-eslint/restrict-plus-operands": "off",
-        "@typescript-eslint/restrict-template-expressions": "off",
-        "@typescript-eslint/unbound-method": "off"
       }
     },
     {
@@ -224,7 +201,8 @@
         "@typescript-eslint/no-unsafe-assignment": "off",
         "@typescript-eslint/no-unsafe-call": "off",
         "@typescript-eslint/no-unsafe-member-access": "off",
-        "@typescript-eslint/no-unsafe-return": "off"
+        "@typescript-eslint/no-unsafe-return": "off",
+        "@typescript-eslint/unbound-method": "off"
       }
     },
     {

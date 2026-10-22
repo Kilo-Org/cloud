@@ -382,7 +382,7 @@ function toProviderTrpcError(error: unknown): TRPCError {
       case 'forbidden':
         return new TRPCError({ code: 'FORBIDDEN', message: error.message });
       case 'reconnect':
-        // The provider credential must be re-established; the caller's Kilo
+        // The provider connection must be re-established; the caller's Kilo
         // access is not the problem. This is the mobile reconnect state.
         return new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
       case 'stale_head':

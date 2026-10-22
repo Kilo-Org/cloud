@@ -44,14 +44,18 @@ const recall = 'What was the vault code I gave you? Answer with the number only.
  * and is still billed for.
  */
 const say = (session: SessionHandle, text: string) =>
-  Stream.runFold(session.ask(text, { maxTokens: room }), { said: '', output: 0 }, (held, event) => {
-    if (event.kind === 'delta') {
-      return { ...held, said: held.said + event.text };
+  Stream.runFold(
+    session.ask(text, { maxTokens: room }),
+    () => ({ said: '', output: 0 }),
+    (held, event) => {
+      if (event.kind === 'delta') {
+        return { ...held, said: held.said + event.text };
+      }
+      return event.kind === 'done'
+        ? { ...held, output: held.output + event.usage.outputTokens }
+        : held;
     }
-    return event.kind === 'done'
-      ? { ...held, output: held.output + event.usage.outputTokens }
-      : held;
-  });
+  );
 const layers = kilo({ apiKinds: everyShape, contextWindow });
 
 const program = (model: string) =>

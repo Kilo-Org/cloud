@@ -1365,9 +1365,7 @@ async function latestBuildStateFor(
 export type BitbucketReviewStatusParticipant = {
   login: string;
   avatarUrl: string | null;
-  /** Whether the participant has approved the pull request. */
   approved: boolean;
-  /** True when the participant holds the REVIEWER role. */
   reviewer: boolean;
 };
 

@@ -16,6 +16,7 @@ export type PaidExecutionKey = {
   rep: number;
   caseId: string;
   token: string;
+  attemptStartedAt?: number;
 };
 
 const positiveLimit = BenchmarkSchedulerLimitSchema;
@@ -867,8 +868,18 @@ export async function getPaidCasePromptRevision(
 ): Promise<number | null> {
   const row = await db
     .prepare(`SELECT prompt_revision FROM scheduler_executions
-    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?`)
-    .bind(key.runId, key.model, key.variant, key.rep, key.caseId, key.token)
+    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?
+      AND (? IS NULL OR started_at = ?)`)
+    .bind(
+      key.runId,
+      key.model,
+      key.variant,
+      key.rep,
+      key.caseId,
+      key.token,
+      key.attemptStartedAt ?? null,
+      key.attemptStartedAt ?? null
+    )
     .first<{ prompt_revision: number }>();
   return row?.prompt_revision ?? null;
 }
@@ -895,18 +906,34 @@ export async function restartPaidCase(
   const result = await db
     .prepare(`UPDATE scheduler_executions SET started_at = ?
     WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?
+      AND (? IS NULL OR started_at = ?)
       AND EXISTS (
         SELECT 1 FROM scheduler_chunks AS chunk
         WHERE chunk.run_id = scheduler_executions.run_id AND chunk.model = scheduler_executions.model
           AND chunk.variant = scheduler_executions.variant AND chunk.rep = scheduler_executions.rep
           AND chunk.token = scheduler_executions.token AND chunk.status = 'active' AND chunk.lease_until > ?
       )
+      AND EXISTS (
+        SELECT 1 FROM benchmark_runs
+        WHERE id = scheduler_executions.run_id AND status = 'running'
+      )
       AND NOT EXISTS (
         SELECT 1 FROM run_lane_failures AS failure
         WHERE failure.run_id = scheduler_executions.run_id AND failure.model = scheduler_executions.model
           AND failure.variant = scheduler_executions.variant AND failure.rep = scheduler_executions.rep
       )`)
-    .bind(now, key.runId, key.model, key.variant, key.rep, key.caseId, key.token, now)
+    .bind(
+      now,
+      key.runId,
+      key.model,
+      key.variant,
+      key.rep,
+      key.caseId,
+      key.token,
+      key.attemptStartedAt ?? null,
+      key.attemptStartedAt ?? null,
+      now
+    )
     .run();
   return result.meta.changes > 0;
 }
@@ -915,12 +942,42 @@ export function schedulerBackoffSeconds(attempts: number): number {
   return Math.min(300, 15 * 2 ** Math.min(attempts - 1, 5));
 }
 
-export async function clearUnbilledCase(db: D1Database, key: PaidExecutionKey): Promise<void> {
-  await db
-    .prepare(`DELETE FROM scheduler_executions
-    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?`)
-    .bind(key.runId, key.model, key.variant, key.rep, key.caseId, key.token)
-    .run();
+export async function clearUnbilledCase(
+  db: D1Database,
+  key: Omit<PaidExecutionKey, 'token'> & { token?: string }
+): Promise<void> {
+  if (key.token === undefined && key.attemptStartedAt === undefined) {
+    throw new Error('Unbilled cleanup requires a claim token or attempt generation.');
+  }
+  const bindings = [
+    key.runId,
+    key.model,
+    key.variant,
+    key.rep,
+    key.caseId,
+    key.token ?? null,
+    key.attemptStartedAt ?? null,
+  ];
+  await db.batch([
+    db
+      .prepare(`
+        DELETE FROM pending_decider_outputs
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND rep = ?4 AND case_id = ?5
+          AND EXISTS (
+            SELECT 1 FROM scheduler_executions
+            WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND rep = ?4 AND case_id = ?5
+              AND (?6 IS NULL OR token = ?6) AND (?7 IS NULL OR started_at = ?7)
+          )
+      `)
+      .bind(...bindings),
+    db
+      .prepare(`
+        DELETE FROM scheduler_executions
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND rep = ?4 AND case_id = ?5
+          AND (?6 IS NULL OR token = ?6) AND (?7 IS NULL OR started_at = ?7)
+      `)
+      .bind(...bindings),
+  ]);
 }
 
 /**

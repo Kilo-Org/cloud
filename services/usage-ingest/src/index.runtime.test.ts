@@ -75,8 +75,10 @@ it.each([undefined, 'staging'])(
       );
       for (const receipt of receipts) {
         expect(receipt).toEqual({
+          level: 'info',
           event: 'usage_ingest_receipt',
           outcome: 'received',
+          queue_action: 'ack',
           usage_id: expect.any(String),
           queue_message_id: expect.any(String),
           delivery_attempts: expect.any(Number),
@@ -105,8 +107,10 @@ it.each([undefined, 'staging'])(
       for (const receipt of server.getLogs().map(log => JSON.parse(log.message))) {
         if (receipt.outcome === 'invalid') {
           expect(receipt).toEqual({
+            level: 'info',
             event: 'usage_ingest_receipt',
             outcome: 'invalid',
+            queue_action: 'ack',
             queue_message_id: expect.any(String),
             delivery_attempts: expect.any(Number),
           });

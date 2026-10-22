@@ -612,6 +612,9 @@ export function getOutputHeaders(response: Response) {
   }
   outputHeaders.set('Content-Encoding', 'identity');
   // Content-Encoding: identity is here because Vercel modifies encoding/compression and causes issues
+  // no-transform keeps a proxy in front of the gateway, such as the web app's rewrite to the
+  // ai-gateway app in local dev, from compressing a stream and holding it until the end.
+  outputHeaders.set('Cache-Control', 'no-cache, no-transform');
 
   return outputHeaders;
 }
@@ -958,7 +961,7 @@ function parseMistralFimUsageFromString(
   provider: ProviderId,
   statusCode: number
 ): MicrodollarUsageStats {
-  const json: MistralFimCompletion = JSON.parse(response);
+  const json = JSON.parse(response) as MistralFimCompletion;
   const cost_mUsd = computeFimMicrodollarCost(json.usage, provider);
 
   return {
@@ -985,7 +988,7 @@ function parseMistralFimUsageFromString(
 }
 
 async function parseMistralFimUsageFromStream(
-  stream: ReadableStream,
+  stream: ReadableStream<Uint8Array>,
   requestSpan: Span | undefined,
   provider: ProviderId,
   statusCode: number
@@ -1022,7 +1025,7 @@ async function parseMistralFimUsageFromStream(
       if (event.data === '[DONE]') return;
 
       try {
-        const json: MistralFimStreamChunk = JSON.parse(event.data);
+        const json = JSON.parse(event.data) as MistralFimStreamChunk;
 
         model = json.model ?? model;
         messageId = json.id ?? messageId;
@@ -1121,7 +1124,7 @@ export function countAndStoreFimUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      if (usageContext.is_free || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }
@@ -1195,7 +1198,7 @@ export function parseEditUsageFromResponse(
   provider: ProviderId,
   statusCode: number
 ): MicrodollarUsageStats {
-  const json: MercuryEditCompletionResponse = JSON.parse(response);
+  const json = JSON.parse(response) as MercuryEditCompletionResponse;
   const usage = json.usage;
   const cacheHitTokens = usage ? getEditCacheHitTokens(usage) : 0;
   return {
@@ -1258,7 +1261,7 @@ export function countAndStoreEditUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      if (usageContext.is_free || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }
@@ -1306,7 +1309,7 @@ export function parseEmbeddingUsageFromResponse(
   responseText: string,
   statusCode: number
 ): MicrodollarUsageStats {
-  const json: EmbeddingResponse = JSON.parse(responseText);
+  const json = JSON.parse(responseText) as EmbeddingResponse;
 
   // Upstream providers (OpenRouter, Vercel) include cost in USD → convert to microdollars.
   const cost_mUsd = json.usage.cost != null ? toMicrodollars(json.usage.cost) : 0;
@@ -1339,7 +1342,7 @@ export function parseTranscriptionUsageFromResponse(
   statusCode: number,
   requestedModel: string
 ): MicrodollarUsageStats {
-  const json: TranscriptionResponse = JSON.parse(responseText);
+  const json = JSON.parse(responseText) as TranscriptionResponse;
   const base = {
     messageId: json.id ?? null,
     model: json.model ?? requestedModel,
@@ -1415,10 +1418,10 @@ export function countAndStoreEmbeddingUsage(
         return;
       }
 
-      // Preserve the real upstream cost for analytics before zeroing for BYOK
+      // Preserve the real upstream cost before free-model or BYOK zeroing.
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      if (usageContext.is_free || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
       }
 
@@ -1515,6 +1518,6 @@ export async function sendProxiedChatCompletion<T>(
     return { ok: false, status: response.status, error: errorText };
   }
 
-  const data: T = await response.json();
+  const data = (await response.json()) as T;
   return { ok: true, data };
 }

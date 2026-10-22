@@ -38,6 +38,7 @@ import { trpcClient, useTRPC } from '@/lib/trpc';
 import {
   type ProviderPrPlatform,
   type ProviderPrScope,
+  type ProviderPrTriple,
   providerPrTriple,
 } from '@/lib/pr-review/provider-pr-ref';
 import {
@@ -58,8 +59,6 @@ import {
   mapPrOperationError,
   prOperationToastMessage,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
-
-type PrRef = { owner: string; repo: string; number: number };
 
 type RouterInputs = inferRouterInputs<MobileRouter>;
 type MergePullRequestInput = RouterInputs['githubPrReview']['mergePullRequest'];
@@ -283,7 +282,7 @@ export function useMergePullRequestMutation(ref: ReviewWriteRef) {
   });
 }
 
-export function useUpdateBranchMutation(ref: PrRef) {
+export function useUpdateBranchMutation(ref: ProviderPrTriple) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const keys = useMergeKeys({ ref: { platform: 'github', ...ref }, organizationId: null });

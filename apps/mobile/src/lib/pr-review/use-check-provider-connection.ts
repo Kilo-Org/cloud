@@ -30,30 +30,34 @@ export function useCheckProviderConnection() {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
 
+  const fetchProviderStatus = (input: CheckProviderConnectionInput) => {
+    // The two providers answer with different status shapes, so each arm
+    // fetches its own options — a union of the two queryOptions types is
+    // not assignable to a single fetchQuery call.
+    if (input.platform === 'gitlab') {
+      return queryClient.fetchQuery({
+        ...(input.organizationId
+          ? trpc.organizations.reviewAgent.getGitLabStatus.queryOptions({
+              organizationId: input.organizationId,
+            })
+          : trpc.personalReviewAgent.getGitLabStatus.queryOptions()),
+        staleTime: 0,
+      });
+    }
+    if (!input.organizationId) {
+      return Promise.resolve({ connected: false });
+    }
+    return queryClient.fetchQuery({
+      ...trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({
+        organizationId: input.organizationId,
+      }),
+      staleTime: 0,
+    });
+  };
+
   return useMutation({
     mutationFn: async (input: CheckProviderConnectionInput) => {
-      if (input.platform === 'bitbucket' && !input.organizationId) {
-        return { connected: false };
-      }
-      // The two providers answer with different status shapes, so each arm
-      // fetches its own options — a union of the two queryOptions types is
-      // not assignable to a single fetchQuery call.
-      const status =
-        input.platform === 'gitlab'
-          ? await queryClient.fetchQuery({
-              ...(input.organizationId
-                ? trpc.organizations.reviewAgent.getGitLabStatus.queryOptions({
-                    organizationId: input.organizationId,
-                  })
-                : trpc.personalReviewAgent.getGitLabStatus.queryOptions()),
-              staleTime: 0,
-            })
-          : await queryClient.fetchQuery({
-              ...trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({
-                organizationId: input.organizationId ?? '',
-              }),
-              staleTime: 0,
-            });
+      const status = await fetchProviderStatus(input);
       if (status.connected) {
         await queryClient.invalidateQueries(trpc.providerReview.pathFilter());
       }

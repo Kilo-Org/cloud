@@ -58,10 +58,8 @@ import {
   prOperationToastMessage,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
 
-type PrRef = { owner: string; repo: string; number: number };
-
 /** Any ref the review write hooks accept: the legacy triple or a provider ref. */
-export type ReviewWriteRef = ProviderPrRef | PrRef;
+export type ReviewWriteRef = ProviderPrRef | ProviderPrTriple;
 
 /** The legacy triple behind any accepted ref. */
 function reviewWriteTriple(ref: ReviewWriteRef): ProviderPrTriple {

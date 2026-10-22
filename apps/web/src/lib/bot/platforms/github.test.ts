@@ -194,15 +194,15 @@ describe('getGitHubRepositoryReference', () => {
     expect(reference).toEqual({ id: 123, fullName: 'acme/widgets' });
   });
 
-  it('falls back to the repository encoded in the GitHub thread id', () => {
-    const reference = getGitHubRepositoryReference(
-      {
-        adapter: { name: PLATFORM.GITHUB },
-        channelId: 'github:acme/widgets',
-        id: 'github:acme/widgets:issue:42',
-      } as Thread,
-      { raw: {} } as Message
-    );
+  it.each([
+    'github:acme/widgets:issue:42',
+    'github:acme/widgets:42',
+    'github:acme/widgets:42:rc:301',
+  ])('resolves %s without a raw message', threadId => {
+    const reference = getGitHubRepositoryReference({
+      adapter: { name: PLATFORM.GITHUB },
+      id: threadId,
+    } as Thread);
 
     expect(reference).toEqual({ id: null, fullName: 'acme/widgets' });
   });
@@ -218,6 +218,15 @@ describe('getGitHubRepositoryReference', () => {
     );
 
     expect(reference).toEqual({ id: null, fullName: 'acme/widgets' });
+  });
+
+  it('does not resolve a repository when trusted metadata is unavailable', () => {
+    const reference = getGitHubRepositoryReference({
+      id: 'github:unresolved',
+      channelId: 'github:unresolved',
+    } as Thread);
+
+    expect(reference).toEqual({ id: null, fullName: null });
   });
 });
 

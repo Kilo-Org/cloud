@@ -39,11 +39,9 @@ function parseGitHubRepositoryFullName(id: string | undefined): string | null {
 
 export function getGitHubRepositoryReference(
   thread: Thread,
-  message: Message
+  message?: Message
 ): GitHubRepositoryReference {
-  // GitHub adapter messages always carry a GitHubRawMessage.raw, but tests
-  // exercise fallback paths with sparse fixtures, so treat raw as partial.
-  const { repository } = (message as Message<Partial<GitHubRawMessage>>).raw;
+  const { repository } = (message as Message<Partial<GitHubRawMessage>> | undefined)?.raw ?? {};
 
   return {
     id: repository?.id ?? null,

@@ -192,10 +192,41 @@ describe('Discord gateway delivery', () => {
     await until(() => fetchMock.mock.calls.length === 1);
   });
 
+  it.each([503, 429])('recovers temporary HTTP status %s', async status => {
+    const { client } = await startListener();
+    fetchMock.mockResolvedValueOnce(new Response(null, { status }));
+    client.emit('raw', packet());
+    await until(() => fetchMock.mock.calls.length === 2);
+    expect(mockOwnerRead).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][1]?.body).toBe(fetchMock.mock.calls[1][1]?.body);
+    expect(fetchMock.mock.calls[0][1]?.signal).toBe(fetchMock.mock.calls[1][1]?.signal);
+  });
+
+  it('bounds HTTP recovery attempts', async () => {
+    const { client } = await startListener();
+    fetchMock.mockImplementation(async () => new Response(null, { status: 503 }));
+    client.emit('raw', packet());
+    await until(() => jest.mocked(console.error).mock.calls.length > 0);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(client.destroy).not.toHaveBeenCalled();
+  });
+
+  it('confirms ownership throughout HTTP recovery', async () => {
+    const { client, request } = await startListener();
+    fetchMock.mockImplementationOnce(async () => {
+      mockListenerId = 'fixture-next-owner';
+      return new Response(null, { status: 503 });
+    });
+    client.emit('raw', packet());
+    await request;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(client.destroy).toHaveBeenCalledTimes(1);
+  });
+
   it('applies the forwarding deadline', async () => {
     const { client } = await startListener();
     const deadline = new AbortController();
-    jest.spyOn(AbortSignal, 'timeout').mockReturnValue(deadline.signal);
+    jest.spyOn(AbortSignal, 'timeout').mockReturnValueOnce(deadline.signal);
     const finished = Promise.withResolvers<void>();
     fetchMock.mockImplementation((_url, init) => {
       const result = Promise.withResolvers<Response>();

@@ -240,7 +240,8 @@ eight forwarding slots, a 10-second request deadline, and primary-database
 ownership checks with bounded retries. Listener availability is retained while
 ownership reads recover. Capacity drops are counted in listener logs.
 Forwarding slots cover the HTTP request lifecycle; background bot execution has a
-separate lifecycle.
+separate lifecycle. HTTP recovery uses at most three attempts for temporary
+admission responses within the same slot and deadline.
 
 ### Encryption & Secrets
 

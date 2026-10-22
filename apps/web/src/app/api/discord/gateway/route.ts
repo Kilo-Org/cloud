@@ -206,37 +206,46 @@ async function runGatewayListener(
   let nextDropLogAt = 0;
 
   async function forwardMessage(event: ForwardedGatewayEvent): Promise<void> {
-    try {
-      if (!(await isActiveListener(listenerId, abortSignal))) {
-        abortController.abort();
+    const signal = AbortSignal.any([abortSignal, AbortSignal.timeout(FORWARD_TIMEOUT_MS)]);
+    const body = JSON.stringify(event);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        if (!(await isActiveListener(listenerId, signal))) {
+          abortController.abort();
+          return;
+        }
+      } catch (error) {
+        if (!signal.aborted) console.error('[DiscordGateway] Ownership check failed:', error);
         return;
       }
-    } catch (error) {
-      console.error('[DiscordGateway] Ownership check failed:', error);
-      return;
-    }
 
-    if (abortSignal.aborted) return;
+      if (signal.aborted) return;
 
-    try {
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-discord-gateway-token': DISCORD_BOT_TOKEN,
-        },
-        body: JSON.stringify(event),
-        signal: AbortSignal.any([abortSignal, AbortSignal.timeout(FORWARD_TIMEOUT_MS)]),
-      });
+      try {
+        const response = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-discord-gateway-token': DISCORD_BOT_TOKEN,
+          },
+          body,
+          signal,
+        });
+        await response.body?.cancel();
+        if (response.ok) return;
 
-      if (!response.ok) {
+        if (attempt < 2 && (response.status === 503 || response.status === 429)) {
+          await delay(100 * (attempt + 1), undefined, { signal });
+          continue;
+        }
         console.error('[DiscordGateway] Failed to forward event:', response.status);
-      }
-      await response.body?.cancel();
-    } catch (error) {
-      if (!abortSignal.aborted) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error('[DiscordGateway] Error forwarding event:', errorMessage);
+        return;
+      } catch (error) {
+        if (!abortSignal.aborted) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error('[DiscordGateway] Error forwarding event:', errorMessage);
+        }
+        return;
       }
     }
   }

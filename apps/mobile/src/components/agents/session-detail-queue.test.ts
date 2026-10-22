@@ -272,7 +272,7 @@ vi.mock('@/lib/analytics/posthog', () => ({
   SESSION_VIEWED_EVENT: 'session_viewed',
 }));
 vi.mock('@/lib/a11y/announce', () => ({
-  moveA11yFocus: () => false,
+  requestA11yFocus: () => false,
   announceForA11y: hoisted.announce,
 }));
 vi.mock('@/lib/persist/drafts', () => ({

@@ -20,7 +20,7 @@ import { Pressable, View } from 'react-native';
 import { ReactionPickerSheet } from '@/components/pr-review/discussion/reaction-picker-sheet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { requestA11yFocus } from '@/lib/a11y/announce';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REACTION_EMOJI, selectReactionPills } from '@/lib/pr-review/discussion/reaction-pills';
@@ -76,7 +76,7 @@ export function ReactionsRow({
   // sheet's `visible` off, then returns screen-reader focus to the trigger
   // once the slide-out has run. Reopening cancels a pending restore, so a
   // fast close-reopen never pulls focus to the trigger behind the sheet. An
-  // unmounted row needs no cleanup: `moveA11yFocus` no-ops on an empty ref.
+  // unmounted row needs no cleanup: `requestA11yFocus` no-ops on an empty ref.
   function openPicker() {
     clearTimeout(focusTimerRef.current);
     setPickerOpen(true);
@@ -85,7 +85,7 @@ export function ReactionsRow({
   function closePicker() {
     setPickerOpen(false);
     focusTimerRef.current = setTimeout(() => {
-      moveA11yFocus(addReactionRef);
+      requestA11yFocus(addReactionRef);
     }, SHEET_DISMISS_ANIMATION_MS);
   }
 

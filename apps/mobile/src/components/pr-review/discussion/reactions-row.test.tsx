@@ -30,7 +30,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 vi.mock('@/lib/a11y/announce', () => ({
-  moveA11yFocus: moveFocus,
+  requestA11yFocus: moveFocus,
 }));
 
 vi.mock('expo-haptics', () => ({

@@ -19,7 +19,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { RenameModal } from '@/components/rename-modal';
 import { Text } from '@/components/ui/text';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { requestA11yFocus } from '@/lib/a11y/announce';
 import { SESSION_TRANSCRIPT_STALE_TIME_MS } from '@/lib/agent-session-cache';
 import { useTRPC } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -188,7 +188,7 @@ function SessionPreviewContent({
   const setMenuFirstItem = useCallback((node: View | null) => {
     menuFirstItemRef.current = node;
     if (node && visibleRef.current) {
-      moveA11yFocus(menuFirstItemRef);
+      requestA11yFocus(menuFirstItemRef);
     }
   }, []);
 
@@ -198,7 +198,7 @@ function SessionPreviewContent({
   // mounted yet — the ref callback above owns that case.
   useEffect(() => {
     if (visible && menuFirstItemRef.current) {
-      moveA11yFocus(menuFirstItemRef);
+      requestA11yFocus(menuFirstItemRef);
     }
   }, [visible]);
 

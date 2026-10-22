@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type Component, type RefObject } from 'react';
 
-import { announceForA11y, moveA11yFocus } from './announce';
+import { announceForA11y, requestA11yFocus } from './announce';
 
 const accessibilityMock = vi.hoisted(() => ({
   announceForAccessibility: vi.fn(),
@@ -59,7 +59,7 @@ describe('announceForA11y', () => {
   });
 });
 
-describe('moveA11yFocus', () => {
+describe('requestA11yFocus', () => {
   beforeEach(() => {
     accessibilityMock.setAccessibilityFocus.mockClear();
     findNodeHandleMock.mockClear();
@@ -73,36 +73,36 @@ describe('moveA11yFocus', () => {
     findNodeHandleMock.mockReturnValueOnce(null);
     const ref: RefObject<Component | null> = { current: null };
 
-    const moved = moveA11yFocus(ref);
+    const requested = requestA11yFocus(ref);
 
-    expect(moved).toBe(false);
+    expect(requested).toBe(false);
     expect(accessibilityMock.setAccessibilityFocus).not.toHaveBeenCalled();
   });
 
-  it('moves focus and returns true when a node handle is found', () => {
+  it('dispatches the focus request and returns true when a node handle is found', () => {
     findNodeHandleMock.mockReturnValueOnce(123);
     const ref: RefObject<Component | null> = {
       current: { node: 'placeholder' } as unknown as Component,
     };
 
-    const moved = moveA11yFocus(ref);
+    const requested = requestA11yFocus(ref);
 
-    expect(moved).toBe(true);
+    expect(requested).toBe(true);
     expect(accessibilityMock.setAccessibilityFocus).toHaveBeenCalledWith(123);
   });
 
-  it('returns false and does not throw when the native focus move fails', () => {
+  it('returns false and does not throw when the native call throws', () => {
     findNodeHandleMock.mockReturnValue(123);
     accessibilityMock.setAccessibilityFocus.mockImplementationOnce(() => {
-      throw new Error('native focus move failed');
+      throw new Error('native focus request failed');
     });
     const ref: RefObject<Component | null> = {
       current: { node: 'placeholder' } as unknown as Component,
     };
 
-    const moved = moveA11yFocus(ref);
+    const requested = requestA11yFocus(ref);
 
-    expect(moved).toBe(false);
+    expect(requested).toBe(false);
     expect(accessibilityMock.setAccessibilityFocus).toHaveBeenCalledWith(123);
   });
 });

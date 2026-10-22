@@ -29,13 +29,22 @@ export function announceForA11y(message: string): void {
 }
 
 /**
- * Move assistive-technology focus to a component by ref. Returns `true` if a
- * focusable node handle was found and the platform accepted the move, so
- * callers can fall back to a different focus target on tablets/web where
- * `setAccessibilityFocus` may be a no-op. A throwing native call counts as a
- * rejected move (returns `false`) and never propagates.
+ * Ask the platform to move assistive-technology focus to a component by ref.
+ * The boolean reports only what this function can observe:
+ *
+ * - `true`: a focusable node handle was found and the focus request was
+ *   dispatched.
+ * - `false`: the ref had no mounted node, or the native call threw (swallowed,
+ *   never propagated).
+ *
+ * `true` is not proof that focus moved. React Native's `setAccessibilityFocus`
+ * reports no outcome, so a platform that honours the request and one that
+ * ignores it look identical here; a caller must not skip a fallback focus
+ * target because the request was dispatched. The useful signal is `false`:
+ * the node did not exist yet, so a later signal (mount, layout, next frame)
+ * can retry the request.
  */
-export function moveA11yFocus(ref: RefObject<Component | null>): boolean {
+export function requestA11yFocus(ref: RefObject<Component | null>): boolean {
   const node = findNodeHandle(ref.current);
   if (node == null) {
     return false;

@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { requestA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REACTION_EMOJI, reactionLabel } from '@/lib/pr-review/discussion/reaction-pills';
 import {
@@ -46,17 +46,19 @@ export function ReactionPickerSheet({
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const titleRef = useRef<RNText | null>(null);
-  // Latch only when the move actually happened: on Android the title's first
-  // layout can arrive before its ref is attached, so the attempt resolves no
-  // handle, returns false, and a later signal has to retry.
-  const titleFocusedRef = useRef(false);
+  // Latch once the request left with a mounted title: on Android the title's
+  // first layout can arrive before its ref is attached, so the attempt resolves
+  // no handle, returns false, and a later signal has to retry. A dispatched
+  // request says nothing about whether the platform honoured it, so there is
+  // nothing left to retry once it has.
+  const titleFocusRequestedRef = useRef(false);
   const titleLaidOutRef = useRef(false);
   const focusTitle = useCallback(() => {
-    if (titleFocusedRef.current) {
+    if (titleFocusRequestedRef.current) {
       return;
     }
-    if (moveA11yFocus(titleRef)) {
-      titleFocusedRef.current = true;
+    if (requestA11yFocus(titleRef)) {
+      titleFocusRequestedRef.current = true;
     }
   }, []);
   const attachTitle = useCallback(
@@ -73,15 +75,16 @@ export function ReactionPickerSheet({
     focusTitle();
   }, [focusTitle]);
 
-  // Focus the picker's title once per presentation, when the move can actually
-  // land. `Sheet` returns null on the commit that flips `visible`, so the title
-  // mounts a render later; on Android its `onLayout` can even arrive before the
-  // ref is attached. Reaching the title is retried from each real signal — this
-  // effect for a reopen that never unmounted the title, `handleTitleLayout` and
-  // `attachTitle` otherwise — and the guard latches only on a successful move.
+  // Focus the picker's title once per presentation, when a request can actually
+  // reach it. `Sheet` returns null on the commit that flips `visible`, so the
+  // title mounts a render later; on Android its `onLayout` can even arrive
+  // before the ref is attached. Reaching the title is retried from each real
+  // signal — this effect for a reopen that never unmounted the title,
+  // `handleTitleLayout` and `attachTitle` otherwise — and the guard latches only
+  // on a dispatched request.
   useEffect(() => {
     if (!visible) {
-      titleFocusedRef.current = false;
+      titleFocusRequestedRef.current = false;
       titleLaidOutRef.current = false;
       return;
     }

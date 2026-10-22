@@ -53,6 +53,11 @@ type BlockingCardPresentation = {
 
 export type BlockingCardA11yDeps = {
   announce: (message: string) => void;
+  /**
+   * Ask for focus and report whether the request reached a mounted node
+   * (`requestA11yFocus`). `false` means there was no node handle yet, or the
+   * native call threw — the only case a retry can improve.
+   */
   focus: (ref: RefObject<Component | null>) => boolean;
 };
 
@@ -133,7 +138,9 @@ export function getBlockingCardPresentationForKind(input: {
  * "announce + move focus" pair here so the React components execute the same
  * path the unit tests cover. If the focus target has no node handle yet
  * (first-paint race), a follow-up attempt is scheduled on the next tick and the
- * cleanup function clears that timeout on unmount/request change.
+ * cleanup function clears that timeout on unmount/request change. A `true`
+ * result only means the request was dispatched, so no retry is scheduled for a
+ * platform that ignores it: a retry could not change that outcome.
  */
 export function applyBlockingCardAppearance(
   presentation: BlockingCardPresentation,

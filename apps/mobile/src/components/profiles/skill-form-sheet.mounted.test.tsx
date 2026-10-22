@@ -83,6 +83,23 @@ function pressCancel(root: ReactTestInstance): void {
   });
 }
 
+/** Save through the header's done control. */
+function pressDone(root: ReactTestInstance): void {
+  const onDone = voidHandler(findOne(root, 'SheetHeader').props.onDone);
+  act(() => {
+    onDone();
+  });
+}
+
+/** The name field as rendered after the latest prefill. */
+function nameField(root: ReactTestInstance): ReactTestInstance {
+  const field = findAll(root, 'FormField').find(node => node.props.label === 'Skill name');
+  if (!field) {
+    throw new Error('field Skill name was not rendered');
+  }
+  return field;
+}
+
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
 function mountSheet(skill: { name: string; rawMarkdown: string } | null = null) {
   return renderWithProviders(
@@ -92,8 +109,8 @@ function mountSheet(skill: { name: string; rawMarkdown: string } | null = null) 
       onClose: () => {
         h.onClose();
       },
-      onSave: () => {
-        h.onSave();
+      onSave: (submission: unknown) => {
+        h.onSave(submission);
       },
     })
   );
@@ -136,6 +153,70 @@ describe('SkillFormSheet dismissal', () => {
       cancelLabel: i18n.t('common.keepEditing'),
     });
     expect(h.onClose).not.toHaveBeenCalled();
+
+    unmount();
+  });
+});
+
+describe('SkillFormSheet name fill', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('fills the name from frontmatter and clears the empty-name error', async () => {
+    const { renderer, unmount } = await mountSheet();
+
+    pressDone(renderer.root);
+    expect(nameField(renderer.root).props.error).toBe(i18n.t('profiles.skillNameRequired'));
+
+    changeText(renderer.root, 'Skill content', ['---', 'name: My Skill', '---', 'Body'].join('\n'));
+
+    expect(nameField(renderer.root).props.defaultValue).toBe('my-skill');
+    expect(nameField(renderer.root).props.error).toBeUndefined();
+
+    pressDone(renderer.root);
+    expect(h.onSave).toHaveBeenCalledWith({
+      name: 'my-skill',
+      rawMarkdown: ['---', 'name: My Skill', '---', 'Body'].join('\n'),
+    });
+
+    unmount();
+  });
+
+  it('leaves the name empty for a frontmatter name the server rejects', async () => {
+    const { renderer, unmount } = await mountSheet();
+
+    changeText(
+      renderer.root,
+      'Skill content',
+      ['---', 'name: مراجعة الجودة', '---', 'Body'].join('\n')
+    );
+
+    expect(nameField(renderer.root).props.defaultValue).toBe('');
+
+    pressDone(renderer.root);
+    expect(h.onSave).not.toHaveBeenCalled();
+    expect(nameField(renderer.root).props.error).toBe(i18n.t('profiles.skillNameRequired'));
+
+    unmount();
+  });
+
+  it('keeps a typed name when frontmatter arrives later', async () => {
+    const { renderer, unmount } = await mountSheet();
+
+    changeText(renderer.root, 'Skill name', 'my-review');
+    changeText(
+      renderer.root,
+      'Skill content',
+      ['---', 'name: other-skill', '---', 'Body'].join('\n')
+    );
+
+    expect(nameField(renderer.root).props.defaultValue).toBe('');
+    pressDone(renderer.root);
+    expect(h.onSave).toHaveBeenCalledWith({
+      name: 'my-review',
+      rawMarkdown: ['---', 'name: other-skill', '---', 'Body'].join('\n'),
+    });
 
     unmount();
   });

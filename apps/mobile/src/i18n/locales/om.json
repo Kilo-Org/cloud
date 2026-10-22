@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "Maqaan ogummaa qubee ykn dijiitii irraa jalqabuu fi qubee xixiqqaa, dijiitii fi daash qofa fayyadamuu qaba",
     "skillContentRequired": "Qabiyyeen ogummaa barbaachisaadha",
     "skillSaveFailed": "Ogummaa qusachuu hin dandeenye",
+    "skillSourceCustom": "Dhuunfaa",
+    "skillSourceMarketplace": "Gabaa",
     "skillsHint": "SKILL.md tokko maxxansi maqaan isaa ni guuta; bilbila keessan irraa ogummaa tokko osoo harkisuu fi hin gadi dhiisin itti dabalaa.",
     "skillEditTitle": "Dandeettii gulaaluu",
     "mcp": {

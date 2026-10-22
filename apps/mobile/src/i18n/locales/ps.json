@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "د مهارت نوم باید د یوه لیک یا عدد سره پیل شي او یوازې د کوچنیو حروفو، ګوتو او ډیشونو څخه کار واخلئ",
     "skillContentRequired": "د مهارت منځپانګې ته اړتیا ده",
     "skillSaveFailed": "مهارت نه شو ژغورلی",
+    "skillSourceCustom": "دودیز",
+    "skillSourceMarketplace": "بازار",
     "skillsHint": "یو SKILL.md پیسټ کړئ او نوم یې ډک شي؛ پرته له ډریګ او ډراپ خپل تلیفون څخه مهارت اضافه کړئ.",
     "skillEditTitle": "د ترمیم مهارت",
     "mcp": {

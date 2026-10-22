@@ -3732,6 +3732,8 @@
     "skillNameInvalid": "O nome da competência deve começar por uma letra ou dígito e usar apenas letras minúsculas, dígitos e hífenes",
     "skillContentRequired": "O conteúdo da competência é obrigatório",
     "skillSaveFailed": "Não foi possível guardar a competência",
+    "skillSourceCustom": "Personalizado",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Cole um SKILL.md e o nome é preenchido automaticamente; adicione uma competência a partir do telemóvel, sem arrastar e largar.",
     "skillEditTitle": "Editar competência",
     "mcp": {

@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "Oskuste nimi peab algama tähe või numbriga ning kasutama ainult väiketähti, numbreid ja sidekriipse",
     "skillContentRequired": "Vajalik on oskuste sisu",
     "skillSaveFailed": "Oskust ei õnnestunud salvestada",
+    "skillSourceCustom": "Kohandatud",
+    "skillSourceMarketplace": "Turg",
     "skillsHint": "Kleepige fail SKILL.md ja selle nimi täidetakse; lisage oma telefonist oskusi ilma lohistamata.",
     "skillEditTitle": "Muuda oskusi",
     "mcp": {

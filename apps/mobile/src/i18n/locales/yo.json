@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "Orukọ ogbon gbọdọ bẹrẹ pẹlu lẹta tabi nọmba ati lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
     "skillContentRequired": "Akoonu ogbon ni a nilo",
     "skillSaveFailed": "Ko le fi ogbon pamọ",
+    "skillSourceCustom": "Ti ara rẹ",
+    "skillSourceMarketplace": "Ọjà",
     "skillsHint": "Lẹẹmọ SKILL.md ati orukọ rẹ kun; ṣafikun ọgbọn lati inu foonu rẹ laisi fa ati ju silẹ.",
     "skillEditTitle": "Olorijori Ṣatunkọ",
     "mcp": {

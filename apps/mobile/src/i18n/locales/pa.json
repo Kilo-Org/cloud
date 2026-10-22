@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "ਹੁਨਰ ਦਾ ਨਾਮ ਇੱਕ ਅੱਖਰ ਜਾਂ ਅੰਕ ਨਾਲ ਸ਼ੁਰੂ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ ਅਤੇ ਸਿਰਫ ਛੋਟੇ ਅੱਖਰਾਂ, ਅੰਕਾਂ ਅਤੇ ਡੈਸ਼ਾਂ ਦੀ ਵਰਤੋਂ ਕਰਨਾ ਚਾਹੀਦਾ ਹੈ",
     "skillContentRequired": "ਹੁਨਰ ਸਮੱਗਰੀ ਦੀ ਲੋੜ ਹੈ",
     "skillSaveFailed": "ਹੁਨਰ ਨੂੰ ਬਚਾ ਨਹੀਂ ਸਕਿਆ",
+    "skillSourceCustom": "ਕਸਟਮ",
+    "skillSourceMarketplace": "ਮਾਰਕੀਟਪਲੇਸ",
     "skillsHint": "ਇੱਕ SKILL.md ਪੇਸਟ ਕਰੋ ਅਤੇ ਇਸਦਾ ਨਾਮ ਭਰੋ; ਬਿਨਾਂ ਡਰੈਗ ਐਂਡ ਡ੍ਰੌਪ ਦੇ ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਹੁਨਰ ਸ਼ਾਮਲ ਕਰੋ।",
     "skillEditTitle": "ਹੁਨਰ ਨੂੰ ਸੋਧੋ",
     "mcp": {

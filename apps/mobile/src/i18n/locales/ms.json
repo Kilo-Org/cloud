@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "Nama kemahiran mesti bermula dengan huruf atau digit dan hanya menggunakan huruf kecil, angka dan sempang",
     "skillContentRequired": "Kandungan kemahiran diperlukan",
     "skillSaveFailed": "Tidak dapat menyelamatkan kemahiran",
+    "skillSourceCustom": "Tersuai",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Tampal SKILL.md dan namanya diisi; tambah kemahiran daripada telefon anda tanpa seret dan lepas.",
     "skillEditTitle": "Kemahiran mengedit",
     "mcp": {

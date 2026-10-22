@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "A készség nevének betűvel vagy számjegygel kell kezdődnie, és csak kisbetűket, számjegyeket és kötőjeleket kell használnia",
     "skillContentRequired": "A készség tartalma kötelező",
     "skillSaveFailed": "Nem sikerült elmenteni a készséget",
+    "skillSourceCustom": "Egyéni",
+    "skillSourceMarketplace": "Piactér",
     "skillsHint": "Illesszen be egy SKILL.md fájlt, és a neve automatikusan kitöltődik; töltsön fel egy készséget a telefonjáról húzás nélkül.",
     "skillEditTitle": "Készség szerkesztése",
     "mcp": {

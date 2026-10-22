@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Δεν εμφανίζονται αποθετήρια. Έλεγξε την πρόσβαση στα αποθετήρια του GitLab και μετά ανανέωσε τη λίστα.",
       "noRepositoriesVisibleBitbucket": "Δεν εμφανίζονται αποθετήρια. Έλεγξε την πρόσβαση στα αποθετήρια του Bitbucket και μετά ανανέωσε τη λίστα.",
       "bitbucketOrganizationsOnly": "Το Bitbucket είναι διαθέσιμο μόνο για οργανισμούς.",
+      "githubNeedsAttention": "Απαιτείται επανασύνδεση του GitHub",
+      "githubNeedsAttentionDescription": "Κάνε επανασύνδεση της εφαρμογής Kilo στο GitHub και μετά ανανέωσε για να φορτώσουν τα αποθετήριά της.",
+      "partialRepositories": "Δεν φορτώθηκαν ορισμένα αποθετήρια του GitHub.",
       "branchPickerTitle": "Επιλογή κλάδου",
       "branchDefault": "Προεπιλογή",
       "branchAccessibility": "Κλάδος: {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "Το όνομα δεξιοτήτων πρέπει να ξεκινά με γράμμα ή ψηφίο και να χρησιμοποιεί μόνο πεζά γράμματα, ψηφία και παύλες",
     "skillContentRequired": "Απαιτείται περιεχόμενο δεξιοτήτων",
     "skillSaveFailed": "Δεν ήταν δυνατή η εξοικονόμηση δεξιοτήτων",
+    "skillSourceCustom": "Προσαρμοσμένο",
+    "skillSourceMarketplace": "Αγορά",
     "skillsHint": "Επικολλήστε ένα SKILL.md και το όνομά του συμπληρώνεται. προσθέστε μια δεξιότητα από το τηλέφωνό σας χωρίς μεταφορά και απόθεση.",
     "skillEditTitle": "Επεξεργασία ικανότητας",
     "mcp": {

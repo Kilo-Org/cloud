@@ -1738,6 +1738,9 @@
       "noRepositoriesVisibleGitlab": "Репозитории не отображаются. Проверьте доступ к репозиториям GitLab и обновите список.",
       "noRepositoriesVisibleBitbucket": "Репозитории не отображаются. Проверьте доступ к репозиториям Bitbucket и обновите список.",
       "bitbucketOrganizationsOnly": "Bitbucket доступен только для организаций.",
+      "githubNeedsAttention": "GitHub требует переподключения",
+      "githubNeedsAttentionDescription": "Переподключите приложение Kilo GitHub, затем обновите список, чтобы загрузить его репозитории.",
+      "partialRepositories": "Некоторые репозитории GitHub не загрузились.",
       "branchPickerTitle": "Выбрать ветку",
       "branchDefault": "По умолчанию",
       "branchAccessibility": "Ветка: {{label}}",
@@ -3774,6 +3777,8 @@
     "skillNameInvalid": "Название навыка должно начинаться с буквы или цифры и содержать только строчные буквы, цифры и тире.",
     "skillContentRequired": "Требуется содержание навыков.",
     "skillSaveFailed": "Не удалось сохранить навык",
+    "skillSourceCustom": "Собственный",
+    "skillSourceMarketplace": "Магазин",
     "skillsHint": "Вставьте SKILL.md, и его имя заполнится; добавьте навык со своего телефона без перетаскивания.",
     "skillEditTitle": "Изменить навык",
     "mcp": {

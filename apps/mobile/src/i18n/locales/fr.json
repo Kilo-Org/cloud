@@ -1627,6 +1627,9 @@
       "noRepositoriesVisibleGitlab": "Aucun dépôt visible. Vérifiez les droits d'accès aux dépôts GitLab, puis actualisez.",
       "noRepositoriesVisibleBitbucket": "Aucun dépôt visible. Vérifiez les droits d'accès aux dépôts Bitbucket, puis actualisez.",
       "bitbucketOrganizationsOnly": "Bitbucket n'est disponible que pour les organisations.",
+      "githubNeedsAttention": "GitHub doit être reconnecté",
+      "githubNeedsAttentionDescription": "Reconnectez l'application Kilo GitHub, puis actualisez pour charger ses dépôts.",
+      "partialRepositories": "Certains dépôts GitHub ne se sont pas chargés.",
       "branchPickerTitle": "Sélectionner une branche",
       "branchDefault": "Par défaut",
       "branchAccessibility": "Branche : {{label}}",
@@ -3729,6 +3732,8 @@
     "skillNameInvalid": "Le nom de la compétence doit commencer par une lettre ou un chiffre et utiliser uniquement des lettres minuscules, des chiffres et des tirets.",
     "skillContentRequired": "Un contenu de compétence est requis",
     "skillSaveFailed": "Impossible de sauvegarder la compétence",
+    "skillSourceCustom": "Personnalisé",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Collez un SKILL.md et son nom est renseigné ; ajoutez une compétence depuis votre téléphone sans glisser-déposer.",
     "skillEditTitle": "Modifier la compétence",
     "mcp": {

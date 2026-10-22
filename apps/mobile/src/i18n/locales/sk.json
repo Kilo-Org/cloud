@@ -2287,6 +2287,9 @@
       "noRepositoriesVisibleGitlab": "Nezobrazujú sa žiadne repozitáre. Skontroluj prístup k repozitárom v službe GitLab a potom obnov zoznam.",
       "noRepositoriesVisibleBitbucket": "Nezobrazujú sa žiadne repozitáre. Skontroluj prístup k repozitárom v službe Bitbucket a potom obnov zoznam.",
       "bitbucketOrganizationsOnly": "Bitbucket je dostupný len pre organizácie.",
+      "githubNeedsAttention": "GitHub je potrebné znova pripojiť",
+      "githubNeedsAttentionDescription": "Znova prepoj aplikáciu Kilo GitHub App a potom obnov zoznam, aby sa načítali jej repozitáre.",
+      "partialRepositories": "Niektoré repozitáre zo služby GitHub sa nenačítali.",
       "branchPickerTitle": "Vybrať vetvu",
       "branchDefault": "Predvolená",
       "branchAccessibility": "Vetva: {{label}}",
@@ -3774,6 +3777,8 @@
     "skillNameInvalid": "Názov zručnosti musí začínať písmenom alebo číslicou a používať iba malé písmená, číslice a pomlčky",
     "skillContentRequired": "Vyžaduje sa obsah zručností",
     "skillSaveFailed": "Nepodarilo sa zachrániť zručnosť",
+    "skillSourceCustom": "Vlastné",
+    "skillSourceMarketplace": "Obchod",
     "skillsHint": "Vložte súbor SKILL.md a jeho názov sa vyplní; pridajte zručnosť zo svojho telefónu bez presúvania myšou.",
     "skillEditTitle": "Upraviť zručnosť",
     "mcp": {

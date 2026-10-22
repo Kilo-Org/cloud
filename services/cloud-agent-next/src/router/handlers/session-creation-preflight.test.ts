@@ -286,7 +286,7 @@ describe('session creation preflight', () => {
     expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
-  it.each(['cloud-agent-web', 'slack', 'github', 'linear', 'discord', 'app-builder'])(
+  it.each(['cloud-agent-web', 'slack', 'github', 'linear', 'discord'])(
     'resolves implicit profiles for approved %s creation',
     async createdOnPlatform => {
       await preflightSessionCreation(

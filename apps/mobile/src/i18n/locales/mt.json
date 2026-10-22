@@ -2315,6 +2315,9 @@
       "noRepositoriesVisibleGitlab": "Ma jidher l-ebda repożitorju. Iċċekkja l-aċċess għar-repożitorji għal GitLab, imbagħad aġġorna.",
       "noRepositoriesVisibleBitbucket": "Ma jidher l-ebda repożitorju. Iċċekkja l-aċċess għar-repożitorji għal Bitbucket, imbagħad aġġorna.",
       "bitbucketOrganizationsOnly": "Bitbucket huwa disponibbli għall-organizzazzjonijiet biss.",
+      "githubNeedsAttention": "GitHub għandu jerġa' jingħaqad",
+      "githubNeedsAttentionDescription": "Erġa' qabbad l-applikazzjoni Kilo għal GitHub, imbagħad aġġorna biex jitgħabbew ir-repożitorji tagħha.",
+      "partialRepositories": "Xi repożitorji ta' GitHub ma tgħabbewx.",
       "branchPickerTitle": "Agħżel fergħa",
       "branchDefault": "Predefinit",
       "branchAccessibility": "Fergħa: {{label}}",
@@ -3819,6 +3822,8 @@
     "skillNameInvalid": "L-isem tal-ħiliet għandu jibda b'ittra jew ċifra u juża biss ittri żgħar, ċifri u sings",
     "skillContentRequired": "Il-kontenut tal-ħiliet huwa meħtieġ",
     "skillSaveFailed": "Ma setgħetx tiffranka l-ħiliet",
+    "skillSourceCustom": "Personalizzat",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Pasta SKILL.md u isimha jimla; żid ħila mit-telefon tiegħek mingħajr drag and drop.",
     "skillEditTitle": "Edit ħiliet",
     "mcp": {

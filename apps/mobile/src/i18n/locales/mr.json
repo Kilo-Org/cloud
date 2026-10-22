@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "कोणतीही रिपॉझिटरी दिसत नाही. GitLab वरील रिपॉझिटरी वापरण्याची परवानगी तपासा, नंतर रिफ्रेश करा.",
       "noRepositoriesVisibleBitbucket": "कोणतीही रिपॉझिटरी दिसत नाही. Bitbucket वरील रिपॉझिटरी वापरण्याची परवानगी तपासा, नंतर रिफ्रेश करा.",
       "bitbucketOrganizationsOnly": "Bitbucket फक्त संघटनांसाठी उपलब्ध आहे.",
+      "githubNeedsAttention": "GitHub पुन्हा कनेक्ट करणे आवश्यक आहे",
+      "githubNeedsAttentionDescription": "Kilo GitHub App पुन्हा कनेक्ट करा, नंतर रिपॉझिटरी लोड करण्यासाठी रिफ्रेश करा.",
+      "partialRepositories": "काही GitHub रिपॉझिटरी लोड झाल्या नाहीत.",
       "branchPickerTitle": "ब्रँच निवडा",
       "branchDefault": "डीफॉल्ट",
       "branchAccessibility": "ब्रँच: {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "कौशल्याचे नाव अक्षर किंवा अंकाने सुरू होणे आवश्यक आहे आणि फक्त लोअरकेस अक्षरे, अंक आणि डॅश वापरणे आवश्यक आहे",
     "skillContentRequired": "कौशल्य सामग्री आवश्यक आहे",
     "skillSaveFailed": "कौशल्य वाचवू शकलो नाही",
+    "skillSourceCustom": "कस्टम",
+    "skillSourceMarketplace": "मार्केटप्लेस",
     "skillsHint": "SKILL.md पेस्ट करा आणि त्याचे नाव भरले; ड्रॅग आणि ड्रॉप न करता तुमच्या फोनवरून कौशल्य जोडा.",
     "skillEditTitle": "कौशल्य संपादित करा",
     "mcp": {

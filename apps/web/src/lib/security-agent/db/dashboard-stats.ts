@@ -239,6 +239,28 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
           FROM ${security_findings}
           WHERE ${security_findings.status} = 'open' AND ${whereClause}
         ),
+        open_agg AS (
+          SELECT
+            severity,
+            COUNT(*) AS finding_count,
+            COUNT(*) FILTER (WHERE sla_due_at IS NOT NULL) AS sla_total,
+            COUNT(*) FILTER (WHERE sla_due_at IS NOT NULL AND sla_due_at > now()) AS within_sla,
+            COUNT(*) FILTER (WHERE sla_due_at IS NOT NULL AND sla_due_at <= now()) AS overdue,
+            COUNT(*) FILTER (WHERE sla_due_at > now() AND sla_due_at <= now() + interval '7 days') AS due_soon,
+            COUNT(*) FILTER (WHERE sla_due_at > now() AND sla_due_at <= now() + interval '7 days' AND analysis_status = 'completed' AND (analysis->'sandboxAnalysis'->>'isExploitable') = 'true') AS due_soon_exploitable,
+            COUNT(*) FILTER (WHERE sla_due_at IS NULL) AS untracked,
+            COUNT(*) FILTER (WHERE analysis_status = 'completed') AS analyzed,
+            COUNT(*) FILTER (WHERE analysis_status = 'completed' AND (analysis->'sandboxAnalysis'->>'isExploitable') = 'true') AS exploitable,
+            COUNT(*) FILTER (WHERE analysis_status = 'completed' AND (analysis->'sandboxAnalysis'->>'isExploitable') = 'false') AS not_exploitable,
+            COUNT(*) FILTER (WHERE analysis_status = 'completed' AND ((analysis->'sandboxAnalysis'->>'isExploitable') IS NULL OR (analysis->'sandboxAnalysis'->>'isExploitable') = 'unknown') AND (analysis->'triage'->>'suggestedAction') = 'analyze_codebase') AS triage_complete,
+            COUNT(*) FILTER (WHERE analysis_status = 'completed' AND (analysis->'triage'->>'suggestedAction') = 'dismiss' AND ((analysis->'sandboxAnalysis'->>'isExploitable') IS NULL OR (analysis->'sandboxAnalysis'->>'isExploitable') = 'unknown')) AS safe_to_dismiss,
+            COUNT(*) FILTER (WHERE analysis_status = 'completed' AND COALESCE(analysis->'sandboxAnalysis'->>'suggestedAction', analysis->'triage'->>'suggestedAction') = 'manual_review' AND ((analysis->'sandboxAnalysis'->>'isExploitable') IS NULL OR (analysis->'sandboxAnalysis'->>'isExploitable') = 'unknown')) AS needs_review,
+            COUNT(*) FILTER (WHERE analysis_status IN ('pending', 'running')) AS analyzing,
+            COUNT(*) FILTER (WHERE analysis_status IS NULL) AS not_analyzed,
+            COUNT(*) FILTER (WHERE analysis_status = 'failed') AS failed
+          FROM base
+          GROUP BY severity
+        ),
         base_status AS (
           SELECT ${security_findings.status} AS status
           FROM ${security_findings}
@@ -258,29 +280,18 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
           'sla', COALESCE(
             (SELECT jsonb_agg(jsonb_build_object(
                'severity', severity,
-               'total', total,
+               'total', sla_total,
                'within_sla', within_sla,
                'overdue', overdue,
                'due_soon', due_soon,
                'due_soon_exploitable', due_soon_exploitable,
                'untracked', untracked
              ))
-             FROM (
-               SELECT
-                 severity,
-                 COUNT(*) FILTER (WHERE sla_due_at IS NOT NULL) AS total,
-                 COUNT(*) FILTER (WHERE sla_due_at IS NOT NULL AND sla_due_at > now()) AS within_sla,
-                 COUNT(*) FILTER (WHERE sla_due_at IS NOT NULL AND sla_due_at <= now()) AS overdue,
-                 COUNT(*) FILTER (WHERE sla_due_at > now() AND sla_due_at <= now() + interval '7 days') AS due_soon,
-                 COUNT(*) FILTER (WHERE sla_due_at > now() AND sla_due_at <= now() + interval '7 days' AND analysis_status = 'completed' AND (analysis->'sandboxAnalysis'->>'isExploitable') = 'true') AS due_soon_exploitable,
-                 COUNT(*) FILTER (WHERE sla_due_at IS NULL) AS untracked
-               FROM base
-               GROUP BY severity
-             ) sla_agg),
+             FROM open_agg),
             '[]'::jsonb),
           'severity', COALESCE(
-            (SELECT jsonb_agg(jsonb_build_object('severity', severity, 'count', count))
-             FROM (SELECT severity, COUNT(*) AS count FROM base GROUP BY severity) severity_agg),
+            (SELECT jsonb_agg(jsonb_build_object('severity', severity, 'count', finding_count))
+             FROM open_agg),
             '[]'::jsonb),
           'status', COALESCE(
             (SELECT jsonb_agg(jsonb_build_object('status', status, 'count', count))
@@ -288,18 +299,18 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
             '[]'::jsonb),
           'analysis', (
             SELECT jsonb_build_object(
-              'total', COUNT(*),
-              'analyzed', COUNT(*) FILTER (WHERE analysis_status = 'completed'),
-              'exploitable', COUNT(*) FILTER (WHERE analysis_status = 'completed' AND (analysis->'sandboxAnalysis'->>'isExploitable') = 'true'),
-              'not_exploitable', COUNT(*) FILTER (WHERE analysis_status = 'completed' AND (analysis->'sandboxAnalysis'->>'isExploitable') = 'false'),
-              'triage_complete', COUNT(*) FILTER (WHERE analysis_status = 'completed' AND ((analysis->'sandboxAnalysis'->>'isExploitable') IS NULL OR (analysis->'sandboxAnalysis'->>'isExploitable') = 'unknown') AND (analysis->'triage'->>'suggestedAction') = 'analyze_codebase'),
-              'safe_to_dismiss', COUNT(*) FILTER (WHERE analysis_status = 'completed' AND (analysis->'triage'->>'suggestedAction') = 'dismiss' AND ((analysis->'sandboxAnalysis'->>'isExploitable') IS NULL OR (analysis->'sandboxAnalysis'->>'isExploitable') = 'unknown')),
-              'needs_review', COUNT(*) FILTER (WHERE analysis_status = 'completed' AND COALESCE(analysis->'sandboxAnalysis'->>'suggestedAction', analysis->'triage'->>'suggestedAction') = 'manual_review' AND ((analysis->'sandboxAnalysis'->>'isExploitable') IS NULL OR (analysis->'sandboxAnalysis'->>'isExploitable') = 'unknown')),
-              'analyzing', COUNT(*) FILTER (WHERE analysis_status IN ('pending', 'running')),
-              'not_analyzed', COUNT(*) FILTER (WHERE analysis_status IS NULL),
-              'failed', COUNT(*) FILTER (WHERE analysis_status = 'failed')
+              'total', COALESCE(SUM(finding_count), 0),
+              'analyzed', COALESCE(SUM(analyzed), 0),
+              'exploitable', COALESCE(SUM(exploitable), 0),
+              'not_exploitable', COALESCE(SUM(not_exploitable), 0),
+              'triage_complete', COALESCE(SUM(triage_complete), 0),
+              'safe_to_dismiss', COALESCE(SUM(safe_to_dismiss), 0),
+              'needs_review', COALESCE(SUM(needs_review), 0),
+              'analyzing', COALESCE(SUM(analyzing), 0),
+              'not_analyzed', COALESCE(SUM(not_analyzed), 0),
+              'failed', COALESCE(SUM(failed), 0)
             )
-            FROM base
+            FROM open_agg
           ),
           'mttr', COALESCE(
             (SELECT jsonb_agg(jsonb_build_object(

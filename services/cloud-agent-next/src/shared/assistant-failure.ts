@@ -80,6 +80,47 @@ export function projectSafeAssistantError(source: unknown): string | undefined {
   return failure.providerOwnership === 'byok' ? `[BYOK] ${message}` : message;
 }
 
+const EXECUTION_STOPPED_MESSAGES = {
+  agent_unresponsive:
+    'Execution stopped because Kilo was not responding and was restarted. You can continue in this chat.',
+  agent_restarted: 'Execution stopped because the agent restarted. You can continue in this chat.',
+  no_progress: 'Execution stopped because it made no progress. You can continue in this chat.',
+  execution_limit:
+    'Execution stopped because it reached its time limit. You can continue in this chat.',
+} as const;
+
+export function executionStoppedMessage(
+  reason: keyof typeof EXECUTION_STOPPED_MESSAGES,
+  safeRetryMessage?: string
+): string {
+  return safeRetryMessage === undefined
+    ? EXECUTION_STOPPED_MESSAGES[reason]
+    : `Execution stopped while the model request kept retrying: ${safeRetryMessage}. You can continue in this chat.`;
+}
+
+const EXECUTION_RETRY_MESSAGES: ReadonlySet<string> = new Set(
+  [...Object.values(ASSISTANT_FAILURE_MESSAGES), BYOK_INVALID_REQUEST_MESSAGE].map(message =>
+    executionStoppedMessage('no_progress', message)
+  )
+);
+
+export function projectSafeSessionError(source: unknown, reason: unknown): string {
+  const safeError = projectSafeAssistantError(source) ?? classifyAssistantFailureMessage(source);
+  if (
+    typeof source === 'string' &&
+    (reason === 'agent_unresponsive' ||
+      reason === 'agent_restarted' ||
+      reason === 'no_progress' ||
+      reason === 'execution_limit') &&
+    (source === executionStoppedMessage(reason) ||
+      ((reason === 'no_progress' || reason === 'execution_limit') &&
+        EXECUTION_RETRY_MESSAGES.has(source)))
+  ) {
+    return source;
+  }
+  return safeError;
+}
+
 export function isAssistantInterrupt(source: unknown): boolean {
   if (typeof source === 'object' && source !== null && 'name' in source) {
     if (source.name === 'MessageAbortedError') return true;

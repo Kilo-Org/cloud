@@ -1,6 +1,7 @@
 import {
   assistantFailureMessage,
   classifyAssistantFailure,
+  executionStoppedMessage,
   isAssistantInterrupt,
   type AssistantFailureClassification,
 } from '../../../src/shared/assistant-failure.js';
@@ -1367,10 +1368,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
             properties: {
               sessionID: execution.sessionId,
               reason: failure,
-              error:
-                failure === 'agent_unresponsive'
-                  ? 'Execution stopped because Kilo was not responding and was restarted. You can continue in this chat.'
-                  : 'Execution stopped because the agent restarted. You can continue in this chat.',
+              error: executionStoppedMessage(failure),
             },
           },
         ]);
@@ -1451,11 +1449,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
             properties: {
               sessionID: identity.sessionId,
               reason,
-              error: failure
-                ? `Execution stopped while the model request kept retrying: ${failure.safeMessage}. You can continue in this chat.`
-                : reason === 'no_progress'
-                  ? 'Execution stopped because it made no progress. You can continue in this chat.'
-                  : 'Execution stopped because it reached its time limit. You can continue in this chat.',
+              error: executionStoppedMessage(reason, failure?.safeMessage),
             },
           },
         ]);

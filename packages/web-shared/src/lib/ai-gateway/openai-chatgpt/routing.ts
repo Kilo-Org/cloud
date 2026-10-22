@@ -51,6 +51,9 @@ const OPENAI_CHATGPT_PURPOSE = "Run the user's coding task in Kilo Code.";
 const METADATA_ENTRY_LIMIT = 16;
 const METADATA_VALUE_LIMIT = 512;
 
+/** OpenAI rejects a smaller `max_output_tokens` with `integer_below_min_value`. */
+const MIN_MAX_OUTPUT_TOKENS = 16;
+
 /**
  * Adds the required traceability keys to the request metadata, keeping any
  * caller-supplied entries. `session_id` is the gateway's identifier for one
@@ -281,6 +284,19 @@ export function buildOpenAiChatGptProvider(
       // api.openai.com rejects unknown request arguments, exactly like the
       // other raw upstream providers strip it.
       delete body.provider;
+      // Subscription sharing accepts only `auto` and `default`, which match the
+      // behavior without a tier, and rejects every other tier.
+      delete body.service_tier;
+      // The reasoning models served on this route reject sampling parameters
+      // with `unsupported_parameter`.
+      delete body.temperature;
+      delete body.top_p;
+      if (
+        typeof body.max_output_tokens === 'number' &&
+        body.max_output_tokens < MIN_MAX_OUTPUT_TOKENS
+      ) {
+        body.max_output_tokens = MIN_MAX_OUTPUT_TOKENS;
+      }
       // OpenAI requires this traceability metadata on every delegated Responses
       // request, including later turns. Without it the request is rejected once
       // the integration is enabled for it.

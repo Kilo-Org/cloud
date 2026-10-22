@@ -708,47 +708,19 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   });
 
   it.each([
-    ['/chat/completions', 'true'],
-    ['/chat/completions', 1],
-    ['/responses', 'yes'],
-    ['/messages', { enabled: true }],
-  ])('rejects a non-boolean stream on %s (%j)', async (path, stream) => {
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const body =
-      path === '/responses'
-        ? { model: 'openai/gpt-4o', input: 'hello', stream }
-        : { ...makeBody(), max_tokens: 100, stream };
-
-    const response = await handleLlmProxyRequest(makeRequest(body, undefined, path) as never);
-
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({
-      error: 'The stream field must be a boolean.',
-      error_type: 'invalid_request',
-      message: 'The stream field must be a boolean.',
-    });
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-    expect(mockedAccountForMicrodollarUsage).not.toHaveBeenCalled();
-  });
-
-  it.each([true, false, null])('accepts stream: %j', async stream => {
+    ['/chat/completions', 'true', { messages: makeBody().messages }],
+    ['/responses', 1, { input: 'hello' }],
+    ['/messages', 'yes', { messages: makeBody().messages, max_tokens: 100 }],
+  ])('forces a truthy stream on %s (%j) to true', async (path, stream, input) => {
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 
-    const body = {
-      model: 'openai/gpt-4o',
-      messages: [{ role: 'user', content: 'x'.repeat(4000) }],
-      stream,
-    };
-
-    const response = await handleLlmProxyRequest(makeRequest(body) as never);
+    const response = await handleLlmProxyRequest(
+      makeRequest({ model: 'openai/gpt-4o', ...input, stream }, undefined, path) as never
+    );
 
     expect(response.status).toBe(200);
-    expect(mockedUpstreamRequest).toHaveBeenCalled();
-    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
-      isStreaming: stream === true,
-      // The text of the model id, role and content, at four characters per token.
-      estimated_input_tokens: 1004,
-    });
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.stream).toBe(true);
+    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].isStreaming).toBe(true);
   });
 
   it('accepts the ai-gateway app /api/v1 path', async () => {

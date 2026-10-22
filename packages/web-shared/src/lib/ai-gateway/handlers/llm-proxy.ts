@@ -136,7 +136,6 @@ import {
   hasMiddleOutTransform,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { estimateInputTokenCount } from '@kilocode/web-shared/lib/ai-gateway/context-overflow';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
@@ -265,7 +264,7 @@ export async function handleLlmProxyRequest(
     if (path === '/chat/completions') {
       const body = JSON.parse(requestBodyText) as OpenRouterChatCompletionRequest;
       // Inject or merge stream_options.include_usage = true (only when streaming)
-      if (body.stream === true) {
+      if (body.stream) {
         body.stream_options = { ...(body.stream_options || {}), include_usage: true };
       }
       requestBodyParsed = { kind: 'chat_completions', body };
@@ -276,6 +275,10 @@ export async function handleLlmProxyRequest(
       const body = JSON.parse(requestBodyText) as GatewayResponsesRequest;
       requestBodyParsed = { kind: 'responses', body };
     }
+    // Usage accounting parses the response as SSE only when `stream` is exactly true.
+    if (requestBodyParsed.body.stream) {
+      requestBodyParsed.body.stream = true;
+    }
   } catch (e) {
     return malformedJsonResponse(e);
   }
@@ -284,17 +287,6 @@ export async function handleLlmProxyRequest(
     const error = 'The providerOptions field is not supported. Use provider instead.';
     return NextResponse.json(
       { error, error_type: ProxyErrorType.unsupported_field, message: error },
-      { status: 400 }
-    );
-  }
-
-  // Usage accounting reads the response as SSE only when `stream` is true. Any
-  // other value an upstream treats as streaming makes the usage unparseable.
-  const stream: unknown = requestBodyParsed.body.stream;
-  if (stream !== undefined && stream !== null && typeof stream !== 'boolean') {
-    const error = 'The stream field must be a boolean.';
-    return NextResponse.json(
-      { error, error_type: ProxyErrorType.invalid_request, message: error },
       { status: 400 }
     );
   }
@@ -937,7 +929,6 @@ export async function handleLlmProxyRequest(
     is_free: effectiveProviderContext.isFree,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
-    estimated_input_tokens: estimateInputTokenCount(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
     reasoning_setting: extractReasoningSetting(requestBodyParsed.body),
     fraudHeaders,

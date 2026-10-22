@@ -134,8 +134,6 @@ export type MicrodollarUsageContext = {
   readonly is_free: boolean;
   promptInfo: PromptInfo;
   max_tokens: number | null;
-  /** Estimated prompt tokens, used to charge a response whose usage could not be parsed. */
-  estimated_input_tokens?: number;
   has_middle_out_transform: boolean | null;
   isStreaming: boolean;
   prior_microdollar_usage: number;

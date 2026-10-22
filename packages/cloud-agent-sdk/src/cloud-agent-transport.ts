@@ -71,10 +71,10 @@ type CloudAgentTransportConfig = {
 
 // Snapshot reads run beside the live socket: a failed read costs the transcript
 // replay, never the live connection, so it is reported once and retried with a
-// short bounded backoff that stays well inside a user-noticeable wait.
+// short bounded backoff (500 ms, 1 s, 2 s) that stays well inside a
+// user-noticeable wait.
 const SNAPSHOT_READ_MAX_RETRIES = 3;
 const SNAPSHOT_READ_BASE_DELAY_MS = 500;
-const SNAPSHOT_READ_MAX_DELAY_MS = 4000;
 
 /** One settled snapshot read. Reads never reject; a failure is a value. */
 type SnapshotRead =
@@ -208,8 +208,13 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       // SessionIngest materialization lags behind the event-log high-water
       // mark. A cursor that live events already advanced is never regressed.
       if (lastEventId === null && page.watermarkEventId != null) lastEventId = 0;
-      initialPageRecorded = true;
-      config.onInitialPageLoaded?.(page);
+      // Exactly one page per connect may seed the manager: a reconnect
+      // catch-up that lands first wins, and a slower initial retry must not
+      // reset the older-pages cursor back to the newest page afterwards.
+      if (!initialPageRecorded) {
+        initialPageRecorded = true;
+        config.onInitialPageLoaded?.(page);
+      }
       replayPage(page);
     }
 
@@ -293,7 +298,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
             scheduleSnapshotRetry(onPage, expectedGeneration, retry + 1);
           });
         },
-        Math.min(SNAPSHOT_READ_MAX_DELAY_MS, SNAPSHOT_READ_BASE_DELAY_MS * 2 ** retry)
+        SNAPSHOT_READ_BASE_DELAY_MS * 2 ** retry
       );
     }
 
@@ -409,22 +414,14 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           // Reconnect replays use the bounded page fetch (newest 50) to
           // avoid overwriting older messages the user has already loaded via
           // `loadOlderMessages`. The manager already has the cursor from
-          // the initial connect, so we deliberately skip `onInitialPageLoaded`
-          // here — a reconnect must never reset the user's older-pages
-          // cursor back to the latest 50. The one exception is a session whose
-          // initial page never landed: this page is then its only seed.
+          // the initial connect, so `replayInitialPage` only hands this page to
+          // the manager when no page seeded the session yet — a reconnect must
+          // never reset the user's older-pages cursor back to the latest 50.
           cancelSnapshotRetry();
           void readSnapshot().then(read => {
             if (expectedGeneration !== lifecycleGeneration) return;
-            const onPage = (page: SessionSnapshotPage): void => {
-              if (initialPageRecorded) {
-                replayPage(page);
-                return;
-              }
-              replayInitialPage(page);
-            };
-            if (!applySnapshotRead(read, onPage, expectedGeneration)) {
-              scheduleSnapshotRetry(onPage, expectedGeneration, 0);
+            if (!applySnapshotRead(read, replayInitialPage, expectedGeneration)) {
+              scheduleSnapshotRetry(replayInitialPage, expectedGeneration, 0);
             }
           });
         },

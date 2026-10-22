@@ -2052,6 +2052,56 @@ describe('CloudAgentTransport snapshot read recovery', () => {
     }
   });
 
+  it('records the initial page once when a reconnect catch-up wins the race', async () => {
+    jest.useFakeTimers();
+    try {
+      const page = {
+        kind: 'success' as const,
+        info: { id: 'ses-1' },
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+      };
+      // The initial retry stays in flight while the socket reconnects and its
+      // catch-up read lands first.
+      let resolveInitialRetry: (page: SessionSnapshotPageOutcome | null) => void = () => undefined;
+      const pendingInitialRetry = new Promise<SessionSnapshotPageOutcome | null>(resolve => {
+        resolveInitialRetry = resolve;
+      });
+      const fetchSnapshotPage = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Connection lost.'))
+        .mockReturnValueOnce(pendingInitialRetry)
+        .mockResolvedValueOnce(page);
+      const { transport, serviceEvents, onInitialPageLoaded } = createSnapshotTransport({
+        fetchSnapshotPage,
+      });
+
+      transport.connect();
+      await flushMicrotasks();
+      jest.advanceTimersByTime(500);
+      await flushMicrotasks();
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(2);
+
+      await reconnectWithoutCursor();
+
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(1);
+
+      resolveInitialRetry(page);
+      await flushMicrotasks();
+
+      // The late initial retry replays its rows, but the manager already holds
+      // a page for this connect: its older-pages cursor must not move.
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(2);
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('retries a typed retryable failure on the initial read', async () => {
     jest.useFakeTimers();
     try {

@@ -15,6 +15,7 @@ import { withDORetry } from '../util/do-retry';
 import { internalApiMiddleware } from '../util/auth';
 import { clampRequestLimit } from '../util/constants';
 import { decodeUserIdFromPath, encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
+import { sandboxAllocationSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import { validateCronExpression, enforcesMinimumInterval, isValidTimezone } from '../util/cron';
 import type { ScheduledInvocationResult } from '../dos/TriggerDO';
 
@@ -189,7 +190,7 @@ export const TriggerConfigInput = z
       .max(50)
       .regex(/^[a-zA-Z]+$/)
       .optional(),
-    sandboxAllocation: z.literal('isolated-standard').optional(),
+    sandboxAllocation: sandboxAllocationSchema.optional(),
     promptTemplate: z.string().trim().min(1, 'promptTemplate is required'),
     profileId: z.string().uuid().optional(),
     autoCommit: z.boolean().optional(),
@@ -317,7 +318,7 @@ export const TriggerConfigUpdateInput = z
       .regex(/^[a-zA-Z]+$/)
       .nullable()
       .optional(),
-    sandboxAllocation: z.literal('isolated-standard').nullable().optional(),
+    sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
     promptTemplate: z.string().trim().min(1).optional(),
     isActive: z.boolean().optional(),
     profileId: z.string().uuid().optional(),

@@ -242,7 +242,10 @@
     "plan",
     "reactions",
     "review",
-    "tokens"
+    "tokens",
+    "{{count}} open",
+    "archived ({{count}})",
+    "completed ({{count}})"
   ],
   "fil": [
     "cancelled",
@@ -365,6 +368,7 @@
     "open",
     "open pull request",
     "reactions",
+    "search sessions",
     "superseded",
     "tokens"
   ],
@@ -468,6 +472,7 @@
     "github connection expired",
     "manual review",
     "no changes needed",
+    "open pull request",
     "pr opened",
     "remediation failed",
     "review",

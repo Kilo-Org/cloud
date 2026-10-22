@@ -25,6 +25,7 @@
     "error": "خرابی: {{error}}",
     "back": "واپس",
     "somethingWentWrong": "کوئی خرابی پیش آ گئی۔",
+    "actionNotRecorded": "ہم اس کارروائی کو ریکارڈ نہیں کر سکے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
     "couldNotOpen": "{{label}} کھولا نہیں جا سکا۔",
     "link": "لنک",
     "takingLonger": "اس میں توقع سے زیادہ وقت لگ رہا ہے۔ آپ اسے بند کر کے دوبارہ چیک کر سکتے ہیں۔",
@@ -111,7 +112,9 @@
     "online": "آن لائن",
     "open": "{{name}} کھولیں",
     "openPullRequest": "پل ریکویسٹ کھولیں",
+    "completed": "مکمل",
     "pending": "زیر التوا",
+    "running": "چل رہا ہے",
     "performance": "کارکردگی",
     "preferences": "ترجیحات",
     "privacyPolicy": "رازداری کی پالیسی",
@@ -782,7 +785,6 @@
       "mergeResultDefaultError": "GitHub نے مرج مکمل نہیں کیا۔",
       "mergeResultNotCompleted": "{{term}} مرج نہیں ہوا۔ اس کی حالت چیک کریں اور دوبارہ کوشش کریں۔",
       "ambiguous": "تصدیق نہیں ہو سکی — دوبارہ کوشش کرنے سے پہلے PR چیک کریں۔",
-      "persistenceFailed": "ہم اس کارروائی کو ریکارڈ نہیں کر سکے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
       "forbidden": "اس کارروائی کی اجازت نہیں ہے۔"
     },
     "capabilities": {
@@ -1454,8 +1456,9 @@
       "loading": "جائزے کی یادداشت لوڈ ہو رہی ہے",
       "couldNotLoad": "جائزے کی یادداشت لوڈ نہیں ہو سکی۔",
       "off": "جائزے کی یادداشت بند ہے۔",
+      "on": "جائزے کی یادداشت فعال ہے۔",
       "offDescription": "اسے فعال کریں تاکہ Kilo دیکھ بھال کرنے والوں کے جوابات سے سیکھ سکے اور REVIEW.md کے لیے ہدایات تجویز کر سکے۔",
-      "readOnlyDescription": "صرف تنظیم کے مالکان اور بلنگ مینیجر جائزے کی یادداشت فعال کر سکتے ہیں۔",
+      "readOnlyDescription": "صرف تنظیم کے مالکان اور بلنگ مینیجر جائزے کی یادداشت بدل سکتے ہیں۔",
       "enable": "جائزے کی یادداشت فعال کریں",
       "loadingProposals": "تجاویز لوڈ ہو رہی ہیں",
       "couldNotLoadProposals": "تجاویز لوڈ نہیں ہو سکیں۔",
@@ -1536,8 +1539,6 @@
     "updateFailed": "ریویور کو اپ ڈیٹ نہیں کیا جا سکا۔",
     "configSaveFailed": "جائزے کی ترتیبات محفوظ نہیں ہو سکیں۔",
     "status": {
-      "running": "چل رہا ہے",
-      "completed": "مکمل",
       "interrupted": "رک گیا"
     },
     "reviewStyle": {
@@ -1872,12 +1873,16 @@
     "settingsSave": {
       "saveChanges": "تبدیلیاں محفوظ کریں",
       "unsavedTitle": "محفوظ نہ کی گئی تبدیلیاں",
-      "unsavedMessage": "اس اسکرین سے جانے سے پہلے اپنی تبدیلیاں محفوظ کریں؟"
+      "unsavedMessage": "اس اسکرین سے جانے سے پہلے اپنی تبدیلیاں محفوظ کریں؟",
+      "unsavedInvalidMessage": "یہ تبدیلیاں ابھی محفوظ نہیں کی جا سکتیں۔ محفوظ کرنے کے لیے انہیں ٹھیک کریں، یا جانے کے لیے انہیں ضائع کریں۔"
     },
     "auditReportButton": {
       "viewA11y": "آڈٹ رپورٹ دیکھیں"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo ایڈمن",
+      "actorMaskedUser": "چھپا ہوا صارف",
+      "actorSystem": "Kilo سسٹم",
       "couldNotLoad": "آڈٹ رپورٹ لوڈ نہیں ہو سکی۔",
       "events": "واقعات",
       "generated": "رپورٹ {{generatedAt}} کو تیار کی گئی۔",
@@ -1938,7 +1943,6 @@
       "installApp": "GitHub ایپ انسٹال کریں",
       "reauthorizeButton": "GitHub ایپ کو دوبارہ اجازت دیں",
       "reauthorizeDescription": "سکیورٹی ایجنٹ کو Dependabot کی اطلاعات تک رسائی کے لیے vulnerability_alerts کی اجازت درکار ہے۔ یہ اجازت دینے کے لیے GitHub ایپ کو دوبارہ مجاز بنائیں۔",
-      "reauthorizeFailed": "دوبارہ اجازت دینے کا عمل شروع نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
       "reauthorizeTitle": "اضافی اجازتیں درکار ہیں",
       "setupFailed": "GitHub سیٹ اپ شروع نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔"
     },
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "ممکن ہے ہم آہنگی مکمل نہ ہوئی ہو۔ حالت درست کرنے کے لیے دوبارہ کوشش کریں یا درخواست مسترد کر دیں۔",
       "syncInProgress": "سکیورٹی ڈیٹا کی ہم آہنگی پہلے سے جاری ہے۔ براہ کرم دوبارہ کوشش کریں۔",
       "dismissalInProgress": "اخراج کی یہ کارروائی پہلے سے جاری ہے۔ براہ کرم دوبارہ کوشش کریں۔",
-      "couldNotReadPendingSyncs": "ہم آہنگی کی زیر التوا درخواستیں پڑھی نہیں جا سکیں۔ دوبارہ کوشش کریں۔"
+      "couldNotReadPendingSyncs": "ہم آہنگی کی زیر التوا درخواستیں پڑھی نہیں جا سکیں۔ دوبارہ کوشش کریں۔",
+      "ambiguous": "تصدیق نہیں ہو سکی — دوبارہ کوشش کرنے سے پہلے سکیورٹی جائزہ چیک کریں۔",
+      "settleFailed": "کارروائی مکمل ہو گئی، لیکن ہم نتیجہ ریکارڈ نہیں کر سکے۔ براہ کرم دوبارہ کوشش کریں۔",
+      "replayFailed": "یہ کارروائی مکمل نہیں ہوئی۔ براہ کرم دوبارہ کوشش کریں۔",
+      "actionFailed": "یہ کارروائی مکمل نہیں ہو سکی۔ براہ کرم دوبارہ کوشش کریں۔",
+      "actionBlocked": "یہ کارروائی مکمل نہیں ہو سکی۔ دوبارہ کوشش کرنے سے پہلے اس مسئلے کو حل کرنا ضروری ہے۔"
     },
     "analysisState": {
       "queued": "تجزیہ قطار میں ہے",
@@ -2312,7 +2321,8 @@
       "linesBadge_other": "{{displayCount}} سطریں",
       "matchesBadge_one": "{{displayCount}} مماثلت",
       "matchesBadge_other": "{{displayCount}} مماثلتیں",
-      "noOutput": "کوئی آؤٹ پٹ نہیں ہے۔"
+      "noOutput": "کوئی آؤٹ پٹ نہیں ہے۔",
+      "translationFailed": "ترجمہ ناکام رہا"
     },
     "readToolMarkdown": {
       "linesTruncated": "سطریں {{start}}–{{end}} (نامکمل متن)",
@@ -2772,7 +2782,7 @@
     "webBrowser": "ویب براؤزر",
     "viewProfile": "پروفائل دیکھیں",
     "signOutThisDevice": "اس ڈیوائس سے سائن آؤٹ کریں",
-    "signOutThisSession": "اس سیشن سے سائن آؤٹ کریں",
+    "signOutSessionLabel": "{{device}} سے سائن آؤٹ کریں، سائن ان: {{signedIn}}",
     "sessionSignedOut": "سیشن سائن آؤٹ ہو گیا۔",
     "signOutThisDeviceTitle": "اس ڈیوائس سے سائن آؤٹ کریں؟",
     "signOutThisSessionTitle": "اس سیشن سے سائن آؤٹ کریں؟",
@@ -3009,11 +3019,22 @@
     "boundary": {
       "backToProfile": "پروفائل پر واپس جائیں",
       "loadErrorMessage": "اپنا انٹرنیٹ کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+
+      "chooseAccount": "ایک اکاؤنٹ منتخب کریں",
       "loadErrorTitle": "آپ کی تنظیمیں لوڈ نہیں ہو سکیں۔",
+      "noOrganization": "کوئی تنظیم نہیں",
+
+      "noOrganizationDescription": "یہ اکاؤنٹ کسی تنظیم کا حصہ نہیں ہے۔ ممبر دعوتیں اور کم بیلنس انتباہات جیسی تنظیمی خصوصیات استعمال کرنے کے لیے ویب پر ایک تنظیم بنائیں یا اس میں شامل ہوں۔",
+
+      "openWebOrganizations": "ویب پر تنظیمیں کھولیں",
+
       "organizationUnavailable": "تنظیم دستیاب نہیں ہے۔",
-      "selectDescription": "جاری رکھنے کے لیے اپنے پروفائل سے ایک تنظیم منتخب کریں۔",
+      "selectDescriptionWithOrganizations": "آپ ایک یا زیادہ تنظیموں سے تعلق رکھتے ہیں۔ وہ اکاؤنٹ منتخب کریں جو یہ اسکرین استعمال کرے۔",
+
       "selectOrganization": "ایک تنظیم منتخب کریں",
       "unavailableDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ جاری رکھنے کے لیے اپنے پروفائل سے کوئی اور تنظیم منتخب کریں۔",
+
+      "unavailableSessionsDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ اس کے سیشنز لوڈ نہیں ہو سکتے۔",
       "accessDeniedDescription": "آپ کو اس تنظیم تک رسائی حاصل نہیں ہے۔"
     },
     "creditActivity": {
@@ -3065,7 +3086,11 @@
       "separateEmailsHint": "ایک سے زیادہ ای میل پتے ہوں تو انہیں کوما سے الگ کریں۔",
       "thresholdLabel": "اس رقم سے کم ہونے پر اطلاع دیں (USD)",
       "title": "بیلنس کم ہونے کی اطلاع",
-      "emailsError": "کم از کم ایک درست ای میل پتہ درج کریں۔ ایک سے زیادہ پتے ہوں تو انہیں کوما سے الگ کریں۔",
+      "emailsInvalid": "ایک یا زیادہ ای میل پتے درست نہیں ہیں۔",
+      "emailsRequired": "کم از کم ایک ای میل پتہ درج کریں۔",
+      "saveEmailsError": "کچھ ای میل پتے قبول نہیں ہوئے۔ انہیں چیک کر کے دوبارہ کوشش کریں۔",
+      "saveError": "بیلنس کم ہونے کی اطلاع محفوظ نہیں ہو سکی۔",
+      "thresholdPlaceholder": "رقم درج کریں",
       "thresholdError": "0 سے زیادہ رقم درج کریں۔"
     },
     "memberLimit": {
@@ -3076,6 +3101,7 @@
       "removeLimit": "حد ہٹائیں",
       "title": "روزانہ استعمال کی حد",
       "blankError": "رقم درج کریں یا نیچے «حد ہٹائیں» پر ٹیپ کریں۔",
+      "blankWithoutLimitError": "0 اور {{max}} کے درمیان روزانہ حد درج کریں۔",
       "rangeError": "0 اور {{max}} کے درمیان رقم درج کریں۔"
     },
     "members": {
@@ -3614,7 +3640,6 @@
     "keyTooLong": "چابی 256 حروف یا اس سے کم ہونی چاہیے",
     "keyDuplicate": "یہ چابی پہلے سے پروفائل میں موجود ہے",
     "valueLabel": "قدر",
-    "secretLabel": "خفیہ",
     "secrets": {
       "markSecret": "خفیہ کے طور پر نشان زد کریں۔",
       "masked": "پوشیدہ قدر",
@@ -3673,7 +3698,9 @@
       "jsonTooLarge": "زیادہ سے زیادہ 50 اندراجات استعمال کریں، چابیاں 128 تک اور اقدار 4096 حروف تک",
       "timeoutInvalid": "ٹائم آؤٹ ملی سیکنڈز کی پوری تعداد میں ہونا چاہیے۔",
       "edit": "MCP سرور میں ترمیم کریں۔",
-      "saveFailed": "MCP سرور محفوظ نہیں ہو سکا"
+      "saveFailed": "MCP سرور محفوظ نہیں ہو سکا",
+      "deleteFailed": "MCP سرور حذف نہیں ہو سکا",
+      "updateFailed": "MCP سرور اپ ڈیٹ نہیں ہو سکا"
     },
     "agents": {
       "title": "پروفائل ایجنٹس",
@@ -3700,6 +3727,7 @@
       "visibilitySubagent": "Subagent — صرف دوسروں سے کال کی جا سکتی ہے۔",
       "visibilityAll": "سبھی — دونوں",
       "saveFailed": "ایجنٹ کو محفوظ نہیں کیا جا سکا",
+      "deleteFailed": "ایجنٹ حذف نہیں کیا جا سکا",
       "nameRequired": "ایجنٹ کا نام درج کریں۔",
       "slugRequired": "ایک ایجنٹ سلگ درج کریں۔",
       "slugInvalid": "سلگ کا آغاز ایک حرف سے ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کرنا چاہیے۔",
@@ -3714,10 +3742,12 @@
       "description": "کمانڈ کی تفصیل",
       "template": "سانچہ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS کی وضاحت کریں۔",
       "subtask": "ذیلی کام کے طور پر چلائیں۔",
       "edit": "سلیش کمانڈ میں ترمیم کریں۔",
       "saveFailed": "کمانڈ کو محفوظ نہیں کیا جا سکا",
+      "deleteFailed": "کمانڈ حذف نہیں کی جا سکی",
       "nameRequired": "کمانڈ کا نام درج کریں۔",
       "nameInvalid": "نام کا آغاز چھوٹے حروف سے ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کرنا چاہیے۔",
       "templateRequired": "کمانڈ ٹیمپلیٹ درج کریں۔",
@@ -3864,7 +3894,7 @@
     "view": "بریفنگ پڑھیں",
     "viewWithPreview": "$t(agentBriefing.view)۔ {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "لائیو اسٹیٹس دکھائیں",
+    "dismiss": "بریفنگ نظر انداز کریں",
     "offline": "آف لائن · محفوظ شدہ بریفنگ",
     "cached": "محفوظ شدہ رپورٹ · ریفریش دستیاب نہیں",
     "revised": "نظرثانی شدہ · {{revision}}",

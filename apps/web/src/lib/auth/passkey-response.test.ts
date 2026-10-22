@@ -73,12 +73,15 @@ describe('native passkey response boundaries', () => {
     ).toBe(false);
   });
 
-  it.each(['clientDataJSON', 'authenticatorData', 'signature'])('rejects null assertion %s', field => {
-    expect(
-      authenticationResponseSchema.safeParse({
-        ...assertion,
-        response: { ...assertion.response, [field]: null },
-      }).success
-    ).toBe(false);
-  });
+  it.each(['clientDataJSON', 'authenticatorData', 'signature'])(
+    'rejects null assertion %s',
+    field => {
+      expect(
+        authenticationResponseSchema.safeParse({
+          ...assertion,
+          response: { ...assertion.response, [field]: null },
+        }).success
+      ).toBe(false);
+    }
+  );
 });

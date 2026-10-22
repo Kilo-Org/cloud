@@ -181,11 +181,28 @@ describe('SheetScrollView', () => {
     unmount();
   });
 
-  it('drops the band while the IME is up, so the sheet keeps its own native inset', async () => {
-    // `tabBarHideOnKeyboard` hides the bar with the keyboard, so reserving its
-    // band again would leave a dead strip above the IME in a half-detent sheet.
+  it('reserves the IME in the frame on Android while the tab bar is hidden', async () => {
     layout.platform = 'android';
     layout.bottom = 16;
+    layout.fontScale = 1;
+    keyboard.occlusion = 300;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        SheetScrollView,
+        { automaticallyAdjustKeyboardInsets: true },
+        createElement('Content')
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+
+    expect(scroll?.props.style).toEqual([undefined, { marginBottom: 300 }]);
+    expect(scroll?.props.automaticallyAdjustKeyboardInsets).toBe(true);
+    unmount();
+  });
+
+  it('does not reserve tab-bar space for an iOS formSheet', async () => {
+    layout.platform = 'ios';
+    layout.bottom = 34;
     layout.fontScale = 1;
     keyboard.occlusion = 300;
     const { renderer, unmount } = await renderWithProviders(

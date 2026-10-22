@@ -205,7 +205,8 @@ export async function runNeedsInputInteraction({
       status: answeredStatus,
       // A row already reporting a different status has moved on from this
       // raise: its time names the next one, so the ack keeps the status alone.
-      statusUpdatedAt: session.status === answeredStatus ? (session.status_updated_at ?? null) : null,
+      statusUpdatedAt:
+        session.status === answeredStatus ? (session.status_updated_at ?? null) : null,
     };
   } catch (error) {
     // A session the user can no longer see is stale, not retryable; every

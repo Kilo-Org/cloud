@@ -12,7 +12,10 @@ import {
 import { isCodestralModel } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { getVercelModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getVercelModelsMetadataFromDatabase,
+  type StoredModelMap,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 
@@ -20,12 +23,10 @@ import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-e
 type ByokOwnerColumn = typeof byok_api_keys.kilo_user_id | typeof byok_api_keys.organization_id;
 type ByokSourceDb = typeof db | DrizzleTransaction;
 
-export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
-  const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
-  if (Object.keys(vercelModelMetadata).length === 0) {
-    console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
-    return [];
-  }
+async function deriveModelUserByokProviders(
+  modelId: string,
+  vercelModelMetadata: StoredModelMap
+): Promise<UserByokProviderId[]> {
   const providers: UserByokProviderId[] = [
     ...new Set(
       vercelModelMetadata[await mapModelIdToVercel(modelId)]?.endpoints
@@ -41,6 +42,15 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
     providers.unshift('codestral');
   }
   return providers;
+}
+
+export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
+  const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
+  if (Object.keys(vercelModelMetadata).length === 0) {
+    console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
+    return [];
+  }
+  return deriveModelUserByokProviders(modelId, vercelModelMetadata);
 }
 
 async function getEnabledByokProviderIds(
@@ -82,11 +92,17 @@ export async function addUserByokAvailability(
   enabledProviderIds: UserByokProviderId[]
 ): Promise<OpenRouterModel[]> {
   const enabledProviders = new Set(enabledProviderIds);
+  const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
+  const hasMetadata = Object.keys(vercelModelMetadata).length > 0;
+  if (!hasMetadata) {
+    console.error('[addUserByokAvailability] no Vercel model metadata');
+  }
   return Promise.all(
     models.map(async model => {
       const hasUserByokAvailable =
+        hasMetadata &&
         !isKiloExclusiveModel(model.id) &&
-        (await getModelUserByokProviders(model.id)).some(provider =>
+        (await deriveModelUserByokProviders(model.id, vercelModelMetadata)).some(provider =>
           enabledProviders.has(provider)
         );
       return { ...model, hasUserByokAvailable };

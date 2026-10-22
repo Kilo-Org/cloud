@@ -2508,6 +2508,7 @@ describe('child transcript requests', () => {
       expect(button.accessibilityLabel).toContain('Researcher');
       expect(button.accessibilityLabel).toContain(`Task ${sessionId}`);
       expect(button.accessibilityLabel).toContain(statusLabel);
+      expect(button.accessibilityLabel).not.toContain(status);
       expect(button.accessibilityLabel?.includes('Waiting for activity')).toBe(false);
       if (activity) {
         expect(button.accessibilityLabel).toContain(activity);

@@ -30,15 +30,15 @@ out of scope; old session IDs are rejected.
 
 ## 2. Components
 
-| Component                                               | Owns                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Does not own                                                                                                           |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Worker                                                  | Authentication, organization and worktree access, billing eligibility on send, tRPC, `/stream` and terminal WebSocket upgrade, preview on/off (`PREVIEW_HOST_SUFFIX`) and UI gate (`PREVIEW_ENABLED_IDS`), `/preview/open` hop, preview hostname dispatch, entry-ticket validation, session-token cookie, entry 303, per-request access checks, and preview request/response header sanitisation (`src/shared/preview-headers.ts`), runtime artifact downloads by grant, startup-failure report admission | Message, route or sandbox state                                                                                        |
-| Session DO, one per session                             | Message queue and message states, route view, event log and client stream, question/permission projection, per-message reports and batch callback, current runtime authorization and delegated Kilo token renewal, preview eligibility and sandbox lookup                                                                                                                                                                                                                                                 | Sandbox lifecycle, preparation steps, Kilo health, turn outcome                                                        |
-| Sandbox DO, one per `sandboxId`                         | Allocation lifecycle through the provider adapter, startup mode and startup command, wrapper socket, per-session routes, forwarding in both directions, activity, idle stop and provider lease, billing admission and attribution, wrapper and session credentials, preview target coordinates                                                                                                                                                                                                            | Message states, Kilo health, turn outcome, workspace steps, physical billing intervals (container lifecycle owns them) |
-| Bootstrap, inside the container, `downloaded` mode only | Verify and install the selected runtime, exec the supervisor, report one startup failure                                                                                                                                                                                                                                                                                                                                                                                                                  | Allocation decisions, retries                                                                                          |
-| Supervisor, inside the container                        | Restart a crashed wrapper, bounded                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Anything else                                                                                                          |
-| Wrapper, one per sandbox                                | Connection to the Sandbox DO, route preparation (clone, checkout, setup commands, Kilo runtime, Kilo session), Kilo supervision and restart, prompt submission, event streaming, turn outcome, finalization (auto-commit, condense), activity heartbeat, terminals, worktree changes                                                                                                                                                                                                                      | Sandbox lifecycle, message states                                                                                      |
-| Kilo                                                    | Agent execution, provider retries, native history published to session-ingest                                                                                                                                                                                                                                                                                                                                                                                                                             | Infrastructure                                                                                                         |
+| Component | Owns | Does not own |
+|---|---|---|
+| Worker | Authentication, organization and worktree access, billing eligibility on send, tRPC, `/stream` and terminal WebSocket upgrade, preview on/off (`PREVIEW_HOST_SUFFIX`) and UI gate (`PREVIEW_ENABLED_IDS`), `/preview/open` hop, preview hostname dispatch, entry-ticket validation, session-token cookie, entry 303, per-request access checks, and preview request/response header sanitisation (`src/shared/preview-headers.ts`), runtime artifact downloads by grant, startup-failure report admission | Message, route or sandbox state |
+| Session DO, one per session | Message queue and message states, route view, event log and client stream, question/permission projection, per-message reports and batch callback, current runtime authorization and delegated Kilo token renewal, preview eligibility and sandbox lookup | Sandbox lifecycle, preparation steps, Kilo health, turn outcome |
+| Sandbox DO, one per `sandboxId` | Allocation lifecycle through the provider adapter, startup mode and startup command, wrapper socket, per-session routes, forwarding in both directions, activity, idle stop and provider lease, billing admission and attribution, wrapper and session credentials, preview target coordinates | Message states, Kilo health, turn outcome, workspace steps, physical billing intervals (container lifecycle owns them) |
+| Bootstrap, inside the container, `downloaded` mode only | Verify and install the selected runtime, exec the supervisor, report one startup failure | Allocation decisions, retries |
+| Supervisor, inside the container | Restart a crashed wrapper, bounded | Anything else |
+| Wrapper, one per sandbox | Connection to the Sandbox DO, route preparation (clone, checkout, setup commands, Kilo runtime, Kilo session), Kilo supervision and restart, prompt submission, event streaming, turn outcome, finalization (auto-commit, condense), activity heartbeat, terminals, worktree changes | Sandbox lifecycle, message states |
+| Kilo | Agent execution, provider retries, native history published to session-ingest | Infrastructure |
 
 Wrapper upgrades are authenticated before Sandbox DO stub lookup. The Worker validates a bounded
 HS256 launch envelope using the existing signing secret, with a domain-separated
@@ -100,21 +100,21 @@ A message stores `messageId`, its immutable intent (turn, agent, model, attachme
 finalization), `state`, `createdAt`, `acceptedAt`, `settledAt` and a failure `reason` when
 terminal. Nothing else.
 
-| Event                                     | Effect                                                                                                                                                                                                                         |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Send                                      | Before a fresh admission with existing preparing work, confirm the owner and settle a known failed old attempt's existing work. Append `queued`. Route `ready`: deliver. Otherwise: `prepare`, and act on the view it returns. |
-| Route ready                               | Deliver all `queued` in order.                                                                                                                                                                                                 |
-| Deliver returns `sent`                    | Those messages become `accepted`.                                                                                                                                                                                              |
-| Deliver returns `not_ready`               | Keep `queued`; call `prepare` and act on the view it returns.                                                                                                                                                                  |
-| Route progress                            | Show the preparation step. No message change.                                                                                                                                                                                  |
-| Route reconnecting                        | Store the view. No message change and no client-visible change.                                                                                                                                                                |
-| Route failed (reason)                     | All `queued` and `accepted` → `failed` with the reason.                                                                                                                                                                        |
-| Route lost (reason)                       | All `accepted` → `failed` with the reason. `queued` stay; if any, call `prepare`.                                                                                                                                              |
-| Owner view names a replacement attempt    | Before storing the new view, all old `accepted` → `failed` (`agent_restarted`). Never replay them; keep `queued` for the new owner.                                                                                            |
-| Outcome (status, reason, `lastMessageId`) | Every `accepted` message up to and including `lastMessageId` takes the status. If `lastMessageId` is unknown, every `accepted` message does.                                                                                   |
-| Stop                                      | All `queued` and `accepted` → `cancelled`; send `abort` (best effort).                                                                                                                                                         |
-| Cancel one queued message                 | That message → `cancelled`.                                                                                                                                                                                                    |
-| Backstop alarm                            | `queued` older than 16.5 minutes → `failed` (`preparation_timeout`). `accepted` older than 125 minutes → `failed` (`no_outcome`).                                                                                              |
+| Event | Effect |
+|---|---|
+| Send | Before a fresh admission with existing preparing work, confirm the owner and settle a known failed old attempt's existing work. Append `queued`. Route `ready`: deliver. Otherwise: `prepare`, and act on the view it returns. |
+| Route ready | Deliver all `queued` in order. |
+| Deliver returns `sent` | Those messages become `accepted`. |
+| Deliver returns `not_ready` | Keep `queued`; call `prepare` and act on the view it returns. |
+| Route progress | Show the preparation step. No message change. |
+| Route reconnecting | Store the view. No message change and no client-visible change. |
+| Route failed (reason) | All `queued` and `accepted` → `failed` with the reason. |
+| Route lost (reason) | All `accepted` → `failed` with the reason. `queued` stay; if any, call `prepare`. |
+| Owner view names a replacement attempt | Before storing the new view, all old `accepted` → `failed` (`agent_restarted`). Never replay them; keep `queued` for the new owner. |
+| Outcome (status, reason, `lastMessageId`) | Every `accepted` message up to and including `lastMessageId` takes the status. If `lastMessageId` is unknown, every `accepted` message does. |
+| Stop | All `queued` and `accepted` → `cancelled`; send `abort` (best effort). |
+| Cancel one queued message | That message → `cancelled`. |
+| Backstop alarm | `queued` older than 16.5 minutes → `failed` (`preparation_timeout`). `accepted` older than 125 minutes → `failed` (`no_outcome`). |
 
 Stop still forwards a best-effort abort to an existing ready Kilo route when no
 message is queued or accepted and the wrapper has no active turn. It does not
@@ -229,10 +229,10 @@ lookup, then the Sandbox DO checks the credential hash and the current allocatio
 `startup-failed` only in `creating` or `starting`. The first accepted report leaves those states,
 so a later report changes nothing.
 
-| Code (exit)                                                                                                 | Kind      |
-| ----------------------------------------------------------------------------------------------------------- | --------- |
+| Code (exit) | Kind |
+|---|---|
 | `artifact_unavailable` (70), `base_incompatible` (72), `install_interrupted` (74), `deadline_exceeded` (75) | Retryable |
-| `artifact_unauthorized` (71), `artifact_invalid` (73), `cli_probe_failed` (76), `supervisor_missing` (77)   | Permanent |
+| `artifact_unauthorized` (71), `artifact_invalid` (73), `cli_probe_failed` (76), `supervisor_missing` (77) | Permanent |
 
 - A permanent code fails the preparing routes at once with `runtime_<code>`. A retryable code keeps
   them `preparing` for a new allocation within the route deadline, like a transient create error.
@@ -255,20 +255,20 @@ so a later report changes nothing.
 
 ### Allocation state
 
-| State                    | Leaves to               | On                                                                                                                               | Timer                                                |
-| ------------------------ | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `stopped`                | `creating`              | `prepare` for a session or pending retry work after reconstruction                                                               | Existing route retry interval when work remains      |
-| `creating`               | `starting`              | Provider created the sandbox and launched the startup command                                                                    | Provider call 2 min                                  |
-| `creating` or `starting` | `stopping`              | Accepted `startup-failed` report: a permanent code fails preparing routes at once; a retryable code keeps them `preparing`       | Existing ladder                                      |
-| `creating`               | `creating` or `stopped` | Transient create error: retry after a 10 s pause while a route deadline remains, else stop                                       | —                                                    |
-| `creating`               | `stopping` or `stopped` | Classified permanent create/launch error: fail preparing routes immediately; an owned physical ref uses the existing stop ladder | Existing ladder when a ref exists                    |
-| `starting`               | `connected`             | Wrapper `hello` accepted                                                                                                         | 5 min without `hello` → `stopping`                   |
-| `connected`              | `disconnected`          | Socket closed, or no heartbeat for 45 s                                                                                          | —                                                    |
-| `connected`              | `stopping`              | Inactive heartbeat after 1 min for unattended routes, no activity for 10 min otherwise, or explicit stop or delete               | Unattended idle 1 min; existing idle backstop 10 min |
-| `disconnected`           | `connected`             | Wrapper `hello`, same or new `wrapperId`                                                                                         | —                                                    |
-| `disconnected`           | `stopping`              | No activity for 10 min, or 90 s after the last frame received, or explicit stop or delete                                        | Idle 10 min, or reconnect 90 s, whichever is earlier |
-| `stopping`               | `stopped`               | Provider confirms stop, or the existing stop ladder ends                                                                         | Existing ladder                                      |
-| any                      | `stopped`               | Provider reports the sandbox gone                                                                                                | —                                                    |
+| State | Leaves to | On | Timer |
+|---|---|---|---|
+| `stopped` | `creating` | `prepare` for a session or pending retry work after reconstruction | Existing route retry interval when work remains |
+| `creating` | `starting` | Provider created the sandbox and launched the startup command | Provider call 2 min |
+| `creating` or `starting` | `stopping` | Accepted `startup-failed` report: a permanent code fails preparing routes at once; a retryable code keeps them `preparing` | Existing ladder |
+| `creating` | `creating` or `stopped` | Transient create error: retry after a 10 s pause while a route deadline remains, else stop | — |
+| `creating` | `stopping` or `stopped` | Classified permanent create/launch error: fail preparing routes immediately; an owned physical ref uses the existing stop ladder | Existing ladder when a ref exists |
+| `starting` | `connected` | Wrapper `hello` accepted | 5 min without `hello` → `stopping` |
+| `connected` | `disconnected` | Socket closed, or no heartbeat for 45 s | — |
+| `connected` | `stopping` | Inactive heartbeat after 1 min for unattended routes, no activity for 10 min otherwise, or explicit stop or delete | Unattended idle 1 min; existing idle backstop 10 min |
+| `disconnected` | `connected` | Wrapper `hello`, same or new `wrapperId` | — |
+| `disconnected` | `stopping` | No activity for 10 min, or 90 s after the last frame received, or explicit stop or delete | Idle 10 min, or reconnect 90 s, whichever is earlier |
+| `stopping` | `stopped` | Provider confirms stop, or the existing stop ladder ends | Existing ladder |
+| any | `stopped` | Provider reports the sandbox gone | — |
 
 - A `hello` from a stale `allocationId`, an older protocol version or a bad credential gets
   `shutdown`. The wrapper exits with code 0 and the supervisor does not restart it.
@@ -319,20 +319,20 @@ ready and the wrapper is connected, `reconnecting` when the route is ready but t
 otherwise `preparing` or `failed`. The Session DO acts on this return value exactly as on a
 notification, so a lost notification never leaves it waiting.
 
-| Event                                                                         | Effect                                                                                                                                                                                                                                                                           |
-| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `prepare`, no route                                                           | Add route `preparing`; send `session.prepare` once connected.                                                                                                                                                                                                                    |
-| `prepare`, route `failed`                                                     | New attempt with a new deadline.                                                                                                                                                                                                                                                 |
-| `prepare`, route `preparing` or `ready`                                       | No change; return the current view.                                                                                                                                                                                                                                              |
-| Wrapper progress                                                              | Forward to the session.                                                                                                                                                                                                                                                          |
-| Allocation enters `creating`, `starting` or `stopping`                        | Notify each preparing route of the sandbox step (`sandbox_create`, `sandbox_start`; a create retry or a pending stop adds a detail). `prepare` and `status` return the same step while the allocation is in one of those states (`creating`, `starting`, `stopping`, `stopped`). |
-| Wrapper `session.ready`                                                       | `ready`; notify.                                                                                                                                                                                                                                                                 |
-| Wrapper `session.failed` (while preparing, or later when Kilo is unavailable) | `failed`; notify.                                                                                                                                                                                                                                                                |
-| Deadline while `preparing`                                                    | `failed` (`preparation_timeout`); notify.                                                                                                                                                                                                                                        |
-| Socket lost                                                                   | Notify `reconnecting`. Route state unchanged.                                                                                                                                                                                                                                    |
-| `hello`, same `wrapperId`                                                     | Notify `ready` again for ready routes; send `session.prepare` again for preparing routes.                                                                                                                                                                                        |
-| `hello`, new `wrapperId`                                                      | Ready routes → `preparing`; notify `route lost` (`agent_restarted`); send `session.prepare` again.                                                                                                                                                                               |
-| `release` (session deleted)                                                   | Remove the route; send `session.release`.                                                                                                                                                                                                                                        |
+| Event | Effect |
+|---|---|
+| `prepare`, no route | Add route `preparing`; send `session.prepare` once connected. |
+| `prepare`, route `failed` | New attempt with a new deadline. |
+| `prepare`, route `preparing` or `ready` | No change; return the current view. |
+| Wrapper progress | Forward to the session. |
+| Allocation enters `creating`, `starting` or `stopping` | Notify each preparing route of the sandbox step (`sandbox_create`, `sandbox_start`; a create retry or a pending stop adds a detail). `prepare` and `status` return the same step while the allocation is in one of those states (`creating`, `starting`, `stopping`, `stopped`). |
+| Wrapper `session.ready` | `ready`; notify. |
+| Wrapper `session.failed` (while preparing, or later when Kilo is unavailable) | `failed`; notify. |
+| Deadline while `preparing` | `failed` (`preparation_timeout`); notify. |
+| Socket lost | Notify `reconnecting`. Route state unchanged. |
+| `hello`, same `wrapperId` | Notify `ready` again for ready routes; send `session.prepare` again for preparing routes. |
+| `hello`, new `wrapperId` | Ready routes → `preparing`; notify `route lost` (`agent_restarted`); send `session.prepare` again. |
+| `release` (session deleted) | Remove the route; send `session.release`. |
 
 ### Forwarding
 
@@ -485,20 +485,20 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
 - **Start.** `launch` receives the key of the routes waiting for the allocation: exactly one key,
   else none. `SandboxContainers` appends the image, and starts from the
   repository snapshot in the `REPO_SNAPSHOTS` KV index when it has one for that digest, else from
-  the image. `launch` returns `startSource`. A failed repository start retains the index entry
-  and asks the Sandbox DO to clean up the failed container and launch the image for the same
-  allocation. Cleanup and fallback only run while that allocation is still creating; a wrapper
-  that already connected is never destroyed by fallback. Before cleanup, the Sandbox DO rotates
-  the launch credential so a late wrapper from the failed snapshot cannot connect. The snapshot attempt, cleanup and image fallback share the original
-  launch deadline. No separate half-budget reservation exists.
-  Each later sandbox start retries the snapshot once, up to ten failed starts per snapshot ID
-  in that sandbox's durable record. After that it uses the image; a replacement snapshot gets
-  its own failure budget. Failure never deletes or changes the shared snapshot index.
+   the image. `launch` returns `startSource`. A failed repository start retains the index entry
+   and asks the Sandbox DO to clean up the failed container and launch the image for the same
+   allocation. Cleanup and fallback only run while that allocation is still creating; a wrapper
+   that already connected is never destroyed by fallback. Before cleanup, the Sandbox DO rotates
+   the launch credential so a late wrapper from the failed snapshot cannot connect. The snapshot attempt, cleanup and image fallback share the original
+   launch deadline. No separate half-budget reservation exists.
+   Each later sandbox start retries the snapshot once, up to ten failed starts per snapshot ID
+   in that sandbox's durable record. After that it uses the image; a replacement snapshot gets
+   its own failure budget. Failure never deletes or changes the shared snapshot index.
 - **First start only.** The Sandbox DO remembers how the previous allocation started and whether its
   wrapper connected. When a repository start never connected (for example the first-connect timeout
-  stopped it), the next launch skips the snapshot and starts from the image without deleting
-  the entry. A completed image fallback records `image`, so the next start tries the retained
-  snapshot again unless its failure budget is exhausted.
+   stopped it), the next launch skips the snapshot and starts from the image without deleting
+   the entry. A completed image fallback records `image`, so the next start tries the retained
+   snapshot again unless its failure budget is exhausted.
 - **Capture.** `session.prepare` carries `capture: true` when the route has a key and the provider
   can capture. The key names the setup commands as well as the user and the repository, because
   capture runs after setup: a snapshot built with one setup is never adopted by a route with
@@ -544,9 +544,9 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
   `session.prepare` carries the names as frame-only `secretEnvKeys`, never written to the route row; a
   frame with no secrets omits the field and stays valid for a version-3 wrapper. A secret-bearing
   prepare is never sent to a wrapper that did not advertise the capability: the attempt fails
-  `workspace_setup_failed`. Worktree chats inherit their source chat's profile, environment, and
-  secrets and share its directory runtime and HOME. Separate worktree directories retain separate
-  runtimes; read-only Bitbucket reviews carry no profile secrets, like the withheld MCP snapshot.
+   `workspace_setup_failed`. Worktree chats inherit their source chat's profile, environment, and
+   secrets and share its directory runtime and HOME. Separate worktree directories retain separate
+   runtimes; read-only Bitbucket reviews carry no profile secrets, like the withheld MCP snapshot.
 
 - Connect, send `hello` (`wrapperId`, `allocationId`, protocol version), wait for `welcome` or
   `shutdown`. On `shutdown`, permanently close the connection and exit with code 0, even when the
@@ -575,15 +575,15 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
 
 The wrapper owns the step timeouts and retries:
 
-| Step                                                                                                         | Bound                      | Retry                                                               |
-| ------------------------------------------------------------------------------------------------------------ | -------------------------- | ------------------------------------------------------------------- |
-| Clone or fetch                                                                                               | 6 min total                | Network errors: 3 attempts with backoff                             |
-| Use a prepared repository (`restore`)                                                                        | 2 min                      | Network errors: 3 attempts; any other failure falls back to a clone |
-| Checkout, branch restore                                                                                     | In the clone budget        | No                                                                  |
-| Setup commands                                                                                               | Current per-command limits | No; a failure fails preparation                                     |
-| Save the repository (`snapshot`)                                                                             | 5 min 10 s wait            | No; a failure is logged and preparation continues                   |
-| Kilo runtime start                                                                                           | 2 min                      | 1 retry                                                             |
-| Kilo session: use the one Kilo has on disk; if missing (new sandbox), restore from the snapshot; else create | 2 min                      | 1 retry                                                             |
+| Step | Bound | Retry |
+|---|---|---|
+| Clone or fetch | 6 min total | Network errors: 3 attempts with backoff |
+| Use a prepared repository (`restore`) | 2 min | Network errors: 3 attempts; any other failure falls back to a clone |
+| Checkout, branch restore | In the clone budget | No |
+| Setup commands | Current per-command limits | No; a failure fails preparation |
+| Save the repository (`snapshot`) | 5 min 10 s wait | No; a failure is logged and preparation continues |
+| Kilo runtime start | 2 min | 1 retry |
+| Kilo session: use the one Kilo has on disk; if missing (new sandbox), restore from the snapshot; else create | 2 min | 1 retry |
 
 Each step sends progress. Long steps also send a short, throttled `detail` line within the step
 (git clone and checkout percentages, clone retries, session history loading); the detail is display
@@ -606,12 +606,12 @@ A prepared workspace carries `.git/kilo-workspace.json` (`{ allocationId, commit
 generation }`; beside the directory when there is no repository). It replaces the boolean bootstrap marker. At
 `session.prepare` the wrapper decides from the filesystem alone:
 
-| Found                         | Meaning                                | Work                                                     |
-| ----------------------------- | -------------------------------------- | -------------------------------------------------------- |
-| No `.git`                     | Image start                            | Clone, checkout, setup, stamp, then capture when asked   |
-| `.git`, no stamp              | A preparation that did not finish      | Reuse the clone: checkout, setup, stamp. Never captured. |
-| Stamp from this allocation    | A sibling session or a wrapper restart | Nothing                                                  |
-| Stamp from another allocation | A restored repository snapshot         | **Adopt**                                                |
+| Found | Meaning | Work |
+|---|---|---|
+| No `.git` | Image start | Clone, checkout, setup, stamp, then capture when asked |
+| `.git`, no stamp | A preparation that did not finish | Reuse the clone: checkout, setup, stamp. Never captured. |
+| Stamp from this allocation | A sibling session or a wrapper restart | Nothing |
+| Stamp from another allocation | A restored repository snapshot | **Adopt** |
 
 Adopt makes the snapshot equal to a fresh clone, then runs the ordinary steps:
 
@@ -752,6 +752,7 @@ late events and callbacks are fenced by process/feed identity and cancelled on r
 Credential replacement uses the same native activity plus the existing Cloud-work and PTY
 protections.
 
+
 - SSE silence for 30 s: send one health request (`GET /global/health`, 5 s timeout). No answer:
   Kilo is hung; restart it at once. An answer: reconnect the event stream; after 6 reconnects in 2
   minutes, restart Kilo. A reconnected stream gets 12 s to deliver a real event, because Kilo's
@@ -850,72 +851,72 @@ native-only and are not an upload substitute either.
 Each timer has one owner. All values live in one constants module per side. Local E2E may shorten
 them through one development-only override.
 
-| Owner      | Timer                                                          | Value                                                             | On expiry                                                                                                                           |
-| ---------- | -------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Session DO | Queued backstop                                                | 16.5 min from send (reconnect + attempt + 3 min)                  | `failed` (`preparation_timeout`)                                                                                                    |
-| Session DO | Accepted backstop                                              | 125 min from accept                                               | `failed` (`no_outcome`)                                                                                                             |
-| Session DO | Sandbox transport pass / best-effort abort                     | 2 s including RPC retries, not scaled                             | Retain queued intent / return from abort                                                                                            |
-| Session DO | Queued transport recovery                                      | 15 s after exhaustion; development-only scaling                   | Consume once; passive status then bounded prepare/deliver, no self-rearm                                                            |
-| Sandbox DO | Provider create call                                           | 2 min                                                             | Retry after the pause below while a route deadline remains                                                                          |
-| Sandbox DO | Provider create retry pause                                    | 10 s after a transient failed create                              | Create again within the unchanged route attempt; classified permanent errors fail promptly                                          |
-| Sandbox DO | Wrapper first connect                                          | 5 min from launch; includes the `downloaded` install              | Stop the sandbox                                                                                                                    |
-| Sandbox DO | Unbound wrapper hello                                          | 30 s from socket admission, not scaled                            | Close candidate only; attachment deadline survives hibernation and participates in the existing alarm even while stopped            |
-| Sandbox DO | Heartbeat                                                      | 45 s                                                              | Treat the socket as lost                                                                                                            |
-| Sandbox DO | Reconnect                                                      | 90 s from the last frame received                                 | Stop the sandbox                                                                                                                    |
-| Sandbox DO | Route preparation                                              | 12 min per preparation attempt                                    | Route `failed` (`preparation_timeout`)                                                                                              |
-| Sandbox DO | Session notification                                           | 2 s from enqueue including queue wait and RPC retries, not scaled | Drop expired queued work before RPC; bounded best-effort loss, existing Session backstop                                            |
-| Sandbox DO | Idle                                                           | 10 min without activity                                           | Stop the sandbox                                                                                                                    |
-| Sandbox DO | Provider lease                                                 | Existing lease length, renewed while active                       | Provider may stop an inactive sandbox                                                                                               |
-| Sandbox DO | Credential grant                                               | 4 h; re-issued on `deliver` below 1 h                             | —                                                                                                                                   |
-| Sandbox DO | Artifact grant                                                 | `createDeadlineAt` plus first connect                             | Downloads are rejected                                                                                                              |
-| Bootstrap  | Install                                                        | Until the first-connect deadline, rendered by the Worker          | Report `deadline_exceeded` and exit                                                                                                 |
-| Sandbox DO | Provider stop                                                  | Existing ladder                                                   | Log unconfirmed stop; routing state `stopped`                                                                                       |
-| Sandbox DO | Repository capture call                                        | 5 min 5 s (container DO: 5 min)                                   | Answer `ok: false`; preparation continues                                                                                           |
-| Wrapper    | Preparation steps                                              | Section 7                                                         | Route `failed` with the step reason                                                                                                 |
-| Wrapper    | Adopt a repository snapshot                                    | 2 min                                                             | Empty the directory and clone                                                                                                       |
-| Wrapper    | Wait for a capture                                             | 5 min 10 s                                                        | Continue without a snapshot                                                                                                         |
-| Wrapper    | SSE silence                                                    | 30 s                                                              | Health request                                                                                                                      |
-| Wrapper    | Kilo health request                                            | 5 s                                                               | Restart Kilo                                                                                                                        |
-| Wrapper    | SSE reconnects                                                 | 6 in 2 min                                                        | Restart Kilo                                                                                                                        |
-| Wrapper    | Kilo restart budget                                            | 3 in 10 min                                                       | Routes `failed` (`agent_unavailable`)                                                                                               |
-| Wrapper    | Native execution without real progress, including silent tools | 20 min excluding user waits                                       | Bounded tree abort; `no_progress` outcome or routed error, or the retried assistant failure when Kilo is retrying the model request |
-| Wrapper    | Native execution hard cap                                      | 120 min including user waits                                      | Bounded tree abort; `execution_limit` outcome or routed error                                                                       |
-| Wrapper    | Reconnect backoff                                              | 1 s to 30 s, forever                                              | —                                                                                                                                   |
-| Wrapper    | Connect attempt (upgrade, `hello`, `welcome`, outbox flush)    | 30 s from socket creation                                         | Detach the socket and use the reconnect backoff; Kilo keeps running                                                                 |
-| Supervisor | Wrapper restarts                                               | 5 in 10 min                                                       | Stop restarting                                                                                                                     |
+| Owner | Timer | Value | On expiry |
+|---|---|---|---|
+| Session DO | Queued backstop | 16.5 min from send (reconnect + attempt + 3 min) | `failed` (`preparation_timeout`) |
+| Session DO | Accepted backstop | 125 min from accept | `failed` (`no_outcome`) |
+| Session DO | Sandbox transport pass / best-effort abort | 2 s including RPC retries, not scaled | Retain queued intent / return from abort |
+| Session DO | Queued transport recovery | 15 s after exhaustion; development-only scaling | Consume once; passive status then bounded prepare/deliver, no self-rearm |
+| Sandbox DO | Provider create call | 2 min | Retry after the pause below while a route deadline remains |
+| Sandbox DO | Provider create retry pause | 10 s after a transient failed create | Create again within the unchanged route attempt; classified permanent errors fail promptly |
+| Sandbox DO | Wrapper first connect | 5 min from launch; includes the `downloaded` install | Stop the sandbox |
+| Sandbox DO | Unbound wrapper hello | 30 s from socket admission, not scaled | Close candidate only; attachment deadline survives hibernation and participates in the existing alarm even while stopped |
+| Sandbox DO | Heartbeat | 45 s | Treat the socket as lost |
+| Sandbox DO | Reconnect | 90 s from the last frame received | Stop the sandbox |
+| Sandbox DO | Route preparation | 12 min per preparation attempt | Route `failed` (`preparation_timeout`) |
+| Sandbox DO | Session notification | 2 s from enqueue including queue wait and RPC retries, not scaled | Drop expired queued work before RPC; bounded best-effort loss, existing Session backstop |
+| Sandbox DO | Idle | 10 min without activity | Stop the sandbox |
+| Sandbox DO | Provider lease | Existing lease length, renewed while active | Provider may stop an inactive sandbox |
+| Sandbox DO | Credential grant | 4 h; re-issued on `deliver` below 1 h | — |
+| Sandbox DO | Artifact grant | `createDeadlineAt` plus first connect | Downloads are rejected |
+| Bootstrap | Install | Until the first-connect deadline, rendered by the Worker | Report `deadline_exceeded` and exit |
+| Sandbox DO | Provider stop | Existing ladder | Log unconfirmed stop; routing state `stopped` |
+| Sandbox DO | Repository capture call | 5 min 5 s (container DO: 5 min) | Answer `ok: false`; preparation continues |
+| Wrapper | Preparation steps | Section 7 | Route `failed` with the step reason |
+| Wrapper | Adopt a repository snapshot | 2 min | Empty the directory and clone |
+| Wrapper | Wait for a capture | 5 min 10 s | Continue without a snapshot |
+| Wrapper | SSE silence | 30 s | Health request |
+| Wrapper | Kilo health request | 5 s | Restart Kilo |
+| Wrapper | SSE reconnects | 6 in 2 min | Restart Kilo |
+| Wrapper | Kilo restart budget | 3 in 10 min | Routes `failed` (`agent_unavailable`) |
+| Wrapper | Native execution without real progress, including silent tools | 20 min excluding user waits | Bounded tree abort; `no_progress` outcome or routed error, or the retried assistant failure when Kilo is retrying the model request |
+| Wrapper | Native execution hard cap | 120 min including user waits | Bounded tree abort; `execution_limit` outcome or routed error |
+| Wrapper | Reconnect backoff | 1 s to 30 s, forever | — |
+| Wrapper | Connect attempt (upgrade, `hello`, `welcome`, outbox flush) | 30 s from socket creation | Detach the socket and use the reconnect backoff; Kilo keeps running |
+| Supervisor | Wrapper restarts | 5 in 10 min | Stop restarting |
 
 ## 9. Failures
 
-| Failure                                                        | Detected by                                                                                | Recovery                                                                       | Message effect                                                                                                                                                 |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Transient provider create error                                | Sandbox DO                                                                                 | Retry after a 10 s pause, within the unchanged route deadline                  | Queued fail at the deadline                                                                                                                                    |
-| Actual compute credit denial                                   | Provider adapter / existing Vercel billing admission                                       | New message after adding credits                                               | Queued fail promptly (`billing_blocked`)                                                                                                                       |
-| Proven invalid/unsupported provider configuration              | Provider adapter                                                                           | New message after correcting configuration                                     | Queued fail promptly (`invalid_configuration`)                                                                                                                 |
-| Wrapper never connects                                         | Sandbox DO, 5 min                                                                          | Stop; new allocation within the route deadline                                 | Queued fail at the deadline                                                                                                                                    |
-| Startup configuration, release descriptor or payload missing   | `startup-selection.ts`, `downloaded-startup.ts`                                            | New message after the configuration is corrected                               | Queued fail promptly (`invalid_configuration`)                                                                                                                 |
-| Runtime install fails permanently                              | Bootstrap report                                                                           | None until the next message                                                    | Queued fail promptly (`runtime_<code>`)                                                                                                                        |
-| Runtime install fails transiently, or the base is incompatible | Bootstrap report                                                                           | Stop; new allocation within the route deadline, from the image after a restore | Queued fail at the deadline                                                                                                                                    |
-| Startup report lost                                            | Sandbox DO, 5 min                                                                          | Same as "Wrapper never connects"                                               | Queued fail at the deadline                                                                                                                                    |
-| Clone network error                                            | Wrapper                                                                                    | 3 attempts                                                                     | Queued fail (`workspace_setup_failed`)                                                                                                                         |
-| Repository snapshot cannot be used (start, adopt)              | Container DO, wrapper                                                                      | Start from the image, or clone                                                 | None; a cold start                                                                                                                                             |
-| Repository capture fails or times out                          | Sandbox DO, wrapper                                                                        | Continue without a snapshot                                                    | None                                                                                                                                                           |
-| Setup command fails                                            | Wrapper                                                                                    | None                                                                           | Queued fail with the command output visible                                                                                                                    |
-| Socket drops, wrapper returns                                  | Sandbox DO                                                                                 | Wrapper reconnects                                                             | None                                                                                                                                                           |
-| Socket down 90 s                                               | Sandbox DO                                                                                 | Stop the sandbox                                                               | Accepted fail (`connection_lost`); queued re-prepare                                                                                                           |
-| Wrapper crash                                                  | Supervisor                                                                                 | Restart wrapper; routes re-prepared                                            | Accepted fail (`agent_restarted`)                                                                                                                              |
-| Kilo hang (no events, no HTTP answer)                          | Wrapper, about 35 s; up to two extra minutes while the workload reclaims at its memory cap | Restart Kilo, at most 3 in 10 min                                              | Busy turn without real progress: submitted again once; otherwise accepted fail (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
-| Kilo crash                                                     | Wrapper                                                                                    | Restart Kilo, at most 3 in 10 min                                              | Same as Kilo hang, but the reason is `agent_restarted`                                                                                                         |
-| Dead event stream (Kilo still answers health)                  | Wrapper, after 6 reconnects in 2 min                                                       | Restart Kilo, at most 3 in 10 min                                              | Same as Kilo hang (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired)                                                              |
-| Kilo restart budget used up                                    | Wrapper                                                                                    | None until the next message                                                    | Queued and accepted fail (`agent_unavailable`)                                                                                                                 |
-| Kilo final error                                               | Wrapper                                                                                    | None (Kilo already retried)                                                    | Accepted fail with Kilo's reason                                                                                                                               |
-| No real progress for 20 min, including silent tools            | Native session supervisor                                                                  | Bounded tree abort; runtime recovery if unconfirmed                            | Accepted fail (`no_progress`, or the retried assistant failure during a Kilo model retry), or routed error without a current turn                              |
-| Native execution over 120 min                                  | Native session supervisor                                                                  | Bounded tree abort                                                             | Accepted fail (`execution_limit`), or routed error without a current turn                                                                                      |
-| Idle 10 min, question pending                                  | Sandbox DO                                                                                 | Stop the sandbox                                                               | Accepted fail (`sandbox_stopped`); a later answer is a new message                                                                                             |
-| Sandbox gone                                                   | Provider via Sandbox DO                                                                    | New allocation on next `prepare`                                               | Accepted fail (`sandbox_lost`); queued re-prepare                                                                                                              |
-| Notification lost                                              | Session DO backstop                                                                        | —                                                                              | Fail at 16.5 or 125 min                                                                                                                                        |
-| User Stop                                                      | Session DO                                                                                 | Abort the Kilo session only                                                    | Queued and accepted `cancelled`                                                                                                                                |
-| Auto-commit or condense fails                                  | Wrapper                                                                                    | None                                                                           | Warning event; turn `completed`                                                                                                                                |
-| Provider stop not confirmed                                    | Sandbox DO                                                                                 | Logged; next `prepare` may create again                                        | None; worktree deletion reports incomplete                                                                                                                     |
+| Failure | Detected by | Recovery | Message effect |
+|---|---|---|---|
+| Transient provider create error | Sandbox DO | Retry after a 10 s pause, within the unchanged route deadline | Queued fail at the deadline |
+| Actual compute credit denial | Provider adapter / existing Vercel billing admission | New message after adding credits | Queued fail promptly (`billing_blocked`) |
+| Proven invalid/unsupported provider configuration | Provider adapter | New message after correcting configuration | Queued fail promptly (`invalid_configuration`) |
+| Wrapper never connects | Sandbox DO, 5 min | Stop; new allocation within the route deadline | Queued fail at the deadline |
+| Startup configuration, release descriptor or payload missing | `startup-selection.ts`, `downloaded-startup.ts` | New message after the configuration is corrected | Queued fail promptly (`invalid_configuration`) |
+| Runtime install fails permanently | Bootstrap report | None until the next message | Queued fail promptly (`runtime_<code>`) |
+| Runtime install fails transiently, or the base is incompatible | Bootstrap report | Stop; new allocation within the route deadline, from the image after a restore | Queued fail at the deadline |
+| Startup report lost | Sandbox DO, 5 min | Same as "Wrapper never connects" | Queued fail at the deadline |
+| Clone network error | Wrapper | 3 attempts | Queued fail (`workspace_setup_failed`) |
+| Repository snapshot cannot be used (start, adopt) | Container DO, wrapper | Start from the image, or clone | None; a cold start |
+| Repository capture fails or times out | Sandbox DO, wrapper | Continue without a snapshot | None |
+| Setup command fails | Wrapper | None | Queued fail with the command output visible |
+| Socket drops, wrapper returns | Sandbox DO | Wrapper reconnects | None |
+| Socket down 90 s | Sandbox DO | Stop the sandbox | Accepted fail (`connection_lost`); queued re-prepare |
+| Wrapper crash | Supervisor | Restart wrapper; routes re-prepared | Accepted fail (`agent_restarted`) |
+| Kilo hang (no events, no HTTP answer) | Wrapper, about 35 s; up to two extra minutes while the workload reclaims at its memory cap | Restart Kilo, at most 3 in 10 min | Busy turn without real progress: submitted again once; otherwise accepted fail (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
+| Kilo crash | Wrapper | Restart Kilo, at most 3 in 10 min | Same as Kilo hang, but the reason is `agent_restarted` |
+| Dead event stream (Kilo still answers health) | Wrapper, after 6 reconnects in 2 min | Restart Kilo, at most 3 in 10 min | Same as Kilo hang (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
+| Kilo restart budget used up | Wrapper | None until the next message | Queued and accepted fail (`agent_unavailable`) |
+| Kilo final error | Wrapper | None (Kilo already retried) | Accepted fail with Kilo's reason |
+| No real progress for 20 min, including silent tools | Native session supervisor | Bounded tree abort; runtime recovery if unconfirmed | Accepted fail (`no_progress`, or the retried assistant failure during a Kilo model retry), or routed error without a current turn |
+| Native execution over 120 min | Native session supervisor | Bounded tree abort | Accepted fail (`execution_limit`), or routed error without a current turn |
+| Idle 10 min, question pending | Sandbox DO | Stop the sandbox | Accepted fail (`sandbox_stopped`); a later answer is a new message |
+| Sandbox gone | Provider via Sandbox DO | New allocation on next `prepare` | Accepted fail (`sandbox_lost`); queued re-prepare |
+| Notification lost | Session DO backstop | — | Fail at 16.5 or 125 min |
+| User Stop | Session DO | Abort the Kilo session only | Queued and accepted `cancelled` |
+| Auto-commit or condense fails | Wrapper | None | Warning event; turn `completed` |
+| Provider stop not confirmed | Sandbox DO | Logged; next `prepare` may create again | None; worktree deletion reports incomplete |
 
 ## 10. Interfaces
 
@@ -1164,27 +1165,27 @@ per-port hostname. It handles ordinary HTTP and WebSocket upgrades.
 **Status map.** Every body is fixed text; the ticket and upstream error text are never returned.
 Request and response bodies stream; there is no body-size cap.
 
-| Condition                                                                                                                                                                           | Status                 | Body                                                                           |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------ |
-| `/preview/open` or enter method other than `GET`/`HEAD`; proxied `TRACE`/`CONNECT`                                                                                                  | 405                    | `Method not allowed`                                                           |
-| `/preview/open` while `PREVIEW_HOST_SUFFIX` is unset                                                                                                                                | 404                    | `Preview is not configured`                                                    |
-| Invalid or missing entry ticket on `/preview/open` or the enter path (signature, audience, purpose, claims, `exp`, `nonce`), or a label derived from it that does not name the host | 401                    | `Preview ticket is missing or invalid`                                         |
-| Entry ticket whose `nonce` was already consumed                                                                                                                                     | 401                    | `Preview ticket was already used. Open the preview again from the chat.`       |
-| Ticket nonce store (`StreamTicketNonceDO`) throws on entry                                                                                                                          | 503 + `Retry-After: 1` | `Preview is temporarily unavailable`                                           |
-| Missing, invalid, expired or wrong-audience/type session token, or a derived label that does not name the host                                                                      | 401                    | `Preview session is missing or expired. Open the preview again from the chat.` |
-| Proxied `/.kilo-preview/*` path                                                                                                                                                     | 404                    | `Not found`                                                                    |
-| WebSocket upgrade or non-`GET`/`HEAD` with a foreign, `null` or missing `Origin`                                                                                                    | 403                    | `Cross-origin preview request rejected`                                        |
-| Access denied                                                                                                                                                                       | 403                    | `Session access denied`                                                        |
-| Reserved port (`cloudflare` 3000), refused by the physical DO                                                                                                                       | 403                    | `That port is reserved`                                                        |
-| Access database unavailable                                                                                                                                                         | 503                    | `Session access is temporarily unavailable`                                    |
-| Ineligible platform                                                                                                                                                                 | 409                    | `Preview is only available for interactive Cloud Agent sessions`               |
-| Unsupported provider                                                                                                                                                                | 409                    | `Preview is not available for this sandbox provider`                           |
-| Route preparing, or no session metadata yet                                                                                                                                         | 503 + `Retry-After: 1` | `The sandbox is not ready`                                                     |
-| Resolver RPC failure (after `withDORetry` retries a retryable DO error) or physical DO `fetch()` throw                                                                              | 503 + `Retry-After: 1` | `Preview is temporarily unavailable`                                           |
-| Sandbox route failed or absent for this session, allocation stopped/stopping, no current `providerRef`, or the physical DO not running                                              | 503                    | `The sandbox is not running`                                                   |
-| Request headers over the cap (40 forwarded, name > 128, value > 8192; bounds header work before the access query and DO calls)                                                      | 431                    | `Preview request headers are too large`                                        |
-| Connection refused on the container port                                                                                                                                            | 502                    | `Nothing is listening on that port`                                            |
-| No upstream response headers within 60 s (a dev server can compile a page on first request)                                                                                         | 504                    | `The server on that port did not respond in time`                              |
+| Condition | Status | Body |
+|---|---|---|
+| `/preview/open` or enter method other than `GET`/`HEAD`; proxied `TRACE`/`CONNECT` | 405 | `Method not allowed` |
+| `/preview/open` while `PREVIEW_HOST_SUFFIX` is unset | 404 | `Preview is not configured` |
+| Invalid or missing entry ticket on `/preview/open` or the enter path (signature, audience, purpose, claims, `exp`, `nonce`), or a label derived from it that does not name the host | 401 | `Preview ticket is missing or invalid` |
+| Entry ticket whose `nonce` was already consumed | 401 | `Preview ticket was already used. Open the preview again from the chat.` |
+| Ticket nonce store (`StreamTicketNonceDO`) throws on entry | 503 + `Retry-After: 1` | `Preview is temporarily unavailable` |
+| Missing, invalid, expired or wrong-audience/type session token, or a derived label that does not name the host | 401 | `Preview session is missing or expired. Open the preview again from the chat.` |
+| Proxied `/.kilo-preview/*` path | 404 | `Not found` |
+| WebSocket upgrade or non-`GET`/`HEAD` with a foreign, `null` or missing `Origin` | 403 | `Cross-origin preview request rejected` |
+| Access denied | 403 | `Session access denied` |
+| Reserved port (`cloudflare` 3000), refused by the physical DO | 403 | `That port is reserved` |
+| Access database unavailable | 503 | `Session access is temporarily unavailable` |
+| Ineligible platform | 409 | `Preview is only available for interactive Cloud Agent sessions` |
+| Unsupported provider | 409 | `Preview is not available for this sandbox provider` |
+| Route preparing, or no session metadata yet | 503 + `Retry-After: 1` | `The sandbox is not ready` |
+| Resolver RPC failure (after `withDORetry` retries a retryable DO error) or physical DO `fetch()` throw | 503 + `Retry-After: 1` | `Preview is temporarily unavailable` |
+| Sandbox route failed or absent for this session, allocation stopped/stopping, no current `providerRef`, or the physical DO not running | 503 | `The sandbox is not running` |
+| Request headers over the cap (40 forwarded, name > 128, value > 8192; bounds header work before the access query and DO calls) | 431 | `Preview request headers are too large` |
+| Connection refused on the container port | 502 | `Nothing is listening on that port` |
+| No upstream response headers within 60 s (a dev server can compile a page on first request) | 504 | `The server on that port did not respond in time` |
 
 - **Accepted residuals.** The SDK physical DO name is the stable pinned sandbox id, so a
   resolve-to-fetch race can reach a replacement container of the same owner scope / same session
@@ -1235,18 +1236,18 @@ Request and response bodies stream; there is no body-size cap.
 
 New states map onto the current public contracts; no public shape changes.
 
-| New state                           | `/stream` (`src/shared/protocol.ts`)                                                                                                                                                                                                                                                                                                              | Report `run.status`          | Callback `status` |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ----------------- |
-| Message `queued`                    | `cloud.message.queued`                                                                                                                                                                                                                                                                                                                            | `queued`                     | —                 |
-| Message `accepted`                  | `cloud.message.sent`                                                                                                                                                                                                                                                                                                                              | `accepted`                   | —                 |
-| Message `completed`                 | `cloud.message.completed`                                                                                                                                                                                                                                                                                                                         | `completed`                  | `completed`       |
-| Message `failed`                    | `cloud.message.failed`, `status: 'failed'`, reason; `error` is the reason's text from `failure-messages.ts` (Kilo text passes through)                                                                                                                                                                                                            | `failed` with stage and code | `failed`          |
-| Message `cancelled`                 | `cloud.message.failed`, `status: 'interrupted'`, reason `interrupted`                                                                                                                                                                                                                                                                             | `interrupted`                | `interrupted`     |
-| Route `preparing(step)`             | `preparing` v2 row (`attemptId` = route attempt, `triggerMessageId` = oldest queued message; the step's detail is its `latestDetail`) and `cloud.status` `preparing`. A stepless view for the same attempt keeps the current step                                                                                                                 | —                            | —                 |
-| Route `ready`                       | `cloud.status` `ready`                                                                                                                                                                                                                                                                                                                            | —                            | —                 |
-| Route `failed`                      | `cloud.status` `error`                                                                                                                                                                                                                                                                                                                            | —                            | —                 |
-| Finalization running                | `cloud.status` `finalizing`, from a wrapper `finalizing` event; `ready` again on the outcome                                                                                                                                                                                                                                                      | —                            | —                 |
-| Stale Kilo `busy` after a turn ends | When Kilo's last root status is `busy` or `retry`, an accepted message settled after it, and none is accepted now, `connected` carries `sessionStatus: idle`, so a reload after a hang or kill does not apply that stale status. Otherwise `connected` omits it and Kilo's replayed status applies, including native work without a Cloud message | —                            | —                 |
+| New state | `/stream` (`src/shared/protocol.ts`) | Report `run.status` | Callback `status` |
+|---|---|---|---|
+| Message `queued` | `cloud.message.queued` | `queued` | — |
+| Message `accepted` | `cloud.message.sent` | `accepted` | — |
+| Message `completed` | `cloud.message.completed` | `completed` | `completed` |
+| Message `failed` | `cloud.message.failed`, `status: 'failed'`, reason; `error` is the reason's text from `failure-messages.ts` (Kilo text passes through) | `failed` with stage and code | `failed` |
+| Message `cancelled` | `cloud.message.failed`, `status: 'interrupted'`, reason `interrupted` | `interrupted` | `interrupted` |
+| Route `preparing(step)` | `preparing` v2 row (`attemptId` = route attempt, `triggerMessageId` = oldest queued message; the step's detail is its `latestDetail`) and `cloud.status` `preparing`. A stepless view for the same attempt keeps the current step | — | — |
+| Route `ready` | `cloud.status` `ready` | — | — |
+| Route `failed` | `cloud.status` `error` | — | — |
+| Finalization running | `cloud.status` `finalizing`, from a wrapper `finalizing` event; `ready` again on the outcome | — | — |
+| Stale Kilo `busy` after a turn ends | When Kilo's last root status is `busy` or `retry`, an accepted message settled after it, and none is accepted now, `connected` carries `sessionStatus: idle`, so a reload after a hang or kill does not apply that stale status. Otherwise `connected` omits it and Kilo's replayed status applies, including native work without a Cloud message | — | — |
 
 Reports carry `failureStage` and `failureCode` from the closed pairs in
 `packages/worker-utils/src/cloud-agent-queue-report.ts`. `classifyControlPlaneFailure`
@@ -1254,22 +1255,22 @@ Reports carry `failureStage` and `failureCode` from the closed pairs in
 the new reasons. The `session_message_committed` diagnostic keeps its name and fields so the
 failure monitors keep working.
 
-| Reason                                                                                                                | Stage / code                                                                                                                                          |
-| --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `preparation_timeout`                                                                                                 | `pre_dispatch` / `wrapper_start_failed`                                                                                                               |
-| `workspace_setup_failed` with the failed step's subtype                                                               | `pre_dispatch` / `workspace_setup_failed`                                                                                                             |
-| `billing_blocked` (actual compute credit denial)                                                                      | `pre_dispatch` / `payment_required`                                                                                                                   |
-| `billing_unavailable` (existing Vercel admission failure)                                                             | `pre_dispatch` / `admission_billing_unavailable`                                                                                                      |
-| `invalid_configuration` (proven provider configuration failure)                                                       | `pre_dispatch` / `sandbox_connect_failed`                                                                                                             |
-| `agent_unavailable`                                                                                                   | queued: `pre_dispatch` / `kilo_server_failed`; accepted: `post_dispatch_no_activity` / `wrapper_disconnected`                                         |
-| `connection_lost`, `sandbox_lost`, `agent_restarted`, `agent_unresponsive`, `sandbox_out_of_memory`                   | `post_dispatch_no_activity` / `wrapper_disconnected`                                                                                                  |
-| `no_progress`, `no_outcome`                                                                                           | `post_dispatch_no_activity` / `wrapper_no_output`                                                                                                     |
-| `prompt_failed`                                                                                                       | `post_dispatch_no_activity` / `wrapper_error_before_activity`                                                                                         |
-| `sandbox_stopped` (idle while waiting on the user), `execution_limit`                                                 | `interruption` / `system_interrupt`                                                                                                                   |
-| Kilo final error, or `no_progress` during a Kilo model retry                                                          | `agent_activity` / `assistant_error`; responsibility from the existing assistant-failure helpers, so Kilo and provider errors stay attributed to them |
-| Stop                                                                                                                  | `interruption` / `user_interrupt`                                                                                                                     |
-| `runtime_artifact_unauthorized`, `runtime_artifact_invalid`, `runtime_cli_probe_failed`, `runtime_supervisor_missing` | `pre_dispatch` / `wrapper_start_failed`                                                                                                               |
-| `missing_metadata`, `invalid_model`, payment required                                                                 | Unchanged                                                                                                                                             |
+| Reason | Stage / code |
+|---|---|
+| `preparation_timeout` | `pre_dispatch` / `wrapper_start_failed` |
+| `workspace_setup_failed` with the failed step's subtype | `pre_dispatch` / `workspace_setup_failed` |
+| `billing_blocked` (actual compute credit denial) | `pre_dispatch` / `payment_required` |
+| `billing_unavailable` (existing Vercel admission failure) | `pre_dispatch` / `admission_billing_unavailable` |
+| `invalid_configuration` (proven provider configuration failure) | `pre_dispatch` / `sandbox_connect_failed` |
+| `agent_unavailable` | queued: `pre_dispatch` / `kilo_server_failed`; accepted: `post_dispatch_no_activity` / `wrapper_disconnected` |
+| `connection_lost`, `sandbox_lost`, `agent_restarted`, `agent_unresponsive`, `sandbox_out_of_memory` | `post_dispatch_no_activity` / `wrapper_disconnected` |
+| `no_progress`, `no_outcome` | `post_dispatch_no_activity` / `wrapper_no_output` |
+| `prompt_failed` | `post_dispatch_no_activity` / `wrapper_error_before_activity` |
+| `sandbox_stopped` (idle while waiting on the user), `execution_limit` | `interruption` / `system_interrupt` |
+| Kilo final error, or `no_progress` during a Kilo model retry | `agent_activity` / `assistant_error`; responsibility from the existing assistant-failure helpers, so Kilo and provider errors stay attributed to them |
+| Stop | `interruption` / `user_interrupt` |
+| `runtime_artifact_unauthorized`, `runtime_artifact_invalid`, `runtime_cli_probe_failed`, `runtime_supervisor_missing` | `pre_dispatch` / `wrapper_start_failed` |
+| `missing_metadata`, `invalid_model`, payment required | Unchanged |
 
 ## 11. Acceptance scenarios
 
@@ -1340,15 +1341,15 @@ counts.
 18. **Question answered live.** A question during a turn is answered; the same turn continues and
     completes.
 19. **Kilo hangs during a model call.** The wrapper restarts Kilo within about 1 minute.
-    Before any real progress, it may submit the message again once; a second hang fails it
-    (`agent_restarted`). After observed assistant output, the progressed turn fails
-    `agent_restarted` and a fresh message recovers the same chat. The real `first-token`
-    fixture exercises this latter path: it emits a native text delta before the freeze.
-    The failed original message remains present once in Kilo history.
-    Held retired submissions rejected before or after the recovery callback cannot emit
-    `prompt_failed` or block redispatch. A prompt first received during restart keeps that one
-    recovery allowance; genuine application errors and real-progress work are not replayed as
-    recoverable transport failures. Stop/release/new-turn fencing remains effective.
+     Before any real progress, it may submit the message again once; a second hang fails it
+     (`agent_restarted`). After observed assistant output, the progressed turn fails
+     `agent_restarted` and a fresh message recovers the same chat. The real `first-token`
+     fixture exercises this latter path: it emits a native text delta before the freeze.
+     The failed original message remains present once in Kilo history.
+     Held retired submissions rejected before or after the recovery callback cannot emit
+     `prompt_failed` or block redispatch. A prompt first received during restart keeps that one
+     recovery allowance; genuine application errors and real-progress work are not replayed as
+      recoverable transport failures. Stop/release/new-turn fencing remains effective.
 20. **Wrapper socket admission.** Missing/malformed, forged and wrong-sandbox credentials never
     resolve a Sandbox DO stub. Correctly signed retired allocations receive shutdown; terminal
     Worker-local rejection and stale-allocation rejection exit the wrapper cleanly, while ordinary

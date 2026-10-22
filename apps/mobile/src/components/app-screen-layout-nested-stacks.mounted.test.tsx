@@ -88,6 +88,8 @@ vi.mock('expo-router', () => ({
     { Screen: ({ name }: { name: string }) => createElement('RegisteredScreen', { name }) }
   ),
   useLocalSearchParams: () => ({ scope: 'personal', platform: 'github' }),
+  // The tab and section stacks settle their switch-input window on focus.
+  useFocusEffect: () => undefined,
 }));
 
 type LayoutComponent = () => ReactElement;

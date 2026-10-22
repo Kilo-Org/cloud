@@ -341,6 +341,18 @@ describe('ScopeEntryScreen organization access', () => {
     expect(host(root, 'DashboardScreen')).toHaveLength(1);
   });
 
+  it('keeps the organization landing when the membership list does not contain it', async () => {
+    // Access is decided by the organization's own queries. A list without the
+    // organization is not a denial: a Kilo admin, or a parent owner opening a
+    // child organization, is absent from it and still reaches the landing.
+    roles = [];
+    configData.isEnabled = true;
+    const root = await mount('org_123');
+    await advanceBy();
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(0);
+    expect(host(root, 'DashboardScreen')).toHaveLength(1);
+  });
+
   it('keeps the load-error screen for the personal scope when its procedures fail', async () => {
     deniedProcedures = new Set(['getPermissionStatus', 'getConfig', 'getRepositories']);
     const root = await mount('personal');

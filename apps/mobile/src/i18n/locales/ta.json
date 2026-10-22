@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "இதுவரை மாறிகள் இல்லை",
     "variablesSaveFailed": "மாறியைச் சேமிக்க முடியவில்லை",
+    "variablesDeleteFailed": "மாறியை நீக்க முடியவில்லை",
     "commandsTitle": "கட்டளைகளை அமைக்கவும்",
     "addCommand": "கட்டளையைச் சேர்க்கவும்",
     "commandLabel": "கட்டளை",

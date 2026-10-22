@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Muutujaid veel pole",
     "variablesSaveFailed": "Muutujat ei saanud salvestada",
+    "variablesDeleteFailed": "Muutujat ei õnnestunud kustutada",
     "commandsTitle": "Seadistuskäsud",
     "addCommand": "Lisa käsk",
     "commandLabel": "Käsk",

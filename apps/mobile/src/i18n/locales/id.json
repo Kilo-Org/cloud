@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Belum ada variabel",
     "variablesSaveFailed": "Tidak dapat menyimpan variabel",
+    "variablesDeleteFailed": "Tidak dapat menghapus variabel",
     "commandsTitle": "Perintah pengaturan",
     "addCommand": "Tambahkan perintah",
     "commandLabel": "Memerintah",

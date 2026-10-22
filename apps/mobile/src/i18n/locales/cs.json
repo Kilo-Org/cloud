@@ -3758,6 +3758,7 @@
     },
     "variablesEmpty": "Zatím žádné proměnné",
     "variablesSaveFailed": "Proměnnou se nepodařilo uložit",
+    "variablesDeleteFailed": "Proměnnou se nepodařilo smazat",
     "commandsTitle": "Nastavení příkazů",
     "addCommand": "Přidat příkaz",
     "commandLabel": "Příkaz",

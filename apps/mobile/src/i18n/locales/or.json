@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଭେରିଏବଲ୍ ନାହିଁ।",
     "variablesSaveFailed": "ଭେରିଏବଲ୍ ସେଭ୍ କରିପାରିଲା ନାହିଁ।",
+    "variablesDeleteFailed": "ଭେରିଏବଲ୍ ଡିଲିଟ୍ କରିପାରିଲା ନାହିଁ।",
     "commandsTitle": "ସେଟଅପ୍ କମାଣ୍ଡ୍।",
     "addCommand": "କମାଣ୍ଡ୍ ଯୋଡନ୍ତୁ।",
     "commandLabel": "ନିର୍ଦ୍ଦେଶ।",

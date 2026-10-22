@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "अहिलेसम्म कुनै चर छैन",
     "variablesSaveFailed": "चर बचत गर्न सकिएन",
+    "variablesDeleteFailed": "चर मेटाउन सकिएन",
     "commandsTitle": "आदेशहरू सेटअप गर्नुहोस्",
     "addCommand": "आदेश थप्नुहोस्",
     "commandLabel": "आदेश",

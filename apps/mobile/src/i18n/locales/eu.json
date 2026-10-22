@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Oraindik ez dago aldagairik",
     "variablesSaveFailed": "Ezin izan da aldagaia gorde",
+    "variablesDeleteFailed": "Ezin izan da aldagaia ezabatu",
     "commandsTitle": "Konfiguratu komandoak",
     "addCommand": "Gehitu komandoa",
     "commandLabel": "Agindua",

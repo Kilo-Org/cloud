@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "ಇನ್ನೂ ಯಾವುದೇ ಅಸ್ಥಿರಗಳಿಲ್ಲ",
     "variablesSaveFailed": "ವೇರಿಯಬಲ್ ಅನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+    "variablesDeleteFailed": "ವೇರಿಯಬಲ್ ಅನ್ನು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "commandsTitle": "ಆಜ್ಞೆಗಳನ್ನು ಹೊಂದಿಸಿ",
     "addCommand": "ಆಜ್ಞೆಯನ್ನು ಸೇರಿಸಿ",
     "commandLabel": "ಆಜ್ಞೆ",

@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "هنوز هیچ متغیری وجود ندارد",
     "variablesSaveFailed": "متغیر ذخیره نشد",
+    "variablesDeleteFailed": "متغیر حذف نشد",
     "commandsTitle": "دستورات راه اندازی",
     "addCommand": "دستور اضافه کنید",
     "commandLabel": "فرمان",

@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "ჯერ არ არის ცვლადი",
     "variablesSaveFailed": "ცვლადის შენახვა ვერ მოხერხდა",
+    "variablesDeleteFailed": "ცვლადის წაშლა ვერ მოხერხდა",
     "commandsTitle": "დაყენების ბრძანებები",
     "addCommand": "დაამატეთ ბრძანება",
     "commandLabel": "ბრძანება",

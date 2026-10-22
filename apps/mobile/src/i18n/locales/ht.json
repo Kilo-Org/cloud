@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Pa gen varyab ankò",
     "variablesSaveFailed": "Pa t 'kapab sove varyab",
+    "variablesDeleteFailed": "Pa t 'kapab efase varyab",
     "commandsTitle": "Enstalasyon kòmandman yo",
     "addCommand": "Ajoute lòd",
     "commandLabel": "Kòmandman",

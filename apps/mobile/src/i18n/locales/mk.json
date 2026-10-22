@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Сè уште нема променливи",
     "variablesSaveFailed": "Не може да се зачува променливата",
+    "variablesDeleteFailed": "Не може да се избрише променливата",
     "commandsTitle": "Команди за поставување",
     "addCommand": "Додадете команда",
     "commandLabel": "Команда",

@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Айнымалылар әлі жоқ",
     "variablesSaveFailed": "Айнымалы мәнді сақтау мүмкін болмады",
+    "variablesDeleteFailed": "Айнымалы мәнді өшіру мүмкін болмады",
     "commandsTitle": "Орнату пәрмендері",
     "addCommand": "Пәрменді қосу",
     "commandLabel": "Пәрмен",

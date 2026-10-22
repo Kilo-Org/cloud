@@ -3713,6 +3713,7 @@
     },
     "variablesEmpty": "Aucune variable pour l'instant",
     "variablesSaveFailed": "Impossible d'enregistrer la variable",
+    "variablesDeleteFailed": "Impossible de supprimer la variable",
     "commandsTitle": "Commandes de configuration",
     "addCommand": "Ajouter une commande",
     "commandLabel": "Commande",

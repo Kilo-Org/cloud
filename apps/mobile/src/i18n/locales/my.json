@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "ပြောင်းလွဲမှုများမရှိသေးပါ။",
     "variablesSaveFailed": "ကိန်းရှင်ကို သိမ်းဆည်း၍မရပါ။",
+    "variablesDeleteFailed": "ကိန်းရှင်ကို ဖျက်၍မရပါ။",
     "commandsTitle": "သတ်မှတ်အမိန့်များ",
     "addCommand": "အမိန့်ကိုထည့်ပါ။",
     "commandLabel": "အမိန့်ပေးသည်။",

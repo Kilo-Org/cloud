@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "এখনও কোন পরিবর্তনশীল",
     "variablesSaveFailed": "ভেরিয়েবল সংরক্ষণ করা যায়নি",
+    "variablesDeleteFailed": "ভেরিয়েবল মুছে ফেলা যায়নি",
     "commandsTitle": "সেটআপ কমান্ড",
     "addCommand": "কমান্ড যোগ করুন",
     "commandLabel": "আদেশ",

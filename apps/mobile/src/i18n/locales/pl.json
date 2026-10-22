@@ -3758,6 +3758,7 @@
     },
     "variablesEmpty": "Nie ma jeszcze zmiennych",
     "variablesSaveFailed": "Nie udało się zapisać zmiennej",
+    "variablesDeleteFailed": "Nie udało się usunąć zmiennej",
     "commandsTitle": "Polecenia konfiguracyjne",
     "addCommand": "Dodaj polecenie",
     "commandLabel": "Rozkaz",

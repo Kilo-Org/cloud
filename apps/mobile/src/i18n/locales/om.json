@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Jijjiiramoota hanga ammaatti hin jiran",
     "variablesSaveFailed": "Jijjiiramaa qusachuu hin dandeenye",
+    "variablesDeleteFailed": "Jijjiiramaa haquu hin dandeenye",
     "commandsTitle": "Ajajoota saaguu",
     "addCommand": "Ajaja itti dabali",
     "commandLabel": "Ajaja",

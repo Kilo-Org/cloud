@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Henüz değişken yok",
     "variablesSaveFailed": "Değişken kaydedilemedi",
+    "variablesDeleteFailed": "Değişken silinemedi",
     "commandsTitle": "Kurulum komutları",
     "addCommand": "Komut ekle",
     "commandLabel": "Emretmek",

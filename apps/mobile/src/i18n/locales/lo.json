@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "ບໍ່ມີຕົວແປເທື່ອ",
     "variablesSaveFailed": "ບໍ່ສາມາດບັນທຶກຕົວແປໄດ້",
+    "variablesDeleteFailed": "ບໍ່ສາມາດລຶບຕົວແປໄດ້",
     "commandsTitle": "ຕັ້ງຄ່າຄໍາສັ່ງ",
     "addCommand": "ເພີ່ມຄໍາສັ່ງ",
     "commandLabel": "ຄໍາສັ່ງ",

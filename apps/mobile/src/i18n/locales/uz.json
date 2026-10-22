@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Hali oʻzgaruvchilar yoʻq",
     "variablesSaveFailed": "Oʻzgaruvchini saqlab boʻlmadi",
+    "variablesDeleteFailed": "Oʻzgaruvchi oʻchirilmadi",
     "commandsTitle": "O'rnatish buyruqlari",
     "addCommand": "Buyruq qo'shish",
     "commandLabel": "Buyruq",

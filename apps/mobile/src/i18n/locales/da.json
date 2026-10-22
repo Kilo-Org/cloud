@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Ingen variabler endnu",
     "variablesSaveFailed": "Variablen kunne ikke gemmes",
+    "variablesDeleteFailed": "Variablen kunne ikke slettes",
     "commandsTitle": "Opsætningskommandoer",
     "addCommand": "Tilføj kommando",
     "commandLabel": "Kommando",

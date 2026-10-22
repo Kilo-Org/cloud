@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Ingen variabler ennå",
     "variablesSaveFailed": "Kunne ikke lagre variabelen",
+    "variablesDeleteFailed": "Kunne ikke slette variabelen",
     "commandsTitle": "Oppsettkommandoer",
     "addCommand": "Legg til kommando",
     "commandLabel": "Kommando",

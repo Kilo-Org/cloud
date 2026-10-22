@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Ende nuk ka variabla",
     "variablesSaveFailed": "Variabla nuk mund të ruhej",
+    "variablesDeleteFailed": "Variabla nuk mund të fshihej",
     "commandsTitle": "Komandat e konfigurimit",
     "addCommand": "Shto komandë",
     "commandLabel": "Komanda",

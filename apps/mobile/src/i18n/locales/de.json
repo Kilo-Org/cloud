@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Noch keine Variablen",
     "variablesSaveFailed": "Variable konnte nicht gespeichert werden",
+    "variablesDeleteFailed": "Die Variable konnte nicht gelöscht werden",
     "commandsTitle": "Setup-Befehle",
     "addCommand": "Befehl hinzufügen",
     "commandLabel": "Befehl",

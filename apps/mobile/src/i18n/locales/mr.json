@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "अद्याप कोणतेही व्हेरिएबल्स नाहीत",
     "variablesSaveFailed": "व्हेरिएबल सेव्ह करू शकलो नाही",
+    "variablesDeleteFailed": "व्हेरिएबल हटवू शकलो नाही",
     "commandsTitle": "सेटअप कमांड",
     "addCommand": "आदेश जोडा",
     "commandLabel": "आज्ञा",

@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Tiada pembolehubah lagi",
     "variablesSaveFailed": "Tidak dapat menyimpan pembolehubah",
+    "variablesDeleteFailed": "Tidak dapat memadam pembolehubah",
     "commandsTitle": "Perintah persediaan",
     "addCommand": "Tambah arahan",
     "commandLabel": "Perintah",

@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Tsy mbola misy variables",
     "variablesSaveFailed": "Tsy voatahiry ny fari-piainana",
+    "variablesDeleteFailed": "Tsy afaka namafa ny ova",
     "commandsTitle": "Mametraka baiko",
     "addCommand": "Ampio baiko",
     "commandLabel": "didy",

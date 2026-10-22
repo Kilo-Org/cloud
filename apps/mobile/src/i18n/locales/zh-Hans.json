@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "还没有变量",
     "variablesSaveFailed": "无法保存变量",
+    "variablesDeleteFailed": "无法删除变量",
     "commandsTitle": "设置命令",
     "addCommand": "添加命令",
     "commandLabel": "命令",

@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Одоогоор хувьсагч алга",
     "variablesSaveFailed": "Хувьсагчийг хадгалж чадсангүй",
+    "variablesDeleteFailed": "Хувьсагчийг устгаж чадсангүй",
     "commandsTitle": "Тохируулах командууд",
     "addCommand": "Команд нэмэх",
     "commandLabel": "Тушаал",

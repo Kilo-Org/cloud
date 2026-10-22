@@ -3753,6 +3753,7 @@
     },
     "variablesEmpty": "No variables yet",
     "variablesSaveFailed": "Couldn't save variable",
+    "variablesDeleteFailed": "Couldn't delete variable",
     "commandsTitle": "Setup commands",
     "addCommand": "Add command",
     "commandLabel": "Command",

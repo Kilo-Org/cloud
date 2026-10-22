@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Bado hakuna vigeu",
     "variablesSaveFailed": "Haikuweza kuhifadhi tofauti",
+    "variablesDeleteFailed": "Haikuweza kufuta kigeu",
     "commandsTitle": "Kuanzisha amri",
     "addCommand": "Ongeza amri",
     "commandLabel": "Amri",

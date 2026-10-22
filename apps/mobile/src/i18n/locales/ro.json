@@ -3713,6 +3713,7 @@
     },
     "variablesEmpty": "Încă nu există variabile",
     "variablesSaveFailed": "Variabila nu a putut fi salvată",
+    "variablesDeleteFailed": "Variabila nu a putut fi ștearsă",
     "commandsTitle": "Configurați comenzi",
     "addCommand": "Adăugați comanda",
     "commandLabel": "Comanda",

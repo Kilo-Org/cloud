@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "تر اوسه کوم تغیرات نشته",
     "variablesSaveFailed": "متغیر خوندي نه شو",
+    "variablesDeleteFailed": "متغیر ړنګول نشو کړای",
     "commandsTitle": "امرونه تنظیم کړئ",
     "addCommand": "کمانډ اضافه کړئ",
     "commandLabel": "امر",

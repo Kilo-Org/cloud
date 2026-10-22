@@ -113,7 +113,7 @@ export function ProfileVariablesScreen({
       await deleteVar.mutateAsync({ profileId, key });
     } catch (error) {
       if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.variablesSaveFailed'));
+        toast.error(t('profiles.variablesDeleteFailed'));
       }
       return;
     }

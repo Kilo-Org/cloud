@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "ابھی تک کوئی متغیر نہیں ہے۔",
     "variablesSaveFailed": "متغیر کو محفوظ نہیں کیا جا سکا",
+    "variablesDeleteFailed": "متغیر حذف نہیں کیا جا سکا",
     "commandsTitle": "سیٹ اپ کمانڈز",
     "addCommand": "کمانڈ شامل کریں۔",
     "commandLabel": "حکم",

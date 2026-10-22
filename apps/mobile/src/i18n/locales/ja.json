@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "まだ変数がありません",
     "variablesSaveFailed": "変数を保存できませんでした",
+    "variablesDeleteFailed": "変数を削除できませんでした",
     "commandsTitle": "セットアップコマンド",
     "addCommand": "コマンドの追加",
     "commandLabel": "指示",

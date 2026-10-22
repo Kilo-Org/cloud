@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "មិនមានអថេរនៅឡើយ",
     "variablesSaveFailed": "មិនអាចរក្សាទុកអថេរបានទេ។",
+    "variablesDeleteFailed": "មិនអាចលុបអថេរបានទេ។",
     "commandsTitle": "ដំឡើងពាក្យបញ្ជា",
     "addCommand": "បន្ថែមពាក្យបញ្ជា",
     "commandLabel": "បញ្ជា",

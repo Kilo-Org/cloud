@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "還沒有變數",
     "variablesSaveFailed": "無法保存變數",
+    "variablesDeleteFailed": "無法刪除變數",
     "commandsTitle": "設定命令",
     "addCommand": "新增命令",
     "commandLabel": "命令",

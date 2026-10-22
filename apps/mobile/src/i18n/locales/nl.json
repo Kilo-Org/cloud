@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Nog geen variabelen",
     "variablesSaveFailed": "Kan variabele niet opslaan",
+    "variablesDeleteFailed": "Kan variabele niet verwijderen",
     "commandsTitle": "Instelopdrachten",
     "addCommand": "Commando toevoegen",
     "commandLabel": "Commando",

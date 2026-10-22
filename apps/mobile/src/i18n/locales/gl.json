@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Aínda non hai variables",
     "variablesSaveFailed": "Non se puido gardar a variable",
+    "variablesDeleteFailed": "Non se puido eliminar a variable",
     "commandsTitle": "Comandos de configuración",
     "addCommand": "Engadir comando",
     "commandLabel": "Comando",

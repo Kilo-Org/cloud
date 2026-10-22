@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "እስካሁን ምንም ተለዋዋጮች የሉም",
     "variablesSaveFailed": "ተለዋዋጭ ማስቀመጥ አልተቻለም",
+    "variablesDeleteFailed": "ተለዋዋጭ ማጥፋት አልተቻለም",
     "commandsTitle": "ማዋቀር ትዕዛዞች",
     "addCommand": "ትዕዛዝ ጨምር",
     "commandLabel": "ትዕዛዝ",

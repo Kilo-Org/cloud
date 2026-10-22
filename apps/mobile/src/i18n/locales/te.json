@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "ఇంకా వేరియబుల్స్ లేవు",
     "variablesSaveFailed": "వేరియబుల్‌ని సేవ్ చేయడం సాధ్యపడలేదు",
+    "variablesDeleteFailed": "వేరియబుల్‌ని డిలీట్ చేయడం సాధ్యపడలేదు",
     "commandsTitle": "సెటప్ ఆదేశాలు",
     "addCommand": "ఆదేశాన్ని జోడించండి",
     "commandLabel": "ఆదేశం",

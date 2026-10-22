@@ -3758,6 +3758,7 @@
     },
     "variablesEmpty": "Ще немає змінних",
     "variablesSaveFailed": "Не вдалося зберегти змінну",
+    "variablesDeleteFailed": "Не вдалося видалити змінну",
     "commandsTitle": "Команди налаштування",
     "addCommand": "Додати команду",
     "commandLabel": "Команда",

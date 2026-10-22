@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Hələ heç bir dəyişən yoxdur",
     "variablesSaveFailed": "Dəyişən yadda saxlamaq mümkün olmadı",
+    "variablesDeleteFailed": "Dəyişəni silmək mümkün olmadı",
     "commandsTitle": "Quraşdırma əmrləri",
     "addCommand": "Komanda əlavə edin",
     "commandLabel": "Əmr",

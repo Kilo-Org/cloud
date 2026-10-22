@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Wala pang variable",
     "variablesSaveFailed": "Hindi ma-save ang variable",
+    "variablesDeleteFailed": "Hindi ma-delete ang variable",
     "commandsTitle": "Mga utos sa pag-setup",
     "addCommand": "Magdagdag ng utos",
     "commandLabel": "Utos",

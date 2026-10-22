@@ -3713,6 +3713,7 @@
     },
     "variablesEmpty": "Još nema promenljivih",
     "variablesSaveFailed": "Nije moguće sačuvati promenljivu",
+    "variablesDeleteFailed": "Nije moguće izbrisati promenljivu",
     "commandsTitle": "Komande za podešavanje",
     "addCommand": "Dodaj komandu",
     "commandLabel": "Komanda",

@@ -3758,6 +3758,7 @@
     },
     "variablesEmpty": "Ni še spremenljivk",
     "variablesSaveFailed": "Spremenljivke ni bilo mogoče shraniti",
+    "variablesDeleteFailed": "Spremenljivke ni bilo mogoče izbrisati",
     "commandsTitle": "Ukazi za nastavitev",
     "addCommand": "Dodaj ukaz",
     "commandLabel": "Ukaz",

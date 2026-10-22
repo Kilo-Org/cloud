@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Még nincsenek változók",
     "variablesSaveFailed": "Nem sikerült menteni a változót",
+    "variablesDeleteFailed": "Nem sikerült törölni a változót",
     "commandsTitle": "Beállítási parancsok",
     "addCommand": "Parancs hozzáadása",
     "commandLabel": "Parancs",

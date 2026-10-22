@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "هێشتا هیچ گۆڕاوێک نییە",
     "variablesSaveFailed": "نەتوانرا گۆڕاوەکە پاشەکەوت بکات",
+    "variablesDeleteFailed": "نەتوانرا گۆڕاوەکە بسڕێتەوە",
     "commandsTitle": "فەرمانەکانی ڕێکخستن",
     "addCommand": "فەرمان زیاد بکە",
     "commandLabel": "فەرمان",

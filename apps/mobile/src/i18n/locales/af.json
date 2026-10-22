@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Nog geen veranderlikes nie",
     "variablesSaveFailed": "Kon nie veranderlike stoor nie",
+    "variablesDeleteFailed": "Kon nie veranderlike verwyder nie",
     "commandsTitle": "Stel opdragte op",
     "addCommand": "Voeg opdrag by",
     "commandLabel": "Bevel",

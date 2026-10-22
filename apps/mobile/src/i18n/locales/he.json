@@ -3713,6 +3713,7 @@
     },
     "variablesEmpty": "עדיין אין משתנים",
     "variablesSaveFailed": "לא ניתן לשמור משתנה",
+    "variablesDeleteFailed": "לא ניתן למחוק את המשתנה",
     "commandsTitle": "פקודות הגדרה",
     "addCommand": "הוסף פקודה",
     "commandLabel": "פְּקוּדָה",

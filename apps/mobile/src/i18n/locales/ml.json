@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "ഇതുവരെ വേരിയബിളുകളൊന്നുമില്ല",
     "variablesSaveFailed": "വേരിയബിൾ സംരക്ഷിക്കാൻ കഴിഞ്ഞില്ല",
+    "variablesDeleteFailed": "വേരിയബിൾ ഡിലീറ്റ് ചെയ്യാനായില്ല",
     "commandsTitle": "കമാൻഡുകൾ സജ്ജമാക്കുക",
     "addCommand": "കമാൻഡ് ചേർക്കുക",
     "commandLabel": "കമാൻഡ്",

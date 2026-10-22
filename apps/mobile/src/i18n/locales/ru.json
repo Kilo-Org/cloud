@@ -3758,6 +3758,7 @@
     },
     "variablesEmpty": "Переменных пока нет",
     "variablesSaveFailed": "Не удалось сохранить переменную",
+    "variablesDeleteFailed": "Не удалось удалить переменную",
     "commandsTitle": "Команды настройки",
     "addCommand": "Добавить команду",
     "commandLabel": "Команда",

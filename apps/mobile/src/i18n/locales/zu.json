@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Akukho okuguquguqukayo okwamanje",
     "variablesSaveFailed": "Ayikwazanga ukulondoloza okuhlukile",
+    "variablesDeleteFailed": "Ayikwazanga ukususa okuguquguqukayo",
     "commandsTitle": "Setha imiyalo",
     "addCommand": "Engeza umyalo",
     "commandLabel": "Umyalo",

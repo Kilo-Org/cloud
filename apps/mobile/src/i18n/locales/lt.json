@@ -3758,6 +3758,7 @@
     },
     "variablesEmpty": "Dar nėra kintamųjų",
     "variablesSaveFailed": "Nepavyko išsaugoti kintamojo",
+    "variablesDeleteFailed": "Nepavyko ištrinti kintamojo",
     "commandsTitle": "Sąrankos komandos",
     "addCommand": "Pridėti komandą",
     "commandLabel": "komandą",

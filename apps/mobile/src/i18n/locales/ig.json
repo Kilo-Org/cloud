@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Enweghị mgbanwe ma",
     "variablesSaveFailed": "Enweghị ike ichekwa mgbanwe",
+    "variablesDeleteFailed": "Enweghị ike ihichapụ mgbanwe",
     "commandsTitle": "Nhazi iwu",
     "addCommand": "Tinye iwu",
     "commandLabel": "Iwu",

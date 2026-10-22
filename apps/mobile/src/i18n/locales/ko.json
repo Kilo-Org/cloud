@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "아직 변수가 없습니다.",
     "variablesSaveFailed": "변수를 저장할 수 없습니다.",
+    "variablesDeleteFailed": "변수를 삭제할 수 없습니다",
     "commandsTitle": "설정 명령",
     "addCommand": "명령 추가",
     "commandLabel": "명령",

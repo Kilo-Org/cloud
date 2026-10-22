@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "තවමත් විචල්‍ය නොමැත",
     "variablesSaveFailed": "විචල්‍යය සුරැකීමට නොහැකි විය",
+    "variablesDeleteFailed": "විචල්‍යය මකා දැමීමට නොහැකි විය",
     "commandsTitle": "සැකසුම් විධාන",
     "addCommand": "විධානය එක් කරන්න",
     "commandLabel": "විධානය",

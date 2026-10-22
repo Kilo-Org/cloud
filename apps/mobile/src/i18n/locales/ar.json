@@ -3848,6 +3848,7 @@
     },
     "variablesEmpty": "لا توجد متغيرات بعد",
     "variablesSaveFailed": "تعذر حفظ المتغير",
+    "variablesDeleteFailed": "تعذر حذف المتغير",
     "commandsTitle": "أوامر الإعداد",
     "addCommand": "إضافة أمر",
     "commandLabel": "يأمر",

@@ -336,6 +336,48 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
+  it.each([undefined, new Error(''), new Error('   ')])(
+    'keeps the row and shows a delete-specific fallback for an unreadable error: %s',
+    async error => {
+      h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+      h.query.isPending = false;
+      h.mutations.deleteVar.mutateAsync.mockRejectedValueOnce(error);
+
+      const { renderer, unmount } = await mountScreen();
+      pressPressable(renderer.root, 'Delete');
+      await act(async () => {
+        confirmRequest(h.confirm as TestConfirmMock);
+        await Promise.resolve();
+      });
+
+      expect(h.mutations.deleteVar.mutateAsync).toHaveBeenCalledWith({
+        profileId: 'profile-1',
+        key: 'API_KEY',
+      });
+      expect(findPressable(renderer.root, 'API_KEY')).toBeDefined();
+      expect(h.error).toHaveBeenCalledExactlyOnceWith("Couldn't delete variable");
+      unmount();
+    }
+  );
+
+  it('keeps the row without duplicating the mutation toast for a readable delete error', async () => {
+    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.isPending = false;
+    h.mutations.deleteVar.mutateAsync.mockRejectedValueOnce(new Error('Permission denied'));
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Delete');
+    await act(async () => {
+      confirmRequest(h.confirm as TestConfirmMock);
+      await Promise.resolve();
+    });
+
+    expect(h.mutations.deleteVar.mutateAsync).toHaveBeenCalledOnce();
+    expect(findPressable(renderer.root, 'API_KEY')).toBeDefined();
+    expect(h.error).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('disables delete and refuses another confirmation while deletion is pending', async () => {
     h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;

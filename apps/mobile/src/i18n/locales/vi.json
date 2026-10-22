@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Chưa có biến nào",
     "variablesSaveFailed": "Không thể lưu biến",
+    "variablesDeleteFailed": "Không thể xóa biến",
     "commandsTitle": "Lệnh thiết lập",
     "addCommand": "Thêm lệnh",
     "commandLabel": "Yêu cầu",

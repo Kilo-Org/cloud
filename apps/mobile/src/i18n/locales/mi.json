@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Kaore ano kia rereke",
     "variablesSaveFailed": "Kāore i taea te tiaki taurangi",
+    "variablesDeleteFailed": "Kāore i taea te muku taurangi",
     "commandsTitle": "Tatūnga whakahau",
     "addCommand": "Tāpiri whakahau",
     "commandLabel": "Whakahau",

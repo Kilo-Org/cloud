@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Engar breytur ennþá",
     "variablesSaveFailed": "Ekki tókst að vista breytu",
+    "variablesDeleteFailed": "Ekki tókst að eyða breytunni",
     "commandsTitle": "Uppsetningarskipanir",
     "addCommand": "Bæta við skipun",
     "commandLabel": "Skipun",

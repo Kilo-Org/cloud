@@ -3758,6 +3758,7 @@
     },
     "variablesEmpty": "Zatiaľ žiadne premenné",
     "variablesSaveFailed": "Premennú sa nepodarilo uložiť",
+    "variablesDeleteFailed": "Premennú sa nepodarilo vymazať",
     "commandsTitle": "Príkazy nastavenia",
     "addCommand": "Pridať príkaz",
     "commandLabel": "Príkaz",

@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "ยังไม่มีตัวแปร",
     "variablesSaveFailed": "ไม่สามารถบันทึกตัวแปรได้",
+    "variablesDeleteFailed": "ไม่สามารถลบตัวแปรได้",
     "commandsTitle": "คำสั่งการตั้งค่า",
     "addCommand": "เพิ่มคำสั่ง",
     "commandLabel": "คำสั่ง",

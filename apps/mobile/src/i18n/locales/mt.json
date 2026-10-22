@@ -3803,6 +3803,7 @@
     },
     "variablesEmpty": "S'issa l-ebda varjabbli",
     "variablesSaveFailed": "Ma setgħetx tissejvja l-varjabbli",
+    "variablesDeleteFailed": "Ma setax jħassar il-varjabbli",
     "commandsTitle": "Setup kmandi",
     "addCommand": "Żid kmand",
     "commandLabel": "Kmand",

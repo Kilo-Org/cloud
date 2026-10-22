@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Փոփոխականներ դեռ չկան",
     "variablesSaveFailed": "Չհաջողվեց պահպանել փոփոխականը",
+    "variablesDeleteFailed": "Չհաջողվեց ջնջել փոփոխականը",
     "commandsTitle": "Կարգավորման հրամաններ",
     "addCommand": "Ավելացնել հրաման",
     "commandLabel": "Հրաման",

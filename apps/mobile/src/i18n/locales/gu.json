@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "હજુ સુધી કોઈ ચલ નથી",
     "variablesSaveFailed": "ચલ સાચવી શકાયું નથી",
+    "variablesDeleteFailed": "ચલ ડિલીટ કરી શકાયું નથી",
     "commandsTitle": "સેટઅપ આદેશો",
     "addCommand": "આદેશ ઉમેરો",
     "commandLabel": "આદેશ",

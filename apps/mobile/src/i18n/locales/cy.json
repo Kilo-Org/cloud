@@ -3848,6 +3848,7 @@
     },
     "variablesEmpty": "Dim newidynnau eto",
     "variablesSaveFailed": "Methu â chadw'r newidyn",
+    "variablesDeleteFailed": "Ni fu modd dileu'r newidyn",
     "commandsTitle": "Gosod gorchmynion",
     "addCommand": "Ychwanegu gorchymyn",
     "commandLabel": "Gorchymyn",

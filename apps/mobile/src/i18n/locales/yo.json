@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "Ko si awọn oniyipada sibẹsibẹ",
     "variablesSaveFailed": "Ko le fi oniyipada pamọ",
+    "variablesDeleteFailed": "Ko le paarẹ oniyipada",
     "commandsTitle": "Awọn aṣẹ iṣeto",
     "addCommand": "Fi aṣẹ kun",
     "commandLabel": "Òfin",

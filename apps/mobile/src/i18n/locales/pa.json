@@ -3668,6 +3668,7 @@
     },
     "variablesEmpty": "ਹਾਲੇ ਕੋਈ ਵੇਰੀਏਬਲ ਨਹੀਂ",
     "variablesSaveFailed": "ਵੇਰੀਏਬਲ ਨੂੰ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "variablesDeleteFailed": "ਵੇਰੀਏਬਲ ਨੂੰ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
     "commandsTitle": "ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ",
     "addCommand": "ਕਮਾਂਡ ਸ਼ਾਮਲ ਕਰੋ",
     "commandLabel": "ਹੁਕਮ",

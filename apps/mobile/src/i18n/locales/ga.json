@@ -3803,6 +3803,7 @@
     },
     "variablesEmpty": "Níl aon athróg ann fós",
     "variablesSaveFailed": "Níorbh fhéidir an athróg a shábháil",
+    "variablesDeleteFailed": "Níorbh fhéidir an athróg a scriosadh",
     "commandsTitle": "Orduithe socraithe",
     "addCommand": "Cuir ordú leis",
     "commandLabel": "Ordú",

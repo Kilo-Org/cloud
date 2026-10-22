@@ -2,15 +2,22 @@ import {
   CONTROL_PLANE_FAILURE_REASON_VALUES,
   type ControlPlaneFailureReason,
 } from '../../shared/control-plane-protocol.js';
+import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from '../../shared/credential-upgrade.js';
 
 const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
+  runtime_artifact_unauthorized: 'Runtime download was not authorized',
+  runtime_artifact_invalid: 'Runtime artifact verification failed',
+  runtime_cli_probe_failed: 'Runtime CLI validation failed',
+  runtime_supervisor_missing: 'Runtime supervisor is missing',
   preparation_timeout: 'Environment preparation timed out',
   workspace_setup_failed: 'Workspace setup failed',
+  credential_upgrade_required: SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE,
   agent_unavailable: 'The agent became unavailable',
   billing_blocked: 'Sandbox billing requires additional credits',
-  billing_unavailable: 'Sandbox billing is unavailable',
+  billing_unavailable:
+    'Sandbox billing or capacity verification is unavailable. Try again shortly.',
   container_limit_reached:
-    'Container limit reached (20 per personal account or 50 per organization). Stop an existing container before starting another.',
+    'Container limit reached. Stop an existing container before starting another.',
   invalid_configuration: 'Sandbox configuration is invalid or unsupported',
   connection_lost: 'The sandbox connection was lost',
   sandbox_lost: 'The sandbox was lost',

@@ -15,11 +15,11 @@ const call = (args: unknown): ToolCall => ({
 });
 
 const run = (tool: ReturnType<typeof todoTool>, one: ToolCall) =>
-  Effect.runPromise(Effect.either(tool.run(one)));
+  Effect.runPromise(Effect.result(tool.run(one)));
 
 const said = async (tool: ReturnType<typeof todoTool>, todos: readonly unknown[]) => {
   const got = await run(tool, call({ todos }));
-  return got._tag === 'Right' ? got.right : `FAILED: ${String(got.left.cause)}`;
+  return got._tag === 'Success' ? got.success : `FAILED: ${String(got.failure.cause)}`;
 };
 
 it('reads the list back with a mark for each state', async () => {
@@ -75,8 +75,8 @@ it('tells the model when the harness could not draw the list', async () => {
 
   /* The person cannot see what the model wrote down, which is a thing the model
      needs to know rather than a thing to swallow. */
-  expect(got._tag).toBe('Left');
-  expect(got._tag === 'Left' && got.left).toBeInstanceOf(ToolFailure);
+  expect(got._tag).toBe('Failure');
+  expect(got._tag === 'Failure' && got.failure).toBeInstanceOf(ToolFailure);
 });
 
 it('refuses a state it does not have, rather than storing it', async () => {
@@ -84,7 +84,7 @@ it('refuses a state it does not have, rather than storing it', async () => {
 
   const got = await run(tool, call({ todos: [{ text: 'Only', state: 'nearly' }] }));
 
-  expect(got._tag).toBe('Left');
+  expect(got._tag).toBe('Failure');
   /* And the list is untouched, so a bad call does not lose what was there. */
   expect(await said(tool, [])).toBe('The list is empty.');
 });
@@ -92,11 +92,11 @@ it('refuses a state it does not have, rather than storing it', async () => {
 it('refuses a step with no text', async () => {
   const got = await run(todoTool(), call({ todos: [{ state: 'pending' }] }));
 
-  expect(got._tag).toBe('Left');
+  expect(got._tag).toBe('Failure');
 });
 
 it('refuses arguments that are not a list at all', async () => {
   const got = await run(todoTool(), { id: 'tc_1', name: 'todo', arguments: 'not json' });
 
-  expect(got._tag).toBe('Left');
+  expect(got._tag).toBe('Failure');
 });

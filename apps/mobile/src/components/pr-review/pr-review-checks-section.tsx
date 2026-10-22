@@ -323,14 +323,20 @@ export function PrReviewChecksSection({
       );
     }
 
-    // Retryable (server/offline) — section-level retry button.
+    // Retryable / service-unavailable (server/offline) — section-level retry
+    // button. A BAD_GATEWAY names its own cause; every other failure keeps
+    // the generic could-not-load copy.
     return (
       <View className="gap-2">
         <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
           {t('prReview.checks.title')}
         </Text>
         <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
-          <Text className="text-sm text-muted-foreground">{t('prReview.checks.couldNotLoad')}</Text>
+          <Text className="text-sm text-muted-foreground">
+            {state.kind === 'service-unavailable'
+              ? t('prReview.reviewServiceUnavailableDescription')
+              : t('prReview.checks.couldNotLoad')}
+          </Text>
           <Button
             variant="outline"
             onPress={() => {

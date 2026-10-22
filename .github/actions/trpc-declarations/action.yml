@@ -21,7 +21,11 @@ runs:
         path: packages/trpc/dist
         key: ${{ runner.os }}-trpc-declarations-${{ steps.key.outputs.key }}
 
+    # The build script keeps tsgo under 2 GiB for memory-capped sandboxes. CI
+    # runners have at least 8 GB, where that limit only slows the build down.
     - name: Build trpc types
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
+      env:
+        GOMEMLIMIT: 'off'
       run: pnpm --filter @kilocode/trpc run build

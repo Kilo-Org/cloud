@@ -7,7 +7,6 @@ import {
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
-import { captureMessage } from '@sentry/nextjs';
 import type {
   MemberOrganizationWithMembers,
   OrganizationSsoPolicyView,
@@ -70,15 +69,11 @@ import { organizationAuditLogRouter } from '@/routers/organizations/organization
 import { organizationAdminRouter } from '@/routers/organizations/organization-admin-router';
 import { organizationModesRouter } from '@/routers/organizations/organization-modes-router';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
-import { organizationDeploymentsRouter } from '@/routers/organizations/organization-deployments-router';
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { organizationReviewAgentRouter } from '@/routers/organizations/organization-code-reviews-router';
 import { organizationCloudAgentNextRouter } from '@/routers/organizations/organization-cloud-agent-next-router';
-import { organizationAppBuilderRouter } from '@/routers/organizations/organization-app-builder-router';
 import { organizationSecurityAgentRouter } from '@/routers/organizations/organization-security-agent-router';
 import { organizationSecurityAuditLogRouter } from '@/routers/organizations/organization-security-audit-log-router';
-import { organizationAutoTriageRouter } from '@/routers/organizations/organization-auto-triage-router';
-import { organizationAutoFixRouter } from '@/routers/organizations/organization-auto-fix-router';
 import { organizationAutoTopUpRouter } from '@/routers/organizations/organization-auto-top-up-router';
 import { organizationKiloclawRouter } from '@/routers/organizations/organization-kiloclaw-router';
 import { organizationBitbucketRouter } from '@/routers/organizations/organization-bitbucket-router';
@@ -124,8 +119,6 @@ function daysAgo(days: number): Date {
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 }
 
-const MAX_ORGANIZATIONS_PER_USER = 5;
-
 function getDateThreshold(period: string): Date | null {
   switch (period) {
     case 'week':
@@ -150,14 +143,10 @@ export const organizationsRouter = createTRPCRouter({
   auditLogs: organizationAuditLogRouter,
   admin: organizationAdminRouter,
   modes: organizationModesRouter,
-  deployments: organizationDeploymentsRouter,
   reviewAgent: organizationReviewAgentRouter,
   cloudAgentNext: organizationCloudAgentNextRouter,
-  appBuilder: organizationAppBuilderRouter,
   securityAgent: organizationSecurityAgentRouter,
   securityAuditLog: organizationSecurityAuditLogRouter,
-  autoTriage: organizationAutoTriageRouter,
-  autoFix: organizationAutoFixRouter,
   autoTopUp: organizationAutoTopUpRouter,
   kiloclaw: organizationKiloclawRouter,
   bitbucket: organizationBitbucketRouter,
@@ -211,35 +200,14 @@ export const organizationsRouter = createTRPCRouter({
       childrenByParentId.set(child.parentOrganizationId, children);
     }
 
-    return directOrganizations.map(
-      (organization): UserOrganizationWithInheritedChildren => ({
-        ...organization,
-        inheritedChildren: childrenByParentId.get(organization.organizationId) ?? [],
-      })
-    );
+    return directOrganizations.map((organization): UserOrganizationWithInheritedChildren => ({
+      ...organization,
+      inheritedChildren: childrenByParentId.get(organization.organizationId) ?? [],
+    }));
   }),
 
   create: baseProcedure.input(OrganizationCreateRequestSchema).mutation(async opts => {
     const { user } = opts.ctx;
-    const existingOrgMemberships = await getUserOrganizationsWithSeats(user.id);
-
-    if (
-      existingOrgMemberships.length >= MAX_ORGANIZATIONS_PER_USER &&
-      !user.google_user_email.endsWith('kilocode.ai')
-    ) {
-      captureMessage('User hit max organizations', {
-        level: 'warning',
-        extra: {
-          userId: user.id,
-          existingOrgMemberships: existingOrgMemberships.length,
-          max: MAX_ORGANIZATIONS_PER_USER,
-        },
-      });
-      throw new TRPCError({
-        code: 'TOO_MANY_REQUESTS',
-        message: `You have reached the maximum number of organizations (${MAX_ORGANIZATIONS_PER_USER}) allowed. Please contact support if you need more.`,
-      });
-    }
     const org = await createOrganization(
       opts.input.name,
       user.id,
@@ -486,8 +454,12 @@ export const organizationsRouter = createTRPCRouter({
 
   createChild: organizationAdminMutationProcedure
     .input(OrganizationCreateChildSchema)
-    .mutation(async ({ input }) => {
-      const organization = await createChildOrganization(input.name, input.organizationId);
+    .mutation(async ({ input, ctx }) => {
+      const organization = await createChildOrganization(
+        input.name,
+        input.organizationId,
+        ctx.user.id
+      );
       return { organization };
     }),
 

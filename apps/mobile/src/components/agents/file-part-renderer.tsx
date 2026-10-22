@@ -652,7 +652,7 @@ function FilePreviewModal({
       />
       <AccessibleStatus message={shareError} className="px-6 pt-2 text-sm" />
       {status === 'error' || (status === 'ready' && text === '') ? (
-        <CenteredState className="px-6">
+        <CenteredState contentContainerClassName="px-6">
           <View className="items-center py-6">{renderBody()}</View>
         </CenteredState>
       ) : (

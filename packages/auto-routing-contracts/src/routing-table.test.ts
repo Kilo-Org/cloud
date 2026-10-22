@@ -240,6 +240,54 @@ describe('rankCandidates', () => {
     const ranked = rankCandidates([rankInput('a', 0.5, 1), rankInput('b', 0.6, 5)], 0.9);
     expect(ranked[0].model).toBe('b');
   });
+
+  it('ranks a $0 candidate inside the band before a cheaper-looking paid candidate', () => {
+    const ranked = rankCandidates(
+      [rankInput('paid-fast-accurate', 1, 0.0001, 500), rankInput('free-slow', 0.95, 0, 20_000)],
+      0.95
+    );
+    expect(order(ranked)).toEqual(['free-slow', 'paid-fast-accurate']);
+    expect(ranked[0].estimatedRequestCostUsd).toBe(0);
+  });
+
+  it('orders $0 candidates by latency and Wilson accuracy, not by cost', () => {
+    const ranked = rankCandidates(
+      [
+        { ...rankInput('free-thin-fast', 1, 0, 1_000), cases: 1 },
+        { ...rankInput('free-proven-slower', 1, 0, 1_500), cases: 500 },
+      ],
+      0.95
+    );
+    expect(order(ranked)).toEqual(['free-proven-slower', 'free-thin-fast']);
+  });
+
+  it('keeps a $0 candidate without latency behind $0 candidates with it', () => {
+    const ranked = rankCandidates(
+      [
+        rankInput('paid-measured', 1, 0.0001, 500),
+        rankInput('free-unmeasured', 1, 0, null),
+        rankInput('free-measured', 0.99, 0, 30_000),
+      ],
+      0.95
+    );
+    expect(order(ranked)).toEqual(['free-measured', 'free-unmeasured', 'paid-measured']);
+  });
+
+  it('keeps a $0 candidate below the band behind every competing candidate', () => {
+    const ranked = rankCandidates(
+      [rankInput('paid-meets', 1, 0.01, 10_000), rankInput('free-below-band', 0.89, 0, 100)],
+      0.95
+    );
+    expect(order(ranked)).toEqual(['paid-meets', 'free-below-band']);
+  });
+
+  it('carries the stale flag through ranking', () => {
+    const ranked = rankCandidates(
+      [{ ...rankInput('stale-free', 1, 0), stale: true }, rankInput('fresh-paid', 1, 0.001)],
+      0.95
+    );
+    expect(ranked[0].stale).toBe(true);
+  });
 });
 
 describe('RoutingTableSchema', () => {
@@ -274,7 +322,7 @@ describe('RoutingTableSchema', () => {
       }).success
     ).toBe(false);
   });
-  it('requires at least one candidate per taxonomy route', () => {
+  it('rejects an empty candidate list for a present route', () => {
     expect(
       RoutingTableSchema.safeParse({
         version: 'v',
@@ -288,6 +336,20 @@ describe('RoutingTableSchema', () => {
         },
       }).success
     ).toBe(false);
+  });
+
+  it('accepts a table that omits a taxonomy route instead of requiring full coverage', () => {
+    const parsed = RoutingTableSchema.parse({
+      version: 'v',
+      generatedAt: new Date(0).toISOString(),
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      source: 'benchmark',
+      routes: {
+        'implementation/code_generation': [candidate('impl', 0.9, 1)],
+      },
+    });
+    expect(Object.keys(parsed.routes)).toEqual(['implementation/code_generation']);
   });
 
   it('accepts a table routed by classifier taxonomy pair', () => {

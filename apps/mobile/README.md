@@ -11,6 +11,20 @@ Humans: follow instructions below or talk to [@iscekic](https://github.com/iscek
 - PostHog feature flag infrastructure and the version-aware registry remain available for future flags.
 - KiloClaw tab visibility still depends on instance ownership.
 
+## Profile credits
+
+The bonus-credit subtitle includes only grants with an expiry strictly after the
+current render time. Elapsed grants and non-expiring credits do not contribute to
+its amount or earliest expiry, for both personal and organization accounts.
+The balance continues to come from the balance query.
+
+## Organization hub connectivity
+
+Usage tiles retain labels and show cached totals or em dash placeholders.
+Unavailable usage and low-balance settings expose Retry. The low-balance row
+retries its settings read until data is available, then opens configuration.
+Cached settings remain visible during offline pauses and refresh failures.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.
@@ -72,6 +86,23 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - Use `--display=1` for the outer display and `--display=3` for the inner display.
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
+
+## One-off agent briefings
+
+- Open **Briefings → Create briefing** and select Personal or one organization.
+- Select a preset or a custom period of up to 31 days, then review the exact range and timezone.
+- Review coverage, the payer, the model, and the cost limit before creating a paid summary.
+- Incomplete history remains available with a coverage warning. Missing data does not mean zero activity.
+- Empty periods produce a saved report without an AI request or charge.
+- Reports preserve activity and session state at the selected period's end, not current live status.
+- Large reports use bounded evidence samples across the selected period, with explicit partial coverage and known omission counts.
+- The app discards pending results when the signed-in account changes.
+- Find confirmed reports in **History** for 30 days after creation, including reports whose AI summary is still running.
+- One-off reports do not replace the morning Home card or change the schedule or automatic AI preferences.
+- Paid retries require another cost review. Offline paid requests do not enter a background queue.
+- The Kilo Model Context Protocol (MCP) catalog excludes paid briefing confirmation.
+
+Deploy the database migration before the backend that uses the new report metadata.
 
 ## Quick Chat backends
 

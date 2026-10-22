@@ -16,12 +16,10 @@ const mocks = vi.hoisted(() => ({
   setQueryData: vi.fn(() => undefined),
   toastError: vi.fn(),
   refreshGitHubForceFresh: vi.fn(async () => undefined),
-  listBranches: vi.fn(
-    async (_input: unknown): Promise<unknown> => ({
-      defaultBranch: 'main',
-      branches: ['main'],
-    })
-  ),
+  listBranches: vi.fn(async (_input: unknown): Promise<unknown> => ({
+    defaultBranch: 'main',
+    branches: ['main'],
+  })),
   /** Every `useQuery` call in mount order, so a test can read the branch query's options. */
   queryCalls: [] as { queryKey?: unknown[]; enabled?: boolean; staleTime?: number }[],
   /** Result the branch query (the one with a `queryFn`) reports. */

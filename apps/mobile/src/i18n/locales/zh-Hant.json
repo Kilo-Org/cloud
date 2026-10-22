@@ -894,7 +894,7 @@
     },
     "autoReviews": "自動審查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者與帳單管理員可以設定連結。",
+      "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。",
       "setupIncomplete": "設定尚未完成。請在 kilo.ai 上完成設定。",
       "setup": "Bitbucket 設定"
     },
@@ -918,7 +918,10 @@
       "starting": "正在啟動審查…",
       "title": "手動審查"
     },
-    "notConnectedReadOnly": "尚未連結 {{platform}}。只有組織擁有者與帳單管理員可以設定連結。",
+    "notConnectedReadOnly": "尚未連結 {{platform}}。只有組織擁有者和管理員可以設定連結。",
+    "gitlab": {
+      "notConnectedReadOnly": "尚未連結 {{platform}}。請要求組織的擁有者、管理員或帳單管理員進行連結。"
+    },
     "platformList": {
       "activity": "活動",
       "checking": "正在檢查…",
@@ -997,7 +1000,7 @@
       "off": "審查記憶已關閉。",
       "on": "審查記憶已開啟。",
       "offDescription": "啟用後，Kilo 會從維護者的回覆中學習，並提出 REVIEW.md 指引建議。",
-      "readOnlyDescription": "只有組織擁有者和帳單管理員可以變更審查記憶。",
+      "readOnlyDescription": "只有組織擁有者、管理員和帳單管理員可以變更審查記憶。",
       "title": "審查記憶"
     },
     "scopeList": {
@@ -1149,7 +1152,7 @@
       "summary": "報告摘要",
       "title": "稽核報告",
       "unavailable": "無法取得稽核報告",
-      "unavailableDescription": "只有組織擁有者與帳單管理員可以檢視稽核報告。請向組織擁有者或帳單管理員申請存取權限。",
+      "unavailableDescription": "只有組織擁有者、管理員和帳單管理員可以檢視稽核報告。請向組織擁有者、管理員或帳單管理員申請存取權限。",
       "eventActions": {
         "findingAnalysisCompleted": "分析已完成",
         "findingAnalysisFailed": "分析失敗",
@@ -1263,7 +1266,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "這項資安問題已解決，無法再將其設為忽略。",
-      "cannotDismissDescription": "只有組織擁有者與帳單管理員可以忽略資安問題。",
+      "cannotDismissDescription": "只有組織擁有者、管理員和帳單管理員可以忽略資安問題。",
       "cannotDismissTitle": "無法忽略這項資安問題",
       "commentAccessibility": "忽略原因備註",
       "commentLabel": "備註（選填）",
@@ -1395,7 +1398,7 @@
       "automationCount": "已啟用 {{displayCount}}/3 項",
       "couldNotLoadPermissions": "無法載入權限。",
       "couldNotLoadSettings": "無法載入資安代理設定。",
-      "disabledNoManage": "資安代理已停用。只有組織擁有者與帳單管理員可以啟用。",
+      "disabledNoManage": "資安代理已停用。只有組織擁有者、管理員和帳單管理員可以啟用。",
       "disabledNoRepo": "啟用資安代理前，請至少選取一個存放庫。",
       "disabledPrompt": "啟用資安代理，即可同步 Dependabot 警報、選取存放庫並設定自動化。",
       "notificationsCount": "已啟用 {{displayCount}}/2 項",
@@ -1428,7 +1431,7 @@
       "lowDescription": "對安全性的影響極小。",
       "medium": "中",
       "mediumDescription": "影響有限，或需符合特定條件。",
-      "permissionNote": "只有組織擁有者與帳單管理員可以變更這些設定。",
+      "permissionNote": "只有組織擁有者、管理員和帳單管理員可以變更這些設定。",
       "remediationDeadlineA11y": "{{label}}修復期限，以天為單位",
       "title": "SLA 原則"
     },
@@ -1729,6 +1732,8 @@
       "commitAndPush": "提交並推送",
       "startSession": "開始工作階段",
       "selectRepositoryToStart": "選取儲存庫以開始。",
+      "enterPromptToStart": "新增提示詞以開始。",
+      "enterPromptOrFileToStart": "新增提示詞或檔案以開始。",
       "connectProviderToStart": "連結平台以開始。",
       "promptPlaceholder": "你想處理什麼？",
       "couldNotLoadModels": "無法載入模型。",
@@ -2550,6 +2555,8 @@
     },
     "connectionExpired": "GitHub 連線已過期。",
     "couldNotLoadPullRequest": "無法載入提取請求。",
+    "reviewServiceUnavailable": "審查服務無法使用",
+    "reviewServiceUnavailableDescription": "審查服務暫時無法使用。請稍後再試一次。",
     "couldNotOpenGitHubAppSettings": "無法開啟 GitHub 應用程式設定。",
     "description": "說明",
     "discussion": {
@@ -2960,6 +2967,7 @@
       "truncationBanner_other": "受 GitHub API 限制，僅顯示 {{total}} 個變更檔案中的前 {{limit}} 個。"
     },
     "linkPasteClipboardEmpty": "剪貼簿沒有內容。",
+    "linkPasteDenied": "貼上的存取權遭拒。請允許貼上並再試一次。",
     "linkPasteNotAPullRequest": "不是提取請求或合併請求連結",
     "announce": {
       "commentPosted": "留言已發佈",
@@ -3014,6 +3022,7 @@
 
       "chooseAccount": "選取帳戶",
       "loadErrorTitle": "無法載入你的組織清單。",
+      "membershipLostNotice": "你已無法存取此組織。已切換至 {{target}}。",
       "noOrganization": "沒有組織",
 
       "noOrganizationDescription": "此帳戶不屬於任何組織。請在網頁版建立或加入組織，以使用成員邀請和低餘額提醒等組織功能。",
@@ -3106,7 +3115,7 @@
     "members": {
       "changeRole": "變更角色",
       "emptyDescriptionCanInvite": "邀請團隊成員，一起在此組織中協作。",
-      "emptyDescriptionCannotInvite": "請組織擁有者或帳單管理員邀請團隊成員。",
+      "emptyDescriptionCannotInvite": "請組織擁有者、管理員或帳單管理員邀請團隊成員。",
       "emptyTitle": "尚無成員",
       "invitedDate": "{{date}} 已邀請",
       "limitPerDay": "{{amount}}/天",
@@ -3371,7 +3380,8 @@
       "settingsToolsOn": "開啟 — 設定工具會傳送給模型",
       "settingsToolsOff": "關閉 — 不會傳送任何設定工具給模型",
       "serverChecking": "正在檢查此伺服器…",
-      "serverToolCount": "{{count}} 個工具",
+      "serverToolCount_one": "{{count}} 個工具",
+      "serverToolCount_other": "{{count}} 個工具",
       "serverUnreachable": "無法連線至此伺服器",
       "serverOff": "此伺服器已關閉"
     },
@@ -3518,6 +3528,8 @@
       "quantizationsHelp": "較小的檔案佔用較少記憶體和儲存空間。較大的檔案通常能提供較好的回答。",
       "quantDetail": "下載 {{size}} · 約需 {{memory}} 記憶體",
       "downloadQuant": "下載 {{quant}}",
+      "downloadModelA11y": "下載 {{name}}",
+      "detailsA11y": "詳細資料：{{name}}",
       "loadingModel": "正在載入模型詳細資料",
       "couldNotLoadModel": "無法載入此模型",
       "noFiles": "沒有此 App 可執行的檔案",
@@ -3569,6 +3581,7 @@
   "appActions": {
     "start": {
       "promptRequired": "啟動代理程式需要提示詞。請新增提示詞後重新執行。",
+      "repositoryRequired": "啟動代理程式需要存放庫。請開啟 Kilo 並選擇一個存放庫，然後重新執行。",
       "repositoryUnknown": "Kilo 無法將 {{repository}} 辨識為 GitHub 或 GitLab 存放庫。請在 Kilo 中選擇其他存放庫。",
       "repositoryUnsupported": "{{repository}} 是 Bitbucket 存放庫——啟動代理程式暫時無法使用它。請在 Kilo 中選擇其他存放庫。"
     }
@@ -3606,10 +3619,13 @@
     "emptyDescription": "建立設定檔以跨會話重複使用環境變數、設定命令和技能。",
     "loadFailed": "無法載入設定檔",
     "counts": {
-      "vars": "{{count}} 個變數",
+      "vars_one": "{{count}} 個變數",
+      "vars_other": "{{count}} 個變數",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} 個技能",
-      "commands": "{{count}} 個命令",
+      "skills_one": "{{count}} 個技能",
+      "skills_other": "{{count}} 個技能",
+      "commands_one": "{{count}} 個命令",
+      "commands_other": "{{count}} 個命令",
       "varsShort": "{{count}}變",
       "skillsShort": "{{count}}技",
       "commandsShort": "{{count}}命"
@@ -3683,7 +3699,7 @@
       "environment": "環境（JSON）",
       "headers": "標頭 (JSON)",
       "timeout": "逾時",
-      "secretCount": "密鑰數量",
+      "secretCount": "密鑰數量：{{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3726,6 +3742,9 @@
       "visibilityPrimary": "主要 — 顯示在選擇器中",
       "visibilitySubagent": "子代理程式——只能從其他人調用",
       "visibilityAll": "全部 — 兩者",
+      "modePrimary": "僅主要",
+      "modeSubagent": "僅子代理程式",
+      "modeAll": "全部模式",
       "saveFailed": "無法保存代理",
       "deleteFailed": "無法刪除代理",
       "nameRequired": "輸入代理名稱",
@@ -3786,6 +3805,8 @@
     "empty": "目前無法取得點數包。",
     "noMatchingProducts": "App Store 未傳回相符的點數包。",
     "noMatchingProductsPlay": "Google Play 未傳回相符的點數包。",
+    "storeTimedOut": "App Store 未及時回應。請再試一次。",
+    "storeTimedOutPlay": "Google Play 未及時回應。請再試一次。",
     "purchaseOwnedByAnotherAccount": "此 Apple 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。"
   },

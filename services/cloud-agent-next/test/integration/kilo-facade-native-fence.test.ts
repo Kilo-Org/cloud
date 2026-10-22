@@ -10,7 +10,6 @@ import {
   CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlaneEvent,
   type ControlPlanePromptPayload,
-  type ControlPlaneWrapperFrame,
 } from '../../src/shared/control-plane-protocol.js';
 import type {
   ProviderAdapter,
@@ -19,9 +18,11 @@ import type {
 } from '../../src/sandbox-control/provider.js';
 import {
   createFakeCredentialBroker,
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { createSseDataReader, readSseUntil } from './helpers/sse-reader.js';
 import {
@@ -39,7 +40,7 @@ const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDB
 
 const USER_ID = 'user_native_fence';
 const ORG_ID = 'org_native_fence';
-const KILO_TOKEN = 'native-fence-kilo-token';
+const KILO_TOKEN = FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN;
 
 const userId = USER_ID;
 // `containedKiloSessionIdSchema` requires exactly 26 alphanumerics after the prefix.
@@ -125,6 +126,7 @@ async function installSandbox(
       }
     );
     Object.assign(instance, { createProviderAdapter: () => provider, provider });
+    installFakeRuntimeProxyPeer(instance);
   });
   return sandboxStub;
 }

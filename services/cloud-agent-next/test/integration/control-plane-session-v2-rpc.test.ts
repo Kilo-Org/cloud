@@ -1,3 +1,4 @@
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
@@ -34,7 +35,6 @@ type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
 const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace }).SANDBOX_CONTROL;
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
 
-const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
 const USER_ID = 'user_123';
 const ORG_ID = 'org_123';
 let sequence = 0;
@@ -110,7 +110,7 @@ function metadata(input: {
     },
     auth: {
       kiloSessionId: input.kiloSessionId,
-      kilocodeToken: input.kiloToken ?? NATIVE_KILO_TOKEN,
+      kilocodeToken: input.kiloToken ?? runtimeAuthorizedKiloToken(),
     },
     agent: { mode: 'code', model: 'test/model' },
     repository: input.repository ?? {
@@ -181,6 +181,7 @@ async function installSandbox(
       KILO_OPENROUTER_BASE: 'https://control.test',
       KILO_SESSION_INGEST_URL: 'https://control.test',
     });
+    installFakeRuntimeProxyPeer(instance);
     Object.assign(instance, { createProviderAdapter: () => provider, provider });
   });
   return sandboxStub;

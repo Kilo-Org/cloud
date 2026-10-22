@@ -321,6 +321,7 @@ describe.each(['top-level', 'nested'] as const)('%s child-card initial history',
           expect(button.props.accessibilityRole).toBe('button');
           expect(button.props.accessibilityLabel).toContain('General, child task');
           expect(button.props.accessibilityLabel).toContain(statusLabel);
+          expect(button.props.accessibilityLabel).not.toContain(status);
           if (modelLabel) {
             expect(button.props.accessibilityLabel).toContain(modelLabel);
           }

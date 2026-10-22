@@ -122,6 +122,26 @@ export function firstGrapheme(value: string, locale: string): string {
   );
 }
 
+const DECIMAL_DIGIT = /\p{Nd}/u;
+
+/**
+ * Fold every Unicode decimal digit to ASCII. A keypad's digits follow its own
+ * script, not the active app language: an Arabic keyboard types `٢٥` while the
+ * `ar` locale formats with Latin digits. Unicode encodes each decimal digit set
+ * as ten consecutive code points in ascending order, so a digit's value is its
+ * offset from the start of its run.
+ */
+function foldDecimalDigits(value: string): string {
+  return value.replaceAll(/\p{Nd}/gu, digit => {
+    const codePoint = digit.codePointAt(0) ?? 0;
+    let start = codePoint;
+    while (DECIMAL_DIGIT.test(String.fromCodePoint(start - 1))) {
+      start -= 1;
+    }
+    return String(codePoint - start);
+  });
+}
+
 export function parseLocalizedNumber(value: string, locale: string): number | null {
   const parts = numberFormat(locale, { useGrouping: true }).formatToParts(-12_345.6);
   const part = (type: Intl.NumberFormatPartTypes, fallback: string) =>
@@ -129,16 +149,7 @@ export function parseLocalizedNumber(value: string, locale: string): number | nu
   const group = part('group', ',');
   const decimal = part('decimal', '.');
   const minus = part('minusSign', '-');
-  const digits = new Map(
-    Array.from({ length: 10 }, (_, digit) => [
-      numberFormat(locale, { useGrouping: false }).format(digit),
-      String(digit),
-    ])
-  );
-  let normalized = value.trim().replaceAll(/[\u061C\u200E\u200F]/g, '');
-  for (const [local, ascii] of digits) {
-    normalized = normalized.split(local).join(ascii);
-  }
+  let normalized = foldDecimalDigits(value.trim().replaceAll(/[\u061C\u200E\u200F]/g, ''));
   if (/^[\s\u00A0\u202F]+$/u.test(group)) {
     normalized = normalized.replaceAll(/[ \u00A0\u202F]/gu, group);
   }

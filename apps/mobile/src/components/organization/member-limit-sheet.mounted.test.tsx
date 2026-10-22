@@ -264,6 +264,23 @@ describe('MemberLimitSheet validation', () => {
     unmount();
   });
 
+  it('enables save for an amount typed with Arabic-Indic digits under the Arabic UI', async () => {
+    await i18n.changeLanguage('ar');
+    try {
+      const { renderer, unmount } = await mountLimitForm(1200);
+
+      act(() => {
+        (formField(renderer).onChangeText as (value: string) => void)('٢٥');
+      });
+
+      expect(formField(renderer).error).toBeUndefined();
+      expect(saveButton(renderer).disabled).toBe(false);
+      unmount();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
   it('explains a blank field on a member with no limit only after interaction', async () => {
     const { renderer, unmount } = await mountLimitForm(null);
 

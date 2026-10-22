@@ -37,4 +37,13 @@ describe('limitError', () => {
     expect(limitError('-1', true)).toBe(rangeMessage);
     expect(limitError('lots', true)).toBe(rangeMessage);
   });
+
+  it('accepts Arabic-Indic digits typed under the Arabic UI', async () => {
+    await i18n.changeLanguage('ar');
+    try {
+      expect(limitError('٢٥', true)).toBeNull();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
 });

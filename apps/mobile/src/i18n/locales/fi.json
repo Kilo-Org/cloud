@@ -1458,7 +1458,7 @@
       "off": "Katselmointimuisti on pois käytöstä.",
       "on": "Katselmointimuisti on käytössä.",
       "offDescription": "Ota se käyttöön, jotta Kilo voi oppia ylläpitäjien vastauksista ja ehdottaa REVIEW.md-ohjeita.",
-      "readOnlyDescription": "Vain organisaation omistajat ja laskutusvastaavat voivat muuttaa katselmointimuistia.",
+      "readOnlyDescription": "Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat muuttaa katselmointimuistia.",
       "enable": "Ota katselmointimuisti käyttöön",
       "loadingProposals": "Ladataan ehdotuksia",
       "couldNotLoadProposals": "Ehdotuksia ei voitu ladata.",
@@ -1478,7 +1478,10 @@
       "starting": "Käynnistetään katselmointia…",
       "start": "Aloita katselmointi"
     },
-    "notConnectedReadOnly": "Palvelua {{platform}} ei ole yhdistetty. Vain organisaation omistajat ja laskutusvastaavat voivat yhdistää sen.",
+    "notConnectedReadOnly": "Palvelua {{platform}} ei ole yhdistetty. Vain organisaation omistajat ja ylläpitäjät voivat yhdistää sen.",
+    "gitlab": {
+      "notConnectedReadOnly": "Palvelua {{platform}} ei ole yhdistetty. Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se."
+    },
     "webhookSetup": "Webhook-kutsujen määritys on kesken.",
     "webhookSetupDescription": "Automaattiset katselmoinnit eivät ehkä toimi kaikissa koodivarastoissa.",
     "autoReviews": "Automaattiset katselmoinnit",
@@ -1486,7 +1489,7 @@
     "followReviewMd": "Noudata REVIEW.md-ohjeita",
     "followReviewMdSubtitle": "Noudata koodivarastokohtaisia REVIEW.md-ohjeita",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Vain organisaation omistajat ja laskutusvastaavat voivat yhdistää sen.",
+      "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen.",
       "setupIncomplete": "Käyttöönotto on kesken. Viimeistele määritys osoitteessa kilo.ai.",
       "setup": "Bitbucketin käyttöönotto"
     },
@@ -1746,7 +1749,7 @@
       "couldNotLoad": "Havainnon lataaminen epäonnistui",
       "couldNotCheckPermissions": "Hylkäysoikeuksia ei voitu tarkistaa",
       "cannotDismissTitle": "Tätä havaintoa ei voi hylätä",
-      "cannotDismissDescription": "Vain organisaation omistajat ja laskutusvastaavat voivat hylätä havaintoja.",
+      "cannotDismissDescription": "Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat hylätä havaintoja.",
       "alreadyResolvedDescription": "Havainto on jo ratkaistu, joten sitä ei voi enää hylätä."
     },
     "findingDetails": {
@@ -1788,7 +1791,7 @@
       "automationAllOff": "Kaikki pois käytöstä",
       "automationCount": "{{displayCount}}/3 käytössä",
       "notificationsCount": "{{displayCount}}/2 käytössä",
-      "disabledNoManage": "Tietoturva-agentti on pois käytöstä. Vain organisaation omistajat ja laskutusvastaavat voivat ottaa sen käyttöön.",
+      "disabledNoManage": "Tietoturva-agentti on pois käytöstä. Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat ottaa sen käyttöön.",
       "disabledNoRepo": "Valitse vähintään yksi koodivarasto ennen tietoturva-agentin käyttöönottoa.",
       "disabledPrompt": "Ota tietoturva-agentti käyttöön, niin voit synkronoida Dependabot-hälytykset, valita koodivarastot ja määrittää automaation."
     },
@@ -1837,7 +1840,7 @@
       "invalidDayCount": "anna päivien määrä kokonaislukuna väliltä 1–365.",
       "remediationDeadlineA11y": "Vakavuus: {{label}}. Korjauksen määräaika päivinä",
       "enterWholeNumber": "Anna kokonaisluku välillä 1–365",
-      "permissionNote": "Vain organisaation omistajat ja laskutusvastaavat voivat muuttaa näitä asetuksia.",
+      "permissionNote": "Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat muuttaa näitä asetuksia.",
       "enableTracking": "Ota SLA-seuranta käyttöön",
       "enableTrackingSubtitle": "Korjausten määräajat asetetaan havaintojen vakavuuden mukaan.",
       "deadlinesHeading": "Korjausten määräajat (päivää)"
@@ -1893,7 +1896,7 @@
       "summary": "Raportin yhteenveto",
       "title": "Tarkastusraportti",
       "unavailable": "Tarkastusraporttia ei ole saatavilla",
-      "unavailableDescription": "Vain organisaation omistajat ja laskutusvastaavat voivat tarkastella tarkastusraportteja. Pyydä käyttöoikeus omistajalta tai laskutusvastaavalta.",
+      "unavailableDescription": "Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat tarkastella tarkastusraportteja. Pyydä käyttöoikeus omistajalta, ylläpitäjältä tai laskutusvastaavalta.",
       "queryFailed": "Raportin haku jäi kesken. Yritä uudelleen.",
       "eventActions": {
         "findingAnalysisCompleted": "Analyysi valmistui",
@@ -3110,7 +3113,7 @@
     "members": {
       "changeRole": "Vaihda rooli",
       "emptyDescriptionCanInvite": "Kutsu tiimisi jäseniä yhteistyöhön tässä organisaatiossa.",
-      "emptyDescriptionCannotInvite": "Pyydä omistajaa tai laskutusvastaavaa kutsumaan tiimisi jäseniä.",
+      "emptyDescriptionCannotInvite": "Pyydä omistajaa, ylläpitäjää tai laskutusvastaavaa kutsumaan tiimisi jäseniä.",
       "emptyTitle": "Ei vielä jäseniä",
       "invitedDate": "Kutsuttu {{date}}",
       "limitPerDay": "{{amount}}/päivä",

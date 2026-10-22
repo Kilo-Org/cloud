@@ -1458,7 +1458,7 @@
       "off": "Granskningsminnet är avstängt",
       "on": "Granskningsminnet är påslaget",
       "offDescription": "Aktivera det så att Kilo kan lära sig av de projektansvarigas svar och föreslå riktlinjer för REVIEW.md.",
-      "readOnlyDescription": "Endast organisationsägare och faktureringsansvariga kan ändra granskningsminne.",
+      "readOnlyDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan ändra granskningsminne.",
       "enable": "Aktivera granskningsminne",
       "loadingProposals": "Läser in förslag",
       "couldNotLoadProposals": "Kunde inte läsa in förslagen",
@@ -1478,7 +1478,10 @@
       "starting": "Startar granskning…",
       "start": "Starta granskning"
     },
-    "notConnectedReadOnly": "Det finns ingen anslutning till {{platform}}. Endast organisationsägare och faktureringsansvariga kan skapa anslutningen.",
+    "notConnectedReadOnly": "Det finns ingen anslutning till {{platform}}. Endast organisationsägare och administratörer kan skapa anslutningen.",
+    "gitlab": {
+      "notConnectedReadOnly": "Det finns ingen anslutning till {{platform}}. Be en organisationsägare, administratör eller faktureringsansvarig att ansluta den."
+    },
     "webhookSetup": "Konfigurationen av webbhookar är inte klar",
     "webhookSetupDescription": "Vissa kodarkiv kanske inte granskas automatiskt.",
     "autoReviews": "Automatiska granskningar",
@@ -1486,7 +1489,7 @@
     "followReviewMd": "Följ REVIEW.md",
     "followReviewMdSubtitle": "Följ instruktionerna i varje kodarkivs REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare och faktureringsansvariga kan skapa anslutningen.",
+      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen.",
       "setupIncomplete": "Konfigurationen är inte klar. Slutför den på kilo.ai",
       "setup": "Konfiguration av Bitbucket"
     },
@@ -1746,7 +1749,7 @@
       "couldNotLoad": "Kunde inte läsa in det här fyndet",
       "couldNotCheckPermissions": "Kunde inte kontrollera behörigheten att avfärda fynd",
       "cannotDismissTitle": "Det går inte att avfärda fyndet",
-      "cannotDismissDescription": "Endast organisationsägare och faktureringsansvariga kan avfärda fynd.",
+      "cannotDismissDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan avfärda fynd.",
       "alreadyResolvedDescription": "Fyndet har redan åtgärdats och kan inte längre avfärdas."
     },
     "findingDetails": {
@@ -1788,7 +1791,7 @@
       "automationAllOff": "Allt avstängt",
       "automationCount": "{{displayCount}} av 3 aktiverade",
       "notificationsCount": "{{displayCount}} av 2 aktiverade",
-      "disabledNoManage": "Security Agent är inaktiverad. Endast organisationsägare och faktureringsansvariga kan aktivera den.",
+      "disabledNoManage": "Security Agent är inaktiverad. Endast organisationsägare, administratörer och faktureringsansvariga kan aktivera den.",
       "disabledNoRepo": "Välj minst ett kodarkiv innan du aktiverar Security Agent.",
       "disabledPrompt": "Aktivera Security Agent för att synkronisera Dependabot-varningar, välja kodarkiv och ställa in automatisering."
     },
@@ -1837,7 +1840,7 @@
       "invalidDayCount": "Ange 1–365 dagar, endast heltal.",
       "remediationDeadlineA11y": "Tidsfrist för åtgärd i dagar, {{label}}",
       "enterWholeNumber": "Ange ett heltal mellan 1 och 365",
-      "permissionNote": "Endast organisationsägare och faktureringsansvariga kan ändra dessa inställningar.",
+      "permissionNote": "Endast organisationsägare, administratörer och faktureringsansvariga kan ändra dessa inställningar.",
       "enableTracking": "Aktivera SLA-uppföljning",
       "enableTrackingSubtitle": "Ange tidsfrister för åtgärder utifrån fyndens allvarlighetsgrad.",
       "deadlinesHeading": "Tidsfrister för åtgärder (dagar)"
@@ -1893,7 +1896,7 @@
       "summary": "Rapportsammanfattning",
       "title": "Revisionsrapport",
       "unavailable": "Revisionsrapporten är inte tillgänglig",
-      "unavailableDescription": "Endast organisationsägare och faktureringsansvariga kan se revisionsrapporter. Be en organisationsägare eller faktureringsansvarig att ge dig åtkomst.",
+      "unavailableDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan se revisionsrapporter. Be en organisationsägare, administratör eller faktureringsansvarig att ge dig åtkomst.",
       "queryFailed": "Hämtningen av rapporten slutfördes inte. Försök igen.",
       "eventActions": {
         "findingAnalysisCompleted": "Analys slutförd",
@@ -3109,7 +3112,7 @@
     "members": {
       "changeRole": "Ändra roll",
       "emptyDescriptionCanInvite": "Bjud in kollegor för att börja samarbeta i den här organisationen.",
-      "emptyDescriptionCannotInvite": "Be en ägare eller faktureringsansvarig att bjuda in kollegor.",
+      "emptyDescriptionCannotInvite": "Be en ägare, administratör eller faktureringsansvarig att bjuda in kollegor.",
       "emptyTitle": "Inga medlemmar ännu",
       "invitedDate": "Inbjuden {{date}}",
       "limitPerDay": "{{amount}}/dag",

@@ -1458,7 +1458,7 @@
       "off": "Inkumbulo yokuhlola ivaliwe.",
       "on": "Inkumbulo yokuhlola ivuliwe.",
       "offDescription": "Yivule ukuze i-Kilo ifunde ezimpendulweni zabagcini bekhodi futhi iphakamise imihlahlandlela ye-REVIEW.md.",
-      "readOnlyDescription": "Abanikazi benhlangano nabaphathi bezinkokhelo kuphela abangashintsha inkumbulo yokuhlola.",
+      "readOnlyDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangashintsha inkumbulo yokuhlola.",
       "enable": "Vula inkumbulo yokuhlola",
       "loadingProposals": "Kulayishwa iziphakamiso",
       "couldNotLoadProposals": "Asikwazanga ukulayisha iziphakamiso.",
@@ -1478,7 +1478,10 @@
       "starting": "Kuqaliswa ukuhlolwa…",
       "start": "Qala ukuhlola"
     },
-    "notConnectedReadOnly": "{{platform}} ayixhunyiwe. Abanikazi benhlangano nabaphathi bezinkokhelo kuphela abangayixhuma.",
+    "notConnectedReadOnly": "{{platform}} ayixhunyiwe. Abanikazi benhlangano nabalawuli kuphela abangayixhuma.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} ayixhunyiwe. Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma."
+    },
     "webhookSetup": "Ukusetha i-webhook akukaqedwa.",
     "webhookSetupDescription": "Ezinye izinqolobane zekhodi kungenzeka zingahlolwa ngokuzenzakalelayo.",
     "autoReviews": "Ukuhlolwa okuzenzakalelayo",
@@ -1486,7 +1489,7 @@
     "followReviewMd": "Landela i-REVIEW.md",
     "followReviewMdSubtitle": "Landela imiyalo yamafayela e-REVIEW.md enqolobaneni ngayinye yekhodi",
     "bitbucket": {
-      "notConnectedReadOnly": "I-Bitbucket ayixhunyiwe. Abanikazi benhlangano nabaphathi bezinkokhelo kuphela abangayixhuma.",
+      "notConnectedReadOnly": "I-Bitbucket ayixhunyiwe. Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
       "setupIncomplete": "Ukusetha akukaqedwa. Kuqedele ku-kilo.ai.",
       "setup": "Ukusetha kwe-Bitbucket"
     },
@@ -1746,7 +1749,7 @@
       "couldNotLoad": "Asikwazanga ukulayisha lokhu okutholakele.",
       "couldNotCheckPermissions": "Asikwazanga ukuhlola izimvume zokuchitha.",
       "cannotDismissTitle": "Awukwazi ukuchitha lokhu okutholakele",
-      "cannotDismissDescription": "Abanikazi benhlangano nabaphathi bezinkokhelo kuphela abangachitha okutholakele.",
+      "cannotDismissDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangachitha okutholakele.",
       "alreadyResolvedDescription": "Lokhu okutholakele sekuxazululiwe futhi akusakwazi ukuchithwa."
     },
     "findingDetails": {
@@ -1788,7 +1791,7 @@
       "automationAllOff": "Konke kuvaliwe",
       "automationCount": "{{displayCount}} kwezingu-3 kuvuliwe",
       "notificationsCount": "{{displayCount}} kwezingu-2 kuvuliwe",
-      "disabledNoManage": "I-ejenti yezokuphepha ivaliwe. Abanikazi benhlangano nabaphathi bezinkokhelo kuphela abangayivula.",
+      "disabledNoManage": "I-ejenti yezokuphepha ivaliwe. Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayivula.",
       "disabledNoRepo": "Khetha okungenani inqolobane yekhodi eyodwa ngaphambi kokuvula i-ejenti yezokuphepha.",
       "disabledPrompt": "Vula i-ejenti yezokuphepha ukuze uvumelanise izexwayiso ze-Dependabot, ukhethe izinqolobane zekhodi futhi usethe okuzenzakalelayo."
     },
@@ -1837,7 +1840,7 @@
       "invalidDayCount": "faka izinsuku ezingu-1–365, usebenzise izinombolo eziphelele kuphela.",
       "remediationDeadlineA11y": "Umnqamulajuqu wokulungisa ngezinsuku: {{label}}",
       "enterWholeNumber": "Faka inombolo ephelele phakathi kuka-1 no-365",
-      "permissionNote": "Abanikazi benhlangano nabaphathi bezinkokhelo kuphela abangashintsha lezi zilungiselelo.",
+      "permissionNote": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangashintsha lezi zilungiselelo.",
       "enableTracking": "Vula ukulandelela kwe-SLA",
       "enableTrackingSubtitle": "Beka iminqamulajuqu yokulungisa ngokobucayi bokutholakele.",
       "deadlinesHeading": "Iminqamulajuqu yokulungisa (izinsuku)"
@@ -1893,7 +1896,7 @@
       "summary": "Isifinyezo sombiko",
       "title": "Umbiko wokuhlola",
       "unavailable": "Umbiko wokuhlola awutholakali",
-      "unavailableDescription": "Abanikazi benhlangano nabaphathi bezinkokhelo kuphela abangabuka imibiko yokuhlola. Cela umnikazi noma umphathi wezinkokhelo akunike imvume yokuyifinyelela.",
+      "unavailableDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangabuka imibiko yokuhlola. Cela umnikazi, umlawuli, noma umphathi wezinkokhelo akunike imvume yokuyifinyelela.",
       "queryFailed": "Ukucela idatha yombiko akuphelanga. Zama futhi.",
       "eventActions": {
         "findingAnalysisCompleted": "Ukuhlaziywa kuqediwe",
@@ -3110,7 +3113,7 @@
     "members": {
       "changeRole": "Shintsha iqhaza",
       "emptyDescriptionCanInvite": "Mema ozakwenu ukuze niqale ukusebenzisana kule nhlangano.",
-      "emptyDescriptionCannotInvite": "Cela umnikazi noma umphathi wokukhokha ukuthi ameme ozakwenu.",
+      "emptyDescriptionCannotInvite": "Cela umnikazi, umlawuli, noma umphathi wokukhokha ukuthi ameme ozakwenu.",
       "emptyTitle": "Awekho amalungu okwamanje",
       "invitedDate": "Umenyiwe: {{date}}",
       "limitPerDay": "{{amount}}/ngosuku",

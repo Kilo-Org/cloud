@@ -1458,7 +1458,7 @@
       "off": "የግምገማ ትውስታ ተሰናክሏል።",
       "on": "የግምገማ ትውስታ በርቷል።",
       "offDescription": "Kilo ከፕሮጀክት ተንከባካቢዎች ምላሾች እንዲማርና ለREVIEW.md መመሪያዎችን እንዲጠቁም ያንቁት።",
-      "readOnlyDescription": "የግምገማ ትውስታን መቀየር የሚችሉት የድርጅት ባለቤቶች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
+      "readOnlyDescription": "የግምገማ ትውስታን መቀየር የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
       "enable": "የግምገማ ትውስታን ያንቁ",
       "loadingProposals": "የቀረቡ ሐሳቦችን በመጫን ላይ",
       "couldNotLoadProposals": "የቀረቡ ሐሳቦችን መጫን አልተቻለም።",
@@ -1478,7 +1478,10 @@
       "starting": "ግምገማን በመጀመር ላይ…",
       "start": "ግምገማ ይጀምሩ"
     },
-    "notConnectedReadOnly": "{{platform}} አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
+    "notConnectedReadOnly": "{{platform}} አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} አልተገናኘም። የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።"
+    },
     "webhookSetup": "ዌብሁክን ማዋቀር አልተጠናቀቀም።",
     "webhookSetupDescription": "አንዳንድ ማከማቻዎች በራስ-ሰር ላይገመገሙ ይችላሉ።",
     "autoReviews": "ራስ-ሰር ግምገማዎች",
@@ -1486,7 +1489,7 @@
     "followReviewMd": "REVIEW.mdን ይከተሉ",
     "followReviewMdSubtitle": "በእያንዳንዱ ማከማቻ ውስጥ ያሉትን የREVIEW.md መመሪያ ፋይሎች ይከተሉ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
+      "notConnectedReadOnly": "Bitbucket አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
       "setupIncomplete": "ማዋቀሩ አልተጠናቀቀም። በkilo.ai ላይ ያጠናቅቁት።",
       "setup": "የBitbucket ማዋቀር"
     },
@@ -1746,7 +1749,7 @@
       "couldNotLoad": "ይህን ግኝት መጫን አልተቻለም።",
       "couldNotCheckPermissions": "የማስወገድ ፈቃዶችን መፈተሽ አልተቻለም።",
       "cannotDismissTitle": "ይህን ግኝት ማስወገድ አይቻልም",
-      "cannotDismissDescription": "የድርጅት ባለቤቶች እና የክፍያ አስተዳዳሪዎች ብቻ ግኝቶችን ማስወገድ ይችላሉ።",
+      "cannotDismissDescription": "ግኝቶችን ማስወገድ የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
       "alreadyResolvedDescription": "ይህ ግኝት አስቀድሞ መፍትሄ ስላገኘ ከእንግዲህ ማስወገድ አይቻልም።"
     },
     "findingDetails": {
@@ -1788,7 +1791,7 @@
       "automationAllOff": "ሁሉም ተሰናክለዋል",
       "automationCount": "ከ3 ውስጥ {{displayCount}} ነቅተዋል",
       "notificationsCount": "ከ2 ውስጥ {{displayCount}} ነቅተዋል",
-      "disabledNoManage": "የደህንነት ወኪሉ ተሰናክሏል። የድርጅት ባለቤቶች እና የክፍያ አስተዳዳሪዎች ብቻ ሊያነቁት ይችላሉ።",
+      "disabledNoManage": "የደህንነት ወኪሉ ተሰናክሏል። ሊያነቁት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
       "disabledNoRepo": "የደህንነት ወኪሉን ከማንቃት በፊት ቢያንስ አንድ ማከማቻ ይምረጡ።",
       "disabledPrompt": "የDependabot ማስጠንቀቂያዎችን ለማመሳሰል፣ ማከማቻዎችን ለመምረጥ እና ራስ-ሰር አሠራርን ለማዋቀር የደህንነት ወኪሉን ያንቁ።"
     },
@@ -1837,7 +1840,7 @@
       "invalidDayCount": "ከ1 እስከ 365 ያለ ሙሉ የቀናት ቁጥር ያስገቡ።",
       "remediationDeadlineA11y": "የ{{label}} ጥገና ጊዜ ገደብ በቀናት",
       "enterWholeNumber": "ከ1 እስከ 365 ያለ ሙሉ ቁጥር አስገባ",
-      "permissionNote": "የድርጅት ባለቤቶች እና የክፍያ አስተዳዳሪዎች ብቻ እነዚህን ቅንብሮች መቀየር ይችላሉ።",
+      "permissionNote": "እነዚህን ቅንብሮች መቀየር የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
       "enableTracking": "የSLA ክትትልን ያንቁ",
       "enableTrackingSubtitle": "በግኝት ክብደት ላይ በመመስረት የጥገና ጊዜ ገደቦችን ያዘጋጁ።",
       "deadlinesHeading": "የጥገና ጊዜ ገደቦች (ቀናት)"
@@ -1893,7 +1896,7 @@
       "summary": "የሪፖርት ማጠቃለያ",
       "title": "የኦዲት ሪፖርት",
       "unavailable": "የኦዲት ሪፖርት አይገኝም",
-      "unavailableDescription": "የድርጅት ባለቤቶች እና የክፍያ አስተዳዳሪዎች ብቻ የኦዲት ሪፖርቶችን መመልከት ይችላሉ። የማየት ፈቃድ እንዲሰጥዎ የድርጅት ባለቤትን ወይም የክፍያ አስተዳዳሪን ይጠይቁ።",
+      "unavailableDescription": "የኦዲት ሪፖርቶችን ማየት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው። የማየት ፈቃድ እንዲሰጥዎ የድርጅት ባለቤትን፣ አስተዳዳሪን ወይም የክፍያ አስተዳዳሪን ይጠይቁ።",
       "queryFailed": "ሪፖርቱን የማምጣት ሂደት አልተጠናቀቀም። እንደገና ይሞክሩ።",
       "eventActions": {
         "findingAnalysisCompleted": "ትንተናው ተጠናቋል",
@@ -3110,7 +3113,7 @@
     "members": {
       "changeRole": "ሚናውን ይቀይሩ",
       "emptyDescriptionCanInvite": "በዚህ ድርጅት ውስጥ መተባበር ለመጀመር የሥራ ባልደረቦችን ይጋብዙ።",
-      "emptyDescriptionCannotInvite": "ባለቤት ወይም የክፍያ አስተዳዳሪ የሥራ ባልደረቦችን እንዲጋብዝ ይጠይቁ።",
+      "emptyDescriptionCannotInvite": "የሥራ ባልደረቦችን እንዲጋብዝ ባለቤትን፣ አስተዳዳሪን ወይም የክፍያ አስተዳዳሪን ይጠይቁ።",
       "emptyTitle": "እስካሁን አባላት የሉም",
       "invitedDate": "ግብዣ የተላከበት፦ {{date}}",
       "limitPerDay": "{{amount}}/ቀን",

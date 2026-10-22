@@ -1458,7 +1458,7 @@
       "off": "An kashe ƙwaƙwalwar bita.",
       "on": "An kunna ƙwaƙwalwar bita.",
       "offDescription": "Kunna ta don Kilo ya koya daga amsoshin masu kula da shirin kuma ya ba da shawarar ƙa'idodin REVIEW.md.",
-      "readOnlyDescription": "Masu mallakar ƙungiya da masu kula da biyan kuɗi kawai za su iya canza ƙwaƙwalwar bita.",
+      "readOnlyDescription": "Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya canza ƙwaƙwalwar bita.",
       "enable": "Kunna ƙwaƙwalwar bita",
       "loadingProposals": "Ana loda shawarwari",
       "couldNotLoadProposals": "An kasa loda shawarwari.",
@@ -1478,7 +1478,10 @@
       "starting": "Ana fara bita…",
       "start": "Fara bita"
     },
-    "notConnectedReadOnly": "Ba a haɗa {{platform}} ba. Masu mallakar ƙungiya da masu kula da biyan kuɗi kawai za su iya haɗa shi.",
+    "notConnectedReadOnly": "Ba a haɗa {{platform}} ba. Masu ƙungiya da masu gudanarwa kawai za su iya haɗa shi.",
+    "gitlab": {
+      "notConnectedReadOnly": "Ba a haɗa {{platform}} ba. Nemi Mai ƙungiya, Mai gudanarwa, ko Manajan biyan kuɗi ya haɗa shi."
+    },
     "webhookSetup": "Ba a kammala saitin hanyar sanarwa ta yanar gizo ba.",
     "webhookSetupDescription": "Wataƙila ba za a yi bitar wasu ma'ajiyoyi ta atomatik ba.",
     "autoReviews": "Bitar atomatik",
@@ -1486,7 +1489,7 @@
     "followReviewMd": "Bi REVIEW.md",
     "followReviewMdSubtitle": "Bi umarnin fayil ɗin REVIEW.md na kowace ma'ajiya",
     "bitbucket": {
-      "notConnectedReadOnly": "Ba a haɗa Bitbucket ba. Masu mallakar ƙungiya da masu kula da biyan kuɗi kawai za su iya haɗa shi.",
+      "notConnectedReadOnly": "Ba a haɗa Bitbucket ba. Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi.",
       "setupIncomplete": "Ba a kammala saitin ba. Kammala shi a kilo.ai.",
       "setup": "Saitin Bitbucket"
     },
@@ -1746,7 +1749,7 @@
       "couldNotLoad": "An kasa loda wannan sakamakon bincike.",
       "couldNotCheckPermissions": "An kasa duba izinin yin watsi.",
       "cannotDismissTitle": "Ba za a iya yin watsi da wannan matsalar ba",
-      "cannotDismissDescription": "Masu mallakar ƙungiya da masu kula da biyan kuɗi kawai za su iya yin watsi da matsalolin da aka gano.",
+      "cannotDismissDescription": "Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya yin watsi da matsalolin da aka gano.",
       "alreadyResolvedDescription": "An riga an warware wannan matsalar, don haka ba za a iya yin watsi da ita ba."
     },
     "findingDetails": {
@@ -1788,7 +1791,7 @@
       "automationAllOff": "Duk a kashe",
       "automationCount": "An kunna {{displayCount}} daga cikin 3",
       "notificationsCount": "An kunna {{displayCount}} daga cikin 2",
-      "disabledNoManage": "An kashe Wakilin tsaro. Masu mallakar ƙungiya da masu kula da biyan kuɗi kawai za su iya kunna shi.",
+      "disabledNoManage": "An kashe Wakilin tsaro. Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya kunna shi.",
       "disabledNoRepo": "Zaɓi aƙalla ma'ajiya ɗaya kafin kunna Wakilin tsaro.",
       "disabledPrompt": "Kunna Wakilin tsaro don daidaita faɗakarwar Dependabot, zaɓar ma'ajiyoyi da saita aiki na atomatik."
     },
@@ -1837,7 +1840,7 @@
       "invalidDayCount": "shigar da kwanaki 1–365, da lambobi cikakku kawai.",
       "remediationDeadlineA11y": "Wa'adin gyaran {{label}} a kwanaki",
       "enterWholeNumber": "Shigar da cikakkiyar lamba tsakanin 1 da 365",
-      "permissionNote": "Masu mallakar ƙungiya da masu kula da biyan kuɗi kawai za su iya canza waɗannan saitunan.",
+      "permissionNote": "Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya canza waɗannan saitunan.",
       "enableTracking": "Kunna bin diddigin SLA",
       "enableTrackingSubtitle": "Saita wa'adin gyara bisa tsananin matsalar da aka gano.",
       "deadlinesHeading": "Wa'adin gyara (kwanaki)"
@@ -1893,7 +1896,7 @@
       "summary": "Taƙaitaccen rahoto",
       "title": "Rahoton bincike",
       "unavailable": "Ba a iya samun rahoton bincike",
-      "unavailableDescription": "Masu mallakar ƙungiya da masu kula da biyan kuɗi kawai za su iya duba rahotannin bincike. Nemi mai ƙungiya ko mai kula da biyan kuɗi ya ba ka dama.",
+      "unavailableDescription": "Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya duba rahotannin bincike. Nemi mai ƙungiya, mai gudanarwa, ko manajan biyan kuɗi ya ba ka dama.",
       "queryFailed": "Ba a kammala neman bayanan rahoton ba. Sake gwadawa.",
       "eventActions": {
         "findingAnalysisCompleted": "An kammala bincike",
@@ -3110,7 +3113,7 @@
     "members": {
       "changeRole": "Canza matsayi",
       "emptyDescriptionCanInvite": "Gayyaci abokan aiki don fara haɗin gwiwa a wannan ƙungiyar.",
-      "emptyDescriptionCannotInvite": "Nemi mai ƙungiyar ko manajan biyan kuɗi ya gayyaci abokan aiki.",
+      "emptyDescriptionCannotInvite": "Nemi mai ƙungiya, mai gudanarwa, ko manajan biyan kuɗi ya gayyaci abokan aiki.",
       "emptyTitle": "Babu membobi tukuna",
       "invitedDate": "Ranar gayyata: {{date}}",
       "limitPerDay": "{{amount}}/rana",

@@ -894,7 +894,7 @@
     },
     "autoReviews": "자동 리뷰",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket이 연결되지 않았습니다. 조직 소유자와 결제 관리자만 연결할 수 있습니다.",
+      "notConnectedReadOnly": "Bitbucket이 연결되지 않았습니다. 조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다.",
       "setupIncomplete": "설정이 완료되지 않았습니다. kilo.ai에서 설정을 완료하세요.",
       "setup": "Bitbucket 설정"
     },
@@ -918,7 +918,10 @@
       "starting": "리뷰 시작 중…",
       "title": "수동 리뷰"
     },
-    "notConnectedReadOnly": "{{platform}} 연결이 설정되지 않았습니다. 조직 소유자와 결제 관리자만 연결할 수 있습니다.",
+    "notConnectedReadOnly": "{{platform}} 연결이 설정되지 않았습니다. 조직 소유자와 관리자만 연결할 수 있습니다.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} 연결이 설정되지 않았습니다. 조직 소유자, 관리자 또는 결제 관리자에게 연결을 요청하세요."
+    },
     "platformList": {
       "activity": "활동",
       "checking": "확인 중…",
@@ -997,7 +1000,7 @@
       "off": "리뷰 메모리가 꺼져 있습니다.",
       "on": "리뷰 메모리가 켜져 있습니다.",
       "offDescription": "리뷰 메모리를 활성화하면 Kilo가 유지보수 담당자의 답변을 학습하여 REVIEW.md 지침을 제안합니다.",
-      "readOnlyDescription": "조직 소유자와 결제 관리자만 리뷰 메모리를 변경할 수 있습니다.",
+      "readOnlyDescription": "조직 소유자, 관리자, 결제 관리자만 리뷰 메모리를 변경할 수 있습니다.",
       "title": "리뷰 메모리"
     },
     "scopeList": {
@@ -1149,7 +1152,7 @@
       "summary": "보고서 요약",
       "title": "감사 보고서",
       "unavailable": "감사 보고서 열람 불가",
-      "unavailableDescription": "조직 소유자와 결제 관리자만 감사 보고서를 볼 수 있습니다. 소유자나 결제 관리자에게 접근 권한을 요청하세요.",
+      "unavailableDescription": "조직 소유자, 관리자, 결제 관리자만 감사 보고서를 볼 수 있습니다. 소유자, 관리자, 결제 관리자에게 접근 권한을 요청하세요.",
       "eventActions": {
         "findingAnalysisCompleted": "분석 완료됨",
         "findingAnalysisFailed": "분석 실패함",
@@ -1263,7 +1266,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "이 문제는 이미 해결되어 더 이상 무시 처리할 수 없습니다.",
-      "cannotDismissDescription": "조직 소유자와 결제 관리자만 발견된 문제를 무시 처리할 수 있습니다.",
+      "cannotDismissDescription": "조직 소유자, 관리자, 결제 관리자만 발견된 문제를 무시 처리할 수 있습니다.",
       "cannotDismissTitle": "이 문제를 무시 처리할 수 없음",
       "commentAccessibility": "무시 처리에 대한 추가 설명",
       "commentLabel": "추가 설명(선택 사항)",
@@ -1395,7 +1398,7 @@
       "automationCount": "3개 중 {{displayCount}}개 활성화됨",
       "couldNotLoadPermissions": "권한을 불러올 수 없습니다.",
       "couldNotLoadSettings": "보안 에이전트 설정을 불러올 수 없습니다.",
-      "disabledNoManage": "보안 에이전트가 비활성화되어 있습니다. 조직 소유자와 결제 관리자만 활성화할 수 있습니다.",
+      "disabledNoManage": "보안 에이전트가 비활성화되어 있습니다. 조직 소유자, 관리자, 결제 관리자만 활성화할 수 있습니다.",
       "disabledNoRepo": "보안 에이전트를 활성화하기 전에 저장소를 하나 이상 선택하세요.",
       "disabledPrompt": "보안 에이전트를 활성화하여 Dependabot 알림을 동기화하고, 저장소를 선택하고, 자동화를 설정하세요.",
       "notificationsCount": "2개 중 {{displayCount}}개 활성화됨",
@@ -1428,7 +1431,7 @@
       "lowDescription": "보안에 미치는 영향이 매우 적습니다.",
       "medium": "중간",
       "mediumDescription": "영향이 제한적이거나 특정 조건에서만 발생합니다.",
-      "permissionNote": "조직 소유자와 결제 관리자만 이 설정을 변경할 수 있습니다.",
+      "permissionNote": "조직 소유자, 관리자, 결제 관리자만 이 설정을 변경할 수 있습니다.",
       "remediationDeadlineA11y": "{{label}} 수정 기한, 일 단위",
       "title": "SLA 정책"
     },
@@ -3109,7 +3112,7 @@
     "members": {
       "changeRole": "역할 변경",
       "emptyDescriptionCanInvite": "이 조직에서 협업을 시작하려면 팀원을 초대하세요.",
-      "emptyDescriptionCannotInvite": "소유자나 결제 관리자에게 팀원 초대를 요청하세요.",
+      "emptyDescriptionCannotInvite": "소유자, 관리자, 결제 관리자에게 팀원 초대를 요청하세요.",
       "emptyTitle": "아직 멤버 없음",
       "invitedDate": "{{date}}에 초대됨",
       "limitPerDay": "일일 {{amount}}",

@@ -894,7 +894,7 @@
     },
     "autoReviews": "自動審查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者與帳單管理員可以設定連結。",
+      "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。",
       "setupIncomplete": "設定尚未完成。請在 kilo.ai 上完成設定。",
       "setup": "Bitbucket 設定"
     },
@@ -918,7 +918,10 @@
       "starting": "正在啟動審查…",
       "title": "手動審查"
     },
-    "notConnectedReadOnly": "尚未連結 {{platform}}。只有組織擁有者與帳單管理員可以設定連結。",
+    "notConnectedReadOnly": "尚未連結 {{platform}}。只有組織擁有者和管理員可以設定連結。",
+    "gitlab": {
+      "notConnectedReadOnly": "尚未連結 {{platform}}。請要求組織的擁有者、管理員或帳單管理員進行連結。"
+    },
     "platformList": {
       "activity": "活動",
       "checking": "正在檢查…",
@@ -997,7 +1000,7 @@
       "off": "審查記憶已關閉。",
       "on": "審查記憶已開啟。",
       "offDescription": "啟用後，Kilo 會從維護者的回覆中學習，並提出 REVIEW.md 指引建議。",
-      "readOnlyDescription": "只有組織擁有者和帳單管理員可以變更審查記憶。",
+      "readOnlyDescription": "只有組織擁有者、管理員和帳單管理員可以變更審查記憶。",
       "title": "審查記憶"
     },
     "scopeList": {
@@ -1149,7 +1152,7 @@
       "summary": "報告摘要",
       "title": "稽核報告",
       "unavailable": "無法取得稽核報告",
-      "unavailableDescription": "只有組織擁有者與帳單管理員可以檢視稽核報告。請向組織擁有者或帳單管理員申請存取權限。",
+      "unavailableDescription": "只有組織擁有者、管理員和帳單管理員可以檢視稽核報告。請向組織擁有者、管理員或帳單管理員申請存取權限。",
       "eventActions": {
         "findingAnalysisCompleted": "分析已完成",
         "findingAnalysisFailed": "分析失敗",
@@ -1263,7 +1266,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "這項資安問題已解決，無法再將其設為忽略。",
-      "cannotDismissDescription": "只有組織擁有者與帳單管理員可以忽略資安問題。",
+      "cannotDismissDescription": "只有組織擁有者、管理員和帳單管理員可以忽略資安問題。",
       "cannotDismissTitle": "無法忽略這項資安問題",
       "commentAccessibility": "忽略原因備註",
       "commentLabel": "備註（選填）",
@@ -1395,7 +1398,7 @@
       "automationCount": "已啟用 {{displayCount}}/3 項",
       "couldNotLoadPermissions": "無法載入權限。",
       "couldNotLoadSettings": "無法載入資安代理設定。",
-      "disabledNoManage": "資安代理已停用。只有組織擁有者與帳單管理員可以啟用。",
+      "disabledNoManage": "資安代理已停用。只有組織擁有者、管理員和帳單管理員可以啟用。",
       "disabledNoRepo": "啟用資安代理前，請至少選取一個存放庫。",
       "disabledPrompt": "啟用資安代理，即可同步 Dependabot 警報、選取存放庫並設定自動化。",
       "notificationsCount": "已啟用 {{displayCount}}/2 項",
@@ -1428,7 +1431,7 @@
       "lowDescription": "對安全性的影響極小。",
       "medium": "中",
       "mediumDescription": "影響有限，或需符合特定條件。",
-      "permissionNote": "只有組織擁有者與帳單管理員可以變更這些設定。",
+      "permissionNote": "只有組織擁有者、管理員和帳單管理員可以變更這些設定。",
       "remediationDeadlineA11y": "{{label}}修復期限，以天為單位",
       "title": "SLA 原則"
     },
@@ -3109,7 +3112,7 @@
     "members": {
       "changeRole": "變更角色",
       "emptyDescriptionCanInvite": "邀請團隊成員，一起在此組織中協作。",
-      "emptyDescriptionCannotInvite": "請組織擁有者或帳單管理員邀請團隊成員。",
+      "emptyDescriptionCannotInvite": "請組織擁有者、管理員或帳單管理員邀請團隊成員。",
       "emptyTitle": "尚無成員",
       "invitedDate": "{{date}} 已邀請",
       "limitPerDay": "{{amount}}/天",

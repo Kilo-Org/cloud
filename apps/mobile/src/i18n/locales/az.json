@@ -1458,7 +1458,7 @@
       "off": "Kod yoxlaması yaddaşı deaktivdir.",
       "on": "Kod yoxlaması yaddaşı aktivdir.",
       "offDescription": "Kilo-nun layihəyə cavabdeh şəxslərin cavablarından öyrənməsi və REVIEW.md üçün təlimatlar təklif etməsi üçün yaddaşı aktivləşdir.",
-      "readOnlyDescription": "Kod yoxlaması yaddaşını yalnız təşkilat sahibləri və ödəniş menecerləri dəyişə bilər.",
+      "readOnlyDescription": "Kod yoxlaması yaddaşını yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri dəyişə bilər.",
       "enable": "Kod yoxlaması yaddaşını aktivləşdir",
       "loadingProposals": "Təkliflər yüklənir",
       "couldNotLoadProposals": "Təklifləri yükləmək mümkün olmadı.",
@@ -1478,7 +1478,10 @@
       "starting": "Kod yoxlaması başlayır…",
       "start": "Yoxlamaya başla"
     },
-    "notConnectedReadOnly": "{{platform}} qoşulmayıb. Onu yalnız təşkilat sahibləri və ödəniş menecerləri qoşa bilər.",
+    "notConnectedReadOnly": "{{platform}} qoşulmayıb. Onu yalnız təşkilat sahibləri və inzibatçılar qoşa bilər.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} qoşulmayıb. Onu qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin."
+    },
     "webhookSetup": "Vebhuk quraşdırması tamamlanmayıb.",
     "webhookSetupDescription": "Bəzi repozitoriyalarda avtomatik kod yoxlaması aparılmaya bilər.",
     "autoReviews": "Avtomatik kod yoxlamaları",
@@ -1486,7 +1489,7 @@
     "followReviewMd": "REVIEW.md təlimatlarına əməl et",
     "followReviewMdSubtitle": "Hər repozitoriyanın REVIEW.md faylındakı təlimatlara əməl et",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri və ödəniş menecerləri qoşa bilər.",
+      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
       "setupIncomplete": "Quraşdırma tamamlanmayıb. Tənzimləməni kilo.ai saytında tamamla.",
       "setup": "Bitbucket quraşdırması"
     },
@@ -1746,7 +1749,7 @@
       "couldNotLoad": "Bu problem barədə məlumatı yükləmək mümkün olmadı.",
       "couldNotCheckPermissions": "Rədd etmə icazələrini yoxlamaq mümkün olmadı.",
       "cannotDismissTitle": "Bu tapıntını rədd etmək olmur",
-      "cannotDismissDescription": "Tapıntıları yalnız təşkilat sahibləri və ödəniş menecerləri rədd edə bilər.",
+      "cannotDismissDescription": "Tapıntıları yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri rədd edə bilər.",
       "alreadyResolvedDescription": "Bu tapıntı artıq həll edilib və onu rədd etmək mümkün deyil."
     },
     "findingDetails": {
@@ -1788,7 +1791,7 @@
       "automationAllOff": "Hamısı deaktivdir",
       "automationCount": "3 seçimdən {{displayCount}} seçim aktivdir",
       "notificationsCount": "2 seçimdən {{displayCount}} seçim aktivdir",
-      "disabledNoManage": "Təhlükəsizlik agenti deaktivdir. Onu yalnız təşkilat sahibləri və ödəniş menecerləri aktivləşdirə bilər.",
+      "disabledNoManage": "Təhlükəsizlik agenti deaktivdir. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri aktivləşdirə bilər.",
       "disabledNoRepo": "Təhlükəsizlik agentini aktivləşdirməzdən əvvəl ən azı bir repozitoriya seç.",
       "disabledPrompt": "Dependabot bildirişlərini sinxronlaşdırmaq, repozitoriyaları seçmək və avtomatlaşdırmanı tənzimləmək üçün təhlükəsizlik agentini aktivləşdir."
     },
@@ -1837,7 +1840,7 @@
       "invalidDayCount": "gün sayını 1–365 aralığında tam ədədlə göstər.",
       "remediationDeadlineA11y": "{{label}} üçün düzəliş müddəti, günlə",
       "enterWholeNumber": "1-Dən 365-ə qədər tam ədəd daxil et",
-      "permissionNote": "Bu parametrləri yalnız təşkilat sahibləri və ödəniş menecerləri dəyişə bilər.",
+      "permissionNote": "Bu parametrləri yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri dəyişə bilər.",
       "enableTracking": "SLA izləməsini aktivləşdir",
       "enableTrackingSubtitle": "Tapıntıların ciddilik dərəcəsinə görə düzəliş müddətlərini təyin et.",
       "deadlinesHeading": "Düzəliş müddətləri (gün)"
@@ -1893,7 +1896,7 @@
       "summary": "Hesabatın xülasəsi",
       "title": "Audit hesabatı",
       "unavailable": "Audit hesabatı mövcud deyil",
-      "unavailableDescription": "Audit hesabatlarına yalnız təşkilat sahibləri və ödəniş menecerləri baxa bilər. Giriş icazəsi üçün təşkilat sahibinə və ya ödəniş menecerinə müraciət et.",
+      "unavailableDescription": "Audit hesabatlarına yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri baxa bilər. Giriş icazəsi üçün sahibdən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
       "queryFailed": "Hesabat sorğusu tamamlanmadı. Yenidən cəhd et.",
       "eventActions": {
         "findingAnalysisCompleted": "Analiz tamamlandı",
@@ -3110,7 +3113,7 @@
     "members": {
       "changeRole": "Rolu dəyiş",
       "emptyDescriptionCanInvite": "Bu təşkilatda birlikdə işləməyə başlamaq üçün komanda yoldaşlarını dəvət et.",
-      "emptyDescriptionCannotInvite": "Təşkilat sahibindən və ya ödəniş menecerindən komanda yoldaşlarını dəvət etməsini istə.",
+      "emptyDescriptionCannotInvite": "Komanda yoldaşlarını dəvət etmək üçün sahibdən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
       "emptyTitle": "Hələ üzv yoxdur",
       "invitedDate": "{{date}} tarixində dəvət edilib",
       "limitPerDay": "gündə {{amount}}",

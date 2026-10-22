@@ -1477,7 +1477,7 @@
       "off": "Memorija pregleda je isključena.",
       "on": "Memorija pregleda je uključena.",
       "offDescription": "Uključi je da Kilo uči iz odgovora održavatelja i predlaže smjernice za REVIEW.md.",
-      "readOnlyDescription": "Samo vlasnici organizacije i upravitelji naplate mogu promijeniti memoriju pregleda.",
+      "readOnlyDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu promijeniti memoriju pregleda.",
       "enable": "Omogući memoriju pregleda",
       "loadingProposals": "Učitavanje prijedloga",
       "couldNotLoadProposals": "Nije moguće učitati prijedloge.",
@@ -1497,7 +1497,10 @@
       "starting": "Pokretanje pregleda…",
       "start": "Započni pregled"
     },
-    "notConnectedReadOnly": "Platforma {{platform}} nije povezana. Samo vlasnici organizacije i upravitelji naplate mogu je povezati.",
+    "notConnectedReadOnly": "Platforma {{platform}} nije povezana. Samo vlasnici organizacije i administratori mogu je povezati.",
+    "gitlab": {
+      "notConnectedReadOnly": "Platforma {{platform}} nije povezana. Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da je poveže."
+    },
     "webhookSetup": "Podešavanje webhooka nije završeno.",
     "webhookSetupDescription": "Neki repozitoriji možda neće imati automatske preglede.",
     "autoReviews": "Automatski pregledi",
@@ -1505,7 +1508,7 @@
     "followReviewMd": "Slijedi upute iz REVIEW.md",
     "followReviewMdSubtitle": "Poštuj upute iz datoteke REVIEW.md u svakom repozitoriju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije i upravitelji naplate mogu ga povezati.",
+      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu ga povezati.",
       "setupIncomplete": "Podešavanje nije završeno. Završi ga na kilo.ai.",
       "setup": "Podešavanje Bitbucketa"
     },
@@ -1768,7 +1771,7 @@
       "couldNotLoad": "Nije moguće učitati ovaj nalaz.",
       "couldNotCheckPermissions": "Nije moguće provjeriti dozvole za odbacivanje.",
       "cannotDismissTitle": "Ovaj nalaz nije moguće odbaciti",
-      "cannotDismissDescription": "Samo vlasnici organizacije i upravitelji naplate mogu odbaciti nalaze.",
+      "cannotDismissDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu odbaciti nalaze.",
       "alreadyResolvedDescription": "Ovaj nalaz je već riješen i više ga nije moguće odbaciti."
     },
     "findingDetails": {
@@ -1810,7 +1813,7 @@
       "automationAllOff": "Sve isključeno",
       "automationCount": "{{displayCount}} od 3 omogućeno",
       "notificationsCount": "{{displayCount}} od 2 omogućeno",
-      "disabledNoManage": "Sigurnosni agent je isključen. Samo vlasnici organizacije i upravitelji naplate mogu ga uključiti.",
+      "disabledNoManage": "Sigurnosni agent je isključen. Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu ga uključiti.",
       "disabledNoRepo": "Odaberi barem jedan repozitorij prije uključivanja sigurnosnog agenta.",
       "disabledPrompt": "Uključi sigurnosnog agenta za sinhronizaciju upozorenja iz Dependabota, odabir repozitorija i podešavanje automatizacije.",
       "repositoriesCount_few": "Odabrana {{displayCount}} repozitorija"
@@ -1860,7 +1863,7 @@
       "invalidDayCount": "unesi cijeli broj dana od 1 do 365.",
       "remediationDeadlineA11y": "Rok za otklanjanje u danima: {{label}}",
       "enterWholeNumber": "Unesi cijeli broj od 1 do 365",
-      "permissionNote": "Samo vlasnici organizacije i upravitelji naplate mogu mijenjati ove postavke.",
+      "permissionNote": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu mijenjati ove postavke.",
       "enableTracking": "Omogući praćenje SLA-a",
       "enableTrackingSubtitle": "Postavi rokove za otklanjanje na osnovu ozbiljnosti nalaza.",
       "deadlinesHeading": "Rokovi za otklanjanje (dani)"
@@ -1916,7 +1919,7 @@
       "summary": "Sažetak izvještaja",
       "title": "Revizijski izvještaj",
       "unavailable": "Revizijski izvještaj nije dostupan",
-      "unavailableDescription": "Samo vlasnici organizacije i upravitelji naplate mogu pregledavati revizijske izvještaje. Zatraži pristup od vlasnika ili upravitelja naplate.",
+      "unavailableDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu pregledavati revizijske izvještaje. Zatraži pristup od vlasnika, administratora ili menadžera za naplatu.",
       "queryFailed": "Upit za izvještaj nije završen. Pokušaj ponovo.",
       "eventActions": {
         "findingAnalysisCompleted": "Analiza dovršena",
@@ -3150,7 +3153,7 @@
     "members": {
       "changeRole": "Promijeni ulogu",
       "emptyDescriptionCanInvite": "Pozovi kolege iz tima da počnete sarađivati u ovoj organizaciji.",
-      "emptyDescriptionCannotInvite": "Zamoli vlasnika ili menadžera za naplatu da pozove kolege iz tima.",
+      "emptyDescriptionCannotInvite": "Zamoli vlasnika, administratora ili menadžera za naplatu da pozove kolege iz tima.",
       "emptyTitle": "Još nema članova",
       "invitedDate": "Pozvan {{date}}",
       "limitPerDay": "{{amount}}/dan",

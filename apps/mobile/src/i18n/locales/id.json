@@ -894,7 +894,7 @@
     },
     "autoReviews": "Tinjauan otomatis",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak terhubung. Hanya pemilik organisasi dan manajer penagihan yang dapat menghubungkannya.",
+      "notConnectedReadOnly": "Bitbucket tidak terhubung. Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya.",
       "setupIncomplete": "Penyiapan belum selesai. Selesaikan konfigurasi di kilo.ai.",
       "setup": "Penyiapan Bitbucket"
     },
@@ -918,7 +918,10 @@
       "starting": "Memulai tinjauan…",
       "title": "Tinjauan manual"
     },
-    "notConnectedReadOnly": "{{platform}} tidak terhubung. Hanya pemilik organisasi dan manajer penagihan yang dapat menghubungkannya.",
+    "notConnectedReadOnly": "{{platform}} tidak terhubung. Hanya pemilik organisasi dan admin yang dapat menghubungkannya.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} tidak terhubung. Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya."
+    },
     "platformList": {
       "activity": "Aktivitas",
       "checking": "Memeriksa…",
@@ -997,7 +1000,7 @@
       "off": "Memori tinjauan nonaktif.",
       "on": "Memori tinjauan aktif.",
       "offDescription": "Aktifkan agar Kilo dapat belajar dari balasan pengelola repositori dan mengusulkan panduan untuk REVIEW.md.",
-      "readOnlyDescription": "Hanya pemilik organisasi dan manajer penagihan yang dapat mengubah memori tinjauan.",
+      "readOnlyDescription": "Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat mengubah memori tinjauan.",
       "title": "Memori tinjauan"
     },
     "scopeList": {
@@ -1149,7 +1152,7 @@
       "summary": "Ringkasan laporan",
       "title": "Laporan audit",
       "unavailable": "Laporan audit tidak tersedia",
-      "unavailableDescription": "Hanya pemilik organisasi dan manajer penagihan yang dapat melihat laporan audit. Minta akses kepada pemilik organisasi atau manajer penagihan.",
+      "unavailableDescription": "Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat melihat laporan audit. Minta akses kepada pemilik, admin, atau manajer penagihan.",
       "eventActions": {
         "findingAnalysisCompleted": "Analisis selesai",
         "findingAnalysisFailed": "Analisis gagal",
@@ -1263,7 +1266,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Temuan ini sudah diselesaikan dan tidak dapat diabaikan lagi.",
-      "cannotDismissDescription": "Hanya pemilik organisasi dan manajer penagihan yang dapat mengabaikan temuan.",
+      "cannotDismissDescription": "Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat mengabaikan temuan.",
       "cannotDismissTitle": "Tidak dapat mengabaikan temuan ini",
       "commentAccessibility": "Komentar pengabaian",
       "commentLabel": "Komentar (opsional)",
@@ -1395,7 +1398,7 @@
       "automationCount": "{{displayCount}} dari 3 aktif",
       "couldNotLoadPermissions": "Tidak dapat memuat izin.",
       "couldNotLoadSettings": "Tidak dapat memuat pengaturan Agen keamanan.",
-      "disabledNoManage": "Agen keamanan dinonaktifkan. Hanya pemilik organisasi dan manajer penagihan yang dapat mengaktifkannya.",
+      "disabledNoManage": "Agen keamanan dinonaktifkan. Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat mengaktifkannya.",
       "disabledNoRepo": "Pilih setidaknya satu repositori sebelum mengaktifkan Agen keamanan.",
       "disabledPrompt": "Aktifkan Agen keamanan untuk menyinkronkan peringatan Dependabot, memilih repositori, dan mengatur otomatisasi.",
       "notificationsCount": "{{displayCount}} dari 2 aktif",
@@ -1428,7 +1431,7 @@
       "lowDescription": "Dampak terhadap keamanan minimal.",
       "medium": "Sedang",
       "mediumDescription": "Dampaknya terbatas atau hanya terjadi dalam kondisi tertentu.",
-      "permissionNote": "Hanya pemilik organisasi dan manajer penagihan yang dapat mengubah pengaturan ini.",
+      "permissionNote": "Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat mengubah pengaturan ini.",
       "remediationDeadlineA11y": "Tenggat perbaikan untuk tingkat {{label}} dalam hari",
       "title": "Kebijakan SLA"
     },
@@ -3109,7 +3112,7 @@
     "members": {
       "changeRole": "Ubah peran",
       "emptyDescriptionCanInvite": "Undang rekan tim untuk mulai berkolaborasi di organisasi ini.",
-      "emptyDescriptionCannotInvite": "Minta pemilik atau manajer penagihan untuk mengundang rekan tim.",
+      "emptyDescriptionCannotInvite": "Minta pemilik, admin, atau manajer penagihan untuk mengundang rekan tim.",
       "emptyTitle": "Belum ada anggota",
       "invitedDate": "Diundang pada {{date}}",
       "limitPerDay": "{{amount}}/hari",

@@ -897,7 +897,7 @@
     },
     "autoReviews": "סקירות אוטומטיות",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket לא מחובר. רק בעלי הארגון ומנהלי החיוב יכולים לחבר אותו.",
+      "notConnectedReadOnly": "Bitbucket לא מחובר. רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
       "setupIncomplete": "ההגדרה לא הושלמה. השלם אותה ב-kilo.ai.",
       "setup": "הגדרת Bitbucket"
     },
@@ -921,7 +921,10 @@
       "starting": "הסקירה מתחילה…",
       "title": "סקירה ידנית"
     },
-    "notConnectedReadOnly": "{{platform}} לא מחובר. רק בעלי הארגון ומנהלי החיוב יכולים לחבר אותו.",
+    "notConnectedReadOnly": "{{platform}} לא מחובר. רק בעלי הארגון ומנהלים יכולים לחבר אותו.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} אינו מחובר. בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו."
+    },
     "platformList": {
       "activity": "פעילות",
       "checking": "בבדיקה…",
@@ -1000,7 +1003,7 @@
       "off": "זיכרון הסקירה כבוי.",
       "on": "זיכרון הסקירה דלוק.",
       "offDescription": "הפעל אותו כדי לאפשר ל-Kilo ללמוד מתשובות של מתחזקים ולהציע הנחיות לקובץ REVIEW.md.",
-      "readOnlyDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לשנות זיכרון סקירה.",
+      "readOnlyDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לשנות זיכרון סקירה.",
       "title": "זיכרון סקירה"
     },
     "scopeList": {
@@ -1152,7 +1155,7 @@
       "summary": "סיכום הדוח",
       "title": "דוח ביקורת",
       "unavailable": "דוח הביקורת אינו זמין",
-      "unavailableDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לצפות בדוחות ביקורת. בקש מאחד מבעלי הארגון או ממנהל החיוב לתת לך גישה.",
+      "unavailableDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לצפות בדוחות ביקורת. בקש מבעל ארגון, ממנהל או ממנהל חיובים לתת לך גישה.",
       "eventActions": {
         "findingAnalysisCompleted": "הניתוח הושלם",
         "findingAnalysisFailed": "הניתוח נכשל",
@@ -1269,7 +1272,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "הממצא הזה כבר נפתר ולא ניתן עוד לדחות אותו.",
-      "cannotDismissDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לדחות ממצאים.",
+      "cannotDismissDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לדחות ממצאים.",
       "cannotDismissTitle": "לא ניתן לדחות את הממצא הזה",
       "commentAccessibility": "הערת דחייה",
       "commentLabel": "הערה (לא חובה)",
@@ -1401,7 +1404,7 @@
       "automationCount": "{{displayCount}} מתוך 3 מופעלים",
       "couldNotLoadPermissions": "לא ניתן לטעון את ההרשאות.",
       "couldNotLoadSettings": "לא ניתן לטעון את הגדרות סוכן האבטחה.",
-      "disabledNoManage": "סוכן האבטחה מושבת. רק בעלי הארגון ומנהלי החיוב יכולים להפעיל אותו.",
+      "disabledNoManage": "סוכן האבטחה מושבת. רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים להפעיל אותו.",
       "disabledNoRepo": "יש לבחור לפחות מאגר אחד לפני הפעלת סוכן האבטחה.",
       "disabledPrompt": "הפעל את סוכן האבטחה כדי לסנכרן התראות Dependabot, לבחור מאגרים ולהגדיר אוטומציה.",
       "notificationsCount": "{{displayCount}} מתוך 2 מופעלים",
@@ -1435,7 +1438,7 @@
       "lowDescription": "השפעה מזערית על האבטחה.",
       "medium": "בינונית",
       "mediumDescription": "השפעה מוגבלת או ניצול בתנאים מסוימים בלבד.",
-      "permissionNote": "רק בעלי הארגון ומנהלי החיוב יכולים לשנות את ההגדרות האלה.",
+      "permissionNote": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לשנות את ההגדרות האלה.",
       "remediationDeadlineA11y": "מספר הימים לתיקון ממצאים בחומרה {{label}}",
       "title": "מדיניות SLA"
     },
@@ -3149,7 +3152,7 @@
     "members": {
       "changeRole": "שינוי תפקיד",
       "emptyDescriptionCanInvite": "הזמן חברי צוות כדי להתחיל לשתף פעולה בארגון זה.",
-      "emptyDescriptionCannotInvite": "בקש מבעלי הארגון או ממנהל החיובים להזמין חברי צוות.",
+      "emptyDescriptionCannotInvite": "בקש מבעל ארגון, ממנהל או ממנהל חיובים להזמין חברי צוות.",
       "emptyTitle": "אין עדיין חברים",
       "invitedDate": "מועד ההזמנה: {{date}}",
       "limitPerDay": "{{amount}} ליום",

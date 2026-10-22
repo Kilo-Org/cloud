@@ -866,7 +866,7 @@
     },
     "autoReviews": "Revisioni automatiche",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket non è connesso. Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono connetterlo.",
+      "notConnectedReadOnly": "Bitbucket non è connesso. Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo.",
       "setupIncomplete": "La configurazione è incompleta. Completala su kilo.ai.",
       "setup": "Configurazione di Bitbucket"
     },
@@ -890,7 +890,10 @@
       "starting": "Avvio della revisione…",
       "title": "Revisione manuale"
     },
-    "notConnectedReadOnly": "{{platform}} non è connesso. Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono connetterlo.",
+    "notConnectedReadOnly": "{{platform}} non è connesso. Solo i proprietari dell'organizzazione e gli amministratori possono connetterlo.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} non è connesso. Chiedi a un Proprietario, a un Amministratore o a un Responsabile della fatturazione dell'organizzazione di connetterlo."
+    },
     "platformList": {
       "activity": "Attività",
       "checking": "Verifica in corso…",
@@ -969,7 +972,7 @@
       "off": "La memoria di revisione è disattivata.",
       "on": "La memoria di revisione è attivata.",
       "offDescription": "Attivala per consentire a Kilo di imparare dalle risposte dei responsabili del progetto e proporre indicazioni per REVIEW.md.",
-      "readOnlyDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono modificare la memoria di revisione.",
+      "readOnlyDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono modificare la memoria di revisione.",
       "title": "Memoria delle revisioni"
     },
     "scopeList": {
@@ -1121,7 +1124,7 @@
       "summary": "Riepilogo del report",
       "title": "Report di audit",
       "unavailable": "Report di audit non disponibile",
-      "unavailableDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono visualizzare i report di audit. Chiedi a un proprietario o a un responsabile della fatturazione di concederti l'accesso.",
+      "unavailableDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono visualizzare i report di audit. Chiedi a un proprietario, a un amministratore o a un responsabile della fatturazione di concederti l'accesso.",
       "eventActions": {
         "findingAnalysisCompleted": "Analisi completata",
         "findingAnalysisFailed": "Analisi non riuscita",
@@ -1238,7 +1241,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Questa segnalazione è già stata risolta e non può più essere ignorata.",
-      "cannotDismissDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono ignorare le segnalazioni.",
+      "cannotDismissDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono ignorare le segnalazioni.",
       "cannotDismissTitle": "Impossibile ignorare questa segnalazione",
       "commentAccessibility": "Commento sull'esclusione",
       "commentLabel": "Commento (facoltativo)",
@@ -1370,7 +1373,7 @@
       "automationCount": "{{displayCount}} su 3 attive",
       "couldNotLoadPermissions": "Impossibile caricare le autorizzazioni.",
       "couldNotLoadSettings": "Impossibile caricare le impostazioni di Security Agent.",
-      "disabledNoManage": "Security Agent è disattivato. Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono attivarlo.",
+      "disabledNoManage": "Security Agent è disattivato. Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono attivarlo.",
       "disabledNoRepo": "Seleziona almeno un repository prima di attivare Security Agent.",
       "disabledPrompt": "Attiva Security Agent per sincronizzare gli avvisi di Dependabot, scegliere i repository e configurare l'automazione.",
       "notificationsCount": "{{displayCount}} su 2 attive",
@@ -1404,7 +1407,7 @@
       "lowDescription": "Impatto minimo sulla sicurezza.",
       "medium": "Livello medio",
       "mediumDescription": "Impatto limitato o condizioni specifiche.",
-      "permissionNote": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono modificare queste impostazioni.",
+      "permissionNote": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono modificare queste impostazioni.",
       "remediationDeadlineA11y": "Termine per la correzione in giorni, gravità {{label}}",
       "title": "Criterio SLA"
     },
@@ -3149,7 +3152,7 @@
     "members": {
       "changeRole": "Cambia ruolo",
       "emptyDescriptionCanInvite": "Invita i membri del tuo team per iniziare a collaborare in questa organizzazione.",
-      "emptyDescriptionCannotInvite": "Chiedi a un proprietario o a un responsabile della fatturazione di invitare i membri del tuo team.",
+      "emptyDescriptionCannotInvite": "Chiedi a un proprietario, a un amministratore o a un responsabile della fatturazione di invitare i membri del tuo team.",
       "emptyTitle": "Ancora nessun membro",
       "invitedDate": "Invitato il {{date}}",
       "limitPerDay": "{{amount}}/giorno",

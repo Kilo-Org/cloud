@@ -1458,7 +1458,7 @@
       "off": "A ti pa ìrántí àtúnyẹ̀wò.",
       "on": "A ti ṣí ìrántí àtúnyẹ̀wò.",
       "offDescription": "Mú un ṣiṣẹ́ kí Kilo lè kẹ́kọ̀ọ́ láti inú àwọn ìdáhùn olùtọ́jú, kí ó sì dábàá ìtọ́sọ́nà fún REVIEW.md.",
-      "readOnlyDescription": "Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè yí ìrántí àtúnyẹ̀wò padà.",
+      "readOnlyDescription": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè yí ìrántí àtúnyẹ̀wò padà.",
       "enable": "Mú ìrántí àtúnyẹ̀wò ṣiṣẹ́",
       "loadingProposals": "A ń gbé àwọn àbá wọlé",
       "couldNotLoadProposals": "A kò lè gbé àwọn àbá wọlé.",
@@ -1478,7 +1478,10 @@
       "starting": "Àtúnyẹ̀wò ń bẹ̀rẹ̀…",
       "start": "Bẹ̀rẹ̀ àtúnyẹ̀wò"
     },
-    "notConnectedReadOnly": "A kò tíì so {{platform}} pọ̀. Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
+    "notConnectedReadOnly": "A kò tíì so {{platform}} pọ̀. Àwọn ẹni tó ni àjọ àti àwọn alákòóso nìkan ló lè so ó pọ̀.",
+    "gitlab": {
+      "notConnectedReadOnly": "A kò tíì so {{platform}} pọ̀. Ẹ bẹ̀ Ẹni tó ni àjọ, Alákòóso, tàbí Olùṣàkóso ìsanwó kí wọ́n so ó pọ̀."
+    },
     "webhookSetup": "Ìṣètò ìfitónilétí wẹ́bù kò tíì parí.",
     "webhookSetupDescription": "Ó ṣeé ṣe kí àwọn ibi ìpamọ́ kan má gba àtúnyẹ̀wò aládàáṣiṣẹ́.",
     "autoReviews": "Àwọn àtúnyẹ̀wò aládàáṣiṣẹ́",
@@ -1486,7 +1489,7 @@
     "followReviewMd": "Tẹ̀lé REVIEW.md",
     "followReviewMdSubtitle": "Tẹ̀lé àwọn fáìlì ìtọ́sọ́nà REVIEW.md nínú ibi ìpamọ́ kọ̀ọ̀kan",
     "bitbucket": {
-      "notConnectedReadOnly": "A kò tíì so Bitbucket pọ̀. Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
+      "notConnectedReadOnly": "A kò tíì so Bitbucket pọ̀. Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
       "setupIncomplete": "Ìṣètò kò tíì parí — parí rẹ̀ lórí kilo.ai.",
       "setup": "Ìṣètò Bitbucket"
     },
@@ -1746,7 +1749,7 @@
       "couldNotLoad": "A kò lè gbé àwárí yìí wọlé.",
       "couldNotCheckPermissions": "A kò lè ṣàyẹ̀wò àṣẹ láti kọ àbùkù sílẹ̀.",
       "cannotDismissTitle": "A kò lè kọ àbùkù yìí sílẹ̀",
-      "cannotDismissDescription": "Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè kọ àwọn àbùkù sílẹ̀.",
+      "cannotDismissDescription": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè kọ àwọn àbùkù sílẹ̀.",
       "alreadyResolvedDescription": "A ti yanjú àbùkù yìí tẹ́lẹ̀, a kò sì lè kọ̀ ọ́ sílẹ̀ mọ́."
     },
     "findingDetails": {
@@ -1788,7 +1791,7 @@
       "automationAllOff": "Gbogbo rẹ̀ ti pa",
       "automationCount": "{{displayCount}} nínú 3 ń ṣiṣẹ́",
       "notificationsCount": "{{displayCount}} nínú 2 ń ṣiṣẹ́",
-      "disabledNoManage": "A ti pa Aṣojú ààbò. Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè mú un ṣiṣẹ́.",
+      "disabledNoManage": "A ti pa Aṣojú ààbò. Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè mú un ṣiṣẹ́.",
       "disabledNoRepo": "Yan ó kéré tán ibi ìpamọ́ kan kí o tó mú Aṣojú ààbò ṣiṣẹ́.",
       "disabledPrompt": "Mú Aṣojú ààbò ṣiṣẹ́ láti mú àwọn ìkìlọ̀ Dependabot ṣiṣẹ́pọ̀, yan àwọn ibi ìpamọ́, kí o sì ṣètò ìṣiṣẹ́ aládàáṣiṣẹ́."
     },
@@ -1837,7 +1840,7 @@
       "invalidDayCount": "lo odindi nọ́ńbà ọjọ́ láàárín 1 àti 365.",
       "remediationDeadlineA11y": "Ọjọ́ ìparí àtúnṣe {{label}}, ní iye ọjọ́",
       "enterWholeNumber": "Tẹ nọ́ńbà odidi láàárín 1 àti 365 sí i",
-      "permissionNote": "Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè yí àwọn ètò wọ̀nyí padà.",
+      "permissionNote": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè yí àwọn ètò wọ̀nyí padà.",
       "enableTracking": "Mú ìtọpinpin SLA ṣiṣẹ́",
       "enableTrackingSubtitle": "Ṣètò àwọn ọjọ́ ìparí àtúnṣe gẹ́gẹ́ bí ìwọ̀n ewu àbùkù.",
       "deadlinesHeading": "Ọjọ́ ìparí àtúnṣe (iye ọjọ́)"
@@ -1893,7 +1896,7 @@
       "summary": "Àkótán ìròyìn",
       "title": "Ìròyìn àyẹ̀wò",
       "unavailable": "Ìròyìn àyẹ̀wò kò sí",
-      "unavailableDescription": "Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè wo àwọn ìròyìn àyẹ̀wò. Béèrè lọ́wọ́ oní àjọ tàbí olùṣàkóso ìsanwó láti fún ọ ní àṣẹ.",
+      "unavailableDescription": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè wo àwọn ìròyìn àyẹ̀wò. Béèrè lọ́wọ́ ẹni tó ni àjọ, alákòóso, tàbí olùṣàkóso ìsanwó láti fún ọ ní àṣẹ.",
       "queryFailed": "Ìbéèrè ìròyìn kò parí. Gbìyànjú lẹ́ẹ̀kan sí i.",
       "eventActions": {
         "findingAnalysisCompleted": "Ìtupalẹ̀ ti parí",
@@ -3110,7 +3113,7 @@
     "members": {
       "changeRole": "Yí ipò padà",
       "emptyDescriptionCanInvite": "Pe àwọn ẹlẹgbẹ́ láti bẹ̀rẹ̀ sí í ṣiṣẹ́ pọ̀ nínú àjọ yìí.",
-      "emptyDescriptionCannotInvite": "Béèrè lọ́wọ́ ẹni tó ni àjọ tàbí olùṣàkóso ìsanwó láti pe àwọn ẹlẹgbẹ́.",
+      "emptyDescriptionCannotInvite": "Béèrè lọ́wọ́ ẹni tó ni àjọ, alákòóso, tàbí olùṣàkóso ìsanwó láti pe àwọn ẹlẹgbẹ́.",
       "emptyTitle": "Kò tíì sí ọmọ ẹgbẹ́",
       "invitedDate": "A pè é {{date}}",
       "limitPerDay": "{{amount}}/ọjọ",

@@ -866,7 +866,7 @@
     },
     "autoReviews": "Revues automatiques",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket n'est pas connecté. Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent établir la connexion.",
+      "notConnectedReadOnly": "Bitbucket n'est pas connecté. Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion.",
       "setupIncomplete": "La configuration est incomplète. Terminez-la sur kilo.ai.",
       "setup": "Configuration de Bitbucket"
     },
@@ -890,7 +890,10 @@
       "starting": "Démarrage de la revue…",
       "title": "Revue manuelle"
     },
-    "notConnectedReadOnly": "{{platform}} n'est pas connecté. Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent établir la connexion.",
+    "notConnectedReadOnly": "{{platform}} n'est pas connecté. Seuls les propriétaires et les administrateurs de l'organisation peuvent établir la connexion.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} n'est pas connecté. Demandez à un propriétaire, un administrateur ou un responsable de la facturation de le connecter."
+    },
     "platformList": {
       "activity": "Activité",
       "checking": "Vérification…",
@@ -969,7 +972,7 @@
       "off": "La mémoire de revue est désactivée.",
       "on": "La mémoire de revue est activée.",
       "offDescription": "Activez-la pour permettre à Kilo d'apprendre des réponses des responsables du dépôt et de proposer des consignes pour REVIEW.md.",
-      "readOnlyDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent modifier la mémoire de revue.",
+      "readOnlyDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent modifier la mémoire de revue.",
       "title": "Mémoire des revues"
     },
     "scopeList": {
@@ -1121,7 +1124,7 @@
       "summary": "Résumé du rapport",
       "title": "Rapport d'audit",
       "unavailable": "Rapport d'audit indisponible",
-      "unavailableDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent consulter les rapports d'audit. Demandez à l'un d'eux de vous accorder l'accès.",
+      "unavailableDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent consulter les rapports d'audit. Demandez à un propriétaire, un administrateur ou un responsable de la facturation de vous accorder l'accès.",
       "eventActions": {
         "findingAnalysisCompleted": "Analyse terminée",
         "findingAnalysisFailed": "Échec de l'analyse",
@@ -1238,7 +1241,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Ce signalement a déjà été résolu et ne peut plus être exclu.",
-      "cannotDismissDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent exclure des signalements.",
+      "cannotDismissDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent exclure des signalements.",
       "cannotDismissTitle": "Impossible d'exclure ce signalement",
       "commentAccessibility": "Commentaire sur l'exclusion",
       "commentLabel": "Commentaire (facultatif)",
@@ -1370,7 +1373,7 @@
       "automationCount": "{{displayCount}} sur 3 activées",
       "couldNotLoadPermissions": "Impossible de charger les autorisations.",
       "couldNotLoadSettings": "Impossible de charger les paramètres de l'agent de sécurité.",
-      "disabledNoManage": "L'agent de sécurité est désactivé. Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent l'activer.",
+      "disabledNoManage": "L'agent de sécurité est désactivé. Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent l'activer.",
       "disabledNoRepo": "Sélectionnez au moins un dépôt avant d'activer l'agent de sécurité.",
       "disabledPrompt": "Activez l'agent de sécurité pour synchroniser les alertes Dependabot, choisir des dépôts et configurer l'automatisation.",
       "notificationsCount": "{{displayCount}} sur 2 activées",
@@ -1404,7 +1407,7 @@
       "lowDescription": "Impact minimal sur la sécurité.",
       "medium": "Moyen",
       "mediumDescription": "Impact limité ou conditions spécifiques.",
-      "permissionNote": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent modifier ces paramètres.",
+      "permissionNote": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent modifier ces paramètres.",
       "remediationDeadlineA11y": "Délai de correction en jours pour la gravité {{label}}",
       "title": "Politique SLA"
     },
@@ -3149,7 +3152,7 @@
     "members": {
       "changeRole": "Changer le rôle",
       "emptyDescriptionCanInvite": "Invitez des collègues pour commencer à collaborer dans cette organisation.",
-      "emptyDescriptionCannotInvite": "Demandez à un propriétaire ou à un responsable de la facturation d'inviter des collègues.",
+      "emptyDescriptionCannotInvite": "Demandez à un propriétaire, à un administrateur ou à un responsable de la facturation d'inviter des collègues.",
       "emptyTitle": "Aucun membre pour le moment",
       "invitedDate": "Invité le {{date}}",
       "limitPerDay": "{{amount}}/jour",

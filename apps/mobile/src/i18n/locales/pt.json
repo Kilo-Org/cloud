@@ -1477,7 +1477,7 @@
       "off": "A memória de revisão está desativada.",
       "on": "A memória de revisão está ativada.",
       "offDescription": "Ativa-a para o Kilo aprender com as respostas dos responsáveis pelo projeto e propor orientações para o ficheiro REVIEW.md.",
-      "readOnlyDescription": "Apenas os proprietários da organização e os gestores de faturação podem alterar a memória de revisão.",
+      "readOnlyDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação podem alterar a memória de revisão.",
       "enable": "Ativar memória de revisão",
       "loadingProposals": "A carregar propostas",
       "couldNotLoadProposals": "Não foi possível carregar as propostas.",
@@ -1497,7 +1497,10 @@
       "starting": "A iniciar a revisão…",
       "start": "Iniciar revisão"
     },
-    "notConnectedReadOnly": "O {{platform}} não está ligado. Apenas os proprietários da organização e os gestores de faturação o podem ligar.",
+    "notConnectedReadOnly": "O {{platform}} não está ligado. Apenas os proprietários da organização e os administradores o podem ligar.",
+    "gitlab": {
+      "notConnectedReadOnly": "O {{platform}} não está ligado. Peça a um proprietário, administrador ou gestor de faturação da organização que o ligue."
+    },
     "webhookSetup": "A configuração do webhook está incompleta.",
     "webhookSetupDescription": "Alguns repositórios podem não receber revisões automáticas.",
     "autoReviews": "Revisões automáticas",
@@ -1505,7 +1508,7 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Respeitar as instruções do ficheiro REVIEW.md de cada repositório",
     "bitbucket": {
-      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização e os gestores de faturação o podem ligar.",
+      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
       "setupIncomplete": "A configuração está incompleta. Conclui-a em kilo.ai.",
       "setup": "Configuração do Bitbucket"
     },
@@ -1768,7 +1771,7 @@
       "couldNotLoad": "Não foi possível carregar esta ocorrência.",
       "couldNotCheckPermissions": "Não foi possível verificar as permissões para descartar ocorrências.",
       "cannotDismissTitle": "Não é possível descartar esta ocorrência",
-      "cannotDismissDescription": "Apenas os proprietários da organização e os gestores de faturação podem descartar ocorrências.",
+      "cannotDismissDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação podem descartar ocorrências.",
       "alreadyResolvedDescription": "Esta ocorrência já foi resolvida e já não pode ser descartada."
     },
     "findingDetails": {
@@ -1810,7 +1813,7 @@
       "automationAllOff": "Todas desativadas",
       "automationCount": "{{displayCount}} de 3 ativadas",
       "notificationsCount": "{{displayCount}} de 2 ativadas",
-      "disabledNoManage": "O agente de segurança está desativado. Apenas os proprietários da organização e os gestores de faturação o podem ativar.",
+      "disabledNoManage": "O agente de segurança está desativado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ativar.",
       "disabledNoRepo": "Seleciona pelo menos um repositório antes de ativar o agente de segurança.",
       "disabledPrompt": "Ativa o agente de segurança para sincronizar os alertas do Dependabot, escolher repositórios e configurar a automação.",
       "repositoriesCount_many": "{{displayCount}} repositórios selecionados"
@@ -1860,7 +1863,7 @@
       "invalidDayCount": "o prazo tem de ser um número inteiro entre 1 e 365 dias.",
       "remediationDeadlineA11y": "Prazo de correção para gravidade {{label}}, em dias",
       "enterWholeNumber": "Introduz um número inteiro entre 1 e 365",
-      "permissionNote": "Apenas os proprietários da organização e os gestores de faturação podem alterar estas definições.",
+      "permissionNote": "Apenas os proprietários da organização, os administradores e os gestores de faturação podem alterar estas definições.",
       "enableTracking": "Ativar acompanhamento do SLA",
       "enableTrackingSubtitle": "Define prazos de correção com base na gravidade das ocorrências.",
       "deadlinesHeading": "Prazos de correção (dias)"
@@ -1916,7 +1919,7 @@
       "summary": "Resumo do relatório",
       "title": "Relatório de auditoria",
       "unavailable": "Relatório de auditoria indisponível",
-      "unavailableDescription": "Apenas os proprietários da organização e os gestores de faturação podem ver relatórios de auditoria. Pede a um deles que te dê acesso.",
+      "unavailableDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação podem ver relatórios de auditoria. Peça a um proprietário, administrador ou gestor de faturação que lhe dê acesso.",
       "queryFailed": "A consulta do relatório não foi concluída. Tenta novamente.",
       "eventActions": {
         "findingAnalysisCompleted": "Análise concluída",
@@ -3150,7 +3153,7 @@
     "members": {
       "changeRole": "Alterar função",
       "emptyDescriptionCanInvite": "Convide colegas para começar a colaborar nesta organização.",
-      "emptyDescriptionCannotInvite": "Peça a um proprietário ou gestor de faturação que convide colegas.",
+      "emptyDescriptionCannotInvite": "Peça a um proprietário, administrador ou gestor de faturação que convide colegas.",
       "emptyTitle": "Ainda sem membros",
       "invitedDate": "Convidado em {{date}}",
       "limitPerDay": "{{amount}}/dia",

@@ -1477,7 +1477,7 @@
       "off": "Memoria de revizuire este dezactivată.",
       "on": "Memoria de revizuire este activată.",
       "offDescription": "Activeaz-o pentru ca Kilo să învețe din răspunsurile responsabililor de proiect și să propună instrucțiuni pentru REVIEW.md.",
-      "readOnlyDescription": "Doar proprietarii organizației și responsabilii cu facturarea pot modifica memoria de revizuire.",
+      "readOnlyDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației pot modifica memoria de revizuire.",
       "enable": "Activează memoria de revizuire",
       "loadingProposals": "Se încarcă propunerile",
       "couldNotLoadProposals": "Nu s-au putut încărca propunerile.",
@@ -1497,7 +1497,10 @@
       "starting": "Se începe revizuirea…",
       "start": "Începe revizuirea"
     },
-    "notConnectedReadOnly": "{{platform}} nu este conectat. Doar proprietarii organizației și responsabilii cu facturarea îl pot conecta.",
+    "notConnectedReadOnly": "{{platform}} nu este conectat. Doar proprietarii și administratorii organizației îl pot conecta.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} nu este conectat. Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să îl conecteze."
+    },
     "webhookSetup": "Configurarea webhook-ului este incompletă.",
     "webhookSetupDescription": "Este posibil ca unele depozite să nu primească revizuiri automate.",
     "autoReviews": "Revizuiri automate",
@@ -1505,7 +1508,7 @@
     "followReviewMd": "Respectă REVIEW.md",
     "followReviewMdSubtitle": "Respectă instrucțiunile din fișierul REVIEW.md al fiecărui depozit",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nu este conectat. Doar proprietarii organizației și responsabilii cu facturarea îl pot conecta.",
+      "notConnectedReadOnly": "Bitbucket nu este conectat. Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
       "setupIncomplete": "Configurarea este incompletă. Finalizeaz-o pe kilo.ai.",
       "setup": "Configurare Bitbucket"
     },
@@ -1768,7 +1771,7 @@
       "couldNotLoad": "Nu s-a putut încărca această problemă.",
       "couldNotCheckPermissions": "Nu s-au putut verifica permisiunile de respingere.",
       "cannotDismissTitle": "Nu se poate respinge această constatare",
-      "cannotDismissDescription": "Doar proprietarii organizației și responsabilii cu facturarea pot respinge constatări.",
+      "cannotDismissDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației pot respinge constatări.",
       "alreadyResolvedDescription": "Această constatare a fost deja rezolvată și nu mai poate fi respinsă."
     },
     "findingDetails": {
@@ -1810,7 +1813,7 @@
       "automationAllOff": "Toate dezactivate",
       "automationCount": "{{displayCount}} din 3 activate",
       "notificationsCount": "{{displayCount}} din 2 activate",
-      "disabledNoManage": "Agentul de securitate este dezactivat. Doar proprietarii organizației și responsabilii cu facturarea îl pot activa.",
+      "disabledNoManage": "Agentul de securitate este dezactivat. Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot activa.",
       "disabledNoRepo": "Selectează cel puțin un depozit înainte de a activa agentul de securitate.",
       "disabledPrompt": "Activează agentul de securitate pentru a sincroniza alertele Dependabot, a alege depozitele și a configura automatizarea.",
       "repositoriesCount_few": "{{displayCount}} depozite selectate"
@@ -1860,7 +1863,7 @@
       "invalidDayCount": "introdu un număr întreg de zile între 1 și 365.",
       "remediationDeadlineA11y": "Termen limită de remediere în zile pentru {{label}}",
       "enterWholeNumber": "Introdu un număr întreg între 1 și 365",
-      "permissionNote": "Doar proprietarii organizației și responsabilii cu facturarea pot modifica aceste setări.",
+      "permissionNote": "Doar proprietarii, administratorii și managerii de facturare ai organizației pot modifica aceste setări.",
       "enableTracking": "Activează urmărirea SLA",
       "enableTrackingSubtitle": "Stabilește termene limită de remediere în funcție de gravitatea constatării.",
       "deadlinesHeading": "Termene limită de remediere (zile)"
@@ -1916,7 +1919,7 @@
       "summary": "Rezumatul raportului",
       "title": "Raport de audit",
       "unavailable": "Raport de audit indisponibil",
-      "unavailableDescription": "Doar proprietarii organizației și responsabilii cu facturarea pot vedea rapoartele de audit. Cere unui proprietar sau unui responsabil cu facturarea să îți acorde acces.",
+      "unavailableDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației pot vedea rapoartele de audit. Cere unui proprietar, unui administrator sau unui manager de facturare să îți acorde acces.",
       "queryFailed": "Interogarea pentru raport nu s-a finalizat. Încearcă din nou.",
       "eventActions": {
         "findingAnalysisCompleted": "Analiză finalizată",
@@ -3150,7 +3153,7 @@
     "members": {
       "changeRole": "Schimbă rolul",
       "emptyDescriptionCanInvite": "Invită colegi pentru a începe colaborarea în această organizație.",
-      "emptyDescriptionCannotInvite": "Roagă un proprietar sau un manager de facturare să invite colegi.",
+      "emptyDescriptionCannotInvite": "Roagă un proprietar, un administrator sau un manager de facturare să invite colegi.",
       "emptyTitle": "Încă niciun membru",
       "invitedDate": "Invitat la {{date}}",
       "limitPerDay": "{{amount}}/zi",

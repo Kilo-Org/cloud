@@ -1496,7 +1496,7 @@
       "off": "Pomnjenje pregledov je izklopljeno.",
       "on": "Pomnjenje pregledov je vklopljeno.",
       "offDescription": "Vklopi ga, da se Kilo uči iz odgovorov vzdrževalcev in predlaga smernice za datoteko REVIEW.md.",
-      "readOnlyDescription": "Pomnjenje pregledov lahko spremenijo samo lastniki organizacije in upravitelji obračunavanja.",
+      "readOnlyDescription": "Pomnjenje pregledov lahko spremenijo samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
       "enable": "Omogoči pomnjenje pregledov",
       "loadingProposals": "Nalaganje predlogov",
       "couldNotLoadProposals": "Predlogov ni bilo mogoče naložiti.",
@@ -1516,7 +1516,10 @@
       "starting": "Zaganjanje pregleda…",
       "start": "Začni pregled"
     },
-    "notConnectedReadOnly": "Povezava s platformo {{platform}} ni vzpostavljena. Vzpostavijo jo lahko samo lastniki organizacije in upravitelji obračunavanja.",
+    "notConnectedReadOnly": "Povezava s platformo {{platform}} ni vzpostavljena. Vzpostavijo jo lahko samo lastniki organizacije in skrbniki.",
+    "gitlab": {
+      "notConnectedReadOnly": "Povezava s platformo {{platform}} ni vzpostavljena. Prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja, da jo poveže."
+    },
     "webhookSetup": "Nastavitev spletnih povratnih klicev ni dokončana.",
     "webhookSetupDescription": "Samodejni pregledi v nekaterih skladiščih morda ne bodo delovali.",
     "autoReviews": "Samodejni pregledi",
@@ -1524,7 +1527,7 @@
     "followReviewMd": "Upoštevaj REVIEW.md",
     "followReviewMdSubtitle": "Upoštevaj navodila iz datotek REVIEW.md v posameznih skladiščih",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ni povezan. Povežejo ga lahko samo lastniki organizacije in upravitelji obračunavanja.",
+      "notConnectedReadOnly": "Bitbucket ni povezan. Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
       "setupIncomplete": "Nastavitev ni dokončana. Dokončaj jo na kilo.ai.",
       "setup": "Nastavitev povezave z Bitbucket"
     },
@@ -1790,7 +1793,7 @@
       "couldNotLoad": "Te ugotovitve ni bilo mogoče naložiti.",
       "couldNotCheckPermissions": "Dovoljenj za zavrnitev ni bilo mogoče preveriti.",
       "cannotDismissTitle": "Te ugotovitve ni mogoče zavrniti",
-      "cannotDismissDescription": "Ugotovitve lahko zavrnejo samo lastniki organizacije in upravitelji obračunavanja.",
+      "cannotDismissDescription": "Ugotovitve lahko zavrnejo samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
       "alreadyResolvedDescription": "Ta ugotovitev je že razrešena, zato je ni več mogoče zavrniti."
     },
     "findingDetails": {
@@ -1832,7 +1835,7 @@
       "automationAllOff": "Vse izklopljeno",
       "automationCount": "Omogočeno: {{displayCount}} od 3",
       "notificationsCount": "Omogočeno: {{displayCount}} od 2",
-      "disabledNoManage": "Varnostni agent je onemogočen. Omogočijo ga lahko samo lastniki organizacije in upravitelji obračunavanja.",
+      "disabledNoManage": "Varnostni agent je onemogočen. Omogočijo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
       "disabledNoRepo": "Pred omogočanjem varnostnega agenta izberi vsaj eno skladišče.",
       "disabledPrompt": "Vklopi varnostnega agenta, da sinhroniziraš opozorila Dependabot, izbereš skladišča in nastaviš avtomatizacijo.",
       "repositoriesCount_two": "Izbrani {{displayCount}} skladišči",
@@ -1883,7 +1886,7 @@
       "invalidDayCount": "vnesi celo število dni med 1 in 365.",
       "remediationDeadlineA11y": "Rok za odpravljanje v dneh, resnost: {{label}}",
       "enterWholeNumber": "Vnesi celo število med 1 in 365",
-      "permissionNote": "Te nastavitve lahko spremenijo samo lastniki organizacije in upravitelji obračunavanja.",
+      "permissionNote": "Te nastavitve lahko spremenijo samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
       "enableTracking": "Omogoči spremljanje SLA",
       "enableTrackingSubtitle": "Nastavi roke za odpravljanje glede na resnost ugotovitev.",
       "deadlinesHeading": "Roki za odpravljanje (v dneh)"
@@ -1939,7 +1942,7 @@
       "summary": "Povzetek poročila",
       "title": "Poročilo o reviziji",
       "unavailable": "Poročilo o reviziji ni na voljo",
-      "unavailableDescription": "Poročila o reviziji lahko pregledujejo samo lastniki organizacije in upravitelji obračunavanja. Prosi lastnika ali upravitelja obračunavanja, naj ti odobri dostop.",
+      "unavailableDescription": "Poročila o reviziji lahko pregledujejo samo lastniki organizacije, skrbniki in skrbniki obračunavanja. Prosi lastnika, skrbnika ali skrbnika obračunavanja, naj ti odobri dostop.",
       "queryFailed": "Poizvedba za poročilo se ni končala. Poskusi znova.",
       "eventActions": {
         "findingAnalysisCompleted": "Analiza zaključena",
@@ -3190,7 +3193,7 @@
     "members": {
       "changeRole": "Spremeni vlogo",
       "emptyDescriptionCanInvite": "Povabi sodelavce, da začnete sodelovati v tej organizaciji.",
-      "emptyDescriptionCannotInvite": "Prosi lastnika ali skrbnika obračunavanja, naj povabi sodelavce.",
+      "emptyDescriptionCannotInvite": "Prosi lastnika, skrbnika ali skrbnika obračunavanja, naj povabi sodelavce.",
       "emptyTitle": "Še ni članov",
       "invitedDate": "Povabljen {{date}}",
       "limitPerDay": "{{amount}}/dan",

@@ -86,15 +86,17 @@ function convertModel(
 }
 
 async function getDirectByokModels(byokProviders: UserByokProviderId[]) {
-  let nextPreferredId = (await getPreferredModels()).length;
-  return (
-    await Promise.all(
-      DIRECT_BYOK_PROVIDERS.filter(provider => byokProviders.includes(provider.id)).map(
-        async provider =>
-          (await provider.models()).map(model => convertModel(provider, model, nextPreferredId++))
-      )
-    )
-  ).flat();
+  const firstPreferredId = (await getPreferredModels()).length;
+  const enabledProviders = DIRECT_BYOK_PROVIDERS.filter(provider =>
+    byokProviders.includes(provider.id)
+  );
+  const modelsByProvider = await Promise.all(
+    enabledProviders.map(async provider => ({ provider, models: await provider.models() }))
+  );
+  let nextPreferredId = firstPreferredId;
+  return modelsByProvider.flatMap(({ provider, models }) =>
+    models.map(model => convertModel(provider, model, nextPreferredId++))
+  );
 }
 
 export async function getDirectByokModel(requestedModel: string): Promise<{

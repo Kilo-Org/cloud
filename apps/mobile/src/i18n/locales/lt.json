@@ -25,6 +25,7 @@
     "error": "klaida: {{error}}",
     "back": "Atgal",
     "somethingWentWrong": "Įvyko klaida.",
+    "actionNotRecorded": "Nepavyko užfiksuoti šio veiksmo. Bandyk dar kartą vėliau.",
     "couldNotOpen": "Nepavyko atidaryti {{label}}.",
     "link": "nuoroda",
     "takingLonger": "Tai užtrunka ilgiau nei tikėtasi. Gali uždaryti šį ekraną ir patikrinti vėliau.",
@@ -35,6 +36,8 @@
     "connectGithub": "Prijungti GitHub",
     "cost": "Kaina",
     "discard": "Atmesti",
+    "discardChangesMessage": "Jūsų pakeitimai bus prarasti.",
+    "discardChangesTitle": "Atmesti pakeitimus?",
     "findings": "Problemos",
     "mergeRequest": "merge request",
     "notConnected": "Neprijungta",
@@ -109,7 +112,9 @@
     "online": "Prisijungęs",
     "open": "Atidaryti {{name}}",
     "openPullRequest": "Atidaryti pakeitimų užklausą",
+    "completed": "Baigta",
     "pending": "Laukiama",
+    "running": "Vykdoma",
     "performance": "Našumas",
     "preferences": "Nuostatos",
     "privacyPolicy": "Privatumo politika",
@@ -812,7 +817,6 @@
       "mergeResultDefaultError": "GitHub neužbaigė sujungimo.",
       "mergeResultNotCompleted": "Nepavyko sujungti {{term}}. Patikrink būseną ir bandyk dar kartą.",
       "ambiguous": "Nepavyko patvirtinti rezultato — prieš bandydamas dar kartą patikrink PR.",
-      "persistenceFailed": "Nepavyko užfiksuoti šio veiksmo. Bandyk dar kartą vėliau.",
       "forbidden": "Šis veiksmas neleidžiamas."
     },
     "capabilities": {
@@ -1490,8 +1494,9 @@
       "loading": "Įkeliama peržiūros atmintis",
       "couldNotLoad": "Nepavyko įkelti peržiūros atminties.",
       "off": "Peržiūros atmintis išjungta.",
+      "on": "Peržiūros atmintis įjungta.",
       "offDescription": "Įjunk ją, kad Kilo mokytųsi iš prižiūrėtojų atsakymų ir siūlytų gaires REVIEW.md failui.",
-      "readOnlyDescription": "Peržiūros atmintį gali įjungti tik organizacijos savininkai ir atsiskaitymų administratoriai.",
+      "readOnlyDescription": "Peržiūros atmintį gali keisti tik organizacijos savininkai ir atsiskaitymų administratoriai.",
       "enable": "Įjungti peržiūros atmintį",
       "loadingProposals": "Įkeliami pasiūlymai",
       "couldNotLoadProposals": "Nepavyko įkelti pasiūlymų.",
@@ -1572,8 +1577,6 @@
     "updateFailed": "Nepavyko atnaujinti kodo peržiūros agento.",
     "configSaveFailed": "Nepavyko išsaugoti peržiūros nustatymų.",
     "status": {
-      "running": "Vykdoma",
-      "completed": "Baigta",
       "interrupted": "Nutraukta"
     },
     "reviewStyle": {
@@ -1701,7 +1704,14 @@
       "whereFound": "Kur tai rasta ({{displayCount}})",
       "fullReport": "Visa sugeneruota ataskaita",
       "yes": "Taip",
-      "no": "Ne"
+      "no": "Ne",
+      "action": {
+        "analyzeCodebase": "Analizuoti kodų bazę",
+        "dismiss": "Atmesti",
+        "manualReview": "Rankinis peržiūrėjimas",
+        "monitor": "Stebėti",
+        "openPr": "Atidaryti traukimo užklausą"
+      }
     },
     "dashboard": {
       "findingsCount": "Radinių: {{displayCount}}",
@@ -1909,12 +1919,16 @@
     "settingsSave": {
       "saveChanges": "Išsaugoti pakeitimus",
       "unsavedTitle": "Neišsaugoti pakeitimai",
-      "unsavedMessage": "Išsaugoti pakeitimus prieš išeinant iš šio ekrano?"
+      "unsavedMessage": "Išsaugoti pakeitimus prieš išeinant iš šio ekrano?",
+      "unsavedInvalidMessage": "Šių pakeitimų dar negalima išsaugoti. Ištaisykite juos, kad išsaugotumėte, arba atmeskite juos, kad išeitumėte."
     },
     "auditReportButton": {
       "viewA11y": "Peržiūrėti audito ataskaitą"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administratorius",
+      "actorMaskedUser": "Paslėptas naudotojas",
+      "actorSystem": "Kilo sistema",
       "couldNotLoad": "Nepavyko įkelti audito ataskaitos.",
       "events": "Įvykiai",
       "generated": "Ataskaita sugeneruota {{generatedAt}}.",
@@ -1926,7 +1940,24 @@
       "title": "Audito ataskaita",
       "unavailable": "Audito ataskaita nepasiekiama",
       "unavailableDescription": "Audito ataskaitas gali peržiūrėti tik organizacijos savininkai ir atsiskaitymų administratoriai. Paprašyk savininko arba atsiskaitymų administratoriaus suteikti tau prieigą.",
-      "queryFailed": "Nepavyko užbaigti ataskaitos užklausos. Bandyk dar kartą."
+      "queryFailed": "Nepavyko užbaigti ataskaitos užklausos. Bandyk dar kartą.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analizė atlikta",
+        "findingAnalysisFailed": "Analizė nesėkminga",
+        "findingAutoDismissed": "Atmesta automatiškai",
+        "findingCreated": "Importuota",
+        "findingDeleted": "Ištrinta",
+        "findingDismissed": "Atmesta",
+        "findingSeverityChanged": "Pakeistas sunkumo lygis",
+        "findingStatusChange": "Pakeista būsena",
+        "findingSuperseded": "Išstumta",
+        "remediationBlocked": "Taisymas užblokuotas",
+        "remediationCancelled": "Atšaukta",
+        "remediationFailed": "Taisymas nesėkmingas",
+        "remediationNoChangesNeeded": "Pakeitimų nereikia",
+        "remediationPrOpened": "Atidaryta traukimo užklausa",
+        "remediationQueued": "Pateikta taisymo užklausa"
+      }
     },
     "notifications": {
       "couldNotLoad": "Nepavyko įkelti pranešimų nustatymų.",
@@ -1958,7 +1989,6 @@
       "installApp": "Įdiegti GitHub programėlę",
       "reauthorizeButton": "Iš naujo suteikti teises GitHub programėlei",
       "reauthorizeDescription": "Saugos agentui reikia vulnerability_alerts teisės, kad galėtų pasiekti Dependabot įspėjimus. Iš naujo suteik teises GitHub programėlei, kad pridėtum šią teisę.",
-      "reauthorizeFailed": "Nepavyko pradėti pakartotinio teisių suteikimo. Bandyk dar kartą.",
       "reauthorizeTitle": "Reikia papildomų teisių",
       "setupFailed": "Nepavyko pradėti GitHub sąrankos. Bandyk dar kartą."
     },
@@ -1977,7 +2007,12 @@
       "syncMayNotHaveCompleted": "Sinchronizavimas galėjo likti neužbaigtas. Bandyk dar kartą, kad suderintum jo būseną, arba atmesk užklausą.",
       "syncInProgress": "Saugos duomenys jau sinchronizuojami. Bandyk dar kartą.",
       "dismissalInProgress": "Šis radinys jau atmetamas. Bandyk dar kartą.",
-      "couldNotReadPendingSyncs": "Nepavyko nuskaityti laukiančių sinchronizavimo užklausų. Bandyk dar kartą."
+      "couldNotReadPendingSyncs": "Nepavyko nuskaityti laukiančių sinchronizavimo užklausų. Bandyk dar kartą.",
+      "ambiguous": "Nepavyko patvirtinti rezultato — prieš bandydamas dar kartą patikrink saugumo peržiūrą.",
+      "settleFailed": "Veiksmas buvo atliktas, bet nepavyko įrašyti rezultato. Bandyk dar kartą.",
+      "replayFailed": "Šis veiksmas nebuvo užbaigtas. Bandyk dar kartą.",
+      "actionFailed": "Nepavyko užbaigti šio veiksmo. Bandyk dar kartą.",
+      "actionBlocked": "Nepavyko užbaigti šio veiksmo. Iš pradžių reikia išspręsti problemą."
     },
     "analysisState": {
       "queued": "Analizė eilėje",
@@ -2350,7 +2385,8 @@
       "matchesBadge_other": "atitikčių: {{displayCount}}",
       "matchesBadge_few": "atitiktys: {{displayCount}}",
       "matchesBadge_many": "atitikčių: {{displayCount}}",
-      "noOutput": "Nėra išvesties."
+      "noOutput": "Nėra išvesties.",
+      "translationFailed": "Vertimas nepavyko"
     },
     "readToolMarkdown": {
       "linesTruncated": "eilutės {{start}}–{{end}} (sutrumpinta)",
@@ -2823,7 +2859,7 @@
     "thisDevice": "Šis įrenginys",
     "viewProfile": "Peržiūrėti profilį",
     "signOutThisDevice": "Atsijungti šiame įrenginyje",
-    "signOutThisSession": "Baigti šią sesiją",
+    "signOutSessionLabel": "Atsijungti „{{device}}“, prisijungta {{signedIn}}",
     "sessionSignedOut": "Sesija baigta.",
     "signOutThisDeviceTitle": "Atsijungti šiame įrenginyje?",
     "signOutThisSessionTitle": "Baigti šią sesiją?",
@@ -3063,11 +3099,22 @@
     "boundary": {
       "backToProfile": "Grįžti į profilį",
       "loadErrorMessage": "Patikrink ryšį ir bandyk dar kartą.",
+
+      "chooseAccount": "Pasirinkite paskyrą",
       "loadErrorTitle": "Nepavyko įkelti jūsų organizacijų.",
+      "noOrganization": "Nėra organizacijos",
+
+      "noOrganizationDescription": "Ši paskyra nepriklauso jokiai organizacijai. Kad galėtumėte naudoti organizacijos funkcijas, tokias kaip narių kvietimai ir įspėjimai apie mažą likutį, sukurkite organizaciją arba prisijunkite prie jos naršyklėje.",
+
+      "openWebOrganizations": "Atidaryti organizacijas naršyklėje",
+
       "organizationUnavailable": "Organizacija nepasiekiama.",
-      "selectDescription": "Norėdami tęsti, savo profilyje pasirinkite organizaciją.",
+      "selectDescriptionWithOrganizations": "Priklausote vienai ar daugiau organizacijų. Pasirinkite paskyrą, kurią turėtų naudoti šis ekranas.",
+
       "selectOrganization": "Pasirinkite organizaciją",
       "unavailableDescription": "Ši organizacija nebepasiekiama. Norėdami tęsti, savo profilyje pasirinkite kitą organizaciją.",
+
+      "unavailableSessionsDescription": "Ši organizacija nebepasiekiama. Jos seansų įkelti negalima.",
       "accessDeniedDescription": "Neturite prieigos prie šios organizacijos."
     },
     "creditActivity": {
@@ -3119,7 +3166,11 @@
       "separateEmailsHint": "El. pašto adresus atskirkite kableliais.",
       "thresholdLabel": "Pranešti, kai likutis mažesnis nei (USD)",
       "title": "Pranešimas apie mažą likutį",
-      "emailsError": "Įveskite bent vieną tinkamą el. pašto adresą. Kelis adresus atskirkite kableliais.",
+      "emailsInvalid": "Vienas ar keli el. pašto adresai netinkami.",
+      "emailsRequired": "Įveskite bent vieną el. pašto adresą.",
+      "saveEmailsError": "Kai kurie el. pašto adresai nebuvo priimti. Patikrinkite juos ir bandykite dar kartą.",
+      "saveError": "Nepavyko išsaugoti pranešimo apie mažą likutį.",
+      "thresholdPlaceholder": "Įveskite sumą",
       "thresholdError": "Įveskite sumą, didesnę nei 0."
     },
     "memberLimit": {
@@ -3130,6 +3181,7 @@
       "removeLimit": "Panaikinti ribą",
       "title": "Dienos išlaidų riba",
       "blankError": "Įveskite sumą arba žemiau panaikinkite ribą.",
+      "blankWithoutLimitError": "Įveskite dienos ribą nuo 0 iki {{max}}.",
       "rangeError": "Įveskite sumą nuo 0 iki {{max}}."
     },
     "members": {
@@ -3599,6 +3651,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Norint paleisti agentą, reikia užklausos. Pridėk užklausą ir paleisk iš naujo.",
+      "repositoryRequired": "Norint paleisti agentą, reikia saugyklos. Atsidaryk Kilo ir pasirink saugyklą, tada paleisk iš naujo.",
       "repositoryUnknown": "Kilo neatpažįsta {{repository}} kaip GitHub ar GitLab saugyklos. Pasirink kitą saugyklą Kilo programoje.",
       "repositoryUnsupported": "{{repository}} yra Bitbucket saugykla — Paleisti agentą jos dar negali naudoti. Pasirink kitą saugyklą Kilo programoje."
     }
@@ -3670,7 +3723,6 @@
     "keyTooLong": "Raktas gali būti ne ilgesnis kaip 256 simboliai",
     "keyDuplicate": "Šis raktas jau yra profilyje",
     "valueLabel": "Vertė",
-    "secretLabel": "Paslaptis",
     "secrets": {
       "markSecret": "Pažymėti kaip paslaptį",
       "masked": "Paslėpta vertė",
@@ -3729,7 +3781,9 @@
       "jsonTooLarge": "Naudokite ne daugiau kaip 50 įrašų, raktai iki 128 ir reikšmės iki 4096 simbolių",
       "timeoutInvalid": "Skirtasis laikas turi būti sveikas milisekundžių skaičius",
       "edit": "Redaguoti MCP serverį",
-      "saveFailed": "Nepavyko išsaugoti MCP serverio"
+      "saveFailed": "Nepavyko išsaugoti MCP serverio",
+      "deleteFailed": "Nepavyko ištrinti MCP serverio",
+      "updateFailed": "Nepavyko atnaujinti MCP serverio"
     },
     "agents": {
       "title": "Profilio agentai",
@@ -3756,6 +3810,7 @@
       "visibilitySubagent": "Subagentas – skambinama tik iš kitų",
       "visibilityAll": "Visi - abu",
       "saveFailed": "Nepavyko išsaugoti agento",
+      "deleteFailed": "Nepavyko ištrinti agento",
       "nameRequired": "Įveskite agento pavadinimą",
       "slugRequired": "Įveskite agento šliužą",
       "slugInvalid": "Slug turi prasidėti raide ir naudoti tik mažąsias raides, skaitmenis ir brūkšnius",
@@ -3770,10 +3825,12 @@
       "description": "Komandos aprašymas",
       "template": "Šablonas",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Paaiškinkite $ARGUMENTS",
       "subtask": "Vykdyti kaip papildomą užduotį",
       "edit": "Redaguoti pasvirojo brūkšnio komandą",
       "saveFailed": "Nepavyko išsaugoti komandos",
+      "deleteFailed": "Nepavyko ištrinti komandos",
       "nameRequired": "Įveskite komandos pavadinimą",
       "nameInvalid": "Pavadinimas turi prasidėti mažosiomis raidėmis ir naudoti tik mažąsias raides, skaitmenis ir brūkšnius",
       "templateRequired": "Įveskite komandos šabloną",
@@ -3928,7 +3985,7 @@
     "view": "Skaityti suvestinę",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Rodyti dabartinę būseną",
+    "dismiss": "Atmesti suvestinę",
     "offline": "Neprisijungta · išsaugota suvestinė",
     "cached": "Išsaugota ataskaita · atnaujinti negalima",
     "revised": "Pataisyta · {{revision}}",

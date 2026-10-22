@@ -71,6 +71,7 @@ import {
   type StartupFailureCode,
 } from '../../sandbox-control/startup-failure.js';
 import { preinstalledStartup } from '../../sandbox-control/preinstalled-startup.js';
+import type { GrantDiagnostic } from '../../sandbox-control/grant-diagnostic.js';
 import {
   kiloTokenHasRuntimeAuthorization,
   prepareCredentialGrant,
@@ -2202,11 +2203,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
           payload: await this.withContainer(update, state),
         });
       },
-      issueGrant: (spec, source) =>
+      issueGrant: (spec, source, diagnostic) =>
         withTimeout(
-          this.issueRouteGrant(spec, source),
+          this.issueRouteGrant(spec, source, diagnostic),
           this.grantIssueTimeoutMs(),
-          'Credential grant issuance timed out'
+          'Credential grant issuance timed out',
+          diagnostic?.markTimeout
         ),
       applyPolicy: candidate =>
         candidate === undefined
@@ -2480,12 +2482,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async issueRouteGrant(
     spec: ControlPlaneRouteSpec,
-    source: ControlPlaneCredentialSource
+    source: ControlPlaneCredentialSource,
+    diagnostic?: GrantDiagnostic
   ): Promise<RouteGrantIssue> {
     const provider = this.currentProvider();
     const allocation = await this.readAllocation();
+    diagnostic?.fact({
+      provider,
+      containment: this.credentialContainmentEnabled() ? 'enabled' : 'disabled',
+    });
     const runtimeContract = readRuntimeContract(this.ctx.storage.kv, allocation.allocationId);
-    const outboundContainerId = this.outboundContainerIdFor(allocation) ?? undefined;
+    const outboundContainerId = this.outboundContainerIdFor(allocation, diagnostic) ?? undefined;
     const base: SessionAttachPayload = {
       directory: spec.directory,
       ...(spec.branch ? { branch: spec.branch } : {}),
@@ -2510,23 +2517,27 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ) &&
       scopeMemberCount(scopes, scopeId) >= MAX_SCOPE_MEMBERS
     ) {
+      diagnostic?.record({ grantPhase: 'compatibility', grantFailureReason: 'scope_member_limit' });
       throw new ScopeMemberLimitError();
     }
-    const { grant, payload } = await prepareCredentialGrant({
-      env: this.env,
-      source,
-      sessionId: spec.sessionId,
-      sandboxId: this.sandboxId,
-      provider,
-      containmentEnabled: this.credentialContainmentEnabled(),
-      directory: spec.directory,
-      scopeId,
-      payload: base,
-      leaseMs: this.sandboxTimers().credentialGrantMs,
-      ...(existing === undefined ? {} : { existing }),
-      refreshBacking: existing !== undefined && this.grantNeedsReissue(existing),
-      ...(outboundContainerId === undefined ? {} : { outboundContainerId }),
-    });
+    const { grant, payload } = await prepareCredentialGrant(
+      {
+        env: this.env,
+        source,
+        sessionId: spec.sessionId,
+        sandboxId: this.sandboxId,
+        provider,
+        containmentEnabled: this.credentialContainmentEnabled(),
+        directory: spec.directory,
+        scopeId,
+        payload: base,
+        leaseMs: this.sandboxTimers().credentialGrantMs,
+        ...(existing === undefined ? {} : { existing }),
+        refreshBacking: existing !== undefined && this.grantNeedsReissue(existing),
+        ...(outboundContainerId === undefined ? {} : { outboundContainerId }),
+      },
+      diagnostic
+    );
     // A worktree scope may adopt one canonical handle only when it already has
     // an accepted entry under the current fence. Rows on this fence are written
     // in the same transaction as an accepted entry, so once ANY entry exists
@@ -2550,7 +2561,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
             scopeGrantId(grant),
             fence
           );
-          if (accepted.length === 0) throw new ScopeHandleConflictError();
+          if (accepted.length === 0) {
+            diagnostic?.record({
+              grantPhase: 'compatibility',
+              grantFailureReason: 'scope_handle_conflict',
+            });
+            throw new ScopeHandleConflictError();
+          }
         }
       }
     }
@@ -2570,6 +2587,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
         otherGrant.directory === grant.directory &&
         (otherGrant.kilo.runtimeProxy !== undefined) !== (grant.kilo.runtimeProxy !== undefined)
       ) {
+        diagnostic?.record({
+          grantPhase: 'compatibility',
+          grantFailureReason: 'mixed_credential_class',
+        });
         throw new MixedCredentialClassError();
       }
       if (
@@ -2580,6 +2601,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             member.sessionId === spec.sessionId || member.kiloSessionId === source.kiloSessionId
         )
       ) {
+        diagnostic?.record({ grantPhase: 'compatibility', grantFailureReason: 'scope_mismatch' });
         throw new Error('Worktree credential scope mismatch');
       }
     }
@@ -3058,7 +3080,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /** The managed outbound container id for the current provider/allocation. */
-  private outboundContainerIdFor(state: AllocationState): string | null {
+  private outboundContainerIdFor(
+    state: AllocationState,
+    diagnostic?: GrantDiagnostic
+  ): string | null {
     // The container is the containment boundary. When containment is off there
     // is no proxy container to name, and the environment may not even bind the
     // containment namespaces (the e2e Worker strips them).
@@ -3081,9 +3106,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
       decodeCloudflareProviderRef(state.providerRef)?.sandboxId ??
       this.providerPin?.allocationName ??
       this.sandboxId;
-    return this.sandboxNamespace(this.providerPin, physicalSandboxId, true)
-      .idFromName(physicalSandboxId)
-      .toString();
+    const selected: DurableObjectNamespace<Sandbox> | null | undefined = this.sandboxNamespace(
+      this.providerPin,
+      physicalSandboxId,
+      true
+    );
+    if (selected === null || selected === undefined) {
+      diagnostic?.record({ grantPhase: 'configuration', grantFailureReason: 'namespace_unbound' });
+    }
+    return selected.idFromName(physicalSandboxId).toString();
   }
 
   private sandboxCanResolveCredentials(state: AllocationState): boolean {

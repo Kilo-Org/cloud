@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 
+import { i18n } from '@/i18n';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
   clearDraft,
@@ -19,17 +20,27 @@ import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
  * intent is still in flight or just submitted; a non-null value means the
  * mutation failed before the server accepted a command id, so no command
  * observer will ever reconcile it — the retry card must.
+ *
+ * `lastErrorKey` names the catalog key the failure sentence was translated
+ * from (null for a message the mapper does not recognise). The retry card
+ * re-translates the key at render, so a failure that survives an app-language
+ * change reads the reader's language instead of the language that recorded it.
  */
 const SecurityDismissDraftSchema = z.object({
   reason: z.string(),
   comment: z.string(),
   lastError: z.string().nullable(),
   retryable: z.boolean().nullable(),
+  lastErrorKey: z.string().nullable().default(null),
 });
 
 export type SecurityDismissDraft = z.infer<typeof SecurityDismissDraftSchema>;
 
-/** Runtime shape guard for a persisted dismiss draft, passed to `loadDraft`. */
+/**
+ * Runtime shape guard for a persisted dismiss draft, passed to `loadDraft`.
+ * Pure: a draft recorded before `lastErrorKey` existed has no field to narrow,
+ * so consumers default a missing key to null where they read it.
+ */
 export function isSecurityDismissDraft(value: unknown): value is SecurityDismissDraft {
   return SecurityDismissDraftSchema.safeParse(value).success;
 }
@@ -116,8 +127,25 @@ const SECURITY_DISMISS_KEY_PREFIX = 'security-dismiss:';
 export type SecurityDismissFailure = {
   findingId: string;
   lastError: string;
+  /** The catalog key the stored sentence was translated from, if known. */
+  lastErrorKey: string | null;
   retryable: boolean | null;
 };
+
+/**
+ * The failure copy a stored draft renders: the stored sentence re-translated
+ * through its catalog key, so a failure that survives an app-language change
+ * reads the reader's language. Drafts recorded before the key existed, or with
+ * a message the mapper does not recognise, keep their stored sentence verbatim.
+ */
+export function securityDismissFailureCopy(draft: {
+  lastError: string | null;
+  lastErrorKey: string | null | undefined;
+}): string {
+  // A draft recorded before the key existed reads back without the field.
+  const key = draft.lastErrorKey ?? null;
+  return key === null ? (draft.lastError ?? '') : i18n.t(key);
+}
 
 /**
  * Lists every dismiss draft in one scope whose `lastError` is non-null (a
@@ -141,7 +169,13 @@ export async function listSecurityDismissFailures(
   const failures: SecurityDismissFailure[] = [];
   for (const { findingId, draft } of loaded) {
     if (draft !== null && draft.lastError !== null) {
-      failures.push({ findingId, lastError: draft.lastError, retryable: draft.retryable });
+      failures.push({
+        findingId,
+        lastError: draft.lastError,
+        // A draft recorded before the key existed reads back without it.
+        lastErrorKey: draft.lastErrorKey ?? null,
+        retryable: draft.retryable,
+      });
     }
   }
   return failures;

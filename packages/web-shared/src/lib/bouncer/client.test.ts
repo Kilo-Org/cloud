@@ -484,7 +484,7 @@ describe('usage event and charge cost fields', () => {
 function lastRequestBody(): Record<string, unknown> {
   const call = mockFetch.mock.calls[mockFetch.mock.calls.length - 1];
   const body = call?.[1]?.body;
-  return JSON.parse(String(body)) as Record<string, unknown>;
+  return JSON.parse(body as string) as Record<string, unknown>;
 }
 
 describe('normalizeJa4', () => {

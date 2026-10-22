@@ -25,6 +25,7 @@
     "error": "fehler: {{error}}",
     "back": "Zurück",
     "somethingWentWrong": "Etwas ist schiefgelaufen.",
+    "actionNotRecorded": "Wir konnten diese Aktion nicht speichern. Bitte versuche es später erneut.",
     "couldNotOpen": "{{label}} konnte nicht geöffnet werden.",
     "link": "link",
     "takingLonger": "Das dauert länger als erwartet. Du kannst diese Ansicht schließen und später erneut nachsehen.",
@@ -35,6 +36,8 @@
     "connectGithub": "GitHub verbinden",
     "cost": "Kosten",
     "discard": "Verwerfen",
+    "discardChangesMessage": "Deine Änderungen gehen verloren.",
+    "discardChangesTitle": "Änderungen verwerfen?",
     "findings": "Befunde",
     "mergeRequest": "Merge-Request",
     "notConnected": "Nicht verbunden",
@@ -109,7 +112,9 @@
     "online": "Verbunden",
     "open": "{{name}} öffnen",
     "openPullRequest": "Pull-Request öffnen",
+    "completed": "Abgeschlossen",
     "pending": "Ausstehend",
+    "running": "Läuft",
     "performance": "Leistung",
     "preferences": "Einstellungen",
     "privacyPolicy": "Datenschutzerklärung",
@@ -982,16 +987,17 @@
       "title": "Letzte Reviews"
     },
     "reviewMemory": {
-      "couldNotLoad": "Der Review-Speicher konnte nicht geladen werden.",
+      "couldNotLoad": "Die gespeicherten Prüfhinweise konnten nicht geladen werden.",
       "couldNotLoadProposals": "Die Vorschläge konnten nicht geladen werden.",
-      "enable": "Review-Speicher aktivieren",
-      "loading": "Review-Speicher wird geladen",
+      "enable": "Gespeicherte Prüfhinweise aktivieren",
+      "loading": "Gespeicherte Prüfhinweise werden geladen",
       "loadingProposals": "Vorschläge werden geladen",
       "noProposals": "Keine Vorschläge",
-      "noProposalsDescription": "Hier erscheinen Vorschläge aus dem Review-Speicher, sobald Kilo die Antworten der Projektverantwortlichen analysiert hat.",
-      "off": "Der Review-Speicher ist deaktiviert.",
-      "offDescription": "Aktiviere ihn, damit Kilo aus Antworten der Projektverantwortlichen lernt und Richtlinien für REVIEW.md vorschlägt.",
-      "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können den Review-Speicher aktivieren.",
+      "noProposalsDescription": "Hier erscheinen Vorschläge zu den gespeicherten Prüfhinweisen, sobald Kilo die Antworten der Projektverantwortlichen analysiert hat.",
+      "off": "Gespeicherte Prüfhinweise sind deaktiviert.",
+      "on": "Gespeicherte Prüfhinweise sind aktiviert.",
+      "offDescription": "Aktiviere sie, damit Kilo aus den Antworten der Projektverantwortlichen lernt und Richtlinien für REVIEW.md vorschlägt.",
+      "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können gespeicherte Prüfhinweise ändern.",
       "title": "Gespeicherte Prüfhinweise"
     },
     "scopeList": {
@@ -1019,8 +1025,6 @@
     "updateFailed": "Code Reviewer konnte nicht aktualisiert werden.",
     "configSaveFailed": "Die Review-Einstellungen konnten nicht gespeichert werden.",
     "status": {
-      "running": "Läuft",
-      "completed": "Abgeschlossen",
       "interrupted": "Unterbrochen"
     },
     "reviewStyle": {
@@ -1113,7 +1117,14 @@
       "triageReasoning": "Begründung der Ersteinschätzung",
       "watchInCloudAgent": "Im Cloud Agent ansehen",
       "whereFound": "Fundstellen ({{displayCount}})",
-      "yes": "Ja"
+      "yes": "Ja",
+      "action": {
+        "analyzeCodebase": "Codebasis analysieren",
+        "dismiss": "Verwerfen",
+        "manualReview": "Manuelle Prüfung",
+        "monitor": "Überwachen",
+        "openPr": "PR öffnen"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Analysemodell",
@@ -1124,6 +1135,9 @@
       "triageModel": "Modell für die Ersteinschätzung"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-Administrator",
+      "actorMaskedUser": "Maskierter Benutzer",
+      "actorSystem": "Kilo-System",
       "couldNotLoad": "Der Auditbericht konnte nicht geladen werden.",
       "events": "Ereignisse",
       "generated": "Der Bericht wurde am {{generatedAt}} erstellt.",
@@ -1135,7 +1149,24 @@
       "summary": "Zusammenfassung des Berichts",
       "title": "Auditbericht",
       "unavailable": "Auditbericht nicht verfügbar",
-      "unavailableDescription": "Nur Organisationsinhaber und Abrechnungsmanager können Auditberichte ansehen. Bitte einen Inhaber oder Abrechnungsmanager, dir Zugriff zu gewähren."
+      "unavailableDescription": "Nur Organisationsinhaber und Abrechnungsmanager können Auditberichte ansehen. Bitte einen Inhaber oder Abrechnungsmanager, dir Zugriff zu gewähren.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyse abgeschlossen",
+        "findingAnalysisFailed": "Analyse fehlgeschlagen",
+        "findingAutoDismissed": "Automatisch verworfen",
+        "findingCreated": "Importiert",
+        "findingDeleted": "Gelöscht",
+        "findingDismissed": "Verworfen",
+        "findingSeverityChanged": "Schweregrad geändert",
+        "findingStatusChange": "Status geändert",
+        "findingSuperseded": "Ersetzt",
+        "remediationBlocked": "Behebung blockiert",
+        "remediationCancelled": "Abgebrochen",
+        "remediationFailed": "Behebung fehlgeschlagen",
+        "remediationNoChangesNeeded": "Keine Änderungen erforderlich",
+        "remediationPrOpened": "PR geöffnet",
+        "remediationQueued": "Behebung angefordert"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Auditbericht ansehen"
@@ -1355,7 +1386,6 @@
       "installApp": "GitHub-App installieren",
       "reauthorizeButton": "GitHub-App erneut autorisieren",
       "reauthorizeDescription": "Security Agent benötigt die Berechtigung vulnerability_alerts, um auf Dependabot-Warnungen zuzugreifen. Autorisiere die GitHub-App erneut, um diese Berechtigung zu gewähren.",
-      "reauthorizeFailed": "Die erneute Autorisierung konnte nicht gestartet werden. Bitte versuche es erneut.",
       "reauthorizeTitle": "Zusätzliche Berechtigungen erforderlich",
       "setupFailed": "Die GitHub-Einrichtung konnte nicht gestartet werden. Bitte versuche es erneut."
     },
@@ -1378,6 +1408,7 @@
     "settingsSave": {
       "saveChanges": "Änderungen speichern",
       "unsavedMessage": "Möchtest du deine Änderungen speichern, bevor du diesen Bildschirm verlässt?",
+      "unsavedInvalidMessage": "Diese Änderungen können noch nicht gespeichert werden. Behebe sie, um zu speichern, oder verwirf sie, um den Bildschirm zu verlassen.",
       "unsavedTitle": "Ungespeicherte Änderungen"
     },
     "setup": {
@@ -1416,7 +1447,12 @@
       "syncMayNotHaveCompleted": "Eine Synchronisierung wurde möglicherweise nicht abgeschlossen. Wiederhole sie zum Abgleich oder verwirf sie.",
       "syncInProgress": "Die Sicherheitsbefunde werden bereits synchronisiert. Bitte versuche es erneut.",
       "dismissalInProgress": "Dieser Befund wird bereits verworfen. Bitte versuche es erneut.",
-      "couldNotReadPendingSyncs": "Ausstehende Synchronisierungen konnten nicht gelesen werden. Versuche es erneut."
+      "couldNotReadPendingSyncs": "Ausstehende Synchronisierungen konnten nicht gelesen werden. Versuche es erneut.",
+      "ambiguous": "Die Aktion konnte nicht bestätigt werden. Prüfe die Sicherheitsüberprüfung, bevor du es erneut versuchst.",
+      "settleFailed": "Die Aktion wurde abgeschlossen, aber wir konnten das Ergebnis nicht speichern. Bitte versuche es erneut.",
+      "replayFailed": "Diese Aktion wurde nicht abgeschlossen. Bitte versuche es erneut.",
+      "actionFailed": "Diese Aktion konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
+      "actionBlocked": "Diese Aktion konnte nicht abgeschlossen werden. Das Problem muss behoben werden, bevor du es erneut versuchen kannst."
     },
     "analysisState": {
       "queued": "Analyse in der Warteschlange",
@@ -1771,7 +1807,8 @@
       "linesBadge_other": "{{displayCount}} Zeilen",
       "matchesBadge_one": "{{displayCount}} Treffer",
       "matchesBadge_other": "{{displayCount}} Treffer",
-      "noOutput": "Keine Ausgabe."
+      "noOutput": "Keine Ausgabe.",
+      "translationFailed": "Übersetzung fehlgeschlagen"
     },
     "readToolMarkdown": {
       "linesTruncated": "zeilen {{start}}–{{end}} (gekürzt)",
@@ -2185,7 +2222,7 @@
       "invalidLink": "Dieser Link kann nicht geöffnet werden.",
       "hostConfirmTitle": "Externen Link öffnen?",
       "hostConfirmMessage": "Dieser Link öffnet {{host}} in deinem Browser.",
-      "open": "Offen",
+      "open": "Öffnen",
       "trustThisHost": "Diesem Host vertrauen"
     },
     "folderPicker": {
@@ -2230,7 +2267,7 @@
     "thisDevice": "Dieses Gerät",
     "viewProfile": "Profil ansehen",
     "signOutThisDevice": "Dieses Gerät abmelden",
-    "signOutThisSession": "Diese Sitzung abmelden",
+    "signOutSessionLabel": "{{device}} abmelden, angemeldet: {{signedIn}}",
     "sessionSignedOut": "Sitzung abgemeldet.",
     "signOutThisDeviceTitle": "Dieses Gerät abmelden?",
     "signOutThisSessionTitle": "Diese Sitzung abmelden?",
@@ -2628,7 +2665,7 @@
       "openAccessibility": "Pull-Request oder Merge-Request öffnen",
       "clearLink": "Link löschen",
       "pasteLink": "Füge einen Pull-Request- oder Merge-Request-Link ein",
-      "open": "Offen"
+      "open": "Öffnen"
     },
     "eventChips": {
       "comment": "Kommentieren",
@@ -2946,7 +2983,6 @@
       "mergeResultDefaultError": "GitHub hat die Zusammenführung nicht abgeschlossen.",
       "mergeResultNotCompleted": "Der {{term}} wurde nicht zusammengeführt. Prüfe seinen Status und versuche es erneut.",
       "ambiguous": "Die Aktion konnte nicht bestätigt werden. Prüfe den PR, bevor du es erneut versuchst.",
-      "persistenceFailed": "Wir konnten diese Aktion nicht speichern. Bitte versuche es später erneut.",
       "forbidden": "Du hast keine Berechtigung für diese Aktion."
     },
     "capabilities": {
@@ -2975,11 +3011,22 @@
     "boundary": {
       "backToProfile": "Zurück zum Profil",
       "loadErrorMessage": "Prüfe deine Verbindung und versuche es erneut.",
+
+      "chooseAccount": "Konto auswählen",
       "loadErrorTitle": "Deine Organisationen konnten nicht geladen werden.",
+      "noOrganization": "Keine Organisation",
+
+      "noOrganizationDescription": "Dieses Konto gehört keiner Organisation an. Erstelle eine Organisation oder tritt einer auf der Website bei, um Organisationsfunktionen wie Mitgliedseinladungen und Warnungen bei niedrigem Guthaben zu nutzen.",
+
+      "openWebOrganizations": "Organisationen auf der Website öffnen",
+
       "organizationUnavailable": "Die Organisation ist nicht verfügbar.",
-      "selectDescription": "Wähle in deinem Profil eine Organisation aus, um fortzufahren.",
+      "selectDescriptionWithOrganizations": "Du gehörst einer oder mehreren Organisationen an. Wähle das Konto aus, das dieser Bildschirm verwenden soll.",
+
       "selectOrganization": "Organisation auswählen",
       "unavailableDescription": "Diese Organisation ist nicht mehr verfügbar. Wähle in deinem Profil eine andere Organisation aus, um fortzufahren.",
+
+      "unavailableSessionsDescription": "Diese Organisation ist nicht mehr verfügbar. Ihre Sitzungen können nicht geladen werden.",
       "accessDeniedDescription": "Du hast keinen Zugriff auf diese Organisation."
     },
     "creditActivity": {
@@ -3038,7 +3085,11 @@
       "separateEmailsHint": "Trenne mehrere E-Mail-Adressen durch Kommas.",
       "thresholdLabel": "Warnung unter (USD)",
       "title": "Warnung bei niedrigem Guthaben",
-      "emailsError": "Gib mindestens eine gültige E-Mail-Adresse ein. Trenne mehrere Adressen durch Kommas.",
+      "emailsInvalid": "Eine oder mehrere E-Mail-Adressen sind ungültig.",
+      "emailsRequired": "Gib mindestens eine E-Mail-Adresse ein.",
+      "saveEmailsError": "Einige E-Mail-Adressen wurden nicht akzeptiert. Prüfe sie und versuche es erneut.",
+      "saveError": "Die Warnung bei niedrigem Guthaben konnte nicht gespeichert werden.",
+      "thresholdPlaceholder": "Betrag eingeben",
       "thresholdError": "Gib einen Betrag größer als 0 ein."
     },
     "memberLimit": {
@@ -3049,6 +3100,7 @@
       "removeLimit": "Limit entfernen",
       "title": "Tägliches Nutzungslimit",
       "blankError": "Gib einen Betrag ein oder tippe unten auf „Limit entfernen“.",
+      "blankWithoutLimitError": "Gib ein tägliches Limit zwischen 0 und {{max}} ein.",
       "rangeError": "Gib einen Betrag zwischen 0 und {{max}} ein."
     },
     "members": {
@@ -3517,6 +3569,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agent starten benötigt einen Prompt. Füge einen Prompt hinzu und führe die Aktion erneut aus.",
+      "repositoryRequired": "Agent starten benötigt ein Repository. Öffne Kilo, wähle eines und führe die Aktion erneut aus.",
       "repositoryUnknown": "Kilo erkennt {{repository}} nicht als GitHub- oder GitLab-Repository. Wähle ein anderes Repository in Kilo.",
       "repositoryUnsupported": "{{repository}} ist ein Bitbucket-Repository — Agent starten kann es noch nicht verwenden. Wähle ein anderes Repository in Kilo."
     }
@@ -3588,7 +3641,6 @@
     "keyTooLong": "Der Schlüssel darf höchstens 256 Zeichen lang sein",
     "keyDuplicate": "Dieser Schlüssel ist bereits im Profil vorhanden",
     "valueLabel": "Wert",
-    "secretLabel": "Geheimnis",
     "secrets": {
       "markSecret": "Als geheim markieren",
       "masked": "Versteckter Wert",
@@ -3647,14 +3699,16 @@
       "jsonTooLarge": "Verwenden Sie höchstens 50 Einträge, Schlüssel bis 128 und Werte bis 4096 Zeichen",
       "timeoutInvalid": "Das Zeitlimit muss eine ganze Zahl von Millisekunden betragen",
       "edit": "Bearbeiten Sie den MCP-Server",
-      "saveFailed": "Der MCP-Server konnte nicht gespeichert werden"
+      "saveFailed": "Der MCP-Server konnte nicht gespeichert werden",
+      "deleteFailed": "Der MCP-Server konnte nicht gelöscht werden",
+      "updateFailed": "Der MCP-Server konnte nicht aktualisiert werden"
     },
     "agents": {
       "title": "Profilagenten",
       "add": "Agent hinzufügen",
       "empty": "Noch keine Agenten",
       "name": "Name des Agenten",
-      "slug": "Agent-Schnecke",
+      "slug": "Slug des Agenten",
       "description": "Beschreibung des Agenten",
       "model": "Modellüberschreibung",
       "modelPlaceholder": "Sitzungsstandard verwenden",
@@ -3674,6 +3728,7 @@
       "visibilitySubagent": "Subagent – nur von anderen aufrufbar",
       "visibilityAll": "Alle – beides",
       "saveFailed": "Der Agent konnte nicht gespeichert werden",
+      "deleteFailed": "Der Agent konnte nicht gelöscht werden",
       "nameRequired": "Geben Sie einen Agentennamen ein",
       "slugRequired": "Geben Sie einen Agenten-Slug ein",
       "slugInvalid": "Slug muss mit einem Buchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche verwenden",
@@ -3688,10 +3743,12 @@
       "description": "Befehlsbeschreibung",
       "template": "Vorlage",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Erklären Sie $ARGUMENTS",
       "subtask": "Als Unteraufgabe ausführen",
       "edit": "Slash-Befehl bearbeiten",
       "saveFailed": "Der Befehl konnte nicht gespeichert werden",
+      "deleteFailed": "Der Befehl konnte nicht gelöscht werden",
       "nameRequired": "Geben Sie einen Befehlsnamen ein",
       "nameInvalid": "Der Name muss mit einem Kleinbuchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten",
       "templateRequired": "Geben Sie eine Befehlsvorlage ein",
@@ -3838,7 +3895,7 @@
     "view": "Briefing lesen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Live-Status anzeigen",
+    "dismiss": "Briefing verwerfen",
     "offline": "Offline · gespeichertes Briefing",
     "cached": "Gespeicherter Bericht · Aktualisierung nicht verfügbar",
     "revised": "Überarbeitet · {{revision}}",

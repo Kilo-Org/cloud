@@ -1,10 +1,12 @@
+/* eslint-disable max-lines -- the provider mock harness, the focus simulator, and the General rows share one mounted fixture. */
 import { act } from '@/test/renderer';
+import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
+import { useEffect, useSyncExternalStore } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { GeneralSettingsScreen } from '@/components/general-settings-screen';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
-import { renderWithProviders } from '@/test/render-with-providers';
 
 vi.hoisted(() => {
   vi.stubGlobal('__DEV__', false);
@@ -45,8 +47,34 @@ vi.mock('react-native', () => ({
   AccessibilityInfo: {},
   AppState: { currentState: 'active', addEventListener: () => ({ remove: () => undefined }) },
 }));
+// Focus state drives the mocked focus effect: flipping it notifies subscribers,
+// so the effect's cleanup runs exactly like a real blur while the provider and
+// the screen stay mounted.
+const focus = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  const subscribe = (notify: () => void) => {
+    listeners.add(notify);
+    return () => {
+      listeners.delete(notify);
+    };
+  };
+  return {
+    focused: false,
+    setFocused(next: boolean) {
+      focus.focused = next;
+      for (const notify of listeners) {
+        notify();
+      }
+    },
+    subscribe,
+  };
+});
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    const focused = useSyncExternalStore(focus.subscribe, () => focus.focused);
+    useEffect(() => (focused ? effect() : undefined), [effect, focused]);
+  },
 }));
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
@@ -113,14 +141,14 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ secondaryForeground: '#000000', mutedForeground: '#000000' }),
 }));
 
-let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
+let view: RenderWithProvidersResult | undefined = undefined;
 async function flush(update?: () => void) {
   await act(async () => {
     update?.();
     await vi.dynamicImportSettled();
   });
 }
-async function mountGeneral(): Promise<Awaited<ReturnType<typeof renderWithProviders>>> {
+async function mountGeneral(): Promise<RenderWithProvidersResult> {
   storage.getItemAsync.mockResolvedValue(null);
   view = await renderWithProviders(<GeneralSettingsScreen />, {
     wrapper: ({ children }) => (
@@ -130,7 +158,7 @@ async function mountGeneral(): Promise<Awaited<ReturnType<typeof renderWithProvi
   await flush();
   return view;
 }
-function texts(renderer: Awaited<ReturnType<typeof renderWithProviders>>) {
+function texts(renderer: RenderWithProvidersResult) {
   return renderer.renderer.root
     .findAll(
       node =>
@@ -138,12 +166,21 @@ function texts(renderer: Awaited<ReturnType<typeof renderWithProviders>>) {
         (node.type as string) === 'Text' &&
         typeof node.props.children === 'string'
     )
-    .map(node => node.props.children);
+    .map(node => node.props.children as string);
+}
+function biometricToggle(renderer: RenderWithProvidersResult) {
+  const found = renderer.renderer.root
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Switch')
+    .find(sw => sw.props.accessibilityLabel === 'Unlock with biometrics');
+  return typeof found?.props.onValueChange === 'function'
+    ? (found.props.onValueChange as (next: boolean) => void)
+    : undefined;
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('__DEV__', false);
   vi.resetAllMocks();
+  focus.setFocused(false);
   native.hasHardwareAsync.mockResolvedValue(true);
   native.isEnrolledAsync.mockResolvedValue(true);
   native.getEnrolledLevelAsync.mockResolvedValue(3);
@@ -233,5 +270,52 @@ describe('GeneralSettingsScreen', () => {
   it('does not prompt for native authentication when opening settings', async () => {
     await mountGeneral();
     expect(native.authenticateAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows the failure feedback while the screen stays focused after a failed enable attempt', async () => {
+    focus.setFocused(true);
+    native.authenticateAsync.mockResolvedValue({
+      success: false,
+      error: 'not_available',
+    });
+    const renderer = await mountGeneral();
+    const attempt = biometricToggle(renderer);
+    expect(attempt).toBeDefined();
+
+    await flush(() => {
+      attempt?.(true);
+    });
+
+    const feedback = texts(renderer);
+    expect(feedback).toContain('Unavailable');
+    expect(feedback).toContain('Check your device security settings and try again.');
+  });
+
+  it('shows no failure feedback after the screen loses focus and the user returns', async () => {
+    focus.setFocused(true);
+    native.authenticateAsync.mockResolvedValue({
+      success: false,
+      error: 'not_available',
+    });
+    const renderer = await mountGeneral();
+    const attempt = biometricToggle(renderer);
+    expect(attempt).toBeDefined();
+
+    await flush(() => {
+      attempt?.(true);
+    });
+    expect(texts(renderer)).toContain('Unavailable');
+
+    // Blur (back to Preferences) retires the attempt's feedback; the provider
+    // stays mounted, so the clear must come from the focus cleanup itself.
+    await flush(() => {
+      focus.setFocused(false);
+    });
+    await flush(() => {
+      focus.setFocused(true);
+    });
+
+    expect(texts(renderer)).not.toContain('Unavailable');
+    expect(texts(renderer)).not.toContain('Check your device security settings and try again.');
   });
 });

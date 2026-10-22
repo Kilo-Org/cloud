@@ -32417,75 +32417,99 @@
           ]
         },
         "features": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "models": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "modes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "userIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "providers": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "projects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedFeatures": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModels": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedUserIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProjects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "dimension": {
@@ -32643,75 +32667,99 @@
           ]
         },
         "features": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "models": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "modes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "userIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "providers": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "projects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedFeatures": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModels": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedUserIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProjects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         }
       },
@@ -32813,75 +32861,99 @@
           ]
         },
         "features": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "models": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "modes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "userIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "providers": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "projects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedFeatures": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModels": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedUserIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProjects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "groupBy": {
@@ -33007,75 +33079,99 @@
           ]
         },
         "features": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "models": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "modes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "userIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "providers": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "projects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedFeatures": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModels": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedUserIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProjects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "metric": {

@@ -4,6 +4,7 @@ import {
   GitLabSessionCapabilityCodec,
   GitLabSessionCapabilityError,
   parseGitLabCloneUrl,
+  validateGitLabSessionCapabilityPath,
 } from './gitlab-session-capability.js';
 
 const encryptionKey = Buffer.alloc(32, 7).toString('base64');
@@ -183,6 +184,60 @@ describe('GitLabSessionCapabilityCodec', () => {
     );
   });
 });
+
+describe.each([{ type: 'integration' }, claims.source] as const)(
+  'GitLab request paths for $type credentials',
+  source => {
+    const codec = new GitLabSessionCapabilityCodec(encryptionKey);
+    const session = codec.decode(codec.issue({ ...claims, source }));
+    const prefix = '/gitlab/api/v4/projects/';
+
+    it.each([
+      [`${prefix}Acme%2Fplatform%2Fwidgets`, null, 'api'],
+      [`${prefix}Acme%2fplatform%2fwidgets/merge_requests/7/approval_state`, null, 'api'],
+      [`${prefix}Acme%2Fplatform%2Fwidgets/repository/files/src%2Fmain.ts/raw`, null, 'api'],
+      [
+        `${prefix}42/merge_requests/7`,
+        source.type === 'project' ? null : 'repository_mismatch',
+        'api',
+      ],
+      [`${prefix}43/merge_requests/7`, 'repository_mismatch', 'api'],
+      [`${prefix}Acme%2Fplatform%2Fother/issues`, 'repository_mismatch', 'api'],
+      [`${prefix}Acme%2Fplatform%2Fwidgets-extra/issues`, 'repository_mismatch', 'api'],
+      [`${prefix}Acme%252Fplatform%252Fwidgets/issues`, 'repository_mismatch', 'api'],
+      [`${prefix}Acme%2Fplatform%2Fwidgets%2Fextra/issues`, 'repository_mismatch', 'api'],
+      [`${prefix}Acme%2Fplatform%2Fwidgets%/issues`, 'invalid_upstream_url', 'api'],
+      [`${prefix}/issues`, 'invalid_upstream_url', 'api'],
+      ['/gitlab/api/v4/projects', 'invalid_upstream_request', 'api'],
+      ['/gitlab/api/v4/user', 'invalid_upstream_request', 'api'],
+      ['/gitlab/api/graphql', 'invalid_upstream_request', 'api'],
+      ['/gitlab/Acme/platform/widgets.git/info/refs', null, 'git'],
+      ['/gitlab/Acme/platform/widgets.git/git-upload-pack', null, 'git'],
+      ['/gitlab/Acme/platform/widgets.git/info/lfs/locks/123/unlock', null, 'git'],
+      ['/gitlab/Acme/platform/other.git/info/refs', 'repository_mismatch', 'git'],
+      ['/gitlab/Acme/platform/widgets', 'invalid_upstream_request', 'git'],
+      ['/gitlab/Acme/platform/widgets.git/archive/main.zip', 'invalid_upstream_request', 'git'],
+    ] as const)('evaluates request path %s', (pathname, failure, authSurface) => {
+      expect(validateGitLabSessionCapabilityPath(pathname, session, '/gitlab')).toEqual({
+        failure,
+        authSurface,
+      });
+    });
+
+    it.each(['api/project', 'api/v4/project', 'api/v4/projects/project'])(
+      'selects Git authentication for %s',
+      projectPath => {
+        expect(
+          validateGitLabSessionCapabilityPath(
+            `/gitlab/${projectPath}.git/info/refs`,
+            { ...session, projectPath },
+            '/gitlab'
+          )
+        ).toEqual({ failure: null, authSurface: 'git' });
+      }
+    );
+  }
+);
 
 describe('parseGitLabCloneUrl', () => {
   const urlWithCredentials = new URL('https://gitlab.example.com/acme/widgets.git');

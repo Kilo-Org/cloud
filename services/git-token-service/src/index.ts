@@ -35,6 +35,7 @@ import {
   GitLabSessionCapabilityCodec,
   GitLabSessionCapabilityError,
   sha256Digest,
+  validateGitLabSessionCapabilityPath,
   type GitLabAuthType,
   type GitLabCapabilityCredentialSource,
   type GitLabSessionCapabilityFailureReason,
@@ -485,12 +486,6 @@ function validateLegacyGitHubCapabilityUpstream(
   return 'invalid_upstream_request';
 }
 
-function isGitLabGitAuthPath(pathname: string): boolean {
-  return /\.git\/(?:info\/refs|git-upload-pack|git-receive-pack|info\/lfs\/(?:objects\/batch|locks(?:\/verify|\/[^/]+\/unlock)?))$/.test(
-    pathname
-  );
-}
-
 function decodePathnameIteratively(pathname: string): string | null {
   let decoded = pathname;
   for (let depth = 0; depth < 4; depth++) {
@@ -508,12 +503,16 @@ function decodePathnameIteratively(pathname: string): string | null {
 
 function validateGitLabCapabilityUpstream(
   requestUrl: string,
-  instanceOrigin: string
+  session: {
+    instanceOrigin: string;
+    projectPath: string;
+    source: GitLabCapabilityCredentialSource;
+  }
 ): { failure: RedeemGitLabSessionCapabilityFailureReason | null; authSurface: 'git' | 'api' } {
   if (/%5c/i.test(requestUrl) || /\/(?:(?:\.|%2e){1,2})(?:\/|$)/i.test(requestUrl)) {
     return { failure: 'invalid_upstream_url', authSurface: 'git' };
   }
-  const base = parseGitLabBaseUrl(instanceOrigin);
+  const base = parseGitLabBaseUrl(session.instanceOrigin);
   if (!base) return { failure: 'invalid_upstream_url', authSurface: 'git' };
   let url: URL;
   try {
@@ -542,15 +541,7 @@ function validateGitLabCapabilityUpstream(
   ) {
     return { failure: 'upstream_origin_not_allowed', authSurface: 'git' };
   }
-  const apiV4Prefix = `${base.basePath}/api/v4`;
-  const authSurface =
-    !isGitLabGitAuthPath(url.pathname) &&
-    (url.pathname === apiV4Prefix ||
-      url.pathname.startsWith(`${apiV4Prefix}/`) ||
-      url.pathname === `${base.basePath}/api/graphql`)
-      ? 'api'
-      : 'git';
-  return { failure: null, authSurface };
+  return validateGitLabSessionCapabilityPath(url.pathname, session, base.basePath);
 }
 
 function validateBitbucketCapabilityUpstream(
@@ -1376,7 +1367,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
     const upstream =
       claims.version === 2
-        ? validateGitLabCapabilityUpstream(params.requestUrl, claims.instanceOrigin)
+        ? validateGitLabCapabilityUpstream(params.requestUrl, claims)
         : validateLegacyGitLabCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
     if (upstream.failure) return { success: false, reason: upstream.failure };
     const context = {

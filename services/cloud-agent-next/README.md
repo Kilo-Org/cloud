@@ -62,6 +62,14 @@ By default, the script looks for kilo-cli at `$HOME/projects/kilo-cli`. Override
 - GitHub CLI (`gh`) and GitLab CLI (`glab`)
 - Wrapper bundle built inside the container
 
+### Managed GitLab requests
+
+Managed GitLab sessions support project REST operations and Git smart-HTTP/LFS
+endpoints for their configured repository. REST project selectors use the full
+project path; project credentials also support their recorded numeric project ID.
+The configured instance base path and outbound container binding remain part of
+request authorization.
+
 ## API Documentation
 
 ### Overview

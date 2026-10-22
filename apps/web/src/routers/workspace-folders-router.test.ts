@@ -46,6 +46,10 @@ function newWorktreeId(): CloudAgentWorktreeId {
   return `worktree_${crypto.randomUUID()}`;
 }
 
+function newWorkspaceId(): `workspace_${string}` {
+  return `workspace_${crypto.randomUUID()}`;
+}
+
 function makeSession(overrides: Partial<NewCliSessionV2> = {}): NewCliSessionV2 {
   return {
     session_id: `ses_${crypto.randomUUID().replaceAll('-', '').slice(0, 26)}`,
@@ -763,7 +767,7 @@ describe('workspaceFolders worktree membership', () => {
 describe('workspaceFolders session moves', () => {
   it('materializes workspace metadata when filing a standalone session and unfiling keeps the link', async () => {
     const folder = await createFolder();
-    const workspaceId = `workspace_${crypto.randomUUID()}`;
+    const workspaceId = newWorkspaceId();
     const worktreeId = `worktree_${workspaceId.slice('workspace_'.length)}`;
     const session = await insertSession({
       cloud_agent_session_id: workspaceId,
@@ -809,7 +813,7 @@ describe('workspaceFolders session moves', () => {
 
   it('moves the whole workspace group when filing a grouped session by any root chat', async () => {
     const folder = await createFolder();
-    const siblingWorkspaceId = `workspace_${crypto.randomUUID()}`;
+    const siblingWorkspaceId = newWorkspaceId();
     await insertSession({
       status: 'busy',
       status_updated_at: LATER_TIME,
@@ -857,7 +861,7 @@ describe('workspaceFolders session moves', () => {
 
   it('rejects child sessions as missing without materializing metadata', async () => {
     const folder = await createFolder();
-    const childWorkspaceId = `workspace_${crypto.randomUUID()}`;
+    const childWorkspaceId = newWorkspaceId();
     await insertSession({
       parent_session_id: SESSION_ID,
       cloud_agent_session_id: childWorkspaceId,
@@ -888,7 +892,7 @@ describe('workspaceFolders session moves', () => {
     async ({ sourceUserId, sourceOrganizationId, organizationId }) => {
       const folder = await createFolder(organizationId);
       for (const hasMetadata of [false, true]) {
-        const workspaceId = `workspace_${crypto.randomUUID()}`;
+        const workspaceId = newWorkspaceId();
         const worktreeId = `worktree_${workspaceId.slice('workspace_'.length)}`;
         await insertSession({
           kilo_user_id: sourceUserId,
@@ -935,7 +939,7 @@ describe('workspaceFolders session moves', () => {
     // A destination owned by another member of the same organization must be
     // rejected for ownership, not because the caller is in the wrong scope.
     const otherMemberDestination = await createFolder(ORGANIZATION_ID, 'Private', otherUser);
-    const organizationWorkspaceId = `workspace_${crypto.randomUUID()}`;
+    const organizationWorkspaceId = newWorkspaceId();
     await insertSession({
       organization_id: ORGANIZATION_ID,
       cloud_agent_session_id: organizationWorkspaceId,

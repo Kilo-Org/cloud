@@ -10,6 +10,9 @@ import PrReviewNumberLayout from './_layout';
 vi.mock('@/components/app-unlock-screen', () => ({
   appUnlockScreenLayout: ({ children }: { children: ReactElement }) => children,
 }));
+vi.mock('@/components/centered-state-surface', () => ({
+  NativeStateSurface: ({ children }: { children: ReactElement }) => children,
+}));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/pr-review/pr-review-connect-gate', () => ({
   PrReviewConnectGate: ({ children }: { children: ReactElement }) => children,

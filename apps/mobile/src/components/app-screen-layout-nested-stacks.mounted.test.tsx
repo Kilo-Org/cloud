@@ -2,6 +2,7 @@ import { createElement, type ElementType, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, expect, it, vi } from 'vitest';
 
+import AuthLayout from '@/app/(auth)/_layout';
 import ChatLayout from '@/app/(app)/(tabs)/(4_chat)/_layout';
 import HomeLayout from '@/app/(app)/(tabs)/(0_home)/_layout';
 import AgentsLayout from '@/app/(app)/(tabs)/(2_agents)/_layout';
@@ -23,7 +24,16 @@ vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
   useValidatedReviewerRouteParams: () => ({ scope: 'personal', platform: 'github' }),
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({ useReviewerEditGuard: () => undefined }));
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ background: 'background' }),
+}));
+vi.mock('@/lib/form-sheet', () => ({
+  useFormSheetScreenOptions: () => ({ sheetAllowedDetents: [0.5, 1] }),
+}));
+vi.mock('@/components/centered-state-surface', () => ({
+  NativeStateSurface: ({ children }: { children: ReactElement }) => children,
+}));
+vi.mock('react-native', () => ({ Platform: { OS: 'android' }, View: 'View' }));
 
 /**
  * One scene navigation object per navigator the fake Stack mounts, reporting
@@ -89,6 +99,7 @@ const layouts: [string, LayoutComponent][] = [
   ['chat', ChatLayout],
   ['code reviewer', CodeReviewerPlatformLayout],
   ['code reviewer edit', CodeReviewerEditLayout],
+  ['sign-in', AuthLayout],
 ];
 
 function gate(renderer: TestRenderer.ReactTestRenderer) {
@@ -113,7 +124,7 @@ beforeEach(() => {
   scenes.made.length = 0;
 });
 
-it.each(layouts)('hides a covered %s tab scene from screen readers', (_name, Layout) => {
+it.each(layouts)('hides a covered %s scene from screen readers', (_name, Layout) => {
   const renderer = mount(Layout);
   const scene = scenes.made[0];
   if (!scene) {

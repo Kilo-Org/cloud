@@ -2,7 +2,7 @@ import { type ReactElement, useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
-import { type ScreenLayoutProps } from '@/components/centered-state-surface';
+import { NativeStateSurface, type ScreenLayoutProps } from '@/components/centered-state-surface';
 
 /**
  * Hides every covered `(app)` stack scene from screen readers.
@@ -70,6 +70,19 @@ function CoveredScreenA11yGate({
  */
 export function appSceneLayout({ navigation, children }: ScreenLayoutProps): ReactElement {
   return <CoveredScreenA11yGate navigation={navigation}>{children}</CoveredScreenA11yGate>;
+}
+
+/**
+ * The gate around the measured state surface, for a stack whose screens carry
+ * no unlock surface: the pre-auth stack, where the language picker sheet opens
+ * over the login screen. Hiding the covered scene is the same requirement.
+ */
+export function appSurfaceSceneLayout(props: ScreenLayoutProps): ReactElement {
+  return (
+    <CoveredScreenA11yGate navigation={props.navigation}>
+      <NativeStateSurface {...props} />
+    </CoveredScreenA11yGate>
+  );
 }
 
 // The unlock surface stays the scene's layout (its NativeStateSurface hosts

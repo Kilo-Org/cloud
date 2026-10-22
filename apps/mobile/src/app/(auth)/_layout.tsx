@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { Platform } from 'react-native';
 
-import { NativeStateSurface } from '@/components/centered-state-surface';
+import { appSurfaceSceneLayout } from '@/components/app-screen-layout';
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -28,10 +28,7 @@ export default function AuthLayout() {
   };
 
   return (
-    <Stack
-      screenLayout={props => <NativeStateSurface {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
+    <Stack screenLayout={appSurfaceSceneLayout} screenOptions={{ headerShown: false }}>
       <Stack.Screen name="login" />
       <Stack.Screen name="language-picker" options={themedSheetOptions} />
     </Stack>

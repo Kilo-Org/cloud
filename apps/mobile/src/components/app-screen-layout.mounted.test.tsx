@@ -15,6 +15,11 @@ vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/app-unlock-screen', () => ({
   appUnlockScreenLayout: ({ children }: { children: unknown }) => children,
 }));
+// The gate module also installs itself around the measured state surface for
+// the pre-auth stack; that surface needs native measurement, not under test.
+vi.mock('@/components/centered-state-surface', () => ({
+  NativeStateSurface: ({ children }: { children: unknown }) => children,
+}));
 
 type FocusListener = () => void;
 

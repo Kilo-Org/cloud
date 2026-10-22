@@ -10,6 +10,9 @@ import OrganizationLayout from './_layout';
 vi.mock('@/components/app-unlock-screen', () => ({
   appUnlockScreenLayout: ({ children }: { children: ReactElement }) => children,
 }));
+vi.mock('@/components/centered-state-surface', () => ({
+  NativeStateSurface: ({ children }: { children: ReactElement }) => children,
+}));
 vi.mock('@/lib/form-sheet', () => ({ useFormSheetScreenOptions: () => ({}) }));
 vi.mock('react-native', () => ({ View: 'View' }));
 

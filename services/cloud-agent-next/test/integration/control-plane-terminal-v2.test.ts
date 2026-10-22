@@ -298,6 +298,31 @@ describe('control-plane terminals on the Sandbox DO (B10)', () => {
       error: { code: 'not_ready', retryable: true },
     });
   });
+
+  it('settles pending requests during allocation policy closure', async () => {
+    const { stub, wrapper } = await startTerminalSandbox();
+    const pending = stub.terminal({
+      operation: 'create',
+      session: sessionInput('workspace_policy'),
+      payload: { operationId: crypto.randomUUID() },
+    });
+    await awaitFrame(wrapper, 'terminal.create');
+    await runInDurableObject(stub, (instance, state) => {
+      Object.assign(instance, {
+        readWrapperBillingBlock: async () => true,
+        webSocketClose: async () => undefined,
+      });
+      for (const socket of state.getWebSockets()) {
+        socket.serializeAttachment({ ...socket.deserializeAttachment(), billingCheckedAt: 0 });
+      }
+    });
+    wrapper.heartbeat(true);
+    expect(await wrapper.waitForClose()).toBe(4402);
+    await expect(pending).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'not_ready', retryable: true },
+    });
+  });
 });
 
 async function markRouteReady(

@@ -410,6 +410,10 @@ These keep their current owners and evidence; the rewrite ports them, it does no
 
 - Compute billing follows the physical container lifecycle (`metered-billing-lifecycle.ts`), not
   the routing state.
+- The Sandbox DO reconciles the current wrapper's stored compute policy on a 30-second cadence.
+  A confirmed `billing_blocked` result enters the allocation's existing stop ladder and closes
+  the wrapper socket with code `4402`. Allocation state fences forwarding and activity renewal.
+  Unavailable policy reads remain non-enforcing; message admission retains its own checks.
 - The Sandbox DO mints the wrapper launch credential and owns one canonical Git/Kilo grant per
   compatible credential scope in DO SQLite. Route rows reference that owner rather than storing
   writable grant copies. Compatibility requires the same user, organization, worktree/directory,

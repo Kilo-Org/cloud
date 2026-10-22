@@ -5648,6 +5648,21 @@
         "session_id": {
           "type": "string",
           "minLength": 1
+        },
+        "duration": {
+          "default": "7d",
+          "type": "string",
+          "enum": [
+            "1h",
+            "1d",
+            "7d",
+            "30d",
+            "forever"
+          ]
+        },
+        "include_new_messages": {
+          "default": false,
+          "type": "boolean"
         }
       },
       "required": [
@@ -5657,9 +5672,11 @@
     "tags": [
       "clisessionsv2",
       "share",
-      "session_id"
+      "session_id",
+      "duration",
+      "include_new_messages"
     ],
-    "searchBlob": "cliSessionsV2.share Share a CLI session by generating a public share link. Return the share token. clisessionsv2 share session_id session_id"
+    "searchBlob": "cliSessionsV2.share Share a CLI session by generating a public share link. Return the share token. clisessionsv2 share session_id duration include_new_messages session_id duration include_new_messages"
   },
   "cliSessionsV2.unshare": {
     "path": "cliSessionsV2.unshare",

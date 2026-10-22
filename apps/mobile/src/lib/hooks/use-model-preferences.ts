@@ -111,16 +111,12 @@ export function useModelPreferences(organizationId: string | undefined) {
       }
       await invalidate();
     },
-    onError: async (error, _selection, context) => {
+    onError: error => {
+      // Do not refetch here: the server still holds the previous selection,
+      // and the model resolves from that cache first, so a failed sync must
+      // not silently switch the form back to the older model. The local
+      // preference already holds this pick; the toast reports the failure.
       onError(error);
-      // A failed save leaves this scope holding an unconfirmed pick; the
-      // latest one reconciles with server truth. A stale save's refetch
-      // must not overwrite the newer optimistic value. A failure before the
-      // optimistic write published the pick has nothing newer to protect.
-      if (context && !isLatestMutationGeneration(context.hash, context.generation)) {
-        return;
-      }
-      await invalidate();
     },
   });
 

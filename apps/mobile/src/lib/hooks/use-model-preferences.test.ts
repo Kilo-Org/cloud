@@ -178,19 +178,15 @@ describe('useModelPreferences (generation guard)', () => {
     expect(invalidateQueriesMock).toHaveBeenCalledTimes(1);
   });
 
-  it('reconciles a failed last-selected save only for the newest pick', async () => {
+  it('keeps the explicit pick cached when its save fails', async () => {
     useModelPreferences(undefined);
     const setLastSelected = capturedMutations[0];
-    const older = await setLastSelected?.onMutate?.({ model: 'first' });
-    const newer = await setLastSelected?.onMutate?.({ model: 'chosen', variant: 'high' });
+    await setLastSelected?.onMutate?.({ model: 'chosen', variant: 'high' });
     invalidateQueriesMock.mockClear();
     toastErrorMock.mockClear();
 
-    setLastSelected?.onError?.(new Error('boom'), { model: 'first' }, older);
+    setLastSelected?.onError?.(new Error('boom'), { model: 'chosen' }, undefined);
     expect(toastErrorMock).toHaveBeenCalledWith('boom');
     expect(invalidateQueriesMock).not.toHaveBeenCalled();
-
-    setLastSelected?.onError?.(new Error('boom'), { model: 'chosen' }, newer);
-    expect(invalidateQueriesMock).toHaveBeenCalledTimes(1);
   });
 });

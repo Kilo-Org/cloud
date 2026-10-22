@@ -127,6 +127,11 @@ vi.mock('@/components/pr-review/pr-review-inbox-list', () => ({
 vi.mock('@/components/pr-review/pr-link-placeholder', () => ({
   PrLinkPlaceholder: 'PrLinkPlaceholder',
 }));
+// The harness calls the screen as a plain function, so the context line is a
+// same-named host stub; its own mounted test covers its content.
+vi.mock('@/components/pr-review/pr-review-context-line', () => ({
+  PrReviewContextLine: 'PrReviewContextLine',
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61', primaryForeground: '#FFFFFF' }),
 }));

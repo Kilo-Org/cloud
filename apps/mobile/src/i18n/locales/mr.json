@@ -25,6 +25,7 @@
     "error": "त्रुटी: {{error}}",
     "back": "मागे",
     "somethingWentWrong": "काहीतरी चूक झाली.",
+    "actionNotRecorded": "ही कृती नोंदवता आली नाही. कृपया नंतर पुन्हा प्रयत्न करा.",
     "couldNotOpen": "{{label}} उघडता आले नाही.",
     "link": "लिंक",
     "takingLonger": "यासाठी अपेक्षेपेक्षा जास्त वेळ लागत आहे. तुम्ही हे बंद करून पुन्हा तपासू शकता.",
@@ -35,6 +36,8 @@
     "connectGithub": "GitHub जोडा",
     "cost": "खर्च",
     "discard": "टाकून द्या",
+    "discardChangesMessage": "तुमचे बदल गमावले जातील.",
+    "discardChangesTitle": "बदल टाकून द्यायचे का?",
     "findings": "निष्कर्ष",
     "mergeRequest": "मर्ज रिक्वेस्ट",
     "notConnected": "जोडलेले नाही",
@@ -109,7 +112,9 @@
     "online": "ऑनलाइन",
     "open": "{{name}} उघडा",
     "openPullRequest": "पुल रिक्वेस्ट उघडा",
+    "completed": "पूर्ण",
     "pending": "प्रलंबित",
+    "running": "चालू आहे",
     "performance": "कार्यक्षमता",
     "preferences": "प्राधान्ये",
     "privacyPolicy": "गोपनीयता धोरण",
@@ -661,7 +666,8 @@
       "description": "मोबाइलवर पुल रिक्वेस्टचे पुनरावलोकन करण्यासाठी तुमचे GitHub खाते कनेक्ट करा.",
       "gitlabDescription": "मोबाइलवर मर्ज रिक्वेस्ट तपासण्यासाठी तुमचे GitLab खाते कनेक्ट करा.",
       "bitbucketDescription": "मोबाइलवर पुल रिक्वेस्ट तपासण्यासाठी हे संघटन Bitbucket शी कनेक्ट करा.",
-      "bitbucketOrgOnlyDescription": "तुमच्या प्रोफाइलमध्ये एक संघटन निवडा जेणेकरून त्याची Bitbucket पुल रिक्वेस्ट तपासता येतील."
+      "bitbucketOrgOnlyDescription": "त्याच्या Bitbucket पुल रिक्वेस्ट तपासण्यासाठी वरील खाते एका संघटनेत बदला.",
+      "contextLine": "{{organization}} साठी"
     },
     "screen": {
       "title": "#{{number}}",
@@ -770,7 +776,9 @@
       "reviewNotSubmitted": "हे पुनरावलोकन सध्याच्या स्वरूपात सादर करता येत नाही. PR बदलला असेल किंवा ही तुमची स्वतःची पुल रिक्वेस्ट असेल, जिचे तुम्ही पुनरावलोकन करू शकत नाही.",
       "reviewNotSubmittedTerm": "हे पुनरावलोकन तसेच सबमिट करता येत नाही. {{term}} बदलली असेल, किंवा तुम्ही तुमच्या स्वतःच्या {{term}} चे पुनरावलोकन करू शकत नाही.",
       "couldNotPostComment": "टिप्पणी पोस्ट करता आली नाही.",
-      "couldNotSubmitReview": "पुनरावलोकन सादर करता आले नाही. इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा."
+      "couldNotSubmitReview": "पुनरावलोकन सादर करता आले नाही. इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+      "rateLimited": "खूप जास्त विनंत्या. कृपया नंतर पुन्हा प्रयत्न करा.",
+      "conflict": "तुम्ही यावर काम करत असताना हे बदलले. कृपया हे पुन्हा लोड करून पुन्हा प्रयत्न करा."
     },
     "operation": {
       "couldNotReply": "उत्तर देता आले नाही.",
@@ -778,7 +786,6 @@
       "mergeResultDefaultError": "GitHub ने मर्ज पूर्ण केले नाही.",
       "mergeResultNotCompleted": "{{term}} मर्ज झाली नाही. तिची स्थिती तपासा आणि पुन्हा प्रयत्न करा.",
       "ambiguous": "पुष्टी करता आली नाही — पुन्हा प्रयत्न करण्यापूर्वी PR तपासा.",
-      "persistenceFailed": "ही कृती नोंदवता आली नाही. कृपया नंतर पुन्हा प्रयत्न करा.",
       "forbidden": "या कृतीची परवानगी नाही."
     },
     "capabilities": {
@@ -1450,8 +1457,9 @@
       "loading": "पुनरावलोकन मेमरी लोड होत आहे",
       "couldNotLoad": "पुनरावलोकन मेमरी लोड करता आली नाही.",
       "off": "पुनरावलोकन मेमरी बंद आहे.",
+      "on": "पुनरावलोकन मेमरी चालू आहे.",
       "offDescription": "प्रकल्पाची देखभाल करणाऱ्यांच्या उत्तरांमधून Kilo ने शिकावे आणि REVIEW.md साठी मार्गदर्शक सूचना सुचवाव्यात यासाठी ती चालू करा.",
-      "readOnlyDescription": "केवळ संस्थेचे मालक आणि बिलिंग व्यवस्थापक पुनरावलोकन मेमरी चालू करू शकतात.",
+      "readOnlyDescription": "केवळ संस्थेचे मालक आणि बिलिंग व्यवस्थापक पुनरावलोकन मेमरी बदलू शकतात.",
       "enable": "पुनरावलोकन मेमरी चालू करा",
       "loadingProposals": "प्रस्ताव लोड होत आहेत",
       "couldNotLoadProposals": "प्रस्ताव लोड करता आले नाहीत.",
@@ -1532,8 +1540,6 @@
     "updateFailed": "कोड पुनरावलोकक अद्ययावत करता आला नाही.",
     "configSaveFailed": "पुनरावलोकनाच्या सेटिंग्ज जतन करता आल्या नाहीत.",
     "status": {
-      "running": "चालू आहे",
-      "completed": "पूर्ण",
       "interrupted": "व्यत्यय आला"
     },
     "reviewStyle": {
@@ -1546,7 +1552,8 @@
       "bugs": "बग",
       "style": "शैली",
       "testing": "चाचणी",
-      "documentation": "दस्तऐवजीकरण"
+      "documentation": "दस्तऐवजीकरण",
+      "unknown": "इतर ({{area}})"
     },
     "gateThreshold": {
       "warning": "चेतावणी"
@@ -1658,7 +1665,14 @@
       "whereFound": "आढळलेली ठिकाणे ({{displayCount}})",
       "fullReport": "तयार केलेला संपूर्ण अहवाल",
       "yes": "होय",
-      "no": "नाही"
+      "no": "नाही",
+      "action": {
+        "analyzeCodebase": "कोडबेसचे विश्लेषण करा",
+        "dismiss": "नाकारा",
+        "manualReview": "मॅन्युअल पुनरावलोकन",
+        "monitor": "निरीक्षण करा",
+        "openPr": "PR उघडा"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} निष्कर्ष",
@@ -1860,12 +1874,16 @@
     "settingsSave": {
       "saveChanges": "बदल जतन करा",
       "unsavedTitle": "जतन न केलेले बदल",
-      "unsavedMessage": "ही स्क्रीन सोडण्यापूर्वी तुमचे बदल जतन करायचे?"
+      "unsavedMessage": "ही स्क्रीन सोडण्यापूर्वी तुमचे बदल जतन करायचे?",
+      "unsavedInvalidMessage": "हे बदल अजून जतन करता येत नाहीत. जतन करण्यासाठी हे दुरुस्त करा, किंवा सोडून जाण्यासाठी हे टाकून द्या."
     },
     "auditReportButton": {
       "viewA11y": "ऑडिट अहवाल पाहा"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo प्रशासक",
+      "actorMaskedUser": "लपवलेला वापरकर्ता",
+      "actorSystem": "Kilo सिस्टीम",
       "couldNotLoad": "ऑडिट अहवाल लोड करता आला नाही.",
       "events": "घटना",
       "generated": "{{generatedAt}} रोजी तयार केला.",
@@ -1877,7 +1895,24 @@
       "title": "ऑडिट अहवाल",
       "unavailable": "ऑडिट अहवाल अनुपलब्ध",
       "unavailableDescription": "केवळ संस्थेचे मालक आणि बिलिंग व्यवस्थापक ऑडिट अहवाल पाहू शकतात. तुम्हाला प्रवेश देण्याची विनंती त्यांच्याकडे करा.",
-      "queryFailed": "अहवालासाठीची क्वेरी पूर्ण झाली नाही. पुन्हा प्रयत्न करा."
+      "queryFailed": "अहवालासाठीची क्वेरी पूर्ण झाली नाही. पुन्हा प्रयत्न करा.",
+      "eventActions": {
+        "findingAnalysisCompleted": "विश्लेषण पूर्ण झाले",
+        "findingAnalysisFailed": "विश्लेषण अयशस्वी झाले",
+        "findingAutoDismissed": "स्वयंचलितपणे नाकारले",
+        "findingCreated": "आयात केले",
+        "findingDeleted": "हटवले",
+        "findingDismissed": "नाकारले",
+        "findingSeverityChanged": "तीव्रता बदलली",
+        "findingStatusChange": "स्थिती बदलली",
+        "findingSuperseded": "जुने झाले",
+        "remediationBlocked": "निराकरण अडवले गेले",
+        "remediationCancelled": "रद्द केले",
+        "remediationFailed": "निराकरण अयशस्वी झाले",
+        "remediationNoChangesNeeded": "बदलांची गरज नाही",
+        "remediationPrOpened": "PR उघडले",
+        "remediationQueued": "निराकरणाची विनंती केली"
+      }
     },
     "notifications": {
       "couldNotLoad": "सूचनांच्या सेटिंग्ज लोड करता आल्या नाहीत.",
@@ -1909,7 +1944,6 @@
       "installApp": "GitHub ॲप इन्स्टॉल करा",
       "reauthorizeButton": "GitHub ॲपला पुन्हा परवानगी द्या",
       "reauthorizeDescription": "Dependabot सूचना पाहण्यासाठी सुरक्षा एजंटला vulnerability_alerts ही परवानगी आवश्यक आहे. ती देण्यासाठी GitHub ॲपला पुन्हा परवानगी द्या.",
-      "reauthorizeFailed": "पुन्हा परवानगी देण्याची प्रक्रिया सुरू करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
       "reauthorizeTitle": "अतिरिक्त परवानग्या आवश्यक",
       "setupFailed": "GitHub सेटअप सुरू करता आला नाही. कृपया पुन्हा प्रयत्न करा."
     },
@@ -1928,7 +1962,12 @@
       "syncMayNotHaveCompleted": "एखादे सिंक पूर्ण झाले नसण्याची शक्यता आहे. त्याची स्थिती जुळवण्यासाठी पुन्हा प्रयत्न करा किंवा ते रद्द करा.",
       "syncInProgress": "सुरक्षा सिंक आधीच सुरू आहे. कृपया पुन्हा प्रयत्न करा.",
       "dismissalInProgress": "हा निष्कर्ष फेटाळण्याची प्रक्रिया आधीच सुरू आहे. कृपया पुन्हा प्रयत्न करा.",
-      "couldNotReadPendingSyncs": "प्रलंबित सिंकची माहिती वाचता आली नाही. पुन्हा प्रयत्न करा."
+      "couldNotReadPendingSyncs": "प्रलंबित सिंकची माहिती वाचता आली नाही. पुन्हा प्रयत्न करा.",
+      "ambiguous": "पुष्टी करता आली नाही — पुन्हा प्रयत्न करण्यापूर्वी सुरक्षा समीक्षा तपासा.",
+      "settleFailed": "कृती पूर्ण झाली, पण आम्ही परिणाम नोंदवू शकलो नाही. कृपया पुन्हा प्रयत्न करा.",
+      "replayFailed": "ही कृती पूर्ण झाली नाही. कृपया पुन्हा प्रयत्न करा.",
+      "actionFailed": "ही कृती पूर्ण करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
+      "actionBlocked": "ही कृती पूर्ण करता आली नाही. पुन्हा प्रयत्न करण्यापूर्वी समस्या दुरुस्त करणे आवश्यक आहे."
     },
     "analysisState": {
       "queued": "विश्लेषण रांगेत",
@@ -2213,6 +2252,7 @@
       "prefillModelUnavailable": "{{model}} आता उपलब्ध नाही. त्याऐवजी तुमचे डीफॉल्ट मॉडेल वापरले जात आहे.",
       "couldNotReadPendingSessions": "प्रलंबित सत्रे वाचता आली नाहीत. पुन्हा प्रयत्न करा.",
       "failedToCreate": "सत्र तयार करता आले नाही.",
+      "checkOrganizationAccess": "या संस्थेकडील तुमचा प्रवेश तपासा आणि पुन्हा प्रयत्न करा.",
       "couldNotRefreshRepositories": "रिपॉझिटरींची यादी रिफ्रेश करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
       "discardDraftTitle": "मसुदा रद्द करायचा?",
       "discardDraftMessage": "तुमचा प्रॉम्प्ट हटवला जाईल.",
@@ -2282,7 +2322,8 @@
       "linesBadge_other": "{{displayCount}} ओळी",
       "matchesBadge_one": "{{displayCount}} जुळणारे परिणाम",
       "matchesBadge_other": "{{displayCount}} जुळणारे परिणाम",
-      "noOutput": "कोणतेही आउटपुट नाही."
+      "noOutput": "कोणतेही आउटपुट नाही.",
+      "translationFailed": "अनुवाद अयशस्वी"
     },
     "readToolMarkdown": {
       "linesTruncated": "ओळी {{start}}–{{end}} (काही मजकूर वगळला)",
@@ -2742,7 +2783,7 @@
     "viewProfile": "प्रोफाइल पहा",
     "webBrowser": "वेब ब्राउझर",
     "signOutThisDevice": "या डिव्हाइसवरून साइन आउट करा",
-    "signOutThisSession": "या सत्रातून साइन आउट करा",
+    "signOutSessionLabel": "{{device}} वरून साइन आउट करा, साइन इन: {{signedIn}}",
     "sessionSignedOut": "सत्र साइन आउट झाले.",
     "signOutThisDeviceTitle": "या डिव्हाइसवरून साइन आउट करायचे?",
     "signOutThisSessionTitle": "या सत्रातून साइन आउट करायचे?",
@@ -2979,11 +3020,23 @@
     "boundary": {
       "backToProfile": "प्रोफाइलवर परत जा",
       "loadErrorMessage": "इंटरनेट जोडणी तपासा आणि पुन्हा प्रयत्न करा.",
+
+      "chooseAccount": "खाते निवडा",
       "loadErrorTitle": "तुमच्या संस्था लोड करता आल्या नाहीत.",
+      "membershipLostNotice": "तुम्हाला या संस्थेमध्ये आता प्रवेश नाही. {{target}} वर स्विच केले.",
+      "noOrganization": "कोणतीही संस्था नाही",
+
+      "noOrganizationDescription": "हे खाते कोणत्याही संस्थेचा भाग नाही. सदस्य आमंत्रणे आणि कमी शिल्लक सूचना यांसारखी संस्था वैशिष्ट्ये वापरण्यासाठी वेबवर संस्था तयार करा किंवा एकात सामील व्हा.",
+
+      "openWebOrganizations": "वेबवर संस्था उघडा",
+
       "organizationUnavailable": "संस्था उपलब्ध नाही.",
-      "selectDescription": "पुढे जाण्यासाठी तुमच्या प्रोफाइलमधून संस्था निवडा.",
+      "selectDescriptionWithOrganizations": "तुम्ही एक किंवा अधिक संस्थांचे सदस्य आहात. ही स्क्रीन जे खाते वापरावे ते निवडा.",
+
       "selectOrganization": "संस्था निवडा",
       "unavailableDescription": "ही संस्था आता उपलब्ध नाही. पुढे जाण्यासाठी तुमच्या प्रोफाइलमधून दुसरी संस्था निवडा.",
+
+      "unavailableSessionsDescription": "ही संस्था आता उपलब्ध नाही. तिचे सत्र लोड केले जू शकत नाहीत.",
       "accessDeniedDescription": "तुम्हाला या संस्थेमध्ये प्रवेश नाही."
     },
     "creditActivity": {
@@ -3035,7 +3088,11 @@
       "separateEmailsHint": "एकापेक्षा जास्त ईमेल पत्ते देताना त्यांच्यामध्ये स्वल्पविराम द्या.",
       "thresholdLabel": "यापेक्षा कमी शिल्लक झाल्यावर सूचना (USD)",
       "title": "शिल्लक कमी झाल्याची सूचना",
-      "emailsError": "किमान एक वैध ईमेल पत्ता द्या. एकापेक्षा जास्त पत्त्यांमध्ये स्वल्पविराम द्या.",
+      "emailsInvalid": "एक किंवा अधिक ईमेल पत्ते वैध नाहीत.",
+      "emailsRequired": "किमान एक ईमेल पत्ता द्या.",
+      "saveEmailsError": "काही ईमेल पत्ते स्वीकारले गेले नाहीत. ते तपासा आणि पुन्हा प्रयत्न करा.",
+      "saveError": "शिल्लक कमी झाल्याची सूचना जतन करता आली नाही.",
+      "thresholdPlaceholder": "रक्कम द्या",
       "thresholdError": "0 पेक्षा जास्त रक्कम द्या."
     },
     "memberLimit": {
@@ -3046,6 +3103,7 @@
       "removeLimit": "मर्यादा काढा",
       "title": "दररोजच्या वापराची मर्यादा",
       "blankError": "रक्कम द्या किंवा खालील मर्यादा काढा हे बटण वापरा.",
+      "blankWithoutLimitError": "0 ते {{max}} दरम्यानची रोजची मर्यादा द्या.",
       "rangeError": "0 ते {{max}} दरम्यानची रक्कम द्या."
     },
     "members": {
@@ -3513,6 +3571,7 @@
   "appActions": {
     "start": {
       "promptRequired": "एजंट सुरू करण्यासाठी प्रॉम्प्ट आवश्यक आहे. प्रॉम्प्ट जोडा आणि ते पुन्हा चालवा.",
+      "repositoryRequired": "एजंट सुरू करण्यासाठी रिपॉझिटरी आवश्यक आहे. Kilo उघडा आणि एक निवडा, नंतर ते पुन्हा चालवा.",
       "repositoryUnknown": "Kilo, {{repository}} ला GitHub किंवा GitLab रिपॉझिटरी म्हणून ओळखत नाही. Kilo मध्ये दुसरी रिपॉझिटरी निवडा.",
       "repositoryUnsupported": "{{repository}} ही Bitbucket रिपॉझिटरी आहे — एजंट सुरू करा अजून ती वापरू शकत नाही. Kilo मध्ये दुसरी रिपॉझिटरी निवडा."
     }
@@ -3584,7 +3643,6 @@
     "keyTooLong": "की 256 अक्षरे किंवा कमी असावी",
     "keyDuplicate": "ही की आधीपासून प्रोफाइलमध्ये आहे",
     "valueLabel": "मूल्य",
-    "secretLabel": "गुप्त",
     "secrets": {
       "markSecret": "गुप्त म्हणून चिन्हांकित करा",
       "masked": "लपलेले मूल्य",
@@ -3643,7 +3701,9 @@
       "jsonTooLarge": "कमाल 50 नोंदी वापरा, की 128 पर्यंत आणि मूल्ये 4096 अक्षरांपर्यंत",
       "timeoutInvalid": "कालबाह्य पूर्ण संख्या मिलीसेकंद असणे आवश्यक आहे",
       "edit": "MCP सर्व्हर संपादित करा",
-      "saveFailed": "MCP सर्व्हर जतन करू शकलो नाही"
+      "saveFailed": "MCP सर्व्हर जतन करू शकलो नाही",
+      "deleteFailed": "MCP सर्व्हर हटवू शकलो नाही",
+      "updateFailed": "MCP सर्व्हर अपडेट करू शकलो नाही"
     },
     "agents": {
       "title": "प्रोफाइल एजंट",
@@ -3670,6 +3730,7 @@
       "visibilitySubagent": "Subagent — फक्त इतरांकडून कॉल करण्यायोग्य",
       "visibilityAll": "सर्व - दोन्ही",
       "saveFailed": "एजंट जतन करू शकलो नाही",
+      "deleteFailed": "एजंट हटवू शकलो नाही",
       "nameRequired": "एजंटचे नाव एंटर करा",
       "slugRequired": "एजंट स्लग एंटर करा",
       "slugInvalid": "स्लग अक्षराने सुरू होणे आवश्यक आहे आणि फक्त लोअरकेस अक्षरे, अंक आणि डॅश वापरणे आवश्यक आहे",
@@ -3684,10 +3745,12 @@
       "description": "आदेश वर्णन",
       "template": "साचा",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS स्पष्ट करा",
       "subtask": "सबटास्क म्हणून चालवा",
       "edit": "स्लॅश कमांड संपादित करा",
       "saveFailed": "कमांड सेव्ह करू शकलो नाही",
+      "deleteFailed": "कमांड हटवू शकलो नाही",
       "nameRequired": "कमांडचे नाव एंटर करा",
       "nameInvalid": "नाव लोअरकेस अक्षराने सुरू होणे आवश्यक आहे आणि फक्त लोअरकेस अक्षरे, अंक आणि डॅश वापरणे आवश्यक आहे",
       "templateRequired": "कमांड टेम्पलेट प्रविष्ट करा",
@@ -3834,7 +3897,7 @@
     "view": "आढावा वाचा",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "थेट स्थिती दाखवा",
+    "dismiss": "आढावाकडे दुर्लक्ष करा",
     "offline": "ऑफलाइन · जतन केलेला आढावा",
     "cached": "जतन केलेला अहवाल · रिफ्रेश उपलब्ध नाही",
     "revised": "सुधारित · {{revision}}",

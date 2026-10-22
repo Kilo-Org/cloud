@@ -9,6 +9,7 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
 import { PrLinkPlaceholder } from '@/components/pr-review/pr-link-placeholder';
+import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
 import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
 import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
@@ -313,6 +314,7 @@ export function PrReviewEntryScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.prReview')} />
+      <PrReviewContextLine />
       <PrReviewInboxList header={pasteBlock} recents={recentsBody} />
       {dialog}
     </View>

@@ -129,6 +129,9 @@ vi.mock('@/lib/pr-review/recent-prs', () => ({
 // test can assert the header's contract directly. `headerRight` stays a named
 // slot prop, which the walker follows into.
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/organization/organization-boundary', () => ({
+  OrganizationBoundary: 'OrganizationBoundary',
+}));
 vi.mock('@/components/pr-review/merge/pr-merge-partial-success-banner', () => ({
   PrMergePartialSuccessBanner: 'PrMergePartialSuccessBanner',
 }));

@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "開啟 — 設定工具會傳送給模型",
       "settingsToolsOff": "關閉 — 不會傳送任何設定工具給模型",
       "serverChecking": "正在檢查此伺服器…",
-      "serverToolCount": "{{count}} 個工具",
+      "serverToolCount_one": "{{count}} 個工具",
+      "serverToolCount_other": "{{count}} 個工具",
       "serverUnreachable": "無法連線至此伺服器",
       "serverOff": "此伺服器已關閉"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "建立設定檔以跨會話重複使用環境變數、設定命令和技能。",
     "loadFailed": "無法載入設定檔",
     "counts": {
-      "vars": "{{count}} 個變數",
+      "vars_one": "{{count}} 個變數",
+      "vars_other": "{{count}} 個變數",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} 個技能",
-      "commands": "{{count}} 個命令",
+      "skills_one": "{{count}} 個技能",
+      "skills_other": "{{count}} 個技能",
+      "commands_one": "{{count}} 個命令",
+      "commands_other": "{{count}} 個命令",
       "varsShort": "{{count}}變",
       "skillsShort": "{{count}}技",
       "commandsShort": "{{count}}命"

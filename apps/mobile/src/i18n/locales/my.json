@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "ဖွင့်ထားသည် — ဆက်တင်ကိရိယာများကို မော်ဒယ်သို့ ပေးပို့သည်",
       "settingsToolsOff": "ပိတ်ထားသည် — ဆက်တင်ကိရိယာ တစ်ခုမှ မော်ဒယ်သို့ မပေးပို့ပါ",
       "serverChecking": "ဤဆာဗာကို စစ်ဆေးနေသည်…",
-      "serverToolCount": "ကိရိယာ {{count}} ခု",
+      "serverToolCount_one": "ကိရိယာ {{count}} ခု",
+      "serverToolCount_other": "ကိရိယာ {{count}} ခု",
       "serverUnreachable": "ဤဆာဗာသို့ မရောက်နိုင်ခဲ့ပါ",
       "serverOff": "ဤဆာဗာ ပိတ်ထားသည်"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "စက်ရှင်များတစ်လျှောက် ပတ်ဝန်းကျင် variable များ၊ စနစ်ထည့်သွင်းရန် ညွှန်ကြားချက်များနှင့် ကျွမ်းကျင်မှုများကို ပြန်လည်အသုံးပြုရန် ပရိုဖိုင်တစ်ခု ဖန်တီးပါ။",
     "loadFailed": "ပရိုဖိုင်များကို တင်၍မရပါ။",
     "counts": {
-      "vars": "{{count}} ကိန်းရှင်",
+      "vars_one": "{{count}} ကိန်းရှင်",
+      "vars_other": "{{count}} ကိန်းရှင်",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ကျွမ်းကျင်မှု",
-      "commands": "{{count}} အမိန့်",
+      "skills_one": "{{count}} ကျွမ်းကျင်မှု",
+      "skills_other": "{{count}} ကျွမ်းကျင်မှု",
+      "commands_one": "{{count}} အမိန့်",
+      "commands_other": "{{count}} အမိန့်",
       "varsShort": "{{count}}က",
       "skillsShort": "{{count}}ကျ",
       "commandsShort": "{{count}}အ"

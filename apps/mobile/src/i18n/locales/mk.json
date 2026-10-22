@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "Вклучено — алатките за поставки се испраќаат до моделот",
       "settingsToolsOff": "Исклучено — ниту една алатка за поставки не се испраќа до моделот",
       "serverChecking": "Проверка на овој сервер…",
-      "serverToolCount": "{{count}} алатки",
+      "serverToolCount_one": "{{count}} алатка",
+      "serverToolCount_other": "{{count}} алатки",
       "serverUnreachable": "Не успеа да се достигне овој сервер",
       "serverOff": "Овој сервер е исклучен"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Создадете профил за повторна употреба на променливи на околината, команди за поставување и вештини низ сесиите.",
     "loadFailed": "Не може да се вчитаат профилите",
     "counts": {
-      "vars": "{{count}} променливи",
+      "vars_one": "{{count}} променлива",
+      "vars_other": "{{count}} променливи",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} вештини",
-      "commands": "{{count}} команди",
+      "skills_one": "{{count}} вештина",
+      "skills_other": "{{count}} вештини",
+      "commands_one": "{{count}} команда",
+      "commands_other": "{{count}} команди",
       "varsShort": "{{count}}п",
       "skillsShort": "{{count}}в",
       "commandsShort": "{{count}}к"

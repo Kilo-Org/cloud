@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "Activado — as ferramentas de configuración envíanse ao modelo",
       "settingsToolsOff": "Desactivado — non se envía ningunha ferramenta de configuración ao modelo",
       "serverChecking": "Comprobando este servidor…",
-      "serverToolCount": "{{count}} ferramentas",
+      "serverToolCount_one": "{{count}} ferramenta",
+      "serverToolCount_other": "{{count}} ferramentas",
       "serverUnreachable": "Non se puido contactar con este servidor",
       "serverOff": "Este servidor está desactivado"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Crea un perfil para reutilizar as variables de ambiente, os comandos de configuración e as habilidades nas sesións.",
     "loadFailed": "Non se puideron cargar os perfís",
     "counts": {
-      "vars": "{{count}} variables",
+      "vars_one": "{{count}} variable",
+      "vars_other": "{{count}} variables",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} habilidades",
-      "commands": "{{count}} comandos",
+      "skills_one": "{{count}} habilidade",
+      "skills_other": "{{count}} habilidades",
+      "commands_one": "{{count}} comando",
+      "commands_other": "{{count}} comandos",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}h",
       "commandsShort": "{{count}}c"

@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "បើក — ឧបករណ៍កំណត់ត្រូវបានផ្ញើទៅគំរូ",
       "settingsToolsOff": "បិទ — គ្មានឧបករណ៍កំណត់ត្រូវបានផ្ញើទៅគំរូទេ",
       "serverChecking": "កំពុងពិនិត្យម៉ាស៊ីនបម្រើនេះ…",
-      "serverToolCount": "ឧបករណ៍ {{count}}",
+      "serverToolCount_one": "ឧបករណ៍ {{count}}",
+      "serverToolCount_other": "ឧបករណ៍ {{count}}",
       "serverUnreachable": "មិនអាចទៅដល់ម៉ាស៊ីនបម្រើនេះបានទេ",
       "serverOff": "ម៉ាស៊ីនបម្រើនេះត្រូវបានបិទ"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "បង្កើតទម្រង់ដើម្បីប្រើអថេរបរិស្ថានឡើងវិញ រៀបចំពាក្យបញ្ជា និងជំនាញនៅទូទាំងវគ្គ។",
     "loadFailed": "មិនអាចផ្ទុកទម្រង់បានទេ។",
     "counts": {
-      "vars": "{{count}} អថេរ",
+      "vars_one": "{{count}} អថេរ",
+      "vars_other": "{{count}} អថេរ",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ជំនាញ",
-      "commands": "{{count}} ពាក្យបញ្ជា",
+      "skills_one": "{{count}} ជំនាញ",
+      "skills_other": "{{count}} ជំនាញ",
+      "commands_one": "{{count}} ពាក្យបញ្ជា",
+      "commands_other": "{{count}} ពាក្យបញ្ជា",
       "varsShort": "{{count}}អ",
       "skillsShort": "{{count}}ជ",
       "commandsShort": "{{count}}ព"

@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "Включено — инструментите за настройки се изпращат на модела",
       "settingsToolsOff": "Изключено — нито един инструмент за настройки не се изпраща на модела",
       "serverChecking": "Проверка на този сървър…",
-      "serverToolCount": "{{count}} инструмента",
+      "serverToolCount_one": "{{count}} инструмент",
+      "serverToolCount_other": "{{count}} инструмента",
       "serverUnreachable": "Неуспешно свързване с този сървър",
       "serverOff": "Този сървър е изключен"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Създайте профил за повторно използване на променливи на средата, команди за настройка и умения в сесиите.",
     "loadFailed": "Профилите не можаха да се заредят",
     "counts": {
-      "vars": "{{count}} променливи",
+      "vars_one": "{{count}} променлива",
+      "vars_other": "{{count}} променливи",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} умения",
-      "commands": "{{count}} команди",
+      "skills_one": "{{count}} умение",
+      "skills_other": "{{count}} умения",
+      "commands_one": "{{count}} команда",
+      "commands_other": "{{count}} команди",
       "varsShort": "{{count}}п",
       "skillsShort": "{{count}}у",
       "commandsShort": "{{count}}к"

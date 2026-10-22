@@ -3377,9 +3377,10 @@
       "settingsToolsOn": "ಆನ್ — ಸೆಟ್ಟಿಂಗ್ಸ್ ಸಾಧನಗಳನ್ನು ಮಾದರಿಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ",
       "settingsToolsOff": "ಆಫ್ — ಮಾದರಿಗೆ ಯಾವುದೇ ಸೆಟ್ಟಿಂಗ್ಸ್ ಸಾಧನ ಕಳುಹಿಸಲಾಗುವುದಿಲ್ಲ",
       "serverChecking": "ಈ ಸರ್ವರ್ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…",
-      "serverToolCount": "{{count}} ಸಾಧನಗಳು",
       "serverUnreachable": "ಈ ಸರ್ವರ್ ತಲುಪಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
-      "serverOff": "ಈ ಸರ್ವರ್ ಆಫ್ ಆಗಿದೆ"
+      "serverOff": "ಈ ಸರ್ವರ್ ಆಫ್ ಆಗಿದೆ",
+      "serverToolCount_one": "{{count}} ಸಾಧನ",
+      "serverToolCount_other": "{{count}} ಸಾಧನಗಳು"
     },
     "mcpOAuth": {
       "authMethod": "ದೃಢೀಕರಣ",
@@ -3613,13 +3614,16 @@
     "emptyDescription": "ಸೆಷನ್‌ಗಳಾದ್ಯಂತ ಪರಿಸರ ವೇರಿಯಬಲ್‌ಗಳು, ಸೆಟಪ್ ಕಮಾಂಡ್‌ಗಳು ಮತ್ತು ಕೌಶಲ್ಯಗಳನ್ನು ಮರುಬಳಕೆ ಮಾಡಲು ಪ್ರೊಫೈಲ್ ಅನ್ನು ರಚಿಸಿ.",
     "loadFailed": "ಪ್ರೊಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "counts": {
-      "vars": "{{count}} ಅಸ್ಥಿರ",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ಕೌಶಲ್ಯಗಳು",
-      "commands": "{{count}} ಆಜ್ಞೆಗಳು",
       "varsShort": "{{count}}ಅ",
       "skillsShort": "{{count}}ಕ",
-      "commandsShort": "{{count}}ಆ"
+      "commandsShort": "{{count}}ಆ",
+      "commands_one": "{{count}} ಆಜ್ಞೆ",
+      "commands_other": "{{count}} ಆಜ್ಞೆಗಳು",
+      "skills_one": "{{count}} ಕೌಶಲ್ಯ",
+      "skills_other": "{{count}} ಕೌಶಲ್ಯಗಳು",
+      "vars_one": "{{count}} ಅಸ್ಥಿರ",
+      "vars_other": "{{count}} ಅಸ್ಥಿರಗಳು"
     },
     "nameLabel": "ಪ್ರೊಫೈಲ್ ಹೆಸರು",
     "namePlaceholder": "ಉದಾ. ಬ್ಯಾಕೆಂಡ್ ಡೀಬಗ್ ಮಾಡುವಿಕೆ",

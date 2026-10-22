@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "Be — a beállításeszközök elküldésre kerülnek a modellnek",
       "settingsToolsOff": "Ki — semmilyen beállításeszköz nem kerül elküldésre a modellnek",
       "serverChecking": "Szerver ellenőrzése…",
-      "serverToolCount": "{{count}} eszköz",
+      "serverToolCount_one": "{{count}} eszköz",
+      "serverToolCount_other": "{{count}} eszköz",
       "serverUnreachable": "Nem sikerült elérni ezt a szervert",
       "serverOff": "Ez a szerver ki van kapcsolva"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Hozzon létre egy profilt a környezeti változók, a beállítási parancsok és a készségek munkamenetek közötti újrafelhasználásához.",
     "loadFailed": "Nem sikerült betölteni a profilokat",
     "counts": {
-      "vars": "{{count}} változó",
+      "vars_one": "{{count}} változó",
+      "vars_other": "{{count}} változó",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} készség",
-      "commands": "{{count}} parancs",
+      "skills_one": "{{count}} készség",
+      "skills_other": "{{count}} készség",
+      "commands_one": "{{count}} parancs",
+      "commands_other": "{{count}} parancs",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}k",
       "commandsShort": "{{count}}p"

@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "Aktiv — mjetet e cilësimeve i dërgohen modelit",
       "settingsToolsOff": "Joaktiv — asnjë mjet cilësimesh nuk i dërgohet modelit",
       "serverChecking": "Duke kontrolluar këtë server…",
-      "serverToolCount": "{{count}} mjete",
+      "serverToolCount_one": "{{count}} mjet",
+      "serverToolCount_other": "{{count}} mjete",
       "serverUnreachable": "Nuk u arrit ky server",
       "serverOff": "Ky server është i fikur"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Krijo një profil për të ripërdorur variablat e mjedisit, komandat e konfigurimit dhe aftësitë nëpër sesione.",
     "loadFailed": "Profilet nuk mund të ngarkoheshin",
     "counts": {
-      "vars": "{{count}} variabla",
+      "vars_one": "{{count}} variabël",
+      "vars_other": "{{count}} variabla",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} aftësi",
-      "commands": "{{count}} komanda",
+      "skills_one": "{{count}} aftësi",
+      "skills_other": "{{count}} aftësi",
+      "commands_one": "{{count}} komandë",
+      "commands_other": "{{count}} komanda",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}a",
       "commandsShort": "{{count}}k"

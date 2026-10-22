@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "Gbanyere — a na-eziga ngwá ọrụ ntọala na ụdị",
       "settingsToolsOff": "Gbanyụrụ — a naghị eziga ngwá ọrụ ntọala ọ bụla na ụdị",
       "serverChecking": "Na-enyocha sava a…",
-      "serverToolCount": "ngwá ọrụ {{count}}",
+      "serverToolCount_one": "ngwá ọrụ {{count}}",
+      "serverToolCount_other": "ngwá ọrụ {{count}}",
       "serverUnreachable": "Enweghị ike iru sava a",
       "serverOff": "Sava a agbanyụrụ"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Mepụta profaịlụ iji megharịa mgbanwe gburugburu ebe obibi, iwu ntọlite na nka n'ofe oge.",
     "loadFailed": "Enweghị ike ibunye profaịlụ",
     "counts": {
-      "vars": "{{count}} mgbanwe",
+      "vars_one": "{{count}} mgbanwe",
+      "vars_other": "{{count}} mgbanwe",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} nkà",
-      "commands": "{{count}} iwu",
+      "skills_one": "{{count}} nkà",
+      "skills_other": "{{count}} nkà",
+      "commands_one": "{{count}} iwu",
+      "commands_other": "{{count}} iwu",
       "varsShort": "{{count}}m",
       "skillsShort": "{{count}}n",
       "commandsShort": "{{count}}i"

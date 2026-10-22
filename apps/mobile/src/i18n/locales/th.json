@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "เปิด — เครื่องมือการตั้งค่าถูกส่งไปยังโมเดล",
       "settingsToolsOff": "ปิด — ไม่มีเครื่องมือการตั้งค่าถูกส่งไปยังโมเดล",
       "serverChecking": "กำลังตรวจสอบเซิร์ฟเวอร์นี้…",
-      "serverToolCount": "{{count}} เครื่องมือ",
+      "serverToolCount_one": "{{count}} เครื่องมือ",
+      "serverToolCount_other": "{{count}} เครื่องมือ",
       "serverUnreachable": "ไม่สามารถเข้าถึงเซิร์ฟเวอร์นี้ได้",
       "serverOff": "เซิร์ฟเวอร์นี้ปิดอยู่"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "สร้างโปรไฟล์เพื่อนำตัวแปรสภาพแวดล้อม คำสั่งการตั้งค่า และทักษะมาใช้ซ้ำในเซสชันต่างๆ",
     "loadFailed": "ไม่สามารถโหลดโปรไฟล์ได้",
     "counts": {
-      "vars": "{{count}} ตัวแปร",
+      "vars_one": "{{count}} ตัวแปร",
+      "vars_other": "{{count}} ตัวแปร",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ทักษะ",
-      "commands": "{{count}} คำสั่ง",
+      "skills_one": "{{count}} ทักษะ",
+      "skills_other": "{{count}} ทักษะ",
+      "commands_one": "{{count}} คำสั่ง",
+      "commands_other": "{{count}} คำสั่ง",
       "varsShort": "{{count}}ต",
       "skillsShort": "{{count}}ท",
       "commandsShort": "{{count}}ค"

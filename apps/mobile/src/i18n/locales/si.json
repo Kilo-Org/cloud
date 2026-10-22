@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "ක්‍රියාත්මකයි — සැකසුම් මෙවලම් ආකෘතියට යවනු ලැබේ",
       "settingsToolsOff": "අක්‍රීයයි — කිසිදු සැකසුම් මෙවලමක් ආකෘතියට යවනු නොලැබේ",
       "serverChecking": "මෙම සේවාදායකය පරීක්ෂා කරමින්…",
-      "serverToolCount": "මෙවලම් {{count}}",
+      "serverToolCount_one": "මෙවලම {{count}}",
+      "serverToolCount_other": "මෙවලම් {{count}}",
       "serverUnreachable": "මෙම සේවාදායකය වෙත ළඟා විය නොහැකි විය",
       "serverOff": "මෙම සේවාදායකය ක්‍රියා විරහිතයි"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "සැසි හරහා පරිසර විචල්‍ය, සැකසුම් විධාන සහ කුසලතා නැවත භාවිතා කිරීමට පැතිකඩක් සාදන්න.",
     "loadFailed": "පැතිකඩ පූරණය කළ නොහැකි විය",
     "counts": {
-      "vars": "{{count}} විචල්ය",
+      "vars_one": "{{count}} විචල්ය",
+      "vars_other": "{{count}} විචල්ය",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} කුසලතා",
-      "commands": "{{count}} විධාන",
+      "skills_one": "{{count}} කුසලතාව",
+      "skills_other": "{{count}} කුසලතා",
+      "commands_one": "{{count}} විධානය",
+      "commands_other": "{{count}} විධාන",
       "varsShort": "{{count}}වි",
       "skillsShort": "{{count}}කු",
       "commandsShort": "{{count}}විධ"

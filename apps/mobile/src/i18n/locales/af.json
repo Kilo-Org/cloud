@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "Aan — die instellingsgereedskap word aan die model gestuur",
       "settingsToolsOff": "Af — geen instellingsgereedskap word aan die model gestuur nie",
       "serverChecking": "Kontroleer hierdie bediener…",
-      "serverToolCount": "{{count}} gereedskap",
+      "serverToolCount_one": "{{count}} gereedskapstuk",
+      "serverToolCount_other": "{{count}} gereedskap",
       "serverUnreachable": "Kon nie hierdie bediener bereik nie",
       "serverOff": "Hierdie bediener is af"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Skep 'n profiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik.",
     "loadFailed": "Kon nie profiele laai nie",
     "counts": {
-      "vars": "{{count}} veranderlikes",
+      "vars_one": "{{count}} veranderlike",
+      "vars_other": "{{count}} veranderlikes",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} vaardighede",
-      "commands": "{{count}} opdragte",
+      "skills_one": "{{count}} vaardigheid",
+      "skills_other": "{{count}} vaardighede",
+      "commands_one": "{{count}} opdrag",
+      "commands_other": "{{count}} opdragte",
       "varsShort": "{{count}}ver",
       "skillsShort": "{{count}}vaa",
       "commandsShort": "{{count}}opr"

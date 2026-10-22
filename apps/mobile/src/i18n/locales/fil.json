@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "Naka-on — ipinapadala ang mga setting tool sa modelo",
       "settingsToolsOff": "Naka-off — walang setting tool na ipinapadala sa modelo",
       "serverChecking": "Sinusuri ang server na ito…",
-      "serverToolCount": "{{count}} tool",
+      "serverToolCount_one": "{{count}} tool",
+      "serverToolCount_other": "{{count}} tool",
       "serverUnreachable": "Hindi maabot ang server na ito",
       "serverOff": "Naka-off ang server na ito"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Gumawa ng profile para magamit muli ang mga variable ng kapaligiran, mga command sa pag-setup, at mga kasanayan sa mga session.",
     "loadFailed": "Hindi ma-load ang mga profile",
     "counts": {
-      "vars": "{{count}} variable",
+      "vars_one": "{{count}} variable",
+      "vars_other": "{{count}} variable",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} kasanayan",
-      "commands": "{{count}} utos",
+      "skills_one": "{{count}} kasanayan",
+      "skills_other": "{{count}} kasanayan",
+      "commands_one": "{{count}} utos",
+      "commands_other": "{{count}} utos",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}k",
       "commandsShort": "{{count}}u"

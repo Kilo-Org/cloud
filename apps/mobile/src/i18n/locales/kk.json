@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "Қосулы — параметр құралдары модельге жіберіледі",
       "settingsToolsOff": "Өшірулі — модельге ешбір параметр құралы жіберілмейді",
       "serverChecking": "Осы сервер тексерілуде…",
-      "serverToolCount": "{{count}} құрал",
+      "serverToolCount_one": "{{count}} құрал",
+      "serverToolCount_other": "{{count}} құрал",
       "serverUnreachable": "Осы серверге қосылу мүмкін болмады",
       "serverOff": "Осы сервер өшірулі"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Орташа айнымалы мәндерді, орнату пәрмендерін және сеанстардағы дағдыларды қайта пайдалану үшін профиль жасаңыз.",
     "loadFailed": "Профильдерді жүктеу мүмкін болмады",
     "counts": {
-      "vars": "{{count}} айнымалы",
+      "vars_one": "{{count}} айнымалы",
+      "vars_other": "{{count}} айнымалы",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} дағды",
-      "commands": "{{count}} пәрмен",
+      "skills_one": "{{count}} дағды",
+      "skills_other": "{{count}} дағды",
+      "commands_one": "{{count}} пәрмен",
+      "commands_other": "{{count}} пәрмен",
       "varsShort": "{{count}}а",
       "skillsShort": "{{count}}д",
       "commandsShort": "{{count}}п"

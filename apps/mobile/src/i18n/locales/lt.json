@@ -3459,9 +3459,12 @@
       "settingsToolsOn": "Įjungta — nustatymų įrankiai siunčiami modeliui",
       "settingsToolsOff": "Išjungta — modeliui nesiunčiamas joks nustatymų įrankis",
       "serverChecking": "Tikrinamas šis serveris…",
-      "serverToolCount": "{{count}} įrankiai",
       "serverUnreachable": "Nepavyko pasiekti šio serverio",
-      "serverOff": "Šis serveris išjungtas"
+      "serverOff": "Šis serveris išjungtas",
+      "serverToolCount_one": "{{count}} įrankis",
+      "serverToolCount_few": "{{count}} įrankiai",
+      "serverToolCount_many": "{{count}} įrankių",
+      "serverToolCount_other": "{{count}} įrankių"
     },
     "mcpOAuth": {
       "authMethod": "Autentifikavimas",
@@ -3695,13 +3698,22 @@
     "emptyDescription": "Sukurkite profilį, kad seansų metu pakartotinai naudotumėte aplinkos kintamuosius, sąrankos komandas ir įgūdžius.",
     "loadFailed": "Nepavyko įkelti profilių",
     "counts": {
-      "vars": "{{count}} kintamųjų",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} įgūdžių",
-      "commands": "{{count}} komandų",
       "varsShort": "{{count}}k",
       "skillsShort": "{{count}}į",
-      "commandsShort": "{{count}}kom"
+      "commandsShort": "{{count}}kom",
+      "commands_one": "{{count}} komanda",
+      "commands_few": "{{count}} komandos",
+      "commands_many": "{{count}} komandų",
+      "commands_other": "{{count}} komandų",
+      "skills_one": "{{count}} įgūdis",
+      "skills_few": "{{count}} įgūdžiai",
+      "skills_many": "{{count}} įgūdžių",
+      "skills_other": "{{count}} įgūdžių",
+      "vars_one": "{{count}} kintamasis",
+      "vars_few": "{{count}} kintamieji",
+      "vars_many": "{{count}} kintamųjų",
+      "vars_other": "{{count}} kintamųjų"
     },
     "nameLabel": "Profilio pavadinimas",
     "namePlaceholder": "pvz. Backend derinimas",

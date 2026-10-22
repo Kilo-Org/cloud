@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "Yoniq — sozlama vositalari modelga yuboriladi",
       "settingsToolsOff": "Oʻchiq — modelga hech qanday sozlama vositasi yuborilmaydi",
       "serverChecking": "Bu server tekshirilmoqda…",
-      "serverToolCount": "{{count}} vosita",
+      "serverToolCount_one": "{{count}} vosita",
+      "serverToolCount_other": "{{count}} vosita",
       "serverUnreachable": "Bu serverga yetib boʻlmadi",
       "serverOff": "Bu server oʻchirilgan"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Seanslar davomida muhit o'zgaruvchilari, sozlash buyruqlari va ko'nikmalarni qayta ishlatish uchun profil yarating.",
     "loadFailed": "Profillarni yuklab bo‘lmadi",
     "counts": {
-      "vars": "{{count}} o'zgaruvchi",
+      "vars_one": "{{count}} o'zgaruvchi",
+      "vars_other": "{{count}} o'zgaruvchi",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ko'nikma",
-      "commands": "{{count}} buyruq",
+      "skills_one": "{{count}} ko'nikma",
+      "skills_other": "{{count}} ko'nikma",
+      "commands_one": "{{count}} buyruq",
+      "commands_other": "{{count}} buyruq",
       "varsShort": "{{count}}o'",
       "skillsShort": "{{count}}k",
       "commandsShort": "{{count}}b"

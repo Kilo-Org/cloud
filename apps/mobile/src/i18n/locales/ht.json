@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "Limen — zouti paramèt yo voye bay modèl la",
       "settingsToolsOff": "Etenn — pa gen zouti paramèt ki voye bay modèl la",
       "serverChecking": "N ap tcheke sèvè sa a…",
-      "serverToolCount": "{{count}} zouti",
+      "serverToolCount_one": "{{count}} zouti",
+      "serverToolCount_other": "{{count}} zouti",
       "serverUnreachable": "Nou pa t kapab rive jwenn sèvè sa a",
       "serverOff": "Sèvè sa a etenn"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Kreye yon pwofil pou reitilize varyab anviwònman yo, lòd konfigirasyon, ak ladrès atravè sesyon yo.",
     "loadFailed": "Pa t 'kapab chaje pwofil yo",
     "counts": {
-      "vars": "{{count}} varyab",
+      "vars_one": "{{count}} varyab",
+      "vars_other": "{{count}} varyab",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} konpetans",
-      "commands": "{{count}} kòmandman",
+      "skills_one": "{{count}} konpetans",
+      "skills_other": "{{count}} konpetans",
+      "commands_one": "{{count}} kòmandman",
+      "commands_other": "{{count}} kòmandman",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}k",
       "commandsShort": "{{count}}kò"

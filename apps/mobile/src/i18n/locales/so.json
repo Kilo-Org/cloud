@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "Daaran — qalabka dejinta waxaa loo diraa moodeelka",
       "settingsToolsOff": "Dami — ma jiro qalab dejin oo loo diraa moodeelka",
       "serverChecking": "Waa la hubinayaa serverkan…",
-      "serverToolCount": "{{count}} qalab",
+      "serverToolCount_one": "{{count}} qalab",
+      "serverToolCount_other": "{{count}} qalab",
       "serverUnreachable": "Lama gaari karin serverkan",
       "serverOff": "Serverkan waa dammaan"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Abuur profile si dib loogu isticmaalo doorsoomayaasha deegaanka, amarrada dejinta, iyo xirfadaha kalfadhiyada oo dhan.",
     "loadFailed": "Waa la rari waayay muuqaallada",
     "counts": {
-      "vars": "{{count}} doorsoomayaal",
+      "vars_one": "{{count}} doorsoome",
+      "vars_other": "{{count}} doorsoomayaal",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} xirfado",
-      "commands": "{{count}} amar",
+      "skills_one": "{{count}} xirfad",
+      "skills_other": "{{count}} xirfado",
+      "commands_one": "{{count}} amar",
+      "commands_other": "{{count}} amar",
       "varsShort": "{{count}}d",
       "skillsShort": "{{count}}x",
       "commandsShort": "{{count}}a"

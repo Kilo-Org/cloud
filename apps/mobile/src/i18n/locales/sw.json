@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "Imewashwa — zana za mipangilio zinatumwa kwa modeli",
       "settingsToolsOff": "Imezimwa — hakuna zana ya mipangilio inayotumwa kwa modeli",
       "serverChecking": "Inakagua seva hii…",
-      "serverToolCount": "zana {{count}}",
+      "serverToolCount_one": "zana {{count}}",
+      "serverToolCount_other": "zana {{count}}",
       "serverUnreachable": "Haikuweza kufikia seva hii",
       "serverOff": "Seva hii imezimwa"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Unda wasifu ili kutumia tena vigezo vya mazingira, amri za usanidi na ujuzi katika vipindi vyote.",
     "loadFailed": "Haikuweza kupakia wasifu",
     "counts": {
-      "vars": "{{count}} vigezo",
+      "vars_one": "{{count}} kigezo",
+      "vars_other": "{{count}} vigezo",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ujuzi",
-      "commands": "{{count}} amri",
+      "skills_one": "{{count}} ujuzi",
+      "skills_other": "{{count}} ujuzi",
+      "commands_one": "{{count}} amri",
+      "commands_other": "{{count}} amri",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}u",
       "commandsShort": "{{count}}a"

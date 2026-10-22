@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "オン — 設定ツールがモデルに送信されます",
       "settingsToolsOff": "オフ — 設定ツールはモデルに送信されません",
       "serverChecking": "このサーバーを確認しています…",
-      "serverToolCount": "{{count}} 個のツール",
+      "serverToolCount_one": "{{count}} 個のツール",
+      "serverToolCount_other": "{{count}} 個のツール",
       "serverUnreachable": "このサーバーに接続できませんでした",
       "serverOff": "このサーバーはオフです"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "プロファイルを作成して、セッション間で環境変数、セットアップ コマンド、スキルを再利用します。",
     "loadFailed": "プロファイルを読み込めませんでした",
     "counts": {
-      "vars": "{{count}} 変数",
+      "vars_one": "{{count}} 変数",
+      "vars_other": "{{count}} 変数",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} スキル",
-      "commands": "{{count}} コマンド",
+      "skills_one": "{{count}} スキル",
+      "skills_other": "{{count}} スキル",
+      "commands_one": "{{count}} コマンド",
+      "commands_other": "{{count}} コマンド",
       "varsShort": "{{count}}変",
       "skillsShort": "{{count}}ス",
       "commandsShort": "{{count}}コ"

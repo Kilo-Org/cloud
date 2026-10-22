@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "ເປີດ — ເຄື່ອງມືຕັ້ງຄ່າຖືກສົ່ງໄປຫາໂມເດລ",
       "settingsToolsOff": "ປິດ — ບໍ່ມີເຄື່ອງມືຕັ້ງຄ່າໃດໆຖືກສົ່ງໄປຫາໂມເດລ",
       "serverChecking": "ກຳລັງກວດສອບເຊີບເວີນີ້…",
-      "serverToolCount": "ເຄື່ອງມື {{count}}",
+      "serverToolCount_one": "ເຄື່ອງມື {{count}}",
+      "serverToolCount_other": "ເຄື່ອງມື {{count}}",
       "serverUnreachable": "ບໍ່ສາມາດເຂົ້າເຖິງເຊີບເວີນີ້ໄດ້",
       "serverOff": "ເຊີບເວີນີ້ປິດຢູ່"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "ສ້າງໂປຣໄຟລ໌ເພື່ອນຳໃຊ້ຕົວແປສະພາບແວດລ້ອມຄືນໃໝ່, ຕັ້ງຄ່າຄຳສັ່ງ ແລະທັກສະຕ່າງໆໃນທົ່ວເຊດຊັນ.",
     "loadFailed": "ບໍ່ສາມາດໂຫຼດໂປຣໄຟລ໌ໄດ້",
     "counts": {
-      "vars": "{{count}} ຕົວແປ",
+      "vars_one": "{{count}} ຕົວແປ",
+      "vars_other": "{{count}} ຕົວແປ",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ທັກສະ",
-      "commands": "{{count}} ຄຳສັ່ງ",
+      "skills_one": "{{count}} ທັກສະ",
+      "skills_other": "{{count}} ທັກສະ",
+      "commands_one": "{{count}} ຄຳສັ່ງ",
+      "commands_other": "{{count}} ຄຳສັ່ງ",
       "varsShort": "{{count}}ຕ",
       "skillsShort": "{{count}}ທ",
       "commandsShort": "{{count}}ຄ"

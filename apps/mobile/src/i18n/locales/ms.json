@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "Hidup — alat tetapan dihantar kepada model",
       "settingsToolsOff": "Mati — tiada alat tetapan dihantar kepada model",
       "serverChecking": "Menyemak pelayan ini…",
-      "serverToolCount": "{{count}} alat",
+      "serverToolCount_one": "{{count}} alat",
+      "serverToolCount_other": "{{count}} alat",
       "serverUnreachable": "Tidak dapat menghubungi pelayan ini",
       "serverOff": "Pelayan ini dimatikan"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Buat profil untuk menggunakan semula pembolehubah persekitaran, arahan persediaan dan kemahiran merentas sesi.",
     "loadFailed": "Tidak dapat memuatkan profil",
     "counts": {
-      "vars": "{{count}} pembolehubah",
+      "vars_one": "{{count}} pembolehubah",
+      "vars_other": "{{count}} pembolehubah",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} kemahiran",
-      "commands": "{{count}} perintah",
+      "skills_one": "{{count}} kemahiran",
+      "skills_other": "{{count}} kemahiran",
+      "commands_one": "{{count}} perintah",
+      "commands_other": "{{count}} perintah",
       "varsShort": "{{count}}pb",
       "skillsShort": "{{count}}k",
       "commandsShort": "{{count}}pr"

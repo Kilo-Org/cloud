@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "켜짐 — 설정 도구가 모델로 전송됩니다",
       "settingsToolsOff": "꺼짐 — 설정 도구가 모델로 전송되지 않습니다",
       "serverChecking": "이 서버를 확인하는 중…",
-      "serverToolCount": "도구 {{count}}개",
+      "serverToolCount_one": "도구 {{count}}개",
+      "serverToolCount_other": "도구 {{count}}개",
       "serverUnreachable": "이 서버에 연결할 수 없습니다",
       "serverOff": "이 서버는 꺼져 있습니다"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "세션 전체에서 환경 변수, 설정 명령 및 기술을 재사용하기 위한 프로필을 만듭니다.",
     "loadFailed": "프로필을 로드할 수 없습니다.",
     "counts": {
-      "vars": "{{count}} 변수",
+      "vars_one": "{{count}} 변수",
+      "vars_other": "{{count}} 변수",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} 스킬",
-      "commands": "{{count}} 명령",
+      "skills_one": "{{count}} 스킬",
+      "skills_other": "{{count}} 스킬",
+      "commands_one": "{{count}} 명령",
+      "commands_other": "{{count}} 명령",
       "varsShort": "{{count}}변",
       "skillsShort": "{{count}}스",
       "commandsShort": "{{count}}명"

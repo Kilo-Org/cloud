@@ -3377,7 +3377,8 @@
       "settingsToolsOn": "An — die Einstellungs-Tools werden an das Modell gesendet",
       "settingsToolsOff": "Aus — kein Einstellungs-Tool wird an das Modell gesendet",
       "serverChecking": "Dieser Server wird geprüft…",
-      "serverToolCount": "{{count}} Tools",
+      "serverToolCount_one": "{{count}} Tool",
+      "serverToolCount_other": "{{count}} Tools",
       "serverUnreachable": "Dieser Server konnte nicht erreicht werden",
       "serverOff": "Dieser Server ist ausgeschaltet"
     },
@@ -3613,10 +3614,13 @@
     "emptyDescription": "Erstellen Sie ein Profil, um Umgebungsvariablen, Setup-Befehle und Fähigkeiten sitzungsübergreifend wiederzuverwenden.",
     "loadFailed": "Profile konnten nicht geladen werden",
     "counts": {
-      "vars": "{{count}} Variablen",
+      "vars_one": "{{count}} Variable",
+      "vars_other": "{{count}} Variablen",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} Fähigkeiten",
-      "commands": "{{count}} Befehle",
+      "skills_one": "{{count}} Fähigkeit",
+      "skills_other": "{{count}} Fähigkeiten",
+      "commands_one": "{{count}} Befehl",
+      "commands_other": "{{count}} Befehle",
       "varsShort": "{{count}}Var",
       "skillsShort": "{{count}}Fäh",
       "commandsShort": "{{count}}Bef"

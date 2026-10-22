@@ -25,6 +25,7 @@
     "error": "fehler: {{error}}",
     "back": "Zurück",
     "somethingWentWrong": "Etwas ist schiefgelaufen.",
+    "actionNotRecorded": "Wir konnten diese Aktion nicht speichern. Bitte versuche es später erneut.",
     "couldNotOpen": "{{label}} konnte nicht geöffnet werden.",
     "link": "link",
     "takingLonger": "Das dauert länger als erwartet. Du kannst diese Ansicht schließen und später erneut nachsehen.",
@@ -994,8 +995,9 @@
       "noProposals": "Keine Vorschläge",
       "noProposalsDescription": "Hier erscheinen Vorschläge zu den gespeicherten Prüfhinweisen, sobald Kilo die Antworten der Projektverantwortlichen analysiert hat.",
       "off": "Gespeicherte Prüfhinweise sind deaktiviert.",
+      "on": "Gespeicherte Prüfhinweise sind aktiviert.",
       "offDescription": "Aktiviere sie, damit Kilo aus den Antworten der Projektverantwortlichen lernt und Richtlinien für REVIEW.md vorschlägt.",
-      "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können gespeicherte Prüfhinweise aktivieren.",
+      "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können gespeicherte Prüfhinweise ändern.",
       "title": "Gespeicherte Prüfhinweise"
     },
     "scopeList": {
@@ -1133,6 +1135,9 @@
       "triageModel": "Modell für die Ersteinschätzung"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-Administrator",
+      "actorMaskedUser": "Maskierter Benutzer",
+      "actorSystem": "Kilo-System",
       "couldNotLoad": "Der Auditbericht konnte nicht geladen werden.",
       "events": "Ereignisse",
       "generated": "Der Bericht wurde am {{generatedAt}} erstellt.",
@@ -1442,7 +1447,12 @@
       "syncMayNotHaveCompleted": "Eine Synchronisierung wurde möglicherweise nicht abgeschlossen. Wiederhole sie zum Abgleich oder verwirf sie.",
       "syncInProgress": "Die Sicherheitsbefunde werden bereits synchronisiert. Bitte versuche es erneut.",
       "dismissalInProgress": "Dieser Befund wird bereits verworfen. Bitte versuche es erneut.",
-      "couldNotReadPendingSyncs": "Ausstehende Synchronisierungen konnten nicht gelesen werden. Versuche es erneut."
+      "couldNotReadPendingSyncs": "Ausstehende Synchronisierungen konnten nicht gelesen werden. Versuche es erneut.",
+      "ambiguous": "Die Aktion konnte nicht bestätigt werden. Prüfe die Sicherheitsüberprüfung, bevor du es erneut versuchst.",
+      "settleFailed": "Die Aktion wurde abgeschlossen, aber wir konnten das Ergebnis nicht speichern. Bitte versuche es erneut.",
+      "replayFailed": "Diese Aktion wurde nicht abgeschlossen. Bitte versuche es erneut.",
+      "actionFailed": "Diese Aktion konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
+      "actionBlocked": "Diese Aktion konnte nicht abgeschlossen werden. Das Problem muss behoben werden, bevor du es erneut versuchen kannst."
     },
     "analysisState": {
       "queued": "Analyse in der Warteschlange",
@@ -2257,7 +2267,7 @@
     "thisDevice": "Dieses Gerät",
     "viewProfile": "Profil ansehen",
     "signOutThisDevice": "Dieses Gerät abmelden",
-    "signOutThisSession": "Diese Sitzung abmelden",
+    "signOutSessionLabel": "{{device}} abmelden, angemeldet: {{signedIn}}",
     "sessionSignedOut": "Sitzung abgemeldet.",
     "signOutThisDeviceTitle": "Dieses Gerät abmelden?",
     "signOutThisSessionTitle": "Diese Sitzung abmelden?",
@@ -2973,7 +2983,6 @@
       "mergeResultDefaultError": "GitHub hat die Zusammenführung nicht abgeschlossen.",
       "mergeResultNotCompleted": "Der {{term}} wurde nicht zusammengeführt. Prüfe seinen Status und versuche es erneut.",
       "ambiguous": "Die Aktion konnte nicht bestätigt werden. Prüfe den PR, bevor du es erneut versuchst.",
-      "persistenceFailed": "Wir konnten diese Aktion nicht speichern. Bitte versuche es später erneut.",
       "forbidden": "Du hast keine Berechtigung für diese Aktion."
     },
     "capabilities": {
@@ -3002,11 +3011,23 @@
     "boundary": {
       "backToProfile": "Zurück zum Profil",
       "loadErrorMessage": "Prüfe deine Verbindung und versuche es erneut.",
+
+      "chooseAccount": "Konto auswählen",
       "loadErrorTitle": "Deine Organisationen konnten nicht geladen werden.",
+      "membershipLostNotice": "Du hast keinen Zugriff mehr auf diese Organisation. Gewechselt zu {{target}}.",
+      "noOrganization": "Keine Organisation",
+
+      "noOrganizationDescription": "Dieses Konto gehört keiner Organisation an. Erstelle eine Organisation oder tritt einer auf der Website bei, um Organisationsfunktionen wie Mitgliedseinladungen und Warnungen bei niedrigem Guthaben zu nutzen.",
+
+      "openWebOrganizations": "Organisationen auf der Website öffnen",
+
       "organizationUnavailable": "Die Organisation ist nicht verfügbar.",
-      "selectDescription": "Wähle in deinem Profil eine Organisation aus, um fortzufahren.",
+      "selectDescriptionWithOrganizations": "Du gehörst einer oder mehreren Organisationen an. Wähle das Konto aus, das dieser Bildschirm verwenden soll.",
+
       "selectOrganization": "Organisation auswählen",
       "unavailableDescription": "Diese Organisation ist nicht mehr verfügbar. Wähle in deinem Profil eine andere Organisation aus, um fortzufahren.",
+
+      "unavailableSessionsDescription": "Diese Organisation ist nicht mehr verfügbar. Ihre Sitzungen können nicht geladen werden.",
       "accessDeniedDescription": "Du hast keinen Zugriff auf diese Organisation."
     },
     "creditActivity": {
@@ -3065,7 +3086,11 @@
       "separateEmailsHint": "Trenne mehrere E-Mail-Adressen durch Kommas.",
       "thresholdLabel": "Warnung unter (USD)",
       "title": "Warnung bei niedrigem Guthaben",
-      "emailsError": "Gib mindestens eine gültige E-Mail-Adresse ein. Trenne mehrere Adressen durch Kommas.",
+      "emailsInvalid": "Eine oder mehrere E-Mail-Adressen sind ungültig.",
+      "emailsRequired": "Gib mindestens eine E-Mail-Adresse ein.",
+      "saveEmailsError": "Einige E-Mail-Adressen wurden nicht akzeptiert. Prüfe sie und versuche es erneut.",
+      "saveError": "Die Warnung bei niedrigem Guthaben konnte nicht gespeichert werden.",
+      "thresholdPlaceholder": "Betrag eingeben",
       "thresholdError": "Gib einen Betrag größer als 0 ein."
     },
     "memberLimit": {
@@ -3076,6 +3101,7 @@
       "removeLimit": "Limit entfernen",
       "title": "Tägliches Nutzungslimit",
       "blankError": "Gib einen Betrag ein oder tippe unten auf „Limit entfernen“.",
+      "blankWithoutLimitError": "Gib ein tägliches Limit zwischen 0 und {{max}} ein.",
       "rangeError": "Gib einen Betrag zwischen 0 und {{max}} ein."
     },
     "members": {
@@ -3544,6 +3570,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agent starten benötigt einen Prompt. Füge einen Prompt hinzu und führe die Aktion erneut aus.",
+      "repositoryRequired": "Agent starten benötigt ein Repository. Öffne Kilo, wähle eines und führe die Aktion erneut aus.",
       "repositoryUnknown": "Kilo erkennt {{repository}} nicht als GitHub- oder GitLab-Repository. Wähle ein anderes Repository in Kilo.",
       "repositoryUnsupported": "{{repository}} ist ein Bitbucket-Repository — Agent starten kann es noch nicht verwenden. Wähle ein anderes Repository in Kilo."
     }
@@ -3615,7 +3642,6 @@
     "keyTooLong": "Der Schlüssel darf höchstens 256 Zeichen lang sein",
     "keyDuplicate": "Dieser Schlüssel ist bereits im Profil vorhanden",
     "valueLabel": "Wert",
-    "secretLabel": "Geheimnis",
     "secrets": {
       "markSecret": "Als geheim markieren",
       "masked": "Versteckter Wert",

@@ -60,7 +60,7 @@
     "@modelcontextprotocol/ext-apps": "1.7.5",
     "@modelcontextprotocol/sdk": "1.32.1",
     "drizzle-orm": "catalog:",
-    "effect": "3.22.1",
+    "effect": "4.0.5",
     "eventsource-parser": "4.1.2",
     "typia": "14.0.4"
   },

@@ -25,6 +25,7 @@
     "error": "erro: {{error}}",
     "back": "Voltar",
     "somethingWentWrong": "Algo deu errado.",
+    "actionNotRecorded": "Não foi possível registrar esta ação. Tente novamente mais tarde.",
     "couldNotOpen": "Não foi possível abrir {{label}}.",
     "link": "endereço do link",
     "takingLonger": "Isso está demorando mais que o esperado. Você pode fechar esta tela e verificar novamente.",
@@ -966,8 +967,9 @@
       "noProposals": "Nenhuma proposta",
       "noProposalsDescription": "As propostas da memória de revisão aparecem aqui depois que o Kilo analisa as respostas dos mantenedores.",
       "off": "A memória de revisão está desativada.",
+      "on": "A memória de revisão está ativada.",
       "offDescription": "Ative-a para que o Kilo aprenda com as respostas dos mantenedores e proponha orientações para o REVIEW.md.",
-      "readOnlyDescription": "Somente proprietários da organização e gerentes de cobrança podem ativar a memória de revisão.",
+      "readOnlyDescription": "Somente proprietários da organização e gerentes de cobrança podem alterar a memória de revisão.",
       "title": "Memória das revisões"
     },
     "scopeList": {
@@ -1105,6 +1107,9 @@
       "triageModel": "Modelo de triagem"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrador Kilo",
+      "actorMaskedUser": "Usuário mascarado",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "Não foi possível carregar o relatório de auditoria.",
       "events": "Eventos",
       "generated": "O relatório foi gerado em {{generatedAt}}.",
@@ -1418,7 +1423,12 @@
       "syncMayNotHaveCompleted": "Uma sincronização pode não ter sido concluída. Tente novamente para atualizar o status ou descarte-a.",
       "syncInProgress": "Uma sincronização de segurança já está em andamento. Tente novamente.",
       "dismissalInProgress": "O descarte já está em andamento. Tente novamente.",
-      "couldNotReadPendingSyncs": "Não foi possível ler as sincronizações pendentes. Tente novamente."
+      "couldNotReadPendingSyncs": "Não foi possível ler as sincronizações pendentes. Tente novamente.",
+      "ambiguous": "Não foi possível confirmar — verifique a revisão de segurança antes de tentar novamente.",
+      "settleFailed": "A ação foi concluída, mas não foi possível registrar o resultado. Tente novamente.",
+      "replayFailed": "Esta ação não foi concluída. Tente novamente.",
+      "actionFailed": "Não foi possível concluir esta ação. Tente novamente.",
+      "actionBlocked": "Não foi possível concluir esta ação. É preciso corrigir o problema antes de tentar novamente."
     },
     "analysisState": {
       "queued": "Análise na fila",
@@ -2280,7 +2290,7 @@
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver perfil",
     "signOutThisDevice": "Sair deste dispositivo",
-    "signOutThisSession": "Encerrar esta sessão",
+    "signOutSessionLabel": "Sair de {{device}}, entrada: {{signedIn}}",
     "sessionSignedOut": "Sessão encerrada.",
     "signOutThisDeviceTitle": "Sair deste dispositivo?",
     "signOutThisSessionTitle": "Encerrar esta sessão?",
@@ -3013,7 +3023,6 @@
       "mergeResultDefaultError": "O GitHub não concluiu a mesclagem.",
       "mergeResultNotCompleted": "O {{term}} não foi mesclado. Verifique o estado e tente novamente.",
       "ambiguous": "Não foi possível confirmar — verifique o PR antes de tentar novamente.",
-      "persistenceFailed": "Não foi possível registrar esta ação. Tente novamente mais tarde.",
       "forbidden": "Você não tem permissão para realizar esta ação."
     },
     "capabilities": {
@@ -3042,11 +3051,23 @@
     "boundary": {
       "backToProfile": "Voltar para o perfil",
       "loadErrorMessage": "Verifique sua conexão e tente novamente.",
+
+      "chooseAccount": "Selecione uma conta",
       "loadErrorTitle": "Não foi possível carregar suas organizações.",
+      "membershipLostNotice": "Você não tem mais acesso a esta organização. Mudou para {{target}}.",
+      "noOrganization": "Sem organização",
+
+      "noOrganizationDescription": "Esta conta não faz parte de uma organização. Crie ou entre em uma organização no site para usar recursos de organização como convites de membros e alertas de saldo baixo.",
+
+      "openWebOrganizations": "Abrir organizações no site",
+
       "organizationUnavailable": "A organização não está disponível.",
-      "selectDescription": "Escolha uma organização no seu perfil para continuar.",
+      "selectDescriptionWithOrganizations": "Você pertence a uma ou mais organizações. Escolha a conta que esta tela deve usar.",
+
       "selectOrganization": "Selecione uma organização",
       "unavailableDescription": "Esta organização não está mais disponível. Escolha outra no seu perfil para continuar.",
+
+      "unavailableSessionsDescription": "Esta organização não está mais disponível. Não é possível carregar as sessões dela.",
       "accessDeniedDescription": "Você não tem acesso a esta organização."
     },
     "creditActivity": {
@@ -3105,7 +3126,11 @@
       "separateEmailsHint": "Separe vários e-mails com vírgulas.",
       "thresholdLabel": "Alertar abaixo de (USD)",
       "title": "Alerta de saldo baixo",
-      "emailsError": "Digite pelo menos um e-mail válido. Separe os endereços com vírgulas.",
+      "emailsInvalid": "Um ou mais endereços de e-mail não são válidos.",
+      "emailsRequired": "Digite pelo menos um endereço de e-mail.",
+      "saveEmailsError": "Alguns endereços de e-mail não foram aceitos. Verifique-os e tente novamente.",
+      "saveError": "Não foi possível salvar o alerta de saldo baixo.",
+      "thresholdPlaceholder": "Digite um valor",
       "thresholdError": "Digite um valor maior que 0."
     },
     "memberLimit": {
@@ -3116,6 +3141,7 @@
       "removeLimit": "Remover limite",
       "title": "Limite de uso diário",
       "blankError": "Digite um valor ou toque em Remover limite abaixo.",
+      "blankWithoutLimitError": "Digite um limite diário entre 0 e {{max}}.",
       "rangeError": "Digite um valor entre 0 e {{max}}."
     },
     "members": {
@@ -3585,6 +3611,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Iniciar agente precisa de um prompt. Adicione um prompt e execute novamente.",
+      "repositoryRequired": "Iniciar agente precisa de um repositório. Abra o Kilo e escolha um, depois execute novamente.",
       "repositoryUnknown": "O Kilo não reconhece {{repository}} como um repositório do GitHub ou GitLab. Escolha outro repositório no Kilo.",
       "repositoryUnsupported": "{{repository}} é um repositório do Bitbucket — Iniciar agente ainda não pode usá-lo. Escolha outro repositório no Kilo."
     }
@@ -3656,7 +3683,6 @@
     "keyTooLong": "A chave deve ter 256 caracteres ou menos",
     "keyDuplicate": "Esta chave já existe no perfil",
     "valueLabel": "Valor",
-    "secretLabel": "Segredo",
     "secrets": {
       "markSecret": "Marcar como secreto",
       "masked": "Valor oculto",

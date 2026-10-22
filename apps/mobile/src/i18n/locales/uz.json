@@ -25,6 +25,7 @@
     "error": "xato: {{error}}",
     "back": "Orqaga",
     "somethingWentWrong": "Xatolik yuz berdi.",
+    "actionNotRecorded": "Bu amalni qayd etib bo'lmadi. Keyinroq qayta urinib ko'ring.",
     "couldNotOpen": "{{label}}ni ochib bo'lmadi.",
     "link": "havola",
     "takingLonger": "Bu kutilganidan uzoqroq davom etmoqda. Bu oynani yopib, keyin qayta tekshirishingiz mumkin.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub birlashtirishni yakunlamadi.",
       "mergeResultNotCompleted": "{{term}} birlashtirilmadi. Holatini tekshiring va qayta urinib ko‘ring.",
       "ambiguous": "Amal natijasini tasdiqlab bo'lmadi — qayta urinishdan oldin PRni tekshiring.",
-      "persistenceFailed": "Bu amalni qayd etib bo'lmadi. Keyinroq qayta urinib ko'ring.",
       "forbidden": "Bu amalni bajarishga ruxsat yo'q."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "Ko'rib chiqish xotirasi yuklanmoqda",
       "couldNotLoad": "Ko'rib chiqish xotirasini yuklab bo'lmadi.",
       "off": "Ko'rib chiqish xotirasi o'chiq.",
+      "on": "Ko'rib chiqish xotirasi yoniq.",
       "offDescription": "Kilo loyiha mas'ullarining javoblaridan o'rganishi va REVIEW.md uchun ko'rsatmalar taklif qilishi uchun bu funksiyani yoqing.",
-      "readOnlyDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari ko'rib chiqish xotirasini yoqishi mumkin.",
+      "readOnlyDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari ko'rib chiqish xotirasini o'zgartirishi mumkin.",
       "enable": "Ko'rib chiqish xotirasini yoqish",
       "loadingProposals": "Takliflar yuklanmoqda",
       "couldNotLoadProposals": "Takliflarni yuklab bo'lmadi.",
@@ -1879,6 +1880,9 @@
       "viewA11y": "Audit hisobotini ko'rish"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administratori",
+      "actorMaskedUser": "Yashirilgan foydalanuvchi",
+      "actorSystem": "Kilo tizimi",
       "couldNotLoad": "Audit hisobotini yuklab bo'lmadi.",
       "events": "Hodisalar",
       "generated": "Yaratilgan vaqt: {{generatedAt}}.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "Sinxronlash yakunlanmagan bo'lishi mumkin. Uning holatini aniqlashtirish uchun qayta urinib ko'ring yoki bekor qiling.",
       "syncInProgress": "Xavfsizlik ma'lumotlari allaqachon sinxronlanmoqda. Iltimos, qayta urinib ko'ring.",
       "dismissalInProgress": "Bu muammo allaqachon rad etilmoqda. Iltimos, qayta urinib ko'ring.",
-      "couldNotReadPendingSyncs": "Kutilayotgan sinxronlashlar haqidagi ma'lumotlarni o'qib bo'lmadi. Qayta urinib ko'ring."
+      "couldNotReadPendingSyncs": "Kutilayotgan sinxronlashlar haqidagi ma'lumotlarni o'qib bo'lmadi. Qayta urinib ko'ring.",
+      "ambiguous": "Amal natijasini tasdiqlab bo'lmadi — qayta urinishdan oldin xavfsizlik ko'rigini tekshiring.",
+      "settleFailed": "Amal bajarildi, ammo natijani qayd etishimiz mumkin bo'lmadi. Iltimos, qayta urinib ko'ring.",
+      "replayFailed": "Bu amal tugallanmadi. Iltimos, qayta urinib ko'ring.",
+      "actionFailed": "Bu amalni tugallab bo'lmadi. Iltimos, qayta urinib ko'ring.",
+      "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak."
     },
     "analysisState": {
       "queued": "Tahlil navbatda",
@@ -2773,7 +2782,7 @@
     "webBrowser": "Veb-brauzer",
     "viewProfile": "Profilni ko'rish",
     "signOutThisDevice": "Bu qurilmada tizimdan chiqish",
-    "signOutThisSession": "Bu sessiyani tugatish",
+    "signOutSessionLabel": "{{device}} qurilmasida tizimdan chiqish, kirilgan vaqt: {{signedIn}}",
     "sessionSignedOut": "Sessiyadan chiqildi.",
     "signOutThisDeviceTitle": "Bu qurilmada tizimdan chiqilsinmi?",
     "signOutThisSessionTitle": "Bu sessiya tugatilsinmi?",
@@ -3010,11 +3019,23 @@
     "boundary": {
       "backToProfile": "Profilga qaytish",
       "loadErrorMessage": "Internetga ulanishni tekshiring va qayta urinib ko‘ring.",
+
+      "chooseAccount": "Hisobni tanlang",
       "loadErrorTitle": "Tashkilotlaringizni yuklab bo'lmadi.",
+      "membershipLostNotice": "Sizda ushbu tashkilotga kirish huquqi endi yo'q. {{target}} ga o'tkazildi.",
+      "noOrganization": "Tashkilot yo'q",
+
+      "noOrganizationDescription": "Bu hisob hech qanday tashkilotga tegishli emas. A'zolarni taklif qilish va kam balans haqidagi ogohlantirishlar kabi tashkilot funksiyalaridan foydalanish uchun saytda tashkilot yarating yoki unga qo'shiling.",
+
+      "openWebOrganizations": "Tashkilotlarni saytda ochish",
+
       "organizationUnavailable": "Tashkilot mavjud emas.",
-      "selectDescription": "Davom etish uchun profilingizdan tashkilotni tanlang.",
+      "selectDescriptionWithOrganizations": "Siz bir yoki bir nechta tashkilotga a'zosiz. Bu ekran foydalanishi kerak bo'lgan hisobni tanlang.",
+
       "selectOrganization": "Tashkilotni tanlang",
       "unavailableDescription": "Bu tashkilot endi mavjud emas. Davom etish uchun profilingizdan boshqa tashkilotni tanlang.",
+
+      "unavailableSessionsDescription": "Bu tashkilot endi mavjud emas. Uning sessiyalarini yuklab bo'lmaydi.",
       "accessDeniedDescription": "Sizda ushbu tashkilotga kirish huquqi yo'q."
     },
     "creditActivity": {
@@ -3066,7 +3087,11 @@
       "separateEmailsHint": "Elektron pochta manzillarini vergul bilan ajrating.",
       "thresholdLabel": "Ogohlantirish chegarasi (USD)",
       "title": "Balans kamayishi haqida ogohlantirish",
-      "emailsError": "Kamida bitta to'g'ri elektron pochta manzilini kiriting. Bir nechta manzilni vergul bilan ajrating.",
+      "emailsInvalid": "Bir yoki bir nechta elektron pochta manzili noto'g'ri.",
+      "emailsRequired": "Kamida bitta elektron pochta manzilini kiriting.",
+      "saveEmailsError": "Ba'zi elektron pochta manzillari qabul qilinmadi. Ularni tekshirib, qayta urinib ko'ring.",
+      "saveError": "Balans kamayishi haqida ogohlantirishni saqlab bo'lmadi.",
+      "thresholdPlaceholder": "Miqdor kiriting",
       "thresholdError": "0 Dan katta miqdorni kiriting."
     },
     "memberLimit": {
@@ -3077,6 +3102,7 @@
       "removeLimit": "Limitni olib tashlash",
       "title": "Kunlik foydalanish limiti",
       "blankError": "Miqdor kiriting yoki quyidagi Limitni olib tashlash tugmasini bosing.",
+      "blankWithoutLimitError": "0 Va {{max}} oralig'idagi kunlik limitni kiriting.",
       "rangeError": "0 Va {{max}} oralig'idagi miqdorni kiriting."
     },
     "members": {
@@ -3544,6 +3570,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agentni ishga tushirish uchun so'rov kerak. So'rov qo'shing va qayta ishga tushiring.",
+      "repositoryRequired": "Agentni ishga tushirish uchun repozitoriya kerak. Kilo'ni oching, bir repozitoriy tanlang va qayta ishga tushiring.",
       "repositoryUnknown": "Kilo {{repository}} ni GitHub yoki GitLab repozitoriyasi deb tanimaydi. Kilo'da boshqa repozitoriy tanlang.",
       "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasi — Agentni ishga tushirish hali undan foydalana olmaydi. Kilo'da boshqa repozitoriy tanlang."
     }
@@ -3615,7 +3642,6 @@
     "keyTooLong": "Kalit 256 ta belgi yoki undan kam bo'lishi kerak",
     "keyDuplicate": "Bu kalit profilda allaqachon mavjud",
     "valueLabel": "Qiymat",
-    "secretLabel": "Sir",
     "secrets": {
       "markSecret": "Sir sifatida belgilang",
       "masked": "Yashirin qiymat",

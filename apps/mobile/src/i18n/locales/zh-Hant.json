@@ -25,6 +25,7 @@
     "error": "錯誤：{{error}}",
     "back": "返回",
     "somethingWentWrong": "發生錯誤。",
+    "actionNotRecorded": "無法記錄此操作。請稍後再試。",
     "couldNotOpen": "無法開啟 {{label}}。",
     "link": "連結",
     "takingLonger": "此操作所需時間比預期更長。你可以關閉此畫面，稍後再查看。",
@@ -994,8 +995,9 @@
       "noProposals": "沒有提案",
       "noProposalsDescription": "Kilo 分析維護者回覆後，審查記憶提案會顯示在這裡。",
       "off": "審查記憶已關閉。",
+      "on": "審查記憶已開啟。",
       "offDescription": "啟用後，Kilo 會從維護者的回覆中學習，並提出 REVIEW.md 指引建議。",
-      "readOnlyDescription": "只有組織擁有者和帳單管理員可以啟用審查記憶。",
+      "readOnlyDescription": "只有組織擁有者和帳單管理員可以變更審查記憶。",
       "title": "審查記憶"
     },
     "scopeList": {
@@ -1133,6 +1135,9 @@
       "triageModel": "初步評估模型"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo 管理員",
+      "actorMaskedUser": "已隱藏使用者",
+      "actorSystem": "Kilo 系統",
       "couldNotLoad": "無法載入稽核報告。",
       "events": "事件",
       "generated": "已於 {{generatedAt}} 產生。",
@@ -1442,7 +1447,12 @@
       "syncMayNotHaveCompleted": "同步可能尚未完成。請再試一次以確認同步狀態，或捨棄這次同步。",
       "syncInProgress": "資安資料正在同步中。請再試一次。",
       "dismissalInProgress": "此忽略動作已在進行中。請再試一次。",
-      "couldNotReadPendingSyncs": "無法讀取待處理的同步。請再試一次。"
+      "couldNotReadPendingSyncs": "無法讀取待處理的同步。請再試一次。",
+      "ambiguous": "無法確認操作結果。請先查看安全性審查，再試一次。",
+      "settleFailed": "操作已完成，但我們無法記錄結果。請再試一次。",
+      "replayFailed": "此操作未完成。請再試一次。",
+      "actionFailed": "無法完成此操作。請再試一次。",
+      "actionBlocked": "無法完成此操作。必須先修正此問題，才能重試。"
     },
     "analysisState": {
       "queued": "等待分析",
@@ -2258,7 +2268,7 @@
     "webBrowser": "網頁瀏覽器",
     "viewProfile": "檢視個人資料",
     "signOutThisDevice": "登出此裝置",
-    "signOutThisSession": "登出此工作階段",
+    "signOutSessionLabel": "登出 {{device}}，登入時間：{{signedIn}}",
     "sessionSignedOut": "工作階段已登出。",
     "signOutThisDeviceTitle": "登出此裝置？",
     "signOutThisSessionTitle": "登出此工作階段？",
@@ -2973,7 +2983,6 @@
       "mergeResultDefaultError": "GitHub 未完成合併。",
       "mergeResultNotCompleted": "{{term}}未合併。檢查其狀態後重試。",
       "ambiguous": "無法確認操作結果。請先檢查 PR，再試一次。",
-      "persistenceFailed": "無法記錄此操作。請稍後再試。",
       "forbidden": "沒有執行此操作的權限。"
     },
     "capabilities": {
@@ -3002,11 +3011,23 @@
     "boundary": {
       "backToProfile": "返回個人資料",
       "loadErrorMessage": "請檢查網路連線後再試一次。",
+
+      "chooseAccount": "選取帳戶",
       "loadErrorTitle": "無法載入你的組織清單。",
+      "membershipLostNotice": "你已無法存取此組織。已切換至 {{target}}。",
+      "noOrganization": "沒有組織",
+
+      "noOrganizationDescription": "此帳戶不屬於任何組織。請在網頁版建立或加入組織，以使用成員邀請和低餘額提醒等組織功能。",
+
+      "openWebOrganizations": "在網頁版開啟組織",
+
       "organizationUnavailable": "無法存取組織。",
-      "selectDescription": "請到個人資料頁面選取組織，即可繼續。",
+      "selectDescriptionWithOrganizations": "您屬於一個或多個組織。請選取此畫面應使用的帳戶。",
+
       "selectOrganization": "選取組織",
       "unavailableDescription": "此組織已無法存取。請到個人資料頁面選取其他組織，即可繼續。",
+
+      "unavailableSessionsDescription": "此組織已無法存取。無法載入其工作階段。",
       "accessDeniedDescription": "你沒有存取此組織的權限。"
     },
     "creditActivity": {
@@ -3065,7 +3086,11 @@
       "separateEmailsHint": "請以逗號分隔多個電子郵件地址。",
       "thresholdLabel": "餘額低於此金額時提醒（USD）",
       "title": "餘額不足提醒",
-      "emailsError": "請輸入至少一個有效的電子郵件地址，多個地址請以逗號分隔。",
+      "emailsInvalid": "有一個或多個電子郵件地址無效。",
+      "emailsRequired": "請輸入至少一個電子郵件地址。",
+      "saveEmailsError": "部分電子郵件地址未被接受，請檢查後再試一次。",
+      "saveError": "無法儲存餘額不足提醒。",
+      "thresholdPlaceholder": "輸入金額",
       "thresholdError": "請輸入大於 0 的金額。"
     },
     "memberLimit": {
@@ -3076,6 +3101,7 @@
       "removeLimit": "移除限制",
       "title": "每日用量限制",
       "blankError": "請輸入金額，或點一下下方的「移除限制」。",
+      "blankWithoutLimitError": "請輸入介於 0 與 {{max}} 之間的每日上限。",
       "rangeError": "請輸入介於 0 與 {{max}} 之間的金額。"
     },
     "members": {
@@ -3544,6 +3570,7 @@
   "appActions": {
     "start": {
       "promptRequired": "啟動代理程式需要提示詞。請新增提示詞後重新執行。",
+      "repositoryRequired": "啟動代理程式需要存放庫。請開啟 Kilo 並選擇一個存放庫，然後重新執行。",
       "repositoryUnknown": "Kilo 無法將 {{repository}} 辨識為 GitHub 或 GitLab 存放庫。請在 Kilo 中選擇其他存放庫。",
       "repositoryUnsupported": "{{repository}} 是 Bitbucket 存放庫——啟動代理程式暫時無法使用它。請在 Kilo 中選擇其他存放庫。"
     }
@@ -3615,7 +3642,6 @@
     "keyTooLong": "鍵不能超過 256 個字元",
     "keyDuplicate": "此鍵已存在於設定檔中",
     "valueLabel": "值",
-    "secretLabel": "秘密",
     "secrets": {
       "markSecret": "標記為秘密",
       "masked": "隱藏值",

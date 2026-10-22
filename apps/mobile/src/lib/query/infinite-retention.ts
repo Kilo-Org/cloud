@@ -40,8 +40,8 @@ export function withInfiniteRetention<T extends object>(
  * prefix while the live cache keys carry the query input as well, so
  * `setQueryData` on the prefix would match nothing.
  *
- * A non-infinite entry under the prefix is left untouched by the
- * `'pages' in old` guard.
+ * A non-infinite entry under the prefix is left untouched: it does not parse
+ * as infinite query data, so the callback returns it unchanged.
  */
 export function reconcileFirstPage(
   queryClient: QueryClient,

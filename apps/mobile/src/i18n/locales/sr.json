@@ -25,6 +25,7 @@
     "error": "greška: {{error}}",
     "back": "Nazad",
     "somethingWentWrong": "Došlo je do greške.",
+    "actionNotRecorded": "Nismo uspeli da zabeležimo ovu radnju. Pokušaj ponovo kasnije.",
     "couldNotOpen": "Nije moguće otvoriti {{label}}.",
     "link": "veza",
     "takingLonger": "Ovo traje duže nego što se očekivalo. Možeš da zatvoriš ovaj ekran i ponovo proveriš kasnije.",
@@ -800,7 +801,6 @@
       "mergeResultDefaultError": "GitHub nije završio spajanje.",
       "mergeResultNotCompleted": "{{term}} nije spojen. Proveri njegovo stanje i pokušaj ponovo.",
       "ambiguous": "Nije moguće potvrditi ishod — proveri PR pre ponovnog pokušaja.",
-      "persistenceFailed": "Nismo uspeli da zabeležimo ovu radnju. Pokušaj ponovo kasnije.",
       "forbidden": "Pristup je zabranjen."
     },
     "capabilities": {
@@ -1475,8 +1475,9 @@
       "loading": "Učitavanje memorije pregleda",
       "couldNotLoad": "Nije moguće učitati memoriju pregleda.",
       "off": "Memorija pregleda je isključena.",
+      "on": "Memorija pregleda je uključena.",
       "offDescription": "Uključi je da Kilo uči iz odgovora osoba koje održavaju repozitorijum i predlaže smernice za REVIEW.md.",
-      "readOnlyDescription": "Samo vlasnici organizacije i menadžeri naplate mogu da uključe memoriju pregleda.",
+      "readOnlyDescription": "Samo vlasnici organizacije i menadžeri naplate mogu da promene memoriju pregleda.",
       "enable": "Uključi memoriju pregleda",
       "loadingProposals": "Učitavanje predloga",
       "couldNotLoadProposals": "Nije moguće učitati predloge.",
@@ -1902,6 +1903,9 @@
       "viewA11y": "Prikaži izveštaj o reviziji"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administrator",
+      "actorMaskedUser": "Maskirani korisnik",
+      "actorSystem": "Kilo sistem",
       "couldNotLoad": "Nije moguće učitati izveštaj o reviziji.",
       "events": "Događaji",
       "generated": "Izveštaj je generisan {{generatedAt}}.",
@@ -1980,7 +1984,12 @@
       "syncMayNotHaveCompleted": "Sinhronizacija možda nije završena. Pokušaj ponovo da uskladiš njeno stanje ili je odbaci.",
       "syncInProgress": "Sinhronizacija bezbednosnih nalaza je već u toku. Pokušaj ponovo.",
       "dismissalInProgress": "Odbacivanje ovog nalaza je već u toku. Pokušaj ponovo.",
-      "couldNotReadPendingSyncs": "Nije moguće pročitati sinhronizacije na čekanju. Pokušaj ponovo."
+      "couldNotReadPendingSyncs": "Nije moguće pročitati sinhronizacije na čekanju. Pokušaj ponovo.",
+      "ambiguous": "Nije moguće potvrditi ishod — proveri pregled bezbednosti pre ponovnog pokušaja.",
+      "settleFailed": "Radnja je izvršena, ali nismo mogli da zabeležimo rezultat. Pokušaj ponovo.",
+      "replayFailed": "Ova radnja nije dovršena. Pokušaj ponovo.",
+      "actionFailed": "Nije moguće dovršiti ovu radnju. Pokušaj ponovo.",
+      "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem mora biti rešen pre nego što pokušaš ponovo."
     },
     "analysisState": {
       "queued": "Analiza u redu čekanja",
@@ -2811,7 +2820,7 @@
     "thisDevice": "Ovaj uređaj",
     "viewProfile": "Prikaži profil",
     "signOutThisDevice": "Odjavi ovaj uređaj",
-    "signOutThisSession": "Odjavi ovu sesiju",
+    "signOutSessionLabel": "Odjavi uređaj {{device}}, prijava: {{signedIn}}",
     "sessionSignedOut": "Sesija je odjavljena.",
     "signOutThisDeviceTitle": "Odjaviti ovaj uređaj?",
     "signOutThisSessionTitle": "Odjaviti ovu sesiju?",
@@ -3050,11 +3059,23 @@
     "boundary": {
       "backToProfile": "Nazad na profil",
       "loadErrorMessage": "Proveri vezu i pokušaj ponovo.",
+
+      "chooseAccount": "Izaberi nalog",
       "loadErrorTitle": "Učitavanje tvojih organizacija nije uspelo.",
+      "membershipLostNotice": "Više nemaš pristup ovoj organizaciji. Prebačeno na {{target}}.",
+      "noOrganization": "Nema organizacije",
+
+      "noOrganizationDescription": "Ovaj nalog nije deo organizacije. Napravi ili se pridruži organizaciji na vebu da bi koristio funkcije organizacije kao što su pozivnice za članove i upozorenja o niskom saldu.",
+
+      "openWebOrganizations": "Otvori organizacije na vebu",
+
       "organizationUnavailable": "Organizacija nije dostupna.",
-      "selectDescription": "Izaberi organizaciju na svom profilu da nastaviš.",
+      "selectDescriptionWithOrganizations": "Pripadaš jednoj ili više organizacija. Izaberi nalog koji ovaj ekran treba da koristi.",
+
       "selectOrganization": "Izaberi organizaciju",
       "unavailableDescription": "Ova organizacija više nije dostupna. Izaberi drugu na svom profilu da nastaviš.",
+
+      "unavailableSessionsDescription": "Ova organizacija više nije dostupna. Njene sesije nije moguće učitati.",
       "accessDeniedDescription": "Nemaš pristup ovoj organizaciji."
     },
     "creditActivity": {
@@ -3106,7 +3127,11 @@
       "separateEmailsHint": "Odvoji adrese e-pošte zapetama.",
       "thresholdLabel": "Prag upozorenja (USD)",
       "title": "Upozorenje o niskom saldu",
-      "emailsError": "Unesi bar jednu važeću adresu e-pošte. Ako ih ima više, odvoji ih zapetama.",
+      "emailsInvalid": "Jedna ili više adresa e-pošte nisu važeće.",
+      "emailsRequired": "Unesi bar jednu adresu e-pošte.",
+      "saveEmailsError": "Neke adrese e-pošte nisu prihvaćene. Proveri ih i probaj ponovo.",
+      "saveError": "Nije moguće sačuvati upozorenje o niskom saldu.",
+      "thresholdPlaceholder": "Unesi iznos",
       "thresholdError": "Unesi iznos veći od 0."
     },
     "memberLimit": {
@@ -3117,6 +3142,7 @@
       "removeLimit": "Ukloni limit",
       "title": "Dnevni limit potrošnje",
       "blankError": "Unesi iznos ili dodirni „Ukloni limit“ ispod.",
+      "blankWithoutLimitError": "Unesi dnevni limit između 0 i {{max}}.",
       "rangeError": "Unesi iznos između 0 i {{max}}."
     },
     "members": {
@@ -3585,6 +3611,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Za pokretanje agenta potreban je upit. Dodaj upit i pokreni ga ponovo.",
+      "repositoryRequired": "Za pokretanje agenta potreban je repozitorijum. Otvori Kilo i izaberi repozitorijum, zatim ga pokreni ponovo.",
       "repositoryUnknown": "Kilo ne prepoznaje {{repository}} kao GitHub ili GitLab repozitorijum. Izaberi drugi repozitorijum u Kilo.",
       "repositoryUnsupported": "{{repository}} je Bitbucket repozitorijum — Pokreni agenta ga još ne može koristiti. Izaberi drugi repozitorijum u Kilo."
     }
@@ -3656,7 +3683,6 @@
     "keyTooLong": "Ključ može imati najviše 256 znakova",
     "keyDuplicate": "Ovaj ključ već postoji u profilu",
     "valueLabel": "Vrednost",
-    "secretLabel": "Tajna",
     "secrets": {
       "markSecret": "Označi kao tajnu",
       "masked": "Skrivena vrednost",

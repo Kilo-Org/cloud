@@ -25,6 +25,7 @@
     "error": "تېروتنه: {{error}}",
     "back": "شاته",
     "somethingWentWrong": "تېروتنه وشوه.",
+    "actionNotRecorded": "موږ ونه شو کړای دا کړنه ثبت کړو. مهرباني وکړئ وروسته بیا هڅه وکړئ.",
     "couldNotOpen": "{{label}} پرانیستل نه شو.",
     "link": "لینک",
     "takingLonger": "دا له تمې ډېر وخت نیسي. تاسو یې تړلی شئ او بیا یې کتلی شئ.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub یوځای کول بشپړ نه کړل.",
       "mergeResultNotCompleted": "{{term}} و نه یوځای شو. حالت یې وګورئ او بیا هڅه وکړئ.",
       "ambiguous": "تایید نه شو — له بیا هڅې مخکې PR وګورئ.",
-      "persistenceFailed": "موږ ونه شو کړای دا کړنه ثبت کړو. مهرباني وکړئ وروسته بیا هڅه وکړئ.",
       "forbidden": "اجازه نشته."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "د بیاکتنې حافظه بارول",
       "couldNotLoad": "د بیاکتنې حافظه بار نه شوه.",
       "off": "د بیاکتنې حافظه غیرفعاله ده.",
+      "on": "د بیاکتنې حافظه فعاله ده.",
       "offDescription": "د بیاکتنې حافظه فعاله کړئ، څو Kilo د ساتونکو له ځوابونو زده کړه وکړي او د REVIEW.md لپاره لارښوونې وړاندیز کړي.",
-      "readOnlyDescription": "یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي د بیاکتنې حافظه فعاله کړي.",
+      "readOnlyDescription": "یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي د بیاکتنې حافظه بدله کړي.",
       "enable": "د بیاکتنې حافظه فعاله کړئ",
       "loadingProposals": "وړاندیزونه بارول",
       "couldNotLoadProposals": "وړاندیزونه بار نه شول.",
@@ -1879,6 +1880,9 @@
       "viewA11y": "د پلټنې راپور وګورئ"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "د Kilo مدیر",
+      "actorMaskedUser": "پټ شوی کارن",
+      "actorSystem": "د Kilo سیسټم",
       "couldNotLoad": "د پلټنې راپور بار نه شو.",
       "events": "پېښې",
       "generated": "په {{generatedAt}} جوړ شو.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "ښايي هممهاله کول بشپړ شوي نه وي. د حالت د سمون لپاره بیا هڅه وکړئ، یا یې پرېږدئ.",
       "syncInProgress": "امنیتي هممهاله کول لا دمخه روان دي. مهرباني وکړئ بیا هڅه وکړئ.",
       "dismissalInProgress": "د دې موندنې له پامه غورځول لا دمخه روان دي. مهرباني وکړئ بیا هڅه وکړئ.",
-      "couldNotReadPendingSyncs": "د هممهاله کولو پاتې غوښتنې و نه لوستل شوې. بیا هڅه وکړئ."
+      "couldNotReadPendingSyncs": "د هممهاله کولو پاتې غوښتنې و نه لوستل شوې. بیا هڅه وکړئ.",
+      "ambiguous": "تایید نه شو — له بیا هڅې مخکې د امنیت بیاکتنه وګورئ.",
+      "settleFailed": "کړنه بشپړه شوه، خو پایله مو ثبت نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
+      "replayFailed": "دا کړنه بشپړه نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
+      "actionFailed": "د دې کړنې بشپړول ممکن نه وو. مهرباني وکړئ بیا هڅه وکړئ.",
+      "actionBlocked": "د دې کړنې بشپړول ممکن نه وو. د بیا هڅې دمخه باید دا ستونزه حل شي."
     },
     "analysisState": {
       "queued": "شننه په کتار کې ده",
@@ -2772,7 +2781,7 @@
     "thisDevice": "دا وسیله",
     "viewProfile": "پروفایل وګورئ",
     "signOutThisDevice": "له دې وسیلې ووځئ",
-    "signOutThisSession": "له دې ناستې ووځئ",
+    "signOutSessionLabel": "له {{device}} ووځئ، د ننوتلو وخت: {{signedIn}}",
     "sessionSignedOut": "له ناستې ووتل شو.",
     "signOutThisDeviceTitle": "له دې وسیلې حساب وباسم؟",
     "signOutThisSessionTitle": "له دې ناستې ووځم؟",
@@ -3010,11 +3019,23 @@
     "boundary": {
       "backToProfile": "بېرته پروفایل ته ورشئ",
       "loadErrorMessage": "خپله انټرنېټي اړیکه وګورئ او بیا هڅه وکړئ.",
+
+      "chooseAccount": "یو حساب غوره کړئ",
       "loadErrorTitle": "ستاسو سازمانونه بار نه شول.",
+      "membershipLostNotice": "تاسو دې سازمان ته نور لاسرسی نه لرئ. په {{target}} بدل شو.",
+      "noOrganization": "هیڅ سازمان نشته",
+
+      "noOrganizationDescription": "دا حساب د یو سازمان برخه نه ده. د غړو بلنې او د ټیټ بیلانس خبرتیاوې په څیر د سازمان ځانګړتیاوې کارولو لپاره په ویب کې سازمان جوړ کړئ یا یو ځای شئ.",
+
+      "openWebOrganizations": "په ویب کې سازمانونه پرانیزئ",
+
       "organizationUnavailable": "سازمان د لاسرسي وړ نه دی.",
-      "selectDescription": "د دوام لپاره له خپل پروفایل څخه یو سازمان غوره کړئ.",
+      "selectDescriptionWithOrganizations": "تاسو د یو یا ډیرو سازمانونو غړی یاست. هغه حساب غوره کړئ چې دا سکرین باید یې وکاروي.",
+
       "selectOrganization": "یو سازمان غوره کړئ",
       "unavailableDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دوام لپاره له خپل پروفایل څخه یو سازمان غوره کړئ.",
+
+      "unavailableSessionsDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دې سازمان نښتې نشي لوډ کېدلی.",
       "accessDeniedDescription": "تاسو دې سازمان ته لاسرسی نه لرئ."
     },
     "creditActivity": {
@@ -3066,7 +3087,11 @@
       "separateEmailsHint": "د برېښنالیک پتې په کامو سره جلا کړئ.",
       "thresholdLabel": "تر دې بیلانس لاندې خبرتیا (USD)",
       "title": "د کم بیلانس خبرتیا",
-      "emailsError": "لږ تر لږه د برېښنالیک یوه سمه پته ولیکئ. که څو پتې وي، په کامو یې جلا کړئ.",
+      "emailsInvalid": "یوه یا څو د برېښنالیک پتې سمې نه دي.",
+      "emailsRequired": "لږ تر لږه د برېښنالیک یوه پته ولیکئ.",
+      "saveEmailsError": "ځینې برېښنالیک پتې ومنل نه شوې. هغه وګورئ او بیا هڅه وکړئ.",
+      "saveError": "د کم بیلانس خبرتیا ونه شوه خوندي کول.",
+      "thresholdPlaceholder": "یوه اندازه ولیکئ",
       "thresholdError": "له 0 څخه زیاته اندازه ولیکئ."
     },
     "memberLimit": {
@@ -3077,6 +3102,7 @@
       "removeLimit": "حد لرې کړئ",
       "title": "د ورځني کارولو حد",
       "blankError": "یوه اندازه ولیکئ، یا لاندې د «حد لرې کړئ» تڼۍ وکاروئ.",
+      "blankWithoutLimitError": "د 0 او {{max}} ترمنځ ورځنی حد ولیکئ.",
       "rangeError": "د 0 او {{max}} ترمنځ یوه اندازه ولیکئ."
     },
     "members": {
@@ -3544,6 +3570,7 @@
   "appActions": {
     "start": {
       "promptRequired": "د اجنټ پیل کولو لپاره پرامپټ ته اړتیا ده. پرامپټ اضافه کړئ او بیا یې وچلوئ.",
+      "repositoryRequired": "د اجنټ پیل کولو لپاره زېرمتون ته اړتیا ده. Kilo خلاص کړئ او یو وټاکئ، بیا یې وچلوئ.",
       "repositoryUnknown": "Kilo {{repository}} د GitHub یا GitLab زېرمتون په توګه نه پېژني. په Kilo کې بل زېرمتون وټاکئ.",
       "repositoryUnsupported": "{{repository}} د Bitbucket زېرمتون دی — اجنټ پیل کړئ لاهم نشي کولی ترې وکار اخلي. په Kilo کې بل زېرمتون وټاکئ."
     }
@@ -3615,7 +3642,6 @@
     "keyTooLong": "کلید باید 256 توري یا لږ وي",
     "keyDuplicate": "دا کلید دمخه په پروفایل کې شته",
     "valueLabel": "ارزښت",
-    "secretLabel": "پټه",
     "secrets": {
       "markSecret": "د پټ په توګه نښه کړئ",
       "masked": "پټ ارزښت",

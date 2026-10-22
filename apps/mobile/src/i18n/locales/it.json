@@ -25,6 +25,7 @@
     "error": "errore: {{error}}",
     "back": "Indietro",
     "somethingWentWrong": "Si è verificato un errore.",
+    "actionNotRecorded": "Impossibile registrare questa azione. Riprova più tardi.",
     "couldNotOpen": "Impossibile aprire {{label}}.",
     "link": "collegamento",
     "takingLonger": "Questa operazione richiede più tempo del previsto. Puoi chiudere questa schermata e ricontrollare più tardi.",
@@ -966,8 +967,9 @@
       "noProposals": "Nessuna proposta",
       "noProposalsDescription": "Le proposte della memoria di revisione compaiono qui dopo che Kilo ha analizzato le risposte dei responsabili del progetto.",
       "off": "La memoria di revisione è disattivata.",
+      "on": "La memoria di revisione è attivata.",
       "offDescription": "Attivala per consentire a Kilo di imparare dalle risposte dei responsabili del progetto e proporre indicazioni per REVIEW.md.",
-      "readOnlyDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono attivare la memoria di revisione.",
+      "readOnlyDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono modificare la memoria di revisione.",
       "title": "Memoria delle revisioni"
     },
     "scopeList": {
@@ -1105,6 +1107,9 @@
       "triageModel": "Modello per la valutazione preliminare"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Amministratore Kilo",
+      "actorMaskedUser": "Utente mascherato",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "Impossibile caricare il report di audit.",
       "events": "Eventi",
       "generated": "Il report è stato generato il {{generatedAt}}.",
@@ -1418,7 +1423,12 @@
       "syncMayNotHaveCompleted": "Una sincronizzazione potrebbe non essere terminata. Riprova per verificarne e aggiornarne lo stato oppure scartala.",
       "syncInProgress": "Una sincronizzazione di sicurezza è già in corso. Riprova.",
       "dismissalInProgress": "L'esclusione di questa segnalazione è già in corso. Riprova.",
-      "couldNotReadPendingSyncs": "Impossibile leggere le sincronizzazioni in sospeso. Riprova."
+      "couldNotReadPendingSyncs": "Impossibile leggere le sincronizzazioni in sospeso. Riprova.",
+      "ambiguous": "Impossibile confermare l'esito dell'operazione. Controlla la revisione di sicurezza prima di riprovare.",
+      "settleFailed": "L'operazione è stata completata, ma non è stato possibile registrare il risultato. Riprova.",
+      "replayFailed": "Questa operazione non è stata completata. Riprova.",
+      "actionFailed": "Impossibile completare questa operazione. Riprova.",
+      "actionBlocked": "Impossibile completare questa operazione. Il problema deve essere risolto prima di riprovare."
     },
     "analysisState": {
       "queued": "Analisi in coda",
@@ -2280,7 +2290,7 @@
     "thisDevice": "Questo dispositivo",
     "viewProfile": "Visualizza il profilo",
     "signOutThisDevice": "Disconnetti questo dispositivo",
-    "signOutThisSession": "Disconnetti questa sessione",
+    "signOutSessionLabel": "Disconnetti {{device}}, accesso effettuato {{signedIn}}",
     "sessionSignedOut": "Sessione disconnessa.",
     "signOutThisDeviceTitle": "Disconnettere questo dispositivo?",
     "signOutThisSessionTitle": "Disconnettere questa sessione?",
@@ -3013,7 +3023,6 @@
       "mergeResultDefaultError": "GitHub non ha completato l'unione.",
       "mergeResultNotCompleted": "Unione di {{term}} non completata. Verifica lo stato e riprova.",
       "ambiguous": "Impossibile confermare l'esito dell'operazione. Controlla la PR prima di riprovare.",
-      "persistenceFailed": "Impossibile registrare questa azione. Riprova più tardi.",
       "forbidden": "Non hai l'autorizzazione per questa operazione."
     },
     "capabilities": {
@@ -3042,11 +3051,23 @@
     "boundary": {
       "backToProfile": "Torna al profilo",
       "loadErrorMessage": "Controlla la connessione e riprova.",
+
+      "chooseAccount": "Seleziona un account",
       "loadErrorTitle": "Impossibile caricare le tue organizzazioni.",
+      "membershipLostNotice": "Non hai più accesso a questa organizzazione. Passato a {{target}}.",
+      "noOrganization": "Nessuna organizzazione",
+
+      "noOrganizationDescription": "Questo account non fa parte di un'organizzazione. Crea o unisciti a un'organizzazione sul web per usare le funzioni dell'organizzazione come gli inviti dei membri e gli avvisi di saldo basso.",
+
+      "openWebOrganizations": "Apri le organizzazioni sul web",
+
       "organizationUnavailable": "L'organizzazione non è disponibile.",
-      "selectDescription": "Scegli un'organizzazione dal tuo profilo per continuare.",
+      "selectDescriptionWithOrganizations": "Appartieni a una o più organizzazioni. Scegli l'account che questa schermata deve usare.",
+
       "selectOrganization": "Seleziona un'organizzazione",
       "unavailableDescription": "Questa organizzazione non è più disponibile. Scegline una dal tuo profilo per continuare.",
+
+      "unavailableSessionsDescription": "Questa organizzazione non è più disponibile. Non è possibile caricare le sue sessioni.",
       "accessDeniedDescription": "Non hai accesso a questa organizzazione."
     },
     "creditActivity": {
@@ -3105,7 +3126,11 @@
       "separateEmailsHint": "Separa gli indirizzi email con una virgola.",
       "thresholdLabel": "Soglia di avviso (USD)",
       "title": "Avviso di saldo basso",
-      "emailsError": "Inserisci almeno un indirizzo email valido. Se ne inserisci più di uno, separali con una virgola.",
+      "emailsInvalid": "Uno o più indirizzi email non sono validi.",
+      "emailsRequired": "Inserisci almeno un indirizzo email.",
+      "saveEmailsError": "Alcuni indirizzi email non sono stati accettati. Controllali e riprova.",
+      "saveError": "Impossibile salvare l'avviso di saldo basso.",
+      "thresholdPlaceholder": "Inserisci un importo",
       "thresholdError": "Inserisci un importo maggiore di 0."
     },
     "memberLimit": {
@@ -3116,6 +3141,7 @@
       "removeLimit": "Rimuovi il limite",
       "title": "Limite di utilizzo giornaliero",
       "blankError": "Inserisci un importo oppure rimuovi il limite con il pulsante qui sotto.",
+      "blankWithoutLimitError": "Inserisci un limite giornaliero tra 0 e {{max}}.",
       "rangeError": "Inserisci un importo tra 0 e {{max}}."
     },
     "members": {
@@ -3585,6 +3611,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Avvia agente richiede un prompt. Aggiungi un prompt e rieseguilo.",
+      "repositoryRequired": "Avvia agente richiede un repository. Apri Kilo e scegline uno, quindi rieseguilo.",
       "repositoryUnknown": "Kilo non riconosce {{repository}} come repository GitHub o GitLab. Scegli un altro repository in Kilo.",
       "repositoryUnsupported": "{{repository}} è un repository Bitbucket — Avvia agente non può ancora usarlo. Scegli un altro repository in Kilo."
     }
@@ -3656,7 +3683,6 @@
     "keyTooLong": "La chiave deve contenere 256 caratteri o meno",
     "keyDuplicate": "Questa chiave esiste già nel profilo",
     "valueLabel": "Valore",
-    "secretLabel": "Segreto",
     "secrets": {
       "markSecret": "Contrassegna come segreto",
       "masked": "Valore nascosto",

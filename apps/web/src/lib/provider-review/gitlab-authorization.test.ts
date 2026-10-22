@@ -6,6 +6,7 @@ import {
   authorizeOwner,
   authorizeProject,
   classifyGitLabError,
+  classifyGitLabErrorForOwner,
   classifyGitLabStatus,
   GitLabApiStatusError,
   GitLabReviewError,
@@ -230,14 +231,20 @@ describe('authorizeOwner', () => {
 });
 
 describe('credential failures are classified', () => {
-  it('maps an expired connection to non-retryable forbidden', async () => {
+  it('maps a refused credential to the non-retryable reconnect state', async () => {
     mockGetIntegrationForOwner.mockResolvedValue(integrationRow({}));
     mockGetValidGitLabToken.mockRejectedValue(
       new TRPCError({ code: 'UNAUTHORIZED', message: 'reconnect' })
     );
 
+    // The broker refused the stored credential: the connection must be
+    // re-established, and that is not the reader's permission.
     await expect(authorizeProject(SELF_MANAGED_USER, 'group/sub/repo')).rejects.toMatchObject({
-      kind: 'forbidden',
+      kind: 'reconnect',
+      retryable: false,
+    });
+    await expect(authorizeOwner(SELF_MANAGED_ORG)).rejects.toMatchObject({
+      kind: 'reconnect',
       retryable: false,
     });
   });
@@ -256,8 +263,10 @@ describe('credential failures are classified', () => {
 });
 
 describe('classifyGitLabStatus / classifyGitLabError', () => {
-  it('classifies 404, 403, and 409 as non-retryable kinds', () => {
+  it('classifies 404, 401, 403, and 409 as non-retryable kinds', () => {
     expect(classifyGitLabStatus(404).kind).toBe('not_found');
+    // A refused credential is the connection's, never the reader's permission.
+    expect(classifyGitLabStatus(401).kind).toBe('reconnect');
     expect(classifyGitLabStatus(403).kind).toBe('forbidden');
     expect(classifyGitLabStatus(409).kind).toBe('stale_head');
     expect(classifyGitLabStatus(409).retryable).toBe(false);
@@ -286,5 +295,50 @@ describe('classifyGitLabStatus / classifyGitLabError', () => {
 
   it('classifies network failures as retryable', () => {
     expect(classifyGitLabError(new TypeError('fetch failed')).retryable).toBe(true);
+  });
+});
+
+// The token belongs to the connection. For an organization integration it is
+// the organization's credential, so a provider refusal of it says nothing
+// about the member's own GitLab role.
+describe('classifyGitLabErrorForOwner', () => {
+  it('classifies an organization connection 403 as a non-retryable reconnect', () => {
+    const error = classifyGitLabErrorForOwner(
+      new Error('GitLab MR fetch failed: 403'),
+      SELF_MANAGED_ORG
+    );
+
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toMatch(/reconnect/i);
+  });
+
+  it('keeps a personal connection 403 as the caller GitLab role refusal', () => {
+    const error = classifyGitLabErrorForOwner(
+      new Error('GitLab MR fetch failed: 403'),
+      SELF_MANAGED_USER
+    );
+
+    expect(error.kind).toBe('forbidden');
+    expect(error.retryable).toBe(false);
+  });
+
+  it('classifies a refused credential as a reconnect for either owner', () => {
+    const statusError = new GitLabApiStatusError(401, 'GitLab GET request failed: 401');
+
+    expect(classifyGitLabErrorForOwner(statusError, SELF_MANAGED_USER).kind).toBe('reconnect');
+    expect(classifyGitLabErrorForOwner(statusError, SELF_MANAGED_ORG).kind).toBe('reconnect');
+  });
+
+  it('leaves the other kinds unchanged for an organization', () => {
+    expect(
+      classifyGitLabErrorForOwner(new Error('GitLab MR fetch failed: 404'), SELF_MANAGED_ORG).kind
+    ).toBe('not_found');
+    expect(
+      classifyGitLabErrorForOwner(new Error('GitLab MR fetch failed: 409'), SELF_MANAGED_ORG).kind
+    ).toBe('stale_head');
+    expect(classifyGitLabErrorForOwner(new TypeError('fetch failed'), SELF_MANAGED_ORG).kind).toBe(
+      'retryable'
+    );
   });
 });

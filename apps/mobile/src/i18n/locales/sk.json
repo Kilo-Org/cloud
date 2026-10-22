@@ -25,6 +25,7 @@
     "error": "chyba: {{error}}",
     "back": "Späť",
     "somethingWentWrong": "Vyskytla sa chyba.",
+    "actionNotRecorded": "Túto akciu sa nepodarilo zaznamenať. Skús to neskôr.",
     "couldNotOpen": "Nepodarilo sa otvoriť {{label}}.",
     "link": "odkaz",
     "takingLonger": "Trvá to dlhšie, než sa očakávalo. Túto obrazovku môžeš zavrieť a stav skontrolovať neskôr.",
@@ -816,7 +817,6 @@
       "mergeResultDefaultError": "GitHub nedokončil zlúčenie.",
       "mergeResultNotCompleted": "{{term}} nebol zlúčený. Skontroluj jeho stav a skús to znova.",
       "ambiguous": "Výsledok sa nepodarilo potvrdiť. Pred ďalším pokusom skontroluj PR.",
-      "persistenceFailed": "Túto akciu sa nepodarilo zaznamenať. Skús to neskôr.",
       "forbidden": "Na túto akciu nemáš oprávnenie."
     },
     "capabilities": {
@@ -1494,8 +1494,9 @@
       "loading": "Načítava sa pamäť kontrol",
       "couldNotLoad": "Pamäť kontrol sa nepodarilo načítať.",
       "off": "Pamäť kontrol je vypnutá.",
+      "on": "Pamäť kontrol je zapnutá.",
       "offDescription": "Zapnite ju, aby sa Kilo mohlo učiť z odpovedí správcov a navrhovať pokyny do súboru REVIEW.md.",
-      "readOnlyDescription": "Pamäť kontrol môžu zapnúť iba vlastníci organizácie a správcovia fakturácie.",
+      "readOnlyDescription": "Pamäť kontrol môžu zmeniť iba vlastníci organizácie a správcovia fakturácie.",
       "enable": "Zapnúť pamäť kontrol",
       "loadingProposals": "Načítavajú sa návrhy",
       "couldNotLoadProposals": "Návrhy sa nepodarilo načítať.",
@@ -1925,6 +1926,9 @@
       "viewA11y": "Zobraziť správu o audite"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Správca Kilo",
+      "actorMaskedUser": "Maskovaný používateľ",
+      "actorSystem": "Systém Kilo",
       "couldNotLoad": "Správu o audite sa nepodarilo načítať.",
       "events": "Udalosti",
       "generated": "Správa bola vygenerovaná {{generatedAt}}.",
@@ -2003,7 +2007,12 @@
       "syncMayNotHaveCompleted": "Synchronizácia sa možno nedokončila. Zopakujte ju, aby sa zosúladil stav údajov, alebo ju zrušte.",
       "syncInProgress": "Synchronizácia bezpečnostných nálezov už prebieha. Skúste to znova.",
       "dismissalInProgress": "Zamietanie tohto nálezu už prebieha. Skúste to znova.",
-      "couldNotReadPendingSyncs": "Čakajúce synchronizácie sa nepodarilo načítať. Skúste to znova."
+      "couldNotReadPendingSyncs": "Čakajúce synchronizácie sa nepodarilo načítať. Skúste to znova.",
+      "ambiguous": "Výsledok sa nepodarilo potvrdiť. Pred ďalším pokusom skontroluj bezpečnostnú kontrolu.",
+      "settleFailed": "Akcia sa vykonala, ale nepodarilo sa nám zaznamenať výsledok. Skúste to znova.",
+      "replayFailed": "Táto akcia sa nevykonala. Skúste to znova.",
+      "actionFailed": "Túto akciu sa nepodarilo dokončiť. Skúste to znova.",
+      "actionBlocked": "Túto akciu sa nepodarilo dokončiť. Problém je potrebné najprv vyriešiť."
     },
     "analysisState": {
       "queued": "Analýza čaká v poradí",
@@ -2850,7 +2859,7 @@
     "thisDevice": "Toto zariadenie",
     "viewProfile": "Zobraziť profil",
     "signOutThisDevice": "Odhlásiť toto zariadenie",
-    "signOutThisSession": "Odhlásiť túto reláciu",
+    "signOutSessionLabel": "Odhlásiť zariadenie {{device}}, prihlásenie: {{signedIn}}",
     "sessionSignedOut": "Relácia bola odhlásená.",
     "signOutThisDeviceTitle": "Odhlásiť toto zariadenie?",
     "signOutThisSessionTitle": "Odhlásiť túto reláciu?",
@@ -3090,11 +3099,23 @@
     "boundary": {
       "backToProfile": "Späť na profil",
       "loadErrorMessage": "Skontroluj pripojenie a skús to znova.",
+
+      "chooseAccount": "Vyber účet",
       "loadErrorTitle": "Tvoje organizácie sa nepodarilo načítať.",
+      "membershipLostNotice": "Už nemáš prístup k tejto organizácii. Prepnuté na {{target}}.",
+      "noOrganization": "Žiadna organizácia",
+
+      "noOrganizationDescription": "Tento účet nie je súčasťou organizácie. Vytvor organizáciu alebo sa k nej pripoj na webe, aby si mohol používať funkcie organizácie, ako sú pozvánky pre členov a upozornenia na nízky zostatok.",
+
+      "openWebOrganizations": "Otvoriť organizácie na webe",
+
       "organizationUnavailable": "Organizácia nie je dostupná.",
-      "selectDescription": "Ak chceš pokračovať, vyber organizáciu vo svojom profile.",
+      "selectDescriptionWithOrganizations": "Patríš k jednej alebo viacerým organizáciám. Vyber účet, ktorý má táto obrazovka používať.",
+
       "selectOrganization": "Vybrať organizáciu",
       "unavailableDescription": "Táto organizácia už nie je dostupná. Ak chceš pokračovať, vyber inú vo svojom profile.",
+
+      "unavailableSessionsDescription": "Táto organizácia už nie je dostupná. Jej relácie nie je možné načítať.",
       "accessDeniedDescription": "Nemáš prístup k tejto organizácii."
     },
     "creditActivity": {
@@ -3146,7 +3167,11 @@
       "separateEmailsHint": "Viaceré e-mailové adresy oddeľ čiarkami.",
       "thresholdLabel": "Hranica upozornenia (USD)",
       "title": "Upozornenie na nízky zostatok",
-      "emailsError": "Zadaj aspoň jednu platnú e-mailovú adresu. Viaceré adresy oddeľ čiarkami.",
+      "emailsInvalid": "Jedna alebo viac e-mailových adries nie je platných.",
+      "emailsRequired": "Zadaj aspoň jednu e-mailovú adresu.",
+      "saveEmailsError": "Niektoré e-mailové adresy neboli prijaté. Skontroluj ich a skús to znova.",
+      "saveError": "Upozornenie na nízky zostatok sa nepodarilo uložiť.",
+      "thresholdPlaceholder": "Zadaj sumu",
       "thresholdError": "Zadaj sumu väčšiu ako 0."
     },
     "memberLimit": {
@@ -3157,6 +3182,7 @@
       "removeLimit": "Odstrániť limit",
       "title": "Denný limit spotreby",
       "blankError": "Zadaj sumu alebo klepni na Odstrániť limit nižšie.",
+      "blankWithoutLimitError": "Zadaj denný limit od 0 do {{max}}.",
       "rangeError": "Zadaj sumu od 0 do {{max}}."
     },
     "members": {
@@ -3626,6 +3652,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Na spustenie agenta je potrebné zadanie. Pridaj zadanie a spusť ho znova.",
+      "repositoryRequired": "Spustenie agenta vyžaduje repozitár. Otvor Kilo a vyber repozitár, potom ho spusť znova.",
       "repositoryUnknown": "Kilo nerozpoznáva {{repository}} ako repozitár na GitHube alebo GitLabe. Vyber iný repozitár v Kile.",
       "repositoryUnsupported": "{{repository}} je repozitár na Bitbuckete — Spustiť agenta ho zatiaľ nemôže použiť. Vyber iný repozitár v Kile."
     }
@@ -3697,7 +3724,6 @@
     "keyTooLong": "Kľúč môže mať maximálne 256 znakov",
     "keyDuplicate": "Tento kľúč už v profile existuje",
     "valueLabel": "Hodnota",
-    "secretLabel": "Tajomstvo",
     "secrets": {
       "markSecret": "Označiť ako tajné",
       "masked": "Skrytá hodnota",

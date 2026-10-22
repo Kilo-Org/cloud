@@ -25,6 +25,7 @@
     "error": "eroare: {{error}}",
     "back": "Înapoi",
     "somethingWentWrong": "A apărut o eroare.",
+    "actionNotRecorded": "Nu am putut înregistra această acțiune. Încearcă din nou mai târziu.",
     "couldNotOpen": "Nu s-a putut deschide {{label}}.",
     "link": "legătură",
     "takingLonger": "Operația durează mai mult decât era de așteptat. Poți închide acest ecran și verifica din nou mai târziu.",
@@ -800,7 +801,6 @@
       "mergeResultDefaultError": "GitHub nu a finalizat îmbinarea.",
       "mergeResultNotCompleted": "{{term}} nu a fost îmbinat. Verifică starea lui și încearcă din nou.",
       "ambiguous": "Nu s-a putut confirma rezultatul — verifică PR-ul înainte de a încerca din nou.",
-      "persistenceFailed": "Nu am putut înregistra această acțiune. Încearcă din nou mai târziu.",
       "forbidden": "Accesul este interzis."
     },
     "capabilities": {
@@ -1475,8 +1475,9 @@
       "loading": "Se încarcă memoria de revizuire",
       "couldNotLoad": "Nu s-a putut încărca memoria de revizuire.",
       "off": "Memoria de revizuire este dezactivată.",
+      "on": "Memoria de revizuire este activată.",
       "offDescription": "Activeaz-o pentru ca Kilo să învețe din răspunsurile responsabililor de proiect și să propună instrucțiuni pentru REVIEW.md.",
-      "readOnlyDescription": "Doar proprietarii organizației și responsabilii cu facturarea pot activa memoria de revizuire.",
+      "readOnlyDescription": "Doar proprietarii organizației și responsabilii cu facturarea pot modifica memoria de revizuire.",
       "enable": "Activează memoria de revizuire",
       "loadingProposals": "Se încarcă propunerile",
       "couldNotLoadProposals": "Nu s-au putut încărca propunerile.",
@@ -1902,6 +1903,9 @@
       "viewA11y": "Vezi raportul de audit"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrator Kilo",
+      "actorMaskedUser": "Utilizator mascat",
+      "actorSystem": "Sistemul Kilo",
       "couldNotLoad": "Nu s-a putut încărca raportul de audit.",
       "events": "Evenimente",
       "generated": "Raport generat la {{generatedAt}}.",
@@ -1980,7 +1984,12 @@
       "syncMayNotHaveCompleted": "Este posibil ca o sincronizare să nu se fi finalizat. Reîncearcă pentru a-i actualiza starea sau renunță.",
       "syncInProgress": "O sincronizare de securitate este deja în curs. Încearcă din nou.",
       "dismissalInProgress": "Această respingere este deja în curs. Încearcă din nou.",
-      "couldNotReadPendingSyncs": "Nu s-au putut citi sincronizările în așteptare. Încearcă din nou."
+      "couldNotReadPendingSyncs": "Nu s-au putut citi sincronizările în așteptare. Încearcă din nou.",
+      "ambiguous": "Nu s-a putut confirma rezultatul — verifică revizuirea de securitate înainte de a încerca din nou.",
+      "settleFailed": "Acțiunea s-a finalizat, dar nu am putut înregistra rezultatul. Încearcă din nou.",
+      "replayFailed": "Această acțiune nu s-a finalizat. Încearcă din nou.",
+      "actionFailed": "Această acțiune nu a putut fi finalizată. Încearcă din nou.",
+      "actionBlocked": "Această acțiune nu a putut fi finalizată. Problema trebuie rezolvată înainte de a încerca din nou."
     },
     "analysisState": {
       "queued": "Analiză în coadă",
@@ -2811,7 +2820,7 @@
     "thisDevice": "Acest dispozitiv",
     "viewProfile": "Vezi profilul",
     "signOutThisDevice": "Deconectează acest dispozitiv",
-    "signOutThisSession": "Deconectează această sesiune",
+    "signOutSessionLabel": "Deconectează {{device}}, autentificare: {{signedIn}}",
     "sessionSignedOut": "Sesiune deconectată.",
     "signOutThisDeviceTitle": "Deconectezi acest dispozitiv?",
     "signOutThisSessionTitle": "Deconectezi această sesiune?",
@@ -3050,11 +3059,23 @@
     "boundary": {
       "backToProfile": "Înapoi la profil",
       "loadErrorMessage": "Verifică conexiunea și încearcă din nou.",
+
+      "chooseAccount": "Selectează un cont",
       "loadErrorTitle": "Nu s-au putut încărca organizațiile tale.",
+      "membershipLostNotice": "Nu mai ai acces la această organizație. S-a comutat la {{target}}.",
+      "noOrganization": "Nicio organizație",
+
+      "noOrganizationDescription": "Acest cont nu face parte dintr-o organizație. Creează sau alătură-te unei organizații pe site pentru a folosi funcții de organizație precum invitațiile pentru membri și alertele de sold scăzut.",
+
+      "openWebOrganizations": "Deschide organizațiile pe site",
+
       "organizationUnavailable": "Organizația nu este disponibilă.",
-      "selectDescription": "Alege o organizație din profilul tău pentru a continua.",
+      "selectDescriptionWithOrganizations": "Aparții unei sau mai multor organizații. Alege contul pe care ar trebui să îl folosească acest ecran.",
+
       "selectOrganization": "Selectează o organizație",
       "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua.",
+
+      "unavailableSessionsDescription": "Această organizație nu mai este disponibilă. Sesiunile ei nu pot fi încărcate.",
       "accessDeniedDescription": "Nu ai acces la această organizație."
     },
     "creditActivity": {
@@ -3106,7 +3127,11 @@
       "separateEmailsHint": "Separă adresele de e-mail prin virgule.",
       "thresholdLabel": "Prag de alertă (USD)",
       "title": "Alertă de sold scăzut",
-      "emailsError": "Introdu cel puțin o adresă de e-mail validă. Separă adresele prin virgule.",
+      "emailsInvalid": "Una sau mai multe adrese de e-mail nu sunt valide.",
+      "emailsRequired": "Introdu cel puțin o adresă de e-mail.",
+      "saveEmailsError": "Unele adrese de e-mail nu au fost acceptate. Verifică-le și încearcă din nou.",
+      "saveError": "Nu am putut salva alerta de sold scăzut.",
+      "thresholdPlaceholder": "Introdu o sumă",
       "thresholdError": "Introdu o sumă mai mare decât 0."
     },
     "memberLimit": {
@@ -3117,6 +3142,7 @@
       "removeLimit": "Elimină limita",
       "title": "Limită zilnică de utilizare",
       "blankError": "Introdu o sumă sau atinge „Elimină limita” mai jos.",
+      "blankWithoutLimitError": "Introdu o limită zilnică între 0 și {{max}}.",
       "rangeError": "Introdu o sumă între 0 și {{max}}."
     },
     "members": {
@@ -3585,6 +3611,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Pornește un agent necesită o instrucțiune. Adaugă o instrucțiune și rulează-l din nou.",
+      "repositoryRequired": "Pornește un agent necesită un depozit. Deschide Kilo și alege unul, apoi rulează-l din nou.",
       "repositoryUnknown": "Kilo nu recunoaște {{repository}} ca depozit GitHub sau GitLab. Alege alt depozit în Kilo.",
       "repositoryUnsupported": "{{repository}} este un depozit Bitbucket — Pornește un agent nu îl poate folosi încă. Alege alt depozit în Kilo."
     }
@@ -3656,7 +3683,6 @@
     "keyTooLong": "Cheia trebuie să aibă 256 de caractere sau mai puțin",
     "keyDuplicate": "Această cheie există deja în profil",
     "valueLabel": "Valoare",
-    "secretLabel": "Secret",
     "secrets": {
       "markSecret": "Marcați ca secret",
       "masked": "Valoare ascunsă",

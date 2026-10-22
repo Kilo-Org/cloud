@@ -123,9 +123,15 @@ jobs:
         if: steps.catalog_changes.outputs.catalog == 'true'
         run: node --test scripts/kilo-mcp-catalog.test.mjs
 
+      # `cloud-agent-next` is not in web's dependency closure, but
+      # `apps/web/src/routers/cloud-agent-next-schemas.ts` imports schemas from
+      # it by relative path. Without that project installed, its bare `zod`
+      # import falls back to pnpm's hoisted copy, which can be a different
+      # version from the one the tests use, and the dump then rewrites the
+      # catalog with that version's JSON Schema output.
       - name: Install web dependencies
         if: steps.catalog_changes.outputs.catalog == 'true'
-        run: pnpm install --frozen-lockfile --filter web...
+        run: pnpm install --frozen-lockfile --filter web... --filter cloud-agent-next
 
       # Same dummies the jest suite already tolerates (ci.yml does the same for
       # the production build). The dump itself layers apps/web/.env.test under
@@ -371,9 +377,12 @@ jobs:
         if: steps.merge_changes.outputs.catalog == 'true'
         run: npm install -g @kilocode/cli
 
+      # Same install scope as the PR job: the dump statically imports schemas
+      # from `cloud-agent-next`, so that project must be installed for its
+      # `zod` to resolve to the workspace version rather than the hoisted one.
       - name: Install web dependencies
         if: steps.merge_changes.outputs.catalog == 'true'
-        run: pnpm install --frozen-lockfile --filter web...
+        run: pnpm install --frozen-lockfile --filter web... --filter cloud-agent-next
 
       - name: Setup dummy env
         if: steps.merge_changes.outputs.catalog == 'true'

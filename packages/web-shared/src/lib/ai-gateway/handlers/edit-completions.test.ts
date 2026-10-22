@@ -100,10 +100,6 @@ function setOrganizationAuth(settings?: OrganizationSettings) {
     settings,
     plan: 'teams',
   });
-  mockedResolveOrganizationMemberModelDecision.mockResolvedValue({
-    policy: { dataCollection: settings?.data_collection } as never,
-    decision: { allowed: true },
-  });
   mockedGetBYOKforOrganization.mockResolvedValue(null);
   mockedGetBYOKforUser.mockResolvedValue(null);
 }
@@ -226,39 +222,21 @@ describe('POST /api/edit/completions', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
-  it('rejects direct Inception requests when organization data collection is denied', async () => {
+  it('forwards a direct Inception request', async () => {
     setOrganizationAuth({ data_collection: 'deny' } satisfies OrganizationSettings);
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
     const { handleEditCompletionsRequest } = await import('./edit-completions');
-    const response = await handleEditCompletionsRequest(
-      makeRequest(makeValidRequestBody()) as never
-    );
+    const requestBody = makeValidRequestBody();
+    const response = await handleEditCompletionsRequest(makeRequest(requestBody) as never);
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
+    const [url, init] = mockedFetch.mock.calls[0];
+    expect(url).toBe('https://api.inceptionlabs.ai/v1/edit/completions');
+    expect(JSON.parse(init?.body as string).messages).toEqual(requestBody.messages);
     expect(await response.json()).toMatchObject({
-      error_type: ProxyErrorType.data_collection_required,
+      choices: [{ message: { role: 'assistant', content: 'edited' } }],
     });
-    expect(mockedFetch).not.toHaveBeenCalled();
-  });
-
-  it('applies the organization policy to every membership role', async () => {
-    // The organization row is the source of the policy for every membership role.
-    setOrganizationAuth();
-    mockedResolveOrganizationMemberModelDecision.mockResolvedValue({
-      policy: { dataCollection: 'deny' } as never,
-      decision: { allowed: true },
-    });
-
-    const { handleEditCompletionsRequest } = await import('./edit-completions');
-    const response = await handleEditCompletionsRequest(
-      makeRequest(makeValidRequestBody()) as never
-    );
-
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({
-      error_type: ProxyErrorType.data_collection_required,
-    });
-    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it.each([

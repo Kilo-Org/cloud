@@ -90,11 +90,9 @@ function makeRequest(model = 'inception/mercury-edit-2') {
 function setOrganizationAuth({
   balance = 1000,
   settings,
-  policyDataCollection = settings?.data_collection,
 }: {
   balance?: number;
   settings?: OrganizationSettings;
-  policyDataCollection?: OrganizationSettings['data_collection'];
 } = {}) {
   mockedGetUserFromAuth.mockResolvedValue({
     user: {
@@ -109,10 +107,6 @@ function setOrganizationAuth({
     balance,
     settings,
     plan: 'teams',
-  });
-  mockedResolveOrganizationMemberModelDecision.mockResolvedValue({
-    policy: { dataCollection: policyDataCollection } as never,
-    decision: { allowed: true },
   });
   mockedGetBYOKforOrganization.mockResolvedValue(null);
   mockedGetBYOKforUser.mockResolvedValue(null);
@@ -259,7 +253,7 @@ describe('POST /api/fim/completions', () => {
   });
 
   it.each(['inception/mercury-edit-2', 'mistralai/codestral-2508'])(
-    'rejects %s when the organization denies data collection',
+    'forwards %s to its provider',
     async model => {
       setOrganizationAuth({ settings: { data_collection: 'deny' } satisfies OrganizationSettings });
       mockedFetch.mockResolvedValue(makeUpstreamResponse());
@@ -267,15 +261,17 @@ describe('POST /api/fim/completions', () => {
       const { handleFimCompletionsRequest } = await import('./fim-completions');
       const response = await handleFimCompletionsRequest(makeRequest(model) as never);
 
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({
-        error_type: ProxyErrorType.data_collection_required,
-      });
-      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      const [url, init] = mockedFetch.mock.calls[0];
+      expect(url).toContain('/v1/fim/completions');
+      const upstreamBody = JSON.parse(init?.body as string);
+      expect(upstreamBody.prompt).toBe('const value =');
+      expect(upstreamBody.suffix).toBe(';');
     }
   );
 
-  it('rejects a BYOK request when the organization policy denies data collection', async () => {
+  it('forwards a BYOK request to its provider', async () => {
     setOrganizationAuth({
       balance: 0,
       settings: { data_collection: 'deny' } satisfies OrganizationSettings,
@@ -288,36 +284,17 @@ describe('POST /api/fim/completions', () => {
     const { handleFimCompletionsRequest } = await import('./fim-completions');
     const response = await handleFimCompletionsRequest(makeRequest() as never);
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({
-      error_type: ProxyErrorType.data_collection_required,
-    });
-    expect(mockedFetch).not.toHaveBeenCalled();
-  });
-
-  it('applies the organization policy to every membership role', async () => {
-    // The organization row is the source of the policy for every membership role.
-    setOrganizationAuth({ balance: 0, policyDataCollection: 'deny' });
-    mockedGetBYOKforOrganization.mockResolvedValue([
-      { providerId: 'inception', decryptedAPIKey: 'org-inception-key' },
-    ] as never);
-    mockedFetch.mockResolvedValue(makeUpstreamResponse());
-
-    const { handleFimCompletionsRequest } = await import('./fim-completions');
-    const response = await handleFimCompletionsRequest(makeRequest() as never);
-
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({
-      error_type: ProxyErrorType.data_collection_required,
-    });
-    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    const [, init] = mockedFetch.mock.calls[0];
+    const headers = init?.headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer org-inception-key');
   });
 
   it.each<OrganizationSettings | undefined>([
     { data_collection: 'allow' },
     { data_collection: null },
     undefined,
-  ])('proxies when the organization data collection policy is %j', async settings => {
+  ])('forwards a request for organization settings %j', async settings => {
     setOrganizationAuth({ settings });
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
 

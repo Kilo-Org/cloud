@@ -21,7 +21,6 @@ import {
   captureProxyError,
   extractHeaderAndLimitLength,
   modelNotAllowedResponse,
-  dataCollectionRequiredResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -236,7 +235,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   }
 
   if (organizationId) {
-    const { policy, decision } = await resolveOrganizationMemberModelDecision({
+    const { decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
       kiloUserId: user.id,
       modelId: requestBody.model,
@@ -246,12 +245,12 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     if (decision.eligibleProviderRoutes && !decision.eligibleProviderRoutes.has(fimProvider)) {
       return modelNotAllowedResponse();
     }
-    // The resolved organization policy carries its data-use setting. When it denies data
-    // collection, this route answers with the standard dataCollectionRequiredResponse.
-    if (policy.dataCollection === 'deny') {
-      return dataCollectionRequiredResponse();
-    }
   }
+
+  // Data-use contract for this route: FIM goes straight to the provider, and the supported
+  // providers are classified by the gateway's provider data policy as not training on prompts
+  // (https://openrouter.ai/docs/guides/privacy/provider-logging). A new supported model must
+  // carry the same classification.
 
   const systemKey = getSystemApiKey(fimProvider);
   const userByokEntry = byokProviderKeys

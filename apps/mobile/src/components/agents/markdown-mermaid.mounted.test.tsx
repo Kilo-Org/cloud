@@ -212,4 +212,21 @@ describe('MarkdownMermaid source changes', () => {
       renderer.unmount();
     });
   });
+
+  it('renders a source again after an intermediate source replaced it', async () => {
+    const renderer = await mount('flowchart TD\n  a --> b');
+    await deliver(renderer, { kind: 'error' });
+    expect(countOf(renderer.root, CodeBlockType)).toBe(1);
+
+    await rerender(renderer, 'flowchart TD\n  c --> d');
+    await rerender(renderer, 'flowchart TD\n  a --> b');
+
+    expect(countOf(renderer.root, CodeBlockType)).toBe(0);
+    expect(countOf(renderer.root, WebViewType)).toBe(1);
+    expect(webViewProps(renderer.root).injectedJavaScript).toContain('a --> b');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
 });

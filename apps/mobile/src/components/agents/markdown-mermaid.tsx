@@ -127,12 +127,14 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
   const [failure, setFailure] = useState<{ source: string } | null>(null);
   const failed = failure?.source === source;
   const [host, setHost] = useState<MermaidHost | null>(null);
-  // Clear the measured height of the previous diagram synchronously during
-  // render (React's "adjust state when a prop changes" pattern), so no frame
-  // shows the new diagram in the old one's box.
+  // Every source change starts a fresh render attempt: drop the previous
+  // diagram's failure and measured height synchronously during render (React's
+  // "adjust state when a prop changes" pattern). A source that comes back gets
+  // its own attempt rather than a failure recorded for an earlier one.
   const [prevSource, setPrevSource] = useState(source);
   if (prevSource !== source) {
     setPrevSource(source);
+    setFailure(null);
     setHeight(MIN_HEIGHT);
   }
   // The host is prepared once per process, so a source change only re-runs this

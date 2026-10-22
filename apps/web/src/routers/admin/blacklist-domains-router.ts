@@ -138,25 +138,33 @@ export type BlacklistStats = {
 /**
  * Aggregates per-email_domain counts into per-blacklist-entry blocked counts.
  *
- * For each blacklist entry, sums the counts of email_domain groups that match
- * it via isDomainOnBlacklist (equality or strict subdomain). This preserves
- * the original suffix-match semantics of the old google_user_email LIKE query
- * while scanning only the grouped result set.
+ * Walks each email_domain once and credits every blacklist entry that is one of
+ * its label-boundary suffixes. The entry-major alternative (test every entry
+ * against every group) is quadratic and does not survive a large imported list.
  */
 export function computeBlacklistStats(
   blacklistedDomains: string[],
   emailDomainCounts: readonly EmailDomainCount[]
 ): BlacklistStats {
-  const domainCounts = blacklistedDomains.map(domain => {
-    const entry = domain.toLowerCase();
-    let blockedCount = 0;
-    for (const row of emailDomainCounts) {
-      if (row.email_domain !== null && isDomainOnBlacklist(row.email_domain, [entry])) {
-        blockedCount += row.count;
-      }
+  const lookup = new Set(blacklistedDomains.map(domain => domain.toLowerCase()));
+  const counts = new Map<string, number>();
+
+  for (const row of emailDomainCounts) {
+    if (row.email_domain === null) continue;
+
+    const labels = row.email_domain.toLowerCase().split('.');
+    for (let i = 0; i < labels.length; i++) {
+      const candidate = labels.slice(i).join('.');
+      if (!lookup.has(candidate)) continue;
+
+      counts.set(candidate, (counts.get(candidate) ?? 0) + row.count);
     }
-    return { domain, blockedCount };
-  });
+  }
+
+  const domainCounts = blacklistedDomains.map(domain => ({
+    domain,
+    blockedCount: counts.get(domain.toLowerCase()) ?? 0,
+  }));
 
   domainCounts.sort((a, b) => b.blockedCount - a.blockedCount);
 

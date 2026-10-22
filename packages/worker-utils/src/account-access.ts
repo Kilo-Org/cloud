@@ -188,19 +188,40 @@ export function blacklistedDomainsFromConfig(
   return domains.length > 0 ? domains : fallbackDomains;
 }
 
+// The admin config is cached for a minute, so auth checks keep re-using the same
+// array. Index it once per array reference instead of scanning it per call: a
+// list with tens of thousands of entries costs one Set build per cache refresh,
+// not one scan per sign-in.
+const blacklistIndexCache = new WeakMap<readonly string[], Set<string>>();
+
+function blacklistIndex(domains: readonly string[]): Set<string> {
+  const cached = blacklistIndexCache.get(domains);
+  if (cached) return cached;
+
+  const index = new Set(domains.map(domain => domain.toLowerCase()));
+  blacklistIndexCache.set(domains, index);
+  return index;
+}
+
 // A blocked domain also blocks its subdomains.
 export function isEmailBlacklistedByDomain(
   email: string,
   blacklistedDomains: readonly string[] | undefined
 ): boolean {
+  if (!blacklistedDomains?.length) return false;
+
+  const index = blacklistIndex(blacklistedDomains);
   const normalizedEmail = email.toLowerCase();
-  return (
-    blacklistedDomains?.some(domain => {
-      const normalizedDomain = domain.toLowerCase();
-      return (
-        normalizedEmail.endsWith(`@${normalizedDomain}`) ||
-        normalizedEmail.endsWith(`.${normalizedDomain}`)
-      );
-    }) ?? false
-  );
+  const at = normalizedEmail.lastIndexOf('@');
+  // An address without '@' is matched as if it were the host itself, which is
+  // what the previous endsWith checks did.
+  const host = at === -1 ? normalizedEmail : normalizedEmail.slice(at + 1);
+  const labels = host.split('.');
+
+  // Every label-boundary suffix of the host. '@' cannot appear inside a label,
+  // so this matches exactly the strings the endsWith checks matched.
+  for (let i = 0; i < labels.length; i++) {
+    if (index.has(labels.slice(i).join('.'))) return true;
+  }
+  return false;
 }

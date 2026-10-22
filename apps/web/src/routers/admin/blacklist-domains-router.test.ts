@@ -110,6 +110,28 @@ describe('computeBlacklistStats', () => {
     expect(stats.totalBlockedUsers).toBe(0);
   });
 
+  it('counts one group once for each matching entry, including nested entries', () => {
+    const stats = computeBlacklistStats(
+      ['mailinator.com', 'sub.mailinator.com'],
+      [{ email_domain: 'sub.mailinator.com', count: 3 }]
+    );
+
+    expect(stats.domains).toEqual([
+      { domain: 'mailinator.com', blockedCount: 3 },
+      { domain: 'sub.mailinator.com', blockedCount: 3 },
+    ]);
+    expect(stats.totalBlockedUsers).toBe(6);
+  });
+
+  it('does not match a group whose label boundary differs from the entry', () => {
+    const stats = computeBlacklistStats(
+      ['mailinator.com'],
+      [{ email_domain: 'notmailinator.com', count: 50 }]
+    );
+
+    expect(stats.domains).toEqual([{ domain: 'mailinator.com', blockedCount: 0 }]);
+  });
+
   it('returns empty stats for an empty blacklist', () => {
     const stats = computeBlacklistStats([], [{ email_domain: 'anything.com', count: 5 }]);
 

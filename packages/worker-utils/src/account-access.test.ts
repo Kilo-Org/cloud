@@ -81,6 +81,18 @@ describe('account access rules', () => {
     expect(isEmailBlacklistedByDomain('user@spam.com', undefined)).toBe(false);
   });
 
+  it('matches a list entry that sits several labels above the host', () => {
+    expect(isEmailBlacklistedByDomain('user@a.b.c.spam.com', ['spam.com'])).toBe(true);
+    expect(isEmailBlacklistedByDomain('user@a.b.c.spam.com', ['b.c.spam.com'])).toBe(true);
+    expect(isEmailBlacklistedByDomain('user@a.b.c.spam.com', ['c.spam.com.other.org'])).toBe(false);
+  });
+
+  it('does not reuse an index built for a different list', () => {
+    expect(isEmailBlacklistedByDomain('user@spam.com', ['spam.com'])).toBe(true);
+    expect(isEmailBlacklistedByDomain('user@spam.com', ['safe.com'])).toBe(false);
+    expect(isEmailBlacklistedByDomain('user@spam.com', ['spam.com'])).toBe(true);
+  });
+
   it('reads blocked domains from the admin config and falls back when it is empty', () => {
     const config = (domains: string[]) =>
       JSON.stringify({ domains, updated_at: null, updated_by: null, updated_by_email: null });

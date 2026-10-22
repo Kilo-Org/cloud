@@ -188,6 +188,58 @@ describe('getMinimumVersions', () => {
     }
   });
 
+  test('replaces a read that has been running past the age ceiling', async () => {
+    jest.useFakeTimers();
+    try {
+      const stuck = Promise.withResolvers<unknown>();
+      limitMock.mockReturnValueOnce(stuck.promise);
+
+      const first = getMinimumVersions().catch((caught: unknown) => caught);
+      await jest.advanceTimersByTimeAsync(5_000);
+      expect(await first).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+      expect(limitMock).toHaveBeenCalledTimes(1);
+
+      // Past the backoff window the stuck read is also past its age ceiling, so
+      // the gate reads again instead of joining a read that never settles.
+      limitMock.mockResolvedValueOnce([row]);
+      await jest.advanceTimersByTimeAsync(FAILURE_BACKOFF_MS + 1);
+      await expect(getMinimumVersions()).resolves.toEqual(row);
+      expect(limitMock).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('starts no new read once the live reads are spent', async () => {
+    jest.useFakeTimers();
+    try {
+      const firstStuck = Promise.withResolvers<unknown>();
+      const secondStuck = Promise.withResolvers<unknown>();
+      limitMock.mockReturnValueOnce(firstStuck.promise).mockReturnValueOnce(secondStuck.promise);
+
+      const first = getMinimumVersions().catch((caught: unknown) => caught);
+      await jest.advanceTimersByTimeAsync(5_000);
+      expect(await first).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+
+      // The second read also hangs and is waited on by its own caller.
+      await jest.advanceTimersByTimeAsync(FAILURE_BACKOFF_MS + 1);
+      const second = getMinimumVersions().catch((caught: unknown) => caught);
+      await jest.advanceTimersByTimeAsync(5_000);
+      expect(await second).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+      expect(limitMock).toHaveBeenCalledTimes(2);
+
+      // Both reads still hold a connection, so the gate answers at once rather
+      // than pinning a third one or waiting on a read that never settles.
+      await jest.advanceTimersByTimeAsync(FAILURE_BACKOFF_MS + 1);
+      const third = getMinimumVersions().catch((caught: unknown) => caught);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(await third).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+      expect(limitMock).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('shares one read between concurrent cold callers', async () => {
     limitMock.mockResolvedValue([row]);
 

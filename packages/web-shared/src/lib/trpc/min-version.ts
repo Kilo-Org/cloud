@@ -17,8 +17,14 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 const NO_ROW_CACHE_TTL_MS = 30 * 1000;
 // The gate runs in front of every mobile procedure, so a read that never settles
 // must not be awaited by all of them for their whole budget. Bound how long a
-// caller waits; the single read keeps its connection and is never duplicated.
+// caller waits; a read still running after that keeps its connection.
 const READ_WAIT_MS = 5_000;
+// A read older than this is abandoned: a later caller may start another one, so
+// a query that never settles cannot keep the gate from reading the table again.
+const READ_MAX_AGE_MS = 15_000;
+// An abandoned read holds its pool connection until it settles, so bound how
+// many reads one stuck database can pin.
+const MAX_LIVE_READS = 2;
 const VERSION_PATTERN = /^\d+(\.\d+)*$/;
 
 type CachedMinimumVersions = {
@@ -31,11 +37,17 @@ let cache: CachedMinimumVersions | null = null;
 /** Earliest time at which a failed read, or another wait, may be retried. */
 let nextRetryAt = 0;
 /**
- * The one read allowed at a time. It never rejects, and clears itself when it
- * settles, so a read that outlives a caller's wait cannot be joined by a second
- * one and cannot accumulate pool connections.
+ * The read later callers join. It never rejects, and is released when it
+ * settles or when it is older than `READ_MAX_AGE_MS`, so a read that outlives
+ * a caller's wait is neither duplicated on every request nor kept forever.
  */
 let readInFlight: Promise<void> | null = null;
+/** When `readInFlight` started. */
+let readStartedAt = 0;
+/** Identifies the current read, so a settled abandoned read releases no newer one. */
+let readGeneration = 0;
+/** Reads still running, including abandoned ones that hold a pool connection. */
+let liveReads = 0;
 
 export function isMobileClient(headersList?: MinimumVersionHeaders | null): boolean {
   return headersList?.get('x-kilo-client') === 'mobile';
@@ -95,22 +107,39 @@ async function runRead(): Promise<void> {
   }
 }
 
-/** Start the read, or join the one already running. */
-function ensureRead(): Promise<void> {
-  if (!readInFlight) {
-    readInFlight = runRead()
-      .catch(() => undefined)
-      .finally(() => {
-        readInFlight = null;
-      });
+/**
+ * Join the current read, or start one. Returns `null` when the current read is
+ * too old to join and the live-read budget is spent: the caller answers without
+ * waiting on a read that may never settle, and without pinning another
+ * connection to a database that is already stuck.
+ */
+function ensureRead(now: number): Promise<void> | null {
+  if (readInFlight && now - readStartedAt < READ_MAX_AGE_MS) {
+    return readInFlight;
   }
-  return readInFlight;
+  if (liveReads >= MAX_LIVE_READS) {
+    return null;
+  }
+  const generation = (readGeneration += 1);
+  readStartedAt = now;
+  liveReads += 1;
+  const read = runRead()
+    .catch(() => undefined)
+    .finally(() => {
+      liveReads -= 1;
+      // A superseded read must not release the slot of the one replacing it.
+      if (readGeneration === generation) {
+        readInFlight = null;
+      }
+    });
+  readInFlight = read;
+  return read;
 }
 
 /**
  * Wait for the read, but no longer than `READ_WAIT_MS`. Resolves `false` when
  * the wait expired with the read still running: the caller stops waiting while
- * the read keeps its connection, and `ensureRead` refuses to start another.
+ * the read keeps its connection.
  */
 function waitForRead(read: Promise<void>): Promise<boolean> {
   const { promise, resolve } = Promise.withResolvers<boolean>();
@@ -130,13 +159,15 @@ function waitForRead(read: Promise<void>): Promise<boolean> {
  *
  * A successful read is cached — for `CACHE_TTL_MS` when it returned a row, and
  * for the shorter `NO_ROW_CACHE_TTL_MS` when it found none, so a fail-closed
- * verdict follows a configuration fix quickly. At most one read runs at a time
- * and every caller joins it, so a cold instance or an expired entry never
- * issues more than one `SELECT`, and a read that outlives a caller's wait is
- * never duplicated. A failed read is negatively cached for `FAILURE_BACKOFF_MS`:
- * callers get the last-known value without awaiting a read that is already
- * failing, and neither a failure nor an expired wait is retried inside the
- * window.
+ * verdict follows a configuration fix quickly. Callers share one read at a
+ * time, so a cold instance or an expired entry never issues more than one
+ * `SELECT`. A read that runs past `READ_MAX_AGE_MS` is abandoned rather than
+ * joined, so one query that never settles cannot keep the gate from reading the
+ * table again; abandoned reads still count against `MAX_LIVE_READS` so they
+ * cannot pin an unbounded number of pool connections. A failed read is
+ * negatively cached for `FAILURE_BACKOFF_MS`: callers get the last-known value
+ * without awaiting a read that is already failing, and neither a failure nor an
+ * expired wait is retried inside the window.
  *
  * Resolves `null` only when the last successful read found no row. When nothing
  * is cached and the read fails or does not answer in time, it rejects with
@@ -154,7 +185,8 @@ export async function getMinimumVersions(): Promise<MinimumVersions | null> {
     }
     throw minimumVersionUnavailableError();
   }
-  const settled = await waitForRead(ensureRead());
+  const read = ensureRead(now);
+  const settled = read ? await waitForRead(read) : false;
   if (!settled) {
     nextRetryAt = Date.now() + FAILURE_BACKOFF_MS;
   }

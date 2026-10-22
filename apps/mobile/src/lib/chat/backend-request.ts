@@ -145,7 +145,7 @@ export async function checkBackendConnection(
             ],
           },
         }),
-        { receivedText: false, completed: false },
+        () => ({ receivedText: false, completed: false }),
         (held, event) => {
           if (event.kind === 'delta' && event.text !== '') {
             held.receivedText = true;

@@ -25,6 +25,7 @@
     "error": "오류: {{error}}",
     "back": "뒤로",
     "somethingWentWrong": "문제가 발생했습니다.",
+    "actionNotRecorded": "이 작업을 기록하지 못했습니다. 나중에 다시 시도하세요.",
     "couldNotOpen": "{{label}}을(를) 열지 못했습니다.",
     "link": "링크",
     "takingLonger": "예상보다 시간이 더 걸리고 있습니다. 이 화면을 닫고 나중에 다시 확인할 수 있습니다.",
@@ -893,7 +894,7 @@
     },
     "autoReviews": "자동 리뷰",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket이 연결되지 않았습니다. 조직 소유자와 결제 관리자만 연결할 수 있습니다.",
+      "notConnectedReadOnly": "Bitbucket이 연결되지 않았습니다. 조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다.",
       "setupIncomplete": "설정이 완료되지 않았습니다. kilo.ai에서 설정을 완료하세요.",
       "setup": "Bitbucket 설정"
     },
@@ -917,7 +918,10 @@
       "starting": "리뷰 시작 중…",
       "title": "수동 리뷰"
     },
-    "notConnectedReadOnly": "{{platform}} 연결이 설정되지 않았습니다. 조직 소유자와 결제 관리자만 연결할 수 있습니다.",
+    "notConnectedReadOnly": "{{platform}} 연결이 설정되지 않았습니다. 조직 소유자와 관리자만 연결할 수 있습니다.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} 연결이 설정되지 않았습니다. 조직 소유자, 관리자 또는 결제 관리자에게 연결을 요청하세요."
+    },
     "platformList": {
       "activity": "활동",
       "checking": "확인 중…",
@@ -994,8 +998,9 @@
       "noProposals": "제안 없음",
       "noProposalsDescription": "Kilo가 유지보수 담당자의 답변을 분석하면 리뷰 메모리 제안이 여기에 표시됩니다.",
       "off": "리뷰 메모리가 꺼져 있습니다.",
+      "on": "리뷰 메모리가 켜져 있습니다.",
       "offDescription": "리뷰 메모리를 활성화하면 Kilo가 유지보수 담당자의 답변을 학습하여 REVIEW.md 지침을 제안합니다.",
-      "readOnlyDescription": "조직 소유자와 결제 관리자만 리뷰 메모리를 활성화할 수 있습니다.",
+      "readOnlyDescription": "조직 소유자, 관리자, 결제 관리자만 리뷰 메모리를 변경할 수 있습니다.",
       "title": "리뷰 메모리"
     },
     "scopeList": {
@@ -1133,6 +1138,9 @@
       "triageModel": "분류 모델"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo 관리자",
+      "actorMaskedUser": "마스킹된 사용자",
+      "actorSystem": "Kilo 시스템",
       "couldNotLoad": "감사 보고서를 불러올 수 없습니다.",
       "events": "이벤트",
       "generated": "{{generatedAt}}에 생성되었습니다.",
@@ -1144,7 +1152,7 @@
       "summary": "보고서 요약",
       "title": "감사 보고서",
       "unavailable": "감사 보고서 열람 불가",
-      "unavailableDescription": "조직 소유자와 결제 관리자만 감사 보고서를 볼 수 있습니다. 소유자나 결제 관리자에게 접근 권한을 요청하세요.",
+      "unavailableDescription": "조직 소유자, 관리자, 결제 관리자만 감사 보고서를 볼 수 있습니다. 소유자, 관리자, 결제 관리자에게 접근 권한을 요청하세요.",
       "eventActions": {
         "findingAnalysisCompleted": "분석 완료됨",
         "findingAnalysisFailed": "분석 실패함",
@@ -1258,7 +1266,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "이 문제는 이미 해결되어 더 이상 무시 처리할 수 없습니다.",
-      "cannotDismissDescription": "조직 소유자와 결제 관리자만 발견된 문제를 무시 처리할 수 있습니다.",
+      "cannotDismissDescription": "조직 소유자, 관리자, 결제 관리자만 발견된 문제를 무시 처리할 수 있습니다.",
       "cannotDismissTitle": "이 문제를 무시 처리할 수 없음",
       "commentAccessibility": "무시 처리에 대한 추가 설명",
       "commentLabel": "추가 설명(선택 사항)",
@@ -1390,7 +1398,7 @@
       "automationCount": "3개 중 {{displayCount}}개 활성화됨",
       "couldNotLoadPermissions": "권한을 불러올 수 없습니다.",
       "couldNotLoadSettings": "보안 에이전트 설정을 불러올 수 없습니다.",
-      "disabledNoManage": "보안 에이전트가 비활성화되어 있습니다. 조직 소유자와 결제 관리자만 활성화할 수 있습니다.",
+      "disabledNoManage": "보안 에이전트가 비활성화되어 있습니다. 조직 소유자, 관리자, 결제 관리자만 활성화할 수 있습니다.",
       "disabledNoRepo": "보안 에이전트를 활성화하기 전에 저장소를 하나 이상 선택하세요.",
       "disabledPrompt": "보안 에이전트를 활성화하여 Dependabot 알림을 동기화하고, 저장소를 선택하고, 자동화를 설정하세요.",
       "notificationsCount": "2개 중 {{displayCount}}개 활성화됨",
@@ -1423,7 +1431,7 @@
       "lowDescription": "보안에 미치는 영향이 매우 적습니다.",
       "medium": "중간",
       "mediumDescription": "영향이 제한적이거나 특정 조건에서만 발생합니다.",
-      "permissionNote": "조직 소유자와 결제 관리자만 이 설정을 변경할 수 있습니다.",
+      "permissionNote": "조직 소유자, 관리자, 결제 관리자만 이 설정을 변경할 수 있습니다.",
       "remediationDeadlineA11y": "{{label}} 수정 기한, 일 단위",
       "title": "SLA 정책"
     },
@@ -1442,7 +1450,12 @@
       "syncMayNotHaveCompleted": "동기화가 완료되지 않았을 수 있습니다. 다시 시도하여 상태를 확인하거나 요청을 취소하세요.",
       "syncInProgress": "보안 동기화가 이미 진행 중입니다. 다시 시도하세요.",
       "dismissalInProgress": "이 문제의 무시 처리가 이미 진행 중입니다. 다시 시도하세요.",
-      "couldNotReadPendingSyncs": "대기 중인 동기화 정보를 불러올 수 없습니다. 다시 시도하세요."
+      "couldNotReadPendingSyncs": "대기 중인 동기화 정보를 불러올 수 없습니다. 다시 시도하세요.",
+      "ambiguous": "작업 결과를 확인하지 못했습니다. 다시 시도하기 전에 보안 검토를 확인하세요.",
+      "settleFailed": "작업이 완료되었지만 결과를 기록하지 못했습니다. 다시 시도하세요.",
+      "replayFailed": "이 작업은 완료되지 않았습니다. 다시 시도하세요.",
+      "actionFailed": "이 작업을 완료하지 못했습니다. 다시 시도하세요.",
+      "actionBlocked": "이 작업을 완료하지 못했습니다. 문제를 먼저 해결해야 재시도할 수 있습니다."
     },
     "analysisState": {
       "queued": "분석 대기 중",
@@ -1719,6 +1732,8 @@
       "commitAndPush": "커밋 및 푸시",
       "startSession": "세션 시작",
       "selectRepositoryToStart": "시작하려면 저장소를 선택하세요.",
+      "enterPromptToStart": "시작하려면 프롬프트를 추가하세요.",
+      "enterPromptOrFileToStart": "시작하려면 프롬프트 또는 파일을 추가하세요.",
       "connectProviderToStart": "시작하려면 서비스를 연결하세요.",
       "promptPlaceholder": "어떤 작업을 할까요?",
       "couldNotLoadModels": "모델을 불러올 수 없습니다.",
@@ -2257,7 +2272,7 @@
     "thisDevice": "이 기기",
     "viewProfile": "프로필 보기",
     "signOutThisDevice": "이 기기 로그아웃",
-    "signOutThisSession": "이 세션 로그아웃",
+    "signOutSessionLabel": "{{device}} 기기 로그아웃, {{signedIn}}에 로그인함",
     "sessionSignedOut": "세션이 로그아웃되었습니다.",
     "signOutThisDeviceTitle": "이 기기에서 로그아웃할까요?",
     "signOutThisSessionTitle": "이 세션에서 로그아웃할까요?",
@@ -2540,6 +2555,8 @@
     },
     "connectionExpired": "GitHub 연결이 만료되었습니다.",
     "couldNotLoadPullRequest": "풀 리퀘스트를 불러오지 못했습니다.",
+    "reviewServiceUnavailable": "리뷰 서비스를 사용할 수 없습니다",
+    "reviewServiceUnavailableDescription": "리뷰 서비스를 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
     "couldNotOpenGitHubAppSettings": "GitHub 앱 설정을 열지 못했습니다.",
     "description": "설명",
     "discussion": {
@@ -2950,6 +2967,7 @@
       "truncationBanner_other": "GitHub API 제한으로 변경된 파일 {{total}}개 중 처음 {{limit}}개만 표시합니다."
     },
     "linkPasteClipboardEmpty": "클립보드가 비어 있습니다.",
+    "linkPasteDenied": "붙여넣기 권한이 거부되었습니다. 붙여넣기를 허용한 후 다시 시도하세요.",
     "linkPasteNotAPullRequest": "풀 리퀘스트 또는 머지 요청 링크가 아닙니다",
     "announce": {
       "commentPosted": "댓글이 게시되었습니다",
@@ -2973,7 +2991,6 @@
       "mergeResultDefaultError": "GitHub가 병합을 완료하지 않았습니다.",
       "mergeResultNotCompleted": "{{term}}이(가) 병합되지 않았습니다. 상태를 확인하고 다시 시도하세요.",
       "ambiguous": "작업 결과를 확인하지 못했습니다. 다시 시도하기 전에 PR을 확인하세요.",
-      "persistenceFailed": "이 작업을 기록하지 못했습니다. 나중에 다시 시도하세요.",
       "forbidden": "이 작업을 수행할 권한이 없습니다."
     },
     "capabilities": {
@@ -3005,6 +3022,7 @@
 
       "chooseAccount": "계정 선택",
       "loadErrorTitle": "조직 목록을 불러올 수 없습니다.",
+      "membershipLostNotice": "이 조직에 더 이상 접근할 수 없습니다. {{target}}(으)로 전환되었습니다.",
       "noOrganization": "조직 없음",
 
       "noOrganizationDescription": "이 계정은 조직에 속해 있지 않습니다. 멤버 초대 및 잔액 부족 알림과 같은 조직 기능을 사용하려면 웹에서 조직을 만들거나 참여하세요.",
@@ -3076,7 +3094,11 @@
       "separateEmailsHint": "이메일 주소를 여러 개 입력할 때는 쉼표로 구분하세요.",
       "thresholdLabel": "알림 기준 잔액(USD 미만)",
       "title": "잔액 부족 알림",
-      "emailsError": "올바른 이메일 주소를 하나 이상 입력하세요. 여러 주소는 쉼표로 구분하세요.",
+      "emailsInvalid": "올바르지 않은 이메일 주소가 하나 이상 있습니다.",
+      "emailsRequired": "이메일 주소를 하나 이상 입력하세요.",
+      "saveEmailsError": "일부 이메일 주소가 승인되지 않았습니다. 확인 후 다시 시도하세요.",
+      "saveError": "잔액 부족 알림을 저장하지 못했습니다.",
+      "thresholdPlaceholder": "금액을 입력하세요.",
       "thresholdError": "0보다 큰 금액을 입력하세요."
     },
     "memberLimit": {
@@ -3087,12 +3109,13 @@
       "removeLimit": "한도 해제",
       "title": "일일 사용 한도",
       "blankError": "금액을 입력하거나 아래의 한도 해제를 누르세요.",
+      "blankWithoutLimitError": "0에서 {{max}} 사이의 일일 한도를 입력하세요.",
       "rangeError": "0에서 {{max}} 사이의 금액을 입력하세요."
     },
     "members": {
       "changeRole": "역할 변경",
       "emptyDescriptionCanInvite": "이 조직에서 협업을 시작하려면 팀원을 초대하세요.",
-      "emptyDescriptionCannotInvite": "소유자나 결제 관리자에게 팀원 초대를 요청하세요.",
+      "emptyDescriptionCannotInvite": "소유자, 관리자, 결제 관리자에게 팀원 초대를 요청하세요.",
       "emptyTitle": "아직 멤버 없음",
       "invitedDate": "{{date}}에 초대됨",
       "limitPerDay": "일일 {{amount}}",
@@ -3357,7 +3380,8 @@
       "settingsToolsOn": "켜짐 — 설정 도구가 모델로 전송됩니다",
       "settingsToolsOff": "꺼짐 — 설정 도구가 모델로 전송되지 않습니다",
       "serverChecking": "이 서버를 확인하는 중…",
-      "serverToolCount": "도구 {{count}}개",
+      "serverToolCount_one": "도구 {{count}}개",
+      "serverToolCount_other": "도구 {{count}}개",
       "serverUnreachable": "이 서버에 연결할 수 없습니다",
       "serverOff": "이 서버는 꺼져 있습니다"
     },
@@ -3504,6 +3528,8 @@
       "quantizationsHelp": "파일이 작을수록 메모리와 저장 공간을 적게 사용합니다. 파일이 클수록 대체로 더 나은 답변을 제공합니다.",
       "quantDetail": "다운로드 {{size}} · 메모리 약 {{memory}}",
       "downloadQuant": "{{quant}} 다운로드",
+      "downloadModelA11y": "{{name}} 다운로드",
+      "detailsA11y": "세부 정보: {{name}}",
       "loadingModel": "모델 세부 정보를 불러오는 중",
       "couldNotLoadModel": "이 모델을 불러올 수 없습니다",
       "noFiles": "이 앱에서 실행할 수 있는 파일이 없습니다",
@@ -3555,6 +3581,7 @@
   "appActions": {
     "start": {
       "promptRequired": "에이전트를 시작하려면 프롬프트가 필요합니다. 프롬프트를 추가하고 다시 실행하세요.",
+      "repositoryRequired": "에이전트를 시작하려면 저장소가 필요합니다. Kilo를 열고 저장소를 선택한 다음 다시 실행하세요.",
       "repositoryUnknown": "Kilo는 {{repository}}을(를) GitHub 또는 GitLab 저장소로 인식하지 않습니다. Kilo에서 다른 저장소를 선택하세요.",
       "repositoryUnsupported": "{{repository}}은(는) Bitbucket 저장소입니다 — 에이전트 시작은 아직 이를 사용할 수 없습니다. Kilo에서 다른 저장소를 선택하세요."
     }
@@ -3592,10 +3619,13 @@
     "emptyDescription": "세션 전체에서 환경 변수, 설정 명령 및 기술을 재사용하기 위한 프로필을 만듭니다.",
     "loadFailed": "프로필을 로드할 수 없습니다.",
     "counts": {
-      "vars": "{{count}} 변수",
+      "vars_one": "{{count}} 변수",
+      "vars_other": "{{count}} 변수",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} 스킬",
-      "commands": "{{count}} 명령",
+      "skills_one": "{{count}} 스킬",
+      "skills_other": "{{count}} 스킬",
+      "commands_one": "{{count}} 명령",
+      "commands_other": "{{count}} 명령",
       "varsShort": "{{count}}변",
       "skillsShort": "{{count}}스",
       "commandsShort": "{{count}}명"
@@ -3626,7 +3656,6 @@
     "keyTooLong": "키는 256자 이하여야 합니다",
     "keyDuplicate": "이 키는 이미 프로필에 있습니다.",
     "valueLabel": "값",
-    "secretLabel": "비밀",
     "secrets": {
       "markSecret": "비밀로 표시",
       "masked": "숨겨진 가치",
@@ -3670,7 +3699,7 @@
       "environment": "환경(JSON)",
       "headers": "헤더(JSON)",
       "timeout": "시간 초과",
-      "secretCount": "비밀 카운트",
+      "secretCount": "비밀 카운트: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3713,6 +3742,9 @@
       "visibilityPrimary": "기본 — 선택기에 표시됨",
       "visibilitySubagent": "하위 에이전트 — 다른 사람에게서만 호출 가능",
       "visibilityAll": "모두 — 둘 다",
+      "modePrimary": "기본 전용",
+      "modeSubagent": "하위 에이전트 전용",
+      "modeAll": "모든 모드",
       "saveFailed": "에이전트를 저장할 수 없습니다.",
       "deleteFailed": "에이전트를 삭제할 수 없습니다.",
       "nameRequired": "상담사 이름을 입력하세요.",
@@ -3773,6 +3805,8 @@
     "empty": "현재 크레딧 팩을 사용할 수 없습니다.",
     "noMatchingProducts": "App Store에서 일치하는 크레딧 팩을 반환하지 않았습니다.",
     "noMatchingProductsPlay": "Google Play에서 일치하는 크레딧 팩을 반환하지 않았습니다.",
+    "storeTimedOut": "App Store에서 제시간에 응답하지 않았습니다. 다시 시도",
+    "storeTimedOutPlay": "Google Play에서 제시간에 응답하지 않았습니다. 다시 시도",
     "purchaseOwnedByAnotherAccount": "이 Apple Account의 크레딧은 다른 Kilo 계정에 속해 있습니다. 사용하려면 해당 Kilo 계정에 로그인하세요.",
     "purchaseOwnedByAnotherAccountPlay": "이 Google Play 계정의 크레딧은 다른 Kilo 계정에 속합니다. 사용하려면 해당 Kilo 계정으로 로그인하세요."
   },

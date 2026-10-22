@@ -602,10 +602,7 @@ export function createConnectionManager(
       ]);
 
       const statusEntry = statuses[kiloSessionId];
-      const sessionStatus = (statusEntry ?? { type: 'idle' }) as {
-        type: string;
-        [key: string]: unknown;
-      };
+      const sessionStatus = statusEntry ?? { type: 'idle' };
 
       const pendingQuestion = questions.find(q => q.sessionID === kiloSessionId);
       const pendingPermission = permissions.find(p => p.sessionID === kiloSessionId);

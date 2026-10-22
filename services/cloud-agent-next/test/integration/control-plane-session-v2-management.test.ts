@@ -91,7 +91,7 @@ function metadata(input: {
     },
     auth: {
       kiloSessionId: input.kiloSessionId,
-      kilocodeToken: input.kiloToken ?? NATIVE_KILO_TOKEN,
+      kilocodeToken: input.kiloToken ?? runtimeAuthorizedKiloToken(),
     },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
@@ -425,6 +425,13 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
       sessionId: legacySession,
       sandboxId: await generateSandboxId('*', ORG_ID, USER_ID, legacySession),
       kiloSessionId: kiloSessionId(),
+    });
+    await runInDurableObject(legacyStub, async (instance, state) => {
+      const stored = await instance.getMetadata();
+      if (!stored) throw new Error('Missing registered metadata');
+      const legacy = { ...stored, auth: { ...stored.auth, kilocodeToken: NATIVE_KILO_TOKEN } };
+      await state.storage.put('session_metadata', legacy);
+      Object.assign(instance, { metadata: legacy });
     });
     await expect(legacyStub.getRuntimeAuthorizationStatus()).resolves.toMatchObject({
       state: 'legacy',

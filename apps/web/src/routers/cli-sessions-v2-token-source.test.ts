@@ -15,6 +15,14 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { get: jest.fn(async () => null) },
 }));
 
+// This suite proves a system token cannot be exchanged. A real device proof
+// needs a live App Attest or Play Integrity verdict, so only the verifier is
+// stubbed; the helper sends a complete proof shape.
+jest.mock('@/lib/auth/native-admission', () => ({
+  ...jest.requireActual('@/lib/auth/native-admission'),
+  verifyAdmissionAsync: async () => ({ ok: true, platform: 'android', keyId: '' }),
+}));
+
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(() => ({
     getSession: mockGetSession,

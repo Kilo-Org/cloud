@@ -429,13 +429,7 @@ export const remoteCommandCatalogV1Schema = z
   .transform(catalog => ({
     protocolVersion: 1 as const,
     canExitSession: catalog.canExitSession,
-    commands: catalog.commands
-      // SlashCommandInfo requires a `hints` array; remote commands with no
-      // hints still have an empty array after the strict shape parse above.
-      .map(command => ({
-        ...command,
-        hints: command.hints,
-      })),
+    commands: catalog.commands,
   }));
 export type RemoteCommandCatalogV1 = z.output<typeof remoteCommandCatalogV1Schema>;
 

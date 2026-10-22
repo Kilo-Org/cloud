@@ -91,6 +91,25 @@ describe('computeBlacklistStats', () => {
     expect(stats.domains.map(d => d.domain)).toEqual(['second.com', 'third.com', 'first.com']);
   });
 
+  it('caps the returned rows while keeping the full domain total', () => {
+    const stats = computeBlacklistStats(
+      ['first.com', 'second.com', 'third.com'],
+      [
+        { email_domain: 'first.com', count: 1 },
+        { email_domain: 'second.com', count: 10 },
+        { email_domain: 'third.com', count: 5 },
+      ],
+      2
+    );
+
+    expect(stats.domains).toEqual([
+      { domain: 'second.com', blockedCount: 10 },
+      { domain: 'third.com', blockedCount: 5 },
+    ]);
+    expect(stats.totalDomains).toBe(3);
+    expect(stats.totalBlockedUsers).toBe(16);
+  });
+
   it('ignores rows with null email_domain', () => {
     const stats = computeBlacklistStats(
       ['mailinator.com'],
@@ -108,6 +127,28 @@ describe('computeBlacklistStats', () => {
 
     expect(stats.domains).toEqual([{ domain: 'unused.com', blockedCount: 0 }]);
     expect(stats.totalBlockedUsers).toBe(0);
+  });
+
+  it('counts one group once for each matching entry, including nested entries', () => {
+    const stats = computeBlacklistStats(
+      ['mailinator.com', 'sub.mailinator.com'],
+      [{ email_domain: 'sub.mailinator.com', count: 3 }]
+    );
+
+    expect(stats.domains).toEqual([
+      { domain: 'mailinator.com', blockedCount: 3 },
+      { domain: 'sub.mailinator.com', blockedCount: 3 },
+    ]);
+    expect(stats.totalBlockedUsers).toBe(6);
+  });
+
+  it('does not match a group whose label boundary differs from the entry', () => {
+    const stats = computeBlacklistStats(
+      ['mailinator.com'],
+      [{ email_domain: 'notmailinator.com', count: 50 }]
+    );
+
+    expect(stats.domains).toEqual([{ domain: 'mailinator.com', blockedCount: 0 }]);
   });
 
   it('returns empty stats for an empty blacklist', () => {

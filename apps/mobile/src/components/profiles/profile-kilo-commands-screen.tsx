@@ -28,6 +28,7 @@ import {
   useAgentProfile,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_COMMANDS: AgentProfileDetail['kiloCommands'] = [];
@@ -160,7 +161,7 @@ export function ProfileKiloCommandsScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={startAdd}>
+          <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
             <Text>{t('profiles.slashCommands.add')}</Text>
           </Button>
         }

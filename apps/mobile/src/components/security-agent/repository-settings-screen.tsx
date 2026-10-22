@@ -21,6 +21,7 @@ import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
@@ -225,6 +226,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               description={t('securityAgent.repositories.noRepositoriesDescription')}
               action={
                 <Button
+                  className={STATE_ACTION_CLASS}
                   variant="outline"
                   onPress={() => {
                     void (async () => {

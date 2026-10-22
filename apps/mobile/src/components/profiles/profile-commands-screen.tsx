@@ -28,7 +28,7 @@ import { useAgentProfile } from '@/lib/hooks/use-agent-profiles';
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 type CommandRow = Readonly<{ sequence: number; command: string }>;
 
@@ -249,7 +249,7 @@ export function ProfileCommandsScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={add}>
+          <Button className={STATE_ACTION_CLASS} onPress={add}>
             <Text>{t('profiles.addCommand')}</Text>
           </Button>
         }

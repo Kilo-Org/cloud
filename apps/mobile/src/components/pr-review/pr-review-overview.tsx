@@ -27,6 +27,7 @@ import {
 } from '@/components/pr-review/pr-review-overview-parts';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -34,6 +35,7 @@ import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-q
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { useCheckGitHubConnection } from '@/lib/pr-review/use-check-github-connection';
 import { trpcClient } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 
@@ -139,7 +141,7 @@ export function PrReviewOverview({
           }
           action={
             isGitHub ? (
-              <Button className="mt-3 w-full" onPress={handleInstallApp}>
+              <Button className={cn('mt-3 w-full', STATE_ACTION_CLASS)} onPress={handleInstallApp}>
                 <Text>{t('prReview.installKiloGitHubApp')}</Text>
               </Button>
             ) : (
@@ -196,7 +198,7 @@ export function PrReviewOverview({
           description={t('prReview.reconnectNotice.message')}
           action={
             <Button
-              className="mt-3 w-full"
+              className={cn('mt-3 w-full', STATE_ACTION_CLASS)}
               onPress={() => {
                 connection.mutate();
               }}

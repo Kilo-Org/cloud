@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { todoListPath, todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
@@ -138,7 +139,7 @@ export function TodoListsScreen({ segmentControl }: Readonly<{ segmentControl: R
         title={t('todos.lists.empty')}
         placement="top"
         action={
-          <Button variant="outline" onPress={openNewList}>
+          <Button className={STATE_ACTION_CLASS} variant="outline" onPress={openNewList}>
             <Text>{t('todos.lists.newList')}</Text>
           </Button>
         }

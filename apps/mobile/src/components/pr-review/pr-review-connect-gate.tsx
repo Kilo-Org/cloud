@@ -16,11 +16,13 @@ import { ProviderConnectGate } from '@/components/pr-review/pr-review-provider-c
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
 import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 type PrReviewConnectGateProps = {
   readonly children: ReactNode;
@@ -188,7 +190,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
           }
           action={
             <Button
-              className="mt-3 w-full flex-row gap-2"
+              className={cn('mt-3 w-full flex-row gap-2', STATE_ACTION_CLASS)}
               disabled={connecting}
               onPress={() => {
                 void handleConnect();

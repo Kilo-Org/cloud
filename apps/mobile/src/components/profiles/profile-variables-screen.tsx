@@ -24,6 +24,7 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { KeyRound } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useAgentProfile, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_VARS: readonly ProfileVarSource[] = [];
@@ -167,7 +168,7 @@ export function ProfileVariablesScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={startAdd}>
+          <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
             <Text>{t('profiles.addVariable')}</Text>
           </Button>
         }

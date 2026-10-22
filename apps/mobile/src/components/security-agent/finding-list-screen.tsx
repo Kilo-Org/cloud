@@ -25,6 +25,7 @@ import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   useSecurityAgentConfig,
   useSecurityAgentRepositories,
@@ -232,6 +233,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           action={
             filtersActive ? (
               <Button
+                className={STATE_ACTION_CLASS}
                 variant="outline"
                 onPress={() => {
                   setFilters(DEFAULT_SECURITY_FINDING_FILTERS);

@@ -91,6 +91,7 @@ import {
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { mergeDiscussionListItemsBySortKey } from '@/lib/pr-review/discussion/merge-discussion-list-items';
 import { useMotionPolicy } from '@/lib/a11y/motion';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   expandedForThread,
   expandThread,
@@ -415,6 +416,7 @@ export function PrReviewDiscussionTab({
       action={
         onRequestFiles ? (
           <Button
+            className={STATE_ACTION_CLASS}
             variant="outline"
             onPress={onRequestFiles}
             accessibilityLabel={t('prReview.discussion.reviewFiles')}

@@ -13,6 +13,7 @@ import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { WEB_BASE_URL } from '@/lib/config';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -20,6 +21,7 @@ import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform'
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
 import { type ProviderPrPlatform, useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 /**
  * The pasted MR URL's origin, when the deep link carried one and it is worth
@@ -203,7 +205,7 @@ export function ProviderConnectGate({
           }
           action={
             <Button
-              className="mt-3 w-full flex-row gap-2"
+              className={cn('mt-3 w-full flex-row gap-2', STATE_ACTION_CLASS)}
               disabled={connecting}
               onPress={() => {
                 void handleConnect();

@@ -40,14 +40,10 @@ export function AIAdoptionDistribution({ userScores, isLoading }: AIAdoptionDist
     for (let i = 0; i < 100; i += 5) {
       // Color gradient from red to green
       let color;
-      if (i < 20)
-        color = '#ef4444'; // red
-      else if (i < 40)
-        color = '#f59e0b'; // orange
-      else if (i < 60)
-        color = '#3b82f6'; // blue
-      else if (i < 80)
-        color = '#10b981'; // green
+      if (i < 20) color = '#ef4444'; // red
+      else if (i < 40) color = '#f59e0b'; // orange
+      else if (i < 60) color = '#3b82f6'; // blue
+      else if (i < 80) color = '#10b981'; // green
       else color = '#22c55e'; // bright green
 
       buckets.push({

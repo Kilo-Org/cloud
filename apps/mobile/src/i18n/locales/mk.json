@@ -762,6 +762,7 @@
       "truncationBanner_other": "Се прикажуваат првите {{limit}} од {{total}} променети датотеки поради ограничувањето на API на GitHub."
     },
     "linkPasteClipboardEmpty": "Таблата со исечоци е празна.",
+    "linkPasteDenied": "Одбиен е пристапот за налепување. Дозволете налепување и обидете се повторно.",
     "linkPasteNotAPullRequest": "Ова не е врска до барање за спојување или merge барање",
     "announce": {
       "commentPosted": "Коментарот е објавен",

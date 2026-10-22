@@ -762,6 +762,7 @@
       "truncationBanner_other": "Kuboniswa amafayela okuqala angu-{{limit}} kwangu-{{total}} ashintshiwe — umkhawulo we-API ye-GitHub."
     },
     "linkPasteClipboardEmpty": "Ibhodi lokukopisha alinalutho.",
+    "linkPasteDenied": "Ukufinyelela ukunamathisela kwenqatyiwe. Vumela ukunamathisela bese uzama kabusha.",
     "linkPasteNotAPullRequest": "Lokhu akusiso isixhumanisi se-PR noma sesicelo sokuhlanganisa",
     "announce": {
       "commentPosted": "Amazwana athunyelwe",

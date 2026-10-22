@@ -810,6 +810,7 @@
       "truncationBanner_many": "Qed jintwerew l-ewwel {{limit}} minn {{total}} fajl mibdul — dan huwa l-limitu tal-API ta' GitHub."
     },
     "linkPasteClipboardEmpty": "Il-klibbord huwa vojt.",
+    "linkPasteDenied": "L-aċċess għat-twaħħil ġie miċħud. Ippermetti t-twaħħil u erġa' pprova.",
     "linkPasteNotAPullRequest": "Din mhix ħolqa ta' PR jew merge request",
     "announce": {
       "commentPosted": "Il-kumment ġie ppubblikat",

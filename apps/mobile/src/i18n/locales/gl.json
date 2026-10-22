@@ -762,6 +762,7 @@
       "truncationBanner_other": "Amósanse os primeiros {{limit}} de {{total}} ficheiros modificados polo límite da API de GitHub."
     },
     "linkPasteClipboardEmpty": "O portapapeis está baleiro.",
+    "linkPasteDenied": "Denegouse o acceso para pegar. Permite pegar e vólvao intentar.",
     "linkPasteNotAPullRequest": "Non é unha ligazón a unha solicitude de integración ou de fusión",
     "announce": {
       "commentPosted": "Comentario publicado",

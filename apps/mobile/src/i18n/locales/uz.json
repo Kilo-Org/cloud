@@ -762,6 +762,7 @@
       "truncationBanner_other": "O'zgargan {{total}} ta fayldan dastlabki {{limit}} tasi ko'rsatilmoqda — bu GitHub API cheklovi."
     },
     "linkPasteClipboardEmpty": "Nusxalash buferi bo'sh.",
+    "linkPasteDenied": "Joylashga kirish rad etildi. Joylashga ruxsat bering va qaytadan urinib ko'ring.",
     "linkPasteNotAPullRequest": "Bu PR yoki merge so‘rovi havolasi emas",
     "announce": {
       "commentPosted": "Izoh joylashtirildi",

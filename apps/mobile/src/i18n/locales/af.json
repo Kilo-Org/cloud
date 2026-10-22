@@ -762,6 +762,7 @@
       "truncationBanner_other": "Die eerste {{limit}} van {{total}} gewysigde lêers word vertoon — dit is die GitHub-API se limiet."
     },
     "linkPasteClipboardEmpty": "Die knipbord is leeg.",
+    "linkPasteDenied": "Toegang om te plak is geweier. Laat plak toe en probeer weer.",
     "linkPasteNotAPullRequest": "Dit is nie 'n skakel na 'n trekversoek of merge request nie",
     "announce": {
       "commentPosted": "Kommentaar geplaas",

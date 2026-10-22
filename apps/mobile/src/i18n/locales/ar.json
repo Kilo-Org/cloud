@@ -3125,6 +3125,7 @@
       "truncationBanner_many": "نعرض أول {{limit}} ملفًا من الملفات التي تغيّرت، وعددها {{total}}، بسبب حد API لدى GitHub."
     },
     "linkPasteClipboardEmpty": "الحافظة فارغة.",
+    "linkPasteDenied": "تم رفض الوصول للصق. اسمح باللصق وحاول مرة أخرى.",
     "linkPasteNotAPullRequest": "هذا ليس رابط طلب سحب أو طلب دمج",
     "announce": {
       "commentPosted": "تم نشر التعليق",

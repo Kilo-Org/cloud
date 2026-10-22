@@ -762,6 +762,7 @@
       "truncationBanner_other": "به‌دلیل محدودیت API در GitHub، فقط {{limit}} فایل اول از {{total}} فایل تغییریافته نمایش داده می‌شود."
     },
     "linkPasteClipboardEmpty": "کلیپ‌بورد خالی است.",
+    "linkPasteDenied": "دسترسی برای چسباندن رد شد. اجازهٔ چسباندن را بدهید و دوباره تلاش کنید.",
     "linkPasteNotAPullRequest": "این پیوند مربوط به پول ریکوئست یا درخواست ادغام نیست.",
     "announce": {
       "commentPosted": "نظر ارسال شد",

@@ -778,6 +778,7 @@
       "truncationBanner_many": "A causa del límit de l'API de GitHub, només es mostren els primers {{limit}} de {{total}} fitxers modificats."
     },
     "linkPasteClipboardEmpty": "El porta-retalls és buit.",
+    "linkPasteDenied": "S'ha denegat l'accés per enganxar. Permeteu enganxar i torneu-ho a provar.",
     "linkPasteNotAPullRequest": "No és un enllaç a una sol·licitud d'integració o de fusió",
     "announce": {
       "commentPosted": "Comentari publicat",

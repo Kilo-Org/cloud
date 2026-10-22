@@ -778,6 +778,7 @@
       "truncationBanner_zero": "GitHub API ierobežojuma dēļ tiek rādīti tikai pirmie {{limit}} no {{total}} mainītajiem failiem."
     },
     "linkPasteClipboardEmpty": "Starpliktuve ir tukša.",
+    "linkPasteDenied": "Ielīmēšanas piekļuve tika liegta. Atļaujiet ielīmēšanu un mēģiniet vēlreiz.",
     "linkPasteNotAPullRequest": "Šī nav izmaiņu pieprasījuma vai merge request saite",
     "announce": {
       "commentPosted": "Komentārs publicēts",

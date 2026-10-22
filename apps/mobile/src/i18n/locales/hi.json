@@ -2965,6 +2965,7 @@
       "truncationBanner_other": "बदली गई {{total}} फ़ाइलों में से पहली {{limit}} फ़ाइलें दिखाई जा रही हैं — GitHub API की सीमा के कारण।"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली है।",
+    "linkPasteDenied": "पेस्ट करने की अनुमति अस्वीकार कर दी गई। पेस्ट करने की अनुमति दें और फिर से कोशिश करें।",
     "linkPasteNotAPullRequest": "यह पुल रिक्वेस्ट या मर्ज रिक्वेस्ट का लिंक नहीं है",
     "announce": {
       "commentPosted": "टिप्पणी पोस्ट हुई",

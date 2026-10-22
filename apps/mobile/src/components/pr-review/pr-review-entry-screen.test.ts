@@ -11,11 +11,14 @@ import {
   resetHookSlots,
   seedRecents,
 } from './pr-review-entry-screen-test-utils';
+import { prLinkDraft } from '@/lib/pr-review/pr-link-draft';
 
 beforeEach(() => {
   vi.clearAllMocks();
   resetHookSlots();
   mocks.clipboard.current = '';
+  mocks.clipboardHasString.current = false;
+  prLinkDraft.text = '';
   seedRecents([]);
 });
 
@@ -196,6 +199,81 @@ describe('provider-neutral URL field', () => {
       '/(app)/pr-review/gitlab/acme/api/3?instance=https%3A%2F%2Fgitlab.com'
     );
     expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+
+  it('reports a denied paste instead of an empty clipboard', async () => {
+    mocks.clipboard.current = '';
+    mocks.clipboardHasString.current = true;
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      'Paste access was denied. Allow paste and try again.'
+    );
+    expect(mocks.toastError).not.toHaveBeenCalledWith('Clipboard is empty');
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('keeps the empty-clipboard copy when the clipboard has no text either', async () => {
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.toastError).toHaveBeenCalledWith('Clipboard is empty');
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('keeps the pasted link and Open enabled when the entry screen remounts', async () => {
+    const link = 'https://gitlab.com/acme/api/-/merge_requests/3';
+    mocks.clipboard.current = link;
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.push).toHaveBeenCalledWith(
+      '/(app)/pr-review/gitlab/acme/api/3?instance=https%3A%2F%2Fgitlab.com'
+    );
+
+    resetHookSlots();
+    const remounted = render();
+    expect(find(remounted, 'Input', () => true).props?.defaultValue).toBe(link);
+    expect(
+      find(remounted, 'Button', p => p.accessibilityLabel === 'Open pull request or merge request')
+        .props?.disabled
+    ).toBe(false);
+    expect(findAll(remounted, 'PrLinkPlaceholder')).toHaveLength(0);
+  });
+
+  it('drops the stored link when the clear control empties the field', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)(
+      'https://github.com/octocat/hello-world/pull/42'
+    );
+    const withText = render();
+    const clear = find(withText, 'Pressable', p => p.accessibilityLabel === 'Clear link');
+    (propsOf(clear).onPress as () => void)();
+
+    resetHookSlots();
+    const remounted = render();
+    expect(find(remounted, 'Input', () => true).props?.defaultValue).toBe('');
+    expect(
+      find(remounted, 'Button', p => p.accessibilityLabel === 'Open pull request or merge request')
+        .props?.disabled
+    ).toBe(true);
   });
 
   it('paste of plain text shows inline feedback without navigating', async () => {

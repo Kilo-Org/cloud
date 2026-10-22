@@ -2965,6 +2965,7 @@
       "truncationBanner_other": "Aufgrund einer Begrenzung der GitHub-API werden nur die ersten {{limit}} von {{total}} geänderten Dateien angezeigt."
     },
     "linkPasteClipboardEmpty": "Die Zwischenablage ist leer.",
+    "linkPasteDenied": "Der Zugriff zum Einfügen wurde abgelehnt. Erlaube das Einfügen und versuche es erneut.",
     "linkPasteNotAPullRequest": "Dieser Link führt nicht zu einem Pull-Request oder Merge-Request.",
     "announce": {
       "commentPosted": "Kommentar veröffentlicht",

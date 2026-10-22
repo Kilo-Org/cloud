@@ -3005,6 +3005,7 @@
       "truncationBanner_many": "Sono visualizzati i primi {{limit}} file modificati su {{total}}, per un limite dell'API di GitHub."
     },
     "linkPasteClipboardEmpty": "Gli appunti sono vuoti.",
+    "linkPasteDenied": "L'accesso per incollare è stato negato. Consenti di incollare e riprova.",
     "linkPasteNotAPullRequest": "Non è un collegamento a una pull request o merge request",
     "announce": {
       "commentPosted": "Commento pubblicato",

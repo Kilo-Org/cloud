@@ -762,6 +762,7 @@
       "truncationBanner_other": "Ցուցադրվում են փոփոխված {{total}} ֆայլից առաջին {{limit}}-ը՝ GitHub API-ի սահմանափակման պատճառով։"
     },
     "linkPasteClipboardEmpty": "Սեղմատախտակը դատարկ է։",
+    "linkPasteDenied": "Տեղադրման հասանելիությունը մերժվեց. Թույլատրեք տեղադրումը և կրկին փորձեք.",
     "linkPasteNotAPullRequest": "Սա միավորման կամ միաձուլման հարցման հղում չէ",
     "announce": {
       "commentPosted": "Մեկնաբանությունը հրապարակվել է",

@@ -762,6 +762,7 @@
       "truncationBanner_other": "GitHub API పరిమితి కారణంగా మారిన {{total}} ఫైళ్లలో మొదటి {{limit}} ఫైళ్లను మాత్రమే చూపిస్తున్నాము."
     },
     "linkPasteClipboardEmpty": "క్లిప్‌బోర్డ్ ఖాళీగా ఉంది.",
+    "linkPasteDenied": "పేస్ట్ చేసే యాక్సెస్ తిరస్కరించబడింది. పేస్ట్‌ను అనుమతించి మళ్లీ ప్రయత్నించండి.",
     "linkPasteNotAPullRequest": "ఇది పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్ లింక్ కాదు",
     "announce": {
       "commentPosted": "వ్యాఖ్య పోస్ట్ చేయబడింది",

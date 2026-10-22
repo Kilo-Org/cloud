@@ -2965,6 +2965,7 @@
       "truncationBanner_other": "Đang hiển thị {{limit}} tệp đầu tiên trong số {{total}} tệp đã thay đổi do giới hạn API của GitHub."
     },
     "linkPasteClipboardEmpty": "Bộ nhớ tạm trống.",
+    "linkPasteDenied": "Quyền truy cập để dán đã bị từ chối. Cho phép dán và thử lại.",
     "linkPasteNotAPullRequest": "Đây không phải là liên kết PR hoặc merge request",
     "announce": {
       "commentPosted": "Đã đăng bình luận",

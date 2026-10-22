@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
-  effectiveAppTypeCondition,
   lockGitHubInstallationIdentity,
   observeGitHubInstallationLifecycle,
 } from '@/lib/integrations/db/github-installations';
+import { effectiveAppTypeCondition } from '@/lib/integrations/db/predicates';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, ne } from 'drizzle-orm';

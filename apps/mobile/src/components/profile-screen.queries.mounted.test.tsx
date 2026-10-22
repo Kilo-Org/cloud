@@ -17,8 +17,10 @@ import {
   nodeCount,
   nodeCountWithChildren,
   organizationsQueryFn,
+  organizationState,
   providersQueryFn,
   routerPush,
+  setOrganizationIdFn,
   signOutFn,
 } from '@/components/profile-screen.test-helpers';
 import { i18n } from '@/i18n';
@@ -41,6 +43,9 @@ describe('ProfileScreen deferred queries', () => {
     interactionState.cancel.mockReset();
     getProfileAgentScopeMock.mockReset();
     getProfileAgentScopeMock.mockReturnValue('personal');
+    organizationState.organizationId = 'org-1';
+    organizationState.isLoaded = true;
+    setOrganizationIdFn.mockReset();
   });
 
   it('defers both queries until interactions settle, showing the skeleton first', async () => {

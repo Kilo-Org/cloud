@@ -1,13 +1,17 @@
+FROM node:22-bookworm-slim AS node-runtime
+
 FROM docker.io/cloudflare/sandbox:0.6.11
+
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack
+COPY --from=node-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
 
 # Set command timeout to 10 min
 ENV COMMAND_TIMEOUT_MS=600000
 
-# Install package managers globally (these work across node versions)
-RUN npm install -g pnpm yarn
-
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
     jq \
     git-lfs \
     build-essential \
@@ -17,7 +21,11 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev \
     libyaml-dev \
     libffi-dev \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# Install package managers globally (these work across node versions)
+RUN npm install -g pnpm yarn
 
 # Install mise (modern replacement for asdf)
 RUN curl https://mise.run | sh && \
@@ -28,7 +36,7 @@ ENV PATH="/root/.local/bin:${PATH}"
 # These are fallback versions when .tool-versions is not present
 # Users can override by providing .tool-versions in their project
 
-# Node.js versions (18, 20, 22, 24)
+# Node 18/20 remain customer targets, but have no supported eMudhra verifier fix.
 RUN mise install node@18 node@20 node@22 node@24
 
 # Ruby versions (3.2, 3.3)

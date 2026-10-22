@@ -57,7 +57,7 @@ function createMetadata(provider: 'cloudflare' | 'vercel' = 'cloudflare'): Sessi
     },
     auth: {
       kiloSessionId: 'kilo_runtime',
-      kilocodeToken: 'kilo_token',
+      kilocodeToken: 'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln',
     },
     lifecycle: {
       version: 1,
@@ -69,6 +69,7 @@ function createMetadata(provider: 'cloudflare' | 'vercel' = 'cloudflare'): Sessi
       workspacePath: '/workspace/runtime',
       sessionHome: '/home/agent_runtime',
       branchName: 'main',
+      credentialContainment: { github: false, gitlab: false, kilocode: true },
     },
   } satisfies SessionMetadata;
 }
@@ -500,8 +501,15 @@ describe('AgentRuntime', () => {
       storage,
       env: {
         WORKER_URL: 'https://worker.example.com',
+        CLOUD_AGENT_SESSION: {
+          idFromName: vi.fn(),
+          get: () => ({ issueRuntimeCredentialProxyGrant: async () => 'runtime-proxy-handle' }),
+        },
         NEXTAUTH_SECRET: 'test-secret',
         SandboxSmall: { idFromName: () => ({ toString: () => 'container-id' }) },
+        SandboxSmallContainment: {
+          idFromName: () => ({ toString: () => 'containment-container-id' }),
+        },
         GIT_TOKEN_SERVICE: {
           issueKiloSessionCapability: async () => ({ success: true, capability: 'kka1.test' }),
         },
@@ -566,8 +574,15 @@ describe('AgentRuntime', () => {
       storage,
       env: {
         WORKER_URL: 'https://worker.example.com',
+        CLOUD_AGENT_SESSION: {
+          idFromName: vi.fn(),
+          get: () => ({ issueRuntimeCredentialProxyGrant: async () => 'runtime-proxy-handle' }),
+        },
         NEXTAUTH_SECRET: 'test-secret',
         SandboxSmall: { idFromName: () => ({ toString: () => 'container-id' }) },
+        SandboxSmallContainment: {
+          idFromName: () => ({ toString: () => 'containment-container-id' }),
+        },
         GIT_TOKEN_SERVICE: {
           issueKiloSessionCapability: async () => ({ success: true, capability: 'kka1.test' }),
         },
@@ -630,8 +645,15 @@ describe('AgentRuntime', () => {
       storage,
       env: {
         WORKER_URL: 'https://worker.example.com',
+        CLOUD_AGENT_SESSION: {
+          idFromName: vi.fn(),
+          get: () => ({ issueRuntimeCredentialProxyGrant: async () => 'runtime-proxy-handle' }),
+        },
         NEXTAUTH_SECRET: 'test-secret',
         SandboxSmall: { idFromName: () => ({ toString: () => 'container-id' }) },
+        SandboxSmallContainment: {
+          idFromName: () => ({ toString: () => 'containment-container-id' }),
+        },
         GIT_TOKEN_SERVICE: {
           issueKiloSessionCapability: async () => ({ success: true, capability: 'kka1.test' }),
         },

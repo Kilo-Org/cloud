@@ -25,6 +25,8 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_MCP_SERVERS: AgentProfileDetail['mcpServers'] = [];
@@ -71,11 +73,19 @@ function McpServerRowView({
           </Text>
           {secretCount > 0 ? (
             <View
-              className="flex-row items-center gap-0.5"
-              accessibilityLabel={t('profiles.mcp.secretCount')}
+              accessible
+              accessibilityRole="text"
+              accessibilityLabel={t('profiles.mcp.secretCount', { count: secretCount })}
+              className="flex-row items-center"
             >
-              <Lock size={12} color={colors.mutedForeground} />
-              <Text className="text-xs text-muted-foreground">{secretCount}</Text>
+              <View
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                className="flex-row items-center gap-0.5"
+              >
+                <Lock size={12} color={colors.mutedForeground} />
+                <Text className="text-xs text-muted-foreground">{secretCount}</Text>
+              </View>
             </View>
           ) : null}
         </View>
@@ -93,7 +103,7 @@ function McpServerRowView({
       />
       {onEdit !== undefined ? (
         <Pressable
-          className="h-11 w-11 items-center justify-center active:opacity-70"
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
           accessibilityLabel={t('profiles.mcp.edit')}
           onPress={onEdit}
@@ -103,7 +113,7 @@ function McpServerRowView({
       ) : null}
       {onDelete !== undefined ? (
         <Pressable
-          className="h-11 w-11 items-center justify-center active:opacity-70"
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
           accessibilityLabel={t('common.delete')}
           onPress={onDelete}

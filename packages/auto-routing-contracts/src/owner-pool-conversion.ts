@@ -107,9 +107,10 @@ export type ConvertedOwnerPoolRouter = {
 export function convertedOwnerPoolRouter(
   conversion: OwnerPoolConversion
 ): ConvertedOwnerPoolRouter {
-  const entries = conversion.models.map(
-    (model): GatewayCustomRouterEntry => ({ kind: 'gateway', model })
-  );
+  const entries = conversion.models.map((model): GatewayCustomRouterEntry => ({
+    kind: 'gateway',
+    model,
+  }));
   const [first] = entries;
   if (!first) throw new Error('An owner pool conversion needs at least one model');
   return {

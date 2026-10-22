@@ -897,7 +897,7 @@
     },
     "autoReviews": "Revisiones automáticas",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no está conectado. Solo los propietarios de la organización y los administradores de facturación pueden conectarlo.",
+      "notConnectedReadOnly": "Bitbucket no está conectado. Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo.",
       "setupIncomplete": "La configuración está incompleta. Complétala en kilo.ai.",
       "setup": "Configuración de Bitbucket"
     },
@@ -921,7 +921,10 @@
       "starting": "Iniciando revisión…",
       "title": "Revisión manual"
     },
-    "notConnectedReadOnly": "{{platform}} no está conectado. Solo los propietarios de la organización y los administradores de facturación pueden conectarlo.",
+    "notConnectedReadOnly": "{{platform}} no está conectado. Solo los propietarios de la organización y los administradores pueden conectarlo.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} no está conectado. Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que lo conecte."
+    },
     "platformList": {
       "activity": "Actividad",
       "checking": "Comprobando…",
@@ -1000,7 +1003,7 @@
       "off": "La memoria de revisión está desactivada.",
       "on": "La memoria de revisión está activada.",
       "offDescription": "Actívala para que Kilo aprenda de las respuestas de los responsables del mantenimiento y proponga directrices para REVIEW.md.",
-      "readOnlyDescription": "Solo los propietarios de la organización y los administradores de facturación pueden cambiar la memoria de revisión.",
+      "readOnlyDescription": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden cambiar la memoria de revisión.",
       "title": "Memoria de revisiones"
     },
     "scopeList": {
@@ -1152,7 +1155,7 @@
       "summary": "Resumen del informe",
       "title": "Informe de auditoría",
       "unavailable": "Informe de auditoría no disponible",
-      "unavailableDescription": "Solo los propietarios de la organización y los administradores de facturación pueden ver los informes de auditoría. Pide a un propietario o a un administrador de facturación que te dé acceso.",
+      "unavailableDescription": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden ver los informes de auditoría. Pide a un propietario, a un administrador o a un gestor de facturación que te dé acceso.",
       "eventActions": {
         "findingAnalysisCompleted": "Análisis completado",
         "findingAnalysisFailed": "Error en el análisis",
@@ -1269,7 +1272,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Este hallazgo ya está resuelto y no se puede descartar.",
-      "cannotDismissDescription": "Solo los propietarios de la organización y los administradores de facturación pueden descartar hallazgos.",
+      "cannotDismissDescription": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden descartar hallazgos.",
       "cannotDismissTitle": "No se puede descartar este hallazgo",
       "commentAccessibility": "Comentario del descarte",
       "commentLabel": "Comentario (opcional)",
@@ -1401,7 +1404,7 @@
       "automationCount": "{{displayCount}} de 3 activadas",
       "couldNotLoadPermissions": "No se pudieron cargar los permisos.",
       "couldNotLoadSettings": "No se pudieron cargar los ajustes del agente de seguridad.",
-      "disabledNoManage": "El agente de seguridad está desactivado. Solo los propietarios de la organización y los administradores de facturación pueden activarlo.",
+      "disabledNoManage": "El agente de seguridad está desactivado. Solo los propietarios de la organización, los administradores y los gestores de facturación pueden activarlo.",
       "disabledNoRepo": "Selecciona al menos un repositorio antes de activar el agente de seguridad.",
       "disabledPrompt": "Activa el agente de seguridad para sincronizar las alertas de Dependabot, elegir repositorios y configurar la automatización.",
       "notificationsCount": "{{displayCount}} de 2 activadas",
@@ -1435,7 +1438,7 @@
       "lowDescription": "Impacto mínimo en la seguridad.",
       "medium": "Nivel medio",
       "mediumDescription": "Impacto limitado o condiciones específicas.",
-      "permissionNote": "Solo los propietarios de la organización y los administradores de facturación pueden cambiar estos ajustes.",
+      "permissionNote": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden cambiar estos ajustes.",
       "remediationDeadlineA11y": "Plazo de corrección en días para gravedad {{label}}",
       "title": "Política de SLA"
     },
@@ -1741,6 +1744,8 @@
       "commitAndPush": "Confirmar y subir",
       "startSession": "Empezar sesión",
       "selectRepositoryToStart": "Selecciona un repositorio para empezar.",
+      "enterPromptToStart": "Añade un prompt para empezar.",
+      "enterPromptOrFileToStart": "Añade un prompt o un archivo para empezar.",
       "connectProviderToStart": "Conecta un proveedor para empezar.",
       "promptPlaceholder": "¿En qué te gustaría trabajar?",
       "couldNotLoadModels": "No se pudieron cargar los modelos.",
@@ -2575,6 +2580,8 @@
     },
     "connectionExpired": "La conexión con GitHub ha caducado.",
     "couldNotLoadPullRequest": "No se pudo cargar la PR.",
+    "reviewServiceUnavailable": "Servicio no disponible",
+    "reviewServiceUnavailableDescription": "El servicio no está disponible temporalmente. Inténtalo de nuevo en unos momentos.",
     "couldNotOpenGitHubAppSettings": "No se pudieron abrir los ajustes de la aplicación de GitHub.",
     "description": "Descripción",
     "discussion": {
@@ -3000,6 +3007,7 @@
       "truncationBanner_many": "Se muestran los primeros {{limit}} de {{total}} archivos modificados debido al límite de la API de GitHub."
     },
     "linkPasteClipboardEmpty": "El portapapeles está vacío.",
+    "linkPasteDenied": "Se denegó el permiso para pegar. Permite pegar e inténtalo de nuevo.",
     "linkPasteNotAPullRequest": "No es un enlace a una PR o una merge request",
     "announce": {
       "commentPosted": "Comentario publicado",
@@ -3054,6 +3062,7 @@
 
       "chooseAccount": "Elegir una cuenta",
       "loadErrorTitle": "No se pudieron cargar tus organizaciones.",
+      "membershipLostNotice": "Ya no tienes acceso a esta organización. Cambiado a {{target}}.",
       "noOrganization": "Sin organización",
 
       "noOrganizationDescription": "Esta cuenta no forma parte de una organización. Crea una o únete a una en la web para usar funciones de organización como invitaciones de miembros y alertas de saldo bajo.",
@@ -3146,7 +3155,7 @@
     "members": {
       "changeRole": "Cambiar rol",
       "emptyDescriptionCanInvite": "Invita a tus compañeros de equipo para empezar a colaborar en esta organización.",
-      "emptyDescriptionCannotInvite": "Pide a un propietario o a un gestor de facturación que invite a tus compañeros de equipo.",
+      "emptyDescriptionCannotInvite": "Pide a un propietario, a un administrador o a un gestor de facturación que invite a tus compañeros de equipo.",
       "emptyTitle": "Aún no hay miembros",
       "invitedDate": "Invitación enviada el {{date}}",
       "limitPerDay": "{{amount}}/día",
@@ -3412,7 +3421,9 @@
       "settingsToolsOn": "Activado — las herramientas de configuración se envían al modelo",
       "settingsToolsOff": "Desactivado — no se envía ninguna herramienta de configuración al modelo",
       "serverChecking": "Comprobando este servidor…",
-      "serverToolCount": "{{count}} herramientas",
+      "serverToolCount_many": "{{count}} herramientas",
+      "serverToolCount_one": "{{count}} herramienta",
+      "serverToolCount_other": "{{count}} herramientas",
       "serverUnreachable": "No se pudo contactar con este servidor",
       "serverOff": "Este servidor está desactivado"
     },
@@ -3559,6 +3570,8 @@
       "quantizationsHelp": "Los archivos más pequeños usan menos memoria y almacenamiento. Los más grandes suelen dar mejores respuestas.",
       "quantDetail": "Descarga de {{size}} · unos {{memory}} de memoria",
       "downloadQuant": "Descargar {{quant}}",
+      "downloadModelA11y": "Descargar {{name}}",
+      "detailsA11y": "Detalles: {{name}}",
       "loadingModel": "Cargando detalles del modelo",
       "couldNotLoadModel": "No se pudo cargar este modelo",
       "noFiles": "No hay archivos que esta app pueda ejecutar",
@@ -3610,6 +3623,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Iniciar agente necesita instrucciones. Añade unas instrucciones y vuelve a ejecutarlo.",
+      "repositoryRequired": "Iniciar agente necesita un repositorio. Abre Kilo, elige uno y vuelve a ejecutarlo.",
       "repositoryUnknown": "Kilo no reconoce {{repository}} como un repositorio de GitHub o GitLab. Elige otro repositorio en Kilo.",
       "repositoryUnsupported": "{{repository}} es un repositorio de Bitbucket — Iniciar agente aún no puede usarlo. Elige otro repositorio en Kilo."
     }
@@ -3647,10 +3661,16 @@
     "emptyDescription": "Cree un perfil para reutilizar variables de entorno, comandos de configuración y habilidades en todas las sesiones.",
     "loadFailed": "No se pudieron cargar perfiles",
     "counts": {
-      "vars": "{{count}} variables",
+      "vars_many": "{{count}} variables",
+      "vars_one": "{{count}} variable",
+      "vars_other": "{{count}} variables",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} habilidades",
-      "commands": "{{count}} comandos",
+      "skills_many": "{{count}} habilidades",
+      "skills_one": "{{count}} habilidad",
+      "skills_other": "{{count}} habilidades",
+      "commands_many": "{{count}} comandos",
+      "commands_one": "{{count}} comando",
+      "commands_other": "{{count}} comandos",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}h",
       "commandsShort": "{{count}}c"
@@ -3724,7 +3744,7 @@
       "environment": "Entorno (JSON)",
       "headers": "Encabezados (JSON)",
       "timeout": "Se acabó el tiempo",
-      "secretCount": "recuento secreto",
+      "secretCount": "recuento secreto: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3767,6 +3787,9 @@
       "visibilityPrimary": "Primario: se muestra en el selector",
       "visibilitySubagent": "Subagente: solo puede ser invocado por otros",
       "visibilityAll": "Todos - ambos",
+      "modePrimary": "Solo primario",
+      "modeSubagent": "Solo subagente",
+      "modeAll": "Todos",
       "saveFailed": "No se pudo guardar al agente",
       "deleteFailed": "No se pudo eliminar al agente",
       "nameRequired": "Ingrese el nombre de un agente",
@@ -3827,6 +3850,8 @@
     "empty": "Los paquetes de créditos no están disponibles ahora mismo.",
     "noMatchingProducts": "La App Store no devolvió ningún paquete de créditos coincidente.",
     "noMatchingProductsPlay": "Google Play no devolvió ningún paquete de créditos coincidente.",
+    "storeTimedOut": "App Store no respondió a tiempo. Volver a intentarlo.",
+    "storeTimedOutPlay": "Google Play no respondió a tiempo. Volver a intentarlo.",
     "purchaseOwnedByAnotherAccount": "El crédito de esta cuenta de Apple pertenece a una cuenta de Kilo diferente. Inicia sesión en esa cuenta de Kilo para usarlo.",
     "purchaseOwnedByAnotherAccountPlay": "El crédito de esta cuenta de Google Play pertenece a una cuenta de Kilo diferente. Inicia sesión en esa cuenta de Kilo para usarlo."
   },

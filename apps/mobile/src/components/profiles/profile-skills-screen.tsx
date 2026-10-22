@@ -21,6 +21,8 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_SKILLS: AgentProfileDetail['skills'] = [];
@@ -70,7 +72,7 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
       />
       {onEdit !== undefined ? (
         <Pressable
-          className="h-11 w-11 items-center justify-center active:opacity-70"
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
           accessibilityLabel={t('profiles.skillEditTitle')}
           onPress={onEdit}
@@ -80,7 +82,7 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
       ) : null}
       {onDelete !== undefined ? (
         <Pressable
-          className="h-11 w-11 items-center justify-center active:opacity-70"
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
           accessibilityLabel={t('common.delete')}
           onPress={onDelete}

@@ -288,6 +288,25 @@ describe('ProfileMcpScreen', () => {
     unmount();
   });
 
+  it('a11y: the secret badge is one counted node and the lock glyph is hidden', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const badge = findAll(renderer.root, 'View').find(node =>
+      String(node.props.accessibilityLabel ?? '').startsWith('Secret count:')
+    );
+    expect(badge?.props.accessibilityLabel).toBe('Secret count: 1');
+    expect(badge?.props.accessible).toBe(true);
+    expect(findOne(renderer.root, 'Lock').parent?.props).toMatchObject({
+      accessibilityElementsHidden: true,
+      importantForAccessibility: 'no-hide-descendants',
+    });
+
+    unmount();
+  });
+
   it('happy: confirming delete calls deleteMcp', async () => {
     h.query.data = testProfile([testServer()]);
     h.query.isPending = false;

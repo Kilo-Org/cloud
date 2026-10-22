@@ -10,6 +10,7 @@ import { useOpenToolRun } from './open-tool-run-context';
 import { buildToolRunCountLabel, buildToolRunLabel, buildToolRunRows } from './session-tool-run';
 import { getToolDisplay } from './tool-card-display';
 import { getToolRowIcon } from './tool-row-icon';
+import { toolStatusLabel } from './tool-status-label';
 import { ToolSummaryTranslationScope } from './tool-summary-translation-scope';
 
 /**
@@ -42,7 +43,7 @@ export function ToolOneLineRow({
         status={part.state.status}
         accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
           name: label,
-          status: part.state.status,
+          status: toolStatusLabel(t, part.state.status),
         })}
         onPress={onPress ?? defaultPress}
       />

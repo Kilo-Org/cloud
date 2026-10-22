@@ -894,7 +894,7 @@
     },
     "autoReviews": "自动审查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者和账单管理员可以完成连接。",
+      "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者、管理员和账单管理员可以完成连接。",
       "setupIncomplete": "配置尚未完成。请在 kilo.ai 上完成配置。",
       "setup": "Bitbucket 设置"
     },
@@ -918,7 +918,10 @@
       "starting": "正在启动审查…",
       "title": "手动审查"
     },
-    "notConnectedReadOnly": "尚未连接 {{platform}}。只有组织所有者和账单管理员可以完成连接。",
+    "notConnectedReadOnly": "尚未连接 {{platform}}。只有组织所有者和管理员可以完成连接。",
+    "gitlab": {
+      "notConnectedReadOnly": "尚未连接 {{platform}}。请让组织所有者、管理员或账单管理员进行连接。"
+    },
     "platformList": {
       "activity": "活动",
       "checking": "正在检查…",
@@ -997,7 +1000,7 @@
       "off": "审查记忆已关闭。",
       "on": "审查记忆已开启。",
       "offDescription": "启用审查记忆后，Kilo 可以从维护者的回复中学习，并为 REVIEW.md 提出审查准则建议。",
-      "readOnlyDescription": "只有组织所有者和账单管理员可以更改审查记忆。",
+      "readOnlyDescription": "只有组织所有者、管理员和账单管理员可以更改审查记忆。",
       "title": "审查记忆"
     },
     "scopeList": {
@@ -1149,7 +1152,7 @@
       "summary": "报告摘要",
       "title": "审计报告",
       "unavailable": "审计报告不可用",
-      "unavailableDescription": "只有组织所有者和账单管理员可以查看审计报告。请联系组织所有者或账单管理员获取访问权限。",
+      "unavailableDescription": "只有组织所有者、管理员和账单管理员可以查看审计报告。请联系组织所有者、管理员或账单管理员获取访问权限。",
       "eventActions": {
         "findingAnalysisCompleted": "分析已完成",
         "findingAnalysisFailed": "分析失败",
@@ -1263,7 +1266,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "此安全问题已解决，无法再执行忽略操作。",
-      "cannotDismissDescription": "只有组织所有者和账单管理员可以忽略安全问题。",
+      "cannotDismissDescription": "只有组织所有者、管理员和账单管理员可以忽略安全问题。",
       "cannotDismissTitle": "无法忽略此安全问题",
       "commentAccessibility": "忽略备注",
       "commentLabel": "备注（可选）",
@@ -1395,7 +1398,7 @@
       "automationCount": "已启用 {{displayCount}}/3 项",
       "couldNotLoadPermissions": "无法加载权限信息。",
       "couldNotLoadSettings": "无法加载安全智能体设置。",
-      "disabledNoManage": "安全智能体已禁用。只有组织所有者和账单管理员可以启用。",
+      "disabledNoManage": "安全智能体已禁用。只有组织所有者、管理员和账单管理员可以启用。",
       "disabledNoRepo": "启用安全智能体前，请至少选择一个仓库。",
       "disabledPrompt": "启用安全智能体，即可同步 Dependabot 警报、选择仓库并配置自动化。",
       "notificationsCount": "已启用 {{displayCount}}/2 项",
@@ -1428,7 +1431,7 @@
       "lowDescription": "对安全的影响极小。",
       "medium": "中",
       "mediumDescription": "影响有限，或需满足特定条件才能利用。",
-      "permissionNote": "只有组织所有者和账单管理员可以更改这些设置。",
+      "permissionNote": "只有组织所有者、管理员和账单管理员可以更改这些设置。",
       "remediationDeadlineA11y": "{{label}}修复期限，单位为天",
       "title": "SLA 策略"
     },
@@ -1729,6 +1732,8 @@
       "commitAndPush": "提交并推送",
       "startSession": "开始会话",
       "selectRepositoryToStart": "选择仓库以开始。",
+      "enterPromptToStart": "添加提示词以开始。",
+      "enterPromptOrFileToStart": "添加提示词或文件以开始。",
       "connectProviderToStart": "连接代码托管平台以开始。",
       "promptPlaceholder": "你想完成什么任务？",
       "couldNotLoadModels": "无法加载模型。",
@@ -2550,6 +2555,8 @@
     },
     "connectionExpired": "GitHub 连接已过期。",
     "couldNotLoadPullRequest": "无法加载拉取请求。",
+    "reviewServiceUnavailable": "评审服务不可用",
+    "reviewServiceUnavailableDescription": "评审服务暂时不可用。请稍后重试。",
     "couldNotOpenGitHubAppSettings": "无法打开 GitHub 应用设置。",
     "description": "描述",
     "discussion": {
@@ -2960,6 +2967,7 @@
       "truncationBanner_other": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个。"
     },
     "linkPasteClipboardEmpty": "剪贴板为空。",
+    "linkPasteDenied": "粘贴访问被拒绝。请允许粘贴后重试。",
     "linkPasteNotAPullRequest": "不是拉取请求或合并请求链接",
     "announce": {
       "commentPosted": "评论已发布",
@@ -3014,6 +3022,7 @@
 
       "chooseAccount": "选择账户",
       "loadErrorTitle": "无法加载你的组织列表。",
+      "membershipLostNotice": "你已无法访问此组织。已切换至 {{target}}。",
       "noOrganization": "无组织",
 
       "noOrganizationDescription": "此账户不属于任何组织。请在网页版创建或加入组织，以使用成员邀请和低余额提醒等组织功能。",
@@ -3106,7 +3115,7 @@
     "members": {
       "changeRole": "更改角色",
       "emptyDescriptionCanInvite": "邀请同事，开始在此组织中协作。",
-      "emptyDescriptionCannotInvite": "请让所有者或账单管理员邀请同事。",
+      "emptyDescriptionCannotInvite": "请让所有者、管理员或账单管理员邀请同事。",
       "emptyTitle": "暂无成员",
       "invitedDate": "{{date}} 已邀请",
       "limitPerDay": "{{amount}}/天",
@@ -3371,7 +3380,8 @@
       "settingsToolsOn": "开启 — 设置工具会发送给模型",
       "settingsToolsOff": "关闭 — 不会向模型发送任何设置工具",
       "serverChecking": "正在检查此服务器…",
-      "serverToolCount": "{{count}} 个工具",
+      "serverToolCount_one": "{{count}} 个工具",
+      "serverToolCount_other": "{{count}} 个工具",
       "serverUnreachable": "无法连接此服务器",
       "serverOff": "此服务器已关闭"
     },
@@ -3518,6 +3528,8 @@
       "quantizationsHelp": "较小的文件占用更少的内存和存储空间。较大的文件通常能给出更好的回答。",
       "quantDetail": "下载大小 {{size}} · 约需 {{memory}} 内存",
       "downloadQuant": "下载 {{quant}}",
+      "downloadModelA11y": "下载 {{name}}",
+      "detailsA11y": "详情：{{name}}",
       "loadingModel": "正在加载模型详情",
       "couldNotLoadModel": "无法加载此模型",
       "noFiles": "没有此应用可运行的文件",
@@ -3569,6 +3581,7 @@
   "appActions": {
     "start": {
       "promptRequired": "启动智能体需要提示词。请添加提示词后重新运行。",
+      "repositoryRequired": "启动智能体需要一个仓库。请打开 Kilo，选择一个仓库，然后重新运行。",
       "repositoryUnknown": "Kilo 无法将 {{repository}} 识别为 GitHub 或 GitLab 仓库。请在 Kilo 中选择其他仓库。",
       "repositoryUnsupported": "{{repository}} 是 Bitbucket 仓库——启动智能体暂时无法使用它。请在 Kilo 中选择其他仓库。"
     }
@@ -3606,10 +3619,13 @@
     "emptyDescription": "创建配置文件以跨会话重复使用环境变量、设置命令和技能。",
     "loadFailed": "无法加载配置文件",
     "counts": {
-      "vars": "{{count}} 个变量",
+      "vars_one": "{{count}} 个变量",
+      "vars_other": "{{count}} 个变量",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} 个技能",
-      "commands": "{{count}} 个命令",
+      "skills_one": "{{count}} 个技能",
+      "skills_other": "{{count}} 个技能",
+      "commands_one": "{{count}} 个命令",
+      "commands_other": "{{count}} 个命令",
       "varsShort": "{{count}}变",
       "skillsShort": "{{count}}技",
       "commandsShort": "{{count}}命"
@@ -3683,7 +3699,7 @@
       "environment": "环境（JSON）",
       "headers": "标头 (JSON)",
       "timeout": "超时",
-      "secretCount": "密钥数量",
+      "secretCount": "密钥数量：{{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3726,6 +3742,9 @@
       "visibilityPrimary": "主要 — 显示在选择器中",
       "visibilitySubagent": "子代理——只能从其他人调用",
       "visibilityAll": "全部 — 两者",
+      "modePrimary": "仅主要",
+      "modeSubagent": "仅子代理",
+      "modeAll": "全部模式",
       "saveFailed": "无法保存代理",
       "deleteFailed": "无法删除代理",
       "nameRequired": "输入代理名称",
@@ -3786,6 +3805,8 @@
     "empty": "目前无法获取额度包。",
     "noMatchingProducts": "App Store 未返回匹配的额度包。",
     "noMatchingProductsPlay": "Google Play 未返回匹配的额度包。",
+    "storeTimedOut": "App Store 未及时响应。请再试一次。",
+    "storeTimedOutPlay": "Google Play 未及时响应。请再试一次。",
     "purchaseOwnedByAnotherAccount": "此 Apple Account 上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 账户上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。"
   },

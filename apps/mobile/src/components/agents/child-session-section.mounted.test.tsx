@@ -543,31 +543,39 @@ describe('ChildSessionSection live task status', () => {
     expect(statusBadge(renderer.root).props.children).toBe(i18n.t('common.running'));
     expect(textValues(renderer.root)).not.toContain(i18n.t('common.completed'));
   });
+});
 
-  it('draws and announces the status in the reader’s language', async () => {
-    const { storage } = await createTaskManager(
-      vi.fn<NonNullable<SessionManagerConfig['fetchSnapshotPage']>>()
-    );
-    feedTaskPart(storage, taskPart('running'), LIVE_RUNNING_AT);
-
-    const previousLanguage = i18n.language;
-    await act(async () => {
-      await i18n.changeLanguage('hu');
-    });
-    try {
-      const renderer = await renderCard(storedTaskPart(storage));
-      const badgeLabel = statusBadge(renderer.root).props.children;
-      expect(badgeLabel).toBe(i18n.t('common.running'));
-      expect(badgeLabel).not.toBe('Running');
-
-      const pressable = findByType(renderer.root, 'Pressable')[0];
-      const accessibilityLabel = pressable?.props.accessibilityLabel as string;
-      expect(accessibilityLabel).toContain(badgeLabel);
-      expect(accessibilityLabel).not.toContain('running');
-    } finally {
-      await act(async () => {
-        await i18n.changeLanguage(previousLanguage);
-      });
-    }
+// The card shows the SDK status as a word. A translated card must not carry an
+// English enum token in the badge or in the spoken card label, so each locale's
+// catalog copy is what both surfaces read.
+describe.each(['de', 'km'] as const)('ChildSessionSection status copy in %s', tag => {
+  beforeEach(async () => {
+    await i18n.changeLanguage(tag);
   });
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it.each([
+    ['pending', 'common.pending'],
+    ['running', 'common.running'],
+    ['completed', 'common.completed'],
+    ['error', 'common.failed'],
+  ] as const)(
+    'shows the catalog word for %s in the badge and the card label',
+    async (status, key) => {
+      const renderer = await renderCard(taskPart(status));
+      const button = findByType(renderer.root, 'Pressable')[0];
+      if (!button) {
+        throw new Error('card button was not rendered');
+      }
+      const expected = i18n.t(key);
+
+      expect(statusBadge(renderer.root).props.children).toBe(expected);
+      expect(button.props.accessibilityLabel).toContain(expected);
+      expect(button.props.accessibilityLabel).not.toContain(status);
+      expect(textValues(renderer.root)).not.toContain(status);
+    }
+  );
 });

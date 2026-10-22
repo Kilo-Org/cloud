@@ -1984,7 +1984,7 @@ async function answerHostedNativeInteraction(params: {
             response: params.reply.response,
           };
   const result = await withDORetry<DurableObjectStub<SandboxSessionV2>, ControlPlaneDispatchResult>(
-    () => getSandboxSessionStub(params.env, params.userId, params.cloudAgentSessionId as SessionId),
+    () => getSandboxSessionStub(params.env, params.userId, params.cloudAgentSessionId),
     stub => stub.answer({ sessionId: params.cloudAgentSessionId, reply: payload }),
     'answer'
   );

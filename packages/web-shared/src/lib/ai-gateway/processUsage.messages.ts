@@ -51,6 +51,25 @@ type MessagesApiUsage = Anthropic.Messages.MessageDeltaUsage & {
   cost_details?: { upstream_inference_cost: number };
 };
 
+// message_start already reports the input and cache tokens, so a stream that
+// stops before message_delta still records the prompt it consumed. Providers
+// that repeat these fields in message_delta, or send them as null, keep the
+// message_delta value only when it is present.
+function mergeMessageDeltaUsage(
+  startUsage: MessagesApiUsage | null,
+  deltaUsage: MessagesApiUsage
+): MessagesApiUsage {
+  if (!startUsage) return deltaUsage;
+  return {
+    ...deltaUsage,
+    input_tokens: deltaUsage.input_tokens ?? startUsage.input_tokens,
+    cache_creation_input_tokens:
+      deltaUsage.cache_creation_input_tokens ?? startUsage.cache_creation_input_tokens,
+    cache_read_input_tokens:
+      deltaUsage.cache_read_input_tokens ?? startUsage.cache_read_input_tokens,
+  };
+}
+
 function getVercelResolvedModel(
   providerMetadata: VercelProviderMetaData | null | undefined
 ): string | undefined {
@@ -129,7 +148,8 @@ export async function parseMessagesMicrodollarUsageFromStream(
   let reportedError = statusCode >= 400;
   const startedAt = performance.now();
   let firstTokenReceived = false;
-  let usage: MessagesApiUsage | null = null;
+  let startUsage: MessagesApiUsage | null = null;
+  let deltaUsage: MessagesApiUsage | null = null;
   let finish_reason: string | null = null;
   let providerMetadata: VercelProviderMetaData | null = null;
   let inference_provider: string | null = null;
@@ -176,6 +196,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
       if (json.type === 'message_start') {
         messageId = json.message.id;
         model = json.message.model;
+        startUsage = json.message.usage ?? startUsage;
         const openRouterProvider = (json.message as MaybeHasOpenRouterProvider).provider;
         if (openRouterProvider) {
           inference_provider = openRouterProvider;
@@ -192,7 +213,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
 
       if (json.type === 'message_delta') {
         finish_reason = json.delta.stop_reason;
-        usage = json.usage ?? usage;
+        deltaUsage = json.usage ?? deltaUsage;
         const meta = (json as MaybeHasVercelProviderMetadata).provider_metadata;
         if (meta) {
           providerMetadata = meta;
@@ -209,7 +230,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
     streamProcessingSpan
   );
 
-  if (!reportedError && !usage) {
+  if (!reportedError && !deltaUsage) {
     captureMessage('SUSPICIOUS: No usage in Messages API stream', {
       level: 'warning',
       tags: { source: 'messages_usage_processing' },
@@ -233,6 +254,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
     status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
+  const usage = deltaUsage ? mergeMessageDeltaUsage(startUsage, deltaUsage) : startUsage;
   const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
   return { ...coreProps, ...costs };
 }

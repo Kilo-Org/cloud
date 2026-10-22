@@ -249,7 +249,7 @@ export const GITLAB_OAUTH_SCOPES = [
   'api', // Full API access (needed for MR comments, reactions)
   'read_user', // Read user info
   'read_repository', // Read repository contents
-  'write_repository', // Push branches (for auto-fix)
+  'write_repository', // Push branches
 ] as const;
 
 export type GitLabUser = {

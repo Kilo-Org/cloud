@@ -923,11 +923,13 @@ export async function completeWorktreeDeletion(
   return deletionDiagnostic('complete', params, async timing => {
     const db = getWorkerDb(env.HYPERDRIVE.connectionString);
     timing.setStage('readState');
-    const [row] = await db
-      .select()
-      .from(cloud_agent_worktrees)
-      .where(eq(cloud_agent_worktrees.worktree_id, params.worktreeId));
-    const worktree = await authorize(db, row, params);
+    const worktree = await db.transaction(async tx => {
+      const [row] = await tx
+        .select()
+        .from(cloud_agent_worktrees)
+        .where(eq(cloud_agent_worktrees.worktree_id, params.worktreeId));
+      return authorize(tx, row, params);
+    });
     if (worktree.deletion_started_at === null) throw new Error('worktree_deletion_not_started');
     const state = deletionState(worktree);
     const sessionIds = state.manifest.sessions.map(session => session.sessionId);

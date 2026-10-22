@@ -464,7 +464,6 @@ describe('authoritative message failure settlement', () => {
         variant: null,
         repository: 'test/repo',
         isInitiated: true,
-        needsLegacyPrepare: false,
         isPreparingAsync: false,
         prompt: null,
         initialMessageId: null,

@@ -199,6 +199,12 @@ describe('getToolDisplay mapping', () => {
     });
   });
 
+  it('names a patch file from an absolute cloud workspace path', () => {
+    const patchText =
+      '*** Begin Patch\n*** Update File: /workspace/user-1/sessions/ses_abc123/src/app.ts\n@@\n-old\n+new\n*** End Patch';
+    expect(getDisplay(makeToolPart('patch', completed({ patchText }))).subtitle).toBe('app.ts');
+  });
+
   it('maps a multi-file patch to the file count', () => {
     const patchText =
       '*** Begin Patch\n*** Update File: src/a.ts\n@@\n-old\n+new\n' +

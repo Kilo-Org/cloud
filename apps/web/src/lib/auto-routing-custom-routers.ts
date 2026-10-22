@@ -32,7 +32,6 @@ import {
 import {
   customRouterOwnerCondition,
   findCustomRouter,
-  isCustomRoutersEnabled,
   listCustomRouters,
   toCustomRouterDefinition,
   type CustomRouterOwner,
@@ -44,7 +43,7 @@ import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizat
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
 import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
-import { and, eq, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { NextResponse, type NextRequest } from 'next/server';
 import * as z from 'zod';
 import { buildEligibleCatalog, type EligibleCatalog } from '@/lib/auto-routing-pool-validation';
@@ -104,8 +103,6 @@ async function resolveRequestContext(request: NextRequest): Promise<CustomRouter
       'Authentication required'
     );
   }
-  if (!(await isCustomRoutersEnabled(auth.user.id))) throw routerNotFound();
-
   const queryOrganizationId = request.nextUrl.searchParams.get('organizationId');
   const authOrganizationId = auth.organizationId ?? null;
   if (queryOrganizationId && authOrganizationId && queryOrganizationId !== authOrganizationId) {
@@ -266,6 +263,8 @@ async function toSummary(
     baseRouter: router.baseRouter,
     mode: router.mode,
     defaultEntryKey: router.defaultEntryKey,
+    legacyPool: router.legacyPool ?? false,
+    legacyModeInherited: router.legacyModeInherited ?? false,
     canEdit,
     entries,
   };
@@ -378,7 +377,7 @@ async function requestPlatformBenchmarks(params: {
   }
 }
 
-async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
+export async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
   const key = `auto-routing-custom-routers:${owner.type}:${owner.id}`;
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
 }
@@ -405,6 +404,7 @@ async function saveRouter(
       mode: router.mode,
       entries: router.entries,
       default_entry_key: router.defaultEntryKey,
+      legacy_mode_inherited: router.legacyModeInherited ?? false,
     })
     .where(eq(auto_routing_custom_routers.id, router.id))
     .returning();
@@ -431,7 +431,10 @@ export async function listCustomRoutersResponse(
   const summaries = await Promise.all(
     routers.map(router => toSummary(router, router.ownerType === 'user' || orgCanEdit))
   );
-  return NextResponse.json({ routers: summaries });
+  return NextResponse.json({
+    routers: summaries,
+    canCreate: !context.organization || orgCanEdit,
+  });
 }
 
 export async function getCustomRouterResponse(
@@ -458,7 +461,7 @@ function assertCanCreate(existing: { slug: string }[], slug: string): void {
   }
 }
 
-async function ownerRouterSlugs(
+export async function ownerRouterSlugs(
   executor: DrizzleTransaction | typeof db,
   owner: CustomRouterOwner
 ): Promise<{ slug: string }[]> {
@@ -526,6 +529,7 @@ function applyUpdate(
     name: input.name ?? current.name,
     baseRouter: input.baseRouter ?? current.baseRouter,
     mode: input.mode ?? current.mode,
+    legacyModeInherited: input.mode === undefined ? current.legacyModeInherited : false,
     entries: input.entries ?? current.entries,
     defaultEntryKey: input.defaultEntryKey ?? current.defaultEntryKey,
   };
@@ -544,11 +548,14 @@ export async function updateCustomRouterResponse(
   request: NextRequest
 ): Promise<NextResponse> {
   const { scope, slug } = parseRouterParams(params);
-  const parsed = UpdateCustomRouterRequestSchema.safeParse(await readJsonBody(request));
+  const rawInput = await readJsonBody(request);
+  const parsed = UpdateCustomRouterRequestSchema.safeParse(rawInput);
   if (!parsed.success) throw invalidRequest(parsed.error);
   const input = parsed.data;
   const owner = await resolveEditableOwner(context, scope);
 
+  const requestedSlug =
+    rawInput !== null && typeof rawInput === 'object' && 'slug' in rawInput ? rawInput.slug : slug;
   const rejections = await gatewayEntryRejections({
     userId: context.user.id,
     owner,
@@ -558,6 +565,12 @@ export async function updateCustomRouterResponse(
   const router = await db.transaction(async tx => {
     await lockOwner(tx, owner);
     const current = await findRouter(tx, owner, slug);
+    if (current.legacyPool && requestedSlug !== slug) {
+      throw new CustomRouterApiError(
+        'invalid_request',
+        'The migrated pool slug cannot change during the notice period'
+      );
+    }
     const next = applyUpdate(current, input);
     validateNewGatewayEntries({
       entries: next.entries,
@@ -583,14 +596,19 @@ export async function deleteCustomRouterResponse(
 ): Promise<NextResponse> {
   const { scope, slug } = parseRouterParams(params);
   const owner = await resolveEditableOwner(context, scope);
-  const deleted = await db.transaction(async tx => {
+  await db.transaction(async tx => {
     await lockOwner(tx, owner);
-    return tx
+    const current = await findRouter(tx, owner, slug);
+    if (current.legacyPool) {
+      throw new CustomRouterApiError(
+        'invalid_request',
+        'The migrated pool cannot be deleted during the notice period'
+      );
+    }
+    await tx
       .delete(auto_routing_custom_routers)
-      .where(and(customRouterOwnerCondition(owner), eq(auto_routing_custom_routers.slug, slug)))
-      .returning({ id: auto_routing_custom_routers.id });
+      .where(eq(auto_routing_custom_routers.id, current.id));
   });
-  if (deleted.length === 0) throw routerNotFound();
   return new NextResponse(null, { status: 204 });
 }
 

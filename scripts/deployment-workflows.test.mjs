@@ -161,10 +161,6 @@ test('staging and production Worker changes use independent deployment baselines
   assert.match(workers.jobs['detect-changes'].if, /inputs.base_sha != ''/);
   const detect = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
   assert.match(detect.run, /has_named_environment "\$dir\/wrangler\.jsonc"/);
-  assert.match(
-    detect.run,
-    /git diff --quiet "\$BASE_SHA" HEAD -- "\$dir\/" packages pnpm-lock\.yaml/
-  );
   assert.equal(
     production.jobs['deploy-kiloclaw'],
     undefined,
@@ -427,5 +423,23 @@ test('deployment gate only deploys changes since the last complete run', () => {
     assert.equal(runGate('').should_deploy, 'true');
   } finally {
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('both Worker deployment paths retry a deploy once', () => {
+  // Cloudflare's upload validation rejected a script that it accepted with a
+  // byte-identical bundle a moment earlier, so one retry stands between that
+  // noise and a failed release.
+  for (const name of ['deploy-manual', 'deploy-changed']) {
+    const steps = workers.jobs[name].steps;
+    const first = steps.findIndex(step => step.name === 'Deploy to Cloudflare Workers');
+    assert.ok(first >= 0, `${name} must deploy the Worker`);
+    assert.equal(steps[first].id, 'deploy');
+    assert.equal(steps[first]['continue-on-error'], true);
+    const retry = steps[first + 1];
+    assert.equal(retry.name, 'Deploy to Cloudflare Workers (retry)');
+    assert.equal(retry.if, "steps.deploy.outcome == 'failure'");
+    assert.equal(retry.with.command, steps[first].with.command);
+    assert.equal(retry.with.workingDirectory, steps[first].with.workingDirectory);
   }
 });

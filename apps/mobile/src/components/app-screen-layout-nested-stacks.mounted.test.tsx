@@ -8,6 +8,7 @@ import HomeLayout from '@/app/(app)/(tabs)/(0_home)/_layout';
 import AgentsLayout from '@/app/(app)/(tabs)/(2_agents)/_layout';
 import CodeReviewerEditLayout from '@/app/(app)/(tabs)/(3_profile)/code-reviewer/[scope]/[platform]/(edit)/_layout';
 import CodeReviewerPlatformLayout from '@/app/(app)/(tabs)/(3_profile)/code-reviewer/[scope]/[platform]/_layout';
+import SecurityAgentScopeLayout from '@/app/(app)/(tabs)/(3_profile)/security-agent/[scope]/_layout';
 import ProfileLayout from '@/app/(app)/(tabs)/(3_profile)/_layout';
 
 // These stacks sit inside a root `(app)` scene that already hosts the unlock
@@ -17,6 +18,9 @@ vi.mock('@/components/app-unlock-screen', () => ({
   appUnlockScreenLayout: ({ children }: { children: ReactElement }) => children,
 }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
+vi.mock('@/components/security-agent/security-agent-command-observer', () => ({
+  SecurityAgentCommandObserver: 'SecurityAgentCommandObserver',
+}));
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
   useRouteForegroundRefresh: () => undefined,
 }));
@@ -101,6 +105,7 @@ const layouts: [string, LayoutComponent][] = [
   ['chat', ChatLayout],
   ['code reviewer', CodeReviewerPlatformLayout],
   ['code reviewer edit', CodeReviewerEditLayout],
+  ['security agent', SecurityAgentScopeLayout],
   ['sign-in', AuthLayout],
 ];
 

@@ -91,6 +91,15 @@ describe('formatAttemptDuration', () => {
     expect(formatAttemptDuration({ startedAt: 1000 })).toBeUndefined();
   });
 
+  it('formats elapsed time when the current time is supplied', () => {
+    expect(formatAttemptDuration({ startedAt: 1000 }, 13_400)).toBe('12s');
+    expect(formatAttemptDuration({ startedAt: 1000 }, 126_000)).toBe('2m 5s');
+  });
+
+  it('uses the completion time instead of the current time for finished steps', () => {
+    expect(formatAttemptDuration({ startedAt: 1000, completedAt: 13_400 }, 126_000)).toBe('12s');
+  });
+
   it('formats sub-minute durations as seconds', () => {
     expect(formatAttemptDuration({ startedAt: 1000, completedAt: 13_400 })).toBe('12s');
   });

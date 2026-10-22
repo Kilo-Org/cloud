@@ -12,3 +12,7 @@ KILO_WEB_API_BASE_URL=http://localhost:3000
 # convention as services/wasteland).
 # @url nextjs
 KILO_CLI_API_URL=http://host.docker.internal:3000
+
+# Where a benchmark container posts a case outcome after losing its caller. It
+# must reach this worker's dev port from inside the container.
+BENCH_RESULT_URL=http://host.docker.internal:8814/container/case-result

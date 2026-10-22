@@ -37,7 +37,9 @@ const { balanceMiddleware } = await import('./balance.js');
 const { fetchOrgIdForSession, validateBalanceOnly } = await import('../balance-validation.js');
 const { createSessionManagementHandlers } =
   await import('../router/handlers/session-management.js');
-const { router } = await import('../router/auth.js');
+const { protectedProcedure, router } = await import('../router/auth.js');
+
+const INTERNAL_API_SECRET = 'internal-api-secret';
 
 describe('balanceMiddleware', () => {
   const env = {} as Env;
@@ -75,6 +77,389 @@ describe('balanceMiddleware', () => {
       env
     );
   }
+
+  function createTrpcApp() {
+    const calls: string[] = [];
+    const sendInputs: unknown[] = [];
+    const testRouter = router({
+      start: protectedProcedure.mutation(({ ctx }) => {
+        calls.push('start');
+        return { ok: true, validatedSessionAccess: ctx.validatedSessionAccess };
+      }),
+      send: protectedProcedure
+        .input(value => value)
+        .mutation(({ ctx, input }) => {
+          calls.push('send');
+          sendInputs.push(input);
+          return { ok: true, validatedSessionAccess: ctx.validatedSessionAccess };
+        }),
+      deleteSession: protectedProcedure.mutation(() => {
+        calls.push('deleteSession');
+        return { ok: true };
+      }),
+      getSandboxStatus: protectedProcedure.query(() => {
+        calls.push('getSandboxStatus');
+        return { ok: true };
+      }),
+    });
+
+    const app = new Hono<HonoContext>();
+    app.use('/trpc/*', async (c, next) => {
+      c.set('userId', 'user-123');
+      c.set('authToken', 'token-123');
+      await next();
+    });
+    app.use('/trpc/*', balanceMiddleware);
+    app.use(
+      '/trpc/*',
+      trpcServer({
+        router: testRouter,
+        createContext: (_opts, c) => ({
+          env: c.env,
+          userId: c.get('userId'),
+          authToken: c.get('authToken'),
+          request: c.req.raw,
+        }),
+      })
+    );
+    return { app, calls, sendInputs };
+  }
+
+  async function postTrpcApp(
+    app: Hono<HonoContext>,
+    pathAndQuery: string,
+    body: unknown,
+    options: { headers?: Record<string, string>; requestEnv?: Env } = {}
+  ) {
+    return app.fetch(
+      new Request(`https://worker.test${pathAndQuery}`, {
+        method: 'POST',
+        body: typeof body === 'string' ? body : JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json', ...options.headers },
+      }),
+      options.requestEnv ?? env
+    );
+  }
+
+  it('rejects a public balance bypass header before checking a paid mutation', async () => {
+    vi.mocked(validateBalanceOnly).mockResolvedValue({
+      success: false,
+      status: 402,
+      message: 'Insufficient credits',
+    });
+    const { app, calls } = createTrpcApp();
+
+    const response = await postTrpcApp(
+      app,
+      '/trpc/start',
+      {},
+      {
+        headers: { 'x-skip-balance-check': 'true' },
+        requestEnv: { INTERNAL_API_SECRET } as Env,
+      }
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { message: 'Balance bypass is not supported' },
+    });
+    expect(validateBalanceOnly).not.toHaveBeenCalled();
+    expect(calls).toEqual([]);
+  });
+
+  it('honors the skip header for an authenticated internal caller', async () => {
+    vi.mocked(validateBalanceOnly).mockResolvedValue({
+      success: false,
+      status: 402,
+      message: 'Insufficient credits',
+    });
+    const { app, calls } = createTrpcApp();
+
+    const response = await postTrpcApp(
+      app,
+      '/trpc/start',
+      {},
+      {
+        headers: {
+          'x-skip-balance-check': 'true',
+          'x-internal-api-key': INTERNAL_API_SECRET,
+        },
+        requestEnv: { INTERNAL_API_SECRET } as Env,
+      }
+    );
+
+    expect(response.status).toBe(200);
+    expect(validateBalanceOnly).not.toHaveBeenCalled();
+    expect(calls).toEqual(['start']);
+  });
+
+  it('rejects the skip header when the internal API key is invalid', async () => {
+    const { app, calls } = createTrpcApp();
+
+    const response = await postTrpcApp(
+      app,
+      '/trpc/start',
+      {},
+      {
+        headers: {
+          'x-skip-balance-check': 'true',
+          'x-internal-api-key': 'wrong',
+        },
+        requestEnv: { INTERNAL_API_SECRET } as Env,
+      }
+    );
+
+    expect(response.status).toBe(400);
+    expect(validateBalanceOnly).not.toHaveBeenCalled();
+    expect(calls).toEqual([]);
+  });
+
+  it('does not reject the header on procedures that do not require balance', async () => {
+    const { app, calls } = createTrpcApp();
+
+    const response = await postTrpcApp(
+      app,
+      '/trpc/deleteSession',
+      {},
+      {
+        headers: { 'x-skip-balance-check': 'true' },
+        requestEnv: { INTERNAL_API_SECRET } as Env,
+      }
+    );
+
+    expect(response.status).toBe(200);
+    expect(validateBalanceOnly).not.toHaveBeenCalled();
+    expect(calls).toEqual(['deleteSession']);
+  });
+
+  it.each([
+    ['an unencoded path', '/trpc/start,send?batch=1'],
+    ['a URL-encoded path', '/trpc/start%2Csend?batch=1'],
+  ])('checks each input in %s against its own scope', async (_name, path) => {
+    vi.mocked(validateBalanceOnly).mockImplementation(async (_token, orgId) =>
+      orgId === 'org-funded'
+        ? { success: true }
+        : { success: false, status: 402, message: 'Insufficient credits' }
+    );
+    requireCurrentSessionAccessMock.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: 'org-unfunded',
+    });
+    const { app, calls } = createTrpcApp();
+
+    const response = await postTrpcApp(app, path, {
+      0: { options: { kilocodeOrganizationId: 'org-funded' } },
+      1: { cloudAgentSessionId: 'agent-existing' },
+    });
+
+    expect(response.status).toBe(402);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-funded', env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-unfunded', env);
+    expect(calls).toEqual([]);
+  });
+
+  it('checks the input at the deferred position when empty segments precede a call', async () => {
+    vi.mocked(validateBalanceOnly).mockImplementation(async (_token, orgId) =>
+      orgId === 'org-funded'
+        ? { success: true }
+        : { success: false, status: 402, message: 'Insufficient credits' }
+    );
+    requireCurrentSessionAccessMock.mockImplementation(async ({ cloudAgentSessionId }) => ({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: cloudAgentSessionId === 'agent-funded' ? 'org-funded' : 'org-unfunded',
+    }));
+    const { app, calls } = createTrpcApp();
+
+    const response = await postTrpcApp(app, '/trpc/,,send?batch=1', {
+      0: { cloudAgentSessionId: 'agent-funded' },
+      2: { cloudAgentSessionId: 'agent-unfunded' },
+    });
+
+    expect(response.status).toBe(402);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(1);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: 'agent-unfunded' })
+    );
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-unfunded', env);
+    expect(validateBalanceOnly).not.toHaveBeenCalledWith('token-123', 'org-funded', env);
+    expect(calls).toEqual([]);
+  });
+
+  it('checks the input at the deferred position when empty segments separate calls', async () => {
+    vi.mocked(validateBalanceOnly).mockImplementation(async (_token, orgId) =>
+      orgId === 'org-funded'
+        ? { success: true }
+        : { success: false, status: 402, message: 'Insufficient credits' }
+    );
+    requireCurrentSessionAccessMock.mockImplementation(async ({ cloudAgentSessionId }) => ({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: cloudAgentSessionId === 'agent-funded' ? 'org-funded' : 'org-unfunded',
+    }));
+    const { app, calls } = createTrpcApp();
+
+    const response = await postTrpcApp(app, '/trpc/send,,send?batch=1', {
+      0: { cloudAgentSessionId: 'agent-funded' },
+      2: { cloudAgentSessionId: 'agent-unfunded' },
+    });
+
+    expect(response.status).toBe(402);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: 'agent-funded' })
+    );
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: 'agent-unfunded' })
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it('executes a deferred call with the input its balance validation checked', async () => {
+    const { app, calls, sendInputs } = createTrpcApp();
+
+    const response = await postTrpcApp(app, '/trpc/,,send?batch=1', {
+      0: { cloudAgentSessionId: 'agent-funded' },
+      2: { cloudAgentSessionId: 'agent-executed' },
+    });
+
+    expect(response.status).toBe(207);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-current', env);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(1);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: 'agent-executed' })
+    );
+    expect(calls).toEqual(['send']);
+    expect(sendInputs).toEqual([{ cloudAgentSessionId: 'agent-executed' }]);
+  });
+
+  it('keeps a trailing empty segment from shifting an earlier call', async () => {
+    const { app, calls, sendInputs } = createTrpcApp();
+
+    const response = await postTrpcApp(app, '/trpc/send,?batch=1', {
+      0: { cloudAgentSessionId: 'agent-executed' },
+    });
+
+    expect(response.status).toBe(207);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-current', env);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: 'agent-executed' })
+    );
+    expect(calls).toEqual(['send']);
+    expect(sendInputs).toEqual([{ cloudAgentSessionId: 'agent-executed' }]);
+  });
+
+  it('does not let a funded personal input authorize an unfunded organization input', async () => {
+    vi.mocked(validateBalanceOnly).mockImplementation(async (_token, orgId) =>
+      orgId === undefined
+        ? { success: true }
+        : { success: false, status: 402, message: 'Insufficient credits' }
+    );
+    const { app, calls } = createTrpcApp();
+
+    const response = await postTrpcApp(app, '/trpc/start,start?batch=1', {
+      0: {},
+      1: { options: { kilocodeOrganizationId: 'org-unfunded' } },
+    });
+
+    expect(response.status).toBe(402);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', undefined, env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-unfunded', env);
+    expect(calls).toEqual([]);
+  });
+
+  it('does not let a funded organization input authorize an unfunded personal input', async () => {
+    vi.mocked(validateBalanceOnly).mockImplementation(async (_token, orgId) =>
+      orgId === 'org-funded'
+        ? { success: true }
+        : { success: false, status: 402, message: 'Insufficient credits' }
+    );
+    const { app, calls } = createTrpcApp();
+
+    const response = await postTrpcApp(app, '/trpc/start,start?batch=1', {
+      0: { options: { kilocodeOrganizationId: 'org-funded' } },
+      1: {},
+    });
+
+    expect(response.status).toBe(402);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-funded', env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', undefined, env);
+    expect(calls).toEqual([]);
+  });
+
+  it('checks only the mutation in a read/mutation batch', async () => {
+    const { app } = createTrpcApp();
+
+    await postTrpcApp(app, '/trpc/getSandboxStatus,send?batch=1', {
+      0: { cloudAgentSessionId: 'agent-read' },
+      1: { cloudAgentSessionId: 'agent-send' },
+    });
+
+    expect(validateBalanceOnly).toHaveBeenCalledTimes(1);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-current', env);
+  });
+
+  it('uses each session organization in a batch of session mutations', async () => {
+    vi.mocked(validateBalanceOnly).mockImplementation(async (_token, orgId) =>
+      orgId === 'org-a'
+        ? { success: true }
+        : { success: false, status: 402, message: 'Insufficient credits' }
+    );
+    requireCurrentSessionAccessMock.mockImplementation(async ({ cloudAgentSessionId }) => ({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: cloudAgentSessionId === 'agent-a' ? 'org-a' : 'org-b',
+    }));
+    const { app, calls } = createTrpcApp();
+
+    const response = await postTrpcApp(app, '/trpc/send,send?batch=1', {
+      0: { cloudAgentSessionId: 'agent-a' },
+      1: { cloudAgentSessionId: 'agent-b' },
+    });
+
+    expect(response.status).toBe(402);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-a', env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-b', env);
+    expect(calls).toEqual([]);
+  });
+
+  it.each([
+    ['a non-object batch body', ['start']],
+    ['a missing input for a paid procedure', { 1: {} }],
+    ['a non-object input for a paid procedure', { 0: 'start' }],
+    ['invalid JSON', '{'],
+  ])('rejects %s without checking balance', async (_name, body) => {
+    const { app, calls } = createTrpcApp();
+
+    const response = await postTrpcApp(app, '/trpc/start?batch=1', body);
+
+    expect(response.status).toBe(400);
+    expect(validateBalanceOnly).not.toHaveBeenCalled();
+    expect(calls).toEqual([]);
+  });
+
+  it('does not use a top-level organization for start balance scope', async () => {
+    const { app } = createTrpcApp();
+
+    const response = await postTrpcApp(app, '/trpc/start', {
+      kilocodeOrganizationId: 'org-top-level',
+    });
+
+    expect(response.status).toBe(200);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', undefined, env);
+  });
+
+  it('does not apply balance to a read with the header present', async () => {
+    const { app, calls } = createTrpcApp();
+    const input = encodeURIComponent(JSON.stringify({ cloudAgentSessionId: 'agent-read' }));
+
+    const response = await app.fetch(
+      new Request(`https://worker.test/trpc/getSandboxStatus?input=${input}`, {
+        headers: { 'x-skip-balance-check': 'true' },
+      }),
+      { INTERNAL_API_SECRET } as Env
+    );
+
+    expect(response.status).toBe(200);
+    expect(validateBalanceOnly).not.toHaveBeenCalled();
+    expect(calls).toEqual(['getSandboxStatus']);
+  });
 
   it('serves the real passive status query without credits or a balance bypass', async () => {
     vi.mocked(validateBalanceOnly).mockResolvedValue({

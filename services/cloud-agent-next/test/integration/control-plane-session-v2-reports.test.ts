@@ -1,4 +1,5 @@
-import { env, reset, runInDurableObject } from 'cloudflare:test';
+import { FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN } from './helpers/fake-credentials.js';
+import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
@@ -16,7 +17,7 @@ import { waitFor } from './wait-for.js';
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
 
-const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
+const NATIVE_KILO_TOKEN = FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN;
 const QUEUED_BACKSTOP_MS = CONTROL_PLANE_TIMERS.session.queuedBackstopMs;
 
 let sequence = 0;
@@ -122,7 +123,7 @@ async function readAlarm(stub: DurableObjectStub<SandboxSessionV2>): Promise<num
   return await runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
 }
 
-async function setup(): Promise<{
+async function setup(callbackUrl = 'https://callback.test/hook'): Promise<{
   sessionId: string;
   stub: DurableObjectStub<SandboxSessionV2>;
   peer: FakeSandboxPeer;
@@ -130,8 +131,10 @@ async function setup(): Promise<{
   const sessionId = newSessionId();
   const sandboxId = unique('sbx__reports');
   const stub = sessions.getByName(sessionId);
+  const sessionMetadata = metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId });
+  sessionMetadata.callback = { target: { url: callbackUrl } };
   await stub.registerSessionFromMetadata({
-    metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
+    metadata: sessionMetadata,
     sandboxSelection: { provider: 'cloudflare' },
   });
   const peer = new FakeSandboxPeer();
@@ -145,6 +148,381 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 reports and callbacks', () => {
+  it.each(['terminal_only', 'persisted', 'replacement', 'initial'] as const)(
+    'captures attempted preparation runtime before dispatch: %s',
+    async source => {
+      const { stub, peer } = await setup();
+      const captured = await installCapturedQueues(stub);
+      const container = {
+        provider: 'cloudflare' as const,
+        sandboxId: 'sandbox-1',
+        allocationId: 'allocation-1',
+        instanceId: 'allocation-1',
+        startSource: 'image' as const,
+      };
+      peer.prepareView =
+        source === 'initial'
+          ? {
+              state: 'failed',
+              attemptId: peer.attemptId,
+              reason: 'workspace_setup_failed',
+              container,
+            }
+          : {
+              state: 'preparing',
+              attemptId: peer.attemptId,
+              ...(source === 'terminal_only' ? {} : { container }),
+            };
+      await stub.send(promptPayload('m1'));
+      if (source !== 'initial') {
+        expect(await messageStatus(stub, 'm1')).toBe('queued');
+        const failed = {
+          state: 'failed' as const,
+          attemptId: peer.attemptId,
+          reason: 'workspace_setup_failed' as const,
+          ...(source === 'persisted'
+            ? {}
+            : {
+                container:
+                  source === 'replacement'
+                    ? { ...container, allocationId: 'unrelated', instanceId: 'unrelated' }
+                    : container,
+              }),
+        };
+        peer.prepareView = failed;
+        await stub.onRoute(failed);
+      }
+      expect(peer.deliverCalls).toHaveLength(0);
+      peer.statusError = new Error('report consumption must not look up runtime');
+      await flush(stub);
+      expect(captured.reports).toHaveLength(1);
+      expect(captured.reports[0]?.run).toMatchObject({
+        status: 'failed',
+        failureStage: 'pre_dispatch',
+        container,
+      });
+      expect(captured.reports[0]?.run.dispatchAcceptedAt).toBeUndefined();
+    }
+  );
+
+  it('captures a lost preparing route without attributing queued work to the replacement', async () => {
+    const { stub, peer } = await setup();
+    const captured = await installCapturedQueues(stub);
+    const container = {
+      provider: 'cloudflare' as const,
+      sandboxId: 'sandbox-1',
+      allocationId: 'allocation-1',
+      instanceId: 'allocation-1',
+    };
+    const attemptId = peer.attemptId;
+    peer.prepareView = { state: 'preparing', attemptId, container };
+    await stub.send(promptPayload('m1'));
+    peer.attemptId = crypto.randomUUID();
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'workspace_setup_failed',
+      container: { ...container, allocationId: 'unrelated', instanceId: 'unrelated' },
+    };
+    await stub.onRoute({ state: 'lost', attemptId, reason: 'sandbox_lost', container });
+    await flush(stub);
+    expect(peer.deliverCalls).toHaveLength(0);
+    expect(captured.reports).toHaveLength(1);
+    expect(captured.reports[0]?.run).toMatchObject({ status: 'failed', container });
+  });
+
+  it('captures a new immediate preparation failure after a previously failed attempt', async () => {
+    const { stub, peer } = await setup();
+    const captured = await installCapturedQueues(stub);
+    const container = {
+      provider: 'cloudflare' as const,
+      sandboxId: 'sandbox-1',
+      allocationId: 'allocation-1',
+    };
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'workspace_setup_failed',
+      container,
+    };
+    await stub.send(promptPayload('m1'));
+    const replacement = { ...container, allocationId: 'allocation-2' };
+    peer.attemptId = crypto.randomUUID();
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'workspace_setup_failed',
+      container: replacement,
+    };
+    await stub.send(promptPayload('m2'));
+    await flush(stub);
+    expect(captured.reports.find(report => report.run.messageId === 'm1')?.run.container).toEqual(
+      container
+    );
+    expect(captured.reports.find(report => report.run.messageId === 'm2')?.run.container).toEqual(
+      replacement
+    );
+  });
+
+  it('preserves accepted runtime while a queued message fails on its preparation runtime', async () => {
+    const { stub, peer } = await setup();
+    const captured = await installCapturedQueues(stub);
+    const original = {
+      provider: 'cloudflare' as const,
+      sandboxId: 'sandbox-1',
+      allocationId: 'allocation-1',
+      instanceId: 'allocation-1',
+    };
+    peer.prepareView = { state: 'ready', attemptId: peer.attemptId, container: original };
+    await stub.send(promptPayload('accepted'));
+    const preparing = { ...original, allocationId: 'allocation-2', instanceId: 'allocation-2' };
+    peer.prepareView = { state: 'preparing', attemptId: peer.attemptId, container: preparing };
+    await stub.onRoute(peer.prepareView);
+    await stub.send(promptPayload('queued'));
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'workspace_setup_failed',
+      container: preparing,
+    };
+    await stub.onRoute(peer.prepareView);
+    await flush(stub);
+    expect(
+      captured.reports.find(report => report.run.messageId === 'accepted')?.run.container
+    ).toEqual(original);
+    expect(
+      captured.reports.find(report => report.run.messageId === 'queued')?.run.container
+    ).toEqual(preparing);
+  });
+
+  it('persists runtime before dispatch and retains it through route replacement and eviction', async () => {
+    const { sessionId, stub, peer } = await setup();
+    let captured = await installCapturedQueues(stub);
+    const original = {
+      provider: 'vercel' as const,
+      sandboxId: 'sandbox-1',
+      allocationId: 'allocation-1',
+      instanceId: 'physical-session-1',
+      snapshotId: 'snapshot-1',
+      runtimeBuildId: 'build-1',
+      startSource: 'snapshot' as const,
+    };
+    peer.prepareView = { state: 'ready', attemptId: peer.attemptId, container: original };
+    const deliver = peer.deliver.bind(peer);
+    await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      peer.deliver = async payload => {
+        const stored = await db.select().from(controlPlaneMessages);
+        expect(stored.map(row => JSON.parse(row.container ?? 'null'))).toEqual([original]);
+        expect(payload.allocationId).toBe(original.allocationId);
+        return deliver(payload);
+      };
+    });
+    await stub.send(promptPayload('m1'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
+
+    const replacement = {
+      ...original,
+      allocationId: 'allocation-2',
+      instanceId: 'physical-session-2',
+    };
+    await stub.onRoute({ state: 'ready', attemptId: peer.attemptId, container: replacement });
+    await evictAllDurableObjects();
+    captured = await installCapturedQueues(stub);
+    peer.deliver = deliver;
+    peer.prepareView = { state: 'ready', attemptId: peer.attemptId, container: replacement };
+    await installPeer(stub, peer);
+    await stub.send(promptPayload('m2'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm2')).toBe('running'));
+    peer.statusError = new Error('reports must not query current runtime');
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'm2' });
+    await flush(stub);
+    expect(captured.reports.find(report => report.run.messageId === 'm1')?.run.container).toEqual(
+      original
+    );
+    expect(captured.reports.find(report => report.run.messageId === 'm2')?.run.container).toEqual(
+      replacement
+    );
+  });
+
+  it('replaces queued metadata on a not_ready retry and freezes it after acceptance', async () => {
+    const { sessionId, stub, peer } = await setup();
+    const captured = await installCapturedQueues(stub);
+    const original = {
+      provider: 'cloudflare' as const,
+      sandboxId: 'sandbox-1',
+      allocationId: 'allocation-1',
+      instanceId: 'allocation-1',
+      startSource: 'image' as const,
+    };
+    const replacement = { ...original, allocationId: 'allocation-2', instanceId: 'allocation-2' };
+    peer.prepareViews = [
+      { state: 'ready', attemptId: peer.attemptId, container: original },
+      { state: 'ready', attemptId: peer.attemptId, container: replacement },
+    ];
+    peer.prepareView = { state: 'ready', attemptId: peer.attemptId, container: replacement };
+    peer.deliverResults = ['not_ready', 'sent'];
+    const deliver = peer.deliver.bind(peer);
+    peer.deliver = async payload => {
+      const result = await deliver(payload);
+      if (result === 'not_ready') peer.attemptId = crypto.randomUUID();
+      return result;
+    };
+    await stub.send(promptPayload('m1'));
+    expect(await messageStatus(stub, 'm1')).toBe('queued');
+    await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const [row] = await db.select().from(controlPlaneMessages);
+      expect(JSON.parse(row?.container ?? 'null')).toEqual(original);
+    });
+
+    await runInDurableObject(stub, async (instance, state) => {
+      const dueAt = Date.now() - 1;
+      await state.storage.put('control_plane_transport_recovery_at', dueAt);
+      Object.assign(instance, { transportRecoveryAt: dueAt });
+      await instance.alarm();
+    });
+    expect(await messageStatus(stub, 'm1')).toBe('running');
+    expect(peer.deliverCalls.map(call => call.allocationId)).toEqual([
+      original.allocationId,
+      replacement.allocationId,
+    ]);
+    await stub.onRoute({ state: 'ready', attemptId: peer.attemptId, container: original });
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'm1' });
+    await flush(stub);
+    expect(captured.reports).toHaveLength(1);
+    expect(captured.reports[0]?.run.container).toEqual(replacement);
+  });
+
+  it('retains a captured queued container when a retry route has no runtime metadata', async () => {
+    const { sessionId, stub, peer } = await setup();
+    const captured = await installCapturedQueues(stub);
+    const original = {
+      provider: 'cloudflare' as const,
+      sandboxId: 'sandbox-1',
+      allocationId: 'allocation-1',
+      instanceId: 'allocation-1',
+      startSource: 'image' as const,
+    };
+    peer.prepareViews = [
+      { state: 'ready', attemptId: peer.attemptId, container: original },
+      { state: 'ready', attemptId: peer.attemptId },
+    ];
+    peer.prepareView = { state: 'ready', attemptId: peer.attemptId };
+    peer.deliverResults = ['not_ready', 'sent'];
+    const deliver = peer.deliver.bind(peer);
+    peer.deliver = async payload => {
+      const result = await deliver(payload);
+      if (result === 'not_ready') peer.attemptId = crypto.randomUUID();
+      return result;
+    };
+    await stub.send(promptPayload('m1'));
+    expect(await messageStatus(stub, 'm1')).toBe('queued');
+    await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const [row] = await db.select().from(controlPlaneMessages);
+      expect(JSON.parse(row?.container ?? 'null')).toEqual(original);
+    });
+
+    await runInDurableObject(stub, async (instance, state) => {
+      const dueAt = Date.now() - 1;
+      await state.storage.put('control_plane_transport_recovery_at', dueAt);
+      Object.assign(instance, { transportRecoveryAt: dueAt });
+      await instance.alarm();
+    });
+    expect(await messageStatus(stub, 'm1')).toBe('running');
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'm1' });
+    await flush(stub);
+    expect(captured.reports).toHaveLength(1);
+    expect(captured.reports[0]?.run.container).toEqual(original);
+  });
+
+  it('uses the original runtime when reallocation terminalizes accepted work', async () => {
+    const { stub, peer } = await setup();
+    const captured = await installCapturedQueues(stub);
+    const original = {
+      provider: 'cloudflare' as const,
+      sandboxId: 'sandbox-1',
+      allocationId: 'allocation-1',
+      instanceId: 'allocation-1',
+      startSource: 'image' as const,
+    };
+    peer.prepareView = { state: 'ready', attemptId: peer.attemptId, container: original };
+    await stub.send(promptPayload('m1'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
+    peer.attemptId = crypto.randomUUID();
+    peer.prepareView = {
+      state: 'preparing',
+      attemptId: peer.attemptId,
+      container: { ...original, allocationId: 'allocation-2', instanceId: 'allocation-2' },
+    };
+    peer.deliverResult = 'not_ready';
+    await stub.send(promptPayload('m2'));
+    await flush(stub);
+    expect(captured.reports).toHaveLength(1);
+    expect(captured.reports[0]?.run).toMatchObject({ status: 'failed', container: original });
+  });
+
+  it('settles an evicted legacy message with null runtime metadata without a live lookup', async () => {
+    const { sessionId, stub, peer } = await setup();
+    await stub.send(promptPayload('m1'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
+    await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const [row] = await db.select().from(controlPlaneMessages);
+      expect(row?.container).toBeNull();
+    });
+    await evictAllDurableObjects();
+    const captured = await installCapturedQueues(stub);
+    peer.statusError = new Error('legacy report must not query runtime');
+    await installPeer(stub, peer);
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'm1' });
+    await flush(stub);
+    expect(captured.reports).toHaveLength(1);
+    expect(captured.reports[0]?.run).not.toHaveProperty('container');
+  });
+
+  it('ignores a malformed stored container instead of failing initialization', async () => {
+    const { stub } = await setup();
+    await stub.send(promptPayload('m1'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
+    await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      await db
+        .update(controlPlaneMessages)
+        .set({ container: '{ not json' })
+        .where(eq(controlPlaneMessages.message_id, 'm1'));
+    });
+    await evictAllDurableObjects();
+    expect(await messageStatus(stub, 'm1')).toBe('running');
+  });
+
+  it('persists parent delivery identity and deduplicates its admitted parent turn', async () => {
+    const { sessionId, stub } = await setup('session:parent');
+    const captured = await installCapturedQueues(stub);
+    await stub.send(promptPayload('child-task'));
+    await waitFor(async () => expect(await messageStatus(stub, 'child-task')).toBe('running'));
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'child-task' });
+    await flush(stub);
+    expect(captured.callbacks).toHaveLength(1);
+    const callback = captured.callbacks[0];
+    expect(callback.parentSession).toMatchObject({
+      userId: 'user_123',
+      messageId: expect.stringMatching(/^msg_/),
+    });
+    if (!callback.parentSession) throw new Error('Missing parent delivery identity');
+    const { stub: parent } = await setup();
+    await installCapturedQueues(parent);
+    const intent = promptPayload(callback.parentSession.messageId, 'Child task completed');
+    await parent.send(intent);
+    await parent.send(intent);
+    const rows = await runInDurableObject(parent, (_instance, state) =>
+      drizzle(state.storage).select().from(controlPlaneMessages).all()
+    );
+    expect(rows.filter(row => row.message_id === callback.parentSession?.messageId)).toHaveLength(
+      1
+    );
+  });
   it('writes one report per terminal message and one batch callback under the session id', async () => {
     const { sessionId, stub } = await setup();
     const captured = await installCapturedQueues(stub);
@@ -184,7 +562,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
   });
 
   it('writes a failed report with its stage/code and one callback for a failure batch', async () => {
-    const { sessionId, stub, peer } = await setup();
+    const { stub, peer } = await setup();
     const captured = await installCapturedQueues(stub);
 
     await stub.send(promptPayload('m1'));
@@ -216,7 +594,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
   });
 
   it('writes interrupted reports and one callback for a Stop batch', async () => {
-    const { sessionId, stub } = await setup();
+    const { stub } = await setup();
     const captured = await installCapturedQueues(stub);
 
     await stub.send(promptPayload('m1'));
@@ -245,7 +623,12 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     const captured = await installCapturedQueues(stub);
 
     // Keep the message queued so the queued backstop (`preparation_timeout`) fires.
-    peer.prepareView = peer.view('preparing');
+    const container = {
+      provider: 'cloudflare' as const,
+      sandboxId: 'sandbox-1',
+      allocationId: 'allocation-1',
+    };
+    peer.prepareView = { state: 'preparing', attemptId: peer.attemptId, container };
     await stub.send(promptPayload('m1'));
     expect(await messageStatus(stub, 'm1')).toBe('queued');
     await runInDurableObject(stub, async (_instance, state) => {
@@ -262,6 +645,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     expect(report?.run.status).toBe('failed');
     expect(report?.run.failureStage).toBe('pre_dispatch');
     expect(report?.run.failureCode).toBe('wrapper_start_failed');
+    expect(report?.run.container).toEqual(container);
     expect(captured.callbacks).toHaveLength(1);
     expect(captured.callbacks[0]?.payload.status).toBe('failed');
   });
@@ -334,7 +718,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     await runInDurableObject(stub, async (_instance, state) => {
       for (const [key, value] of state.storage.kv.list({ prefix: 'report_outbox:' })) {
         const entry = value as { report: CloudAgentQueueReport; attempts: number; dueAt: number };
-        await state.storage.kv.put(key, { ...entry, dueAt: Date.now() - 1 });
+        state.storage.kv.put(key, { ...entry, dueAt: Date.now() - 1 });
       }
     });
     await flush(stub);
@@ -368,7 +752,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     await runInDurableObject(stub, async (_instance, state) => {
       for (const [key, value] of state.storage.kv.list({ prefix: 'callback_outbox:' })) {
         const entry = value as { job: CallbackJob; attempts: number; dueAt: number };
-        await state.storage.kv.put(key, { ...entry, dueAt: Date.now() - 1 });
+        state.storage.kv.put(key, { ...entry, dueAt: Date.now() - 1 });
       }
     });
     await flush(stub);

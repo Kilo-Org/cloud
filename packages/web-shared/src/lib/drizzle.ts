@@ -27,7 +27,6 @@ const IS_SCRIPT = process.env.IS_SCRIPT === 'true';
 
 if (IS_SCRIPT) {
   // For scripts, we use a different connection string to avoid conflicts with the main app
-  // This allows us to run scripts without affecting the main database connection
   assert(getEnvVariable('POSTGRES_SCRIPT_URL'), 'POSTGRES_SCRIPT_URL must be set for scripts');
   postgresUrl = getEnvVariable('POSTGRES_SCRIPT_URL');
 }
@@ -73,7 +72,6 @@ export function selectReplicaUrl({
  * - Falls back to primary if no replica URL is configured for the region
  */
 function getReplicaUrl(): string {
-  if (NODE_ENV === 'development') return postgresUrl;
   return selectReplicaUrl({
     primaryUrl: postgresUrl,
     nodeEnv: NODE_ENV,
@@ -82,7 +80,7 @@ function getReplicaUrl(): string {
     euReplicaUrls: [
       getEnvVariable('POSTGRES_REPLICA_EU_URL'),
       getEnvVariable('POSTGRES_REPLICA_EU_URL_2'),
-    ].filter(Boolean) as string[],
+    ].filter(Boolean),
   });
 }
 
@@ -100,7 +98,7 @@ const sharedPoolConfig: Partial<pg.PoolConfig> = {
   idleTimeoutMillis,
 };
 
-// Primary pool - always points to Frankfurt (writes go here)
+// Primary pool - writes go here; script runs (IS_SCRIPT) connect to POSTGRES_SCRIPT_URL
 const primary = createDrizzleClient({
   connectionString: postgresUrl,
   poolConfig: { ...sharedPoolConfig, application_name: appName },
@@ -108,7 +106,8 @@ const primary = createDrizzleClient({
 });
 export const pool = primary.pool;
 
-// Replica pool - points to US replica in US regions, primary in EU regions
+// Replica pool - US replica in US regions; in EU regions the configured EU
+// replica, with the primary only as fallback
 const replicaUrl = getReplicaUrl();
 export const usesSeparateReplica = replicaUrl !== postgresUrl;
 
@@ -182,7 +181,7 @@ if (usesSeparateReplica) {
  * Primary database instance - use for all writes (INSERT, UPDATE, DELETE)
  * and for reads that require strong consistency (read-after-write).
  *
- * This always connects to the primary database in Frankfurt.
+ * Connects to the primary connection string, or POSTGRES_SCRIPT_URL for script runs.
  */
 const primaryDb = primary.db;
 
@@ -229,30 +228,94 @@ export async function closeAllDrizzleConnections(): Promise<void> {
 
 export type DrizzleTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+// Public tables that are not partitions; a partitioned root covers its partitions.
+const cleanupRoots = drizzleSql`
+  roots AS (
+    SELECT c.oid, c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind IN ('r', 'p')
+      AND c.relname <> 'migrations'
+      AND NOT EXISTS (SELECT 1 FROM pg_inherits i WHERE i.inhrelid = c.oid)
+  )
+`;
+
+/**
+ * Leaves the database as `TRUNCATE <every public table> RESTART IDENTITY CASCADE`
+ * would: every table and partition empty, every owned identity/serial sequence
+ * restarted. Sequence restarts roll back with the deletes if cleanup fails.
+ * TRUNCATE recreates the files of all ~250 tables and their indexes on every
+ * call; this only deletes from tables whose heap has pages. A table without
+ * pages holds no tuples, so the set never misses rows.
+ * Like TRUNCATE RESTART IDENTITY, sequence restarts wait for transactions using
+ * those sequences to finish. Each Jest worker has its own database.
+ *
+ * `session_replication_role = replica` skips FK checks and ON DELETE actions,
+ * which is safe because every table holding rows is emptied in the same
+ * transaction. It needs a superuser, as the test and dev Postgres roles are.
+ */
 export async function cleanupDbForTest(): Promise<void> {
   // Use primary for test cleanup to ensure consistency
-  const { rows: tables } = await primaryDb.execute<{ tablename: string }>(
-    drizzleSql`
-      SELECT tablename
-      FROM pg_tables
-      WHERE schemaname = 'public'
-        AND tablename != 'migrations'
-        AND NOT EXISTS (
-          SELECT 1
-          FROM pg_inherits
-          JOIN pg_class child ON pg_inherits.inhrelid = child.oid
-          JOIN pg_namespace child_ns ON child.relnamespace = child_ns.oid
-          WHERE child_ns.nspname = 'public'
-            AND child.relname = pg_tables.tablename
-        )
-      ORDER BY tablename
-    `
-  );
+  const emptied = await primaryDb.transaction(async tx => {
+    const { rows: roots } = await tx.execute<{ name: string }>(drizzleSql`
+      WITH ${cleanupRoots}
+      SELECT format('%I', relname) AS name FROM roots ORDER BY relname
+    `);
+    if (roots.length === 0) return [];
+    // Blocks writers on every table until commit, as TRUNCATE's lock did, so the
+    // set below cannot go stale. A fixed order keeps concurrent cleanups from
+    // deadlocking.
+    await tx.execute(
+      drizzleSql.raw(
+        `LOCK TABLE ${roots.map(root => root.name).join(', ')} IN SHARE ROW EXCLUSIVE MODE`
+      )
+    );
 
-  if (tables.length === 0) return;
+    const { rows } = await tx.execute<{ kind: 'table' | 'sequence'; sql: string }>(drizzleSql`
+      WITH RECURSIVE ${cleanupRoots},
+      tree AS (
+        SELECT oid AS root, oid AS rel FROM roots
+        UNION ALL
+        SELECT tree.root, i.inhrelid FROM tree JOIN pg_inherits i ON i.inhparent = tree.rel
+      ),
+      -- Materialized so pg_sequence_last_value only ever sees sequence OIDs.
+      owned AS MATERIALIZED (
+        SELECT s.seqrelid
+        FROM tree
+        JOIN pg_depend d
+          ON d.refclassid = 'pg_class'::regclass
+          AND d.refobjid = tree.rel
+          AND d.classid = 'pg_class'::regclass
+          AND d.deptype IN ('a', 'i')
+        JOIN pg_sequence s ON s.seqrelid = d.objid
+      )
+      SELECT 'table' AS kind, format('%I', roots.relname) AS sql
+      FROM roots
+      JOIN tree ON tree.root = roots.oid
+      GROUP BY roots.oid, roots.relname
+      HAVING bool_or(pg_relation_size(tree.rel) > 0)
+      UNION ALL
+      SELECT 'sequence', format('ALTER SEQUENCE %s RESTART', seqrelid::regclass)
+      FROM owned
+      WHERE pg_sequence_last_value(seqrelid) IS NOT NULL
+    `);
+    const tables = rows.filter(row => row.kind === 'table').map(row => row.sql);
+    const sequenceResets = rows.filter(row => row.kind === 'sequence').map(row => row.sql);
 
-  const truncateTargets = tables.map(({ tablename }) => `"${tablename}"`).join(', ');
-  await primaryDb.execute(
-    drizzleSql.raw(`TRUNCATE TABLE ${truncateTargets} RESTART IDENTITY CASCADE;`)
-  );
+    const statements: string[] = [];
+    if (tables.length > 0) {
+      statements.push(
+        'SET LOCAL session_replication_role = replica',
+        ...tables.map(table => `DELETE FROM ${table}`)
+      );
+    }
+    statements.push(...sequenceResets);
+    if (statements.length > 0) await tx.execute(drizzleSql.raw(statements.join(';\n')));
+    return tables;
+  });
+
+  // Shrinks the emptied heaps back to zero pages, as TRUNCATE leaves them, so the
+  // next file inserts into a fresh heap and the next cleanup skips these tables.
+  if (emptied.length > 0) await primaryDb.execute(drizzleSql.raw(`VACUUM ${emptied.join(', ')}`));
 }

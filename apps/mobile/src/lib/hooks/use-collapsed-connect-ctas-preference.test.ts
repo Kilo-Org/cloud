@@ -142,7 +142,7 @@ describe('collapsed-connect-ctas store', () => {
     unsubscribe();
   });
 
-  it('keeps the in-memory value and toasts Could not save setting when the write fails', async () => {
+  it('keeps the last stored list and toasts Could not save setting when the write fails', async () => {
     getItemAsync.mockResolvedValue(null);
     setItemAsync.mockRejectedValue(new Error('disk full'));
     const { setConnectCtaCollapsed } = await import('./use-collapsed-connect-ctas-preference');
@@ -150,17 +150,24 @@ describe('collapsed-connect-ctas store', () => {
     setConnectCtaCollapsed('github', true);
     await flushMicrotasks();
     await flushMicrotasks();
+    // A failed write can take a few turns of the queue to reject.
+    await new Promise(resolve => {
+      setImmediate(resolve);
+    });
+    await new Promise(resolve => {
+      setImmediate(resolve);
+    });
 
     expect(toastError).toHaveBeenCalledWith('Could not save setting');
     expect(setItemAsync).toHaveBeenLastCalledWith('collapsed-connect-ctas', '["github"]');
 
-    // The failed write still changed the session value: un-collapsing it now
-    // builds the empty list instead of returning early on unchanged membership.
+    // The failed choice was dropped, so the platform is not collapsed: the next
+    // request is the same membership the stored list already has and is skipped
+    // instead of queueing a second write.
     setItemAsync.mockClear();
     setConnectCtaCollapsed('github', false);
     await flushMicrotasks();
-    await flushMicrotasks();
-    expect(setItemAsync).toHaveBeenLastCalledWith('collapsed-connect-ctas', '[]');
+    expect(setItemAsync).not.toHaveBeenCalled();
   });
 
   it('clearCollapsedConnectCtasPreference deletes the key', async () => {

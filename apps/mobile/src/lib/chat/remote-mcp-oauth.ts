@@ -1,4 +1,4 @@
-import { Effect, Either } from 'effect';
+import { Effect, Result } from 'effect';
 import * as Crypto from 'expo-crypto';
 import { remoteMcpSignIn } from '@kilocode/harness-sdk/plugins/remote-mcp';
 
@@ -45,14 +45,14 @@ export async function signInRemoteMcpServer(
     },
   });
   const outcome = await Effect.runPromise(
-    Effect.either(
+    Effect.result(
       remoteMcpSignIn(
         { id: server.id, name: server.name, url: server.url, auth: { type: 'oauth' } },
         { fetch, authProvider }
       )
     )
   );
-  if (Either.isRight(outcome)) {
+  if (Result.isSuccess(outcome)) {
     return 'signed-in';
   }
   return authProvider.turnedBack() ? 'turned-back' : 'failed';

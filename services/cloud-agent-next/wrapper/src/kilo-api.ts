@@ -14,10 +14,13 @@ import {
   type SessionCommandResponse,
   type SessionPromptResponse,
   type SessionMessagesResponse2,
+  type SnapshotFileDiff,
   type SuggestionRequest,
+  type Todo,
 } from '@kilocode/sdk/v2';
 import { z } from 'zod';
 import { logToFile } from './utils.js';
+import { kiloClientConfig, type KiloServer } from './kilo-server-auth.js';
 import {
   boundSlashCommandCatalog,
   toSlashCommandInfo,
@@ -25,6 +28,8 @@ import {
   type SlashCommandInfo,
 } from '../../src/shared/slash-commands.js';
 import { KILO_CLI_VERSION } from '../../src/shared/kilo-cli-version.js';
+import { sessionChildSchema } from './control/session-child-schema.js';
+import type { ControlPlaneSessionCredentialsPayload } from '../../src/shared/control-plane-protocol.js';
 
 const sessionStatusesSchema = z.record(
   z.string().min(1),
@@ -248,6 +253,10 @@ type PromptOptions = {
  * All wrapper modules depend on this type rather than the raw SDK client.
  */
 export type WrapperKiloClient = {
+  updateCloudAgentMcp: (
+    grant: NonNullable<ControlPlaneSessionCredentialsPayload['cloudAgentMcp']>,
+    signal?: AbortSignal
+  ) => Promise<void>;
   createSession: (opts?: { title?: string }) => Promise<{ id: string }>;
   getSession: (sessionId: string) => Promise<{ id: string }>;
   getSessionDetails: (
@@ -286,6 +295,27 @@ export type WrapperKiloClient = {
     directory?: string;
     signal?: AbortSignal;
   }) => Promise<boolean>;
+  /** Direct child sessions forked from one session, for release tree cleanup. */
+  children: (opts: {
+    sessionId: string;
+    directory: string;
+    signal?: AbortSignal;
+  }) => Promise<Array<{ id: string; directory: string }>>;
+  /**
+   * Abort a session during release cleanup. A 404 is success: the session is
+   * already gone, so there is nothing left to abort.
+   */
+  abortSessionForCleanup: (opts: {
+    sessionId: string;
+    directory: string;
+    signal?: AbortSignal;
+  }) => Promise<void>;
+  /** Stops and forgets every background process owned by one session. */
+  stopSessionProcesses: (opts: {
+    sessionId: string;
+    directory: string;
+    signal?: AbortSignal;
+  }) => Promise<void>;
   summarizeSession: (opts: {
     sessionId: string;
     model: { providerID?: string; modelID: string };
@@ -335,6 +365,12 @@ export type WrapperKiloClient = {
   ) => Promise<Record<string, { type: string; [key: string]: unknown }>>;
   getQuestions: (directory?: string, signal?: AbortSignal) => Promise<QuestionRequest[]>;
   getPermissions: (directory?: string, signal?: AbortSignal) => Promise<PermissionRequest[]>;
+  getSessionTodos: (sessionID: string, directory?: string, signal?: AbortSignal) => Promise<Todo[]>;
+  getSessionDiff: (
+    sessionID: string,
+    directory?: string,
+    signal?: AbortSignal
+  ) => Promise<SnapshotFileDiff[]>;
   getNetworkWaits: () => Promise<NetworkWait[]>;
   resumeNetworkWait: (requestID: string) => Promise<boolean>;
   listEffectiveModels: (providerID: string) => Promise<string[]>;
@@ -359,16 +395,19 @@ export type WrapperKiloClient = {
   }>;
   /** The in-process server URL — for diagnostics */
   readonly serverUrl: string;
+  /** The server and its credential; raw requests and sockets must use both. */
+  readonly server: KiloServer;
 };
 
 export function createWrapperKiloClient(
   sdkClient: SDKClient,
-  serverUrl: string,
+  server: KiloServer,
   workspacePath: string
 ): WrapperKiloClient {
+  const serverUrl = server.url;
   logToFile(`creating wrapper kilo client for ${serverUrl}`);
-  const v2Client = createV2Client({ baseUrl: serverUrl, directory: workspacePath });
-  const globalClient = createV2Client({ baseUrl: serverUrl });
+  const v2Client = createV2Client(kiloClientConfig(server, workspacePath));
+  const globalClient = createV2Client(kiloClientConfig(server));
 
   function promptParameters(opts: PromptOptions) {
     const rawParts =
@@ -399,6 +438,31 @@ export function createWrapperKiloClient(
 
   return {
     serverUrl,
+    server,
+    updateCloudAgentMcp: async (grant, signal) => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        signal?.throwIfAborted();
+        try {
+          const result = await v2Client.mcp.add(
+            {
+              directory: workspacePath,
+              name: 'kilo-cloud-agent',
+              config: {
+                type: 'remote',
+                url: grant.url,
+                oauth: false,
+                headers: { Authorization: `Bearer ${grant.token}` },
+              },
+            },
+            { signal }
+          );
+          if (!result.error && result.data?.['kilo-cloud-agent']?.status === 'connected') return;
+        } catch {
+          signal?.throwIfAborted();
+        }
+      }
+      throw new Error('Cloud Agent MCP credential refresh failed');
+    },
 
     subscribeEvents: async opts => {
       const result = await v2Client.global.event({ signal: opts.signal });
@@ -568,6 +632,41 @@ export function createWrapperKiloClient(
       return data;
     },
 
+    children: async opts => {
+      const result = await v2Client.session.children(
+        { sessionID: opts.sessionId, directory: opts.directory },
+        { signal: opts.signal }
+      );
+      const data = requireSdkData(result, `Session children for ${opts.sessionId}`);
+      return z.array(sessionChildSchema).parse(data);
+    },
+
+    abortSessionForCleanup: async opts => {
+      const result = await v2Client.session.abort(
+        { sessionID: opts.sessionId, directory: opts.directory },
+        { signal: opts.signal }
+      );
+      // A missing session is already aborted; do not retry a 404.
+      if (result.response?.status === 404) return;
+      const operation = `Cleanup abort for ${opts.sessionId}`;
+      const data = requireSdkData<unknown>(result, operation);
+      if (data !== true) {
+        throw new Error(`${operation} returned no boolean result`);
+      }
+    },
+
+    stopSessionProcesses: async opts => {
+      const result = await v2Client.backgroundProcess.stopSession(
+        { sessionID: opts.sessionId, directory: opts.directory },
+        { signal: opts.signal }
+      );
+      const operation = `Stop session processes for ${opts.sessionId}`;
+      const data = requireSdkData<unknown>(result, operation);
+      if (data !== true) {
+        throw new Error(`${operation} returned no boolean result`);
+      }
+    },
+
     summarizeSession: async opts => {
       const result = await v2Client.session.summarize(
         {
@@ -679,6 +778,16 @@ export function createWrapperKiloClient(
     getPermissions: async (directory = workspacePath, signal) => {
       const result = await v2Client.permission.list({ directory }, { signal });
       return requireSdkData(result, 'Permission list');
+    },
+
+    getSessionTodos: async (sessionID, directory = workspacePath, signal) => {
+      const result = await v2Client.session.todo({ sessionID, directory }, { signal });
+      return requireSdkData(result, `Session todo ${sessionID}`);
+    },
+
+    getSessionDiff: async (sessionID, directory = workspacePath, signal) => {
+      const result = await v2Client.session.diff({ sessionID, directory }, { signal });
+      return requireSdkData(result, `Session diff ${sessionID}`);
     },
 
     getNetworkWaits: async () => {

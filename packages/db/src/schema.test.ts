@@ -1064,22 +1064,6 @@ describe('database schema', () => {
         'security_configuration',
         'other',
       ],
-      MCPGatewayOwnerScope: ['personal', 'organization'],
-      MCPGatewayAuthMode: ['none', 'static_headers', 'oauth_dynamic', 'oauth_static'],
-      MCPGatewaySharingMode: ['single_user', 'multi_user'],
-      MCPGatewayProviderScopeSource: ['none', 'discovered', 'override'],
-      MCPGatewayRouteStatus: ['active', 'rotated', 'revoked'],
-      MCPGatewayInstanceStatus: ['active', 'needs_reauth', 'revoked', 'removed'],
-      MCPGatewayProviderGrantStatus: ['active', 'revoked'],
-      MCPGatewaySecretKind: [
-        'static_provider_credentials',
-        'dynamic_registration',
-        'static_headers',
-      ],
-      MCPGatewayOAuthClientAuthMethod: ['none', 'client_secret_post', 'client_secret_basic'],
-      MCPGatewayAuthorizationRequestStatus: ['pending', 'completed', 'error'],
-      MCPGatewayPendingProviderAuthorizationStatus: ['pending', 'completed', 'error'],
-      MCPGatewayAuditOutcome: ['success', 'failure', 'blocked'],
       SecurityFindingNotificationKind: ['new_finding', 'sla_warning', 'sla_breach'],
       SecurityFindingNotificationStatus: [
         'staged',
@@ -1089,6 +1073,8 @@ describe('database schema', () => {
         'failed',
         'cancelled',
       ],
+      CustomRouterBaseRouter: ['efficient', 'frontier'],
+      CustomRouterMode: ['cost_per_accuracy', 'best_accuracy'],
     };
 
     const actualEnumValues: Record<string, string[]> = {};

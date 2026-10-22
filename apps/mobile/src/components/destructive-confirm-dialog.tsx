@@ -1,6 +1,6 @@
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
@@ -36,10 +36,12 @@ export type DestructiveConfirmDialogProps = {
  * `formSheet` routes and from content already presented in
  * `SessionPageSheet`, where a `@rn-primitives/portal` dialog would render
  * behind the sheet. The sheet sizes to the card and carries no drag indicator,
- * so the two buttons are the choices.
+ * so the stacked buttons are the choices. Both native sheets already keep their
+ * content above the home indicator and the navigation bar, so the card adds no
+ * bottom inset of its own.
  *
- * Mount it only while it should be open (e.g. `{confirming && <DestructiveConfirmDialog ... />}`),
- * the same lifecycle `RenameModal` uses.
+ * Keep the request mounted until native dismissal finishes. The action runs
+ * afterward, so deleting its owner cannot empty the sheet during dismissal.
  */
 export function DestructiveConfirmDialog({
   title,
@@ -51,31 +53,66 @@ export function DestructiveConfirmDialog({
   onCancel,
 }: Readonly<DestructiveConfirmDialogProps>) {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
+  const [visible, setVisible] = useState(true);
+  const pendingAction = useRef<(() => void) | null>(null);
+
+  function dismiss(action: () => void) {
+    if (pendingAction.current !== null) {
+      return;
+    }
+    pendingAction.current = action;
+    setVisible(false);
+  }
+
   return (
-    <Sheet visible onClose={onCancel} showHandle={false}>
-      <View className="gap-4 px-5 pt-5" style={{ paddingBottom: insets.bottom + 20 }}>
-        <Text accessibilityRole="header" className="text-base font-semibold">
-          {title}
-        </Text>
-        <Text className="text-sm text-muted-foreground">{message}</Text>
-        <View className="flex-row justify-end gap-3">
-          <Button variant="outline" onPress={onCancel}>
-            <Text>{cancelLabel ?? t('common.cancel')}</Text>
+    <Sheet
+      visible={visible}
+      onClose={() => {
+        dismiss(onCancel);
+      }}
+      onDismiss={() => {
+        const action = pendingAction.current ?? onCancel;
+        pendingAction.current = null;
+        action();
+      }}
+      showHandle={false}
+    >
+      <View className="gap-5 px-5 pt-6">
+        <View className="gap-2">
+          <Text accessibilityRole="header" className="text-lg font-semibold">
+            {title}
+          </Text>
+          <Text className="text-sm text-muted-foreground">{message}</Text>
+        </View>
+        <View className="gap-2">
+          <Button
+            variant="destructive"
+            className="w-full"
+            onPress={() => {
+              dismiss(onConfirm);
+            }}
+          >
+            <Text>{confirmLabel}</Text>
           </Button>
           {extraAction ? (
-            <Pressable
+            <Button
+              variant="secondary"
+              className="w-full"
               onPress={() => {
                 extraAction.onPress();
               }}
-              accessibilityRole="button"
-              className="shrink-0 flex-row items-center justify-center rounded-md px-3 active:opacity-70"
             >
-              <Text className="text-sm font-semibold text-foreground">{extraAction.label}</Text>
-            </Pressable>
+              <Text>{extraAction.label}</Text>
+            </Button>
           ) : null}
-          <Button variant="destructive" onPress={onConfirm}>
-            <Text>{confirmLabel}</Text>
+          <Button
+            variant="outline"
+            className="w-full"
+            onPress={() => {
+              dismiss(onCancel);
+            }}
+          >
+            <Text>{cancelLabel ?? t('common.cancel')}</Text>
           </Button>
         </View>
       </View>

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import type { Organization } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
 import {
@@ -73,6 +74,8 @@ export const subjects = {
   kiloPassOrgBlocked: 'Action required: Update Kilo Pass assignments',
   userDataExportReady: 'Your Kilo data export is ready',
   dataExportDownloadCode: 'Your Kilo data export download code',
+  // The sender appends the cutover date; this is the admin preview and test subject.
+  autoRoutingPoolNotice: 'Change Required: Your Auto model pool has a new model ID',
 } as const;
 
 export type TemplateName = keyof typeof subjects;
@@ -124,11 +127,12 @@ export function renderTemplate(
   directory: 'emails' | 'marketing-emails' = 'emails'
 ): string {
   const html = readTemplate(name, directory);
+  const templateVars: TemplateVars = { ...vars, support_email: SUPPORT_EMAIL };
   return html.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => {
-    if (!(key in vars)) {
+    if (!(key in templateVars)) {
       throw new Error(`Missing template variable '${key}' in email template '${name}'`);
     }
-    const value = vars[key];
+    const value = templateVars[key];
     return value instanceof RawHtml ? value.html : escapeHtml(value);
   });
 }
@@ -626,7 +630,7 @@ export async function sendAccountDeletionSupportNotification(
   userId: string
 ): Promise<void> {
   await sendViaMailgun({
-    to: 'hi@kilo.ai',
+    to: SUPPORT_EMAIL,
     subject: `Account Deletion Request — ${userEmail}`,
     html: `<p>User <strong>${userEmail}</strong> (ID: <code>${userId}</code>) has requested account deletion from the mobile app.</p>`,
     replyTo: userEmail,
@@ -821,7 +825,7 @@ export async function sendKiloPassDuplicateCardCanceledEmail(
   to: string,
   props: { supportUrl?: string }
 ): Promise<SendResult> {
-  const support_url = props.supportUrl ?? `mailto:hi@kilo.ai`;
+  const support_url = props.supportUrl ?? `mailto:${SUPPORT_EMAIL}`;
   return send({
     to,
     templateName: 'kiloPassDuplicateCardCanceled',

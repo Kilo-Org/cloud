@@ -90,6 +90,7 @@ export async function recordUsageInPrimaryRegion(
         headers: {
           'content-type': 'application/json',
           'x-internal-api-key': INTERNAL_API_SECRET,
+          'x-usage-write-source': 'region_handoff',
         },
         body,
         signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),

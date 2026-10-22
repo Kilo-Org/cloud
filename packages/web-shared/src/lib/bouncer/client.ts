@@ -181,7 +181,11 @@ type UsageEventFields = {
  * `accountId`, so it can never be joined to a payer.
  */
 export type UsageEvent =
-  | (UsageEventFields & { accountId: string })
+  | (UsageEventFields & {
+      accountId: string;
+      /** The request ran on the person's own ChatGPT subscription through Sign in with ChatGPT. */
+      siwc?: boolean;
+    })
   | (UsageEventFields & { tier: 'anonymous'; ip: string });
 
 export type DecideTier = 'anonymous' | 'free' | 'paid' | 'team';
@@ -236,10 +240,34 @@ const decideResponseSchema = z.object({
 export type DecideResponse = z.infer<typeof decideResponseSchema>;
 export type DecideFlag = DecideResponse['flags'][number];
 
+/** Bouncer's shape for a signup method (a Cloud `AuthProviderId`) and a step-up method. */
+const SIGNUP_METHOD = /^[a-z0-9-]{1,32}$/;
+/** Bouncer's shape for the lowercase domain part of a normalized email. */
+const SIGNUP_EMAIL_DOMAIN = /^[a-z0-9.-]{1,253}$/;
+/** Bouncer emits at most 8 signup flags: IP ≤4, domain ≤2, JA4 ≤2, or one ban flag. */
+const MAX_SIGNUP_FLAGS = 8;
+
+/**
+ * The optional step-up facts are dropped whole when invalid, like JA4. Without `method`, Bouncer
+ * applies its method-less policy, which an old Cloud build also gets.
+ */
 const signupRequestSchema = z.strictObject({
   operationId: z.string().min(1).max(MAX_ID_LENGTH),
   ip: z.union([z.ipv4(), z.ipv6()]),
   ja4: z.string().nullable().optional().transform(normalizeJa4),
+  method: z
+    .string()
+    .nullable()
+    .optional()
+    .transform(value => (value && SIGNUP_METHOD.test(value) ? value : undefined)),
+  emailDomain: z
+    .string()
+    .nullable()
+    .optional()
+    .transform(value => {
+      const domain = value?.trim().toLowerCase();
+      return domain && SIGNUP_EMAIL_DOMAIN.test(domain) ? domain : undefined;
+    }),
 });
 
 export type SignupDecideRequest = z.input<typeof signupRequestSchema>;
@@ -248,6 +276,8 @@ const signupFlagSchema = z.strictObject({
   name: z.enum([
     'signup:burst',
     'signup:sustained',
+    'signup:busy',
+    'signup:domain',
     'signup:ja4',
     'signup:saturated',
     'signup:banned',
@@ -258,11 +288,17 @@ const signupFlagSchema = z.strictObject({
   source: z.string().max(MAX_ID_LENGTH).optional(),
 });
 
-/** Signup requires a validated verdict; an unavailable verdict prevents account creation. */
-const signupResponseSchema = z.discriminatedUnion('enforced', [
+const signupFlagsSchema = z.array(signupFlagSchema).max(MAX_SIGNUP_FLAGS);
+
+/**
+ * Signup requires a validated verdict; an unavailable verdict prevents account creation. A
+ * `signup_step_up` verdict lists the sign-in methods that would be admitted now; callers render
+ * only the ones they know.
+ */
+const signupResponseSchema = z.union([
   z.strictObject({
     enforced: z.literal(false),
-    flags: z.array(signupFlagSchema).max(5),
+    flags: signupFlagsSchema,
   }),
   z.strictObject({
     enforced: z.literal(true),
@@ -273,7 +309,13 @@ const signupResponseSchema = z.discriminatedUnion('enforced', [
       .nonnegative()
       // Allow clock and request-order skew beyond the longest supported window.
       .max(31 * 24 * 60 * 60 * 1000),
-    flags: z.array(signupFlagSchema).max(5),
+    flags: signupFlagsSchema,
+  }),
+  z.strictObject({
+    enforced: z.literal(true),
+    code: z.literal('signup_step_up'),
+    methods: z.array(z.string().regex(SIGNUP_METHOD)).min(1).max(8),
+    flags: signupFlagsSchema,
   }),
 ]);
 
@@ -593,7 +635,7 @@ export function usageEventWireBody(event: UsageEvent): Record<string, unknown> {
   // An anonymous request carries only the tier and its required ip; a signed-in one adds accountId.
   return 'tier' in event
     ? compact({ ...common, tier: event.tier })
-    : compact({ ...common, accountId: event.accountId });
+    : compact({ ...common, accountId: event.accountId, siwc: event.siwc === true || undefined });
 }
 
 /** Reports one inference request after its upstream response. Resolves on any failure. */

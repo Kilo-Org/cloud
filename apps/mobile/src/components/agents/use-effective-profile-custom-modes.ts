@@ -12,6 +12,7 @@ type EffectiveProfileCustomModes = {
   customOptions: ModeOption[];
   profileAgents: ReturnType<typeof visibleProfileAgents>;
   isLoading: boolean;
+  settled: boolean;
 };
 
 /**
@@ -69,10 +70,17 @@ export function useEffectiveProfileCustomModes(
 
   const profileAgents = visibleProfileAgents(get.data?.agents ?? []);
   const customOptions = dedupeCustomModeOptions(customModeOptionsFromProfileAgents(profileAgents));
+  // True once the profile's agent list is known: the context lookup answered
+  // and the selected profile (if any) loaded. A failed read is not settled.
+  const contextResolved = organizationId
+    ? listCombined.isSuccess
+    : Boolean(profileId) || list.isSuccess;
+  const settled = contextResolved && (!targetProfileId || get.isSuccess);
 
   return {
     customOptions,
     profileAgents,
     isLoading: get.isLoading,
+    settled,
   };
 }

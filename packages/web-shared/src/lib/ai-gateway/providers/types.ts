@@ -4,8 +4,9 @@ import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detec
 import type { OpenAiChatGptOwner } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import {
   ReasoningDetailsTransform,
+  type CustomLlmAwsBedrockCredentials,
   type ReasoningDetailsTransform as ReasoningDetailsTransformType,
-} from '@kilocode/db';
+} from '@kilocode/db/schema-types';
 
 export { ReasoningDetailsTransform };
 
@@ -43,6 +44,13 @@ export type ProviderApiUrlOverrides = Readonly<Partial<Record<GatewayChatApiKind
 
 export type ProviderResponseTransforms = ReasoningDetailsTransformType;
 
+export type SecureProxyRoute = {
+  /** Proxy endpoint URL, used as-is. */
+  url: string;
+  /** Upstream authentication headers, applied by the proxy instead of the API key. */
+  upstreamAuthHeaders: Record<string, string>;
+};
+
 export type Provider = {
   id: ProviderId;
   /**
@@ -57,6 +65,14 @@ export type Provider = {
   apiKey: string;
   /** Uses bearer authorization unless the provider requires an x-api-key header. */
   apiKeyHeader: 'x-api-key' | null;
+  /**
+   * Sends the request through apps/ai-gateway-secure-proxy. `apiUrl` and
+   * `disableUrlSuffix` then describe the upstream behind the proxy, and
+   * `apiKey` is the proxy's shared secret.
+   */
+  secureProxy?: SecureProxyRoute;
+  /** Signs each request with AWS SigV4 for Amazon Bedrock; `apiKey` is then unused. */
+  awsBedrock?: CustomLlmAwsBedrockCredentials;
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
   responseTransforms: ProviderResponseTransforms | null;
   transformRequest(context: TransformRequestContext): Promise<void>;

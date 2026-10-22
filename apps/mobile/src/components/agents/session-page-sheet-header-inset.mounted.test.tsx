@@ -40,6 +40,9 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeAreaMock.insets,
 }));
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ addListener: () => () => undefined }),
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Share: 'Share' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({

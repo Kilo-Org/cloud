@@ -19,6 +19,7 @@ export type SessionSection = {
 export const PLATFORM_FILTERS = [
   'cloud-agent',
   'extension',
+  'desktop',
   'cli',
   'slack',
   'github',
@@ -226,7 +227,9 @@ export function composeStoredSessionVisibleMeta(cost: string | null, timeMeta: s
  * the visible "$0.12 · 5M AGO" order.
  */
 export function composeStoredSessionSpokenMeta(cost: string | null, timeSpoken: string): string {
-  return cost ? `cost ${cost}, ${timeSpoken}` : timeSpoken;
+  return cost
+    ? i18n.t('agents.sessionRow.costSpokenWithTime', { cost, time: timeSpoken })
+    : timeSpoken;
 }
 
 /**

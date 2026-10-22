@@ -2,9 +2,12 @@ import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudfla
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
+import { resolveSecret } from '../../src/auth.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { sessionDoName } from '../../src/session-plane.js';
+import { verifySandboxLaunchCredential } from '../../src/sandbox-control/credential.js';
+import { validateControlLogUploadGrant } from '../../src/sandbox-control/log-upload-grant.js';
 import {
   allocation as allocationTable,
   routes as routesTable,
@@ -24,7 +27,11 @@ import {
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
-import { FakeSessionPeer } from './helpers/fake-session-peer.js';
+import {
+  FakeSessionPeer,
+  createRuntimeProxyMintingPeer,
+  installFakeRuntimeProxyPeer,
+} from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { waitFor } from './wait-for.js';
 
@@ -38,6 +45,7 @@ const NOT_ENROLLED = { CONTAINER_REPO_SNAPSHOT_IDS: '' };
 // The Durable Object shares one env object across tests, so every test states the env it
 // needs and the Worker secret a previous test removed is put back.
 const WORKER_SECRET = (env as unknown as { NEXTAUTH_SECRET: unknown }).NEXTAUTH_SECRET;
+const WORKER_URL = (env as unknown as { WORKER_URL?: string }).WORKER_URL;
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
@@ -96,7 +104,7 @@ function createFakeProvider(
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(ref, launchEnv, launchOptions) {
+    async launch(ref, { env: launchEnv }, launchOptions) {
       const launchIndex = provider.launchEnvs.length;
       provider.launchEnvs.push({ ...launchEnv });
       const { deadlineAt, ...recordedOptions } = launchOptions ?? {};
@@ -162,9 +170,12 @@ type RouteOverrides = {
   kiloSessionId?: string;
 };
 
+const preparedIdentities = new Map<string, { userId: string; kiloSessionId: string }>();
+
 function prepareInput(overrides: RouteOverrides = {}) {
   const sessionId = overrides.sessionId ?? SESSION;
   const kiloSessionId = overrides.kiloSessionId ?? KILO_SESSION;
+  preparedIdentities.set(sessionId, { userId: overrides.userId ?? 'user_123', kiloSessionId });
   const git = overrides.git === null ? undefined : (overrides.git ?? { url: REPO_URL });
   const spec: ControlPlaneRouteSpec = {
     sessionId,
@@ -180,7 +191,7 @@ function prepareInput(overrides: RouteOverrides = {}) {
     credentials: {
       userId: overrides.userId ?? 'user_123',
       kiloSessionId,
-      kiloToken: 'native-kilo-token-user',
+      kiloToken: 'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln',
       orgId: overrides.orgId === null ? undefined : (overrides.orgId ?? 'org_123'),
       repository: { type: 'github' as const, repo: 'acme/widgets' },
       scopeId: sessionId,
@@ -195,10 +206,16 @@ async function setup(
   peer = new FakeSessionPeer()
 ): Promise<{ stub: DurableObjectStub<SandboxControlV2>; peer: FakeSessionPeer }> {
   const stub = sandboxNamespace.getByName(sandboxId);
+  peer.runtimeProxyForSession = createRuntimeProxyMintingPeer(env, sessionId => {
+    const identity = preparedIdentities.get(sessionId);
+    if (!identity) throw new Error('Missing prepared identity');
+    return identity;
+  });
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
       NEXTAUTH_SECRET: WORKER_SECRET,
+      WORKER_URL,
       ...extraEnv,
     });
     Object.assign(instance, {
@@ -438,6 +455,7 @@ describe('repository snapshot launch', () => {
   );
 
   it('cleans up a failed snapshot and launches the image on the same allocation and deadline', async () => {
+    const workerUrl = 'https://worker.example.test/';
     const sandboxId = 'sbx__repo_launch_fallback';
     const provider = createFakeProvider({
       launches: [{ startSource: 'repository', snapshotFailed: true }, { startSource: 'image' }],
@@ -445,6 +463,7 @@ describe('repository snapshot launch', () => {
     const { stub } = await setup(sandboxId, provider, {
       ...ENROLLED,
       SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      WORKER_URL: workerUrl,
     });
     await stub.prepare({
       ...prepareInput(),
@@ -461,19 +480,55 @@ describe('repository snapshot launch', () => {
     ]);
     expect(provider.launchRefs[1]).toBe(provider.launchRefs[0]);
     expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
-    expect(provider.launchEnvs[1]).toEqual({
-      ...provider.launchEnvs[0],
-      SANDBOX_CONTROL_CREDENTIAL: expect.any(String),
-    });
-    expect(provider.launchEnvs[1].SANDBOX_CONTROL_CREDENTIAL).not.toBe(
-      provider.launchEnvs[0].SANDBOX_CONTROL_CREDENTIAL
+    const signingSecret = await runInDurableObject(stub, instance =>
+      resolveSecret(instance.env.NEXTAUTH_SECRET)
     );
+    if (!signingSecret) throw new Error('Test signing secret unavailable');
+    const launches = provider.launchEnvs.map(
+      ({
+        SANDBOX_CONTROL_CREDENTIAL: credential,
+        CONTROL_LOG_UPLOAD_GRANT: uploadGrant,
+        CONTROL_WRAPPER_INSTANCE_ID: wrapperInstanceId,
+        CONTROL_LOG_UPLOAD_URL: uploadUrl,
+        ...stableEnv
+      }) => {
+        const launchClaims = verifySandboxLaunchCredential(credential, signingSecret);
+        if (!launchClaims) throw new Error('Invalid wrapper launch credential');
+        expect({
+          sandboxId: launchClaims.sandboxId,
+          allocationId: launchClaims.allocationId,
+        }).toEqual({
+          sandboxId,
+          allocationId,
+        });
+        expect(validateControlLogUploadGrant(`Bearer ${uploadGrant}`, signingSecret)).toEqual({
+          sandboxId,
+          allocationId,
+          wrapperInstanceId,
+        });
+        expect(uploadUrl).toBe(
+          `${workerUrl.replace(/\/$/, '')}/sandbox-logs/${sandboxId}/${allocationId}/${wrapperInstanceId}`
+        );
+        return { credential, uploadGrant, wrapperInstanceId, uploadUrl, stableEnv };
+      }
+    );
+    expect(launches[1].stableEnv).toEqual(launches[0].stableEnv);
+    expect(launches[0].stableEnv).toMatchObject({
+      CONTROL_PLANE_ALLOCATION_ID: allocationId,
+      PROVIDER_INSTANCE_ID: sandboxId,
+      CONTROL_SANDBOX_PROVIDER: 'cloudflare-containers',
+    });
+    expect(launches[1].credential !== launches[0].credential).toBe(true);
+    expect(launches[1].uploadGrant !== launches[0].uploadGrant).toBe(true);
+    expect(launches[1].wrapperInstanceId).not.toBe(launches[0].wrapperInstanceId);
+    expect(launches[1].uploadUrl).not.toBe(launches[0].uploadUrl);
     expect(provider.launchDeadlines[0]).toEqual(expect.any(Number));
     expect(provider.launchDeadlines[0]).toBe(launchDeadline);
     expect(provider.launchDeadlines[1]).toBe(launchDeadline);
     await prepareFrameOf(wrapper);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,
+      startupMode: 'preinstalled',
       startSource: 'image',
       confirmed: true,
     });
@@ -563,6 +618,7 @@ describe('repository snapshot launch', () => {
     expect(provider.launchEnvs).toHaveLength(1);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,
+      startupMode: 'preinstalled',
       startSource: 'repository',
       confirmed: true,
     });
@@ -701,6 +757,7 @@ describe('repository snapshot launch', () => {
     expect(frame.spec.capture).toBe(true);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,
+      startupMode: 'preinstalled',
       startSource: 'repository',
       confirmed: true,
     });
@@ -844,7 +901,8 @@ describe('repository snapshot launch', () => {
       const db = drizzle(state.storage, { logger: false });
       await db
         .update(allocationTable)
-        .set({ last_frame_at: Date.now(), last_activity_at: Date.now() - 60 * 60_000 });
+        .set({ last_frame_at: Date.now(), last_activity_at: Date.now() - 60 * 60_000 })
+        .where(eq(allocationTable.id, 'current'));
       await instance.alarm();
       expect((await instance.getAllocationState()).kind).toBe('stopping');
     });
@@ -915,6 +973,10 @@ describe('repository snapshot preparation fallback', () => {
         sessionPeerFor: (ownerId: string, sessionId: string) =>
           namespace.getByName(sessionDoName(ownerId, sessionId)),
       });
+      installFakeRuntimeProxyPeer(instance, async () => ({
+        userId: 'user_123',
+        kiloSessionId: KILO_SESSION,
+      }));
     });
     for (const messageId of ['m1', 'm2']) {
       await session.send({
@@ -1543,7 +1605,10 @@ describe('repository capture request', () => {
 
     await runInDurableObject(stub, async (instance, state) => {
       const db = drizzle(state.storage, { logger: false });
-      await db.update(allocationTable).set({ last_frame_at: Date.now() - 60_000 });
+      await db
+        .update(allocationTable)
+        .set({ last_frame_at: Date.now() - 60_000 })
+        .where(eq(allocationTable.id, 'current'));
       await instance.alarm();
       expect((await instance.getAllocationState()).kind).toBe('connected');
       expect(await state.storage.getAlarm()).toBeGreaterThan(Date.now());
@@ -1600,7 +1665,10 @@ describe('repository capture request', () => {
     const replacement = crypto.randomUUID();
     await runInDurableObject(stub, async (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });
-      await db.update(allocationTable).set({ allocation_id: replacement });
+      await db
+        .update(allocationTable)
+        .set({ allocation_id: replacement })
+        .where(eq(allocationTable.id, 'current'));
     });
     provider.launchEnvs[0].CONTROL_PLANE_ALLOCATION_ID = replacement;
     const { wrapper: replaced } = await connect(sandboxId, provider);

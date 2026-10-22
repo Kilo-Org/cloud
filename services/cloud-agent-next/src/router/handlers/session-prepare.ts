@@ -14,6 +14,7 @@
  * execution-scoped callback target override on `send`.
  */
 import { TRPCError } from '@trpc/server';
+import { PARENT_SESSION_CALLBACK_URL } from '@kilocode/worker-utils/cloud-agent-authority';
 import type * as z from 'zod';
 import { logger, withLogTags } from '../../logger.js';
 import { resolveSessionStub } from '../../sandbox-session/session-stub.js';
@@ -115,6 +116,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
           };
 
   return {
+    allowSubagentSessions: input.allowSubagentSessions ?? false,
     initialTurn,
     agent: {
       mode: input.mode,
@@ -163,6 +165,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       clientProvenance: input.clientProvenance,
       shallow: input.shallow,
       operationKey: input.operationKey,
+      kiloSessionId: 'kiloSessionId' in input ? input.kiloSessionId : undefined,
     },
   };
 }
@@ -187,8 +190,19 @@ const prepareSessionHandler = internalApiProtectedProcedure
   .output(PrepareSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'prepareSession' }, async () => {
+      const request = prepareInputToSessionCreateRequest(input);
+      if (input.callbackTarget?.url === PARENT_SESSION_CALLBACK_URL && !ctx.cloudAgentAuthority) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'A parent callback requires a session launched by a Cloud Agent parent',
+        });
+      }
+      if (ctx.cloudAgentAuthority) {
+        request.parentCloudAgentSessionId = ctx.cloudAgentAuthority.parentSessionId;
+        request.options = { ...request.options, createdOnPlatform: 'cloud-agent' };
+      }
       const requestWithProfile = await preflightSessionCreation(
-        prepareInputToSessionCreateRequest(input),
+        request,
         ctx,
         'prepareSession',
         resolvedRequest => {
@@ -211,6 +225,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
         userId: ctx.userId,
         authToken: ctx.authToken,
         botId: ctx.botId,
+        cloudAgentAuthority: ctx.cloudAgentAuthority,
       };
       const billingOrigin = { billingOrigin: input.createdOnPlatform };
       // Admit into the operation ledger only when the client supplied an
@@ -251,6 +266,12 @@ const updateSessionHandler = internalApiProtectedProcedure
   .output(UpdateSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'updateSession' }, async () => {
+      if (input.callbackTarget?.url === PARENT_SESSION_CALLBACK_URL) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'A parent callback can only be set when a Cloud Agent parent launches a session',
+        });
+      }
       logger.setTags({
         cloudAgentSessionId: input.cloudAgentSessionId,
         userId: ctx.userId,

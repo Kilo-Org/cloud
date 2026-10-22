@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 
-import { type LucideIcon } from '@/components/ui/icons';
+import { Eye, FileText, type LucideIcon } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { type DeviceFit } from '@/lib/chat/device-fit';
 import { type CatalogModel } from '@/lib/chat/gguf-catalog';
@@ -25,15 +25,40 @@ const FIT_STYLES = {
   },
 } as const satisfies Record<DeviceFit, { key: string; tile: string; text: string }>;
 
+/** Says how the file fits this device, or that the device cannot judge the fit. */
 export function FitBadge({ fit }: Readonly<{ fit: DeviceFit | undefined }>) {
   const { t } = useTranslation();
   if (fit === undefined) {
-    return null;
+    return (
+      <View className="shrink-0 rounded-full bg-secondary px-2 py-0.5">
+        <Text className="text-xs text-muted-foreground">{t('modelChat.catalog.fit.unknown')}</Text>
+      </View>
+    );
   }
   const style = FIT_STYLES[fit];
   return (
     <View className={cn('shrink-0 rounded-full px-2 py-0.5', style.tile)}>
       <Text className={cn('text-xs font-medium', style.text)}>{t(style.key)}</Text>
+    </View>
+  );
+}
+
+export function CatalogCapabilities({ images }: Readonly<{ images: boolean }>) {
+  const { t } = useTranslation();
+  return (
+    <View className="flex-row flex-wrap gap-x-3 gap-y-1">
+      <CatalogStat
+        icon={FileText}
+        value={t('modelChat.catalog.text')}
+        label={t('modelChat.catalog.text')}
+      />
+      {images && (
+        <CatalogStat
+          icon={Eye}
+          value={t('modelChat.catalog.vision')}
+          label={t('modelChat.catalog.vision')}
+        />
+      )}
     </View>
   );
 }

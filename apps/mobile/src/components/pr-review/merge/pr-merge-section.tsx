@@ -30,6 +30,7 @@ import {
   useDisableAutoMergeMutation,
   useUpdateBranchMutation,
 } from '@/lib/pr-review/merge/use-pr-merge-mutations';
+import { type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
 import {
   AutoMergeEnabledBanner,
   BlockedPanel,
@@ -63,13 +64,12 @@ function ignoreRejection(promise: Promise<unknown>): void {
   })();
 }
 
-function mergeSheetHref(args: {
-  owner: string;
-  repo: string;
-  number: number;
-  mode: 'merge' | 'enable-auto-merge';
-  method: PrMergeMethod;
-}): Href {
+function mergeSheetHref(
+  args: ProviderPrTriple & {
+    mode: 'merge' | 'enable-auto-merge';
+    method: PrMergeMethod;
+  }
+): Href {
   const href: Href = {
     pathname: '/(app)/pr-review/[owner]/[repo]/[number]/merge',
     params: {

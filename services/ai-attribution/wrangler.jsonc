@@ -8,10 +8,18 @@
   "compatibility_flags": ["nodejs_compat"],
   "ratelimits": [
     {
-      "name": "ATTRIBUTION_TRACK_RATE_LIMITER",
+      "name": "ATTRIBUTION_TRACK_ORG_RATE_LIMITER",
       "namespace_id": "1005",
       "simple": {
-        "limit": 60,
+        "limit": 6000,
+        "period": 60,
+      },
+    },
+    {
+      "name": "ATTRIBUTION_TRACK_USER_RATE_LIMITER",
+      "namespace_id": "1007",
+      "simple": {
+        "limit": 600,
         "period": 60,
       },
     },
@@ -90,10 +98,18 @@
       },
       "ratelimits": [
         {
-          "name": "ATTRIBUTION_TRACK_RATE_LIMITER",
+          "name": "ATTRIBUTION_TRACK_ORG_RATE_LIMITER",
           "namespace_id": "1006",
           "simple": {
-            "limit": 60,
+            "limit": 6000,
+            "period": 60,
+          },
+        },
+        {
+          "name": "ATTRIBUTION_TRACK_USER_RATE_LIMITER",
+          "namespace_id": "1008",
+          "simple": {
+            "limit": 600,
             "period": 60,
           },
         },

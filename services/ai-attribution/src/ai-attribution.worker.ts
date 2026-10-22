@@ -66,11 +66,14 @@ app.post('/attributions/track', async c => {
   const user_id = c.get('user_id');
   const organization_id = c.get('organization_id');
 
-  // Share the per-organization and per-user counter before reading the body.
-  const rateLimitOutcome = await env.ATTRIBUTION_TRACK_RATE_LIMITER?.limit({
-    key: `${organization_id}:${user_id}`,
-  });
-  if (rateLimitOutcome && !rateLimitOutcome.success) {
+  // Apply the per-organization and the per-user limits before the body is read.
+  // Both counters are charged on every request, and each key keeps its own
+  // counter because a Rate Limit binding counts per key within a location.
+  const [organizationOutcome, userOutcome] = await Promise.all([
+    env.ATTRIBUTION_TRACK_ORG_RATE_LIMITER.limit({ key: organization_id }),
+    env.ATTRIBUTION_TRACK_USER_RATE_LIMITER.limit({ key: user_id }),
+  ]);
+  if (!organizationOutcome.success || !userOutcome.success) {
     return c.json(resError('Too many attribution requests, slow down'), 429);
   }
 

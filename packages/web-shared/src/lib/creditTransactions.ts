@@ -1,4 +1,5 @@
 import { eq, desc, and, isNull, gt, notExists, or, notLike } from 'drizzle-orm';
+import { z } from 'zod';
 import { db, readDb, sql } from './drizzle';
 import type { Organization } from '@kilocode/db/schema';
 import { credit_transactions, kilo_pass_issuance_items, kilocode_users } from '@kilocode/db/schema';
@@ -154,12 +155,58 @@ function encodeLedgerCursor(row: { created_at: string; id: string }): string {
   return `${row.created_at}|${row.id}`;
 }
 
+// `created_at` is selected in `mode: 'string'`, so a cursor carries it exactly as
+// Postgres renders a `timestamptz`: `2026-10-22 10:49:31.051648+00`, or `+05:30`
+// for a half-hour offset.
+const LEDGER_TIMESTAMP_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?[+-](\d{2})(?::?(\d{2}))?$/;
+const LEDGER_CURSOR_ID = z.uuid();
+
+function isLedgerTimestamp(value: string): boolean {
+  const match = LEDGER_TIMESTAMP_PATTERN.exec(value);
+  if (!match) {
+    return false;
+  }
+  const [, year, month, day, hour, minute, second, fraction = '', offsetHour, offsetMinute = '00'] =
+    match;
+  if (Number(offsetHour) > 15 || Number(offsetMinute) > 59) {
+    return false;
+  }
+  // `Date.UTC` normalizes out-of-range fields where the database cast rejects them
+  // (`2026-02-30` becomes March 2, `24:00` the next day), so the wall clock has to
+  // survive a round trip before the value can be handed to the query.
+  const wallClock = new Date(
+    Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second),
+      Number(fraction.padEnd(3, '0').slice(0, 3))
+    )
+  );
+  return (
+    wallClock.getUTCFullYear() === Number(year) &&
+    wallClock.getUTCMonth() === Number(month) - 1 &&
+    wallClock.getUTCDate() === Number(day) &&
+    wallClock.getUTCHours() === Number(hour) &&
+    wallClock.getUTCMinutes() === Number(minute) &&
+    wallClock.getUTCSeconds() === Number(second)
+  );
+}
+
 function decodeLedgerCursor(cursor: string): { createdAt: string; id: string } | null {
   const separator = cursor.indexOf('|');
   if (separator <= 0 || separator === cursor.length - 1) {
     return null;
   }
-  return { createdAt: cursor.slice(0, separator), id: cursor.slice(separator + 1) };
+  const createdAt = cursor.slice(0, separator);
+  const id = cursor.slice(separator + 1);
+  if (!isLedgerTimestamp(createdAt) || !LEDGER_CURSOR_ID.safeParse(id).success) {
+    return null;
+  }
+  return { createdAt, id };
 }
 
 export async function getCreditTransactionsForOrganizationPage(

@@ -166,7 +166,8 @@ class KiloActionActivity : Activity() {
     if (awaitsResult) {
       waitingFor = payload
       AppActionDispatcher.await(payload) { result -> finishWith(result) }
-      main.postDelayed({ finishWith(null) }, RESULT_TIMEOUT_MS)
+      val timeout = if (startAgent) START_AGENT_RESULT_TIMEOUT_MS else RESULT_TIMEOUT_MS
+      main.postDelayed({ finishWith(null) }, timeout)
     }
     if (AppActionDispatcher.dispatch(payload)) {
       if (startAgent) {
@@ -219,7 +220,16 @@ class KiloActionActivity : Activity() {
   }
 
   private companion object {
-    /** A cold start has to boot the app before the dispatcher can answer. */
+    /**
+     * A cold start has to boot the app before the dispatcher can answer. The
+     * three open actions answer as soon as the JS runtime is up.
+     */
     const val RESULT_TIMEOUT_MS = 15_000L
+
+    /**
+     * `StartAgent` answers after the person reads and answers the confirmation,
+     * so its bound holds the whole run: boot, the confirmation, and the create.
+     */
+    const val START_AGENT_RESULT_TIMEOUT_MS = 300_000L
   }
 }

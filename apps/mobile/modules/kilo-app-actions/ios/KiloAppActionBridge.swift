@@ -204,7 +204,11 @@ final class KiloAppActionBridge: @unchecked Sendable {
     let sessionId: String?
     let message: String?
     let retryable: Bool?
+    let code: String?
   }
+
+  /// The result code a declined confirmation reports.
+  private static let cancelledCode = "start-cancelled"
 
   /// The dispatcher may answer with the result or with a promise of it; both
   /// are accepted, and a rejected promise propagates its JS error.
@@ -218,8 +222,9 @@ final class KiloAppActionBridge: @unchecked Sendable {
     }
   }
 
-  /// The caller-facing result: the session id a `StartAgent` run created.
-  /// A refusal throws with the pipeline's message.
+  /// The caller-facing result: the session id a `StartAgent` run created. A
+  /// declined confirmation reports its message as a normal value; any other
+  /// refusal throws with the pipeline's message.
   private static func result(from answer: JavaScriptValue) throws -> String {
     let decoded = try decode(answer)
     guard let ok = decoded.ok else {
@@ -232,6 +237,9 @@ final class KiloAppActionBridge: @unchecked Sendable {
       guard let message = nonBlank(decoded.message) else {
         throw KiloAppActionError.malformedResult
       }
+      return message
+    }
+    if decoded.code == cancelledCode, let message = nonBlank(decoded.message) {
       return message
     }
     throw KiloAppActionError.refused(
@@ -261,11 +269,13 @@ final class KiloAppActionBridge: @unchecked Sendable {
     let sessionId = object.getProperty("sessionId")
     let message = object.getProperty("message")
     let retryable = object.getProperty("retryable")
+    let code = object.getProperty("code")
     return Answer(
       ok: ok.isBool() ? ok.getBool() : nil,
       sessionId: sessionId.isString() ? sessionId.getString() : nil,
       message: message.isString() ? message.getString() : nil,
-      retryable: retryable.isBool() ? retryable.getBool() : nil
+      retryable: retryable.isBool() ? retryable.getBool() : nil,
+      code: code.isString() ? code.getString() : nil
     )
   }
 

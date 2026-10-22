@@ -58,8 +58,8 @@ const INTENT_TYPES = {
   OpenPullRequest: 'OpenPullRequestIntent',
 } as const satisfies Record<AppActionId, string>;
 
-/** The actions that open the app themselves; `StartAgent` runs in the background. */
-const OPEN_ACTIONS = ['OpenNeedsInput', 'OpenSession', 'OpenPullRequest'] as const;
+/** The actions that also carry a `kiloapp://` URL; `StartAgent` passes a payload instead. */
+const URL_ACTIONS = ['OpenNeedsInput', 'OpenSession', 'OpenPullRequest'] as const;
 
 /** The lines that hand a label to the App Intents metadata extractor. */
 const LABEL_LINE =
@@ -175,13 +175,12 @@ describe('the four App Intents', () => {
     expect(intents).not.toContain('INIntent');
   });
 
-  it('opens the app for the open actions and stays closed for StartAgent', () => {
-    for (const action of OPEN_ACTIONS) {
+  it('opens the app for every action', () => {
+    for (const action of APP_ACTION_IDS) {
       expect(openAppWhenRun(swiftStruct(INTENT_TYPES[action])), `${action} must open the app`).toBe(
         'true'
       );
     }
-    expect(openAppWhenRun(swiftStruct(INTENT_TYPES.StartAgent))).toBe('false');
   });
 
   it('lists every action in the AppShortcutsProvider', () => {
@@ -222,8 +221,8 @@ describe('the Swift action URLs', () => {
   }
 
   it('declares one URL per open action', () => {
-    expect(literals).toHaveLength(OPEN_ACTIONS.length);
-    expect(new Set(literals).size).toBe(OPEN_ACTIONS.length);
+    expect(literals).toHaveLength(URL_ACTIONS.length);
+    expect(new Set(literals).size).toBe(URL_ACTIONS.length);
   });
 
   it.each(literals)('%s parses with parseAppActionUrl', literal => {
@@ -322,7 +321,7 @@ describe('the native handshake', () => {
   it('reads the result fields the JS contract answers with', () => {
     // The `AppActionResult` fields of src/lib/app-actions/app-action-contract.ts:
     // a renamed field here would silently turn every run into a malformed result.
-    for (const field of ['ok', 'sessionId', 'message', 'retryable']) {
+    for (const field of ['ok', 'sessionId', 'message', 'retryable', 'code']) {
       expect(bridge, `${field} is not read from the answer`).toContain(`getProperty("${field}")`);
     }
   });

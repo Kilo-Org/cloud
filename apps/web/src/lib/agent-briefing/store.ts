@@ -347,7 +347,7 @@ export async function listBriefings(
   const contexts = await briefingContexts(userId);
   if (input.organizationId) await requireBriefingContext(userId, input.organizationId);
   const now = new Date().toISOString();
-  const limit = Math.min(input.limit ?? 20, 20);
+  const limit = input.limit ?? 30;
   const scopeFilter =
     input.scope === 'personal'
       ? isNull(agent_briefing_reports.organization_id)

@@ -113,10 +113,12 @@ export function Sheet({
   // receives Back natively and this listener does not run.
   const requestSelfDismissRef = useRef<() => void>(() => undefined);
   requestSelfDismissRef.current = () => {
-    if (onRequestDismiss?.() === false) {
+    // A dismissal the caller superseded is already on its way out; asking again
+    // would raise the caller's own confirm a second time for one press.
+    if (visible && dismissalPending) {
       return;
     }
-    if (visible && dismissalPending) {
+    if (onRequestDismiss?.() === false) {
       return;
     }
     onClose();

@@ -3,6 +3,7 @@
 // it closes the sheet, it still asks a caller that wants to confirm first, and
 // it never registers on iOS or after the sheet closes.
 
+import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -44,6 +45,14 @@ vi.mock('@expo/ui/community/bottom-sheet', () => ({
 }));
 
 const mounted: { unmount: () => void }[] = [];
+
+function sheetIndex(renderer: { root: { findAllByType: (type: never) => { props: { index?: number } }[] } }) {
+  const node = renderer.root.findAllByType('BottomSheet' as never).at(0);
+  if (!node) {
+    throw new Error('sheet not rendered');
+  }
+  return node.props.index;
+}
 
 async function mount(onClose: () => void, onRequestDismiss?: () => boolean) {
   const ui = await renderWithProviders(
@@ -117,5 +126,36 @@ describe('Sheet Android back before the sheet window owns it', () => {
     await mount(() => undefined);
 
     expect(platform.backListeners).toHaveLength(0);
+  });
+
+  it('does not ask the caller again for a dismissal already in flight', async () => {
+    const onRequestDismiss = vi.fn(() => true);
+    const onClose = vi.fn<() => void>();
+    const { renderer, queryClient } = await mount(onClose, onRequestDismiss);
+
+    const update = async (visible: boolean) => {
+      await act(async () => {
+        renderer.update(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            <Sheet visible={visible} onClose={onClose} onRequestDismiss={onRequestDismiss}>
+              {createElement('View', { testID: 'sheet-content' })}
+            </Sheet>
+          )
+        );
+        await Promise.resolve();
+      });
+    };
+
+    // Close and reopen before the native dismissal reports: the wrapper keeps
+    // the presentation on its way out and holds the reopen back.
+    await update(false);
+    await update(true);
+    expect(sheetIndex(renderer)).toBe(-1);
+
+    expect(await pressBack()).toBe(true);
+    expect(onRequestDismiss).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

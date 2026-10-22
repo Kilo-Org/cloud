@@ -72,6 +72,16 @@ export function useModelPreferences(organizationId: string | undefined) {
 
   const setLastSelected = useMutation(
     trpc.modelPreferences.setLastSelected.mutationOptions({
+      // Reopened forms resolve server preferences before the local saved pick.
+      // Publish the pick now; a failed sync still leaves that local choice saved.
+      onMutate: async selection => {
+        const queryKey = trpc.modelPreferences.get.queryKey(input);
+        await queryClient.cancelQueries({ queryKey });
+        queryClient.setQueryData(queryKey, previous => ({
+          favorites: previous?.favorites ?? [],
+          lastSelected: selection,
+        }));
+      },
       onSuccess: invalidate,
       onError,
     })

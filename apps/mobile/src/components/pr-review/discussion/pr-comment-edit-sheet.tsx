@@ -19,7 +19,14 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackHandler, Keyboard, ScrollView, type TextInput, View } from 'react-native';
+import {
+  BackHandler,
+  Keyboard,
+  ScrollView,
+  type ScrollViewInstance,
+  type TextInput,
+  View,
+} from 'react-native';
 
 import {
   ComposerInlineError,
@@ -62,7 +69,7 @@ export function PrCommentEditSheet({
   // iOS uncontrolled: ref + defaultValue; no value+state.
   const bodyRef = useRef<string>(initialBody);
   const bodyInputRef = useRef<TextInput | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
 
   // State only for derived UI: an empty body and an unchanged body both have
   // nothing to save, so each keeps Save down.

@@ -9,7 +9,7 @@ Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-
 
 ## Stack
 
-- Expo SDK 57, React Native 0.86, React 19, strict TypeScript (`tsgo`)
+- Expo SDK 58, React Native 0.88, React 19.3, strict TypeScript (`tsgo`)
 - NativeWind v5 / Tailwind CSS v4; React Native Reusables in `src/components/ui/`
 - Expo Router routes in `src/app/`
 - oxlint and oxfmt
@@ -62,10 +62,10 @@ git diff --check
 Before you build a UI element, find the library that already does it.
 
 1. Check the element map below. If the concern has an entry, use that element.
-2. Check `@expo/ui` (`node_modules/@expo/ui/build/`), which ships native modules for `57.x`: universal
+2. Check `@expo/ui` (`node_modules/@expo/ui/build/`), which ships native modules for `58.x`: universal
    `BottomSheet`, `Picker`, `Switch`, `TextInput`, `List`, `Host`, plus
    `community/{segmented-control, picker, datetime-picker, masked-view, menu, pager-view, slider}`.
-3. Check the Expo SDK 57 docs for the concern.
+3. Check the Expo SDK 58 docs for the concern.
 4. Check npm for a maintained package. A release in the last six months is the bar.
 
 A hand-built element is correct only when steps 1–4 fail. Record the decision in the PR body: the library

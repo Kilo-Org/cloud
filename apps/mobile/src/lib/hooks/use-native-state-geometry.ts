@@ -1,6 +1,6 @@
 import { captureException } from '@sentry/react-native';
 import { useEffect, useState } from 'react';
-import { findNodeHandle, type View } from 'react-native';
+import { findNodeHandle, type ViewInstance } from 'react-native';
 
 import {
   addSurfaceGeometryListener,
@@ -11,7 +11,7 @@ import {
 } from '@/lib/native-surface-geometry';
 
 type Observation = {
-  node: View | null;
+  node: ViewInstance | null;
   status: 'pending' | 'ready' | 'failed';
   geometry: NativeSurfaceGeometry | null;
   failure?: string;
@@ -28,7 +28,7 @@ function sameGeometry(left: NativeSurfaceGeometry | null, right: NativeSurfaceGe
   );
 }
 
-export function useNativeStateGeometry(node: View | null) {
+export function useNativeStateGeometry(node: ViewInstance | null) {
   const [observation, setObservation] = useState<Observation>({
     node: null,
     status: 'pending',
@@ -40,7 +40,7 @@ export function useNativeStateGeometry(node: View | null) {
       return undefined;
     }
     const tag = findNodeHandle(node);
-    if (tag === null) {
+    if (tag == null) {
       setObservation({
         node,
         status: 'failed',

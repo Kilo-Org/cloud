@@ -16,9 +16,13 @@ describe('Hermes NumberFormat compatibility', () => {
 
     const { prewarmIntl } = await import('./intl-cache');
     prewarmIntl('de');
-    const { formatFileSize, formatMoney } = await import('./format');
+    const { formatFileSize, formatMoney, parseLocalizedNumber } = await import('./format');
 
     expect(formatMoney(1234.5, 'de')).toMatch(/1\.234,50[\s\u00A0\u202F]+\$/);
     expect(formatFileSize(1024, 'de')).toContain('1 kB');
+    // The device path validates through the polyfilled formatter as well.
+    expect(parseLocalizedNumber('1.234,5', 'de')).toBe(1234.5);
+    expect(parseLocalizedNumber('1,5', 'de')).toBe(1.5);
+    expect(parseLocalizedNumber('1.5', 'de')).toBeNull();
   });
 });

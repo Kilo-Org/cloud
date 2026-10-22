@@ -3826,6 +3826,7 @@
       "newList": "Нов список",
       "empty": "Сè уште нема списоци",
       "couldNotLoad": "Списоците не се вчитаа",
+      "createFailed": "Списокот не се создаде",
       "noRepository": "Нема репозиториум",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} отворени",

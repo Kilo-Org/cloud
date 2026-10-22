@@ -3826,6 +3826,7 @@
       "newList": "Liis cusub",
       "empty": "Weli ma jiraan liisas",
       "couldNotLoad": "Liisas lama soo rarin karin",
+      "createFailed": "Liiska lama abuur karin",
       "noRepository": "Kayd ma jiro",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} furan",

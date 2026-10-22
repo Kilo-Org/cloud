@@ -3826,6 +3826,7 @@
       "newList": "新建列表",
       "empty": "暂无列表",
       "couldNotLoad": "无法加载列表",
+      "createFailed": "无法创建列表",
       "noRepository": "无仓库",
       "rowA11y": "{{name}}，{{openCount}}",
       "openCount_one": "{{count}} 个未完成",

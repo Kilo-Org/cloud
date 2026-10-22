@@ -3871,6 +3871,7 @@
       "newList": "Nova llista",
       "empty": "Encara no hi ha llistes",
       "couldNotLoad": "No s'han pogut carregar les llistes",
+      "createFailed": "No s'ha pogut crear la llista",
       "noRepository": "Sense repositori",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} obertes",

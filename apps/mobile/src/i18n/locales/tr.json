@@ -3826,6 +3826,7 @@
       "newList": "Yeni liste",
       "empty": "Henüz liste yok",
       "couldNotLoad": "Listeler yüklenemedi",
+      "createFailed": "Liste oluşturulamadı",
       "noRepository": "Depo yok",
       "rowA11y": "{{name}} — {{openCount}}",
       "openCount_one": "{{count}} açık",

@@ -3871,6 +3871,7 @@
       "newList": "רשימה חדשה",
       "empty": "אין רשימות עדיין",
       "couldNotLoad": "לא הצלחנו לטעון רשימות",
+      "createFailed": "לא הצלחנו ליצור את הרשימה",
       "noRepository": "בלי מאגר",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} פתוח",

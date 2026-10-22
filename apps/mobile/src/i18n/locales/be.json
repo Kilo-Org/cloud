@@ -3916,6 +3916,7 @@
       "newList": "Новы спіс",
       "empty": "Спісаў пакуль няма",
       "couldNotLoad": "Не атрымалася загрузіць спісы",
+      "createFailed": "Не атрымалася стварыць спіс",
       "noRepository": "Няма рэпазіторыя",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} адкрытых",

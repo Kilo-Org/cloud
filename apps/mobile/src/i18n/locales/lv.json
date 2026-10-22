@@ -3871,6 +3871,7 @@
       "newList": "Jauns saraksts",
       "empty": "Vēl nav sarakstu",
       "couldNotLoad": "Neizdevās ielādēt sarakstus",
+      "createFailed": "Neizdevās izveidot sarakstu",
       "noRepository": "Nav repozitorija",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} atvērti",

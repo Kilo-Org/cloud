@@ -3826,6 +3826,7 @@
       "newList": "نوی لېست",
       "empty": "تر اوسه هېڅ لېست نشته",
       "couldNotLoad": "لېستونه بار نه شول",
+      "createFailed": "لېست جوړ نه شو",
       "noRepository": "زېرمتون نشته",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} پرانیستي",

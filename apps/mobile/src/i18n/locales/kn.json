@@ -3826,6 +3826,7 @@
       "newList": "ಹೊಸ ಪಟ್ಟಿ",
       "empty": "ಇನ್ನೂ ಯಾವುದೇ ಪಟ್ಟಿಗಳಿಲ್ಲ",
       "couldNotLoad": "ಪಟ್ಟಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+      "createFailed": "ಪಟ್ಟಿಯನ್ನು ರಚಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "noRepository": "ರೆಪೊಸಿಟರಿ ಇಲ್ಲ",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} ತೆರೆದಿವೆ",

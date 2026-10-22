@@ -3826,6 +3826,7 @@
       "newList": "പുതിയ പട്ടിക",
       "empty": "ഇതുവരെ പട്ടികകളൊന്നുമില്ല",
       "couldNotLoad": "പട്ടികകൾ ലോഡ് ചെയ്യാനായില്ല",
+      "createFailed": "പട്ടിക സൃഷ്ടിക്കാനായില്ല",
       "noRepository": "റിപ്പോസിറ്ററി ഇല്ല",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} തുറന്നത്",

@@ -3826,6 +3826,7 @@
       "newList": "Ny liste",
       "empty": "Ingen lister endnu",
       "couldNotLoad": "Kunne ikke indlæse lister",
+      "createFailed": "Kunne ikke oprette listen",
       "noRepository": "Intet kodelager",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} åbne",

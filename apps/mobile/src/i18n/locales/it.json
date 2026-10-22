@@ -3871,6 +3871,7 @@
       "newList": "Nuovo elenco",
       "empty": "Ancora nessun elenco",
       "couldNotLoad": "Impossibile caricare gli elenchi",
+      "createFailed": "Impossibile creare l'elenco",
       "noRepository": "Nessun repository",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} aperte",

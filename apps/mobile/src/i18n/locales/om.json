@@ -3826,6 +3826,7 @@
       "newList": "Tarree haaraa",
       "empty": "Tarree hin jiru",
       "couldNotLoad": "Tarreewwan fe'uun hin danda'amne",
+      "createFailed": "Tarree uumuun hin danda'amne",
       "noRepository": "Kuusaa koodii hin jiru",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} banaa",

@@ -3826,6 +3826,7 @@
       "newList": "አዲስ ዝርዝር",
       "empty": "እስካሁን ዝርዝር የለም",
       "couldNotLoad": "ዝርዝሮችን መጫን አልተቻለም።",
+      "createFailed": "ዝርዝሩን መፍጠር አልተቻለም",
       "noRepository": "ማከማቻ የለም",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} ክፍት",

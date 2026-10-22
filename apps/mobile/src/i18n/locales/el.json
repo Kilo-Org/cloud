@@ -3826,6 +3826,7 @@
       "newList": "Νέα λίστα",
       "empty": "Καμία λίστα ακόμα",
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των λιστών",
+      "createFailed": "Δεν ήταν δυνατή η δημιουργία της λίστας",
       "noRepository": "Χωρίς αποθετήριο",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} ανοιχτές",

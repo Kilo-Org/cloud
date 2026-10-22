@@ -3826,6 +3826,7 @@
       "newList": "Ndepụta ọhụrụ",
       "empty": "Enweghị ndepụta",
       "couldNotLoad": "Enweghị ike ibudata ndepụta",
+      "createFailed": "Enweghị ike imepụta ndepụta",
       "noRepository": "Enweghị ebe nchekwa koodu",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} mepere emepe",

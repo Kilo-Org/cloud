@@ -3826,6 +3826,7 @@
       "newList": "புதிய பட்டியல்",
       "empty": "இன்னும் பட்டியல்கள் இல்லை",
       "couldNotLoad": "பட்டியல்களை ஏற்ற முடியவில்லை",
+      "createFailed": "பட்டியலை உருவாக்க முடியவில்லை",
       "noRepository": "களஞ்சியம் இல்லை",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} திறந்தவை",

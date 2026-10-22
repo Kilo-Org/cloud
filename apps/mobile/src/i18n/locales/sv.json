@@ -3825,6 +3825,7 @@
       "newList": "Ny lista",
       "empty": "Inga listor ännu",
       "couldNotLoad": "Kunde inte läsa in listorna",
+      "createFailed": "Kunde inte skapa listan",
       "noRepository": "Inget kodarkiv",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} öppen",

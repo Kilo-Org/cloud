@@ -3871,6 +3871,7 @@
       "newList": "Listă nouă",
       "empty": "Încă nu există liste",
       "couldNotLoad": "Nu s-au putut încărca listele",
+      "createFailed": "Nu s-a putut crea lista",
       "noRepository": "Niciun depozit",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} deschise",

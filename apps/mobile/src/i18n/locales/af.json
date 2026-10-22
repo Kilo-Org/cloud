@@ -3826,6 +3826,7 @@
       "newList": "Nuwe lys",
       "empty": "Nog geen lyste nie",
       "couldNotLoad": "Kon nie lyste laai nie",
+      "createFailed": "Kon nie die lys skep nie",
       "noRepository": "Geen bewaarplek",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} oop",

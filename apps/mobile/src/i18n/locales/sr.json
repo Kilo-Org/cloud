@@ -3871,6 +3871,7 @@
       "newList": "Novi spisak",
       "empty": "Još nema spiskova",
       "couldNotLoad": "Spiskovi nisu mogli da se učitaju",
+      "createFailed": "Spisak nije mogao da se napravi",
       "noRepository": "Nema repozitorijuma",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} otvorenih",

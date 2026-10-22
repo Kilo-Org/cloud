@@ -3826,6 +3826,7 @@
       "newList": "નવી યાદી",
       "empty": "હજુ કોઈ યાદી નથી",
       "couldNotLoad": "યાદીઓ લોડ કરી શકાઈ નહીં",
+      "createFailed": "યાદી બનાવી શકાઈ નહીં",
       "noRepository": "કોઈ રિપોઝિટરી નથી",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} ખુલ્લાં",

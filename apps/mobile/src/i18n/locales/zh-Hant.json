@@ -3826,6 +3826,7 @@
       "newList": "新增清單",
       "empty": "尚無清單",
       "couldNotLoad": "無法載入清單",
+      "createFailed": "無法建立清單",
       "noRepository": "沒有儲存庫",
       "rowA11y": "{{name}}，{{openCount}}",
       "openCount_one": "未完成 {{count}} 項",

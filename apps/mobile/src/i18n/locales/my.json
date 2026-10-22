@@ -3826,6 +3826,7 @@
       "newList": "စာရင်းအသစ်",
       "empty": "စာရင်းမရှိသေးပါ",
       "couldNotLoad": "စာရင်းများကို ရယူ၍ မရပါ။",
+      "createFailed": "စာရင်းကို ဖန်တီး၍ မရပါ။",
       "noRepository": "ကုဒ်သိုလှောင်ရာ မသတ်မှတ်ထားပါ",
       "rowA11y": "{{name}}၊ {{openCount}}",
       "openCount_one": "{{count}} ခု ဖွင့်ထားသည်",

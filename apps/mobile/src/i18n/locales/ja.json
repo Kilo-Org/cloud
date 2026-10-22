@@ -3826,6 +3826,7 @@
       "newList": "新しいリスト",
       "empty": "リストはまだありません",
       "couldNotLoad": "リストを読み込めませんでした",
+      "createFailed": "リストを作成できませんでした",
       "noRepository": "リポジトリなし",
       "rowA11y": "{{name}}、{{openCount}}",
       "openCount_one": "未完了{{count}}件",

@@ -3826,6 +3826,7 @@
       "newList": "Bagong listahan",
       "empty": "Wala pang listahan",
       "couldNotLoad": "Hindi ma-load ang mga listahan",
+      "createFailed": "Hindi malikha ang listahan",
       "noRepository": "Walang repositoryo",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} bukas",

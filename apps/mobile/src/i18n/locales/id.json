@@ -3826,6 +3826,7 @@
       "newList": "Daftar baru",
       "empty": "Belum ada daftar",
       "couldNotLoad": "Tidak dapat memuat daftar",
+      "createFailed": "Tidak dapat membuat daftar",
       "noRepository": "Tanpa repositori",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} terbuka",

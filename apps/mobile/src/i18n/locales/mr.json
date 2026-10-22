@@ -3826,6 +3826,7 @@
       "newList": "नवीन यादी",
       "empty": "अजून याद्या नाहीत",
       "couldNotLoad": "याद्या लोड करता आल्या नाहीत",
+      "createFailed": "यादी तयार करता आली नाही",
       "noRepository": "रिपॉझिटरी नाही",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} खुले",

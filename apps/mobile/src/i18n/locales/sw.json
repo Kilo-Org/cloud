@@ -3826,6 +3826,7 @@
       "newList": "Orodha mpya",
       "empty": "Hakuna orodha bado",
       "couldNotLoad": "Imeshindikana kupakia orodha",
+      "createFailed": "Imeshindikana kuunda orodha",
       "noRepository": "Hakuna hazina",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} wazi",

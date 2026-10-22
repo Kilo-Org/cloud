@@ -3826,6 +3826,7 @@
       "newList": "ახალი სია",
       "empty": "სიები ჯერ არ არის",
       "couldNotLoad": "სიების ჩატვირთვა ვერ მოხერხდა.",
+      "createFailed": "სიის შექმნა ვერ მოხერხდა.",
       "noRepository": "რეპოზიტორია არ არის",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} ღია",

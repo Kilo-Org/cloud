@@ -3826,6 +3826,7 @@
       "newList": "Yeni siyahı",
       "empty": "Hələ siyahı yoxdur",
       "couldNotLoad": "Siyahıları yükləmək mümkün olmadı",
+      "createFailed": "Siyahını yaratmaq mümkün olmadı",
       "noRepository": "Repozitoriya yoxdur",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} açıq",

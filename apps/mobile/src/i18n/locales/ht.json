@@ -3826,6 +3826,7 @@
       "newList": "Nouvo lis",
       "empty": "Poko gen lis",
       "couldNotLoad": "Nou pa t ka chaje lis yo",
+      "createFailed": "Nou pa t ka kreye lis la",
       "noRepository": "Pa gen depo",
       "rowA11y": "{{name}} — {{openCount}}",
       "openCount_one": "{{count}} ouvè",

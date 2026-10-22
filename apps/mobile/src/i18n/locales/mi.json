@@ -3826,6 +3826,7 @@
       "newList": "Rārangi hōu",
       "empty": "Kāore anō he rārangi",
       "couldNotLoad": "Kāore i taea te uta i ngā rārangi",
+      "createFailed": "Kāore i taea te hanga i te rārangi",
       "noRepository": "Kāore he pūranga waehere",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} tuwhera",

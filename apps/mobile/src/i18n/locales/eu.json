@@ -3826,6 +3826,7 @@
       "newList": "Zerrenda berria",
       "empty": "Oraindik ez dago zerrendarik",
       "couldNotLoad": "Ezin izan dira zerrendak kargatu",
+      "createFailed": "Ezin izan da zerrenda sortu",
       "noRepository": "Ez dago biltegirik",
       "rowA11y": "{{name}} — {{openCount}}",
       "openCount_one": "{{count}} irekita",

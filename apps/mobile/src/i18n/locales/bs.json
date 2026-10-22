@@ -3871,6 +3871,7 @@
       "newList": "Nova lista",
       "empty": "Još nema listi",
       "couldNotLoad": "Učitavanje listi nije uspjelo",
+      "createFailed": "Kreiranje liste nije uspjelo",
       "noRepository": "Bez repozitorija",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "Otvoreno: {{count}}",

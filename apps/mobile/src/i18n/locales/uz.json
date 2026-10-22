@@ -3826,6 +3826,7 @@
       "newList": "Yangi ro‘yxat",
       "empty": "Hozircha ro‘yxatlar yo‘q",
       "couldNotLoad": "Ro‘yxatlarni yuklab bo‘lmadi",
+      "createFailed": "Ro‘yxat yaratib bo‘lmadi",
       "noRepository": "Repozitoriy yo‘q",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} ochiq",

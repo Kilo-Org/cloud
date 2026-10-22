@@ -3826,6 +3826,7 @@
       "newList": "Шинэ жагсаалт",
       "empty": "Жагсаалт одоогоор алга",
       "couldNotLoad": "Жагсаалтыг ачаалж чадсангүй",
+      "createFailed": "Жагсаалтыг үүсгэж чадсангүй",
       "noRepository": "Кодын сан алга",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} нээлттэй",

@@ -3916,6 +3916,7 @@
       "newList": "Nový zoznam",
       "empty": "Zatiaľ žiadne zoznamy",
       "couldNotLoad": "Zoznamy sa nepodarilo načítať",
+      "createFailed": "Zoznam sa nepodarilo vytvoriť",
       "noRepository": "Žiadny repozitár",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "Otvorené: {{count}}",

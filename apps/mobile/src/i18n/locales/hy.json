@@ -3826,6 +3826,7 @@
       "newList": "Նոր ցուցակ",
       "empty": "Ցուցակներ դեռ չկան",
       "couldNotLoad": "Չհաջողվեց բեռնել ցուցակները",
+      "createFailed": "Չհաջողվեց ստեղծել ցուցակը",
       "noRepository": "Պահոց չկա",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} բաց",

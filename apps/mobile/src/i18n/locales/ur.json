@@ -3826,6 +3826,7 @@
       "newList": "نئی فہرست",
       "empty": "ابھی تک کوئی فہرست نہیں",
       "couldNotLoad": "فہرستیں لوڈ نہیں ہو سکیں",
+      "createFailed": "فہرست نہیں بن سکی",
       "noRepository": "ریپوزٹری موجود نہیں",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "کھلے: {{count}}",

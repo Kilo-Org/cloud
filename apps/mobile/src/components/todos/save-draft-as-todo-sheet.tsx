@@ -56,7 +56,9 @@ export function SaveDraftAsTodoSheet({
   const [hiddenForCreate, setHiddenForCreate] = useState(false);
   const openCreateList = useCallback(() => {
     setHiddenForCreate(true);
-    router.push(todoListSettingsPath({ organizationId }));
+    // Return here rather than to the created list: the draft this picker saves is
+    // still in the composer, and the new list is the one it is about to go into.
+    router.push(todoListSettingsPath({ organizationId, afterCreate: 'back' }));
   }, [organizationId, router]);
   useFocusEffect(
     useCallback(() => {

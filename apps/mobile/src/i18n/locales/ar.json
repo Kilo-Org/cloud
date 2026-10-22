@@ -4006,6 +4006,7 @@
       "newList": "قائمة جديدة",
       "empty": "لا توجد قوائم بعد",
       "couldNotLoad": "تعذّر تحميل القوائم",
+      "createFailed": "تعذّر إنشاء القائمة",
       "noRepository": "بلا مستودع",
       "rowA11y": "{{name}}، {{openCount}}",
       "openCount_one": "{{count}} مفتوحة",

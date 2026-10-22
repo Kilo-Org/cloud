@@ -3826,6 +3826,7 @@
       "newList": "Нов списък",
       "empty": "Все още няма списъци",
       "couldNotLoad": "Не успяхме да заредим списъците",
+      "createFailed": "Не успяхме да създадем списъка",
       "noRepository": "Няма хранилище",
       "rowA11y": "{{name}} — {{openCount}}",
       "openCount_one": "Отворени: {{count}}",

@@ -3916,6 +3916,7 @@
       "newList": "Naujas sąrašas",
       "empty": "Sąrašų dar nėra",
       "couldNotLoad": "Sąrašų įkelti nepavyko",
+      "createFailed": "Sąrašo sukurti nepavyko",
       "noRepository": "Nėra saugyklos",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "Atviros: {{count}}",

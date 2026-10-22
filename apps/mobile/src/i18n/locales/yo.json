@@ -3826,6 +3826,7 @@
       "newList": "Àkójọ tuntun",
       "empty": "Kò sí àkójọ síbẹ̀",
       "couldNotLoad": "A kò lè gbé àwọn àkójọ wọlé",
+      "createFailed": "A kò lè ṣẹ̀dá àkójọ náà",
       "noRepository": "Kò sí ibi ìpamọ́ kóòdù",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} ṣí",

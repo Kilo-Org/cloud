@@ -3826,6 +3826,7 @@
       "newList": "Uus loend",
       "empty": "Loendeid veel pole",
       "couldNotLoad": "Loendeid ei õnnestunud laadida",
+      "createFailed": "Loendit ei õnnestunud luua",
       "noRepository": "Hoidlat pole",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} avatud",

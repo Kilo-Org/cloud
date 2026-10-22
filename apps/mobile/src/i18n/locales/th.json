@@ -3826,6 +3826,7 @@
       "newList": "รายการใหม่",
       "empty": "ยังไม่มีรายการ",
       "couldNotLoad": "ไม่สามารถโหลดรายการได้",
+      "createFailed": "ไม่สามารถสร้างรายการได้",
       "noRepository": "ไม่มีคลังโค้ด",
       "rowA11y": "{{name}} {{openCount}}",
       "openCount_one": "เปิดอยู่ {{count}}",

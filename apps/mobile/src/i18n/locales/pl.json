@@ -3916,6 +3916,7 @@
       "newList": "Nowa lista",
       "empty": "Brak list",
       "couldNotLoad": "Nie udało się wczytać list",
+      "createFailed": "Nie udało się utworzyć listy",
       "noRepository": "Brak repozytorium",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "Otwarte: {{count}}",

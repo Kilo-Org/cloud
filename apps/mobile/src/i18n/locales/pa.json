@@ -3826,6 +3826,7 @@
       "newList": "ਨਵੀਂ ਸੂਚੀ",
       "empty": "ਹਾਲੇ ਕੋਈ ਸੂਚੀ ਨਹੀਂ",
       "couldNotLoad": "ਸੂਚੀਆਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ",
+      "createFailed": "ਸੂਚੀ ਬਣਾਈ ਨਹੀਂ ਜਾ ਸਕੀ",
       "noRepository": "ਕੋਈ ਰਿਪੋਜ਼ਿਟਰੀ ਨਹੀਂ",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} ਖੁੱਲ੍ਹੇ",

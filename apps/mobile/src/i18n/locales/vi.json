@@ -3826,6 +3826,7 @@
       "newList": "Danh sách mới",
       "empty": "Chưa có danh sách nào",
       "couldNotLoad": "Không thể tải danh sách",
+      "createFailed": "Không thể tạo danh sách",
       "noRepository": "Không có kho mã nguồn",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} chưa xong",

@@ -3826,6 +3826,7 @@
       "newList": "Sabon jeri",
       "empty": "Babu jeri tukuna",
       "couldNotLoad": "An kasa loda jeri",
+      "createFailed": "An kasa ƙirƙirar jeri",
       "noRepository": "Babu ma'ajiya",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} a buɗe",

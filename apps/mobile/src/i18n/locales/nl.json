@@ -3826,6 +3826,7 @@
       "newList": "Nieuwe lijst",
       "empty": "Nog geen lijsten",
       "couldNotLoad": "De lijsten konden niet worden geladen",
+      "createFailed": "De lijst kon niet worden aangemaakt",
       "noRepository": "Geen coderepository",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} open",

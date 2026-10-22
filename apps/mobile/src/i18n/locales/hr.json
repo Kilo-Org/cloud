@@ -3871,6 +3871,7 @@
       "newList": "Novi popis",
       "empty": "Još nema popisa",
       "couldNotLoad": "Nije moguće učitati popise",
+      "createFailed": "Nije moguće stvoriti popis",
       "noRepository": "Nema repozitorija",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} otvorenih",

@@ -3826,6 +3826,7 @@
       "newList": "Lisitra vaovao",
       "empty": "Mbola tsy misy lisitra",
       "couldNotLoad": "Tsy tafiditra ny lisitra",
+      "createFailed": "Tsy taforona ny lisitra",
       "noRepository": "Tsy misy tahirin-kaody",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} misokatra",

@@ -3826,6 +3826,7 @@
       "newList": "Жаңа тізім",
       "empty": "Әзірге тізімдер жоқ",
       "couldNotLoad": "Тізімдерді жүктеу мүмкін болмады",
+      "createFailed": "Тізімді жасау мүмкін болмады",
       "noRepository": "Репозиторий жоқ",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} ашық",

@@ -3826,6 +3826,7 @@
       "newList": "ନୂଆ ତାଲିକା",
       "empty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ତାଲିକା ନାହିଁ",
       "couldNotLoad": "ତାଲିକାଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
+      "createFailed": "ତାଲିକା ସୃଷ୍ଟି କରିପାରିଲା ନାହିଁ",
       "noRepository": "କୌଣସି ରିପୋଜିଟୋରୀ ନାହିଁ",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} ଖୋଲା",

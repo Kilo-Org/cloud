@@ -3916,6 +3916,7 @@
       "newList": "Новый список",
       "empty": "Списков пока нет",
       "couldNotLoad": "Не удалось загрузить списки",
+      "createFailed": "Не удалось создать список",
       "noRepository": "Нет репозитория",
       "rowA11y": "{{name}} — {{openCount}}",
       "openCount_one": "{{count}} открытая",

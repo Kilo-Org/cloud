@@ -3826,6 +3826,7 @@
       "newList": "కొత్త జాబితా",
       "empty": "ఇంకా జాబితాలు లేవు",
       "couldNotLoad": "జాబితాలను లోడ్ చేయలేకపోయాము",
+      "createFailed": "జాబితాను సృష్టించలేకపోయాము",
       "noRepository": "రిపోజిటరీ లేదు",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} తెరిచి ఉన్నవి",

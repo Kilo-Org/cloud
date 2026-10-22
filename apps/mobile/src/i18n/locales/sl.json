@@ -3916,6 +3916,7 @@
       "newList": "Nov seznam",
       "empty": "Ni še seznamov",
       "couldNotLoad": "Seznamov ni bilo mogoče naložiti",
+      "createFailed": "Seznama ni bilo mogoče ustvariti",
       "noRepository": "Brez repozitorija",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} odprtih",

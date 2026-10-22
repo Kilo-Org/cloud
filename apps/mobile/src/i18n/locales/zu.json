@@ -3826,6 +3826,7 @@
       "newList": "Uhlu olusha",
       "empty": "Awekho amahlu okwamanje",
       "couldNotLoad": "Asikwazanga ukulayisha amahlu",
+      "createFailed": "Asikwazanga ukudala uhlu",
       "noRepository": "Ayikho inqolobane yekhodi",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} evuliwe",

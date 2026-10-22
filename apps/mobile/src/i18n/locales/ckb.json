@@ -3826,6 +3826,7 @@
       "newList": "لیستی نوێ",
       "empty": "هێشتا هیچ لیستێک نییە",
       "couldNotLoad": "نەتوانرا لیستەکان بار بکرێن",
+      "createFailed": "نەتوانرا لیستەکە دروست بکرێت",
       "noRepository": "هیچ کۆگایەک نییە",
       "rowA11y": "{{name}}، {{openCount}}",
       "openCount_one": "{{count}} کراوە",

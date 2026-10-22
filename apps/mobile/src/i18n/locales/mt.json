@@ -3961,6 +3961,7 @@
       "newList": "Lista ġdida",
       "empty": "S'issa m'hemmx listi",
       "couldNotLoad": "Ma stajniex ngħabbu l-listi",
+      "createFailed": "Ma stajniex noħolqu l-lista",
       "noRepository": "L-ebda repożitorju",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} miftuħa",

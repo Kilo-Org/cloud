@@ -3826,6 +3826,7 @@
       "newList": "Új lista",
       "empty": "Még nincsenek listák",
       "couldNotLoad": "Nem sikerült betölteni a listákat",
+      "createFailed": "Nem sikerült létrehozni a listát",
       "noRepository": "Nincs adattár",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} nyitott",

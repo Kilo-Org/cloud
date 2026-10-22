@@ -3826,6 +3826,7 @@
       "newList": "Senarai baharu",
       "empty": "Belum ada senarai",
       "couldNotLoad": "Tidak dapat memuatkan senarai",
+      "createFailed": "Tidak dapat mencipta senarai",
       "noRepository": "Tiada repositori",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} terbuka",

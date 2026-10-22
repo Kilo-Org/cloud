@@ -3961,6 +3961,7 @@
       "newList": "Liosta nua",
       "empty": "Níl aon liosta ann fós",
       "couldNotLoad": "Níorbh fhéidir liostaí a lódáil",
+      "createFailed": "Níorbh fhéidir an liosta a chruthú",
       "noRepository": "Gan stór",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} oscailte",

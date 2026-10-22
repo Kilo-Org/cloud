@@ -3916,6 +3916,7 @@
       "newList": "Nový seznam",
       "empty": "Zatím žádné seznamy",
       "couldNotLoad": "Seznamy se nepodařilo načíst",
+      "createFailed": "Seznam se nepodařilo vytvořit",
       "noRepository": "Žádný repozitář",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} otevřeno",

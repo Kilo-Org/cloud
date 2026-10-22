@@ -3826,6 +3826,7 @@
       "newList": "ລາຍການໃໝ່",
       "empty": "ຍັງບໍ່ມີລາຍການ",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດລາຍການໄດ້.",
+      "createFailed": "ບໍ່ສາມາດສ້າງລາຍການໄດ້.",
       "noRepository": "ບໍ່ມີຄັງໂຄ້ດ",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} ເປີດ",

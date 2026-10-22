@@ -3826,6 +3826,7 @@
       "newList": "Nýr listi",
       "empty": "Engir listar enn",
       "couldNotLoad": "Ekki tókst að sækja lista",
+      "createFailed": "Ekki tókst að búa til lista",
       "noRepository": "Ekkert kóðasafn",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} opið",

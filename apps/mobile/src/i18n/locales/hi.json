@@ -3826,6 +3826,7 @@
       "newList": "नई सूची",
       "empty": "अभी कोई सूची नहीं",
       "couldNotLoad": "सूचियाँ लोड नहीं हो सकीं",
+      "createFailed": "सूची नहीं बन सकी",
       "noRepository": "कोई रिपॉज़िटरी नहीं",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} खुले",

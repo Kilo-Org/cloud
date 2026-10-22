@@ -3826,6 +3826,7 @@
       "newList": "නව ලැයිස්තුවක්",
       "empty": "තවම ලැයිස්තු නැත",
       "couldNotLoad": "ලැයිස්තු පූරණය කිරීමට නොහැකි විය.",
+      "createFailed": "ලැයිස්තුව සෑදීමට නොහැකි විය.",
       "noRepository": "කේත ගබඩාවක් නැත",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} විවෘත",

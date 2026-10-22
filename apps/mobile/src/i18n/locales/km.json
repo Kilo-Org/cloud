@@ -3826,6 +3826,7 @@
       "newList": "បញ្ជីថ្មី",
       "empty": "មិនទាន់មានបញ្ជីទេ",
       "couldNotLoad": "មិនអាចផ្ទុកបញ្ជីបានទេ",
+      "createFailed": "មិនអាចបង្កើតបញ្ជីបានទេ",
       "noRepository": "គ្មានឃ្លាំងកូដ",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} មិនទាន់រួច",

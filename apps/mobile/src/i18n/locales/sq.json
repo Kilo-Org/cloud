@@ -3826,6 +3826,7 @@
       "newList": "Listë e re",
       "empty": "Ende pa lista",
       "couldNotLoad": "Listat nuk u ngarkuan",
+      "createFailed": "Lista nuk u krijua",
       "noRepository": "Pa depo",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} hapur",

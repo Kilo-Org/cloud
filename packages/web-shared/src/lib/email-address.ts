@@ -1,5 +1,7 @@
 export function getLowerDomainFromEmail(email: string): string | null {
-  return email?.split('@').pop()?.toLowerCase() || null;
+  const at = email.lastIndexOf('@');
+  if (at === -1) return null;
+  return email.slice(at + 1).toLowerCase() || null;
 }
 
 /**

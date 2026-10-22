@@ -25,6 +25,7 @@
     "error": "erreur : {{error}}",
     "back": "Retour",
     "somethingWentWrong": "Une erreur s'est produite.",
+    "actionNotRecorded": "Nous n'avons pas pu enregistrer cette action. Veuillez réessayer plus tard.",
     "couldNotOpen": "Impossible d'ouvrir {{label}}.",
     "link": "lien",
     "takingLonger": "Cela prend plus de temps que prévu. Vous pouvez fermer cet écran et revenir vérifier plus tard.",
@@ -35,6 +36,8 @@
     "connectGithub": "Connecter GitHub",
     "cost": "Coût",
     "discard": "Abandonner",
+    "discardChangesMessage": "Vos modifications seront perdues.",
+    "discardChangesTitle": "Abandonner les modifications ?",
     "findings": "Problèmes détectés",
     "mergeRequest": "merge request",
     "notConnected": "Non connecté",
@@ -109,7 +112,9 @@
     "online": "En ligne",
     "open": "Ouvrir {{name}}",
     "openPullRequest": "Ouverture de la PR",
+    "completed": "Terminé",
     "pending": "En attente",
+    "running": "En cours",
     "performance": "Performances",
     "preferences": "Préférences",
     "privacyPolicy": "Politique de confidentialité",
@@ -915,6 +920,9 @@
       "gateHidden": "Masqué",
       "gateNone": "Aucun",
       "noFindings": "Aucun signalement.",
+      "findingsUnavailable": "Les résultats ne sont pas disponibles, car cette revue a échoué.",
+      "serviceUnavailable": "Impossible de joindre le service de revue de code. Relancez la revue lorsque le service sera disponible.",
+      "reviewFailed": "La revue a échoué. Veuillez réessayer.",
       "retryMessage": "Cela relancera la revue de code.",
       "retryReview": "Relancer la revue",
       "retryNeedsSettings": "L'agent de revue de code est désactivé ou ses paramètres nécessitent votre attention. Corrigez les paramètres, puis relancez cette revue.",
@@ -959,8 +967,9 @@
       "noProposals": "Aucune proposition",
       "noProposalsDescription": "Les propositions de la mémoire de revue apparaissent ici après l'analyse des réponses des responsables du dépôt par Kilo.",
       "off": "La mémoire de revue est désactivée.",
+      "on": "La mémoire de revue est activée.",
       "offDescription": "Activez-la pour permettre à Kilo d'apprendre des réponses des responsables du dépôt et de proposer des consignes pour REVIEW.md.",
-      "readOnlyDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent activer la mémoire de revue.",
+      "readOnlyDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent modifier la mémoire de revue.",
       "title": "Mémoire des revues"
     },
     "scopeList": {
@@ -988,8 +997,6 @@
     "updateFailed": "Impossible de mettre à jour l'agent de revue de code.",
     "configSaveFailed": "Impossible d'enregistrer la configuration de la revue.",
     "status": {
-      "running": "En cours",
-      "completed": "Terminé",
       "interrupted": "Interrompue"
     },
     "reviewStyle": {
@@ -1002,7 +1009,8 @@
       "bugs": "Bogues",
       "style": "Style du code",
       "testing": "Tests",
-      "documentation": "Documentation du code"
+      "documentation": "Documentation du code",
+      "unknown": "Autre ({{area}})"
     },
     "gateThreshold": {
       "warning": "Avertissement"
@@ -1081,7 +1089,14 @@
       "triageReasoning": "Justification du triage",
       "watchInCloudAgent": "Suivre dans l'agent cloud",
       "whereFound": "Emplacements détectés ({{displayCount}})",
-      "yes": "Oui"
+      "yes": "Oui",
+      "action": {
+        "analyzeCodebase": "Analyser la base de code",
+        "dismiss": "Ignorer",
+        "manualReview": "Examen manuel",
+        "monitor": "Surveiller",
+        "openPr": "Ouvrir une PR"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Modèle d'analyse",
@@ -1092,6 +1107,9 @@
       "triageModel": "Modèle de triage"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrateur Kilo",
+      "actorMaskedUser": "Utilisateur masqué",
+      "actorSystem": "Système Kilo",
       "couldNotLoad": "Impossible de charger le rapport d'audit.",
       "events": "Événements",
       "generated": "Ce rapport a été généré le {{generatedAt}}.",
@@ -1103,7 +1121,24 @@
       "summary": "Résumé du rapport",
       "title": "Rapport d'audit",
       "unavailable": "Rapport d'audit indisponible",
-      "unavailableDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent consulter les rapports d'audit. Demandez à l'un d'eux de vous accorder l'accès."
+      "unavailableDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent consulter les rapports d'audit. Demandez à l'un d'eux de vous accorder l'accès.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analyse terminée",
+        "findingAnalysisFailed": "Échec de l'analyse",
+        "findingAutoDismissed": "Ignoré automatiquement",
+        "findingCreated": "Importé",
+        "findingDeleted": "Supprimé",
+        "findingDismissed": "Ignoré",
+        "findingSeverityChanged": "Gravité modifiée",
+        "findingStatusChange": "Statut modifié",
+        "findingSuperseded": "Remplacé",
+        "remediationBlocked": "Correction bloquée",
+        "remediationCancelled": "Annulé",
+        "remediationFailed": "Échec de la correction",
+        "remediationNoChangesNeeded": "Aucune modification nécessaire",
+        "remediationPrOpened": "PR ouverte",
+        "remediationQueued": "Correction demandée"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Voir le rapport d'audit"
@@ -1326,7 +1361,6 @@
       "installApp": "Installer l'application GitHub",
       "reauthorizeButton": "Réautoriser l'application GitHub",
       "reauthorizeDescription": "L'agent de sécurité a besoin de l'autorisation vulnerability_alerts pour accéder aux alertes Dependabot. Réautorisez l'application GitHub pour lui accorder cette autorisation.",
-      "reauthorizeFailed": "Impossible de lancer la réautorisation. Réessayez.",
       "reauthorizeTitle": "Autorisations supplémentaires requises",
       "setupFailed": "Impossible de lancer la configuration de GitHub. Réessayez."
     },
@@ -1350,6 +1384,7 @@
     "settingsSave": {
       "saveChanges": "Enregistrer les modifications",
       "unsavedMessage": "Enregistrer vos modifications avant de quitter cet écran ?",
+      "unsavedInvalidMessage": "Ces modifications ne peuvent pas encore être enregistrées. Corrigez-les pour enregistrer ou abandonnez-les pour quitter.",
       "unsavedTitle": "Modifications non enregistrées"
     },
     "setup": {
@@ -1388,7 +1423,12 @@
       "syncMayNotHaveCompleted": "Une synchronisation n'a peut-être pas abouti. Réessayez pour mettre son état à jour, ou abandonnez.",
       "syncInProgress": "Une synchronisation des données de sécurité est déjà en cours. Réessayez.",
       "dismissalInProgress": "L'exclusion de ce signalement est déjà en cours. Réessayez.",
-      "couldNotReadPendingSyncs": "Impossible de lire les synchronisations en attente. Réessayez."
+      "couldNotReadPendingSyncs": "Impossible de lire les synchronisations en attente. Réessayez.",
+      "ambiguous": "Impossible de confirmer le résultat. Vérifiez la révision de sécurité avant de réessayer.",
+      "settleFailed": "L'action a été effectuée, mais nous n'avons pas pu enregistrer le résultat. Réessayez.",
+      "replayFailed": "Cette action n'a pas abouti. Réessayez.",
+      "actionFailed": "Impossible d'effectuer cette action. Réessayez.",
+      "actionBlocked": "Impossible d'effectuer cette action. Le problème doit être résolu avant de pouvoir réessayer."
     },
     "analysisState": {
       "queued": "Analyse en file d'attente",
@@ -1610,6 +1650,7 @@
       "prefillModelUnavailable": "{{model}} n'est plus disponible. Votre modèle par défaut est utilisé.",
       "couldNotReadPendingSessions": "Impossible de lire les sessions en attente. Réessayez.",
       "failedToCreate": "Impossible de créer la session.",
+      "checkOrganizationAccess": "Vérifiez votre accès à cette organisation, puis réessayez.",
       "couldNotRefreshRepositories": "Impossible d'actualiser les dépôts. Réessayez.",
       "discardDraftTitle": "Supprimer le brouillon ?",
       "discardDraftMessage": "Votre consigne sera perdue.",
@@ -1683,7 +1724,8 @@
       "matchesBadge_one": "{{displayCount}} résultat",
       "matchesBadge_other": "{{displayCount}} résultats",
       "matchesBadge_many": "{{displayCount}} résultats",
-      "noOutput": "Aucune sortie."
+      "noOutput": "Aucune sortie.",
+      "translationFailed": "Échec de la traduction"
     },
     "readToolMarkdown": {
       "linesTruncated": "lignes {{start}}–{{end}} (tronquées)",
@@ -2103,7 +2145,7 @@
       "invalidLink": "Ce lien ne peut pas être ouvert.",
       "hostConfirmTitle": "Ouvrir le lien externe ?",
       "hostConfirmMessage": "Ce lien ouvre {{host}} dans votre navigateur.",
-      "open": "Ouverture",
+      "open": "Ouvrir",
       "trustThisHost": "Faire confiance à ce site"
     },
     "folderPicker": {
@@ -2172,6 +2214,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Vos sessions actives restent indisponibles tant que leur chargement n'a pas abouti.",
     "currentDeviceUnidentified": "Impossible d'identifier l'appareil actuel.",
+    "kiloApp": "Application Kilo",
     "noSessions": "Aucune session active",
     "noSessionsDescription": "Connectez-vous à l'application Kilo sur un autre appareil pour le voir apparaître ici.",
     "onlyKiloAppSignIns": "Seules les connexions à l'application Kilo apparaissent ici. Les connexions depuis l'éditeur ou la CLI ne sont pas affichées.",
@@ -2179,7 +2222,7 @@
     "thisDevice": "Cet appareil",
     "viewProfile": "Voir le profil",
     "signOutThisDevice": "Déconnecter cet appareil",
-    "signOutThisSession": "Déconnecter cette session",
+    "signOutSessionLabel": "Déconnecter {{device}}, connexion : {{signedIn}}",
     "sessionSignedOut": "Session déconnectée.",
     "signOutThisDeviceTitle": "Déconnecter cet appareil ?",
     "signOutThisSessionTitle": "Déconnecter cette session ?",
@@ -2321,6 +2364,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Avant de commencer",
+    "summaryTitle": "Préférences de partage des données",
     "introDescription": "Kilo envoie vos messages à des fournisseurs d'IA pour générer des réponses. Voici ce qui est partagé et avec qui.",
     "required": "Requis pour utiliser Kilo",
     "promptsTitle": "Vos consignes et conversations",
@@ -2329,7 +2373,6 @@
     "accountDescription": "Votre identifiant de compte Kilo et les métadonnées des requêtes, utilisés pour vous authentifier et mesurer l'utilisation.",
     "diagnosticsTitle": "Diagnostics de l'application",
     "diagnosticsDescription": "Rapports de plantage et d'erreur, sans le contenu de l'application, utilisés pour assurer sa stabilité.",
-    "optional": "Facultatif",
     "helpImprove": "Aider à améliorer Kilo",
     "helpImproveDescription": "Partager des données d'utilisation anonymes et l'origine de l'installation. Vous pouvez modifier ce choix à tout moment dans les réglages.",
     "seeFullDetails": "Voir tous les détails",
@@ -2527,7 +2570,8 @@
       "description": "Connectez votre compte GitHub pour examiner des demandes de fusion sur mobile.",
       "gitlabDescription": "Connectez votre compte GitLab pour examiner des merge requests sur mobile.",
       "bitbucketDescription": "Connectez Bitbucket à cette organisation pour examiner des PR sur mobile.",
-      "bitbucketOrgOnlyDescription": "Sélectionnez une organisation dans votre profil pour examiner ses PR Bitbucket sur mobile."
+      "bitbucketOrgOnlyDescription": "Basculez le compte ci-dessus vers une organisation pour examiner ses PR Bitbucket.",
+      "contextLine": "Pour {{organization}}"
     },
     "connectionExpired": "La connexion à GitHub a expiré.",
     "couldNotLoadPullRequest": "Impossible de charger la demande de fusion.",
@@ -2649,7 +2693,7 @@
       "openAccessibility": "Ouvrir une PR ou un merge request",
       "clearLink": "Effacer le lien",
       "pasteLink": "Coller le lien de PR ou de merge request",
-      "open": "Ouverture"
+      "open": "Ouvrir"
     },
     "eventChips": {
       "comment": "Commenter",
@@ -2969,7 +3013,9 @@
       "reviewNotSubmitted": "Impossible d'envoyer cette revue en l'état. La PR a peut-être changé ou vous tentez d'examiner votre propre demande de fusion, ce qui n'est pas autorisé.",
       "reviewNotSubmittedTerm": "Impossible d'envoyer cette revue en l'état. Il se peut que {{term}} ait changé, ou que vous ne puissiez pas examiner votre propre {{term}}.",
       "couldNotPostComment": "Impossible de publier le commentaire.",
-      "couldNotSubmitReview": "Impossible d'envoyer la revue. Vérifiez votre connexion et réessayez."
+      "couldNotSubmitReview": "Impossible d'envoyer la revue. Vérifiez votre connexion et réessayez.",
+      "rateLimited": "Trop de requêtes. Réessayez plus tard.",
+      "conflict": "Cet élément a été modifié pendant que vous y travailliez. Rechargez-le et réessayez."
     },
     "operation": {
       "couldNotReply": "Impossible de répondre.",
@@ -2977,7 +3023,6 @@
       "mergeResultDefaultError": "GitHub n'a pas terminé la fusion.",
       "mergeResultNotCompleted": "La fusion de {{term}} n'a pas abouti. Vérifiez son état et réessayez.",
       "ambiguous": "Impossible de confirmer le résultat. Vérifiez la PR avant de réessayer.",
-      "persistenceFailed": "Nous n'avons pas pu enregistrer cette action. Veuillez réessayer plus tard.",
       "forbidden": "Cette action n'est pas autorisée."
     },
     "capabilities": {
@@ -3006,11 +3051,23 @@
     "boundary": {
       "backToProfile": "Retour au profil",
       "loadErrorMessage": "Vérifiez votre connexion et réessayez.",
+
+      "chooseAccount": "Choisir un compte",
       "loadErrorTitle": "Impossible de charger vos organisations.",
+      "membershipLostNotice": "Vous n'avez plus accès à cette organisation. Basculé vers {{target}}.",
+      "noOrganization": "Aucune organisation",
+
+      "noOrganizationDescription": "Ce compte ne fait partie d'aucune organisation. Créez une organisation ou rejoignez-en une sur le site web pour utiliser les fonctionnalités d'organisation telles que les invitations de membres et les alertes de solde faible.",
+
+      "openWebOrganizations": "Ouvrir les organisations sur le site web",
+
       "organizationUnavailable": "L'organisation n'est pas disponible.",
-      "selectDescription": "Choisissez une organisation dans votre profil pour continuer.",
+      "selectDescriptionWithOrganizations": "Vous appartenez à une ou plusieurs organisations. Choisissez le compte que cet écran doit utiliser.",
+
       "selectOrganization": "Choix d'une organisation",
       "unavailableDescription": "Cette organisation n'est plus disponible. Choisissez-en une dans votre profil pour continuer.",
+
+      "unavailableSessionsDescription": "Cette organisation n'est plus disponible. Ses sessions ne peuvent pas être chargées.",
       "accessDeniedDescription": "Vous n'avez pas accès à cette organisation."
     },
     "creditActivity": {
@@ -3069,7 +3126,11 @@
       "separateEmailsHint": "Séparez les adresses e-mail par des virgules.",
       "thresholdLabel": "Seuil d'alerte (USD)",
       "title": "Alerte de solde faible",
-      "emailsError": "Saisissez au moins une adresse e-mail valide. Séparez les adresses par des virgules.",
+      "emailsInvalid": "Une ou plusieurs adresses e-mail ne sont pas valides.",
+      "emailsRequired": "Saisissez au moins une adresse e-mail.",
+      "saveEmailsError": "Certaines adresses e-mail n'ont pas été acceptées. Vérifiez-les et réessayez.",
+      "saveError": "Impossible d'enregistrer l'alerte de solde faible.",
+      "thresholdPlaceholder": "Saisissez un montant",
       "thresholdError": "Saisissez un montant supérieur à 0."
     },
     "memberLimit": {
@@ -3080,6 +3141,7 @@
       "removeLimit": "Supprimer la limite",
       "title": "Limite d'utilisation quotidienne",
       "blankError": "Saisissez un montant ou touchez Supprimer la limite ci-dessous.",
+      "blankWithoutLimitError": "Saisissez une limite quotidienne comprise entre 0 et {{max}}.",
       "rangeError": "Saisissez un montant compris entre 0 et {{max}}."
     },
     "members": {
@@ -3509,6 +3571,9 @@
     "localModels": {
       "title": "Modèles sur l'appareil",
       "help": "Les modèles sur l'appareil s'exécutent sur ce téléphone. Vos requêtes et les réponses restent sur l'appareil.",
+      "switchTitle": "Passer à un modèle sur l'appareil ?",
+      "switchMessage": "Si vous passez à {{name}}, les invites et le contexte de cette conversation seront traités sur ce téléphone, et non sur un serveur distant.",
+      "switchConfirm": "Changer de modèle",
       "systemPurpose": "Le modèle intégré au système de cet appareil. Il s'exécute sur l'appareil.",
       "apple": "Apple Intelligence (sur l'appareil)",
       "checking": "Vérification de la disponibilité…",
@@ -3546,6 +3611,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Démarrer un agent nécessite une consigne. Ajoutez une consigne et relancez-le.",
+      "repositoryRequired": "Démarrer un agent nécessite un dépôt. Ouvrez Kilo et choisissez-en un, puis relancez-le.",
       "repositoryUnknown": "Kilo ne reconnaît pas {{repository}} comme un dépôt GitHub ou GitLab. Choisissez un autre dépôt dans Kilo.",
       "repositoryUnsupported": "{{repository}} est un dépôt Bitbucket — Démarrer un agent ne peut pas encore l'utiliser. Choisissez un autre dépôt dans Kilo."
     }
@@ -3605,7 +3671,6 @@
     "personalDefaultDescription": "Chargé automatiquement lorsqu'aucun référentiel n'a de profil épinglé.",
     "organizationDefaultDescription": "Chargé automatiquement pour les membres qui n’ont aucun défaut personnel.",
     "setAsDefault": "Définir par défaut",
-    "removeDefault": "Supprimer par défaut",
     "saveFailed": "Impossible d'enregistrer le profil",
     "deleteTitle": "Supprimer le profil",
     "deleteMessage": "Cela supprime définitivement le profil et ses paramètres. Cela ne peut pas être annulé.",
@@ -3618,7 +3683,6 @@
     "keyTooLong": "La clé doit contenir 256 caractères ou moins",
     "keyDuplicate": "Cette clé existe déjà dans le profil",
     "valueLabel": "Valeur",
-    "secretLabel": "Secrète",
     "secrets": {
       "markSecret": "Marquer comme secret",
       "masked": "Valeur cachée",
@@ -3631,11 +3695,13 @@
     "commandsTitle": "Commandes de configuration",
     "addCommand": "Ajouter une commande",
     "commandLabel": "Commande",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "p. ex. pnpm install",
     "commandsEmpty": "Aucune commande de configuration pour l'instant",
     "commandsSaveFailed": "Impossible d'enregistrer les commandes de configuration",
     "moveUp": "Monter",
     "moveDown": "Descendre",
+    "moveCommandUp": "Déplacer la commande {{position}} vers le haut",
+    "moveCommandDown": "Déplacer la commande {{position}} vers le bas",
     "skillsTitle": "Compétences",
     "addSkill": "Ajouter une compétence",
     "skillNameLabel": "Nom de la compétence",
@@ -3675,7 +3741,9 @@
       "jsonTooLarge": "Utilisez au maximum 50 entrées, des clés jusqu'à 128 et des valeurs jusqu'à 4096 caractères",
       "timeoutInvalid": "Le délai d'attente doit être un nombre entier de millisecondes",
       "edit": "Modifier le serveur MCP",
-      "saveFailed": "Impossible de sauvegarder le serveur MCP"
+      "saveFailed": "Impossible de sauvegarder le serveur MCP",
+      "deleteFailed": "Impossible de supprimer le serveur MCP",
+      "updateFailed": "Impossible de mettre à jour le serveur MCP"
     },
     "agents": {
       "title": "Agents de profil",
@@ -3702,10 +3770,11 @@
       "visibilitySubagent": "Sous-agent – appelable uniquement par d'autres",
       "visibilityAll": "Tous — les deux",
       "saveFailed": "Impossible de sauvegarder l'agent",
+      "deleteFailed": "Impossible de supprimer l'agent",
       "nameRequired": "Entrez un nom d'agent",
       "slugRequired": "Entrez un slug d'agent",
       "slugInvalid": "Slug doit commencer par une lettre et utiliser uniquement des lettres minuscules, des chiffres et des tirets.",
-      "slugConflict": "Ce slug est réservé par un agent intégré",
+      "slugConflict": "Ce slug est déjà utilisé par un agent intégré ou un autre agent de ce profil",
       "edit": "Modifier l'agent"
     },
     "slashCommands": {
@@ -3716,10 +3785,12 @@
       "description": "Description de la commande",
       "template": "Modèle",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Expliquez $ARGUMENTS",
       "subtask": "Exécuter en tant que sous-tâche",
       "edit": "Modifier la commande barre oblique",
       "saveFailed": "Impossible d'enregistrer la commande",
+      "deleteFailed": "Impossible de supprimer la commande",
       "nameRequired": "Entrez un nom de commande",
       "nameInvalid": "Le nom doit commencer par une lettre minuscule et utiliser uniquement des lettres minuscules, des chiffres et des tirets.",
       "templateRequired": "Entrez un modèle de commande",
@@ -3851,5 +3922,69 @@
       "title": "Enregistrer dans une liste",
       "saved": "Enregistré dans {{list}}"
     }
+  },
+  "agentBriefing": {
+    "title": "Briefing du matin",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Une partie de l’activité passée peut manquer. ≥ signifie au moins cette valeur ; inconnu ne signifie pas zéro.",
+    "available": "Briefings disponibles",
+    "history": "Historique des briefings",
+    "historyHint": "Les rapports sont conservés 30 jours, y compris ceux ignorés.",
+    "settings": "Paramètres du briefing",
+    "empty": "Aucune activité cette nuit",
+    "emptyHint": "Vos sessions de code cloud et CLI apparaîtront ici après une nuit active.",
+    "loadError": "Impossible de charger les briefings",
+    "sessions": "Actives cette nuit",
+    "pullRequests": "PRs ouvertes",
+    "blockers": "Nouveaux blocages",
+    "spend": "Dépenses de la nuit",
+    "view": "Lire le briefing",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Ignorer le briefing",
+    "offline": "Hors ligne · briefing enregistré",
+    "cached": "Rapport enregistré · actualisation indisponible",
+    "revised": "Révisé · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "Résumé AI",
+    "summaryDisabled": "Rapport structuré · AI désactivée pour ce contexte",
+    "summaryPending": "Résumé AI en cours. Il s’affichera ici une fois prêt.",
+    "summaryFailed": "Échec du résumé AI. Réessayer peut entraîner un nouveau débit.",
+    "summaryUnavailable": "Résumé AI indisponible. Votre rapport structuré reste disponible.",
+    "summaryOutdated": "Ce résumé est antérieur à la dernière révision du rapport.",
+    "summaryCharge": "AI facturée {{cost}}",
+    "summaryChargePending": "Facturation AI en attente de rapprochement",
+    "generate": "Générer le résumé",
+    "retrySummary": "Relancer le résumé payant",
+    "sources": "Preuves et artefacts",
+    "timezone": "Fuseau horaire du briefing",
+    "deviceTimezone": "Utiliser le fuseau de l’appareil",
+    "timezoneHint": "Fuseau horaire IANA, par exemple Europe/Berlin. Les changements s’appliquent aux nuits suivantes.",
+    "nightStart": "Début de la nuit",
+    "morningStart": "Fin de la nuit / début du matin",
+    "morningEnd": "Fin du matin",
+    "timeHint": "La carte d’accueil rétablit le statut en direct à la fin du matin, même hors ligne.",
+    "invalidSchedule": "Choisissez un fuseau horaire valide et des périodes de nuit et de matin non vides et sans chevauchement.",
+    "notificationsHint": "Une notification générique par matin quand votre premier rapport est prêt. Indépendante des résumés AI payants.",
+    "notificationPermission": "Activez les notifications de l’appareil dans $t(common.notifications) pour recevoir votre briefing.",
+    "aiOptIn": "Résumés AI payants",
+    "aiHint": "Facultatif, pour ce contexte uniquement. Des extraits choisis et masqués ainsi que des faits structurés sont envoyés à votre modèle dans la langue de l’app. Les frais sont débités du solde de ce contexte.",
+    "defaultModel": "Utiliser le modèle par défaut de Kilo",
+    "duration": "Limite de temps (minutes)",
+    "spendLimit": "Limite de dépense (USD)",
+    "safeguardHint": "Limites finies par résumé, pas un budget quotidien. Par défaut : 10 minutes et $2. Un rapport est publié après cinq minutes maximum, la génération se poursuivant dans ces limites.",
+    "invalidSafeguards": "Saisissez des limites de temps et de dépense positives et finies.",
+    "estimate": "Estimation {{estimate}} · maximum {{maximum}}",
+    "estimateUnavailable": "Aucun résumé payant n’est disponible pour ces paramètres.",
+    "estimatePricingUnavailable": "Tarification indisponible pour ce modèle.",
+    "estimateBalanceUnavailable": "Solde insuffisant pour un résumé payant.",
+    "estimateModelNotAllowed": "Ce modèle n’est pas autorisé ici.",
+    "estimateSpendLimitTooLow": "Augmentez le plafond de dépenses pour autoriser ce résumé.",
+    "confirmPaid": "Activer les résumés payants pour {{context}} ?",
+    "confirmGeneration": "Générer un résumé payant ?",
+    "paidDisclosure": "{{estimate}} estimé, jusqu’à {{maximum}}, avec une limite de {{minutes}} minutes. Les frais s’appliquent même en cas d’échec.",
+    "enable": "Activer les résumés payants",
+    "contextSettings": "Paramètres AI · {{context}}",
+    "allContexts": "Les briefings personnels et d’organisation restent séparés."
   }
 }

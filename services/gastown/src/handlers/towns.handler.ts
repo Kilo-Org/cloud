@@ -129,6 +129,8 @@ export async function handleDeleteTown(
   params: { userId: string; townId: string }
 ) {
   const townDO = getGastownUserStub(c.env, params.userId);
+  const town = await townDO.getTownAsync(params.townId);
+  if (!town) return c.json(resError('Town not found'), 404);
 
   // Destroy the Town DO (handles all rigs, agents, and mayor cleanup)
   try {

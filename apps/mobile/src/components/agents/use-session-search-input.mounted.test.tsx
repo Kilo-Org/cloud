@@ -13,12 +13,13 @@ import {
 const input = vi.hoisted(() => ({
   blurs: 0,
   clears: 0,
+  focuses: 0,
+  focused: true,
   mounts: [] as { defaultValue?: string }[],
 }));
-
 // The field is uncontrolled, so its visible text is what the native input was
-// mounted with. This mock records that mount-time value + key, and counts the
-// imperative calls the hook makes on the input's ref.
+// mounted with. The mount effect records that value; the imperative handle
+// counts calls the hook makes on the input's ref.
 // `vi.mock` factories are hoisted above the module's imports, so React can only
 // be reached through a dynamic import here.
 vi.mock('react-native', async () => {
@@ -32,14 +33,25 @@ vi.mock('react-native', async () => {
       () => ({
         blur: () => {
           input.blurs += 1;
+          input.focused = false;
         },
         clear: () => {
           input.clears += 1;
         },
+        focus: () => {
+          input.focuses += 1;
+          input.focused = true;
+        },
+        isFocused: () => input.focused,
       }),
       []
     );
-    input.mounts.push({ defaultValue: props.defaultValue as string | undefined });
+    const initialDefaultValueRef = React.useRef(props.defaultValue);
+    React.useEffect(() => {
+      input.mounts.push({
+        defaultValue: initialDefaultValueRef.current as string | undefined,
+      });
+    }, []);
     return React.createElement('TextInput', props);
   });
   return {
@@ -106,6 +118,8 @@ describe('useSessionSearchInput visible text', () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     input.blurs = 0;
     input.clears = 0;
+    input.focuses = 0;
+    input.focused = true;
     input.mounts.length = 0;
     latest.current = null;
   });
@@ -145,6 +159,21 @@ describe('useSessionSearchInput visible text', () => {
     expect(input.mounts).toHaveLength(mountsBeforeClear + 1);
     expect(hook().hasText).toBe(false);
     expect(hook().searchQuery).toBe('');
+  });
+
+  it('keeps focus when a broad clear remounts the uncontrolled field', () => {
+    mount({ userId: 'u1', restoredQuery: null, restoreSettled: false });
+    act(() => {
+      hook().handleSearchInputChange('search text');
+    });
+    act(() => {
+      hook().clearSearchInput();
+    });
+
+    expect(input.clears).toBe(0);
+    expect(input.focuses).toBe(1);
+    expect(input.focused).toBe(true);
+    expect(input.mounts.at(-1)?.defaultValue).toBe('');
   });
 
   it('keeps a cleared field empty when the durable draft settles afterwards', () => {

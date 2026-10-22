@@ -158,6 +158,8 @@ export function useSessionSearchInput({
   // The search TextInput lives above the pinned "Active now" tray (so it's
   // always visible) but must stay uncontrolled — see iOS TextInput rules.
   const searchInputRef = useRef<TextInput>(null);
+
+  const refocusAfterRemountRef = useRef(false);
   const [hasText, setHasText] = useState(false);
 
   const handleSearchInputChange = useCallback(
@@ -197,16 +199,25 @@ export function useSessionSearchInput({
   }, [handleClearSearchOnly, replaceInputText]);
 
   // Broad clear primitive: empty the visible text through a remount and reset
-  // `hasText` without blurring. The caller still orchestrates the query reset
-  // and any filter reset itself.
+  // `hasText` without blurring. If the field owned focus before the remount,
+  // return it to the new input after React attaches the ref.
   const clearSearchInput = useCallback(() => {
     userInteractedRef.current = true;
+    refocusAfterRemountRef.current = searchInputRef.current?.isFocused() ?? false;
     replaceInputText('');
     setHasText(false);
     lastTypedRef.current = '';
     setAwaitingCommit(false);
     saveSearchDraft('');
   }, [replaceInputText, saveSearchDraft]);
+
+  useEffect(() => {
+    if (!refocusAfterRemountRef.current) {
+      return;
+    }
+    refocusAfterRemountRef.current = false;
+    searchInputRef.current?.focus();
+  }, [searchInputKey]);
 
   // Seed the input once the durable draft settles and the user has not touched
   // it. An empty persisted value (including '' persisted by a clear) seeds

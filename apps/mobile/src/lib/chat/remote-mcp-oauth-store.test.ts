@@ -71,7 +71,7 @@ describe('writing a remote MCP server OAuth state', () => {
   it('reads a write the disk has not taken yet', async () => {
     const { store, epoch } = await fresh();
     heldDiskRead(null)();
-    const landing = Promise.withResolvers<void>();
+    const landing = Promise.withResolvers<undefined>();
     setItemAsync.mockReturnValue(landing.promise);
 
     await store.writeRemoteMcpOAuth(
@@ -86,7 +86,7 @@ describe('writing a remote MCP server OAuth state', () => {
       tokens: TOKENS,
     });
     expect(await store.readRemoteMcpOAuth(SERVER.id, 'https://other.example/mcp')).toBeUndefined();
-    landing.resolve();
+    landing.resolve(undefined);
   });
 
   it('drops a write that a sign-out overtook while it waited on the disk read', async () => {

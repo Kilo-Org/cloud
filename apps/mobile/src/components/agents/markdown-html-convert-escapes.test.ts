@@ -26,6 +26,17 @@ describe('convertHtmlToMarkdown literal text', () => {
     expect(convertHtmlToMarkdown('<p>run `pnpm build` now</p>')).toBe('run `pnpm build` now');
   });
 
+  it('leaves a bare URL or address as the link the renderer makes of it', () => {
+    expect(convertHtmlToMarkdown('<p>see https://x.dev/a_b</p>')).toBe('see https://x.dev/a_b');
+    expect(convertHtmlToMarkdown('<p>mail first_last@example.com</p>')).toBe(
+      'mail first_last@example.com'
+    );
+    // Text around the run still escapes.
+    expect(convertHtmlToMarkdown('<p>_x_ see https://x.dev/a_b</p>')).toBe(
+      String.raw`\_x\_ see https://x.dev/a_b`
+    );
+  });
+
   it('renders escaped text as the characters the source HTML held', () => {
     // The round trip through the transcript's own renderer: literal text stays
     // literal, and the elements markdown can express still parse as syntax.
@@ -34,6 +45,11 @@ describe('convertHtmlToMarkdown literal text', () => {
       ['<p>snake_case</p>', 'snake_case'],
       ['<p>~~gone~~</p>', '~~gone~~'],
       ['<p>5 &lt; 6</p>', '5 &lt; 6'],
+      ['<p>https://x.dev/a_b</p>', '<a href="https://x.dev/a_b">https://x.dev/a_b</a>'],
+      [
+        '<p>first_last@example.com</p>',
+        '<a href="mailto:first_last@example.com">first_last@example.com</a>',
+      ],
       [
         '<p>real <em>em</em> <code>c</code> <a href="https://example.com">link</a></p>',
         'real <em>em</em> <code>c</code> <a href="https://example.com">link</a>',

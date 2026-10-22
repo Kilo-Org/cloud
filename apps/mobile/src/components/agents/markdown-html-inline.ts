@@ -52,14 +52,28 @@ const EDGE_WHITESPACE = /^(\s*)([\s\S]*?)(\s*)$/;
 // The inline syntax markdown reads in ordinary text: an escape, a code span,
 // emphasis, strikethrough, a link or image label, and an HTML tag or autolink.
 const MARKDOWN_SYNTAX = /[\\`*_[\]~<]/g;
+// A bare URL or address the renderer links on its own. It is copied exactly:
+// a backslash inside it would become part of the link text and its target.
+const AUTOLINK_RUN =
+  /(?:https?:\/\/|www\.)[^\s<>]+|[a-zA-Z\d.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z\d-]+(?:\.[a-zA-Z\d-]+)+/g;
 
 /**
  * Escapes the markdown syntax inside text copied out of HTML, so the characters
  * render as the source element held them (`a*b*c` stays three asterisks). The
  * delimiters the converter generates for real emphasis, code, links and images
- * are added after this and stay unescaped.
+ * are added after this and stay unescaped, and a bare URL or address keeps the
+ * characters that make it a link.
  */
-const escapeText = (source: string) => source.replaceAll(MARKDOWN_SYNTAX, String.raw`\$&`);
+function escapeText(source: string): string {
+  let escaped = '';
+  let cursor = 0;
+  for (const match of source.matchAll(AUTOLINK_RUN)) {
+    const run = match[0];
+    escaped += source.slice(cursor, match.index).replaceAll(MARKDOWN_SYNTAX, String.raw`\$&`) + run;
+    cursor = match.index + run.length;
+  }
+  return escaped + source.slice(cursor).replaceAll(MARKDOWN_SYNTAX, String.raw`\$&`);
+}
 
 /**
  * A run of inline markdown. Emphasis keeps its delimiter apart until it is

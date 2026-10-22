@@ -42,18 +42,6 @@ export type { SendMessagePayload } from './types.js';
 
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL') || '';
 
-function isConnectionResetError(error: unknown): boolean {
-  const seen = new Set<object>();
-  while (typeof error === 'object' && error !== null && !seen.has(error)) {
-    seen.add(error);
-    if ('code' in error && error.code === 'ECONNRESET') {
-      return true;
-    }
-    error = 'cause' in error ? error.cause : undefined;
-  }
-  return false;
-}
-
 // MCP server config types — CLI-native local/remote format.
 // Each env/header value is either a plain string (passed through verbatim)
 // or an RSA+AES envelope (decrypted per-value by the worker when
@@ -123,6 +111,7 @@ export type AgentMode = string;
 
 /** Shared fields for prepareSession, present on both the non-clone and clone variants. */
 type PrepareSessionSharedFields = {
+  allowSubagentSessions?: boolean;
   githubAccessPurpose?: 'workflow' | 'agent';
   mode: AgentMode;
   model: string;
@@ -476,23 +465,6 @@ export type HealthOutput = {
   version: string;
 };
 
-export type ComputeBillingStatus = {
-  payer: { type: 'user' | 'org'; id: string };
-  attribution: 'payer_shared' | 'session';
-  phase: 'idle' | 'active' | 'stopping' | 'settling' | 'unavailable';
-  estimatedHourlyRateMicrodollars: number | null;
-  estimatedIntervalAmountMicrodollars: number | null;
-  billingMode: 'shadow' | 'paid' | null;
-  interval: {
-    id: string;
-    startedAt: string;
-    lastSeenAt: string;
-    stoppedAt: string | null;
-    confirmedSeconds: number;
-    settledBillableSeconds: number;
-  } | null;
-};
-
 /**
  * Custom error class for payment-related errors from cloud-agent.
  */
@@ -647,9 +619,6 @@ type CloudAgentNextTRPCClient = {
   };
   getWorktreeFile: {
     query: (input: GetWorktreeFileInput) => Promise<unknown>;
-  };
-  getComputeBillingStatus: {
-    query: (input: GetSessionInput) => Promise<ComputeBillingStatus>;
   };
   getSandboxSelectionOptions: {
     query: (input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>;
@@ -954,18 +923,6 @@ export class CloudAgentNextClient {
       throw new Error('Saved worktree file does not match the query');
     }
     return result;
-  }
-
-  async getComputeBillingStatus(cloudAgentSessionId: string): Promise<ComputeBillingStatus> {
-    try {
-      return await this.client.getComputeBillingStatus.query({ cloudAgentSessionId });
-    } catch (error) {
-      if (!isConnectionResetError(error)) {
-        throw error;
-      }
-      await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 100));
-      return await this.client.getComputeBillingStatus.query({ cloudAgentSessionId });
-    }
   }
 
   async createWorktreeChat(input: CreateWorktreeChatInput): Promise<CreateWorktreeChatOutput> {

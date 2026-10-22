@@ -53,12 +53,9 @@ import {
   type NativeEgressPolicy,
 } from './egress-policy.js';
 
-export type ContainerInstanceSize =
-  | 'lite'
-  | 'standard-1'
-  | 'standard-2'
-  | 'standard-3'
-  | 'standard-4';
+import { containerInstanceStartValue, type ContainerInstanceSize } from './instance-size.js';
+
+export type { ContainerInstanceSize } from './instance-size.js';
 
 export type ContainersState = 'idle' | 'launching' | 'running' | 'stopping';
 
@@ -1098,7 +1095,7 @@ export class SandboxContainers extends DurableObject<Env> {
     // The supplied command runs first, including on a repository restore.
     return {
       ...(snapshotId === undefined ? { image } : { containerSnapshot: { id: snapshotId } }),
-      instance,
+      instance: containerInstanceStartValue(instance),
       enableInternet: egressAllowlist === undefined,
       entrypoint: [...command.argv],
       env,

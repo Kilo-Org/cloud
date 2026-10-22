@@ -198,7 +198,11 @@ export function BriefingListScreen() {
             void query.refetch();
           }}
           onEndReached={() => {
-            if (query.hasNextPage && !query.isFetchingNextPage) {
+            // Once the next page has failed, auto-loading re-fires on every
+            // content-size change (the footer grows/shrinks as the fetch flips
+            // between loading and error), so the retry footer never settles.
+            // Leave recovery to the retry tap until a fetch succeeds.
+            if (query.hasNextPage && !query.isFetchingNextPage && !query.isFetchNextPageError) {
               void query.fetchNextPage();
             }
           }}

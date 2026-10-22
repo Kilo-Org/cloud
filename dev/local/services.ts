@@ -272,6 +272,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: [],
     dir: 'services/event-service',
   },
+  'kilo-mcp': {
+    group: 'cloud-agent',
+    dependsOn: [],
+    dir: 'services/kilo-mcp',
+  },
   'kilo-chat': {
     group: 'kiloclaw',
     dependsOn: ['kiloclaw', 'event-service'],

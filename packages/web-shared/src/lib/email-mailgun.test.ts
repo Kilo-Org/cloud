@@ -159,7 +159,10 @@ describe('Mailgun email boundary', () => {
     };
     expect(payload.html).toContain('kilo-auto/custom/efficient');
     expect(payload.html).toContain('kilo-auto/custom/org/efficient');
-    expect(payload.html).toContain('2099-11-01T12:00:00.000Z');
+    expect(payload.html).toContain('Sunday, November 1, 2099 at 12:00 UTC');
+    expect(payload.subject).toBe(
+      'Change Required: Your Auto model pool has a new model ID on November 1st, 2099'
+    );
     expect(payload.html).toContain('href="https://app.example.test/profile"');
     expect(payload.html).toContain(
       'href="https://app.example.test/organizations/org-id/providers-and-models"'

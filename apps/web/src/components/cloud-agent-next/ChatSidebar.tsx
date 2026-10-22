@@ -445,26 +445,35 @@ function WorktreeGroupRow({
           </>
         ) : (
           <>
-            <button
-              ref={openButtonRef}
-              type="button"
-              disabled={isDeleting}
-              onClick={() => onOpenSession(group.latestSession.sessionId)}
-              aria-label={`Open worktree ${label}`}
-              aria-current={isActive ? 'page' : undefined}
-              className="focus-visible:ring-ring -my-2 -ml-3 flex min-w-0 flex-1 items-center rounded-md py-2 pl-3 text-left focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait"
-            >
-              {isLoadingDetails ? (
-                <span
-                  className="bg-muted line-clamp-1 w-32 min-w-0 max-w-full rounded leading-snug text-transparent"
-                  aria-hidden="true"
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  ref={openButtonRef}
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => onOpenSession(group.latestSession.sessionId)}
+                  aria-label={`Open worktree ${label}`}
+                  aria-current={isActive ? 'page' : undefined}
+                  className="focus-visible:ring-ring -my-2 -ml-3 flex min-w-0 flex-1 items-center rounded-md py-2 pl-3 text-left focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait"
                 >
-                  Loading worktree…
-                </span>
-              ) : (
-                <span className="line-clamp-1 min-w-0 leading-snug">{label}</span>
+                  {isLoadingDetails ? (
+                    <span
+                      className="bg-muted line-clamp-1 w-32 min-w-0 max-w-full rounded leading-snug text-transparent"
+                      aria-hidden="true"
+                    >
+                      Loading worktree…
+                    </span>
+                  ) : (
+                    <span className="line-clamp-1 min-w-0 leading-snug">{label}</span>
+                  )}
+                </button>
+              </TooltipTrigger>
+              {!isLoadingDetails && (
+                <TooltipContent side="right" className="max-w-xs break-words">
+                  {label}
+                </TooltipContent>
               )}
-            </button>
+            </Tooltip>
             {prSession && <SessionPrIndicator session={prSession} />}
             <span className="group/session-actions relative flex w-6 shrink-0 justify-end [@media(any-pointer:coarse)]:w-auto [@media(hover:none)]:w-auto">
               {isDeleting ? (

@@ -1,5 +1,5 @@
 {
-  "id": "91ae2f7b-5431-45f8-8763-10b0fdb3c06a",
+  "id": "48da44e5-b482-4eae-a823-83defe1a305a",
   "prevId": "140eaf3d-3dc3-47a6-8127-257c20dfa20d",
   "version": "7",
   "dialect": "postgresql",
@@ -546,43 +546,11 @@
           "primaryKey": false,
           "notNull": false
         },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'scheduled'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "timezone": {
-          "name": "timezone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "language": {
-          "name": "language",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "evidence_recorded_before": {
-          "name": "evidence_recorded_before",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "local_date": {
           "name": "local_date",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "night_start_at": {
           "name": "night_start_at",
@@ -2282,6 +2250,18 @@
         },
         "stale_alert_last_posted_at": {
           "name": "stale_alert_last_posted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_byok_last_completed_at": {
+          "name": "direct_byok_last_completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_byok_stale_alert_last_posted_at": {
+          "name": "direct_byok_stale_alert_last_posted_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

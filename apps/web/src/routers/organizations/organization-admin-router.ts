@@ -81,6 +81,8 @@ import {
   setOrganizationServiceFeeExemption,
 } from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
 import { createDefaultOrganizationServiceFeeExemptionStore } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
+import { invalidateOrganizationSessionAccessForUsers } from '@/lib/organizations/organization-member-removal';
+import { runAfterResponse } from '@/lib/after-response';
 
 const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -1100,11 +1102,12 @@ export const organizationAdminRouter = createTRPCRouter({
       }
     }
 
+    let affectedUserIds: string[] = [];
     try {
       await db.transaction(async tx => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
         await assertOrganizationHierarchyChangeAllowed(tx, organizationId);
-        await markOrganizationAsDeleted(organizationId, tx);
+        affectedUserIds = await markOrganizationAsDeleted(organizationId, tx);
       });
     } catch (error) {
       if (error instanceof Error && error.message === KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR) {
@@ -1122,6 +1125,14 @@ export const organizationAdminRouter = createTRPCRouter({
       message: 'Deleted organization',
       metadata: { name: existingOrg.name },
     });
+
+    // The database already denies access: the organization is soft-deleted.
+    // Cached grants expire within the documented cache bound, so fan-out is
+    // best-effort and bounded after the response instead of extending the
+    // admin mutation for every member.
+    await runAfterResponse(() =>
+      invalidateOrganizationSessionAccessForUsers(organizationId, affectedUserIds)
+    );
 
     return successResult();
   }),

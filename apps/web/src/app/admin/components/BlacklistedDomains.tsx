@@ -161,34 +161,42 @@ function StatsTab() {
             No blacklisted domains configured
           </div>
         ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Domain</TableHead>
-                  <TableHead className="text-right">Blocked Users</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {stats.domains.map(domain => (
-                  <TableRow key={domain.domain}>
-                    <TableCell className="font-medium">
-                      <code className="bg-muted rounded px-2 py-1 text-sm">{domain.domain}</code>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {domain.blockedCount > 0 ? (
-                        <Badge variant={domain.blockedCount > 100 ? 'destructive' : 'secondary'}>
-                          {domain.blockedCount.toLocaleString()}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">0</span>
-                      )}
-                    </TableCell>
+          <>
+            {stats.domains.length < stats.totalDomains && (
+              <p className="text-muted-foreground mb-2 text-xs">
+                Showing the {stats.domains.length} domains with the most matching users, of{' '}
+                {stats.totalDomains.toLocaleString()} blacklisted domains.
+              </p>
+            )}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Domain</TableHead>
+                    <TableHead className="text-right">Blocked Users</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {stats.domains.map(domain => (
+                    <TableRow key={domain.domain}>
+                      <TableCell className="font-medium">
+                        <code className="bg-muted rounded px-2 py-1 text-sm">{domain.domain}</code>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {domain.blockedCount > 0 ? (
+                          <Badge variant={domain.blockedCount > 100 ? 'destructive' : 'secondary'}>
+                            {domain.blockedCount.toLocaleString()}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">0</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

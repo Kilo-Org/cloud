@@ -142,7 +142,7 @@ function subtractFollowed(
     ...snapshot,
     running: Math.max(0, snapshot.running - followed.running),
     needsInput,
-    needsApproval: Math.max(0, (snapshot.needsApproval ?? 0) - followed.needsApproval),
+    needsApproval: Math.max(0, snapshot.needsApproval - followed.needsApproval),
     idle: Math.max(0, snapshot.idle - followed.idle),
     scheduled,
     needsInputSince: needsInput === 0 ? null : snapshot.needsInputSince,
@@ -611,7 +611,9 @@ export function republishAggregateCard(): void {
 export const iosSink: GlanceableSink = {
   async waitForNativeTerminal() {
     await Promise.all(
-      [...endingActivities.values()].map((ending): Promise<void> | null => ending.pending)
+      [...endingActivities.values()]
+        .map(ending => ending.pending)
+        .filter((pending): pending is Promise<void> => pending !== null)
     );
     // A replacement card deferred behind a dismissal is part of that terminal work.
     await pendingStart;

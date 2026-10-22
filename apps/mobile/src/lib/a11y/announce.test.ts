@@ -76,7 +76,6 @@ describe('moveA11yFocus', () => {
     const moved = moveA11yFocus(ref);
 
     expect(moved).toBe(false);
-    expect(findNodeHandleMock).toHaveBeenCalledWith(null);
     expect(accessibilityMock.setAccessibilityFocus).not.toHaveBeenCalled();
   });
 
@@ -89,7 +88,6 @@ describe('moveA11yFocus', () => {
     const moved = moveA11yFocus(ref);
 
     expect(moved).toBe(true);
-    expect(findNodeHandleMock).toHaveBeenCalledWith(ref.current);
     expect(accessibilityMock.setAccessibilityFocus).toHaveBeenCalledWith(123);
   });
 

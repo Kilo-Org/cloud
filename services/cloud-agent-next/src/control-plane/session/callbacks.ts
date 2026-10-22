@@ -2,6 +2,8 @@ import {
   fitCallbackJobToQueueLimit,
   type CallbackJobQueueFitResult,
 } from '../../callbacks/queue-payload.js';
+import { PARENT_SESSION_CALLBACK_URL } from '@kilocode/worker-utils/cloud-agent-authority';
+import { createMessageId, isCanonicalMessageId } from '../../session/message-id.js';
 import type { CallbackJob, CallbackTarget } from '../../callbacks/types.js';
 import { renderRecentActivity } from '../../callbacks/recent-activity.js';
 import { logger } from '../../logger.js';
@@ -26,10 +28,8 @@ export type PendingCallbackJob = {
 };
 
 /**
- * Terminal callback outbox for the new plane (plan B5). Adapted from the legacy
- * `message-callbacks.ts`: it reads the new `SessionMessage` row and never
- * imports the legacy message model. One job per drained batch, keyed by the
- * representative terminal message id.
+ * Terminal callback outbox. One job per drained batch, keyed by the
+ * representative terminal message ID.
  */
 export type MessageCallbacksDependencies = {
   storage: CallbackStorage;
@@ -89,6 +89,12 @@ function isCallbackJob(value: unknown): value is CallbackJob {
   }
   const payload = value.payload;
   return (
+    (value.target.url !== PARENT_SESSION_CALLBACK_URL ||
+      (isRecord(value.parentSession) &&
+        typeof value.parentSession.userId === 'string' &&
+        value.parentSession.userId.length > 0 &&
+        typeof value.parentSession.messageId === 'string' &&
+        isCanonicalMessageId(value.parentSession.messageId))) &&
     typeof payload.sessionId === 'string' &&
     typeof payload.cloudAgentSessionId === 'string' &&
     (payload.executionId === undefined || typeof payload.executionId === 'string') &&
@@ -212,7 +218,7 @@ export function createMessageCallbacks(
     // The classification is derived from the message alone; settlement facts
     // only enrich it (workspace subtype, assistant reason, provider ownership).
     // Every terminal callback carries the structured failure, matching the
-    // legacy plane's `projectSafeFailure(state)`.
+    // shared safe-failure projection.
     const failure = projectSettledMessageFailure(message, facts ?? {});
     // A workspace subtype carries a specific cause ("Repository clone timed
     // out"); the generic control reason would hide it from receivers that match
@@ -224,6 +230,9 @@ export function createMessageCallbacks(
 
     return {
       target: structuredClone(target),
+      ...(target.url === PARENT_SESSION_CALLBACK_URL
+        ? { parentSession: { userId: metadata.identity.userId, messageId: createMessageId() } }
+        : {}),
       payload: {
         sessionId,
         cloudAgentSessionId: sessionId,

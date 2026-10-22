@@ -296,6 +296,27 @@ export async function handlePullRequestCodeReview(
       return NextResponse.json({ message: 'Skipped bot-authored PR' }, { status: 200 });
     }
     if (isExternalPullRequestSkip) {
+      if (appType !== 'lite') {
+        const [repoOwner, repoName] = repository.full_name.split('/');
+        try {
+          await createCheckRun(
+            integration.platform_installation_id as string,
+            repoOwner,
+            repoName,
+            pull_request.head.sha,
+            {
+              conclusion: 'neutral',
+              output: {
+                title: 'Kilo Code Review not scheduled',
+                summary: 'Automated review settings do not select this pull request.',
+              },
+            },
+            appType
+          );
+        } catch (error) {
+          logExceptInTest('Failed to report automated review policy result:', error);
+        }
+      }
       return NextResponse.json(
         { message: 'Skipped by automated review author policy' },
         { status: 200 }

@@ -943,7 +943,7 @@ export function ReviewConfigForm({
                   </Label>
                   <p className="text-muted-foreground text-sm">
                     Do not run automated reviews on {prLabel} opened by bot accounts (for example
-                    Dependabot or Renovate). Turn this off to review bot {prLabel} too.
+                    Dependabot or Renovate). Bot reviews also follow the contributor setting below.
                   </p>
                 </div>
                 <Switch

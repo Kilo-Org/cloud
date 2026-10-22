@@ -1503,6 +1503,7 @@ export async function createCheckRun(
   options: {
     detailsUrl?: string;
     output?: CheckRunOutput;
+    conclusion?: CheckRunConclusion;
   } = {},
   appType: GitHubAppType = 'standard'
 ): Promise<number> {
@@ -1514,7 +1515,10 @@ export async function createCheckRun(
     repo,
     name: 'Kilo Code Review',
     head_sha: headSha,
-    status: 'queued',
+    status: options.conclusion ? 'completed' : 'queued',
+    ...(options.conclusion
+      ? { conclusion: options.conclusion, completed_at: new Date().toISOString() }
+      : {}),
     ...(options.detailsUrl ? { details_url: options.detailsUrl } : {}),
     ...(options.output ? { output: options.output } : {}),
   });

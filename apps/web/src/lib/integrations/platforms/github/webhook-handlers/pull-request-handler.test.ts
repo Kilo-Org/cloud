@@ -489,8 +489,35 @@ describe('handlePullRequest', () => {
       expect(response.status).toBe(status);
       expect(mockCreateCodeReview).toHaveBeenCalledTimes(status === 202 ? 1 : 0);
       expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(status === 202 ? 1 : 0);
-      expect(mockCreateCheckRun).toHaveBeenCalledTimes(status === 202 ? 1 : 0);
+      expect(mockCreateCheckRun).toHaveBeenCalledTimes(1);
+      if (status === 200) {
+        expect(mockCreateCheckRun).toHaveBeenCalledWith(
+          '98765',
+          'acme',
+          'widgets',
+          payload.pull_request.head.sha,
+          expect.objectContaining({ conclusion: 'neutral' }),
+          'standard'
+        );
+      }
       expect(mockAddReactionToPR).toHaveBeenCalledTimes(status === 202 ? 1 : 0);
+    });
+
+    it('preserves lite app check capabilities', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+      const payload = pullRequestPayload();
+      payload.pull_request.author_association = 'NONE';
+
+      const response = await handlePullRequest(
+        payload,
+        platformIntegration({ github_app_type: 'lite' })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockCreateCheckRun).not.toHaveBeenCalled();
+      expect(mockCreateCodeReview).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
 
     it('completes supersession cleanup', async () => {

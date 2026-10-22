@@ -301,4 +301,31 @@ describe('sanitizeSentryRequestData', () => {
 
     expect(result.request?.url).toBe('/s/:share_token#open');
   });
+
+  test('applies the query policy to the forwarded search header', () => {
+    const event: Event = {
+      request: {
+        url: 'https://app.kilo.sh/github-app',
+        headers: {
+          'x-search': '?organizationId=org_123&installState=abc-token-123&fromApp=1',
+          accept: '*/*',
+        },
+      },
+    };
+
+    const result = sanitizeSentryRequestData(event);
+
+    expect(result.request?.headers?.['x-search']).toBe('?organizationId=org_123&fromApp=1');
+    expect(result.request?.headers?.accept).toBe('*/*');
+  });
+
+  test('matches the search header name case-insensitively', () => {
+    const event: Event = {
+      request: { headers: { 'X-Search': 'state=raw-state-token&tab=usage' } },
+    };
+
+    const result = sanitizeSentryRequestData(event);
+
+    expect(result.request?.headers?.['X-Search']).toBe('tab=usage');
+  });
 });

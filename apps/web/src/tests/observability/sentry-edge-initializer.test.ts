@@ -91,6 +91,18 @@ describe('edge Sentry initializer request data', () => {
     expect(result?.request?.url).toBe('https://app.kilo.sh/s/:share_token?utm_source=copy');
   });
 
+  test('applies the query policy to the forwarded search header', async () => {
+    const beforeSend = await loadEdgeBeforeSend();
+
+    const result = beforeSend({
+      request: {
+        headers: { 'x-search': '?organizationId=org_123&installState=abc-token-123&fromApp=1' },
+      },
+    });
+
+    expect(result?.request?.headers?.['x-search']).toBe('?organizationId=org_123&fromApp=1');
+  });
+
   test('keeps request data without the policy keys unchanged', async () => {
     const beforeSend = await loadEdgeBeforeSend();
 

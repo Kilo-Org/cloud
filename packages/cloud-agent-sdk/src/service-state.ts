@@ -106,6 +106,8 @@ type ServiceState = {
   getPreparationAttempts(): readonly PreparationAttempt[];
   getCommits(): readonly SessionCommit[];
   clearCommits(): void;
+  /** Drop the preparation rows held by the live state. */
+  clearPreparationAttempts(): void;
   getQuestion(): QuestionState | null;
   getPermission(): PermissionState | null;
   getSuggestion(): SuggestionState | null;
@@ -1121,6 +1123,10 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     getCommits: () => commits,
     clearCommits(): void {
       commits = [];
+      notify();
+    },
+    clearPreparationAttempts(): void {
+      preparationAttempts = [];
       notify();
     },
     getQuestion: () => questions[0] ?? null,

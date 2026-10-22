@@ -107,6 +107,7 @@ const mockSession = {
     getSetupLog: jest.fn((): readonly string[] => []),
     getCommits: jest.fn(() => []),
     clearCommits: jest.fn(),
+    clearPreparationAttempts: jest.fn(),
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),

@@ -1340,6 +1340,32 @@ describe('user router - register push token', () => {
     expect(rows[0]?.user_id).toBe(tokenUser.id);
   });
 
+  it('accepts simultaneous registrations of a new token by the same account', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const input = {
+      token: 'ExponentPushToken[token-simultaneous]',
+      platform: 'ios' as const,
+      appVersion: '1.0.5',
+      locale: 'es',
+    };
+
+    await expect(
+      Promise.all([caller.user.registerPushToken(input), caller.user.registerPushToken(input)])
+    ).resolves.toEqual([{ success: true }, { success: true }]);
+
+    const rows = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.token, input.token));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      user_id: tokenUser.id,
+      platform: input.platform,
+      app_version: input.appVersion,
+      locale: input.locale,
+    });
+  });
+
   it('rejects a token registered by another account and leaves the row with its owner', async () => {
     const owner = await createCallerForUser(tokenUser.id);
     const otherCaller = await createCallerForUser(otherTokenUser.id);

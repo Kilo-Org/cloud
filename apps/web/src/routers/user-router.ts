@@ -1349,38 +1349,32 @@ export const userRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // A token belongs to the account that registered it. A device that
       // switches accounts releases the token with unregisterPushToken first.
-      const updated = await db
-        .update(user_push_tokens)
-        .set({
+      const registered = await db
+        .insert(user_push_tokens)
+        .values({
+          user_id: ctx.user.id,
+          token: input.token,
           platform: input.platform,
           app_version: input.appVersion ?? null,
           locale: input.locale ?? null,
-          updated_at: sql`now()`,
         })
-        .where(
-          and(eq(user_push_tokens.token, input.token), eq(user_push_tokens.user_id, ctx.user.id))
-        )
-        .returning({ id: user_push_tokens.id });
-
-      if (updated.length === 0) {
-        const inserted = await db
-          .insert(user_push_tokens)
-          .values({
-            user_id: ctx.user.id,
-            token: input.token,
+        .onConflictDoUpdate({
+          target: [user_push_tokens.token],
+          set: {
             platform: input.platform,
             app_version: input.appVersion ?? null,
             locale: input.locale ?? null,
-          })
-          .onConflictDoNothing()
-          .returning({ id: user_push_tokens.id });
+            updated_at: sql`now()`,
+          },
+          setWhere: eq(user_push_tokens.user_id, ctx.user.id),
+        })
+        .returning({ id: user_push_tokens.id });
 
-        if (inserted.length === 0) {
-          throw new TRPCError({
-            code: 'CONFLICT',
-            message: 'Push token is registered to another account.',
-          });
-        }
+      if (registered.length === 0) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Push token is registered to another account.',
+        });
       }
 
       return { success: true };

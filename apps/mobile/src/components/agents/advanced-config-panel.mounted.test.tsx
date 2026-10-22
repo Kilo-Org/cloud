@@ -51,6 +51,8 @@ vi.mock('@/components/ui/icons', () => ({
   Building2: 'Building2',
   ChevronDown: 'ChevronDown',
   ChevronUp: 'ChevronUp',
+  Eye: 'Eye',
+  EyeOff: 'EyeOff',
   GitBranch: 'GitBranch',
   Lock: 'Lock',
   Plus: 'Plus',
@@ -237,6 +239,23 @@ function addVariable(renderer: TestRenderer.ReactTestRenderer, key: string, valu
   press(buttonByText(renderer, 'Save'));
 }
 
+/** Add a variable marked secret, so its row offers the reveal control. */
+function addSecretVariable(renderer: TestRenderer.ReactTestRenderer, key: string, value: string) {
+  press(buttonByText(renderer, 'Add variable'));
+  typeInto(renderer, 'Key', key);
+  typeInto(renderer, 'Value', value);
+  const markSecret = renderer.root
+    .findAll(node => node.props.accessibilityLabel === 'Mark as secret')
+    .find(node => typeof node.props.onValueChange === 'function');
+  if (!markSecret) {
+    throw new Error('no Mark as secret switch');
+  }
+  act(() => {
+    (markSecret.props.onValueChange as (next: boolean) => void)(true);
+  });
+  press(buttonByText(renderer, 'Save'));
+}
+
 beforeEach(() => {
   toast.success.mockReset();
   toast.error.mockReset();
@@ -297,6 +316,27 @@ describe('AdvancedConfigPanel', () => {
       renderer.root.findAllByType('FormField' as never).filter(node => node.props.label === 'Value')
     ).toHaveLength(0);
     expect(texts(renderer)).toContain('1 environment variables · 0 setup commands');
+  });
+
+  it('names the row reveal control after its action and reveals the draft value', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+    addSecretVariable(renderer, 'API_KEY', 's3cretdraft');
+
+    // The row control announces the action a screen-reader user takes, the
+    // same copy the edit-form reveal toggle uses; the "Secret" noun names the
+    // kind, not the action, and no control carries it.
+    expect(byLabel(renderer, 'Secret')).toBeUndefined();
+    const reveal = byLabel(renderer, 'Reveal value');
+    expect(reveal?.props.accessibilityState).toMatchObject({ selected: false });
+    expect(texts(renderer)).not.toContain('s3cretdraft');
+
+    press(reveal);
+
+    expect(texts(renderer)).toContain('s3cretdraft');
+    expect(byLabel(renderer, 'Reveal value')?.props.accessibilityState).toMatchObject({
+      selected: true,
+    });
   });
 
   it('caps manual setup commands at the server list and row bounds', () => {

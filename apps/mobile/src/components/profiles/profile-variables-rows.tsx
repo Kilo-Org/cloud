@@ -122,7 +122,7 @@ export function VariableRowView({
         <Pressable
           className="h-11 w-11 items-center justify-center active:opacity-70"
           accessibilityRole="button"
-          accessibilityLabel={t('profiles.secretLabel')}
+          accessibilityLabel={t('profiles.secrets.reveal')}
           accessibilityState={{ selected: revealed }}
           onPress={onToggleReveal}
         >

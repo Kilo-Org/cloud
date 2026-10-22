@@ -34,11 +34,11 @@ import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import { isKiloExclusiveRateLimitedModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   accountForMicrodollarUsage,
   captureProxyError,
@@ -263,17 +263,17 @@ export async function handleLlmProxyRequest(
   let requestBodyParsed: GatewayRequest;
   try {
     if (path === '/chat/completions') {
-      const body: OpenRouterChatCompletionRequest = JSON.parse(requestBodyText);
+      const body = JSON.parse(requestBodyText) as OpenRouterChatCompletionRequest;
       // Inject or merge stream_options.include_usage = true (only when streaming)
       if (body.stream) {
         body.stream_options = { ...(body.stream_options || {}), include_usage: true };
       }
       requestBodyParsed = { kind: 'chat_completions', body };
     } else if (path === '/messages') {
-      const body: GatewayMessagesRequest = JSON.parse(requestBodyText);
+      const body = JSON.parse(requestBodyText) as GatewayMessagesRequest;
       requestBodyParsed = { kind: 'messages', body };
     } else {
-      const body: GatewayResponsesRequest = JSON.parse(requestBodyText);
+      const body = JSON.parse(requestBodyText) as GatewayResponsesRequest;
       requestBodyParsed = { kind: 'responses', body };
     }
   } catch (e) {
@@ -601,11 +601,11 @@ export async function handleLlmProxyRequest(
   // the report-only decide call and the usage event, which share this request.
   const clientIp = bareIpLiteral(ipAddress);
 
-  // For rate-limited Kilo-exclusive models: server-side products (cloud-agent,
-  // code-review, app-builder, gastown) rate-limit per user when the request comes
-  // from Cloudflare IPs (Kilo infrastructure). All other products rate-limit per
-  // IP (fast pre-auth path).
-  if (isKiloExclusiveRateLimitedModel(effectiveModelIdLowerCased)) {
+  // For free models: server-side products (cloud-agent, code-review, app-builder,
+  // gastown) rate-limit per user when the request comes from Cloudflare IPs (Kilo
+  // infrastructure). All other products rate-limit per IP (fast pre-auth path).
+  // Custom LLMs are exempt, even when their id matches a free-model pattern.
+  if (isFreeRequestedModel && !(await isCustomLlm(effectiveModelIdLowerCased))) {
     const rateLimitKey = await resolveFreeModelRateLimitKey(feature, ipAddress, authPromise);
     if (rateLimitKey instanceof NextResponse) return rateLimitKey;
 
@@ -728,6 +728,7 @@ export async function handleLlmProxyRequest(
             organizationId,
             provider: 'openrouter',
             requested_model: requestedModelLowerCased,
+            is_free: false,
             promptInfo: {
               system_prompt_prefix: '',
               system_prompt_length: 0,
@@ -899,7 +900,7 @@ export async function handleLlmProxyRequest(
 
     if (
       !canSpendPaidUsage(balance) &&
-      !isFreeRequestedModel &&
+      !effectiveProviderContext.isFree &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {
@@ -930,6 +931,7 @@ export async function handleLlmProxyRequest(
     kiloUserId: user.id,
     provider: effectiveProviderContext.provider.id,
     requested_model: effectiveModelIdLowerCased,
+    is_free: effectiveProviderContext.isFree,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),

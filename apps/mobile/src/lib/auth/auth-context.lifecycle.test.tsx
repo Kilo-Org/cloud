@@ -334,6 +334,14 @@ vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
   clearLiveActivityPreference: vi.fn(),
 }));
 
+// The tracking prompt module pulls expo-tracking-transparency -> expo, which
+// needs `__DEV__` and cannot load in the node test environment. Mock it like
+// the sibling SecureStore preference modules: this suite only asserts the
+// teardown ordering.
+vi.mock('@/lib/hooks/use-tracking-permission-prompt', () => ({
+  clearTrackingPromptDismissed: vi.fn(),
+}));
+
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference }));
 
 // Like use-trusted-hosts below: the real module pulls secure-store-preference
@@ -457,6 +465,7 @@ vi.mock('@/lib/storage-keys', () => ({
   ORGANIZATION_PERSONAL_STORAGE_KEY: 'selected-organization-personal',
   PENDING_DEEP_LINK_KEY: 'pending-deep-link',
   PICKER_LAUNCH_CONTEXT_KEY: 'picker-launch-context',
+  PICKER_RESTORE_RECORD_KEY: 'picker-restore-record',
   REFRESH_TOKEN_KEY: 'refresh-token',
   LIVE_SESSION_FILTERS_KEY: 'live-session-filters',
   SESSION_FILTERS_KEY: 'session-filters',

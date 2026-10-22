@@ -633,3 +633,32 @@ describe('ToolDiff bounds and escaping', () => {
     expect(html).not.toContain('<pre');
   });
 });
+
+describe('cloud workspace file labels', () => {
+  const workspaceFilePath = '/workspace/user-1/sessions/ses_abc123/src/nested/file.ts';
+
+  it('shows the repo-relative path for an edit card', () => {
+    const html = renderTool('edit', { filePath: workspaceFilePath });
+    expect(html).toContain('src/nested/file.ts');
+    expect(html).not.toContain('/workspace/user-1/sessions/ses_abc123');
+  });
+
+  it('shows the repo-relative path for an apply_patch file without relativePath', () => {
+    const html = renderTool(
+      'apply_patch',
+      {},
+      {
+        files: [
+          {
+            filePath: workspaceFilePath,
+            type: 'update',
+            additions: 1,
+            deletions: 1,
+          },
+        ],
+      }
+    );
+    expect(html).toContain('src/nested/file.ts');
+    expect(html).not.toContain('/workspace/user-1/sessions/ses_abc123');
+  });
+});

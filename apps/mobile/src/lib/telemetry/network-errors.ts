@@ -30,7 +30,7 @@ import { isAbortError, isRequestDeadlineError } from '@/lib/telemetry/abort-clas
 import { NETWORK_BODY_CONTEXT } from '@/lib/telemetry/sentry-scrub';
 
 // Re-exported for existing consumers and tests; the classifier lives in
-// `abort-classification.ts` so this module stays under the line limit.
+// `abort-classification.ts`.
 export { isAbortError };
 
 type TelemetrySource = 'trpc' | 'fetch';

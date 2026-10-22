@@ -21,6 +21,28 @@ import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 const PLAY_INTEGRITY_API_BASE = 'https://playintegrity.googleapis.com/v1';
 
+/** Abort budget for both outbound Google calls. */
+const GOOGLE_FETCH_TIMEOUT_MS = 10_000;
+
+/** Refresh the cached access token this long before its actual expiry. */
+const TOKEN_EXPIRY_MARGIN_MS = 5 * 60 * 1000;
+
+/**
+ * Access-token cache keyed by service-account email. Google tokens are
+ * reusable for about an hour, so verification mints a token only when the
+ * cached one is inside the expiry margin. Concurrent cold starts share the
+ * single in-flight refresh promise.
+ */
+const accessTokenCache = new Map<
+  string,
+  { token: string; refreshAt: number; inflight?: Promise<string> }
+>();
+
+/** Exported for tests: clear the cache so each test exercises a cold start. */
+export function resetAccessTokenCacheForTests(): void {
+  accessTokenCache.clear();
+}
+
 // Required integrity labels per the plan
 const REQUIRED_INTEGRITY_LABEL = 'MEETS_DEVICE_INTEGRITY';
 
@@ -41,11 +63,11 @@ function isProduction(): boolean {
 export const isProductionInternal = isProduction;
 
 /** Obtain a GCP access token from a service-account key via JWT bearer assertion. */
-async function getAccessToken(
+async function requestAccessToken(
   clientEmail: string,
   privateKey: string,
   tokenUri: string
-): Promise<string> {
+): Promise<{ token: string; refreshAt: number }> {
   const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
   const now = Math.floor(Date.now() / 1000);
   const claimSet = Buffer.from(
@@ -72,10 +94,56 @@ async function getAccessToken(
       grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
       assertion: jwt,
     }),
+    signal: AbortSignal.timeout(GOOGLE_FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Google token endpoint ${res.status}`);
-  const data = (await res.json()) as { access_token: string };
-  return data.access_token;
+  const data = (await res.json()) as { access_token: string; expires_in?: number };
+  if (!data.access_token) throw new Error('Google token endpoint returned no access_token');
+  // Without expires_in, fall back to the standard one-hour Google lifetime.
+  const lifetimeMs = (data.expires_in ?? 3600) * 1000;
+  return { token: data.access_token, refreshAt: Date.now() + lifetimeMs };
+}
+
+/**
+ * Return a cached access token when it is still outside the expiry margin;
+ * otherwise mint a fresh one. Concurrent callers awaiting the same cold start
+ * share one in-flight refresh; a failed refresh clears the entry so the next
+ * caller retries.
+ */
+async function getAccessToken(
+  clientEmail: string,
+  privateKey: string,
+  tokenUri: string
+): Promise<string> {
+  const cached = accessTokenCache.get(clientEmail);
+  if (cached && cached.refreshAt > Date.now()) return cached.token;
+  if (cached?.inflight) return cached.inflight;
+
+  // Holder lets the callbacks compare against the settled promise reference
+  // without reassigning it.
+  const pending: { promise?: Promise<string> } = {};
+  const promise = requestAccessToken(clientEmail, privateKey, tokenUri)
+    .then(({ token, refreshAt }) => {
+      const entry = accessTokenCache.get(clientEmail);
+      if (entry?.inflight === pending.promise) {
+        // Refresh inside the margin so the token stays valid for the whole
+        // verify call that follows.
+        accessTokenCache.set(clientEmail, {
+          token,
+          refreshAt: refreshAt - TOKEN_EXPIRY_MARGIN_MS,
+        });
+      }
+      return token;
+    })
+    .catch(err => {
+      const entry = accessTokenCache.get(clientEmail);
+      if (entry?.inflight === pending.promise) accessTokenCache.delete(clientEmail);
+      throw err;
+    });
+  pending.promise = promise;
+
+  accessTokenCache.set(clientEmail, { token: '', refreshAt: 0, inflight: promise });
+  return promise;
 }
 
 /**
@@ -164,6 +232,7 @@ export async function verifyPlayIntegrity(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ integrityToken }),
+      signal: AbortSignal.timeout(GOOGLE_FETCH_TIMEOUT_MS),
     }
   );
 

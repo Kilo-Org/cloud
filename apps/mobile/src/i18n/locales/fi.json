@@ -49,7 +49,7 @@
     "added": "Lisätty",
     "cancelled": "Peruttu",
     "close": "Sulje",
-    "codeReviewer": "Koodintarkistaja",
+    "codeReviewer": "Koodikatselmoija",
     "connected": "Yhdistetty",
     "couldNotLoadModels": "Mallien lataaminen epäonnistui.",
     "couldNotLoadRepositories": "Koodivarastojen lataaminen epäonnistui.",
@@ -67,7 +67,7 @@
     "off": "Ei käytössä",
     "organization": "Organisaatio",
     "platform": "Alusta",
-    "prReview": "PR-tarkistus",
+    "prReview": "PR-katselmointi",
     "queued": "Jonossa",
     "remove": "Poista",
     "repository": "Koodivarasto",
@@ -127,7 +127,7 @@
     "reply": "Vastaa",
     "reportSubmittedReceipt": "Ilmoitus lähetetty. Tunniste: {{receiptId}}",
     "retryLoadingMore": "Yritä uudelleen ladata lisää",
-    "reviewPr": "Tarkista PR",
+    "reviewPr": "Katselmoi PR",
     "role": "Rooli",
     "searchModels": "Hae malleja…",
     "selectedRepositories": "Valitut koodivarastot",
@@ -1400,21 +1400,21 @@
       "repositoryAccess": "koodivaraston käyttöoikeus"
     },
     "style": {
-      "title": "Tarkistustyyli",
+      "title": "Katselmointityyli",
       "balanced": "Olennaiset havainnot ilman turhia huomautuksia",
       "lenient": "Vain vakavat ongelmat",
       "roast": "Viihdyttävän armoton ja rehellinen",
       "strict": "Huomauta kaikesta ja vaadi korkeaa laatua"
     },
     "reviewDetail": {
-      "title": "Tarkistus",
+      "title": "Katselmointi",
       "cancelTitle": "Peruutetaanko katselmointi?",
       "cancelMessage": "Tämä pysäyttää käynnissä olevan koodikatselmoinnin.",
       "cancelReview": "Peruuta katselmointi",
       "retryTitle": "Yritetäänkö katselmointia uudelleen?",
       "retryMessage": "Tämä suorittaa koodikatselmoinnin uudelleen.",
       "retryReview": "Yritä katselmointia uudelleen",
-      "retryNeedsSettings": "Koodintarkistaja on poissa käytöstä tai sen asetukset vaativat huomiota. Korjaa asetukset ja yritä sitten tätä katselmointia uudelleen.",
+      "retryNeedsSettings": "Koodikatselmoija on poissa käytöstä tai sen asetukset vaativat huomiota. Korjaa asetukset ja yritä sitten tätä katselmointia uudelleen.",
       "fixSettings": "Korjaa asetukset",
       "couldNotLoad": "Katselmointia ei voitu ladata.",
       "couldNotGetLatest": "Uusimpia tietoja ei voitu hakea.",
@@ -1446,13 +1446,13 @@
       "executionStarted": "Suoritus aloitettu",
       "reviewCompleted": "Katselmointi valmis",
       "reviewInterrupted": "Katselmointi keskeytynyt",
-      "sessionError": "Istunnossa tapahtui virhe: {{error}}.",
+      "sessionError": "Istunnossa tapahtui virhe: {{error}}",
       "statusWithValue": "Tila: {{status}}",
       "toolName": "Työkalu: {{name}}",
       "toolNameError": "Työkalussa {{name}} tapahtui virhe."
     },
     "reviewMemory": {
-      "title": "Tarkistusmuisti",
+      "title": "Katselmointimuisti",
       "loading": "Ladataan katselmointimuistia",
       "couldNotLoad": "Katselmointimuistia ei voitu ladata.",
       "off": "Katselmointimuisti on pois käytöstä.",
@@ -1492,7 +1492,7 @@
     },
     "bitbucketConnect": {
       "description": "Luo työtilan käyttöoikeustunnus vaadituilla oikeuksilla ja liitä se alla olevaan kenttään.",
-      "scopes": "Tili: luku · Koodivarastot: luku/kirjoitus · Muutospyynnöt: luku · Webhook-kutsut: luku/kirjoitus",
+      "scopes": "Tili: luku · Koodivarastot: luku/kirjoitus · Muutospyynnöt: luku · Webhookit: luku/kirjoitus",
       "tokenPlaceholder": "Työtilan käyttöoikeustunnus"
     },
     "scopeList": {
@@ -1522,12 +1522,12 @@
       "bitbucketError": "Bitbucketin käyttöönottoa ei voitu avata. Yritä uudelleen."
     },
     "overview": {
-      "reviewStyle": "Tarkistustyyli",
+      "reviewStyle": "Katselmointityyli",
       "focusAreas": "Painopisteet",
       "allAreas": "Kaikki osa-alueet",
       "customInstructions": "Mukautetut ohjeet",
       "set": "Määritetty",
-      "nSelected": "{{displayCount}} valittu",
+      "nSelected": "Valittu: {{displayCount}}",
       "proposedReviewMdGuidance": "Ehdotetut REVIEW.md-ohjeet"
     },
     "decision": {
@@ -1580,7 +1580,7 @@
       "repeatedRepositoryCloneTimeout": {
         "description": "Koodikatselmoija poistettiin käytöstä, koska koodivaraston kloonaus aikakatkaistiin tänään kolmesti. Pyydä apua osoitteesta {{supportEmail}} ja ota sitten koodikatselmoija uudelleen käyttöön."
       },
-      "title": "Koodintarkistaja vaatii toimenpiteitä.",
+      "title": "Koodikatselmoija vaatii toimenpiteitä",
       "recoveryLabel": "Ota yhteyttä tukeen"
     },
     "unknownError": "Tapahtui tuntematon virhe."

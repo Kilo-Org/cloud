@@ -332,7 +332,7 @@ export default function TabsLayout() {
               <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={profileTabPressListeners(router)}
+          listeners={profileTabPressListeners(segments)}
         />
       </Tabs>
     </StateSurfaceInsets>

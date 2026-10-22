@@ -30,7 +30,6 @@ import { UserProfileCard } from '@/components/profile/UserProfileCard';
 import { getContributorChampionProfileBadgeForUser } from '@/lib/contributor-champions/service';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import { CustomRoutersCard } from '@/components/auto-routing/CustomRoutersCard';
-import { hasCustomRoutersAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { smartAppBannerItunes } from '@/lib/smart-app-banner';
 import { DeleteAccountDialog } from '@/components/profile/DeleteAccountDialog';
 
@@ -48,7 +47,6 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
   const isDevelopment = process.env.NODE_ENV === 'development';
   const isKiloPassUiEnabled =
     isDevelopment || (await isFeatureFlagEnabled('kilo-pass-ui', user.id));
-  const isCustomRoutersUiEnabled = await hasCustomRoutersAccess(user.id);
 
   const { ideName, logoSrc } = getExtensionUrl(params, await cookies());
   const orgs = customerInfo.hasOrganizations ? await getUserOrganizationsWithSeats(user.id) : [];
@@ -117,7 +115,7 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
 
       <AutoRoutingModeCard />
 
-      {isCustomRoutersUiEnabled && <CustomRoutersCard />}
+      <CustomRoutersCard />
 
       {params.source && (
         <SupportCard kiloToken={kiloToken} ideName={ideName} logoSrc={logoSrc} isProminent={true} />

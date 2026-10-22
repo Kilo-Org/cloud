@@ -32,6 +32,13 @@ export function useRepoBindings(organizationId?: string) {
   const query = useQuery({
     ...options,
     placeholderData: keepPreviousDataForQueryKey(options.queryKey),
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when the option is undefined), so re-enable it unconditionally:
+    // a connectivity blip must recover the pins without waiting for the
+    // freshness window.
+    refetchOnReconnect: 'always',
   });
 
   return {
@@ -55,7 +62,11 @@ export function useRepoBindingMutations(organizationId?: string) {
   const queryClient = useQueryClient();
   const bindingsFilter = trpc.agentProfiles.listRepoBindings.pathFilter();
 
+  // `networkMode: 'always'` keeps a bind or unbind settling while the online
+  // manager is offline (NetInfo can misreport while the backend is reachable):
+  // the request either succeeds or fails fast, so `isPending` can never stick.
   const callbacks = {
+    networkMode: 'always' as const,
     onSuccess: () => {
       void queryClient.invalidateQueries(bindingsFilter);
     },

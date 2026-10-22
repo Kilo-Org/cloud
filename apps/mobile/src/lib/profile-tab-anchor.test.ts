@@ -3,8 +3,7 @@ import { readFileSync } from 'node:fs';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only guard, runs in node, never bundled into the app
 import { fileURLToPath } from 'node:url';
 
-import { type Href } from 'expo-router';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   findingDetailBackTarget,
@@ -12,6 +11,7 @@ import {
   PROFILE_TAB_ROOT,
 } from './finding-detail-back';
 import { profileTabPressListeners } from './tab-press-listeners';
+import { __resetTabSwitchInputForTests } from './tab-switch-input-gate';
 
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 
@@ -87,17 +87,65 @@ describe('profile tab anchor', () => {
   it("declares initialRouteName: 'index'", () => {
     expect(layoutSource).toMatch(/initialRouteName:\s*'index'/);
   });
+});
 
-  it('returns to the profile root when the profile tab is pressed', () => {
-    const navigate = vi.fn<(href: Href) => void>();
+describe('profile tab press', () => {
+  // The re-press resets through the shared plan (`planProfileTabPress`), which
+  // dispatches a targeted stack pop so the unsaved-changes guard can intercept
+  // it; a cross-tab press and a form-sheet leaf are left to the navigator, which
+  // keeps the tab's stack.
+  const PROFILE_SEGMENTS = ['(app)', '(tabs)', '(3_profile)'];
+  const HOME_SEGMENTS = ['(app)', '(tabs)', '(0_home)'];
+
+  function pressProfileTab({
+    segments,
+    stackKey = 'profile-stack',
+    stackIndex = 0,
+  }: Readonly<{ segments: string[]; stackKey?: string; stackIndex?: number }>) {
     const preventDefault = vi.fn<() => void>();
-    const listeners = profileTabPressListeners({ navigate })({
-      navigation: { isFocused: () => false },
+    const dispatch = vi.fn<(action: { type: string; target?: string }) => void>();
+
+    profileTabPressListeners(segments)({
+      navigation: {
+        isFocused: () => true,
+        getState: () => ({
+          routes: [{ name: '(3_profile)', state: { key: stackKey, index: stackIndex } }],
+        }),
+        dispatch,
+      },
+    }).tabPress({ preventDefault });
+
+    return { preventDefault, dispatch };
+  }
+
+  afterEach(() => {
+    __resetTabSwitchInputForTests();
+  });
+
+  it('leaves a cross-tab press to the navigator so the tab keeps its stack', () => {
+    const { preventDefault, dispatch } = pressProfileTab({
+      segments: HOME_SEGMENTS,
+      stackIndex: 2,
     });
 
-    listeners.tabPress({ preventDefault });
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('leaves a re-press at the profile root to the navigator', () => {
+    const { preventDefault, dispatch } = pressProfileTab({ segments: PROFILE_SEGMENTS });
+
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('pops back to the profile root from a screen above it', () => {
+    const { preventDefault, dispatch } = pressProfileTab({
+      segments: PROFILE_SEGMENTS,
+      stackIndex: 2,
+    });
 
     expect(preventDefault).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledWith(PROFILE_TAB_ROOT);
+    expect(dispatch).toHaveBeenCalledWith({ type: 'POP_TO_TOP', target: 'profile-stack' });
   });
 });

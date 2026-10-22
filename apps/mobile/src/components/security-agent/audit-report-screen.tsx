@@ -1,6 +1,7 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useQuery } from '@tanstack/react-query';
+import { type TFunction } from 'i18next';
 import { FileText, ShieldOff } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -21,6 +22,7 @@ type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type AuditReportResponse = RouterOutputs['securityAgent']['getAuditReport'];
 type SecurityAgentAuditReport = Extract<AuditReportResponse, { status: 'ok' }>['report'];
 type SecurityFindingAuditSection = SecurityAgentAuditReport['findings'][number];
+type SecurityAgentAuditReportActor = SecurityFindingAuditSection['events'][number]['actor'];
 
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'] as const;
 
@@ -35,6 +37,74 @@ const SEVERITY_LABEL_KEYS = {
   // row for it, so reuse the finding-details word.
   unknown: 'common.unknown',
 } as const;
+
+const MASKED_ACTOR_LABEL_KEYS = {
+  kilo_admin: 'securityAgent.auditReport.actorMaskedKiloAdmin',
+  user: 'securityAgent.auditReport.actorMaskedUser',
+} as const;
+
+// The period line is labelled UTC, so every timestamp inside the report carries
+// the same zone: a reader west of UTC must never see a generated date their own
+// calendar has not reached yet. `formatDate` renders the date and clock in the
+// language's own order and 12/24-hour cycle; the zone marker stays invariant,
+// like `periodUtc`'s.
+function formatUtcTimestamp(value: string): string {
+  const formatOptions: Intl.DateTimeFormatOptions = {
+    timeZone: 'UTC',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  };
+  return `${formatDate(parseTimestamp(value), i18n.language, formatOptions)} UTC`;
+}
+
+// A masked actor's displayName is a server-side English label; the localized
+// label is chosen from the mask the server reports, never from that string.
+function actorLabel(actor: SecurityAgentAuditReportActor, t: TFunction): string {
+  if (actor.type === 'system') {
+    return t('securityAgent.auditReport.actorSystem');
+  }
+  if (!actor.masked) {
+    return actor.displayName;
+  }
+  return t(MASKED_ACTOR_LABEL_KEYS[actor.maskedKind ?? 'user']);
+}
+
+// Literal keys, never a template: the catalog check scans the source for the
+// keys a lookup passes on, and a computed key is invisible to it. An action
+// the server adds before this app learns it falls back to the server label.
+const EVENT_ACTION_LABEL_KEYS: Record<string, string> = Object.freeze({
+  'security.finding.created': 'securityAgent.auditReport.eventActions.findingCreated',
+  'security.finding.severity_changed':
+    'securityAgent.auditReport.eventActions.findingSeverityChanged',
+  'security.finding.status_change': 'securityAgent.auditReport.eventActions.findingStatusChange',
+  'security.finding.dismissed': 'securityAgent.auditReport.eventActions.findingDismissed',
+  'security.finding.auto_dismissed': 'securityAgent.auditReport.eventActions.findingAutoDismissed',
+  'security.finding.superseded': 'securityAgent.auditReport.eventActions.findingSuperseded',
+  'security.finding.analysis_completed':
+    'securityAgent.auditReport.eventActions.findingAnalysisCompleted',
+  'security.finding.analysis_failed':
+    'securityAgent.auditReport.eventActions.findingAnalysisFailed',
+  'security.remediation.queued': 'securityAgent.auditReport.eventActions.remediationQueued',
+  'security.remediation.pr_opened': 'securityAgent.auditReport.eventActions.remediationPrOpened',
+  'security.remediation.failed': 'securityAgent.auditReport.eventActions.remediationFailed',
+  'security.remediation.blocked': 'securityAgent.auditReport.eventActions.remediationBlocked',
+  'security.remediation.no_changes_needed':
+    'securityAgent.auditReport.eventActions.remediationNoChangesNeeded',
+  'security.remediation.cancelled': 'securityAgent.auditReport.eventActions.remediationCancelled',
+  'security.finding.deleted': 'securityAgent.auditReport.eventActions.findingDeleted',
+});
+
+function eventLabel(action: string, serverLabel: string): string {
+  // Object.hasOwn: a bare index would return inherited members like
+  // `constructor` or `toString` instead of undefined for an unknown action.
+  const key = Object.hasOwn(EVENT_ACTION_LABEL_KEYS, action)
+    ? EVENT_ACTION_LABEL_KEYS[action]
+    : undefined;
+  return key === undefined ? serverLabel : i18n.t(key);
+}
 
 // Personal and org procedures resolve to nominally distinct tRPC option
 // types even when structurally identical, so we always call both hooks (one
@@ -73,9 +143,7 @@ function ReportHeader({ report }: Readonly<{ report: SecurityAgentAuditReport }>
   const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language, {
     timeZone: 'UTC',
   });
-  const generatedAt = formatDate(parseTimestamp(report.generatedAt), i18n.language, {
-    timeZone: 'UTC',
-  });
+  const generatedAt = formatUtcTimestamp(report.generatedAt);
 
   return (
     <View className="gap-1">
@@ -141,10 +209,9 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
       <View className="gap-3">
         {finding.events.map(event => (
           <View key={event.id} className="gap-0.5">
-            <Text className="text-sm">{event.label}</Text>
+            <Text className="text-sm">{eventLabel(event.action, event.label)}</Text>
             <Text variant="muted" className="text-xs">
-              {formatDate(parseTimestamp(event.occurredAt), i18n.language, { timeZone: 'UTC' })} ·{' '}
-              {event.actor.displayName}
+              {formatUtcTimestamp(event.occurredAt)} · {actorLabel(event.actor, t)}
             </Text>
           </View>
         ))}

@@ -6,7 +6,7 @@ import {
   markTabSwitchPending,
   TAB_SWITCH_ACTIVE_TAB_SETTLE_MS,
 } from '@/lib/tab-switch-input-gate';
-import { tabPressListeners } from '@/lib/tab-press-listeners';
+import { tabPressListeners, profileTabPressListeners } from '@/lib/tab-press-listeners';
 
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 
@@ -32,5 +32,22 @@ describe('tab press listeners', () => {
     vi.advanceTimersByTime(TAB_SWITCH_ACTIVE_TAB_SETTLE_MS);
 
     expect(isTabSwitchPending()).toBe(true);
+  });
+
+  it('settles the input window when the focused profile tab is pressed', () => {
+    markTabSwitchPending();
+
+    profileTabPressListeners(['(app)', '(tabs)', '(3_profile)'])({
+      navigation: {
+        isFocused: () => true,
+        getState: () => ({
+          routes: [{ name: '(3_profile)', state: { key: 'profile-stack', index: 0 } }],
+        }),
+        dispatch: vi.fn(),
+      },
+    }).tabPress({ preventDefault: vi.fn() });
+    vi.advanceTimersByTime(TAB_SWITCH_ACTIVE_TAB_SETTLE_MS);
+
+    expect(isTabSwitchPending()).toBe(false);
   });
 });

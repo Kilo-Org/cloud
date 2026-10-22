@@ -23,6 +23,16 @@ const i18nManager = vi.hoisted(() => ({
   forceRTL: vi.fn(),
 }));
 const navigation = vi.hoisted(() => ({ dispatch: vi.fn() }));
+// react-navigation re-registers the guard on every render, and Continue relies
+// on the skip flag arming the registration that is live *before* the state
+// update lands, so the mock keeps each registration instead of dropping it.
+const guardRegistrations = vi.hoisted(
+  () =>
+    [] as {
+      prevented: boolean;
+      callback: (event: { data: { action: string } }) => void;
+    }[]
+);
 // FlashList renders through a callback, so a host-string mock would drop every
 // row. This mock calls the render props so the row assertions still see rows.
 const flashListMock = vi.hoisted(
@@ -88,7 +98,13 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo', () => ({ reloadAppAsync }));
 vi.mock('@/lib/navigation/prevent-remove', () => ({
-  usePreventRemove: () => undefined,
+  usePreventRemove: (
+    prevented: boolean,
+    // eslint-disable-next-line promise/prefer-await-to-callbacks -- the mock must capture the guard callback so a test can fire the navigation it holds
+    callback: (event: { data: { action: string } }) => void
+  ) => {
+    guardRegistrations.push({ prevented, callback });
+  },
 }));
 vi.mock('@/i18n/apply-language', async importOriginal => {
   const actual = await importOriginal<typeof ApplyLanguageModule>();
@@ -215,6 +231,8 @@ describe('LanguagePickerSheet apply', () => {
     renameAndroidNotificationChannels.mockReset();
     registerNeedsInputCategories.mockReset();
     insets.bottom = 0;
+    guardRegistrations.length = 0;
+    navigation.dispatch.mockReset();
     i18nManager.isRTL = false;
     i18nManager.forceRTL.mockReset();
     vi.mocked(applyLanguagePreference).mockClear();
@@ -431,7 +449,7 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
-  it('keeps Retry as the only action when the reload fails', async () => {
+  it('offers Continue beside Retry so a saved language is not trapped behind the reload', async () => {
     reloadAppAsync.mockRejectedValue(new Error('reload failed'));
     const onClose = vi.fn<() => void>();
     const renderer = await applySelection(onClose, 'العربية');
@@ -440,7 +458,36 @@ describe('LanguagePickerSheet apply', () => {
     if (!failedSheet) {
       throw new Error('PickerSheet not found');
     }
-    expect(failedSheet.props.onCancel).toBeUndefined();
+    expect(failedSheet.props.cancelLabel).toBe('Continue');
+    expect(failedSheet.props.onCancel).toEqual(expect.any(Function));
+    expect(failedSheet.props.doneLabel).toBe('Retry');
+    const armed = guardRegistrations.findLast(registration => registration.prevented);
+    if (!armed) {
+      throw new Error('the failed state did not hold the navigation guard');
+    }
+
+    act(() => {
+      (failedSheet.props.onCancel as () => void)();
+    });
+
+    // Continue leaves the failed state without another reload: the preference
+    // was persisted before the reload attempt, so the sheet closes into the
+    // normal picker instead of asking for a retry that may never succeed.
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    expect(findByType(renderer.root, 'PickerSheet')[0]?.props.doneLabel).toBe('Done');
+
+    // The guard the failed state held is still registered when the close runs,
+    // so the skip Continue armed releases exactly this one navigation.
+    act(() => {
+      armed.callback({ data: { action: 'BACK' } });
+    });
+    expect(navigation.dispatch).toHaveBeenCalledTimes(1);
+    expect(navigation.dispatch).toHaveBeenCalledWith('BACK');
+    act(() => {
+      armed.callback({ data: { action: 'BACK' } });
+    });
+    expect(navigation.dispatch).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });

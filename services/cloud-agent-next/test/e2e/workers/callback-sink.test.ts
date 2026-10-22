@@ -3,9 +3,12 @@ import { createDrizzleClient } from '@kilocode/db/client';
 import { kilocode_users } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
+import { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { e2eSurfaceApp, isCallbackIngestRequest } from '../../../src/e2e-surface/app.js';
 import { E2E_CALLBACK_TOKEN_TTL_MS } from '../../../src/persistence/E2eCallbackSink.js';
+import { handleCallbackIngest } from '../../../src/e2e-surface/callbacks.js';
+import type { HonoContext } from '../../../src/hono-context.js';
 
 /**
  * e2e-only callback sink contract, in the real Workers runtime against the real
@@ -180,13 +183,59 @@ describe('callback surface authorization', () => {
     expect(response.status).toBe(404);
   });
 
-  it('accepts a valid path token and rejects a wrong one without either credential', async () => {
+  it('supports the callback lifecycle', async () => {
     const minted = await mint(tokenFor(ALLOWED_USER));
     const accepted = await ingest(minted.token, JSON.stringify({ messageId: 'message_1' }));
     expect(accepted.status).toBe(200);
 
     const rejected = await ingest('not-a-real-token', JSON.stringify({ messageId: 'x' }));
     expect(rejected.status).toBe(404);
+
+    const unknown = crypto.randomUUID();
+    expect((await ingest(unknown, '{}')).status).toBe(404);
+    await runInDurableObject(callbackSink().getByName(unknown), async (_instance, state) => {
+      expect(await state.storage.list()).toEqual(new Map());
+    });
+  });
+
+  it('applies callback token syntax at the handler boundary', async () => {
+    const app = new Hono<HonoContext>();
+    app.post('/__e2e/callbacks/:token', handleCallbackIngest);
+    const valid = 'abcdef01-2345-4678-9abc-def012345678';
+    const tokens = [
+      'not-a-real-token',
+      valid.toUpperCase(),
+      valid.replace('-4', '-7'),
+      valid.replace('-9', '-7'),
+      `${valid}0`,
+      'a'.repeat(4096),
+      `${valid}%0A`,
+    ];
+    for (const token of tokens) {
+      let pulls = 0;
+      const body = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            pulls += 1;
+            controller.enqueue(new TextEncoder().encode('{}'));
+            controller.close();
+          },
+        },
+        { highWaterMark: 0 }
+      );
+      const response = await app.fetch(
+        new Request(`https://worker.test/__e2e/callbacks/${token}`, { method: 'POST', body }),
+        {
+          ...env,
+          get E2E_CALLBACK_SINK(): never {
+            throw new Error('Unexpected sink access');
+          },
+        },
+        createExecutionContext()
+      );
+      expect(response.status, token).toBe(404);
+      expect(pulls, token).toBe(0);
+    }
   });
 
   it('ingests with an unset or empty Worker secret and a wrong key', async () => {
@@ -241,7 +290,8 @@ describe('callback surface authorization', () => {
     // case-insensitive regex, a prefix match, or matching the raw URL) must fail
     // here, because the HTTP boundary alone would not catch it: Hono's routing
     // is case-sensitive, so a widened predicate can still 404 instead of 200.
-    expect(isCallbackIngestRequest('POST', '/__e2e/callbacks/token')).toBe(true);
+    const path = `/__e2e/callbacks/${crypto.randomUUID()}`;
+    expect(isCallbackIngestRequest('POST', path)).toBe(true);
     const nonExempt: Array<[string, string]> = [
       ['post', '/__e2e/callbacks/token'],
       ['GET', '/__e2e/callbacks/token'],

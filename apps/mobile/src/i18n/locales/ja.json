@@ -1724,6 +1724,7 @@
       "branchLoadError": "ブランチを読み込めませんでした",
       "branchUnavailable": "このリポジトリではブランチが利用できません。プロバイダーでのアクセスを確認し、別のリポジトリを選択してください。",
       "branchEmpty": "利用可能なブランチがありません",
+      "branchListIncomplete": "一部のブランチのみ表示されています。このリポジトリには、このリストに含めきれないブランチがあります。",
       "branchPlaceholder": "ブランチを選択",
       "runOnWithTarget": "実行先：{{target}}",
       "environment": "環境",

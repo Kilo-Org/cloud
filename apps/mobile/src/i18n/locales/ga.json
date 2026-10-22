@@ -2325,6 +2325,7 @@
       "branchLoadError": "Níorbh fhéidir na brainsí a lódáil",
       "branchUnavailable": "Níl brainsí ar fáil don stór seo. Seiceáil do rochtain leis an soláthraí, ansin roghnaigh stór eile.",
       "branchEmpty": "Níl aon bhrainse ar fáil",
+      "branchListIncomplete": "Ní thaispeántar ach cuid de na brainsí. Tá níos mó brainsí sa stór ná mar is féidir leis an liosta seo a áireamh.",
       "branchPlaceholder": "Roghnaigh brainse",
       "runOnWithTarget": "Rith ar: {{target}}",
       "environment": "Timpeallacht",

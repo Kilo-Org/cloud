@@ -1724,6 +1724,7 @@
       "branchLoadError": "Branches konnten nicht geladen werden",
       "branchUnavailable": "Für dieses Repository sind keine Branches verfügbar. Prüfe deinen Zugriff beim Anbieter und wähle dann ein anderes Repository.",
       "branchEmpty": "Keine Branches verfügbar",
+      "branchListIncomplete": "Es werden nur einige Branches angezeigt. Dieses Repository hat mehr Branches, als diese Liste enthalten kann.",
       "branchPlaceholder": "Branch auswählen",
       "runOnWithTarget": "Ausführen auf: {{target}}",
       "environment": "Umgebung",

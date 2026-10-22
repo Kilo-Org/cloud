@@ -2241,6 +2241,7 @@
       "branchLoadError": "Ba a iya loda rasshe ba",
       "branchUnavailable": "Rasshe ba su samuwa ga wannan ma'ajiya ba. Duba damar shigarka tare da mai ba da sabis, sannan ka zaɓi wata ma'ajiya.",
       "branchEmpty": "Babu reshe da ya samu",
+      "branchListIncomplete": "Ana nuna wasu rasshe kawai. Wannan ma'ajiya na da rasshe fiye da yadda wannan jerin zai iya ɗauka.",
       "branchPlaceholder": "Zaɓi reshe",
       "runOnWithTarget": "Gudanar da aiki a: {{target}}",
       "environment": "Muhallin aiki",

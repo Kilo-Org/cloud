@@ -2241,6 +2241,7 @@
       "branchLoadError": "Harude laadimine ebaõnnestus",
       "branchUnavailable": "Selle hoidla harud pole saadaval. Kontrolli oma õigusi pakkujas ja vali mõni teine hoidla.",
       "branchEmpty": "Ühtegi haru pole saadaval",
+      "branchListIncomplete": "Kuvatakse ainult mõned harud. Selles hoidlas on rohkem harusid, kui see loend võib sisaldada.",
       "branchPlaceholder": "Vali haru",
       "runOnWithTarget": "Käivituskoht: {{target}}",
       "environment": "Keskkond",

@@ -2269,6 +2269,7 @@
       "branchLoadError": "Nije moguće učitati grane",
       "branchUnavailable": "Grene nisu dostupne za ovaj repozitorij. Provjeri svoj pristup kod pružatelja usluge, pa odaberi drugi repozitorij.",
       "branchEmpty": "Nema dostupnih grana",
+      "branchListIncomplete": "Prikazane su samo neke grane. Ovaj repozitorij ima više grana nego što ih ova lista može uključiti.",
       "branchPlaceholder": "Odaberi granu",
       "runOnWithTarget": "Mjesto pokretanja: {{target}}",
       "environment": "Okruženje",

@@ -2297,6 +2297,7 @@
       "branchLoadError": "Vej ni bilo mogoče naložiti",
       "branchUnavailable": "Veje za to skladišče niso na voljo. Preveri svoj dostop pri ponudniku in izberi drugo skladišče.",
       "branchEmpty": "Ni razpoložljivih vej",
+      "branchListIncomplete": "Prikazane so le nekatere veje. Skladišče ima več vej, kot jih lahko ta seznam vključi.",
       "branchPlaceholder": "Izberi vejo",
       "runOnWithTarget": "Zaženi na: {{target}}",
       "environment": "Okolje",

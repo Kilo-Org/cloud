@@ -2269,6 +2269,7 @@
       "branchLoadError": "Nu s-au putut încărca ramurile",
       "branchUnavailable": "Nu există ramuri disponibile pentru acest depozit. Verifică-ți accesul la furnizor, apoi alege alt depozit.",
       "branchEmpty": "Nicio ramură disponibilă",
+      "branchListIncomplete": "Sunt afișate doar unele ramuri. Depozitul are mai multe ramuri decât poate cuprinde această listă.",
       "branchPlaceholder": "Selectează o ramură",
       "runOnWithTarget": "Rulează pe: {{target}}",
       "environment": "Mediu",

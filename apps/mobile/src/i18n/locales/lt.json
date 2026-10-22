@@ -2297,6 +2297,7 @@
       "branchLoadError": "Nepavyko įkelti šakų",
       "branchUnavailable": "Šiai saugyklai šakų nėra. Patikrink prieigos teises pas tiekėją ir pasirink kitą saugyklą.",
       "branchEmpty": "Nėra prieinamų šakų",
+      "branchListIncomplete": "Rodomos tik kai kurios šakos. Saugykloje yra daugiau šakų, nei gali tilpti į šį sąrašą.",
       "branchPlaceholder": "Pasirinkti šaką",
       "runOnWithTarget": "Vykdymo vieta: {{target}}",
       "environment": "Aplinka",

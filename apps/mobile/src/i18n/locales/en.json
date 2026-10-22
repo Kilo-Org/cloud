@@ -2332,6 +2332,7 @@
       "branchLoadError": "Couldn't load branches",
       "branchUnavailable": "Branches aren't available for this repository. Check your access with the provider, then pick another repository.",
       "branchEmpty": "No branches available",
+      "branchListIncomplete": "Only some branches are shown. The repository has more branches than this list can include.",
       "branchPlaceholder": "Select a branch",
       "runOnWithTarget": "Run on: {{target}}",
       "environment": "Environment",

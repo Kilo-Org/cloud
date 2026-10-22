@@ -2325,6 +2325,7 @@
       "branchLoadError": "Ma setgħetx titgħabba l-fergħat",
       "branchUnavailable": "M'hemmx fergħat disponibbli għal dan ir-repożitorju. Iċċekkja l-aċċess tiegħek mal-fornitur, imbagħad agħżel repożitorju ieħor.",
       "branchEmpty": "Ebda fergħa disponibbli",
+      "branchListIncomplete": "Qed jintwerew biss xi fergħat. Ir-repożitorju għandu aktar fergħat milli din il-lista tista' tinkludi.",
       "branchPlaceholder": "Agħżel fergħa",
       "runOnWithTarget": "Ħaddem fuq: {{target}}",
       "environment": "Ambjent",

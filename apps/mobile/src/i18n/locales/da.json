@@ -2241,6 +2241,7 @@
       "branchLoadError": "Grene kunne ikke indlæses",
       "branchUnavailable": "For dette kodelager er der ingen tilgængelige grene. Tjek din adgang hos udbyderen, og vælg et andet kodelager.",
       "branchEmpty": "Ingen tilgængelige grene",
+      "branchListIncomplete": "Der vises kun nogle grene. Kodelageret har flere grene, end denne liste kan indeholde.",
       "branchPlaceholder": "Vælg en gren",
       "runOnWithTarget": "Kør på: {{target}}",
       "environment": "Miljø",

@@ -2241,6 +2241,7 @@
       "branchLoadError": "Imeshindikana kupakia matawi",
       "branchUnavailable": "Matawi hayapatikani kwa hazina hii. Angalia ruhusa yako kwa mtoa huduma, kisha chagua hazina nyingine.",
       "branchEmpty": "Hakuna matawi yanayopatikana",
+      "branchListIncomplete": "Ni matawi machache tu yanayoonyeshwa. Hazina ina matawi zaidi kuliko orodha hii inavyoweza kujumuisha.",
       "branchPlaceholder": "Chagua tawi",
       "runOnWithTarget": "Endesha kwenye: {{target}}",
       "environment": "Mazingira",

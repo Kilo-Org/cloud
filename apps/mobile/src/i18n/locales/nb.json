@@ -2241,6 +2241,7 @@
       "branchLoadError": "Kunne ikke laste inn grener",
       "branchUnavailable": "Ingen grener er tilgjengelige for dette kodelageret. Sjekk tilgangen din hos leverandøren og velg et annet kodelager.",
       "branchEmpty": "Ingen tilgjengelige grener",
+      "branchListIncomplete": "Bare noen grener vises. Kodelageret har flere grener enn denne listen kan inneholde.",
       "branchPlaceholder": "Velg en gren",
       "runOnWithTarget": "Kjør på: {{target}}",
       "environment": "Miljø",

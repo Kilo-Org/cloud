@@ -2241,6 +2241,7 @@
       "branchLoadError": "Enweghị ike ibudata alaka",
       "branchUnavailable": "Alaka adịghị maka ebe nchekwa koodu a. Lelee ikike gị n'aka onye na-enye ọrụ, ma họrọ ebe nchekwa koodu ọzọ.",
       "branchEmpty": "Enweghị alaka dị",
+      "branchListIncomplete": "Naanị ụfọdụ alaka ka egosiri. Ebe nchekwa koodu a nwere alaka karịrị nke ndepụta a nwere ike ịgụnye.",
       "branchPlaceholder": "Họrọ otu alaka",
       "runOnWithTarget": "Rụọ ọrụ na: {{target}}",
       "environment": "Ebe ọrụ",

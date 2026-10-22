@@ -1748,6 +1748,7 @@
       "branchLoadError": "Nie udało się wczytać gałęzi",
       "branchUnavailable": "Gałęzie nie są dostępne dla tego repozytorium. Sprawdź swój dostęp u dostawcy, a potem wybierz inne repozytorium.",
       "branchEmpty": "Brak dostępnych gałęzi",
+      "branchListIncomplete": "Wyświetlono tylko niektóre gałęzie. Repozytorium ma więcej gałęzi, niż może pomieścić ta lista.",
       "branchPlaceholder": "Wybierz gałąź",
       "runOnWithTarget": "Miejsce uruchomienia: {{target}}",
       "environment": "Środowisko",

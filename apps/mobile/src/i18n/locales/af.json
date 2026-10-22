@@ -2241,6 +2241,7 @@
       "branchLoadError": "Takke kon nie gelaai word nie",
       "branchUnavailable": "Takke is nie beskikbaar vir hierdie bewaarplek nie. Gaan jou toegang by die verskaffer na en kies 'n ander bewaarplek.",
       "branchEmpty": "Geen takke beskikbaar nie",
+      "branchListIncomplete": "Slegs sommige takke word vertoon. Die bewaarplek het meer takke as wat hierdie lys kan bevat.",
       "branchPlaceholder": "Kies 'n tak",
       "runOnWithTarget": "Voer uit op: {{target}}",
       "environment": "Omgewing",

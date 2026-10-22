@@ -2241,6 +2241,7 @@
       "branchLoadError": "Kwehlulekile ukulayisha amagatsha",
       "branchUnavailable": "Amagatsha awatholakali kule nqolobane yekhodi. Hlola ukufinyelela kwakho kumhlinzeki, bese ukhetha enye inqolobane yekhodi.",
       "branchEmpty": "Akukho gatsha elitholakalayo",
+      "branchListIncomplete": "Kuboniswa amanye amagatsha kuphela. Le nqolobane yekhodi inamagatsha amaningi kunalokho uhlu lungakufaka.",
       "branchPlaceholder": "Khetha igatsha",
       "runOnWithTarget": "Qalisa ku: {{target}}",
       "environment": "Indawo yokusebenza",

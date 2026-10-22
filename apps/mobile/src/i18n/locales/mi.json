@@ -2241,6 +2241,7 @@
       "branchLoadError": "Kāore i taea te uta i ngā peka",
       "branchUnavailable": "Kāore ngā peka e wātea ana mō tēnei pūranga waehere. Tirohia tō urunga ki te kaiwhakarato, kātahi ka kōwhiri i tētahi atu pūranga waehere.",
       "branchEmpty": "Kāore he peka e wātea ana",
+      "branchListIncomplete": "E whakaatuhia ana ētahi peka anake. He nui ake ngā peka o te pūranga waehere i ngā peka ka taea e tēnei rārangi te whakauru.",
       "branchPlaceholder": "Kōwhiria he peka",
       "runOnWithTarget": "Whakahaeretia ki: {{target}}",
       "environment": "Te taiao",

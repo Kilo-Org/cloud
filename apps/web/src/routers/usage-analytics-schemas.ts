@@ -9,6 +9,21 @@ import * as z from 'zod';
  */
 export const MAX_SCOPE_ORGANIZATION_IDS = 1_000;
 
+/**
+ * Upper bound on the values accepted in one dimension filter list (`features`,
+ * `models`, `modes`, `userIds`, `providers`, `projects`, and each `excluded*`
+ * twin). The dashboard filter picker offers at most 100 suggestions per
+ * dimension, so this leaves ample room for any real selection.
+ */
+export const MAX_FILTER_VALUES = 500;
+
+/**
+ * Upper bound on the length of one dimension filter value. Filter values are
+ * feature, model, mode, provider and project identifiers plus user UUIDs; this
+ * is well above any real identifier.
+ */
+export const MAX_FILTER_VALUE_LENGTH = 256;
+
 export const GranularitySchema = z.enum(['hour', 'day', 'week', 'month']);
 export type Granularity = z.infer<typeof GranularitySchema>;
 
@@ -37,6 +52,12 @@ export const MetricSchema = z.enum([
 ]);
 export type Metric = z.infer<typeof MetricSchema>;
 
+/** One dimension filter list, bounded by the shared count and length limits. */
+const FilterValuesSchema = z
+  .array(z.string().max(MAX_FILTER_VALUE_LENGTH))
+  .max(MAX_FILTER_VALUES)
+  .optional();
+
 const FiltersShape = {
   startDate: z.iso.datetime(),
   endDate: z.iso.datetime(),
@@ -52,18 +73,18 @@ const FiltersShape = {
   organizationIds: z.array(z.uuid()).max(MAX_SCOPE_ORGANIZATION_IDS).optional(),
   personalScope: z.enum(['personal-only', 'include-orgs']).default('personal-only'),
   viewAs: z.enum(['self', 'org-wide']).default('self'),
-  features: z.array(z.string()).optional(),
-  models: z.array(z.string()).optional(),
-  modes: z.array(z.string()).optional(),
-  userIds: z.array(z.string()).optional(),
-  providers: z.array(z.string()).optional(),
-  projects: z.array(z.string()).optional(),
-  excludedFeatures: z.array(z.string()).optional(),
-  excludedModels: z.array(z.string()).optional(),
-  excludedModes: z.array(z.string()).optional(),
-  excludedUserIds: z.array(z.string()).optional(),
-  excludedProviders: z.array(z.string()).optional(),
-  excludedProjects: z.array(z.string()).optional(),
+  features: FilterValuesSchema,
+  models: FilterValuesSchema,
+  modes: FilterValuesSchema,
+  userIds: FilterValuesSchema,
+  providers: FilterValuesSchema,
+  projects: FilterValuesSchema,
+  excludedFeatures: FilterValuesSchema,
+  excludedModels: FilterValuesSchema,
+  excludedModes: FilterValuesSchema,
+  excludedUserIds: FilterValuesSchema,
+  excludedProviders: FilterValuesSchema,
+  excludedProjects: FilterValuesSchema,
 } as const;
 
 export const UsageAnalyticsFiltersSchema = z.object(FiltersShape);

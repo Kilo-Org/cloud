@@ -52,6 +52,8 @@ export {
   CostSourceSchema,
   DimensionSchema,
   GranularitySchema,
+  MAX_FILTER_VALUES,
+  MAX_FILTER_VALUE_LENGTH,
   MAX_SCOPE_ORGANIZATION_IDS,
   MetricSchema,
   SummaryOutputSchema,

@@ -17,6 +17,8 @@ const mockExecuteSnowflakeStatement = jest.mocked(executeSnowflakeStatement);
 import {
   BreakdownInputSchema,
   CostSourceSchema,
+  MAX_FILTER_VALUES,
+  MAX_FILTER_VALUE_LENGTH,
   MAX_SCOPE_ORGANIZATION_IDS,
   TableInputSchema,
   TimeseriesInputSchema,
@@ -150,6 +152,61 @@ describe('usage analytics scope conditions', () => {
         organizationIds: makeIds(MAX_SCOPE_ORGANIZATION_IDS + 1),
       }).success
     ).toBe(false);
+  });
+});
+
+describe('usage analytics filter bounds', () => {
+  const FILTER_KEYS = [
+    'features',
+    'models',
+    'modes',
+    'userIds',
+    'providers',
+    'projects',
+    'excludedFeatures',
+    'excludedModels',
+    'excludedModes',
+    'excludedUserIds',
+    'excludedProviders',
+    'excludedProjects',
+  ] as const;
+
+  const makeValues = (n: number) => Array.from({ length: n }, (_, i) => `value-${i}`);
+
+  it.each(FILTER_KEYS)('caps %s element count at the boundary', key => {
+    expect(
+      UsageAnalyticsFiltersSchema.safeParse({
+        ...baseFilters,
+        [key]: makeValues(MAX_FILTER_VALUES),
+      }).success
+    ).toBe(true);
+
+    const rejected = UsageAnalyticsFiltersSchema.safeParse({
+      ...baseFilters,
+      [key]: makeValues(MAX_FILTER_VALUES + 1),
+    });
+    expect(rejected.success).toBe(false);
+    expect(rejected.error?.issues).toEqual([
+      expect.objectContaining({ code: 'too_big', path: [key] }),
+    ]);
+  });
+
+  it.each(FILTER_KEYS)('caps %s value length at the boundary', key => {
+    expect(
+      UsageAnalyticsFiltersSchema.safeParse({
+        ...baseFilters,
+        [key]: ['x'.repeat(MAX_FILTER_VALUE_LENGTH)],
+      }).success
+    ).toBe(true);
+
+    const rejected = UsageAnalyticsFiltersSchema.safeParse({
+      ...baseFilters,
+      [key]: ['x'.repeat(MAX_FILTER_VALUE_LENGTH + 1)],
+    });
+    expect(rejected.success).toBe(false);
+    expect(rejected.error?.issues).toEqual([
+      expect.objectContaining({ code: 'too_big', path: [key, 0] }),
+    ]);
   });
 });
 
@@ -351,6 +408,23 @@ describe('usage analytics procedures', () => {
     } finally {
       errorLog.mockRestore();
     }
+  });
+
+  it.each([
+    () =>
+      caller().getSummary({
+        ...baseFilters,
+        features: Array.from({ length: MAX_FILTER_VALUES + 1 }, (_, i) => `feature-${i}`),
+      }),
+    () =>
+      caller().getTable({
+        ...baseFilters,
+        groupBy: [],
+        excludedProjects: ['y'.repeat(MAX_FILTER_VALUE_LENGTH + 1)],
+      }),
+  ])('rejects out-of-bounds filters with a bad request', async invoke => {
+    await expect(invoke()).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockExecuteSnowflakeStatement).not.toHaveBeenCalled();
   });
 
   it.each([

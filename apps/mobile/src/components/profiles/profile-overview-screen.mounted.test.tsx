@@ -83,6 +83,7 @@ vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrol
 vi.mock('@/components/profiles/profile-repo-pins-section', () => ({
   ProfileRepoPinsSection: 'ProfileRepoPinsSection',
 }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
@@ -225,20 +226,35 @@ describe('ProfileOverviewScreen', () => {
     unmount();
   });
 
-  it('retryable: a save failure with no usable message adds saveFailed', async () => {
+  it('retains edited metadata after a failed save and clears the error after an explicit retry', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
-    const error = new Error('placeholder');
-    error.message = '';
-    h.mutations.update.mutateAsync.mockRejectedValue(error);
+    h.mutations.update.mutateAsync
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockResolvedValueOnce({ success: true });
 
-    const { renderer, unmount } = await mountScreen();
+    const { renderer, queryClient, unmount } = await mountScreen();
 
+    changeText(renderer.root, 'Profile name', 'Renamed');
+    changeText(renderer.root, 'Profile description', 'Retained description');
     await pressSave(renderer.root);
+    await waitFor(() => findAll(renderer.root, 'AccessibleStatus').length === 1);
 
-    await waitFor(() => h.error.mock.calls.length > 0);
-    expect(h.error).toHaveBeenCalledWith("Couldn't save profile");
+    // An unrelated profile refetch must not replace the failed draft.
+    h.query.data = testProfile({ vars: [{ key: 'NEW' }] });
+    rerenderScreen(renderer, queryClient);
+    expect(findField(renderer.root, 'Profile name').props.defaultValue).toBe('Renamed');
+    expect(findField(renderer.root, 'Profile description').props.defaultValue).toBe(
+      'Retained description'
+    );
+    await pressSave(renderer.root);
+    await waitFor(() => h.success.mock.calls.length === 1);
 
+    expect(h.mutations.update.mutateAsync.mock.calls.map(([input]) => input)).toEqual([
+      { profileId: 'profile-1', name: 'Renamed', description: 'Retained description' },
+      { profileId: 'profile-1', name: 'Renamed', description: 'Retained description' },
+    ]);
+    expect(findAll(renderer.root, 'AccessibleStatus')).toHaveLength(0);
     unmount();
   });
 

@@ -16,6 +16,7 @@ import { ProfileRepoPinsSection } from '@/components/profiles/profile-repo-pins-
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -81,14 +82,13 @@ function hasUsableMessage(error: unknown): boolean {
 type MetadataFormProps = Readonly<{
   profile: AgentProfileDetail;
   isSaving: boolean;
-  onSave: (values: { name: string; description: string }) => void;
+  onSave: (values: { name: string; description: string }) => Promise<boolean>;
 }>;
 
 /**
- * Uncontrolled metadata form. The screen remounts this component — keyed on the
- * metadata it seeds via `metadataFormKey` — so a refetch re-seeds both fields
- * only when that metadata changed; the refs live here, so the remount resets
- * them alongside the inputs.
+ * Uncontrolled metadata form, remounted via `metadataFormKey` only when server
+ * metadata changes. Defaults follow the draft refs so pending/error renders
+ * cannot restore the old server values in the native fields.
  */
 function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
   const { t } = useTranslation();
@@ -96,8 +96,9 @@ function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
   const descriptionRef = useRef(profile.description ?? '');
   const [nameError, setNameError] = useState<string | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
 
-  const submit = () => {
+  const submit = async () => {
     const name = nameRef.current.trim();
     const nameIssue = validateProfileName(name);
     if (nameIssue !== null) {
@@ -113,7 +114,8 @@ function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
     }
     setNameError(null);
     setDescriptionError(null);
-    onSave({ name, description });
+    setSaveFailed(false);
+    setSaveFailed(!(await onSave({ name, description })));
   };
 
   return (
@@ -121,7 +123,7 @@ function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
       <FormField
         label={t('profiles.nameLabel')}
         placeholder={t('profiles.namePlaceholder')}
-        defaultValue={profile.name}
+        defaultValue={nameRef.current}
         error={nameError ?? undefined}
         disabled={isSaving}
         required
@@ -136,7 +138,7 @@ function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
       <FormField
         label={t('profiles.descriptionLabel')}
         placeholder={t('profiles.descriptionPlaceholder')}
-        defaultValue={profile.description ?? ''}
+        defaultValue={descriptionRef.current}
         error={descriptionError ?? undefined}
         multiline
         textAlignVertical="top"
@@ -149,8 +151,9 @@ function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
           }
         }}
       />
+      {saveFailed ? <AccessibleStatus message={t('profiles.saveFailed')} /> : null}
       <Button loading={isSaving} disabled={isSaving} onPress={submit}>
-        <Text>{t('common.save')}</Text>
+        <Text>{t(saveFailed ? 'common.retry' : 'common.save')}</Text>
       </Button>
     </View>
   );
@@ -177,10 +180,12 @@ export function ProfileOverviewScreen({
     try {
       await update.mutateAsync({ profileId, name, description });
       toast.success(t('common.updated'));
+      return true;
     } catch (error) {
       if (!hasUsableMessage(error)) {
         toast.error(t('profiles.saveFailed'));
       }
+      return false;
     }
   };
 
@@ -242,9 +247,7 @@ export function ProfileOverviewScreen({
               key={metadataFormKey(profile)}
               profile={profile}
               isSaving={update.isPending}
-              onSave={values => {
-                void saveMetadata(values);
-              }}
+              onSave={saveMetadata}
             />
 
             <PreferenceRow

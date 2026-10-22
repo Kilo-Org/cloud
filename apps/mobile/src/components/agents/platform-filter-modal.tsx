@@ -56,6 +56,9 @@ function platformFilterLabel(p: string): string {
     case 'extension': {
       return i18n.t('agentChat.sessionFilter.platformExtension');
     }
+    case 'desktop': {
+      return i18n.t('agentChat.sessionFilter.platformDesktop');
+    }
     case 'cli': {
       return i18n.t('agentChat.sessionFilter.platformCli');
     }

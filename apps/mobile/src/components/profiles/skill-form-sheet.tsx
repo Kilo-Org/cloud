@@ -4,11 +4,16 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
-import { parseSkillMarkdown, skillErrorKey } from '@/components/profiles/skill-markdown';
+import { skillErrorKey } from '@/components/profiles/skill-markdown';
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
-import { type SkillInputError, validateSkillInput } from '@/lib/agent-profile-forms';
+import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
+import {
+  type SkillInputError,
+  skillNameFromMarkdown,
+  validateSkillInput,
+} from '@/lib/agent-profile-forms';
 
 /** The validated fields a saved skill is built from. */
 export type SkillFormSubmission = {
@@ -33,7 +38,9 @@ type SkillFormSheetProps = Readonly<{
  * The add/edit skill sheet. Mounted only while open, so every open seeds fresh
  * fields from the skill it edits. Fields are uncontrolled (refs), per the app's
  * iOS text-input rule; the name field remounts via `prefill` when frontmatter
- * in the content fills it in, and never overwrites a name the user typed.
+ * in the content fills it in, and never overwrites a name the user typed. A
+ * filled name is reduced to the server's name rule first, so the field never
+ * holds a value Save would refuse.
  *
  * Save validates through `validateSkillInput`; a refused input shows the
  * matching `profiles.skill*` message under the field at fault and persists
@@ -56,6 +63,12 @@ export function SkillFormSheet({
   const nameError = error === 'empty' || error === 'bad-name' ? t(skillErrorKey(error)) : undefined;
   const contentError = error === 'no-content' ? t(skillErrorKey(error)) : undefined;
 
+  const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
+    isDirty: () =>
+      nameRef.current !== (skill?.name ?? '') || contentRef.current !== (skill?.rawMarkdown ?? ''),
+    onDiscard: onClose,
+  });
+
   const submit = () => {
     const result = validateSkillInput({ name: nameRef.current, content: contentRef.current });
     if (result.error !== null) {
@@ -71,13 +84,13 @@ export function SkillFormSheet({
   };
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
       <SheetHeader
         title={skill ? t('profiles.skillEditTitle') : t('profiles.addSkill')}
         onDone={submit}
-        onCancel={onClose}
+        onCancel={requestClose}
         doneLabel={t('common.save')}
-        disabled={isSaving}
+        doneDisabled={isSaving}
         topInset="ios-page-sheet"
       />
       <ScrollView
@@ -121,17 +134,25 @@ export function SkillFormSheet({
             if (error === 'no-content' && value.trim().length > 0) {
               setError(null);
             }
-            if (!nameEditedRef.current) {
-              const parsed = parseSkillMarkdown(value);
-              if (parsed.name !== undefined && parsed.name.length > 0 && parsed.name !== prefill) {
-                nameRef.current = parsed.name;
-                setPrefill(parsed.name);
-              }
+            if (nameEditedRef.current) {
+              return;
+            }
+            const derived = skillNameFromMarkdown(value);
+            if (derived === undefined || derived === prefill) {
+              return;
+            }
+            nameRef.current = derived;
+            setPrefill(derived);
+            // The field now holds a name the validator accepts, so an error the
+            // last save left on the empty field no longer describes it.
+            if (error === 'empty' || error === 'bad-name') {
+              setError(null);
             }
           }}
         />
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
+      {dialog}
     </SessionPageSheet>
   );
 }

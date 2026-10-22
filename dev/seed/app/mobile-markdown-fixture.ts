@@ -16,7 +16,7 @@ import {
   type SessionIngestItem,
 } from '../lib/mobile-sheet-fixtures';
 
-export const usage = '<email>';
+export const usage = '<email> [--causal-order]';
 
 // 30 chars: ses_ + 26.
 const SESSION_ID = 'ses_00000000000MarkdownLibs001';
@@ -54,6 +54,7 @@ function printUsage(): void {
   console.log('Seeds one agent session whose assistant message covers the markdown,');
   console.log('Mermaid, and HTML-in-markdown renderers, through the local');
   console.log('cloudflare-session-ingest worker. Resets only its own session.');
+  console.log('Use --causal-order for a compact prompt and replies with mismatched device clocks.');
   console.log('');
   console.log('Example:');
   console.log('  pnpm dev:seed app:mobile-markdown-fixture ada@example.com');
@@ -195,10 +196,10 @@ const HTML = [
   FENCE,
 ].join('\n');
 
-function textPart(id: string, text: string): SessionIngestItem {
+function textPart(id: string, text: string, messageID = ASSISTANT_ID): SessionIngestItem {
   return {
     type: 'part',
-    data: { id, sessionID: SESSION_ID, messageID: ASSISTANT_ID, type: 'text', text },
+    data: { id, sessionID: SESSION_ID, messageID, type: 'text', text },
   };
 }
 
@@ -206,7 +207,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-async function waitForParts(baseUrl: string, token: string): Promise<void> {
+async function waitForParts(baseUrl: string, token: string, expected = EXPECTED): Promise<void> {
   const deadline = Date.now() + 30_000;
   for (;;) {
     const response = await fetch(`${baseUrl}/api/session/${SESSION_ID}/messages?limit=50`, {
@@ -223,7 +224,7 @@ async function waitForParts(baseUrl: string, token: string): Promise<void> {
         }
       }
     }
-    if (EXPECTED.every(id => seen.has(id))) return;
+    if (expected.every(id => seen.has(id))) return;
     if (Date.now() > deadline) throw new Error('timed out waiting for markdown parts');
     await new Promise(resolve => setTimeout(resolve, 500));
   }
@@ -239,6 +240,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     printUsage();
     throw new Error('email is required');
   }
+  const causalOrder = args.includes('--causal-order');
   const secret = process.env.NEXTAUTH_SECRET;
   if (!secret) {
     throw new Error('NEXTAUTH_SECRET is not set for this worktree.');
@@ -293,7 +295,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       slug: 'markdown-libs-fixture',
       title: SESSION_TITLE,
     }),
-    buildUserMessageItem({ messageId: USER_ID, sessionId: SESSION_ID, createdAt: T0 }),
+    buildUserMessageItem({
+      messageId: USER_ID,
+      sessionId: SESSION_ID,
+      createdAt: causalOrder ? T0 + 60_000 : T0,
+    }),
     buildAssistantMessageItem({
       messageId: ASSISTANT_ID,
       sessionId: SESSION_ID,
@@ -338,6 +344,30 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       url: `data:text/markdown;base64,${Buffer.from(MD_DOC).toString('base64')}`,
     }),
   ];
+  const expected = causalOrder ? ['prtCausalPrompt', PART_RICH, 'prtCausalContinuation'] : EXPECTED;
+  if (causalOrder) {
+    const continuationId = 'msgMdLibsAsst000002';
+    items.splice(
+      3,
+      items.length - 3,
+      textPart('prtCausalPrompt', 'Please inspect transcript ordering.', USER_ID),
+      textPart(PART_RICH, 'Opening answer: the prompt appears before this reply.'),
+      buildAssistantMessageItem({
+        messageId: continuationId,
+        sessionId: SESSION_ID,
+        parentId: USER_ID,
+        createdAt: T0 + 3_000,
+        completedAt: T0 + 4_000,
+        cost: 0,
+        tokens: { total: 0, input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      }),
+      textPart(
+        'prtCausalContinuation',
+        'Continuation answer: both replies stay below the prompt.',
+        continuationId
+      )
+    );
+  }
   const response = await fetch(`${baseUrl}/api/session/${SESSION_ID}/ingest?v=1`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -346,9 +376,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   if (!response.ok) {
     throw new Error(`ingest failed (${response.status}): ${await response.text()}`);
   }
-  await waitForParts(baseUrl, token);
+  await waitForParts(baseUrl, token, expected);
   console.log(
-    'This fixture represents: one finished agent turn whose text parts exercise markdown, Mermaid, and HTML in markdown, plus a Markdown read tool and file part.'
+    causalOrder
+      ? 'This fixture represents: a phone-clock prompt and CLI-clock replies whose IDs and creation times put the replies first.'
+      : 'This fixture represents: one finished agent turn whose text parts exercise markdown, Mermaid, and HTML in markdown, plus a Markdown read tool and file part.'
   );
   console.log('Suggested next step: open the deep link on a signed-in dev build.');
   return { userId: user.id, sessionId: SESSION_ID, deepLink: `kiloapp://agent-chat/${SESSION_ID}` };

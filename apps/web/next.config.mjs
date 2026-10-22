@@ -1,4 +1,4 @@
-import { withSentryConfig } from '@sentry/nextjs';
+import { withSentryConfig } from '@sentry/nextjs/config';
 import createMDX from '@next/mdx';
 import { statSync } from 'fs';
 import { resolve } from 'path';
@@ -72,6 +72,14 @@ const nextConfig = {
   // and applies its own proxied-request timeout to external rewrites.
   experimental: {
     proxyTimeout: 800_000,
+    // The Cloud Agent sandbox runs dev work under a memory cgroup whose cap is
+    // far below the sandbox's MemTotal (e.g. 9 GiB cap, 12.5 GiB MemTotal).
+    // Turbopack's `auto` eviction decides from OS memory-pressure feedback, so
+    // it sees free memory the cgroup does not have and never evicts; the web
+    // dev server then grows until it fills the cap and everything in the cgroup
+    // stalls. The sandbox setup exports `full` to bound that; leaving it unset
+    // elsewhere keeps Next's `auto` default.
+    turbopackMemoryEviction: process.env.KILO_TURBOPACK_MEMORY_EVICTION || undefined,
   },
 
   async rewrites() {

@@ -157,6 +157,23 @@ describe('BranchPickerScreen', () => {
     expect(onSelect).toHaveBeenCalledWith('main');
   });
 
+  it('renders a long branch name in full so names that share a prefix stay distinguishable', () => {
+    const branch =
+      '89-validate-all-maintainers-are-represented-in-maintainers-and-reviewers-الذكية-لإدارة';
+    setBridge({ branches: [branch, 'main'], defaultBranch: 'main', selectedBranch: 'main' });
+    const renderer = mount();
+
+    const row = branchRow(renderer, branch);
+    if (!row) {
+      throw new Error('The long branch row did not mount');
+    }
+    // No line cap: the row grows with the name instead of cutting the tail that
+    // tells it apart from its siblings.
+    const name = row.findAll(node => String(node.type) === 'Text')[0];
+    expect(name?.props.children).toBe(branch);
+    expect(name?.props.numberOfLines).toBeUndefined();
+  });
+
   it('dismisses from the header Cancel without reporting a pick', () => {
     const onSelect = vi.fn(() => undefined);
     setBridge({ onSelect });

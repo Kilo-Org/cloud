@@ -221,17 +221,17 @@ describe('Worker worktree changes procedures', () => {
         expect(harness.session.get).toHaveBeenCalledTimes(1);
       });
 
-      it('rejects legacy sessions after authorization without calling either session DO', async () => {
+      it('rejects retired session IDs before authorization or DO resolution', async () => {
         const harness = setup();
         await expect(harness.call(procedure, legacySessionId)).rejects.toMatchObject({
-          code: 'PRECONDITION_FAILED',
+          code: 'BAD_REQUEST',
         });
-        expect(queryAccess).toHaveBeenCalledTimes(1);
+        expect(queryAccess).not.toHaveBeenCalled();
         expect(harness.session.get).not.toHaveBeenCalled();
         expect(harness.legacy.get).not.toHaveBeenCalled();
         queryAccess.mockResolvedValue(null);
         await expect(harness.call(procedure, legacySessionId)).rejects.toMatchObject({
-          code: 'FORBIDDEN',
+          code: 'BAD_REQUEST',
         });
       });
 

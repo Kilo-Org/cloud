@@ -18,8 +18,14 @@ type SessionRowProps = {
   /** Uppercase label shown in the eyebrow (and hashed for the row hue). */
   agentLabel: string;
   title: string;
-  /** Small mono line shown below the title (e.g. git branch). */
+  /** Small line shown below the title (e.g. git branch, a message preview). */
   subtitle?: string | null;
+  /**
+   * Type style for the subtitle. `mono` (the default) suits an identifier such
+   * as a branch; `default` suits a subtitle that is prose — the newest message
+   * in a chat.
+   */
+  subtitleVariant?: 'mono' | 'default';
   meta?: string;
   /** When true, renders the session's status glyph in the eyebrow. */
   live?: boolean;
@@ -92,6 +98,7 @@ export function SessionRow({
   onPress,
   last,
   stripMode = 'edge',
+  subtitleVariant = 'mono',
   className,
 }: Readonly<SessionRowProps>) {
   const colors = useThemeColors();
@@ -231,8 +238,12 @@ export function SessionRow({
         </Text>
         {subtitle ? (
           <Text
-            variant="mono"
-            className="mt-1 text-xs tracking-[0.3px] text-muted-foreground"
+            variant={subtitleVariant}
+            className={
+              subtitleVariant === 'mono'
+                ? 'mt-1 text-xs tracking-[0.3px] text-muted-foreground'
+                : 'mt-1 text-xs text-muted-foreground'
+            }
             numberOfLines={2}
           >
             {subtitle}

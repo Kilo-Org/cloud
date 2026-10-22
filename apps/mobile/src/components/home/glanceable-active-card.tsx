@@ -58,6 +58,7 @@ type GlanceableActiveCardProps = {
    * gets the same empty-list explanation instead of a dead row.
    */
   onPressStatus: (kind: GlanceableStatusKind) => void;
+  embedded?: boolean;
 };
 
 /**
@@ -73,6 +74,7 @@ export function GlanceableActiveCard({
   sessions,
   onPressSession,
   onPressStatus,
+  embedded = false,
 }: Readonly<GlanceableActiveCardProps>) {
   const { t } = useTranslation();
   // A minute-bucketed clock keeps the relative age fresh without reading
@@ -102,7 +104,7 @@ export function GlanceableActiveCard({
   const newestLabel = [newestTitle, stateLabel, newestAge].filter(Boolean).join(', ');
 
   return (
-    <View className={CARD_CLASS}>
+    <View className={cn(CARD_CLASS, embedded && 'rounded-none border-0 bg-transparent')}>
       <View className={COUNTS_CLASS}>
         {STATUS_FILTER_ORDER.map(line => {
           const isPrimary = line.kind === primaryKind;
@@ -176,10 +178,12 @@ export function GlanceableActiveCard({
 }
 
 /** The pending placeholder repeats the card's minimum frame and count rows. */
-export function GlanceableActiveCardSkeleton() {
+export function GlanceableActiveCardSkeleton({
+  embedded = false,
+}: { readonly embedded?: boolean } = {}) {
   return (
     <View
-      className={CARD_CLASS}
+      className={cn(CARD_CLASS, embedded && 'rounded-none border-0 bg-transparent')}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >

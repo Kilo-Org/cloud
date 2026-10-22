@@ -7,8 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type GlanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { i18n } from '@/i18n';
-import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
 import { statusRowTestId } from '@/components/home/glanceable-active-card';
+import { AgentSessionsSection } from '@/components/home/home-agent-sessions-section';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
@@ -84,6 +84,12 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+// The briefing card reaches the native SQLCipher dismissal journal; these
+// assertions cover the live card and the section header only.
+vi.mock('@/components/agent-briefing/briefing-card', () => ({
+  BriefingCard: 'BriefingCard',
+  useHomeBriefing: () => ({ briefing: undefined, frameReport: undefined }),
+}));
 // A host element that still renders the header notice. The factory is hoisted
 // above the static imports, so it loads React itself.
 vi.mock('@/components/home/section-header', async () => {

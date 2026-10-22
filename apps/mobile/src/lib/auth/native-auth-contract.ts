@@ -14,7 +14,10 @@ const emailCodeResponseSchema = z.object({
 const errorResponseSchema = z.object({
   error: z.string(),
   ssoOrganizationId: z.string().min(1).optional(),
+  // Parsed on its own below: a malformed method list must not hide the error code.
+  methods: z.unknown().optional(),
 });
+const signupMethodsSchema = z.array(z.string());
 
 export type TokenPair =
   | { token: string; refreshToken: string; expiresIn: number; created?: boolean }
@@ -118,12 +121,17 @@ export function parseEmailCodeResponse(value: unknown) {
 
 export function parseAuthError(
   value: unknown
-): { code: string; ssoOrganizationId?: string } | undefined {
+): { code: string; ssoOrganizationId?: string; signupMethods?: string[] } | undefined {
   const result = errorResponseSchema.safeParse(value);
   if (!result.success) {
     return undefined;
   }
-  return { code: result.data.error, ssoOrganizationId: result.data.ssoOrganizationId };
+  const methods = signupMethodsSchema.safeParse(result.data.methods);
+  return {
+    code: result.data.error,
+    ssoOrganizationId: result.data.ssoOrganizationId,
+    signupMethods: methods.success ? methods.data : undefined,
+  };
 }
 
 export type ChallengeEntry = { email: string; challengeId: string };

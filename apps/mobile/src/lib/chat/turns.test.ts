@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { getMessageDetailsContent } from '@/components/agents/message-details-content';
 
 import { askedMessageId, asMessages } from './turns';
+import { answerParts } from './answer-parts';
 
 const turn = (id: string, role: Turn['role'], parts: Turn['parts']): Turn => ({
   id,
@@ -29,7 +30,7 @@ describe('asMessages', () => {
           turn('t1', 'user', [text('p1', 'what is a monad')]),
           turn('t2', 'assistant', [text('p2', 'a burrito')]),
         ],
-        answering: '',
+        answering: [],
         asked: null,
         askedImages: [],
         waiting: [],
@@ -50,7 +51,7 @@ describe('asMessages', () => {
         ]),
         turn('t2', 'assistant', [{ id: 'p3', kind: 'reasoning', body: 'more working' }]),
       ],
-      answering: '',
+      answering: [],
       asked: null,
       askedImages: [],
       waiting: [],
@@ -65,7 +66,12 @@ describe('asMessages', () => {
       drawn({
         sessionId: 's1',
         turns: [turn('t1', 'user', [text('p1', 'first')])],
-        answering: 'well',
+        answering: answerParts({
+          sessionId: 's1',
+          parts: [],
+          event: { kind: 'delta', text: 'well' },
+          now: 0,
+        }),
         asked: 'second',
         askedImages: [],
         waiting: [],
@@ -81,7 +87,12 @@ describe('asMessages', () => {
     const messages = asMessages({
       sessionId: 's1',
       turns: [turn('t1', 'user', [text('p1', 'first')])],
-      answering: 'well',
+      answering: answerParts({
+        sessionId: 's1',
+        parts: [],
+        event: { kind: 'delta', text: 'well' },
+        now: 0,
+      }),
       asked: 'second',
       askedImages: [],
       waiting: [],
@@ -95,7 +106,12 @@ describe('asMessages', () => {
       drawn({
         sessionId: 's1',
         turns: [],
-        answering: 'a bur',
+        answering: answerParts({
+          sessionId: 's1',
+          parts: [],
+          event: { kind: 'delta', text: 'a bur' },
+          now: 0,
+        }),
         asked: 'what is a monad',
         askedImages: [],
         waiting: [],
@@ -111,7 +127,12 @@ describe('asMessages', () => {
       drawn({
         sessionId: 's1',
         turns: [],
-        answering: 'a bur',
+        answering: answerParts({
+          sessionId: 's1',
+          parts: [],
+          event: { kind: 'delta', text: 'a bur' },
+          now: 0,
+        }),
         asked: 'what is a monad',
         askedImages: [],
         waiting: [
@@ -131,7 +152,7 @@ describe('asMessages', () => {
     const messages = asMessages({
       sessionId: 's1',
       turns: [],
-      answering: '',
+      answering: [],
       asked: 'what is a monad',
       askedImages: [],
       waiting: [{ text: 'and a functor', images: [] }],
@@ -150,7 +171,7 @@ describe('asMessages', () => {
         turn('t1', 'user', [text('p1', 'what is a monad')]),
         turn('t2', 'assistant', [text('p2', 'a burrito')]),
       ],
-      answering: '',
+      answering: [],
       asked: null,
       askedImages: [],
       waiting: [],
@@ -176,7 +197,7 @@ describe('asMessages', () => {
           text('p2', 'what is this'),
         ]),
       ],
-      answering: '',
+      answering: [],
       asked: null,
       askedImages: [],
       waiting: [],
@@ -200,7 +221,7 @@ describe('asMessages', () => {
       asMessages({
         sessionId: 's1',
         turns: [turn('t1', 'user', [{ id: 'p1', kind: 'image', media: 'image/png', body: 'AA' }])],
-        answering: '',
+        answering: [],
         asked: null,
         askedImages: [],
         waiting: [],
@@ -213,7 +234,7 @@ describe('asMessages', () => {
     const messages = asMessages({
       sessionId: 's1',
       turns: [],
-      answering: '',
+      answering: [],
       asked: 'look',
       askedImages: [image],
       waiting: [{ text: '', images: [image] }],

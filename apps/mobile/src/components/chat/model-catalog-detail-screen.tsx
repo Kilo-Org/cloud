@@ -9,7 +9,6 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import {
   Cpu,
   Download,
-  Eye,
   FileSearch,
   Lock,
   type LucideIcon,
@@ -23,11 +22,17 @@ import { type DeviceBudget, deviceFit, estimatedMemoryBytes } from '@/lib/chat/d
 import { useGgufModels } from '@/lib/chat/gguf-models';
 import { type HfModelDetail, hfModelName, type HfQuant, isHfRepoId } from '@/lib/chat/hf-catalog';
 import { HfRequestError, useDeviceBudget, useHfModelDetail } from '@/lib/chat/use-hf-catalog';
-import { formatFileSize } from '@/lib/format';
+import { formatFileSize, formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { GgufDownloadControls } from './gguf-model-section';
-import { CatalogStat, compactNumber, FitBadge, useCatalogDownload } from './model-catalog-parts';
+import {
+  CatalogCapabilities,
+  CatalogStat,
+  compactNumber,
+  FitBadge,
+  useCatalogDownload,
+} from './model-catalog-parts';
 
 function Hint({ icon: Icon, label }: Readonly<{ icon: LucideIcon; label: string }>) {
   const colors = useThemeColors();
@@ -46,10 +51,13 @@ function Summary({ detail }: Readonly<{ detail: HfModelDetail }>) {
   const likes = compactNumber(detail.likes, i18n.language);
   const parameters =
     detail.parameters === undefined ? undefined : compactNumber(detail.parameters, i18n.language);
+  // The context window is an exact specification figure, not an approximate
+  // count: compact notation drops grouping below 10 000, so de-DE read
+  // "8192" beside the grouped downloads. Group it in every language.
   const context =
     detail.contextLength === undefined
       ? undefined
-      : compactNumber(detail.contextLength, i18n.language);
+      : formatNumber(detail.contextLength, i18n.language);
   return (
     <View className="gap-4 px-6 pb-2 pt-2">
       <View className="flex-row flex-wrap gap-x-4 gap-y-2">
@@ -84,17 +92,17 @@ function Summary({ detail }: Readonly<{ detail: HfModelDetail }>) {
             : t('modelChat.catalog.license', { license: detail.license })}
         </Text>
       </View>
-      {(detail.tools || detail.vision) && (
-        <View className="gap-2">
-          <View className="flex-row flex-wrap gap-2">
-            {detail.tools && <Hint icon={Wrench} label={t('modelChat.catalog.tools')} />}
-            {detail.vision && <Hint icon={Eye} label={t('modelChat.catalog.vision')} />}
-          </View>
+      <View className="gap-2">
+        <View className="flex-row flex-wrap items-center gap-2">
+          <CatalogCapabilities images={detail.vision} />
+          {detail.tools && <Hint icon={Wrench} label={t('modelChat.catalog.tools')} />}
+        </View>
+        {(detail.tools || detail.vision) && (
           <Text variant="muted" className="text-xs">
             {t('modelChat.catalog.hintsHelp')}
           </Text>
-        </View>
-      )}
+        )}
+      </View>
       {detail.gated && (
         <View className="flex-row items-start gap-2 rounded-xl bg-warn-tile-bg p-3">
           <Lock size={16} color={colors.warn} />
@@ -105,6 +113,9 @@ function Summary({ detail }: Readonly<{ detail: HfModelDetail }>) {
         <Eyebrow>{t('modelChat.catalog.quantizations')}</Eyebrow>
         <Text variant="muted" className="text-xs">
           {t('modelChat.catalog.quantizationsHelp')}
+        </Text>
+        <Text variant="muted" className="text-xs">
+          {t('modelChat.catalog.memoryEstimateNote')}
         </Text>
       </View>
     </View>
@@ -136,6 +147,14 @@ function QuantRow({
           memory: formatFileSize(estimatedMemoryBytes(bytes), i18n.language),
         })}
       </Text>
+      <Text variant="muted" className="text-xs">
+        {t('modelChat.catalog.fullFileName', { name: quant.path.split('/').pop() ?? quant.path })}
+      </Text>
+      {quant.model.license !== '' && (
+        <Text variant="muted" className="text-xs">
+          {t('modelChat.catalog.license', { license: quant.model.license })}
+        </Text>
+      )}
       <GgufDownloadControls
         fileId={quant.model.fileId}
         name={quant.model.name}

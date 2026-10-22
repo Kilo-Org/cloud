@@ -24,6 +24,7 @@ import {
   refreshGlanceableSnapshot,
 } from '../lib/glanceable-refresh';
 import { expoPushExtrasForPushData } from '../lib/push-message-extras';
+import { agentBriefingDispatchGate, pushIdempotencyTtlMs } from '../lib/agent-briefing-push';
 
 type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
@@ -238,6 +239,8 @@ export class NotificationChannelDO extends DurableObject<Env> {
     //    `delivered` state. No receipt work is created; `delivered` here
     //    means the sink captured the payload, never device delivery.
     if (isPushSinkEnabled(this.env)) {
+      const briefingSuppression = await agentBriefingDispatchGate(db, input);
+      if (briefingSuppression) return briefingSuppression;
       const ts = Date.now();
       // Content-free observability only. Title, body, and the `data` object are
       // agent/user-controlled and can carry credentials or private customer
@@ -278,7 +281,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
       let title: string;
       let body: string;
-      if (previews === 'generic') {
+      if (previews === 'generic' || input.push.data.type === 'agent_briefing') {
         ({ title, body } = genericPushContentForPushData(input.push.data, resolvedLocale));
       } else if (input.push.i18nKey !== undefined) {
         // Per-token translation of the system copy. User-authored fields
@@ -336,6 +339,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
         title,
         body,
         data: input.push.data,
+        ...(input.push.data.type === 'agent_briefing' && input.agentBriefing
+          ? { expiration: Math.floor(Date.parse(input.agentBriefing.expiresAt) / 1000) }
+          : {}),
         ...pushExtras,
         ...(clientChannelId !== undefined && { channelId: clientChannelId }),
         // iOS has no per-kind channel; the interruption level is its
@@ -354,9 +360,18 @@ export class NotificationChannelDO extends DurableObject<Env> {
     });
 
     const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
+    let briefingSuppression = await agentBriefingDispatchGate(db, input);
+    if (briefingSuppression) return briefingSuppression;
     let result: SendResult;
     try {
-      result = await sendPushNotifications(messages, accessToken);
+      if (input.push.data.type === 'agent_briefing') {
+        result = await sendPushNotifications(messages, accessToken, async () => {
+          briefingSuppression = await agentBriefingDispatchGate(db, input);
+          return briefingSuppression === null;
+        });
+      } else {
+        result = await sendPushNotifications(messages, accessToken);
+      }
     } catch (err) {
       // Leave any `pending` marker in place — retries will re-attempt the
       // send while skipping the badge increment.
@@ -426,6 +441,8 @@ export class NotificationChannelDO extends DurableObject<Env> {
       await this.ensureCleanupAlarm(ts);
       return { kind: 'no_tokens' };
     }
+
+    if (briefingSuppression) return briefingSuppression;
 
     console.warn('Expo returned no classified ticket outcomes for attempted push dispatch', {
       tokenCount: tokens.length,
@@ -531,15 +548,15 @@ export class NotificationChannelDO extends DurableObject<Env> {
           console.warn('Accepted push bookkeeping repair failed', { error: bookkeepingError });
           requestAlarmAtOrBefore(now + ACCEPTED_BOOKKEEPING_RETRY_DELAY_MS);
         } else {
-          requestAlarmAtOrBefore(Date.now() + IDEM_TTL_MS);
+          requestAlarmAtOrBefore(Date.now() + pushIdempotencyTtlMs(key));
         }
         continue;
       }
 
-      if (now - rec.ts > IDEM_TTL_MS) {
+      if (now - rec.ts >= pushIdempotencyTtlMs(key)) {
         expiredIdem.push(key);
       } else {
-        requestAlarmAtOrBefore(rec.ts + IDEM_TTL_MS);
+        requestAlarmAtOrBefore(rec.ts + pushIdempotencyTtlMs(key));
       }
     }
 

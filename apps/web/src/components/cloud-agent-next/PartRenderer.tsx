@@ -32,6 +32,8 @@ import type { ReactNode } from 'react';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { createMarkdownParseCachePlugin, useMarkdownParseCache } from './markdown-parse-cache';
 import { toSafeHttpUrl, toSafeImageSrc } from '@/lib/safe-http-url';
+import { parsePreviewLinkTarget, previewLinkUrl } from '@/lib/cloud-agent/preview-link';
+import { usePreviewLinks } from './use-preview';
 import type { Part, StoredMessage } from './types';
 import {
   isTextPart,
@@ -46,10 +48,6 @@ import {
   isPartStreaming,
 } from './types';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export type PartRendererProps = {
   part: Part;
   isStreaming?: boolean;
@@ -60,11 +58,40 @@ export type PartRendererProps = {
   onOpenChildSession?: OpenChildSession;
 };
 
-// ============================================================================
-// Shared Components
-// ============================================================================
+/** True when the link text is the address itself, as in a bare autolinked URL. */
+function isAddressText(children: ReactNode, href: string): boolean {
+  const text = Array.isArray(children) && children.length === 1 ? children[0] : children;
+  return text === href;
+}
 
 function LinkRenderer({ href, children }: { href?: string; children?: ReactNode }) {
+  const previewLinks = usePreviewLinks();
+  const previewTarget = previewLinks ? parsePreviewLinkTarget(href) : null;
+  if (previewLinks && previewTarget && href) {
+    // A localhost address in a cloud chat means the sandbox, so link to its preview.
+    const previewUrl = previewLinkUrl(previewLinks.urlTemplate, previewTarget);
+    return (
+      <a
+        href={previewUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Open a preview of this sandbox server"
+        onClick={event => {
+          event.preventDefault();
+          previewLinks.open(previewTarget.port, previewTarget.path);
+        }}
+        // A middle click must also mint a ticket; the bare preview host needs the cookie.
+        onAuxClick={event => {
+          if (event.button !== 1) return;
+          event.preventDefault();
+          previewLinks.open(previewTarget.port, previewTarget.path);
+        }}
+      >
+        {isAddressText(children, href) ? previewUrl : children}
+      </a>
+    );
+  }
+
   const safeHref = toSafeHttpUrl(href);
   if (!safeHref) {
     return <>{children}</>;
@@ -79,13 +106,6 @@ function LinkRenderer({ href, children }: { href?: string; children?: ReactNode 
 const markdownComponents = { a: LinkRenderer };
 const remarkPlugins = [remarkGfm];
 
-// ============================================================================
-// Part Renderers
-// ============================================================================
-
-/**
- * Renders a TextPart as markdown
- */
 const TextPartRenderer = memo(function TextPartRenderer({
   text,
   isStreaming,
@@ -119,7 +139,6 @@ function hasRequiredInput(part: Extract<Part, { type: 'tool' }>): boolean {
   const input = part.state.input;
   if (!input || typeof input !== 'object') return false;
 
-  // Check required fields based on tool type
   switch (part.tool) {
     case 'read':
     case 'edit':
@@ -303,7 +322,6 @@ function FilePartRenderer({ part }: { part: Extract<Part, { type: 'file' }> }) {
     );
   }
 
-  // Non-image file attachment
   return (
     <div className="bg-muted/30 border-muted my-2 flex items-center gap-2 rounded-md border px-3 py-2">
       <span className="text-sm">{part.filename || 'File attachment'}</span>
@@ -412,10 +430,6 @@ function UnknownPartRenderer({ part }: { part: Part }) {
   );
 }
 
-// ============================================================================
-// Main Component
-// ============================================================================
-
 /**
  * Error fallback for individual parts
  */
@@ -435,7 +449,6 @@ export const PartRenderer = memo(
     getChildMessages,
     onOpenChildSession,
   }: PartRendererProps) {
-    // Text parts -> render markdown
     if (isTextPart(part)) {
       return (
         <MessageErrorBoundary fallback={<PartErrorFallback partType="text" />}>
@@ -460,7 +473,6 @@ export const PartRenderer = memo(
       );
     }
 
-    // File parts -> render file/image attachments
     if (isFilePart(part)) {
       return (
         <MessageErrorBoundary fallback={<PartErrorFallback partType="file" />}>
@@ -469,7 +481,6 @@ export const PartRenderer = memo(
       );
     }
 
-    // Reasoning parts -> collapsible reasoning display
     if (isReasoningPart(part)) {
       if (!shouldRenderReasoningPart(part)) {
         return null;
@@ -481,12 +492,10 @@ export const PartRenderer = memo(
       );
     }
 
-    // Step start/finish -> return null (no visible rendering)
     if (isStepStartPart(part) || isStepFinishPart(part)) {
       return null;
     }
 
-    // Subtask parts -> render child session indicator
     if (isSubtaskPart(part)) {
       return (
         <MessageErrorBoundary fallback={<PartErrorFallback partType="subtask" />}>
@@ -495,7 +504,6 @@ export const PartRenderer = memo(
       );
     }
 
-    // Patch parts -> render patch/commit info
     if (isPatchPart(part)) {
       return (
         <MessageErrorBoundary fallback={<PartErrorFallback partType="patch" />}>
@@ -504,7 +512,6 @@ export const PartRenderer = memo(
       );
     }
 
-    // Unknown types -> graceful fallback
     return <UnknownPartRenderer part={part} />;
   },
   (previous, next) =>

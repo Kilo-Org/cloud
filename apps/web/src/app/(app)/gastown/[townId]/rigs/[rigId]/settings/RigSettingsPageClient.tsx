@@ -892,7 +892,7 @@ export function RigSettingsPageClient({ townId, rigId, organizationId }: Props) 
                         {isActive && (
                           <motion.div
                             layoutId="rig-settings-nav-indicator"
-                            className="ml-auto size-1 rounded-full bg-[color:oklch(95%_0.15_108)]"
+                            className="ml-auto size-1 rounded-full bg-primary"
                             transition={{
                               type: 'spring',
                               stiffness: 350,

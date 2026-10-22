@@ -11,6 +11,7 @@ import { TRPCError } from '@trpc/server';
 import { requireNumericPlatformRepositories, type Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { updateRepositoriesForIntegration } from '@/lib/integrations/db/platform-integrations';
+import { ownerCondition } from '@/lib/integrations/db/predicates';
 import { resetCodeReviewConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import {
   fetchGitLabProjects,
@@ -139,10 +140,7 @@ function requireGitLabProjectId(projectId: string | number): string {
  * Get GitLab integration for an owner
  */
 export async function getGitLabIntegration(owner: Owner): Promise<PlatformIntegration | null> {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
@@ -151,6 +149,58 @@ export async function getGitLabIntegration(owner: Owner): Promise<PlatformIntegr
     .limit(1);
 
   return integration || null;
+}
+
+/**
+ * Deadline for the status read's broker round trip. Shorter than the broker
+ * client's own 30s request timeout: status renders spinners in the mobile
+ * connect gate, so a hung token service must fail open quickly.
+ */
+const GITLAB_CREDENTIAL_STATUS_TIMEOUT_MS = 3_000;
+
+/**
+ * Whether the integration's stored credential is currently usable. Asks the
+ * private-key holding token service to resolve it — the same resolution every
+ * review read performs — so a row that is active but whose credential the
+ * broker refuses answers `connected: false` instead of faking health.
+ *
+ * Only a definitive broker refusal disconnects. `temporarily_unavailable`
+ * (and any transport error, already mapped inside the broker client) fails
+ * open, so a token-service blip never renders a working connection as
+ * broken.
+ *
+ * Status is a hot read (the mobile connect gate spins on it), so the broker
+ * request races a short per-call deadline instead of the broker client's 30s
+ * request timeout: a hung token service answers `connected: true` after the
+ * deadline rather than stalling the settings surface. The race loser is only
+ * a discarded response — the broker client's own AbortController still cleans
+ * up.
+ */
+export async function isGitLabCredentialConnected(
+  integration: PlatformIntegration,
+  actor: GitLabCredentialActor
+): Promise<boolean> {
+  const { promise: deadline, resolve: hitDeadline } =
+    Promise.withResolvers<GitLabCredentialBrokerResult>();
+  const timer = setTimeout(
+    () => hitDeadline({ status: 'temporarily_unavailable' }),
+    GITLAB_CREDENTIAL_STATUS_TIMEOUT_MS
+  );
+  timer.unref?.();
+  try {
+    const result = await Promise.race([
+      fetchGitLabCredential(actor, {
+        credential: 'integration',
+        integrationId: integration.id,
+      }),
+      deadline,
+    ]);
+    if (result.status === 'available') return true;
+    if (result.status === 'reconnect_required' || result.status === 'not_connected') return false;
+    return true;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -234,10 +284,7 @@ export async function listGitLabRepositories(
   actor: GitLabCredentialActor,
   forceRefresh: boolean = false
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
@@ -259,7 +306,6 @@ export async function listGitLabRepositories(
   }
 
   const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-  // If forceRefresh, no cached repos, or never synced before, fetch from GitLab and update cache
   if (forceRefresh || !cachedRepositories?.length || !integration.repositories_synced_at) {
     const accessToken = await getValidGitLabToken(integration, actor);
     const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
@@ -274,7 +320,6 @@ export async function listGitLabRepositories(
     };
   }
 
-  // Return cached repos
   return {
     repositories: cachedRepositories,
     syncedAt: integration.repositories_synced_at,
@@ -291,10 +336,7 @@ export async function listGitLabBranches(
   actor: GitLabCredentialActor,
   projectPath: string // e.g., "group/project" or project ID
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
@@ -338,12 +380,8 @@ export async function listGitLabBranches(
  * configurations continue to work.
  */
 export async function disconnectGitLabIntegration(owner: Owner) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
-  // Get the integration
   const [integration] = await db
     .select()
     .from(platform_integrations)
@@ -414,12 +452,8 @@ export async function disconnectGitLabIntegration(owner: Owner) {
  * their GitLab webhook settings
  */
 export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSecret: string }> {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
-  // Get the integration
   const [integration] = await db
     .select()
     .from(platform_integrations)
@@ -439,7 +473,6 @@ export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSe
     });
   }
 
-  // Generate new webhook secret
   const newWebhookSecret = randomBytes(32).toString('hex');
 
   const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
@@ -670,7 +703,6 @@ export async function getOrCreateProjectAccessToken(
       });
     }
 
-    // Store the new token
     await updateStoredProjectAccessToken(integration, projectIdStr, newToken);
 
     logExceptInTest('[getOrCreateProjectAccessToken] Token created successfully', {
@@ -908,7 +940,6 @@ export async function importExistingProjectAccessToken(
   const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
   const userToken = await getValidGitLabToken(integration, actor);
 
-  // Find existing Kilo token on GitLab
   const existingToken = await findKiloProjectAccessToken(
     userToken,
     projectId,

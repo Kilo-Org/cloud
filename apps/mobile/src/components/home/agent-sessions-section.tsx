@@ -1,45 +1,27 @@
-/* eslint-disable max-lines -- the shared live feedback (Home and the Agents tab) and the Home section that places its notices share one state model */
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type ScrollViewProps, View } from 'react-native';
-import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
-import { type GlanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { CenteredState } from '@/components/centered-state';
-
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
-import { useSessionRowPress } from '@/components/agents/use-session-row-press';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
-import {
-  GlanceableActiveCard,
-  GlanceableActiveCardSkeleton,
-} from '@/components/home/glanceable-active-card';
-import {
-  LiveSessionHeaderNotice,
-  useLiveSessionHeaderNotice,
-} from '@/components/home/live-session-header-notice';
 import {
   liveSessionContent,
   type LiveSessionContext,
   type LiveSessions,
 } from '@/components/home/live-session-state';
-import { SectionHeader } from '@/components/home/section-header';
 import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { createSubmitLock } from '@/lib/submit-lock';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
-
-// The trailing slash pins the index route.
-const AGENTS_INDEX_HREF = '/(app)/(tabs)/(2_agents)/' as const;
 
 type LiveSessionProps = Readonly<{ context: LiveSessionContext; sessions: LiveSessions }>;
 
@@ -149,7 +131,7 @@ export function LiveSessionFeedback({
     let message: string | undefined = undefined;
     if (unavailable && context.organizationId !== null) {
       title = t('organization.boundary.organizationUnavailable');
-      message = t('organization.boundary.unavailableDescription');
+      message = t('organization.boundary.unavailableSessionsDescription');
     } else if (denied && code === 'NOT_FOUND') {
       variant = 'not-found';
     } else if (denied && code !== 'FORBIDDEN' && code !== 'UNAUTHORIZED') {
@@ -304,68 +286,5 @@ export function LiveSessionFeedback({
     <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>
   ) : (
     feedback
-  );
-}
-
-export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
-  const router = useRouter();
-  const { t } = useTranslation();
-  const { reducedMotion } = useMotionPolicy();
-  const handleRowPress = useSessionRowPress();
-  const content = liveSessionContent(context, sessions);
-  const failureLabel = t('home.couldNotLoadActiveSessions');
-  const notice = useLiveSessionHeaderNotice(context, sessions, failureLabel);
-  // Open the Agents tab, with the status filter a count row names. Same tab
-  // switch and stack reset as `See all`, so a pushed history screen cannot hide
-  // the filtered list. `See all` passes no status, which clears any filter a
-  // previous tap left on the route.
-  const openAgentsIndex = useCallback(
-    (status?: GlanceableStatusKind) => {
-      const href: Href = { pathname: AGENTS_INDEX_HREF, params: status ? { status } : {} };
-      router.navigate(href);
-      router.dismissTo(href);
-    },
-    [router]
-  );
-
-  return (
-    <View>
-      {/* The header row stays in every state, so settling never adds or
-          removes it. `See all` keeps its box but hides while nothing runs: it
-          would advertise the Agents live index for sessions that do not exist. */}
-      <SectionHeader
-        label={t('home.agentSessions')}
-        actionLabel={t('home.seeAll')}
-        actionHidden={content === 'empty'}
-        onActionPress={() => {
-          openAgentsIndex();
-        }}
-        notice={notice && <LiveSessionHeaderNotice notice={notice} />}
-      />
-      <View className="mx-4 gap-2">
-        <LiveSessionFeedback
-          context={context}
-          sessions={sessions}
-          failureLabel={failureLabel}
-          inlineNotices={false}
-        />
-        {/* One card, not a row per session. The skeleton shares the loaded
-            card's minimum frame; scaled text can grow the loaded content. */}
-        <Animated.View layout={LinearTransition}>
-          {content === 'pending' && <GlanceableActiveCardSkeleton />}
-          {(content === 'empty' || content === 'rows') && (
-            <Animated.View
-              entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
-            >
-              <GlanceableActiveCard
-                sessions={sessions.activeSessions}
-                onPressSession={handleRowPress}
-                onPressStatus={openAgentsIndex}
-              />
-            </Animated.View>
-          )}
-        </Animated.View>
-      </View>
-    </View>
   );
 }

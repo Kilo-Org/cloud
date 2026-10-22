@@ -402,7 +402,7 @@ export function AgentSessionListScreen({
 
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
-    body = <SessionListSkeletonRows sidePadding={sidePadding} />;
+    body = <SessionListSkeletonRows insets={{ left, right }} />;
   } else if (hasLiveRows && visibleSessions.length === 0) {
     // The reserved band is mounted here too (the sessions exist behind the
     // filter), so the native control gets the same treatment as the rows

@@ -3860,7 +3860,8 @@
       "startNewSession": "Neue Sitzung starten",
       "startNewSessionHint": "Lange drücken, um eine neue Sitzung zu starten.",
       "linkSession": "Sitzung verknüpfen",
-      "linkFailed": "Die Sitzung konnte nicht mit der Aufgabe verknüpft werden."
+      "linkFailed": "Die Sitzung konnte nicht mit der Aufgabe verknüpft werden.",
+      "moveToAnotherTodo": "Zu anderer Aufgabe verschieben"
     },
     "linkSession": {
       "title": "Eine Sitzung verknüpfen",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Als Nächstes",
     "sessionTodo": "Aufgabe: {{title}}",
+    "openTodoHint": "Öffnet die Aufgabe.",
     "linkToTodo": "Mit Aufgabe verknüpfen",
     "candidates": {
       "empty": "Keine offenen Aufgaben"

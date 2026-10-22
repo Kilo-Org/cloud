@@ -3950,7 +3950,8 @@
       "startNewSession": "Začni novo sejo",
       "startNewSessionHint": "Za novo sejo pridržite.",
       "linkSession": "Poveži sejo",
-      "linkFailed": "Seje ni bilo mogoče povezati z nalogo"
+      "linkFailed": "Seje ni bilo mogoče povezati z nalogo",
+      "moveToAnotherTodo": "Premakni v drugo nalogo"
     },
     "linkSession": {
       "title": "Povezava seje",
@@ -3959,6 +3960,7 @@
     },
     "upNext": "Naslednje",
     "sessionTodo": "Naloga: {{title}}",
+    "openTodoHint": "Odpre nalogo.",
     "linkToTodo": "Poveži z nalogo",
     "candidates": {
       "empty": "Ni odprtih nalog"

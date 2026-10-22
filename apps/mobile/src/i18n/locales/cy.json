@@ -4040,7 +4040,8 @@
       "startNewSession": "Dechrau sesiwn newydd",
       "startNewSessionHint": "Gwasga'n hir i ddechrau sesiwn newydd.",
       "linkSession": "Cysylltu sesiwn",
-      "linkFailed": "Methu cysylltu'r sesiwn â'r dasg"
+      "linkFailed": "Methu cysylltu'r sesiwn â'r dasg",
+      "moveToAnotherTodo": "Symud i dasg arall"
     },
     "linkSession": {
       "title": "Cysylltu sesiwn",
@@ -4049,6 +4050,7 @@
     },
     "upNext": "Nesaf",
     "sessionTodo": "Tasg: {{title}}",
+    "openTodoHint": "Yn agor y dasg.",
     "linkToTodo": "Cysylltu â thasg",
     "candidates": {
       "empty": "Dim tasgau ar agor"

@@ -3860,7 +3860,8 @@
       "startNewSession": "Seeshinii haaraa jalqabi",
       "startNewSessionHint": "Seeshinii haaraa jalqabuuf yeroo dheeraa tuqi.",
       "linkSession": "Turtii walitti hidhi",
-      "linkFailed": "Turtii hojii waliin walitti hidhuun hin danda'amne"
+      "linkFailed": "Turtii hojii waliin walitti hidhuun hin danda'amne",
+      "moveToAnotherTodo": "Gara hojii biraatti darbi"
     },
     "linkSession": {
       "title": "Turtii walitti hidhi",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Itti aanu",
     "sessionTodo": "Hojii: {{title}}",
+    "openTodoHint": "Hojii bana.",
     "linkToTodo": "Hojii waliin hidhi",
     "candidates": {
       "empty": "Hojii banaa hin jiru"

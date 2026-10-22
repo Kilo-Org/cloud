@@ -3905,7 +3905,8 @@
       "startNewSession": "Démarrer une nouvelle session",
       "startNewSessionHint": "Appuyez longuement pour démarrer une nouvelle session.",
       "linkSession": "Lier une session",
-      "linkFailed": "Impossible de lier la session à la tâche"
+      "linkFailed": "Impossible de lier la session à la tâche",
+      "moveToAnotherTodo": "Déplacer vers une autre tâche"
     },
     "linkSession": {
       "title": "Lier une session",
@@ -3914,6 +3915,7 @@
     },
     "upNext": "À suivre",
     "sessionTodo": "Tâche : {{title}}",
+    "openTodoHint": "Ouvre la tâche.",
     "linkToTodo": "Lier à une tâche",
     "candidates": {
       "empty": "Aucune tâche à faire"

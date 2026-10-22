@@ -3905,7 +3905,8 @@
       "startNewSession": "Sākt jaunu sesiju",
       "startNewSessionHint": "Turiet nospiestu, lai sāktu jaunu sesiju.",
       "linkSession": "Saistīt sesiju",
-      "linkFailed": "Neizdevās saistīt sesiju ar uzdevumu"
+      "linkFailed": "Neizdevās saistīt sesiju ar uzdevumu",
+      "moveToAnotherTodo": "Pārvietot uz citu uzdevumu"
     },
     "linkSession": {
       "title": "Sesijas saistīšana",
@@ -3914,6 +3915,7 @@
     },
     "upNext": "Nākamais",
     "sessionTodo": "Uzdevums: {{title}}",
+    "openTodoHint": "Atver uzdevumu.",
     "linkToTodo": "Saistīt ar uzdevumu",
     "candidates": {
       "empty": "Nav atvērtu uzdevumu"

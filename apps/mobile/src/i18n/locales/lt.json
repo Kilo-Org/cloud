@@ -3950,7 +3950,8 @@
       "startNewSession": "Pradėti naują sesiją",
       "startNewSessionHint": "Paspauskite ir palaikykite, kad pradėtumėte naują sesiją.",
       "linkSession": "Susieti sesiją",
-      "linkFailed": "Sesijos susieti su užduotimi nepavyko"
+      "linkFailed": "Sesijos susieti su užduotimi nepavyko",
+      "moveToAnotherTodo": "Perkelti į kitą užduotį"
     },
     "linkSession": {
       "title": "Sesijos susiejimas",
@@ -3959,6 +3960,7 @@
     },
     "upNext": "Toliau",
     "sessionTodo": "Užduotis: {{title}}",
+    "openTodoHint": "Atidaro užduotį.",
     "linkToTodo": "Susieti su užduotimi",
     "candidates": {
       "empty": "Nėra atvirų užduočių"

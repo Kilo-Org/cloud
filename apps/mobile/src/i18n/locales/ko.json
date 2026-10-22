@@ -3860,7 +3860,8 @@
       "startNewSession": "새 세션 시작",
       "startNewSessionHint": "길게 눌러 새 세션을 시작하세요.",
       "linkSession": "세션 연결",
-      "linkFailed": "세션을 할 일에 연결할 수 없습니다"
+      "linkFailed": "세션을 할 일에 연결할 수 없습니다",
+      "moveToAnotherTodo": "다른 할 일로 이동"
     },
     "linkSession": {
       "title": "세션 연결하기",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "다음",
     "sessionTodo": "할 일: {{title}}",
+    "openTodoHint": "할 일을 엽니다.",
     "linkToTodo": "할 일에 연결",
     "candidates": {
       "empty": "열린 할 일 없음"

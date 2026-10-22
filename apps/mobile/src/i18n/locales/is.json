@@ -3860,7 +3860,8 @@
       "startNewSession": "Byrja nýja lotu",
       "startNewSessionHint": "Haltu inni til að byrja nýja lotu.",
       "linkSession": "Tengja lotu",
-      "linkFailed": "Ekki tókst að tengja lotuna við verkefnið"
+      "linkFailed": "Ekki tókst að tengja lotuna við verkefnið",
+      "moveToAnotherTodo": "Færa yfir í annað verkefni"
     },
     "linkSession": {
       "title": "Tengja lotu við verkefni",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Næst í röðinni",
     "sessionTodo": "Verkefni: {{title}}",
+    "openTodoHint": "Opnar verkefnið.",
     "linkToTodo": "Tengja við verkefni",
     "candidates": {
       "empty": "Engin opin verkefni"

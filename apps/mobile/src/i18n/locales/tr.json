@@ -3860,7 +3860,8 @@
       "startNewSession": "Yeni oturum başlat",
       "startNewSessionHint": "Yeni bir oturum başlatmak için uzun bas.",
       "linkSession": "Oturum bağla",
-      "linkFailed": "Oturum göreve bağlanamadı"
+      "linkFailed": "Oturum göreve bağlanamadı",
+      "moveToAnotherTodo": "Başka bir göreve taşı"
     },
     "linkSession": {
       "title": "Bir oturum bağla",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Sıradaki",
     "sessionTodo": "Görev: {{title}}",
+    "openTodoHint": "Görevi açar.",
     "linkToTodo": "Göreve bağla",
     "candidates": {
       "empty": "Açık görev yok"

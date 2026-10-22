@@ -3860,7 +3860,8 @@
       "startNewSession": "नया सेशन शुरू करें",
       "startNewSessionHint": "नया सेशन शुरू करने के लिए देर तक दबाएँ।",
       "linkSession": "सत्र जोड़ें",
-      "linkFailed": "सत्र को कार्य से जोड़ा नहीं जा सका"
+      "linkFailed": "सत्र को कार्य से जोड़ा नहीं जा सका",
+      "moveToAnotherTodo": "किसी अन्य कार्य में ले जाएँ"
     },
     "linkSession": {
       "title": "एक सत्र जोड़ें",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "अगला",
     "sessionTodo": "कार्य: {{title}}",
+    "openTodoHint": "कार्य खोलता है।",
     "linkToTodo": "कार्य से जोड़ें",
     "candidates": {
       "empty": "कोई खुला कार्य नहीं"

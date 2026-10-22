@@ -3950,7 +3950,8 @@
       "startNewSession": "Rozpocznij nową sesję",
       "startNewSessionHint": "Przytrzymaj, aby rozpocząć nową sesję.",
       "linkSession": "Powiąż sesję",
-      "linkFailed": "Nie udało się powiązać sesji z zadaniem"
+      "linkFailed": "Nie udało się powiązać sesji z zadaniem",
+      "moveToAnotherTodo": "Przenieś do innego zadania"
     },
     "linkSession": {
       "title": "Powiąż sesję",
@@ -3959,6 +3960,7 @@
     },
     "upNext": "Następne",
     "sessionTodo": "Zadanie: {{title}}",
+    "openTodoHint": "Otwiera zadanie.",
     "linkToTodo": "Powiąż z zadaniem",
     "candidates": {
       "empty": "Brak otwartych zadań"

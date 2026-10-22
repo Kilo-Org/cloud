@@ -3950,7 +3950,8 @@
       "startNewSession": "Začať novú reláciu",
       "startNewSessionHint": "Dlhým stlačením začnete novú reláciu.",
       "linkSession": "Prepojiť reláciu",
-      "linkFailed": "Reláciu sa nepodarilo prepojiť s úlohou"
+      "linkFailed": "Reláciu sa nepodarilo prepojiť s úlohou",
+      "moveToAnotherTodo": "Presunúť do inej úlohy"
     },
     "linkSession": {
       "title": "Prepojenie relácie",
@@ -3959,6 +3960,7 @@
     },
     "upNext": "Ďalej",
     "sessionTodo": "Úloha: {{title}}",
+    "openTodoHint": "Otvorí úlohu.",
     "linkToTodo": "Prepojiť s úlohou",
     "candidates": {
       "empty": "Žiadne otvorené úlohy"

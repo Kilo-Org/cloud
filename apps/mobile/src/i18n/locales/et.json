@@ -3860,7 +3860,8 @@
       "startNewSession": "Alusta uut seanssi",
       "startNewSessionHint": "Uue seansi alustamiseks vajuta pikalt.",
       "linkSession": "Seo seanss",
-      "linkFailed": "Seanssi ei õnnestunud ülesandega siduda"
+      "linkFailed": "Seanssi ei õnnestunud ülesandega siduda",
+      "moveToAnotherTodo": "Teisalda teise ülesandesse"
     },
     "linkSession": {
       "title": "Seansside linkimine",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Järgmisena",
     "sessionTodo": "Ülesanne: {{title}}",
+    "openTodoHint": "Avab ülesande.",
     "linkToTodo": "Lingi ülesandega",
     "candidates": {
       "empty": "Avatud ülesandeid pole"

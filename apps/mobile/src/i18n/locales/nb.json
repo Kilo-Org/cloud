@@ -3860,7 +3860,8 @@
       "startNewSession": "Start ny økt",
       "startNewSessionHint": "Langtrykk for å starte en ny økt.",
       "linkSession": "Koble til økt",
-      "linkFailed": "Kunne ikke koble økten til gjøremålet."
+      "linkFailed": "Kunne ikke koble økten til gjøremålet.",
+      "moveToAnotherTodo": "Flytt til et annet gjøremål"
     },
     "linkSession": {
       "title": "Koble til en økt",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Neste",
     "sessionTodo": "Gjøremål: {{title}}",
+    "openTodoHint": "Åpner gjøremålet.",
     "linkToTodo": "Koble til gjøremål",
     "candidates": {
       "empty": "Ingen åpne gjøremål"

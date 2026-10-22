@@ -3860,7 +3860,8 @@
       "startNewSession": "Malite nzukọ ọhụrụ",
       "startNewSessionHint": "Pịa ogologo oge iji malite nzukọ ọhụrụ.",
       "linkSession": "Jikọọ nnọkọ",
-      "linkFailed": "Enweghị ike ijikọ nnọkọ ahụ na ọrụ ahụ"
+      "linkFailed": "Enweghị ike ijikọ nnọkọ ahụ na ọrụ ahụ",
+      "moveToAnotherTodo": "Bugharịa gaa na ọrụ ọzọ"
     },
     "linkSession": {
       "title": "Jikọọ nnọkọ",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Na-esote",
     "sessionTodo": "Ọrụ: {{title}}",
+    "openTodoHint": "Na-emepe ọrụ.",
     "linkToTodo": "Jikọọ na ọrụ",
     "candidates": {
       "empty": "Enweghị ọrụ mepere emepe"

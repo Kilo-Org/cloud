@@ -3860,7 +3860,8 @@
       "startNewSession": "Nieuwe sessie starten",
       "startNewSessionHint": "Houd ingedrukt om een nieuwe sessie te starten.",
       "linkSession": "Sessie koppelen",
-      "linkFailed": "De sessie kon niet aan de taak worden gekoppeld"
+      "linkFailed": "De sessie kon niet aan de taak worden gekoppeld",
+      "moveToAnotherTodo": "Naar een andere taak verplaatsen"
     },
     "linkSession": {
       "title": "Een sessie koppelen",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Hierna",
     "sessionTodo": "Taak: {{title}}",
+    "openTodoHint": "Opent de taak.",
     "linkToTodo": "Aan een taak koppelen",
     "candidates": {
       "empty": "Geen open taken"

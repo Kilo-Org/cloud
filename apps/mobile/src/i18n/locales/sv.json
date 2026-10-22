@@ -3865,7 +3865,8 @@
       "startNewSession": "Starta ny session",
       "startNewSessionHint": "Håll in för att starta en ny session.",
       "linkSession": "Länka session",
-      "linkFailed": "Kunde inte länka sessionen till uppgiften"
+      "linkFailed": "Kunde inte länka sessionen till uppgiften",
+      "moveToAnotherTodo": "Flytta till en annan uppgift"
     },
     "linkSession": {
       "title": "Länka en session",
@@ -3874,6 +3875,7 @@
     },
     "upNext": "Härnäst",
     "sessionTodo": "Uppgift: {{title}}",
+    "openTodoHint": "Öppnar uppgiften.",
     "linkToTodo": "Länka till uppgift",
     "candidates": {
       "empty": "Inga öppna uppgifter"

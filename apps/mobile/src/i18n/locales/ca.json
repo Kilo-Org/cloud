@@ -3905,7 +3905,8 @@
       "startNewSession": "Inicia una sessió nova",
       "startNewSessionHint": "Mantén premut per iniciar una sessió nova.",
       "linkSession": "Vincula una sessió",
-      "linkFailed": "No s'ha pogut vincular la sessió a la tasca"
+      "linkFailed": "No s'ha pogut vincular la sessió a la tasca",
+      "moveToAnotherTodo": "Mou a una altra tasca"
     },
     "linkSession": {
       "title": "Vincular una sessió",
@@ -3914,6 +3915,7 @@
     },
     "upNext": "A continuació",
     "sessionTodo": "Tasca: {{title}}",
+    "openTodoHint": "Obre la tasca.",
     "linkToTodo": "Vincula a una tasca",
     "candidates": {
       "empty": "No hi ha tasques obertes"

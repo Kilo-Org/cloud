@@ -3860,7 +3860,8 @@
       "startNewSession": "ចាប់ផ្តើមសេសសិនថ្មី",
       "startNewSessionHint": "ចុចយូរដើម្បីចាប់ផ្តើមសេសសិនថ្មី។",
       "linkSession": "ភ្ជាប់សេសសិន",
-      "linkFailed": "មិនអាចភ្ជាប់សេសសិនទៅកិច្ចការបានទេ"
+      "linkFailed": "មិនអាចភ្ជាប់សេសសិនទៅកិច្ចការបានទេ",
+      "moveToAnotherTodo": "ផ្លាស់ទីទៅកិច្ចការផ្សេងទៀត"
     },
     "linkSession": {
       "title": "ភ្ជាប់សេសសិនមួយ",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "បន្ទាប់",
     "sessionTodo": "កិច្ចការ៖ {{title}}",
+    "openTodoHint": "បើកកិច្ចការ។",
     "linkToTodo": "ភ្ជាប់ទៅកិច្ចការ",
     "candidates": {
       "empty": "គ្មានកិច្ចការបើក"

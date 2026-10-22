@@ -3860,7 +3860,8 @@
       "startNewSession": "เริ่มเซสชันใหม่",
       "startNewSessionHint": "กดค้างเพื่อเริ่มเซสชันใหม่.",
       "linkSession": "เชื่อมโยงเซสชัน",
-      "linkFailed": "ไม่สามารถเชื่อมโยงเซสชันกับงานได้"
+      "linkFailed": "ไม่สามารถเชื่อมโยงเซสชันกับงานได้",
+      "moveToAnotherTodo": "ย้ายไปยังงานอื่น"
     },
     "linkSession": {
       "title": "เลือกเซสชันที่จะเชื่อมโยง",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "ถัดไป",
     "sessionTodo": "งาน: {{title}}",
+    "openTodoHint": "เปิดงาน.",
     "linkToTodo": "เชื่อมโยงกับงาน",
     "candidates": {
       "empty": "ไม่มีงานที่เปิดอยู่"

@@ -3905,7 +3905,8 @@
       "startNewSession": "Iniciar nova sessão",
       "startNewSessionHint": "Toque e segure para iniciar uma nova sessão.",
       "linkSession": "Vincular sessão",
-      "linkFailed": "Não foi possível vincular a sessão à tarefa"
+      "linkFailed": "Não foi possível vincular a sessão à tarefa",
+      "moveToAnotherTodo": "Mover para outra tarefa"
     },
     "linkSession": {
       "title": "Vincular uma sessão",
@@ -3914,6 +3915,7 @@
     },
     "upNext": "A seguir",
     "sessionTodo": "Tarefa: {{title}}",
+    "openTodoHint": "Abre a tarefa.",
     "linkToTodo": "Vincular a uma tarefa",
     "candidates": {
       "empty": "Não há tarefas abertas"

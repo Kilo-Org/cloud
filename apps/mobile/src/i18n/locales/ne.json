@@ -3860,7 +3860,8 @@
       "startNewSession": "नयाँ सत्र सुरु गर्नुहोस्",
       "startNewSessionHint": "नयाँ सत्र सुरु गर्न लामो थिच्नुहोस्।",
       "linkSession": "सत्र लिङ्क गर्नुहोस्",
-      "linkFailed": "सत्रलाई कामसँग लिङ्क गर्न सकिएन"
+      "linkFailed": "सत्रलाई कामसँग लिङ्क गर्न सकिएन",
+      "moveToAnotherTodo": "अर्को काममा सार्नुहोस्"
     },
     "linkSession": {
       "title": "एउटा सत्र लिङ्क गर्नुहोस्",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "अब अर्को",
     "sessionTodo": "काम: {{title}}",
+    "openTodoHint": "काम खोल्छ।",
     "linkToTodo": "कामसँग लिङ्क गर्नुहोस्",
     "candidates": {
       "empty": "कुनै खुला काम छैन"

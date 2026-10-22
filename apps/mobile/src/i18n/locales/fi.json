@@ -3860,7 +3860,8 @@
       "startNewSession": "Aloita uusi istunto",
       "startNewSessionHint": "Aloita uusi istunto pitämällä painettuna.",
       "linkSession": "Linkitä istunto",
-      "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut"
+      "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut",
+      "moveToAnotherTodo": "Siirrä toiseen tehtävään"
     },
     "linkSession": {
       "title": "Istunnon linkittäminen",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Seuraavaksi",
     "sessionTodo": "Tehtävä: {{title}}",
+    "openTodoHint": "Avaa tehtävän.",
     "linkToTodo": "Linkitä tehtävään",
     "candidates": {
       "empty": "Ei avoimia tehtäviä"

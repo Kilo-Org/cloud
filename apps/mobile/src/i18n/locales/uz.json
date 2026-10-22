@@ -3860,7 +3860,8 @@
       "startNewSession": "Yangi sessiya boshlash",
       "startNewSessionHint": "Yangi sessiya boshlash uchun uzoq bosib turing.",
       "linkSession": "Sessiya bog‘lash",
-      "linkFailed": "Sessiyani vazifaga bog‘lab bo‘lmadi"
+      "linkFailed": "Sessiyani vazifaga bog‘lab bo‘lmadi",
+      "moveToAnotherTodo": "Boshqa vazifaga ko‘chirish"
     },
     "linkSession": {
       "title": "Sessiyani bog‘lash",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Navbatdagisi",
     "sessionTodo": "Vazifa: {{title}}",
+    "openTodoHint": "Vazifani ochadi.",
     "linkToTodo": "Vazifaga bog‘lash",
     "candidates": {
       "empty": "Ochiq vazifalar yo‘q"

@@ -93,6 +93,15 @@ export function RenameModal<TSaveResult>({
     }
   };
 
+  // The keyboard's Done key is the Save button: same guards, so an unchanged or
+  // empty value and a save already in flight stay inert. A multi-line field
+  // keeps Return for a new line, so only the single-line field submits.
+  const submitFromKeyboard = () => {
+    if (!multiline && canSave && !pending && !saveInFlight) {
+      void handleSave();
+    }
+  };
+
   return (
     <DialogCard onClose={handleClose} placement="top">
       <Text className="text-base font-semibold">{title}</Text>
@@ -123,6 +132,8 @@ export function RenameModal<TSaveResult>({
         autoFocus={Platform.OS !== 'android'}
         maxLength={maxLength}
         editable={!pending}
+        onSubmitEditing={multiline ? undefined : submitFromKeyboard}
+        returnKeyType={multiline ? undefined : 'done'}
         accessibilityState={{ disabled: pending }}
       />
       {errorText ? <Text className="text-sm text-destructive">{errorText}</Text> : null}

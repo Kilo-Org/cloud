@@ -3860,7 +3860,8 @@
       "startNewSession": "Шинэ сесс эхлүүлэх",
       "startNewSessionHint": "Шинэ сесс эхлүүлэхийн тулд удаан дарна уу.",
       "linkSession": "Сесс холбох",
-      "linkFailed": "Сессийг хийх ажилтай холбож чадсангүй"
+      "linkFailed": "Сессийг хийх ажилтай холбож чадсангүй",
+      "moveToAnotherTodo": "Өөр хийх ажилд шилжүүлэх"
     },
     "linkSession": {
       "title": "Сессийг холбох",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Дараагийнх",
     "sessionTodo": "Хийх ажил: {{title}}",
+    "openTodoHint": "Хийх ажлыг нээнэ.",
     "linkToTodo": "Хийх ажилтай холбох",
     "candidates": {
       "empty": "Нээлттэй хийх ажил алга"

@@ -3905,7 +3905,8 @@
       "startNewSession": "Započni novu sesiju",
       "startNewSessionHint": "Dugo pritisni da započneš novu sesiju.",
       "linkSession": "Poveži sesiju",
-      "linkFailed": "Povezivanje sesije sa zadatkom nije uspjelo"
+      "linkFailed": "Povezivanje sesije sa zadatkom nije uspjelo",
+      "moveToAnotherTodo": "Premjesti na drugi zadatak"
     },
     "linkSession": {
       "title": "Povezivanje sesije",
@@ -3914,6 +3915,7 @@
     },
     "upNext": "Sljedeće na redu",
     "sessionTodo": "Zadatak: {{title}}",
+    "openTodoHint": "Otvara zadatak.",
     "linkToTodo": "Poveži sa zadatkom",
     "candidates": {
       "empty": "Nema otvorenih zadataka"

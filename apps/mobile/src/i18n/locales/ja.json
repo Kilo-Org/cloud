@@ -3860,7 +3860,8 @@
       "startNewSession": "新しいセッションを開始",
       "startNewSessionHint": "長押しして新しいセッションを開始します。",
       "linkSession": "セッションをリンク",
-      "linkFailed": "セッションをタスクにリンクできませんでした"
+      "linkFailed": "セッションをタスクにリンクできませんでした",
+      "moveToAnotherTodo": "別のタスクに移動"
     },
     "linkSession": {
       "title": "セッションをリンク",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "次の予定",
     "sessionTodo": "タスク：{{title}}",
+    "openTodoHint": "タスクを開きます。",
     "linkToTodo": "タスクにリンク",
     "candidates": {
       "empty": "未完了のタスクはありません"

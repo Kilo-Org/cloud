@@ -3860,7 +3860,8 @@
       "startNewSession": "Tīmata wātū hou",
       "startNewSessionHint": "Pēhia kia roa kia tīmata ai i tētahi wātū hou.",
       "linkSession": "Hono wātū",
-      "linkFailed": "Kāore i taea te hono te wātū ki te mahi"
+      "linkFailed": "Kāore i taea te hono te wātū ki te mahi",
+      "moveToAnotherTodo": "Neke ki tētahi mahi"
     },
     "linkSession": {
       "title": "Hono i tētahi wātū",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "E whai ake nei",
     "sessionTodo": "Mahi: {{title}}",
+    "openTodoHint": "Ka whakatuwhera i te mahi.",
     "linkToTodo": "Hono ki te mahi",
     "candidates": {
       "empty": "Kāore he mahi tuwhera"

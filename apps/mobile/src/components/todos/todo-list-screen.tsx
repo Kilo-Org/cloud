@@ -15,7 +15,7 @@ import { TodoQuickAdd } from '@/components/todos/todo-quick-add';
 import { useStartTodo } from '@/components/todos/use-start-todo';
 import { useTodoListDefaultsSummary } from '@/components/todos/use-todo-list-defaults-summary';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { ChevronDown, ChevronRight, Settings2 } from '@/components/ui/icons';
+import { ChevronDown, Settings2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -26,6 +26,7 @@ import {
 } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { selectTodoQueryErrorView, type TodoQueryErrorView } from '@/lib/todos/todo-query-error';
 import { todoItemPath, todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
 
@@ -148,11 +149,15 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
   if (items.isPending || (lists.isPending && !list)) {
     body = <TodoRowsSkeleton />;
   } else if (items.isError || notFound) {
+    // A list the caller's collection no longer names is missing, not denied.
+    const errorView: TodoQueryErrorView = notFound
+      ? { variant: 'not-found', showRetry: false }
+      : selectTodoQueryErrorView(items.error);
     body = (
       <QueryError
-        variant={notFound || items.error?.data?.code === 'NOT_FOUND' ? 'not-found' : 'server'}
+        variant={errorView.variant}
         placement="top"
-        onRetry={notFound ? undefined : () => void items.refetch()}
+        onRetry={errorView.showRetry ? () => void items.refetch() : undefined}
         isRetrying={items.isFetching}
       />
     );
@@ -208,7 +213,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
             {showCompleted ? (
               <ChevronDown size={16} color={colors.mutedForeground} />
             ) : (
-              <ChevronRight size={16} color={colors.mutedForeground} />
+              <DirectionalChevronRight size={16} color={colors.mutedForeground} />
             )}
             <Text variant="eyebrow">{t('todos.list.completed', { count: doneItems.length })}</Text>
           </Pressable>

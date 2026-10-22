@@ -3860,7 +3860,8 @@
       "startNewSession": "ເລີ່ມເຊສຊັນໃໝ່",
       "startNewSessionHint": "ກົດຍາວເພື່ອເລີ່ມເຊສຊັນໃໝ່.",
       "linkSession": "ເຊື່ອມຕໍ່ເຊດຊັນ",
-      "linkFailed": "ບໍ່ສາມາດເຊື່ອມຕໍ່ເຊດຊັນກັບວຽກໄດ້."
+      "linkFailed": "ບໍ່ສາມາດເຊື່ອມຕໍ່ເຊດຊັນກັບວຽກໄດ້.",
+      "moveToAnotherTodo": "ຍ້າຍໄປວຽກອື່ນ"
     },
     "linkSession": {
       "title": "ເຊື່ອມຕໍ່ກັບເຊດຊັນ",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "ຕໍ່ໄປ",
     "sessionTodo": "ວຽກ: {{title}}",
+    "openTodoHint": "ເປີດວຽກ.",
     "linkToTodo": "ເຊື່ອມຕໍ່ກັບວຽກ",
     "candidates": {
       "empty": "ບໍ່ມີວຽກທີ່ເປີດຢູ່"

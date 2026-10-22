@@ -3860,7 +3860,8 @@
       "startNewSession": "ਨਵਾਂ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ",
       "startNewSessionHint": "ਨਵਾਂ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਲੰਬਾ ਦਬਾਓ।",
       "linkSession": "ਸੈਸ਼ਨ ਲਿੰਕ ਕਰੋ",
-      "linkFailed": "ਸੈਸ਼ਨ ਨੂੰ ਕੰਮ ਨਾਲ ਲਿੰਕ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ"
+      "linkFailed": "ਸੈਸ਼ਨ ਨੂੰ ਕੰਮ ਨਾਲ ਲਿੰਕ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+      "moveToAnotherTodo": "ਹੋਰ ਕੰਮ ਵਿੱਚ ਲਿਜਾਓ"
     },
     "linkSession": {
       "title": "ਸੈਸ਼ਨ ਲਿੰਕ ਕਰੋ",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "ਅੱਗੇ",
     "sessionTodo": "ਕੰਮ: {{title}}",
+    "openTodoHint": "ਕੰਮ ਖੋਲ੍ਹਦਾ ਹੈ।",
     "linkToTodo": "ਕੰਮ ਨਾਲ ਲਿੰਕ ਕਰੋ",
     "candidates": {
       "empty": "ਕੋਈ ਖੁੱਲ੍ਹਾ ਕੰਮ ਨਹੀਂ"

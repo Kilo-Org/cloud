@@ -3860,7 +3860,8 @@
       "startNewSession": "Anza kikao kipya",
       "startNewSessionHint": "Bonyeza kwa muda mrefu kuanza kikao kipya.",
       "linkSession": "Unganisha kikao",
-      "linkFailed": "Imeshindikana kuunganisha kikao na kazi"
+      "linkFailed": "Imeshindikana kuunganisha kikao na kazi",
+      "moveToAnotherTodo": "Hamisha kwenye kazi nyingine"
     },
     "linkSession": {
       "title": "Kuunganisha kikao",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Kinachofuata",
     "sessionTodo": "Kazi: {{title}}",
+    "openTodoHint": "Hufungua kazi.",
     "linkToTodo": "Unganisha na kazi",
     "candidates": {
       "empty": "Hakuna kazi zilizo wazi"

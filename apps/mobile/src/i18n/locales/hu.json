@@ -3860,7 +3860,8 @@
       "startNewSession": "Új munkamenet indítása",
       "startNewSessionHint": "Hosszan nyomd meg új munkamenet indításához.",
       "linkSession": "Munkamenet társítása",
-      "linkFailed": "Nem sikerült a munkamenetet a teendőhöz társítani."
+      "linkFailed": "Nem sikerült a munkamenetet a teendőhöz társítani.",
+      "moveToAnotherTodo": "Áthelyezés másik teendőbe"
     },
     "linkSession": {
       "title": "Munkamenet hozzákapcsolása",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Következő",
     "sessionTodo": "Teendő: {{title}}",
+    "openTodoHint": "Megnyitja a teendőt.",
     "linkToTodo": "Teendőhöz kapcsolás",
     "candidates": {
       "empty": "Nincsenek nyitott teendők"

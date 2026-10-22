@@ -3860,7 +3860,8 @@
       "startNewSession": "নতুন সেশন শুরু করো",
       "startNewSessionHint": "নতুন সেশন শুরু করতে চেপে ধরো।",
       "linkSession": "সেশন সংযুক্ত করুন",
-      "linkFailed": "সেশনের সাথে করণীয়ের লিংক করা যায়নি।"
+      "linkFailed": "সেশনের সাথে করণীয়ের লিংক করা যায়নি।",
+      "moveToAnotherTodo": "অন্য করণীয়ে স্থানান্তর করুন"
     },
     "linkSession": {
       "title": "সেশন লিংক করুন",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "পরবর্তী",
     "sessionTodo": "করণীয়: {{title}}",
+    "openTodoHint": "করণীয়টি খোলে।",
     "linkToTodo": "করণীয়ের সাথে লিংক করুন",
     "candidates": {
       "empty": "কোনো খোলা করণীয় নেই"

@@ -14,7 +14,8 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { TodoListRow } from '@/components/todos/todo-list-row';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { ChevronDown, ChevronRight, ListTodo, Plus } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { ChevronDown, ListTodo, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
@@ -179,7 +180,7 @@ export function TodoListsScreen({ segmentControl }: Readonly<{ segmentControl: R
             {showArchived ? (
               <ChevronDown size={16} color={colors.mutedForeground} />
             ) : (
-              <ChevronRight size={16} color={colors.mutedForeground} />
+              <DirectionalChevronRight size={16} color={colors.mutedForeground} />
             )}
             <Text variant="eyebrow">
               {t('todos.lists.archived', { count: archivedLists.length })}

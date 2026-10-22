@@ -3860,7 +3860,8 @@
       "startNewSession": "開始新的工作階段",
       "startNewSessionHint": "長按以開始新的工作階段。",
       "linkSession": "連結工作階段",
-      "linkFailed": "無法將工作階段連結至待辦事項"
+      "linkFailed": "無法將工作階段連結至待辦事項",
+      "moveToAnotherTodo": "移至另一個待辦事項"
     },
     "linkSession": {
       "title": "連結工作階段",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "接下來",
     "sessionTodo": "待辦事項：{{title}}",
+    "openTodoHint": "開啟該待辦事項。",
     "linkToTodo": "連結至待辦事項",
     "candidates": {
       "empty": "沒有未完成的待辦事項"

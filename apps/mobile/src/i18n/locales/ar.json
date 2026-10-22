@@ -4040,7 +4040,8 @@
       "startNewSession": "بدء جلسة جديدة",
       "startNewSessionHint": "اضغط مطولًا لبدء جلسة جديدة.",
       "linkSession": "ربط جلسة",
-      "linkFailed": "تعذّر ربط الجلسة بالمهمة"
+      "linkFailed": "تعذّر ربط الجلسة بالمهمة",
+      "moveToAnotherTodo": "النقل إلى مهمة أخرى"
     },
     "linkSession": {
       "title": "الربط بجلسة",
@@ -4049,6 +4050,7 @@
     },
     "upNext": "التالي",
     "sessionTodo": "المهمة: {{title}}",
+    "openTodoHint": "يفتح المهمة.",
     "linkToTodo": "ربط بمهمة",
     "candidates": {
       "empty": "لا توجد مهام مفتوحة"

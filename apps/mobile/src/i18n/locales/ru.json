@@ -3950,7 +3950,8 @@
       "startNewSession": "Начать новый сеанс",
       "startNewSessionHint": "Нажмите и удерживайте, чтобы начать новый сеанс.",
       "linkSession": "Привязать сеанс",
-      "linkFailed": "Не удалось привязать сеанс к задаче"
+      "linkFailed": "Не удалось привязать сеанс к задаче",
+      "moveToAnotherTodo": "Переместить в другую задачу"
     },
     "linkSession": {
       "title": "Связать сеанс",
@@ -3959,6 +3960,7 @@
     },
     "upNext": "Далее",
     "sessionTodo": "Задача: {{title}}",
+    "openTodoHint": "Открывает задачу.",
     "linkToTodo": "Привязать к задаче",
     "candidates": {
       "empty": "Нет открытых задач"

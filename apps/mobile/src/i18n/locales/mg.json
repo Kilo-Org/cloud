@@ -3860,7 +3860,8 @@
       "startNewSession": "Manomboka sesiona vaovao",
       "startNewSessionHint": "Tsindrio ela hanombohana sesiona vaovao.",
       "linkSession": "Ampifandraiso fotoam-piasana",
-      "linkFailed": "Tsy afaka nampifandray ny fotoam-piasana tamin'ny asa"
+      "linkFailed": "Tsy afaka nampifandray ny fotoam-piasana tamin'ny asa",
+      "moveToAnotherTodo": "Afindrao amin'ny asa hafa"
     },
     "linkSession": {
       "title": "Ampifandraiso fotoam-piasana",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Manaraka",
     "sessionTodo": "Asa: {{title}}",
+    "openTodoHint": "Manokatra ny asa.",
     "linkToTodo": "Ampifandraiso amin'ny asa",
     "candidates": {
       "empty": "Tsy misy asa misokatra"

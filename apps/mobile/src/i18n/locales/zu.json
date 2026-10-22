@@ -3860,7 +3860,8 @@
       "startNewSession": "Qala iseshini entsha",
       "startNewSessionHint": "Cindezela isikhathi eside ukuqala iseshini entsha.",
       "linkSession": "Xhumanisa iseshini",
-      "linkFailed": "Ayikwazanga ukuxhumanisa iseshini nomsebenzi"
+      "linkFailed": "Ayikwazanga ukuxhumanisa iseshini nomsebenzi",
+      "moveToAnotherTodo": "Hambisa kwelinye umsebenzi"
     },
     "linkSession": {
       "title": "Ukuxhumanisa iseshini",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "Okulandelayo",
     "sessionTodo": "Umsebenzi: {{title}}",
+    "openTodoHint": "Ivula umsebenzi.",
     "linkToTodo": "Xhumanisa nomsebenzi",
     "candidates": {
       "empty": "Ayikho imisebenzi evuliwe"

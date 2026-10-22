@@ -3950,7 +3950,8 @@
       "startNewSession": "Пачаць новы сеанс",
       "startNewSessionHint": "Доўга націсні, каб пачаць новы сеанс.",
       "linkSession": "Звязаць сеанс",
-      "linkFailed": "Не атрымалася звязаць сеанс з задачай"
+      "linkFailed": "Не атрымалася звязаць сеанс з задачай",
+      "moveToAnotherTodo": "Перамясціць у іншую задачу"
     },
     "linkSession": {
       "title": "Прывязаць сеанс",
@@ -3959,6 +3960,7 @@
     },
     "upNext": "Далей",
     "sessionTodo": "Задача: {{title}}",
+    "openTodoHint": "Адкрывае задачу.",
     "linkToTodo": "Звязаць з задачай",
     "candidates": {
       "empty": "Няма адкрытых задач"

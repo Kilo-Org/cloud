@@ -3860,7 +3860,8 @@
       "startNewSession": "નવું સેશન શરૂ કરો",
       "startNewSessionHint": "નવું સેશન શરૂ કરવા લાંબુ દબાવો.",
       "linkSession": "સત્ર જોડો",
-      "linkFailed": "સત્રને કાર્ય સાથે જોડી શકાયું નહીં"
+      "linkFailed": "સત્રને કાર્ય સાથે જોડી શકાયું નહીં",
+      "moveToAnotherTodo": "અન્ય કાર્ય પર ખસેડો"
     },
     "linkSession": {
       "title": "સત્ર જોડો",
@@ -3869,6 +3870,7 @@
     },
     "upNext": "આગળ",
     "sessionTodo": "કાર્ય: {{title}}",
+    "openTodoHint": "કાર્ય ખોલે છે.",
     "linkToTodo": "કાર્ય સાથે જોડો",
     "candidates": {
       "empty": "કોઈ ખુલ્લું કાર્ય નથી"

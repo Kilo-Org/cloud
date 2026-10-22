@@ -938,4 +938,57 @@ describe('reportNetworkError', () => {
       trpcCode: 'UNAUTHORIZED',
     });
   });
+
+  it('holds one origin-and-path form for every copy of the URL', () => {
+    reportNetworkError({
+      source: 'fetch',
+      url: 'https://example.com/oauth/callback/abcdefghijklmnopqrst',
+      method: 'POST',
+      status: 500,
+      durationMs: 7,
+    });
+
+    const event = reportedEvent();
+
+    // The context, the title, and the fingerprint key all name the endpoint in
+    // the same form.
+    expect(event?.contexts?.network).toMatchObject({
+      url: 'https://example.com/oauth/callback/[redacted]',
+    });
+    expect(errorMessageOf(event)).toBe('POST /oauth/callback/[redacted] -> 500');
+    expect(event?.fingerprint).toEqual([
+      'network-error',
+      'fetch',
+      '/oauth/callback/[redacted]',
+      'http.500',
+    ]);
+    expect(JSON.stringify(event)).not.toContain('abcdefghijklmnopqrst');
+  });
+
+  it('holds the origin-and-path form in a transport-failure breadcrumb', async () => {
+    const wrapped = createNetworkErrorFetch(rejectingFetch(new Error('socket closed')));
+
+    await expect(
+      wrapped('https://example.com/oauth/callback/abcdefghijklmnopqrst')
+    ).rejects.toThrow('socket closed');
+
+    expect(breadcrumbs).toHaveLength(1);
+    expect(breadcrumbs[0]).toMatchObject({
+      message: 'GET /oauth/callback/[redacted] failed',
+      data: { path: '/oauth/callback/[redacted]' },
+    });
+    expect(JSON.stringify(breadcrumbs)).not.toContain('abcdefghijklmnopqrst');
+  });
+
+  it('holds the origin-and-path form in an expected-response breadcrumb', async () => {
+    const wrapped = createNetworkErrorFetch(resolvingFetch(new Response('gone', { status: 404 })));
+
+    await wrapped('https://example.com/oauth/callback/abcdefghijklmnopqrst');
+
+    expect(breadcrumbs).toHaveLength(1);
+    expect(breadcrumbs[0]).toMatchObject({
+      message: 'GET /oauth/callback/[redacted] -> 404',
+    });
+    expect(JSON.stringify(breadcrumbs)).not.toContain('abcdefghijklmnopqrst');
+  });
 });

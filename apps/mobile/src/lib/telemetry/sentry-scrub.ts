@@ -36,6 +36,18 @@ function stripQuery(url: unknown): string {
   return originAndPath.replace(URL_USERINFO_PATTERN, '$1');
 }
 
+/**
+ * The URL form telemetry carries: origin and path, with a token-shaped run
+ * redacted and an app-set word-chain identifier (`session.list`,
+ * `/api/auth/native/token`) kept readable. {@link scrubEvent} applies it to
+ * `contexts.network.url`; a producer that stores a URL or a path in a field the
+ * event walker does not visit — a fingerprint key, a breadcrumb message —
+ * applies it too, so every copy of a URL has one form.
+ */
+export function redactUrlText(url: unknown): string {
+  return redactString(stripQuery(url), true);
+}
+
 /** A `scheme://host[:port]` origin. */
 const URL_ORIGIN_PATTERN = /\b[a-z][\da-z+.-]*:\/\/[^\s/]+/giu;
 
@@ -255,6 +267,18 @@ const NETWORK_IDENTIFIER_FIELDS: Readonly<Record<string, true>> = {
 };
 
 /**
+ * Token-scrub one `network` context field. `url` goes through
+ * {@link redactUrlText} (origin and path, token runs redacted); the other
+ * strings keep word-chain identifiers readable.
+ */
+function scrubNetworkField(key: string, item: string): string {
+  if (key === 'url') {
+    return redactUrlText(item);
+  }
+  return redactString(item, NETWORK_IDENTIFIER_FIELDS[key] === true);
+}
+
+/**
  * Token-scrub the app-attached `network` context. Its `url` is first reduced to
  * origin and path, since a producer other than {@link reportNetworkError} may
  * store a raw request URL there. Every other value is touched only when it is
@@ -270,10 +294,7 @@ function scrubNetworkContext(value: unknown): unknown {
   for (const [key, item] of Object.entries(network)) {
     result[key] =
       typeof item === 'string'
-        ? redactString(
-            key === 'url' ? stripQuery(item) : item,
-            NETWORK_IDENTIFIER_FIELDS[key] === true
-          )
+        ? scrubNetworkField(key, item)
         : redactValue(item, new WeakMap(), []);
   }
   return result;

@@ -27,7 +27,7 @@ import { z } from 'zod';
 import { classifyAuthResponse, isAuthTerminalRoute } from '@/lib/auth/auth-response-class';
 import { addTelemetryBreadcrumb, captureTelemetry } from '@/lib/telemetry/error-sink';
 import { isAbortError, isRequestDeadlineError } from '@/lib/telemetry/abort-classification';
-import { NETWORK_BODY_CONTEXT } from '@/lib/telemetry/sentry-scrub';
+import { NETWORK_BODY_CONTEXT, redactUrlText } from '@/lib/telemetry/sentry-scrub';
 
 // Re-exported for existing consumers and tests; the classifier lives in
 // `abort-classification.ts` so this module stays under the line limit.
@@ -325,8 +325,11 @@ function buildSyntheticError(
  */
 export function reportNetworkError(context: NetworkErrorContext): void {
   try {
-    const pathOnly = stripQueryString(context.url);
-    const normalizedPath = normalizeUrlPath(context.url);
+    // The fingerprint key, the synthesized message, and the context URL all
+    // name the endpoint, and all three carry the same origin-and-path form.
+    // The app-set tRPC procedure stays readable instead.
+    const pathOnly = redactUrlText(context.url);
+    const normalizedPath = redactUrlText(normalizeUrlPath(context.url));
     const procedure = trpcProcedureFromUrl(context.url);
     const trpc = readTrpcErrorContext(context.error);
     const trpcCode = trpc.code;
@@ -412,7 +415,7 @@ function isExpectedResponse(context: NetworkErrorContext): boolean {
 function recordExpectedResponse(context: NetworkErrorContext): void {
   try {
     const trpc = readTrpcErrorContext(context.error);
-    const path = normalizeUrlPath(context.url);
+    const path = redactUrlText(normalizeUrlPath(context.url));
     const procedure = trpcProcedureFromUrl(context.url);
     addTelemetryBreadcrumb({
       category: 'network',
@@ -443,7 +446,7 @@ function recordTransportFailure(
 ): void {
   try {
     const method = context.method ?? 'GET';
-    const path = normalizeUrlPath(context.url);
+    const path = redactUrlText(normalizeUrlPath(context.url));
     const outcome: TransportOutcome = isRequestDeadlineError(context.error) ? 'timeout' : 'failed';
     addTelemetryBreadcrumb({
       category: 'network',

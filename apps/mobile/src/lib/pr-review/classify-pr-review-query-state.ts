@@ -12,7 +12,7 @@
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { i18n } from '@/i18n';
 
-type PrReviewQueryState =
+export type PrReviewQueryState =
   | {
       /**
        * The fetch failed with a transient error (network, 5xx, etc.). The

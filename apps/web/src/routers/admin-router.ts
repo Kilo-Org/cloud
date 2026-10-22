@@ -31,6 +31,7 @@ import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
 import { postTestStaleSyncAlert } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
+import { syncAndStoreDirectByokProviders } from '@/lib/providers/direct-byok/sync-direct-byok';
 import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
 import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
 import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
@@ -2406,10 +2407,21 @@ export const adminRouter = createTRPCRouter({
       const result = await syncAndStoreProviders();
       return result;
     }),
-    postTestStaleAlert: adminProcedure.mutation(async () => {
-      const delivery = await postTestStaleSyncAlert();
-      return { delivery };
+    triggerDirectByokSync: adminProcedure.mutation(async () => {
+      if (!isManualProviderSyncEnabled()) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Manual provider sync is disabled in production; the cron handles syncing.',
+        });
+      }
+      return syncAndStoreDirectByokProviders();
     }),
+    postTestStaleAlert: adminProcedure
+      .input(z.object({ job: z.enum(['providers', 'direct_byok']) }))
+      .mutation(async ({ input }) => {
+        const delivery = await postTestStaleSyncAlert(input.job);
+        return { delivery };
+      }),
     getLastSync: adminProcedure.query(async () => {
       const [[latest], [syncState]] = await Promise.all([
         db
@@ -2418,18 +2430,25 @@ export const adminRouter = createTRPCRouter({
           .orderBy(desc(modelsByProvider.id))
           .limit(1),
         db
-          .select({ lastCompletedAt: ai_gateway_sync_providers_state.last_completed_at })
+          .select({
+            lastCompletedAt: ai_gateway_sync_providers_state.last_completed_at,
+            directByokLastCompletedAt:
+              ai_gateway_sync_providers_state.direct_byok_last_completed_at,
+          })
           .from(ai_gateway_sync_providers_state)
           .where(eq(ai_gateway_sync_providers_state.id, 1))
           .limit(1),
       ]);
       const lastCompletedAt = syncState?.lastCompletedAt ?? null;
-      const completedAtIso = lastCompletedAt ? new Date(lastCompletedAt).toISOString() : null;
-      if (!latest && !lastCompletedAt) return null;
+      const directByokLastCompletedAt = syncState?.directByokLastCompletedAt ?? null;
+      if (!latest && !lastCompletedAt && !directByokLastCompletedAt) return null;
       return {
         id: latest?.id ?? null,
         generated_at: latest?.data.generated_at ?? null,
-        completed_at: completedAtIso,
+        completed_at: lastCompletedAt ? new Date(lastCompletedAt).toISOString() : null,
+        direct_byok_completed_at: directByokLastCompletedAt
+          ? new Date(directByokLastCompletedAt).toISOString()
+          : null,
         total_providers: latest?.data.total_providers ?? 0,
         total_models: latest?.data.total_models ?? 0,
       };

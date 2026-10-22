@@ -65,11 +65,9 @@ export function encryptWithPublicKey(
 
     const authTag = cipher.getAuthTag();
 
-    // Combine iv, encrypted data, and authTag for storage
     const encryptedDataBuffer = Buffer.concat([iv, encrypted, authTag]);
     const encryptedData = encryptedDataBuffer.toString('base64');
 
-    // Encrypt DEK with RSA public key
     const encryptedDEKBuffer = publicEncrypt(
       {
         key: publicKeyPem,
@@ -131,7 +129,6 @@ export function decryptWithPrivateKey(
   }
 
   try {
-    // Decrypt DEK using private key
     const encryptedDEKBuffer = Buffer.from(envelope.encryptedDEK, 'base64');
     const dekBuffer = privateDecrypt(
       {
@@ -142,7 +139,6 @@ export function decryptWithPrivateKey(
       encryptedDEKBuffer
     );
 
-    // Decrypt data using decrypted DEK
     const encryptedDataBuffer = Buffer.from(envelope.encryptedData, 'base64');
 
     // Extract iv (first 16 bytes), encrypted data, and authTag (last 16 bytes)

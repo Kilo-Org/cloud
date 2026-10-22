@@ -1,5 +1,5 @@
 {
-  "id": "eb2d4e02-8353-4f48-9dc0-f82a8e86ca8a",
+  "id": "48da44e5-b482-4eae-a823-83defe1a305a",
   "prevId": "140eaf3d-3dc3-47a6-8127-257c20dfa20d",
   "version": "7",
   "dialect": "postgresql",
@@ -2250,6 +2250,18 @@
         },
         "stale_alert_last_posted_at": {
           "name": "stale_alert_last_posted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_byok_last_completed_at": {
+          "name": "direct_byok_last_completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_byok_stale_alert_last_posted_at": {
+          "name": "direct_byok_stale_alert_last_posted_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -4569,13 +4581,6 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
-        },
-        "is_fork": {
-          "name": "is_fork",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "parent_session_id": {
           "name": "parent_session_id",
@@ -32594,21 +32599,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_shared_cli_sessions_kilo_user_id": {
-          "name": "IDX_shared_cli_sessions_kilo_user_id",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

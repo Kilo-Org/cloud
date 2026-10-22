@@ -323,7 +323,7 @@ function launch(
     command: preinstalledStartup(),
     allocationRef,
     env,
-    instance: 'standard-2',
+    instance: 'standard-4',
   });
 }
 
@@ -352,11 +352,31 @@ describe('supplied startup command', () => {
     expect(readRecord().state).toBe('running');
   });
 
+  it('starts the code-review instance at the legacy code-review capacity', async () => {
+    const { instance, container } = setup();
+    container.cmdlineRaw = `${preinstalledStartup().argv.join('\0')}\0`;
+
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        command: preinstalledStartup(),
+        env: {},
+        instance: 'code-review',
+      })
+    ).resolves.toMatchObject({ started: true });
+
+    expect(container.startCalls[0]?.instance).toEqual({
+      vcpu: 1,
+      memoryMib: 4_096,
+      diskMb: 8_000,
+    });
+  });
+
   it('accepts the stable supervisor after the supplied command execs it', async () => {
     const { instance, container } = setup();
     container.cmdlineRaw = `/bin/sh\0${CONTROL_SUPERVISOR_PATH}\0`;
     await expect(
-      instance.launchWrapper({ allocationRef: REF_A, command, env: {}, instance: 'lite' })
+      instance.launchWrapper({ allocationRef: REF_A, command, env: {}, instance: 'standard-3' })
     ).resolves.toMatchObject({ started: true });
     expect(container.startCalls[0]?.entrypoint).toEqual(command.argv);
   });
@@ -378,7 +398,7 @@ describe('supplied startup command', () => {
         allocationRef: REF_A,
         command,
         env: { CALLER: 'test' },
-        instance: 'lite',
+        instance: 'standard-3',
       })
     ).resolves.toMatchObject({ started: true });
     expect(container.startCalls).toEqual([]);
@@ -456,7 +476,7 @@ describe('SandboxContainers egress enforcement', () => {
         command: preinstalledStartup(),
         allocationRef: REF_A,
         env: { EGRESS_ALLOWLIST: '*' },
-        instance: 'lite',
+        instance: 'standard-3',
         egressAllowlist,
       });
 
@@ -497,7 +517,7 @@ describe('SandboxContainers egress enforcement', () => {
           command: preinstalledStartup(),
           allocationRef: REF_A,
           env: {},
-          instance: 'lite',
+          instance: 'standard-3',
           egressAllowlist: [],
         })
       ).rejects.toThrow('interceptor unavailable');
@@ -512,7 +532,7 @@ describe('SandboxContainers egress enforcement', () => {
       command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
-      instance: 'lite',
+      instance: 'standard-3',
       egressAllowlist: ['example.com'],
     });
     const restored = setup({ record: initial.readRecord(), running: true });
@@ -521,7 +541,7 @@ describe('SandboxContainers egress enforcement', () => {
       command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
-      instance: 'lite',
+      instance: 'standard-3',
       egressAllowlist: ['EXAMPLE.COM.'],
     });
     expect(restored.container.calls).toEqual(['https-intercept', 'http-intercept']);
@@ -552,7 +572,7 @@ describe('SandboxContainers egress enforcement', () => {
           command: preinstalledStartup(),
           allocationRef: REF_A,
           env: {},
-          instance: 'lite',
+          instance: 'standard-3',
           egressAllowlist,
         })
       ).rejects.toThrow('egress policy cannot change');
@@ -571,7 +591,7 @@ describe('SandboxContainers egress enforcement', () => {
         command: preinstalledStartup(),
         allocationRef: REF_A,
         env: {},
-        instance: 'lite',
+        instance: 'standard-3',
         egressAllowlist: [],
       })
     ).rejects.toThrow('egress policy cannot change');
@@ -585,7 +605,7 @@ describe('SandboxContainers egress enforcement', () => {
         command: preinstalledStartup(),
         allocationRef: REF_A,
         env: {},
-        instance: 'lite',
+        instance: 'standard-3',
         egressAllowlist: [],
       })
     ).rejects.toThrow('unowned running container');
@@ -601,7 +621,7 @@ describe('SandboxContainers egress enforcement', () => {
         command: preinstalledStartup(),
         allocationRef: REF_A,
         env: {},
-        instance: 'lite',
+        instance: 'standard-3',
         egressAllowlist,
       } as never)
     ).rejects.toThrow();
@@ -630,7 +650,7 @@ describe('SandboxContainers egress enforcement', () => {
       command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
-      instance: 'lite' as const,
+      instance: 'standard-3' as const,
       egressAllowlist: ['example.com'],
     };
     await expect(instance.launchWrapper(input)).rejects.toThrow('start failed');
@@ -659,7 +679,7 @@ describe('SandboxContainers egress enforcement', () => {
       command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
-      instance: 'lite',
+      instance: 'standard-3',
       egressAllowlist: [],
     });
     expect(container.calls).toEqual(['https-intercept', 'http-intercept', 'start', 'exec:cat']);
@@ -680,7 +700,7 @@ describe('SandboxContainers egress enforcement', () => {
       command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
-      instance: 'lite',
+      instance: 'standard-3',
       egressAllowlist: ['example.com'],
     });
     expect(container.startCalls).toHaveLength(0);
@@ -699,7 +719,7 @@ describe('SandboxContainers egress enforcement', () => {
       command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
-      instance: 'lite',
+      instance: 'standard-3',
       egressAllowlist: [],
     });
     await launch(instance, REF_B);
@@ -715,7 +735,7 @@ describe('SandboxContainers egress enforcement', () => {
       command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
-      instance: 'lite' as const,
+      instance: 'standard-3' as const,
       egressAllowlist: [],
     };
     await instance.launchWrapper(input);
@@ -740,13 +760,13 @@ describe('SandboxContainers launch', () => {
       command: preinstalledStartup(),
       allocationRef: REF_A,
       env: { FOO: 'bar' },
-      instance: 'standard-2',
+      instance: 'standard-4',
       containment: true,
     });
 
     expect(result).toEqual({ started: true, startSource: 'image' });
     expect(container.startCalls).toEqual([
-      nativeStartOptions('standard-2', {
+      nativeStartOptions('standard-4', {
         FOO: 'bar',
         SANDBOX_INTERCEPT_HTTPS: '1',
         NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt',
@@ -778,11 +798,11 @@ describe('SandboxContainers launch', () => {
       command: preinstalledStartup(),
       allocationRef: REF_B,
       env: {},
-      instance: 'lite',
+      instance: 'standard-3',
     });
 
     const options = container.startCalls[0] as Record<string, unknown>;
-    expect(options).toEqual(nativeStartOptions('lite'));
+    expect(options).toEqual(nativeStartOptions('standard-3'));
     expect('containerSnapshot' in options).toBe(false);
     expect(container.inspectCalls).toBe(0);
   });
@@ -795,7 +815,7 @@ describe('SandboxContainers launch', () => {
       command: preinstalledStartup(),
       allocationRef: REF_A,
       env: { FOO: 'bar' },
-      instance: 'standard-2',
+      instance: 'standard-4',
       containment: true,
     });
 
@@ -817,7 +837,7 @@ describe('SandboxContainers launch', () => {
         command: preinstalledStartup(),
         allocationRef: REF_A,
         env: { FOO: 'bar' },
-        instance: 'standard-2',
+        instance: 'standard-4',
         containment: true,
       })
     ).resolves.toEqual({ started: true, startSource: 'image' });
@@ -1435,7 +1455,7 @@ describe('SandboxContainers launch', () => {
         allocationRef: REF_A,
         wrapperAttempt: 'exec_pending',
         startSource: 'repository',
-        instance: 'standard-2',
+        instance: 'standard-4',
       },
       running: true,
     });
@@ -1446,7 +1466,7 @@ describe('SandboxContainers launch', () => {
     });
 
     expect(container.runningAtDestroy).toEqual([true]);
-    expect(container.startCalls).toEqual([nativeStartOptions('standard-2')]);
+    expect(container.startCalls).toEqual([nativeStartOptions('standard-4')]);
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_B });
     expect(readRecord().wrapperAttempt).toBeUndefined();
     await expect(instance.stop(REF_A)).resolves.toBe('terminal');
@@ -1513,7 +1533,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
         ...idleRecord,
         state: 'running',
         allocationRef: REF_A,
-        instance: 'standard-1',
+        instance: 'standard-3',
         wrapperAttempt: 'exec_pending',
       },
     });
@@ -1529,7 +1549,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
     expect(readRecord()).toMatchObject({
       state: 'running',
       allocationRef: REF_A,
-      instance: 'standard-1',
+      instance: 'standard-3',
       wrapperAttempt: 'exec_pending',
     });
   });
@@ -1541,7 +1561,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
           ...idleRecord,
           state: 'launching',
           allocationRef: REF_A,
-          instance: 'standard-1',
+          instance: 'standard-3',
           ...(wrapperAttempt === undefined ? {} : { wrapperAttempt }),
         },
       });
@@ -1554,7 +1574,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
           command: preinstalledStartup(),
           allocationRef: REF_A,
           env: {},
-          instance: 'standard-2',
+          instance: 'standard-4',
           containment: true,
         })
       ).resolves.toEqual({ started: true, startSource: 'image' });
@@ -1570,7 +1590,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
       expect(readRecord()).toMatchObject({
         state: 'running',
         allocationRef: REF_A,
-        instance: 'standard-1',
+        instance: 'standard-3',
         wrapperAttempt: 'exec_pending',
       });
     }
@@ -1620,7 +1640,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
           command: preinstalledStartup(),
           allocationRef: REF_A,
           env: {},
-          instance: 'standard-2',
+          instance: 'standard-4',
           containment: true,
         })
       ).rejects.toThrow('pending and the container is not running');
@@ -1650,7 +1670,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
       command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
-      instance: 'standard-2',
+      instance: 'standard-4',
       containment: true,
     });
 
@@ -1743,7 +1763,7 @@ describe('SandboxContainers native start and main-process identity', () => {
 
   it('treats a same-ref running record as a no-op and does not read identity', async () => {
     const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A, instance: 'standard-1' },
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A, instance: 'standard-3' },
     });
     container.running = true;
 
@@ -2008,7 +2028,7 @@ describe('SandboxContainers native start confirmation', () => {
         command: preinstalledStartup(),
         allocationRef: REF_A,
         env: {},
-        instance: 'standard-2',
+        instance: 'standard-4',
         deadlineAt: Date.now() + 5_000,
       })
     ).rejects.toThrow('wrapper exec timed out');
@@ -2528,7 +2548,7 @@ function launchFromRepo(instance: SandboxContainers, ref: string, extra = {}) {
     command: preinstalledStartup(),
     allocationRef: ref,
     env: {},
-    instance: 'standard-2',
+    instance: 'standard-4',
     repoKey: REPO_KEY,
     ...extra,
   });
@@ -2584,7 +2604,7 @@ describe('SandboxContainers repository snapshots', () => {
     const options = container.startCalls[0] as Record<string, unknown>;
     expect(options).toEqual({
       containerSnapshot: { id: 'snap-repo' },
-      instance: 'standard-2',
+      instance: 'standard-4',
       enableInternet: true,
       entrypoint: ['/bin/sh', CONTROL_SUPERVISOR_PATH],
       env: NATIVE_GATE_ENV,
@@ -2629,7 +2649,7 @@ describe('SandboxContainers repository snapshots', () => {
       started: true,
       startSource: 'image',
     });
-    expect(container.startCalls[0]).toEqual(nativeStartOptions('standard-2'));
+    expect(container.startCalls[0]).toEqual(nativeStartOptions('standard-4'));
   });
 
   it('never consults the index without a repo key or a KV binding', async () => {
@@ -2725,7 +2745,7 @@ describe('SandboxContainers repository snapshots', () => {
         expect(container.startCalls[attempt * 2]).toMatchObject({
           containerSnapshot: { id: 'snap-missing' },
         });
-        expect(container.startCalls[attempt * 2 + 1]).toEqual(nativeStartOptions('standard-2'));
+        expect(container.startCalls[attempt * 2 + 1]).toEqual(nativeStartOptions('standard-4'));
         expect(readRecord().repositoryStartFailures).toEqual({
           snapshotId: 'snap-missing',
           attempts: attempt + 1,
@@ -2739,7 +2759,7 @@ describe('SandboxContainers repository snapshots', () => {
         startSource: 'image',
       });
       expect(container.startCalls).toHaveLength(21);
-      expect(container.startCalls[20]).toEqual(nativeStartOptions('standard-2'));
+      expect(container.startCalls[20]).toEqual(nativeStartOptions('standard-4'));
       expect(readRecord()).toMatchObject({
         allocationRef: REF_B,
         state: 'running',
@@ -2780,7 +2800,7 @@ describe('SandboxContainers repository snapshots', () => {
       started: true,
       startSource: 'repository',
     });
-    expect(container.startCalls[1]).toEqual(nativeStartOptions('standard-2'));
+    expect(container.startCalls[1]).toEqual(nativeStartOptions('standard-4'));
     expect(container.startCalls[2]).toMatchObject({ containerSnapshot: { id: 'snap-broken' } });
     expect(readRecord().repositoryStartFailures).toEqual({
       snapshotId: 'snap-broken',
@@ -2810,7 +2830,7 @@ describe('SandboxContainers repository snapshots', () => {
       'container start failed'
     );
     expect(container.startCalls).toHaveLength(2);
-    expect(container.startCalls[1]).toEqual(nativeStartOptions('standard-2'));
+    expect(container.startCalls[1]).toEqual(nativeStartOptions('standard-4'));
     expect(readRecord()).toMatchObject({
       state: 'launching',
       allocationRef: REF_A,
@@ -2997,7 +3017,7 @@ describe('SandboxContainers repository snapshots', () => {
       started: true,
       startSource: 'image',
     });
-    expect(container.startCalls[0]).toEqual(nativeStartOptions('standard-2'));
+    expect(container.startCalls[0]).toEqual(nativeStartOptions('standard-4'));
     expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual({ snapshotId: 'snap-bad' });
     expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
     expect(store.calls.filter(call => call.op === 'put')).toEqual([]);
@@ -3039,7 +3059,7 @@ describe('SandboxContainers repository snapshots', () => {
         ...idleRecord,
         state: 'launching',
         allocationRef: REF_A,
-        instance: 'standard-2',
+        instance: 'standard-4',
         startSource: 'repository',
         wrapperAttempt: 'not_started',
       },
@@ -3061,7 +3081,7 @@ describe('SandboxContainers repository snapshots', () => {
         ...idleRecord,
         state: 'launching',
         allocationRef: REF_A,
-        instance: 'standard-2',
+        instance: 'standard-4',
         startSource: 'repository',
         wrapperAttempt: 'not_started',
       },

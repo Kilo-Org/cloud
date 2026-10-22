@@ -6,7 +6,9 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { briefingMoney, BriefingScorecard } from './briefing-card';
+import { briefingSessionHref, briefingSourceHref } from './briefing-session-href';
 import { BriefingSummary } from './briefing-summary';
+import { formatBriefingTimestamp } from './briefing-window';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -17,16 +19,13 @@ import {
   useBriefingAccess,
   useBriefingDismissals,
   useBriefingInvalidation,
+  useBriefingPreferences,
 } from '@/lib/agent-briefing';
 import { briefingAccessDenied, briefingReportMissing } from '@/lib/agent-briefing-state';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatDate } from '@/lib/format';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
-import { parseTimestamp } from '@/lib/utils';
-
-const BRIEFING_DATE_TIME: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
 
 export function BriefingDetailScreen() {
   const { 'report-id': reportId } = useLocalSearchParams<{ 'report-id': string }>();
@@ -36,8 +35,10 @@ export function BriefingDetailScreen() {
   const { t, i18n } = useTranslation();
   const { setOrganizationId } = useOrganization();
   const access = useBriefingAccess();
+  const preferences = useBriefingPreferences();
   const offline = useOfflineBannerState();
   const dismissals = useBriefingDismissals();
+  const timeZone = briefingAccessDenied(preferences.error) ? undefined : preferences.data?.timezone;
   const [goneReportId, setGoneReportId] = useState<string | null>(null);
   const gone = goneReportId === reportId;
   const query = useQuery({
@@ -115,12 +116,8 @@ export function BriefingDetailScreen() {
             <Text className="text-sm text-muted-foreground">{report.localDate}</Text>
             <Text className="text-xs text-muted-foreground">
               {t('agentBriefing.window', {
-                start: formatDate(
-                  parseTimestamp(report.nightStartAt),
-                  i18n.language,
-                  BRIEFING_DATE_TIME
-                ),
-                end: formatDate(parseTimestamp(report.cutoffAt), i18n.language, BRIEFING_DATE_TIME),
+                start: formatBriefingTimestamp(report.nightStartAt, i18n.language, timeZone),
+                end: formatBriefingTimestamp(report.cutoffAt, i18n.language, timeZone),
               })}
             </Text>
             {report.revised ? (
@@ -162,9 +159,7 @@ export function BriefingDetailScreen() {
                   className="gap-1 rounded-xl border border-border bg-card p-4 active:opacity-70"
                   onPress={() => {
                     setOrganizationId(report.context.organizationId);
-                    router.push(
-                      `/(app)/agent-chat/${encodeURIComponent(session.sessionId)}` as Href
-                    );
+                    router.push(briefingSessionHref(report, session.sessionId));
                   }}
                 >
                   <Text>{session.title || t('agents.sessionRow.untitled')}</Text>
@@ -181,25 +176,18 @@ export function BriefingDetailScreen() {
                 accessibilityRole="link"
                 className="gap-1 rounded-xl border border-border bg-card p-4 active:opacity-70"
                 onPress={() => {
-                  if (
-                    source.kind === 'activity' ||
-                    source.kind === 'cost' ||
-                    source.kind === 'blocker'
-                  ) {
-                    const rootId =
-                      report.sessions.find(session =>
-                        session.sources.some(entry => entry.id === source.id)
-                      )?.sessionId ?? source.sessionId;
-                    setOrganizationId(report.context.organizationId);
-                    router.push(`/(app)/agent-chat/${encodeURIComponent(rootId)}` as Href);
-                  } else {
+                  const href = briefingSourceHref(report, source);
+                  if (href === null) {
                     void openExternalUrl(source.url, { label: source.title });
+                    return;
                   }
+                  setOrganizationId(report.context.organizationId);
+                  router.push(href);
                 }}
               >
                 <Text className="text-sm">{source.title}</Text>
                 <Text className="text-xs text-muted-foreground">
-                  {formatDate(parseTimestamp(source.occurredAt), i18n.language, BRIEFING_DATE_TIME)}
+                  {formatBriefingTimestamp(source.occurredAt, i18n.language, timeZone)}
                 </Text>
               </Pressable>
             ))}

@@ -470,6 +470,45 @@ describe('grantCreditForCategory', () => {
     expect(rows.length).toBe(cap);
   });
 
+  it('applies total_redemptions_allowed when the caller supplies the transaction', async () => {
+    const cap = 2;
+    const attempts = 6;
+    const promoConfig: PromoCreditCategoryConfig = {
+      credit_category: 'CALLER_TX_CAP_TEST',
+      amount_usd: 10,
+      total_redemptions_allowed: cap,
+    };
+
+    const users = await Promise.all(Array.from({ length: attempts }, () => insertTestUser()));
+
+    // Each grant runs in its own caller-owned transaction; the cap applies
+    // across concurrent transactions.
+    const results = await Promise.all(
+      users.map(user =>
+        db.transaction(tx =>
+          grantCreditForCategoryConfig(
+            { organization: null, user },
+            {
+              credit_category: 'CALLER_TX_CAP_TEST',
+              counts_as_selfservice: false,
+              dbOrTx: tx,
+            },
+            promoConfig
+          )
+        )
+      )
+    );
+
+    const succeeded = results.filter(r => r.success);
+    expect(succeeded.length).toBe(cap);
+
+    const rows = await db
+      .select({ id: credit_transactions.id })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.credit_category, 'CALLER_TX_CAP_TEST'));
+    expect(rows.length).toBe(cap);
+  });
+
   it('returns a failure result when the redemption count is unavailable', async () => {
     const user = await insertTestUser();
     const promoConfig: PromoCreditCategoryConfig = {

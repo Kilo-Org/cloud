@@ -1374,6 +1374,8 @@ describe('bootstrap and foreground race fencing', () => {
       return Promise.resolve(null);
     });
     act(first.unmount);
+    // signIn already binds the user id; only the remount may satisfy the assertion below.
+    hoisted.deepLinkLaunch.setCurrentDeepLinkUserId.mockClear();
 
     const recovered = await mountProvider(first.mod);
     onTestFinished(() => act(recovered.unmount));
@@ -1398,6 +1400,47 @@ describe('bootstrap and foreground race fencing', () => {
 
     expect(recovered.getCtx().restoreFailed).toBe(true);
     expect(recovered.getCtx().sessionEnded).toBe(false);
+  });
+
+  it('does not republish stored credentials when a provider mounts during sign-out teardown', async () => {
+    const first = await mountProvider();
+    await settleBootstrap(first.getCtx);
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    await act(async () => {
+      await first.getCtx().signIn(storedToken, 'stored-refresh', 3600);
+    });
+
+    // Hold the remote cleanup open: the epoch bump that would fence a remount
+    // waits for it, so the stored credentials stay readable in the window.
+    const { promise: cleanupGate, resolve: releaseCleanup } = Promise.withResolvers<undefined>();
+    logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(async () => {
+      await cleanupGate;
+    });
+    const signOutPromise = first.getCtx().signOut();
+    await vi.waitFor(() => {
+      expect(logoutCleanupMock.runLogoutCleanup).toHaveBeenCalled();
+    });
+    hoisted.secureStore.getItemAsync.mockImplementation((key: string) => {
+      if (key === 'auth-token') {
+        return Promise.resolve(storedToken);
+      }
+      if (key === 'refresh-token') {
+        return Promise.resolve('stored-refresh');
+      }
+      return Promise.resolve(null);
+    });
+
+    const mountedDuringTeardown = await mountProvider(first.mod);
+    onTestFinished(() => act(mountedDuringTeardown.unmount));
+    await settleBootstrap(mountedDuringTeardown.getCtx);
+
+    expect(mountedDuringTeardown.getCtx().token).toBeUndefined();
+
+    releaseCleanup(undefined);
+    await act(async () => {
+      await signOutPromise;
+    });
+    expect(mountedDuringTeardown.getCtx().token).toBeUndefined();
   });
 
   it('regression: sign-out during bootstrap does not restore the preloaded token into React state or the owner', async () => {

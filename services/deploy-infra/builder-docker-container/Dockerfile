@@ -3,6 +3,8 @@ FROM node:22-bookworm-slim AS node-runtime
 FROM docker.io/cloudflare/sandbox:0.6.11
 
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack
+COPY --from=node-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
 
 # Set command timeout to 10 min
 ENV COMMAND_TIMEOUT_MS=600000

@@ -7,7 +7,7 @@
 
 import { consoleLoggingIntegration, init } from '@sentry/nextjs';
 import { RESTRICTED_DATA_COLLECTION } from '@kilocode/web-shared/lib/observability/sentry-data-collection';
-import { sanitizeSentryRequestData } from '@kilocode/web-shared/lib/observability/sentry-server';
+import { sanitizeSentryRequestData } from '@kilocode/web-shared/lib/observability/sentry-request-data';
 
 if (process.env.NODE_ENV !== 'development') {
   init({

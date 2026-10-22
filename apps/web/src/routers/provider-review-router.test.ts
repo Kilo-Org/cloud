@@ -596,6 +596,44 @@ describe('providerReviewRouter ledger', () => {
   });
 });
 
+// ----- failed-row ledger outcomes --------------------------------------------------
+
+describe('providerReviewRouter failed-row outcome codes', () => {
+  it('records an unclassified write failure as internal_error, never a client rejection', async () => {
+    gitlabWrite.addComment.mockRejectedValueOnce(new Error('unexpected provider-layer failure'));
+    await expect(
+      caller.addComment({
+        ...gitlabBase,
+        body: 'hello',
+        operationKey: 'key-internal',
+      })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ rowId: 'row-1', status: 'failed', outcomeCode: 'internal_error' })
+    );
+    // A server failure is deterministic, not ambiguous: the row settles.
+    expect(mockMarkReconcilePending).not.toHaveBeenCalled();
+  });
+
+  it('keeps bad_request reserved for a BAD_REQUEST rejection', async () => {
+    gitlabWrite.addComment.mockRejectedValueOnce(
+      new GitLabReviewError('bad_request', 'GitLab rejected this request.')
+    );
+    await expect(
+      caller.addComment({
+        ...gitlabBase,
+        body: 'hello',
+        operationKey: 'key-rejected',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ status: 'failed', outcomeCode: 'bad_request' })
+    );
+  });
+});
+
 // ----- inline anchors -------------------------------------------------------------
 
 describe('providerReviewRouter inline anchors', () => {

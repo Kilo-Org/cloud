@@ -2063,8 +2063,15 @@
     {
       "idx": 294,
       "version": "7",
-      "when": 1792673062779,
-      "tag": "0294_yellow_starfox",
+      "when": 1792681536086,
+      "tag": "0294_heavy_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 295,
+      "version": "7",
+      "when": 1792684623752,
+      "tag": "0295_yellow_starfox",
       "breakpoints": true
     }
   ]

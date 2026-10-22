@@ -3,7 +3,10 @@ import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { backfillBlockBlacklistedDomainsBatch, blacklistedDomainCondition } from './route';
+import {
+  backfillBlockBlacklistedDomainsBatch,
+  blacklistedDomainCondition,
+} from './block-blacklisted-domains';
 
 beforeEach(async () => {
   await cleanupDbForTest();
@@ -140,6 +143,18 @@ describe('blacklistedDomainCondition', () => {
 
     expect(matches).toContain(user.id);
   });
+
+  it('handles a list large enough to exceed the bind-parameter limit', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+    });
+    const filler = Array.from({ length: 35_000 }, (_, i) => `filler-${i}.example`);
+
+    const matches = await unblockedMatches([...filler, 'mailinator.com']);
+
+    expect(matches).toContain(user.id);
+  });
 });
 
 describe('backfillBlockBlacklistedDomainsBatch', () => {
@@ -183,6 +198,26 @@ describe('backfillBlockBlacklistedDomainsBatch', () => {
     const untouched = byId.get(safe.id);
     expect(untouched?.blocked_reason).toBeNull();
     expect(untouched?.api_token_pepper).toBe('safe-pepper');
+  });
+
+  it('does not block admin accounts', async () => {
+    const adminUser = await insertTestUser({
+      google_user_email: 'admin@mailinator.com',
+      email_domain: 'mailinator.com',
+      is_admin: true,
+    });
+
+    const result = await backfillBlockBlacklistedDomainsBatch({
+      actorId: adminUser.id,
+      domains: ['mailinator.com'],
+    });
+    expect(result.processed).toBe(0);
+
+    const [row] = await db
+      .select({ blocked_reason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, adminUser.id));
+    expect(row.blocked_reason).toBeNull();
   });
 
   it('does not overwrite or re-rotate an already-blocked user', async () => {

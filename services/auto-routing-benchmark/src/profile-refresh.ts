@@ -1,6 +1,7 @@
 import type { AutoRouter, BenchmarkPair } from '@kilocode/auto-routing-contracts';
 import { getReasoningVariantKeys } from '@kilocode/auto-routing-contracts';
 import type { z } from 'zod';
+import { isExactModelUnavailableResult } from './cli-runner';
 import type { BenchmarkModelCatalogSchema } from './platform-models';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 
@@ -13,6 +14,16 @@ type RefreshInput = {
 };
 
 type RefreshedRow = { model: string; variant: string; status: 'pending' | 'failed' };
+
+type RecordedLookupResult = {
+  run_id: string;
+  model: string;
+  variant: string;
+  error: string;
+  output_prefix: string | null;
+  cost_usd: number | null;
+  timed_out: number;
+};
 
 export class ProfileRefreshConflictError extends Error {
   constructor() {
@@ -59,6 +70,37 @@ export async function refreshCurrentProfiles(
   ) {
     throw new ProfileRefreshConflictError();
   }
+  const repairable =
+    input.mode === 'repair_unavailable'
+      ? (
+          await db
+            .prepare(`SELECT DISTINCT result.run_id, result.model, result.variant, result.error,
+              result.output_prefix, result.cost_usd, result.timed_out
+            FROM benchmark_profiles AS profile
+            JOIN json_each(?4) AS requested
+              ON profile.model = json_extract(requested.value, '$.model')
+              AND profile.variant = json_extract(requested.value, '$.variant')
+            JOIN case_results AS result
+              ON result.run_id = profile.run_id AND result.model = profile.model
+              AND result.variant = profile.variant
+            WHERE profile.router = ?1 AND profile.engine_identity = ?2
+              AND profile.repetitions = ?3 AND result.error IS NOT NULL`)
+            .bind(...bindings)
+            .all<RecordedLookupResult>()
+        ).results
+          .filter(row =>
+            isExactModelUnavailableResult(
+              {
+                text: row.output_prefix ?? '',
+                stderrTail: row.error,
+                costUsd: row.cost_usd,
+                timedOut: row.timed_out !== 0,
+              },
+              row.model
+            )
+          )
+          .map(row => ({ run_id: row.run_id, model: row.model, variant: row.variant }))
+      : [];
   const availableSql = `SELECT json_extract(requested.value, '$.available')
     FROM json_each(?4) AS requested
     WHERE json_extract(requested.value, '$.model') = benchmark_profiles.model
@@ -74,14 +116,13 @@ export async function refreshCurrentProfiles(
       AND EXISTS (${availableSql}) AND status != 'running'
       AND NOT EXISTS (${runningSql})
       AND (?6 = 'refresh' OR EXISTS (
-        SELECT 1 FROM case_results AS result
-        WHERE result.run_id = benchmark_profiles.run_id
-          AND result.model = benchmark_profiles.model
-          AND result.variant = benchmark_profiles.variant
-          AND instr(result.error, 'Model not found: kilo/' || benchmark_profiles.model) > 0
+        SELECT 1 FROM json_each(?7) AS repairable
+        WHERE json_extract(repairable.value, '$.run_id') = benchmark_profiles.run_id
+          AND json_extract(repairable.value, '$.model') = benchmark_profiles.model
+          AND json_extract(repairable.value, '$.variant') = benchmark_profiles.variant
       ))
     RETURNING model, variant, status`)
-    .bind(...bindings, nowIso, input.mode)
+    .bind(...bindings, nowIso, input.mode, JSON.stringify(repairable))
     .all<RefreshedRow>();
   if (
     result.results.length === 0 &&

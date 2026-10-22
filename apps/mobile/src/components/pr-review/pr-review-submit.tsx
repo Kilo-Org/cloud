@@ -268,6 +268,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
       const display = mutationErrorDisplay('submit', classification, {
         rawError: submitReview.error,
         term: providerPlatform ? i18n.t(providerPrNounKey(providerPlatform)) : undefined,
+        platform: providerPlatform,
       });
       setInlineError(display.message);
       setInlineErrorKind(display.kind);

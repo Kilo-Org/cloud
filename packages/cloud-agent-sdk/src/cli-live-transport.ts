@@ -3,7 +3,11 @@
  * one remote CLI session into normalized transport events and commands.
  */
 import { normalizeCliEvent, isChatEvent } from './normalizer';
-import { replayStoredMessages } from './stored-message-replay';
+import {
+  replaySnapshotPage,
+  sessionSnapshotFailureMessage,
+  snapshotPageFromSnapshot,
+} from './snapshot-page';
 import { parseRemoteCommandCatalog, type RemoteCommandState } from './remote-command-catalog';
 import { parseCreateSessionResponse } from './create-session';
 import { cloudAgentSdkRuntime } from './runtime';
@@ -582,12 +586,6 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         });
     }
 
-    function replayPage(page: SessionSnapshotPage): void {
-      sink.onServiceEvent({ type: 'session.created', info: page.info });
-
-      replayStoredMessages(page.messages, event => sink.onChatEvent(event));
-    }
-
     function handleEventMessage(
       sessionId: string,
       parentSessionId: string | undefined,
@@ -840,7 +838,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
               config.onInitialPageLoaded?.(page);
             }
             bufferedEventsFromSupersededSnapshot = [];
-            replayPage(page);
+            replaySnapshotPage(sink, page);
             drainBufferedCliEvents();
           };
           const onError = (error: unknown): void => {
@@ -866,31 +864,20 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             void config.fetchSnapshotPage(config.kiloSessionId, {}).then(page => {
               if (page && page.kind === 'success') {
                 onPage(page);
-              } else {
-                onError(
-                  new Error(
-                    page === null
-                      ? 'Session not found'
-                      : page.kind === 'retryable_failure'
-                        ? 'Session history temporarily unavailable'
-                        : page.kind === 'too_large'
-                          ? 'Session history too large to load'
-                          : 'Session history is unavailable'
-                  )
-                );
+                return;
               }
+              if (page === null) {
+                onError(new Error('Session not found'));
+                return;
+              }
+              onError(new Error(sessionSnapshotFailureMessage(page.kind)));
             }, onError);
             return;
           }
 
           if (config.fetchSnapshot) {
             void config.fetchSnapshot(config.kiloSessionId).then(snapshot => {
-              onPage({
-                info: snapshot.info,
-                messages: snapshot.messages,
-                nextCursor: null,
-                omittedItemCount: 0,
-              });
+              onPage(snapshotPageFromSnapshot(snapshot));
             }, onError);
           }
         };

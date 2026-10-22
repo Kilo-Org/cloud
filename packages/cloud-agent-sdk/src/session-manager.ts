@@ -30,7 +30,7 @@ import {
 } from './session';
 import type { CloudAgentSession } from './session';
 import { createChatProcessor } from './chat-processor';
-import { replayStoredMessages } from './stored-message-replay';
+import { replayStoredMessages } from './snapshot-page';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
 import type { SessionStorage } from './storage/types';

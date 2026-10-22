@@ -166,14 +166,18 @@ describe('new-session preference resolution', () => {
     fixture.read = () => pendingRead.promise;
     const pendingSave = Promise.withResolvers<undefined>();
     fixture.save = () => pendingSave.promise;
-    act(() => renderForm('cold'));
+    act(() => {
+      renderForm('cold');
+    });
     expect(selected).toEqual({ model: '', variant: '' });
 
     await act(() => {
       choose();
       return Promise.resolve();
     });
-    act(() => renderForm('cold-reopened'));
+    act(() => {
+      renderForm('cold-reopened');
+    });
     expect(selected).toEqual({ model: 'chosen', variant: 'high' });
     await act(() => {
       pendingRead.resolve({ favorites: [], lastSelected: { model: 'chosen', variant: 'high' } });

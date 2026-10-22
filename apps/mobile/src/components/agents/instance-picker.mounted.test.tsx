@@ -14,6 +14,7 @@ const fetchInstances = vi.hoisted(() =>
   vi.fn<() => Promise<{ instances: InstancePickerInstance[] }>>()
 );
 const navigation = vi.hoisted(() => ({ current: 'picker' }));
+const platform = vi.hoisted(() => ({ OS: 'ios' }));
 const QUERY_KEY = ['instance-picker'];
 
 type ListProps<T> = {
@@ -27,7 +28,7 @@ type ListProps<T> = {
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
-  Platform: { OS: 'android' },
+  Platform: platform,
   StatusBar: { currentHeight: 0 },
   FlatList: <T,>(props: ListProps<T>) =>
     createElement(
@@ -139,7 +140,12 @@ type ControlProps = {
   testID?: string;
   accessibilityRole?: string;
   accessibilityLabel?: string;
-  accessibilityState?: { checked?: boolean; disabled?: boolean; busy?: boolean };
+  accessibilityState?: {
+    checked?: boolean;
+    selected?: boolean;
+    disabled?: boolean;
+    busy?: boolean;
+  };
   disabled?: boolean;
   onPress?: () => void;
 };
@@ -149,8 +155,14 @@ function hosts(mounted: Mounted, type: string) {
 function controls(mounted: Mounted) {
   return hosts(mounted, 'Pressable').map(node => node.props as ControlProps);
 }
+function rowSelected(row: ControlProps) {
+  return platform.OS === 'ios' ? row.accessibilityState?.selected : row.accessibilityState?.checked;
+}
 function radios(mounted: Mounted) {
-  return controls(mounted).filter(props => props.accessibilityRole === 'radio');
+  const role = platform.OS === 'ios' ? 'button' : 'radio';
+  return controls(mounted).filter(
+    props => props.accessibilityRole === role && rowSelected(props) !== undefined
+  );
 }
 function text(mounted: Mounted) {
   return hosts(mounted, 'Text')
@@ -188,7 +200,10 @@ beforeEach(() => {
   navigation.current = 'picker';
 });
 
-describe('InstancePickerScreen', () => {
+describe.each(['ios', 'android'])('InstancePickerScreen on %s', os => {
+  beforeEach(() => {
+    platform.OS = os;
+  });
   it('groups remotes, terminals, and legacy rows with icons and accessible connection facts', async () => {
     const mounted = await openPicker();
     await waitFor(() => radios(mounted).length === 5);
@@ -206,7 +221,7 @@ describe('InstancePickerScreen', () => {
       expect.stringMatching(/Terminals.*laptop on kilo/),
       expect.stringMatching(/Terminals.*laptop on kilo.*fix\/mobile/),
     ]);
-    const checked = choices.map(row => row.accessibilityState?.checked);
+    const checked = choices.map(row => rowSelected(row));
     expect(checked).toEqual([false, false, true, false, false]);
     const headings = hosts(mounted, 'Text').filter(
       node => (node.props as ControlProps).accessibilityRole === 'header'
@@ -230,7 +245,7 @@ describe('InstancePickerScreen', () => {
       const mounted = await openPicker(target ? null : TERMINAL);
       await waitFor(() => radios(mounted).length === 5);
       const testID = radios(mounted)[index]?.testID;
-      const checkedID = radios(mounted).find(row => row.accessibilityState?.checked)?.testID;
+      const checkedID = radios(mounted).find(row => rowSelected(row))?.testID;
       fetchInstances.mockResolvedValue({
         instances: [SAME_FOLDER, LEGACY, { ...REMOTE, kind: 'cli' }, TERMINAL],
       });
@@ -238,8 +253,8 @@ describe('InstancePickerScreen', () => {
         await mounted.queryClient.refetchQueries({ queryKey: QUERY_KEY });
       });
       await waitFor(() => !text(mounted).includes('Remotes'));
-      expect(radios(mounted).find(row => row.accessibilityState?.checked)?.testID).toBe(checkedID);
-      press(mounted, row => row.accessibilityRole === 'radio' && row.testID === testID);
+      expect(radios(mounted).find(row => rowSelected(row))?.testID).toBe(checkedID);
+      press(mounted, row => rowSelected(row) !== undefined && row.testID === testID);
       expect(mounted.caller.selection).toEqual(
         target === null ? null : expect.objectContaining({ ...target, kind: 'cli' })
       );
@@ -256,7 +271,7 @@ describe('InstancePickerScreen', () => {
     await waitFor(() => radios(mounted).length === 3);
     expect(text(mounted)).toContain('000061');
     expect(text(mounted)).toContain('000062');
-    const checked = radios(mounted).map(row => row.accessibilityState?.checked);
+    const checked = radios(mounted).map(row => rowSelected(row));
     expect(checked).toEqual([false, false, true]);
     press(mounted, row => row.testID === 'instance-picker-row-000061');
     expect(mounted.caller.selection?.connectionId).toBe('a');
@@ -292,7 +307,7 @@ describe('InstancePickerScreen', () => {
     fetchInstances.mockResolvedValue({ instances: [] });
     const mounted = await openPicker(null);
     await waitFor(() => text(mounted).includes('No CLI instances connected'));
-    expect(radios(mounted).map(row => row.accessibilityState?.checked)).toEqual([true]);
+    expect(radios(mounted).map(row => rowSelected(row))).toEqual([true]);
     expect(text(mounted)).not.toContain('Remotes');
     expect(text(mounted)).not.toContain('Terminals');
     const refresh = Promise.withResolvers<{ instances: InstancePickerInstance[] }>();

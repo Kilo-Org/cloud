@@ -157,7 +157,7 @@
     "postcss": "8.5.30",
     "test-renderer": "1.3.1",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:vitest5"
   },
   "dependenciesMeta": {
     "@kilocode/kilo-chat-hooks": {

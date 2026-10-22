@@ -263,7 +263,9 @@ patchedDependencies:
   # cancelAll(), which removed the ongoing Active Agents card on Android.
   expo-notifications@58.1.4: patches/expo-notifications@58.1.4.patch
   # Repo-local features the SDK lacks, carried onto each SDK patch release:
-  # router — rank static-suffix siblings before catch-all index routes;
+  # router — rank static-suffix siblings before catch-all index routes, and
+  # keep the bottom tab bar from becoming one accessibility element (iOS named
+  # it after the first tab and treated it as the container of every screen);
   # widgets — Live Activity state query (getInfo), areLiveActivitiesEnabled,
   # includeEnded instance reads, factory-registered push-to-start URL.
   expo-router@58.0.19: patches/expo-router@58.0.19.patch

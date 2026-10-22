@@ -2102,6 +2102,40 @@ describe('CloudAgentTransport snapshot read recovery', () => {
     }
   });
 
+  it('keeps a terminal typed reconnect catch-up outcome off the error channel', async () => {
+    jest.useFakeTimers();
+    try {
+      const initial = {
+        kind: 'success' as const,
+        info: { id: 'ses-1' },
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+      };
+      const fetchSnapshotPage = jest
+        .fn()
+        .mockResolvedValueOnce(initial)
+        .mockResolvedValue({ kind: 'too_large' });
+      const { transport, errors, serviceEvents } = createSnapshotTransport({ fetchSnapshotPage });
+
+      transport.connect();
+      await flushMicrotasks();
+      expect(errors).toEqual([]);
+
+      await reconnectWithoutCursor();
+
+      // History that can never be loaded is not a new failure on every
+      // reconnect; the initial open already reported it.
+      expect(errors).toEqual([]);
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(1);
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(2);
+
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('retries a typed retryable failure on the initial read', async () => {
     jest.useFakeTimers();
     try {

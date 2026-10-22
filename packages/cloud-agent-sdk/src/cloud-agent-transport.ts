@@ -252,9 +252,12 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     }
 
     /**
-     * Handle one settled snapshot read: replay a page, or report a failure once
-     * per episode while the retry chain keeps running. Returns true when the
-     * episode is over, false when the read is worth retrying.
+     * Handle one settled snapshot read: replay a page, or report a transient
+     * failure once per episode while the retry chain keeps running. Returns true
+     * when the episode is over, false when the read is worth retrying. A
+     * terminal typed failure ends the episode unreported: only the initial read
+     * surfaces it, exactly as it did before the retry existed, so a reconnect
+     * never raises the session error for history that cannot be loaded at all.
      */
     function applySnapshotRead(
       read: SnapshotRead,
@@ -266,14 +269,14 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         return true;
       }
       if (read.kind === 'missing') return true;
-      const transient = read.kind === 'rejected' || read.outcome.kind === 'retryable_failure';
+      if (read.kind === 'typed' && read.outcome.kind !== 'retryable_failure') return true;
       reportSnapshotFailure(
         read.kind === 'rejected'
           ? snapshotReadFailureMessage(read.error)
           : typedSnapshotFailureMessage(read.outcome),
         expectedGeneration
       );
-      return !transient;
+      return false;
     }
 
     /**
@@ -318,6 +321,11 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       if (read.kind === 'missing') {
         handleTicketError(new Error('Session not found'), expectedGeneration);
         return null;
+      }
+      // A terminal typed history failure is reported here, once per open, and
+      // still connects: the websocket remains useful for live events.
+      if (read.kind === 'typed' && read.outcome.kind !== 'retryable_failure') {
+        reportSnapshotFailure(typedSnapshotFailureMessage(read.outcome), expectedGeneration);
       }
       if (!applySnapshotRead(read, replayInitialPage, expectedGeneration)) {
         scheduleSnapshotRetry(replayInitialPage, expectedGeneration, 0);

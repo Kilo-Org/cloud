@@ -205,19 +205,22 @@ export async function listRepositories(
 }
 
 /**
- * Cancel a pending installation
+ * Cancel one pending installation request.
+ *
+ * The id is required: a user can hold several pending requests, so the caller
+ * must name the row it displayed. An id that is not a pending request for this
+ * owner is refused rather than replaced by another matching row.
  */
-export async function cancelPendingInstallation(owner: Owner, integrationId?: string) {
+export async function cancelPendingInstallation(owner: Owner, integrationId: string) {
   const ownershipCondition = ownerCondition(owner);
 
-  // Find the pending installation
   const [integration] = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
         ownershipCondition,
-        ...(integrationId ? [eq(platform_integrations.id, integrationId)] : []),
+        eq(platform_integrations.id, integrationId),
         eq(platform_integrations.platform, 'github'),
         eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
         isNull(platform_integrations.platform_installation_id)

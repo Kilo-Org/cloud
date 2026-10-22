@@ -224,7 +224,7 @@
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je skriven",
-    "bonusCreditsExpiring": "Bonus krediti u iznosu od {{amount}} istječu {{date}}.",
+    "bonusCreditsExpiring": "Krediti u iznosu od {{amount}} istječu {{date}}.",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Za pristup svom radnom prostoru morat ćeš se ponovno prijaviti.",
     "deleteAccountTitle": "Izbrisati račun?",

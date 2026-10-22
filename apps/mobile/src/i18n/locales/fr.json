@@ -224,7 +224,7 @@
     "hideBalance": "Masquer le solde",
     "showBalance": "Afficher le solde",
     "balanceHidden": "Solde masqué",
-    "bonusCreditsExpiring": "{{amount}} de crédits bonus expirent le {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} de crédits expirent le {{date}}.",
     "signOutTitle": "Se déconnecter ?",
     "signOutMessage": "Vous devrez vous reconnecter pour accéder à votre espace de travail.",
     "deleteAccountTitle": "Supprimer le compte ?",

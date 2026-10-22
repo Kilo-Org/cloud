@@ -320,8 +320,8 @@ describe('CreditsCard balance state', () => {
       const { texts, unmount } = await mountCard();
       try {
         await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
-        const notes = texts().filter(text => text.includes('in bonus credits'));
-        expect(notes).toEqual(future ? ['$2.00 in bonus credits expiring 12/17/2026'] : []);
+        const notes = texts().filter(text => text.includes('in credits expiring'));
+        expect(notes).toEqual(future ? ['$2.00 in credits expiring 12/17/2026'] : []);
       } finally {
         unmount();
       }
@@ -355,8 +355,8 @@ describe('CreditsCard balance state', () => {
       const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
       try {
         await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
-        expect(texts().filter(text => text.includes('in bonus credits'))).toEqual([
-          '$2.00 in bonus credits expiring 12/17/2026',
+        expect(texts().filter(text => text.includes('in credits expiring'))).toEqual([
+          '$2.00 in credits expiring 12/17/2026',
         ]);
       } finally {
         unmount();

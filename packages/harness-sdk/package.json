@@ -71,7 +71,7 @@
     "drizzle-kit": "catalog:",
     "openai": "7.36.0",
     "ttsc": "0.33.0",
-    "typescript": "7.0.2",
+    "typescript": "catalog:",
     "vitest": "catalog:vitest5"
   },
   "files": [

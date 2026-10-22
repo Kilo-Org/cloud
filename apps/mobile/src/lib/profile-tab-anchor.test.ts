@@ -90,7 +90,21 @@ describe('profile tab anchor', () => {
   it('returns to the profile root when the profile tab is pressed', () => {
     const profileTab = tabsLayoutSource.split('name="(3_profile)"')[1];
 
-    expect(profileTab).toContain('event.preventDefault()');
-    expect(profileTab).toContain('router.navigate(PROFILE_TAB_ROOT)');
+    // The re-press resets through the shared plan (`planProfileTabPress`), which
+    // dispatches a targeted stack pop so the unsaved-changes guard can
+    // intercept it; a cross-tab press and a form-sheet leaf are left to the
+    // navigator, which keeps the tab's stack.
+    expect(profileTab).toContain('planProfileTabPress(');
+    expect(profileTab).toContain("plan !== 'reset-to-root'");
+    expect(profileTab).toContain("'POP_TO_TOP'");
+  });
+
+  it('does not force-navigate the profile root on a tab press', () => {
+    // A forced `router.navigate(profileRoot)` pushes the root above the current
+    // screen: the sheet closes, the stack is dropped from view, and the
+    // unsaved-changes guard never sees a removal.
+    const profileTab = tabsLayoutSource.split('name="(3_profile)"')[1];
+
+    expect(profileTab).not.toContain('router.navigate');
   });
 });

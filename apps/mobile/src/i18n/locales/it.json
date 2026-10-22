@@ -25,6 +25,7 @@
     "error": "errore: {{error}}",
     "back": "Indietro",
     "somethingWentWrong": "Si è verificato un errore.",
+    "actionNotRecorded": "Impossibile registrare questa azione. Riprova più tardi.",
     "couldNotOpen": "Impossibile aprire {{label}}.",
     "link": "collegamento",
     "takingLonger": "Questa operazione richiede più tempo del previsto. Puoi chiudere questa schermata e ricontrollare più tardi.",
@@ -113,7 +114,9 @@
     "online": "In linea",
     "open": "Apri {{name}}",
     "openPullRequest": "Apri la PR",
+    "completed": "Completata",
     "pending": "In attesa",
+    "running": "In esecuzione",
     "performance": "Prestazioni",
     "preferences": "Preferenze",
     "privacyPolicy": "Informativa sulla privacy",
@@ -964,8 +967,9 @@
       "noProposals": "Nessuna proposta",
       "noProposalsDescription": "Le proposte della memoria di revisione compaiono qui dopo che Kilo ha analizzato le risposte dei responsabili del progetto.",
       "off": "La memoria di revisione è disattivata.",
+      "on": "La memoria di revisione è attivata.",
       "offDescription": "Attivala per consentire a Kilo di imparare dalle risposte dei responsabili del progetto e proporre indicazioni per REVIEW.md.",
-      "readOnlyDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono attivare la memoria di revisione.",
+      "readOnlyDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono modificare la memoria di revisione.",
       "title": "Memoria delle revisioni"
     },
     "scopeList": {
@@ -993,8 +997,6 @@
     "updateFailed": "Impossibile aggiornare il revisore.",
     "configSaveFailed": "Impossibile salvare la configurazione della revisione.",
     "status": {
-      "running": "In esecuzione",
-      "completed": "Completata",
       "interrupted": "Interrotta"
     },
     "reviewStyle": {
@@ -1105,6 +1107,9 @@
       "triageModel": "Modello per la valutazione preliminare"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Amministratore Kilo",
+      "actorMaskedUser": "Utente mascherato",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "Impossibile caricare il report di audit.",
       "events": "Eventi",
       "generated": "Il report è stato generato il {{generatedAt}}.",
@@ -1356,7 +1361,6 @@
       "installApp": "Installa l'app GitHub",
       "reauthorizeButton": "Riautorizza l'app GitHub",
       "reauthorizeDescription": "Security Agent richiede l'autorizzazione vulnerability_alerts per accedere agli avvisi di Dependabot. Riautorizza l'app GitHub per concederla.",
-      "reauthorizeFailed": "Impossibile avviare la riautorizzazione. Riprova.",
       "reauthorizeTitle": "Servono autorizzazioni aggiuntive",
       "setupFailed": "Impossibile avviare la configurazione di GitHub. Riprova."
     },
@@ -1380,6 +1384,7 @@
     "settingsSave": {
       "saveChanges": "Salva le modifiche",
       "unsavedMessage": "Salvare le modifiche prima di uscire da questa schermata?",
+      "unsavedInvalidMessage": "Queste modifiche non possono ancora essere salvate. Correggile per salvare o scartale per uscire.",
       "unsavedTitle": "Modifiche non salvate"
     },
     "setup": {
@@ -1418,7 +1423,12 @@
       "syncMayNotHaveCompleted": "Una sincronizzazione potrebbe non essere terminata. Riprova per verificarne e aggiornarne lo stato oppure scartala.",
       "syncInProgress": "Una sincronizzazione di sicurezza è già in corso. Riprova.",
       "dismissalInProgress": "L'esclusione di questa segnalazione è già in corso. Riprova.",
-      "couldNotReadPendingSyncs": "Impossibile leggere le sincronizzazioni in sospeso. Riprova."
+      "couldNotReadPendingSyncs": "Impossibile leggere le sincronizzazioni in sospeso. Riprova.",
+      "ambiguous": "Impossibile confermare l'esito dell'operazione. Controlla la revisione di sicurezza prima di riprovare.",
+      "settleFailed": "L'operazione è stata completata, ma non è stato possibile registrare il risultato. Riprova.",
+      "replayFailed": "Questa operazione non è stata completata. Riprova.",
+      "actionFailed": "Impossibile completare questa operazione. Riprova.",
+      "actionBlocked": "Impossibile completare questa operazione. Il problema deve essere risolto prima di riprovare."
     },
     "analysisState": {
       "queued": "Analisi in coda",
@@ -1782,7 +1792,8 @@
       "matchesBadge_one": "{{displayCount}} corrispondenza",
       "matchesBadge_other": "{{displayCount}} corrispondenze",
       "matchesBadge_many": "{{displayCount}} corrispondenze",
-      "noOutput": "Nessun output."
+      "noOutput": "Nessun output.",
+      "translationFailed": "Traduzione non riuscita"
     },
     "readToolMarkdown": {
       "linesTruncated": "righe {{start}}–{{end}} (troncate)",
@@ -2279,7 +2290,7 @@
     "thisDevice": "Questo dispositivo",
     "viewProfile": "Visualizza il profilo",
     "signOutThisDevice": "Disconnetti questo dispositivo",
-    "signOutThisSession": "Disconnetti questa sessione",
+    "signOutSessionLabel": "Disconnetti {{device}}, accesso effettuato {{signedIn}}",
     "sessionSignedOut": "Sessione disconnessa.",
     "signOutThisDeviceTitle": "Disconnettere questo dispositivo?",
     "signOutThisSessionTitle": "Disconnettere questa sessione?",
@@ -3012,7 +3023,6 @@
       "mergeResultDefaultError": "GitHub non ha completato l'unione.",
       "mergeResultNotCompleted": "Unione di {{term}} non completata. Verifica lo stato e riprova.",
       "ambiguous": "Impossibile confermare l'esito dell'operazione. Controlla la PR prima di riprovare.",
-      "persistenceFailed": "Impossibile registrare questa azione. Riprova più tardi.",
       "forbidden": "Non hai l'autorizzazione per questa operazione."
     },
     "capabilities": {
@@ -3041,11 +3051,22 @@
     "boundary": {
       "backToProfile": "Torna al profilo",
       "loadErrorMessage": "Controlla la connessione e riprova.",
+
+      "chooseAccount": "Seleziona un account",
       "loadErrorTitle": "Impossibile caricare le tue organizzazioni.",
+      "noOrganization": "Nessuna organizzazione",
+
+      "noOrganizationDescription": "Questo account non fa parte di un'organizzazione. Crea o unisciti a un'organizzazione sul web per usare le funzioni dell'organizzazione come gli inviti dei membri e gli avvisi di saldo basso.",
+
+      "openWebOrganizations": "Apri le organizzazioni sul web",
+
       "organizationUnavailable": "L'organizzazione non è disponibile.",
-      "selectDescription": "Scegli un'organizzazione dal tuo profilo per continuare.",
+      "selectDescriptionWithOrganizations": "Appartieni a una o più organizzazioni. Scegli l'account che questa schermata deve usare.",
+
       "selectOrganization": "Seleziona un'organizzazione",
       "unavailableDescription": "Questa organizzazione non è più disponibile. Scegline una dal tuo profilo per continuare.",
+
+      "unavailableSessionsDescription": "Questa organizzazione non è più disponibile. Non è possibile caricare le sue sessioni.",
       "accessDeniedDescription": "Non hai accesso a questa organizzazione."
     },
     "creditActivity": {
@@ -3104,7 +3125,11 @@
       "separateEmailsHint": "Separa gli indirizzi email con una virgola.",
       "thresholdLabel": "Soglia di avviso (USD)",
       "title": "Avviso di saldo basso",
-      "emailsError": "Inserisci almeno un indirizzo email valido. Se ne inserisci più di uno, separali con una virgola.",
+      "emailsInvalid": "Uno o più indirizzi email non sono validi.",
+      "emailsRequired": "Inserisci almeno un indirizzo email.",
+      "saveEmailsError": "Alcuni indirizzi email non sono stati accettati. Controllali e riprova.",
+      "saveError": "Impossibile salvare l'avviso di saldo basso.",
+      "thresholdPlaceholder": "Inserisci un importo",
       "thresholdError": "Inserisci un importo maggiore di 0."
     },
     "memberLimit": {
@@ -3115,6 +3140,7 @@
       "removeLimit": "Rimuovi il limite",
       "title": "Limite di utilizzo giornaliero",
       "blankError": "Inserisci un importo oppure rimuovi il limite con il pulsante qui sotto.",
+      "blankWithoutLimitError": "Inserisci un limite giornaliero tra 0 e {{max}}.",
       "rangeError": "Inserisci un importo tra 0 e {{max}}."
     },
     "members": {
@@ -3655,7 +3681,6 @@
     "keyTooLong": "La chiave deve contenere 256 caratteri o meno",
     "keyDuplicate": "Questa chiave esiste già nel profilo",
     "valueLabel": "Valore",
-    "secretLabel": "Segreto",
     "secrets": {
       "markSecret": "Contrassegna come segreto",
       "masked": "Valore nascosto",
@@ -3714,18 +3739,20 @@
       "jsonTooLarge": "Usa al massimo 50 voci, chiavi fino a 128 e valori fino a 4096 caratteri",
       "timeoutInvalid": "Il timeout deve essere un numero intero di millisecondi",
       "edit": "Modifica il server MCP",
-      "saveFailed": "Impossibile salvare il server MCP"
+      "saveFailed": "Impossibile salvare il server MCP",
+      "deleteFailed": "Impossibile eliminare il server MCP",
+      "updateFailed": "Impossibile aggiornare il server MCP"
     },
     "agents": {
       "title": "Agenti del profilo",
       "add": "Aggiungi agente",
       "empty": "Nessun agente ancora",
       "name": "Nome dell'agente",
-      "slug": "Lumaca dell'agente",
+      "slug": "Slug dell'agente",
       "description": "Descrizione dell'agente",
       "model": "Sostituzione del modello",
       "modelPlaceholder": "Utilizza l'impostazione predefinita della sessione",
-      "prompt": "Richiesta di sistema",
+      "prompt": "Prompt di sistema",
       "steps": "Passi massimi",
       "stepsPlaceholder": "es. 50",
       "temperature": "Temperatura",
@@ -3741,6 +3768,7 @@
       "visibilitySubagent": "Subagente: richiamabile solo da altri",
       "visibilityAll": "Tutti, entrambi",
       "saveFailed": "Impossibile salvare l'agente",
+      "deleteFailed": "Impossibile eliminare l'agente",
       "nameRequired": "Inserisci il nome di un agente",
       "slugRequired": "Inserisci uno slug dell'agente",
       "slugInvalid": "Lo slug deve iniziare con una lettera e utilizzare solo lettere minuscole, cifre e trattini",
@@ -3755,10 +3783,12 @@
       "description": "Descrizione del comando",
       "template": "Modello",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Spiega $ARGUMENTS",
       "subtask": "Esegui come attività secondaria",
       "edit": "Comando Modifica barra",
       "saveFailed": "Impossibile salvare il comando",
+      "deleteFailed": "Impossibile eliminare il comando",
       "nameRequired": "Immettere un nome di comando",
       "nameInvalid": "Il nome deve iniziare con una lettera minuscola e utilizzare solo lettere minuscole, numeri e trattini",
       "templateRequired": "Immettere un modello di comando",
@@ -3909,7 +3939,7 @@
     "view": "Leggi briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Mostra stato live",
+    "dismiss": "Ignora il briefing",
     "offline": "Offline · briefing salvato",
     "cached": "Report salvato · aggiornamento non disponibile",
     "revised": "Revisionato · {{revision}}",

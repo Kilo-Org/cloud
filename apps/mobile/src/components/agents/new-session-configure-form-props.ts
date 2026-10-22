@@ -6,6 +6,7 @@ import {
   type RepositoryPlatform,
 } from '@/components/agents/new-session-repository-state';
 import { type CloudCreateFailure } from '@/components/agents/use-new-session-creator';
+import { type RemoteSpawnFailure } from '@/components/agents/use-remote-spawn-dispatch';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { type ModeOption } from '@/components/agents/mode-normalize';
@@ -113,4 +114,8 @@ export type NewSessionConfigureFormProps = {
   cloudCreateError?: CloudCreateFailure | null;
   /** Re-runs the cloud create with the same draft (the retryable recovery). */
   onRetryCloudCreate?: () => void;
+  /** The remote spawn's settled or timed-out failure, or null before one. */
+  remoteSpawnFailure?: RemoteSpawnFailure | null;
+  /** Re-runs the remote spawn with the same draft (the retryable recovery). */
+  onRetryRemoteSpawn?: () => void;
 };

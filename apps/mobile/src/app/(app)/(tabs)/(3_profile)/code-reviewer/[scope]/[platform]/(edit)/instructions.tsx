@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TextInput, View } from 'react-native';
+import { InputAccessoryView, Keyboard, Pressable, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { ScreenHeader } from '@/components/screen-header';
@@ -10,7 +10,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
+import {
+  type SaveReviewConfigMutation,
+  useReviewConfig,
+  useSaveReviewConfig,
+} from '@/lib/hooks/use-code-reviewer';
+
+// The multiline editor's keyboard has no Done key on iOS (return inserts a
+// newline), so a covered Save left no keyboard-adjacent way out. The accessory
+// bar rides above the IME and dismisses it.
+const INSTRUCTIONS_DONE_ACCESSORY_ID = 'instructions-editor-done';
 
 // Mounted only once `data != null`, so useRef(initial) captures the real
 // loaded value instead of the pre-fetch default.
@@ -20,7 +29,7 @@ function InstructionsEditor({
   onSaved,
 }: Readonly<{
   initial: string;
-  save: ReturnType<typeof useSaveReviewConfig>;
+  save: SaveReviewConfigMutation;
   onSaved: () => void;
 }>) {
   const valueRef = useRef(initial);
@@ -35,12 +44,27 @@ function InstructionsEditor({
         className="h-32 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
         multiline
         textAlignVertical="top"
+        inputAccessoryViewID={INSTRUCTIONS_DONE_ACCESSORY_ID}
         placeholder={t('codeReviewer.instructions.placeholder')}
         defaultValue={initial}
         onChangeText={text => {
           valueRef.current = text;
         }}
       />
+      <InputAccessoryView nativeID={INSTRUCTIONS_DONE_ACCESSORY_ID}>
+        <View className="flex-row justify-end bg-background px-4 py-2">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('common.done')}
+            onPress={() => {
+              Keyboard.dismiss();
+            }}
+            className="px-3 py-2 active:opacity-70"
+          >
+            <Text className="text-sm font-medium text-primary">{t('common.done')}</Text>
+          </Pressable>
+        </View>
+      </InputAccessoryView>
       <Button
         disabled={save.isPending}
         onPress={() => {

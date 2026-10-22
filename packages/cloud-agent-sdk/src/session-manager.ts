@@ -1520,11 +1520,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     );
   }
 
-  /**
-   * Replay a stored message page into the active storage through a fresh chat
-   * processor. Root pages (initial, cached, older) and child pages both land
-   * here, so the processor options the replay needs are built in one place.
-   */
   function replayMessagesIntoStorage(
     storage: SessionStorage,
     messages: SessionSnapshot['messages']

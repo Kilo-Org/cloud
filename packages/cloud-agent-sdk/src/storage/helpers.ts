@@ -340,8 +340,7 @@ function createReadonlyPartView(part: Part): Part {
  * The delta path buffers every `message.part.delta` and joins the batch once
  * per publication, so the per-token cost stays O(1) (a buffer push) instead of
  * re-copying the whole accumulated text — which is O(n) per token and
- * quadratic over a long reasoning/text stream. A single-chunk batch is the
- * same code path, so an adapter that applies one delta per call shares it.
+ * quadratic over a long reasoning/text stream.
  */
 function applyTextDeltas(part: Part, deltas: readonly string[]): Part {
   if (!('text' in part) || typeof part.text !== 'string') {
@@ -358,14 +357,8 @@ function applyTextDeltas(part: Part, deltas: readonly string[]): Part {
 }
 
 /**
- * Apply streamed text chunks to the stored parts of one message: find the part
- * and append, or seed it with the joined chunks when the message or the part
- * is not stored yet.
- *
- * Returns the message's current array untouched when the chunks change
- * nothing, so a caller can skip its snapshot invalidation and publication on a
- * no-op. The append is the only part mutation, so `partsSnapshot` stays
- * authoritative until a caller publishes.
+ * Returns the stored array unchanged when the chunks change nothing, so a
+ * caller can skip publication on a no-op.
  */
 function appendPartTextChunks(
   arr: Part[] | undefined,
@@ -393,11 +386,9 @@ function appendPartTextChunks(
 }
 
 /**
- * Publish a change to one message's parts: drop the cached read-only snapshot
- * so the next `getParts` rebuilds it, then notify that message's subscribers.
- *
- * Both adapters own a snapshot cache and a subscriber set, so the pair lives
- * here; when each adapter publishes is its own contract (`SessionStorage`).
+ * The snapshot is dropped before the notification, so a subscriber that reads
+ * `getParts` from its callback rebuilds from this change instead of the stale
+ * snapshot.
  */
 function publishPartsChanged(
   snapshot: Map<string, Part[] | null>,

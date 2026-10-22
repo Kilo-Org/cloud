@@ -17,11 +17,9 @@ type SessionStorage = {
    * Append one streamed chunk to a text part, seeding the part when it is not
    * stored yet.
    *
-   * An adapter may coalesce: it need not apply the chunk or publish it to
-   * `parts:{messageId}` subscribers before this call returns, as long as
-   * `getParts` returns the deltas it has already accepted. The memory adapter
-   * applies and notifies per call; the jotai adapter buffers chunks and
-   * publishes them together on its flush.
+   * An implementation may coalesce: it need not apply the chunk or publish it
+   * to `parts:{messageId}` subscribers before this call returns, as long as
+   * `getParts` returns the deltas it has already accepted.
    */
   applyPartDelta(messageId: string, partId: string, field: string, delta: string): void;
   deletePart(messageId: string, partId: string): void;

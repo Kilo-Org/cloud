@@ -61,8 +61,6 @@ function createMemoryStorage(): SessionStorage {
       }
 
       const arr = parts.get(messageId);
-      // This adapter applies one chunk per call, so each applied chunk
-      // publishes on its own; `SessionStorage` lets an adapter coalesce.
       const nextArr = appendPartTextChunks(arr, messageId, partId, [delta]);
       if (nextArr === arr) {
         return;

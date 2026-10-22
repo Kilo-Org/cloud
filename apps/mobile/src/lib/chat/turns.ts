@@ -1,8 +1,14 @@
-import { type FilePart, type MessageInfo, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import {
+  type FilePart,
+  type MessageInfo,
+  type Part,
+  type StoredMessage,
+} from '@kilocode/cloud-agent-sdk';
 import { type Turn, type TurnPart } from '@kilocode/harness-sdk';
 
 import { type LocalImage } from '@/lib/agent-attachments/local-image';
 import { type Question } from './state';
+import { pendingTool, resolvedTool } from './answer-parts';
 
 /**
  * A harness turn, as the bubble that draws an agent message.
@@ -49,29 +55,6 @@ const infoFor = (turn: Turn): MessageInfo =>
         tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
       };
 
-/**
- * What of a turn a reader sees.
- *
- * The words and the images. A chat offers the clock and, when it has them on,
- * the Kilo MCP server's tools — so a tool part can be a call the model made.
- * That is not what was said: the model's prose is the answer, and a call is
- * working, which would draw as an empty bubble.
- */
-const said = (turn: Turn) =>
-  turn.parts.filter(part => part.kind === 'text' || part.kind === 'image');
-
-type StoredReasoning = Extract<TurnPart, { kind: 'reasoning' }>;
-
-/**
- * The thinking in front of an answer. A person picks a thinking effort to get
- * it, so it is drawn with the answer, folded the way the agent bubble folds it.
- * It never makes a bubble of its own.
- */
-const thought = (turn: Turn) =>
-  turn.parts.filter(
-    (part): part is StoredReasoning => part.kind === 'reasoning' && part.body !== ''
-  );
-
 type StoredImage = Extract<TurnPart, { kind: 'image' }>;
 
 /**
@@ -101,31 +84,57 @@ function imagePart(
   };
 }
 
-function asMessage(turn: Turn): StoredMessage {
-  return {
-    info: infoFor(turn),
-    parts: [
-      ...thought(turn).map(part => ({
-        id: part.id,
-        sessionID: turn.sessionId,
-        messageID: turn.id,
-        type: 'reasoning' as const,
-        text: part.body,
-        time: { start: 0, end: 0 },
-      })),
-      ...said(turn).map(part =>
-        part.kind === 'image'
-          ? imagePart(part, part.id, turn)
-          : {
-              id: part.id,
-              sessionID: turn.sessionId,
-              messageID: turn.id,
-              type: 'text' as const,
-              text: part.body,
-            }
-      ),
-    ],
-  };
+function asMessage(
+  turn: Turn,
+  results?: ReadonlyMap<string, Extract<TurnPart, { kind: 'toolResult' }>>
+): StoredMessage {
+  const parts: Part[] = [];
+  for (const part of turn.parts) {
+    const identity = { id: part.id, sessionID: turn.sessionId, messageID: turn.id };
+    switch (part.kind) {
+      case 'text': {
+        if (part.body !== '') {
+          parts.push({ ...identity, type: 'text', text: part.body });
+        }
+        break;
+      }
+      case 'image': {
+        parts.push(imagePart(part, part.id, turn));
+        break;
+      }
+      case 'reasoning': {
+        if (part.body !== '') {
+          parts.push({
+            ...identity,
+            type: 'reasoning',
+            text: part.body,
+            time: { start: 0, end: 0 },
+          });
+        }
+        break;
+      }
+      case 'toolCall': {
+        const tool = pendingTool({
+          ...identity,
+          callID: part.callId,
+          tool: part.name,
+          raw: part.body,
+        });
+        const result = results?.get(part.id);
+        parts.push(result === undefined ? tool : resolvedTool(tool, result));
+        break;
+      }
+      case 'summary':
+      case 'redacted':
+      case 'toolResult': {
+        break;
+      }
+      default: {
+        break;
+      }
+    }
+  }
+  return { info: infoFor(turn), parts };
 }
 
 /** The identifier of the question that has no answer yet. Its Retry hangs off it. */
@@ -158,14 +167,32 @@ function questionMessage(turn: Pick<Turn, 'id' | 'sessionId'>, question: Questio
 export function asMessages(input: {
   readonly sessionId: string;
   readonly turns: readonly Turn[];
-  readonly answering: string;
+  readonly answering: readonly Part[];
   readonly asked: string | null;
   /** The images the pending question carries. */
   readonly askedImages: readonly LocalImage[];
   /** Questions typed while an answer was arriving, in the order they go. */
   readonly waiting: readonly Question[];
 }): StoredMessage[] {
-  const drawn = input.turns.filter(turn => said(turn).length > 0).map(turn => asMessage(turn));
+  const calls = new Map<string, string>();
+  const results = new Map<string, Extract<TurnPart, { kind: 'toolResult' }>>();
+  for (const turn of input.turns) {
+    for (const part of turn.parts) {
+      if (part.kind === 'toolCall') {
+        calls.set(part.callId, part.id);
+      }
+      if (part.kind === 'toolResult') {
+        const id = calls.get(part.callId);
+        if (id !== undefined) {
+          results.set(id, part);
+          calls.delete(part.callId);
+        }
+      }
+    }
+  }
+  const drawn = input.turns
+    .map(turn => asMessage(turn, results))
+    .filter(message => message.parts.some(part => part.type !== 'reasoning'));
   if (input.asked !== null) {
     const id = askedMessageId(input.sessionId);
     drawn.push(
@@ -175,15 +202,16 @@ export function asMessages(input: {
       )
     );
   }
-  if (input.answering !== '') {
-    drawn.push(
-      asMessage({
+  if (input.answering.some(part => part.type !== 'reasoning')) {
+    drawn.push({
+      info: infoFor({
         id: `${input.sessionId}:answering`,
         sessionId: input.sessionId,
         role: 'assistant',
-        parts: [{ id: `${input.sessionId}:answering:text`, kind: 'text', body: input.answering }],
-      })
-    );
+        parts: [],
+      }),
+      parts: [...input.answering],
+    });
   }
   for (const [index, question] of input.waiting.entries()) {
     drawn.push(

@@ -17,6 +17,7 @@ import { MessageCircle, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
+import { autoModelLabel } from '@/lib/auto-model-name';
 import { defaultChatModel } from '@/lib/chat/backend-model-options';
 import { rememberModelFacts } from '@/lib/chat/layers';
 import { type ChatSummary } from '@/lib/chat/store';
@@ -97,7 +98,11 @@ function ScopedChatListScreen() {
   });
 
   const nameOf = useCallback(
-    (id: string) => options.find(model => model.id === id)?.name ?? '',
+    (id: string) =>
+      // Kilo's own Auto models arrive with an English catalogue name that no
+      // catalog translates, so the row resolves it the same way the composer's
+      // chip does and the two never disagree.
+      autoModelLabel(id, options.find(model => model.id === id)?.name ?? ''),
     [options]
   );
 

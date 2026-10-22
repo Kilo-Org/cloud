@@ -38,16 +38,6 @@ jobs:
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
-  stage-global-app:
-    needs: verify-main
-    if: github.repository == 'Kilo-Org/cloud'
-    uses: ./.github/workflows/stage-vercel-deployment.yml
-    with:
-      target_environment: production
-      vercel_project_id_var: VERCEL_PROJECT_ID_GLOBAL_APP
-    secrets:
-      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
-
   promote-app:
     needs: stage-app
     if: github.repository == 'Kilo-Org/cloud'
@@ -57,13 +47,4 @@ jobs:
       axiom_annotation_dataset: kilocode-app
     secrets:
       AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-
-  promote-global-app:
-    needs: stage-global-app
-    if: github.repository == 'Kilo-Org/cloud'
-    uses: ./.github/workflows/promote-vercel-deployment.yml
-    with:
-      deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
-    secrets:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

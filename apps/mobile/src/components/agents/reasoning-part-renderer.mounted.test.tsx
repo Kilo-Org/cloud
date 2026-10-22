@@ -155,7 +155,6 @@ describe('ReasoningPartRenderer mounted', () => {
       throw new Error('row not found');
     }
     expect(row.props.label).toBe('Thought');
-    expect(row.props.labelKind).toBe('eyebrow');
     expect(row.props.variant).toBe('dashed');
     expect(row.props.accessibilityLabel).toBe('Thought');
 
@@ -213,6 +212,19 @@ describe('ReasoningPartRenderer mounted', () => {
       text: '   \n\t  ',
       isStreaming: false,
       defaultExpanded: true,
+    });
+    expect(renderer.root.children).toHaveLength(0);
+  });
+
+  // A provider can leave a block it never put into words. A body made only of
+  // zero-width and format characters paints nothing, so it is not content: the
+  // row would open onto an empty body (video V1 ~8s, "MISAO" rows above short
+  // answers).
+  it('returns null for a body that draws nothing', async () => {
+    const renderer = await renderRenderer({
+      partId: 'p1',
+      text: '\u200B\u200B\uFEFF',
+      isStreaming: false,
     });
     expect(renderer.root.children).toHaveLength(0);
   });

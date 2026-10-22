@@ -1,4 +1,6 @@
 import { randomUUID } from 'crypto';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -11,6 +13,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   captureProxyError,
   getOrganizationProviderPrivacy,
@@ -111,7 +114,7 @@ export async function handleEmbeddingsRequest(
   debugSaveProxyRequest(requestBodyText);
   let requestBodyParsed: EmbeddingProxyRequest;
   try {
-    requestBodyParsed = JSON.parse(requestBodyText);
+    requestBodyParsed = JSON.parse(requestBodyText) as EmbeddingProxyRequest;
   } catch (e) {
     captureException(e, {
       extra: { requestBodyText },
@@ -121,6 +124,11 @@ export async function handleEmbeddingsRequest(
   }
 
   if (typeof requestBodyParsed.model !== 'string' || requestBodyParsed.model.trim().length === 0) {
+    return modelDoesNotExistResponse();
+  }
+
+  // Custom LLMs are served only through chat routes; never forward their ids elsewhere.
+  if (await isCustomLlm(requestBodyParsed.model)) {
     return modelDoesNotExistResponse();
   }
 
@@ -134,7 +142,6 @@ export async function handleEmbeddingsRequest(
   const requestedModel = requestBodyParsed.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  // Extract IP for all requests (needed for free model rate limiting)
   const ipAddress = rawClientIp(request);
   if (!ipAddress) {
     return NextResponse.json(
@@ -173,7 +180,7 @@ export async function handleEmbeddingsRequest(
       return invalidTokenResponse();
     }
 
-    if (!isFreeModel(requestedModelLowerCased)) {
+    if (!(await isFreeModel(requestedModelLowerCased))) {
       return NextResponse.json(
         {
           error: {
@@ -195,7 +202,7 @@ export async function handleEmbeddingsRequest(
   // Extract fraud/project headers
   const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
 
-  const { provider, userByok } = await getEmbeddingProvider(
+  const { provider, userByok, isFree } = await getEmbeddingProvider(
     requestedModelLowerCased,
     user,
     organizationId
@@ -220,6 +227,7 @@ export async function handleEmbeddingsRequest(
     kiloUserId: user.id,
     provider: provider.id,
     requested_model: requestedModelLowerCased,
+    is_free: isFree,
     promptInfo,
     max_tokens: null,
     has_middle_out_transform: null,
@@ -265,13 +273,13 @@ export async function handleEmbeddingsRequest(
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
     const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-      await getBalanceAndOrgSettings(organizationId, user);
+      await getBalanceAndOrgSettings(organizationId, user, readDb);
     accountBalance = balance;
     accountPlan = plan;
     accountPayer = payer;
     organizationDataCollection = settings?.data_collection;
 
-    if (balance <= 0 && !isFreeModel(requestedModelLowerCased) && !userByok) {
+    if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
       return await creditsBlockedResponse({
         user,
         balance,
@@ -287,6 +295,7 @@ export async function handleEmbeddingsRequest(
         organizationId,
         kiloUserId: user.id,
         modelId: requestedModelLowerCased,
+        fromDb: readDb,
       });
       if (!decision.allowed) return modelNotAllowedResponse();
       if (decision.eligibleProviderRoutes) {

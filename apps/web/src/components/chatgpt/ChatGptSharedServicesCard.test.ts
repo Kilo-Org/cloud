@@ -88,7 +88,7 @@ describe('ChatGptSharedServicesCardView', () => {
   it('shows the usage-limit message for a current plan limit', async () => {
     const html = await render({
       status: connectedStatus({
-        usageLimit: { reachedAt: '2026-09-16T13:00:00.000Z', resetsAt: null },
+        usageLimit: { reachedAt: '2026-09-16T13:00:00.000Z', resetsAt: null, code: null },
       }),
     });
 
@@ -100,7 +100,7 @@ describe('ChatGptSharedServicesCardView', () => {
   it('hides the usage-limit message once it is dismissed', async () => {
     const html = await render({
       status: connectedStatus({
-        usageLimit: { reachedAt: '2026-09-16T13:00:00.000Z', resetsAt: null },
+        usageLimit: { reachedAt: '2026-09-16T13:00:00.000Z', resetsAt: null, code: null },
       }),
       isUsageLimitDismissed: true,
     });

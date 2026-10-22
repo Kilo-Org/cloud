@@ -364,6 +364,7 @@ describe('assessScenarioSupport', () => {
             containerEnvironment: vi.fn(async () => ({})),
             gitRemoteUrl: vi.fn(async () => null),
             summaryCount: vi.fn(async () => 0),
+            startPreviewFixture: vi.fn(async () => ({ port: 8765, stop: async () => undefined })),
           },
         }
       )

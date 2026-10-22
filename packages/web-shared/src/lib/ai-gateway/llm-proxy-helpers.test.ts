@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
+import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
@@ -26,14 +27,31 @@ jest.mock('./processUsage', () => ({
   ) => mockedLogMicrodollarUsage(stats, ctx),
 }));
 
+const mockedErrorExceptInTest = jest.fn();
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/utils.server') as Record<string, unknown>),
+  errorExceptInTest: (...args: unknown[]) => mockedErrorExceptInTest(...args),
+}));
+
 import {
+  gemma_4_26b_a4b_it_free_model,
+  glyph_cluster_stealth_free_model,
+  kiloExclusiveModels,
+  reflection_beam_free_model,
+} from './kilo-exclusive-models';
+import type { KiloExclusiveModel } from './providers/kilo-exclusive-model';
+import {
+  captureProxyError,
+  checkExclusiveModelProviderAllowed,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
+  countAndStoreEmbeddingUsage,
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
   extractReasoningSetting,
   getOrganizationProviderPrivacy,
+  getOutputHeaders,
   lastUserPromptText,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
@@ -42,6 +60,36 @@ import {
   requestedLogprobs,
   requestedSamples,
 } from './llm-proxy-helpers';
+
+describe('getOutputHeaders', () => {
+  it.each(['text/event-stream', 'text/event-stream; charset=utf-8', 'Text/Event-Stream'])(
+    'prevents intermediary compression and caching of %s responses',
+    contentType => {
+      const response = new Response(null, {
+        headers: { 'content-type': contentType, 'cache-control': 'public, max-age=3600' },
+      });
+
+      const headers = getOutputHeaders(response);
+
+      expect(headers.get('content-type')).toBe(contentType);
+      expect(headers.get('content-encoding')).toBe('identity');
+      expect(headers.get('cache-control')).toBe('no-cache, no-transform');
+      expect(response.headers.get('cache-control')).toBe('public, max-age=3600');
+    }
+  );
+
+  it.each(['application/json', 'text/plain', 'text/event-stream-other'])(
+    'prevents intermediary caching and compression of %s responses',
+    contentType => {
+      const headers = getOutputHeaders(
+        new Response(null, { headers: { 'content-type': contentType } })
+      );
+
+      expect(headers.get('content-encoding')).toBe('identity');
+      expect(headers.get('cache-control')).toBe('no-cache, no-transform');
+    }
+  );
+});
 
 describe('extractReasoningSetting', () => {
   it.each<{ name: string; body: unknown; expected: string | null }>([
@@ -358,6 +406,41 @@ describe('parseEditUsageFromResponse', () => {
   });
 });
 
+describe('countAndStoreEmbeddingUsage', () => {
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+  });
+
+  it.each([
+    { is_free: false, user_byok: false, expectedCost: 1000 },
+    { is_free: true, user_byok: false, expectedCost: 0 },
+    { is_free: false, user_byok: true, expectedCost: 0 },
+  ])('uses the free/BYOK snapshots for embedding cost: %j', async testCase => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+      is_free: testCase.is_free,
+      user_byok: testCase.user_byok,
+    };
+    const response = new Response(
+      JSON.stringify({
+        id: 'embedding-id',
+        model: 'test/embedding',
+        usage: { prompt_tokens: 10, cost: 0.001 },
+      })
+    );
+
+    countAndStoreEmbeddingUsage(response, usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: testCase.expectedCost, market_cost: 1000 }),
+      usageContext
+    );
+  });
+});
+
 describe('countAndStoreFimUsage', () => {
   function makeUsageContext(
     overrides: Partial<MicrodollarUsageContext> = {}
@@ -384,6 +467,7 @@ describe('countAndStoreFimUsage', () => {
       editor_name: null,
       machine_id: null,
       user_byok: false,
+      is_free: false,
       has_tools: false,
       feature: null,
       session_id: null,
@@ -443,8 +527,11 @@ describe('countAndStoreFimUsage', () => {
     expect(stats.market_cost).toBe(390);
   });
 
-  it('does not bill BYOK requests', async () => {
-    countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext({ user_byok: true }), undefined);
+  it.each([
+    { user_byok: true, is_free: false },
+    { user_byok: false, is_free: true },
+  ])('does not bill BYOK or free requests: %j', async overrides => {
+    countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext(overrides), undefined);
 
     await new Promise(resolve => setImmediate(resolve));
 
@@ -481,6 +568,7 @@ describe('countAndStoreEditUsage', () => {
       editor_name: null,
       machine_id: null,
       user_byok: false,
+      is_free: false,
       has_tools: false,
       feature: null,
       session_id: null,
@@ -504,7 +592,10 @@ describe('countAndStoreEditUsage', () => {
     mockedLogMicrodollarUsage.mockResolvedValue(null);
   });
 
-  it('zeros both cost_mUsd and cacheDiscount_mUsd for BYOK requests', async () => {
+  it.each([
+    { user_byok: true, is_free: false },
+    { user_byok: false, is_free: true },
+  ])('zeros costs for BYOK or free requests: %j', async overrides => {
     const response = makeUpstreamResponse({
       id: 'edit-byok',
       model: 'mercury-edit-2',
@@ -517,7 +608,7 @@ describe('countAndStoreEditUsage', () => {
       choices: [],
     });
 
-    countAndStoreEditUsage(response, makeUsageContext({ user_byok: true }), undefined);
+    countAndStoreEditUsage(response, makeUsageContext(overrides), undefined);
 
     // Allow the async usage parse + after() callback to settle.
     await new Promise(resolve => setImmediate(resolve));
@@ -740,6 +831,80 @@ describe('parseTranscriptionUsageFromResponse', () => {
   });
 });
 
+describe('captureProxyError', () => {
+  beforeEach(() => {
+    mockedErrorExceptInTest.mockClear();
+  });
+
+  async function capturedErrorData() {
+    for (
+      let attempt = 0;
+      attempt < 20 && mockedErrorExceptInTest.mock.calls.length === 0;
+      attempt++
+    ) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    expect(mockedErrorExceptInTest).toHaveBeenCalledTimes(1);
+    return mockedErrorExceptInTest.mock.calls[0][1] as Record<string, unknown>;
+  }
+
+  it('logs the gateway model, BYOK providers, and request field names', async () => {
+    await captureProxyError({
+      errorMessage: 'direct-byok returned error 400',
+      user: { id: 'user-1' },
+      request: {
+        model: 'glm-5.3-flash',
+        reasoning: { effort: 'high' },
+        messages: [
+          { role: 'user', content: 'secret prompt' },
+          { role: 'assistant', content: 'hi', reasoning: 'secret thoughts' },
+        ],
+      },
+      response: new Response('{"error":"unknown field"}', {
+        status: 400,
+        statusText: 'Bad Request',
+        headers: { 'content-type': 'application/json' },
+      }),
+      organizationId: undefined,
+      model: 'glm-5.3-flash',
+      gatewayModel: 'opencode-go/glm-5.3-flash',
+      byokProviderIds: ['opencode-go'],
+      trackInSentry: false,
+    });
+
+    const data = await capturedErrorData();
+    expect(data).toMatchObject({
+      model: 'glm-5.3-flash',
+      gatewayModel: 'opencode-go/glm-5.3-flash',
+      byokProviderIds: 'opencode-go',
+      requestFields: 'messages,model,reasoning',
+      messageFields: 'content,reasoning,role',
+      first4kOfResponse: '{"error":"unknown field"}',
+    });
+    expect(JSON.stringify(data)).not.toContain('secret');
+  });
+
+  it('omits optional fields that add no information', async () => {
+    await captureProxyError({
+      errorMessage: 'openrouter returned error 400',
+      user: { id: 'user-1' },
+      request: null,
+      response: new Response('', { status: 400 }),
+      organizationId: undefined,
+      model: 'vendor/model',
+      gatewayModel: 'vendor/model',
+      byokProviderIds: null,
+      trackInSentry: false,
+    });
+
+    const data = await capturedErrorData();
+    expect(data).not.toHaveProperty('gatewayModel');
+    expect(data).not.toHaveProperty('byokProviderIds');
+    expect(data).not.toHaveProperty('requestFields');
+    expect(data).not.toHaveProperty('messageFields');
+  });
+});
+
 describe('makeErrorReadable', () => {
   const request = {
     kind: 'chat_completions',
@@ -918,10 +1083,81 @@ describe('makeErrorReadable', () => {
 
       expect(result?.status).toBe(status);
       const body = await result?.json();
+      const baselineBody = await baseline?.json();
       expect(body).toMatchObject({ error_type: 'byok_error' });
-      expect(body).toEqual(await baseline?.json());
+      expect(body.message.startsWith(baselineBody.message)).toBe(true);
     }
   );
+
+  it('appends the provider explanation to a specific BYOK 401 message', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'direct-byok',
+      requestedModel: 'opencode-go/glm-5.3-flash',
+      request,
+      response: Response.json(
+        {
+          error: {
+            type: 'authentication_error',
+            code: 'api_key_expired',
+            message:
+              'This API key has expired. Create a new API key in OpenCode Console and replace it in your client or secret store.',
+          },
+        },
+        { status: 401 }
+      ),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    const expected =
+      '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration. Provider message: This API key has expired. Create a new API key in OpenCode Console and replace it in your client or secret store.';
+    expect(result?.status).toBe(401);
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
+
+  it('appends the provider explanation to the OpenCode Go BYOK permission message', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'direct-byok',
+      requestedModel: 'opencode-go/mimo-v2.5',
+      request,
+      response: Response.json(
+        { message: 'Synthetic data collection opt-in required.' },
+        { status: 403 }
+      ),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    const expected =
+      '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go. Provider message: Synthetic data collection opt-in required.';
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
+
+  it('removes control characters and bounds provider text appended to a specific BYOK message', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'synthetic-model',
+      request,
+      response: Response.json(
+        { error: { message: `  Synthetic\u0000\n${'x'.repeat(400)}  ` } },
+        { status: 429 }
+      ),
+      userByokProviderIds: ['anthropic'],
+    });
+
+    const expected = `[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider. Provider message: ${`Synthetic  ${'x'.repeat(400)}`.slice(0, 300)}`;
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
 
   it.each([400, 500, 502, 503])(
     'leaves non-BYOK errors and BYOK outages unchanged for status %i',
@@ -1317,5 +1553,64 @@ describe('requestedSamples', () => {
     expect(requestedSamples({ n: 3 })).toBe(3);
     expect(requestedSamples({})).toBeNull();
     expect(requestedSamples({ n: null })).toBeNull();
+  });
+});
+
+describe('checkExclusiveModelProviderAllowed', () => {
+  const multiProviderModel: KiloExclusiveModel = {
+    ...reflection_beam_free_model,
+    public_id: 'test/multi-provider-exclusive',
+    inference_providers: ['anthropic', 'amazon-bedrock'],
+  };
+
+  beforeEach(() => {
+    kiloExclusiveModels.push(multiProviderModel);
+  });
+
+  afterEach(() => {
+    kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(multiProviderModel), 1);
+  });
+
+  it('allows non-exclusive models, missing provider config, and unrestricted exclusives', () => {
+    expect(checkExclusiveModelProviderAllowed('vendor/model', { only: ['openai'] })).toBeNull();
+    expect(
+      checkExclusiveModelProviderAllowed(reflection_beam_free_model.public_id, undefined)
+    ).toBeNull();
+    expect(
+      checkExclusiveModelProviderAllowed(gemma_4_26b_a4b_it_free_model.public_id, {
+        only: ['openai'],
+      })
+    ).toBeNull();
+  });
+
+  it('allows a model when any of its inference providers is eligible', () => {
+    expect(
+      checkExclusiveModelProviderAllowed(multiProviderModel.public_id, {
+        only: ['amazon-bedrock'],
+      })
+    ).toBeNull();
+    expect(
+      checkExclusiveModelProviderAllowed(multiProviderModel.public_id, { ignore: ['anthropic'] })
+    ).toBeNull();
+  });
+
+  it('rejects a model when none of its inference providers is eligible', async () => {
+    const onlyResult = checkExclusiveModelProviderAllowed(multiProviderModel.public_id, {
+      only: ['openai'],
+    });
+    expect(onlyResult?.status).toBe(403);
+    expect(await onlyResult?.json()).toMatchObject({
+      error_type: 'provider_not_allowed',
+      error:
+        'No eligible provider can serve the selected model. Please enable provider: anthropic, amazon-bedrock',
+    });
+
+    const ignoreResult = checkExclusiveModelProviderAllowed(
+      glyph_cluster_stealth_free_model.public_id,
+      {
+        ignore: ['stealth'],
+      }
+    );
+    expect(ignoreResult?.status).toBe(403);
   });
 });

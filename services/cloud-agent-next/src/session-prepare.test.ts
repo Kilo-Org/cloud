@@ -1,5 +1,6 @@
 import type * as CloudAgentProfile from '@kilocode/cloud-agent-profile';
-import type * as SandboxIdModule from './sandbox-id.js';
+import type * as SandboxPlacementModule from './sandbox-placement.js';
+import type * as SessionIdentityModule from './session-identity.js';
 import { TRPCError } from '@trpc/server';
 import {
   getSandboxAllocationRequest,
@@ -10,46 +11,18 @@ import * as schemas from './router/schemas.js';
 
 const {
   generateSessionIdMock,
-  generateSandboxRoutingTargetMock,
-  selectSandboxForNewSessionMock,
-  selectSandboxProviderMock,
+  selectControlPlaneSandboxMock,
   createCliSessionMock,
   deleteCliSessionMock,
-  createSessionReportMock,
-  recordSandboxIdentityMock,
-  recordSessionFailureMock,
-  recordVisibleSessionOutcomeMock,
-  recordMetadataRegisteredMock,
-  recordInitialAdmissionMock,
-  recordInternalCompensationMock,
   mergeProfileConfigurationMock,
   organizationMembershipLimitMock,
   assertKiloModelAvailableMock,
   getSandboxAllocationCandidatesMock,
 } = vi.hoisted(() => ({
-  generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
-  generateSandboxRoutingTargetMock: vi
-    .fn()
-    .mockResolvedValue({ kind: 'isolated', sandboxId: 'ses-0123456789abcdef' }),
-  selectSandboxForNewSessionMock: vi.fn().mockResolvedValue({
-    sandboxId: 'ses-0123456789abcdef',
-    provider: 'cloudflare',
-  }),
-  selectSandboxProviderMock: vi.fn(
-    (input?: { sandboxAllocation?: string }): 'cloudflare' | 'cloudflare-containers' | 'vercel' =>
-      input?.sandboxAllocation === 'cloudflare-containers-standard-3'
-        ? 'cloudflare-containers'
-        : 'cloudflare'
-  ),
+  generateSessionIdMock: vi.fn(() => 'workspace_12345678-1234-1234-1234-123456789abc'),
+  selectControlPlaneSandboxMock: vi.fn(),
   createCliSessionMock: vi.fn().mockResolvedValue({ created: true }),
   deleteCliSessionMock: vi.fn().mockResolvedValue({ deleted: true }),
-  createSessionReportMock: vi.fn().mockResolvedValue(undefined),
-  recordSandboxIdentityMock: vi.fn().mockResolvedValue(undefined),
-  recordSessionFailureMock: vi.fn().mockResolvedValue(undefined),
-  recordVisibleSessionOutcomeMock: vi.fn().mockResolvedValue(undefined),
-  recordMetadataRegisteredMock: vi.fn().mockResolvedValue(undefined),
-  recordInitialAdmissionMock: vi.fn().mockResolvedValue(undefined),
-  recordInternalCompensationMock: vi.fn().mockResolvedValue(undefined),
   mergeProfileConfigurationMock: vi.fn(),
   organizationMembershipLimitMock: vi.fn(),
   assertKiloModelAvailableMock: vi.fn(),
@@ -78,62 +51,33 @@ vi.mock('./db/pg.js', () => ({
   })),
 }));
 
+vi.mock('./telemetry/session-reports.js', () => ({
+  createCloudAgentSessionReport: vi.fn().mockResolvedValue(undefined),
+  recordCloudAgentSandboxIdentity: vi.fn().mockResolvedValue(undefined),
+  recordCloudAgentSessionFailure: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('./utils/kilo-session-id.js', () => ({
   generateKiloSessionId: vi.fn(() => 'cli-session-abc123'),
 }));
 
-vi.mock('./sandbox-id.js', async importOriginal => {
-  const actual = await importOriginal<typeof SandboxIdModule>();
+vi.mock('./sandbox-placement.js', async importOriginal => {
+  const actual = await importOriginal<typeof SandboxPlacementModule>();
   return {
     ...actual,
-    generateSandboxRoutingTarget: generateSandboxRoutingTargetMock,
-    selectSandboxForNewSession: selectSandboxForNewSessionMock,
-    selectSandboxProvider: selectSandboxProviderMock,
-    getSandboxNamespace: vi.fn(),
+    selectControlPlaneSandbox: async (
+      input: Parameters<typeof actual.selectControlPlaneSandbox>[0]
+    ) => (await selectControlPlaneSandboxMock(input)) ?? actual.selectControlPlaneSandbox(input),
   };
 });
-
-vi.mock('./telemetry/session-reports.js', () => ({
-  createCloudAgentSessionReport: createSessionReportMock,
-  recordCloudAgentSandboxIdentity: recordSandboxIdentityMock,
-  recordCloudAgentSessionFailure: recordSessionFailureMock,
-}));
-
-vi.mock('@cloudflare/sandbox', () => ({
-  getSandbox: vi.fn(),
-  Sandbox: class Sandbox {},
-}));
 
 vi.mock('./model-validation.js', () => ({
   assertKiloModelAvailable: assertKiloModelAvailableMock,
 }));
 
-vi.mock('./session-service.js', () => ({
+vi.mock('./session-identity.js', async importOriginal => ({
+  ...(await importOriginal<typeof SessionIdentityModule>()),
   generateSessionId: () => generateSessionIdMock(),
-  fetchSessionMetadata: vi.fn(),
-  determineBranchName: vi.fn(
-    (sessionId: string, upstreamBranch?: string) => upstreamBranch || `session/${sessionId}`
-  ),
-  runSetupCommands: vi.fn().mockResolvedValue(undefined),
-  writeAuthFile: vi.fn().mockResolvedValue(undefined),
-  InvalidSessionMetadataError: class InvalidSessionMetadataError extends Error {
-    constructor(
-      public readonly userId: string,
-      public readonly sessionId: string,
-      public readonly details?: string
-    ) {
-      super(`Invalid session metadata for session ${sessionId}`);
-      this.name = 'InvalidSessionMetadataError';
-    }
-  },
-  SessionService: class SessionService {
-    createCliSessionViaSessionIngest = createCliSessionMock;
-    deleteCliSessionViaSessionIngest = deleteCliSessionMock;
-    recordCloudAgentVisibleSessionOutcome = recordVisibleSessionOutcomeMock;
-    recordCloudAgentMetadataRegistered = recordMetadataRegisteredMock;
-    recordCloudAgentInitialAdmission = recordInitialAdmissionMock;
-    recordCloudAgentInternalCompensation = recordInternalCompensationMock;
-  },
 }));
 
 import { appRouter } from './router.js';
@@ -142,7 +86,7 @@ import type { TRPCContext, SessionId } from './types.js';
 
 function createMockDOStub(
   overrides: {
-    registerSession?: ReturnType<typeof vi.fn>;
+    registerSessionFromMetadata?: ReturnType<typeof vi.fn>;
     createSessionWithInitialAdmission?: ReturnType<typeof vi.fn>;
     tryUpdate?: ReturnType<typeof vi.fn>;
     getMetadata?: ReturnType<typeof vi.fn>;
@@ -150,8 +94,8 @@ function createMockDOStub(
   } = {}
 ) {
   return {
-    registerSession: overrides.registerSession ?? vi.fn().mockResolvedValue({ success: true }),
-    registerSessionFromMetadata: vi.fn().mockResolvedValue({ success: true }),
+    registerSessionFromMetadata:
+      overrides.registerSessionFromMetadata ?? vi.fn().mockResolvedValue({ success: true }),
     createSessionWithInitialAdmission:
       overrides.createSessionWithInitialAdmission ??
       vi.fn().mockResolvedValue({
@@ -227,18 +171,22 @@ function createInternalApiContext(options: {
     env: {
       Sandbox: {} as TRPCContext['env']['Sandbox'],
       SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
-      CLOUD_AGENT_SESSION: {
+      SANDBOX_SESSION: {
         idFromName: vi.fn((id: string) => ({ id })),
         get: vi.fn(() => doStub),
-      } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
+      } as unknown as TRPCContext['env']['SANDBOX_SESSION'],
       SESSION_INGEST: {
         fetch: vi.fn(),
-        createSessionForCloudAgent: vi.fn().mockResolvedValue({ created: true }),
-        deleteSessionForCloudAgent: vi.fn().mockResolvedValue({ deleted: true }),
+        createSessionForCloudAgent: createCliSessionMock,
+        deleteSessionForCloudAgent: deleteCliSessionMock,
       } as unknown as TRPCContext['env']['SESSION_INGEST'],
       INTERNAL_API_SECRET: effectiveInternalApiSecret,
       NEXTAUTH_SECRET: 'test-secret',
       R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+      R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID: 'fixture-access-key',
+      R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY: 'fixture-secret-key',
+      R2_ENDPOINT: 'https://attachments.example.test',
+      R2_ATTACHMENTS_BUCKET: 'attachments',
       CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
       GIT_TOKEN_SERVICE: {
         authorizeCloudAgentGitHubRepo:
@@ -291,6 +239,7 @@ describe('sandbox selection Worker API', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    selectControlPlaneSandboxMock.mockReset();
     organizationMembershipLimitMock.mockResolvedValue([{ id: 'membership' }]);
     mergeProfileConfigurationMock.mockResolvedValue({});
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
@@ -322,7 +271,6 @@ describe('sandbox selection Worker API', () => {
         caller.start({ ...startInput, runtime: { sandboxAllocation } })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
       expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
-      expect(createSessionReportMock).not.toHaveBeenCalled();
       expect(createCliSessionMock).not.toHaveBeenCalled();
     }
   );
@@ -356,9 +304,8 @@ describe('sandbox selection Worker API', () => {
       await expect(
         caller.start({ ...startInput, runtime: { sandboxAllocation } })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-      expect(createSessionReportMock).not.toHaveBeenCalled();
       expect(createCliSessionMock).not.toHaveBeenCalled();
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+      expect(selectControlPlaneSandboxMock).not.toHaveBeenCalled();
     }
   );
 
@@ -450,9 +397,8 @@ describe('sandbox selection Worker API', () => {
       await expect(
         caller.start({ ...startInput, options: {}, runtime: { sandboxAllocation } })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-      expect(createSessionReportMock).not.toHaveBeenCalled();
       expect(createCliSessionMock).not.toHaveBeenCalled();
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+      expect(selectControlPlaneSandboxMock).not.toHaveBeenCalled();
     }
   );
 
@@ -462,7 +408,7 @@ describe('sandbox selection Worker API', () => {
       const doStub = createMockDOStub();
       const ctx = createInternalApiContext({ doStub, skipBalanceCheck: true });
       ctx.env.SANDBOX_SELECTION_IDS = allowlist;
-      generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
+      generateSessionIdMock.mockReturnValue('workspace_12345678-1234-1234-1234-123456789abc');
       const caller = appRouter.createCaller(ctx);
       await caller.prepareSession({
         ...prepareInput,
@@ -474,14 +420,22 @@ describe('sandbox selection Worker API', () => {
         options: {},
         runtime: { sandboxAllocation: 'cloudflare-single' },
       });
-      expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
         expect.objectContaining({
-          workspace: expect.objectContaining({ sandboxAllocation: 'cloudflare-single' }),
+          metadata: expect.objectContaining({
+            workspace: expect.objectContaining({
+              sandboxAllocation: 'cloudflare-containers-standard-3',
+            }),
+          }),
         })
       );
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
         expect.objectContaining({
-          workspace: expect.objectContaining({ sandboxAllocation: 'cloudflare-single' }),
+          metadata: expect.objectContaining({
+            workspace: expect.objectContaining({
+              sandboxAllocation: 'cloudflare-containers-standard-3',
+            }),
+          }),
         })
       );
     }
@@ -504,8 +458,7 @@ describe('sandbox selection Worker API', () => {
         ).toEqual(normal);
       }
       expect(generateSessionIdMock).not.toHaveBeenCalled();
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
-      expect(createSessionReportMock).not.toHaveBeenCalled();
+      expect(selectControlPlaneSandboxMock).not.toHaveBeenCalled();
       expect(createCliSessionMock).not.toHaveBeenCalled();
     }
   );
@@ -533,30 +486,8 @@ describe('sandbox selection Worker API', () => {
         message: expect.stringContaining('BYOC'),
       });
       expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
-      expect(createSessionReportMock).not.toHaveBeenCalled();
       expect(createCliSessionMock).not.toHaveBeenCalled();
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
-    }
-  );
-
-  it.each(['auto-triage', 'autofix'])(
-    'authorizes Dedicated Standard for an enrolled organization %s trigger',
-    async createdOnPlatform => {
-      const doStub = createMockDOStub();
-      const ctx = createInternalApiContext({ doStub });
-      ctx.env.SANDBOX_SELECTION_IDS = orgId;
-      generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
-      await appRouter.createCaller(ctx).prepareSession({
-        ...prepareInput,
-        sandboxAllocation: 'isolated-standard',
-        createdOnPlatform,
-      });
-      expect(doStub.registerSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          identity: expect.objectContaining({ orgId, createdOnPlatform }),
-          workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
-        })
-      );
+      expect(selectControlPlaneSandboxMock).not.toHaveBeenCalled();
     }
   );
 
@@ -564,15 +495,17 @@ describe('sandbox selection Worker API', () => {
     const doStub = createMockDOStub();
     const ctx = createInternalApiContext({ doStub, requestInternalApiKey: null });
     ctx.env.SANDBOX_SELECTION_IDS = orgId;
-    generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
+    generateSessionIdMock.mockReturnValue('workspace_12345678-1234-1234-1234-123456789abc');
     await appRouter.createCaller(ctx).start({
       ...startInput,
       runtime: { sandboxAllocation: 'isolated-standard' },
     });
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        identity: expect.objectContaining({ orgId }),
-        workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
+        metadata: expect.objectContaining({
+          identity: expect.objectContaining({ orgId }),
+          workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
+        }),
       })
     );
   });
@@ -582,8 +515,6 @@ describe('sandbox selection Worker API', () => {
     async format => {
       const doStub = createMockDOStub();
       const ctx = createInternalApiContext({ doStub });
-      ctx.env.SANDBOX_SESSION = ctx.env
-        .CLOUD_AGENT_SESSION as unknown as typeof ctx.env.SANDBOX_SESSION;
       ctx.env.SANDBOX_SELECTION_IDS = orgId;
       generateSessionIdMock.mockReturnValue('workspace_12345678-1234-1234-1234-123456789abc');
       const sandboxAllocation =
@@ -616,7 +547,6 @@ describe('effective session profile policy', () => {
     { origin: 'github', expected: 'include-web-defaults' },
     { origin: 'linear', expected: 'include-web-defaults' },
     { origin: 'discord', expected: 'include-web-defaults' },
-    { origin: 'app-builder', expected: 'include-web-defaults' },
     { origin: 'webhook', expected: 'include-web-defaults' },
     { origin: 'scheduled', expected: 'include-web-defaults' },
     { origin: undefined, expected: 'explicit-profile-only' },
@@ -625,8 +555,6 @@ describe('effective session profile policy', () => {
     { origin: 'Slack', expected: 'explicit-profile-only' },
     { origin: 'code-review', expected: 'explicit-profile-only' },
     { origin: 'security-agent', expected: 'explicit-profile-only' },
-    { origin: 'autofix', expected: 'explicit-profile-only' },
-    { origin: 'auto-triage', expected: 'explicit-profile-only' },
   ])('selects $expected for origin $origin', ({ origin, expected }) => {
     expect(profileResolutionPolicyForSessionCreateOrigin(origin)).toEqual({
       defaultProfileResolution: expected,
@@ -637,25 +565,10 @@ describe('effective session profile policy', () => {
 describe('prepareSession endpoint', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
-    generateSandboxRoutingTargetMock.mockResolvedValue({
-      kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
-    });
-    selectSandboxForNewSessionMock.mockResolvedValue({
-      sandboxId: 'ses-0123456789abcdef',
-      provider: 'cloudflare',
-    });
-    selectSandboxProviderMock.mockReturnValue('cloudflare');
+    selectControlPlaneSandboxMock.mockReset();
+    generateSessionIdMock.mockReturnValue('workspace_12345678-1234-1234-1234-123456789abc');
     createCliSessionMock.mockResolvedValue({ created: true });
     deleteCliSessionMock.mockResolvedValue({ deleted: true });
-    createSessionReportMock.mockResolvedValue(undefined);
-    recordSandboxIdentityMock.mockResolvedValue(undefined);
-    recordSessionFailureMock.mockResolvedValue(undefined);
-    recordVisibleSessionOutcomeMock.mockResolvedValue(undefined);
-    recordMetadataRegisteredMock.mockResolvedValue(undefined);
-    recordInitialAdmissionMock.mockResolvedValue(undefined);
-    recordInternalCompensationMock.mockResolvedValue(undefined);
     mergeProfileConfigurationMock.mockResolvedValue({});
     organizationMembershipLimitMock.mockResolvedValue([{ id: 'membership-123' }]);
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
@@ -722,7 +635,7 @@ describe('prepareSession endpoint', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
 
     expect(createCliSessionMock).not.toHaveBeenCalled();
-    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
 
@@ -825,7 +738,7 @@ describe('prepareSession endpoint', () => {
   });
 
   it('registers full lazy-prep metadata in one DO call', async () => {
-    generateSandboxRoutingTargetMock.mockResolvedValueOnce({
+    selectControlPlaneSandboxMock.mockResolvedValueOnce({
       kind: 'isolated',
       sandboxId: 'crv-abcdef',
     });
@@ -853,82 +766,75 @@ describe('prepareSession endpoint', () => {
     });
 
     expect(result).toEqual({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      cloudAgentSessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
       kiloSessionId: 'cli-session-abc123',
     });
     expect(createCliSessionMock).toHaveBeenCalledWith(
-      'cli-session-abc123',
-      'agent_12345678-1234-1234-1234-123456789abc',
-      'test-user-123',
-      expect.any(Object),
-      'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-      undefined,
-      'code-review',
-      expect.stringMatching(/^New session - /),
-      'https://github.com/acme/repo',
-      undefined
-    );
-    expect(doStub.registerSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        identity: {
-          sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-          userId: 'test-user-123',
-          orgId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-          botId: undefined,
-          createdOnPlatform: 'code-review',
-          billingOrigin: 'code-review',
-        },
-        auth: {
-          kiloSessionId: 'cli-session-abc123',
-          kilocodeToken: 'test-auth-token',
-        },
-        message: {
-          initialMessageId: expect.stringMatching(/^msg_/) as unknown,
-          turn: {
-            type: 'prompt',
-            id: expect.stringMatching(/^msg_/) as unknown,
-            prompt: 'Test prompt',
-            attachments: undefined,
-          },
-        },
-        agent: {
-          mode: 'plan',
-          model: 'claude-3',
-          variant: undefined,
-          appendSystemPrompt: 'extra rules',
-        },
-        repository: {
-          type: 'github',
-          repo: 'acme/repo',
-          branch: 'feature/test-branch',
-          githubAccessPurpose: 'workflow',
-        },
-        profile: {
-          envVars: { API_KEY: 'secret' },
-          setupCommands: ['npm install'],
-          mcpServers: { test: { type: 'local', command: ['npx', 'test-server'] } },
-          encryptedSecrets: undefined,
-          runtimeSkills: undefined,
-          runtimeAgents: undefined,
-          kiloCommands: undefined,
-        },
-        finalization: {
-          autoCommit: true,
-          condenseOnComplete: true,
-          gateThreshold: 'warning',
-        },
-        callback: {
-          target: { url: 'https://example.com/callback' },
-        },
-        workspace: {
-          sandboxId: 'crv-abcdef',
-          sandboxProvider: 'cloudflare',
-          shallow: true,
-          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
-        },
+        sessionId: 'cli-session-abc123',
+        cloudAgentSessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+        kiloUserId: 'test-user-123',
+        organizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+        profileId: undefined,
+        createdOnPlatform: 'code-review',
+        title: expect.stringMatching(/^New session - /),
+        gitUrl: 'https://github.com/acme/repo',
+        cloneFromKiloSessionId: undefined,
       })
     );
-    expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
+    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          identity: expect.objectContaining({
+            sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+            userId: 'test-user-123',
+            orgId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+            botId: undefined,
+            createdOnPlatform: 'code-review',
+            billingOrigin: 'code-review',
+          }),
+          auth: { kiloSessionId: 'cli-session-abc123', kilocodeToken: 'test-auth-token' },
+          initialMessage: expect.objectContaining({
+            id: expect.stringMatching(/^msg_/) as unknown,
+            turn: expect.objectContaining({
+              type: 'prompt',
+              prompt: 'Test prompt',
+              attachments: undefined,
+            }),
+          }),
+          agent: expect.objectContaining({
+            mode: 'plan',
+            model: 'claude-3',
+            variant: undefined,
+            appendSystemPrompt: 'extra rules',
+          }),
+          repository: expect.objectContaining({
+            type: 'github',
+            repo: 'acme/repo',
+            upstreamBranch: 'feature/test-branch',
+            githubAccessPurpose: 'workflow',
+          }),
+          profile: expect.objectContaining({
+            envVars: { API_KEY: 'secret' },
+            setupCommands: ['npm install'],
+            mcpServers: { test: { type: 'local', command: ['npx', 'test-server'] } },
+          }),
+          finalization: { autoCommit: true, condenseOnComplete: true, gateThreshold: 'warning' },
+          callback: { target: { url: 'https://example.com/callback' } },
+          workspace: expect.objectContaining({
+            sandboxId: 'crv-abcdef',
+            sandboxProvider: 'cloudflare',
+            shallow: true,
+            credentialContainment: {
+              github: true,
+              gitlab: false,
+              bitbucket: false,
+              kilocode: true,
+            },
+          }),
+        }),
+      })
+    );
   });
 
   it('persists the resolved profile id on the created session, not the requested one', async () => {
@@ -946,16 +852,43 @@ describe('prepareSession endpoint', () => {
     });
 
     expect(createCliSessionMock).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.any(String),
-      'test-user-123',
-      expect.any(Object),
-      undefined,
-      'profile-abc123',
-      'cloud-agent-web',
-      expect.stringMatching(/^New session - /),
-      'https://github.com/acme/repo',
-      undefined
+      expect.objectContaining({
+        sessionId: expect.any(String),
+        cloudAgentSessionId: expect.any(String),
+        kiloUserId: 'test-user-123',
+        organizationId: undefined,
+        profileId: 'profile-abc123',
+        createdOnPlatform: 'cloud-agent-web',
+        title: expect.stringMatching(/^New session - /),
+        gitUrl: 'https://github.com/acme/repo',
+        cloneFromKiloSessionId: undefined,
+      })
+    );
+  });
+
+  it('projects resolved instruction files into registered profile metadata', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+    mergeProfileConfigurationMock.mockResolvedValue({
+      instructions: [{ name: 'repo-rules', content: 'Follow the repository policy' }],
+    });
+
+    await caller.prepareSession({
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      createdOnPlatform: 'cloud-agent-web',
+    });
+
+    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          profile: expect.objectContaining({
+            runtimeInstructions: [{ name: 'repo-rules', content: 'Follow the repository policy' }],
+          }),
+        }),
+      })
     );
   });
 
@@ -973,7 +906,7 @@ describe('prepareSession endpoint', () => {
         kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
       })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
   });
 
   it('retains split legacy preparation as registration-only', async () => {
@@ -988,7 +921,7 @@ describe('prepareSession endpoint', () => {
       autoInitiate: false,
     });
 
-    expect(doStub.registerSession).toHaveBeenCalledOnce();
+    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledOnce();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
   });
@@ -1007,13 +940,15 @@ describe('prepareSession endpoint', () => {
       upstreamBranch: 'feature/gitlab',
     });
 
-    expect(doStub.registerSession).toHaveBeenCalledWith(
+    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
       expect.objectContaining({
-        repository: {
-          type: 'gitlab',
-          url: 'https://gitlab.com/acme/repo.git',
-          branch: 'feature/gitlab',
-        },
+        metadata: expect.objectContaining({
+          repository: expect.objectContaining({
+            type: 'gitlab',
+            url: 'https://gitlab.com/acme/repo.git',
+            upstreamBranch: 'feature/gitlab',
+          }),
+        }),
       })
     );
   });
@@ -1033,17 +968,21 @@ describe('prepareSession endpoint', () => {
       upstreamBranch: 'feature/gitlab',
     });
 
-    expect(doStub.registerSession).toHaveBeenCalledWith(
+    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
       expect.objectContaining({
-        identity: expect.objectContaining({ createdOnPlatform: 'code-review' }),
-        repository: {
-          type: 'gitlab',
-          url: 'https://gitlab.com/acme/repo.git',
-          branch: 'feature/gitlab',
-        },
+        metadata: expect.objectContaining({
+          identity: expect.objectContaining({ createdOnPlatform: 'code-review' }),
+          repository: expect.objectContaining({
+            type: 'gitlab',
+            url: 'https://gitlab.com/acme/repo.git',
+            upstreamBranch: 'feature/gitlab',
+          }),
+        }),
       })
     );
-    expect(doStub.registerSession.mock.calls[0]?.[0].repository).not.toHaveProperty('token');
+    expect(
+      doStub.registerSessionFromMetadata.mock.calls[0]?.[0].metadata.repository
+    ).not.toHaveProperty('token');
   });
 
   it('persists only generic Bitbucket repository identity after access preflight', async () => {
@@ -1085,26 +1024,35 @@ describe('prepareSession endpoint', () => {
       repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
       repositoryUrl: 'https://bitbucket.org/acme/repo.git',
     });
-    expect(doStub.registerSession).toHaveBeenCalledWith(
+    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
       expect.objectContaining({
-        identity: expect.objectContaining({
-          orgId: organizationId,
-          createdOnPlatform: 'code-review',
+        metadata: expect.objectContaining({
+          identity: expect.objectContaining({
+            orgId: organizationId,
+            createdOnPlatform: 'code-review',
+          }),
+          workspace: expect.objectContaining({
+            credentialContainment: {
+              github: false,
+              gitlab: false,
+              bitbucket: true,
+              kilocode: true,
+            },
+          }),
+          repository: expect.objectContaining({
+            type: 'bitbucket',
+            url: 'https://bitbucket.org/acme/repo.git',
+            workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+            repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+            bitbucketIntegrationId: integrationId,
+            upstreamBranch: 'feature/bitbucket',
+          }),
         }),
-        workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: false, bitbucket: true, kilocode: true },
-        }),
-        repository: {
-          type: 'bitbucket',
-          url: 'https://bitbucket.org/acme/repo.git',
-          workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
-          repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
-          bitbucketIntegrationId: integrationId,
-          branch: 'feature/bitbucket',
-        },
       })
     );
-    expect(doStub.registerSession.mock.calls[0]?.[0].repository).not.toHaveProperty('token');
+    expect(
+      doStub.registerSessionFromMetadata.mock.calls[0]?.[0].metadata.repository
+    ).not.toHaveProperty('token');
   });
 
   it('preserves caller gitToken for generic git repositories', async () => {
@@ -1120,14 +1068,16 @@ describe('prepareSession endpoint', () => {
       upstreamBranch: 'feature/generic',
     });
 
-    expect(doStub.registerSession).toHaveBeenCalledWith(
+    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
       expect.objectContaining({
-        repository: {
-          type: 'git',
-          url: 'https://git.example.com/acme/repo.git',
-          token: 'generic-git-token',
-          branch: 'feature/generic',
-        },
+        metadata: expect.objectContaining({
+          repository: expect.objectContaining({
+            type: 'git',
+            url: 'https://git.example.com/acme/repo.git',
+            token: 'generic-git-token',
+            upstreamBranch: 'feature/generic',
+          }),
+        }),
       })
     );
   });
@@ -1159,64 +1109,49 @@ describe('prepareSession endpoint', () => {
 
     expect(createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: {
-          initialTurn: {
-            type: 'prompt',
-            messageId: initialMessageId,
-            prompt: 'Inspect the screenshot',
-            attachments: images,
-          },
-        },
+        metadata: expect.objectContaining({
+          initialMessage: expect.objectContaining({
+            turn: expect.objectContaining({
+              type: 'prompt',
+              prompt: 'Inspect the screenshot',
+              attachments: images,
+            }),
+            id: initialMessageId,
+          }),
+        }),
       })
     );
-    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
   });
 
-  it('persists the shared sandbox selected by the KV suffix', async () => {
-    const routeKey = 'usr-000000000000000000000000000000000000000000000000';
-    const failoverSandboxId = 'usr-b4593afcaf2e9e1dfb1611150b786cfe8aeba3c77352a3df';
-    generateSandboxRoutingTargetMock.mockResolvedValueOnce({
-      kind: 'shared',
-      routeKey,
-    });
-    const overrideStore = {
-      get: vi.fn().mockResolvedValue('shared-slot-v1'),
-      put: vi.fn(),
-    };
+  it('stores one neutral shared allocation across session IDs and ignores retired KV suffixes', async () => {
+    const overrideStore = { get: vi.fn().mockResolvedValue('shared-slot-v1'), put: vi.fn() };
     const doStub = createMockDOStub();
     const context = createInternalApiContext({ doStub });
+    context.env.SANDBOX_SELECTION_IDS = '*';
     Object.assign(context.env, { SHARED_SANDBOX_OVERRIDES: overrideStore });
     const caller = appRouter.createCaller(context);
-
-    await caller.start({
-      message: { prompt: 'Use the assigned shared sandbox' },
+    const input = {
+      message: { prompt: 'Use the shared allocation' },
       agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
-      repository: { type: 'github', repo: 'acme/repo' },
+      repository: { type: 'github' as const, repo: 'acme/repo' },
+      runtime: { sandboxAllocation: 'cloudflare-shared' as const },
+    };
+    await caller.start(input);
+    generateSessionIdMock.mockReturnValueOnce('workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    await caller.start(input);
+    const first = doStub.createSessionWithInitialAdmission.mock.calls[0]?.[0];
+    const second = doStub.createSessionWithInitialAdmission.mock.calls[1]?.[0];
+    expect(first.metadata.workspace).toMatchObject({
+      sandboxId: expect.stringMatching(/^sbx-[a-f0-9]{48}$/),
+      sandboxKind: 'shared',
+      sandboxProvider: 'cloudflare',
+      sandboxAllocation: 'cloudflare-shared',
     });
-
-    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledOnce();
-    expect(overrideStore.get).toHaveBeenCalledWith(`shared-sandbox-route:${routeKey}`);
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
-      expect.objectContaining({
-        identity: expect.objectContaining({ billingOrigin: 'cloud-agent' }),
-        workspace: {
-          sandboxId: failoverSandboxId,
-          sandboxProvider: 'cloudflare',
-          shallow: undefined,
-          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
-          sandboxRoute: {
-            kind: 'shared',
-            routeKey,
-            suffix: 'shared-slot-v1',
-          },
-        },
-      })
-    );
-    expect(recordSandboxIdentityMock).toHaveBeenCalledWith(
-      expect.objectContaining({ sandboxId: failoverSandboxId }),
-      expect.any(Object)
-    );
+    expect(second.metadata.workspace.sandboxId).toBe(first.metadata.workspace.sandboxId);
+    expect(first.metadata.workspace).not.toHaveProperty('sandboxRoute');
+    expect(overrideStore.get).not.toHaveBeenCalled();
   });
 
   it('does not let public createdOnPlatform select the Code Review sandbox class', async () => {
@@ -1231,17 +1166,18 @@ describe('prepareSession endpoint', () => {
       options: { createdOnPlatform: 'code-review' },
     });
 
-    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledWith(
-      undefined,
-      undefined,
-      'test-user-123',
-      expect.any(String),
-      undefined,
-      expect.objectContaining({ createdOnPlatform: undefined })
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'test-user-123',
+        orgId: undefined,
+        sessionId: expect.any(String),
+      })
     );
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        identity: expect.objectContaining({ billingOrigin: 'cloud-agent' }),
+        metadata: expect.objectContaining({
+          identity: expect.objectContaining({ billingOrigin: 'cloud-agent' }),
+        }),
       })
     );
   });
@@ -1261,10 +1197,9 @@ describe('prepareSession endpoint', () => {
       })
     ).rejects.toThrow('Devcontainer support has been retired');
 
-    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
-    expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
+    expect(selectControlPlaneSandboxMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
   });
 
   it('enables containment when the global flag is true', async () => {
@@ -1281,34 +1216,41 @@ describe('prepareSession endpoint', () => {
       autoInitiate: true,
     });
 
-    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledWith(
-      undefined,
-      undefined,
-      'test-user-123',
-      'agent_12345678-1234-1234-1234-123456789abc',
-      undefined,
-      {
-        devcontainer: undefined,
-        createdOnPlatform: undefined,
-      }
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'test-user-123',
+        orgId: undefined,
+        sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+      })
     );
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspace: expect.objectContaining({
-          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+        metadata: expect.objectContaining({
+          workspace: expect.objectContaining({
+            credentialContainment: {
+              github: true,
+              gitlab: false,
+              bitbucket: false,
+              kilocode: true,
+            },
+          }),
         }),
       })
     );
   });
 
   it.each([
-    ['ses-abcdef', undefined, undefined],
-    [`ses-${'a'.repeat(48)}`, 'cloudflare-single', undefined],
-    ['crv-abcdef', undefined, 'code-review'],
+    [`sbx-${'a'.repeat(48)}`, undefined, undefined],
+    [`sbx-${'b'.repeat(48)}`, 'cloudflare-single', undefined],
+    [`sbx-${'c'.repeat(48)}`, undefined, 'code-review'],
   ] as const)(
     'persists the generated %s identity unchanged with containment disabled',
     async (sandboxId, sandboxAllocation, createdOnPlatform) => {
-      generateSandboxRoutingTargetMock.mockResolvedValueOnce({ kind: 'isolated', sandboxId });
+      selectControlPlaneSandboxMock.mockResolvedValueOnce({
+        sandboxKind: createdOnPlatform === 'code-review' ? 'code-review' : 'isolated',
+        sandboxId,
+        provider: 'cloudflare',
+      });
       const doStub = createMockDOStub();
       const ctx = createInternalApiContext({ doStub, credentialContainmentEnabled: 'false' });
       ctx.env.SANDBOX_SELECTION_IDS = '*';
@@ -1323,16 +1265,18 @@ describe('prepareSession endpoint', () => {
       });
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
         expect.objectContaining({
-          workspace: expect.objectContaining({
-            sandboxId,
-            sandboxProvider: 'cloudflare',
-            ...(sandboxAllocation ? { sandboxAllocation } : {}),
-            credentialContainment: {
-              github: false,
-              gitlab: false,
-              bitbucket: false,
-              kilocode: false,
-            },
+          metadata: expect.objectContaining({
+            workspace: expect.objectContaining({
+              sandboxId,
+              sandboxProvider: 'cloudflare',
+              ...(sandboxAllocation ? { sandboxAllocation } : {}),
+              credentialContainment: {
+                github: false,
+                gitlab: false,
+                bitbucket: false,
+                kilocode: false,
+              },
+            }),
           }),
         })
       );
@@ -1352,15 +1296,17 @@ describe('prepareSession endpoint', () => {
       githubRepo: 'Kilo-Org/kg',
     });
 
-    expect(doStub.registerSession).toHaveBeenCalledWith(
+    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspace: expect.objectContaining({
-          credentialContainment: {
-            github: false,
-            gitlab: false,
-            bitbucket: false,
-            kilocode: false,
-          },
+        metadata: expect.objectContaining({
+          workspace: expect.objectContaining({
+            credentialContainment: {
+              github: false,
+              gitlab: false,
+              bitbucket: false,
+              kilocode: false,
+            },
+          }),
         }),
       })
     );
@@ -1381,8 +1327,15 @@ describe('prepareSession endpoint', () => {
 
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: true, bitbucket: false, kilocode: true },
+        metadata: expect.objectContaining({
+          workspace: expect.objectContaining({
+            credentialContainment: {
+              github: false,
+              gitlab: true,
+              bitbucket: false,
+              kilocode: true,
+            },
+          }),
         }),
       })
     );
@@ -1402,8 +1355,15 @@ describe('prepareSession endpoint', () => {
 
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspace: expect.objectContaining({
-          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+        metadata: expect.objectContaining({
+          workspace: expect.objectContaining({
+            credentialContainment: {
+              github: true,
+              gitlab: false,
+              bitbucket: false,
+              kilocode: true,
+            },
+          }),
         }),
       })
     );
@@ -1424,7 +1384,7 @@ describe('prepareSession endpoint', () => {
       })
     ).rejects.toThrow('Devcontainer support has been retired');
 
-    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
     expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
@@ -1455,17 +1415,19 @@ describe('prepareSession endpoint', () => {
 
     expect(createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: {
-          initialTurn: {
-            type: 'command',
-            messageId: initialMessageId,
-            command: 'compact',
-            arguments: '--aggressive',
-          },
-        },
+        metadata: expect.objectContaining({
+          initialMessage: expect.objectContaining({
+            turn: expect.objectContaining({
+              type: 'command',
+              command: 'compact',
+              arguments: '--aggressive',
+            }),
+            id: initialMessageId,
+          }),
+        }),
       })
     );
-    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
     expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
@@ -1493,14 +1455,12 @@ describe('prepareSession endpoint', () => {
       })
     ).rejects.toThrow('Attachments cannot be attached to slash commands');
 
-    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
     expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
-  it('returns a prepared session when post-registration fact persistence fails', async () => {
-    recordMetadataRegisteredMock.mockRejectedValueOnce(new Error('reporting unavailable'));
-    recordInitialAdmissionMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+  it('returns a prepared session after metadata registration', async () => {
     const caller = appRouter.createCaller(createInternalApiContext({}));
 
     const result = await caller.prepareSession({
@@ -1511,15 +1471,14 @@ describe('prepareSession endpoint', () => {
     });
 
     expect(result).toMatchObject({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      cloudAgentSessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
       kiloSessionId: 'cli-session-abc123',
     });
   });
 
-  it('preserves a legacy registration rejection when fact persistence fails', async () => {
-    recordSessionFailureMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+  it('preserves a split preparation registration rejection', async () => {
     const doStub = createMockDOStub({
-      registerSession: vi
+      registerSessionFromMetadata: vi
         .fn()
         .mockResolvedValue({ success: false, error: 'Registration rejected' }),
     });
@@ -1535,10 +1494,11 @@ describe('prepareSession endpoint', () => {
     ).rejects.toThrow('Registration rejected');
   });
 
-  it('preserves a legacy registration unknown outcome when fact persistence fails', async () => {
-    recordSessionFailureMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+  it('preserves an unknown split preparation outcome', async () => {
     const doStub = createMockDOStub({
-      registerSession: vi.fn().mockRejectedValue(new Error('unknown registration outcome')),
+      registerSessionFromMetadata: vi
+        .fn()
+        .mockRejectedValue(new Error('unknown registration outcome')),
     });
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
@@ -1554,7 +1514,7 @@ describe('prepareSession endpoint', () => {
 
   it('attempts best-effort ownership-row compensation on explicit registration rejection', async () => {
     const doStub = createMockDOStub({
-      registerSession: vi
+      registerSessionFromMetadata: vi
         .fn()
         .mockResolvedValue({ success: false, error: 'Registration rejected' }),
     });
@@ -1569,26 +1529,18 @@ describe('prepareSession endpoint', () => {
       })
     ).rejects.toThrow('Registration rejected');
 
-    expect(deleteCliSessionMock).toHaveBeenCalledWith(
-      'cli-session-abc123',
-      'test-user-123',
-      expect.any(Object),
-      { onlyIfEmpty: true }
-    );
-    expect(doStub.registerSession).toHaveBeenCalledTimes(1);
-    expect(recordSessionFailureMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        failure: { stage: 'registration', code: 'do_registration_rejected' },
-      }),
-      expect.any(Object)
-    );
-    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
+    expect(deleteCliSessionMock).toHaveBeenCalledWith({
+      sessionId: 'cli-session-abc123',
+      kiloUserId: 'test-user-123',
+      ...{ onlyIfEmpty: true },
+    });
+    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
   });
 
   it('does not record compensation when empty-only ownership deletion declines deletion', async () => {
     deleteCliSessionMock.mockResolvedValueOnce({ deleted: false });
     const doStub = createMockDOStub({
-      registerSession: vi
+      registerSessionFromMetadata: vi
         .fn()
         .mockResolvedValue({ success: false, error: 'Registration rejected' }),
     });
@@ -1604,22 +1556,15 @@ describe('prepareSession endpoint', () => {
     ).rejects.toThrow('Registration rejected');
 
     expect(deleteCliSessionMock).toHaveBeenCalled();
-    expect(recordSessionFailureMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        failure: { stage: 'registration', code: 'do_registration_rejected' },
-      }),
-      expect.any(Object)
-    );
-    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
   });
 
-  it('does not replay or compensate a committed registration with lost retryable response', async () => {
+  it('retries idempotent registration without compensating an unknown committed state', async () => {
     const retryableError = Object.assign(new Error('registration response lost'), {
       retryable: true,
     });
-    const registerSession = vi.fn().mockRejectedValue(retryableError);
+    const registerSessionFromMetadata = vi.fn().mockRejectedValue(retryableError);
     const caller = appRouter.createCaller(
-      createInternalApiContext({ doStub: createMockDOStub({ registerSession }) })
+      createInternalApiContext({ doStub: createMockDOStub({ registerSessionFromMetadata }) })
     );
 
     await expect(
@@ -1631,14 +1576,16 @@ describe('prepareSession endpoint', () => {
       })
     ).rejects.toThrow('registration response lost');
 
-    expect(registerSession).toHaveBeenCalledTimes(1);
+    expect(registerSessionFromMetadata).toHaveBeenCalledTimes(3);
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
   });
 
   it('retains ownership state when registration outcome remains unknown', async () => {
-    const registerSession = vi.fn().mockRejectedValue(new Error('unknown registration outcome'));
+    const registerSessionFromMetadata = vi
+      .fn()
+      .mockRejectedValue(new Error('unknown registration outcome'));
     const caller = appRouter.createCaller(
-      createInternalApiContext({ doStub: createMockDOStub({ registerSession }) })
+      createInternalApiContext({ doStub: createMockDOStub({ registerSessionFromMetadata }) })
     );
 
     await expect(
@@ -1650,39 +1597,18 @@ describe('prepareSession endpoint', () => {
       })
     ).rejects.toThrow('unknown registration outcome');
 
-    expect(registerSession).toHaveBeenCalledTimes(1);
+    expect(registerSessionFromMetadata).toHaveBeenCalledTimes(1);
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
-    expect(recordSessionFailureMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
-      }),
-      expect.any(Object)
-    );
   });
 });
 
 describe('start endpoint', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
-    generateSandboxRoutingTargetMock.mockResolvedValue({
-      kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
-    });
-    selectSandboxForNewSessionMock.mockResolvedValue({
-      sandboxId: 'ses-0123456789abcdef',
-      provider: 'cloudflare',
-    });
-    selectSandboxProviderMock.mockReturnValue('cloudflare');
+    selectControlPlaneSandboxMock.mockReset();
+    generateSessionIdMock.mockReturnValue('workspace_12345678-1234-1234-1234-123456789abc');
     createCliSessionMock.mockResolvedValue({ created: true });
     deleteCliSessionMock.mockResolvedValue({ deleted: true });
-    createSessionReportMock.mockResolvedValue(undefined);
-    recordSandboxIdentityMock.mockResolvedValue(undefined);
-    recordSessionFailureMock.mockResolvedValue(undefined);
-    recordVisibleSessionOutcomeMock.mockResolvedValue(undefined);
-    recordMetadataRegisteredMock.mockResolvedValue(undefined);
-    recordInitialAdmissionMock.mockResolvedValue(undefined);
-    recordInternalCompensationMock.mockResolvedValue(undefined);
     mergeProfileConfigurationMock.mockResolvedValue({});
     organizationMembershipLimitMock.mockResolvedValue([{ id: 'membership-123' }]);
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
@@ -1744,21 +1670,24 @@ describe('start endpoint', () => {
       options: { kilocodeOrganizationId: orgId },
     });
 
-    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledWith(
-      undefined,
-      orgId,
-      'test-user-123',
-      'agent_12345678-1234-1234-1234-123456789abc',
-      undefined,
-      {
-        devcontainer: undefined,
-        createdOnPlatform: undefined,
-      }
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'test-user-123',
+        orgId: orgId,
+        sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+      })
     );
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspace: expect.objectContaining({
-          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+        metadata: expect.objectContaining({
+          workspace: expect.objectContaining({
+            credentialContainment: {
+              github: true,
+              gitlab: false,
+              bitbucket: false,
+              kilocode: true,
+            },
+          }),
         }),
       })
     );
@@ -1790,12 +1719,14 @@ describe('start endpoint', () => {
     });
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        repository: {
-          type: 'github',
-          repo: 'acme/repo',
-          githubIntegrationId,
-          githubAccessPurpose: 'workflow',
-        },
+        metadata: expect.objectContaining({
+          repository: expect.objectContaining({
+            type: 'github',
+            repo: 'acme/repo',
+            githubIntegrationId,
+            githubAccessPurpose: 'workflow',
+          }),
+        }),
       })
     );
   });
@@ -1841,8 +1772,15 @@ describe('start endpoint', () => {
 
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: true, bitbucket: false, kilocode: true },
+        metadata: expect.objectContaining({
+          workspace: expect.objectContaining({
+            credentialContainment: {
+              github: false,
+              gitlab: true,
+              bitbucket: false,
+              kilocode: true,
+            },
+          }),
         }),
       })
     );
@@ -1875,13 +1813,15 @@ describe('start endpoint', () => {
 
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
         expect.objectContaining({
-          workspace: expect.objectContaining({
-            credentialContainment: {
-              github: false,
-              gitlab: false,
-              bitbucket: false,
-              kilocode: false,
-            },
+          metadata: expect.objectContaining({
+            workspace: expect.objectContaining({
+              credentialContainment: {
+                github: false,
+                gitlab: false,
+                bitbucket: false,
+                kilocode: false,
+              },
+            }),
           }),
         })
       );
@@ -1935,10 +1875,12 @@ describe('start endpoint', () => {
 
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        agent: expect.objectContaining({ mode: 'reviewer' }),
-        profile: expect.objectContaining({
-          envVars: { PROFILE_VALUE: 'resolved' },
-          runtimeAgents: [runtimeAgent],
+        metadata: expect.objectContaining({
+          agent: expect.objectContaining({ mode: 'reviewer' }),
+          profile: expect.objectContaining({
+            envVars: { PROFILE_VALUE: 'resolved' },
+            runtimeAgents: [runtimeAgent],
+          }),
         }),
       })
     );
@@ -1954,11 +1896,9 @@ describe('start endpoint', () => {
     });
 
     expect(result.delivery).toBe('queued');
-    expect(recordSessionFailureMock).not.toHaveBeenCalled();
   });
 
-  it('preserves a rejected Durable Object outcome when failure fact persistence fails', async () => {
-    recordSessionFailureMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+  it('preserves a rejected Durable Object outcome', async () => {
     const doStub = createMockDOStub({
       createSessionWithInitialAdmission: vi
         .fn()
@@ -1975,8 +1915,7 @@ describe('start endpoint', () => {
     ).rejects.toThrow('admission failed');
   });
 
-  it('preserves an unknown Durable Object outcome when failure fact persistence fails', async () => {
-    recordSessionFailureMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+  it('preserves an unknown Durable Object outcome', async () => {
     const doStub = createMockDOStub({
       createSessionWithInitialAdmission: vi.fn().mockRejectedValue(new Error('rpc unavailable')),
     });
@@ -2015,14 +1954,14 @@ describe('start endpoint', () => {
     expect(createCliSessionMock).toHaveBeenCalled();
   });
 
-  it('resolves implicit profiles for grouped App Builder starts', async () => {
+  it('resolves implicit profiles for grouped GitHub starts', async () => {
     const caller = appRouter.createCaller(createInternalApiContext({}));
 
     await caller.start({
-      message: { prompt: 'App Builder start' },
+      message: { prompt: 'GitHub start' },
       agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
       repository: { type: 'github', repo: 'acme/repo' },
-      options: { createdOnPlatform: 'app-builder' },
+      options: { createdOnPlatform: 'github' },
     });
 
     expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
@@ -2048,32 +1987,27 @@ describe('start endpoint', () => {
     expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
   });
 
-  it('fails without later outcome facts when creating the session report fails', async () => {
-    createSessionReportMock.mockRejectedValueOnce(new Error('session report unavailable'));
+  it('does not admit or compensate a session when ownership creation fails', async () => {
+    createCliSessionMock.mockRejectedValueOnce(new Error('session ownership unavailable'));
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
     await expect(
       caller.start({
-        message: { prompt: 'Do not allocate without a session report' },
+        message: { prompt: 'Do not admit without ownership' },
         agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
         repository: { type: 'github', repo: 'acme/repo' },
       })
-    ).rejects.toThrow('session report unavailable');
+    ).rejects.toThrow('session ownership unavailable');
 
-    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
-    expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
-    expect(createCliSessionMock).not.toHaveBeenCalled();
-    expect(recordVisibleSessionOutcomeMock).not.toHaveBeenCalled();
-    expect(recordInitialAdmissionMock).not.toHaveBeenCalled();
-    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledOnce();
+    expect(createCliSessionMock).toHaveBeenCalledOnce();
+    expect(deleteCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
 
   it('records sandbox identity failure without claiming visible-row compensation', async () => {
-    generateSandboxRoutingTargetMock.mockRejectedValueOnce(
-      new Error('sandbox identity unavailable')
-    );
+    selectControlPlaneSandboxMock.mockRejectedValueOnce(new Error('sandbox identity unavailable'));
     const caller = appRouter.createCaller(createInternalApiContext({}));
 
     await expect(
@@ -2085,13 +2019,6 @@ describe('start endpoint', () => {
     ).rejects.toThrow('sandbox identity unavailable');
 
     expect(createCliSessionMock).not.toHaveBeenCalled();
-    expect(recordSessionFailureMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        failure: { stage: 'sandbox_identity', code: 'sandbox_id_derivation_failed' },
-      }),
-      expect.any(Object)
-    );
-    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
   });
 
   it('records ambiguous visible ownership creation without compensating it', async () => {
@@ -2105,27 +2032,17 @@ describe('start endpoint', () => {
         repository: { type: 'github', repo: 'acme/repo' },
       })
     ).rejects.toThrow('visible create response unavailable');
-
-    expect(recordSessionFailureMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
-      }),
-      expect.any(Object)
-    );
-    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
   });
 
-  it('creates the session report before deriving sandbox identity, creating ownership, or admitting work', async () => {
+  it('selects the sandbox before creating ownership and admitting work', async () => {
     const steps: string[] = [];
-    createSessionReportMock.mockImplementationOnce(async () => {
-      steps.push('session-report');
-    });
-    generateSandboxRoutingTargetMock.mockImplementationOnce(async () => {
+    selectControlPlaneSandboxMock.mockImplementationOnce(async () => {
       steps.push('sandbox');
-      return { kind: 'isolated', sandboxId: 'ses-0123456789abcdef' };
-    });
-    recordSandboxIdentityMock.mockImplementationOnce(async () => {
-      steps.push('sandbox-report');
+      return {
+        sandboxKind: 'isolated',
+        sandboxId: `sbx-${'d'.repeat(48)}`,
+        provider: 'cloudflare-containers',
+      };
     });
     createCliSessionMock.mockImplementationOnce(async () => {
       steps.push('visible');
@@ -2150,23 +2067,7 @@ describe('start endpoint', () => {
       repository: { type: 'github', repo: 'acme/repo' },
     });
 
-    expect(steps).toEqual(['session-report', 'sandbox', 'sandbox-report', 'visible', 'admission']);
-    expect(createSessionReportMock).toHaveBeenCalledWith(
-      {
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-        kiloSessionId: 'cli-session-abc123',
-        initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-      },
-      expect.any(Object)
-    );
-    expect(recordSandboxIdentityMock).toHaveBeenCalledWith(
-      {
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-        sandboxId: 'ses-0123456789abcdef',
-      },
-      expect.any(Object)
-    );
-    expect(recordSessionFailureMock).not.toHaveBeenCalled();
+    expect(steps).toEqual(['sandbox', 'visible', 'admission']);
   });
 
   it('admits canonical document attachments through one grouped creation operation', async () => {
@@ -2201,24 +2102,26 @@ describe('start endpoint', () => {
     });
 
     expect(result).toMatchObject({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      cloudAgentSessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
       kiloSessionId: 'cli-session-abc123',
       messageId: initialMessageId,
       delivery: 'queued',
     });
     expect(createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: {
-          initialTurn: {
-            type: 'prompt',
-            messageId: initialMessageId,
-            prompt: 'Describe the attached document',
-            attachments,
-          },
-        },
+        metadata: expect.objectContaining({
+          initialMessage: expect.objectContaining({
+            turn: expect.objectContaining({
+              type: 'prompt',
+              prompt: 'Describe the attached document',
+              attachments,
+            }),
+            id: initialMessageId,
+          }),
+        }),
       })
     );
-    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
   });
 
@@ -2240,21 +2143,9 @@ describe('start endpoint', () => {
         repository: { type: 'github', repo: 'acme/repo' },
       })
     ).rejects.toThrow('metadata invalid');
-
-    expect(recordSessionFailureMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        failure: { stage: 'registration', code: 'do_registration_rejected' },
-      }),
-      expect.any(Object)
-    );
   });
 
   it('forwards Vercel enrollment configuration and persists only the selected identity', async () => {
-    generateSandboxRoutingTargetMock.mockResolvedValueOnce({
-      kind: 'isolated',
-      sandboxId: 'ses-abcdef',
-    });
-    selectSandboxProviderMock.mockReturnValueOnce('vercel');
     const doStub = createMockDOStub();
     const context = createInternalApiContext({ doStub });
     Object.assign(context.env, {
@@ -2278,10 +2169,9 @@ describe('start endpoint', () => {
       options: { kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' },
     });
 
-    expect(selectSandboxProviderMock).toHaveBeenCalledWith(
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        sandboxId: 'ses-abcdef',
-        sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
         orgId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
         env: expect.objectContaining({
           VERCEL_SANDBOX_ORG_IDS: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
@@ -2293,9 +2183,11 @@ describe('start endpoint', () => {
     );
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspace: expect.objectContaining({
-          sandboxId: 'ses-abcdef',
-          sandboxProvider: 'vercel',
+        metadata: expect.objectContaining({
+          workspace: expect.objectContaining({
+            sandboxId: expect.stringMatching(/^sbx-/),
+            sandboxProvider: 'vercel',
+          }),
         }),
       })
     );
@@ -2320,25 +2212,13 @@ describe('start endpoint', () => {
       })
     ).rejects.toThrow('admission failed');
 
-    expect(deleteCliSessionMock).toHaveBeenCalledWith(
-      'cli-session-abc123',
-      'test-user-123',
-      expect.any(Object),
-      { onlyIfEmpty: true }
-    );
-    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(deleteCliSessionMock).toHaveBeenCalledWith({
+      sessionId: 'cli-session-abc123',
+      kiloUserId: 'test-user-123',
+      ...{ onlyIfEmpty: true },
+    });
+    expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
-    expect(recordSessionFailureMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        failure: {
-          stage: 'initial_admission',
-          code: 'initial_admission_rejected',
-          admissionCode: 'INTERNAL',
-        },
-      }),
-      expect.any(Object)
-    );
-    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
   });
 
   it('preserves failed admission evidence when empty-only deletion cannot compensate the visible row', async () => {
@@ -2357,18 +2237,6 @@ describe('start endpoint', () => {
         repository: { type: 'github', repo: 'acme/repo' },
       })
     ).rejects.toThrow('admission failed');
-
-    expect(recordSessionFailureMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        failure: {
-          stage: 'initial_admission',
-          code: 'initial_admission_rejected',
-          admissionCode: 'INTERNAL',
-        },
-      }),
-      expect.any(Object)
-    );
-    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
   });
 
   it('retains the ownership row when grouped Durable Object RPC outcome is unknown', async () => {
@@ -2386,13 +2254,6 @@ describe('start endpoint', () => {
     ).rejects.toThrow('rpc unavailable');
 
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
-    expect(recordSessionFailureMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
-      }),
-      expect.any(Object)
-    );
-    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
   });
 
   it('rejects callbackTarget options before session registration or queueing', async () => {
@@ -2418,7 +2279,7 @@ describe('start endpoint', () => {
       })
     ).rejects.toThrow();
 
-    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
   });
 });
@@ -2433,7 +2294,7 @@ describe('updateSession endpoint', () => {
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
     const result = await caller.updateSession({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
+      cloudAgentSessionId: 'workspace_12345678-1234-1234-1234-123456789abc' as SessionId,
       callbackTarget: { url: 'https://example.com/next-callback', headers: { 'X-Test': '1' } },
     });
 
@@ -2448,7 +2309,7 @@ describe('updateSession endpoint', () => {
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
     await caller.updateSession({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
+      cloudAgentSessionId: 'workspace_12345678-1234-1234-1234-123456789abc' as SessionId,
       callbackTarget: null,
     });
 
@@ -2465,7 +2326,7 @@ describe('updateSession endpoint', () => {
 
     await expect(
       caller.updateSession({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc' as SessionId,
+        cloudAgentSessionId: 'workspace_12345678-1234-1234-1234-123456789abc' as SessionId,
         callbackTarget: { url: 'https://example.com/callback' },
       })
     ).rejects.toThrow('Session metadata is not available');
@@ -2475,7 +2336,7 @@ describe('updateSession endpoint', () => {
 describe('schema validation', () => {
   it('accepts prepared session input', () => {
     const result = schemas.InitiateFromPreparedSessionInput.safeParse({
-      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      cloudAgentSessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
     });
     expect(result.success).toBe(true);
   });
@@ -2501,13 +2362,13 @@ describe('schema validation', () => {
   it('restricts updateSession to supported internal updates', () => {
     expect(
       schemas.UpdateSessionInput.safeParse({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        cloudAgentSessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
         callbackTarget: { url: 'https://example.com/callback' },
       }).success
     ).toBe(true);
     expect(
       schemas.UpdateSessionInput.safeParse({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        cloudAgentSessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
         mode: 'plan',
       }).success
     ).toBe(false);

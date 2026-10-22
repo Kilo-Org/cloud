@@ -109,7 +109,13 @@ type ModelEvent =
    * every round to find out is worse than being told.
    */
   | { readonly kind: 'toolResult'; readonly result: ToolResult }
-  | { readonly kind: 'done'; readonly usage: ModelUsage; readonly stop: StopReason };
+  | {
+      readonly kind: 'done';
+      readonly usage: ModelUsage;
+      readonly stop: StopReason;
+      /** The model the provider served, when reported; not the next request's target. */
+      readonly model?: string;
+    };
 
 const zeroUsage: ModelUsage = {
   inputTokens: 0,
@@ -130,7 +136,9 @@ interface ModelClientService {
   readonly stream: (request: ModelRequest) => Stream.Stream<ModelEvent, ModelError>;
 }
 
-class ModelClient extends Context.Tag('harness/ModelClient')<ModelClient, ModelClientService>() {}
+class ModelClient extends Context.Service<ModelClient, ModelClientService>()(
+  'harness/ModelClient'
+) {}
 
 /**
  * What the model said, once it has said all of it.
@@ -147,8 +155,10 @@ class ModelClient extends Context.Tag('harness/ModelClient')<ModelClient, ModelC
  * not a read of the last event.
  */
 const said = <E, R>(answer: Stream.Stream<ModelEvent, E, R>): Effect.Effect<string, E, R> =>
-  Stream.runFold(answer, '', (held: string, event) =>
-    event.kind === 'delta' ? held + event.text : held
+  Stream.runFold(
+    answer,
+    () => '',
+    (held: string, event) => (event.kind === 'delta' ? held + event.text : held)
   );
 
 export type { Effort, ModelClientService, ModelEvent, ModelRequest, ModelUsage, StopReason };

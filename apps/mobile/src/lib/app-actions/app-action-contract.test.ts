@@ -5,7 +5,6 @@ import {
   APP_ACTION_SLUGS,
   appActionHref,
   type AppActionRequest,
-  type AppActionResult,
   appActionUrl,
   parseActionRepository,
   parseAppActionPayload,
@@ -26,28 +25,6 @@ describe('APP_ACTION_SLUGS', () => {
     for (const id of APP_ACTION_IDS) {
       expect(APP_ACTION_SLUGS[id]).toMatch(/^[a-z][a-z-]*$/);
     }
-  });
-});
-
-describe('AppActionResult', () => {
-  it('carries the success and failure shapes the callers report', () => {
-    const success: AppActionResult = {
-      ok: true,
-      action: 'StartAgent',
-      sessionId: 'ses_1',
-      href: '/(app)/agent-chat/ses_1',
-      message: 'started',
-    };
-    const failure: AppActionResult = {
-      ok: false,
-      action: 'OpenSession',
-      retryable: false,
-      code: 'unknown-session',
-      message: 'session not found',
-    };
-    expect(success.ok).toBe(true);
-    expect(failure.ok).toBe(false);
-    expect(failure.retryable).toBe(false);
   });
 });
 

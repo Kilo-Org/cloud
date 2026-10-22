@@ -13,6 +13,7 @@ import {
 } from './schemas';
 
 const COMMAND_TIMEOUT_MS = 30_000;
+const GENERIC_COMMAND_ERROR_MESSAGE = 'Command failed';
 const INITIAL_AUTH_RETRY_BASE_MS = 1_000;
 const INITIAL_AUTH_RETRY_CAP_MS = 30_000;
 export const VIEWER_PING_INTERVAL_MS = 20_000;
@@ -38,11 +39,12 @@ class UserWebCommandError extends Error {
 
 /**
  * Error class used to wrap a *delivered* (non-structured, bare-string) command
- * error response. The message is preserved verbatim so generic `catch (e)`
- * consumers see the same string the relay/CLI emitted; the new class only
- * lets downstream callers distinguish a delivered error from a transport-level
- * failure (timeout, connection destroyed, socket gone — those stay plain
- * `Error`).
+ * error response. A non-blank message is preserved verbatim so generic
+ * `catch (e)` consumers see the same string the relay/CLI emitted; a blank one
+ * is replaced by the generic message so no surface shows empty error copy. The
+ * new class only lets downstream callers distinguish a delivered error from a
+ * transport-level failure (timeout, connection destroyed, socket gone — those
+ * stay plain `Error`).
  *
  * Structured `UserWebCommandError` responses (relay envelopes with a `.code`)
  * are NOT wrapped — they already carry enough info.
@@ -128,19 +130,24 @@ type UserWebConnection = {
  *
  * - A bare-string delivered error is wrapped in `CommandDeliveredError` so
  *   downstream consumers can distinguish it from transport-level failures
- *   (which stay plain `Error`).
+ *   (which stay plain `Error`). A blank string carries no copy to show, so it
+ *   reports the generic message instead of an empty one.
  * - A structured relay envelope that matches `userWebCommandErrorDataSchema`
  *   becomes a `UserWebCommandError` (already has a `.code`).
- * - A malformed structured payload collapses to a plain `Error('Command failed')`
- *   — the relay envelope wasn't trustworthy so this is not a real "delivered"
- *   message.
+ * - A malformed structured payload collapses to a plain
+ *   `Error(GENERIC_COMMAND_ERROR_MESSAGE)` — the relay envelope wasn't
+ *   trustworthy so this is not a real "delivered" message.
  */
 function parseCommandError(error: unknown): Error {
-  if (typeof error === 'string') return new CommandDeliveredError(error);
+  if (typeof error === 'string') {
+    return new CommandDeliveredError(
+      error.trim().length > 0 ? error : GENERIC_COMMAND_ERROR_MESSAGE
+    );
+  }
 
   const parsed = userWebCommandErrorDataSchema.safeParse(error);
   if (parsed.success) return new UserWebCommandError(parsed.data);
-  return new Error('Command failed');
+  return new Error(GENERIC_COMMAND_ERROR_MESSAGE);
 }
 
 function createUserWebConnection(
@@ -410,7 +417,7 @@ function createUserWebConnection(
     if (!pending) return;
     clearTimeout(pending.timer);
     pendingCommands.delete(msg.id);
-    if (msg.error) pending.reject(parseCommandError(msg.error));
+    if (msg.error !== undefined) pending.reject(parseCommandError(msg.error));
     else pending.resolve(msg.result);
   }
 
@@ -748,10 +755,10 @@ function createUserWebConnection(
     },
     onSessionEvent(event, listener) {
       const listeners = sessionListeners.get(event) ?? new Set<(data: never) => void>();
-      listeners.add(listener as (data: never) => void);
+      listeners.add(listener);
       sessionListeners.set(event, listeners);
       return () => {
-        listeners.delete(listener as (data: never) => void);
+        listeners.delete(listener);
         if (listeners.size === 0) sessionListeners.delete(event);
       };
     },

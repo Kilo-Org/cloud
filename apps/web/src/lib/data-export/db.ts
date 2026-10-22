@@ -1,6 +1,6 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { getDatabaseClientConfig } from '@kilocode/db';
-import { pg } from '@kilocode/db/client';
+import { databaseTypeParsers, pg } from '@kilocode/db/client';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { attachDatabasePool } from '@vercel/functions';
 import { z } from 'zod';
@@ -153,6 +153,7 @@ function getDataExportClient(): { db: DataExportDb; pool: pg.Pool } {
 
   const pool = new pg.Pool({
     ...baseConfig,
+    types: databaseTypeParsers,
     ssl: resolveSslConfig(new URL(parsedUrl.url).hostname),
     max: MAX_POOL_CONNECTIONS,
     idleTimeoutMillis: IDLE_TIMEOUT_MS,

@@ -1,4 +1,6 @@
+import { preinstalledStartup } from './preinstalled-startup.js';
 import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import type { AgentSandboxProvider } from '../types.js';
 import type { SandboxInstance } from '../types.js';
 import {
@@ -103,6 +105,7 @@ type ContractHarness = {
   launchedEnv(): Record<string, string> | undefined;
   /** The supervisor invocation the adapter issued, where it names one explicitly. */
   launchSupervisor(): string | undefined;
+  launchInvocation(): string | readonly string[] | undefined;
   /** Lease attempts the backend received for an owned ref. */
   leaseCalls(): number;
   /** Lease durations the backend received where it has one (Cloudflare has none). */
@@ -183,6 +186,7 @@ function cloudflareHarness(): ContractHarness {
     },
     launchedEnv: () => state.startEnvs.at(-1),
     launchSupervisor: () => state.startPaths.at(-1),
+    launchInvocation: () => state.startPaths.at(-1),
     leaseCalls: () => state.leaseCalls,
     leaseMs: () => [],
   };
@@ -270,6 +274,7 @@ function containersHarness(
     launchedEnv: () => state.launchInputs.at(-1)?.env,
     // Containers start the supervisor as the image entrypoint; no path is passed.
     launchSupervisor: () => undefined,
+    launchInvocation: () => state.launchInputs.at(-1)?.command.argv,
     leaseCalls: () => state.leaseMs.length,
     leaseMs: () => [...state.leaseMs],
     captureRepository: (ref, repoKey, commit) => adapter.captureRepository!(ref, repoKey, commit),
@@ -377,6 +382,10 @@ function vercelHarness(): ContractHarness {
     },
     launchedEnv: () => state.commands.at(-1)?.env,
     launchSupervisor: () => state.commands.at(-1)?.args.at(-1),
+    launchInvocation: () => {
+      const input = state.commands.at(-1);
+      return input ? [input.command, ...input.args] : undefined;
+    },
     leaseCalls: () => state.extendedMs.length,
     leaseMs: () => [...state.extendedMs],
     grantReads: () => state.grantReads,
@@ -389,11 +398,40 @@ const harnessFactories = [cloudflareHarness, containersHarness, vercelHarness];
 describe.each(harnessFactories.map(factory => [factory().name, factory] as const))(
   'provider adapter contract: %s',
   (_name, factory) => {
+    it('projects owned runtime identity without querying the backend', async () => {
+      const harness = factory();
+      const ref = await harness.create();
+      harness.failObserve();
+      harness.failCreate();
+      const container = harness.adapter.describeRuntime?.(ref);
+      expect(container).toEqual({
+        provider: harness.name,
+        sandboxId: SANDBOX,
+        instanceId: harness.name === 'vercel' ? 'session-1' : intent.intentId,
+        ...(harness.name === 'vercel'
+          ? {
+              region: 'fra1',
+              instanceType: 'small',
+              snapshotId: 'snapshot',
+              runtimeBuildId: 'build',
+              startSource: 'snapshot',
+            }
+          : harness.name === 'cloudflare'
+            ? { startSource: 'image' }
+            : { instanceType: 'standard-3' }),
+      });
+      expect(harness.adapter.describeRuntime?.(harness.foreignRef())).toBeUndefined();
+      expect(harness.adapter.describeRuntime?.('invalid')).toBeUndefined();
+    });
+
     it('creates a ref, then launch maps the ref, caller env and supervisor', async () => {
       const harness = factory();
       const ref = await harness.create();
 
-      const launched = await harness.adapter.launch(ref, { CALLER: 'value' });
+      const launched = await harness.adapter.launch(ref, {
+        command: preinstalledStartup(),
+        env: { CALLER: 'value' },
+      });
 
       expect(launched).toEqual({ startSource: 'image' });
       expect(harness.launchedEnv()).toMatchObject({
@@ -402,6 +440,22 @@ describe.each(harnessFactories.map(factory => [factory().name, factory] as const
         WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
       });
       expect(harness.launchedEnv()?.WRAPPER_LOG_PATH).toBe('/tmp/kilocode-control-wrapper.log');
+    });
+
+    it('runs exactly the supplied argv, preserving shell metacharacters and empty arguments', async () => {
+      const harness = factory();
+      const ref = await harness.create();
+      const args = ['', 'two words', "one'quote", '"double"', '$HOME', '$(exit 79)', 'line\nbreak'];
+      const command = { argv: ['/bin/sh', '-c', 'printf "%s\\n" "$@"', 'startup', ...args] };
+      await harness.adapter.launch(ref, { command, env: {} });
+      const invocation = harness.launchInvocation();
+      if (invocation === undefined) throw new Error('No physical startup command');
+      const [executable, ...argv] =
+        typeof invocation === 'string' ? ['/bin/sh', '-c', invocation] : invocation;
+      if (!executable) throw new Error('No executable');
+      const output = execFileSync(executable, argv, { encoding: 'utf8' });
+      expect(output).toBe(`${args.join('\n')}\n`);
+      if (typeof invocation !== 'string') expect(invocation).toEqual(command.argv);
     });
 
     it('observes an owned ref active, then terminal once the backend reports it gone', async () => {
@@ -447,9 +501,9 @@ describe.each(harnessFactories.map(factory => [factory().name, factory] as const
     it('refuses a foreign ref for launch, observe and stop', async () => {
       const harness = factory();
 
-      await expect(harness.adapter.launch(harness.foreignRef(), {})).rejects.toBeInstanceOf(
-        ProviderCreationError
-      );
+      await expect(
+        harness.adapter.launch(harness.foreignRef(), { command: preinstalledStartup(), env: {} })
+      ).rejects.toBeInstanceOf(ProviderCreationError);
       await expect(harness.adapter.observe(harness.foreignRef(), intent)).resolves.toMatchObject({
         status: 'unknown',
       });
@@ -485,7 +539,9 @@ describe('provider-specific contract differences', () => {
   it('reports the actual snapshot launch source even if its initial lease renewal fails', async () => {
     const harness = containersHarness({ startSource: 'repository', failLaunchLease: true });
     const ref = await harness.create();
-    await expect(harness.adapter.launch(ref, {})).resolves.toEqual({ startSource: 'repository' });
+    await expect(
+      harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} })
+    ).resolves.toEqual({ startSource: 'repository' });
     expect(harness.leaseCalls()).toBe(1);
   });
 
@@ -493,8 +549,8 @@ describe('provider-specific contract differences', () => {
     const harness = cloudflareHarness();
     const ref = await harness.create();
 
-    await harness.adapter.launch(ref, {});
-    expect(harness.launchSupervisor()).toBe(CONTROL_SUPERVISOR_PATH);
+    await harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} });
+    expect(harness.launchSupervisor()).toBe(`'/bin/sh' '${CONTROL_SUPERVISOR_PATH}'`);
     expect(await harness.adapter.logs(ref)).toBe(`cloudflare ${ref}`);
     await harness.adapter.ensureLeaseAtLeast(ref, OWNED_LEASE_MS);
     // Cloudflare renews its activity timeout with no duration argument.
@@ -536,7 +592,7 @@ describe('provider-specific contract differences', () => {
     const harness = containersHarness();
     const ref = await harness.create();
 
-    await harness.adapter.launch(ref, { CALLER: 'value' });
+    await harness.adapter.launch(ref, { command: preinstalledStartup(), env: { CALLER: 'value' } });
 
     expect(harness.launchedEnv()).toMatchObject({
       CALLER: 'value',
@@ -555,8 +611,8 @@ describe('provider-specific contract differences', () => {
     // Creation reads the authoritative grants exactly once, even when empty.
     expect(harness.grantReads!()).toBe(1);
 
-    await harness.adapter.launch(ref, {});
-    expect(harness.launchSupervisor()).toContain(`exec ${CONTROL_SUPERVISOR_PATH}`);
+    await harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} });
+    expect(harness.launchSupervisor()).toBe(CONTROL_SUPERVISOR_PATH);
     expect('applyContainedCredentials' in harness.adapter).toBe(true);
     // A foreign ref is refused before any Vercel request.
     const leases = harness.leaseMs().length;

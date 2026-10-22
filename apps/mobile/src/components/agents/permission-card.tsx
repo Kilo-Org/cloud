@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type Text as RNText, ScrollView, View } from 'react-native';
+import { ScrollView, type TextInstance, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
@@ -73,7 +73,7 @@ export function PermissionCard({
   // accessibility element. The focus target is a non-interactive leaf title
   // inside the header; this keeps every Deny/Allow option reachable by
   // VoiceOver while still landing focus on the card when it appears.
-  const titleRef = useRef<RNText | null>(null);
+  const titleRef = useRef<TextInstance | null>(null);
   const presentationRef = useRef(presentation);
   presentationRef.current = presentation;
   useEffect(

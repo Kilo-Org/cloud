@@ -1,0 +1,1 @@
+ALTER TABLE `routing_tables` ADD `effort_by_complexity` text;

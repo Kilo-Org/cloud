@@ -11,6 +11,7 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { buildStoredSessionsQueryOptions } from '@/lib/hooks/use-agent-sessions';
+import { todoLinkCandidates } from '@/lib/todos/todo-model';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
 
@@ -23,8 +24,8 @@ type TodoLinkSessionSheetProps = {
 };
 
 /**
- * Recent sessions to link to a to-do: those in the list's repository when it
- * names one, never the sessions already linked.
+ * Sheet for picking the session to link to a to-do. Filtering lives in
+ * `todoLinkCandidates`.
  */
 export function TodoLinkSessionSheet({
   visible,
@@ -44,15 +45,12 @@ export function TodoLinkSessionSheet({
   );
 
   const candidates = useMemo(() => {
-    const linked = new Set(todo.sessions.map(session => session.sessionId));
-    const repo = list.gitUrl?.toLowerCase();
+    const linkedSessionIds = new Set(todo.sessions.map(session => session.sessionId));
     const page = sessions.data?.pages[0];
-    return (page?.cliSessions ?? []).filter(
-      session =>
-        !linked.has(session.session_id) &&
-        (!repo ||
-          (session.git_url ? formatGitUrlProject(session.git_url).toLowerCase() === repo : false))
-    );
+    return todoLinkCandidates(page?.cliSessions ?? [], {
+      repository: list.gitUrl,
+      linkedSessionIds,
+    });
   }, [list.gitUrl, sessions.data, todo.sessions]);
 
   let body: ReactNode = null;

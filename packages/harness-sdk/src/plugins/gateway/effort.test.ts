@@ -14,7 +14,7 @@ const bodyOf = async (kinds: readonly ApiKind[], effort: Effort) => {
     Effect.map(client => client.stream({ ...sampleRequest(), effort })),
     Stream.unwrap,
     Stream.runDrain,
-    Effect.either,
+    Effect.result,
     Effect.provide(testGateway({ fetch, kinds })),
     Effect.runPromise
   );

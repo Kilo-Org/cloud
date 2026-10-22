@@ -63,8 +63,9 @@ describe('consentPage', () => {
     // The [hidden] attribute must actually hide (author display rules win).
     expect(html).toContain('[hidden]{display:none !important}');
     expect(html).toMatch(/class="cta"[^>]*target="_blank"/);
-    // The Kilo Cloud brand primary, not the old blue CTA.
-    expect(html).toContain('--primary:#f7f586');
+    expect(html).toContain('--primary:#ffdd00');
+    expect(html).toContain('--primary-hover:#edcd00');
+    expect(html).toContain('--ring:#ffdd0059');
   });
 });
 

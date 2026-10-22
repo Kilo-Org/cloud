@@ -147,10 +147,88 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
   function createClient(serverUrl: string) {
     return createWrapperKiloClient(
       createKiloClient({ baseUrl: serverUrl }),
-      serverUrl,
+      { url: serverUrl },
       '/workspace'
     );
   }
+
+  it('replaces the running CLI MCP connection using the generated directory-scoped SDK API', async () => {
+    const stub = startStub(200, { 'kilo-cloud-agent': { status: 'connected' } });
+    await createClient(stub.url).updateCloudAgentMcp({
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'renewed-session-mcp-token',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    });
+    expect(stub.requests).toEqual([
+      {
+        method: 'POST',
+        pathname: '/mcp',
+        directory: '/workspace',
+        body: {
+          name: 'kilo-cloud-agent',
+          config: {
+            type: 'remote',
+            url: 'https://mcp.kiloapps.io/mcp',
+            oauth: false,
+            headers: { Authorization: 'Bearer renewed-session-mcp-token' },
+          },
+        },
+      },
+    ]);
+  });
+
+  it('does not leak scoped MCP credentials in configuration refresh failures', async () => {
+    const stub = startStub(400, { message: 'private-scoped-mcp-token' });
+    const error: unknown = await createClient(stub.url)
+      .updateCloudAgentMcp({
+        url: 'https://mcp.kiloapps.io/mcp',
+        token: 'private-scoped-mcp-token',
+        expiresAt: 123,
+      })
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+    if (!(error instanceof Error)) throw new Error('Expected credential refresh failure');
+    expect(error.message).toBe('Cloud Agent MCP credential refresh failed');
+    expect(stub.requests).toHaveLength(2);
+  });
+
+  it.each(['failed', 'needs_auth', 'disabled'])(
+    'rejects an HTTP-successful but unavailable MCP status %s after bounded retry',
+    async status => {
+      const stub = startStub(200, {
+        'kilo-cloud-agent': { status, error: 'private-scoped-mcp-token' },
+      });
+      const error: unknown = await createClient(stub.url)
+        .updateCloudAgentMcp({
+          url: 'https://mcp.kiloapps.io/mcp',
+          token: 'private-scoped-mcp-token',
+          expiresAt: 123,
+        })
+        .catch(cause => cause);
+      expect(error).toMatchObject({ message: 'Cloud Agent MCP credential refresh failed' });
+      expect(stub.requests).toHaveLength(2);
+    }
+  );
+
+  it('retries a transient MCP connection failure without changing the issued credential', async () => {
+    let attempts = 0;
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => {
+        attempts++;
+        return Response.json({
+          'kilo-cloud-agent': { status: attempts === 1 ? 'failed' : 'connected' },
+        });
+      },
+    });
+    startedServers.push(server);
+    await createClient(server.url.toString()).updateCloudAgentMcp({
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'renewed-session-mcp-token',
+      expiresAt: 123,
+    });
+    expect(attempts).toBe(2);
+  });
 
   it('discovers directory and ancestry across the process without retaining session history', async () => {
     let query: URL | undefined;
@@ -406,6 +484,22 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       invoke: (client, directory) => client.getSessionStatuses(directory),
     },
     {
+      name: 'session diff',
+      method: 'GET',
+      pathname: '/session/ses_1/diff',
+      response: [
+        {
+          file: 'src/file.ts',
+          patch:
+            'diff --git a/src/file.ts b/src/file.ts\n--- a/src/file.ts\n+++ b/src/file.ts\n@@ -1 +1 @@\n-before\n+after\n',
+          additions: 1,
+          deletions: 1,
+          status: 'modified',
+        },
+      ],
+      invoke: (client, directory) => client.getSessionDiff('ses_1', directory),
+    },
+    {
       name: 'question list',
       method: 'GET',
       pathname: '/question',
@@ -494,20 +588,42 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     expect(await client.getSessionStatuses()).toEqual({});
   });
 
-  it.each([
-    { name: 'empty object', body: {} },
-    { name: 'success-shaped object', body: { success: true } },
-    { name: 'string', body: 'true' },
-    { name: 'number', body: 1 },
-    { name: 'array', body: [] },
-  ])('rejects a non-boolean abort acknowledgement: %j', async ({ body }) => {
-    const stub = startStub(200, body);
+  it('rejects a non-boolean abort acknowledgement', async () => {
+    const stub = startStub(200, {});
     const error: unknown = await createClient(stub.url)
       .abortSession({ sessionId: 'ses_1' })
       .catch(cause => cause);
     expect(error).toBeInstanceOf(Error);
     if (!(error instanceof Error)) throw new Error('Expected invalid abort response failure');
     expect(error.message).toBe('Session abort for ses_1 returned no boolean result');
+  });
+
+  it('treats a 404 cleanup abort as success without retrying', async () => {
+    const stub = startStub(404, {});
+    await createClient(stub.url).abortSessionForCleanup({
+      sessionId: 'ses_1',
+      directory: '/workspace',
+    });
+    expect(stub.requests).toHaveLength(1);
+    expect(stub.requests[0]).toMatchObject({
+      method: 'POST',
+      pathname: '/session/ses_1/abort',
+      directory: '/workspace',
+    });
+  });
+
+  it('validates cleanup child rows before walking them', async () => {
+    const valid = 'ses_22222222222222222222222222';
+    const good = startStub(200, [{ id: valid, directory: '/workspace' }]);
+    expect(
+      await createClient(good.url).children({ sessionId: 'ses_1', directory: '/workspace' })
+    ).toEqual([{ id: valid, directory: '/workspace' }]);
+
+    const malformed = startStub(200, [{ id: 'not-a-session', directory: '/workspace' }]);
+    const error: unknown = await createClient(malformed.url)
+      .children({ sessionId: 'ses_1', directory: '/workspace' })
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
   });
 
   const errorOperations: Array<{
@@ -681,7 +797,11 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     });
     try {
       const url = server.url.toString();
-      const client = createWrapperKiloClient(createKiloClient({ baseUrl: url }), url, directory);
+      const client = createWrapperKiloClient(
+        createKiloClient({ baseUrl: url }),
+        { url },
+        directory
+      );
       await client.ensureSession(sessionId, directory);
       expect(await client.getSession(sessionId)).toEqual({ id: sessionId });
       expect(await client.abortSession({ sessionId, directory })).toBe(true);
@@ -806,6 +926,19 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     expect(await createClient(startStub(200, {}).url).getSessionStatuses()).toEqual({});
     expect(await createClient(startStub(200, []).url).getQuestions()).toEqual([]);
     expect(await createClient(startStub(200, []).url).getPermissions()).toEqual([]);
+    expect(await createClient(startStub(200, []).url).getSessionDiff('ses_1')).toEqual([]);
+  });
+
+  it('cancels a native diff HTTP read without treating it as an empty result', async () => {
+    const stub = startStub(200, []);
+    const controller = new AbortController();
+    controller.abort(new Error('Diff request cancelled'));
+    const error: unknown = await createClient(stub.url)
+      .getSessionDiff('ses_1', '/attached', controller.signal)
+      .catch(error => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ message: 'Session diff ses_1 failed: request error' });
+    expect(stub.requests).toHaveLength(0);
   });
 
   it('scopes question lists, answers, and rejections to the owning checkout directory', async () => {

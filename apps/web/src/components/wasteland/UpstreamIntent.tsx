@@ -673,7 +673,7 @@ function UpstreamAdminToggle({
         checked={checked}
         disabled={disabled}
         onChange={e => onCheckedChange(e.target.checked)}
-        className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-[color:oklch(95%_0.15_108_/_0.95)]"
+        className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-primary/95"
       />
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 text-xs text-white/75">

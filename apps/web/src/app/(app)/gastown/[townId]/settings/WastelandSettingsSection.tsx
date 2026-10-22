@@ -696,7 +696,7 @@ function ConnectWastelandDialog({
               ) : isDolthubInstalled ? (
                 <div className="space-y-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-3">
                   <div className="flex items-start gap-2">
-                    <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[color:oklch(95%_0.15_108_/_0.9)]" />
+                    <Sparkles className="mt-0.5 size-3.5 shrink-0 text-primary/90" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm text-white/85">Use your connected DoltHub account</p>
                       <p className="mt-0.5 text-[11px] text-white/40">
@@ -741,7 +741,7 @@ function ConnectWastelandDialog({
                     href="/integrations/dolthub"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1 inline-flex items-center gap-1 text-xs text-[color:oklch(95%_0.15_108_/_0.9)] underline-offset-4 hover:underline"
+                    className="mt-1 inline-flex items-center gap-1 text-xs text-primary/90 underline-offset-4 hover:underline"
                   >
                     Install DoltHub integration
                     <ArrowUpRight className="size-3" />

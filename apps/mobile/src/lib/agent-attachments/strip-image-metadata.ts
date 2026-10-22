@@ -27,31 +27,75 @@ function saveFormatFor(extension: AgentAttachmentExtension): ImageManipulator.Sa
   return ImageManipulator.SaveFormat.JPEG;
 }
 
+export type StripImageMetadataResult =
+  | { ok: true; uri: string; extension: AgentAttachmentExtension }
+  | { ok: false };
+
 /**
  * Re-encode an image with no operations, which drops EXIF, GPS, and maker
- * notes. Returns the new cache URI. On failure it reports to Sentry and
- * returns the original URI so the caller keeps the unmodified file.
+ * notes. Returns the new cache URI and the extension of the produced file. If
+ * the format-matched re-encode fails, PNG and WebP inputs retry once with a
+ * forced JPEG output (the one format every platform's encoder supports);
+ * JPEG-family inputs (jpg, jpeg, gif, heic, heif) already encode to JPEG and
+ * keep their single attempt. Only a total failure says so in the result — the
+ * original URI is never returned as a success value, so a caller can never
+ * treat an unstripped image as sanitized.
  */
 export async function stripImageMetadata(
   uri: string,
   extension: AgentAttachmentExtension
-): Promise<string> {
+): Promise<StripImageMetadataResult> {
+  let lastError: Error = new Error('Attachment image metadata strip failed');
+  const report = (cause: Error): void => {
+    Sentry.captureException(new Error('Attachment image metadata strip failed', { cause }), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'strip-image-metadata',
+      },
+      extra: { inputExtension: extension },
+      fingerprint: ['agent-attachments-strip-image-metadata', extension],
+    });
+  };
+  const failure = (): StripImageMetadataResult => {
+    report(lastError);
+    return { ok: false };
+  };
   try {
     // eslint-disable-next-line typescript-eslint/no-deprecated -- manipulateAsync is the documented no-op re-encode; the contextual API adds no benefit for a zero-transformation re-encode
     const result = await ImageManipulator.manipulateAsync(uri, [], {
       compress: 1,
       format: saveFormatFor(extension),
     });
-    return result.uri;
-  } catch {
-    Sentry.captureException(new Error('Attachment image metadata strip failed'), {
-      tags: {
-        'error.subsystem': 'agent-attachments',
-        'error.operation': 'strip-image-metadata',
-      },
-      extra: { outputExtension: strippedExtension(extension) },
-      fingerprint: ['agent-attachments-strip-image-metadata'],
-    });
-    return uri;
+    // A manipulator that resolves while pointing at the input file has not
+    // stripped anything, so the contract treats it like a failure here, where
+    // the guarantee lives — no caller can be handed that URI as a success.
+    if (result.uri === uri) {
+      lastError = new Error('Re-encode resolved to the input URI');
+      return failure();
+    }
+    return { ok: true, uri: result.uri, extension: strippedExtension(extension) };
+  } catch (firstError) {
+    lastError = firstError instanceof Error ? firstError : new Error(String(firstError));
+    // JPEG-family inputs (jpg, jpeg, gif, heic, heif) already encode to JPEG,
+    // so the retry would repeat the identical call and pay a second full
+    // decode/encode for a deterministic failure. Only a PNG or WebP encode
+    // has an untried fallback left.
+    if (saveFormatFor(extension) !== ImageManipulator.SaveFormat.JPEG) {
+      try {
+        // eslint-disable-next-line typescript-eslint/no-deprecated -- see above
+        const result = await ImageManipulator.manipulateAsync(uri, [], {
+          compress: 1,
+          format: ImageManipulator.SaveFormat.JPEG,
+        });
+        if (result.uri === uri) {
+          lastError = new Error('Re-encode resolved to the input URI');
+          return failure();
+        }
+        return { ok: true, uri: result.uri, extension: 'jpg' };
+      } catch (retryError) {
+        lastError = retryError instanceof Error ? retryError : new Error(String(retryError));
+      }
+    }
+    return failure();
   }
 }

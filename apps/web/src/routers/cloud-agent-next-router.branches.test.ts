@@ -214,13 +214,15 @@ describe('cloudAgentNextRouter.listRepositoryBranches (personal)', () => {
       id: 'int-9',
       integration_status: 'revoked',
     });
+    // An inactive connection is a reconnect state (PRECONDITION_FAILED), not a
+    // missing one: the integration exists but its credential must be refreshed.
     await expect(
       caller.listRepositoryBranches({
         platform: 'gitlab',
         repository: { fullName: 'group/proj' },
       })
     ).rejects.toMatchObject({
-      code: 'NOT_FOUND',
+      code: 'PRECONDITION_FAILED',
       message: expect.stringContaining('no longer active'),
     });
     expect(mockFetchGitLabBranches).not.toHaveBeenCalled();

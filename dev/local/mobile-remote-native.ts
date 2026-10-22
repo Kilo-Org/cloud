@@ -223,23 +223,36 @@ function waited(since: number): string {
   return `${((Date.now() - since) / 60000).toFixed(1)}m`;
 }
 
-export type IosToolchain = { xcodeBuildVersion: string; simulatorSdkVersion: string };
+function versionParts(version: unknown): number[] | undefined {
+  if (typeof version !== 'string' || !/^\d+(\.\d+)*$/.test(version)) return undefined;
+  return version.split('.').map(Number);
+}
 
-// The artifact name keys on nativeHash alone, but the local cache key also
-// keys on the Xcode and simulator SDK that produced the binary. Without this
-// check a host publishes a runner-built .app under its own toolchain's key;
-// when the runner's simulator SDK is newer than the host's runtime the app
-// never launches, and the entry sticks under a key the host keeps
-// recomputing. Throwing here drops us onto the local build instead.
-export function assertToolchainMatches(actual: unknown, expected: IosToolchain): void {
-  const found = actual as Partial<IosToolchain> | null;
-  if (
-    !found ||
-    found.xcodeBuildVersion !== expected.xcodeBuildVersion ||
-    found.simulatorSdkVersion !== expected.simulatorSdkVersion
-  ) {
+function compareVersions(left: number[], right: number[]): number {
+  for (let index = 0; index < Math.max(left.length, right.length); index++) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+// The artifact name keys on nativeHash alone, so the runner's Xcode can differ
+// from the host's. A simulator app built against an SDK newer than the target
+// simulator's runtime never launches; an equal or newer runtime runs it.
+// Throwing here drops us onto the local build instead.
+export function assertSimulatorRuntimeSupports(
+  toolchain: unknown,
+  simulatorRuntimeVersion: string
+): void {
+  const sdkVersion =
+    typeof toolchain === 'object' && toolchain !== null && 'simulatorSdkVersion' in toolchain
+      ? toolchain.simulatorSdkVersion
+      : undefined;
+  const sdk = versionParts(sdkVersion);
+  const runtime = versionParts(simulatorRuntimeVersion);
+  if (!sdk || !runtime || compareVersions(sdk, runtime) > 0) {
     throw new Error(
-      `artifact toolchain ${found?.xcodeBuildVersion}/${found?.simulatorSdkVersion} does not match local ${expected.xcodeBuildVersion}/${expected.simulatorSdkVersion}`
+      `artifact simulator SDK ${String(sdkVersion)} cannot run on simulator runtime ${simulatorRuntimeVersion}`
     );
   }
 }
@@ -250,7 +263,7 @@ export function assertToolchainMatches(actual: unknown, expected: IosToolchain):
 export function fetchIosApp(args: {
   nativeHash: string;
   productsDir: string;
-  toolchain: IosToolchain;
+  simulatorRuntimeVersion: string;
 }): boolean {
   return withArtifact('ios', args.nativeHash, unpacked => {
     const tarball = path.join(unpacked, `ios-${args.nativeHash}.tar.gz`);
@@ -260,9 +273,9 @@ export function fetchIosApp(args: {
     // receives Kilo.app. An artifact built before toolchain.json existed
     // fails this extract, which is the same fall-back-to-local path.
     execFileSync('tar', ['-xzf', tarball, '-C', unpacked, 'toolchain.json'], { stdio: 'ignore' });
-    assertToolchainMatches(
+    assertSimulatorRuntimeSupports(
       JSON.parse(fs.readFileSync(path.join(unpacked, 'toolchain.json'), 'utf8')),
-      args.toolchain
+      args.simulatorRuntimeVersion
     );
     execFileSync('tar', ['-xzf', tarball, '-C', args.productsDir, 'Kilo.app'], { stdio: 'ignore' });
     if (!fs.existsSync(path.join(args.productsDir, 'Kilo.app'))) {

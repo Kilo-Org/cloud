@@ -1,6 +1,7 @@
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { describe, expect, it, vi } from 'vitest';
 
-import { resolveAccessIssueUrl, SUPPORT_EMAIL } from './access-issue';
+import { resolveAccessIssueUrl } from './access-issue';
 
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://kilo.test' }));
 

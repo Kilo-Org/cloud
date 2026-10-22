@@ -6,16 +6,9 @@ import {
 import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
-import {
-  ReasoningEffortSchema,
-  VerbositySchema,
-  type OpenCodeSettings,
-} from '@kilocode/db/schema-types';
-import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
-import {
-  getFallbackModelVariants,
-  REASONING_VARIANTS_BINARY,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/variants';
+import { ReasoningOptionSchema, type ReasoningOption } from '@kilocode/db/schema-types';
+import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
@@ -38,19 +31,11 @@ const OpenAICompatibleModelsResponseSchema = z.object({
   ),
 });
 
-const ModelsDevReasoningOptionSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('toggle') }),
-  z.object({
-    type: z.literal('effort'),
-    values: z.array(z.union([z.null(), ReasoningEffortSchema, z.literal('default')])),
-  }),
-]);
-
 const ModelsDevModelSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
   reasoning: z.boolean().optional(),
-  reasoning_options: z.array(ModelsDevReasoningOptionSchema).optional().catch(undefined),
+  reasoning_options: z.array(ReasoningOptionSchema).optional().catch(undefined),
   status: z.enum(['alpha', 'beta', 'deprecated']).optional().catch(undefined),
   limit: z
     .object({
@@ -65,7 +50,16 @@ const ModelsDevModelSchema = z.object({
     })
     .optional(),
   tool_call: z.boolean().optional(),
+  provider: z.object({ npm: z.string().optional() }).optional().catch(undefined),
 });
+
+// A models.dev per-model `provider.npm` names the SDK for the model's own endpoint. Several SDK
+// names, such as `@ai-sdk/mistral`, still speak Chat Completions, so only SDKs for the native
+// Gemini API, which the gateway cannot proxy, are excluded.
+const GEMINI_API_MODELS_DEV_SDKS: ReadonlySet<string> = new Set([
+  '@ai-sdk/google',
+  '@ai-sdk/google-vertex',
+]);
 
 const ModelsDevProviderSchema = z.object({
   models: z.record(z.string(), ModelsDevModelSchema),
@@ -82,7 +76,7 @@ type RawModel = {
   max_completion_tokens?: number;
   input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
   flags?: ReadonlyArray<DirectByokModelFlag>;
-  variants?: OpenCodeSettings['variants'];
+  reasoning_options?: ReasoningOption[];
 };
 
 type SyncContext = {
@@ -135,45 +129,12 @@ export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] 
     }));
 }
 
-function modelsDevReasoningOptionsToVariants(
-  options: ReadonlyArray<z.infer<typeof ModelsDevReasoningOptionSchema>>
-): OpenCodeSettings['variants'] {
-  const hasToggle = options.some(option => option.type === 'toggle');
-  const effortVariants: NonNullable<OpenCodeSettings['variants']> = {};
-  for (const option of options) {
-    if (option.type !== 'effort') continue;
-    for (const value of option.values) {
-      const effort = ReasoningEffortSchema.safeParse(value);
-      if (!effort.success) continue;
-      effortVariants[effort.data] = {
-        reasoning: { enabled: effort.data !== 'none', effort: effort.data },
-      };
-    }
-  }
-
-  if (Object.keys(effortVariants).length > 0) {
-    return hasToggle && !effortVariants.none
-      ? { none: { reasoning: { enabled: false, effort: 'none' } }, ...effortVariants }
-      : effortVariants;
-  }
-  if (hasToggle) {
-    return REASONING_VARIANTS_BINARY;
-  }
-  return undefined;
-}
-
-function addAnthropicVariantVerbosity(
-  variants: OpenCodeSettings['variants'],
-  aiSdkProvider: OpenCodeSettings['ai_sdk_provider']
-): OpenCodeSettings['variants'] {
-  if (aiSdkProvider !== 'anthropic' || !variants) return variants;
-
-  return Object.fromEntries(
-    Object.entries(variants).map(([name, variant]) => {
-      const verbosity = VerbositySchema.safeParse(variant.reasoning?.effort);
-      return [name, verbosity.success ? { ...variant, verbosity: verbosity.data } : variant];
-    })
-  );
+// models.dev `[]` and effort values the gateway cannot send are treated as unknown, so that
+// reasoning models fall back to the model-name defaults when served.
+function supportedReasoningOptions(
+  options: ReasoningOption[] | undefined
+): ReasoningOption[] | undefined {
+  return options?.length && toLegacyVariants(options, undefined) ? options : undefined;
 }
 
 export function parseModelsDevProviderModels(
@@ -189,14 +150,10 @@ export function parseModelsDevProviderModels(
         (!model.modalities?.output || model.modalities.output.includes('text')) &&
         (!availableModelIds || availableModelIds.has(model.id)) &&
         model.tool_call !== false &&
-        (!model.modalities?.input || model.modalities.input.includes('text'))
+        (!model.modalities?.input || model.modalities.input.includes('text')) &&
+        (!model.provider?.npm || !GEMINI_API_MODELS_DEV_SDKS.has(model.provider.npm))
     )
     .map(model => {
-      const modelId = `${providerId}/${model.id}`.toLowerCase();
-      const aiSdkProvider = getAiSdkProvider(modelId, providerId);
-      const variants =
-        modelsDevReasoningOptionsToVariants(model.reasoning_options ?? []) ??
-        (model.reasoning ? getFallbackModelVariants(modelId) : undefined);
       return {
         id: model.id,
         name: shortenDisplayName(model.name),
@@ -204,7 +161,7 @@ export function parseModelsDevProviderModels(
         max_completion_tokens: model.limit?.output,
         input_modalities: model.modalities?.input,
         flags: model.reasoning ? ['reasoning'] : undefined,
-        variants: addAnthropicVariantVerbosity(variants, aiSdkProvider),
+        reasoning_options: supportedReasoningOptions(model.reasoning_options),
       };
     });
 }
@@ -316,7 +273,7 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       flags: flags.size > 0 ? [...flags] : undefined,
       context_length,
       max_completion_tokens,
-      variants: raw.variants,
+      reasoning_options: raw.reasoning_options,
     });
   }
 
@@ -346,4 +303,19 @@ export async function syncDirectByokModels(): Promise<
     FETCHERS.map(async fetcher => [fetcher.providerId, await syncProvider(fetcher, ctx)] as const)
   );
   return Object.fromEntries(entries);
+}
+
+export async function syncAndStoreDirectByokProviders() {
+  const startTime = performance.now();
+  const direct_byok_model_counts = await syncDirectByokModels();
+  console.log('[sync-direct-byok-providers] model counts:', direct_byok_model_counts);
+  const completed_at = await recordSyncCompleted('direct_byok');
+  const counts = Object.values(direct_byok_model_counts);
+  return {
+    completed_at,
+    total_providers: counts.length,
+    total_models: counts.reduce((sum, count) => sum + count, 0),
+    direct_byok_model_counts,
+    time: performance.now() - startTime,
+  };
 }

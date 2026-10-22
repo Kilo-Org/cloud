@@ -7,7 +7,7 @@ import type {
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
-import type { KiloFeedEvent } from '../control/worktree-feed.js';
+import type { KiloFeedEvent } from './kilo-event-feed.js';
 import { runtimeKey } from './prepare.js';
 import {
   createTurnManager,
@@ -1260,17 +1260,17 @@ describe('turn resubmission', () => {
     }
   );
 
-  it('keeps credential restart eligibility independent for MCP-isolated runtime keys', async () => {
+  it('keeps credential restart eligibility independent for distinct runtime keys', async () => {
     const h = createHarness();
     const specA = routeSpec({
       sessionId: 'workspace_a',
       kiloSessionId: 'ses_a',
-      runtimeIsolation: 'per-session',
+      directory: '/workspace/dir-a',
     });
     const specB = routeSpec({
       sessionId: 'workspace_b',
       kiloSessionId: 'ses_b',
-      runtimeIsolation: 'per-session',
+      directory: '/workspace/dir-b',
     });
     h.registerRoute(specA);
     h.registerRoute(specB);
@@ -1485,10 +1485,10 @@ describe('turn resubmission', () => {
     const routeB = routeSpec({
       sessionId: 'workspace_b',
       kiloSessionId: 'ses_cccccccccccccccccccccccccc',
-      runtimeIsolation: 'per-session',
+      directory: '/workspace/dir-b',
     });
     const h = createHarness();
-    h.registerRoute(routeSpec({ runtimeIsolation: 'per-session' }));
+    h.registerRoute(routeSpec());
     h.registerRoute(routeB);
     h.manager.submit(SESSION_ID, promptPayload('m1'));
     h.manager.submit(routeB.sessionId, promptPayload('m2'));
@@ -1497,7 +1497,7 @@ describe('turn resubmission', () => {
       kiloEvent(
         'session.created',
         { info: { id: childId, parentID: KILO_SESSION } },
-        routeB.sessionId
+        routeB.directory
       )
     );
     h.frames.length = 0;
@@ -1505,7 +1505,7 @@ describe('turn resubmission', () => {
       kiloEvent(
         'message.updated',
         { info: { id: 'child-message', sessionID: childId, role: 'assistant' } },
-        routeB.sessionId
+        routeB.directory
       )
     );
     const frames = h.frames.filter(frame => frame.type === 'session.events');
@@ -1543,6 +1543,35 @@ describe('turn resubmission', () => {
     const frames = h.frames.filter(frame => frame.type === 'session.events');
     expect(frames).toHaveLength(1);
     expect(frames[0]).toMatchObject({ sessionId: routeB.sessionId });
+  });
+
+  it('keeps a known idle parent when another shared-runtime root has the only active turn', async () => {
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const routeB = routeSpec({
+      sessionId: 'workspace_b',
+      kiloSessionId: 'ses_cccccccccccccccccccccccccc',
+    });
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.registerRoute(routeB);
+    h.manager.submit(routeB.sessionId, promptPayload('m2'));
+    await settle();
+
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } }, DIRECTORY)
+    );
+    h.frames.length = 0;
+    h.manager.observeKiloEvent(
+      kiloEvent(
+        'message.updated',
+        { info: { id: 'child-message', sessionID: childId, role: 'assistant' } },
+        DIRECTORY
+      )
+    );
+
+    const frames = h.frames.filter(frame => frame.type === 'session.events');
+    expect(frames).toHaveLength(1);
+    expect(frames[0]).toMatchObject({ sessionId: SESSION_ID });
   });
 
   it('attributes an unknown descendant to the only active turn in a shared runtime', async () => {
@@ -1609,17 +1638,17 @@ describe('turn resubmission', () => {
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'sandbox_out_of_memory' });
   });
 
-  it('resubmits only the restarted per-session runtime, not its sibling', async () => {
+  it('resubmits only the restarted runtime, not its sibling', async () => {
     const h = createHarness();
     const specA = routeSpec({
       sessionId: 'session-a',
       kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
-      runtimeIsolation: 'per-session',
+      directory: '/workspace/dir-a',
     });
     const specB = routeSpec({
       sessionId: 'session-b',
       kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
-      runtimeIsolation: 'per-session',
+      directory: '/workspace/dir-b',
     });
     h.registerRoute(specA);
     h.registerRoute(specB);
@@ -1629,7 +1658,11 @@ describe('turn resubmission', () => {
     expect(h.client(specA).prompts).toHaveLength(1);
     expect(h.client(specB).prompts).toHaveLength(1);
 
-    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: 'session-a' });
+    h.manager.onRuntimeRestart({
+      directory: specA.directory,
+      reason: 'hang',
+      key: specA.directory,
+    });
     await settle();
     expect(h.client(specA).prompts).toHaveLength(2);
     expect(h.client(specB).prompts).toHaveLength(1);
@@ -1641,19 +1674,19 @@ describe('turn resubmission', () => {
     const specA = routeSpec({
       sessionId: 'session-a',
       kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
-      runtimeIsolation: 'per-session',
+      directory: '/workspace/dir-a',
     });
     const specB = routeSpec({
       sessionId: 'session-b',
       kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
-      runtimeIsolation: 'per-session',
+      directory: '/workspace/dir-b',
     });
     h.registerRoute(specA);
     h.registerRoute(specB);
     h.manager.submit('session-a', promptPayload('m1'));
     h.manager.submit('session-b', promptPayload('m2'));
     await settle();
-    h.manager.onRuntimeUnavailable(DIRECTORY, 'session-a');
+    h.manager.onRuntimeUnavailable(specA.directory, specA.directory);
     await settle();
     const outcomes = outcomeFrames(h.frames);
     expect(outcomes).toHaveLength(1);
@@ -3096,9 +3129,38 @@ describe('turn answers', () => {
       { questionId: 'q2', directory: DIRECTORY },
     ]);
     expect(h.client(routeSpec()).permissionAnswers).toEqual([
-      { permissionId: 'p1', response: 'always', message: 'ok', directory: DIRECTORY },
+      {
+        permissionId: 'p1',
+        response: 'always',
+        message: 'ok',
+        interactive: true,
+        directory: DIRECTORY,
+      },
     ]);
   });
+
+  it.each(['once', 'always', 'reject'] as const)(
+    'marks a human %s permission reply interactive',
+    async response => {
+      const h = createHarness();
+      const spec = routeSpec();
+      h.registerRoute(spec);
+      await h.manager.answer(SESSION_ID, {
+        action: 'permission',
+        permissionId: 'human-required',
+        response,
+      });
+      expect(h.client(spec).permissionAnswers).toEqual([
+        {
+          permissionId: 'human-required',
+          response,
+          message: undefined,
+          interactive: true,
+          directory: DIRECTORY,
+        },
+      ]);
+    }
+  );
 
   it('ignores an answer for an unknown route', async () => {
     const h = createHarness();
@@ -3113,9 +3175,11 @@ describe('turn answers', () => {
 });
 
 describe('turn route identity', () => {
-  it('derives the runtime key from the isolation mode', () => {
+  it('keeps legacy runtime keys and shares negotiated directory runtimes', () => {
     expect(runtimeKey(routeSpec())).toBe(DIRECTORY);
-    expect(runtimeKey({ ...routeSpec(), runtimeIsolation: 'per-session' })).toBe(SESSION_ID);
+    expect(runtimeKey({ ...routeSpec(), runtimeIsolation: 'per-session' })).toBe(
+      routeSpec().sessionId
+    );
   });
 });
 

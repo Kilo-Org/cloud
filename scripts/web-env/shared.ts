@@ -5,7 +5,7 @@ import path from 'node:path';
 import * as readline from 'node:readline';
 import { Writable } from 'node:stream';
 
-export const PROJECTS = ['kilocode-app', 'kilocode-global-app', 'kilocode-ai-gateway'] as const;
+export const PROJECTS = ['kilocode-app', 'kilocode-ai-gateway'] as const;
 export const ENVIRONMENTS = ['development', 'staging', 'production'] as const;
 export const VAULT = 'Kilo Web ENV Production';
 const ONE_PASSWORD_ACCOUNT_URL = 'kilocode.1password.com';

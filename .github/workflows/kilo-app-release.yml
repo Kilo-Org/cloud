@@ -204,7 +204,7 @@ jobs:
             exit 1
           fi
           MISSING=""
-          for NAME in API_BASE_URL WEB_BASE_URL CLOUD_AGENT_WS_URL SESSION_INGEST_WS_URL APPSFLYER_DEV_KEY APPSFLYER_APP_ID KILO_CHAT_URL EVENT_SERVICE_URL NOTIFICATIONS_URL POSTHOG_API_KEY SENTRY_AUTH_TOKEN EXPO_PUBLIC_SENTRY_ENVIRONMENT; do
+          for NAME in API_BASE_URL WEB_BASE_URL CLOUD_AGENT_WS_URL SESSION_INGEST_WS_URL APPSFLYER_DEV_KEY APPSFLYER_APP_ID KILO_CHAT_URL EVENT_SERVICE_URL NOTIFICATIONS_URL POSTHOG_API_KEY SENTRY_AUTH_TOKEN EXPO_PUBLIC_SENTRY_ENVIRONMENT GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER; do
             if ! printf '%s\n' "$ENV_OUTPUT" | grep -qE "^Name[[:space:]]+${NAME}[[:space:]]*$"; then
               MISSING="$MISSING $NAME"
             fi
@@ -255,9 +255,19 @@ jobs:
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        # eas-cli evaluates app.config.ts itself before it submits, and it syncs
+        # the App ID capabilities from what that evaluation returns. A release
+        # must be evaluated as the production profile: an unset EAS_BUILD_PROFILE
+        # makes app.config.ts evaluate as non-production, which puts the dev-only
+        # File Provider testing-mode entitlement in the extension's EAS entry.
+        # Apple then rejects the capability sync and the whole build command
+        # fails before any artifact exists. env:exec injects the production
+        # environment for that evaluation (a bare EAS_BUILD_PROFILE throws on the
+        # values it never sees), and SENTRY_AUTH_TOKEN is a SECRET variable only
+        # a builder can read, so the evaluation gets the preflight placeholder.
         run: |
           mkdir -p artifacts
-          pnpx eas-cli@24.8.0 build --profile production --platform all --non-interactive --json --wait > build.json
+          pnpx eas-cli@24.8.0 env:exec production --non-interactive 'EAS_BUILD_PROFILE=production SENTRY_AUTH_TOKEN=preflight-placeholder pnpx eas-cli@24.8.0 build --profile production --platform all --non-interactive --json --wait > build.json'
           node ../../scripts/inspect-mobile-artifacts.mjs --select build.json > urls.txt
           echo "IOS_URL=$(sed -n '1p' urls.txt)" >> "$GITHUB_ENV"
           echo "ANDROID_URL=$(sed -n '2p' urls.txt)" >> "$GITHUB_ENV"

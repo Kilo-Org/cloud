@@ -249,6 +249,10 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 
 ### Projections and UI
 
+Credit-expiration summaries MUST group positive remaining balances by expiration instant.
+They MUST exclude non-expiring and exhausted blocks and show each group in chronological order.
+Summaries MUST NOT label all dated credits as bonus credits.
+
 38. The Kilo Pass state read path MUST keep actual issuance amounts and projected amounts separate. It MUST compute
     current-period and next-period projections from tier, cadence, streak, first-time-subscriber status, provider, and
     stored initial welcome-promo reason.
@@ -338,6 +342,13 @@ Rules 51-55 protect against rapid cross-account reuse of a recently first-used c
     no failed cleanup audit is guaranteed.
 61. Successful missing-row cleanup release MUST append a success audit entry. Current behavior MUST NOT be described as
     preserving the original error under every cleanup failure.
+78. A scheduled change MUST NOT be created while a Stripe subscription has pending cancellation. A subscription set to
+    cancel at period end ends instead of switching plans, so the user MUST resume the subscription before changing plans.
+    The server MUST reject the request before any provider mutation and tell the user to resume first, and the UI MUST
+    disable plan selection and explain why. A rejected request MUST NOT alter the pending cancellation. Subscriptions
+    whose status is not `active` remain ineligible.
+79. Cancelling a subscription MUST release its tracked scheduled change first, so a cancellation and a scheduled change
+    never coexist. Resuming a cancelled subscription does not recreate a released change.
 
 ### Pause, Cancellation, and Store Expiry
 
@@ -443,6 +454,11 @@ promo or Kilo Pass referral conversion.
 - Eligible first-time starts at or after the cutoff receive 10%, 50%, then 15%.
 - Earlier starts, returning-subscriber bonuses, yearly bonuses, payment eligibility, and usage unlock remain unchanged.
 - Removed the proposed schedule marker, migration, and new activation date.
+
+### 2026-10-12 -- Plan changes during pending cancellation
+
+- Plan changes are rejected while a Stripe Kilo Pass has pending cancellation; the user resumes the subscription first
+  (Rules 78-79). This avoids withdrawing a cancellation and then having to restore it if the change fails partway.
 
 ### 2026-10-08 -- Timestamp-based monthly welcome bonus cutoff
 

@@ -5,10 +5,12 @@
  * Reads services/kilo-mcp/catalog.json, embeds every row's searchBlob via the
  * Cloudflare REST API (Workers AI run endpoint), and upserts the vectors with
  * the procedure path as vector id (requirement 9) and {path, kind, tags} as
- * metadata. Batches at ≤64 rows per request.
+ * metadata. Batches at ≤64 rows per request. After the upsert it lists the
+ * index and deletes every vector whose id the catalog no longer has, so a
+ * removed or renamed procedure cannot keep occupying a kNN slot.
  *
  * Subcommands:
- *   (none)|upsert  embed + upsert every catalog row
+ *   (none)|upsert  embed + upsert every catalog row, then prune stale vectors
  *   ensure-index   create the Vectorize index idempotently (pinned dimensions
  *                  and metric from src/embedding.ts), then exit
  *
@@ -36,6 +38,12 @@ const API_ROOT = 'https://api.cloudflare.com/client/v4';
 
 /** Rows per AI-embed / Vectorize-upsert request (requirement: batch ≤64). */
 export const EMBED_BATCH_SIZE = 64;
+
+/** Vector ids per list page. The API caps `count` at 1000. */
+export const LIST_PAGE_SIZE = 500;
+
+/** Ids per delete_by_ids request, well below the list cap. */
+export const PRUNE_BATCH_SIZE = 100;
 
 /** One upsert record: vector id = procedure path, values = embedding, metadata. */
 type UpsertRecord = {
@@ -226,6 +234,78 @@ export async function embedAndUpsert(options: EmbedOptions): Promise<{ vectors: 
   return { vectors };
 }
 
+/**
+ * Every vector id currently in the index, paged through the list endpoint.
+ * Used by the prune, which needs the ids the catalog no longer names.
+ */
+export async function listVectorIds(options: EmbedOptions): Promise<string[]> {
+  const fetchImpl = options.fetchImpl ?? defaultFetch();
+  const base = `/accounts/${options.CLOUDFLARE_ACCOUNT_ID}/vectorize/v2/indexes/${options.VECTORIZE_INDEX_NAME}/list`;
+  const ids: string[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const query = `?count=${LIST_PAGE_SIZE}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
+    const page = (await cfRequest(fetchImpl, options, `${base}${query}`)) as {
+      vectors?: Array<{ id?: string }>;
+      nextCursor?: string;
+      isTruncated?: boolean;
+    };
+    for (const vector of page.vectors ?? []) {
+      if (typeof vector.id === 'string') ids.push(vector.id);
+    }
+    // A truncated page without a cursor cannot be followed; stop rather than
+    // report a partial index as complete.
+    if (page.isTruncated !== true || !page.nextCursor) return ids;
+    cursor = page.nextCursor;
+  }
+}
+
+/**
+ * Delete the vectors whose procedure path the catalog no longer has. The index
+ * is otherwise rebuilt by upsert alone, so a removed or renamed procedure would
+ * keep a vector that competes for every future kNN slot.
+ *
+ * An empty catalog prunes nothing: the dump refuses to write one, so an empty
+ * artifact means something went wrong, and emptying the production index on a
+ * bad artifact is worse than leaving stale ids behind.
+ */
+export async function pruneStaleVectors(options: EmbedOptions): Promise<{ deleted: string[] }> {
+  const fetchImpl = options.fetchImpl ?? defaultFetch();
+  const log = options.log ?? (() => {});
+  const paths = new Set(Object.keys(options.catalog));
+  if (paths.size === 0) {
+    log('catalog is empty; skipping the stale-vector prune');
+    return { deleted: [] };
+  }
+
+  const listed = await listVectorIds({ ...options, fetchImpl });
+  const stale = listed.filter(id => !paths.has(id));
+  if (stale.length === 0) {
+    log(
+      `✅ index "${options.VECTORIZE_INDEX_NAME}" matches the catalog (${listed.length} vectors)`
+    );
+    return { deleted: [] };
+  }
+
+  for (let start = 0; start < stale.length; start += PRUNE_BATCH_SIZE) {
+    const batch = stale.slice(start, start + PRUNE_BATCH_SIZE);
+    await cfRequest(
+      fetchImpl,
+      options,
+      `/accounts/${options.CLOUDFLARE_ACCOUNT_ID}/vectorize/v2/indexes/${options.VECTORIZE_INDEX_NAME}/delete_by_ids`,
+      { method: 'POST', body: JSON.stringify({ ids: batch }) }
+    );
+    log(
+      `  pruned ${Math.min(start + PRUNE_BATCH_SIZE, stale.length)}/${stale.length} stale vectors`
+    );
+  }
+
+  log(
+    `✅ deleted ${stale.length} stale vectors from "${options.VECTORIZE_INDEX_NAME}" (${listed.length - stale.length} current)`
+  );
+  return { deleted: stale };
+}
+
 function envFromProcess(): EmbedEnv {
   const missing = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'VECTORIZE_INDEX_NAME'].filter(
     name => !process.env[name]
@@ -301,6 +381,7 @@ async function main(): Promise<void> {
     );
   }
   await embedAndUpsert(options);
+  await pruneStaleVectors(options);
 }
 
 const isMain = Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;

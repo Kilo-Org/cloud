@@ -482,7 +482,9 @@ describe('public session route', () => {
       },
     ]);
     const stub = {
-      getAllStream: vi.fn(async () => new Response('{"messages":["later message"]}').body!),
+      getLiveSharedSessionStream: vi.fn(
+        async () => new Response('{"messages":["later message"]}').body!
+      ),
     };
     vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
     const legacyToken = await new SignJWT({
@@ -508,7 +510,7 @@ describe('public session route', () => {
     selectResult.mockResolvedValue([]);
     expect((await app.request(path, {}, defaultEnv)).status).toBe(404);
     expect((await app.request(`${path}/metadata`, {}, defaultEnv)).status).toBe(404);
-    expect(stub.getAllStream).toHaveBeenCalledTimes(1);
+    expect(stub.getLiveSharedSessionStream).toHaveBeenCalledTimes(1);
   });
 
   it.each([false, true])(
@@ -523,7 +525,7 @@ describe('public session route', () => {
         },
       ]);
       const stub = {
-        getAllStream: vi.fn(async () => new Response('{"mode":"live"}').body!),
+        getLiveSharedSessionStream: vi.fn(async () => new Response('{"mode":"live"}').body!),
         getSharedSessionStream: vi.fn(async () => new Response('{"mode":"snapshot"}').body!),
       };
       vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
@@ -544,7 +546,7 @@ describe('public session route', () => {
       if (include_new_messages) {
         expect(stub.getSharedSessionStream).not.toHaveBeenCalled();
       } else {
-        expect(stub.getAllStream).not.toHaveBeenCalled();
+        expect(stub.getLiveSharedSessionStream).not.toHaveBeenCalled();
         expect(stub.getSharedSessionStream).toHaveBeenCalledWith({
           publicId: '11111111-1111-4111-8111-111111111111',
           ingestedBeforeMs: sharedAt.getTime(),

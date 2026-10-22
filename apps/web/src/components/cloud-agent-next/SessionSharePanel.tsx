@@ -28,11 +28,18 @@ const durations = [
   { value: 'forever', label: 'Never expires' },
 ] satisfies { value: SessionShareDuration; label: string }[];
 
-export function SessionSharePanel({ kiloSessionId }: { kiloSessionId?: string }) {
+export function SessionSharePanel({
+  kiloSessionId,
+  isSharing,
+  onSharingChange,
+}: {
+  kiloSessionId?: string;
+  isSharing: boolean;
+  onSharingChange: (isSharing: boolean) => void;
+}) {
   const id = useId();
   const [duration, setDuration] = useState<SessionShareDuration>('7d');
   const [includeNewMessages, setIncludeNewMessages] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
   const [share, setShare] = useState<({ url: string } & SessionShareOptions) | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const trpc = useRawTRPCClient();
@@ -42,7 +49,7 @@ export function SessionSharePanel({ kiloSessionId }: { kiloSessionId?: string })
       toast.error('Session ID is missing');
       return;
     }
-    setIsSharing(true);
+    onSharingChange(true);
     const options = { duration, include_new_messages: includeNewMessages };
     try {
       const result = await trpc.cliSessionsV2.share.mutate({
@@ -56,7 +63,7 @@ export function SessionSharePanel({ kiloSessionId }: { kiloSessionId?: string })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to share session');
     } finally {
-      setIsSharing(false);
+      onSharingChange(false);
     }
   };
 

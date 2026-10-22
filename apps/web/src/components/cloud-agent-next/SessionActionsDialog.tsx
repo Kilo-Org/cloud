@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -36,10 +37,13 @@ export function SessionActionsDialog({
   organizationId,
   canForkToCloud = false,
 }: SessionActionsDialogProps) {
+  const [isSharing, setIsSharing] = useState(false);
   const { forkSessionToNewCloudSession, forkingSessionId } = useCloudSessionFork(organizationId);
   const isForkingToCloud = forkingSessionId === kiloSessionId;
 
-  const handleClose = () => onOpenChange(false);
+  const handleClose = () => {
+    if (!isSharing) onOpenChange(false);
+  };
 
   const handleForkToCloud = async () => {
     if (!kiloSessionId) return;
@@ -56,7 +60,7 @@ export function SessionActionsDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" showCloseButton={!isSharing}>
         <DialogHeader>
           <DialogTitle>Session Actions</DialogTitle>
           <DialogDescription>Share or fork this session</DialogDescription>
@@ -88,7 +92,11 @@ export function SessionActionsDialog({
               <Share2 className="h-4 w-4" />
               <h3 className="text-sm font-medium">Share Session</h3>
             </div>
-            <SessionSharePanel kiloSessionId={kiloSessionId} />
+            <SessionSharePanel
+              kiloSessionId={kiloSessionId}
+              isSharing={isSharing}
+              onSharingChange={setIsSharing}
+            />
           </div>
 
           {/* Divider */}

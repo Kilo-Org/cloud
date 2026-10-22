@@ -282,6 +282,86 @@ describe('SessionIngestDO integration', () => {
       expect(JSON.stringify(shared)).not.toContain('private');
     });
 
+    it.each(['inline', 'r2'])(
+      'exports later messages in a live share with projected %s session info',
+      async storage => {
+        const sessionId = `ses_live_share_${crypto.randomUUID()}`;
+        const key = `items/${kiloUserId}/${sessionId}/session/current`;
+        const stub = getStub(kiloUserId, sessionId);
+        const info = {
+          title: 'Current title',
+          summary: { additions: 2, diffs: [{ file: 'cumulative-private.ts', after: 'private' }] },
+        };
+        try {
+          await stub.ingest(
+            [
+              { type: 'session', data: { title: 'Original title' } },
+              { type: 'message', data: { id: 'msg_1', role: 'user' } },
+            ],
+            kiloUserId,
+            sessionId,
+            1,
+            1000
+          );
+          const before = await stub
+            .getLiveSharedSessionStream()
+            .then(stream => new Response(stream).json());
+          expect(before).toMatchObject({ messages: [{ info: { id: 'msg_1' } }] });
+
+          if (storage === 'r2') await env.SESSION_INGEST_R2.put(key, JSON.stringify(info));
+          await stub.ingest(
+            [
+              { type: 'session', data: storage === 'r2' ? {} : info },
+              {
+                type: 'message',
+                data: {
+                  id: 'msg_2',
+                  role: 'assistant',
+                  summary: { diffs: [{ file: 'intentional.ts', after: 'included' }] },
+                },
+              },
+              {
+                type: 'part',
+                data: { id: 'part_2', messageID: 'msg_2', type: 'text', text: 'Later' },
+              },
+              { type: 'session_diff', data: [{ file: 'cumulative-private.ts', patch: 'private' }] },
+            ],
+            kiloUserId,
+            sessionId,
+            1,
+            3000,
+            storage === 'r2' ? { session: key } : undefined
+          );
+
+          const shared = JSON.parse(
+            await stub.getLiveSharedSessionStream().then(stream => new Response(stream).text())
+          );
+          expect(shared.info).toEqual({ title: 'Current title', summary: { additions: 2 } });
+          expect(shared.messages).toHaveLength(2);
+          expect(shared.messages[1].info).toMatchObject({
+            id: 'msg_2',
+            summary: { diffs: [{ file: 'intentional.ts', after: 'included' }] },
+          });
+          expect(shared.messages[1].parts).toEqual([
+            { id: 'part_2', messageID: 'msg_2', type: 'text', text: 'Later' },
+          ]);
+          expect(shared.sessionDiff).toEqual([]);
+          expect(JSON.stringify(shared)).not.toContain('cumulative-private.ts');
+
+          const ownerExport = JSON.parse(
+            await stub.getAllStream().then(stream => new Response(stream).text())
+          );
+          expect(ownerExport.info).toEqual(info);
+          expect(ownerExport.sessionDiff).toEqual([
+            { file: 'cumulative-private.ts', patch: 'private' },
+          ]);
+        } finally {
+          await stub.clear();
+          await env.SESSION_INGEST_R2.delete(key);
+        }
+      }
+    );
+
     it('does not expose later updates to an item that existed at the boundary', async () => {
       const sessionId = 'ses_roundtrip_shared_update_000007';
       const publicId = '22222222-2222-4222-8222-222222222222';

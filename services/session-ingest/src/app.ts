@@ -71,7 +71,7 @@ app.use('/internal/cloud-agent/v1/*', requireValidInternalSecret);
 app.route('/internal/cloud-agent/v1', cloudAgentSessionScopeApi);
 
 // Public session endpoint: resolve the purpose-bound share token, then return
-// all ingested DO events for the current session generation.
+// the public transcript for the current session generation.
 app.get('/session/:shareToken', async c => {
   const sharedSession = await resolveSessionShareToken(c.env, c.req.param('shareToken'));
   if (!sharedSession) {
@@ -88,7 +88,7 @@ app.get('/session/:shareToken', async c => {
       }),
     s =>
       sharedSession.contentCutoffMs === null
-        ? s.getAllStream()
+        ? s.getLiveSharedSessionStream()
         : s.getSharedSessionStream({
             publicId: sharedSession.publicId,
             ingestedBeforeMs: sharedSession.contentCutoffMs,

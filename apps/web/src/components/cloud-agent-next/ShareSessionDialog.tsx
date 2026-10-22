@@ -1,6 +1,6 @@
 'use client';
 
-import type { ComponentProps } from 'react';
+import { useState, type ComponentProps } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -25,18 +25,33 @@ export function ShareSessionDialog({
   onCloseAutoFocus,
   kiloSessionId,
 }: ShareSessionDialogProps) {
+  const [isSharing, setIsSharing] = useState(false);
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
+    <Dialog
+      open={open}
+      onOpenChange={nextOpen => {
+        if (!isSharing) onOpenChange(nextOpen);
+      }}
+    >
+      <DialogContent
+        className="sm:max-w-md"
+        onCloseAutoFocus={onCloseAutoFocus}
+        showCloseButton={!isSharing}
+      >
         <DialogHeader>
           <DialogTitle>Share Session</DialogTitle>
           <DialogDescription>
             Choose how long the link works and whether it includes new messages.
           </DialogDescription>
         </DialogHeader>
-        <SessionSharePanel kiloSessionId={kiloSessionId} />
+        <SessionSharePanel
+          kiloSessionId={kiloSessionId}
+          isSharing={isSharing}
+          onSharingChange={setIsSharing}
+        />
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" disabled={isSharing} onClick={() => onOpenChange(false)}>
             Close
           </Button>
         </DialogFooter>

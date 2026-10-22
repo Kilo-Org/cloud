@@ -5,7 +5,7 @@ import type { User } from '@kilocode/db/schema';
 import { eq, and, isNull, gt, sql, getTableColumns } from 'drizzle-orm';
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { createHash, randomBytes } from 'node:crypto';
-import { persistAttestedKeyTx, type VerifyAdmissionOk } from './native-admission';
+import { persistAttestedKey, type VerifyAdmissionOk } from './native-admission';
 
 const REFRESH_TOKEN_BYTES = 32;
 
@@ -356,7 +356,7 @@ export async function createDeviceSessionWithAttestedKey(params: {
   verification: VerifyAdmissionOk;
 }): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }> {
   return await db.transaction(async tx => {
-    await persistAttestedKeyTx(tx, params.userId, params.verification);
+    await persistAttestedKey(params.userId, params.verification, tx);
 
     const [session] = await tx
       .insert(device_sessions)

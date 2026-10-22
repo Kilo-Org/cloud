@@ -80,23 +80,42 @@ function getGoogleClient(): OAuth2Client {
   return googleClient;
 }
 
-export async function verifyNativeGoogleIdToken(idToken: string): Promise<VerifiedGoogleIdToken> {
-  const audience = [GOOGLE_CLIENT_ID, GOOGLE_IOS_CLIENT_ID].filter(Boolean);
-  const googleClient = getGoogleClient();
-  const { certs } = await googleClient.getFederatedSignonCertsAsync();
+/** Issuers Google uses for ID tokens, shared by every native Google path. */
+const GOOGLE_ISSUERS = ['accounts.google.com', 'https://accounts.google.com'];
+
+type GoogleVerificationMessages = {
+  /** Message for a token the JWT verification rejects. */
+  verificationFailed: string;
+  /** Message for a verified ticket that carries no payload. */
+  invalidPayload: string;
+};
+
+/**
+ * Verify a Google ID token against one audience and apply the acceptance rules
+ * every native Google path shares: a payload with a verified email and both
+ * `email` and `sub`, mapped onto VerifiedGoogleIdToken.
+ *
+ * The certificate fetch stays outside the try so provider or network failures
+ * propagate as server errors (5xx); only a rejected token becomes a
+ * NativeIdTokenError (401).
+ */
+async function verifyGoogleIdTokenWith(
+  client: OAuth2Client,
+  idToken: string,
+  audience: string[],
+  messages: GoogleVerificationMessages
+): Promise<VerifiedGoogleIdToken> {
+  const { certs } = await client.getFederatedSignonCertsAsync();
   let ticket;
   try {
-    ticket = await googleClient.verifySignedJwtWithCertsAsync(idToken, certs, audience, [
-      'accounts.google.com',
-      'https://accounts.google.com',
-    ]);
+    ticket = await client.verifySignedJwtWithCertsAsync(idToken, certs, audience, GOOGLE_ISSUERS);
   } catch (error) {
-    throw new NativeIdTokenError('Google ID token verification failed', { cause: error });
+    throw new NativeIdTokenError(messages.verificationFailed, { cause: error });
   }
   const payload = ticket.getPayload();
 
   if (!payload) {
-    throw new NativeIdTokenError('Invalid Google ID token payload');
+    throw new NativeIdTokenError(messages.invalidPayload);
   }
   if (!payload.email_verified) {
     throw new NativeIdTokenError('Google email not verified');
@@ -112,6 +131,14 @@ export async function verifyNativeGoogleIdToken(idToken: string): Promise<Verifi
     picture: payload.picture,
     hd: payload.hd,
   };
+}
+
+export async function verifyNativeGoogleIdToken(idToken: string): Promise<VerifiedGoogleIdToken> {
+  const audience = [GOOGLE_CLIENT_ID, GOOGLE_IOS_CLIENT_ID].filter(Boolean);
+  return verifyGoogleIdTokenWith(getGoogleClient(), idToken, audience, {
+    verificationFailed: 'Google ID token verification failed',
+    invalidPayload: 'Invalid Google ID token payload',
+  });
 }
 
 /**
@@ -151,37 +178,8 @@ export async function exchangeNativeGoogleAuthCode(
   // the same payload checks as the direct idToken path.  Follow the same
   // cert-fetch-outside / JWT-verify-inside pattern as verifyNativeGoogleIdToken:
   // cert/network failures surface as 5xx; invalid tokens surface as 401.
-  const { certs } = await client.getFederatedSignonCertsAsync();
-  let ticket;
-  try {
-    ticket = await client.verifySignedJwtWithCertsAsync(
-      idToken,
-      certs,
-      [GOOGLE_CLIENT_ID],
-      ['accounts.google.com', 'https://accounts.google.com']
-    );
-  } catch (error) {
-    throw new NativeIdTokenError('Google ID token verification failed after code exchange', {
-      cause: error,
-    });
-  }
-  const payload = ticket.getPayload();
-
-  if (!payload) {
-    throw new NativeIdTokenError('Invalid Google ID token payload from code exchange');
-  }
-  if (!payload.email_verified) {
-    throw new NativeIdTokenError('Google email not verified');
-  }
-  if (!payload.email || !payload.sub) {
-    throw new NativeIdTokenError('Google ID token missing email or sub');
-  }
-
-  return {
-    sub: payload.sub,
-    email: payload.email,
-    name: payload.name,
-    picture: payload.picture,
-    hd: payload.hd,
-  };
+  return verifyGoogleIdTokenWith(client, idToken, [GOOGLE_CLIENT_ID], {
+    verificationFailed: 'Google ID token verification failed after code exchange',
+    invalidPayload: 'Invalid Google ID token payload from code exchange',
+  });
 }

@@ -432,17 +432,21 @@ async function verifyAndroidAdmission(
  *
  * Cross-user collision: if the keyId already exists for a different user,
  * refuses the insert/update.
+ *
+ * `executor` defaults to `db`. Pass a transaction when key persistence must be
+ * atomic with device session creation.
  */
 export async function persistAttestedKey(
   userId: string,
-  verification: VerifyAdmissionOk
+  verification: VerifyAdmissionOk,
+  executor: typeof db | DrizzleTransaction = db
 ): Promise<void> {
   // Android has no persistent key tracking — skip.
   if (verification.platform === 'android') return;
 
   if (verification.publicKey !== undefined) {
     // Attestation: insert new key
-    await db
+    await executor
       .insert(native_attested_keys)
       .values({
         key_id: verification.keyId,
@@ -455,7 +459,7 @@ export async function persistAttestedKey(
       .onConflictDoNothing();
 
     // Verify the inserted key belongs to this user (cross-user collision check)
-    const inserted = await db.query.native_attested_keys.findFirst({
+    const inserted = await executor.query.native_attested_keys.findFirst({
       where: and(
         eq(native_attested_keys.key_id, verification.keyId),
         eq(native_attested_keys.platform, verification.platform)
@@ -472,7 +476,7 @@ export async function persistAttestedKey(
     // assertion cannot regress a newer count. The ownership predicate is
     // preserved.
     const now = new Date().toISOString();
-    await db
+    await executor
       .update(native_attested_keys)
       .set({
         last_used_at: now,
@@ -491,67 +495,6 @@ export class KeyCollisionError extends Error {
   constructor() {
     super('Attested key already belongs to a different user');
     this.name = 'KeyCollisionError';
-  }
-}
-
-/**
- * Persist an attested key within an existing Drizzle transaction.
- *
- * Same semantics as `persistAttestedKey` but uses the supplied transaction
- * instead of the default `db` instance. Used when key persistence must be
- * atomic with device session creation.
- */
-export async function persistAttestedKeyTx(
-  tx: DrizzleTransaction,
-  userId: string,
-  verification: VerifyAdmissionOk
-): Promise<void> {
-  if (verification.platform === 'android') return;
-
-  if (verification.publicKey !== undefined) {
-    // Attestation: insert new key
-    await tx
-      .insert(native_attested_keys)
-      .values({
-        key_id: verification.keyId,
-        kilo_user_id: userId,
-        platform: verification.platform,
-        public_key: verification.publicKey,
-        sign_count: 0,
-        attested_at: new Date().toISOString(),
-      })
-      .onConflictDoNothing();
-
-    // Verify the inserted key belongs to this user (cross-user collision check)
-    const inserted = await tx.query.native_attested_keys.findFirst({
-      where: and(
-        eq(native_attested_keys.key_id, verification.keyId),
-        eq(native_attested_keys.platform, verification.platform)
-      ),
-    });
-
-    if (!inserted || inserted.kilo_user_id !== userId) {
-      captureMessage('native_attested_key_cross_user_collision');
-      throw new KeyCollisionError();
-    }
-  } else if (verification.signCount !== undefined) {
-    // Assertion: refresh last_used_at only. The sign count was already bumped
-    // atomically during verification; never rewrite it here so a stale
-    // assertion cannot regress a newer count. The ownership predicate is
-    // preserved.
-    const now = new Date().toISOString();
-    await tx
-      .update(native_attested_keys)
-      .set({
-        last_used_at: now,
-      })
-      .where(
-        and(
-          eq(native_attested_keys.key_id, verification.keyId),
-          eq(native_attested_keys.platform, verification.platform),
-          eq(native_attested_keys.kilo_user_id, userId)
-        )
-      );
   }
 }
 

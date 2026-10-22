@@ -243,6 +243,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       case 'retry':
         // A retry is the same turn making progress again, so it only reports
         // the attempt; the lifecycle status the turn already carries stays.
+        // The turn is in flight, so a later wrapper disconnect is a real loss
+        // and must install the lost-connection status.
+        completed = false;
         activity = {
           type: 'retrying',
           attempt: known.attempt,

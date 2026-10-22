@@ -1774,6 +1774,27 @@ describe('createServiceState', () => {
       expect(state.getStatus()).toEqual({ type: 'error', message: 'Assistant request failed' });
     });
 
+    it.each(['live', 'connect'] as const)(
+      'a retry from a %s report re-arms the lost-connection status after a completed turn',
+      source => {
+        const onError = jest.fn();
+        const state = createServiceState(makeConfig({ onError }));
+        const retry = { type: 'retry' as const, attempt: 2, message: 'Retrying', next: 5_000 };
+
+        state.process({ type: 'stopped', reason: 'complete' });
+        onError.mockClear();
+        if (source === 'live') {
+          state.process({ type: 'session.status', sessionId: 'root-1', status: retry });
+        } else {
+          state.process({ type: 'connected', sessionStatus: retry });
+        }
+        state.process({ type: 'stopped', reason: 'disconnected' });
+
+        expect(state.getStatus()).toEqual({ type: 'disconnected' });
+        expect(onError).toHaveBeenCalledWith('Connection to agent lost');
+      }
+    );
+
     it('leaves activity and status alone for a status this SDK does not know', () => {
       const state = createServiceState(makeConfig());
       state.setActivity({ type: 'busy' });

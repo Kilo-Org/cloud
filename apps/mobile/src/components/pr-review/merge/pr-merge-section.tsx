@@ -190,9 +190,6 @@ export function PrMergeSection({
           onDisable={() => {
             ignoreRejection(
               disableAutoMerge.mutateAsync({
-                owner,
-                repo,
-                number: overview.number,
                 prNodeId: overview.prNodeId,
               })
             );

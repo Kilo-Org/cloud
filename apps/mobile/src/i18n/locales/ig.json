@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Enweghị ebe nchekwa koodu a na-ahụ. Lelee ikike ịbanye na ha na GitLab, wee budata ọzọ.",
       "noRepositoriesVisibleBitbucket": "Enweghị ebe nchekwa koodu a na-ahụ. Lelee ikike ịbanye na ha na Bitbucket, wee budata ọzọ.",
       "bitbucketOrganizationsOnly": "A na-enweta Bitbucket maka òtù naanị.",
+      "githubNeedsAttention": "A chọrọ ijikọ GitHub ọzọ",
+      "githubNeedsAttentionDescription": "Jikọọ ngwa Kilo GitHub ọzọ, wee budata ebe nchekwa koodu ya ọzọ.",
+      "partialRepositories": "Ụfọdụ ebe nchekwa koodu GitHub ebudatabeghị.",
       "branchPickerTitle": "Họrọ alaka",
       "branchDefault": "Ndabere",
       "branchAccessibility": "Alaka: {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "Aha nka ga-ebidorịrị site na mkpụrụedemede ma ọ bụ mkpụrụọnụọgụgụ ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ na ngwucha",
     "skillContentRequired": "Achọrọ ọdịnaya nka",
     "skillSaveFailed": "Enweghị ike ichekwa nka",
+    "skillSourceCustom": "Nke onwe",
+    "skillSourceMarketplace": "Ahịa",
     "skillsHint": "Tapawa SKILL.md na aha ya juputara; tinye nka na ekwentị gị na-adọkpụrụghị na dobe.",
     "skillEditTitle": "Dezie nka",
     "mcp": {

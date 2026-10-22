@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Babu ma'ajiyoyi da ake gani. Duba izinin shiga ma'ajiyoyi na GitLab, sannan ka sabunta.",
       "noRepositoriesVisibleBitbucket": "Babu ma'ajiyoyi da ake gani. Duba izinin shiga ma'ajiyoyi na Bitbucket, sannan ka sabunta.",
       "bitbucketOrganizationsOnly": "Bitbucket yana samuwa ga ƙungiyoyi kawai.",
+      "githubNeedsAttention": "Dole a sake haɗa GitHub",
+      "githubNeedsAttentionDescription": "Ka sake haɗa manhajar Kilo ta GitHub, sannan ka sabunta don a loda ma'ajiyoyinta.",
+      "partialRepositories": "An kasa loda wasu ma'ajiyoyin GitHub.",
       "branchPickerTitle": "Zaɓi reshe",
       "branchDefault": "Na al'ada",
       "branchAccessibility": "Reshe: {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "Dole ne sunan gwani ya fara da harafi ko lambobi kuma yayi amfani da ƙananan haruffa kawai, lambobi, da dashes",
     "skillContentRequired": "Ana buƙatar abun ciki gwaninta",
     "skillSaveFailed": "An kasa ajiye fasaha",
+    "skillSourceCustom": "Al'ada",
+    "skillSourceMarketplace": "Kasuwa",
     "skillsHint": "Manna SKILL.md kuma sunansa ya cika; ƙara fasaha daga wayarka ba tare da ja da sauke ba.",
     "skillEditTitle": "Gyara fasaha",
     "mcp": {

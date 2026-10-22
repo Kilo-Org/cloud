@@ -2259,6 +2259,9 @@
       "noRepositoriesVisibleGitlab": "Nav redzamu repozitoriju. Pārbaudi piekļuvi GitLab repozitorijiem, pēc tam atsvaidzini sarakstu.",
       "noRepositoriesVisibleBitbucket": "Nav redzamu repozitoriju. Pārbaudi piekļuvi Bitbucket repozitorijiem, pēc tam atsvaidzini sarakstu.",
       "bitbucketOrganizationsOnly": "Bitbucket ir pieejams tikai organizācijām.",
+      "githubNeedsAttention": "GitHub ir jāpievieno no jauna",
+      "githubNeedsAttentionDescription": "Pievieno Kilo GitHub lietotni no jauna, pēc tam atsvaidzini, lai ielādētu tās repozitorijus.",
+      "partialRepositories": "Dažus GitHub repozitorijus neizdevās ielādēt.",
       "branchPickerTitle": "Atlasīt atzaru",
       "branchDefault": "Noklusējuma",
       "branchAccessibility": "Atzars: {{label}}",
@@ -3729,6 +3732,8 @@
     "skillNameInvalid": "Prasmes nosaukumam jāsākas ar burtu vai ciparu, un tajā jāizmanto tikai mazie burti, cipari un domuzīmes.",
     "skillContentRequired": "Nepieciešams prasmju saturs",
     "skillSaveFailed": "Nevarēja saglabāt prasmi",
+    "skillSourceCustom": "Pielāgots",
+    "skillSourceMarketplace": "Tirgus",
     "skillsHint": "Ielīmējiet failu SKILL.md, un tā nosaukums tiks aizpildīts; pievienojiet prasmi no sava tālruņa bez vilkšanas un nomešanas.",
     "skillEditTitle": "Rediģēt prasmi",
     "mcp": {

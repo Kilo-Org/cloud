@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Geen bewaarplekke is sigbaar nie. Gaan GitLab se toegang tot bewaarplekke na en verfris dan die lys.",
       "noRepositoriesVisibleBitbucket": "Geen bewaarplekke is sigbaar nie. Gaan Bitbucket se toegang tot bewaarplekke na en verfris dan die lys.",
       "bitbucketOrganizationsOnly": "Bitbucket is slegs vir organisasies beskikbaar.",
+      "githubNeedsAttention": "GitHub moet herkoppel word",
+      "githubNeedsAttentionDescription": "Herkoppel die Kilo GitHub App en verfris dan om sy bewaarplekke te laai.",
+      "partialRepositories": "Sommige GitHub-bewaarplekke het nie gelaai nie.",
       "branchPickerTitle": "Kies tak",
       "branchDefault": "Verstek",
       "branchAccessibility": "Tak: {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "Vaardigheidsnaam moet met 'n letter of syfer begin en slegs kleinletters, syfers en strepies gebruik",
     "skillContentRequired": "Vaardigheidsinhoud word vereis",
     "skillSaveFailed": "Kon nie vaardigheid red nie",
+    "skillSourceCustom": "Pasgemaak",
+    "skillSourceMarketplace": "Markplek",
     "skillsHint": "Plak 'n SKILL.md en sy naam vul in; voeg 'n vaardigheid vanaf jou foon by sonder om te sleep en te laat val.",
     "skillEditTitle": "Wysig vaardigheid",
     "mcp": {

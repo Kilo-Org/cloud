@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "ගබඩා නොපෙනේ. GitLab ගබඩා වෙත ප්‍රවේශ වීමට අවසර තිබේදැයි පරීක්ෂා කර නැවුම් කරන්න.",
       "noRepositoriesVisibleBitbucket": "ගබඩා නොපෙනේ. Bitbucket ගබඩා වෙත ප්‍රවේශ වීමට අවසර තිබේදැයි පරීක්ෂා කර නැවුම් කරන්න.",
       "bitbucketOrganizationsOnly": "සංවිධාන සඳහා පමණක් Bitbucket ලබා ගත හැක.",
+      "githubNeedsAttention": "GitHub නැවත සම්බන්ධ කළ යුතුය",
+      "githubNeedsAttentionDescription": "Kilo GitHub App නැවත සම්බන්ධ කර, එහි ගබඩා පූරණය කිරීමට නැවුම් කරන්න.",
+      "partialRepositories": "සමහර GitHub ගබඩා පූරණය නොවීය.",
       "branchPickerTitle": "ශාඛාව තෝරන්න",
       "branchDefault": "පෙරනිමිය",
       "branchAccessibility": "ශාඛාව: {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "කුසලතා නාමය අකුරකින් හෝ ඉලක්කමකින් ආරම්භ විය යුතු අතර කුඩා අකුරු, ඉලක්කම් සහ ඉරි පමණක් භාවිතා කළ යුතුය",
     "skillContentRequired": "නිපුණතා අන්තර්ගතය අවශ්ය වේ",
     "skillSaveFailed": "කුසලතා සුරැකීමට නොහැකි විය",
+    "skillSourceCustom": "අභිරුචි",
+    "skillSourceMarketplace": "වෙළඳපොළ",
     "skillsHint": "SKILL.md එකක් අලවන්න සහ එහි නම පුරවයි; ඇදගෙන යාමකින් තොරව ඔබගේ දුරකථනයෙන් කුසලතා එක් කරන්න.",
     "skillEditTitle": "සංස්කරණ කුසලතා",
     "mcp": {

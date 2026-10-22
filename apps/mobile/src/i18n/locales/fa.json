@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "هیچ مخزنی نمایش داده نمی‌شود. دسترسی به مخزن‌های GitLab را بررسی کنید، سپس فهرست را تازه‌سازی کنید.",
       "noRepositoriesVisibleBitbucket": "هیچ مخزنی نمایش داده نمی‌شود. دسترسی به مخزن‌های Bitbucket را بررسی کنید، سپس فهرست را تازه‌سازی کنید.",
       "bitbucketOrganizationsOnly": "Bitbucket فقط برای سازمان‌ها در دسترس است.",
+      "githubNeedsAttention": "اتصال به GitHub باید دوباره برقرار شود",
+      "githubNeedsAttentionDescription": "برنامهٔ GitHub Kilo را دوباره متصل کنید، سپس برای بارگذاری مخزن‌های آن، فهرست را تازه‌سازی کنید.",
+      "partialRepositories": "برخی از مخزن‌های GitHub بارگذاری نشد.",
       "branchPickerTitle": "انتخاب شاخه",
       "branchDefault": "پیش‌فرض",
       "branchAccessibility": "شاخه: {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "نام مهارت باید با یک حرف یا رقم شروع شود و فقط از حروف کوچک، ارقام و خط تیره استفاده کند.",
     "skillContentRequired": "محتوای مهارتی مورد نیاز است",
     "skillSaveFailed": "مهارت ذخیره نشد",
+    "skillSourceCustom": "سفارشی",
+    "skillSourceMarketplace": "بازار",
     "skillsHint": "یک SKILL.md قرار دهید و نام آن پر می شود. یک مهارت از تلفن خود بدون کشیدن و رها کردن اضافه کنید.",
     "skillEditTitle": "مهارت ویرایش",
     "mcp": {

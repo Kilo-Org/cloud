@@ -1,5 +1,5 @@
 diff --git a/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt b/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt
-index 9ba0bfb..b8b6620 100644
+index 2e44253..90277ee 100644
 --- a/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt
 +++ b/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt
 @@ -1,11 +1,9 @@
@@ -14,7 +14,7 @@ index 9ba0bfb..b8b6620 100644
  import expo.modules.apploader.HeadlessAppLoader
  import expo.modules.core.interfaces.Consumer
  import expo.modules.core.interfaces.DoNotStrip
-@@ -51,19 +49,13 @@ class RNHeadlessAppLoader @DoNotStrip constructor() : HeadlessAppLoader {
+@@ -52,19 +50,13 @@ class RNHeadlessAppLoader @DoNotStrip constructor() : HeadlessAppLoader {
      }
    }
  

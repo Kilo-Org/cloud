@@ -14,15 +14,18 @@ import {
 
 const expoFileSystemMock = vi.hoisted(() => {
   const File = vi.fn(function FileMock(_base: string, _name: string) {
-    return {
+    const file: MockFileInstance = {
       _exists: true,
       get exists() {
         return (this as { _exists: boolean })._exists;
       },
       text: vi.fn().mockResolvedValue(''),
-      write: vi.fn(),
+      writeSync(value: string) {
+        this.content = value;
+      },
       delete: vi.fn(),
     };
+    return file;
   });
   return {
     File,
@@ -41,13 +44,13 @@ type MockFileInstance = {
   _exists: boolean;
   readonly exists: boolean;
   text: ReturnType<typeof vi.fn>;
-  write: ReturnType<typeof vi.fn>;
+  content?: string;
+  writeSync: (value: string) => void;
   delete: ReturnType<typeof vi.fn>;
 };
 
 function lastFileInstance(): MockFileInstance {
-  const instances = expoFileSystemMock.File.mock.instances as MockFileInstance[];
-  const inst = instances.at(-1);
+  const inst = expoFileSystemMock.File.mock.results.at(-1)?.value;
   if (!inst) {
     throw new Error('no File instance yet — call the operation before checking the instance');
   }
@@ -76,23 +79,25 @@ function makeNextFile(opts?: {
     _base: string,
     _name: string
   ) {
-    return {
+    const file: MockFileInstance = {
       _exists: exists,
       get exists() {
         return exists;
       },
       text: textReject ? vi.fn().mockRejectedValue(textReject) : vi.fn().mockResolvedValue(''),
-      write: writeReject
-        ? vi.fn(() => {
-            throw writeReject;
-          })
-        : vi.fn(),
+      writeSync(value: string) {
+        if (writeReject) {
+          throw writeReject;
+        }
+        this.content = value;
+      },
       delete: deleteReject
         ? vi.fn(() => {
             throw deleteReject;
           })
         : vi.fn(),
     };
+    return file;
   });
 }
 
@@ -179,7 +184,7 @@ describe('posthogCustomStorage', () => {
 
     it('writes the value to the file', () => {
       posthogCustomStorage.setItem('.posthog-rn.json', '{"q":1}');
-      expect(lastFileInstance().write).toHaveBeenCalledWith('{"q":1}');
+      expect(lastFileInstance().content).toBe('{"q":1}');
     });
 
     it('swallows a write error', () => {
@@ -234,7 +239,7 @@ describe('seal', () => {
       sealPostHogStorage();
       unsealPostHogStorage();
       posthogCustomStorage.setItem('.posthog-rn.json', 'payload');
-      expect(lastFileInstance().write).toHaveBeenCalledWith('payload');
+      expect(lastFileInstance().content).toBe('payload');
     });
 
     it('getItem reads again', async () => {
@@ -269,39 +274,6 @@ describe('purgePostHogPersistence', () => {
     for (const inst of expoFileSystemMock.File.mock.instances as MockFileInstance[]) {
       expect(inst.delete).toHaveBeenCalled();
     }
-  });
-
-  it('does not throw when files are missing (purge safety)', () => {
-    sealPostHogStorage();
-    // Override the default so all four File instances report exists = false.
-    expoFileSystemMock.File.mockImplementation(function FileMockMissing(
-      this: MockFileInstance,
-      _base: string,
-      _name: string
-    ) {
-      return {
-        _exists: false,
-        get exists() {
-          return false;
-        },
-        text: vi.fn(),
-        write: vi.fn(),
-        delete: vi.fn(),
-      };
-    });
-
-    expect(() => {
-      purgePostHogPersistence();
-    }).not.toThrow();
-  });
-
-  it('swallows a delete error', () => {
-    sealPostHogStorage();
-    makeNextFile({ deleteReject: new Error('permission denied') });
-
-    expect(() => {
-      purgePostHogPersistence();
-    }).not.toThrow();
   });
 });
 

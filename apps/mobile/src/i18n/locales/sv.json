@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Inga kodarkiv visas. Kontrollera åtkomsten till kodarkiven i GitLab och uppdatera sedan listan.",
       "noRepositoriesVisibleBitbucket": "Inga kodarkiv visas. Kontrollera åtkomsten till kodarkiven i Bitbucket och uppdatera sedan listan.",
       "bitbucketOrganizationsOnly": "Bitbucket är bara tillgängligt för organisationer.",
+      "githubNeedsAttention": "GitHub måste återanslutas",
+      "githubNeedsAttentionDescription": "Anslut Kilos GitHub-app igen och uppdatera sedan för att läsa in dess kodarkiv.",
+      "partialRepositories": "Vissa kodarkiv från GitHub gick inte att läsa in.",
       "branchPickerTitle": "Välj gren",
       "branchDefault": "Standard",
       "branchAccessibility": "Gren: {{label}}",
@@ -3683,6 +3686,8 @@
     "skillNameInvalid": "Färdighetsnamn måste börja med en bokstav eller siffra och endast använda små bokstäver, siffror och bindestreck",
     "skillContentRequired": "Färdighetsinnehåll krävs",
     "skillSaveFailed": "Det gick inte att spara färdigheten",
+    "skillSourceCustom": "Anpassad",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Klistra in en SKILL.md och dess namn fylls i; lägg till en färdighet från din telefon utan att dra och släppa.",
     "skillEditTitle": "Redigera färdighet",
     "mcp": {

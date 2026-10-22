@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Hoidlaid pole näha. Kontrolli GitLabi hoidlate juurdepääsuõigusi ja värskenda seejärel loendit.",
       "noRepositoriesVisibleBitbucket": "Hoidlaid pole näha. Kontrolli Bitbucketi hoidlate juurdepääsuõigusi ja värskenda seejärel loendit.",
       "bitbucketOrganizationsOnly": "Bitbucket on saadaval ainult organisatsioonidele.",
+      "githubNeedsAttention": "GitHub tuleb uuesti ühendada",
+      "githubNeedsAttentionDescription": "Ühenda Kilo GitHubi rakendus uuesti ja värskenda seejärel, et selle hoidlaid laadida.",
+      "partialRepositories": "Mõningaid GitHubi hoidlaid ei õnnestunud laadida.",
       "branchPickerTitle": "Vali haru",
       "branchDefault": "Vaikimisi",
       "branchAccessibility": "Haru: {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "Oskuste nimi peab algama tähe või numbriga ning kasutama ainult väiketähti, numbreid ja sidekriipse",
     "skillContentRequired": "Vajalik on oskuste sisu",
     "skillSaveFailed": "Oskust ei õnnestunud salvestada",
+    "skillSourceCustom": "Kohandatud",
+    "skillSourceMarketplace": "Turg",
     "skillsHint": "Kleepige fail SKILL.md ja selle nimi täidetakse; lisage oma telefonist oskusi ilma lohistamata.",
     "skillEditTitle": "Muuda oskusi",
     "mcp": {

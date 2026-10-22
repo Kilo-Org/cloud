@@ -10,22 +10,40 @@ import { isFreeModelRateLimited } from './free-model-rate-limit';
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 
 describe('isFreeModelRateLimited', () => {
-  it('counts against the free-model firewall rule', async () => {
+  it('counts signed-in callers against the per-account free-model rule', async () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
     const request = new NextRequest('https://gateway.example.com/api/gateway/chat/completions');
 
-    await expect(isFreeModelRateLimited(request, 'user:user-123')).resolves.toBe(true);
+    await expect(
+      isFreeModelRateLimited(request, { kind: 'account', kiloUserId: 'user-123' })
+    ).resolves.toBe(true);
 
     expect(mockCheckRateLimit).toHaveBeenCalledWith(
-      'free-model-inference',
-      expect.objectContaining({ rateLimitKey: 'free-model-inference:user:user-123' })
+      'free-model-inference-user',
+      expect.objectContaining({ rateLimitKey: 'free-model-inference-user:user:user-123' })
     );
   });
 
-  it('keeps admitting free models when the rule is missing, since it is not an admission cap', async () => {
+  it('counts anonymous callers against the per-IP free-model rule', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
+    const request = new NextRequest('https://gateway.example.com/api/gateway/chat/completions');
+
+    await expect(
+      isFreeModelRateLimited(request, { kind: 'ip', ipAddress: '203.0.113.7' })
+    ).resolves.toBe(false);
+
+    expect(mockCheckRateLimit).toHaveBeenCalledWith(
+      'free-model-inference',
+      expect.objectContaining({ rateLimitKey: 'free-model-inference:ip:203.0.113.7' })
+    );
+  });
+
+  it('preserves the free-model fairness policy', async () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
     const request = new NextRequest('https://gateway.example.com/api/gateway/chat/completions');
 
-    await expect(isFreeModelRateLimited(request, 'user:user-123')).resolves.toBe(false);
+    await expect(
+      isFreeModelRateLimited(request, { kind: 'account', kiloUserId: 'user-123' })
+    ).resolves.toBe(false);
   });
 });

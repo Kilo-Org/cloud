@@ -1,5 +1,5 @@
 import { normalize, normalizeCliEvent, isChatEvent } from './normalizer';
-import type { CloudAgentEvent } from './event-types';
+import type { CloudAgentEvent } from './schemas';
 
 function createRaw(streamEventType: string, data: unknown, sessionId = 'ses-1'): CloudAgentEvent {
   return {
@@ -495,6 +495,35 @@ describe('normalize', () => {
         type: 'session.status',
         sessionId: 'ses-1',
         status: { type: 'idle' },
+      });
+    });
+
+    it('keeps a question status so the live transition reaches consumers', () => {
+      const result = normalize(
+        createRaw('session.status', {
+          sessionID: 'ses-1',
+          status: { type: 'question' },
+        })
+      );
+      expect(result).toEqual({
+        type: 'session.status',
+        sessionId: 'ses-1',
+        status: { type: 'question' },
+      });
+    });
+
+    it('keeps a status type this SDK does not know yet', () => {
+      const status = { type: 'offline', requestID: 'que_1', message: 'Kilo is offline' };
+      const result = normalize(
+        createRaw('session.status', {
+          sessionID: 'ses-1',
+          status,
+        })
+      );
+      expect(result).toEqual({
+        type: 'session.status',
+        sessionId: 'ses-1',
+        status,
       });
     });
 
@@ -1742,6 +1771,15 @@ describe('normalize', () => {
       const result = normalize(createRaw('connected', { sessionStatus: 'busy' }));
       expect(result).toEqual({ type: 'connected', cloudSessionId: 'ses-1' });
       expect(result).not.toHaveProperty('sessionStatus');
+    });
+
+    it('keeps a permission sessionStatus instead of discarding it', () => {
+      const result = normalize(createRaw('connected', { sessionStatus: { type: 'permission' } }));
+      expect(result).toEqual({
+        type: 'connected',
+        cloudSessionId: 'ses-1',
+        sessionStatus: { type: 'permission' },
+      });
     });
 
     it('ignores invalid cloudStatus', () => {

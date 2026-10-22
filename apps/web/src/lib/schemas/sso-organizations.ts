@@ -6,7 +6,11 @@ export const SignInDiscoveryRequestSchema = emailSchema;
 export const SignInDiscoveryResponseSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('sso'), organizationId: z.string().min(1) }),
   z.object({ kind: z.literal('existing'), providers: z.array(z.string()) }),
-  z.object({ kind: z.literal('new'), providers: z.array(z.string()) }),
+  z.object({
+    kind: z.literal('new'),
+    providers: z.array(z.string()),
+    emailSignupDisabled: z.boolean().optional(),
+  }),
 ]);
 
 export type SignInDiscoveryResponse = z.infer<typeof SignInDiscoveryResponseSchema>;

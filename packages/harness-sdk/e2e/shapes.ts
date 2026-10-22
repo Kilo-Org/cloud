@@ -29,12 +29,15 @@ interface Answer {
 }
 
 const ask = (session: SessionHandle, text: string) =>
-  Stream.runFold(session.ask(text), { said: '', usage: undefined } as Answer, (held, event) =>
-    event.kind === 'delta'
-      ? { ...held, said: held.said + event.text }
-      : event.kind === 'done'
-        ? { ...held, usage: event.usage }
-        : held
+  Stream.runFold(
+    session.ask(text),
+    () => ({ said: '', usage: undefined }) as Answer,
+    (held, event) =>
+      event.kind === 'delta'
+        ? { ...held, said: held.said + event.text }
+        : event.kind === 'done'
+          ? { ...held, usage: event.usage }
+          : held
   );
 
 const runShape = async (model: string, kind: ApiKind) => {
@@ -51,7 +54,7 @@ const runShape = async (model: string, kind: ApiKind) => {
     return { first, second, total: yield* session.usage };
   });
 
-  return Effect.runPromise(Effect.either(Effect.scoped(Effect.provide(program, layers))));
+  return Effect.runPromise(Effect.result(Effect.scoped(Effect.provide(program, layers))));
 };
 
 const kinds: readonly ApiKind[] = ['messages', 'responses', 'chat_completions'];
@@ -83,16 +86,16 @@ for (const model of models) {
        finding. */
     const once = await runShape(model, kind);
     const result =
-      once._tag === 'Right' && once.right.total.cacheReadTokens > 0
+      once._tag === 'Success' && once.success.total.cacheReadTokens > 0
         ? once
         : await runShape(model, kind);
-    if (result._tag === 'Left') {
-      console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(result.left)}`);
+    if (result._tag === 'Failure') {
+      console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(result.failure)}`);
       fail(`${kind}: the call failed`);
       continue;
     }
 
-    const { first, second, total } = result.right;
+    const { first, second, total } = result.success;
     const ratio = hitRatio(total);
     const answered = first.said.length > 0 && second.said.length > 0;
     console.log(

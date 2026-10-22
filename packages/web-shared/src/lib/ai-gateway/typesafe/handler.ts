@@ -23,6 +23,7 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { logMicrodollarUsageAndReportToBouncer } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
@@ -97,6 +98,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return errorResponse(z.prettifyError(parsed.error), 'invalid_request', 400);
   }
   const { model: requestedModel } = parsed.data;
+  const isFree = isFreeModelExcludingCustomLlms(requestedModel);
   if (!(await isSystemOneModel(requestedModel))) {
     return errorResponse(
       `The requested model '${requestedModel}' is not a System One model`,
@@ -244,7 +246,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
         streamed: false,
         cancelled: false,
         status_code: response.status,
-        cost_mUsd: cost,
+        cost_mUsd: isFree ? 0 : cost,
         market_cost: cost,
         inputTokens: usage.input_tokens,
         outputTokens: usage.output_tokens,
@@ -257,6 +259,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
         kiloUserId: user.id,
         provider: 'openrouter',
         requested_model: requestedModel,
+        is_free: isFree,
         promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
         max_tokens: null,
         has_middle_out_transform: null,

@@ -1,21 +1,42 @@
 import type { QueryClient } from '@tanstack/react-query';
-import type { KiloSessionId, SessionSnapshotPage } from '@kilocode/cloud-agent-sdk';
+import type { CachedSessionSnapshotPage, KiloSessionId } from '@kilocode/cloud-agent-sdk';
+
+const TRANSCRIPT_CACHE_ROOT = 'cloud-agent-transcript';
+const CACHED_MESSAGE_LIMIT = 50;
+
+/** One cache per account context, so personal and organization chats stay apart. */
+export function transcriptCacheScope(organizationId: string | null): string {
+  return organizationId ?? 'personal';
+}
+
+export function transcriptCacheKey(scope: string, sessionId: string) {
+  return [TRANSCRIPT_CACHE_ROOT, scope, sessionId] as const;
+}
+
+/** The recent tail of a page; the live page restores pagination when it lands. */
+export function toCachedTranscriptPage(page: CachedSessionSnapshotPage): CachedSessionSnapshotPage {
+  return {
+    ...page,
+    messages: page.messages.slice(-CACHED_MESSAGE_LIMIT),
+    nextCursor: null,
+    omittedItemCount: 0,
+  };
+}
 
 export function createWebSessionTranscriptCache(queryClient: QueryClient, scope: string) {
-  const queryKey = ['cloud-agent-transcript', scope];
-  queryClient.setQueryDefaults(['cloud-agent-transcript'], {
+  const queryKey = [TRANSCRIPT_CACHE_ROOT, scope];
+  queryClient.setQueryDefaults([TRANSCRIPT_CACHE_ROOT], {
     gcTime: 5 * 60_000,
     structuralSharing: false,
   });
 
   return {
-    read: async (sessionId: KiloSessionId): Promise<SessionSnapshotPage | null> => {
-      await Promise.resolve();
-      return queryClient.getQueryData<SessionSnapshotPage>([...queryKey, sessionId]) ?? null;
-    },
-    write: (page: SessionSnapshotPage): void => {
-      const messages = page.messages.slice(-50);
-      const snapshot = { ...page, messages, nextCursor: null, omittedItemCount: 0 };
+    // Synchronous, so a reopened session paints from its cached page in the first frame.
+    read: (sessionId: KiloSessionId): CachedSessionSnapshotPage | null =>
+      queryClient.getQueryData<CachedSessionSnapshotPage>(transcriptCacheKey(scope, sessionId)) ??
+      null,
+    write: (page: CachedSessionSnapshotPage): void => {
+      const snapshot = toCachedTranscriptPage(page);
       const updatedAt = Date.now();
       queueMicrotask(() => {
         try {
@@ -23,7 +44,9 @@ export function createWebSessionTranscriptCache(queryClient: QueryClient, scope:
             queryClient.removeQueries({ queryKey: [...queryKey, page.info.id], exact: true });
             return;
           }
-          queryClient.setQueryData([...queryKey, page.info.id], snapshot, { updatedAt });
+          queryClient.setQueryData(transcriptCacheKey(scope, page.info.id), snapshot, {
+            updatedAt,
+          });
           const cached = queryClient
             .getQueryCache()
             .findAll({ queryKey })

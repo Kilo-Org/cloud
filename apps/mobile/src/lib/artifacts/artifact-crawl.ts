@@ -430,7 +430,10 @@ function keepsAttachment(part: LoosePart, attachment: LooseAttachment): boolean 
   return attachment.mime.startsWith('image/') || part.tool === 'send_file';
 }
 
-function writeDataUrlArtifact(artifact: CrawledArtifact, target: File): ArtifactMaterializeResult {
+async function writeDataUrlArtifact(
+  artifact: CrawledArtifact,
+  target: File
+): Promise<ArtifactMaterializeResult> {
   const payload = stripDataUrlBase64Prefix(artifact.url, artifact.mime);
   if (payload === undefined) {
     return { ok: false, reason: 'unsupported' };
@@ -440,7 +443,7 @@ function writeDataUrlArtifact(artifact: CrawledArtifact, target: File): Artifact
     return { ok: false, reason: 'too-large' };
   }
   try {
-    target.write(payload, { encoding: 'base64' });
+    await target.write(payload, { encoding: 'base64' });
   } catch {
     return { ok: false, reason: 'download-failed' };
   }

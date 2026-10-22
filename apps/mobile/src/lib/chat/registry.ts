@@ -77,7 +77,7 @@ const openRuntime = (database: SQLiteDatabase, org: ChatOrg) =>
 type ChatRuntime = ReturnType<typeof openRuntime>;
 
 /** Every plugin the runtime holds, which is what a session may still ask for. */
-type ChatContext = ManagedRuntime.ManagedRuntime.Context<ChatRuntime>;
+type ChatContext = ManagedRuntime.ManagedRuntime.Services<ChatRuntime>;
 
 /**
  * A question typed while an answer was arriving, and the model and effort it
@@ -93,8 +93,8 @@ const questionsIn = (waiting: readonly Waiting[]): readonly Question[] =>
 /** A chat that is open: the session behind it, and what it is doing. */
 type Chat = {
   readonly handle: SessionHandle;
-  readonly scope: Scope.CloseableScope;
-  answering: Fiber.RuntimeFiber<void, unknown> | undefined;
+  readonly scope: Scope.Closeable;
+  answering: Fiber.Fiber<void, unknown> | undefined;
   /** What was typed while `answering` was running. Drained when it ends well. */
   readonly waiting: Waiting[];
   /**
@@ -153,10 +153,10 @@ async function runtimeFor(place: ChatPlace): Promise<ChatRuntime> {
 async function inOwnScope<E>(
   runtime: ChatRuntime,
   opened: Effect.Effect<SessionHandle, E, ChatContext | Scope.Scope>
-): Promise<{ readonly handle: SessionHandle; readonly scope: Scope.CloseableScope }> {
+): Promise<{ readonly handle: SessionHandle; readonly scope: Scope.Closeable }> {
   const scope = await runtime.runPromise(Scope.make());
   try {
-    const handle = await runtime.runPromise(Scope.extend(opened, scope));
+    const handle = await runtime.runPromise(Scope.provide(opened, scope));
     return { handle, scope };
   } catch (error) {
     /* Opening the session failed after the scope was made, and every caller
@@ -324,7 +324,7 @@ type Opened =
   | {
       readonly opened: true;
       readonly handle: SessionHandle;
-      readonly scope: Scope.CloseableScope;
+      readonly scope: Scope.Closeable;
     };
 
 /**
@@ -342,14 +342,14 @@ async function openOrMissing<E>(
   opened: Effect.Effect<SessionHandle, E, ChatContext | Scope.Scope>
 ): Promise<Opened> {
   const scope = await runtime.runPromise(Scope.make());
-  const exit = await runtime.runPromise(Effect.exit(Scope.extend(opened, scope)));
+  const exit = await runtime.runPromise(Effect.exit(Scope.provide(opened, scope)));
   if (Exit.isSuccess(exit)) {
     return { opened: true, handle: exit.value, scope };
   }
   /* Opening failed after the scope was made; with nothing holding it, only
      closing it runs the finalizers the half-open session registered. */
   await runtime.runPromise(Scope.close(scope, Exit.void));
-  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(exit.cause));
   if (failure instanceof ToolMissingError) {
     return { opened: false };
   }
@@ -618,13 +618,13 @@ function reading(sessionId: string, question: Question, runtime: ChatRuntime): E
     }
     return Effect.void;
   }).pipe(
-    Effect.locally(questionSearches, { used: 0 }),
+    Effect.provideService(questionSearches, { used: 0 }),
     Effect.matchCauseEffect({
       onFailure: (cause: Cause.Cause<unknown>) =>
         Effect.promise(async () => {
           await settle(sessionId, runtime, {
             reason: why(cause),
-            key: backendFailureKey(Option.getOrUndefined(Cause.failureOption(cause))),
+            key: backendFailureKey(Option.getOrUndefined(Cause.findErrorOption(cause))),
           });
         }),
       onSuccess: () =>
@@ -643,7 +643,7 @@ function reading(sessionId: string, question: Question, runtime: ChatRuntime): E
  * tool — are what say what happened, and none of them are in its message.
  */
 function why(cause: Cause.Cause<unknown>): string {
-  const failure = Option.getOrUndefined(Cause.failureOption(cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(cause));
   if (failure === undefined) {
     return Cause.pretty(cause).slice(0, 300);
   }
@@ -854,7 +854,7 @@ async function cloneOnto(
   runtime: ChatRuntime,
   sessionId: string,
   clone: Clone
-): Promise<{ readonly handle: SessionHandle; readonly scope: Scope.CloseableScope }> {
+): Promise<{ readonly handle: SessionHandle; readonly scope: Scope.Closeable }> {
   const { effort, ...move } = clone.move;
   const wanted: CloneOptions = {
     ...move,

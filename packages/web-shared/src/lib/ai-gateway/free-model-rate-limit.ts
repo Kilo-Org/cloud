@@ -3,24 +3,33 @@ import type { NextRequest } from 'next/server';
 import { checkFirewallRateLimit } from '@kilocode/web-shared/lib/ai-gateway/firewall-rate-limit';
 
 /**
- * Vercel Firewall rate limit for the free models flagged `rate-limited`, which
- * free users reach through `kilo-auto/small` for session titles and other small
- * tasks. It exists to stop obvious abuse, not to meter normal use. The window
- * and limit live in the project's firewall configuration.
+ * Vercel Firewall rate limits shared by all free models, custom LLMs excluded.
+ * They exist to stop abuse, not to meter normal use. Signed-in callers count
+ * per account and anonymous callers per IP, each against its own rule so the
+ * two limits can differ. Abusers rotate IPs far more cheaply than accounts, and
+ * people behind one NAT should not share an allowance. The windows and limits
+ * live in the project's firewall configuration.
  */
-const FREE_MODEL_RATE_LIMIT_ID = 'free-model-inference';
+export type FreeModelRateLimitSubject =
+  | { kind: 'account'; kiloUserId: string }
+  | { kind: 'ip'; ipAddress: string };
 
-/**
- * A missing rule keeps this cap open on purpose. It is a fairness cap on free
- * models, not an admission control: refusing free-model traffic because the
- * rule is absent would take a working route down, and the volume it guards is
- * small. The account inference cap, which does guard admission, fails closed.
- */
-export async function isFreeModelRateLimited(request: NextRequest, key: string): Promise<boolean> {
+const FREE_MODEL_RATE_LIMIT_RULES = {
+  account: { id: 'free-model-inference-user', sentrySource: 'free_model_inference_user' },
+  ip: { id: 'free-model-inference', sentrySource: 'free_model_inference' },
+} as const;
+
+export function freeModelRateLimitKey(subject: FreeModelRateLimitSubject): string {
+  return subject.kind === 'account' ? `user:${subject.kiloUserId}` : `ip:${subject.ipAddress}`;
+}
+
+export async function isFreeModelRateLimited(
+  request: NextRequest,
+  subject: FreeModelRateLimitSubject
+): Promise<boolean> {
   const verdict = await checkFirewallRateLimit(request, {
-    id: FREE_MODEL_RATE_LIMIT_ID,
-    key,
-    sentrySource: 'free_model_inference',
+    ...FREE_MODEL_RATE_LIMIT_RULES[subject.kind],
+    key: freeModelRateLimitKey(subject),
   });
   return verdict === 'limited';
 }

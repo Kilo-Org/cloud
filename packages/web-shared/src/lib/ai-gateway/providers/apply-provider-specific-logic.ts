@@ -33,6 +33,8 @@ import {
 import { isStepModel } from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { isAnonymousUserId } from '@kilocode/web-shared/lib/anonymous';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import {
   repairChatCompletionsTools,
@@ -262,6 +264,59 @@ function hasFallbackModels(value: unknown) {
   return value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0);
 }
 
+function getServerToolType(tool: unknown): string | null {
+  if (!isRecord(tool) || typeof tool.type !== 'string') {
+    return null;
+  }
+  return tool.type === 'function' || tool.type === 'custom' ? null : tool.type;
+}
+
+/**
+ * OpenRouter bills plugins (web search, PDF parsing with OCR) and server tools
+ * (`openrouter:*` and their aliases such as `web_search_20250305`) to the
+ * gateway's account, even when the model itself is free. Free and anonymous
+ * requests keep only tools the client executes itself.
+ */
+export function removePaidServerFeatures(
+  requestedModel: string,
+  requestToMutate: GatewayRequest,
+  userId: string
+) {
+  const body: { plugins?: unknown; tools?: unknown; tool_choice?: unknown } = requestToMutate.body;
+  const { plugins, tools, tool_choice } = body;
+  delete body.plugins;
+
+  const removedToolTypes = Array.isArray(tools)
+    ? tools.map(getServerToolType).filter(type => type !== null)
+    : [];
+  if (Array.isArray(tools) && removedToolTypes.length > 0) {
+    const keptTools = tools.filter(tool => getServerToolType(tool) === null);
+    if (keptTools.length > 0) {
+      body.tools = keptTools;
+    } else {
+      delete body.tools;
+    }
+    const forcesRemovedTool =
+      isRecord(tool_choice) &&
+      typeof tool_choice.type === 'string' &&
+      removedToolTypes.includes(tool_choice.type);
+    if (keptTools.length === 0 || forcesRemovedTool) {
+      delete body.tool_choice;
+    }
+  }
+
+  if (plugins === undefined && removedToolTypes.length === 0) {
+    return;
+  }
+  console.warn('[applyProviderSpecificLogic] Removed paid server features from free request', {
+    userId,
+    model: requestedModel,
+    requestKind: requestToMutate.kind,
+    plugins,
+    removedToolTypes,
+  });
+}
+
 export function removeUnsupportedRequestServiceTier(
   requestedModel: string,
   requestToMutate: GatewayRequest,
@@ -327,6 +382,9 @@ export async function applyProviderSpecificLogic(
   isNonTrialEnterprise: boolean
 ) {
   removeModelsFallback(requestedModel, requestToMutate, userId);
+  if (isFreeModelExcludingCustomLlms(requestedModel) || isAnonymousUserId(userId)) {
+    removePaidServerFeatures(requestedModel, requestToMutate, userId);
+  }
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);

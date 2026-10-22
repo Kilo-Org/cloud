@@ -76,6 +76,10 @@ export type SharedGatewayRequestProperties = {
   // https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#server-side-fallback
   fallbacks?: unknown;
 
+  // OpenRouter plugins (web search, PDF parsing with OCR, ...), stripped from free requests
+  // https://openrouter.ai/docs/guides/features/plugins
+  plugins?: unknown;
+
   // Non-standard reasoning configuration
   enable_thinking?: boolean; // Alibaba
   thinking?: { type?: 'enabled' | 'adaptive' | 'disabled' }; // ByteDance, Z.ai

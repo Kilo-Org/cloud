@@ -6,6 +6,7 @@ import {
   applyReasoningDetailsTransform,
   getIgnoredProviders,
   removeModelsFallback,
+  removePaidServerFeatures,
   removeUnsupportedRequestServiceTier,
   withIgnoredProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
@@ -600,6 +601,148 @@ describe('removeModelsFallback', () => {
       '[applyProviderSpecificLogic] Removed caller-provided fallback models',
       expect.objectContaining({ userId: 'user-1', model, requestKind: 'messages' })
     );
+    warn.mockRestore();
+  });
+});
+
+describe('removePaidServerFeatures', () => {
+  const functionTool = {
+    type: 'function',
+    function: { name: 'lookup', parameters: { type: 'object' } },
+  } as const;
+
+  async function applyTo(model: string, userId: string, fields: Record<string, unknown>) {
+    const request = makeRequest(model);
+    Object.assign(request.body, fields);
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      userId,
+      null,
+      null,
+      null,
+      false
+    );
+    return request.body;
+  }
+
+  it('removes plugins and server tools from free model requests', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const plugins = [{ id: 'web' }, { id: 'file-parser', pdf: { engine: 'mistral-ocr' } }];
+
+    const body = await applyTo('vendor/model:free', 'user-1', {
+      plugins,
+      tools: [{ type: 'openrouter:web_search' }, functionTool, { type: 'openrouter:advisor' }],
+    });
+
+    expect(body).not.toHaveProperty('plugins');
+    expect(body.tools).toEqual([functionTool]);
+    expect(warn).toHaveBeenCalledWith(
+      '[applyProviderSpecificLogic] Removed paid server features from free request',
+      {
+        userId: 'user-1',
+        model: 'vendor/model:free',
+        requestKind: 'chat_completions',
+        plugins,
+        removedToolTypes: ['openrouter:web_search', 'openrouter:advisor'],
+      }
+    );
+    warn.mockRestore();
+  });
+
+  it('removes plugins and server tools from anonymous requests', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const body = await applyTo('vendor/model', 'anon:203.0.113.7', {
+      plugins: [{ id: 'web' }],
+      tools: [{ type: 'web_search_preview' }, functionTool],
+    });
+
+    expect(body).not.toHaveProperty('plugins');
+    expect(body.tools).toEqual([functionTool]);
+    warn.mockRestore();
+  });
+
+  it('removes the tool list and tool choice when only server tools were requested', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const body = await applyTo('vendor/model:free', 'user-1', {
+      tools: [{ type: 'openrouter:web_search' }],
+      tool_choice: 'required',
+    });
+
+    expect(body).not.toHaveProperty('tools');
+    expect(body).not.toHaveProperty('tool_choice');
+    warn.mockRestore();
+  });
+
+  it('removes a tool choice that forces a removed server tool', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const request: Extract<GatewayRequest, { kind: 'responses' }> = {
+      kind: 'responses',
+      body: {
+        model: 'vendor/model:free',
+        input: 'hello',
+        tools: [
+          { type: 'web_search_preview' },
+          { type: 'function', name: 'lookup', parameters: null, strict: false },
+        ],
+        tool_choice: { type: 'web_search_preview' },
+      },
+    };
+
+    removePaidServerFeatures('vendor/model:free', request, 'user-1');
+
+    expect(request.body.tools).toEqual([
+      { type: 'function', name: 'lookup', parameters: null, strict: false },
+    ]);
+    expect(request.body).not.toHaveProperty('tool_choice');
+    warn.mockRestore();
+  });
+
+  it('keeps client-executed Messages API tools', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const request = makeMessagesRequest('vendor/model:free');
+    const customTool = { name: 'lookup', input_schema: { type: 'object' as const } };
+    request.body.tools = [
+      customTool,
+      { type: 'custom', ...customTool },
+      { type: 'web_search_20250305', name: 'web_search' },
+    ];
+    request.body.tool_choice = { type: 'tool', name: 'lookup' };
+
+    removePaidServerFeatures('vendor/model:free', request, 'user-1');
+
+    expect(request.body.tools).toEqual([customTool, { type: 'custom', ...customTool }]);
+    expect(request.body.tool_choice).toEqual({ type: 'tool', name: 'lookup' });
+    warn.mockRestore();
+  });
+
+  it('keeps plugins and server tools for paid signed-in requests', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fields = {
+      plugins: [{ id: 'web' }],
+      tools: [{ type: 'openrouter:web_search' }, functionTool],
+    };
+
+    const body = await applyTo('vendor/model', 'user-1', structuredClone(fields));
+
+    expect(body).toMatchObject(fields);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('does not log when a free request has nothing to remove', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const body = await applyTo('vendor/model:free', 'user-1', { tools: [functionTool] });
+
+    expect(body.tools).toEqual([functionTool]);
+    expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
   });
 });

@@ -4,6 +4,7 @@ import { isSupportedLanguage, LANGUAGE_ENDONYMS } from '@/i18n/languages';
 import { readStoredValue } from '@/lib/auth/secure-store-value';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
+import { decodeSelection } from '@/lib/organization-selection';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 /**
@@ -114,7 +115,7 @@ export async function requestToolSummaryTranslations({
     return nullResults(texts.length);
   }
   // The organization scope the translation is attributed to; null is personal.
-  const organizationId = await readStoredValue(ORGANIZATION_STORAGE_KEY);
+  const organizationId = decodeSelection(await readStoredValue(ORGANIZATION_STORAGE_KEY));
 
   const headers: TranslationRequestHeaders = {
     Authorization: `Bearer ${token}`,

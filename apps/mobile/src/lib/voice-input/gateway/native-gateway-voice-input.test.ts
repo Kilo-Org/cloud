@@ -255,6 +255,14 @@ describe('resolveGatewayTranscriptionModelId', () => {
     expect(transcriptionModels.fetchTranscriptionModels).toHaveBeenCalledWith('org-42');
   });
 
+  it('resolves the personal scope for the catalogue read', async () => {
+    vi.mocked(SecureStore.getItemAsync).mockResolvedValueOnce('personal');
+    transcriptionModels.fetchTranscriptionModels.mockResolvedValue([]);
+
+    await expect(resolveGatewayTranscriptionModelId()).resolves.toBeNull();
+    expect(transcriptionModels.fetchTranscriptionModels).toHaveBeenCalledWith(undefined);
+  });
+
   it('falls back to the first catalogue entry and persists it when none is stored', async () => {
     transcriptionModels.fetchTranscriptionModels.mockResolvedValue([
       { id: 'first-model', name: 'First Model' },

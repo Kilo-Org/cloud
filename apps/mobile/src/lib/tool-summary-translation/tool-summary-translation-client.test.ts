@@ -115,6 +115,19 @@ describe('requestToolSummaryTranslations', () => {
     });
   });
 
+  it('resolves the personal scope for the translation request', async () => {
+    getItemAsync.mockResolvedValue('personal');
+    fetchMock.mockResolvedValue(arrayContent(['ok']));
+
+    await requestToolSummaryTranslations(INPUT);
+
+    expect(lastFetchCall().init.headers).toEqual({
+      Authorization: 'Bearer token-1',
+      'Content-Type': 'application/json',
+      'X-KILOCODE-FEATURE': 'tool-summary-translation',
+    });
+  });
+
   it('falls back to the raw language tag when it has no endonym', async () => {
     fetchMock.mockResolvedValue(arrayContent(['ok']));
 

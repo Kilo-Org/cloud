@@ -4,6 +4,7 @@ import * as SecureStore from '@/lib/auth/secure-store';
 
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { fetchTranscriptionModels } from '@/lib/hooks/use-transcription-models';
+import { decodeSelection } from '@/lib/organization-selection';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 import { createGatewayVoiceInputEngine, type GatewayRecorder } from './gateway-voice-input-engine';
@@ -15,12 +16,6 @@ import {
 } from './gateway-transcription-preference';
 
 const HIGH_QUALITY = RecordingPresets.HIGH_QUALITY;
-
-/** The organization scope the voice flow reads and uploads under; null is personal. */
-async function readStoredOrganizationId(): Promise<string | null> {
-  const value = await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
-  return value;
-}
 
 /**
  * The model the gateway engine transcribes with: the stored choice, else the
@@ -42,7 +37,9 @@ export async function resolveGatewayTranscriptionModelId(): Promise<GatewayTrans
     // Scope the catalogue read to the selected organization: the upload that
     // follows carries the same organization header, so an unscoped default
     // could pick a model the scoped upload then rejects.
-    const organizationId = await readStoredOrganizationId();
+    const organizationId = decodeSelection(
+      await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY)
+    );
     const models = await fetchTranscriptionModels(organizationId ?? undefined);
     return persistFirstTranscriptionModel(models);
   } catch {
@@ -118,7 +115,9 @@ export const gatewayVoiceInputNative = createGatewayVoiceInputEngine({
   },
   readModelId: resolveGatewayTranscriptionModelId,
   readAuthToken: getAuthTokenForRequest,
-  readOrganizationId: readStoredOrganizationId,
+  // The scope the voice flow uploads under, resolved like every other reader.
+  readOrganizationId: async () =>
+    decodeSelection(await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY)),
   deleteRecording: (uri: string) => {
     // `release()` frees the native object, not the file: delete the recording
     // so dictation does not accumulate audio on disk. The modern File API

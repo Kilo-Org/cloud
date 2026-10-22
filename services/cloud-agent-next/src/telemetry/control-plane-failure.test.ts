@@ -112,6 +112,13 @@ const cases: ReadonlyArray<
   // The spec §10 reasons for the new plane (the mapping's one owner).
   ['workspace_setup_failed', 'pre_dispatch', 'failed', 'pre_dispatch', 'workspace_setup_failed'],
   ['workspace_setup_failed', 'accepted', 'failed', 'pre_dispatch', 'workspace_setup_failed'],
+  [
+    'credentials_expired',
+    'accepted',
+    'failed',
+    'post_dispatch_no_activity',
+    'wrapper_error_before_activity',
+  ],
   ['billing_blocked', 'pre_dispatch', 'failed', 'pre_dispatch', 'payment_required'],
   ['billing_blocked', 'accepted', 'failed', 'pre_dispatch', 'payment_required'],
   ['container_limit_reached', 'pre_dispatch', 'failed', 'pre_dispatch', 'container_limit_reached'],

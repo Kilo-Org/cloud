@@ -64,6 +64,10 @@ import {
   type VercelProviderLocator,
 } from '../../sandbox-control/vercel-provider.js';
 import { buildControlWrapperLaunchEnv } from '../../sandbox-control/wrapper-launch-env.js';
+import {
+  mintControlLogUploadCredential,
+  validateControlLogRenewal,
+} from '../../sandbox-control/log-upload-grant.js';
 import { downloadedStartup } from '../../sandbox-control/downloaded-startup.js';
 import { selectStartup, startupRepositoryKey } from '../../sandbox-control/startup-selection.js';
 import {
@@ -172,11 +176,16 @@ import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   CONTROL_PLANE_PROTOCOL_VERSION,
   CONTROL_PLANE_REQUEST_TIMEOUT_MS,
+  CONTROL_PLANE_SESSION_CONTROL_TIMEOUT_MS,
+  CONTROL_PLANE_TURN_COVERAGE_HEADER,
+  CONTROL_PLANE_TURN_COVERAGE_VERSION,
   controlPlaneAnswerPayloadSchema,
   controlPlaneDeliverPayloadSchema,
   controlPlaneKiloRequestInputSchema,
   controlPlanePrepareInputSchema,
   controlPlaneRouteSpecSchema,
+  controlPlaneSessionControlInputSchema,
+  controlPlaneSessionControlResultSchema,
   controlPlaneSessionCredentialsPayloadSchema,
   controlPlaneSessionRefPayloadSchema,
   controlPlaneTerminalInputSchema,
@@ -196,6 +205,7 @@ import {
   type ControlPlaneRouteSpec,
   type ControlPlaneRouteUpdate,
   type ControlPlaneRouteView,
+  type ControlPlaneSessionControlInput,
   type ControlPlaneSessionCredentialsPayload,
   type ControlPlaneSessionRefPayload,
   type ControlPlaneStatusResult,
@@ -347,6 +357,7 @@ const wrapperSocketAttachmentSchema = z.object({
   heartbeatAck: z.literal(true).optional(),
   redactsNamedSecrets: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
+  turnCoverage: z.literal(true).optional(),
 });
 type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
 
@@ -561,11 +572,12 @@ const CORRELATED_RESULT_FRAME_TYPES = new Set<string>([
   'worktree.result',
   'terminal.result',
   'kilo.result',
+  'session.control.result',
 ]);
 
 type CorrelatedResultFrame = Extract<
   ControlPlaneWrapperFrame,
-  { type: 'worktree.result' | 'terminal.result' | 'kilo.result' }
+  { type: 'worktree.result' | 'terminal.result' | 'kilo.result' | 'session.control.result' }
 >;
 
 function isCorrelatedResultFrame(frame: unknown): frame is CorrelatedResultFrame {
@@ -613,6 +625,38 @@ function terminalRequestFrame(
   }
 }
 
+/**
+ * A transient proactive-renewal failure is retried while the current grant is
+ * still valid. The interval is real time, like the grant timers themselves, so
+ * a failure cannot spin the single alarm. The expiry itself bounds the retries.
+ */
+const CREDENTIAL_RENEWAL_RETRY_MS = 5 * 60_000;
+
+type CredentialRenewalTarget = {
+  sessionId: string;
+  scopeKey: string;
+  /**
+   * The exact stored scope grant observed on the queue before minting. The
+   * commit compares this serialized value with the authoritative row so a
+   * sibling release or join during the off-queue mint is never overwritten.
+   */
+  scopeGrantJson: string;
+  allocationId: string;
+  connectionId: string;
+  providerInstanceId: string;
+  wrapperInstanceId: string;
+  attemptId: string;
+  grantExpiresAt: number;
+};
+
+type RenewedRouteGrant = {
+  grant: SessionCredentialGrant;
+  spec: ControlPlaneRouteSpec;
+  cloudAgentMcp: { url: string; token: string; expiresAt: number } | undefined;
+};
+
+type CredentialRenewalOutcome = 'renewed' | 'stale' | 'released' | 'replaced';
+
 export class SandboxControlV2 extends DurableObject<Env> {
   readonly sandboxId: string;
   private readonly db: ReturnType<typeof drizzle>;
@@ -621,6 +665,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private provider: ProviderAdapter;
   private providerPin: StoredProviderPin | null = null;
   private createInFlight = false;
+  /**
+   * One proactive credential maintenance pass at a time. The pass runs outside
+   * the serial queue (external mint/policy calls must not hold it) and only its
+   * final rechecked commit re-enters the queue.
+   */
+  private credentialMaintenance: Promise<void> | null = null;
+  /**
+   * Backoff per scope after a transient renewal failure. In-memory is enough:
+   * the alarm that carries the retry deadline is durable, and a fresh DO drops
+   * no work because the grant is re-evaluated from its stored expiry.
+   */
+  private readonly credentialRenewalRetries = new Map<string, number>();
+  /**
+   * All Vercel policy writes go through this one chain. Operations derive the
+   * live grant set when they run, so an off-queue renewal can never replace a
+   * queued release/revocation with an older precomputed snapshot. The chain does
+   * not await the operation queue; a queued caller may await it.
+   */
+  private policyTail: Promise<void> = Promise.resolve();
   private readonly repositoryCaptures = new Map<
     string,
     { allocationId: string | null; ok?: boolean }
@@ -1230,6 +1293,57 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
+   * Session DO -> Sandbox DO turn coverage/abandon. Reuses the correlated
+   * request path without waking or preparing. The exact allocation + connection
+   * that accepted the request is re-checked after the reply, so a superseded
+   * socket on the same allocation cannot settle a newer turn.
+   */
+  async sessionControl(input: ControlPlaneSessionControlInput): Promise<ControlPlaneControlResult> {
+    await this.initialized;
+    const parsed = controlPlaneSessionControlInputSchema.parse(input);
+    let requestedConnectionId: string | null = null;
+    const handoff = await this.enqueue(async () => {
+      const state = await this.readAllocation();
+      if (
+        state.kind !== 'connected' ||
+        state.allocationId !== parsed.allocationId ||
+        state.connectionId === null
+      ) {
+        return {
+          error: controlRequestFailure('not_ready', 'Wrapper is not connected', true),
+        };
+      }
+      requestedConnectionId = state.connectionId;
+      const frame: ControlPlaneWrapperFrame = {
+        type: 'session.control',
+        requestId: crypto.randomUUID(),
+        action: parsed.action,
+        sessionId: parsed.sessionId,
+        allocationId: parsed.allocationId,
+        messageIds: parsed.messageIds,
+      };
+      return this.beginWrapperControlRequest(frame, CONTROL_PLANE_SESSION_CONTROL_TIMEOUT_MS);
+    });
+    if ('error' in handoff) return handoff.error;
+    const result = await handoff.promise;
+    if (!result.ok) return result;
+    const current = await this.readAllocation();
+    if (
+      current.kind !== 'connected' ||
+      current.allocationId !== parsed.allocationId ||
+      current.connectionId !== requestedConnectionId ||
+      this.boundWrapperSocket(current) === null
+    ) {
+      return controlRequestFailure('not_ready', 'Wrapper connection changed', true);
+    }
+    const typed = controlPlaneSessionControlResultSchema.safeParse(result.result);
+    if (!typed.success || typed.data.type !== parsed.action) {
+      return controlRequestFailure('invalid_result', 'Wrapper returned an invalid result', true);
+    }
+    return { ok: true, result: typed.data };
+  }
+
+  /**
    * Off-queue read the Session DO uses to resolve one preview's provider
    * coordinates. It never enqueues, so a preview never waits behind the control
    * operation queue. The allocation and route are two separate reads, not one
@@ -1783,6 +1897,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(request.headers.get(WORKTREE_RUNTIME_HEADER) === WORKTREE_RUNTIME_VERSION
           ? { runtimeCapability: 'worktree' as const }
           : {}),
+        ...(request.headers.get(CONTROL_PLANE_TURN_COVERAGE_HEADER) ===
+        CONTROL_PLANE_TURN_COVERAGE_VERSION
+          ? { turnCoverage: true as const }
+          : {}),
         helloDeadlineAt: Date.now() + this.sandboxTimers().wrapperHelloMs,
       } satisfies WrapperSocketAttachment);
       await this.armAlarm(await this.readAllocation());
@@ -1845,6 +1963,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       await this.recoverRepositoryPreparationFailures();
       let state = await this.readAllocation();
       await failExpiredRoutes(this.routeContext(state));
+      await this.failExpiredCredentialRoutes();
+      await this.scheduleCredentialMaintenance();
       if (
         state.kind === 'stopped' &&
         !this.createInFlight &&
@@ -1869,6 +1989,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           Math.min(
             Date.now() + this.sandboxTimers().providerCreateMs,
             (await earliestRouteDeadlineAt(this.db)) ?? Infinity,
+            (await this.nextCredentialRenewalAt(Date.now())) ?? Infinity,
             this.earliestHelloDeadlineAt() ?? Infinity,
             this.billingSchedule.snapshotEarliestDue() ?? Infinity
           )
@@ -2616,13 +2737,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private applyCandidateGrantPolicy(candidate: SessionCredentialGrant): Promise<boolean> {
-    const now = Date.now();
-    return this.refreshVercelNetworkPolicy([
-      ...listScopeGrants(this.db).filter(
-        grant => scopeGrantId(grant) !== scopeGrantId(candidate) && grant.expiresAt > now
-      ),
-      candidate,
-    ]);
+    return this.refreshVercelNetworkPolicy(candidate);
   }
 
   private projectRouteSpec(
@@ -2701,7 +2816,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         await onRouteFailed(
           this.routeContext(state),
           payload.sessionId,
-          'workspace_setup_failed',
+          'credentials_expired',
           undefined,
           true
         );
@@ -2721,7 +2836,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       await onRouteFailed(
         this.routeContext(state),
         payload.sessionId,
-        'workspace_setup_failed',
+        'credentials_expired',
         undefined,
         true
       );
@@ -2742,11 +2857,194 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (!sent) return 'not_ready';
     }
     await this.touchActivity(Date.now());
-    return 'sent';
+    return this.readAttachment(socket)?.turnCoverage === true
+      ? { type: 'sent', coverage: true }
+      : 'sent';
   }
 
   private grantNeedsReissue(grant: SessionCredentialGrant): boolean {
     return grant.expiresAt - Date.now() < this.sandboxTimers().credentialGrantReissueBelowMs;
+  }
+
+  /**
+   * The one proactive-renewal deadline, derived from the stored grants so no
+   * route write can leave it stale. A grant that is already due resolves to
+   * `now`; a failed renewal resolves to its per-scope backoff, capped by the
+   * grant's expiry so a retry never runs past the authority it is renewing.
+   * Routes outside a live allocation are left for the expiry sweep: there is no
+   * fence to mint under, and re-arming `now` forever would spin the alarm.
+   */
+  private async nextCredentialRenewalAt(now: number): Promise<number | null> {
+    const state = await this.readAllocation();
+    const canRenew = this.runtimeProxyFenceFor(state) !== null;
+    const keys = new Set<string>();
+    let at: number | null = null;
+    for (const route of await listRoutes(this.db)) {
+      if (route.state !== 'ready' || route.grant === null) continue;
+      const key = scopeGrantId(route.grant);
+      keys.add(key);
+      if (route.grant.expiresAt <= now) {
+        at = Math.min(at ?? Infinity, now);
+        continue;
+      }
+      if (!canRenew || route.credentialSource === null) continue;
+      const dueAt = Math.max(
+        now,
+        route.grant.expiresAt - this.sandboxTimers().credentialGrantReissueBelowMs
+      );
+      const retryAt = this.credentialRenewalRetries.get(key);
+      const deferred =
+        dueAt <= now
+          ? retryAt !== undefined && retryAt > now
+            ? retryAt
+            : this.credentialMaintenance !== null
+              ? now + CREDENTIAL_RENEWAL_RETRY_MS
+              : now
+          : dueAt;
+      at = Math.min(at ?? Infinity, Math.min(deferred, route.grant.expiresAt));
+    }
+    for (const key of this.credentialRenewalRetries.keys()) {
+      if (!keys.has(key)) this.credentialRenewalRetries.delete(key);
+    }
+    return at === null ? null : Math.max(now + 1, at);
+  }
+
+  /**
+   * Starts one maintenance pass when a ready route's grant is due. Runs on the
+   * alarm's serial turn only long enough to snapshot the routes and reserve
+   * their retry slots; the mint, optional MCP issuance and provider policy run
+   * off the queue in `runCredentialMaintenance`.
+   */
+  private async scheduleCredentialMaintenance(): Promise<void> {
+    if (this.credentialMaintenance !== null) return;
+    const state = await this.readAllocation();
+    const fence = this.runtimeProxyFenceFor(state);
+    if (fence === null) return;
+    const now = Date.now();
+    const targets: CredentialRenewalTarget[] = [];
+    const seen = new Set<string>();
+    for (const route of await listRoutes(this.db)) {
+      if (route.state !== 'ready' || route.grant === null || route.credentialSource === null) {
+        continue;
+      }
+      const key = scopeGrantId(route.grant);
+      if (seen.has(key)) continue;
+      const retryAt = this.credentialRenewalRetries.get(key);
+      if (retryAt !== undefined && retryAt > now) continue;
+      if (
+        route.grant.expiresAt > now &&
+        route.grant.expiresAt - now > this.sandboxTimers().credentialGrantReissueBelowMs
+      ) {
+        continue;
+      }
+      seen.add(key);
+      // Reserve the next backoff before yielding, so the alarm is never re-armed
+      // into the past while the pass is in flight.
+      this.credentialRenewalRetries.set(
+        key,
+        Math.min(now + CREDENTIAL_RENEWAL_RETRY_MS, Math.max(now + 1, route.grant.expiresAt))
+      );
+      targets.push({
+        sessionId: route.sessionId,
+        scopeKey: key,
+        scopeGrantJson: JSON.stringify(route.grant),
+        allocationId: fence.allocationId,
+        connectionId: fence.connectionId,
+        providerInstanceId: fence.providerInstanceId,
+        wrapperInstanceId: fence.wrapperInstanceId,
+        attemptId: route.attemptId,
+        grantExpiresAt: route.grant.expiresAt,
+      });
+    }
+    if (targets.length === 0) return;
+    const flight = this.runCredentialMaintenance(targets)
+      .catch(() => {
+        logger.withFields({ sandboxId: this.sandboxId }).warn('Credential maintenance pass failed');
+      })
+      .finally(() => {
+        this.credentialMaintenance = null;
+        this.ctx.waitUntil(
+          this.enqueue(async () => this.armAlarm(await this.readAllocation())).catch(
+            () => undefined
+          )
+        );
+      });
+    this.credentialMaintenance = flight;
+    this.ctx.waitUntil(flight);
+  }
+
+  /** One off-queue pass: every due scope is renewed independently. */
+  private async runCredentialMaintenance(
+    targets: readonly CredentialRenewalTarget[]
+  ): Promise<void> {
+    for (const target of targets) {
+      const route = await readRoute(this.db, target.sessionId);
+      if (route === null || route.grant === null) {
+        this.credentialRenewalRetries.delete(target.scopeKey);
+        continue;
+      }
+      if (route.state !== 'ready') {
+        this.credentialRenewalRetries.delete(target.scopeKey);
+        continue;
+      }
+      if (Date.now() >= target.grantExpiresAt) {
+        await this.expireCredentialTarget(target, 'credential_grant_expired');
+        continue;
+      }
+      const renewed = await this.prepareRouteGrantRenewal(route);
+      if (typeof renewed === 'string') {
+        // `policy_failed` means the provider never installed the candidate
+        // (the update is one atomic provider call), so the previous policy is
+        // still authoritative and a transient provider failure must not stop
+        // healthy work.
+        await this.retryOrExpireCredentialTarget(
+          target,
+          renewed === 'policy_failed' ? 'credential_policy_unavailable' : 'credential_grant_issue'
+        );
+        continue;
+      }
+      const outcome = await this.commitRenewedRouteGrant(target, renewed);
+      if (outcome === 'renewed') {
+        this.credentialRenewalRetries.delete(target.scopeKey);
+        continue;
+      }
+      // The candidate policy ran before the commit recheck. Whether the scope
+      // was released, replaced or merely stale, the candidate was never
+      // published, so remove it again from the provider policy.
+      await this.restoreActiveGrantPolicy();
+      if (outcome === 'released' || outcome === 'replaced') {
+        this.credentialRenewalRetries.delete(target.scopeKey);
+      } else {
+        await this.retryOrExpireCredentialTarget(target, 'credential_renewal_stale');
+      }
+    }
+  }
+
+  /**
+   * The issue/MCP/policy core shared by warm `deliver` re-issue and proactive
+   * maintenance. It performs no route write: the caller either publishes on the
+   * queue (deliver) or rechecks the captured fence before publishing.
+   */
+  private async prepareRouteGrantRenewal(
+    route: RouteRecord
+  ): Promise<RenewedRouteGrant | 'policy_failed' | 'skipped' | 'failed'> {
+    const source = route.credentialSource;
+    if (source === null) return 'skipped';
+    let issued: RouteGrantIssue;
+    try {
+      // Bound the token-service round trip; the grant-issue bound is the
+      // provider-stop bound.
+      issued = await withTimeout(
+        this.issueRouteGrant(route.spec, source),
+        this.grantIssueTimeoutMs(),
+        'Credential grant renewal timed out'
+      );
+    } catch {
+      return 'failed';
+    }
+    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(route.sessionId);
+    if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';
+    return { grant: issued.grant, spec: issued.spec, cloudAgentMcp };
   }
 
   /**
@@ -2762,37 +3060,204 @@ export class SandboxControlV2 extends DurableObject<Env> {
     route: RouteRecord,
     state: AllocationState
   ): Promise<'issued' | 'policy_failed' | 'skipped' | 'failed'> {
-    const source = route.credentialSource;
-    if (source === null) return 'skipped';
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return 'skipped';
-    let issued: RouteGrantIssue;
-    try {
-      // Bound the token-service round trip so a warm-route `deliver` cannot
-      // hang forever; the grant-issue bound is the provider-stop bound.
-      issued = await withTimeout(
-        this.issueRouteGrant(route.spec, source),
-        this.grantIssueTimeoutMs(),
-        'Credential grant re-issue timed out'
-      );
-    } catch {
-      return 'failed';
-    }
-    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(route.sessionId);
-    if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';
-    const next: RouteRecord = { ...route, grant: issued.grant, spec: issued.spec };
+    const renewed = await this.prepareRouteGrantRenewal(route);
+    if (typeof renewed === 'string') return renewed;
+    const next: RouteRecord = { ...route, grant: renewed.grant, spec: renewed.spec };
     this.publishRouteGrant(next);
     // Git/alias material is independent of the runtime-proxy handle, so a
     // re-issue still sends the frame even when the handle string did not change.
     // The canonical handoff runs separately in `runDeliver` maintenance.
     const payload = controlPlaneSessionCredentialsPayloadSchema.parse({
-      ...sessionCredentialsPayloadFromGrant(issued.grant, route.sessionId),
-      ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
+      ...sessionCredentialsPayloadFromGrant(renewed.grant, route.sessionId),
+      ...(renewed.cloudAgentMcp ? { cloudAgentMcp: renewed.cloudAgentMcp } : {}),
     });
     if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
-      await this.markRouteCredentialsSent(route.sessionId, issued.grant);
+      await this.markRouteCredentialsSent(route.sessionId, renewed.grant);
     }
     return 'issued';
+  }
+
+  /**
+   * Publishes a proactively renewed grant only if the exact allocation,
+   * connection, attempt and scope grant captured before the external calls are
+   * still current. A released or replaced scope is discarded, never resurrected.
+   */
+  private commitRenewedRouteGrant(
+    target: CredentialRenewalTarget,
+    renewed: RenewedRouteGrant
+  ): Promise<CredentialRenewalOutcome> {
+    return this.enqueue(async () => {
+      const state = await this.readAllocation();
+      const latest = await readRoute(this.db, target.sessionId);
+      if (latest === null || latest.grant === null) return 'released';
+      const verdict = this.credentialTargetVerdict(target, state, latest);
+      if (verdict !== 'current') return verdict;
+      const next: RouteRecord = { ...latest, grant: renewed.grant, spec: renewed.spec };
+      this.publishRouteGrant(next);
+      const socket = this.boundWrapperSocket(state);
+      if (socket !== null) {
+        const payload = controlPlaneSessionCredentialsPayloadSchema.parse({
+          ...sessionCredentialsPayloadFromGrant(renewed.grant, target.sessionId),
+          ...(renewed.cloudAgentMcp ? { cloudAgentMcp: renewed.cloudAgentMcp } : {}),
+        });
+        if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
+          await this.markRouteCredentialsSent(target.sessionId, renewed.grant);
+        }
+      }
+      logControlDiagnostic('credential_renewal', {
+        sandboxId: this.sandboxId,
+        sessionId: target.sessionId,
+        scopeId: latest.grant?.scopeId,
+        stage: 'proactive',
+        outcome: 'renewed',
+      });
+      return 'renewed';
+    });
+  }
+
+  /** A transient renewal failure keeps valid work; expiry fails it specifically. */
+  private retryOrExpireCredentialTarget(
+    target: CredentialRenewalTarget,
+    stage: string
+  ): Promise<void> {
+    return this.enqueue(async () => {
+      const state = await this.readAllocation();
+      const route = await readRoute(this.db, target.sessionId);
+      const verdict = this.credentialTargetVerdict(target, state, route);
+      if (verdict === 'released' || verdict === 'replaced') {
+        this.credentialRenewalRetries.delete(target.scopeKey);
+        return;
+      }
+      if (route === null || route.grant === null) return;
+      if (Date.now() >= route.grant.expiresAt) {
+        await this.releaseExpiredCredentialRoute(
+          route.sessionId,
+          target.scopeKey,
+          'credential_grant_expired',
+          stage
+        );
+        return;
+      }
+      const retryAt = this.credentialRenewalRetries.get(target.scopeKey);
+      if (retryAt === undefined || retryAt <= Date.now()) {
+        this.credentialRenewalRetries.set(
+          target.scopeKey,
+          Math.min(Date.now() + CREDENTIAL_RENEWAL_RETRY_MS, route.grant.expiresAt)
+        );
+      }
+      logControlDiagnostic('credential_renewal', {
+        sandboxId: this.sandboxId,
+        sessionId: target.sessionId,
+        scopeId: route.grant.scopeId,
+        stage,
+        outcome: 'retry',
+      });
+    });
+  }
+
+  /** Fails every ready route whose grant has expired, before renewing anything. */
+  private async failExpiredCredentialRoutes(): Promise<void> {
+    const now = Date.now();
+    for (const route of await listRoutes(this.db)) {
+      if (route.state !== 'ready' || route.grant === null || route.grant.expiresAt > now) continue;
+      await this.releaseExpiredCredentialRoute(
+        route.sessionId,
+        scopeGrantId(route.grant),
+        'credential_grant_expired'
+      );
+    }
+  }
+
+  private expireCredentialTarget(target: CredentialRenewalTarget, stage: string): Promise<void> {
+    return this.enqueue(async () => {
+      await this.releaseExpiredCredentialRoute(
+        target.sessionId,
+        target.scopeKey,
+        'credential_grant_expired',
+        stage
+      );
+    });
+  }
+
+  /**
+   * Expired authority is a per-route failure: notify that attempt as failed and
+   * release its native route (row, scope membership, accepted handles, wrapper
+   * session) so no unusable alias or membership survives. The alias itself is
+   * already denied by `resolveCredential`; no whole-sandbox policy rebuild is
+   * attempted, so healthy siblings keep running.
+   */
+  private async releaseExpiredCredentialRoute(
+    sessionId: string,
+    scopeKey: string,
+    stage: string,
+    issueStage?: string
+  ): Promise<void> {
+    const state = await this.readAllocation();
+    const route = await readRoute(this.db, sessionId);
+    if (route === null || route.state !== 'ready' || route.grant === null) {
+      this.credentialRenewalRetries.delete(scopeKey);
+      return;
+    }
+    if (scopeGrantId(route.grant) !== scopeKey) {
+      this.credentialRenewalRetries.delete(scopeKey);
+      return;
+    }
+    if (route.grant.expiresAt > Date.now()) {
+      // A concurrent renewal won; the normal deadline will take it from here.
+      this.credentialRenewalRetries.delete(scopeKey);
+      return;
+    }
+    logControlDiagnostic('credential_renewal', {
+      sandboxId: this.sandboxId,
+      sessionId,
+      scopeId: route.grant.scopeId,
+      stage: issueStage ?? stage,
+      outcome: 'expired',
+    });
+    await onRouteFailed(
+      this.routeContext(state),
+      sessionId,
+      'credentials_expired',
+      undefined,
+      true
+    );
+    await deleteRoute(this.db, this.ctx.storage.kv, sessionId);
+    const socket = this.boundWrapperSocket(state);
+    if (socket !== null) {
+      this.trySendFrame(socket, { type: 'session.release', sessionId });
+    }
+    this.credentialRenewalRetries.delete(scopeKey);
+  }
+
+  private credentialTargetVerdict(
+    target: CredentialRenewalTarget,
+    state: AllocationState,
+    route: RouteRecord | null
+  ): CredentialRenewalOutcome | 'current' {
+    if (route === null || route.grant === null) return 'released';
+    if (scopeGrantId(route.grant) !== target.scopeKey) return 'replaced';
+    if (route.grant.expiresAt !== target.grantExpiresAt) return 'replaced';
+    if (route.state !== 'ready' || route.attemptId !== target.attemptId) return 'replaced';
+    const authoritative = readScopeGrant(this.db, target.scopeKey);
+    if (authoritative === null || JSON.stringify(authoritative) !== target.scopeGrantJson) {
+      // A sibling was released or joined while the mint was off-queue. The
+      // candidate was built from the old membership; publishing it would
+      // reinsert a revoked member or drop a joined one.
+      return 'stale';
+    }
+    const fence = this.runtimeProxyFenceFor(state);
+    if (
+      fence === null ||
+      fence.allocationId !== target.allocationId ||
+      fence.connectionId !== target.connectionId ||
+      fence.providerInstanceId !== target.providerInstanceId ||
+      fence.wrapperInstanceId !== target.wrapperInstanceId
+    ) {
+      return 'stale';
+    }
+    return 'current';
   }
 
   /**
@@ -3177,17 +3642,29 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
-   * Rebuilds the Vercel network policy from the stored grants (or a caller's
-   * candidate set) through the provider's contained-credential hook. Runs inside
-   * the operation queue and does not stop the sandbox: it returns `false` on
-   * failure so callers can decide (retry vs. fail closed). Transient failures
-   * keep the route alive so a later send can retry (N2). A live Vercel sandbox
-   * whose adapter lacks the hook cannot apply the policy, so it fails closed
-   * exactly like a throwing hook.
+   * Rebuilds the Vercel network policy from the grants that are live when the
+   * operation runs, optionally replacing one scope with a candidate that has not
+   * been published yet. Every call enters the single policy chain; a candidate
+   * applied by an off-queue renewal therefore cannot overwrite a later queued
+   * release/revocation, and a discarded candidate is repaired by the caller.
+   *
+   * The operation does not await the serial queue. Queued callers await the
+   * chain, never the reverse, so a delayed policy update cannot deadlock a
+   * queue that a policy chain is itself waiting on.
    */
-  private async refreshVercelNetworkPolicy(
-    grantsOverride?: readonly SessionCredentialGrant[]
-  ): Promise<boolean> {
+  private refreshVercelNetworkPolicy(candidate?: SessionCredentialGrant): Promise<boolean> {
+    const run = this.policyTail.then(
+      () => this.applyVercelNetworkPolicy(candidate),
+      () => this.applyVercelNetworkPolicy(candidate)
+    );
+    this.policyTail = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
+  }
+
+  private async applyVercelNetworkPolicy(candidate?: SessionCredentialGrant): Promise<boolean> {
     if (this.currentProvider() !== 'vercel') return true;
     try {
       const state = await this.readAllocation();
@@ -3196,7 +3673,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (state.kind === 'stopping' || state.kind === 'stopped') return true;
       if (providerRef === null) return true;
       if (!provider.applyContainedCredentials) return false;
-      const grants = grantsOverride ?? (await this.activeGrants(Date.now()));
+      const grants = await this.policyGrants(Date.now(), candidate);
       await withTimeout(
         provider.applyContainedCredentials(providerRef, grants),
         this.sandboxTimers().providerStopAttemptMs,
@@ -3206,6 +3683,36 @@ export class SandboxControlV2 extends DurableObject<Env> {
     } catch {
       return false;
     }
+  }
+
+  private async policyGrants(
+    now: number,
+    candidate?: SessionCredentialGrant
+  ): Promise<SessionCredentialGrant[]> {
+    const live = await this.activeGrants(now);
+    if (candidate === undefined) return live;
+    const key = scopeGrantId(candidate);
+    return [...live.filter(grant => scopeGrantId(grant) !== key), candidate];
+  }
+
+  /**
+   * After a maintenance renewal is discarded, the candidate policy may already
+   * be installed. Reapply the authoritative live grants; if that fails, fail
+   * closed by stopping the sandbox so no discarded alias stays injected. Only
+   * the off-queue maintenance pass calls this, so the queued stop cannot
+   * deadlock the policy chain it follows.
+   */
+  private async restoreActiveGrantPolicy(): Promise<void> {
+    if (await this.refreshVercelNetworkPolicy()) return;
+    await this.enqueue(async () => {
+      const state = await this.readAllocation();
+      if (state.kind === 'stopped' || state.kind === 'stopping') return;
+      await this.applyEvent({
+        type: 'stop-requested',
+        at: Date.now(),
+        reason: 'workspace_setup_failed',
+      });
+    });
   }
 
   /**
@@ -4871,6 +5378,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(attachment?.runtimeCapability
           ? { runtimeCapability: attachment.runtimeCapability }
           : {}),
+        ...(attachment?.turnCoverage ? { turnCoverage: true } : {}),
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
         ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
       });
@@ -4938,6 +5446,38 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ) {
         this.sendFrame(ws, { type: 'heartbeat_ack' });
       }
+      return;
+    }
+
+    if (frame.type === 'logs.refresh') {
+      const state = await this.readAllocation();
+      // Renewal authority is the current bound socket, never the grant itself.
+      const socketAuthorized = connectionMatches(
+        state,
+        attachment.allocationId,
+        attachment.connectionId
+      );
+      const secret = socketAuthorized
+        ? await withTimeout(
+            resolveSecret(this.env.NEXTAUTH_SECRET),
+            1_000,
+            'Log upload renewal signing secret lookup timed out'
+          ).catch(() => null)
+        : null;
+      const identity = validateControlLogRenewal({
+        proof: frame.grant,
+        secret,
+        socketAuthorized,
+        sandboxId: this.sandboxId,
+        allocationId: attachment.allocationId,
+      });
+      if (!identity || !secret) return;
+      const credential = mintControlLogUploadCredential(identity, secret);
+      this.sendFrame(ws, {
+        type: 'logs.credentials',
+        grant: credential.grant,
+        expiresAt: credential.expiresAt,
+      });
       return;
     }
 
@@ -5456,6 +5996,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.sandboxTimers()
     );
     const routeAt = await earliestRouteDeadlineAt(this.db);
+    const credentialAt = await this.nextCredentialRenewalAt(Date.now());
     // Pending work must survive loss of the in-memory launch continuation.
     const retryAt =
       state.kind === 'stopped' &&
@@ -5468,6 +6009,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const candidates = [
       allocationAt,
       routeAt,
+      credentialAt,
       retryAt,
       billingAt,
       this.earliestHelloDeadlineAt(),

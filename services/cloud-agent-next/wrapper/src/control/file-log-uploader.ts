@@ -12,6 +12,7 @@ import {
 } from '../../../src/shared/control-diagnostics.js';
 import { createTarStream, type TarArchiveEntry } from '../log-uploader.js';
 import { logToFile, withTimeoutAndAbort } from '../utils.js';
+import type { ControlLogUploadCredentialSource } from './log-upload-auth.js';
 
 export type ControlFileLogUploader = {
   start: (intervalMs?: number) => void;
@@ -23,6 +24,8 @@ export type ControlFileLogUploader = {
 type Options = {
   uploadUrl?: string;
   uploadGrant?: string;
+  /** Shared rotating credential; takes precedence over the static grant. */
+  auth?: ControlLogUploadCredentialSource;
   wrapperLogPath?: string;
   homeRoot?: string;
   fetch?: (url: string, init: RequestInit) => Promise<Response>;
@@ -185,10 +188,13 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
     if (stopped) return Promise.resolve();
     if (queuedUpload) return queuedUpload.promise;
     const uploadUrl = options.uploadUrl;
-    const uploadGrant = options.uploadGrant;
-    if (!uploadUrl || !uploadGrant) return Promise.resolve();
+    const configured = options.auth !== undefined || options.uploadGrant !== undefined;
+    const available =
+      options.auth !== undefined
+        ? options.auth.current() !== undefined
+        : options.uploadGrant !== undefined;
+    if (!uploadUrl || !configured || !available) return Promise.resolve();
     const archiveUrl = `${uploadUrl.replace(/\/$/, '')}/${CONTROL_LOG_ARCHIVE_NAME}`;
-    const authorization = `Bearer ${uploadGrant}`;
 
     const previousUpload = activeUpload;
     const abort = new AbortController();
@@ -223,10 +229,19 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
 
             const payload = new ArrayBuffer(body.byteLength);
             new Uint8Array(payload).set(body);
+            // Read the shared owner only when the archive is ready to send: a
+            // queued upload must use the newest token, not the one captured
+            // before waiting for its predecessor.
+            const credentials = options.auth
+              ? options.auth.current()
+              : options.uploadGrant
+                ? { token: options.uploadGrant, expiresAt: Number.POSITIVE_INFINITY }
+                : undefined;
+            if (!credentials) return;
             const response = await upload(archiveUrl, {
               method: 'PUT',
               headers: {
-                Authorization: authorization,
+                Authorization: `Bearer ${credentials.token}`,
                 'Content-Type': 'application/gzip',
                 'Content-Length': String(payload.byteLength),
               },
@@ -237,6 +252,11 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
             if (!abort.signal.aborted && response.status !== 204) {
               logToFile(`Control file log upload failed: ${response.status}`);
               reportFailure('http_rejection', response.status);
+              if (response.status === 401 || response.status === 403) {
+                // Rotation continues in the background; a late rejection for an
+                // already replaced token is ignored by the shared owner.
+                void options.auth?.rejected(credentials.token).catch(() => undefined);
+              }
             } else if (!abort.signal.aborted) {
               // A 204 accepts the archive: the next failure starts a new episode.
               lastFailureSample = undefined;
@@ -274,7 +294,7 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
     stop();
     stopped = false;
     finalUpload = undefined;
-    if (!options.uploadUrl || !options.uploadGrant) return;
+    if (!options.uploadUrl || (!options.auth && !options.uploadGrant)) return;
     void uploadNow();
     intervalId = setInterval(() => {
       if (!activeUpload && !queuedUpload) void uploadNow();

@@ -11,6 +11,8 @@ import {
   type ControlPlaneOutcome,
   type ControlPlanePromptPayload,
   type ControlPlaneRouteSpec,
+  type ControlPlaneSessionControlAction,
+  type ControlPlaneSessionControlResult,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
@@ -26,6 +28,7 @@ import { childFromSessionCreated, eventKiloSessionId } from '../control/feed.js'
 import type { KiloFeedEvent } from '../control/worktree-feed.js';
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
+import { withTimeoutAndAbort } from '../utils.js';
 import { isUnresponsiveRestart, type KiloRestartInfo } from './kilo-runtime.js';
 import type {
   SessionSupervisor,
@@ -64,6 +67,8 @@ export type TurnKiloRuntime = {
   isRetiredClient(client: WrapperKiloClient): boolean;
   sessionState(id: string): ReturnType<SessionSupervisor['state']>;
   refreshActivity(): Promise<void>;
+  /** Restarts the runtime owner after an unconfirmed abandon abort, when available. */
+  recoverAbandonedAbort?: () => Promise<boolean>;
   applyPendingCredentials?(canRestart: () => boolean): Promise<boolean>;
 };
 
@@ -149,6 +154,8 @@ export type Turn = {
   resubmitted: boolean;
   /** Aborts the running finalization step (timeout or Stop). */
   stepAbort?: AbortController;
+  /** Expired cleanup ids that a fenced abandon has already matched in this turn. */
+  abandonedMessageIds?: Set<string>;
   submitting: Promise<void>;
   publication?: ReturnType<typeof createReviewPublication>;
   gateResult?: 'pass' | 'fail';
@@ -275,6 +282,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
 
   const routes = new Map<string, TurnRoute>();
   const turns = new Map<string, Turn>();
+  const abortBarriers = new Map<string, Promise<void>>();
   const turnByKiloSession = new Map<string, string>();
   const childRoots = new Map<string, string>();
   /** Runtime keys whose Kilo is held under memory pressure (`onRuntimeMemoryHold`). */
@@ -360,6 +368,126 @@ export function createTurnManager(deps: TurnManagerDeps) {
 
   function lastReceivedMessageId(turn: Turn): string {
     return turn.prompts.at(-1)?.payload.messageId ?? '';
+  }
+
+  async function awaitAbortBarrier(sessionId: string): Promise<void> {
+    const barrier = abortBarriers.get(sessionId);
+    if (barrier !== undefined) await barrier;
+  }
+
+  /**
+   * Coverage is per exact current-turn prompt. A live native execution owns the
+   * whole batch; otherwise pending delivery can own only itself while its
+   * bounded deadline has not expired; a running finalization step owns the
+   * batch. A retained turn with no native execution covers nothing, so Kilo's
+   * observation alone is never treated as progress or as an owner.
+   */
+  function promptCovered(turn: Turn, pending: PendingPrompt): boolean {
+    if (pending.abort.signal.aborted) return false;
+    if (
+      turn.phase === 'finalizing' &&
+      turn.stepAbort !== undefined &&
+      !turn.stepAbort.signal.aborted
+    )
+      return true;
+    const native = liveNativeState(turn);
+    const nativeOwns = native !== undefined && native.activity !== 'stopping';
+    if (pending.nativeObserved) return nativeOwns;
+    return !deliveryExpired(turn, pending);
+  }
+
+  function coverage(
+    sessionId: string,
+    messageIds: readonly string[]
+  ): ControlPlaneSessionControlResult {
+    const turn = turns.get(sessionId);
+    if (turn === undefined) return { type: 'coverage', coveredMessageIds: [] };
+    const requested = new Set(messageIds);
+    const coveredMessageIds = turn.prompts
+      .filter(pending => requested.has(pending.payload.messageId) && promptCovered(turn, pending))
+      .map(pending => pending.payload.messageId);
+    return { type: 'coverage', coveredMessageIds };
+  }
+
+  /**
+   * Fenced abandonment across correlated chunks. Only ids that are current turn
+   * prompts accumulate; a newer prompt keeps the request deferred until it is
+   * itself named. The accumulated set dies with the turn.
+   */
+  async function abandon(
+    sessionId: string,
+    messageIds: readonly string[]
+  ): Promise<ControlPlaneSessionControlResult> {
+    await abortBarriers.get(sessionId);
+    const turn = turns.get(sessionId);
+    if (turn === undefined) return { type: 'abandon', outcome: 'absent', cleanedMessageIds: [] };
+    const currentIds = turn.prompts.map(pending => pending.payload.messageId);
+    const requested = new Set(messageIds);
+    const matched = currentIds.filter(messageId => requested.has(messageId));
+    const accumulated = (turn.abandonedMessageIds ??= new Set<string>());
+    for (const messageId of matched) accumulated.add(messageId);
+    if (accumulated.size === 0)
+      return { type: 'abandon', outcome: 'absent', cleanedMessageIds: [] };
+    if (matched.length === 0 || accumulated.size < currentIds.length)
+      return { type: 'abandon', outcome: 'deferred', cleanedMessageIds: [] };
+
+    const route = turn.route;
+    const native = liveNativeState(turn);
+    const runtime = deps.runtimes.get(route.runtimeKey);
+    const currentState = runtime?.sessionState(route.kiloSessionId);
+    const liveMatches =
+      native !== undefined &&
+      native.activity !== 'stopping' &&
+      currentState?.nativeRuntimeId === native.nativeRuntimeId &&
+      currentState.execution === native.execution;
+    const barrier = Promise.withResolvers<void>();
+    if (liveMatches) {
+      abortBarriers.set(sessionId, barrier.promise);
+    }
+    try {
+      if (liveMatches && !(await abortKiloConfirmed(route))) {
+        // Expired Cloud messages remain final across native runtime recovery.
+        turn.resubmitted = true;
+        try {
+          await runtime?.recoverAbandonedAbort?.();
+        } catch {
+          // The durable cleanup obligation retries an unconfirmed cancellation.
+        }
+        return { type: 'abandon', outcome: 'deferred', cleanedMessageIds: [] };
+      }
+
+      if (turns.get(sessionId) !== turn)
+        return { type: 'abandon', outcome: 'absent', cleanedMessageIds: [] };
+
+      const expired = new Set(currentIds);
+      for (let index = turn.prompts.length - 1; index >= 0; index--) {
+        const pending = turn.prompts[index];
+        if (!expired.has(pending.payload.messageId)) continue;
+        pending.abort.abort();
+        turn.prompts.splice(index, 1);
+      }
+      turn.inbox = turn.inbox.filter(pending => !expired.has(pending.payload.messageId));
+      turn.abandonedMessageIds = undefined;
+      turn.deferredCompletion = undefined;
+      if (turn.prompts.length === 0) {
+        turn.stepAbort?.abort(new Error('abandoned'));
+        resetTurn(sessionId);
+      }
+      return { type: 'abandon', outcome: 'abandoned', cleanedMessageIds: matched };
+    } finally {
+      if (abortBarriers.get(sessionId) === barrier.promise) abortBarriers.delete(sessionId);
+      barrier.resolve();
+    }
+  }
+
+  async function sessionControl(input: {
+    action: ControlPlaneSessionControlAction;
+    sessionId: string;
+    messageIds: readonly string[];
+  }): Promise<ControlPlaneSessionControlResult> {
+    return input.action === 'coverage'
+      ? coverage(input.sessionId, input.messageIds)
+      : abandon(input.sessionId, input.messageIds);
   }
 
   function sendOutcome(
@@ -593,6 +721,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
       message = await pending.message;
     }
     if (!isCurrent()) return;
+    await awaitAbortBarrier(route.sessionId);
+    if (!isCurrent()) return;
     if (mustPark(turn, pending)) {
       if (!turn.inbox.includes(pending)) turn.inbox.push(pending);
       return;
@@ -717,16 +847,32 @@ export function createTurnManager(deps: TurnManagerDeps) {
   }
 
   async function abortKilo(route: TurnRoute): Promise<void> {
+    await abortKiloConfirmed(route);
+  }
+
+  async function abortKiloConfirmed(route: TurnRoute): Promise<boolean> {
     const runtime = deps.runtimes.get(route.runtimeKey);
-    if (runtime === undefined) return;
+    if (runtime === undefined) return false;
+    const abort = new AbortController();
     try {
-      await runtime.client.abortSession({
-        sessionId: route.kiloSessionId,
-        directory: route.directory,
-        signal: AbortSignal.timeout(10_000),
-      });
+      return await withTimeoutAndAbort(
+        runtime.client.abortSession({
+          sessionId: route.kiloSessionId,
+          directory: route.directory,
+          signal: abort.signal,
+        }),
+        {
+          signal: abort.signal,
+          timeoutMs: 10_000,
+          timeoutMessage: 'Session cancellation timed out',
+          abortMessage: 'Session cancellation aborted',
+        }
+      );
     } catch {
       log(`turn: Kilo abort failed session=${route.kiloSessionId}`);
+      return false;
+    } finally {
+      abort.abort();
     }
   }
 
@@ -1155,20 +1301,35 @@ export function createTurnManager(deps: TurnManagerDeps) {
     release(sessionId: string): void {
       const route = routes.get(sessionId);
       if (route !== undefined) {
+        const runtime = deps.runtimes.get(route.runtimeKey);
+        const native = runtime?.sessionState(route.kiloSessionId);
+        if (native !== undefined && native.activity !== 'stopping') {
+          const previous = abortBarriers.get(sessionId) ?? Promise.resolve();
+          const barrier = previous
+            .then(async () => {
+              if (!(await abortKiloConfirmed(route))) await runtime?.recoverAbandonedAbort?.();
+            })
+            .catch(() => undefined)
+            .finally(() => {
+              if (abortBarriers.get(sessionId) === barrier) abortBarriers.delete(sessionId);
+            });
+          abortBarriers.set(sessionId, barrier);
+        }
         turnByKiloSession.delete(route.kiloSessionId);
         for (const [child, root] of childRoots) {
           if (root === route.kiloSessionId) childRoots.delete(child);
         }
       }
       routes.delete(sessionId);
-      turns.get(sessionId)?.publication?.dispose();
-      turns.delete(sessionId);
-      stopTickIfIdle();
+      turns.get(sessionId)?.stepAbort?.abort(new Error('released'));
+      resetTurn(sessionId);
     },
 
     submit(sessionId: string, payload: ControlPlanePromptPayload): void {
       acceptPrompt(sessionId, payload);
     },
+
+    sessionControl,
 
     abort(sessionId: string): void {
       const route = routes.get(sessionId);
@@ -1258,6 +1419,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       }
       const turn = turns.get(sessionId);
       if (turn === undefined) return;
+      if (abortBarriers.has(sessionId)) return;
       if (event.type === 'session.turn.open' && eventSessionId === root)
         turn.deferredCompletion = undefined;
       const gateResult = gateResultFromProperties(event.properties);

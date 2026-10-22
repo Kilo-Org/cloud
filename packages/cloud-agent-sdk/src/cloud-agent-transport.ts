@@ -399,16 +399,23 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         closeConnection('destroy');
       },
 
-      send: input =>
-        runMutation(() =>
+      send: input => {
+        if (!input.messageId) {
+          // A Cloud Agent send without a client id cannot be replayed: the
+          // server would admit a second turn for a retry of the same message.
+          throw new Error('Cloud Agent sends require a client message id');
+        }
+        const { messageId } = input;
+        return runMutation(() =>
           config.api.send({
             sessionId: config.sessionId,
             payload: normalizeCloudAgentPayload(input.payload),
-            ...(input.messageId ? { messageId: input.messageId } : {}),
+            messageId,
             ...(input.attachments ? { attachments: input.attachments } : {}),
             ...(input.images ? { images: input.images } : {}),
           })
-        ),
+        );
+      },
       interrupt: () => runMutation(() => config.api.interrupt({ sessionId: config.sessionId })),
       dropQueuedMessage: async messageId => {
         const cancelQueuedMessage = config.api.cancelQueuedMessage;

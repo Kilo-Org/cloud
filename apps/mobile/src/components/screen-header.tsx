@@ -149,9 +149,6 @@ type ScreenHeaderProps = {
    * heading that carries text.
    */
   allowInlineActionsStacking?: boolean;
-  /** Home, Quick Chat, and session headers supply context below the title.
-   * Other callers keep their existing title-only layout when this slot is absent. */
-  context?: React.ReactNode;
   modal?: boolean;
   showBackButton?: boolean;
   onBack?: () => void;
@@ -208,7 +205,6 @@ export function ScreenHeader({
   inlineActions,
   inlineActionsWidth,
   allowInlineActionsStacking = true,
-  context,
   modal,
   centerTitle = modal ?? false,
   showBackButton,
@@ -356,7 +352,6 @@ export function ScreenHeader({
         </Eyebrow>
       ) : null}
       {titleNode}
-      {context}
     </View>
   );
   // A centered title shares its row with the leading and trailing controls.
@@ -441,9 +436,18 @@ export function ScreenHeader({
   // they keep the header's full width, so a long translation (Croatian
   // "TRENUTAČNO AKTIVNO" / "PRETHODNE SESIJE" beside the filter) stays legible
   // instead of squeezing the 30px title into a mid-word break.
+  //
+  // A caller that turns the reflow off has to cap the slot instead: the heading
+  // is `flex-1` over a zero basis, so an unbounded trailing cluster resolves
+  // all negative free space on itself and leaves the heading at zero width,
+  // where a fixed-size child such as the Home mark paints under the cluster.
+  // The half-row cap is the same one `headerRightShrinks` uses; with it the
+  // free space can never go negative, so the heading always keeps its share.
   const inlineActionsSlot =
     inlineActions && !stackInlineActions ? (
-      <View className="ms-3 min-w-0 shrink">{inlineActions}</View>
+      <View className={cn('ms-3 min-w-0 shrink', !allowInlineActionsStacking && 'max-w-[50%]')}>
+        {inlineActions}
+      </View>
     ) : null;
   const stackedInlineActionsRow =
     inlineActions && stackInlineActions ? (

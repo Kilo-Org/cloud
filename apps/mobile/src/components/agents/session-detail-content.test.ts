@@ -1117,7 +1117,6 @@ describe('SessionDetailContent display scope', () => {
     expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
       'min-h-21'
     );
-    expect(header.props.context).toBeUndefined();
     expect(header.findAllByType(ContextControl)).toHaveLength(0);
     // The PR link shares the goal row now, so the header row holds no badge.
     expect(header.findAllByType('SessionPrBadge')).toHaveLength(0);

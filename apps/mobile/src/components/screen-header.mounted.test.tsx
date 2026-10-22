@@ -420,6 +420,21 @@ describe('ScreenHeader mounted', () => {
     const inline = findInlineActionsWrapper(pinned.root);
     expect(inline.children).toEqual(['ACTIONS']);
     expect(inline.parent?.props.className).toContain('flex-row');
+    // Turning the reflow off must cap the slot instead: the heading sits on a
+    // zero flex basis, so an unbounded cluster would keep all negative free
+    // space and leave the heading at zero width, with a fixed-size mark
+    // painting under the cluster.
+    expect(inline.props.className).toContain('max-w-[50%]');
+
+    // A caller that keeps the reflow keeps the uncapped slot.
+    Object.assign(layout, { width: 390, fontScale: 1 });
+    const uncapped = renderHeader({
+      title: 'Kilo',
+      titleContent: 'MARK',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+    });
+    expect(findInlineActionsWrapper(uncapped.root).props.className).not.toContain('max-w-[50%]');
   });
 
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
@@ -604,7 +619,6 @@ describe('ScreenHeader mounted', () => {
     const variants: ScreenHeaderProps[] = [
       { title: 'Sessions' },
       { title: 'Agents', size: 'large' },
-      { title: 'Quick Chat', size: 'large', context: 'ACCOUNT' },
       { title: 'Sessions', modal: true },
       { title: 'A long sheet title', centerTitle: true },
       { title: 'Sessions', eyebrow: 'Agents' },
@@ -628,9 +642,6 @@ describe('ScreenHeader mounted', () => {
       if (props.reserveTitleSpace) {
         expect(title.parent?.props.className).toContain(cappedLines > 2 ? 'min-h-21' : 'min-h-14');
         expect(title.parent?.props.className).toContain('justify-center');
-      }
-      if (props.context) {
-        expect(title.parent?.children).toEqual([title, props.context]);
       }
       if (props.modal || props.centerTitle) {
         expect(title.props.className).toContain('text-center');

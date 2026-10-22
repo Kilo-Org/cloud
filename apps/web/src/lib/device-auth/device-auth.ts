@@ -56,7 +56,11 @@ export function hashDeviceSecret(secret: string): string {
 
 /**
  * Create a new device authorization request.
- * Writes both the legacy code and new user_code/device_code_hash.
+ *
+ * `code` is a high-entropy poll secret kept by the requesting client, while
+ * `user_code` is the short code shown to the user and typed into the approval
+ * page. `device_code_hash` covers the device secret used by the newer
+ * device-code flow.
  */
 export async function createDeviceAuthRequest(params: {
   userAgent?: string;
@@ -88,12 +92,13 @@ export async function createDeviceAuthRequest(params: {
   }
 
   const userCode = generateUserCode();
+  const pollSecret = generateDeviceSecret();
   const deviceSecret = generateDeviceSecret();
   const deviceCodeHash = hashDeviceSecret(deviceSecret);
   const expiresAt = new Date(Date.now() + CODE_EXPIRATION_MINUTES * 60 * 1000);
 
   await db.insert(device_auth_requests).values({
-    code: userCode,
+    code: pollSecret,
     user_code: userCode,
     device_code_hash: deviceCodeHash,
     status: 'pending',
@@ -102,17 +107,17 @@ export async function createDeviceAuthRequest(params: {
     ip_address: ipAddress,
   });
 
-  return { code: userCode, userCode, deviceCode: deviceSecret, expiresAt };
+  return { code: pollSecret, userCode, deviceCode: deviceSecret, expiresAt };
 }
 
 /**
- * Get device auth request by code (legacy path).
+ * Get a device auth request by its displayed user code (approval side).
  */
-export async function getDeviceAuthRequest(code: string) {
+export async function getDeviceAuthRequest(userCode: string) {
   const [request] = await db
     .select()
     .from(device_auth_requests)
-    .where(eq(device_auth_requests.code, code))
+    .where(eq(device_auth_requests.user_code, userCode))
     .limit(1);
 
   return request;
@@ -129,9 +134,9 @@ export function isDeviceAuthRequestExpired(request: {
 }
 
 /**
- * Approve a device authorization request.
+ * Approve a device authorization request by its displayed user code.
  */
-export async function approveDeviceAuthRequest(code: string, userId: string): Promise<void> {
+export async function approveDeviceAuthRequest(userCode: string, userId: string): Promise<void> {
   const now = new Date().toISOString();
   const [approved] = await db
     .update(device_auth_requests)
@@ -142,7 +147,7 @@ export async function approveDeviceAuthRequest(code: string, userId: string): Pr
     })
     .where(
       and(
-        eq(device_auth_requests.code, code),
+        eq(device_auth_requests.user_code, userCode),
         eq(device_auth_requests.status, 'pending'),
         gt(device_auth_requests.expires_at, now)
       )
@@ -153,7 +158,7 @@ export async function approveDeviceAuthRequest(code: string, userId: string): Pr
     return;
   }
 
-  const request = await getDeviceAuthRequest(code);
+  const request = await getDeviceAuthRequest(userCode);
 
   if (!request) {
     throw new Error('Device authorization request not found');
@@ -168,7 +173,7 @@ export async function approveDeviceAuthRequest(code: string, userId: string): Pr
     .set({ status: 'expired' })
     .where(
       and(
-        eq(device_auth_requests.code, code),
+        eq(device_auth_requests.user_code, userCode),
         eq(device_auth_requests.status, 'pending'),
         lte(device_auth_requests.expires_at, now)
       )
@@ -182,10 +187,10 @@ export async function approveDeviceAuthRequest(code: string, userId: string): Pr
 }
 
 /**
- * Deny a device authorization request.
+ * Deny a device authorization request by its displayed user code.
  */
-export async function denyDeviceAuthRequest(code: string): Promise<void> {
-  const request = await getDeviceAuthRequest(code);
+export async function denyDeviceAuthRequest(userCode: string): Promise<void> {
+  const request = await getDeviceAuthRequest(userCode);
 
   if (!request) {
     throw new Error('Device authorization request not found');
@@ -198,7 +203,9 @@ export async function denyDeviceAuthRequest(code: string): Promise<void> {
   const [denied] = await db
     .update(device_auth_requests)
     .set({ status: 'denied' })
-    .where(and(eq(device_auth_requests.code, code), eq(device_auth_requests.status, 'pending')))
+    .where(
+      and(eq(device_auth_requests.user_code, userCode), eq(device_auth_requests.status, 'pending'))
+    )
     .returning({ id: device_auth_requests.id });
 
   if (!denied) {
@@ -331,7 +338,8 @@ export async function consumeDeviceAuthByDeviceCode(
 
 /**
  * Poll for device authorization status and return token if approved.
- * Legacy path — uses atomic consume to prevent double-spend.
+ * Legacy path — keyed on the high-entropy poll secret stored in `code`.
+ * Uses atomic consume to prevent double-spend.
  *
  * If credential issuance fails after the atomic consume succeeds, the row is
  * restored to `approved` so the request remains redeemable.

@@ -27,10 +27,10 @@ describe('POST /api/device-auth/codes', () => {
     jest.clearAllMocks();
   });
 
-  test('returns code, user_code, device_code, verificationUrl, and expiresIn', async () => {
+  test('returns code as the poll secret plus user_code, device_code, verificationUrl, and expiresIn', async () => {
     const expiresAt = new Date(Date.now() + 600_000);
     mockCreate.mockResolvedValue({
-      code: 'ABCD-EFGH',
+      code: 'poll-secret-value-for-the-requesting-client',
       userCode: 'ABCD-EFGH',
       deviceCode: 'base64url-device-secret',
       expiresAt,
@@ -44,21 +44,22 @@ describe('POST /api/device-auth/codes', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.code).toBe('ABCD-EFGH');
+    expect(data.code).toBe('poll-secret-value-for-the-requesting-client');
     expect(data.user_code).toBe('ABCD-EFGH');
     expect(data.device_code).toBe('base64url-device-secret');
     expect(data.verificationUrl).toContain('/device-auth');
     expect(data.verificationUrl).toContain('ABCD-EFGH');
-    // The device secret must never appear in a URL.
+    // Neither secret may appear in the verification URL.
     expect(data.verificationUrl).not.toContain('base64url-device-secret');
+    expect(data.verificationUrl).not.toContain('poll-secret-value-for-the-requesting-client');
     expect(data.expiresIn).toBeGreaterThan(0);
     expect(data.expiresIn).toBeLessThanOrEqual(600);
   });
 
-  test('verificationUrl uses the user code, never the device secret', async () => {
+  test('verificationUrl uses the user code, never the poll secret', async () => {
     const expiresAt = new Date(Date.now() + 600_000);
     mockCreate.mockResolvedValue({
-      code: 'WXYZ-1234',
+      code: 'poll-secret-value-for-the-requesting-client',
       userCode: 'WXYZ-1234',
       deviceCode: 'super-long-secret-that-should-not-leak',
       expiresAt,

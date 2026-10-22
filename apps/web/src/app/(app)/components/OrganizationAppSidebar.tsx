@@ -11,7 +11,6 @@ import {
   Sliders,
   Sparkles,
   Cable,
-  Database,
   Users,
   CreditCard,
   Cloud,
@@ -208,15 +207,6 @@ export default function OrganizationAppSidebar({
       icon: Shield,
       url: `/organizations/${organizationId}/security-agent`,
     },
-    ...(organizationData?.settings?.code_indexing_enabled
-      ? [
-          {
-            title: 'Managed Indexing',
-            icon: Database,
-            url: `/organizations/${organizationId}/code-indexing`,
-          },
-        ]
-      : []),
   ];
 
   // Account group

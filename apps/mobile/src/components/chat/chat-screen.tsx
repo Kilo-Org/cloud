@@ -30,6 +30,8 @@ import { chatTargetKind, resolveChatTarget } from '@/lib/chat/backend-target';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat/effort';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 import { ChatTitle } from './chat-title';
 import { ChatComposerArea } from './chat-composer-area';
@@ -308,7 +310,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
               // state it stood for is named here and drawn in full by the sheet
               // this control opens.
               accessibilityValue={{ text: mcpStatusText }}
-              className="h-11 w-11 items-center justify-center active:opacity-70"
+              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
             >
               <Wrench size={22} color={colors.foreground} />
             </Pressable>

@@ -25,6 +25,7 @@
     "error": "villa: {{error}}",
     "back": "Til baka",
     "somethingWentWrong": "Eitthvað fór úrskeiðis.",
+    "actionNotRecorded": "Ekki tókst að skrá þessa aðgerð. Reyndu aftur síðar.",
     "couldNotOpen": "Ekki tókst að opna {{label}}.",
     "link": "tengill",
     "takingLonger": "Þetta tekur lengri tíma en gert var ráð fyrir. Þú getur lokað þessu og athugað aftur.",
@@ -590,6 +591,8 @@
     "installKiloGitHubApp": "Setja upp Kilo-forritið fyrir GitHub",
     "checkConnection": "Athuga tengingu",
     "couldNotLoadPullRequest": "Ekki tókst að hlaða sameiningarbeiðninni.",
+    "reviewServiceUnavailable": "Þjónusta er ekki tiltæk",
+    "reviewServiceUnavailableDescription": "Þjónustan er tímabundið ótiltæk. Reyndu aftur fljótlega.",
     "description": "Lýsing",
     "noDescriptionProvided": "Engin lýsing hefur verið gefin.",
     "review": "Rýni",
@@ -761,6 +764,7 @@
       "truncationBanner_other": "Fyrstu {{limit}} af {{total}} breyttum skrám eru sýndar — þetta eru takmörk API hjá GitHub."
     },
     "linkPasteClipboardEmpty": "Klippiborðið er tómt.",
+    "linkPasteDenied": "Aðgangur að límingu var hafnað. Leyfðu límingu og reyndu aftur.",
     "linkPasteNotAPullRequest": "Þetta er ekki tengill á samrunabeiðni eða merge request",
     "announce": {
       "commentPosted": "Athugasemd birt",
@@ -784,7 +788,6 @@
       "mergeResultDefaultError": "GitHub lauk ekki sameiningunni.",
       "mergeResultNotCompleted": "{{term}} var ekki sameinuð. Athugaðu stöðuna og reyndu aftur.",
       "ambiguous": "Ekki tókst að staðfesta niðurstöðuna — athugaðu PR-beiðnina áður en þú reynir aftur.",
-      "persistenceFailed": "Ekki tókst að skrá þessa aðgerð. Reyndu aftur síðar.",
       "forbidden": "Þú hefur ekki heimild til þessarar aðgerðar."
     },
     "capabilities": {
@@ -1456,8 +1459,9 @@
       "loading": "Sæki yfirferðarminni",
       "couldNotLoad": "Ekki tókst að sækja yfirferðarminni.",
       "off": "Slökkt er á yfirferðarminni.",
+      "on": "Kveikt er á yfirferðarminni.",
       "offDescription": "Kveiktu á því svo Kilo geti lært af svörum viðhaldsaðila og lagt til leiðbeiningar fyrir REVIEW.md.",
-      "readOnlyDescription": "Aðeins eigendur fyrirtækisins og greiðslustjórar geta virkjað yfirferðarminni.",
+      "readOnlyDescription": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta breytt yfirferðarminni.",
       "enable": "Virkja yfirferðarminni",
       "loadingProposals": "Sæki tillögur",
       "couldNotLoadProposals": "Ekki tókst að sækja tillögur.",
@@ -1477,7 +1481,10 @@
       "starting": "Hef yfirferð…",
       "start": "Hefja yfirferð"
     },
-    "notConnectedReadOnly": "{{platform}} er ekki tengt. Aðeins eigendur fyrirtækisins og greiðslustjórar geta tengt það.",
+    "notConnectedReadOnly": "{{platform}} er ekki tengt. Aðeins eigendur fyrirtækisins og stjórnendur geta tengt það.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} er ekki tengt. Biddu eiganda, stjórnanda eða innheimtustjóra samtakanna um að tengja það."
+    },
     "webhookSetup": "Uppsetningu vefkrækja er ekki lokið.",
     "webhookSetupDescription": "Hugsanlega verða sumar geymslur ekki yfirfarnar sjálfkrafa.",
     "autoReviews": "Sjálfvirkar yfirferðir",
@@ -1485,7 +1492,7 @@
     "followReviewMd": "Fylgja REVIEW.md",
     "followReviewMdSubtitle": "Fylgja leiðbeiningum í REVIEW.md-skrá hverrar geymslu",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ekki tengt. Aðeins eigendur fyrirtækisins og greiðslustjórar geta tengt það.",
+      "notConnectedReadOnly": "Bitbucket er ekki tengt. Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það.",
       "setupIncomplete": "Uppsetningu er ekki lokið. Ljúktu stillingunum á kilo.ai.",
       "setup": "Uppsetning Bitbucket"
     },
@@ -1745,7 +1752,7 @@
       "couldNotLoad": "Tókst ekki að sækja þessa niðurstöðu.",
       "couldNotCheckPermissions": "Ekki tókst að athuga heimildir til að vísa frávikum frá.",
       "cannotDismissTitle": "Ekki hægt að vísa þessu fráviki frá",
-      "cannotDismissDescription": "Aðeins eigendur fyrirtækisins og greiðslustjórar geta vísað frávikum frá.",
+      "cannotDismissDescription": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta vísað frávikum frá.",
       "alreadyResolvedDescription": "Þetta frávik hefur þegar verið leyst og því er ekki lengur hægt að vísa því frá."
     },
     "findingDetails": {
@@ -1787,7 +1794,7 @@
       "automationAllOff": "Allt óvirkt",
       "automationCount": "Virkt: {{displayCount}} af 3",
       "notificationsCount": "Virkt: {{displayCount}} af 2",
-      "disabledNoManage": "Öryggisvakinn er óvirkur. Aðeins eigendur fyrirtækisins og greiðslustjórar geta virkjað hann.",
+      "disabledNoManage": "Öryggisvakinn er óvirkur. Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta kveikt á honum.",
       "disabledNoRepo": "Veldu að minnsta kosti eina geymslu áður en þú virkjar öryggisvakann.",
       "disabledPrompt": "Virkjaðu öryggisvakann til að samstilla Dependabot-viðvaranir, velja geymslur og stilla sjálfvirkni."
     },
@@ -1836,7 +1843,7 @@
       "invalidDayCount": "fjöldi daga verður að vera heil tala frá 1 til 365.",
       "remediationDeadlineA11y": "Úrbótafrestur í dögum fyrir {{label}}",
       "enterWholeNumber": "Sláðu inn heila tölu milli 1 og 365",
-      "permissionNote": "Aðeins eigendur fyrirtækisins og greiðslustjórar geta breytt þessum stillingum.",
+      "permissionNote": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta breytt þessum stillingum.",
       "enableTracking": "Virkja SLA-eftirlit",
       "enableTrackingSubtitle": "Úrbótafrestir eru ákveðnir út frá alvarleika frávika.",
       "deadlinesHeading": "Úrbótafrestir (dagar)"
@@ -1879,6 +1886,9 @@
       "viewA11y": "Skoða endurskoðunarskýrslu"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-stjórnandi",
+      "actorMaskedUser": "Maskeraður notandi",
+      "actorSystem": "Kilo-kerfi",
       "couldNotLoad": "Ekki tókst að sækja endurskoðunarskýrsluna.",
       "events": "Atburðir",
       "generated": "Skýrslan var búin til {{generatedAt}}.",
@@ -1889,7 +1899,7 @@
       "summary": "Samantekt skýrslu",
       "title": "Endurskoðunarskýrsla",
       "unavailable": "Endurskoðunarskýrsla ekki tiltæk",
-      "unavailableDescription": "Aðeins eigendur fyrirtækisins og greiðslustjórar geta skoðað endurskoðunarskýrslur. Biddu eiganda eða greiðslustjóra um að veita þér aðgang.",
+      "unavailableDescription": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta skoðað endurskoðunarskýrslur. Biddu eiganda, stjórnanda eða innheimtustjóra um að veita þér aðgang.",
       "queryFailed": "Fyrirspurn um skýrsluna lauk ekki. Reyndu aftur.",
       "eventActions": {
         "findingAnalysisCompleted": "Greining lokið",
@@ -1957,7 +1967,12 @@
       "syncMayNotHaveCompleted": "Samstillingu er hugsanlega ekki lokið. Reyndu aftur til að samræma stöðuna eða fargaðu beiðninni.",
       "syncInProgress": "Öryggissamstilling er þegar í gangi. Reyndu aftur.",
       "dismissalInProgress": "Þessi frávísun er þegar í gangi. Reyndu aftur.",
-      "couldNotReadPendingSyncs": "Ekki tókst að lesa samstillingar í bið. Reyndu aftur."
+      "couldNotReadPendingSyncs": "Ekki tókst að lesa samstillingar í bið. Reyndu aftur.",
+      "ambiguous": "Ekki tókst að staðfesta niðurstöðuna — athugaðu öryggisskoðunina áður en þú reynir aftur.",
+      "settleFailed": "Aðgerðinni var lokið, en okkur tókst ekki að skrá niðurstöðuna. Reyndu aftur.",
+      "replayFailed": "Þessari aðgerð var ekki lokið. Reyndu aftur.",
+      "actionFailed": "Ekki tókst að ljúka þessari aðgerð. Reyndu aftur.",
+      "actionBlocked": "Ekki tókst að ljúka þessari aðgerð. Leysa verður vandamálið áður en þú getur reynt aftur."
     },
     "analysisState": {
       "queued": "Greining í biðröð",
@@ -2234,6 +2249,8 @@
       "commitAndPush": "Skrá og senda",
       "startSession": "Byrja lotu",
       "selectRepositoryToStart": "Veldu kóðasafn til að byrja.",
+      "enterPromptToStart": "Bættu við skipun til að byrja.",
+      "enterPromptOrFileToStart": "Bættu við skipun eða skrá til að byrja.",
       "connectProviderToStart": "Tengdu þjónustuveitanda til að byrja.",
       "promptPlaceholder": "Hvað viltu vinna að?",
       "couldNotLoadModels": "Ekki tókst að hlaða líkönum.",
@@ -2772,7 +2789,7 @@
     "thisDevice": "Þetta tæki",
     "viewProfile": "Skoða prófíl",
     "signOutThisDevice": "Skrá þetta tæki út",
-    "signOutThisSession": "Skrá þessa lotu út",
+    "signOutSessionLabel": "Skrá {{device}} út, innskráning {{signedIn}}",
     "sessionSignedOut": "Skráð var út úr lotunni.",
     "signOutThisDeviceTitle": "Skrá þetta tæki út?",
     "signOutThisSessionTitle": "Skrá þessa lotu út?",
@@ -3013,6 +3030,7 @@
 
       "chooseAccount": "Veldu reikning",
       "loadErrorTitle": "Ekki tókst að hlaða félögunum þínum.",
+      "membershipLostNotice": "Þú hefur ekki lengur aðgang að þessu félagi. Skipt yfir í {{target}}.",
       "noOrganization": "Ekkert félag",
 
       "noOrganizationDescription": "Þessi reikningur er ekki hluti af félagi. Búðu til eða gakktu til liðs við félag á vefnum til að nota eiginleika félagsins eins og boð til meðlima og viðvaranir um lága stöðu.",
@@ -3077,7 +3095,11 @@
       "separateEmailsHint": "Aðgreindu tölvupóstföng með kommum.",
       "thresholdLabel": "Viðvörun þegar inneign fer undir (USD)",
       "title": "Viðvörun um lága inneign",
-      "emailsError": "Sláðu inn að minnsta kosti eitt gilt tölvupóstfang. Aðgreindu mörg föng með kommum.",
+      "emailsInvalid": "Eitt eða fleiri tölvupóstföng eru ekki gild.",
+      "emailsRequired": "Sláðu inn að minnsta kosti eitt tölvupóstfang.",
+      "saveEmailsError": "Sum tölvupóstföng voru ekki samþykkt. Athugaðu þau og reyndu aftur.",
+      "saveError": "Ekki tókst að vista viðvörun um lága inneign.",
+      "thresholdPlaceholder": "Sláðu inn upphæð",
       "thresholdError": "Sláðu inn upphæð sem er hærri en 0."
     },
     "memberLimit": {
@@ -3088,12 +3110,13 @@
       "removeLimit": "Fjarlægja hámark",
       "title": "Daglegt notkunarhámark",
       "blankError": "Sláðu inn upphæð eða fjarlægðu hámarkið hér að neðan.",
+      "blankWithoutLimitError": "Sláðu inn daglegt hámark milli 0 og {{max}}.",
       "rangeError": "Sláðu inn upphæð milli 0 og {{max}}."
     },
     "members": {
       "changeRole": "Breyta hlutverki",
       "emptyDescriptionCanInvite": "Bjóddu samstarfsfólki að ganga í félagið og hefja samstarf.",
-      "emptyDescriptionCannotInvite": "Biddu eiganda eða innheimtustjóra að bjóða samstarfsfólki að ganga í félagið.",
+      "emptyDescriptionCannotInvite": "Biddu eiganda, stjórnanda eða innheimtustjóra að bjóða samstarfsfólki að ganga í félagið.",
       "emptyTitle": "Engir meðlimir ennþá",
       "invitedDate": "Boðið {{date}}",
       "limitPerDay": "{{amount}}/dag",
@@ -3357,7 +3380,8 @@
       "settingsToolsOn": "Kveikt — stillingaverkfærin eru send til líkansins",
       "settingsToolsOff": "Slökkt — ekkert stillingaverkfæri er sent til líkansins",
       "serverChecking": "Athuga þennan þjón…",
-      "serverToolCount": "{{count}} verkfæri",
+      "serverToolCount_one": "{{count}} verkfæri",
+      "serverToolCount_other": "{{count}} verkfæri",
       "serverUnreachable": "Náði ekki sambandi við þennan þjón",
       "serverOff": "Þessi þjónn er óvirkur"
     },
@@ -3555,6 +3579,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Ræsa fulltrúa krefst skilaboða. Bættu við skilaboðum og keyrðu aftur.",
+      "repositoryRequired": "Ræsa fulltrúa krefst kóðasafns. Opnaðu Kilo og veldu eitt, keyrðu síðan aftur.",
       "repositoryUnknown": "Kilo þekkir ekki {{repository}} sem GitHub- eða GitLab-kóðasafn. Veldu annað kóðasafn í Kilo.",
       "repositoryUnsupported": "{{repository}} er Bitbucket-kóðasafn — Ræsa fulltrúa getur ekki notað það enn. Veldu annað kóðasafn í Kilo."
     }
@@ -3592,10 +3617,13 @@
     "emptyDescription": "Búðu til prófíl til að endurnýta umhverfisbreytur, uppsetningarskipanir og færni yfir lotur.",
     "loadFailed": "Ekki tókst að hlaða prófílum",
     "counts": {
-      "vars": "{{count}} breytur",
+      "vars_one": "{{count}} breyta",
+      "vars_other": "{{count}} breytur",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} færni",
-      "commands": "{{count}} skipanir",
+      "skills_one": "{{count}} færni",
+      "skills_other": "{{count}} færni",
+      "commands_one": "{{count}} skipun",
+      "commands_other": "{{count}} skipanir",
       "varsShort": "{{count}}b",
       "skillsShort": "{{count}}f",
       "commandsShort": "{{count}}s"
@@ -3626,7 +3654,6 @@
     "keyTooLong": "Lykillinn má vera að hámarki 256 stafir",
     "keyDuplicate": "Þessi lykill er þegar til í prófílnum",
     "valueLabel": "Gildi",
-    "secretLabel": "Leyndarmál",
     "secrets": {
       "markSecret": "Merktu sem leyndarmál",
       "masked": "Falið gildi",
@@ -3713,6 +3740,9 @@
       "visibilityPrimary": "Aðal — sýnt í veljarann",
       "visibilitySubagent": "Subagent — aðeins hægt að hringja frá öðrum",
       "visibilityAll": "Allt - bæði",
+      "modePrimary": "Aðeins aðal",
+      "modeSubagent": "Aðeins subagent",
+      "modeAll": "Allt",
       "saveFailed": "Ekki tókst að vista umboðsmann",
       "deleteFailed": "Ekki tókst að eyða umboðsmanni",
       "nameRequired": "Sláðu inn nafn umboðsmanns",
@@ -3773,6 +3803,8 @@
     "empty": "Inneignarpakkar eru ekki tiltækir núna.",
     "noMatchingProducts": "App Store skilaði engum samsvarandi inneignarpökkum.",
     "noMatchingProductsPlay": "Google Play skilaði engum samsvarandi inneignarpökkum.",
+    "storeTimedOut": "App Store svaraði ekki tímanlega. Reyndu aftur.",
+    "storeTimedOutPlay": "Google Play svaraði ekki tímanlega. Reyndu aftur.",
     "purchaseOwnedByAnotherAccount": "Inneignin á þessum Apple Account-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana.",
     "purchaseOwnedByAnotherAccountPlay": "Inneignin á þessum Google Play-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana."
   },

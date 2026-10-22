@@ -229,7 +229,7 @@ export const sandboxBillingInputEnvelopeSchema = z
       .min(1)
       .max(63)
       .refine(isValidSandboxId, 'Invalid sandboxId format')
-      .transform(value => value as SandboxId),
+      .transform(value => value),
     subject: billingSubjectSchema,
     actor: billingActorSchema,
     onBehalfOf: billingSubjectSchema.optional(),

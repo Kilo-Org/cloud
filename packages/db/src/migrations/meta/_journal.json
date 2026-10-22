@@ -2049,8 +2049,15 @@
     {
       "idx": 292,
       "version": "7",
-      "when": 1792616145574,
-      "tag": "0292_preferred_provider_order",
+      "when": 1792612549366,
+      "tag": "0292_direct_byok_sync_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 293,
+      "version": "7",
+      "when": 1792667291991,
+      "tag": "0293_preferred_provider_order",
       "breakpoints": true
     }
   ]

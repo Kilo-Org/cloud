@@ -1,5 +1,5 @@
 {
-  "id": "4cf9fbd4-a129-49ac-91aa-6dfedcbbc97c",
+  "id": "48da44e5-b482-4eae-a823-83defe1a305a",
   "prevId": "140eaf3d-3dc3-47a6-8127-257c20dfa20d",
   "version": "7",
   "dialect": "postgresql",
@@ -2184,12 +2184,6 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
-        },
-        "preferred_provider_order": {
-          "name": "preferred_provider_order",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {},
@@ -2256,6 +2250,18 @@
         },
         "stale_alert_last_posted_at": {
           "name": "stale_alert_last_posted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_byok_last_completed_at": {
+          "name": "direct_byok_last_completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_byok_stale_alert_last_posted_at": {
+          "name": "direct_byok_stale_alert_last_posted_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

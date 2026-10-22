@@ -28,7 +28,10 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
 
-const PAPERCLIP_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+// The paperclip's 28pt frame (h-8 at NativeWind's 14pt rem) carries 10pt of
+// hit slop per side, so its effective target is 28 + 20 = 48dp — Android's
+// minimum (WCAG 2.5.8 AA) — without growing the visual or the row.
+const PAPERCLIP_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 } as const;
 /** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
 const CONTROL_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
 /**

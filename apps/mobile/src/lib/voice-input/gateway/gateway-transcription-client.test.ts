@@ -1,4 +1,4 @@
-/* eslint-disable require-await, @typescript-eslint/require-await -- the fake upload resolves immediately, so the mock implementations settle without await (same as gateway-voice-input-engine.test.tsx) */
+/* eslint-disable require-await, @typescript-eslint/require-await -- the fake upload resolves immediately, so the mock implementations settle without await */
 import {
   classifyTranscriptionFailure,
   transcribeRecording,

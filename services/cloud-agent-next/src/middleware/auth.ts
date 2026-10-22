@@ -14,6 +14,9 @@ export const authMiddleware = createMiddleware<HonoContext>(
     const result = await validateKiloToken(authHeader ?? null, {
       secret: nextAuthSecret,
       connectionString: c.env.HYPERDRIVE.connectionString,
+      ...(new URL(c.req.url).pathname === '/trpc/prepareSession'
+        ? { allowCloudAgentAuthority: true }
+        : {}),
     });
 
     if (!result.success) {
@@ -22,8 +25,13 @@ export const authMiddleware = createMiddleware<HonoContext>(
       return buildTrpcErrorResponse(401, result.error, procedureName);
     }
 
+    if (result.cloudAgentAuthority && new URL(c.req.url).pathname !== '/trpc/prepareSession') {
+      return buildTrpcErrorResponse(403, 'Cloud Agent authority only permits preparation');
+    }
+
     c.set('userId', result.userId);
     c.set('authToken', result.token);
+    if (result.cloudAgentAuthority) c.set('cloudAgentAuthority', result.cloudAgentAuthority);
     if (result.botId) {
       c.set('botId', result.botId);
     }

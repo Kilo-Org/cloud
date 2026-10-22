@@ -15,6 +15,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { cleanVariableKey } from '@/lib/agent-profile-forms';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /** Content-shaped rows in the same slot and height as a loaded variable row. */
 export function VariablesSkeleton() {
@@ -116,9 +118,9 @@ export function VariableRowView({
       </Pressable>
       {row.isSecret && onToggleReveal !== undefined ? (
         <Pressable
-          className="h-11 w-11 items-center justify-center active:opacity-70"
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('profiles.secretLabel')}
+          accessibilityLabel={t('profiles.secrets.reveal')}
           accessibilityState={{ selected: revealed }}
           onPress={onToggleReveal}
         >
@@ -130,7 +132,7 @@ export function VariableRowView({
         </Pressable>
       ) : null}
       <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('common.delete')}
         disabled={isDeleting}

@@ -32,9 +32,9 @@ git lfs install --skip-repo
 
 The `--skip-repo` flag avoids conflicts with the project's Husky hooks. Git LFS is used for large binary files (videos).
 
-### Node.js 24.14.1 (via nvm)
+### Node.js 24.22.1 (via nvm)
 
-The project requires Node.js 24.14.1 locally (see `.nvmrc`) and accepts any Node.js 24.x runtime in `package.json` `engines`.
+The project requires Node.js 24.22.1 locally (see `.nvmrc`) and accepts any Node.js 24.x runtime in `package.json` `engines`.
 
 ```bash
 brew install nvm
@@ -553,7 +553,7 @@ If you see errors about unsupported Node.js versions, ensure you're using the pi
 
 ```bash
 nvm use
-node --version  # Should output v24.14.1
+node --version  # Should output v24.22.1
 ```
 
 ### Database connection errors
@@ -582,3 +582,27 @@ If image/video files appear as small text files with `oid sha256:...`, run:
 ```bash
 git lfs pull
 ```
+
+## Agent morning briefings
+
+The mobile Home briefing summarizes overnight coding sessions separately for Personal and each organization.
+Users configure a saved timezone, night start, shared night-end/morning-start, and morning end.
+Dismissal restores live status across devices; report history remains available.
+
+The backend owns scheduling, report revisions, optional paid summaries, and notification dispatch.
+AI summaries and briefing notifications require separate opt-ins.
+Summary settings include a model override and finite generation time and spend limits.
+The default summary model is `~deepseek/deepseek-flash-latest`.
+Pricing estimates and gateway spend checks resolve latest-model aliases through the stored catalog target.
+An alias remains unavailable when its target is missing or has no usable pricing.
+The gateway rejects an alias request if provider routing selects a different target from the priced catalog target.
+The structured report remains available when generation fails or reaches a limit.
+
+Apply database migrations before deploying the session-ingest, notification, gateway, and web changes.
+The CLI status producer must send occurrence timestamps and transition identities for reliable historical blocker counts.
+Legacy activity remains readable with partial coverage; unknown values must not appear as confirmed zeroes.
+
+The protected cron routes are `/api/cron/agent-briefing` and `/api/cron/agent-briefing-summaries`.
+They use the existing cron authorization, database, gateway, and notification configuration.
+Local verification must use an isolated database and fake accounts.
+Use a local notification sink and fixture inference provider to avoid real pushes or upstream charges.

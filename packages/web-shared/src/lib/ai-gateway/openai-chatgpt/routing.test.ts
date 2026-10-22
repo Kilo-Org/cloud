@@ -12,10 +12,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh', () => ({
   resolveOpenAiChatGptAccessToken: jest.fn(),
   OPENAI_CHATGPT_RECONNECT_MESSAGE: 'Your ChatGPT connection has expired. Reconnect to continue.',
 }));
-// The catalog's live Kilo-exclusive models come and go as promotions are
-// disabled, and at one point none were live at all, which silently turned the
-// exclusive cases below into ordinary-model cases. Stub a synthetic alias, but
-// preserve the real lookup for the catalog status regression tests below.
+// The catalog's Kilo-exclusive models come and go as promotions end, and at one
+// point none were live at all, which silently turned the exclusive cases below
+// into ordinary-model cases. Stub a synthetic alias, but preserve the real lookup
+// for every other model.
 jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
   const actual = jest.requireActual<typeof gatewayModels>(
     '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
@@ -28,25 +28,19 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
     internal_id: 'openai/upstream-test-model',
     display_name: 'OpenAI exclusive test model',
     description: 'Test model',
-    status: 'public',
     context_length: 8_192,
     max_completion_tokens: 4_096,
     provider: { ...OPENROUTER, id: 'vercel' },
     flags: [],
     pricing: null,
-    inference_provider_restriction: ['openai'],
+    inference_providers: ['openai'],
   };
   return {
     ...actual,
     findKiloExclusiveModel: jest.fn((model: string) =>
-      model === testExclusiveModel.public_id && testExclusiveModel.status !== 'disabled'
+      model === testExclusiveModel.public_id
         ? testExclusiveModel
         : actual.findKiloExclusiveModel(model)
-    ),
-    isDisabledKiloExclusiveModel: jest.fn((model: string) =>
-      model === testExclusiveModel.public_id
-        ? testExclusiveModel.status === 'disabled'
-        : actual.isDisabledKiloExclusiveModel(model)
     ),
     kiloExclusiveModels: [...actual.kiloExclusiveModels, testExclusiveModel],
   };
@@ -64,7 +58,7 @@ jest.mock('next/server', () => ({
   }),
 }));
 
-import { afterAll, afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
 import type * as gatewayModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type * as OpenRouterModule from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
@@ -396,16 +390,8 @@ describe('tagOpenAiChatGptByokModels', () => {
   });
 });
 
-describe.each(['public', 'hidden', 'disabled'] as const)('%s Kilo-exclusive aliases', status => {
+describe('Kilo-exclusive aliases', () => {
   const modelId = exclusiveTestModel.public_id;
-
-  beforeEach(() => {
-    jest.replaceProperty(exclusiveTestModel, 'status', status);
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
 
   it('rejects eligibility before looking up the upstream model or connection', async () => {
     await expect(
@@ -520,6 +506,64 @@ describe('checkOpenAiChatGptByok', () => {
     expect(result.subscription_sharing_activity).toBe('coding_agent');
     expect(result.subscription_sharing_purpose).toBe("Run the user's coding task in Kilo Code.");
     expect(result.subscription_sharing_activity_id).toBe('sess_limit');
+  });
+
+  it.each(['auto', 'default', 'flex', 'priority', 'scale', null] as const)(
+    'drops service_tier %s',
+    async serviceTier => {
+      const provider = await buildProviderForTest();
+      const body: GatewayResponsesRequest = {
+        model: 'openai/gpt-5-nano',
+        input: 'hello',
+        service_tier: serviceTier,
+      };
+
+      await transformResponsesRequest(provider, body);
+
+      expect('service_tier' in body).toBe(false);
+    }
+  );
+
+  it('drops the sampling parameters', async () => {
+    const provider = await buildProviderForTest();
+    const body: GatewayResponsesRequest = {
+      model: 'openai/gpt-5-nano',
+      input: 'hello',
+      temperature: 0.2,
+      top_p: 0.9,
+    };
+
+    await transformResponsesRequest(provider, body);
+
+    expect('temperature' in body).toBe(false);
+    expect('top_p' in body).toBe(false);
+  });
+
+  it.each([
+    [1, 16],
+    [15, 16],
+    [16, 16],
+    [4096, 4096],
+  ])('sends max_output_tokens %d as %d', async (requested, sent) => {
+    const provider = await buildProviderForTest();
+    const body: GatewayResponsesRequest = {
+      model: 'openai/gpt-5-nano',
+      input: 'hello',
+      max_output_tokens: requested,
+    };
+
+    await transformResponsesRequest(provider, body);
+
+    expect(body.max_output_tokens).toBe(sent);
+  });
+
+  it('leaves an absent max_output_tokens absent', async () => {
+    const provider = await buildProviderForTest();
+    const body: GatewayResponsesRequest = { model: 'openai/gpt-5-nano', input: 'hello' };
+
+    await transformResponsesRequest(provider, body);
+
+    expect('max_output_tokens' in body).toBe(false);
   });
 
   it('sends the partner key as Authorization and the delegated token upstream', async () => {

@@ -2,7 +2,10 @@ import { TRPCError } from '@trpc/server';
 
 // Monadic Result type
 
-export type SuccessResult<TOk = {}> = { success: true } & TOk;
+// A result that carries no fields of its own.
+type NoFields = Record<never, never>;
+
+export type SuccessResult<TOk = NoFields> = { success: true } & TOk;
 export type CustomFailureResult<TErr> = { success: false } & TErr;
 export type FailureResult<TErr = void> = { success: false; error: TErr };
 
@@ -12,10 +15,10 @@ export type FailureResult<TErr = void> = { success: false; error: TErr };
 export type Result<TOk, TErr> = SuccessResult<TOk> | FailureResult<TErr>;
 
 export type CustomResult<TOk, TErr> = SuccessResult<TOk> | CustomFailureResult<TErr>;
-export type OptionalError<TErr> = Result<{}, TErr>;
+export type OptionalError<TErr> = Result<NoFields, TErr>;
 export type OptionalValue<TOk> = Result<TOk, void>;
 
-export function failureResult(): FailureResult<{}>;
+export function failureResult(): FailureResult<NoFields>;
 export function failureResult<TErr>(error: TErr): FailureResult<TErr>;
 export function failureResult<TErr = void>(error?: TErr): FailureResult<TErr | undefined> {
   return { error, success: false } as FailureResult<TErr | undefined>;
@@ -35,9 +38,9 @@ export function trpcFailure(
   return failureResult(new TRPCError(...opts));
 }
 
-export function successResult(): SuccessResult<{}>;
+export function successResult(): SuccessResult<NoFields>;
 export function successResult<TOk>(okValue: TOk): SuccessResult<TOk>;
-export function successResult<TOk>(okValue?: TOk): SuccessResult<TOk | {}> {
+export function successResult<TOk>(okValue?: TOk): SuccessResult<TOk | NoFields> {
   return { ...okValue, success: true };
 }
 
@@ -61,7 +64,7 @@ function serializeError(error: unknown) {
     /* ignore */
   }
   try {
-    return `${error}`;
+    return String(error);
   } catch {
     /* ignore */
   }

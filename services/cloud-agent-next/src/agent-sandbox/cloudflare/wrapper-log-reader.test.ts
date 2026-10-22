@@ -256,6 +256,23 @@ describe('readWrapperLogsForRoots', () => {
     expect(readout.skipped).toEqual({ [unreadable]: 'read-failed' });
   });
 
+  it('does not descend when a root asks for its own level only', async () => {
+    const root = await sessionRoot();
+    const nested = join(root, 'nested');
+    await mkdir(nested);
+    await writeFile(join(root, 'kilocode-wrapper-agent_a-1.log'), 'top\n');
+    await writeFile(join(nested, 'kilocode-wrapper-agent_a-2.log'), 'nested\n');
+
+    const discovery = await discoverWrapperLogCandidates(
+      fileSystemSession({ readFile: 0, exec: 0 }),
+      [{ path: root, include: isWrapperLogFileName, descend: false }]
+    );
+
+    expect(discovery.candidates.map(candidate => candidate.path)).toEqual([
+      join(root, 'kilocode-wrapper-agent_a-1.log'),
+    ]);
+  });
+
   it('collects only wrapper log names from a shared root', async () => {
     const root = await sessionRoot();
     await writeFile(join(root, 'kilocode-wrapper-agent_a-1.log'), 'wrapper\n');

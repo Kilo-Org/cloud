@@ -642,24 +642,22 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
         render: renderDatetime,
         sortAccessor: row => (row.datetime as string) ?? '',
       },
-      ...tableGroupBy.map(
-        (d): UsageTableColumn => ({
-          key: `dim_${d}`,
-          label: DIMENSION_LABELS[d],
-          render: (_v, row) => {
-            const dims = (row.dimensions as Record<string, string>) ?? {};
-            const rawVal = dims[d];
-            if (rawVal == null || (d !== 'project' && rawVal === '')) return '—';
-            return labelForDimensionValue(d, rawVal);
-          },
-          sortAccessor: row => {
-            const dims = (row.dimensions as Record<string, string>) ?? {};
-            const rawVal = dims[d];
-            if (rawVal == null || (d !== 'project' && rawVal === '')) return '';
-            return labelForDimensionValue(d, rawVal);
-          },
-        })
-      ),
+      ...tableGroupBy.map((d): UsageTableColumn => ({
+        key: `dim_${d}`,
+        label: DIMENSION_LABELS[d],
+        render: (_v, row) => {
+          const dims = (row.dimensions as Record<string, string>) ?? {};
+          const rawVal = dims[d];
+          if (rawVal == null || (d !== 'project' && rawVal === '')) return '—';
+          return labelForDimensionValue(d, rawVal);
+        },
+        sortAccessor: row => {
+          const dims = (row.dimensions as Record<string, string>) ?? {};
+          const rawVal = dims[d];
+          if (rawVal == null || (d !== 'project' && rawVal === '')) return '';
+          return labelForDimensionValue(d, rawVal);
+        },
+      })),
       {
         key: 'costMicrodollars',
         label: costSource === 'market' ? 'Estimated Market Cost' : 'Cost',

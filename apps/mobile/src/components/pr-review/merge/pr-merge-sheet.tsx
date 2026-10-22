@@ -49,6 +49,7 @@ import {
   useMergePullRequestMutation,
 } from '@/lib/pr-review/merge/use-pr-merge-mutations';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { reconnectExpiredMessage } from '@/lib/pr-review/mutation-error-display';
 import {
   isPrOperationPersistenceFailed,
   PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
@@ -344,7 +345,9 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
         );
         setInlineErrorKind('non-retryable');
       } else if (classification.kind === 'reconnect') {
-        setInlineError(t('prReview.connectionExpired'));
+        // The status line sits above the reconnect notice on the provider
+        // arms, so it must name that provider's connection too.
+        setInlineError(reconnectExpiredMessage(providerPlatform));
         setInlineErrorKind('reconnect');
       } else {
         setInlineError(

@@ -30,6 +30,7 @@ import {
   type SessionEventIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
+import { kiloServerEnvForOrigin } from '../../../src/shared/kilo-server-env.js';
 import {
   createWrapperKiloClient,
   type KiloServerHandle,
@@ -323,7 +324,10 @@ export function buildWorktreeKiloEnvironment(
   environment: Record<string, string> = {},
   inherited: NodeJS.ProcessEnv = process.env,
   mcp?: SessionAttachPayload['mcp'],
-  runtimeConfig?: Pick<ControlPlaneRouteSpec, 'permission' | 'githubReviewTarget'> & {
+  runtimeConfig?: Pick<
+    ControlPlaneRouteSpec,
+    'permission' | 'githubReviewTarget' | 'createdOnPlatform'
+  > & {
     cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
   }
 ): Record<string, string> {
@@ -417,6 +421,7 @@ export function buildWorktreeKiloEnvironment(
     KILO_DISABLE_CODEBASE_INDEXING: 'vscode-no-workspace',
     KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'false',
     KILO_DEBUG_SESSION_INGEST: '1',
+    ...kiloServerEnvForOrigin(runtimeConfig?.createdOnPlatform),
     KILOCODE_TOKEN: kilo.token,
     ...(kilo.organizationId ? { KILOCODE_ORGANIZATION_ID: kilo.organizationId } : {}),
     KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: kilo.token } }),

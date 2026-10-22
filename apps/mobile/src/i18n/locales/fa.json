@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "نصب برنامهٔ Kilo در GitHub",
     "checkConnection": "بررسی اتصال",
     "couldNotLoadPullRequest": "بارگذاری درخواست ادغام ممکن نشد.",
+    "reviewServiceUnavailable": "سرویس در دسترس نیست",
+    "reviewServiceUnavailableDescription": "سرویس موقتاً در دسترس نیست. دوباره تلاش کنید.",
     "description": "توضیحات",
     "noDescriptionProvided": "توضیحی ارائه نشده است.",
     "review": "بازبینی",
@@ -762,6 +764,7 @@
       "truncationBanner_other": "به‌دلیل محدودیت API در GitHub، فقط {{limit}} فایل اول از {{total}} فایل تغییریافته نمایش داده می‌شود."
     },
     "linkPasteClipboardEmpty": "کلیپ‌بورد خالی است.",
+    "linkPasteDenied": "دسترسی برای چسباندن رد شد. اجازهٔ چسباندن را بدهید و دوباره تلاش کنید.",
     "linkPasteNotAPullRequest": "این پیوند مربوط به پول ریکوئست یا درخواست ادغام نیست.",
     "announce": {
       "commentPosted": "نظر ارسال شد",
@@ -1458,7 +1461,7 @@
       "off": "حافظه بررسی غیرفعال است.",
       "on": "حافظه بررسی فعال است.",
       "offDescription": "آن را فعال کنید تا Kilo از پاسخ‌های نگهدارندگان یاد بگیرد و دستورالعمل‌هایی برای REVIEW.md پیشنهاد دهد.",
-      "readOnlyDescription": "فقط مالکان سازمان و مدیران صورتحساب می‌توانند حافظه بررسی را تغییر دهند.",
+      "readOnlyDescription": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند حافظه بررسی را تغییر دهند.",
       "enable": "فعال‌سازی حافظه بررسی",
       "loadingProposals": "در حال بارگذاری پیشنهادها",
       "couldNotLoadProposals": "بارگذاری پیشنهادها ممکن نشد.",
@@ -1478,7 +1481,10 @@
       "starting": "در حال شروع بررسی…",
       "start": "شروع بررسی"
     },
-    "notConnectedReadOnly": "{{platform}} متصل نیست. فقط مالکان سازمان و مدیران صورتحساب می‌توانند آن را متصل کنند.",
+    "notConnectedReadOnly": "{{platform}} متصل نیست. فقط مالکان سازمان و مدیران می‌توانند آن را متصل کنند.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} متصل نیست. از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را متصل کند."
+    },
     "webhookSetup": "راه‌اندازی وب‌هوک کامل نشده است.",
     "webhookSetupDescription": "ممکن است بررسی خودکار برای برخی مخازن انجام نشود.",
     "autoReviews": "بررسی‌های خودکار",
@@ -1486,7 +1492,7 @@
     "followReviewMd": "پیروی از REVIEW.md",
     "followReviewMdSubtitle": "رعایت دستورالعمل‌های فایل REVIEW.md در هر مخزن",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket متصل نیست. فقط مالکان سازمان و مدیران صورتحساب می‌توانند آن را متصل کنند.",
+      "notConnectedReadOnly": "Bitbucket متصل نیست. فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
       "setupIncomplete": "راه‌اندازی کامل نشده است. پیکربندی را در kilo.ai تکمیل کنید.",
       "setup": "راه‌اندازی Bitbucket"
     },
@@ -1746,7 +1752,7 @@
       "couldNotLoad": "بارگذاری این یافته ناموفق بود.",
       "couldNotCheckPermissions": "بررسی مجوزهای نادیده‌گرفتن یافته‌ها ممکن نشد.",
       "cannotDismissTitle": "نادیده‌گرفتن این یافته ممکن نیست",
-      "cannotDismissDescription": "فقط مالکان سازمان و مدیران صورتحساب می‌توانند یافته‌ها را نادیده بگیرند.",
+      "cannotDismissDescription": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند یافته‌ها را نادیده بگیرند.",
       "alreadyResolvedDescription": "این یافته قبلاً برطرف شده است و دیگر نمی‌توان آن را نادیده گرفت."
     },
     "findingDetails": {
@@ -1788,7 +1794,7 @@
       "automationAllOff": "همه غیرفعال",
       "automationCount": "{{displayCount}} مورد از ۳ مورد فعال",
       "notificationsCount": "{{displayCount}} مورد از ۲ مورد فعال",
-      "disabledNoManage": "عامل امنیتی غیرفعال است. فقط مالکان سازمان و مدیران صورتحساب می‌توانند آن را فعال کنند.",
+      "disabledNoManage": "عامل امنیتی غیرفعال است. فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را فعال کنند.",
       "disabledNoRepo": "پیش از فعال‌سازی عامل امنیتی، حداقل یک مخزن انتخاب کنید.",
       "disabledPrompt": "عامل امنیتی را فعال کنید تا بتوانید هشدارهای Dependabot را همگام‌سازی کنید، مخازن را انتخاب کنید و خودکارسازی را تنظیم کنید."
     },
@@ -1837,7 +1843,7 @@
       "invalidDayCount": "تعداد روزها باید عددی صحیح بین ۱ تا ۳۶۵ باشد.",
       "remediationDeadlineA11y": "مهلت اصلاح برای شدت {{label}} بر حسب روز",
       "enterWholeNumber": "یک عدد صحیح از ۱ تا ۳۶۵ وارد کنید",
-      "permissionNote": "فقط مالکان سازمان و مدیران صورتحساب می‌توانند این تنظیمات را تغییر دهند.",
+      "permissionNote": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند این تنظیمات را تغییر دهند.",
       "enableTracking": "فعال‌سازی ردیابی SLA",
       "enableTrackingSubtitle": "مهلت‌های اصلاح را بر اساس شدت یافته‌ها تعیین کنید.",
       "deadlinesHeading": "مهلت‌های اصلاح (روز)"
@@ -1893,7 +1899,7 @@
       "summary": "خلاصه گزارش",
       "title": "گزارش ممیزی",
       "unavailable": "گزارش ممیزی در دسترس نیست",
-      "unavailableDescription": "فقط مالکان سازمان و مدیران صورتحساب می‌توانند گزارش‌های ممیزی را ببینند. از یکی از آن‌ها بخواهید به شما دسترسی بدهد.",
+      "unavailableDescription": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند گزارش‌های ممیزی را ببینند. از یک مالک، مدیر یا مدیر صورتحساب بخواهید به شما دسترسی بدهد.",
       "queryFailed": "پرس‌وجوی گزارش کامل نشد. دوباره تلاش کنید.",
       "eventActions": {
         "findingAnalysisCompleted": "تحلیل تکمیل شد",
@@ -2243,6 +2249,8 @@
       "commitAndPush": "کامیت و پوش",
       "startSession": "شروع نشست",
       "selectRepositoryToStart": "برای شروع یک مخزن انتخاب کنید.",
+      "enterPromptToStart": "برای شروع یک پرامپت اضافه کنید.",
+      "enterPromptOrFileToStart": "برای شروع یک پرامپت یا فایل اضافه کنید.",
       "connectProviderToStart": "برای شروع یک ارائه‌دهنده را متصل کنید.",
       "promptPlaceholder": "می‌خواهید روی چه چیزی کار کنید؟",
       "couldNotLoadModels": "بارگذاری مدل‌ها ممکن نشد.",
@@ -3022,6 +3030,7 @@
 
       "chooseAccount": "انتخاب حساب",
       "loadErrorTitle": "بارگذاری سازمان‌های شما ممکن نشد.",
+      "membershipLostNotice": "شما دیگر به این سازمان دسترسی ندارید. به {{target}} تغییر یافت.",
       "noOrganization": "بدون سازمان",
 
       "noOrganizationDescription": "این حساب بخشی از هیچ سازمانی نیست. برای استفاده از ویژگی‌های سازمان مانند دعوت اعضا و هشدارهای موجودی کم، در وب یک سازمان ایجاد کنید یا به یکی بپیوندید.",
@@ -3107,7 +3116,7 @@
     "members": {
       "changeRole": "تغییر نقش",
       "emptyDescriptionCanInvite": "برای شروع همکاری در این سازمان، هم‌تیمی‌ها را دعوت کنید.",
-      "emptyDescriptionCannotInvite": "از یک مالک یا مدیر صورتحساب بخواهید هم‌تیمی‌ها را دعوت کند.",
+      "emptyDescriptionCannotInvite": "از یک مالک، مدیر یا مدیر صورتحساب بخواهید هم‌تیمی‌ها را دعوت کند.",
       "emptyTitle": "هنوز عضوی نیست",
       "invitedDate": "دعوت‌شده در {{date}}",
       "limitPerDay": "{{amount}}/روز",
@@ -3371,7 +3380,8 @@
       "settingsToolsOn": "روشن — ابزارهای تنظیمات به مدل ارسال می‌شود",
       "settingsToolsOff": "خاموش — هیچ ابزار تنظیماتی به مدل ارسال نمی‌شود",
       "serverChecking": "در حال بررسی این سرور…",
-      "serverToolCount": "{{count}} ابزار",
+      "serverToolCount_one": "{{count}} ابزار",
+      "serverToolCount_other": "{{count}} ابزار",
       "serverUnreachable": "دسترسی به این سرور ممکن نشد",
       "serverOff": "این سرور خاموش است"
     },
@@ -3518,6 +3528,8 @@
       "quantizationsHelp": "فایل‌های کوچک‌تر حافظه و فضای ذخیره‌سازی کمتری مصرف می‌کنند. فایل‌های بزرگ‌تر معمولاً پاسخ‌های بهتری می‌دهند.",
       "quantDetail": "دانلود {{size}} · حدود {{memory}} حافظه",
       "downloadQuant": "دانلود {{quant}}",
+      "downloadModelA11y": "دانلود {{name}}",
+      "detailsA11y": "جزئیات: {{name}}",
       "loadingModel": "در حال بارگیری جزئیات مدل",
       "couldNotLoadModel": "بارگیری این مدل ممکن نشد",
       "noFiles": "فایلی که این برنامه بتواند اجرا کند وجود ندارد",
@@ -3569,6 +3581,7 @@
   "appActions": {
     "start": {
       "promptRequired": "برای شروع عامل، یک پیام لازم است. یک پیام اضافه کنید و دوباره اجرا کنید.",
+      "repositoryRequired": "برای شروع عامل، یک مخزن لازم است. Kilo را باز کنید و یکی را انتخاب کنید، سپس دوباره اجرا کنید.",
       "repositoryUnknown": "Kilo مخزن {{repository}} را به عنوان مخزن GitHub یا GitLab نمی‌شناسد. در Kilo مخزن دیگری انتخاب کنید.",
       "repositoryUnsupported": "{{repository}} یک مخزن Bitbucket است — شروع عامل هنوز نمی‌تواند از آن استفاده کند. در Kilo مخزن دیگری انتخاب کنید."
     }
@@ -3606,10 +3619,13 @@
     "emptyDescription": "یک نمایه برای استفاده مجدد از متغیرهای محیطی، دستورات راه‌اندازی و مهارت‌ها در جلسات ایجاد کنید.",
     "loadFailed": "نمایه ها بارگیری نشد",
     "counts": {
-      "vars": "{{count}} متغیر",
+      "vars_one": "{{count}} متغیر",
+      "vars_other": "{{count}} متغیر",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} مهارت",
-      "commands": "{{count}} فرمان",
+      "skills_one": "{{count}} مهارت",
+      "skills_other": "{{count}} مهارت",
+      "commands_one": "{{count}} فرمان",
+      "commands_other": "{{count}} فرمان",
       "varsShort": "{{count}}متغ",
       "skillsShort": "{{count}}مهار",
       "commandsShort": "{{count}}ف"
@@ -3683,7 +3699,7 @@
       "environment": "محیط زیست (JSON)",
       "headers": "سرصفحه ها (JSON)",
       "timeout": "تایم اوت",
-      "secretCount": "شمارش مخفی",
+      "secretCount": "شمارش مخفی: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3726,6 +3742,9 @@
       "visibilityPrimary": "اولیه - در انتخابگر نشان داده شده است",
       "visibilitySubagent": "Subagent - فقط از دیگران قابل تماس است",
       "visibilityAll": "همه - هر دو",
+      "modePrimary": "فقط اولیه",
+      "modeSubagent": "فقط Subagent",
+      "modeAll": "همه",
       "saveFailed": "عامل ذخیره نشد",
       "deleteFailed": "عامل حذف نشد",
       "nameRequired": "یک نام نماینده وارد کنید",
@@ -3786,6 +3805,8 @@
     "empty": "بسته‌های اعتبار در حال حاضر در دسترس نیستند.",
     "noMatchingProducts": "App Store هیچ بسته اعتبار منطبقی برنگرداند.",
     "noMatchingProductsPlay": "Google Play هیچ بسته اعتبار منطبقی برنگرداند.",
+    "storeTimedOut": "App Store در زمان مشخص پاسخ نداد. تلاش مجدد",
+    "storeTimedOutPlay": "Google Play در زمان مشخص پاسخ نداد. تلاش مجدد",
     "purchaseOwnedByAnotherAccount": "اعتبار این Apple Account متعلق به حساب دیگری در Kilo است. برای استفاده از آن وارد همان حساب Kilo شوید.",
     "purchaseOwnedByAnotherAccountPlay": "اعتبار این حساب Google Play متعلق به یک حساب Kilo دیگر است. برای استفاده از آن وارد آن حساب Kilo شوید."
   },

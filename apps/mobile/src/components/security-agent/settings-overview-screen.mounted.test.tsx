@@ -110,7 +110,7 @@ async function retry(root: ReactTestInstance) {
   await advanceBy();
 }
 const denialCopy =
-  'Security Agent is disabled. Only organization owners and billing managers can turn it on.';
+  'Security Agent is disabled. Only organization owners, admins, and billing managers can turn it on.';
 const emptyCopy = 'Select at least one repository before enabling Security Agent.';
 const failureCases = [
   ['personal', 'getConfig', 'Could not load Security Agent settings'],

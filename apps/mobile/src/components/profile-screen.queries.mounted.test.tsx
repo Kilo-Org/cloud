@@ -86,11 +86,10 @@ describe('ProfileScreen deferred queries', () => {
     const { renderer, unmount } = await mountProfile();
 
     // The automated-session state: the callback captured by the
-    // `runAfterInteractions` mock is never flushed, so the interaction queue
-    // stays open and only the hook's fallback can release the gated queries.
-    // Before the fix this mount stayed on the skeleton forever and the
-    // signed-in address -- the only place the app renders it -- never
-    // appeared.
+    // `requestIdleCallback` stub is never flushed, so the deferred reads stay
+    // gated and only the hook's timer fallback can release them. Before the
+    // fix this mount stayed on the skeleton forever and the signed-in address
+    // -- the only place the app renders it -- never appeared.
     expect(providersQueryFn).not.toHaveBeenCalled();
     await advanceUntil(
       () => findConfigureRows(renderer.root, 'GitHub').length === 1,

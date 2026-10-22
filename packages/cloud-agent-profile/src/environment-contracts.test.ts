@@ -62,9 +62,13 @@ describe('environment value limits', () => {
     expect(validateEnvironmentSecretValue('x'.repeat(8192))).toHaveLength(8192);
   });
 
-  it('rejects a masked placeholder as a secret value', () => {
-    expect(() => validateEnvironmentSecrets({ API_KEY: MASKED_SECRET_VALUE })).toThrow();
-  });
+  it.each([MASKED_SECRET_VALUE, '<unchanged>'])(
+    'rejects the secret placeholder %s',
+    placeholder => {
+      expect(() => validateEnvironmentSecretValue(placeholder)).toThrow();
+      expect(() => validateEnvironmentSecrets({ API_KEY: placeholder })).toThrow();
+    }
+  );
 
   it('caps commands at 20', () => {
     expect(() => validateEnvironmentCommands(['echo first', 'echo second'])).toThrow();

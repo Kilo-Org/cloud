@@ -112,11 +112,14 @@ describe('single-editor secret changes', () => {
       'NEW has no saved secret'
     );
   });
-  it('allows a quoted marker as an intentional literal value', () => {
-    expect(buildEnvironmentVariableChanges('TOKEN="<unchanged>"', [], ['TOKEN']).secrets).toEqual([
-      { key: 'TOKEN', value: '<unchanged>' },
-    ]);
-  });
+  it.each(['TOKEN="<unchanged>"', "TOKEN='<unchanged>'"])(
+    'rejects a quoted retention marker as a secret value: %s',
+    text => {
+      expect(() => buildEnvironmentVariableChanges(text, [], ['TOKEN'])).toThrow(
+        'A masked placeholder is not a secret value'
+      );
+    }
+  );
   it('retains a saved secret when a comment follows its marker', () => {
     expect(
       buildEnvironmentVariableChanges('TOKEN=<unchanged> # retain this value', [], ['TOKEN'])

@@ -273,6 +273,14 @@ describe('canonicalGitLabCloneUrl', () => {
     expect(canonicalGitLabCloneUrl('https://git.example/group/%2e/project')).toBeNull();
   });
 
+  it.each([
+    'https://git.example/group/..\\project',
+    'https://git.example/group\\..\\project',
+    'https://git.example\\group\\%2e%2e\\project',
+  ])('rejects dot segments with backslash separators: %s', url => {
+    expect(canonicalGitLabCloneUrl(url)).toBeNull();
+  });
+
   it('rejects an unparseable URL', () => {
     expect(canonicalGitLabCloneUrl('not-a-url')).toBeNull();
   });

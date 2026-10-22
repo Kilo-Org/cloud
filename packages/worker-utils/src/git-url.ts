@@ -158,12 +158,12 @@ export function repoFullNameFromGitUrl(
   return `${coords.owner}/${coords.repo}`;
 }
 
-/** The path component of a URL string, before URL normalization runs on it. */
+/** The raw HTTP path, with backslash separators normalized before checking dot segments. */
 function rawUrlPath(url: string): string | null {
   const schemeEnd = url.indexOf('://');
   if (schemeEnd < 0) return null;
 
-  const afterAuthority = url.slice(schemeEnd + 3);
+  const afterAuthority = url.slice(schemeEnd + 3).replaceAll('\\', '/');
   const pathStart = afterAuthority.search(/[/?#]/);
   if (pathStart < 0 || afterAuthority[pathStart] !== '/') return '';
 

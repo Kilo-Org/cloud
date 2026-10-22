@@ -3866,6 +3866,7 @@
       "titleLabel": "कार्य का शीर्षक",
       "renameTitle": "कार्य का नाम बदलें",
       "notes": "नोट्स",
+      "editNotes": "नोट्स संपादित करें",
       "addNotes": "नोट जोड़ें",
       "notesPrompt": "संदर्भ, ज़रूरतें या स्वीकृति मानदंड जोड़ें।",
       "markdownSupported": "Markdown समर्थित है",

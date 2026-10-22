@@ -3866,6 +3866,7 @@
       "titleLabel": "Tiêu đề việc cần làm",
       "renameTitle": "Đổi tên tác vụ",
       "notes": "Ghi chú",
+      "editNotes": "Chỉnh sửa ghi chú",
       "addNotes": "Thêm ghi chú",
       "notesPrompt": "Thêm ngữ cảnh, yêu cầu hoặc tiêu chí chấp nhận.",
       "markdownSupported": "Hỗ trợ Markdown",

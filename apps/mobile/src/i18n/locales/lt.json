@@ -3964,6 +3964,7 @@
       "titleLabel": "Užduoties pavadinimas",
       "renameTitle": "Pervadinti užduotį",
       "notes": "Pastabos",
+      "editNotes": "Redaguoti pastabas",
       "addNotes": "Pridėti pastabas",
       "notesPrompt": "Pridėkite kontekstą, reikalavimus arba priėmimo kriterijus.",
       "markdownSupported": "Palaikomas Markdown",

@@ -3866,6 +3866,7 @@
       "titleLabel": "Pamagat ng gagawin",
       "renameTitle": "Palitan ang pangalan ng gawain",
       "notes": "Mga tala",
+      "editNotes": "I-edit ang mga tala",
       "addNotes": "Magdagdag ng mga tala",
       "notesPrompt": "Magdagdag ng konteksto, mga kinakailangan, o pamantayan sa pagtanggap.",
       "markdownSupported": "Sinusuportahan ang Markdown",

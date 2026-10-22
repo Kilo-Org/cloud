@@ -3866,6 +3866,7 @@
       "titleLabel": "ناونیشانی ئەرک",
       "renameTitle": "ناونانی ئەرک",
       "notes": "تێبینی",
+      "editNotes": "دەستکاری تێبینی بکە",
       "addNotes": "زیادکردنی تێبینی",
       "notesPrompt": "چوارچێوە، داواکاری، یان مەرجی پەسەندکردن زیاد بکە.",
       "markdownSupported": "Markdown پشتگیری دەکرێت",

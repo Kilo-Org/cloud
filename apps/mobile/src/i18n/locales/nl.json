@@ -3866,6 +3866,7 @@
       "titleLabel": "Titel van de taak",
       "renameTitle": "Taak hernoemen",
       "notes": "Notities",
+      "editNotes": "Notities bewerken",
       "addNotes": "Notities toevoegen",
       "notesPrompt": "Voeg context, vereisten of acceptatiecriteria toe.",
       "markdownSupported": "Markdown ondersteund",

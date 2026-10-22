@@ -3866,6 +3866,7 @@
       "titleLabel": "Heiti verkefnis",
       "renameTitle": "Endurnefna verk",
       "notes": "Minnispunktar",
+      "editNotes": "Breyta minnispunktum",
       "addNotes": "Bæta við athugasemdum",
       "notesPrompt": "Bættu við samhengi, kröfum eða samþykkisskilyrðum.",
       "markdownSupported": "Markdown stutt",

@@ -25,6 +25,11 @@ Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
 
+## To-do accessibility
+
+Populated task notes expose a localized “Edit notes” button name independently of
+the rendered Markdown. Activating the notes body opens the existing notes editor.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.

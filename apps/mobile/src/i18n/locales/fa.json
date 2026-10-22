@@ -3866,6 +3866,7 @@
       "titleLabel": "عنوان کار",
       "renameTitle": "تغییر نام وظیفه",
       "notes": "یادداشت",
+      "editNotes": "ویرایش یادداشت‌ها",
       "addNotes": "افزودن یادداشت‌ها",
       "notesPrompt": "زمینه، نیازها یا معیارهای پذیرش را اضافه کنید.",
       "markdownSupported": "Markdown پشتیبانی می‌شود",

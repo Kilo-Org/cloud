@@ -3866,6 +3866,7 @@
       "titleLabel": "タスクのタイトル",
       "renameTitle": "タスク名を変更",
       "notes": "メモ",
+      "editNotes": "メモを編集",
       "addNotes": "メモを追加",
       "notesPrompt": "コンテキスト、要件、受け入れ条件を追加します。",
       "markdownSupported": "Markdown 対応",

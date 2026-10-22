@@ -3866,6 +3866,7 @@
       "titleLabel": "করণীয়ের শিরোনাম",
       "renameTitle": "কাজের নাম বদলাও",
       "notes": "নোট",
+      "editNotes": "নোট সম্পাদনা করো",
       "addNotes": "নোট যোগ করো",
       "notesPrompt": "প্রসঙ্গ, প্রয়োজনীয়তা বা গ্রহণযোগ্যতার মানদণ্ড যোগ করো।",
       "markdownSupported": "Markdown সমর্থিত",

@@ -3866,6 +3866,7 @@
       "titleLabel": "Tajuk tugasan",
       "renameTitle": "Namakan semula tugasan",
       "notes": "Nota",
+      "editNotes": "Edit nota",
       "addNotes": "Tambah nota",
       "notesPrompt": "Tambah konteks, keperluan atau kriteria penerimaan.",
       "markdownSupported": "Markdown disokong",

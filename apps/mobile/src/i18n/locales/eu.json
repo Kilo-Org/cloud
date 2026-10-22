@@ -3866,6 +3866,7 @@
       "titleLabel": "Zereginaren izenburua",
       "renameTitle": "Aldatu atazaren izena",
       "notes": "Oharrak",
+      "editNotes": "Editatu oharrak",
       "addNotes": "Gehitu oharrak",
       "notesPrompt": "Gehitu testuingurua, baldintzak edo onarpen-irizpideak.",
       "markdownSupported": "Markdown onartzen da",

@@ -3915,6 +3915,7 @@
       "titleLabel": "כותרת המשימה",
       "renameTitle": "שנה שם משימה",
       "notes": "הערות",
+      "editNotes": "ערוך הערות",
       "addNotes": "הוסף הערות",
       "notesPrompt": "הוסף הקשר, דרישות או תנאי קבלה.",
       "markdownSupported": "Markdown נתמך",

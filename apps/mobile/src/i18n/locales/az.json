@@ -3866,6 +3866,7 @@
       "titleLabel": "Tapşırığın başlığı",
       "renameTitle": "Tapşırığın adını dəyiş",
       "notes": "Qeydlər",
+      "editNotes": "Qeydləri redaktə et",
       "addNotes": "Qeyd əlavə et",
       "notesPrompt": "Kontekst, tələblər və ya qəbul meyarları əlavə et.",
       "markdownSupported": "Markdown dəstəklənir",

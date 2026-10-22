@@ -3866,6 +3866,7 @@
       "titleLabel": "የተግባር ርዕስ",
       "renameTitle": "ተግባርን እንደገና ሰይም",
       "notes": "ማስታወሻዎች",
+      "editNotes": "ማስታወሻዎችን አርትዕ",
       "addNotes": "ማስታወሻዎች ጨምር",
       "notesPrompt": "አውድ፣ መስፈርቶች ወይም የመቀበያ መስፈርቶች ጨምር።",
       "markdownSupported": "Markdown ይደገፋል",

@@ -3866,6 +3866,7 @@
       "titleLabel": "Görev başlığı",
       "renameTitle": "Görevi yeniden adlandır",
       "notes": "Notlar",
+      "editNotes": "Notları düzenle",
       "addNotes": "Not ekle",
       "notesPrompt": "Bağlam, gereksinimler veya kabul ölçütleri ekle.",
       "markdownSupported": "Markdown desteklenir",

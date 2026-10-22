@@ -3866,6 +3866,7 @@
       "titleLabel": "Teendő címe",
       "renameTitle": "Feladat átnevezése",
       "notes": "Jegyzetek",
+      "editNotes": "Jegyzetek szerkesztése",
       "addNotes": "Jegyzetek hozzáadása",
       "notesPrompt": "Adj hozzá kontextust, követelményeket vagy elfogadási feltételeket.",
       "markdownSupported": "Markdown támogatott",

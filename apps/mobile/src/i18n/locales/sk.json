@@ -3964,6 +3964,7 @@
       "titleLabel": "Názov úlohy",
       "renameTitle": "Premenovať úlohu",
       "notes": "Poznámky",
+      "editNotes": "Upraviť poznámky",
       "addNotes": "Pridať poznámky",
       "notesPrompt": "Pridajte kontext, požiadavky alebo kritériá prijatia.",
       "markdownSupported": "Podporovaný Markdown",

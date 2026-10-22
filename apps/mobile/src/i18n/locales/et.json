@@ -3866,6 +3866,7 @@
       "titleLabel": "Ülesande pealkiri",
       "renameTitle": "Nimeta ülesanne ümber",
       "notes": "Märkmed",
+      "editNotes": "Muuda märkmeid",
       "addNotes": "Lisa märkmeid",
       "notesPrompt": "Lisa kontekst, nõuded või vastuvõtukriteeriumid.",
       "markdownSupported": "Markdown on toetatud",

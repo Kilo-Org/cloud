@@ -3866,6 +3866,7 @@
       "titleLabel": "Titel der Aufgabe",
       "renameTitle": "Aufgabe umbenennen",
       "notes": "Notizen",
+      "editNotes": "Notizen bearbeiten",
       "addNotes": "Notizen hinzufügen",
       "notesPrompt": "Füge Kontext, Anforderungen oder Akzeptanzkriterien hinzu.",
       "markdownSupported": "Markdown wird unterstützt",

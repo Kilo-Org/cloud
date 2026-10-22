@@ -3866,6 +3866,7 @@
       "titleLabel": "Titulli i detyrës",
       "renameTitle": "Riemërto detyrën",
       "notes": "Shënime",
+      "editNotes": "Redakto shënimet",
       "addNotes": "Shto shënime",
       "notesPrompt": "Shto kontekst, kërkesa ose kritere pranimi.",
       "markdownSupported": "Markdown i mbështetur",

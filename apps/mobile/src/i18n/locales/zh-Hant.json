@@ -3866,6 +3866,7 @@
       "titleLabel": "待辦事項標題",
       "renameTitle": "重新命名任務",
       "notes": "備註",
+      "editNotes": "編輯備註",
       "addNotes": "新增備註",
       "notesPrompt": "新增背景、需求或驗收標準。",
       "markdownSupported": "支援 Markdown",

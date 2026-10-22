@@ -3866,6 +3866,7 @@
       "titleLabel": "Isihloko somsebenzi",
       "renameTitle": "Qamba kabusha umsebenzi",
       "notes": "Amanothi",
+      "editNotes": "Hlela amanothi",
       "addNotes": "Engeza amanothi",
       "notesPrompt": "Engeza umongo, izidingo, noma imibandela yokwamukela.",
       "markdownSupported": "I-Markdown iyasekelwa",

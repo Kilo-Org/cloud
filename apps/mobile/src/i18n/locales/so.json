@@ -3866,6 +3866,7 @@
       "titleLabel": "Cinwaanka hawsha",
       "renameTitle": "Beddel magaca hawsha",
       "notes": "Qoraallo",
+      "editNotes": "Wax ka beddel qoraallada",
       "addNotes": "Ku dar qoraallo",
       "notesPrompt": "Ku dar xaalad, shuruudo, ama shuruudaha aqbalaadda.",
       "markdownSupported": "Markdown waa la taageeraa",

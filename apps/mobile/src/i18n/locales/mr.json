@@ -3866,6 +3866,7 @@
       "titleLabel": "कामाचे शीर्षक",
       "renameTitle": "कार्याचे नाव बदला",
       "notes": "टिपा",
+      "editNotes": "टिपा संपादित करा",
       "addNotes": "टिपा जोडा",
       "notesPrompt": "संदर्भ, आवश्यकता किंवा स्वीकृती निकष जोडा.",
       "markdownSupported": "Markdown समर्थित",

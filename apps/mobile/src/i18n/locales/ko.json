@@ -3866,6 +3866,7 @@
       "titleLabel": "할 일 제목",
       "renameTitle": "작업 이름 바꾸기",
       "notes": "메모",
+      "editNotes": "메모 편집",
       "addNotes": "메모 추가",
       "notesPrompt": "컨텍스트, 요구 사항 또는 수락 기준을 추가하세요.",
       "markdownSupported": "Markdown 지원",

@@ -3866,6 +3866,7 @@
       "titleLabel": "ชื่องาน",
       "renameTitle": "เปลี่ยนชื่องาน",
       "notes": "บันทึก",
+      "editNotes": "แก้ไขบันทึก",
       "addNotes": "เพิ่มบันทึก",
       "notesPrompt": "เพิ่มบริบท ข้อกำหนด หรือเกณฑ์การยอมรับ.",
       "markdownSupported": "รองรับ Markdown",

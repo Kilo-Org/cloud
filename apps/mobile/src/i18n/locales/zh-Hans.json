@@ -3866,6 +3866,7 @@
       "titleLabel": "待办事项标题",
       "renameTitle": "重命名任务",
       "notes": "备注",
+      "editNotes": "编辑备注",
       "addNotes": "添加备注",
       "notesPrompt": "添加背景、需求或验收标准。",
       "markdownSupported": "支持 Markdown",

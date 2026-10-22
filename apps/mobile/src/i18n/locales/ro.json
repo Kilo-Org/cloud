@@ -3915,6 +3915,7 @@
       "titleLabel": "Titlul sarcinii",
       "renameTitle": "Redenumește activitatea",
       "notes": "Notițe",
+      "editNotes": "Editează notițele",
       "addNotes": "Adaugă notițe",
       "notesPrompt": "Adaugă context, cerințe sau criterii de acceptare.",
       "markdownSupported": "Markdown acceptat",

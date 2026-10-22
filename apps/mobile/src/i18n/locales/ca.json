@@ -3915,6 +3915,7 @@
       "titleLabel": "Títol de la tasca",
       "renameTitle": "Canvia el nom de la tasca",
       "notes": "Notes",
+      "editNotes": "Edita les notes",
       "addNotes": "Afegeix notes",
       "notesPrompt": "Afegeix context, requisits o criteris d'acceptació.",
       "markdownSupported": "Markdown compatible",

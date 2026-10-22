@@ -3915,6 +3915,7 @@
       "titleLabel": "Uzdevuma nosaukums",
       "renameTitle": "Pārdēvēt uzdevumu",
       "notes": "Piezīmes",
+      "editNotes": "Rediģēt piezīmes",
       "addNotes": "Pievienot piezīmes",
       "notesPrompt": "Pievienojiet kontekstu, prasības vai pieņemšanas kritērijus.",
       "markdownSupported": "Atbalstīts Markdown",

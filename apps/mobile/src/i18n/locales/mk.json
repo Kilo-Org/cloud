@@ -3866,6 +3866,7 @@
       "titleLabel": "Наслов на задачата",
       "renameTitle": "Преименувај задача",
       "notes": "Белешки",
+      "editNotes": "Уреди белешки",
       "addNotes": "Додај белешки",
       "notesPrompt": "Додајте контекст, барања или критериуми за прифаќање.",
       "markdownSupported": "Поддржан Markdown",

@@ -3866,6 +3866,7 @@
       "titleLabel": "పని శీర్షిక",
       "renameTitle": "టాస్క్ పేరు మార్చండి",
       "notes": "నోట్స్",
+      "editNotes": "నోట్స్ సవరించండి",
       "addNotes": "గమనికలు జోడించండి",
       "notesPrompt": "సందర్భం, అవసరాలు లేదా ఆమోద ప్రమాణాలను జోడించండి.",
       "markdownSupported": "Markdown మద్దతు ఉంది",

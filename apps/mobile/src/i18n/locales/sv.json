@@ -3865,6 +3865,7 @@
       "titleLabel": "Uppgiftens titel",
       "renameTitle": "Byt namn på uppgift",
       "notes": "Anteckningar",
+      "editNotes": "Redigera anteckningar",
       "addNotes": "Lägg till anteckningar",
       "notesPrompt": "Lägg till sammanhang, krav eller acceptanskriterier.",
       "markdownSupported": "Markdown stöds",

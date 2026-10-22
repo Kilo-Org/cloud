@@ -3964,6 +3964,7 @@
       "titleLabel": "Naslov naloge",
       "renameTitle": "Preimenuj opravilo",
       "notes": "Opombe",
+      "editNotes": "Uredi opombe",
       "addNotes": "Dodaj opombe",
       "notesPrompt": "Dodajte kontekst, zahteve ali merila sprejemljivosti.",
       "markdownSupported": "Podprt Markdown",

@@ -3915,6 +3915,7 @@
       "titleLabel": "Titolo dell'attività",
       "renameTitle": "Rinomina attività",
       "notes": "Note",
+      "editNotes": "Modifica note",
       "addNotes": "Aggiungi note",
       "notesPrompt": "Aggiungi contesto, requisiti o criteri di accettazione.",
       "markdownSupported": "Markdown supportato",

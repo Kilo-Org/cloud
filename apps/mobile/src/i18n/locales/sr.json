@@ -3915,6 +3915,7 @@
       "titleLabel": "Naslov zadatka",
       "renameTitle": "Preimenuj zadatak",
       "notes": "Beleške",
+      "editNotes": "Uredi beleške",
       "addNotes": "Dodaj beleške",
       "notesPrompt": "Dodaj kontekst, zahteve ili kriterijume prihvatanja.",
       "markdownSupported": "Markdown je podržan",

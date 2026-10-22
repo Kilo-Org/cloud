@@ -3866,6 +3866,7 @@
       "titleLabel": "Título da tarefa",
       "renameTitle": "Renomear a tarefa",
       "notes": "Notas",
+      "editNotes": "Editar notas",
       "addNotes": "Engadir notas",
       "notesPrompt": "Engade contexto, requisitos ou criterios de aceptación.",
       "markdownSupported": "Markdown compatible",

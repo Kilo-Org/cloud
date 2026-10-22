@@ -1654,11 +1654,20 @@ export async function handleKiloClawScheduleEvent(params: {
         .limit(1);
       if (!before) return;
 
-      const updateSet: Partial<typeof kiloclaw_subscriptions.$inferInsert> = {
-        stripe_schedule_id: null,
-        scheduled_plan: null,
-        scheduled_by: null,
-      };
+      const preservePendingCommitConversion =
+        scheduleStatus === 'released' &&
+        before.pending_conversion &&
+        before.plan === 'commit' &&
+        before.scheduled_plan === 'standard' &&
+        before.scheduled_by === 'user';
+      const updateSet: Partial<typeof kiloclaw_subscriptions.$inferInsert> =
+        preservePendingCommitConversion
+          ? { stripe_schedule_id: null }
+          : {
+              stripe_schedule_id: null,
+              scheduled_plan: null,
+              scheduled_by: null,
+            };
 
       // Schedule lifecycle never owns Commit retirement plan or boundary
       // mutation. Invoice settlement remains authoritative for every hybrid

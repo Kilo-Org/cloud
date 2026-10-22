@@ -127,6 +127,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/process-kiloclaw-stripe-renewals",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/user-deletion-attention-summary",
       "schedule": "0 12 * * *"
     },

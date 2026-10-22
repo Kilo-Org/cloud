@@ -115,6 +115,7 @@ export function EditWebhookTriggerContent({
     if (!triggerData) return undefined;
     return {
       triggerId: triggerData.triggerId,
+      executionUserId: triggerData.executionUserId,
       activationMode: triggerData.activationMode === 'scheduled' ? 'scheduled' : 'webhook',
       cronExpression: triggerData.cronExpression,
       cronTimezone: triggerData.cronTimezone,

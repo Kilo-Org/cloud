@@ -23,6 +23,7 @@ async function insertHistory(
       fallback_title: 'Kilo',
       fallback_body: 'New message',
       idempotency_key: `idem-${crypto.randomUUID()}`,
+      dedupe_bucket: Math.floor(Date.now() / 3_600_000),
       ...over,
     })
     .returning();
@@ -163,6 +164,30 @@ describe('user.getNotificationHistory', () => {
     const caller = await createCallerForUser(user.id);
     const page = await caller.user.getNotificationHistory({});
     expect(page.items.map(item => item.id)).toEqual([inside.id]);
+  });
+
+  it('records a later dispatch of the same key as its own row', async () => {
+    const user = await insertTestUser();
+    const bucket = Math.floor(Date.now() / 3_600_000);
+    const shared = {
+      idempotency_key: 'low-balance:org-repeat',
+      category: 'balanceAlerts',
+      push_type: 'low_balance',
+    };
+
+    // A retry of one dispatch (same acceptance hour) hits the unique index.
+    await insertHistory(user.id, { ...shared, dedupe_bucket: bucket });
+    const retry = await insertHistory(user.id, { ...shared, dedupe_bucket: bucket }).catch(
+      () => null
+    );
+    expect(retry).toBeNull();
+
+    // A later crossing of the same threshold is a new dispatch instance.
+    await insertHistory(user.id, { ...shared, dedupe_bucket: bucket + 3 });
+
+    const caller = await createCallerForUser(user.id);
+    const page = await caller.user.getNotificationHistory({ category: 'balanceAlerts' });
+    expect(page.items.map(item => item.pushType)).toEqual(['low_balance', 'low_balance']);
   });
 
   it('never returns another account’s rows', async () => {

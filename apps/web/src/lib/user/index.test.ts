@@ -5673,6 +5673,7 @@ describe('User', () => {
         i18n_params: { conversationTitle: 'Hello' },
         fallback_title: 'Kilo',
         fallback_body: 'New message',
+        dedupe_bucket: Math.floor(Date.now() / 3_600_000),
       };
       await db.insert(user_notification_history).values([
         { ...historyRow, user_id: user.id, idempotency_key: 'history-user' },

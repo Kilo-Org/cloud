@@ -10066,9 +10066,15 @@ export type NewUserNotificationPreference = typeof user_notification_preferences
 // from `i18n_key`/`i18n_params` in the reader's language and falls back to
 // `fallback_title`/`fallback_body`. Rows never enter a log line.
 //
-// `idempotency_key` is the dispatch key, so a retried dispatch cannot write a
-// second row. A scheduled prune drops rows older than the 90-day retention
-// window; the query applies the same window.
+// `idempotency_key` is the dispatch key. The worker dedupes on it only for a
+// limited window (an hour, or two days for briefings) and several producers
+// reuse one key for distinct events — `low-balance:<organizationId>` for every
+// later crossing of the same threshold, for instance. The row identity is
+// therefore the dispatch instance: the key plus `dedupe_bucket`, the acceptance
+// hour. A retry of one dispatch lands in the same bucket and adds nothing, while
+// a genuine later dispatch of the same key records its own row. A scheduled
+// prune drops rows older than the 90-day retention window; the query applies the
+// same window.
 
 export const user_notification_history = pgTable(
   'user_notification_history',
@@ -10093,13 +10099,19 @@ export const user_notification_history = pgTable(
     fallback_title: text().notNull(),
     fallback_body: text().notNull(),
     idempotency_key: text().notNull(),
+    // Acceptance hour of the dispatch (`floor(epochMs / 3600000)`). Part of the
+    // row identity so a retry is absorbed while a later dispatch of the same
+    // configurable key still records its own row; see the comment above.
+    dedupe_bucket: integer().notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    // A retried dispatch reuses its key, so at most one row per accepted push.
+    // One row per accepted dispatch: a retry of the same dispatch in the same
+    // hour adds nothing, while a later dispatch of the same key does.
     uniqueIndex('UQ_user_notification_history_user_idempotency').on(
       table.user_id,
-      table.idempotency_key
+      table.idempotency_key,
+      table.dedupe_bucket
     ),
     // Newest-first page of one user's history.
     index('IDX_user_notification_history_user_created').on(table.user_id, table.created_at),
@@ -10109,6 +10121,9 @@ export const user_notification_history = pgTable(
       table.category,
       table.created_at
     ),
+    // The retention prune reads the expired prefix across every account, so it
+    // needs a `created_at`-first index; the user-prefixed ones cannot serve it.
+    index('IDX_user_notification_history_created_at').on(table.created_at),
   ]
 );
 

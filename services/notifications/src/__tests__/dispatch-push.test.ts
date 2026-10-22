@@ -1892,6 +1892,7 @@ describe('NotificationChannelDO.dispatchPush — notification history', () => {
         fallback_title: 'Fallback title',
         fallback_body: 'Fallback body',
         idempotency_key: 'history-accepted',
+        dedupe_bucket: expect.any(Number),
       },
     ]);
   });

@@ -119,8 +119,9 @@ const dispatchInput = (over: Partial<DispatchPushInput> = {}): DispatchPushInput
 describe('recordNotificationHistory', () => {
   it('writes the row with the category and the content the push carried', async () => {
     const { db, inserts } = fakeHistoryDb();
+    const now = Date.UTC(2026, 0, 2, 3, 30);
 
-    const result = await recordNotificationHistory(db, dispatchInput());
+    const result = await recordNotificationHistory(db, dispatchInput(), now);
 
     expect(result).toBe('recorded');
     expect(inserts).toHaveLength(1);
@@ -135,9 +136,26 @@ describe('recordNotificationHistory', () => {
       fallback_title: 'Fallback',
       fallback_body: 'Fallback body',
       idempotency_key: 'history-key',
+      dedupe_bucket: Math.floor(now / 3_600_000),
     });
-    // The conflict target is the dispatch key, so a replay cannot add a row.
+    // The conflict target is the dispatch instance, so a retry cannot add a row.
     expect(inserts[0]?.onConflict).toBeDefined();
+  });
+
+  it('gives a later dispatch of the same key its own row identity', async () => {
+    const { db, inserts } = fakeHistoryDb();
+    const withinTheHour = Date.UTC(2026, 0, 2, 3, 5);
+    const laterCrossing = Date.UTC(2026, 0, 2, 5, 5);
+
+    await recordNotificationHistory(db, dispatchInput(), withinTheHour);
+    await recordNotificationHistory(db, dispatchInput(), laterCrossing);
+
+    // Same dispatch key, different acceptance hour: the unique index treats the
+    // two as distinct dispatch instances, so the later crossing is not dropped.
+    expect(inserts.map(insert => insert.row.dedupe_bucket)).toEqual([
+      Math.floor(withinTheHour / 3_600_000),
+      Math.floor(laterCrossing / 3_600_000),
+    ]);
   });
 
   it('skips a kind with no message list without touching the database', async () => {

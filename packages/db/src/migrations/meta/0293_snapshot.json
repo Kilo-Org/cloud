@@ -1,5 +1,5 @@
 {
-  "id": "07947dc7-4e05-4b08-bab2-42e525ffd3de",
+  "id": "3ae4c9ee-0f74-4508-9f04-65da6023c537",
   "prevId": "48da44e5-b482-4eae-a823-83defe1a305a",
   "version": "7",
   "dialect": "postgresql",
@@ -39155,6 +39155,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "dedupe_bucket": {
+          "name": "dedupe_bucket",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -39175,6 +39181,12 @@
             },
             {
               "expression": "idempotency_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "dedupe_bucket",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -39221,6 +39233,21 @@
               "asc": true,
               "nulls": "last"
             },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_user_notification_history_created_at": {
+          "name": "IDX_user_notification_history_created_at",
+          "columns": [
             {
               "expression": "created_at",
               "isExpression": false,

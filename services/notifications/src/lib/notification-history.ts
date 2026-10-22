@@ -16,11 +16,25 @@ import {
 export type RecordNotificationHistoryResult = 'recorded' | 'skipped' | 'failed';
 
 /**
+ * Width of the dispatch-instance bucket that joins the row's uniqueness key.
+ * The worker's idempotency record survives an hour (two days for briefings),
+ * and producers reuse one key for distinct events — every later crossing of a
+ * balance threshold reuses `low-balance:<organizationId>`. Uniqueness on the key
+ * alone would therefore drop those later accepted pushes from history for the
+ * whole retention window, so the row identity is the dispatch instance: the key
+ * within its acceptance hour. A retry of one dispatch is absorbed; a genuine
+ * later dispatch records its own row. A retry that crosses the hour boundary can
+ * only happen after the earlier attempt reached the provider and then died, so
+ * two rows describe two sends.
+ */
+const DEDUPE_BUCKET_MS = 60 * 60 * 1000;
+
+/**
  * Write one history row for an accepted dispatch.
  *
  * Returns `skipped` for a kind that is not recorded (an OS-only surface with no
- * message list to reopen). Idempotent: the unique `(user_id, idempotency_key)`
- * index makes a replay a no-op, so a retried dispatch can never add a row.
+ * message list to reopen). Idempotent per dispatch: the unique
+ * `(user_id, idempotency_key, dedupe_bucket)` index makes a retry a no-op.
  *
  * A failure is logged with the push type and the error's name only — no
  * payload, title, body, params, user id, or error message, any of which can
@@ -29,7 +43,8 @@ export type RecordNotificationHistoryResult = 'recorded' | 'skipped' | 'failed';
  */
 export async function recordNotificationHistory(
   db: WorkerDb,
-  input: DispatchPushInput
+  input: DispatchPushInput,
+  now: number = Date.now()
 ): Promise<RecordNotificationHistoryResult> {
   const entry = notificationHistoryEntryForPushData(input.push.data);
   if (entry === null) {
@@ -49,9 +64,14 @@ export async function recordNotificationHistory(
         fallback_title: input.push.title,
         fallback_body: input.push.body,
         idempotency_key: input.idempotencyKey,
+        dedupe_bucket: Math.floor(now / DEDUPE_BUCKET_MS),
       })
       .onConflictDoNothing({
-        target: [user_notification_history.user_id, user_notification_history.idempotency_key],
+        target: [
+          user_notification_history.user_id,
+          user_notification_history.idempotency_key,
+          user_notification_history.dedupe_bucket,
+        ],
       });
     return 'recorded';
   } catch (error) {

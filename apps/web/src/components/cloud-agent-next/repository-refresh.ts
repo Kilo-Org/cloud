@@ -13,6 +13,22 @@ export type BitbucketRepositoryRefreshStatus =
   | 'temporarily_unavailable'
   | 'invalid_request';
 
+/**
+ * Resolves the connection status a refresh works from: the caller's value
+ * first, then the cached query result, and only then a network load.
+ */
+export async function resolveRepositoryStatus<TStatus>({
+  override,
+  cached,
+  load,
+}: {
+  override: TStatus | undefined;
+  cached: TStatus | undefined;
+  load: () => Promise<TStatus>;
+}): Promise<TStatus> {
+  return override ?? cached ?? (await load());
+}
+
 export async function refreshSessionRepositories({
   refreshGitHubRepositories,
   refreshGitLabRepositories,

@@ -1,6 +1,6 @@
 ---
 name: kilo-mcp
-description: Use when working with the Kilo MCP server, the kilo_search and kilo_call tools, or when deciding which Kilo API area covers a task. Covers the search-then-call sequence, the query/mutation kind split and the mutation safety rule, the retry rule after an ambiguous transport error, and every area of services/kilo-mcp/catalog.json with its query and mutation counts. Generated from that catalog — read the catalog for current detail.
+description: Use when working with the Kilo MCP server, the kilo_search and kilo_call tools, or when deciding which Kilo API area covers a task. Covers the search-then-call sequence, the query/mutation kind split and the mutation safety rule, the retry rule after an ambiguous transport error, and the top-level areas of services/kilo-mcp/catalog.json. Generated from that catalog — read the catalog for current detail.
 ---
 
 <!--
@@ -49,6 +49,8 @@ to send platform feedback and bug reports rather than a support channel.
 ## Areas
 
 The first path segment names an area. Search to learn an area's vocabulary:
-each row's `summary` and `tags` are what the search matches.
+each row's `summary` and `tags` are what the search matches. Some areas also
+exist as an org-scoped mirror under `organizations`, for example
+`organizations.kiloclaw`.
 
 {{CENSUS}}

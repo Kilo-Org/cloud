@@ -71,6 +71,9 @@ vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
 vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
   clearLiveActivityPreference: vi.fn(),
 }));
+vi.mock('@/lib/hooks/use-tracking-permission-prompt', () => ({
+  clearTrackingPromptDismissed: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
   clearPrReviewFooterPreference: vi.fn(),
 }));
@@ -131,6 +134,23 @@ vi.mock('react-native', () => ({
 // above does not cover it: mock the package itself, as the sibling preference
 // suites do, or Node's parser hits react-native's Flow-only `import typeof`.
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+
+// The auth graph imports `exchange-legacy-token`, which now builds the app
+// `User-Agent` through `client-metadata` -> `expo-application`; that module's
+// expo root needs `__DEV__` and cannot load in the node test environment.
+vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
+
+// The same graph builds an admission proof for the legacy exchange, which
+// reaches `@expo/app-integrity`; that module's expo root needs `__DEV__` too.
+vi.mock('@/lib/auth/admission', () => ({
+  getAdmission: vi.fn().mockResolvedValue({
+    platform: 'android',
+    kind: 'assertion',
+    challenge: 'challenge',
+    payload: 'proof',
+  }),
+  clearAttestKeyOnRefusal: vi.fn(),
+}));
 
 // These imported session-clear modules pull in native bindings that crash the
 // node test environment: use-trusted-hosts -> secure-store-preference ->

@@ -8,7 +8,7 @@
  */
 
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
-import type { UserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
+import { UserKiloFacade as RealUserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
 import {
   KILO_FACADE_AUTH_TOKEN_HEADER,
   KILO_FACADE_GLOBAL_FEED_PATH,
@@ -19,12 +19,12 @@ import type {
   SendCloudAgentSessionNotificationParams,
   SendCloudAgentSessionNotificationResult,
 } from '../src/notifications-binding.js';
-import { CloudAgentSession as RealCloudAgentSession } from '../src/persistence/CloudAgentSession';
+import { createTestSessionIngestDouble } from './integration/helpers/session-ingest-double.js';
 import { isSandboxControlId } from '../src/sandbox-control/stub';
 import { admitSandboxWrapperUpgrade } from '../src/sandbox-control/socket-admission.js';
 import { SandboxControlV2 } from '../src/control-plane/sandbox/sandbox-do';
 import { SandboxSessionV2 } from '../src/control-plane/session/session-do';
-import { getSandboxSessionStub, resolveSessionStub } from '../src/sandbox-session/session-stub';
+import { getSandboxSessionStub } from '../src/sandbox-session/session-stub';
 import { SESSION_ID_RE } from '../src/shared/protocol.js';
 import { terminalPtyIdSchema } from '../src/shared/sandbox-control-protocol.js';
 import type { Env } from '../src/types';
@@ -63,22 +63,21 @@ function createNotificationsStub(): NotificationsBinding {
 
 const notificationsStub = createNotificationsStub();
 
-// Re-export CloudAgentSession with the service binding replaced by the stub
-// so tests observe push dispatches without requiring the real Worker.
-export class CloudAgentSession extends RealCloudAgentSession {
+// The Workers-runtime suite binds no `SESSION_INGEST` service and no Postgres,
+// so replace the binding with a storage-backed double. Integration tests seed it
+// through `runInDurableObject` on this same Durable Object.
+export class UserKiloFacade extends RealUserKiloFacade {
   constructor(ctx: DurableObjectState, env: Env) {
-    super(ctx, { ...env, NOTIFICATIONS: notificationsStub });
+    super(ctx, { ...env, SESSION_INGEST: createTestSessionIngestDouble(ctx.storage) });
   }
 }
 
-export { UserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
 // The test Worker binds the production `SANDBOX_CONTROL`/`SANDBOX_SESSION`
 // names to the control-plane V2 classes, matching production after the C1c flip.
 export { SandboxControlV2, SandboxSessionV2 };
 export { PreviewPortTestDO } from './integration/helpers/preview-port-test-do.js';
 
 type TestEnv = {
-  CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   CLOUD_AGENT_REPORT_QUEUE: Queue<CloudAgentQueueReport>;
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   SANDBOX_CONTROL: Env['SANDBOX_CONTROL'];
@@ -198,7 +197,7 @@ export default {
         return new Response('Missing sessionId parameter', { status: 400 });
       }
 
-      return resolveSessionStub(env, userId, sessionId).fetch(request);
+      return getSandboxSessionStub(env, userId, sessionId).fetch(request);
     }
 
     if (url.pathname === '/stream-v2') {

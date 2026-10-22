@@ -24,9 +24,11 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import type * as OperationKeyModule from '@/lib/operation-key';
 import type * as AnnounceModule from '@/lib/a11y/announce';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { PR_OPERATION_AMBIGUOUS_MESSAGE } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
 import type * as ProviderPrRefModule from '@/lib/pr-review/provider-pr-ref';
 import { type ProviderPrRef, type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
@@ -345,10 +347,19 @@ describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {
     expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
   });
 
-  it('maps the ambiguous ledger marker onto the verify-before-retrying copy in onError', () => {
-    useMergePullRequestMutation(REF);
-    lastCapturedOptions?.onError?.(new Error("Couldn't confirm — check the PR before retrying."));
-    expect(toastErrorMock).toHaveBeenCalledWith("Couldn't confirm — check the PR before retrying.");
+  it('maps the ambiguous ledger marker onto the verify-before-retrying copy in onError', async () => {
+    // The raw marker is the English constant, so a toast in the active
+    // catalog's copy can only come from the ambiguous branch mapping it.
+    await i18n.changeLanguage('fi');
+    try {
+      useMergePullRequestMutation(REF);
+      lastCapturedOptions?.onError?.(new Error(PR_OPERATION_AMBIGUOUS_MESSAGE));
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        'Toiminnon onnistumista ei voitu vahvistaa. Tarkista PR ennen kuin yrität uudelleen.'
+      );
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });
 
@@ -468,6 +479,39 @@ describe('useMergePullRequestMutation (s6 bitbucket arm)', () => {
 
     await expect(lastCapturedOptions?.mutationFn?.(PROVIDER_MERGE_VARS)).rejects.toMatchObject({
       message: 'The pull request was not merged. Check its state and try again.',
+    });
+  });
+});
+
+describe('merge failure wording (localized provider noun)', () => {
+  beforeEach(() => {
+    resetMocks();
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+    vi.clearAllMocks();
+  });
+
+  it('renders the Finnish sentence from the catalog with its own merge-request noun', async () => {
+    await i18n.changeLanguage('fi');
+    providerMergeMutateMock.mockResolvedValueOnce({ done: false, replayed: false });
+    useMergePullRequestMutation(GITLAB_REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(PROVIDER_MERGE_VARS)).rejects.toMatchObject({
+      message:
+        'Yhdistäminen ei onnistunut: yhdistämispyyntö jäi yhdistämättä. Tarkista sen tila ja yritä uudelleen.',
+    });
+  });
+
+  it('capitalizes the noun when the catalog opens the sentence with it', async () => {
+    await i18n.changeLanguage('ru');
+    providerMergeMutateMock.mockResolvedValueOnce({ done: false, replayed: false });
+    useMergePullRequestMutation(GITLAB_REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(PROVIDER_MERGE_VARS)).rejects.toMatchObject({
+      message: 'Запрос на слияние не был слит. Проверьте его состояние и повторите попытку.',
     });
   });
 });

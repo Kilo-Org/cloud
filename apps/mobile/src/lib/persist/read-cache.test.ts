@@ -115,6 +115,45 @@ describe('scope derivation', () => {
 });
 
 describe('allowlist filter', () => {
+  it('persists bounded briefing lists and viewed details, but not paid estimates or cursor variants', () => {
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'list'],
+        {
+          type: 'query',
+          input: { currentOnly: true, limit: 100 },
+        },
+      ])
+    ).toBe(true);
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'get'],
+        {
+          type: 'query',
+          input: { reportId: 'report-1' },
+        },
+      ])
+    ).toBe(true);
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'list'],
+        {
+          type: 'query',
+          input: { currentOnly: false, limit: 30, cursor: 'next-page' },
+        },
+      ])
+    ).toBe(false);
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'estimateSummary'],
+        {
+          type: 'query',
+          input: {},
+        },
+      ])
+    ).toBe(false);
+  });
+
   it('allows the default no-input procedures', () => {
     expect(isReadCacheAllowedKey([['user', 'getMe'], { type: 'query' }])).toBe(true);
     expect(isReadCacheAllowedKey([['organizations', 'list'], { type: 'query' }])).toBe(true);
@@ -476,7 +515,9 @@ describe('bounded serialization', () => {
       // Five query-cache changes inside one throttle window. The un-throttled
       // wrapper path must serialize none of them: only the throttled save
       // already running has serialized, exactly once for the whole burst.
-      const inFlight = burst.map(client => persister.persistClient(client));
+      const inFlight = burst
+        .map(client => persister.persistClient(client))
+        .filter((pending): pending is Promise<void> => pending !== undefined);
       expect(blobSerializations()).toBe(1);
 
       await Promise.all(inFlight);

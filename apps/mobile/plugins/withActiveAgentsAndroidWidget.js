@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const { withAppBuildGradle, withDangerousMod } = require('expo/config-plugins');
+const { withDangerousMod } = require('expo/config-plugins');
 
 const { rewriteWidgetProviderCategoryOrThrow } = require('./android-widget-category');
 
@@ -19,31 +19,6 @@ const GALLERY_COPY = require('./widget-gallery-copy.json');
 // translations. The description is passed as text because the library already
 // wraps it in a string resource of its own.
 const WIDGET_CONFIG_PATH = path.resolve(__dirname, '../src/glanceable-android/widget-config.json');
-
-const WORK_FORCE_MARKER = 'kilo-work-runtime-alignment';
-
-// expo-widgets pulls androidx.glance, which depends on work-runtime-ktx 2.7.1,
-// while react-native-android-widget depends on work-runtime 2.8.1. Version
-// 2.8.0 folded the ktx classes into the main artifact, so the two together fail
-// :app:checkDebugDuplicateClasses. Pin both to 2.8.1, where the ktx artifact is
-// an empty shim.
-function withWorkRuntimeAlignment(config) {
-  return withAppBuildGradle(config, cfg => {
-    if (cfg.modResults.contents.includes(WORK_FORCE_MARKER)) {
-      return cfg;
-    }
-    cfg.modResults.contents += `
-// ${WORK_FORCE_MARKER}
-configurations.configureEach {
-    resolutionStrategy {
-        force 'androidx.work:work-runtime:2.8.1'
-        force 'androidx.work:work-runtime-ktx:2.8.1'
-    }
-}
-`;
-    return cfg;
-  });
-}
 
 /**
  * Declare the lock screen / always-on-display host on the provider XML.
@@ -120,5 +95,5 @@ module.exports = function withActiveAgentsAndroidWidget(config) {
   }));
   // The category mod is registered before the library plugin: see its comment.
   const withCategory = withKeyguardWidgetCategory(config, described);
-  return withWorkRuntimeAlignment(loadAndroidWidgetsPlugin()(withCategory, { widgets: described }));
+  return loadAndroidWidgetsPlugin()(withCategory, { widgets: described });
 };

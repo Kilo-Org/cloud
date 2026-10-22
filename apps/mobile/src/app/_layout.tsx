@@ -36,13 +36,16 @@ import {
   usePathname,
   useRouter,
   useSegments,
+  useUnstableGlobalHref,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+
+import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { View, type ViewInstance } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -95,9 +98,11 @@ import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission
 import { prewarmIntl } from '@/lib/intl-cache';
 import {
   captureLaunchDeepLink,
+  clearPendingDeepLink,
   consumePendingDeepLink,
   getPendingDeepLinkSnapshot,
   subscribeToPendingDeepLink,
+  wasLaunchLinkHandled,
 } from '@/lib/deep-link-launch';
 import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
 import { registerNeedsInputCategories } from '@/lib/notification-actions';
@@ -121,6 +126,15 @@ import {
   SHARE_INTENT_OPTIONS,
   shouldIngestShareIntent,
 } from '@/lib/pending-share-navigation';
+import {
+  consumeLastRouteForRepair,
+  getLastRouteHydrationVersion,
+  isLastRouteHydrated,
+  subscribeLastRoute,
+} from '@/lib/last-route';
+import { shouldRepairRestoredRoute } from '@/lib/last-route-repair';
+import { lastRouteHrefFrom } from '@/lib/last-route-recordable';
+import { useRecordLastRoute } from '@/lib/hooks/use-record-last-route';
 import {
   clearSharePayload,
   discardUnstoredSharePayload,
@@ -218,8 +232,17 @@ function RootLayoutNav({
   });
   const segments = useSegments();
   const pathname = usePathname();
+  const globalHref = useUnstableGlobalHref();
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
   const router = useRouter();
+  // The root navigation container's readiness. `store.assertIsReady()` throws
+  // when `navigationRef.isReady()` is false — the exact crash
+  // "Attempted to navigate before mounting the Root Layout component" — and
+  // that bit is the container's focus adapter, true only after the root
+  // navigator's mount effects. The navigation *state* exists earlier (it is
+  // assigned during render), so every router call below gates on this hook
+  // instead: none lands in the mount window.
+  const navigationReady = useRootNavigationReady();
   // The gated pending-deep-link consumer below switches to the tapped
   // notification's organization through this provider before it navigates.
   const { setOrganizationId } = useOrganization();
@@ -327,6 +350,21 @@ function RootLayoutNav({
     setSharePersistUserId(userId ?? null);
   }, [userId]);
 
+  // Reactive hydration version so the relaunch repair below re-runs when the
+  // restart read settles (a restored record lands, or reads as absent).
+  const lastRouteHydratedVersion = useSyncExternalStore(
+    subscribeLastRoute,
+    getLastRouteHydrationVersion
+  );
+
+  // Record the focused in-app route on every navigation commit, so a process
+  // death restores the screen the person had on screen instead of the base
+  // Intent's stale deep link. Account-scoped: a signed-out launch records
+  // nothing. The hook itself holds recording until the store's restart read
+  // has settled, so the repair effect (declared later, same render pass) reads
+  // the persisted record before this process's first commit can overwrite it.
+  useRecordLastRoute({ userId: accountUserId });
+
   useSentryConsentSync(consentChecked && !needsConsent && optionalConsent, initSentry);
 
   const fontsReady = fontsLoaded || fontsError !== null;
@@ -365,6 +403,41 @@ function RootLayoutNav({
     }
   }, [themeHasLoaded, themePreference]);
 
+  // Reopen the screen the user was on before an RTL reload: the target rides
+  // in a ref (the SecureStore read is one-shot), and the navigation runs only
+  // after the root navigator's mount effects. The stash bumps a state epoch,
+  // so the deferred effect re-runs after the target lands — the effect cannot
+  // observe a bare ref.
+  const languageReturnTargetRef = useRef<LanguageReturnTarget | null>(null);
+  const [languageReturnEpoch, setLanguageReturnEpoch] = useState(0);
+  const routerRef = useRef(router);
+  routerRef.current = router;
+  const runLanguageReturnNavigationRef = useRef<(() => void) | null>(null);
+  runLanguageReturnNavigationRef.current = () => {
+    const target = languageReturnTargetRef.current;
+    if (target === null) {
+      return;
+    }
+    languageReturnTargetRef.current = null;
+    if (target === 'login') {
+      routerRef.current.replace('/(auth)/login');
+    } else if (target === 'profile') {
+      routerRef.current.replace('/(app)/(tabs)/(3_profile)' as Href);
+    } else {
+      // Two steps, not one `replace`: the relaunched stack has no entry
+      // below the reopened screen, so a lone `replace` leaves the header's
+      // back control with nothing to pop.
+      routerRef.current.replace('/(app)/(tabs)/(3_profile)' as Href);
+      routerRef.current.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+    }
+  };
+  const runLanguageReturnNavigation = () => {
+    const run = runLanguageReturnNavigationRef.current;
+    if (run) {
+      run();
+    }
+  };
+
   // Resolve the active language once the stored preference has loaded, then
   // prepare the direction and catalog before first paint. A direction change
   // forces RTL and reloads the app; a catalog failure falls back to English so
@@ -395,6 +468,9 @@ function RootLayoutNav({
       // after the reload path, so the helper's one-shot delete is the only read.
       // On a failed reload the key stays in SecureStore, so Retry's successful
       // reloadAppAsync() still reopens the right screen on the relaunch.
+      // The target rides in a ref: the read is one-shot, so the navigation
+      // cannot re-read it — the deferred effect below navigates once the root
+      // navigator's mount effects have run (navigationReady).
       let returnTarget: LanguageReturnTarget | null = null;
       if (!reloadFailed) {
         try {
@@ -403,16 +479,12 @@ function RootLayoutNav({
           // Failed read: fall through so the splash still hides.
         }
       }
-      if (returnTarget === 'login') {
-        router.replace('/(auth)/login');
-      } else if (returnTarget === 'profile') {
-        router.replace('/(app)/(tabs)/(3_profile)' as Href);
-      } else if (returnTarget === 'preferences') {
-        // Two steps, not one `replace`: the relaunched stack has no entry
-        // below the reopened screen, so a lone `replace` leaves the header's
-        // back control with nothing to pop.
-        router.replace('/(app)/(tabs)/(3_profile)' as Href);
-        router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+      if (returnTarget !== null) {
+        languageReturnTargetRef.current = returnTarget;
+        setLanguageReturnEpoch(epoch => epoch + 1);
+        if (navigationReady) {
+          runLanguageReturnNavigation();
+        }
       }
       try {
         // The plural-rules polyfill must be in place before the first render in the new language.
@@ -441,7 +513,18 @@ function RootLayoutNav({
     return () => {
       cancelled = true;
     };
-  }, [languageHasLoaded, router, setLanguageReady]);
+  }, [languageHasLoaded, navigationReady, router, setLanguageReady]);
+
+  // Deferred half of the language return: fires when the navigator finishes
+  // mounting after prepareLanguage stashed the target (the epoch bump makes
+  // this effect re-run after the stash, so a stash landing after the ready
+  // flip is still consumed).
+  useEffect(() => {
+    if (!navigationReady || languageReturnTargetRef.current === null) {
+      return;
+    }
+    runLanguageReturnNavigation();
+  }, [navigationReady, languageReturnEpoch, router]);
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
@@ -697,27 +780,45 @@ function RootLayoutNav({
     };
   }, [hasShareIntent, shareIntent, isShellReady, userId]);
 
-  useEffect(() => {
-    const decision = resolveBootstrapDecision({
+  // Memoized because the repair effect below keys on it: a plain call would
+  // hand the effect a new object identity every render and re-run it each time.
+  const decision = useMemo(
+    () =>
+      resolveBootstrapDecision({
+        isLoading,
+        updateRequired,
+        inForceUpdate,
+        inAuthGroup,
+        hasToken: token != null,
+        userIdLoading: identityLoading,
+        userIdError: identityError,
+        consentCheckError: consentCheckError != null,
+        consentChecked,
+        needsConsent,
+        onConsentRoute,
+        onConsentReviewRoute,
+        languageReloadFailed,
+        restoreFailed,
+      }),
+    [
       isLoading,
       updateRequired,
       inForceUpdate,
       inAuthGroup,
-      hasToken: token != null,
-      userIdLoading: identityLoading,
-      userIdError: identityError,
-      consentCheckError: consentCheckError != null,
+      token,
+      identityLoading,
+      identityError,
+      consentCheckError,
       consentChecked,
       needsConsent,
       onConsentRoute,
       onConsentReviewRoute,
       languageReloadFailed,
       restoreFailed,
-    });
+    ]
+  );
 
-    // Replaces the old inline if-chain (resolveBootstrapTag in
-    // src/lib/bootstrap-decision.ts). Remove this switch when the decision
-    // module owns all bootstrap routing.
+  useEffect(() => {
     switch (decision.tag) {
       case 'settle-language-error': {
         markStartupComplete('language-error');
@@ -734,6 +835,9 @@ function RootLayoutNav({
         return;
       }
       case 'redirect-force-update': {
+        if (!navigationReady) {
+          return;
+        }
         router.replace('/force-update');
         return;
       }
@@ -743,6 +847,9 @@ function RootLayoutNav({
         return;
       }
       case 'exit-force-update': {
+        if (!navigationReady) {
+          return;
+        }
         router.replace('/(app)');
         return;
       }
@@ -752,6 +859,9 @@ function RootLayoutNav({
         return;
       }
       case 'redirect-login': {
+        if (!navigationReady) {
+          return;
+        }
         router.replace('/(auth)/login');
         return;
       }
@@ -771,14 +881,27 @@ function RootLayoutNav({
         return;
       }
       case 'redirect-consent': {
+        if (!navigationReady) {
+          return;
+        }
         router.replace('/(app)/consent' as Href);
         return;
       }
       case 'redirect-app': {
+        if (!navigationReady) {
+          return;
+        }
         router.replace('/(app)');
         return;
       }
       case 'settle-app': {
+        // The relaunch repair navigates to the recorded screen in this same
+        // flush. Revealing the tree before the root navigator accepts
+        // navigation, or before the record's restart read settles, would paint
+        // the restored route first.
+        if (!navigationReady || !isLastRouteHydrated()) {
+          return;
+        }
         markStartupComplete('app');
         setStartupFinished(true);
         // Deep-link navigation is owned by the pendingDeepLink effect below.
@@ -788,23 +911,7 @@ function RootLayoutNav({
       default:
       // Unreachable: BootstrapDecisionTag is a closed union.
     }
-  }, [
-    token,
-    isLoading,
-    updateRequired,
-    inAuthGroup,
-    inForceUpdate,
-    router,
-    identityLoading,
-    identityError,
-    consentCheckError,
-    consentChecked,
-    needsConsent,
-    onConsentRoute,
-    onConsentReviewRoute,
-    languageReloadFailed,
-    restoreFailed,
-  ]);
+  }, [decision, navigationReady, router, setStartupFinished, lastRouteHydratedVersion]);
 
   // Reactive snapshot of the pending deep-link slot so a destination stashed
   // after the gate effect last ran (e.g. a notification tap while signed out,
@@ -815,10 +922,84 @@ function RootLayoutNav({
     getPendingDeepLinkSnapshot
   );
 
+  // Relaunch repair. When the process died, Android recreates the task with
+  // its original base Intent, so a stale deep link (a notification or launcher
+  // session link) replays as the initial route and the app reopens on a
+  // session that may be long gone — the not-found screen. The last focused
+  // in-app route was recorded on every navigation commit
+  // (useRecordLastRoute); once bootstrap settles into the app and before the
+  // hidden wrapper clears for the first frame, replace onto that route. A
+  // missing, foreign-account, or gate route reads as no record: Home stays.
+  //
+  // The latch waits for the mirror read: `getLastRoute` hydrates
+  // asynchronously, so a settle that runs before the read resolves would
+  // otherwise read "no record", latch done, and never repair. The store is
+  // observable (subscribeLastRoute notifies when the restored record lands),
+  // so the effect re-runs on the read's completion and only then latches.
+  // After that, one pass per process — a later navigation away from the
+  // recorded route is never "repaired" back.
+  const lastRouteRepairDone = useRef(false);
+  useEffect(() => {
+    if (lastRouteRepairDone.current) {
+      return;
+    }
+    if (decision.tag !== 'settle-app') {
+      return;
+    }
+    if (!navigationReady) {
+      return;
+    }
+    if (!isLastRouteHydrated()) {
+      return;
+    }
+    lastRouteRepairDone.current = true;
+    // Consume-and-latch: the recorder holds writes until this ran, so the
+    // cold start's first commit (the base Intent's restored route) cannot
+    // overwrite the persisted record before it is read here.
+    const recordedHref = consumeLastRouteForRepair(accountUserId ?? null);
+    if (
+      !shouldRepairRestoredRoute({
+        recordedHref,
+        // The tab group is part of the destination: `/profiles` and `/` are the
+        // same path once groups are stripped, so the resolved href of the route
+        // actually on screen is the comparison, not the bare pathname.
+        restoredRoute: lastRouteHrefFrom(globalHref, pathname, segments) ?? pathname,
+      })
+    ) {
+      return;
+    }
+    // The launch-captured link is the stale replay this repair undoes: the
+    // route it points at was not the screen the person had focused, so the
+    // pending-deep-link consumer (declared below, same flush) must not
+    // re-apply it after this navigation. The slot is dropped only when it
+    // carries exactly the href the cold-start capture stashed — slot and
+    // capture come from the same launch Intent, so a live tap (a notification
+    // or search result delivering a different URL, or the same session via a
+    // fresh resume link with a new anchor) never matches and is left for the
+    // consumer below.
+    const launchCaptured = wasLaunchLinkHandled();
+    const slotHref = getPendingDeepLinkSnapshot();
+    if (launchCaptured !== null && slotHref === launchCaptured) {
+      clearPendingDeepLink();
+    }
+    // `navigate` (not `replace`): replacing the stack root leaves the target
+    // screen with no back stack, the same reasoning as resolvePendingNavigation.
+    router.navigate(recordedHref as Href, { withAnchor: true });
+  }, [
+    decision,
+    accountUserId,
+    pathname,
+    segments,
+    globalHref,
+    router,
+    navigationReady,
+    lastRouteHydratedVersion,
+  ]);
+
   // Declared after the auth effect so that on the same flush a pending
   // deep-link navigate runs first and the share gate opens on top.
   useEffect(() => {
-    if (pendingDeepLink === null || !isShellReady) {
+    if (pendingDeepLink === null || !isShellReady || !navigationReady) {
       return;
     }
     const pending = consumePendingDeepLink();
@@ -837,10 +1018,10 @@ function RootLayoutNav({
     if (navigation) {
       router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
     }
-  }, [pendingDeepLink, isShellReady, router, setOrganizationId]);
+  }, [pendingDeepLink, isShellReady, navigationReady, router, setOrganizationId]);
 
   useEffect(() => {
-    if (pendingShareId === null || !isShellReady) {
+    if (pendingShareId === null || !isShellReady || !navigationReady) {
       return;
     }
 
@@ -859,7 +1040,7 @@ function RootLayoutNav({
     }
     pendingShareIdEpochRef.current += 1;
     setPendingShareId(null);
-  }, [pendingShareId, isShellReady, onGateRoute, router]);
+  }, [pendingShareId, isShellReady, navigationReady, onGateRoute, router]);
 
   // One `app_startup` event per launch, delegated to a drain helper so
   // tests can drive the real guard logic without mounting the full layout.
@@ -950,7 +1131,7 @@ function RootLayoutNav({
   // cleanup cancels the pending frame, which React runs before any later
   // render's frame can fire, so an interrupted reveal never focuses a stale
   // wrapper.
-  const wrapperRef = useRef<View>(null);
+  const wrapperRef = useRef<ViewInstance>(null);
   const wasHiddenRef = useRef(wrapperObscured);
   useEffect(() => {
     const wasHidden = wasHiddenRef.current;

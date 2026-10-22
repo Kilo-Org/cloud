@@ -7,6 +7,7 @@ import {
   rethrowCloudAgentError,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
+import { isPublicRepoUrlEnabled } from '@/lib/cloud-agent-next/public-repo-url';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
@@ -340,6 +341,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         githubRepo,
         githubIntegrationId,
         bitbucketRepo,
+        publicRepoUrl,
         organizationId,
         attachments,
         images,
@@ -369,6 +371,14 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           bitbucketWorkspaceUuid: bitbucketRepo.workspaceUuid,
           bitbucketRepositoryUuid: bitbucketRepo.repositoryUuid,
         };
+      } else if (publicRepoUrl) {
+        if (!isPublicRepoUrlEnabled()) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Public repository URLs are only available in local development',
+          });
+        }
+        gitParams = { gitUrl: publicRepoUrl };
       } else {
         gitParams = { githubRepo, githubIntegrationId, platform: PLATFORM.GITHUB };
       }
@@ -412,6 +422,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         headersList: ctx.headersList,
         sourceKiloSessionId: input.sourceKiloSessionId,
         operationKey: input.operationKey,
+        kiloSessionId: input.kiloSessionId,
         organizationId: input.organizationId,
       })
     ),
@@ -748,7 +759,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(ImageUploadUrlInput)
     .mutation(async ({ ctx, input }) => {
       return generateImageUploadUrl({
-        service: 'cloud-agent',
         userId: ctx.user.id,
         messageUuid: input.messageUuid,
         imageId: input.imageId,
@@ -990,19 +1000,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       ).getSandboxStatus(input.cloudAgentSessionId);
     }),
 
-  getComputeBillingStatus: organizationMemberProcedure
-    .input(GetSessionInput)
-    .query(async ({ ctx, input }) => {
-      await assertOrganizationOwnsSession({
-        organizationId: input.organizationId,
-        userId: ctx.user.id,
-        cloudAgentSessionId: input.cloudAgentSessionId,
-      });
-      return await createCloudAgentNextClient(
-        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
-      ).getComputeBillingStatus(input.cloudAgentSessionId);
-    }),
-
   checkEligibility: organizationMemberProcedure
     .input(z.object({ organizationId: z.uuid() }))
     .query(async ({ ctx, input }) => {
@@ -1032,6 +1029,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         integrationInstalled: z.boolean(),
         syncedAt: z.string().nullish(),
         errorMessage: z.string().optional(),
+        unavailableReason: z
+          .enum(['suspended', 'disconnected', 'reauth_required', 'not_configured'])
+          .optional(),
+        partial: z.boolean().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -1050,6 +1051,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         integrationInstalled: result.integrationInstalled,
         syncedAt: result.syncedAt,
         errorMessage: result.errorMessage,
+        unavailableReason: result.unavailableReason,
+        partial: result.partial,
       };
     }),
 

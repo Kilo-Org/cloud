@@ -195,6 +195,10 @@ what a translator has to work from.
   message, or every catalog quotes a button the reader never sees.
 - Keep the `{{placeholder}}` set identical to English. Word order around a
   placeholder is the translator's to change, so never assume English order.
+  One exception: a plural category may interpolate the count its own family
+  already declares, where that language's plural rules select the category for
+  counts other than one. Never drop a placeholder English requires, and never
+  add one the family does not use.
 - Case follows the English copy, and only in a language that has case. Georgian
   Mkhedruli has none, and Greek keeps the tonos on a capital initial and drops
   it only in full capitals.

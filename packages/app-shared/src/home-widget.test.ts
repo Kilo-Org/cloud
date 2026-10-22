@@ -145,6 +145,19 @@ describe('Home-only widget policy', () => {
     expect(details.waitingAgents[0]?.title).toHaveLength(HOME_WIDGET_TITLE_LIMIT);
   });
 
+  it('preserves complete emoji at the title limit', () => {
+    for (const padding of [HOME_WIDGET_TITLE_LIMIT - 2, HOME_WIDGET_TITLE_LIMIT - 1]) {
+      const prefix = 'a'.repeat(padding);
+      const details = buildHomeWidgetDetails([
+        { status: 'permission', title: `\u200b${prefix}🚀next` },
+      ]);
+      expect(details.primaryTitle).toBe(
+        padding === HOME_WIDGET_TITLE_LIMIT - 2 ? `${prefix}🚀` : prefix
+      );
+      expect(details.waitingAgents[0]?.title).toBe(details.primaryTitle);
+    }
+  });
+
   it('uses one priority and excludes every zero-count secondary row', () => {
     const data = buildHomeWidgetData({
       ...scope,

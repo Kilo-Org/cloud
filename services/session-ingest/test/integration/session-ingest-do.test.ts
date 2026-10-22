@@ -5,6 +5,7 @@ import {
   decodeKiloSdkMessagesCursor,
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  getCloudAgentRootSessionMessagesSchema,
   MAX_SESSION_DIFF_READ_BYTES,
   getSessionShareExpiresAt,
   sessionShareDurationSchema,
@@ -1262,6 +1263,53 @@ describe('SessionIngestDO integration', () => {
       const earlier = await stub.readKiloSdkMessages({ limit: 2, before: latest.nextCursor });
       expect(earlier.messages.map(message => message.info.id)).toEqual(['msg_100', 'msg_200']);
       expect(earlier.nextCursor).toBeNull();
+    });
+
+    it('walks persisted history with the shared page size and native cursors', async () => {
+      const sessionId = 'ses_00000000000000000000000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const messages = Array.from({ length: 121 }, (_, index) => ({
+        id: `msg_default_${String(index).padStart(3, '0')}`,
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created: index },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      }));
+      await stub.ingest(
+        messages.map(data => ({ type: 'message' as const, data })),
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      const readPage = (before?: string) => {
+        const query = getCloudAgentRootSessionMessagesSchema.parse({
+          kiloUserId,
+          kiloSessionId: sessionId,
+          before,
+        });
+        return stub.readKiloSdkMessages({ limit: query.limit, before: query.before });
+      };
+
+      const newest = await readPage();
+      expect(newest).toEqual({
+        messages: messages.slice(71).map(info => ({ info, parts: [] })),
+        nextCursor: expect.any(String),
+        omittedItemCount: 0,
+      });
+      const middle = await readPage(newest.nextCursor);
+      expect(middle).toEqual({
+        messages: messages.slice(21, 71).map(info => ({ info, parts: [] })),
+        nextCursor: expect.any(String),
+        omittedItemCount: 0,
+      });
+      const oldest = await readPage(middle.nextCursor);
+      expect(oldest).toEqual({
+        messages: messages.slice(0, 21).map(info => ({ info, parts: [] })),
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
     });
 
     it('reads the newest page without scanning the part rows that sort after message rows', async () => {

@@ -24,6 +24,11 @@ type InstallationDetails = {
 
 const mockGetIntegrationForOwner =
   jest.fn<(owner: Owner, platform: string) => Promise<TestIntegration | null>>();
+// Records the id the router asks for, so a test can prove the lookup matched
+// the requested request instead of returning any row of the owner.
+const mockGetGitHubIntegrationById = jest.fn<
+  (owner: Owner, integrationId: string) => Promise<TestIntegration | null>
+>(async (owner, _integrationId) => mockGetIntegrationForOwner(owner, 'github'));
 const mockFindIntegrationByInstallationId =
   jest.fn<
     (
@@ -115,8 +120,8 @@ jest.mock('@/lib/integrations/github/install-state', () => ({
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getIntegrationForOwner: (owner: Owner, platform: string) =>
     mockGetIntegrationForOwner(owner, platform),
-  getGitHubIntegrationById: (_owner: Owner, _integrationId: string) =>
-    mockGetIntegrationForOwner(_owner, 'github'),
+  getGitHubIntegrationById: (owner: Owner, integrationId: string) =>
+    mockGetGitHubIntegrationById(owner, integrationId),
   upsertPlatformIntegrationForOwner: (owner: Owner, details: Record<string, unknown>) =>
     mockUpsertPlatformIntegrationForOwner(owner, details),
   updateRepositoriesForIntegration: (integrationId: string, repositories: unknown[]) =>
@@ -787,12 +792,23 @@ describe('githubAppsRouter pending installation cancel', () => {
   });
 
   it('refuses an id that matches no integration for the owner', async () => {
-    mockGetIntegrationForOwner.mockResolvedValue(null);
+    const otherPendingId = '00000000-0000-4000-8000-0000000000aa';
+    // The owner does have an integration, but not the one in the request.
+    mockGetGitHubIntegrationById.mockImplementationOnce(async (_owner, id) =>
+      id === integrationId
+        ? {
+            id: integrationId,
+            platform_installation_id: '98765',
+            platform_account_login: 'existing-org',
+            github_app_type: 'standard',
+          }
+        : null
+    );
     const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
 
-    await expect(caller.cancelPendingInstallation({ integrationId })).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-    });
+    await expect(
+      caller.cancelPendingInstallation({ integrationId: otherPendingId })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
     expect(mockCancelPendingInstallation).not.toHaveBeenCalled();
   });

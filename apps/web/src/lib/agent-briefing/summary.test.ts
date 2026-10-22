@@ -6,6 +6,7 @@ import type {
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getRawOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
 import { briefingPriceBound, briefingPrompt } from './summary';
 import type { BriefingReportRow } from './store';
 
@@ -18,6 +19,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
   getUnavailableModelIds: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config', () => ({
+  getPreferredProviderOrderConfig: jest.fn(),
 }));
 
 function catalogModel(id: string, pricing: OpenRouterModel['pricing']): OpenRouterModel {
@@ -42,6 +46,7 @@ describe('briefing model pricing', () => {
   beforeEach(() => {
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
     jest.mocked(getUnavailableModelIds).mockResolvedValue(new Set<string>());
+    jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({ rules: [] });
     jest
       .mocked(getRawOpenRouterModels)
       .mockResolvedValue({ data: [aion] } satisfies OpenRouterModelsResponse);
@@ -57,6 +62,28 @@ describe('briefing model pricing', () => {
     await expect(briefingPriceBound(aion.id, 'Overnight activity', 1)).rejects.toThrow(
       'spend_limit_too_low'
     );
+  });
+
+  it('quotes the configured preferred route rather than the first endpoint or catalog price', async () => {
+    jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({
+      rules: [{ includes: ['aion-labs/'], providers: ['preferred-route'] }],
+    });
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      [aion.id]: {
+        id: aion.id,
+        name: aion.name,
+        endpoints: [
+          { tag: 'other-route', pricing: { prompt: '0.0000001', completion: '0.0000002' } },
+          { tag: 'preferred-route', pricing: { prompt: '0.000002', completion: '0.000004' } },
+        ],
+      } satisfies StoredModel,
+    });
+
+    const quote = await briefingPriceBound(aion.id, 'Overnight activity', 2_000_000);
+
+    expect(quote.inputRate).toBe(0.000002);
+    expect(quote.outputRate).toBe(0.000004);
+    expect(quote.estimatedCost).toBe(11_300);
   });
 
   it('rejects a model the picker does not price', async () => {

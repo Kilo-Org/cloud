@@ -1,4 +1,20 @@
-import { getSafeReturnUrlPath } from './payment-return-url';
+// The cookie store is stubbed so the return URL can round-trip without a request context.
+jest.mock('next/headers', () => {
+  const store = new Map<string, string>();
+  return {
+    cookies: async () => ({
+      set: (name: string, value: string) => store.set(name, value),
+      get: (name: string) => (store.has(name) ? { value: store.get(name) } : undefined),
+      delete: (name: string) => store.delete(name),
+    }),
+  };
+});
+
+import {
+  getAndClearPaymentReturnUrl,
+  getSafeReturnUrlPath,
+  setPaymentReturnUrl,
+} from './payment-return-url';
 
 function isValid(url: string): boolean {
   return getSafeReturnUrlPath(url) !== null;
@@ -99,5 +115,26 @@ describe('getSafeReturnUrlPath', () => {
   it('should return null for values with separators outside the path grammar', () => {
     expect(getSafeReturnUrlPath('/cre\\dits')).toBeNull();
     expect(getSafeReturnUrlPath('/credits\n')).toBeNull();
+  });
+});
+
+describe('payment return URL cookie', () => {
+  it('should store the normalized path', async () => {
+    await expect(setPaymentReturnUrl('/credits/../profile?a=1#h')).resolves.toBe(true);
+
+    await expect(getAndClearPaymentReturnUrl()).resolves.toBe('/profile?a=1#h');
+  });
+
+  it('should clear the stored path after reading it', async () => {
+    await setPaymentReturnUrl('/credits');
+    await getAndClearPaymentReturnUrl();
+
+    await expect(getAndClearPaymentReturnUrl()).resolves.toBeNull();
+  });
+
+  it('should not store a value outside the application origin', async () => {
+    await expect(setPaymentReturnUrl('//evil.com/path')).resolves.toBe(false);
+
+    await expect(getAndClearPaymentReturnUrl()).resolves.toBeNull();
   });
 });

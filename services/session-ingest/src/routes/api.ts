@@ -1,4 +1,5 @@
 import { Hono, type Context } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import { sql, eq, and, inArray, isNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
@@ -11,6 +12,7 @@ import {
   persistedKiloSdkMessageHistorySchema,
   sessionDiffReadSchema,
   sessionIdSchema,
+  sessionShareOptionsSchema,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
@@ -27,7 +29,7 @@ import {
   withDORetry,
 } from '@kilocode/worker-utils';
 import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
-import { getSessionIngestDO } from '../dos/SessionIngestDO';
+import { getSessionIngestDO, SHARE_INFO_TOO_LARGE_ERROR } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { createConnectionTicket } from '../dos/connection-ticket';
@@ -768,61 +770,147 @@ api.get('/session/:sessionId/messages', async c => {
   );
 });
 
-api.post('/session/:sessionId/share', async c => {
+api.post('/session/:sessionId/share', bodyLimit({ maxSize: 1024 }), async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
 
+  const shareOptions = sessionShareOptionsSchema.safeParse(
+    c.req.raw.body === null ? {} : await c.req.json().catch(() => null)
+  );
+  if (!shareOptions.success) {
+    return c.json({ success: false, error: 'Invalid share options' }, 400);
+  }
+
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
-  const publicId = crypto.randomUUID();
-  const shareResult = await db.execute<{ public_id: string }>(sql`
-    UPDATE ${cli_sessions_v2}
-    SET public_id = COALESCE(${cli_sessions_v2.public_id}, ${publicId})
-    WHERE ${cli_sessions_v2.session_id} = ${parsed.data}
-      AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}
-      AND (
-        ${cli_sessions_v2.organization_id} IS NULL
-        OR EXISTS (
-          SELECT 1
-          FROM ${organization_memberships}
-          INNER JOIN ${organizations}
-            ON ${organizations.id} = ${organization_memberships.organization_id}
-            AND ${organizations.deleted_at} IS NULL
-          WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
-            AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM ${organizations} AS active_target_organization
-          INNER JOIN ${organizations} AS active_parent_organization
-            ON active_parent_organization.id = active_target_organization.parent_organization_id
-            AND active_parent_organization.deleted_at IS NULL
-          INNER JOIN ${organization_memberships} AS active_parent_membership
-            ON active_parent_membership.organization_id = active_target_organization.parent_organization_id
-            AND active_parent_membership.kilo_user_id = ${kiloUserId}
-            AND active_parent_membership.role IN (${sql.join(
-              ORGANIZATION_PARENT_ACCESS_ROLES.map((role: string) => sql`${role}`),
-              sql`, `
-            )})
-          WHERE active_target_organization.id = ${cli_sessions_v2.organization_id}
-            AND active_target_organization.deleted_at IS NULL
-        )
-      )
-    RETURNING ${cli_sessions_v2.public_id}
-  `);
-
-  const sharedSession = shareResult.rows[0];
-  if (!sharedSession) {
+  const accessibleSession = await resolveAccessibleKiloSession(c.env, {
+    kiloUserId,
+    kiloSessionId: parsed.data,
+  });
+  if (!accessibleSession) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  const shareToken = await signSessionShareToken(c.env, {
-    sessionId: parsed.data,
-    publicId: sharedSession.public_id,
-  });
+  const publicId = crypto.randomUUID();
+  const removeSnapshot = () =>
+    withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+      stub => stub.deleteShareInfo(publicId),
+      'SessionIngestDO.deleteShareInfo'
+    ).catch(() => undefined);
+
+  // Freeze the public info and mint the capability before mutating the row so
+  // a snapshot or signing failure leaves the previous generation untouched.
+  let sharedAt = Date.now();
+  try {
+    if (!shareOptions.data.include_new_messages) {
+      sharedAt = await withDORetry(
+        () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+        stub => stub.captureShareInfo(publicId, shareOptions.data.duration),
+        'SessionIngestDO.captureShareInfo'
+      );
+    }
+  } catch (error) {
+    await removeSnapshot();
+    if (error instanceof Error && error.message === SHARE_INFO_TOO_LARGE_ERROR) {
+      return c.json({ success: false, error: 'share_snapshot_too_large' }, 413);
+    }
+    if (error instanceof Error && error.message === 'Session deleted') {
+      return c.json({ success: false, error: 'session_not_found' }, 404);
+    }
+    throw error;
+  }
+
+  let shareToken: string;
+  try {
+    shareToken = await signSessionShareToken(
+      c.env,
+      {
+        sessionId: parsed.data,
+        publicId,
+        ...shareOptions.data,
+      },
+      { now: () => new Date(sharedAt) }
+    );
+  } catch (error) {
+    await removeSnapshot();
+    throw error;
+  }
+
+  // Every share rotates `public_id`, which invalidates the predecessor even
+  // while its signature is still valid. Snapshot links use the capture timestamp
+  // as their signed cutoff and expiry origin.
+  const sharedSession = await db
+    .transaction(async tx => {
+      const [previous] = await tx
+        .select({ publicId: cli_sessions_v2.public_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, parsed.data),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        )
+        .limit(1)
+        .for('update');
+      if (!previous) return null;
+      const result = await tx.execute<{ public_id: string }>(sql`
+      UPDATE ${cli_sessions_v2}
+      SET public_id = ${publicId}
+      WHERE ${cli_sessions_v2.session_id} = ${parsed.data}
+        AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}
+        AND (
+          ${cli_sessions_v2.organization_id} IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM ${organization_memberships}
+            INNER JOIN ${organizations}
+              ON ${organizations.id} = ${organization_memberships.organization_id}
+              AND ${organizations.deleted_at} IS NULL
+            WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
+              AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM ${organizations} AS active_target_organization
+            INNER JOIN ${organizations} AS active_parent_organization
+              ON active_parent_organization.id = active_target_organization.parent_organization_id
+              AND active_parent_organization.deleted_at IS NULL
+            INNER JOIN ${organization_memberships} AS active_parent_membership
+              ON active_parent_membership.organization_id = active_target_organization.parent_organization_id
+              AND active_parent_membership.kilo_user_id = ${kiloUserId}
+              AND active_parent_membership.role IN (${sql.join(
+                ORGANIZATION_PARENT_ACCESS_ROLES.map((role: string) => sql`${role}`),
+                sql`, `
+              )})
+            WHERE active_target_organization.id = ${cli_sessions_v2.organization_id}
+              AND active_target_organization.deleted_at IS NULL
+          )
+        )
+      RETURNING ${cli_sessions_v2.public_id}
+    `);
+      return result.rows[0] ? previous : null;
+    })
+    .catch(async error => {
+      await removeSnapshot();
+      throw error;
+    });
+
+  if (!sharedSession) {
+    await removeSnapshot();
+    return c.json({ success: false, error: 'session_not_found' }, 404);
+  }
+  const previousPublicId = sharedSession.publicId;
+  if (previousPublicId) {
+    await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+      stub => stub.deleteShareInfo(previousPublicId),
+      'SessionIngestDO.deleteShareInfo'
+    ).catch(() => undefined);
+  }
 
   return c.json({ success: true, share_token: shareToken }, 200);
 });
@@ -845,24 +933,46 @@ api.post('/session/:sessionId/unshare', async c => {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  const sessionRows = await db
-    .select({ session_id: cli_sessions_v2.session_id })
-    .from(cli_sessions_v2)
-    .where(
-      and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    )
-    .limit(1);
-
-  if (!sessionRows[0]) {
+  const previous = await db.transaction(async tx => {
+    const [session] = await tx
+      .select({ publicId: cli_sessions_v2.public_id })
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.data),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+        )
+      )
+      .limit(1)
+      .for('update');
+    if (!session) return null;
+    await tx
+      .update(cli_sessions_v2)
+      .set({ public_id: null })
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.data),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+        )
+      );
+    return session;
+  });
+  if (!previous) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
-
-  await db
-    .update(cli_sessions_v2)
-    .set({ public_id: null })
-    .where(
-      and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    );
+  const previousPublicId = previous.publicId;
+  if (previousPublicId) {
+    await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+      stub => stub.deleteShareInfo(previousPublicId),
+      'SessionIngestDO.deleteShareInfo'
+    ).catch(error => {
+      console.warn('Failed to clear share snapshot after unshare', {
+        sessionId: parsed.data,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
 
   return c.json({ success: true }, 200);
 });

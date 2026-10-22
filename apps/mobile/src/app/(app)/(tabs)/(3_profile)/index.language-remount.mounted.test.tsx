@@ -7,8 +7,8 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   authState,
   findConfigureRows,
-  flushInteractions,
-  interactionState,
+  flushIdle,
+  idleState,
   keys,
   nodeCountWithChildren,
   organizationsQueryFn,
@@ -34,8 +34,8 @@ beforeEach(async () => {
   providersQueryFn.mockReset();
   organizationsQueryFn.mockReset();
   authState.token = 'token-1';
-  interactionState.storedCallback = undefined;
-  interactionState.cancel.mockReset();
+  idleState.storedCallback = undefined;
+  idleState.cancel.mockReset();
   providersQueryFn.mockResolvedValue({
     providers: [{ provider: 'github', email: 'dev@kilo.ai' }],
   });
@@ -53,7 +53,7 @@ describe('ProfileRoute language remount', () => {
   it('renders the profile under the active language', async () => {
     const { renderer, unmount } = await renderWithProviders(createElement(ProfileRoute));
 
-    flushInteractions();
+    flushIdle();
     await waitFor(() => findConfigureRows(renderer.root, 'GitHub').length === 1);
     expect(findConfigureRows(renderer.root, 'GitHub')[0]?.props.subtitle).toBe('dev@kilo.ai');
 
@@ -63,29 +63,29 @@ describe('ProfileRoute language remount', () => {
   it('remounts the screen when the applied language changes', async () => {
     const { renderer, unmount } = await renderWithProviders(createElement(ProfileRoute));
 
-    flushInteractions();
+    flushIdle();
     await waitFor(() => findConfigureRows(renderer.root, 'GitHub').length === 1);
     expect(findConfigureRows(renderer.root, 'GitHub')[0]?.props.subtitle).toBe('dev@kilo.ai');
 
     // Applying a new language re-renders the route through `useTranslation`
     // and the key swap unmounts the old screen and mounts a fresh one. The
-    // remount is made observable through the interaction deferral: the fresh
-    // mount re-runs `useAfterInteractions`, so a cleared captured callback is
+    // remount is made observable through the idle deferral: the fresh
+    // mount re-runs the deferred work, so a cleared captured callback is
     // registered again — `ProfileScreen`'s own `useTranslation` alone would
     // re-render copy without any of that.
     organizationsQueryFn.mockReset();
     organizationsQueryFn.mockResolvedValue([]);
-    interactionState.storedCallback = undefined;
-    interactionState.cancel.mockClear();
+    idleState.storedCallback = undefined;
+    idleState.cancel.mockClear();
     await act(async () => {
       await i18n.changeLanguage('ar');
     });
-    // The fresh mount captured a new interaction callback and the old
+    // The fresh mount captured a new idle callback and the old
     // screen's handle was cancelled on unmount.
-    expect(interactionState.storedCallback).toBeTypeOf('function');
-    expect(interactionState.cancel).toHaveBeenCalled();
+    expect(idleState.storedCallback).toBeTypeOf('function');
+    expect(idleState.cancel).toHaveBeenCalled();
 
-    flushInteractions();
+    flushIdle();
     await waitFor(() => nodeCountWithChildren(renderer.root, 'Text', 'الوكلاء') === 1);
 
     // Section headers read from the Arabic resource, proving the fresh mount
@@ -111,13 +111,13 @@ describe('ProfileRoute language remount', () => {
 
     expect(findConfigureRows(renderer.root, 'GitHub')[0]?.props.subtitle).toBe('dev@kilo.ai');
 
-    // The remount re-runs the interaction deferral on the fresh scene.
-    interactionState.storedCallback = undefined;
-    interactionState.cancel.mockClear();
+    // The remount re-runs the idle deferral on the fresh scene.
+    idleState.storedCallback = undefined;
+    idleState.cancel.mockClear();
     await act(async () => {
       await i18n.changeLanguage('de');
     });
-    expect(interactionState.storedCallback).toBeTypeOf('function');
+    expect(idleState.storedCallback).toBeTypeOf('function');
 
     // Cached rows survive the remount (the query client is shared), so the
     // fresh scene paints data immediately instead of a skeleton.

@@ -661,7 +661,7 @@ export function generateEphemeralDeploymentSlug(): string {
 /**
  * Generate a pronounceable deployment slug.
  *
- * - App-builder deployments (repoName is null): `adjective-noun-NNNN`
+ * - Deployments without a repository name: `adjective-noun-NNNN`
  * - Regular deployments: `repoName-NNNN` (repoName truncated to fit 63-char limit)
  */
 export function generateDeploymentSlug(repoName: string | null): string {

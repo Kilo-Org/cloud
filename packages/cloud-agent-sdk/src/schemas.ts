@@ -13,6 +13,15 @@ export const cloudAgentEventSchema = z.object({
 });
 export type CloudAgentEvent = z.infer<typeof cloudAgentEventSchema>;
 
+/**
+ * Whether an untrusted WebSocket frame is a cloud agent event. The schema is
+ * the only definition of the envelope, so this guard cannot drift from the
+ * validation `normalize()` applies.
+ */
+export function isValidCloudAgentEvent(event: unknown): event is CloudAgentEvent {
+  return cloudAgentEventSchema.safeParse(event).success;
+}
+
 export const cloudWorktreeChangesReadyDataSchema = z
   .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
   .strict();
@@ -30,6 +39,17 @@ export const streamErrorSchema = z.object({
   message: z.string(),
 });
 export type StreamError = z.infer<typeof streamErrorSchema>;
+
+/**
+ * Error code of a WebSocket protocol error. These match the WS_* codes from
+ * cloud-agent-next/src/websocket/types.ts, as the schema's enum does.
+ */
+export type StreamErrorCode = StreamError['code'];
+
+/** Whether an untrusted WebSocket frame carries a stream error. */
+export function isStreamError(data: unknown): data is StreamError {
+  return streamErrorSchema.safeParse(data).success;
+}
 
 const KNOWN_SESSION_STATUS_TYPES = [
   'busy',
@@ -108,27 +128,6 @@ export const cloudStatusSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('error'), message: z.string() }),
 ]);
 export type CloudStatus = z.infer<typeof cloudStatusSchema>;
-
-export const questionPayloadSchema = z
-  .object({
-    requestId: z.string(),
-    callId: z.string().optional(),
-    questions: z.array(z.record(z.string(), z.unknown())).optional(),
-  })
-  .passthrough();
-export type QuestionState = z.infer<typeof questionPayloadSchema>;
-
-export const permissionPayloadSchema = z
-  .object({
-    requestId: z.string(),
-    callId: z.string().optional(),
-    permission: z.string(),
-    patterns: z.array(z.string()),
-    metadata: z.record(z.string(), z.unknown()).optional().default({}),
-    always: z.array(z.string()).optional().default([]),
-  })
-  .passthrough();
-export type PermissionState = z.infer<typeof permissionPayloadSchema>;
 
 export const REMOTE_MODEL_MAX_PROVIDERS = 64;
 export const REMOTE_MODEL_MAX_MODELS_PER_PROVIDER = 512;

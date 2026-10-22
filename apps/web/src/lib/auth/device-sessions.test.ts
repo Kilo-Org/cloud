@@ -6,16 +6,19 @@ import {
   kilocode_users,
   organizations,
   user_auth_provider,
+  native_attested_keys,
 } from '@kilocode/db/schema';
 import type { Organization } from '@workos-inc/node';
 import { and, eq, getTableName, isNotNull, isNull, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import {
   createDeviceSession,
+  createDeviceSessionWithAttestedKey,
   issueSessionCredentials,
   rotateRefreshToken,
   revokeDeviceSession,
 } from './device-sessions';
+import { KeyCollisionError } from './native-admission';
 import type { User } from '@kilocode/db/schema';
 import {
   isEmailBlacklistedByDomainAsync,
@@ -779,6 +782,94 @@ describe('device-sessions', () => {
       expect(retry.ok).toBe(true);
       if (retry.ok) {
         expect(retry.refreshToken).not.toBe(refreshToken);
+      }
+    });
+  });
+
+  describe('createDeviceSessionWithAttestedKey', () => {
+    const keyId = `ios-key-${Date.now()}`;
+
+    test('persists the key, the session, and the refresh token together', async () => {
+      const result = await createDeviceSessionWithAttestedKey({
+        userId: testUserId,
+        userAgent: 'attested-agent',
+        user: fakeUser,
+        verification: {
+          ok: true,
+          platform: 'ios',
+          keyId,
+          publicKey: 'c3BraS1wdWJsaWMta2V5',
+        },
+      });
+
+      const [key] = await db
+        .select()
+        .from(native_attested_keys)
+        .where(
+          and(eq(native_attested_keys.key_id, keyId), eq(native_attested_keys.platform, 'ios'))
+        );
+      expect(key?.kilo_user_id).toBe(testUserId);
+      expect(key?.public_key).toBe('c3BraS1wdWJsaWMta2V5');
+
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, result.sessionId));
+      expect(session?.kilo_user_id).toBe(testUserId);
+      expect(session?.user_agent).toBe('attested-agent');
+
+      const refreshRows = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, result.sessionId));
+      expect(refreshRows).toHaveLength(1);
+      expect(refreshRows[0]!.token_hash).toBe(
+        createHash('sha256').update(result.refreshToken).digest('hex')
+      );
+      expect(result.expiresIn).toBe(3600);
+      expect(result.token.length).toBeGreaterThan(0);
+    });
+
+    test('refuses a key already bound to another account and leaves no session', async () => {
+      const otherUserId = `test-user-ds-other-${Date.now()}`;
+      await db.insert(kilocode_users).values({
+        id: otherUserId,
+        google_user_email: `test-ds-other-${Date.now()}@example.com`,
+        google_user_name: 'Other User',
+        google_user_image_url: 'https://example.com/avatar.jpg',
+        stripe_customer_id: 'cus_test_other',
+      });
+
+      try {
+        await createDeviceSessionWithAttestedKey({
+          userId: otherUserId,
+          user: fakeUser,
+          verification: { ok: true, platform: 'ios', keyId, publicKey: 'Zmlyc3Q=' },
+        });
+
+        await expect(
+          createDeviceSessionWithAttestedKey({
+            userId: testUserId,
+            user: fakeUser,
+            verification: { ok: true, platform: 'ios', keyId, publicKey: 'c2Vjb25k' },
+          })
+        ).rejects.toThrow(KeyCollisionError);
+
+        const [key] = await db
+          .select()
+          .from(native_attested_keys)
+          .where(
+            and(eq(native_attested_keys.key_id, keyId), eq(native_attested_keys.platform, 'ios'))
+          );
+        expect(key?.kilo_user_id).toBe(otherUserId);
+
+        const sessions = await db
+          .select()
+          .from(device_sessions)
+          .where(eq(device_sessions.kilo_user_id, testUserId));
+        expect(sessions).toHaveLength(0);
+      } finally {
+        await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));
       }
     });
   });

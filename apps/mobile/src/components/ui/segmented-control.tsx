@@ -42,26 +42,25 @@ export function SegmentedControl<T extends string>({
               onChange(option.value);
             }}
             className={cn(
-              // px-2 (not px-3): equal-width segments are narrow on a phone, and
-              // the longest reference label ("Commit and push") otherwise wraps
-              // to two lines while its sibling stays on one. The tighter inset
-              // keeps every option label on a single line.
-              'min-h-11 flex-1 items-center justify-center rounded-md px-2 active:opacity-70',
+              // No `items-center` here: a centred Text child is sized to its
+              // content, so a label wider than its segment overflows and gets
+              // clipped instead of wrapping. Stretching the child to the segment
+              // width is what lets the label wrap inside the pill.
+              //
+              // `py-2` (with `min-h-11`) leaves a one-line segment at 44dp and a
+              // two-line segment at 56dp, so a wrapped label keeps its vertical
+              // insets instead of touching the edges.
+              'min-h-11 flex-1 justify-center rounded-md px-2 py-2 active:opacity-70',
               selected && 'bg-background'
             )}
           >
-            {/* One line per option: a wrapped label makes the two choices
-                uneven, so the equal-width segments render at unequal height
-                and weight. `numberOfLines` + `adjustsFontSizeToFit` keeps a
-                longer label ("Commit and push") on one line at every width and
-                font scale — the platform shrinks the font to fit rather than
-                truncating, so the label stays readable — and a label that still
-                overflows ellipsizes. Longer locales shrink to fit instead of
-                growing a second line; the radio's accessibilityLabel still
-                carries the full text. */}
+            {/* Every option shows its full label: no line cap, no font shrink
+                and no ellipsis. A label longer than its equal-width segment
+                wraps onto as many lines as it needs, and the row's default
+                `alignItems: stretch` keeps every segment the same height, so a
+                wrapped choice never looks uneven next to a short one. The
+                radio's accessibilityLabel carries the same full text. */}
             <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
               className={cn(
                 'text-center text-sm',
                 selected ? 'font-medium text-foreground' : 'text-muted-foreground'

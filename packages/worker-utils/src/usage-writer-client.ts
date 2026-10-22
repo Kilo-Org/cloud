@@ -69,10 +69,7 @@ export async function recordUsage(
     if (!response.ok) return unavailable('http_error', response.status);
     if (!response.body) return unavailable('invalid_response');
 
-    const body = await readBoundedStream(
-      response.body as ReadableStream<Uint8Array>,
-      MAX_WRITER_RESPONSE_BYTES
-    );
+    const body = await readBoundedStream(response.body, MAX_WRITER_RESPONSE_BYTES);
     if (!body.ok) return unavailable('invalid_response');
     const value: unknown = JSON.parse(
       new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body.bytes)

@@ -279,6 +279,11 @@ To test Stripe integration locally:
 
 If the Stripe CLI is not installed, `pnpm dev:start` skips webhook forwarding. To run only the webhook forwarder manually, use `pnpm --filter web stripe`.
 
+The route response contract is covered by
+`pnpm --filter web test src/app/api/stripe/webhook/route.test.ts --runInBand`.
+The suite uses locally generated SDK signatures and isolated event-processing
+and diagnostic dependencies; it does not require Stripe CLI forwarding.
+
 ## Database Schema Changes
 
 1. Edit the schema in `packages/db/src/schema.ts`

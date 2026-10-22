@@ -146,14 +146,9 @@ function encryptRecord(
  * On update, `existing` carries the previously stored encrypted envelopes
  * so keys left as the masked placeholder round-trip unchanged.
  *
- * Stored secrets stay bound to the destination they were configured for.
- * For remote servers the destination is `url`; for local servers it is the
- * full argv `command` plus the set of environment keys (an endpoint is
- * commonly supplied through an env var, so a key set change is a destination
- * change). When an update changes any of these, every value must be supplied
- * again, and a submission that still carries the placeholder value fails with
- * the package's request error format. Create has no stored row, so its
- * behavior is unchanged.
+ * Local configuration consistency includes the full command argv and all
+ * environment entries. Remote configuration consistency uses the URL.
+ * Create has no stored configuration to compare.
  */
 function buildStoredConfig(
   publicKeyBase64: string,
@@ -172,7 +167,9 @@ function buildStoredConfig(
       existing.environment !== undefined &&
       Object.keys(existing.environment).length === Object.keys(input.config.environment).length &&
       Object.entries(input.config.environment).every(
-        ([key]) => existing.environment?.[key] !== undefined
+        ([key, value]) =>
+          existing.environment?.[key] !== undefined &&
+          (value === MASKED_SECRET_VALUE || value === existing.environment[key])
       );
     const carriesPlaceholder =
       input.config.environment !== undefined &&

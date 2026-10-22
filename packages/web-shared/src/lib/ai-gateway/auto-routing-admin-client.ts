@@ -5,7 +5,7 @@ import {
   AutoRoutingSettingsResponseSchema,
   BenchmarkProfileQuotaErrorSchema,
   type AutoRoutingMode,
-  type AutoRoutingModeOwnerType,
+  type OwnerType,
   type AutoRoutingAnalyticsPeriod,
   type AutoRoutingSettingsResponse,
   type EfficientModelPool,
@@ -64,10 +64,7 @@ export function getAutoRoutingClassifierAnalytics(period: AutoRoutingAnalyticsPe
   );
 }
 
-export function getAutoRoutingMode(owner: {
-  ownerType: AutoRoutingModeOwnerType;
-  ownerId: string;
-}) {
+export function getAutoRoutingMode(owner: { ownerType: OwnerType; ownerId: string }) {
   const searchParams = new URLSearchParams(owner);
   return fetchAutoRoutingAdmin(
     `/admin/routing-mode?${searchParams}`,
@@ -79,7 +76,7 @@ export function getAutoRoutingMode(owner: {
 }
 
 export function updateAutoRoutingMode(owner: {
-  ownerType: AutoRoutingModeOwnerType;
+  ownerType: OwnerType;
   ownerId: string;
   mode: AutoRoutingMode | null;
 }) {
@@ -158,7 +155,7 @@ async function fetchAutoRoutingSettingsAdmin(
 }
 
 export function getAutoRoutingSettings(owner: {
-  ownerType: AutoRoutingModeOwnerType;
+  ownerType: OwnerType;
   ownerId: string;
 }): Promise<AutoRoutingSettingsWorkerResult> {
   const searchParams = new URLSearchParams(owner);
@@ -168,7 +165,7 @@ export function getAutoRoutingSettings(owner: {
 }
 
 export function updateAutoRoutingSettings(params: {
-  ownerType: AutoRoutingModeOwnerType;
+  ownerType: OwnerType;
   ownerId: string;
   mode: AutoRoutingMode | null;
   pool: EfficientModelPool | null;

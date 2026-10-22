@@ -3,7 +3,7 @@ import {
   AutoRoutingSettingsResponseSchema,
   BenchmarkProfileQuotaErrorSchema,
   UpdateAutoRoutingSettingsRequestSchema,
-  type AutoRoutingModeOwnerType,
+  type OwnerType,
   type AutoRoutingSettingsResponse,
 } from '@kilocode/auto-routing-contracts';
 import { TRPCError } from '@trpc/server';
@@ -49,7 +49,7 @@ async function resolveOwner(
   roles?: Parameters<typeof ensureOrganizationAccess>[2]
 ): Promise<
   | {
-      ownerType: AutoRoutingModeOwnerType;
+      ownerType: OwnerType;
       ownerId: string;
       userId: string;
       organizationId: string | null;

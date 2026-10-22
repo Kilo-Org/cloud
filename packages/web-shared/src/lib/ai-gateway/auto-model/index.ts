@@ -12,7 +12,7 @@ import {
   customRouterModelId,
   isCustomRouterModelId,
   type AutoRouter,
-  type CustomRouterScope,
+  type OwnerType,
 } from '@kilocode/auto-routing-contracts';
 
 export type AutoModelPricing = {
@@ -139,7 +139,7 @@ export const AUTO_MODELS = [
 ];
 
 export function customRouterAutoModel(router: {
-  scope: CustomRouterScope;
+  scope: OwnerType;
   slug: string;
   name: string;
   baseRouter: AutoRouter;

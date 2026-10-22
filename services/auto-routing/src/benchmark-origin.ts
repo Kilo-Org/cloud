@@ -13,7 +13,7 @@ import {
   DEFAULT_AUTO_ROUTER,
   customRouterEntryKey,
   type AutoRouter,
-  type AutoRoutingModeOwnerType,
+  type OwnerType,
   type BenchmarkProfileStatusesResponse,
   type ClassifierWinner,
   type CustomRouterBenchmarkContext,
@@ -28,7 +28,7 @@ import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
 
 type BenchmarkEnv = Pick<Env, 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'>;
 
-type BenchmarkOwner = { ownerType: AutoRoutingModeOwnerType; ownerId: string };
+type BenchmarkOwner = { ownerType: OwnerType; ownerId: string };
 
 export class BenchmarkProfileQuotaError extends Error {
   readonly retryAt: string;

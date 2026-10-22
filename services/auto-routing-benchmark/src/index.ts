@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { AUTO_ROUTERS, POLICY_SETTING_KEYS } from '@kilocode/auto-routing-contracts';
+import { AUTO_ROUTERS } from '@kilocode/auto-routing-contracts';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
@@ -89,9 +89,8 @@ export default {
           );
           if (computed) {
             const computedValues: Record<string, unknown> = {};
-            for (const key of POLICY_SETTING_KEYS) {
-              const record = computed[key];
-              if (record) computedValues[key] = { value: record.value, source: record.source };
+            for (const [key, record] of Object.entries(computed)) {
+              computedValues[key] = { value: record.value, source: record.source };
             }
             console.log(
               JSON.stringify({

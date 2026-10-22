@@ -3,7 +3,7 @@ import {
   DEFAULT_AUTO_ROUTING_MODE,
   UpdateAutoRoutingModeRequestSchema,
   type AutoRoutingMode,
-  type AutoRoutingModeOwnerType,
+  type OwnerType,
   type AutoRoutingModeResponse,
 } from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
@@ -11,7 +11,7 @@ import { readConfiguredAutoRoutingMode, setAutoRoutingMode } from './routing-mod
 import type { HonoEnv } from './hono-env';
 
 function responseBody(params: {
-  ownerType: AutoRoutingModeOwnerType;
+  ownerType: OwnerType;
   ownerId: string;
   configuredMode: AutoRoutingMode | null;
 }): AutoRoutingModeResponse {

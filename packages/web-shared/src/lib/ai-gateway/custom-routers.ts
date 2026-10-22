@@ -1,10 +1,10 @@
-import type { CustomRouterDefinition, CustomRouterScope } from '@kilocode/auto-routing-contracts';
+import type { CustomRouterDefinition, OwnerType } from '@kilocode/auto-routing-contracts';
 import { auto_routing_custom_routers, type AutoRoutingCustomRouter } from '@kilocode/db/schema';
 import { and, asc, eq, or } from 'drizzle-orm';
 import { db, readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 
-export type CustomRouterOwner = { type: CustomRouterScope; id: string };
+export type CustomRouterOwner = { type: OwnerType; id: string };
 
 export function customRouterOwnerCondition(owner: CustomRouterOwner) {
   return owner.type === 'user'

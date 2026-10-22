@@ -1,6 +1,6 @@
 import {
   CustomRouterEntriesSchema,
-  CustomRouterScopeSchema,
+  OwnerTypeSchema,
   DEFAULT_AUTO_ROUTING_MODE,
   MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST,
   OWNER_POOL_CONVERSION_ATTENTION_OUTCOMES,
@@ -8,7 +8,7 @@ import {
   OwnerPoolConversionOutcomeSchema,
   OwnerPoolConversionResponseSchema,
   convertedOwnerPoolRouter,
-  type CustomRouterScope,
+  type OwnerType,
   type OwnerPoolConversion,
   type OwnerPoolConversionOutcome,
   type OwnerPoolConversionResult,
@@ -36,7 +36,7 @@ const PAGE_POST_BUDGET_MS = 150_000;
 type AbortReason = 'batch_failed' | 'consecutive_failures';
 
 const ScanRequestSchema = z.object({
-  ownerType: CustomRouterScopeSchema,
+  ownerType: OwnerTypeSchema,
   objectIds: z.array(z.string().regex(/^[0-9a-f]{64}$/)),
   after: z.string().min(1).nullable(),
   limit: z.number().int().min(1).max(10_000).default(2_000),
@@ -48,7 +48,7 @@ const ScanRequestSchema = z.object({
 export type OwnerObjectMatch = { ownerId: string; objectId: string };
 
 export function matchOwnerObjects(
-  ownerType: CustomRouterScope,
+  ownerType: OwnerType,
   ownerIds: readonly string[],
   objectIds: ReadonlySet<string>,
   idFor: (name: string) => string
@@ -61,7 +61,7 @@ export function matchOwnerObjects(
 
 async function listOwnerIds(
   env: Env,
-  ownerType: CustomRouterScope,
+  ownerType: OwnerType,
   after: string | null,
   limit: number
 ): Promise<string[]> {
@@ -158,7 +158,7 @@ export async function postOwnerPoolConversions(
 
 export async function migrateOwnerPoolForSettings(
   env: Env,
-  owner: { ownerType: CustomRouterScope; ownerId: string },
+  owner: { ownerType: OwnerType; ownerId: string },
   requested: AutoRoutingOwnerSettings
 ): Promise<OwnerPoolConversionOutcome | null> {
   const namespace = env.AUTO_ROUTING_MODE_CONFIG;

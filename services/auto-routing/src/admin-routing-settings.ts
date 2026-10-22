@@ -5,7 +5,7 @@ import {
   DEFAULT_AUTO_ROUTING_MODE,
   UpdateAutoRoutingSettingsRequestSchema,
   type AutoRoutingMode,
-  type AutoRoutingModeOwnerType,
+  type OwnerType,
   type AutoRoutingSettingsResponse,
   type BenchmarkProfileEntryStatus,
   type EfficientModelPool,
@@ -26,7 +26,7 @@ const MIGRATED_ROUTING_SETTINGS_ERROR =
   'Edit migrated pools in custom router settings and platform mode at /admin/routing-mode.';
 
 function settingsResponse(params: {
-  ownerType: AutoRoutingModeOwnerType;
+  ownerType: OwnerType;
   ownerId: string;
   configuredMode: AutoRoutingMode | null;
   configuredPool: EfficientModelPool | null;

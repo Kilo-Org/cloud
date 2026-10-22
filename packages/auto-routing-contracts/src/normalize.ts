@@ -16,9 +16,10 @@ const TRUNCATED_KEY = '[truncated]';
 // consumed per visited node and per object property, and traversal stops
 // (with a truncation sentinel) the moment it runs out.
 const PROVIDER_HINTS_MAX_NODES = 512;
+// Keys are compared after every non-alphanumeric character is stripped and the
+// result is lowercased, so each pattern is written in that same normalized form.
 const SENSITIVE_KEY_PATTERNS = [
   'authorization',
-  'api_key',
   'apikey',
   'cookie',
   'credential',

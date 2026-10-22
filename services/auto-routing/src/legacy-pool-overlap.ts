@@ -2,7 +2,7 @@ import {
   DEFAULT_AUTO_ROUTING_MODE,
   EfficientModelPoolSchema,
   type AutoRoutingMode,
-  type AutoRoutingModeOwnerType,
+  type OwnerType,
   type CustomRouterDefinition,
 } from '@kilocode/auto-routing-contracts';
 import { findLegacyPoolRouter } from './custom-router-store';
@@ -13,7 +13,7 @@ import {
   type AutoRoutingOwnerSettings,
 } from './routing-mode';
 
-type Owner = { ownerType: AutoRoutingModeOwnerType; ownerId: string };
+type Owner = { ownerType: OwnerType; ownerId: string };
 type OverlapEnv = Pick<Env, 'AUTO_ROUTING_MODE_CONFIG' | 'HYPERDRIVE'>;
 
 export type LegacyPoolRouting = AutoRoutingOwnerSettings & {

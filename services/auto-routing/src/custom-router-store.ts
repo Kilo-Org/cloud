@@ -1,7 +1,7 @@
 import {
   CustomRouterDefinitionSchema,
   type CustomRouterDefinition,
-  type CustomRouterScope,
+  type OwnerType,
 } from '@kilocode/auto-routing-contracts';
 import {
   auto_routing_custom_routers,
@@ -14,7 +14,7 @@ import { and, eq, type SQL } from 'drizzle-orm';
 const CUSTOM_ROUTER_CACHE_TTL_MS = 30_000;
 const CUSTOM_ROUTER_CACHE_LIMIT = 2_000;
 
-export type CustomRouterOwner = { type: CustomRouterScope; id: string };
+export type CustomRouterOwner = { type: OwnerType; id: string };
 
 type CacheEntry = { expiresAt: number; value: Promise<CustomRouterDefinition | null> };
 

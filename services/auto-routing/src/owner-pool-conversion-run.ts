@@ -1,15 +1,15 @@
 import {
   OwnerPoolConversionOutcomeSchema,
   OwnerPoolConversionScanResponseSchema,
-  type CustomRouterScope,
+  type OwnerType,
   type OwnerPoolConversionOutcome,
   type OwnerPoolConversionScanResponse,
 } from '@kilocode/auto-routing-contracts';
 
-export const OWNER_TYPES = ['user', 'org'] as const satisfies readonly CustomRouterScope[];
+export const OWNER_TYPES = ['user', 'org'] as const satisfies readonly OwnerType[];
 
 export type ScanPageRequest = {
-  ownerType: CustomRouterScope;
+  ownerType: OwnerType;
   after: string | null;
   consecutiveFailed: number;
 };
@@ -26,7 +26,7 @@ export type ConversionRunResult = {
 
 export async function runOwnerPoolConversion(params: {
   objectIds: readonly string[];
-  resume: { ownerType: CustomRouterScope; cursor: string | null } | null;
+  resume: { ownerType: OwnerType; cursor: string | null } | null;
   dryRun: boolean;
   scan: ScanPage;
   log: (line: string) => void;

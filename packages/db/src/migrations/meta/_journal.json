@@ -2073,6 +2073,13 @@
       "when": 1792684800197,
       "tag": "0295_tiresome_champions",
       "breakpoints": true
+    },
+    {
+      "idx": 296,
+      "version": "7",
+      "when": 1792696626920,
+      "tag": "0296_jittery_sersi",
+      "breakpoints": true
     }
   ]
 }

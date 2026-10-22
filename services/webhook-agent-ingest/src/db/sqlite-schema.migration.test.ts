@@ -49,7 +49,38 @@ function insertLegacyRows(db: DatabaseSync, includeVariant: boolean): void {
   }
 }
 
-describe('trigger config sandbox allocation migration', () => {
+describe('trigger config migrations', () => {
+  it('adds a nullable execution identity while preserving legacy webhook and scheduled configurations', async () => {
+    const db = new DatabaseSync(':memory:');
+    try {
+      for (const filename of [
+        '0000_lumpy_loners.sql',
+        '0001_dear_tombstone.sql',
+        '0002_first_mephisto.sql',
+        '0003_sparkling_kate_bishop.sql',
+        '0004_bumpy_firebird.sql',
+      ]) {
+        await executeMigration(db, filename);
+      }
+      insertLegacyRows(db, true);
+      const before = db.prepare('SELECT * FROM trigger_config ORDER BY trigger_id').all() as Row[];
+      await executeMigration(db, '0005_open_morph.sql');
+      const after = db.prepare('SELECT * FROM trigger_config ORDER BY trigger_id').all() as Row[];
+      expect(after).toEqual(before.map(row => ({ ...row, execution_user_id: null })));
+      db.prepare('UPDATE trigger_config SET execution_user_id = ? WHERE trigger_id = ?').run(
+        'oauth/creator',
+        'legacy-webhook'
+      );
+      expect(
+        db
+          .prepare('SELECT execution_user_id FROM trigger_config WHERE trigger_id = ?')
+          .get('legacy-webhook')
+      ).toMatchObject({ execution_user_id: 'oauth/creator' });
+    } finally {
+      db.close();
+    }
+  });
+
   it('preserves legacy webhook and scheduled rows when migrating from 0002 to 0003', async () => {
     const db = new DatabaseSync(':memory:');
     try {

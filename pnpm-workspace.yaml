@@ -5,8 +5,6 @@ packages:
   - services/gastown/container
   - services/kiloclaw/controller
   - services/kiloclaw/plugins/*
-  - services/deploy-infra/builder
-  - services/deploy-infra/dispatcher
   - packages/*
 
 catalog:
@@ -25,9 +23,9 @@ catalog:
   # mobile). Must NOT be added to `overrides`: the Sentry bundler plugins consume
   # @sentry/cli through its Node API, which v3 broke. See the note in `overrides`.
   '@sentry/cli': 3.6.2
-  '@tanstack/query-async-storage-persister': 5.100.10
-  '@tanstack/react-query': 5.100.10
-  '@tanstack/react-query-persist-client': 5.100.10
+  '@tanstack/query-async-storage-persister': 5.104.3
+  '@tanstack/react-query': 5.104.3
+  '@tanstack/react-query-persist-client': 5.104.3
   '@trpc/client': 11.19.0
   '@trpc/server': 11.19.0
   '@trpc/tanstack-react-query': 11.19.0
@@ -99,15 +97,6 @@ minimumReleaseAgeExclude:
   # agent transcript list is exactly that shape. Patch release; exempted so the
   # contract test's pin can move off 2.3.2 without waiting out minimumReleaseAge.
   - '@shopify/flash-list@2.3.3'
-  # react-native-keyboard-controller's 1.22.3 release notes carry the
-  # KeyboardChatScrollView fixes this phase depends on (crash on unmount,
-  # overscroll during interactive dismissal on iOS, propagation view surfaceId
-  # for focused input events inside a Modal). 1.22.6 is the latest patch. Expo
-  # SDK 57 pins 1.21.9, which predates all three, so the pin is overridden with
-  # the same mechanism flash-list uses.
-  - react-native-keyboard-controller@1.22.6
-  # react-native-enriched-markdown 1.1.0 adds onImagePress/onCodeBlockPress, which the transcript markdown cutover wires.
-  - react-native-enriched-markdown@1.1.0
   # react-native-reanimated 4.7.1 carries the stability fixes the app needs
   # (synchronously updated props reset, Android crashes, layout animations).
   # Approved early exception; worklets 0.13.0 is its required pair and is old
@@ -119,12 +108,15 @@ overrides:
   # being assignable to each other across workspace imports.
   pg: 8.23.1
   # Do NOT add an '@sentry/cli' override here to dedupe it against the catalog.
-  # @sentry/bundler-plugin-core (used by @sentry/nextjs to upload source maps)
-  # requires ^2.58.5 and calls @sentry/cli through its Node API. v3 replaced the
+  # @sentry/react-native pulls @sentry/bundler-plugins@10, which requires
+  # @sentry/cli ^2.58.5 and calls it through its Node API. v3 replaced the
   # CommonJS default class export with a named one, so forcing v3 makes every
   # `new SentryCli()` throw "_sentry_cli.default is not a constructor". The plugin
   # swallows that as a recoverable error, so builds stay green while silently
   # uploading nothing. This previously broke apps/web source maps for months.
+  # @sentry/nextjs 11 no longer consumes @sentry/cli (its bundler plugin uses the
+  # separate `sentry` CLI package), so the web path no longer relies on this rule;
+  # the mobile path still does.
   '@babel/plugin-transform-modules-systemjs': 7.29.7
   '@babel/core': 7.29.7
   mdast-util-to-hast: 13.2.1
@@ -134,7 +126,6 @@ overrides:
   adm-zip: 0.6.1
   baseline-browser-mapping: 2.11.20
   browserslist: 4.28.7
-  decode-uri-component: 0.5.0
   glob: '>=13.0.1'
   google-auth-library: 10.6.2
   esbuild: '>=0.28.1'
@@ -213,42 +204,48 @@ overrides:
   # its own WebClient, so the versions must agree. 7.x is the ceiling until
   # @chat-adapter/slack moves to @slack/web-api 8.
   '@slack/web-api': 7.19.0
-  # Direct `@expo/ui@57.0.21` (expo-widgets peer) and expo-router's `^57.0.21`
-  # otherwise resolve to two native-module copies. Force one version.
-  '@expo/ui': 57.0.21
+  # Keep the app, widgets peer and router on one native-module copy.
+  '@expo/ui': 58.0.17
 packageExtensions:
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
   # under pnpm's isolated linker (autoInstallPeers is false).
   '@sentry/react-native':
     dependencies:
       '@expo/config-plugins': '*'
-      # SDK 57 (RN 0.86): metro is no longer in react-native's own dep tree, so
-      # @sentry/react-native/metro's vendored `require('metro/...')` has no
-      # resolution path. Pin the exact metro the SDK 57 graph already uses.
-      metro: 0.84.4
+      # React Native does not expose Metro to Sentry's vendored require calls.
+      # Pin the exact Metro used by the SDK 58 @expo/metro graph.
+      metro: 0.87.1
   expo-share-intent:
     dependencies:
       '@expo/plist': '*'
   react-native-appsflyer:
     dependencies:
       '@expo/config-plugins': '*'
+  # Native ref declarations must use the app's React type identity.
+  react-native-screens:
+    peerDependencies:
+      '@types/react': '*'
+  '@rn-primitives/slot':
+    peerDependencies:
+      '@types/react': '*'
+  react-native-reanimated:
+    peerDependencies:
+      '@types/react': '*'
 patchedDependencies:
   # Text date styles for the glanceable widgets and Live Activity: `elapsed`
   # ("31 minutes", no seconds) and `ago` ("3 minutes ago"). Also separates a
   # bottom sheet's drag gesture from its back/scrim dismissal and lets a caller
   # veto a requested dismissal, so a scrolling form can keep its values.
-  '@expo/ui@57.0.21': patches/@expo+ui@57.0.21.patch
-  # query-string 7 requires this dependency as CommonJS. Keep the 0.5.0 security fix.
-  decode-uri-component@0.5.0: patches/decode-uri-component@0.5.0.patch
-  expo-dev-launcher@57.0.20: patches/expo-dev-launcher@57.0.20.patch
+  '@expo/ui@58.0.17': patches/@expo+ui@58.0.17.patch
+  expo-dev-launcher@58.0.14: patches/expo-dev-launcher@58.0.14.patch
   # A zero badge count must not cancel every app notification: upstream called
   # cancelAll(), which removed the ongoing Active Agents card on Android.
-  expo-notifications@57.0.21: patches/expo-notifications@57.0.21.patch
+  expo-notifications@58.1.4: patches/expo-notifications@58.1.4.patch
   # Repo-local features the SDK lacks, carried onto each SDK patch release:
-  # router — unhandled deep links when getInitialURL resolves later;
+  # router — rank static-suffix siblings before catch-all index routes;
   # widgets — Live Activity state query (getInfo), areLiveActivitiesEnabled,
   # includeEnded instance reads, factory-registered push-to-start URL.
-  expo-router@57.0.24: patches/expo-router@57.0.24.patch
+  expo-router@58.0.19: patches/expo-router@58.0.19.patch
   # Typed-routes generation must skip colocated tests, exactly like the Metro
   # blockList in apps/mobile/metro.config.js already does for the runtime
   # bundle. A `*.test.tsx` next to a route registers as a route, and a
@@ -256,7 +253,7 @@ patchedDependencies:
   # layout; the generator then drops the group's entire subtree, so every
   # `(tabs)` route vanishes from the generated `Href` union and typecheck
   # rejects valid navigations.
-  '@expo/router-server@57.0.11': patches/@expo+router-server@57.0.11.patch
+  '@expo/router-server@58.0.13': patches/@expo+router-server@58.0.13.patch
   # workerd has no undici ALPN support and the bundle must not read package.json
   # at runtime: use globalThis.fetch and inline the SDK version the push request
   # headers report. The patch hard-codes 6.1.0, so it is pinned to that release
@@ -266,12 +263,12 @@ patchedDependencies:
   # loader destroyed the host after each background task, and a destroyed host
   # keeps its native memory, so each background push or refresh added a new
   # instance until a native allocation aborted the process (KILO-APP-3EF).
-  expo-modules-core@57.0.20: patches/expo-modules-core@57.0.20.patch
+  expo-modules-core@58.0.18: patches/expo-modules-core@58.0.18.patch
   # Null-guard the headless app loader in TaskService.executeTask. Without it a
   # data-only FCM wake during cold start dereferences a null loader and fatally
   # crashes the app (KILO-APP-9V; expo/expo#41663, expo/expo#46449).
-  expo-task-manager@57.0.21: patches/expo-task-manager@57.0.21.patch
-  expo-widgets@57.0.22: patches/expo-widgets@57.0.22.patch
+  expo-task-manager@58.0.11: patches/expo-task-manager@58.0.11.patch
+  expo-widgets@58.0.17: patches/expo-widgets@58.0.17.patch
   # PurchaseConnector.create returns the native promise, so a create failure
   # is observable. Android: compile against the project's Kotlin stdlib, not
   # the 2.4.10 default that RN 0.86's Kotlin 2.1 compiler cannot read. The
@@ -284,15 +281,13 @@ patchedDependencies:
   # KILO-APP-6H; react/react-native#58299). Also synchronizes the
   # LegacyViewManagerInterop cache. iOS needs buildReactNativeFromSource to
   # compile this in — see apps/mobile/app.config.ts.
-  # Bounds-guard the unmountChildComponentView assert message. Without it a
-  # stale Fabric child index throws NSRangeException while the assert is being
-  # formatted, which SIGABRTs release builds that link the assert-enabled
-  # prebuilt React core (Kilo-Org/kilocode#14065; react/react-native#57865).
-  react-native@0.86.3: patches/react-native@0.86.3.patch
+  react-native@0.88.0: patches/react-native@0.88.0.patch
   # Android: read the live entry of the unique work chain, not the first one.
   # A finished first entry made a cold start re-enqueue with REPLACE, which
   # cancelled the glanceable refresh run in progress.
-  expo-background-task@57.0.21: patches/expo-background-task@57.0.21.patch
+  expo-background-task@58.0.10: patches/expo-background-task@58.0.10.patch
+  # React Native installs on-device JSI bindings through its TurboModule runtime hook.
+  llama.rn@0.12.9: patches/llama.rn@0.12.9.patch
   stripe@23.0.0: patches/stripe@23.0.0.patch
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
 publicHoistPattern:

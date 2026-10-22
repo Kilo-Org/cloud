@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { load } from 'js-yaml';
+
+const repoRoot = fileURLToPath(new URL('../', import.meta.url));
 
 const workflowPath = '.github/workflows/kilo-mcp-catalog.yml';
 const testPath = 'scripts/kilo-mcp-catalog.test.mjs';
@@ -31,6 +35,12 @@ const catalogPathFragments = [
   /kilo-mcp\/SKILL|\.kilo\/skills\//,
   /kilo-mcp-catalog\\?\.yml/,
   /kilo-mcp-catalog\\?\.test\\?\.mjs/,
+  // Router sources read zod schemas by relative path from cloud-agent-next and
+  // by package name from the workspaces below, so a schema-only change there
+  // alters catalog.json (inputSchema, tags, searchBlob) without touching
+  // apps/web. The derived test below keeps this list honest.
+  /services\/cloud-agent-next\/src\/shared\//,
+  /packages\/\(app-shared\|cloud-agent-profile\|cloud-agent-sdk\|kiloclaw-instance-tiers\|kiloclaw-secret-catalog\|organization-entitlement\|session-ingest-contracts\)\/src\//,
 ];
 // A `git diff --exit-code` that covers both committed artifacts in the order
 // the workflow writes them (catalog first, then the generated skill), so
@@ -51,6 +61,120 @@ function findStep(job, predicate, what) {
   const step = job.steps.find(predicate);
   assert.ok(step, `${job.name ?? 'job'}: ${what} must exist`);
   return step;
+}
+
+/** The `grep -Eq '…'` pattern a change-detection step runs. */
+function detectionPattern(step, jobName) {
+  const match = /\| grep -Eq '([^']+)'/.exec(step.run ?? '');
+  assert.ok(match, `${jobName}: the change-detection step must grep the changed paths with -Eq`);
+  return match[1];
+}
+
+/**
+ * Compiles a `dorny/paths-filter` entry (`**` across directories, `*` within
+ * one) into a matcher for a repo-relative path.
+ */
+function globToRegExp(glob) {
+  const escaped = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  // One pass: a `**` replaced first would leave a `*` behind for the single
+  // star rule to eat.
+  const body = escaped.replace(/\*\*\/|\*\*|\*/g, token =>
+    token === '**/' ? '(?:.*/)?' : token === '**' ? '.*' : '[^/]*'
+  );
+  return new RegExp(`^${body}$`);
+}
+
+/** Every workspace directory and its package name, per pnpm-workspace.yaml. */
+function workspaceInventory() {
+  const config = load(readFileSync(join(repoRoot, 'pnpm-workspace.yaml'), 'utf8'));
+  const dirs = new Set();
+  const expand = (prefix, tokens) => {
+    if (tokens.length === 0) {
+      if (existsSync(prefix)) dirs.add(relative(repoRoot, prefix));
+      return;
+    }
+    const [head, ...rest] = tokens;
+    if (head !== '*') {
+      expand(join(prefix, head), rest);
+      return;
+    }
+    for (const entry of readdirSync(prefix, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') {
+        continue;
+      }
+      expand(join(prefix, entry.name), rest);
+    }
+  };
+  for (const glob of config.packages ?? []) expand(repoRoot, glob.split('/'));
+
+  const byName = new Map();
+  for (const dir of dirs) {
+    const manifest = join(repoRoot, dir, 'package.json');
+    if (!existsSync(manifest)) continue;
+    const { name } = JSON.parse(readFileSync(manifest, 'utf8'));
+    if (typeof name === 'string') byName.set(name, dir);
+  }
+  return { dirs: [...dirs].sort(), byName };
+}
+
+/** The non-test sources the dump imports: the tRPC routers and the dump itself. */
+function catalogSourceFiles() {
+  const roots = ['apps/web/src/routers', 'apps/web/src/scripts/mcp-catalog'];
+  const files = [];
+  const walk = dir => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules' && !entry.name.startsWith('.')) walk(path);
+        continue;
+      }
+      if (/\.(?:ts|tsx|mts)$/.test(entry.name) && !/\.test\.(?:ts|tsx)$/.test(entry.name)) {
+        files.push(path);
+      }
+    }
+  };
+  for (const root of roots) walk(join(repoRoot, root));
+  return files;
+}
+
+/**
+ * The file a specifier reads, or null for anything outside the workspace
+ * (a third-party package). A bare `@kilocode/<pkg>[/sub]` resolves to that
+ * workspace's `src/`, which is the directory a change has to touch.
+ */
+function resolveSpecifier(specifier, fromFile, byName) {
+  if (specifier.startsWith('.')) {
+    const base = resolve(dirname(fromFile), specifier);
+    const candidates = [`${base}.ts`, `${base}.tsx`, `${base}.mts`, join(base, 'index.ts')];
+    const found = candidates.find(
+      candidate => existsSync(candidate) && statSync(candidate).isFile()
+    );
+    return found ?? (existsSync(base) ? base : null);
+  }
+  const [scope, name] = specifier.split('/');
+  if (!scope?.startsWith('@') || !name) return null;
+  const dir = byName.get(`${scope}/${name}`);
+  return dir ? join(repoRoot, dir, 'src', 'index.ts') : null;
+}
+
+/**
+ * The `kilocode_backend` filter of ci.yml. A change that matches it runs
+ * `web-test`, whose `apps/web/src/scripts/mcp-catalog/catalog.test.ts` re-dumps
+ * the catalog and fails when the committed artifact is stale — so the author
+ * regenerates it and the merge job then sees `services/kilo-mcp/`.
+ */
+function webTestFilterPaths() {
+  const ci = load(readFileSync(join(repoRoot, '.github/workflows/ci.yml'), 'utf8'));
+  const step = (ci.jobs?.changes?.steps ?? []).find(
+    candidate => typeof candidate.with?.filters === 'string'
+  );
+  assert.ok(step, 'ci.yml: the changes job must carry its filters inline');
+  const filters = load(step.with.filters);
+  assert.ok(
+    Array.isArray(filters.kilocode_backend),
+    'ci.yml: kilocode_backend must be a path list'
+  );
+  return filters.kilocode_backend;
 }
 
 function validate(workflow) {
@@ -317,6 +441,92 @@ function validate(workflow) {
     'kilo-mcp-catalog',
     'upsert targets the prod index'
   );
+  // The prune's ids come from git history, never from listing the index: a
+  // full list of the production index times out, and a single-step diff would
+  // strand the ids of a run whose prune failed.
+  const ids = findStep(
+    merge,
+    step => step.id === 'prune_ids',
+    'merge job collects every id the index was ever built from'
+  );
+  assert.equal(ids.if, mergeChangeGate, 'the id collection is gated with the upsert');
+  assert.match(
+    ids.run ?? '',
+    /git log --format=%H -- services\/kilo-mcp\/catalog\.json/,
+    'the ids come from every version of the committed catalog'
+  );
+  assert.match(ids.run ?? '', /keys\[\]/, 'each version contributes its procedure paths');
+  assert.match(ids.run ?? '', /sort -u/, 'the union is deduped');
+  // `git log` and `git show` walk every commit, so the walk's prerequisite is a
+  // full clone: without it the union silently covers only the pushed range.
+  const mergeCheckout = merge.steps.find(step =>
+    (step.uses ?? '').startsWith('useblacksmith/checkout@')
+  );
+  assert.equal(mergeCheckout?.with?.['fetch-depth'], 0, 'the history walk needs the full clone');
+  assert.match(
+    ids.run ?? '',
+    /out="\$RUNNER_TEMP\/catalog-ever-ids\.txt"/,
+    'the collection writes the id list to a file'
+  );
+  assert.match(
+    ids.run ?? '',
+    /echo "file=\$out" >> "\$GITHUB_OUTPUT"/,
+    'the collection publishes its file as the step output'
+  );
+  assert.ok(
+    merge.steps.indexOf(ids) < merge.steps.indexOf(upsert),
+    'the id list is collected before the upsert reads it'
+  );
+  assert.equal(
+    upsert.env?.MCP_CATALOG_PRUNE_IDS,
+    '${{ steps.prune_ids.outputs.file }}',
+    'the upsert prunes from the collected id list'
+  );
+  const afterIds = merge.steps.slice(merge.steps.indexOf(ids) + 1);
+  assert.equal(afterIds[0] === upsert, true, 'the upsert runs immediately after the id collection');
+}
+
+/**
+ * Paths a catalog source reads that neither the catalog job's detection pattern
+ * nor `web-test`'s `kilocode_backend` filter covers. Empty is the invariant:
+ * a change there changes `catalog.json` on main with no regenerate and no
+ * Vectorize upsert.
+ */
+function uncoveredCatalogInputs(workflow) {
+  const pr = findStep(
+    workflow.jobs[prJobName],
+    step => step.id === 'catalog_changes',
+    'PR change-detection step'
+  );
+  const mergeStep = findStep(
+    workflow.jobs[mergeJobName],
+    step => step.id === 'merge_changes',
+    'merge change-detection step'
+  );
+  const prPattern = detectionPattern(pr, prJobName);
+  assert.equal(
+    detectionPattern(mergeStep, mergeJobName),
+    prPattern,
+    'the PR and merge change-detection patterns must stay identical'
+  );
+
+  const catalogPaths = new RegExp(prPattern);
+  const webTestPaths = webTestFilterPaths().map(globToRegExp);
+  const { byName } = workspaceInventory();
+
+  const uncovered = new Set();
+  for (const file of catalogSourceFiles()) {
+    const source = readFileSync(file, 'utf8');
+    for (const match of source.matchAll(/(?:from|import\()\s*['"]([^'"]+)['"]/g)) {
+      const target = resolveSpecifier(match[1], file, byName);
+      if (!target) continue;
+      const path = relative(repoRoot, target);
+      if (catalogPaths.test(path)) continue;
+      if (webTestPaths.some(pattern => pattern.test(path))) continue;
+      uncovered.add(`${path} (read by ${relative(repoRoot, file)})`);
+    }
+  }
+  return [...uncovered].sort();
 }
 
 test('workflow file exists', () => {
@@ -328,6 +538,14 @@ test('workflow file exists', () => {
 
 test('catalog workflow wiring is valid', () => {
   validate(readWorkflow());
+});
+
+test('change detection covers every workspace a catalog source reads', () => {
+  assert.deepEqual(
+    uncoveredCatalogInputs(readWorkflow()),
+    [],
+    'add the workspace to both change-detection patterns in kilo-mcp-catalog.yml: a schema change there alters catalog.json on main with no regenerate and no Vectorize upsert'
+  );
 });
 
 for (const [name, defect] of [
@@ -572,6 +790,23 @@ for (const [name, defect] of [
     assert.throws(() => validate(workflow), assert.AssertionError);
   });
 }
+
+test('derived coverage check rejects a schema workspace dropped from the patterns', () => {
+  const workflow = readWorkflow();
+  for (const [jobName, stepId] of [
+    [prJobName, 'catalog_changes'],
+    [mergeJobName, 'merge_changes'],
+  ]) {
+    const step = workflow.jobs[jobName].steps.find(item => item.id === stepId);
+    const widened = step.run.replaceAll('^packages/(app-shared|', '^packages/(not-app-shared|');
+    assert.notEqual(widened, step.run, `${jobName}: the app-shared alternative must exist`);
+    step.run = widened;
+  }
+  assert.ok(
+    uncoveredCatalogInputs(workflow).some(entry => entry.startsWith('packages/app-shared/src/')),
+    'dropping app-shared from the patterns must be reported as uncovered'
+  );
+});
 
 function dropStep(workflow, jobName, predicate) {
   const job = workflow.jobs[jobName];

@@ -14,6 +14,7 @@ import {
   sandboxAllocationRequestSchema,
   selectableSandboxAllocationInputSchema,
   isSelectableSandboxAllocation,
+  isSandboxAllocationAvailable,
   sandboxAllocationRequiresControlPlane,
   sandboxAllocationSchema,
   sandboxSelectionCapabilitiesSchema,
@@ -21,6 +22,33 @@ import {
 } from './sandbox-allocation.js';
 
 describe('sandbox allocation contract', () => {
+  it.each(['isolated-standard', 'cloudflare-single'] as const)(
+    'allows legacy %s without a picker option only for an enabled owner',
+    allocation => {
+      expect(isSandboxAllocationAvailable({ enabled: true, options: [] }, allocation)).toBe(true);
+      expect(isSandboxAllocationAvailable({ enabled: false, options: [] }, allocation)).toBe(false);
+    }
+  );
+
+  it.each([
+    { reasons: {}, expected: true },
+    { reasons: { unavailableReason: 'Provider unavailable' }, expected: false },
+    { reasons: { repositoryUnavailableReason: 'Repository unsupported' }, expected: false },
+  ])('checks offered allocation availability: $reasons', ({ reasons, expected }) => {
+    expect(
+      isSandboxAllocationAvailable(
+        {
+          enabled: true,
+          options: [{ allocation: getSandboxAllocationRequest('vercel-small'), ...reasons }],
+        },
+        'vercel-small'
+      )
+    ).toBe(expected);
+    expect(isSandboxAllocationAvailable({ enabled: true, options: [] }, 'vercel-small')).toBe(
+      false
+    );
+  });
+
   it.each(sandboxAllocationSchema.options)(
     'normalizes legacy %s to its structured request',
     allocation => {

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   TODO_TITLE_MAX_LENGTH,
   todoFromDraft,
+  todoLinkCandidates,
   todoListGitUrl,
   todoListRepoSelection,
   todoSessionPrompt,
@@ -79,6 +80,59 @@ describe('todoFromDraft', () => {
 
   it('is null for a blank draft', () => {
     expect(todoFromDraft(' \n ')).toBeNull();
+  });
+});
+
+describe('todoLinkCandidates', () => {
+  const SAME_REPO_HTTPS = {
+    session_id: 's-https',
+    git_url: 'https://github.com/drain-labs/notes.git',
+  };
+  const SAME_REPO_SSH = { session_id: 's-ssh', git_url: 'git@github.com:drain-labs/notes.git' };
+  const OTHER_REPO = { session_id: 's-other', git_url: 'https://github.com/drain-labs/tasks' };
+  const NO_REPO = { session_id: 's-none', git_url: null };
+  const sessions = [SAME_REPO_HTTPS, SAME_REPO_SSH, OTHER_REPO, NO_REPO];
+
+  const linkedNone: ReadonlySet<string> = new Set();
+
+  it.each([
+    ['https clone URL', 'https://github.com/drain-labs/notes.git'],
+    ['https clone URL without the .git suffix', 'https://github.com/drain-labs/notes'],
+    ['ssh clone URL', 'git@github.com:drain-labs/notes.git'],
+    ['owner/repo', 'drain-labs/notes'],
+    ['another host case', 'https://GitHub.com/Drain-Labs/Notes.git'],
+  ])('offers every session on the list repository for a %s list', (_label, repository) => {
+    expect(
+      todoLinkCandidates(sessions, { repository, linkedSessionIds: linkedNone }).map(
+        session => session.session_id
+      )
+    ).toEqual(['s-https', 's-ssh']);
+  });
+
+  it('offers every unlinked session when the list names no repository', () => {
+    expect(
+      todoLinkCandidates(sessions, { repository: null, linkedSessionIds: linkedNone }).map(
+        session => session.session_id
+      )
+    ).toEqual(['s-https', 's-ssh', 's-other', 's-none']);
+  });
+
+  it('never offers a session already linked to the to-do', () => {
+    expect(
+      todoLinkCandidates(sessions, {
+        repository: 'drain-labs/notes',
+        linkedSessionIds: new Set(['s-ssh']),
+      }).map(session => session.session_id)
+    ).toEqual(['s-https']);
+  });
+
+  it('offers nothing when the list repository has no session', () => {
+    expect(
+      todoLinkCandidates(sessions, {
+        repository: 'drain-labs/missing',
+        linkedSessionIds: linkedNone,
+      })
+    ).toEqual([]);
   });
 });
 

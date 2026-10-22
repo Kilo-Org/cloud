@@ -24,7 +24,10 @@ async function loadGetAdmission() {
   return fresh.getAdmission;
 }
 
-const config = vi.hoisted(() => ({ playIntegrityProjectNumber: undefined as string | undefined }));
+const config = vi.hoisted(() => ({
+  playIntegrityProjectNumber: undefined as string | undefined,
+  nativeAdmissionDevSentinel: false as boolean,
+}));
 
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'http://localhost:3000',
@@ -32,6 +35,9 @@ vi.mock('@/lib/config', () => ({
   GOOGLE_WEB_CLIENT_ID: 'web-client-id',
   get PLAY_INTEGRITY_PROJECT_NUMBER() {
     return config.playIntegrityProjectNumber;
+  },
+  get NATIVE_ADMISSION_DEV_SENTINEL() {
+    return config.nativeAdmissionDevSentinel;
   },
 }));
 
@@ -63,12 +69,17 @@ vi.mock('expo-crypto', () => ({
 const originalFetch = globalThis.fetch;
 
 /**
- * Resolve the challenge endpoint with a fixed challenge. The Response is a
- * single instance, so each test may call getAdmission once — a second call
- * would fail on an already-read body.
+ * Answer the challenge endpoint with a fixed challenge, a fresh `Response` per
+ * call so a test may exercise the sentinel fallback after a failed attempt.
  */
 function setupChallengeFetch(challenge = 'server-challenge') {
-  const fn = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ challenge }));
+  const fn = vi
+    .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+    .mockImplementation(async () => {
+      // A fresh Response per call: a body can be read only once.
+      await Promise.resolve();
+      return Response.json({ challenge });
+    });
   globalThis.fetch = fn;
   return fn;
 }
@@ -170,7 +181,7 @@ describe('getAdmission', () => {
     const getAdmission = await loadGetAdmission();
     vi.mocked(AppIntegrity.attestKeyAsync).mockRejectedValue(new Error('attest failed'));
 
-    await expect(getAdmission()).resolves.toBeUndefined();
+    await expect(getAdmission()).rejects.toThrow('attest failed');
     expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
   });
 
@@ -208,7 +219,9 @@ describe('getAdmission', () => {
     vi.mocked(SecureStore.getItemAsync).mockResolvedValue('key-stored');
     vi.mocked(AppIntegrity.generateAssertionAsync).mockRejectedValue(new Error('server down'));
 
-    await expect(getAdmission()).resolves.toBeUndefined();
+    // A failed attempt is retryable, so it must reach the caller instead of
+    // looking like a device that cannot attest.
+    await expect(getAdmission()).rejects.toThrow('server down');
     expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
     expect(AppIntegrity.generateKeyAsync).not.toHaveBeenCalled();
   });
@@ -239,9 +252,9 @@ describe('getAdmission', () => {
 
   // ── Failure handling ───────────────────────────────────────────────────
 
-  it('returns undefined when the integrity provider refuses the device', async () => {
-    // A rooted device or one without Play Services must still be able to sign
-    // in: admission is a server-side policy and the server holds the switch.
+  it('throws when the integrity provider refuses the device so the retry is offered', async () => {
+    // A rooted device or one without Play Services cannot pass Play Integrity.
+    // The failure must be retryable, not a silent "device unsupported".
     vi.mocked(Platform).OS = 'android';
     config.playIntegrityProjectNumber = '1234567890';
     setupChallengeFetch();
@@ -250,11 +263,54 @@ describe('getAdmission', () => {
     );
     const getAdmission = await loadGetAdmission();
 
+    await expect(getAdmission()).rejects.toThrow('ERR_APP_INTEGRITY_API_NOT_AVAILABLE');
+  });
+
+  // ── Non-production sentinel ────────────────────────────────────────────
+
+  it('returns undefined when the device cannot attest and no sentinel is configured', async () => {
+    vi.mocked(Platform).OS = 'android';
+    config.playIntegrityProjectNumber = undefined;
+    config.nativeAdmissionDevSentinel = false;
+    const getAdmission = await loadGetAdmission();
+
     await expect(getAdmission()).resolves.toBeUndefined();
   });
 
+  it('sends the sentinel proof when the device cannot attest and the sentinel is configured', async () => {
+    vi.mocked(Platform).OS = 'android';
+    config.playIntegrityProjectNumber = undefined;
+    config.nativeAdmissionDevSentinel = true;
+    setupChallengeFetch();
+    const getAdmission = await loadGetAdmission();
+
+    await expect(getAdmission()).resolves.toEqual({
+      platform: 'android',
+      kind: 'assertion',
+      challenge: 'server-challenge',
+      payload: 'native-admission-dev-sentinel',
+    });
+  });
+
+  it('falls back to the sentinel when a configured device fails to attest', async () => {
+    vi.mocked(Platform).OS = 'android';
+    config.playIntegrityProjectNumber = '1234567890';
+    config.nativeAdmissionDevSentinel = true;
+    setupChallengeFetch();
+    vi.mocked(AppIntegrity.requestIntegrityCheckAsync).mockRejectedValue(
+      new Error('ERR_APP_INTEGRITY_API_NOT_AVAILABLE')
+    );
+    const getAdmission = await loadGetAdmission();
+
+    await expect(getAdmission()).resolves.toMatchObject({
+      payload: 'native-admission-dev-sentinel',
+    });
+  });
+
   it('throws a retryable error when the challenge endpoint fails', async () => {
-    globalThis.fetch = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 500 }));
+    globalThis.fetch = vi
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValue(new Response(null, { status: 500 }));
     const getAdmission = await loadGetAdmission();
 
     await expect(getAdmission()).rejects.toThrow(ADMISSION_CHALLENGE_FAILED);

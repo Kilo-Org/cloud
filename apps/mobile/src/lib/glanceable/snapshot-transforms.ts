@@ -2,6 +2,7 @@ import {
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
   type GlanceableAgentsSnapshot,
   type GlanceableAgentsSnapshotStatus,
+  NO_GLANCEABLE_WORK,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 /**
@@ -25,16 +26,7 @@ export function withStatus(
       ...snapshot,
       revision: snapshot.revision + 1,
       status: expired ? 'expired' : 'stale',
-      ...(expired
-        ? {
-            running: 0,
-            needsInput: 0,
-            idle: 0,
-            scheduled: 0,
-            needsInputSince: null,
-            scheduledAt: null,
-          }
-        : {}),
+      ...(expired ? NO_GLANCEABLE_WORK : {}),
     };
   }
   const updatedAt = new Date(now).toISOString();

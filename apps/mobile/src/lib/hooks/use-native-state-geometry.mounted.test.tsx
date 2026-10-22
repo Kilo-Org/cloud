@@ -1,5 +1,5 @@
 import { act, createElement, useState } from 'react';
-import { type View } from 'react-native';
+import { type ViewInstance } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type NativeSurfaceGeometry } from '@/lib/native-surface-geometry';
@@ -19,7 +19,7 @@ const native = vi.hoisted(() => {
     available: true,
     pending,
     listeners,
-    find: vi.fn<(node: View) => number | null>(),
+    find: vi.fn<(node: ViewInstance) => number | undefined>(),
     observe: vi.fn(async (tag: number) => {
       const result = await new Promise<NativeSurfaceGeometry>((resolve, reject) => {
         pending.set(tag, { resolve, reject });
@@ -46,10 +46,10 @@ vi.mock('@/lib/native-surface-geometry', () => ({
   unobserveSurface: native.unobserve,
 }));
 
-const firstMock: Partial<View> = {};
-const secondMock: Partial<View> = {};
-const first = firstMock as View;
-const second = secondMock as View;
+const firstMock: Partial<ViewInstance> = {};
+const secondMock: Partial<ViewInstance> = {};
+const first = firstMock as ViewInstance;
+const second = secondMock as ViewInstance;
 const snapshot = (tag = 41): NativeSurfaceGeometry => ({
   tag,
   visibleTop: 0,
@@ -61,7 +61,7 @@ const snapshot = (tag = 41): NativeSurfaceGeometry => ({
 
 async function mount() {
   let observation: ReturnType<typeof useNativeStateGeometry> | undefined = undefined;
-  let update: ((node: View) => void) | undefined = undefined;
+  let update: ((node: ViewInstance) => void) | undefined = undefined;
   function Probe() {
     const [node, setNode] = useState(first);
     update = setNode;
@@ -72,7 +72,7 @@ async function mount() {
   return {
     ...mounted,
     read: () => observation,
-    update: (node: View) => {
+    update: (node: ViewInstance) => {
       act(() => {
         update?.(node);
       });
@@ -110,6 +110,18 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('useNativeStateGeometry', () => {
+  it('reports a missing native tag before starting observation', async () => {
+    native.find.mockReturnValue(undefined);
+    const mounted = await mount();
+    expect(mounted.read()).toMatchObject({
+      status: 'failed',
+      failure: 'Native view tag unavailable',
+    });
+    expect(native.observe).not.toHaveBeenCalled();
+    expect(native.listeners.size).toBe(0);
+    mounted.unmount();
+  });
+
   it('waits for the native mounting frame before observing', async () => {
     let frame: FrameRequestCallback | undefined = undefined;
     vi.stubGlobal('requestAnimationFrame', (onFrame: FrameRequestCallback) => {

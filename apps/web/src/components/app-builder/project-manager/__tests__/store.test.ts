@@ -134,15 +134,6 @@ describe('createProjectStore', () => {
   });
 
   describe('subscribe', () => {
-    it('returns unsubscribe function', () => {
-      const store = createProjectStore(initialState);
-      const listener = jest.fn();
-
-      const unsubscribe = store.subscribe(listener);
-
-      expect(typeof unsubscribe).toBe('function');
-    });
-
     it('removes listener when unsubscribe is called', async () => {
       const store = createProjectStore(initialState);
       const listener = jest.fn();

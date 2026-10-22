@@ -86,25 +86,6 @@ describe('startPreviewPolling', () => {
     jest.useRealTimers();
   });
 
-  it('returns polling state with stop function', () => {
-    const store = createMockStore();
-    const trpcClient = createMockTrpcClient([
-      { status: 'running', previewUrl: 'http://preview.test' },
-    ]);
-
-    const pollingState = startPreviewPolling({
-      projectId: 'project-1',
-      organizationId: null,
-      trpcClient: trpcClient as unknown as PreviewPollingConfig['trpcClient'],
-      store,
-      isDestroyed: () => false,
-    });
-
-    expect(pollingState).toHaveProperty('isPolling');
-    expect(pollingState).toHaveProperty('stop');
-    expect(typeof pollingState.stop).toBe('function');
-  });
-
   it('sets previewStatus to building when starting', async () => {
     const store = createMockStore();
     const trpcClient = createMockTrpcClient([

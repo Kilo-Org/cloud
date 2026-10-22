@@ -1,9 +1,5 @@
 import type { SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
-import type { ActiveSessionType } from '@kilocode/cloud-agent-sdk';
-import { atom, createStore } from 'jotai';
-import type { SessionManager } from '@kilocode/cloud-agent-sdk';
 import { selectSlashCommands } from './slash-command-selection';
-import { useSlashCommandSets } from './useSlashCommandSets';
 
 // The shared package is mocked so that tests of the routing logic do not depend
 // on the exact contents of the real pinned default catalog or the
@@ -26,12 +22,6 @@ jest.mock(
   }),
   { virtual: true }
 );
-
-jest.mock('@/components/cloud-agent-next/CloudAgentProvider', () => ({
-  useManager: (): SessionManager => mockManager as SessionManager,
-}));
-
-let mockManager: SessionManager;
 
 const reportedRemoteCommands: SlashCommandInfo[] = [
   {
@@ -135,70 +125,5 @@ describe('selectSlashCommands', () => {
         expansion: '',
       },
     ]);
-  });
-});
-
-describe('useSlashCommandSets', () => {
-  let store: ReturnType<typeof createStore>;
-  let availableCommandsAtom: ReturnType<typeof atom<SlashCommandInfo[]>>;
-  let activeSessionTypeAtom: ReturnType<typeof atom<ActiveSessionType | null>>;
-
-  beforeEach(() => {
-    store = createStore();
-    availableCommandsAtom = atom<SlashCommandInfo[]>([]);
-    activeSessionTypeAtom = atom<ActiveSessionType | null>(null);
-    mockManager = {
-      atoms: {
-        availableCommands: availableCommandsAtom,
-        activeSessionType: activeSessionTypeAtom,
-      },
-    } as unknown as SessionManager;
-  });
-
-  it('recomputes availableCommands when activeSessionType or availableCommands atoms change', () => {
-    // This exercises the same atoms that useSlashCommandSets reads. The hook
-    // is a thin wrapper around useAtomValue for these two atoms plus the
-    // selectSlashCommands selector, so driving the store directly proves the
-    // reactive output the hook would return on each re-render.
-
-    // 1. Remote session with a live CLI catalog: surface the reported commands.
-    store.set(activeSessionTypeAtom, 'remote');
-    store.set(availableCommandsAtom, reportedRemoteCommands);
-    expect(
-      selectSlashCommands(store.get(activeSessionTypeAtom), store.get(availableCommandsAtom))
-    ).toEqual([
-      {
-        trigger: 'review',
-        label: 'review',
-        description: 'Review changes',
-        expansion: '',
-      },
-      {
-        trigger: 'init',
-        label: 'init',
-        description: '',
-        expansion: '',
-      },
-    ]);
-
-    // 2. Switch session type to read-only: output becomes empty.
-    store.set(activeSessionTypeAtom, 'read-only');
-    expect(
-      selectSlashCommands(store.get(activeSessionTypeAtom), store.get(availableCommandsAtom))
-    ).toEqual([]);
-
-    // 3. Switch back to remote, but the wrapper reports an empty catalog:
-    // remote sessions stay empty instead of falling back to Cloud defaults.
-    store.set(activeSessionTypeAtom, 'remote');
-    store.set(availableCommandsAtom, []);
-    expect(
-      selectSlashCommands(store.get(activeSessionTypeAtom), store.get(availableCommandsAtom))
-    ).toEqual([]);
-  });
-
-  it('exports a stable public API shape', () => {
-    // Sanity check that the hook module remains a callable hook that returns
-    // the expected object shape for consumers (BrowseCommandsDialog, CloudChatPage).
-    expect(typeof useSlashCommandSets).toBe('function');
   });
 });

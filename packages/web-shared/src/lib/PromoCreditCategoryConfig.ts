@@ -89,7 +89,6 @@ export type CreditCategoryUsersApiResponse = {
   pagination: PaginationMetadata;
 };
 
-// Helper function to calculate effective expiry date
 function getEffectiveExpiryDate(category: PromoCreditCategoryConfig): Date | null {
   if (category.credit_expiry_date) {
     return category.credit_expiry_date;
@@ -105,7 +104,6 @@ function getEffectiveExpiryDate(category: PromoCreditCategoryConfig): Date | nul
   return null;
 }
 
-// Helper function to format a category as markdown
 export function formatCategoryAsMarkdown(category: GuiCreditCategory): string {
   const lines: string[] = [];
   lines.push('');
@@ -145,7 +143,6 @@ export function formatCategoryAsMarkdown(category: GuiCreditCategory): string {
   return lines.join('\n');
 }
 
-// Helper function to generate markdown documentation for promo credit categories
 export function generatePromoCreditCategoriesMarkdown(
   promoCreditCategories: readonly PromoCreditCategoryConfig[]
 ): string {

@@ -1,3 +1,4 @@
+import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
 import { isPdfSupportingModel } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
@@ -28,7 +29,8 @@ import {
   getDataCollectionRequiredModelIds,
   getProviderSlugsForModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { getPreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { resolvePreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
+import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   getTerminalBenchSummaries,
@@ -130,9 +132,13 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
  */
 export function pickerModelPricing(
   model: OpenRouterModel,
-  endpointsMetadata: StoredModelMap
+  endpointsMetadata: StoredModelMap,
+  preferredProviderOrderConfig: PreferredProviderOrderConfig
 ): OpenRouterModel['pricing'] {
-  const preferredProvider = getPreferredProviderOrder(model.id).at(0);
+  const preferredProvider = resolvePreferredProviderOrder(
+    preferredProviderOrderConfig,
+    model.id
+  ).at(0);
   const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
   const rawPricing = !preferredProvider
     ? endpoints[0]?.pricing
@@ -156,13 +162,19 @@ export function pickerExtraModel(modelId: string): OpenRouterModel | undefined {
 
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
-  const [endpointsMetadata, dataCollectionRequiredModelIds, preferredModels, unavailableModelIds] =
-    await Promise.all([
-      getOpenRouterModelsMetadataFromDatabase(),
-      getDataCollectionRequiredModelIds(),
-      getPreferredModels(),
-      getUnavailableModelIds(),
-    ]);
+  const [
+    endpointsMetadata,
+    dataCollectionRequiredModelIds,
+    preferredModels,
+    unavailableModelIds,
+    preferredProviderOrderConfig,
+  ] = await Promise.all([
+    getOpenRouterModelsMetadataFromDatabase(),
+    getDataCollectionRequiredModelIds(),
+    getPreferredModels(),
+    getUnavailableModelIds(),
+    getPreferredProviderOrderConfig(),
+  ]);
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();
   const catalogModels = models
@@ -174,7 +186,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         !model.id.endsWith(':batch')
     )
     .map((model): OpenRouterModel => {
-      const pricing = pickerModelPricing(model, endpointsMetadata);
+      const pricing = pickerModelPricing(model, endpointsMetadata, preferredProviderOrderConfig);
       const terminalBench = terminalBenchFor(summaries, model.id);
       const aliasTarget = model.id.startsWith('~')
         ? endpointsMetadata[model.id]?.alias_target?.slug

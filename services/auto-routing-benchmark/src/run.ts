@@ -27,7 +27,6 @@ import caseComplexity from './datasets/case-complexity.json';
 import type { RunModelRow, RunRow } from './db';
 import {
   countCaseResultsByLane,
-  countCurrentProfilesByStatus,
   exactPairKey,
   existsNewerCompletedRun,
   getCaseResults,
@@ -38,6 +37,7 @@ import {
   deletePendingDeciderOutput,
   needsPendingOutputRecovery,
   listPendingOutputRecoveries,
+  listCurrentPlatformProfileStatuses,
   claimDeciderGrading,
   releaseDeciderGrading,
   getLatestSummariesByModel,
@@ -94,6 +94,7 @@ import {
   isRetryableContainerAvailabilityError,
   isExactModelUnavailableResult,
   isCatalogLoadFailureResult,
+  isUnsupportedModelResult,
   parseContainerRunResponse,
   runDeciderCaseViaCli,
   warmUpCliContainer,
@@ -461,11 +462,17 @@ export async function syncPlatformRegistry(
  * bound to its own measuring run's summaries — the same provenance rule owner
  * pools use, so platform and user tables read the one shared measurement set.
  *
- * The table is published only once the platform queue has settled: no entry
- * still pending or running. Publishing mid-measurement would put a table built
- * from the handful of models measured so far in front of every user — after an
- * engine bump that can be a single model taking all routes. A permanently
- * failing model does not block publishing, because `failed` is settled.
+ * The table is published once every pair it currently serves has a ready
+ * current-engine row. A pair still being measured is not served yet: the
+ * subscription promotes `servingPairs` only when the whole replacement set is
+ * ready, so it never appears in `desired` first. Waiting for the entire platform
+ * queue to settle instead lets one slow measurement — including one claimed by
+ * the user queue, which shares the registry row — hold back every other
+ * improvement to the live table for as long as it runs.
+ *
+ * This still refuses to publish a table thinner than the live one. After an
+ * engine bump every row is re-requested under the new engine, so `desired` keeps
+ * the previous serving pairs, no ready row matches them, and publishing waits.
  */
 export async function publishPlatformRoutingTable(
   env: Env,
@@ -502,17 +509,10 @@ export async function publishPlatformRoutingTable(
   )
     return null;
   const desired = snapshotPairs(snapshot, true);
+  const targets = new Set(
+    snapshotPairs(snapshot, false).map(pair => exactPairKey(pair.model, pair.variant))
+  );
   const prices = catalogCandidatePrices(catalog);
-  const queueCounts = await countCurrentProfilesByStatus(env.BENCH_DB, current, 'platform');
-  const unsettled = queueCounts
-    .filter(row => row.status === 'pending' || row.status === 'running')
-    .reduce((total, row) => total + row.count, 0);
-  if (unsettled > 0) {
-    console.log(
-      JSON.stringify({ event: 'routing_table_publish_skipped_queue_unsettled', unsettled })
-    );
-    return null;
-  }
 
   const readyRows = await listReadyCurrentProfilesForEntries(env.BENCH_DB, current, desired);
   const readyEntries = readyRows
@@ -523,6 +523,45 @@ export async function publishPlatformRoutingTable(
     }));
   if (readyEntries.length === 0) {
     console.warn(JSON.stringify({ event: 'routing_table_publish_skipped_no_ready_entries' }));
+    return null;
+  }
+  // `desired` is the serving set, which `servingSubscriptionSnapshot` already restricts
+  // to ready rows, so it cannot show that a live pair is about to disappear. The live
+  // table can: a pair it serves, that is still a target, and that has no ready row under
+  // this engine would drop out of the new build. That is a re-measurement in flight or an
+  // engine bump, and either way the existing table stays. A settled `failed` pair is
+  // allowed to drop out, as it was when the gate counted only pending and running rows.
+  const previous = await getLatestRoutingTable(env.BENCH_DB, router).catch(() => null);
+  const readyPairs = new Set(
+    readyEntries.map(({ entry }) => exactPairKey(entry.model, entry.variant))
+  );
+  const statuses = await listCurrentPlatformProfileStatuses(env.BENCH_DB, current);
+  const statusByPair = new Map(
+    statuses.map(row => [exactPairKey(row.model, row.variant), row.status])
+  );
+  const livePairs = new Map<string, { model: string; variant: string | null }>();
+  const previousRoutes = previous?.table.routes;
+  if (previousRoutes) {
+    for (const candidates of Object.values(previousRoutes)) {
+      for (const candidate of candidates) {
+        const variant = candidate.variant ?? null;
+        livePairs.set(exactPairKey(candidate.model, variant), { model: candidate.model, variant });
+      }
+    }
+  }
+  const dropped = [...livePairs.values()].find(pair => {
+    const key = exactPairKey(pair.model, pair.variant);
+    return !readyPairs.has(key) && targets.has(key) && statusByPair.get(key) !== 'failed';
+  });
+  if (dropped) {
+    console.log(
+      JSON.stringify({
+        event: 'routing_table_publish_skipped_serving_pair_unready',
+        model: dropped.model,
+        variant: dropped.variant,
+        status: statusByPair.get(exactPairKey(dropped.model, dropped.variant)) ?? 'missing',
+      })
+    );
     return null;
   }
 
@@ -578,8 +617,7 @@ export async function publishPlatformRoutingTable(
 
   // The version hashes the contributing registry rows and the config knobs, so
   // an identical version means an identical table. Skip the write and the flush.
-  const published = await getLatestRoutingTable(env.BENCH_DB, router).catch(() => null);
-  if (published?.table.version === table.version) {
+  if (previous?.table.version === table.version) {
     return { version: table.version };
   }
 
@@ -1255,7 +1293,14 @@ class AmbiguousBenchmarkExecutionError extends Error {
 
 class BenchmarkThrottleError extends Error {}
 
-class BenchmarkCatalogLoadError extends Error {}
+class BenchmarkCatalogLoadError extends Error {
+  constructor(
+    message: string,
+    readonly category: 'catalog_load' | 'model_resolution'
+  ) {
+    super(message);
+  }
+}
 
 class BenchmarkModelUnavailableError extends Error {}
 
@@ -1456,12 +1501,19 @@ async function recoverPendingOutputJob(env: Env, message: BenchmarkJobMessage): 
   }
   if (
     isCatalogLoadFailureResult(pending.result) ||
+    isUnsupportedModelResult(pending.result, message.model) ||
     (pending.result.text.length === 0 &&
       (pending.result.costUsd ?? 0) === 0 &&
       /(?:\b429\b|rate.?limit|throttl)/i.test(pending.result.stderrTail))
   ) {
     await deletePendingDeciderOutput(env.BENCH_DB, key);
-    skipRecovery(isCatalogLoadFailureResult(pending.result) ? 'catalog_load' : 'provider_throttle');
+    skipRecovery(
+      isCatalogLoadFailureResult(pending.result)
+        ? 'catalog_load'
+        : isUnsupportedModelResult(pending.result, message.model)
+          ? 'model_resolution'
+          : 'provider_throttle'
+    );
     return;
   }
   const judge =
@@ -1686,7 +1738,7 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
               : error instanceof AmbiguousBenchmarkExecutionError
                 ? 'ambiguous_execution'
                 : error instanceof BenchmarkCatalogLoadError
-                  ? 'catalog_load'
+                  ? error.category
                   : error instanceof DeciderGraderRetryError
                     ? 'grading'
                     : isRetryableContainerAvailabilityError(error)
@@ -2121,6 +2173,7 @@ async function processDeciderJob(
         if (
           isExactModelUnavailableResult(first, message.model) ||
           isCatalogLoadFailureResult(first) ||
+          isUnsupportedModelResult(first, message.model) ||
           first.exitCode !== 0 ||
           first.text.length > 0 ||
           /(?:\b429\b|rate.?limit|throttl)/i.test(first.stderrTail)
@@ -2167,7 +2220,8 @@ async function processDeciderJob(
           result.text.length === 0 &&
           (result.costUsd ?? 0) === 0 &&
           /(?:\b429\b|rate.?limit|throttl)/i.test(result.stderrTail);
-        if (isCatalogLoadFailureResult(result) || throttled) {
+        const unsupported = isUnsupportedModelResult(result, message.model);
+        if (isCatalogLoadFailureResult(result) || unsupported || throttled) {
           const { token: _token, ...unbilled } = execution;
           if (attemptStartedAt !== undefined) {
             await clearUnbilledCase(env.BENCH_DB, { ...unbilled, attemptStartedAt });
@@ -2178,7 +2232,12 @@ async function processDeciderJob(
           if (throttled) {
             throw new BenchmarkThrottleError('Provider throttled an unbilled benchmark request');
           }
-          throw new BenchmarkCatalogLoadError('Benchmark model catalog could not be loaded.');
+          throw new BenchmarkCatalogLoadError(
+            unsupported
+              ? 'Gateway rejected the exact model for an unbilled call.'
+              : 'Benchmark model catalog could not be loaded.',
+            unsupported ? 'model_resolution' : 'catalog_load'
+          );
         }
         if (!pending) {
           await savePendingDeciderOutput(env.BENCH_DB, pendingKey, output).catch(() => {

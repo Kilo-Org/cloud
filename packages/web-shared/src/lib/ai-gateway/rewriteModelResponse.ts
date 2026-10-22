@@ -439,6 +439,11 @@ function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
       usage.prompt_tokens_details.cached_tokens = 0; // OpenCode crashes if this is absent
     }
   }
+  if (usage.completion_tokens_details) {
+    if (usage.completion_tokens_details.reasoning_tokens === undefined) {
+      usage.completion_tokens_details.reasoning_tokens = 0; // strict OpenRouter clients reject a details object that omits this
+    }
+  }
 }
 
 export async function rewriteModelResponse_ChatCompletions({
@@ -502,7 +507,7 @@ export async function rewriteModelResponse_ChatCompletions({
   // Shared with the stream's cancel() callback so a client disconnect still
   // logs the partially received response body.
   const capturedChunks: string[] | null = capture ? [] : null;
-  const stream = new ReadableStream({
+  const stream = new ReadableStream<string>({
     async start(controller) {
       const reader = response.body?.getReader();
       if (!reader) {
@@ -546,6 +551,12 @@ export async function rewriteModelResponse_ChatCompletions({
             }
             if (delta.tool_calls === null) {
               delete delta.tool_calls;
+            }
+            for (const toolCall of delta.tool_calls ?? []) {
+              // Some APIs set null on argument continuation chunks, which @openrouter/ai-sdk-provider rejects
+              if (toolCall.type === null) {
+                delete toolCall.type;
+              }
             }
             applyReasoningDetailsResponseTransform(responseTransforms, delta);
           }
@@ -591,7 +602,7 @@ export async function rewriteModelResponse_ChatCompletions({
             },
           }) +
           '\n\n',
-        progress.stop,
+        () => progress.stop(),
         vercelRequestId,
         capture,
         capturedChunks,
@@ -694,7 +705,7 @@ export async function rewriteModelResponse_Messages({
   // Shared with the stream's cancel() callback so a client disconnect still
   // logs the partially received response body.
   const capturedChunks: string[] | null = capture ? [] : null;
-  const stream = new ReadableStream({
+  const stream = new ReadableStream<string>({
     async start(controller) {
       const reader = response.body?.getReader();
       if (!reader) {
@@ -779,7 +790,7 @@ export async function rewriteModelResponse_Messages({
             },
           }) +
           '\n\n',
-        progress.stop,
+        () => progress.stop(),
         vercelRequestId,
         capture,
         capturedChunks,
@@ -858,7 +869,7 @@ export async function rewriteModelResponse_Responses({
   // Shared with the stream's cancel() callback so a client disconnect still
   // logs the partially received response body.
   const capturedChunks: string[] | null = capture ? [] : null;
-  const stream = new ReadableStream({
+  const stream = new ReadableStream<string>({
     async start(controller) {
       const reader = response.body?.getReader();
       if (!reader) {
@@ -938,7 +949,7 @@ export async function rewriteModelResponse_Responses({
             },
           }) +
           '\n\n',
-        progress.stop,
+        () => progress.stop(),
         vercelRequestId,
         capture,
         capturedChunks,

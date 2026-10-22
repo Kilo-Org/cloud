@@ -43,7 +43,8 @@ import { waitFor } from './wait-for.js';
 const SANDBOX_ID = 'sbx__control_v2_routes';
 const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
 const SESSION_NEXT = 'workspace_22222222-2222-2222-2222-222222222222';
-const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
+const NATIVE_KILO_TOKEN =
+  'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
 const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
@@ -216,6 +217,10 @@ async function setup(
   peer: FakeSessionPeer;
 }> {
   const peer = new FakeSessionPeer();
+  peer.runtimeProxyForSession = createRuntimeProxyMintingPeer(env, sessionId => ({
+    userId: 'user_123',
+    kiloSessionId: kiloSessionIdFor(sessionId),
+  }));
   const stub = sandboxNamespace.getByName(SANDBOX_ID);
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
@@ -749,6 +754,10 @@ describe('SandboxControlV2 routes and forwarding', () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const peer = new FakeSessionPeer();
+    peer.runtimeProxyForSession = createRuntimeProxyMintingPeer(env, sessionId => ({
+      userId: 'user_123',
+      kiloSessionId: kiloSessionIdFor(sessionId),
+    }));
     const stub = sandboxNamespace.getByName(SANDBOX_ID);
     await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();
@@ -2057,14 +2066,17 @@ describe('SandboxControlV2 routes and forwarding', () => {
   it('does not block prepare on a hanging events notification', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
+    const mint = createRuntimeProxyMintingPeer(env, sessionId => ({
+      userId: 'user_123',
+      kiloSessionId: kiloSessionIdFor(sessionId),
+    }));
     await runInDurableObject(stub, instance => {
       Object.assign(instance, {
-        sessionPeerFor: () => ({
+        sessionPeerFor: (_ownerId: string, sessionId: string) => ({
+          ...mint(sessionId),
           onRoute: async () => {},
           onEvents: () => new Promise<void>(() => {}),
           onOutcome: async () => {},
-          getRuntimeProxyDelegationExpiresAt: async () => null,
-          issueRuntimeCredentialProxyGrant: async () => null,
         }),
       });
     });
@@ -2202,14 +2214,17 @@ describe('SandboxControlV2 routes and forwarding', () => {
   it('drops a hanging notification within its deadline without blocking prepare', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
+    const mint = createRuntimeProxyMintingPeer(env, sessionId => ({
+      userId: 'user_123',
+      kiloSessionId: kiloSessionIdFor(sessionId),
+    }));
     await runInDurableObject(stub, instance => {
       Object.assign(instance, {
-        sessionPeerFor: () => ({
+        sessionPeerFor: (_ownerId: string, sessionId: string) => ({
+          ...mint(sessionId),
           onRoute: () => new Promise<void>(() => {}),
           onEvents: async () => {},
           onOutcome: async () => {},
-          getRuntimeProxyDelegationExpiresAt: async () => null,
-          issueRuntimeCredentialProxyGrant: async () => null,
         }),
       });
     });

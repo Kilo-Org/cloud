@@ -75,9 +75,15 @@ export function textRequestPriceCeiling(metadata: StoredModel) {
 }
 function requestTextBytes(value: unknown): number {
   if (typeof value === 'string') return Buffer.byteLength(value, 'utf8');
-  if (Array.isArray(value)) return value.reduce((sum, item) => sum + requestTextBytes(item), 0);
-  if (value !== null && typeof value === 'object')
-    return Object.values(value).reduce((sum, item) => sum + requestTextBytes(item), 0);
+  if (Array.isArray(value)) {
+    return (value as unknown[]).reduce<number>((sum, item) => sum + requestTextBytes(item), 0);
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).reduce<number>(
+      (sum, item) => sum + requestTextBytes(item),
+      0
+    );
+  }
   return 0;
 }
 export async function enforceRequestCostLimit(

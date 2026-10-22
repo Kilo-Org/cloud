@@ -25,6 +25,7 @@
     "error": "errore: {{error}}",
     "back": "Indietro",
     "somethingWentWrong": "Si è verificato un errore.",
+    "actionNotRecorded": "Impossibile registrare questa azione. Riprova più tardi.",
     "couldNotOpen": "Impossibile aprire {{label}}.",
     "link": "collegamento",
     "takingLonger": "Questa operazione richiede più tempo del previsto. Puoi chiudere questa schermata e ricontrollare più tardi.",
@@ -35,6 +36,8 @@
     "connectGithub": "Collega GitHub",
     "cost": "Costo",
     "discard": "Scarta",
+    "discardChangesMessage": "Le tue modifiche andranno perse.",
+    "discardChangesTitle": "Scartare le modifiche?",
     "findings": "Problemi rilevati",
     "mergeRequest": "merge request",
     "notConnected": "Non collegato",
@@ -109,7 +112,9 @@
     "online": "In linea",
     "open": "Apri {{name}}",
     "openPullRequest": "Apri la PR",
+    "completed": "Completata",
     "pending": "In attesa",
+    "running": "In esecuzione",
     "performance": "Prestazioni",
     "preferences": "Preferenze",
     "privacyPolicy": "Informativa sulla privacy",
@@ -861,7 +866,7 @@
     },
     "autoReviews": "Revisioni automatiche",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket non è connesso. Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono connetterlo.",
+      "notConnectedReadOnly": "Bitbucket non è connesso. Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo.",
       "setupIncomplete": "La configurazione è incompleta. Completala su kilo.ai.",
       "setup": "Configurazione di Bitbucket"
     },
@@ -885,7 +890,10 @@
       "starting": "Avvio della revisione…",
       "title": "Revisione manuale"
     },
-    "notConnectedReadOnly": "{{platform}} non è connesso. Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono connetterlo.",
+    "notConnectedReadOnly": "{{platform}} non è connesso. Solo i proprietari dell'organizzazione e gli amministratori possono connetterlo.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} non è connesso. Chiedi a un Proprietario, a un Amministratore o a un Responsabile della fatturazione dell'organizzazione di connetterlo."
+    },
     "platformList": {
       "activity": "Attività",
       "checking": "Verifica in corso…",
@@ -962,8 +970,9 @@
       "noProposals": "Nessuna proposta",
       "noProposalsDescription": "Le proposte della memoria di revisione compaiono qui dopo che Kilo ha analizzato le risposte dei responsabili del progetto.",
       "off": "La memoria di revisione è disattivata.",
+      "on": "La memoria di revisione è attivata.",
       "offDescription": "Attivala per consentire a Kilo di imparare dalle risposte dei responsabili del progetto e proporre indicazioni per REVIEW.md.",
-      "readOnlyDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono attivare la memoria di revisione.",
+      "readOnlyDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono modificare la memoria di revisione.",
       "title": "Memoria delle revisioni"
     },
     "scopeList": {
@@ -991,8 +1000,6 @@
     "updateFailed": "Impossibile aggiornare il revisore.",
     "configSaveFailed": "Impossibile salvare la configurazione della revisione.",
     "status": {
-      "running": "In esecuzione",
-      "completed": "Completata",
       "interrupted": "Interrotta"
     },
     "reviewStyle": {
@@ -1005,7 +1012,8 @@
       "bugs": "Bug",
       "style": "Stile",
       "testing": "Test",
-      "documentation": "Documentazione"
+      "documentation": "Documentazione",
+      "unknown": "Altro ({{area}})"
     },
     "gateThreshold": {
       "warning": "Avviso"
@@ -1084,7 +1092,14 @@
       "triageReasoning": "Motivazioni della valutazione preliminare",
       "watchInCloudAgent": "Segui in Cloud Agent",
       "whereFound": "Punti di rilevamento ({{displayCount}})",
-      "yes": "Sì"
+      "yes": "Sì",
+      "action": {
+        "analyzeCodebase": "Analizza codebase",
+        "dismiss": "Ignora",
+        "manualReview": "Revisione manuale",
+        "monitor": "Monitora",
+        "openPr": "Apri richiesta di pull"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Modello di analisi",
@@ -1095,6 +1110,9 @@
       "triageModel": "Modello per la valutazione preliminare"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Amministratore Kilo",
+      "actorMaskedUser": "Utente mascherato",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "Impossibile caricare il report di audit.",
       "events": "Eventi",
       "generated": "Il report è stato generato il {{generatedAt}}.",
@@ -1106,7 +1124,24 @@
       "summary": "Riepilogo del report",
       "title": "Report di audit",
       "unavailable": "Report di audit non disponibile",
-      "unavailableDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono visualizzare i report di audit. Chiedi a un proprietario o a un responsabile della fatturazione di concederti l'accesso."
+      "unavailableDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono visualizzare i report di audit. Chiedi a un proprietario, a un amministratore o a un responsabile della fatturazione di concederti l'accesso.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analisi completata",
+        "findingAnalysisFailed": "Analisi non riuscita",
+        "findingAutoDismissed": "Ignorato automaticamente",
+        "findingCreated": "Importato",
+        "findingDeleted": "Eliminato",
+        "findingDismissed": "Ignorato",
+        "findingSeverityChanged": "Gravità modificata",
+        "findingStatusChange": "Stato modificato",
+        "findingSuperseded": "Sostituito",
+        "remediationBlocked": "Correzione bloccata",
+        "remediationCancelled": "Annullato",
+        "remediationFailed": "Correzione non riuscita",
+        "remediationNoChangesNeeded": "Nessuna modifica necessaria",
+        "remediationPrOpened": "Richiesta di pull aperta",
+        "remediationQueued": "Correzione richiesta"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Visualizza il report di audit"
@@ -1206,7 +1241,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Questa segnalazione è già stata risolta e non può più essere ignorata.",
-      "cannotDismissDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono ignorare le segnalazioni.",
+      "cannotDismissDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono ignorare le segnalazioni.",
       "cannotDismissTitle": "Impossibile ignorare questa segnalazione",
       "commentAccessibility": "Commento sull'esclusione",
       "commentLabel": "Commento (facoltativo)",
@@ -1329,7 +1364,6 @@
       "installApp": "Installa l'app GitHub",
       "reauthorizeButton": "Riautorizza l'app GitHub",
       "reauthorizeDescription": "Security Agent richiede l'autorizzazione vulnerability_alerts per accedere agli avvisi di Dependabot. Riautorizza l'app GitHub per concederla.",
-      "reauthorizeFailed": "Impossibile avviare la riautorizzazione. Riprova.",
       "reauthorizeTitle": "Servono autorizzazioni aggiuntive",
       "setupFailed": "Impossibile avviare la configurazione di GitHub. Riprova."
     },
@@ -1339,7 +1373,7 @@
       "automationCount": "{{displayCount}} su 3 attive",
       "couldNotLoadPermissions": "Impossibile caricare le autorizzazioni.",
       "couldNotLoadSettings": "Impossibile caricare le impostazioni di Security Agent.",
-      "disabledNoManage": "Security Agent è disattivato. Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono attivarlo.",
+      "disabledNoManage": "Security Agent è disattivato. Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono attivarlo.",
       "disabledNoRepo": "Seleziona almeno un repository prima di attivare Security Agent.",
       "disabledPrompt": "Attiva Security Agent per sincronizzare gli avvisi di Dependabot, scegliere i repository e configurare l'automazione.",
       "notificationsCount": "{{displayCount}} su 2 attive",
@@ -1353,6 +1387,7 @@
     "settingsSave": {
       "saveChanges": "Salva le modifiche",
       "unsavedMessage": "Salvare le modifiche prima di uscire da questa schermata?",
+      "unsavedInvalidMessage": "Queste modifiche non possono ancora essere salvate. Correggile per salvare o scartale per uscire.",
       "unsavedTitle": "Modifiche non salvate"
     },
     "setup": {
@@ -1372,7 +1407,7 @@
       "lowDescription": "Impatto minimo sulla sicurezza.",
       "medium": "Livello medio",
       "mediumDescription": "Impatto limitato o condizioni specifiche.",
-      "permissionNote": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono modificare queste impostazioni.",
+      "permissionNote": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono modificare queste impostazioni.",
       "remediationDeadlineA11y": "Termine per la correzione in giorni, gravità {{label}}",
       "title": "Criterio SLA"
     },
@@ -1391,7 +1426,12 @@
       "syncMayNotHaveCompleted": "Una sincronizzazione potrebbe non essere terminata. Riprova per verificarne e aggiornarne lo stato oppure scartala.",
       "syncInProgress": "Una sincronizzazione di sicurezza è già in corso. Riprova.",
       "dismissalInProgress": "L'esclusione di questa segnalazione è già in corso. Riprova.",
-      "couldNotReadPendingSyncs": "Impossibile leggere le sincronizzazioni in sospeso. Riprova."
+      "couldNotReadPendingSyncs": "Impossibile leggere le sincronizzazioni in sospeso. Riprova.",
+      "ambiguous": "Impossibile confermare l'esito dell'operazione. Controlla la revisione di sicurezza prima di riprovare.",
+      "settleFailed": "L'operazione è stata completata, ma non è stato possibile registrare il risultato. Riprova.",
+      "replayFailed": "Questa operazione non è stata completata. Riprova.",
+      "actionFailed": "Impossibile completare questa operazione. Riprova.",
+      "actionBlocked": "Impossibile completare questa operazione. Il problema deve essere risolto prima di riprovare."
     },
     "analysisState": {
       "queued": "Analisi in coda",
@@ -1655,6 +1695,9 @@
       "noRepositoriesVisibleGitlab": "Nessun repository visibile. Controlla le autorizzazioni di accesso ai repository su GitLab, poi aggiorna l'elenco.",
       "noRepositoriesVisibleBitbucket": "Nessun repository visibile. Controlla le autorizzazioni di accesso ai repository su Bitbucket, poi aggiorna l'elenco.",
       "bitbucketOrganizationsOnly": "Bitbucket è disponibile solo per le organizzazioni.",
+      "githubNeedsAttention": "GitHub deve essere ricollegato",
+      "githubNeedsAttentionDescription": "Ricollega l'app Kilo per GitHub, poi aggiorna l'elenco per caricare i suoi repository.",
+      "partialRepositories": "Alcuni repository GitHub non sono stati caricati.",
       "branchPickerTitle": "Seleziona branch",
       "branchDefault": "Predefinito",
       "branchAccessibility": "Branch: {{label}}",
@@ -1673,6 +1716,8 @@
       "commitAndPush": "Commit e push",
       "startSession": "Avvia sessione",
       "selectRepositoryToStart": "Seleziona un repository per iniziare.",
+      "enterPromptToStart": "Aggiungi un prompt per iniziare.",
+      "enterPromptOrFileToStart": "Aggiungi un prompt o un file per iniziare.",
       "connectProviderToStart": "Connetti una piattaforma per iniziare.",
       "promptPlaceholder": "Su cosa vuoi lavorare?",
       "couldNotLoadModels": "Impossibile caricare i modelli.",
@@ -1681,6 +1726,7 @@
       "prefillModelUnavailable": "{{model}} non è più disponibile. Verrà usato il tuo modello predefinito.",
       "couldNotReadPendingSessions": "Impossibile leggere le sessioni in sospeso. Riprova.",
       "failedToCreate": "Impossibile creare la sessione.",
+      "checkOrganizationAccess": "Verifica il tuo accesso a questa organizzazione, poi riprova.",
       "couldNotRefreshRepositories": "Impossibile aggiornare i repository. Riprova.",
       "discardDraftTitle": "Eliminare la bozza?",
       "discardDraftMessage": "Il tuo prompt andrà perso.",
@@ -1754,7 +1800,8 @@
       "matchesBadge_one": "{{displayCount}} corrispondenza",
       "matchesBadge_other": "{{displayCount}} corrispondenze",
       "matchesBadge_many": "{{displayCount}} corrispondenze",
-      "noOutput": "Nessun output."
+      "noOutput": "Nessun output.",
+      "translationFailed": "Traduzione non riuscita"
     },
     "readToolMarkdown": {
       "linesTruncated": "righe {{start}}–{{end}} (troncate)",
@@ -2243,6 +2290,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Le tue sessioni attive saranno disponibili al termine del caricamento.",
     "currentDeviceUnidentified": "Impossibile identificare il dispositivo attuale.",
+    "kiloApp": "App Kilo",
     "noSessions": "Nessuna sessione attiva",
     "noSessionsDescription": "Accedi con l'app Kilo su un altro dispositivo e apparirà qui.",
     "onlyKiloAppSignIns": "Qui compaiono solo gli accessi tramite l'app Kilo. Gli accessi tramite editor e CLI non sono elencati.",
@@ -2250,7 +2298,7 @@
     "thisDevice": "Questo dispositivo",
     "viewProfile": "Visualizza il profilo",
     "signOutThisDevice": "Disconnetti questo dispositivo",
-    "signOutThisSession": "Disconnetti questa sessione",
+    "signOutSessionLabel": "Disconnetti {{device}}, accesso effettuato {{signedIn}}",
     "sessionSignedOut": "Sessione disconnessa.",
     "signOutThisDeviceTitle": "Disconnettere questo dispositivo?",
     "signOutThisSessionTitle": "Disconnettere questa sessione?",
@@ -2396,6 +2444,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Prima di iniziare",
+    "summaryTitle": "Preferenze di condivisione dei dati",
     "introDescription": "Kilo invia i tuoi messaggi ai fornitori di modelli AI per generare risposte. Ecco cosa viene condiviso e con chi.",
     "required": "Necessario per usare Kilo",
     "promptsTitle": "I tuoi prompt e le tue conversazioni",
@@ -2404,7 +2453,6 @@
     "accountDescription": "L'ID del tuo account Kilo e i metadati delle richieste, usati per autenticarti e misurare l'utilizzo.",
     "diagnosticsTitle": "Diagnostica dell'app",
     "diagnosticsDescription": "Segnalazioni di arresti anomali ed errori, prive dei contenuti dell'app, usate per mantenerla stabile.",
-    "optional": "Facoltativo",
     "helpImprove": "Aiuta a migliorare Kilo",
     "helpImproveDescription": "Condividi dati anonimi sull'utilizzo del prodotto e sull'origine dell'installazione. Puoi modificare questa scelta in qualsiasi momento nelle impostazioni.",
     "seeFullDetails": "Vedi tutti i dettagli",
@@ -2530,10 +2578,13 @@
       "description": "Connetti il tuo account GitHub per revisionare le pull request dall'app.",
       "gitlabDescription": "Connetti il tuo account GitLab per revisionare le merge request dall'app.",
       "bitbucketDescription": "Connetti Bitbucket a questa organizzazione per revisionare le pull request dall'app.",
-      "bitbucketOrgOnlyDescription": "Seleziona un'organizzazione nel tuo profilo per revisionarne le pull request di Bitbucket."
+      "bitbucketOrgOnlyDescription": "Passa l'account qui sopra a un'organizzazione per revisionarne le pull request Bitbucket.",
+      "contextLine": "Per {{organization}}"
     },
     "connectionExpired": "La connessione a GitHub è scaduta.",
     "couldNotLoadPullRequest": "Impossibile caricare la pull request.",
+    "reviewServiceUnavailable": "Servizio non disponibile",
+    "reviewServiceUnavailableDescription": "Il servizio è temporaneamente non disponibile. Riprova tra poco.",
     "couldNotOpenGitHubAppSettings": "Impossibile aprire le impostazioni dell'app GitHub.",
     "description": "Descrizione",
     "discussion": {
@@ -2959,6 +3010,7 @@
       "truncationBanner_many": "Sono visualizzati i primi {{limit}} file modificati su {{total}}, per un limite dell'API di GitHub."
     },
     "linkPasteClipboardEmpty": "Gli appunti sono vuoti.",
+    "linkPasteDenied": "L'accesso per incollare è stato negato. Consenti di incollare e riprova.",
     "linkPasteNotAPullRequest": "Non è un collegamento a una pull request o merge request",
     "announce": {
       "commentPosted": "Commento pubblicato",
@@ -2972,7 +3024,9 @@
       "reviewNotSubmitted": "Impossibile inviare questa revisione così com'è. La PR potrebbe essere stata modificata oppure potresti esserne l'autore: non puoi revisionare le tue pull request.",
       "reviewNotSubmittedTerm": "Impossibile inviare questa revisione così com'è. {{term}} potrebbe essere cambiato, oppure non puoi revisionare il tuo {{term}}.",
       "couldNotPostComment": "Impossibile pubblicare il commento.",
-      "couldNotSubmitReview": "Impossibile inviare la revisione. Controlla la connessione e riprova."
+      "couldNotSubmitReview": "Impossibile inviare la revisione. Controlla la connessione e riprova.",
+      "rateLimited": "Troppe richieste. Riprova più tardi.",
+      "conflict": "Questo è stato modificato mentre ci stavi lavorando. Ricaricalo e riprova."
     },
     "operation": {
       "couldNotReply": "Non è stato possibile inviare la risposta.",
@@ -2980,7 +3034,6 @@
       "mergeResultDefaultError": "GitHub non ha completato l'unione.",
       "mergeResultNotCompleted": "Unione di {{term}} non completata. Verifica lo stato e riprova.",
       "ambiguous": "Impossibile confermare l'esito dell'operazione. Controlla la PR prima di riprovare.",
-      "persistenceFailed": "Impossibile registrare questa azione. Riprova più tardi.",
       "forbidden": "Non hai l'autorizzazione per questa operazione."
     },
     "capabilities": {
@@ -3009,11 +3062,23 @@
     "boundary": {
       "backToProfile": "Torna al profilo",
       "loadErrorMessage": "Controlla la connessione e riprova.",
+
+      "chooseAccount": "Seleziona un account",
       "loadErrorTitle": "Impossibile caricare le tue organizzazioni.",
+      "membershipLostNotice": "Non hai più accesso a questa organizzazione. Passato a {{target}}.",
+      "noOrganization": "Nessuna organizzazione",
+
+      "noOrganizationDescription": "Questo account non fa parte di un'organizzazione. Crea o unisciti a un'organizzazione sul web per usare le funzioni dell'organizzazione come gli inviti dei membri e gli avvisi di saldo basso.",
+
+      "openWebOrganizations": "Apri le organizzazioni sul web",
+
       "organizationUnavailable": "L'organizzazione non è disponibile.",
-      "selectDescription": "Scegli un'organizzazione dal tuo profilo per continuare.",
+      "selectDescriptionWithOrganizations": "Appartieni a una o più organizzazioni. Scegli l'account che questa schermata deve usare.",
+
       "selectOrganization": "Seleziona un'organizzazione",
       "unavailableDescription": "Questa organizzazione non è più disponibile. Scegline una dal tuo profilo per continuare.",
+
+      "unavailableSessionsDescription": "Questa organizzazione non è più disponibile. Non è possibile caricare le sue sessioni.",
       "accessDeniedDescription": "Non hai accesso a questa organizzazione."
     },
     "creditActivity": {
@@ -3072,7 +3137,11 @@
       "separateEmailsHint": "Separa gli indirizzi email con una virgola.",
       "thresholdLabel": "Soglia di avviso (USD)",
       "title": "Avviso di saldo basso",
-      "emailsError": "Inserisci almeno un indirizzo email valido. Se ne inserisci più di uno, separali con una virgola.",
+      "emailsInvalid": "Uno o più indirizzi email non sono validi.",
+      "emailsRequired": "Inserisci almeno un indirizzo email.",
+      "saveEmailsError": "Alcuni indirizzi email non sono stati accettati. Controllali e riprova.",
+      "saveError": "Impossibile salvare l'avviso di saldo basso.",
+      "thresholdPlaceholder": "Inserisci un importo",
       "thresholdError": "Inserisci un importo maggiore di 0."
     },
     "memberLimit": {
@@ -3083,12 +3152,13 @@
       "removeLimit": "Rimuovi il limite",
       "title": "Limite di utilizzo giornaliero",
       "blankError": "Inserisci un importo oppure rimuovi il limite con il pulsante qui sotto.",
+      "blankWithoutLimitError": "Inserisci un limite giornaliero tra 0 e {{max}}.",
       "rangeError": "Inserisci un importo tra 0 e {{max}}."
     },
     "members": {
       "changeRole": "Cambia ruolo",
       "emptyDescriptionCanInvite": "Invita i membri del tuo team per iniziare a collaborare in questa organizzazione.",
-      "emptyDescriptionCannotInvite": "Chiedi a un proprietario o a un responsabile della fatturazione di invitare i membri del tuo team.",
+      "emptyDescriptionCannotInvite": "Chiedi a un proprietario, a un amministratore o a un responsabile della fatturazione di invitare i membri del tuo team.",
       "emptyTitle": "Ancora nessun membro",
       "invitedDate": "Invitato il {{date}}",
       "limitPerDay": "{{amount}}/giorno",
@@ -3354,7 +3424,9 @@
       "settingsToolsOn": "Attivo — gli strumenti delle impostazioni vengono inviati al modello",
       "settingsToolsOff": "Disattivo — nessuno strumento delle impostazioni viene inviato al modello",
       "serverChecking": "Verifica di questo server…",
-      "serverToolCount": "{{count}} strumenti",
+      "serverToolCount_many": "{{count}} di strumenti",
+      "serverToolCount_one": "{{count}} strumento",
+      "serverToolCount_other": "{{count}} strumenti",
       "serverUnreachable": "Impossibile raggiungere questo server",
       "serverOff": "Questo server è disattivato"
     },
@@ -3501,6 +3573,8 @@
       "quantizationsHelp": "I file più piccoli usano meno memoria e spazio. I file più grandi di solito danno risposte migliori.",
       "quantDetail": "Download di {{size}} · circa {{memory}} di memoria",
       "downloadQuant": "Scarica {{quant}}",
+      "downloadModelA11y": "Scarica {{name}}",
+      "detailsA11y": "Dettagli: {{name}}",
       "loadingModel": "Caricamento dettagli del modello",
       "couldNotLoadModel": "Impossibile caricare questo modello",
       "noFiles": "Nessun file eseguibile da questa app",
@@ -3512,6 +3586,9 @@
     "localModels": {
       "title": "Modelli sul dispositivo",
       "help": "I modelli sul dispositivo vengono eseguiti su questo telefono. I tuoi prompt e le risposte restano sul dispositivo.",
+      "switchTitle": "Passare a un modello sul dispositivo?",
+      "switchMessage": "Il passaggio a {{name}} fa sì che i messaggi e il contesto di questa conversazione vengano elaborati su questo telefono, non su un server remoto.",
+      "switchConfirm": "Cambia modello",
       "systemPurpose": "Il modello integrato nel sistema di questo dispositivo. Viene eseguito sul dispositivo.",
       "apple": "Apple Intelligence (sul dispositivo)",
       "checking": "Verifica disponibilità…",
@@ -3549,6 +3626,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Avvia agente richiede un prompt. Aggiungi un prompt e rieseguilo.",
+      "repositoryRequired": "Avvia agente richiede un repository. Apri Kilo e scegline uno, quindi rieseguilo.",
       "repositoryUnknown": "Kilo non riconosce {{repository}} come repository GitHub o GitLab. Scegli un altro repository in Kilo.",
       "repositoryUnsupported": "{{repository}} è un repository Bitbucket — Avvia agente non può ancora usarlo. Scegli un altro repository in Kilo."
     }
@@ -3586,10 +3664,16 @@
     "emptyDescription": "Crea un profilo per riutilizzare variabili di ambiente, comandi di configurazione e competenze tra le sessioni.",
     "loadFailed": "Impossibile caricare i profili",
     "counts": {
-      "vars": "{{count}} variabili",
+      "vars_many": "{{count}} di variabili",
+      "vars_one": "{{count}} variabile",
+      "vars_other": "{{count}} variabili",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} competenze",
-      "commands": "{{count}} comandi",
+      "skills_many": "{{count}} di competenze",
+      "skills_one": "{{count}} competenza",
+      "skills_other": "{{count}} competenze",
+      "commands_many": "{{count}} di comandi",
+      "commands_one": "{{count}} comando",
+      "commands_other": "{{count}} comandi",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}comp",
       "commandsShort": "{{count}}cmd"
@@ -3608,7 +3692,6 @@
     "personalDefaultDescription": "Caricato automaticamente quando nessun repository ha un profilo bloccato.",
     "organizationDefaultDescription": "Caricamento automatico per i membri che non hanno impostazioni predefinite personali.",
     "setAsDefault": "Imposta come predefinito",
-    "removeDefault": "Rimuovi come predefinito",
     "saveFailed": "Impossibile salvare il profilo",
     "deleteTitle": "Elimina profilo",
     "deleteMessage": "Ciò rimuove permanentemente il profilo e le sue impostazioni. Questa operazione non può essere annullata.",
@@ -3621,7 +3704,6 @@
     "keyTooLong": "La chiave deve contenere 256 caratteri o meno",
     "keyDuplicate": "Questa chiave esiste già nel profilo",
     "valueLabel": "Valore",
-    "secretLabel": "Segreto",
     "secrets": {
       "markSecret": "Contrassegna come segreto",
       "masked": "Valore nascosto",
@@ -3634,11 +3716,13 @@
     "commandsTitle": "Comandi di impostazione",
     "addCommand": "Aggiungi comando",
     "commandLabel": "Comando",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "es. pnpm install",
     "commandsEmpty": "Nessun comando di configurazione ancora",
     "commandsSaveFailed": "Impossibile salvare i comandi di configurazione",
     "moveUp": "Vai su",
     "moveDown": "Spostati giù",
+    "moveCommandUp": "Sposta il comando {{position}} in alto",
+    "moveCommandDown": "Sposta il comando {{position}} in basso",
     "skillsTitle": "Competenze",
     "addSkill": "Aggiungi abilità",
     "skillNameLabel": "Nome dell'abilità",
@@ -3648,6 +3732,8 @@
     "skillNameInvalid": "Il nome della competenza deve iniziare con una lettera o un numero e utilizzare solo lettere minuscole, numeri e trattini",
     "skillContentRequired": "È richiesto il contenuto delle competenze",
     "skillSaveFailed": "Impossibile salvare l'abilità",
+    "skillSourceCustom": "Personalizzata",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Incolla un SKILL.md e il suo nome si riempie; aggiungi un'abilità dal tuo telefono senza trascinare e rilasciare.",
     "skillEditTitle": "Modifica abilità",
     "mcp": {
@@ -3663,7 +3749,7 @@
       "environment": "Ambiente (JSON)",
       "headers": "Intestazioni (JSON)",
       "timeout": "Tempo scaduto",
-      "secretCount": "Conteggio segreto",
+      "secretCount": "Conteggio segreto: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3678,18 +3764,20 @@
       "jsonTooLarge": "Usa al massimo 50 voci, chiavi fino a 128 e valori fino a 4096 caratteri",
       "timeoutInvalid": "Il timeout deve essere un numero intero di millisecondi",
       "edit": "Modifica il server MCP",
-      "saveFailed": "Impossibile salvare il server MCP"
+      "saveFailed": "Impossibile salvare il server MCP",
+      "deleteFailed": "Impossibile eliminare il server MCP",
+      "updateFailed": "Impossibile aggiornare il server MCP"
     },
     "agents": {
       "title": "Agenti del profilo",
       "add": "Aggiungi agente",
       "empty": "Nessun agente ancora",
       "name": "Nome dell'agente",
-      "slug": "Lumaca dell'agente",
+      "slug": "Slug dell'agente",
       "description": "Descrizione dell'agente",
       "model": "Sostituzione del modello",
       "modelPlaceholder": "Utilizza l'impostazione predefinita della sessione",
-      "prompt": "Richiesta di sistema",
+      "prompt": "Prompt di sistema",
       "steps": "Passi massimi",
       "stepsPlaceholder": "es. 50",
       "temperature": "Temperatura",
@@ -3704,7 +3792,11 @@
       "visibilityPrimary": "Principale: mostrato nel selettore",
       "visibilitySubagent": "Subagente: richiamabile solo da altri",
       "visibilityAll": "Tutti, entrambi",
+      "modePrimary": "Solo principale",
+      "modeSubagent": "Solo subagente",
+      "modeAll": "Tutte le modalità",
       "saveFailed": "Impossibile salvare l'agente",
+      "deleteFailed": "Impossibile eliminare l'agente",
       "nameRequired": "Inserisci il nome di un agente",
       "slugRequired": "Inserisci uno slug dell'agente",
       "slugInvalid": "Lo slug deve iniziare con una lettera e utilizzare solo lettere minuscole, cifre e trattini",
@@ -3719,10 +3811,12 @@
       "description": "Descrizione del comando",
       "template": "Modello",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Spiega $ARGUMENTS",
       "subtask": "Esegui come attività secondaria",
       "edit": "Comando Modifica barra",
       "saveFailed": "Impossibile salvare il comando",
+      "deleteFailed": "Impossibile eliminare il comando",
       "nameRequired": "Immettere un nome di comando",
       "nameInvalid": "Il nome deve iniziare con una lettera minuscola e utilizzare solo lettere minuscole, numeri e trattini",
       "templateRequired": "Immettere un modello di comando",
@@ -3761,6 +3855,8 @@
     "empty": "I pacchetti di crediti non sono disponibili al momento.",
     "noMatchingProducts": "L'App Store non ha restituito pacchetti di crediti corrispondenti.",
     "noMatchingProductsPlay": "Google Play non ha restituito pacchetti di crediti corrispondenti.",
+    "storeTimedOut": "L'App Store non ha risposto in tempo. Riprova.",
+    "storeTimedOutPlay": "Google Play non ha risposto in tempo. Riprova.",
     "purchaseOwnedByAnotherAccount": "I crediti associati a questo Apple Account appartengono a un altro account Kilo. Accedi a quell'account Kilo per usarli.",
     "purchaseOwnedByAnotherAccountPlay": "I crediti su questo account Google Play appartengono a un account Kilo diverso. Accedi a quell'account Kilo per usarli."
   },
@@ -3873,7 +3969,7 @@
     "view": "Leggi briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Mostra stato live",
+    "dismiss": "Ignora il briefing",
     "offline": "Offline · briefing salvato",
     "cached": "Report salvato · aggiornamento non disponibile",
     "revised": "Revisionato · {{revision}}",
@@ -3914,6 +4010,33 @@
     "enable": "Attiva riepiloghi a pagamento",
     "contextSettings": "Impostazioni AI · {{context}}",
     "allContexts": "I briefing personali e dell'organizzazione restano separati.",
+    "create": "Crea briefing",
+    "oneOff": "Una tantum",
+    "createdAt": "Creato {{time}}",
+    "chooseContext": "Scegli un contesto",
+    "period": "Periodo del briefing",
+    "last24Hours": "Ultime 24 ore",
+    "last7Days": "Ultimi 7 giorni",
+    "customPeriod": "Periodo personalizzato",
+    "periodStart": "Inizio del periodo",
+    "periodEnd": "Fine del periodo",
+    "periodHint": "Scegli un periodo fino a 31 giorni. La copertura dei dati storici potrebbe essere incompleta.",
+    "periodSessions": "Attive nel periodo",
+    "periodSpend": "Spesa nel periodo",
+    "invalidPeriod": "Scegli un inizio precedente alla fine.",
+    "futurePeriod": "Il periodo non può terminare nel futuro.",
+    "periodTooLong": "Scegli un periodo di 31 giorni o meno.",
+    "invalidLocalTime": "Questa ora locale non esiste nel fuso orario del briefing. Scegli un'altra ora.",
+    "reviewBriefing": "Rivedi briefing",
+    "reviewAgain": "Prepara una nuova revisione",
+    "payer": "Addebitato a {{context}}",
+    "emptyPeriod": "Nessuna attività trovata in questo periodo. Nessun riepilogo AI né addebito.",
+    "emptyHistory": "Nessun briefing salvato",
+    "historicalStateHint": "Lo stato della sessione riflette la fine del periodo selezionato, non lo stato attuale in tempo reale.",
+    "oneOffHint": "L'AI riceve dati selezionati, con le informazioni sensibili oscurate, nella lingua dell'app. Questo rapporto una tantum non modifica la programmazione del mattino né le preferenze AI.",
+    "createOffline": "Connettiti a Internet per rivedere o creare un briefing. Le richieste a pagamento non vengono mai messe in coda in assenza di connessione.",
+    "estimateInputTooLarge": "Questo periodo contiene troppi dati per il modello selezionato.",
+    "estimatePermissionUnavailable": "Non hai il permesso di utilizzare il saldo di questo contesto.",
     "estimatePricingUnavailable": "Prezzi non disponibili per questo modello.",
     "estimateBalanceUnavailable": "Saldo insufficiente per un riepilogo a pagamento.",
     "estimateModelNotAllowed": "Questo modello non è consentito qui.",

@@ -52,10 +52,11 @@ export {
 };
 
 /** How a finished session ended, for the outcome line. */
-export type SessionLiveOutcomeKind = 'pr_opened' | 'changes' | 'none';
+export const sessionLiveOutcomeKindSchema = z.enum(['pr_opened', 'changes', 'none']);
+export type SessionLiveOutcomeKind = z.infer<typeof sessionLiveOutcomeKindSchema>;
 
 export const sessionLiveOutcomeSchema = z.object({
-  kind: z.enum(['pr_opened', 'changes', 'none']),
+  kind: sessionLiveOutcomeKindSchema,
 });
 
 /**

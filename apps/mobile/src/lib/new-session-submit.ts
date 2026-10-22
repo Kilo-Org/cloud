@@ -240,6 +240,20 @@ export function resolveNewSessionStartBlockedReason(
 }
 
 /**
+ * The provider the footer's connect action opens for the `connect-provider`
+ * reason: the first group still in the `connect` state, in the repository
+ * section's fixed github/gitlab/bitbucket order, or `null` when no provider is
+ * left to connect. Kept pure so the target choice is pinnable without
+ * rendering; the screen only ever reads it when the reason is
+ * `connect-provider`, which itself requires a connectable group.
+ */
+export function resolveNewSessionConnectProvider<K extends string>(
+  groups: readonly { key: K; status: string }[]
+): K | null {
+  return groups.find(group => group.status === 'connect')?.key ?? null;
+}
+
+/**
  * Whether the continue-form Start button is disabled. Distinct from the
  * ordinary new-session gate: a clone carries no prompt and no profile
  * requirement.

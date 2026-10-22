@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   resolveContinueStartDisabled,
+  resolveNewSessionConnectProvider,
   resolveNewSessionStartBlockedReason,
   resolveNewSessionStartDisabled,
   resolveNewSessionSubmitDisabled,
@@ -369,6 +370,50 @@ function continueReasonInput(overrides: {
     gate: overrides.gate ?? continueGate(),
   };
 }
+
+describe('resolveNewSessionConnectProvider', () => {
+  it('picks the first connectable group in the section order', () => {
+    expect(
+      resolveNewSessionConnectProvider([
+        { key: 'github', status: 'connect' },
+        { key: 'gitlab', status: 'connect' },
+        { key: 'bitbucket', status: 'connect' },
+      ])
+    ).toBe('github');
+  });
+
+  it('skips groups that are already connected, empty, loading, or failed', () => {
+    expect(
+      resolveNewSessionConnectProvider([
+        { key: 'github', status: 'connected-empty' },
+        { key: 'gitlab', status: 'loading' },
+        { key: 'bitbucket', status: 'connect' },
+      ])
+    ).toBe('bitbucket');
+    expect(
+      resolveNewSessionConnectProvider([
+        { key: 'github', status: 'error' },
+        { key: 'gitlab', status: 'connect' },
+      ])
+    ).toBe('gitlab');
+    expect(
+      resolveNewSessionConnectProvider([
+        { key: 'github', status: 'repos' },
+        { key: 'gitlab', status: 'connect' },
+      ])
+    ).toBe('gitlab');
+  });
+
+  it('returns null when no provider is left to connect', () => {
+    expect(
+      resolveNewSessionConnectProvider([
+        { key: 'github', status: 'repos' },
+        { key: 'gitlab', status: 'connected-empty' },
+      ])
+    ).toBeNull();
+    expect(resolveNewSessionConnectProvider([])).toBeNull();
+  });
+});
 
 describe('resolveNewSessionStartBlockedReason', () => {
   it('returns select-repository when rows exist and none is selected', () => {

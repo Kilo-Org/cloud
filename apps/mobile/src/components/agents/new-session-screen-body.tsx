@@ -77,6 +77,7 @@ import {
 } from '@/lib/hooks/remote-instance-spawn-classifier';
 import {
   resolveContinueStartDisabled,
+  resolveNewSessionConnectProvider,
   resolveNewSessionStartBlockedReason,
   resolveNewSessionStartDisabled,
 } from '@/lib/new-session-submit';
@@ -1009,13 +1010,12 @@ export function NewSessionScreenBody() {
   // The repository section's own settle state, separated from the repository
   // count exactly as the extension separates provider connect from repo count.
   const hasRepositories = repositories.length > 0;
-  const hasConnectableProvider = groups.some(group => group.status === 'connect');
+  // One source of truth for "a provider can still be connected" and which one
+  // the footer's connect action opens: the first group in the `connect` state,
+  // in the section's fixed github/gitlab/bitbucket order.
+  const connectProviderPlatform = resolveNewSessionConnectProvider(groups);
+  const hasConnectableProvider = connectProviderPlatform !== null;
   const isLoadingRepositories = groups.some(group => group.status === 'loading');
-  // The provider the footer's connect action opens: the first group still in
-  // the `connect` state, in the section's fixed github/gitlab/bitbucket order.
-  // Only read when `startBlockedReasonKey` is `connect-provider`, which
-  // requires at least one connectable group.
-  const connectProviderPlatform = groups.find(group => group.status === 'connect')?.key ?? null;
 
   const startBlockedReasonKey = resolveNewSessionStartBlockedReason(
     isCloneEntry
@@ -1066,15 +1066,14 @@ export function NewSessionScreenBody() {
     );
   } else if (startBlockedReasonKey === 'connect-provider') {
     startBlockedReason = t('agentChat.newSession.connectProviderToStart');
-    // `connect-provider` requires at least one connectable group, so the first
-    // one exists exactly when this branch runs; fall back to no action if it
-    // ever does not, rather than opening a broken connect flow.
-    const connectPlatform = connectProviderPlatform;
-    if (connectPlatform !== null) {
+    // `connect-provider` requires at least one connectable group, so a target
+    // exists exactly when this branch runs; fall back to no action if it ever
+    // does not, rather than opening a broken connect flow.
+    if (connectProviderPlatform !== null) {
       startBlockedAction = {
         label: t('common.connectProvider'),
         onPress: () => {
-          openIntegration(connectPlatform);
+          openIntegration(connectProviderPlatform);
         },
       };
     }

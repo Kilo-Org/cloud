@@ -89,6 +89,8 @@ describe('plural families', () => {
         'fixture.singleQuoted',
       ]);
       expect(collectDynamicCountedCalls(root)).toEqual(['dynamicKey']);
+      // The fixture expression is not in the allowlist, so the audit reports it.
+      expect(findUnlistedDynamicCalls(root)).toEqual(['dynamicKey']);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

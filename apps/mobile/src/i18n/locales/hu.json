@@ -2412,7 +2412,7 @@
       "thought": "Gondolat",
       "showDetails": "Részletek megjelenítése",
       "pending": "Függőben…",
-      "running": "Fut…"
+      "running": "Folyamatban…"
     },
     "messageErrorBoundary": {
       "failedToRender": "Nem sikerült megjeleníteni a tartalmat."

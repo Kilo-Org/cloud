@@ -11,6 +11,10 @@
  *   emits `oauthSignIn failed` with the OAuth error code as `reason` and a
  *   fixed-vocabulary `detail` naming the cause behind that code.
  *
+ * The reuse guard's own rejection never reaches `onError` (it answers from the
+ * Durable Object before the provider runs), so it emits the same failed event
+ * with detail `refresh_token_reuse` from `./refresh-reuse`.
+ *
  * Analytics is best-effort (src/analytics.ts never throws), so a hook can
  * never affect the token response.
  */
@@ -65,6 +69,9 @@ export function tokenExchangeCallback(
     identity: identityFromProps(options.props),
   });
 }
+
+/** Failure detail for a rejected reuse of a rotated refresh token. */
+export const OAUTH_DETAIL_REFRESH_TOKEN_REUSE = 'refresh_token_reuse';
 
 /**
  * The library's `error_description` values, mapped to a fixed slug vocabulary.

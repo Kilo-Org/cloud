@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { McpAnalytics } from '../analytics';
+import { OAUTH_DETAIL_REFRESH_TOKEN_REUSE } from './provider-hooks';
 import {
   createRefreshReuseHandler,
   detectRefreshTokenReuse,
@@ -203,6 +205,33 @@ describe('detectRefreshTokenReuse', () => {
       expect(await detectRefreshTokenReuse(request, deps)).toBeNull();
     }
     expect(deps.revokeGrant).not.toHaveBeenCalled();
+  });
+
+  it('records the destroyed session with the account and a fixed detail', async () => {
+    const oauthSignIn = vi.fn();
+    const deps = { ...makeDeps(), analytics: () => ({ oauthSignIn }) as unknown as McpAnalytics };
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
+
+    expect(await detectRefreshTokenReuse(refreshRequest('u:g:first'), deps)).not.toBeNull();
+    expect(oauthSignIn).toHaveBeenCalledExactlyOnceWith({
+      phase: 'failed',
+      identity: { kiloUserId: 'u', organizationId: null },
+      reason: 'invalid_grant',
+      detail: OAUTH_DETAIL_REFRESH_TOKEN_REUSE,
+    });
+  });
+
+  it('emits nothing when the guard forwards the request', async () => {
+    const oauthSignIn = vi.fn();
+    const deps = { ...makeDeps(), analytics: () => ({ oauthSignIn }) as unknown as McpAnalytics };
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
+
+    for (const token of ['u:g:first', 'u:g:unknown']) {
+      expect(await detectRefreshTokenReuse(refreshRequest(token), deps)).toBeNull();
+    }
+    expect(deps.revokeGrant).not.toHaveBeenCalled();
+    expect(oauthSignIn).not.toHaveBeenCalled();
   });
 });
 

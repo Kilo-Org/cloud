@@ -13,7 +13,7 @@ import {
   checkExistingFork,
 } from '@/lib/integrations/platforms/github/adapter';
 import { DEMO_SOURCE_OWNER, DEMO_SOURCE_REPO_NAME } from '@/components/cloud-agent/demo-config';
-import { PLATFORM } from '@/lib/integrations/core/constants';
+import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import {
   isPlatformIntegrationHealthy,
   isPlatformIntegrationSuspended,
@@ -34,6 +34,7 @@ export type GitHubRepositoriesUnavailableReason =
   | 'suspended'
   | 'disconnected'
   | 'reauth_required'
+  | 'pending_approval'
   | 'not_configured';
 
 type GitHubRepositoriesResult = {
@@ -112,6 +113,7 @@ const UNAVAILABLE_REASON_MESSAGES: Record<GitHubRepositoriesUnavailableReason, s
   suspended: 'GitHub integration is suspended',
   disconnected: 'GitHub integration is disconnected',
   reauth_required: 'GitHub integration requires reauthorization',
+  pending_approval: 'GitHub installation is awaiting approval',
   not_configured: 'GitHub integration is not properly configured',
 };
 
@@ -128,6 +130,9 @@ const unavailableReasonForIntegration = (integration: {
 }): GitHubRepositoriesUnavailableReason => {
   if (integration.github_disconnected_at) return 'disconnected';
   if (isPlatformIntegrationSuspended(integration)) return 'suspended';
+  // A requested installation nobody has approved yet has no installation id
+  // and no fault: it needs an admin decision, not a reconnect.
+  if (integration.integration_status === INTEGRATION_STATUS.PENDING) return 'pending_approval';
   if (integration.auth_invalid_at) return 'reauth_required';
   return 'not_configured';
 };
@@ -364,7 +369,12 @@ async function fetchRepositoriesForIntegrations(
         // The caller retries, so this stays an error rather than a state.
         throw new Error('All GitHub repository fetches failed');
       }
-      return unavailableIntegrationResponse(unavailable.reason);
+      return {
+        ...unavailableIntegrationResponse(unavailable.reason),
+        // A rejected read next to an unusable installation may clear on retry,
+        // so the pickers keep the retry control alongside the reason.
+        ...(outcomes.some(outcome => outcome.status === 'failed') ? { partial: true } : {}),
+      };
     }
     return {
       integrationInstalled: true,

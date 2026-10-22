@@ -2,6 +2,7 @@ export type GitHubRepositoryUnavailableReason =
   | 'suspended'
   | 'disconnected'
   | 'reauth_required'
+  | 'pending_approval'
   | 'not_configured';
 
 type GitHubRepositoryListState = {

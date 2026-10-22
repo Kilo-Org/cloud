@@ -473,6 +473,47 @@ describe('github-integration-helpers', () => {
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     });
 
+    it('keeps the retry affordance when a rejected read sits beside an unusable installation', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          integration_status: 'suspended',
+          suspended_at: '2026-06-25 18:00:00+00',
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          repositories: null,
+        }),
+      ]);
+      mockFetchGitHubRepositories.mockRejectedValue(new Error('GitHub unavailable'));
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.integrationInstalled).toBe(false);
+      expect(result.unavailableReason).toBe('suspended');
+      // The sibling's read can clear on retry, so the list is not settled.
+      expect(result.partial).toBe(true);
+    });
+
+    it('reports a pending installation as awaiting approval', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({ integration_status: 'pending', platform_installation_id: null }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result).toMatchObject({
+        integrationInstalled: false,
+        errorMessage: 'GitHub installation is awaiting approval',
+        unavailableReason: 'pending_approval',
+      });
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    });
+
     it('treats an installation without a platform installation id as unavailable', async () => {
       mockGetIntegrationsByOrganization.mockResolvedValue([
         buildIntegration({ platform_installation_id: null }),

@@ -1044,7 +1044,13 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         syncedAt: z.string().nullish(),
         errorMessage: z.string().optional(),
         unavailableReason: z
-          .enum(['suspended', 'disconnected', 'reauth_required', 'not_configured'])
+          .enum([
+            'suspended',
+            'disconnected',
+            'reauth_required',
+            'pending_approval',
+            'not_configured',
+          ])
           .optional(),
         partial: z.boolean().optional(),
       })

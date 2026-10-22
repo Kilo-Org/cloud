@@ -23,15 +23,15 @@ import {
   applyMoonshotModelSettings,
   isKimiModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
-import { isGlmModel } from '@kilocode/web-shared/lib/ai-gateway/providers/zai';
-import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
+import {
+  PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG,
+  resolvePreferredProviderOrder,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import {
   ReasoningDetailsTransform,
   type BYOKResult,
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { isStepModel } from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
-import { isDeepseekModel } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -48,11 +48,7 @@ import {
   mapReasoningDetailsToReasoningContent,
   scrubOpenCodeSpecificProperties,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
-import {
-  isQwenExplicitCacheModel,
-  isQwenModel,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
-import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import { isQwenExplicitCacheModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
 import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
 import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
@@ -146,43 +142,7 @@ function applyGeminiReasoningTransform(request: OpenRouterChatCompletionRequest)
 }
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
-  if (isOpenAiModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.openai];
-  }
-  if (isClaudeModel(requestedModel)) {
-    return [
-      OpenRouterInferenceProviderIdSchema.enum['google-vertex'],
-      OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
-    ];
-  }
-  if (isMinimaxModel(requestedModel)) {
-    return ['minimax/fp8']; // do not prefer minimax/highspeed
-  }
-  if (isMistralModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.mistral];
-  }
-  if (isKimiModel(requestedModel)) {
-    return [
-      OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
-      OpenRouterInferenceProviderIdSchema.enum.alibaba,
-    ];
-  }
-  if (isStepModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
-  }
-  if (isDeepseekModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.novita];
-  }
-  if (isGlmModel(requestedModel)) {
-    return [
-      OpenRouterInferenceProviderIdSchema.enum.friendli,
-      OpenRouterInferenceProviderIdSchema.enum.novita,
-    ];
-  }
-  if (isQwenModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.alibaba];
-  }
-  return [];
+  return resolvePreferredProviderOrder(PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG, requestedModel);
 }
 
 /**

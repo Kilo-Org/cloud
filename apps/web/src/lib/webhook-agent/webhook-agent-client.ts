@@ -1,6 +1,7 @@
 import 'server-only';
 import { INTERNAL_API_SECRET, WEBHOOK_AGENT_URL } from '@kilocode/web-shared/lib/config.server';
 import { encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
+import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 import * as z from 'zod';
 
 /**
@@ -20,7 +21,7 @@ export type TriggerConfigResponse = {
   mode: string | null;
   model: string | null;
   variant?: string | null;
-  sandboxAllocation?: 'isolated-standard';
+  sandboxAllocation?: SandboxAllocation;
   promptTemplate: string;
   profileId?: string | null;
   autoCommit?: boolean;
@@ -46,7 +47,7 @@ export type CreateTriggerInput = {
   mode?: string;
   model?: string;
   variant?: string;
-  sandboxAllocation?: 'isolated-standard';
+  sandboxAllocation?: SandboxAllocation;
   promptTemplate: string;
   profileId?: string;
   autoCommit?: boolean;
@@ -69,7 +70,7 @@ export type UpdateTriggerInput = {
   mode?: string;
   model?: string;
   variant?: string | null;
-  sandboxAllocation?: 'isolated-standard' | null;
+  sandboxAllocation?: SandboxAllocation | null;
   promptTemplate?: string;
   isActive?: boolean;
   profileId?: string;

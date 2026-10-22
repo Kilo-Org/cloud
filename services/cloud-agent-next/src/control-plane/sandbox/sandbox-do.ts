@@ -73,9 +73,10 @@ import {
 import { preinstalledStartup } from '../../sandbox-control/preinstalled-startup.js';
 import type { GrantDiagnostic } from '../../sandbox-control/grant-diagnostic.js';
 import {
-  kiloTokenHasRuntimeAuthorization,
+  hasRuntimeCredentialProxy,
   prepareCredentialGrant,
   resolveSessionCredential,
+  SessionCredentialUpgradeRequiredError,
   sessionCredentialsPayloadFromGrant,
   type SessionCredentialGrant,
 } from '../../sandbox-control/session-credentials.js';
@@ -2503,10 +2504,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(spec.git ? { git: spec.git } : {}),
     };
     const scopeId = source.scopeId ?? spec.sessionId;
-    const modern = kiloTokenHasRuntimeAuthorization(source.kiloToken);
     const scopes = listScopeGrants(this.db);
     const existing = scopes.find(
-      grant => grant.scopeId === scopeId && (grant.kilo.runtimeProxy !== undefined) === modern
+      grant => grant.scopeId === scopeId && hasRuntimeCredentialProxy(grant)
     );
     if (
       runtimeContract !== 'legacy' &&
@@ -2619,7 +2619,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const now = Date.now();
     return this.refreshVercelNetworkPolicy([
       ...listScopeGrants(this.db).filter(
-        grant => scopeGrantId(grant) !== scopeGrantId(candidate) && grant.expiresAt > now
+        grant =>
+          hasRuntimeCredentialProxy(grant) &&
+          scopeGrantId(grant) !== scopeGrantId(candidate) &&
+          grant.expiresAt > now
       ),
       candidate,
     ]);
@@ -2675,6 +2678,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return 'not_ready';
+    if (route.grant === null || !hasRuntimeCredentialProxy(route.grant)) {
+      await onRouteFailed(
+        this.routeContext(state),
+        payload.sessionId,
+        'credential_upgrade_required',
+        undefined,
+        true
+      );
+      return 'not_ready';
+    }
 
     // Proactive maintenance runs whenever the shared canonical handle is within
     // the threshold, independent of the grant re-issue clock: it converges every
@@ -3173,7 +3186,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async activeGrants(now: number): Promise<SessionCredentialGrant[]> {
-    return listScopeGrants(this.db).filter(grant => grant.expiresAt > now);
+    return listScopeGrants(this.db).filter(
+      grant => hasRuntimeCredentialProxy(grant) && grant.expiresAt > now
+    );
   }
 
   /**
@@ -3294,12 +3309,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
             throw new Error('Credential policy unavailable');
           this.publishRouteGrant({ ...route, ...issued });
         } catch (error) {
+          const upgradeRequired = error instanceof SessionCredentialUpgradeRequiredError;
           await failCurrentAttempt(
             this.routeContext(next),
             route.sessionId,
             route.attemptId,
-            'workspace_setup_failed',
-            admissionFailureStage(error, 'runtime_proxy_bind_failed')
+            upgradeRequired ? 'credential_upgrade_required' : 'workspace_setup_failed',
+            upgradeRequired
+              ? 'credential_upgrade_required'
+              : admissionFailureStage(error, 'runtime_proxy_bind_failed')
           );
         }
       }
@@ -3460,23 +3478,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // A route without a grant never reaches `preparing` (issuance failure marks
     // it `failed`), so never send a spec that could carry raw issuer material.
     if (route.grant === null) return;
-    if (route.grant.kilo.runtimeProxy !== undefined) {
-      // R1: minting the runtime credential proxy handle is a Session DO call that
-      // must stay off this DO's serial queue; the frame is sent once the handle
-      // is minted and bound. A mint failure fails the attempt closed.
-      this.ctx.waitUntil(this.sendSessionPrepareWithRuntimeProxy(route.sessionId, route.attemptId));
-      return;
-    }
-    let spec: ControlPlaneRouteSpec;
-    try {
-      spec = this.materializePrepareFrame(route, socket);
-    } catch (error) {
-      this.logPrepareFrameMaterializationFailure(route, error);
+    if (!hasRuntimeCredentialProxy(route.grant)) {
       this.ctx.waitUntil(
         this.failPrepareAttempt(
           route.sessionId,
           route.attemptId,
-          materializationStage(error)
+          'credential_upgrade_required',
+          'credential_upgrade_required'
         ).catch(() => {
           logger
             .withFields({
@@ -3484,18 +3492,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
               sessionId: route.sessionId,
               attemptId: route.attemptId,
             })
-            .warn('Could not persist frame materialization failure');
+            .warn('Could not persist credential upgrade failure');
         })
       );
       return;
     }
-    // The frame carries the wrapper-safe spec plus the issued credential
-    // material only; the credential source stays DO-private.
-    this.trySendFrame(socket, {
-      type: 'session.prepare',
-      spec,
-      credentials: this.prepareCredentials(route.grant, route.sessionId),
-    });
+    // Minting calls the Session DO and must stay outside this serial queue.
+    this.ctx.waitUntil(this.sendSessionPrepareWithRuntimeProxy(route.sessionId, route.attemptId));
   }
 
   /** Whether the bound wrapper advertised that it redacts named secret keys. */
@@ -4070,17 +4073,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async failPrepareAttempt(
     sessionId: string,
     attemptId: string,
-    stage = 'prepare_dispatch_failed'
+    stage = 'prepare_dispatch_failed',
+    reason: ControlPlaneFailureReason = 'workspace_setup_failed'
   ): Promise<void> {
     await this.enqueue(async () => {
       const state = await this.readAllocation();
-      await failCurrentAttempt(
-        this.routeContext(state),
-        sessionId,
-        attemptId,
-        'workspace_setup_failed',
-        stage
-      );
+      await failCurrentAttempt(this.routeContext(state), sessionId, attemptId, reason, stage);
     });
   }
 

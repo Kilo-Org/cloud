@@ -103,6 +103,7 @@ export type ControlPlaneSetupEvent = z.infer<typeof controlPlaneSetupEventSchema
 export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'preparation_timeout',
   'workspace_setup_failed',
+  'credential_upgrade_required',
   'agent_unavailable',
   'billing_blocked',
   'billing_unavailable',

@@ -91,6 +91,16 @@ if (isProductionBuild && !process.env.SENTRY_AUTH_TOKEN) {
   );
 }
 
+// Admission gate: the server issues native credentials only to a device that
+// proves Play Integrity or App Attest. A production build without the project
+// number ships an Android app that cannot attest, so the app would be unable
+// to sign in.
+if (isProductionBuild && !process.env[OPTIONAL_ENV_KEYS.playIntegrityProjectNumber]) {
+  throw new Error(
+    'Missing GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER: a production build requires it, or the Android app cannot attest and native sign-in is refused.'
+  );
+}
+
 // Google OAuth client IDs are public identifiers (committed .env, all EAS
 // environments). The conditional below tolerates their absence so the app still builds when a
 // checkout lacks them; the native Google button hides itself when undefined.

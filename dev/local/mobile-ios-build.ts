@@ -928,13 +928,13 @@ export type BuildDeps = {
   sleep?: (ms: number) => Promise<void>;
   // Fetch a prebuilt Kilo.app for this nativeHash into productsDir (the
   // directory locateProducedApp reads). Returns false on a miss. When set,
-  // a cache miss tries this before compiling locally. `toolchain` is the
-  // host's own Xcode and simulator SDK: the artifact is keyed on nativeHash
-  // alone, so the fetcher must reject one built by a different toolchain.
+  // a cache miss tries this before compiling locally. The artifact is keyed on
+  // nativeHash alone, so the fetcher must reject one the target simulator
+  // `udid` cannot run.
   fetchRemote?: (args: {
     nativeHash: string;
     productsDir: string;
-    toolchain: { xcodeBuildVersion: string; simulatorSdkVersion: string };
+    udid: string;
   }) => Promise<boolean>;
   // When true, a failed remote fetch fails the build instead of compiling
   // locally (KILO_REMOTE_NATIVE=required).
@@ -1121,10 +1121,7 @@ async function tryRemotePublish(args: {
           const fetched = await fetchRemote({
             nativeHash: args.compatibility.nativeHash,
             productsDir,
-            toolchain: {
-              xcodeBuildVersion: args.compatibility.xcodeBuildVersion,
-              simulatorSdkVersion: args.compatibility.simulatorSdkVersion,
-            },
+            udid: args.udid,
           });
           if (!fetched) throw new Error('remote native artifact unavailable');
         },
@@ -1320,8 +1317,12 @@ async function main(): Promise<void> {
         }),
       validateClaim: (udid: string, worktreeRoot: string, claimRoot: string) =>
         validateSimulatorClaim(udid, worktreeRoot, claimRoot),
-      fetchRemote: async ({ nativeHash, productsDir, toolchain }) =>
-        fetchIosApp({ nativeHash, productsDir, toolchain }),
+      fetchRemote: async ({ nativeHash, productsDir, udid }) =>
+        fetchIosApp({
+          nativeHash,
+          productsDir,
+          simulatorRuntimeVersion: querySimulatorRuntimeVersion(udid),
+        }),
       requireRemote: remoteNativeRequired(),
     });
     process.stdout.write(`Installed ${parsed.udid}\n`);
@@ -1412,6 +1413,23 @@ function querySimulatorSdkVersion(): string {
     encoding: 'utf8',
   });
   return raw.trim();
+}
+
+type SimctlList = {
+  devices?: Record<string, { udid?: string }[]>;
+  runtimes?: { identifier?: string; version?: string }[];
+};
+
+function querySimulatorRuntimeVersion(udid: string): string {
+  const list = JSON.parse(
+    execFileSync('xcrun', ['simctl', 'list', '--json'], { encoding: 'utf8' })
+  ) as SimctlList;
+  const runtimeIdentifier = Object.entries(list.devices ?? {}).find(([, devices]) =>
+    devices.some(device => device.udid === udid)
+  )?.[0];
+  const version = list.runtimes?.find(runtime => runtime.identifier === runtimeIdentifier)?.version;
+  if (!version) throw new Error(`Unable to determine the simulator runtime of ${udid}`);
+  return version;
 }
 
 // Resolve the mobile project root from this module's location, never from

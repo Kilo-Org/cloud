@@ -25,7 +25,7 @@ import { getLocalScopeKey } from './persist';
 
 export type WaitingAsk = {
   kiloSessionId: string;
-  /** 'permission' | 'question' | 'retry' — the tray row's status. */
+  /** 'permission' | 'question' — the tray row's status. */
   status: string;
   /** True when the row came from the cloud-agent control plane. */
   isCloudAgent: boolean;

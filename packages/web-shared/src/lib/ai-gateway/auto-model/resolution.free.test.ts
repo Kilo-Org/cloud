@@ -5,8 +5,6 @@ import {
   findKiloExclusiveModel,
   gemma_4_26b_a4b_it_free_model,
   glyph_cluster_stealth_free_model,
-  kiloExclusiveModels,
-  stepfun_5_preview_free_model,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { getConfiguredAutoFreeModels } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
@@ -64,7 +62,8 @@ describe('getAutoFreeCandidates', () => {
     jest.mocked(findKiloExclusiveModel).mockImplementation(actualFindKiloExclusiveModel);
     jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set(['test/present:free']));
     configure([
-      ...kiloExclusiveModels.map(model => model.public_id),
+      gemma_4_26b_a4b_it_free_model.public_id,
+      glyph_cluster_stealth_free_model.public_id,
       'test/present:free',
       'test/absent:free',
     ]);
@@ -77,7 +76,6 @@ describe('getAutoFreeCandidates', () => {
         [
           gemma_4_26b_a4b_it_free_model.public_id,
           glyph_cluster_stealth_free_model.public_id,
-          stepfun_5_preview_free_model.public_id,
           'test/present:free',
         ].toSorted()
       );
@@ -88,11 +86,7 @@ describe('getAutoFreeCandidates', () => {
     restrictGemmaToChatCompletions();
 
     expect(await getAutoFreeCandidates('messages')).toEqual(
-      [
-        glyph_cluster_stealth_free_model.public_id,
-        stepfun_5_preview_free_model.public_id,
-        'test/present:free',
-      ].toSorted()
+      [glyph_cluster_stealth_free_model.public_id, 'test/present:free'].toSorted()
     );
   });
 

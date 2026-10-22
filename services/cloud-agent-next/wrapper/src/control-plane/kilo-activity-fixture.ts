@@ -5,6 +5,7 @@ import { createKiloClient } from '@kilocode/sdk/v2/client';
 import { createKiloClient as createLegacyKiloClient } from '@kilocode/sdk';
 import { createWrapperKiloClient } from '../kilo-api.js';
 import { unfilteredKiloEvents } from '../control/feed.js';
+import { KILO_CLI_VERSION } from '../../../src/shared/kilo-cli-version.js';
 
 type ToolCall = { name: string; arguments: Record<string, unknown> };
 export type ModelReply = { text?: string; tools?: ToolCall[]; status?: number };
@@ -15,11 +16,17 @@ export async function activityFixture(
   options: {
     subagentPermission?: Record<string, 'allow' | 'ask' | 'deny'>;
     modelBaseUrl?: string;
+    skillMarkdown?: string;
   } = {}
 ) {
   const root = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-activity-781-')));
   const directory = path.join(root, 'workspace');
   await fsp.mkdir(directory);
+  if (options.skillMarkdown) {
+    const skillDirectory = path.join(root, '.kilocode/skills/native-human-permission');
+    await fsp.mkdir(skillDirectory, { recursive: true });
+    await fsp.writeFile(path.join(skillDirectory, 'SKILL.md'), options.skillMarkdown);
+  }
   const env = {
     PATH: process.env.PATH,
     HOME: root,
@@ -29,7 +36,8 @@ export async function activityFixture(
     XDG_STATE_HOME: path.join(root, 'state'),
   };
   const version = Bun.spawnSync([binary, '--version'], { env });
-  if (version.stdout.toString().trim() !== '7.8.1') throw new Error('Expected Kilo 7.8.1');
+  if (version.stdout.toString().trim() !== KILO_CLI_VERSION)
+    throw new Error(`Expected Kilo ${KILO_CLI_VERSION}`);
   let respond: () => Promise<ModelReply> = async () => ({ text: 'done' });
   let requests = 0;
   const fake = Bun.serve({
@@ -105,9 +113,9 @@ export async function activityFixture(
   const events: Array<{ type: string; properties: Record<string, unknown>; directory?: string }> =
     [];
   async function dispose() {
-    lifetime.abort();
     proc.kill();
     await proc.exited;
+    lifetime.abort();
     await fake.stop(true);
     await consume?.catch(() => undefined);
     await fsp.rm(root, { recursive: true, force: true });
@@ -164,7 +172,11 @@ export async function activityFixture(
       root,
       directory,
       client,
-      wrapper: createWrapperKiloClient(createLegacyKiloClient({ baseUrl: url }), url, directory),
+      wrapper: createWrapperKiloClient(
+        createLegacyKiloClient({ baseUrl: url }),
+        { url },
+        directory
+      ),
       globalClient: createKiloClient({ baseUrl: url }),
       events,
       signal,

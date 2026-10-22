@@ -1,4 +1,8 @@
 import {
+  WORKTREE_RUNTIME_HEADER,
+  WORKTREE_RUNTIME_VERSION,
+} from '../../../src/shared/control-plane-runtime-contract.js';
+import {
   CONTROL_PLANE_PROTOCOL_VERSION,
   controlPlaneWrapperFrameSchema,
   type ControlPlaneWrapperFrame,
@@ -366,7 +370,10 @@ export function createControlPlaneConnection(
     let target: WebSocket;
     try {
       target = new WebSocketWithHeaders(options.url, {
-        headers: { Authorization: `Bearer ${options.credential}` },
+        headers: {
+          Authorization: `Bearer ${options.credential}`,
+          [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION,
+        },
       });
     } catch (error) {
       log(`control-plane connection failed: ${messageOf(error)}`);

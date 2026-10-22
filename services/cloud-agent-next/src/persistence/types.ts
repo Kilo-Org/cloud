@@ -1,13 +1,7 @@
-import type { SandboxId, SessionId, SessionContext, ExecutionSession } from '../types.js';
-import type { Sandbox } from '@cloudflare/sandbox';
-import type { CloudAgentSession } from './CloudAgentSession.js';
-import type { SandboxSessionV2 as SandboxSession } from '../control-plane/session/session-do.js';
+import type { Env, SandboxId, SessionId, SessionContext, ExecutionSession } from '../types.js';
+
 import type { MCPSecretValue } from '../router/schemas.js';
 import type { SessionMetadata } from './session-metadata.js';
-import type { SessionIngestBinding } from '../session-ingest-binding.js';
-import type { NotificationsBinding } from '../notifications-binding.js';
-import type { GitTokenService } from '../types.js';
-import type { SecretBinding } from '../auth.js';
 
 /**
  * Local MCP server configuration (runs a command).
@@ -101,6 +95,16 @@ export type RuntimeKiloCommand = {
   subtask?: boolean;
 };
 
+/**
+ * Instruction file injected from the web app's merged profile stack. Each entry
+ * is materialized to `${SESSION_HOME}/.kilocode/rules/<name>.md` at session
+ * preparation time, alongside the Cloud-Agent-owned `cloud-agent.md`.
+ */
+export type RuntimeInstruction = {
+  name: string;
+  content: string;
+};
+
 export type CloudAgentSessionState = SessionMetadata;
 
 /**
@@ -112,84 +116,15 @@ export type OperationResult<T = void> = {
   data?: T;
 };
 
-export type PersistenceEnv = {
-  /** Durable Object namespace for shared Sandbox instances */
-  Sandbox: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for shared Sandbox instances with SCM credential containment */
-  SandboxContainment: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for per-session Sandbox instances */
-  SandboxSmall: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for per-session Sandbox instances with SCM credential containment */
-  SandboxSmallContainment: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for Docker-in-Docker Sandbox instances */
-  SandboxDIND: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for code-review ephemeral Sandbox instances */
-  SandboxCodeReview: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for code-review ephemeral Sandbox instances with SCM credential containment */
-  SandboxCodeReviewContainment: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
-  CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
-  /** Durable Object namespace for control-plane sessions */
-  SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
-  /** Service binding for the session ingest worker */
-  SESSION_INGEST: SessionIngestBinding;
-  /** Shared secret for JWT token validation */
-  NEXTAUTH_SECRET: SecretBinding;
-  /** Comma-separated list of allowed Origins for /stream WebSocket connections */
-  WS_ALLOWED_ORIGINS?: string;
-  /** Optional override for Kilocode org ID injected into session environment (does not affect authentication) */
-  KILOCODE_ORG_ID_OVERRIDE?: string;
-  /** Backend base URL for API calls and session environment variables (defaults to https://kilo.ai) */
-  KILOCODE_BACKEND_BASE_URL?: string;
-  /** Base URL override for OpenRouter-compatible Kilo API */
-  KILO_OPENROUTER_BASE?: string;
-  /** Kilocode CLI timeout override (seconds) */
-  CLI_TIMEOUT_SECONDS?: string;
-  /** Shell-tool default timeout override (ms) forwarded to the Kilo server - defaults to 4 minutes */
-  KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS?: string;
-  /** GitHub App slug for git commit attribution (e.g., 'kiloconnect') */
-  GITHUB_APP_SLUG?: string;
-  /** GitHub App bot user ID for git commit email (e.g., '240665456') */
-  GITHUB_APP_BOT_USER_ID?: string;
-  /** GitHub Lite App slug for git commit attribution (e.g., 'kiloconnect-lite') */
-  GITHUB_LITE_APP_SLUG?: string;
-  /** GitHub Lite App bot user ID for git commit email */
-  GITHUB_LITE_APP_BOT_USER_ID?: string;
-  /**
-   * RSA private key for decrypting encrypted secrets from agent environment profiles.
-   * Required when using encryptedSecrets feature. PEM format.
-   */
-  AGENT_ENV_VARS_PRIVATE_KEY?: string;
-
-  /** URL for session ingest service, injected into sandbox session env vars */
-  KILO_SESSION_INGEST_URL?: string;
-  /** Worker base URL for building wrapper ingest WebSocket endpoints */
-  WORKER_URL?: string;
-
-  /** Shared secret for internal service-to-service authentication */
-  INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
-
-  R2_ENDPOINT?: string;
-  R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID?: string;
-  R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY?: string;
-  R2_ATTACHMENTS_BUCKET?: string;
-  /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
-  PER_SESSION_SANDBOX_ORG_IDS?: string;
-  /** 'true' disables the per-account concurrent-container cap. Set only on the disposable e2e Worker. */
-  CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
-  VERCEL_TOKEN?: string;
-  VERCEL_TEAM_ID?: string;
-  VERCEL_PROJECT_ID?: string;
-  VERCEL_SANDBOX_SNAPSHOT_ID?: string;
-  VERCEL_SANDBOX_RUNTIME_BUILD_ID?: string;
-  VERCEL_SANDBOX_RUNTIME?: string;
-  VERCEL_SANDBOX_INITIAL_TIMEOUT_MS?: string;
-  VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
-  /** Service binding for centralized git token generation */
-  GIT_TOKEN_SERVICE?: GitTokenService;
-  /** Service binding for dispatching push notifications */
-  NOTIFICATIONS: NotificationsBinding;
-};
+export type PersistenceEnv = Pick<
+  Env,
+  | 'SANDBOX_SESSION'
+  | 'NEXTAUTH_SECRET'
+  | 'GIT_TOKEN_SERVICE'
+  | 'KILOCODE_BACKEND_BASE_URL'
+  | 'KILO_OPENROUTER_BASE'
+  | 'KILOCODE_ORG_ID_OVERRIDE'
+>;
 
 // Re-export commonly used types for convenience
 export type { SessionContext, SandboxId, SessionId, ExecutionSession };

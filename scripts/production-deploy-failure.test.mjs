@@ -108,7 +108,7 @@ test('sends the payload to the existing Slack webhook and surfaces delivery fail
 
 test('CI runs the production deployment notification regression tests', () => {
   assert.ok(
-    readWorkflow('ci').jobs.changes.steps.some(
+    readWorkflow('ci').jobs['ci-wiring'].steps.some(
       step => step.run === 'node --test scripts/production-deploy-failure.test.mjs'
     )
   );

@@ -29,6 +29,7 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
+  parseOrgAutoTopUpThresholdCents,
   SYSTEM_AUTO_TOP_UP_USER_ID,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { findUserByStripeCustomerId } from '@/lib/user';
@@ -310,6 +311,100 @@ async function bouncerCardFingerprintForChargeId(chargeId: string): Promise<stri
   } catch {
     return null;
   }
+}
+
+/** The card fingerprint of a payment method, or null when it cannot be read. */
+async function bouncerCardFingerprintForPaymentMethodId(
+  paymentMethodId: string
+): Promise<string | null> {
+  try {
+    const paymentMethod = await client.paymentMethods.retrieve(paymentMethodId);
+    return paymentMethod.card?.fingerprint ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decline codes that mean the customer did not finish authentication. A retried 3DS challenge is
+ * not a declined card, and counting it would reach bouncer's `card_testing` threshold of three
+ * failures per payer in an hour and block a paying customer once that reason is enforced.
+ * `authentication_failed` is a charge outcome reason; the others are payment intent error codes.
+ */
+const AUTHENTICATION_FAILURE_CODES: Record<string, true> = {
+  authentication_failed: true,
+  authentication_required: true,
+  payment_intent_authentication_failure: true,
+};
+
+function isAuthenticationFailureCode(code: string | null | undefined): boolean {
+  return code != null && AUTHENTICATION_FAILURE_CODES[code] === true;
+}
+
+/** True when a failed payment intent records an authentication failure rather than a decline. */
+function isAuthenticationFailure(paymentIntent: Stripe.PaymentIntent): boolean {
+  const error = paymentIntent.last_payment_error;
+  return (
+    isAuthenticationFailureCode(error?.code) || isAuthenticationFailureCode(error?.decline_code)
+  );
+}
+
+/** True when a failed charge records an authentication failure rather than a declined card. */
+function isAuthenticationFailureCharge(charge: Stripe.Charge): boolean {
+  return (
+    isAuthenticationFailureCode(charge.failure_code) ||
+    isAuthenticationFailureCode(charge.outcome?.reason)
+  );
+}
+
+/**
+ * Reports one declined charge attempt to bouncer as `charge.failed`.
+ *
+ * Stripe describes one attempt with up to two events: `charge.failed`, and
+ * `payment_intent.payment_failed` for the payment intent behind it. Both carry the same charge id,
+ * so the event id is derived from that charge and a second event for the same attempt counts once.
+ * An attempt with no charge keeps its payment intent id. An attempt with neither id is skipped
+ * with a visible log, so an enqueue is never keyed on an empty string.
+ *
+ * `cardFingerprint` is what the event itself carries. `fingerprintSource` names where to read a
+ * fingerprint the event lacks; a `charge.failed` payload is the charge, so a second read of it
+ * returns the same answer and it passes none. Without a fingerprint bouncer cannot count the card
+ * ledger and files a `missing_card` review instead.
+ */
+async function reportDeclinedCharge(params: {
+  owner: Parameters<typeof resolveBouncerCreditOwner>[0];
+  chargeId: string | null | undefined;
+  paymentIntentId: string | null | undefined;
+  occurredAt: Date;
+  cardFingerprint: string | null;
+  fingerprintSource?: {
+    chargeId: string | null | undefined;
+    paymentMethodId: string | null | undefined;
+  };
+}): Promise<void> {
+  const chargeId = params.chargeId ?? null;
+  const eventId = chargeId
+    ? `charge:${chargeId}`
+    : params.paymentIntentId
+      ? `payment_intent:${params.paymentIntentId}`
+      : null;
+  if (!eventId) {
+    warnExceptInTest('Bouncer declined charge has no charge or payment intent id; skipping');
+    return;
+  }
+  const lookupChargeId = params.fingerprintSource?.chargeId ?? null;
+  const cardFingerprint =
+    params.cardFingerprint ??
+    (lookupChargeId ? await bouncerCardFingerprintForChargeId(lookupChargeId) : null) ??
+    (params.fingerprintSource?.paymentMethodId
+      ? await bouncerCardFingerprintForPaymentMethodId(params.fingerprintSource.paymentMethodId)
+      : null);
+  await reportWebhookCreditEvent(params.owner, {
+    type: 'charge.failed',
+    eventId,
+    occurredAt: params.occurredAt,
+    cardFingerprint,
+  });
 }
 
 /**
@@ -721,6 +816,11 @@ async function handleOrgAutoTopUpSetup(
   const amountCents = paymentIntent.metadata.amountCents
     ? parseInt(paymentIntent.metadata.amountCents, 10)
     : DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
+  const thresholdCents = parseOrgAutoTopUpThresholdCents(
+    paymentIntent.metadata.thresholdCents
+      ? parseInt(paymentIntent.metadata.thresholdCents, 10)
+      : undefined
+  );
 
   await db
     .insert(auto_top_up_configs)
@@ -728,6 +828,7 @@ async function handleOrgAutoTopUpSetup(
       owned_by_organization_id: organizationId,
       stripe_payment_method_id: paymentMethodId,
       amount_cents: amountCents,
+      threshold_cents: thresholdCents,
       disabled_reason: null,
       created_by_user_id: kiloUserId,
     })
@@ -736,6 +837,7 @@ async function handleOrgAutoTopUpSetup(
       set: {
         stripe_payment_method_id: paymentMethodId,
         amount_cents: amountCents,
+        threshold_cents: thresholdCents,
         disabled_reason: null,
         created_by_user_id: kiloUserId,
       },
@@ -1833,19 +1935,45 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
     case 'charge.failed': {
       const charge = event.data.object;
-      await reportWebhookCreditEvent(
-        {
+      if (isAuthenticationFailureCharge(charge)) {
+        break;
+      }
+      await reportDeclinedCharge({
+        owner: {
           kiloUserId: charge.metadata?.kiloUserId,
           organizationId: charge.metadata?.organizationId,
           customer: charge.customer,
         },
-        {
-          type: 'charge.failed',
-          eventId: event.id,
-          occurredAt: new Date(event.created * 1000),
-          cardFingerprint: charge.payment_method_details?.card?.fingerprint ?? null,
-        }
-      );
+        chargeId: charge.id,
+        paymentIntentId: stripeReferenceId(charge.payment_intent),
+        occurredAt: new Date(event.created * 1000),
+        cardFingerprint: charge.payment_method_details?.card?.fingerprint ?? null,
+      });
+      break;
+    }
+
+    // A declined card reaches the webhook as this event, not as `charge.failed`. Reporting it keeps
+    // bouncer's `card_testing` rule fed; without it the rule never sees a failure.
+    case 'payment_intent.payment_failed': {
+      const paymentIntent = event.data.object;
+      if (isAuthenticationFailure(paymentIntent)) {
+        break;
+      }
+      await reportDeclinedCharge({
+        owner: {
+          kiloUserId: paymentIntent.metadata?.kiloUserId,
+          organizationId: paymentIntent.metadata?.organizationId,
+          customer: paymentIntent.customer,
+        },
+        chargeId: stripeReferenceId(paymentIntent.latest_charge),
+        paymentIntentId: paymentIntent.id,
+        occurredAt: new Date(event.created * 1000),
+        cardFingerprint: null,
+        fingerprintSource: {
+          chargeId: stripeReferenceId(paymentIntent.latest_charge),
+          paymentMethodId: stripeReferenceId(paymentIntent.payment_method),
+        },
+      });
       break;
     }
 

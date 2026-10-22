@@ -42,6 +42,15 @@
       "zone_name": "kilosessions.ai",
       "custom_domain": true,
     },
+    {
+      "pattern": "cloud-agent.kiloapps.ai",
+      "zone_name": "kiloapps.ai",
+      "custom_domain": true,
+    },
+    {
+      "pattern": "*.cloud-agent.kiloapps.ai/*",
+      "zone_name": "kiloapps.ai",
+    },
   ],
   "vars": {
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
@@ -65,8 +74,10 @@
     "CONTAINER_BILLING_HEARTBEAT_SECONDS": "300",
     "RUNTIME_ISOLATION_ENABLED": "true",
     "SANDBOX_SELECTION_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55",
-    "CONTAINER_REPO_SNAPSHOT_IDS": "2bbc9955-5dc2-428c-a353-be59d89a8130",
+    "CONTAINER_REPO_SNAPSHOT_IDS": "",
     "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
+    "PREVIEW_HOST_SUFFIX": "cloud-agent.kiloapps.ai",
+    "PREVIEW_ENABLED_IDS": "*",
     "VERCEL_SANDBOX_ORG_IDS": "",
     "VERCEL_PROJECT_ID": "",
     "VERCEL_TEAM_ID": "",
@@ -75,7 +86,7 @@
     "VERCEL_SANDBOX_RUNTIME": "node24",
     "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "",
     "VERCEL_SANDBOX_EXTEND_DURATION_MS": "",
-    "CODE_REVIEW_CONTROL_PLANE_IDS": "*",
+    "CODE_REVIEW_CONTAINERS_ORG_IDS": "*",
   },
   "placement": { "mode": "smart" },
   /**
@@ -170,6 +181,9 @@
   // SandboxSmall and SandboxCodeReview receive no traffic: every non-contained sandbox runs
   // in Sandbox. SandboxDIND remains for stop/delete of persisted devcontainer sessions.
   // Remove retired applications/bindings only after verifying drain and external bindings.
+  // The containment classes that carry live traffic request the platform maximum 20 GB disk,
+  // so large repository checkouts are not bounded by the class's vCPU/memory tier. The
+  // non-containment classes have no live instances and keep their lower tiers.
   "containers": [
     {
       "class_name": "Sandbox",
@@ -247,7 +261,7 @@
       "instance_type": {
         "vcpu": 2,
         "memory_mib": 6144,
-        "disk_mb": 10000,
+        "disk_mb": 20000,
       },
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
@@ -261,7 +275,7 @@
       "instance_type": {
         "vcpu": 1,
         "memory_mib": 4096,
-        "disk_mb": 8000,
+        "disk_mb": 20000,
       },
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
@@ -310,10 +324,6 @@
       {
         "class_name": "SandboxCodeReviewContainment",
         "name": "SandboxCodeReviewContainment",
-      },
-      {
-        "class_name": "CloudAgentSession",
-        "name": "CLOUD_AGENT_SESSION",
       },
       {
         "class_name": "StreamTicketNonceDO",
@@ -443,6 +453,9 @@
   "env": {
     "dev": {
       "name": "cloud-agent-next-dev",
+      // Do not inherit the top-level custom-domain route. `wrangler dev` takes its
+      // origin host from the first route, which would hide the preview Host.
+      "routes": [],
       "triggers": {
         "crons": ["17 2 * * *", "*/5 * * * *"],
       },
@@ -481,10 +494,11 @@
         "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "false",
         "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "",
         "CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS": "",
-        "CODE_REVIEW_CONTROL_PLANE_IDS": "*",
+        "CODE_REVIEW_CONTAINERS_ORG_IDS": "",
         "RUNTIME_ISOLATION_ENABLED": "true",
         "SANDBOX_SELECTION_IDS": "*",
         "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
+        "PREVIEW_ENABLED_IDS": "*",
         "VERCEL_SANDBOX_ORG_IDS": "",
         "VERCEL_PROJECT_ID": "",
         "VERCEL_TEAM_ID": "",
@@ -527,6 +541,10 @@
         {
           "binding": "R2_BUCKET",
           "bucket_name": "kilocode-sessions-dev",
+        },
+        {
+          "binding": "RUNTIME_RELEASE_BUCKET",
+          "bucket_name": "cloud-agent-runtime-dev",
         },
       ],
       "containers": [
@@ -652,10 +670,6 @@
           {
             "class_name": "SandboxCodeReviewContainment",
             "name": "SandboxCodeReviewContainment",
-          },
-          {
-            "class_name": "CloudAgentSession",
-            "name": "CLOUD_AGENT_SESSION",
           },
           {
             "class_name": "StreamTicketNonceDO",

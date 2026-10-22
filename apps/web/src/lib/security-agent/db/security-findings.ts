@@ -508,7 +508,7 @@ export async function listSecurityFindings(
           // finding triaged as "dismiss" but sandbox-confirmed as exploitable
           // would appear under "Safe to Dismiss" yet display as "Exploitable".
           conditions.push(
-            sql`(${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown'`
+            sql`((${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown')`
           );
           break;
         case 'needs_review':
@@ -519,7 +519,7 @@ export async function listSecurityFindings(
           );
           // Same as safe_to_dismiss: exclude findings where sandbox overrides triage.
           conditions.push(
-            sql`(${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown'`
+            sql`((${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown')`
           );
           break;
         case 'triage_complete':
@@ -817,7 +817,6 @@ export async function findSecurityFindingBySource(
   }
 }
 
-/** Read owner-level last_synced_at from agent_configs.runtime_state. */
 async function getOwnerLastSyncedAt(ownerConverted: Owner): Promise<string | null> {
   const ownerCondition =
     ownerConverted.type === 'org'

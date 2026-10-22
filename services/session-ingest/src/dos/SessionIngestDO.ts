@@ -1,11 +1,28 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
+  getSessionShareExpiresAt,
   sessionIdSchema,
+  sessionShareDurationSchema,
   sessionLiveSummarySchema,
+  type SessionShareDuration,
   type SessionLiveSummary,
 } from '@kilocode/session-ingest-contracts';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
-import { desc, eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull, sql } from 'drizzle-orm';
+import {
+  desc,
+  eq,
+  ne,
+  gt,
+  gte,
+  lt,
+  and,
+  or,
+  inArray,
+  isNull,
+  isNotNull,
+  like,
+  sql,
+} from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
@@ -13,6 +30,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { ingestItems, ingestMeta, agentNotificationDispatch } from '../db/sqlite-schema';
 import type { Env } from '../env';
+import { MAX_INGEST_ITEM_BYTES } from '../util/ingest-limits';
 import type { IngestBatch } from '../types/session-sync';
 import type { SessionDataItem } from '../types/session-sync';
 import { getItemIdentity, getPartItemIdentityRange } from '../util/compaction';
@@ -26,6 +44,8 @@ import {
   extractNormalizedTitleFromItem,
   extractSessionPrLink,
   extractStatusFromItem,
+  extractStatusOccurredAtFromItem,
+  extractStatusTransitionIdFromItem,
 } from './session-ingest-extractors';
 import {
   attentionKindForNeedsInputStatus,
@@ -52,7 +72,6 @@ import {
   EMPTY_SESSION_LIVE_SUMMARY_STATE,
   foldSessionLiveSummary,
   sessionLiveSummaryChanged,
-  type SessionLiveBatchItem,
   type SessionLiveSummaryState,
 } from './session-live-summary';
 import {
@@ -62,7 +81,20 @@ import {
   type KiloSdkSessionSnapshotRead,
 } from './kilo-sdk-materialization';
 import type { SessionDiffRead } from '@kilocode/session-ingest-contracts';
-import { resetAttentionStatusOnCliDisconnect } from '../ingest/metadata';
+import { precedesStatusTransition, resetAttentionStatusOnCliDisconnect } from '../ingest/metadata';
+import {
+  activityEvidence,
+  statusEvidence,
+  persistBriefingEvidence,
+  type BriefingIngestEvent,
+} from '../ingest/briefing-evidence';
+import {
+  SHARE_INFO_KEY_PREFIX,
+  shareInfoKey,
+  readShareInfo,
+  projectSharedSessionInfo,
+  type ShareInfoMetaKey,
+} from './session-share-info';
 
 type LiveThrottleMetaKey =
   | 'lastActivityValueMs'
@@ -71,6 +103,11 @@ type LiveThrottleMetaKey =
   | 'lastCostPersistedAtMs'
   | 'lastCostPersistedMicrodollars'
   | 'lastLiveSummaryPersistedAtMs';
+
+type AlarmMetaKey = 'metricsAlarmAt' | 'briefingEvidenceRetryAt' | 'briefingEvidenceRetryAttempt';
+
+const BRIEFING_EVIDENCE_RETRY_BASE_MS = 30_000;
+const BRIEFING_EVIDENCE_RETRY_MAX_MS = 60 * 60_000;
 
 type IngestMetaKey =
   | ExtractableMetaKey
@@ -83,7 +120,12 @@ type IngestMetaKey =
   | 'sessionReadyNotified'
   | 'liveSummaryState'
   | 'lastLiveSummaryPersisted'
-  | LiveThrottleMetaKey;
+  | 'briefingEvidencePending'
+  | LiveThrottleMetaKey
+  | AlarmMetaKey
+  | ShareInfoMetaKey;
+
+export const SHARE_INFO_TOO_LARGE_ERROR = 'Share snapshot is too large';
 
 type ExtractableMetaKey =
   | 'title'
@@ -93,6 +135,8 @@ type ExtractableMetaKey =
   | 'gitUrl'
   | 'gitBranch'
   | 'status'
+  | 'statusOccurredAt'
+  | 'statusTransitionId'
   | 'prPlatform'
   | 'prUrl'
   | 'prNumber'
@@ -120,6 +164,18 @@ function writeIngestMetaIfChanged(
     .run();
 
   return { changed: true, value: params.incomingValue };
+}
+function stageBriefingEvidence(db: DrizzleSqliteDODatabase, events: BriefingIngestEvent[]): void {
+  for (const event of events) {
+    writeIngestMetaIfChanged(db, { key: 'briefingEvidencePending', incomingValue: 'true' });
+    db.insert(ingestMeta)
+      .values({
+        key: `briefingEvidence:${event.identity}`,
+        value: JSON.stringify(event),
+      })
+      .onConflictDoNothing()
+      .run();
+  }
 }
 
 function hasIngestMeta(db: DrizzleSqliteDODatabase, key: IngestMetaKey): boolean {
@@ -167,7 +223,7 @@ function readLiveSummaryPersisted(db: DrizzleSqliteDODatabase): SessionLiveSumma
 
 function readIngestMetaNumber(
   db: DrizzleSqliteDODatabase,
-  key: LiveThrottleMetaKey
+  key: LiveThrottleMetaKey | AlarmMetaKey
 ): number | null {
   const row = db
     .select({ value: ingestMeta.value })
@@ -181,7 +237,7 @@ function readIngestMetaNumber(
 
 function writeIngestMetaNumber(
   db: DrizzleSqliteDODatabase,
-  key: LiveThrottleMetaKey,
+  key: LiveThrottleMetaKey | AlarmMetaKey,
   value: number
 ): void {
   const serialized = String(value);
@@ -295,6 +351,8 @@ const INGEST_META_EXTRACTORS: Array<{
   { key: 'gitUrl', extract: extractNormalizedGitUrlFromItem },
   { key: 'gitBranch', extract: extractNormalizedGitBranchFromItem },
   { key: 'status', extract: extractStatusFromItem },
+  { key: 'statusOccurredAt', extract: extractStatusOccurredAtFromItem },
+  { key: 'statusTransitionId', extract: extractStatusTransitionIdFromItem },
 ];
 
 type Changes = Array<{ name: ExtractableMetaKey; value: string | null }>;
@@ -518,6 +576,8 @@ export class SessionIngestDO extends DurableObject<Env> {
       gitUrl: undefined,
       gitBranch: undefined,
       status: undefined,
+      statusOccurredAt: undefined,
+      statusTransitionId: undefined,
       prPlatform: undefined,
       prUrl: undefined,
       prNumber: undefined,
@@ -539,9 +599,15 @@ export class SessionIngestDO extends DurableObject<Env> {
     // holds a newer one of, and folding it would move the summary back (an
     // old running state of a tool that already finished would revive its step).
     const storedItems: IngestBatch[number][] = [];
+    const assistantMessageIds = new Set(
+      payload.flatMap(item =>
+        item.type === 'message' && item.data.role === 'assistant' ? [item.data.id] : []
+      )
+    );
 
     for (const item of payload) {
       const { item_id, item_type } = getItemIdentity(item);
+      stageBriefingEvidence(this.db, statusEvidence([item]));
 
       // Check timestamp guard: skip if existing row has a newer ingested_at.
       // Also read the existing R2 key so we can clean up orphaned blobs.
@@ -595,6 +661,29 @@ export class SessionIngestDO extends DurableObject<Env> {
           },
         })
         .run();
+      if (
+        item.type === 'part' &&
+        (item.data.type === 'text' || item.data.type === 'tool') &&
+        !assistantMessageIds.has(item.data.messageID)
+      ) {
+        const parent = this.db
+          .select({ item_data: ingestItems.item_data })
+          .from(ingestItems)
+          .where(eq(ingestItems.item_id, `message/${item.data.messageID}`))
+          .get();
+        if (typeof parent?.item_data === 'string') {
+          const message: unknown = JSON.parse(parent.item_data);
+          if (
+            typeof message === 'object' &&
+            message !== null &&
+            'role' in message &&
+            message.role === 'assistant'
+          ) {
+            assistantMessageIds.add(item.data.messageID);
+          }
+        }
+      }
+      stageBriefingEvidence(this.db, activityEvidence([item], assistantMessageIds));
       storedItems.push(item);
 
       if (item.type === 'message' || item.type === 'part') {
@@ -635,7 +724,26 @@ export class SessionIngestDO extends DurableObject<Env> {
         }
       }
 
+      const olderThanIncomingStatus =
+        item.type === 'session_status' &&
+        precedesStatusTransition(
+          {
+            occurredAt: item.data.occurredAt ?? null,
+            transitionId: item.data.transitionId ?? null,
+          },
+          {
+            occurredAt: incomingByKey.statusOccurredAt ?? null,
+            transitionId: incomingByKey.statusTransitionId ?? null,
+          }
+        );
       for (const extractor of INGEST_META_EXTRACTORS) {
+        if (
+          olderThanIncomingStatus &&
+          (extractor.key === 'status' ||
+            extractor.key === 'statusOccurredAt' ||
+            extractor.key === 'statusTransitionId')
+        )
+          continue;
         const maybeValue = extractor.extract(item);
         if (maybeValue !== undefined) {
           incomingByKey[extractor.key] = maybeValue;
@@ -662,6 +770,9 @@ export class SessionIngestDO extends DurableObject<Env> {
       }
     }
 
+    // Lifecycle side effects (metrics alarm, open/close meta) run before any incoming
+    // metadata is committed, so a failed alarm write leaves that metadata unreported.
+    if (this.isDeleted()) return { accepted: false, reason: 'deleted', changes: [] };
     if (ingestVersion >= 1) {
       // v1 clients send explicit open/close pairs. Only those events drive alarms.
       for (const event of lifecycleEvents) {
@@ -672,29 +783,48 @@ export class SessionIngestDO extends DurableObject<Env> {
             .delete(ingestMeta)
             .where(inArray(ingestMeta.key, ['metricsEmitted', 'closeReason']))
             .run();
-          await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+          await this.scheduleAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
         } else {
           writeIngestMetaIfChanged(this.db, {
             key: 'closeReason',
             incomingValue: event.reason,
           });
-          await this.ctx.storage.setAlarm(Date.now() + POST_CLOSE_DRAIN_MS);
+          await this.scheduleAlarm(Date.now() + POST_CLOSE_DRAIN_MS);
         }
       }
       // Events without open/close (stragglers) don't touch the alarm.
     } else {
       // v0 (legacy): no open/close signals, rely on inactivity timeout.
-      await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+      await this.scheduleAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
     }
 
     // Read before the write loop below persists incoming values: whether this session had ever
     // reported a status. The first-ever status write also registers as a change, and a
     // full-history backfill of an already-idle session must not push about an old turn.
-    if (this.isDeleted()) return { accepted: false, reason: 'deleted', changes: [] };
     const hadPriorStatus = hasIngestMeta(this.db, 'status');
+    const previousStatusOccurredAt = incomingByKey.statusOccurredAt
+      ? readIngestMetaValue(this.db, 'statusOccurredAt')
+      : null;
+    const previousStatusTransitionId = incomingByKey.statusOccurredAt
+      ? readIngestMetaValue(this.db, 'statusTransitionId')
+      : null;
+    const historicalStatus =
+      incomingByKey.statusOccurredAt != null &&
+      precedesStatusTransition(
+        {
+          occurredAt: incomingByKey.statusOccurredAt,
+          transitionId: incomingByKey.statusTransitionId ?? null,
+        },
+        { occurredAt: previousStatusOccurredAt, transitionId: previousStatusTransitionId }
+      );
 
     const changes: Changes = [];
     for (const key of Object.keys(incomingByKey) as ExtractableMetaKey[]) {
+      if (
+        historicalStatus &&
+        (key === 'status' || key === 'statusOccurredAt' || key === 'statusTransitionId')
+      )
+        continue;
       const incoming = incomingByKey[key];
       if (incoming === undefined) continue;
       const meta = writeIngestMetaIfChanged(this.db, {
@@ -704,6 +834,34 @@ export class SessionIngestDO extends DurableObject<Env> {
       if (meta.changed) {
         changes.push({ name: key, value: meta.value });
       }
+    }
+    const localStatusChange = changes.find(change => change.name === 'status');
+    if (
+      incomingByKey.status !== undefined &&
+      (historicalStatus ||
+        changes.some(
+          change =>
+            change.name === 'status' ||
+            change.name === 'statusOccurredAt' ||
+            change.name === 'statusTransitionId'
+        ))
+    ) {
+      if (!changes.some(change => change.name === 'status')) {
+        changes.push({ name: 'status', value: incomingByKey.status });
+      }
+      if (!changes.some(change => change.name === 'statusOccurredAt')) {
+        changes.push({ name: 'statusOccurredAt', value: incomingByKey.statusOccurredAt ?? null });
+      }
+      if (!changes.some(change => change.name === 'statusTransitionId')) {
+        changes.push({
+          name: 'statusTransitionId',
+          value: incomingByKey.statusTransitionId ?? null,
+        });
+      }
+    }
+    // Incoming metadata is committed; only now start the external evidence flush.
+    if (readIngestMetaValue(this.db, 'briefingEvidencePending') === 'true') {
+      this.ctx.waitUntil(this.flushBriefingEvidence(kiloUserId, sessionId));
     }
 
     // Clean up orphaned R2 blobs after metadata is persisted. R2 is external I/O,
@@ -724,7 +882,7 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     // Live activity + cost Postgres persist (items 7 + 17). Not via applyMetadataChanges
     // (avoids per-tick WS fanout). Throttle meta advances only after a successful write.
-    const statusChangeForLive = changes.find(change => change.name === 'status');
+    const statusChangeForLive = localStatusChange;
     const idleTransition =
       statusChangeForLive !== undefined && isCompletedStatus(statusChangeForLive.value);
     const statusValue = statusChangeForLive?.value ?? readIngestMetaValue(this.db, 'status');
@@ -733,11 +891,7 @@ export class SessionIngestDO extends DurableObject<Env> {
     // Session card summary: fold this batch into the running value and apply
     // the status transition. Only the derived summary leaves the DO.
     const priorLiveSummary = readLiveSummaryState(this.db);
-    const foldedLiveSummary = foldSessionLiveSummary(
-      priorLiveSummary,
-      storedItems as unknown as SessionLiveBatchItem[],
-      statusValue
-    );
+    const foldedLiveSummary = foldSessionLiveSummary(priorLiveSummary, storedItems, statusValue);
     const currentLiveSummaryState =
       statusChangeForLive === undefined
         ? foldedLiveSummary
@@ -1070,27 +1224,132 @@ export class SessionIngestDO extends DurableObject<Env> {
    * `sessionDiff`; without it the output is the full export.
    */
   async getAllStream(upToMessageId?: string): Promise<ReadableStream<Uint8Array>> {
+    return this.buildSessionExportStream({ upToMessageId });
+  }
+
+  /** Include later messages using the same session-info projection as snapshot shares. */
+  async getLiveSharedSessionStream(): Promise<ReadableStream<Uint8Array>> {
+    const snapshot = await readKiloSdkSessionSnapshot(this.db, this.env.SESSION_INGEST_R2);
+    // Session details are optional for reading an existing transcript.
+    const shareInfo = snapshot.kind === 'value' ? projectSharedSessionInfo(snapshot.info) : '{}';
+    return this.buildSessionExportStream({ includeSessionDiff: false, shareInfo });
+  }
+
+  /**
+   * Freeze the session info a public share exposes. Snapshots are keyed by the
+   * public generation so a later share cannot replace an earlier snapshot while
+   * its capability is still valid. Snapshot retention matches the link lifetime.
+   */
+  async captureShareInfo(publicId: string, duration: SessionShareDuration = '7d'): Promise<number> {
+    const shareDuration = sessionShareDurationSchema.parse(duration);
+    if (this.isDeleted()) throw new Error('Session deleted');
+    const snapshot = await readKiloSdkSessionSnapshot(this.db, this.env.SESSION_INGEST_R2);
+    if (snapshot.kind === 'too_large') throw new Error(SHARE_INFO_TOO_LARGE_ERROR);
+    if (snapshot.kind !== 'value' && snapshot.kind !== 'pending') {
+      throw new Error('Share snapshot is unavailable');
+    }
+    if (this.isDeleted()) throw new Error('Session deleted');
+    const info = snapshot.kind === 'value' ? projectSharedSessionInfo(snapshot.info) : '{}';
+    const now = Date.now();
+    const expiresAtSeconds = getSessionShareExpiresAt(shareDuration, Math.floor(now / 1000));
+    const expiresAt = expiresAtSeconds === null ? null : expiresAtSeconds * 1000;
+    const value = JSON.stringify({ capturedAt: now, expiresAt, info });
+    if (new TextEncoder().encode(value).byteLength > MAX_INGEST_ITEM_BYTES) {
+      throw new Error(SHARE_INFO_TOO_LARGE_ERROR);
+    }
+
+    this.db
+      .insert(ingestMeta)
+      .values({ key: shareInfoKey(publicId), value })
+      .onConflictDoUpdate({ target: ingestMeta.key, set: { value } })
+      .run();
+    this.pruneShareInfo(now);
+    return now;
+  }
+
+  async deleteShareInfo(publicId: string): Promise<void> {
+    this.db
+      .delete(ingestMeta)
+      .where(eq(ingestMeta.key, shareInfoKey(publicId)))
+      .run();
+  }
+
+  private pruneShareInfo(now: number): void {
+    const rows = this.db
+      .select({ key: ingestMeta.key, value: ingestMeta.value })
+      .from(ingestMeta)
+      .where(like(ingestMeta.key, `${SHARE_INFO_KEY_PREFIX}%`))
+      .all();
+    for (const row of rows) {
+      if (readShareInfo(row.value, now) === null) {
+        this.db.delete(ingestMeta).where(eq(ingestMeta.key, row.key)).run();
+      }
+    }
+  }
+
+  /**
+   * Stream the frozen boundary of a public share. Only items persisted strictly
+   * before `ingestedBeforeMs` are included, the session info is the snapshot
+   * captured when the share was created, and the cumulative whole-session diff
+   * is never exposed. Message-summary diffs remain part of the transcript so
+   * `kilo import` can still restore intentional file changes.
+   */
+  async getSharedSessionStream(params: {
+    publicId: string;
+    ingestedBeforeMs: number;
+  }): Promise<ReadableStream<Uint8Array>> {
+    return this.buildSessionExportStream({
+      ingestedBeforeMs: params.ingestedBeforeMs,
+      includeSessionDiff: false,
+      shareInfo: this.readShareInfo(params.publicId),
+    });
+  }
+
+  private readShareInfo(publicId: string): string | null {
+    const row = this.db
+      .select({ value: ingestMeta.value })
+      .from(ingestMeta)
+      .where(eq(ingestMeta.key, shareInfoKey(publicId)))
+      .get();
+    return readShareInfo(row?.value ?? null, Date.now());
+  }
+
+  private buildSessionExportStream(options: {
+    upToMessageId?: string;
+    ingestedBeforeMs?: number;
+    includeSessionDiff?: boolean;
+    shareInfo?: string | null;
+  }): ReadableStream<Uint8Array> {
     const db = this.db;
     const r2 = this.env.SESSION_INGEST_R2;
     const encoder = new TextEncoder();
+    const upToMessageId = options.upToMessageId;
+    const ingestedBeforeCondition =
+      options.ingestedBeforeMs === undefined
+        ? undefined
+        : lt(ingestItems.ingested_at, options.ingestedBeforeMs);
 
     return new ReadableStream<Uint8Array>({
       async start(controller) {
         try {
           controller.enqueue(encoder.encode('{"info":'));
-          const sessionRow = db
-            .select({
-              item_data: ingestItems.item_data,
-              item_data_r2_key: ingestItems.item_data_r2_key,
-            })
-            .from(ingestItems)
-            .where(eq(ingestItems.item_type, 'session'))
-            .limit(1)
-            .get();
-          if (sessionRow) {
-            await enqueueItemData(controller, sessionRow, r2, encoder);
+          if (options.shareInfo !== undefined) {
+            controller.enqueue(encoder.encode(options.shareInfo ?? '{}'));
           } else {
-            controller.enqueue(encoder.encode('{}'));
+            const sessionRow = db
+              .select({
+                item_data: ingestItems.item_data,
+                item_data_r2_key: ingestItems.item_data_r2_key,
+              })
+              .from(ingestItems)
+              .where(eq(ingestItems.item_type, 'session'))
+              .limit(1)
+              .get();
+            if (sessionRow) {
+              await enqueueItemData(controller, sessionRow, r2, encoder);
+            } else {
+              controller.enqueue(encoder.encode('{}'));
+            }
           }
 
           const CURSOR_BATCH = 10;
@@ -1111,6 +1370,7 @@ export class SessionIngestDO extends DurableObject<Env> {
               .where(
                 and(
                   eq(ingestItems.item_type, 'message'),
+                  ingestedBeforeCondition,
                   msgCursor ? afterIngestOrderCursor(msgCursor) : undefined
                 )
               )
@@ -1158,6 +1418,7 @@ export class SessionIngestDO extends DurableObject<Env> {
                       eq(ingestItems.item_type, 'part'),
                       gte(ingestItems.item_id, partRange.start),
                       lt(ingestItems.item_id, partRange.end),
+                      ingestedBeforeCondition,
                       partCursor ? afterIngestOrderCursor(partCursor) : undefined
                     )
                   )
@@ -1183,14 +1444,14 @@ export class SessionIngestDO extends DurableObject<Env> {
           controller.enqueue(encoder.encode(']'));
           controller.enqueue(encoder.encode(',"sessionDiff":'));
           const diffRow =
-            upToMessageId === undefined
+            upToMessageId === undefined && options.includeSessionDiff !== false
               ? db
                   .select({
                     item_data: ingestItems.item_data,
                     item_data_r2_key: ingestItems.item_data_r2_key,
                   })
                   .from(ingestItems)
-                  .where(eq(ingestItems.item_type, 'session_diff'))
+                  .where(and(eq(ingestItems.item_type, 'session_diff'), ingestedBeforeCondition))
                   .limit(1)
                   .get()
               : undefined;
@@ -1306,15 +1567,175 @@ export class SessionIngestDO extends DurableObject<Env> {
       .onConflictDoUpdate({ target: ingestMeta.key, set: { value: 'true' } })
       .run();
 
-    await this.ctx.storage.deleteAlarm();
-
     return true;
   }
 
   /**
-   * Alarm fires either after POST_CLOSE_DRAIN_MS (session closed) or
-   * INACTIVITY_TIMEOUT_MS (no activity). Reads the close reason from
-   * ingest_meta if present, otherwise falls back to 'abandoned'.
+   * The single DO alarm serves two schedules: session metrics (metricsAlarmAt) and
+   * briefing evidence retries (briefingEvidenceRetryAt). Arms it for whichever is
+   * due first, or clears it when neither is pending. Passing metricsAlarmAt records it.
+   */
+  private async scheduleAlarm(metricsAlarmAt?: number): Promise<void> {
+    if (metricsAlarmAt !== undefined) {
+      writeIngestMetaNumber(this.db, 'metricsAlarmAt', metricsAlarmAt);
+    }
+    const dueTimes = [
+      metricsAlarmAt ?? readIngestMetaNumber(this.db, 'metricsAlarmAt'),
+      readIngestMetaNumber(this.db, 'briefingEvidenceRetryAt'),
+    ].filter((at): at is number => at !== null);
+    if (dueTimes.length === 0) await this.ctx.storage.deleteAlarm();
+    else await this.ctx.storage.setAlarm(Math.min(...dueTimes));
+  }
+
+  /**
+   * Delivers the durable briefing evidence outbox. The backoff retry is recorded and
+   * armed before the external write, so a failure or eviction mid-flush still retries.
+   * Never throws: it runs under waitUntil and ahead of alarm metrics.
+   */
+  private async flushBriefingEvidence(kiloUserId: string, sessionId: string): Promise<void> {
+    try {
+      if (this.isDeleted()) return;
+      const pendingEvidence = this.db
+        .select()
+        .from(ingestMeta)
+        .where(sql`${ingestMeta.key} LIKE 'briefingEvidence:%'`)
+        .all();
+      if (pendingEvidence.length === 0) {
+        const retryArmed = readIngestMetaNumber(this.db, 'briefingEvidenceRetryAt') !== null;
+        this.db
+          .delete(ingestMeta)
+          .where(
+            inArray(ingestMeta.key, [
+              'briefingEvidencePending',
+              'briefingEvidenceRetryAt',
+              'briefingEvidenceRetryAttempt',
+            ])
+          )
+          .run();
+        if (retryArmed) await this.scheduleAlarm();
+        return;
+      }
+      const retryAt = readIngestMetaNumber(this.db, 'briefingEvidenceRetryAt');
+      if (retryAt !== null && retryAt > Date.now()) return;
+      if (
+        readIngestMetaNumber(this.db, 'metricsAlarmAt') === null &&
+        readIngestMetaNumber(this.db, 'briefingEvidenceRetryAt') === null
+      ) {
+        // An alarm armed before metricsAlarmAt was recorded is a pending metrics alarm.
+        const legacyMetricsAlarmAt = await this.ctx.storage.getAlarm();
+        if (this.isDeleted()) return;
+        if (legacyMetricsAlarmAt !== null) {
+          writeIngestMetaNumber(this.db, 'metricsAlarmAt', legacyMetricsAlarmAt);
+        }
+      }
+      const attempt = readIngestMetaNumber(this.db, 'briefingEvidenceRetryAttempt') ?? 0;
+      writeIngestMetaNumber(this.db, 'briefingEvidenceRetryAttempt', attempt + 1);
+      writeIngestMetaNumber(
+        this.db,
+        'briefingEvidenceRetryAt',
+        Date.now() +
+          Math.min(BRIEFING_EVIDENCE_RETRY_BASE_MS * 2 ** attempt, BRIEFING_EVIDENCE_RETRY_MAX_MS)
+      );
+      await this.scheduleAlarm();
+      if (this.isDeleted()) return;
+
+      const evidenceEvents = pendingEvidence.map<BriefingIngestEvent>(row => {
+        if (row.value === null) throw new Error('Invalid persisted briefing evidence');
+        const event: unknown = JSON.parse(row.value);
+        if (
+          typeof event !== 'object' ||
+          event === null ||
+          !('identity' in event) ||
+          typeof event.identity !== 'string' ||
+          !('occurredAt' in event) ||
+          typeof event.occurredAt !== 'string' ||
+          !Number.isFinite(Date.parse(event.occurredAt))
+        ) {
+          throw new Error('Invalid persisted briefing evidence');
+        }
+        if ('kind' in event && event.kind === 'status') {
+          if (
+            !('status' in event) ||
+            typeof event.status !== 'string' ||
+            !('previousStatus' in event) ||
+            (event.previousStatus !== null && typeof event.previousStatus !== 'string') ||
+            ('transitionId' in event &&
+              (typeof event.transitionId !== 'string' ||
+                !/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(event.transitionId)))
+          ) {
+            throw new Error('Invalid persisted briefing status');
+          }
+          return {
+            kind: 'status',
+            identity: event.identity,
+            occurredAt: event.occurredAt,
+            status: event.status,
+            previousStatus: event.previousStatus,
+            previousStatusKnown:
+              'previousStatusKnown' in event && event.previousStatusKnown === true,
+            ...('transitionId' in event && typeof event.transitionId === 'string'
+              ? { transitionId: event.transitionId }
+              : {}),
+          };
+        }
+        return {
+          identity: event.identity,
+          occurredAt: event.occurredAt,
+          ...('excerpt' in event && typeof event.excerpt === 'string'
+            ? { excerpt: event.excerpt }
+            : {}),
+        };
+      });
+      await persistBriefingEvidence(
+        this.env.HYPERDRIVE.connectionString,
+        kiloUserId,
+        sessionId,
+        evidenceEvents
+      );
+      if (this.isDeleted()) return;
+      this.db
+        .delete(ingestMeta)
+        .where(
+          inArray(
+            ingestMeta.key,
+            pendingEvidence.map(row => row.key)
+          )
+        )
+        .run();
+      const remaining = this.db
+        .select({ key: ingestMeta.key })
+        .from(ingestMeta)
+        .where(sql`${ingestMeta.key} LIKE 'briefingEvidence:%'`)
+        .limit(1)
+        .all();
+      const drained = remaining.length === 0;
+      this.db
+        .delete(ingestMeta)
+        .where(
+          inArray(ingestMeta.key, [
+            'briefingEvidenceRetryAt',
+            'briefingEvidenceRetryAttempt',
+            ...(drained ? (['briefingEvidencePending'] as const) : []),
+          ])
+        )
+        .run();
+      await this.scheduleAlarm();
+      if (!drained) await this.flushBriefingEvidence(kiloUserId, sessionId);
+    } catch (error) {
+      console.error('SessionIngestDO failed to flush briefing evidence', {
+        kiloUserId,
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Flushes pending briefing evidence first, then emits session metrics only once
+   * their own time is due: POST_CLOSE_DRAIN_MS after close or INACTIVITY_TIMEOUT_MS
+   * without activity. An evidence retry never emits metrics early, and metrics
+   * completion re-arms any pending retry. Reads the close reason from ingest_meta
+   * if present, otherwise falls back to 'abandoned'.
    */
   async alarm(): Promise<void> {
     const metaRows = this.db
@@ -1327,6 +1748,9 @@ export class SessionIngestDO extends DurableObject<Env> {
           'closeReason',
           'ingestVersion',
           'deleted',
+          'metricsEmitted',
+          'briefingEvidencePending',
+          'briefingEvidenceRetryAt',
         ])
       )
       .all();
@@ -1339,6 +1763,23 @@ export class SessionIngestDO extends DurableObject<Env> {
     const sessionId = meta['sessionId'];
 
     if (!kiloUserId || !sessionId) return;
+
+    if (meta['briefingEvidencePending'] === 'true') {
+      await this.flushBriefingEvidence(kiloUserId, sessionId);
+      if (this.isDeleted()) return;
+    }
+
+    const metricsAlarmAt = readIngestMetaValue(this.db, 'metricsAlarmAt');
+    // Without metricsAlarmAt, only an alarm armed before it was recorded (and not an
+    // evidence retry) is a metrics alarm.
+    const metricsDue =
+      metricsAlarmAt !== null
+        ? Number(metricsAlarmAt) <= Date.now()
+        : meta['briefingEvidenceRetryAt'] == null && meta['metricsEmitted'] !== 'true';
+    if (!metricsDue) {
+      await this.scheduleAlarm();
+      return;
+    }
 
     const closeReason = (meta['closeReason'] ?? 'abandoned') as TerminationReason;
     const ingestVersion = Number(meta['ingestVersion'] ?? '0') || 0;
@@ -1359,6 +1800,16 @@ export class SessionIngestDO extends DurableObject<Env> {
 
       throw error;
     }
+
+    if (this.isDeleted()) return;
+    // A lifecycle event that interleaved with emission armed a newer metrics time; keep it.
+    if (
+      metricsAlarmAt !== null &&
+      readIngestMetaValue(this.db, 'metricsAlarmAt') === metricsAlarmAt
+    ) {
+      this.db.delete(ingestMeta).where(eq(ingestMeta.key, 'metricsAlarmAt')).run();
+    }
+    await this.scheduleAlarm();
   }
 
   /** Returns true when no ingest data has been stored for this session. */

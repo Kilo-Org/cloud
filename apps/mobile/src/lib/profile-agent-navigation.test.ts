@@ -25,8 +25,10 @@ describe('getProfileAgentScope', () => {
     expect(getProfileAgentScope('org-2', organizations)).toBe('org-2');
   });
 
-  it('falls back to personal when the stored organization is unavailable', () => {
-    expect(getProfileAgentScope('removed-org', organizations)).toBe('personal');
+  it('keeps a stored organization the settled list no longer contains', () => {
+    // A lost membership must reach the organization scope, which reports that
+    // access is gone; substituting Personal opened its first-run setup instead.
+    expect(getProfileAgentScope('removed-org', organizations)).toBe('removed-org');
   });
 
   it('waits until organizations have loaded before resolving a selected organization', () => {

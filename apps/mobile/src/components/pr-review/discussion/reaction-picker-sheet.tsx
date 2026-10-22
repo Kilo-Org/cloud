@@ -11,7 +11,7 @@
 import { X } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, type Text as RNText, View } from 'react-native';
+import { Pressable, type TextInstance, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Sheet } from '@/components/ui/sheet';
@@ -45,7 +45,7 @@ export function ReactionPickerSheet({
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  const titleRef = useRef<RNText | null>(null);
+  const titleRef = useRef<TextInstance | null>(null);
   // Latch only when the move actually happened: on Android the title's first
   // layout can arrive before its ref is attached, so the attempt resolves no
   // handle, returns false, and a later signal has to retry.
@@ -60,7 +60,7 @@ export function ReactionPickerSheet({
     }
   }, []);
   const attachTitle = useCallback(
-    (node: RNText | null) => {
+    (node: TextInstance | null) => {
       titleRef.current = node;
       if (node !== null && titleLaidOutRef.current) {
         focusTitle();

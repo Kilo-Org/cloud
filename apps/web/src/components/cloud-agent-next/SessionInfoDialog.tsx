@@ -20,7 +20,6 @@ import {
   type SessionCostBreakdown,
 } from './session-cost-breakdown';
 import { formatShortModelName } from '@/lib/format-model-name';
-import type { ComputeBillingStatus } from '@/lib/cloud-agent-next/cloud-agent-client';
 
 type SessionInfoDialogProps = {
   open: boolean;
@@ -32,7 +31,6 @@ type SessionInfoDialogProps = {
   model: string;
   modelDisplayName?: string;
   sessionCostBreakdown?: SessionCostBreakdown;
-  computeStatus?: ComputeBillingStatus;
 };
 
 export function SessionInfoDialog({
@@ -43,7 +41,6 @@ export function SessionInfoDialog({
   model,
   modelDisplayName,
   sessionCostBreakdown,
-  computeStatus,
   kiloSessionId,
 }: SessionInfoDialogProps) {
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -126,35 +123,6 @@ export function SessionInfoDialog({
                 )}
               </dl>
             )}
-            <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-2 text-sm">
-              <dt className="font-medium">Compute</dt>
-              {computeStatus?.phase === 'unavailable' || !computeStatus ? (
-                <dd className="text-muted-foreground text-right">Status unavailable</dd>
-              ) : computeStatus.estimatedHourlyRateMicrodollars === null ? (
-                <dd className="text-muted-foreground text-right">Pricing unavailable</dd>
-              ) : (
-                <>
-                  <dd className="text-right font-mono tabular-nums">
-                    Est. ${(computeStatus.estimatedHourlyRateMicrodollars / 1_000_000).toFixed(2)} /
-                    hour
-                  </dd>
-                  <dd className="text-muted-foreground col-span-2 space-y-1 text-xs">
-                    <p>Billed only while the sandbox runs.</p>
-                    {computeStatus.billingMode === 'shadow' && (
-                      <p className="text-foreground">Not currently charged</p>
-                    )}
-                    <p>
-                      {computeStatus.attribution === 'payer_shared'
-                        ? 'The estimate may include other sessions using this shared sandbox.'
-                        : 'The estimate is based on this sandbox’s runtime.'}
-                    </p>
-                    {computeStatus.phase === 'stopping' || computeStatus.phase === 'settling' ? (
-                      <p>Saving and stopping. Final cost is confirmed after it stops.</p>
-                    ) : null}
-                  </dd>
-                </>
-              )}
-            </dl>
             <dl className="space-y-3 border-t pt-4 text-sm">
               <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-4">
                 <dt className="text-muted-foreground">Model</dt>

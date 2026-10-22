@@ -6,7 +6,6 @@ import { debugRouter } from '@/routers/debug-router';
 import { userRouter } from '@/routers/user-router';
 import { adminRouter } from '@/routers/admin-router';
 import { codeIndexingRouter } from '@/routers/code-indexing/code-indexing-router';
-import { deploymentsRouter } from '@/routers/deployments-router';
 import { cliSessionsRouter } from '@/routers/cli-sessions-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
 import { workspaceFoldersRouter } from '@/routers/workspace-folders-router';
@@ -25,13 +24,8 @@ import { reviewMemoryRouter } from '@/routers/code-reviews/review-memory-router'
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { byokRouter } from '@/routers/byok-router';
 import { openAiChatGptRouter } from '@/routers/openai-chatgpt-router';
-import { appBuilderRouter } from '@/routers/app-builder-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
 import { securityAuditLogRouter } from '@/routers/security-audit-log-router';
-import { autoTriageRouter } from '@/routers/auto-triage/auto-triage-router';
-import { personalAutoTriageRouter } from '@/routers/personal-auto-triage-router';
-import { autoFixRouter } from '@/routers/auto-fix/auto-fix-router';
-import { personalAutoFixRouter } from '@/routers/personal-auto-fix-router';
 import { appReportedMessagesRouter } from '@/routers/app-reported-messages-router';
 import { kiloPassRouter } from '@/routers/kilo-pass-router';
 import { creditsRouter } from '@/routers/credits-router';
@@ -40,7 +34,6 @@ import { cloudAgentSettingsRouter } from '@/routers/cloud-agent-settings-router'
 import { webhookTriggersRouter } from '@/routers/webhook-triggers-router';
 import { userFeedbackRouter } from '@/routers/user-feedback-router';
 import { feedbackRouter } from '@/routers/feedback-router';
-import { appBuilderFeedbackRouter } from '@/routers/app-builder-feedback-router';
 import { cloudAgentNextFeedbackRouter } from '@/routers/cloud-agent-next-feedback-router';
 import { kiloChatRouter } from '@/routers/kilo-chat-router';
 import { kiloclawRouter } from '@/routers/kiloclaw-router';
@@ -49,14 +42,13 @@ import { codingPlansRouter } from '@/routers/coding-plans-router';
 import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
 import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
-import { mcpGatewayRouter } from '@/routers/mcp-gateway-router';
-import { mcpGatewayAuthorizationsRouter } from '@/routers/mcp-gateway-authorizations-router';
 import { modelPreferencesRouter } from '@/routers/model-preferences-router';
 import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
 import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
+import { agentBriefingRouter } from '@/routers/agent-briefing-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -64,7 +56,6 @@ export const rootRouter = createTRPCRouter({
   user: userRouter,
   admin: adminRouter,
   codeIndexing: codeIndexingRouter,
-  deployments: deploymentsRouter,
   cliSessions: cliSessionsRouter,
   cliSessionsV2: cliSessionsV2Router,
   workspaceFolders: workspaceFoldersRouter,
@@ -83,13 +74,8 @@ export const rootRouter = createTRPCRouter({
   personalReviewAgent: personalReviewAgentRouter,
   byok: byokRouter,
   openAiChatGpt: openAiChatGptRouter,
-  appBuilder: appBuilderRouter,
   securityAgent: securityAgentRouter,
   securityAuditLog: securityAuditLogRouter,
-  autoTriage: autoTriageRouter,
-  personalAutoTriage: personalAutoTriageRouter,
-  autoFix: autoFixRouter,
-  personalAutoFix: personalAutoFixRouter,
   appReportedMessages: appReportedMessagesRouter,
   kiloPass: kiloPassRouter,
   credits: creditsRouter,
@@ -98,7 +84,6 @@ export const rootRouter = createTRPCRouter({
   webhookTriggers: webhookTriggersRouter,
   userFeedback: userFeedbackRouter,
   feedback: feedbackRouter,
-  appBuilderFeedback: appBuilderFeedbackRouter,
   cloudAgentNextFeedback: cloudAgentNextFeedbackRouter,
   kiloChat: kiloChatRouter,
   kiloclaw: kiloclawRouter,
@@ -107,14 +92,13 @@ export const rootRouter = createTRPCRouter({
   unifiedSessions: unifiedSessionsRouter,
   activeSessions: activeSessionsRouter,
   usageAnalytics: usageAnalyticsRouter,
-  mcpGateway: mcpGatewayRouter,
-  mcpGatewayAuthorizations: mcpGatewayAuthorizationsRouter,
   modelPreferences: modelPreferencesRouter,
   githubPrReview: githubPrReviewRouter,
   providerReview: providerReviewRouter,
   moderation: moderationRouter,
   userExports: userExportsRouter,
   spendAlerts: spendAlertRouter,
+  agentBriefing: agentBriefingRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

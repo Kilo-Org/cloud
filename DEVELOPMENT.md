@@ -32,9 +32,9 @@ git lfs install --skip-repo
 
 The `--skip-repo` flag avoids conflicts with the project's Husky hooks. Git LFS is used for large binary files (videos).
 
-### Node.js 24.14.1 (via nvm)
+### Node.js 24.22.1 (via nvm)
 
-The project requires Node.js 24.14.1 locally (see `.nvmrc`) and accepts any Node.js 24.x runtime in `package.json` `engines`.
+The project requires Node.js 24.22.1 locally (see `.nvmrc`) and accepts any Node.js 24.x runtime in `package.json` `engines`.
 
 ```bash
 brew install nvm
@@ -148,11 +148,13 @@ pnpm dev:env
 
 The setup covers: `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `POSTGRES_URL`, `CALLBACK_TOKEN_SECRET`, `BYOK_ENCRYPTION_KEY`, `INTERNAL_API_SECRET`, `STRIPE_SECRET_KEY`, and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
 
+It also provisions the credential-envelope keypairs that the code-review providers need. The GitHub user-token and Bitbucket/GitLab platform-credential envelopes each keep a public half in the web app and a private half in `git-token-service`, so setup generates a local 4096-bit RSA keypair for each one that is unconfigured and writes the key ID plus both halves into `.env.local`; `pnpm dev:env` copies the private halves into the Worker's `.dev.vars`. Values that already exist are kept, read from `.env.local` first and from the Worker's `.dev.vars` second, so re-running setup neither rotates a keypair the Worker already stored credentials under nor drops a half that lives only in the Worker file. Without a complete pair the web app still reports a connected provider, but every review read answers 503 from the Worker.
+
 These changes will allow you to do local testing with a fake account.
 
 #### c. Add or rotate shared web environment variables
 
-Use the repository workflow instead of editing Vercel projects independently. It updates `kilocode-app`, `kilocode-global-app`, and `kilocode-ai-gateway` together for Development, Staging, and Production. `kilocode-global-app` is being phased out and no traffic is deliberately routed to it; it is updated only to keep it consistent until it is removed. A project that does not exist in Vercel yet is skipped and listed in the plan:
+Use the repository workflow instead of editing Vercel projects independently. It updates `kilocode-app` and `kilocode-ai-gateway` together for Development, Staging, and Production. A project that does not exist in Vercel yet is skipped and listed in the plan:
 
 ```bash
 pnpm web:env set EXAMPLE_API_TOKEN
@@ -222,6 +224,7 @@ pnpm dev:start
 ```
 
 This generates the local environment files and launches a tmux dashboard with the Next.js app and local infrastructure. It does not run database migrations.
+It also starts `git-token-service`, because every code-review read and write resolves the caller's GitHub, GitLab or Bitbucket credential through that Worker; without it the web app reports a connected provider while the review inbox and overview fail as a service outage.
 Port offset selection is automatic by default, keeping secondary worktrees from colliding with the root checkout. This setup order assumes no port conflicts; if startup selects a different offset, run `pnpm test:db` again in another terminal in the same worktree.
 When the Stripe CLI is installed, the command also starts the Stripe webhook forwarder. Run `pnpm dev:status` to get the web app's port.
 
@@ -388,6 +391,18 @@ The application consists of the Next.js app plus several Cloudflare Worker servi
 
 AI inference works locally without any extra services. The Next.js app includes an OpenRouter proxy route (`/api/openrouter/[...path]`) that calls real AI providers using API keys from `.env.local`. There are no mocks or local stubs — all inference hits real APIs (OpenRouter, OpenAI, Anthropic, Mistral, etc.).
 
+### Sign in with ChatGPT usage limits
+
+The gateway records plan limits on the connection that serves the request.
+The personal, organization-member, and shared-services settings cards show the recorded notice.
+
+- Consumer limits retain the **Manage usage** action.
+- `subscription_sharing_workplace_individual_usage_limit_exceeded` selects the Business notice.
+- **Copy request for admin** copies a message for the user's ChatGPT workspace admin.
+- Copying does not send the message, change the limit, or switch billing.
+- If clipboard access fails, the notice reveals a selectable request for manual copying.
+- A successful request or a reconnect clears the recorded notice.
+
 ### Running workers locally
 
 Each worker in the workspace can be started individually with `wrangler dev` (or `pnpm dev`) from its directory. Workers communicate with Next.js over HTTP using env vars like `CLOUD_AGENT_NEXT_API_URL`, `CODE_REVIEW_WORKER_URL`, etc. Dev ports are defined in each worker's `wrangler.jsonc`.
@@ -477,12 +492,12 @@ If `CF_AE_TOKEN` is missing, Grafana will still boot — only dashboard queries 
 
 - **Service bindings** resolve locally for Workers launched together by `pnpm dev:start` when the bound target is running. Bindings to optional services remain unavailable unless their owning group is started (for example, session-ingest -> o11y requires the `observability` group).
 - **Webhook → KiloClaw Chat** triggers require the KiloClaw worker running on port 8795. The webhook worker calls it via `KILOCLAW_API_URL` (HTTP, not a service binding) to deliver messages to Stream Chat. Stream Chat credentials (`STREAM_CHAT_API_KEY`, `STREAM_CHAT_API_SECRET`) must be in `kiloclaw/.dev.vars`.
-- **Cloudflare Containers** (used by Cloud Agent Next and App Builder) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
+- **Cloudflare Containers** (used by Cloud Agent Next) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
 - **Analytics Engine writes** are no-ops in `wrangler dev` — there is no local AE simulator. Reads against the real prod datasets still work via the local Grafana above. **Pipelines** and **dispatch namespaces** don't work locally.
 
 ### What works without running any workers
 
-The core Next.js app handles profiles, organizations, usage tracking, billing, and the OpenRouter inference proxy without any workers. Features that require a specific worker (e.g., Cloud Agent sessions, code reviews, app builder) will fail gracefully or show connection errors if that worker isn't running.
+The core Next.js app handles profiles, organizations, usage tracking, billing, and the OpenRouter inference proxy without any workers. Features that require a specific worker (e.g., Cloud Agent sessions, code reviews) will fail gracefully or show connection errors if that worker isn't running.
 
 ### Multi-worktree support
 
@@ -541,7 +556,7 @@ If you see errors about unsupported Node.js versions, ensure you're using the pi
 
 ```bash
 nvm use
-node --version  # Should output v24.14.1
+node --version  # Should output v24.22.1
 ```
 
 ### Database connection errors
@@ -570,3 +585,27 @@ If image/video files appear as small text files with `oid sha256:...`, run:
 ```bash
 git lfs pull
 ```
+
+## Agent morning briefings
+
+The mobile Home briefing summarizes overnight coding sessions separately for Personal and each organization.
+Users configure a saved timezone, night start, shared night-end/morning-start, and morning end.
+Dismissal restores live status across devices; report history remains available.
+
+The backend owns scheduling, report revisions, optional paid summaries, and notification dispatch.
+AI summaries and briefing notifications require separate opt-ins.
+Summary settings include a model override and finite generation time and spend limits.
+The default summary model is `~deepseek/deepseek-flash-latest`.
+Pricing estimates and gateway spend checks resolve latest-model aliases through the stored catalog target.
+An alias remains unavailable when its target is missing or has no usable pricing.
+The gateway rejects an alias request if provider routing selects a different target from the priced catalog target.
+The structured report remains available when generation fails or reaches a limit.
+
+Apply database migrations before deploying the session-ingest, notification, gateway, and web changes.
+The CLI status producer must send occurrence timestamps and transition identities for reliable historical blocker counts.
+Legacy activity remains readable with partial coverage; unknown values must not appear as confirmed zeroes.
+
+The protected cron routes are `/api/cron/agent-briefing` and `/api/cron/agent-briefing-summaries`.
+They use the existing cron authorization, database, gateway, and notification configuration.
+Local verification must use an isolated database and fake accounts.
+Use a local notification sink and fixture inference provider to avoid real pushes or upstream charges.

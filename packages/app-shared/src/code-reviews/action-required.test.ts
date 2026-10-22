@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SUPPORT_EMAIL } from '../support';
 
 import {
   CODE_REVIEW_ACTION_REQUIRED_REASONS,
@@ -6,6 +7,13 @@ import {
 } from './action-required';
 
 describe('getCodeReviewActionRequiredCopy', () => {
+  it.each(['github_ip_allow_list', 'repeated_repository_clone_timeout'] as const)(
+    'includes the shared support email for %s',
+    reason => {
+      expect(getCodeReviewActionRequiredCopy(reason).description).toContain(SUPPORT_EMAIL);
+    }
+  );
+
   it('returns a non-empty title, description, and recovery label for every reason', () => {
     for (const reason of CODE_REVIEW_ACTION_REQUIRED_REASONS) {
       const copy = getCodeReviewActionRequiredCopy(reason);

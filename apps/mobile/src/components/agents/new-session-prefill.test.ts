@@ -124,14 +124,15 @@ describe('appendNewSessionPrefill', () => {
     );
   });
 
-  it('appends the prompt and the to-do id after the targets', () => {
+  it('appends the prompt, the to-do id, and the to-do title after the targets', () => {
     const result = appendNewSessionPrefill('/agent-chat/new', {
       repo: 'owner/repo',
       prompt: 'Fix login\n\nSee #12 & retry',
       todoId: 'todo-1',
+      todoTitle: 'Fix login',
     });
     expect(result).toBe(
-      '/agent-chat/new?prefillRepo=owner%2Frepo&prefillPrompt=Fix%20login%0A%0ASee%20%2312%20%26%20retry&todoId=todo-1'
+      '/agent-chat/new?prefillRepo=owner%2Frepo&prefillPrompt=Fix%20login%0A%0ASee%20%2312%20%26%20retry&todoId=todo-1&prefillTodoTitle=Fix%20login'
     );
   });
 });
@@ -193,16 +194,26 @@ describe('readNewSessionPrefill', () => {
     expect(prefill).toEqual({ mode: 'code' });
   });
 
-  it('reads the prompt and the to-do id', () => {
+  it('reads the prompt, the to-do id, and the to-do title', () => {
     const prefill = readNewSessionPrefill({
       prefillPrompt: 'Fix login\n\nnotes',
       todoId: ['todo-1', 'todo-2'],
+      prefillTodoTitle: 'Fix login',
     });
-    expect(prefill).toEqual({ mode: 'code', prompt: 'Fix login\n\nnotes', todoId: 'todo-1' });
+    expect(prefill).toEqual({
+      mode: 'code',
+      prompt: 'Fix login\n\nnotes',
+      todoId: 'todo-1',
+      todoTitle: 'Fix login',
+    });
   });
 
-  it('treats a blank prompt and an empty to-do id as absent', () => {
-    const prefill = readNewSessionPrefill({ prefillPrompt: '  \n ', todoId: '' });
+  it('treats a blank prompt, an empty to-do id, and a blank to-do title as absent', () => {
+    const prefill = readNewSessionPrefill({
+      prefillPrompt: '  \n ',
+      todoId: '',
+      prefillTodoTitle: '  ',
+    });
     expect(prefill).toEqual({ mode: 'code' });
   });
 });

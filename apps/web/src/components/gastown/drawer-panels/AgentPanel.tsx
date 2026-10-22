@@ -201,7 +201,7 @@ export function AgentPanel({
               <Hexagon className="size-3" />
               Hooked Bead
             </div>
-            <div className="mt-0.5 flex items-center gap-1 font-mono text-xs text-[color:oklch(95%_0.15_108)]">
+            <div className="mt-0.5 flex items-center gap-1 font-mono text-xs text-primary">
               <span>{agent.current_hook_bead_id.slice(0, 12)}</span>
               <ChevronRight className="size-3 shrink-0 text-white/15 transition-colors group-hover/link:text-white/30" />
             </div>

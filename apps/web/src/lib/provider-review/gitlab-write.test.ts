@@ -72,6 +72,12 @@ async function captureRejection(promise: Promise<unknown>): Promise<GitLabReview
 }
 const TARGET = { owner: OWNER, projectPath: PROJECT_PATH, mrIid: 12 };
 
+const ORG_OWNER: { type: 'organization'; organizationId: string; userId: string } = {
+  type: 'organization',
+  organizationId: 'org_1',
+  userId: 'user_1',
+};
+
 const integrationRow = {
   id: 'intg_1',
   platform: 'gitlab',
@@ -941,6 +947,36 @@ describe('mutation failures reach the four mobile states', () => {
     expect(error.retryable).toBe(false);
     expect(error.message).not.toContain('glpat-secret');
     expect(error.message).not.toContain('gitlab.example.com');
+  });
+
+  // A 403 on an action is the action's: GitLab refuses self-approval, a
+  // protected branch or a role the connected identity lacks, and reconnecting
+  // cannot fix any of them. Only a refused credential (401) is the
+  // connection's on a write.
+  it('keeps an organization connection action 403 forbidden', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(integrationRow);
+    mockGetValidGitLabToken.mockResolvedValue('glpat-mock-token');
+    fetchMock.mockResolvedValue(jsonResponse({ message: '403 Forbidden' }, 403));
+
+    const error = await captureRejection(
+      submitReview({ ...TARGET, owner: ORG_OWNER, event: 'approve' })
+    );
+
+    expect(error.kind).toBe('forbidden');
+    expect(error.retryable).toBe(false);
+  });
+
+  it('classifies an organization connection write 401 as reconnect', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(integrationRow);
+    mockGetValidGitLabToken.mockResolvedValue('glpat-mock-token');
+    fetchMock.mockResolvedValue(jsonResponse({ message: '401 Unauthorized' }, 401));
+
+    const error = await captureRejection(
+      submitReview({ ...TARGET, owner: ORG_OWNER, event: 'approve' })
+    );
+
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
   });
 
   it('classifies a 5xx as retryable', async () => {

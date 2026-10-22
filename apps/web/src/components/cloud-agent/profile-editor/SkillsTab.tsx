@@ -3,7 +3,6 @@
 
 import { useState, type DragEvent } from 'react';
 import { toast } from 'sonner';
-import { unzipSync, strFromU8 } from 'fflate';
 import { Loader2, Plus, Sparkles, Upload, FileText, X, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -11,16 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
 import { useProfileMutations, type ProfileSkill } from '@/hooks/useCloudAgentProfiles';
 import { cn } from '@/lib/utils';
+import { extractSkillZip, MAX_COMPANION_FILES, parseSkillFrontmatter } from './skill-archive';
 
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
-const SKILL_FILE_PATH_PATTERN = /^[a-zA-Z0-9._\-/]+$/;
-
-// Keep in sync with apps/web/src/lib/agent/profile-skills-service.ts limits.
-const MAX_SKILL_MARKDOWN_LENGTH = 100_000;
-const MAX_COMPANION_FILES = 40;
-const MAX_COMPANION_FILE_SIZE = 100_000;
-const MAX_COMPANION_FILES_TOTAL = 500_000;
-const MAX_PATH_LENGTH = 200;
 
 type Props = {
   profileId: string;
@@ -278,150 +270,6 @@ function SkillRow({
       </div>
     </div>
   );
-}
-
-/**
- * Parse frontmatter `name` and `description` out of a SKILL.md body.
- * Matches the minimal extension parser (only these two fields).
- */
-function parseSkillFrontmatter(rawMarkdown: string): { name?: string; description?: string } {
-  const match = rawMarkdown.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n/);
-  if (!match) return {};
-  const strip = (v: string) => {
-    const t = v.trim();
-    if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
-      return t.slice(1, -1);
-    }
-    return t;
-  };
-  const nameMatch = match[1].match(/^name\s*:\s*(.+)$/m);
-  const descMatch = match[1].match(/^description\s*:\s*(.+)$/m);
-  return {
-    name: nameMatch ? strip(nameMatch[1]) : undefined,
-    description: descMatch ? strip(descMatch[1]) : undefined,
-  };
-}
-
-type ExtractedSkill = {
-  rawMarkdown: string;
-  files: Record<string, string>;
-  fileCount: number;
-  totalBytes: number;
-  frontmatterName?: string;
-  frontmatterDescription?: string;
-};
-
-/**
- * Returns true for OS-generated metadata that shouldn't count as skill content:
- * macOS `__MACOSX/...` and `._*` AppleDouble files, Finder `.DS_Store`,
- * Windows `Thumbs.db` and `desktop.ini`. Matches at any depth.
- */
-function isJunkEntry(path: string): boolean {
-  if (path.startsWith('__MACOSX/') || path.includes('/__MACOSX/')) return true;
-  const base = path.slice(path.lastIndexOf('/') + 1);
-  if (base.startsWith('._')) return true;
-  return base === '.DS_Store' || base === 'Thumbs.db' || base === 'desktop.ini';
-}
-
-/**
- * Extract a skill bundle from a zip. Looks for `SKILL.md` at the root; if the
- * archive uses a single top-level directory, strips it (matches the extension
- * marketplace's `tar --strip-components=1` behavior).
- *
- * Throws an Error with a user-facing message on invalid archives.
- */
-async function extractSkillZip(file: File): Promise<ExtractedSkill> {
-  if (!file.name.toLowerCase().endsWith('.zip')) {
-    throw new Error('Expected a .zip file');
-  }
-  const buf = new Uint8Array(await file.arrayBuffer());
-  if (buf.byteLength > 5 * 1024 * 1024) {
-    throw new Error('Zip file is larger than 5 MB');
-  }
-
-  let entries: Record<string, Uint8Array>;
-  try {
-    entries = unzipSync(buf, {
-      filter(entry) {
-        return entry.size <= MAX_COMPANION_FILE_SIZE * 2; // trust but verify below
-      },
-    });
-  } catch (error) {
-    throw new Error(`Unable to read zip: ${error instanceof Error ? error.message : 'unknown'}`);
-  }
-
-  // Drop directory entries (keys ending with '/') and OS-generated junk
-  // (Finder's __MACOSX/ + ._* AppleDouble files, Windows Thumbs.db / desktop.ini)
-  // so a folder zipped via Finder still has a single detectable top-level dir.
-  const filePaths = Object.keys(entries).filter(k => !k.endsWith('/') && !isJunkEntry(k));
-  if (filePaths.length === 0) {
-    throw new Error('Zip is empty');
-  }
-  // Detect a single top-level directory to strip. Allow a stray root file
-  // (e.g. a README sibling) to still trigger stripping when all *other* paths
-  // share one top dir.
-  const rootDirs = new Set<string>();
-  for (const p of filePaths) {
-    const slash = p.indexOf('/');
-    if (slash > 0) rootDirs.add(p.slice(0, slash));
-  }
-  const stripPrefix =
-    rootDirs.size === 1 && filePaths.every(p => p.startsWith(`${[...rootDirs][0]}/`))
-      ? `${[...rootDirs][0]}/`
-      : '';
-
-  let skillMd: string | null = null;
-  const files: Record<string, string> = {};
-  let totalBytes = 0;
-  let fileCount = 0;
-
-  for (const path of filePaths) {
-    const rel = stripPrefix && path.startsWith(stripPrefix) ? path.slice(stripPrefix.length) : path;
-    if (!rel || rel === '') continue;
-
-    if (rel.includes('..') || rel.startsWith('/') || rel.length > MAX_PATH_LENGTH) {
-      throw new Error(`Rejected file path "${rel}"`);
-    }
-    if (rel.toLowerCase() === 'skill.md') {
-      const content = strFromU8(entries[path]);
-      if (content.length > MAX_SKILL_MARKDOWN_LENGTH) {
-        throw new Error(`SKILL.md exceeds ${MAX_SKILL_MARKDOWN_LENGTH} bytes`);
-      }
-      skillMd = content;
-      continue;
-    }
-    if (!SKILL_FILE_PATH_PATTERN.test(rel)) {
-      throw new Error(`File "${rel}" contains disallowed characters`);
-    }
-
-    const content = strFromU8(entries[path]);
-    if (content.length > MAX_COMPANION_FILE_SIZE) {
-      throw new Error(`File "${rel}" exceeds ${MAX_COMPANION_FILE_SIZE} bytes`);
-    }
-    fileCount += 1;
-    totalBytes += content.length;
-    if (fileCount > MAX_COMPANION_FILES) {
-      throw new Error(`Skill may have at most ${MAX_COMPANION_FILES} companion files`);
-    }
-    if (totalBytes > MAX_COMPANION_FILES_TOTAL) {
-      throw new Error(`Companion files exceed ${MAX_COMPANION_FILES_TOTAL} bytes total`);
-    }
-    files[rel] = content;
-  }
-
-  if (!skillMd) {
-    throw new Error('Zip must contain SKILL.md at the root');
-  }
-
-  const frontmatter = parseSkillFrontmatter(skillMd);
-  return {
-    rawMarkdown: skillMd,
-    files,
-    fileCount,
-    totalBytes,
-    frontmatterName: frontmatter.name,
-    frontmatterDescription: frontmatter.description,
-  };
 }
 
 // -------------------------------------------------------------------

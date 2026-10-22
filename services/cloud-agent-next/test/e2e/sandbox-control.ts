@@ -25,7 +25,7 @@ export const DOCKER_COMMAND_TIMEOUT_MS = 30_000;
 
 export type DockerCommandExecutor = (args: string[]) => Promise<{ stdout: string }>;
 
-const executeDockerCommand: DockerCommandExecutor = async args => {
+export const executeDockerCommand: DockerCommandExecutor = async args => {
   const { stdout } = await execFileAsync('docker', args, {
     timeout: DOCKER_COMMAND_TIMEOUT_MS,
     killSignal: 'SIGKILL',
@@ -147,7 +147,9 @@ export function computeExclusiveLayout(input: ExclusiveLayoutInput): {
     .filter(name => fs.statSync(path.join(parent, name)).isDirectory())
     .map(name => path.join(parent, name));
   const sessionParent =
-    path.basename(parent) === 'worktrees' || path.basename(parent) === 'sessions';
+    path.basename(parent) === 'worktrees' ||
+    path.basename(parent) === 'sessions' ||
+    directory === '/workspace/app';
   return {
     exclusive:
       sessionParent &&
@@ -168,6 +170,16 @@ const request = JSON.parse(process.argv[1] ?? '{}');
 // __EXCLUSIVE_LAYOUT__
 
 const KILO_SERVER_BASENAMES = new Set(['kilo', '.kilo']);
+
+// Each kilo serve has its own Basic credential in its environment. It stays in
+// this script and never goes into the JSON result.
+const kiloAuthorizations = new Map();
+
+function kiloHeaders(serverUrl) {
+  if (!kiloAuthorizations.has(serverUrl)) kiloListeners();
+  const authorization = kiloAuthorizations.get(serverUrl);
+  return authorization ? { Authorization: authorization } : {};
+}
 
 /**
  * Rosetta re-execs the CLI as: node --no-opt -r /proc/.reset <kilo> serve, so
@@ -231,9 +243,18 @@ function kiloListeners() {
       const cwd = fs.readlinkSync('/proc/' + processId + '/cwd');
       const directory = fs.realpathSync(cwd);
       if (!path.isAbsolute(cwd) || cwd !== directory) continue;
-      const environment = fs.readFileSync('/proc/' + processId + '/environ', 'utf8');
-      const home = environment.split('\0').find(value => value.startsWith('HOME='))?.slice(5);
+      const environment = fs.readFileSync('/proc/' + processId + '/environ', 'utf8').split('\0');
+      const read = name => environment.find(value => value.startsWith(name + '='))?.slice(name.length + 1);
+      const home = read('HOME');
       if (!home || !path.isAbsolute(home) || fs.realpathSync(home) !== home) continue;
+      const password = read('KILO_SERVER_PASSWORD');
+      if (password) {
+        const username = read('KILO_SERVER_USERNAME') ?? 'kilo';
+        kiloAuthorizations.set(
+          serverUrl,
+          'Basic ' + Buffer.from(username + ':' + password).toString('base64')
+        );
+      }
       listeners.push({ serverUrl, processId, directory, home });
     } catch {
       continue;
@@ -249,7 +270,11 @@ function sameListener(left, right) {
 async function getRoot(serverUrl, kiloSessionId, directory = request.directory) {
   const endpoint = new URL('/session/' + encodeURIComponent(kiloSessionId), serverUrl);
   endpoint.searchParams.set('directory', directory);
-  const response = await fetch(endpoint, { signal: AbortSignal.timeout(3_000), redirect: 'error' });
+  const response = await fetch(endpoint, {
+    headers: kiloHeaders(serverUrl),
+    signal: AbortSignal.timeout(3_000),
+    redirect: 'error',
+  });
   if (!response.ok) return null;
   const root = await response.json();
   if (
@@ -357,7 +382,10 @@ async function run() {
       request.serverUrl
     );
     endpoint.searchParams.set('directory', root.directory);
-    const response = await fetch(endpoint, { signal: AbortSignal.timeout(5_000) });
+    const response = await fetch(endpoint, {
+      headers: kiloHeaders(request.serverUrl),
+      signal: AbortSignal.timeout(5_000),
+    });
     if (!response.ok) {
       return { ok: false, reason: 'Kilo messages returned HTTP ' + response.status };
     }
@@ -414,7 +442,10 @@ async function run() {
       request.serverUrl
     );
     endpoint.searchParams.set('directory', root.directory);
-    const response = await fetch(endpoint, { signal: AbortSignal.timeout(5_000) });
+    const response = await fetch(endpoint, {
+      headers: kiloHeaders(request.serverUrl),
+      signal: AbortSignal.timeout(5_000),
+    });
     if (!response.ok) {
       return { ok: false, reason: 'Kilo messages returned HTTP ' + response.status };
     }
@@ -454,7 +485,10 @@ async function run() {
       request.serverUrl
     );
     endpoint.searchParams.set('directory', root.directory);
-    const response = await fetch(endpoint, { signal: AbortSignal.timeout(5_000) });
+    const response = await fetch(endpoint, {
+      headers: kiloHeaders(request.serverUrl),
+      signal: AbortSignal.timeout(5_000),
+    });
     if (!response.ok) {
       return { ok: false, reason: 'Kilo messages returned HTTP ' + response.status };
     }
@@ -851,19 +885,7 @@ export async function recycleControlConnection(
   await executeDocker(['exec', handle.containerId, 'kill', '-USR1', String(handle.processId)]);
 }
 
-/**
- * Legacy control wrapper: `bun run /usr/local/bin/kilocode-control-wrapper.js`
- * (`src/sandbox-control/cloudflare-provider.ts`).
- */
-export const LEGACY_CONTROL_WRAPPER_BASENAME = 'kilocode-control-wrapper.js';
-
-/**
- * New-plane control wrapper: the control-plane supervisor runs
- * `bun run /usr/local/bin/kilocode-control-plane-wrapper.js` (`Dockerfile`).
- * Its basename differs from the legacy wrapper, so a new-plane capture must
- * match this exact basename; the legacy capture finds zero processes in a
- * new-plane container (and vice versa).
- */
+/** Wrapper launched by the container supervisor. */
 export const CONTROL_PLANE_WRAPPER_BASENAME = 'kilocode-control-plane-wrapper.js';
 
 /**
@@ -1014,22 +1036,8 @@ async function captureWrapperProcess(
 }
 
 /**
- * Capture the legacy control-wrapper Bun process for one container in a single
- * `docker exec`. The captured identity is the only safe handle for `STOP`/`CONT`:
- * a frozen process cannot answer a discovery request. Exactly one match is
- * required; zero or several matches is an ambiguous identity and throws.
- */
-export async function captureControlWrapperProcess(
-  containerId: string,
-  executeDocker: DockerCommandExecutor = executeDockerCommand
-): Promise<KiloServerProcessHandle> {
-  return captureWrapperProcess(containerId, LEGACY_CONTROL_WRAPPER_BASENAME, executeDocker);
-}
-
-/**
- * Capture the new-plane control-wrapper Bun process. A unique match is positive
- * evidence the container runs the new plane; zero matches (a legacy container)
- * throws rather than silently falling back.
+ * Capture the wrapper Bun process with one docker exec. Require exactly one
+ * process before returning the handle used for STOP, CONT, and recycling.
  */
 export async function captureControlPlaneWrapperProcess(
   containerId: string,

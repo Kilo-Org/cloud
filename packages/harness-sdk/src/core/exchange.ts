@@ -5,7 +5,7 @@ import { appendTurn, type Session } from './session.js';
 import { onStore, type StoreError } from './storage.js';
 import type { ToolCall } from './tool.js';
 import { makeTurn, partsOf, type PartDraft, type Turn } from './turn.js';
-import { add } from './usage.js';
+import { countUsage } from './usage.js';
 import type { Wiring } from './wiring.js';
 
 /**
@@ -101,7 +101,7 @@ const partsSaid = (spoken: Spoken): readonly PartDraft[] => {
 
 /** Keeps a turn this question made, in memory and on the list to be written. */
 const collect = (wiring: Wiring, exchange: Exchange, turn: Turn): Effect.Effect<void> =>
-  Effect.zipRight(
+  Effect.andThen(
     remember(wiring, turn),
     Ref.update(exchange.written, held => [...held, turn])
   );
@@ -117,7 +117,7 @@ const collect = (wiring: Wiring, exchange: Exchange, turn: Turn): Effect.Effect<
 const endRound = (
   wiring: Wiring,
   exchange: Exchange,
-  ended: { readonly usage: ModelUsage; readonly stop: StopReason }
+  ended: { readonly usage: ModelUsage; readonly stop: StopReason; readonly model?: string }
 ): Effect.Effect<Turn> =>
   Ref.get(exchange.spoken).pipe(
     Effect.flatMap(spoken =>
@@ -131,7 +131,7 @@ const endRound = (
     Effect.tap(() => Ref.set(exchange.stop, ended.stop)),
     Effect.tap(() => Ref.update(exchange.rounds, held => held + 1)),
     Effect.tap(() => Ref.set(wiring.prompted, promptedOf(ended.usage))),
-    Effect.tap(() => Ref.update(wiring.totals, held => add(held, ended.usage)))
+    Effect.tap(() => countUsage(wiring, ended))
   );
 
 /**
@@ -147,7 +147,7 @@ const commit = (wiring: Wiring, exchange: Exchange): Effect.Effect<void, StoreEr
       onStore(wiring.store, plugin =>
         plugin.append({ sessionId: wiring.id, turns: [exchange.question, ...turns], prompted })
       )
-  ).pipe(Effect.zipRight(Ref.set(exchange.answered, true)));
+  ).pipe(Effect.andThen(Ref.set(exchange.answered, true)));
 
 /**
  * Collects one thinking event into the block it belongs to.

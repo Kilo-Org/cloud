@@ -568,13 +568,11 @@ describe('addCandidates — capacity and stored names', () => {
     });
 
     expect(hookApi().attachments).toHaveLength(5);
-    expect(hookApi().attachments.map(chip => chip.filename).toSorted()).toEqual([
-      'a0.pdf',
-      'a1.pdf',
-      'a2.pdf',
-      'b0.pdf',
-      'b1.pdf',
-    ]);
+    expect(
+      hookApi()
+        .attachments.map(chip => chip.filename)
+        .toSorted()
+    ).toEqual(['a0.pdf', 'a1.pdf', 'a2.pdf', 'b0.pdf', 'b1.pdf']);
     expect(hoisted.uploadOne).toHaveBeenCalledTimes(5);
 
     // A third selection against the settled composer is refused outright.

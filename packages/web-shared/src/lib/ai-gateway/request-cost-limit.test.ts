@@ -265,7 +265,12 @@ describe('request cost admission', () => {
         {
           ...body,
           model: model.id,
-          provider: { order: ['anthropic'], sort: 'price' },
+          provider: {
+            order: ['anthropic'],
+            sort: 'price',
+            max_price: { prompt: 4, completion: 6 },
+            allow_fallbacks: false,
+          },
           providerOptions: { gateway: { only: ['anthropic'] } },
           prompt_cache_key: 'session-hash',
           safety_identifier: 'user-hash',

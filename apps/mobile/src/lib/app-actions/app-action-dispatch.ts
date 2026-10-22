@@ -17,6 +17,7 @@ import {
   type StartAgentRequest,
 } from './app-action-contract';
 import { setPendingAppAction } from './pending-app-action';
+import { preflightStartAgent } from './start-agent-preflight';
 
 /** The `StartAgent` request without its discriminant: what `start-agent.ts` takes. */
 type StartAgentInput = Omit<StartAgentRequest, 'action'>;
@@ -127,17 +128,12 @@ export async function dispatchAppActionRequest(
   options: AppActionDispatchOptions = {}
 ): Promise<AppActionResult> {
   if (request.action === 'StartAgent') {
-    // The same classification `start-agent.ts` applies, made before the
-    // question: a request that names neither a prompt nor a session cannot
-    // start, so the user is not asked to approve it.
-    if (request.prompt.trim().length === 0 && (request.sessionId ?? '').trim().length === 0) {
-      return {
-        ok: false,
-        action: 'StartAgent',
-        code: 'empty-prompt',
-        retryable: false,
-        message: i18n.t('appActions.start.promptRequired'),
-      };
+    // Classified from the request alone, before the question: a request that
+    // names nothing to run, or a repository the create call cannot address, is
+    // refused instead of being put to the user for approval.
+    const preflight = preflightStartAgent(request);
+    if (!preflight.ok) {
+      return preflight.result;
     }
     if (options.requireStartAgentConfirmation !== false) {
       const confirmed = await askToConfirmStartAgent(deps, request);

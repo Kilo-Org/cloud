@@ -151,6 +151,31 @@ describe('dispatchAppActionRequest', () => {
     expect(startAgent).not.toHaveBeenCalled();
   });
 
+  it('refuses an unusable repository without asking', async () => {
+    const startAgent = vi.fn();
+    const confirmStartAgent = vi.fn();
+    await expect(
+      dispatchAppActionRequest(
+        {
+          action: 'StartAgent',
+          prompt: 'fix the build',
+          repository: 'https://git.example.com/owner/repo',
+        },
+        { startAgent, confirmStartAgent }
+      )
+    ).resolves.toEqual({
+      ok: false,
+      action: 'StartAgent',
+      code: 'unknown-repository',
+      retryable: false,
+      message: i18n.t('appActions.start.repositoryUnknown', {
+        repository: 'https://git.example.com/owner/repo',
+      }),
+    });
+    expect(confirmStartAgent).not.toHaveBeenCalled();
+    expect(startAgent).not.toHaveBeenCalled();
+  });
+
   it('reports a confirmation that could not be shown as a retryable failure', async () => {
     const startAgent = vi.fn();
     const confirmStartAgent = vi.fn().mockRejectedValue(new Error('no activity'));

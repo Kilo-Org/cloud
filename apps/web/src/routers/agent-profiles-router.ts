@@ -336,7 +336,6 @@ export const agentProfilesRouter = createTRPCRouter({
         profileService.listProfiles(db, { type: 'user', id: ctx.user.id }),
       ]);
 
-      // Effective default: personal default takes precedence over org default
       const effectiveDefault =
         personalProfiles.find(p => p.isDefault) ?? orgProfiles.find(p => p.isDefault);
 
@@ -369,7 +368,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       return profileService.createProfile(db, owner, ctx.user.id, input.name, input.description);

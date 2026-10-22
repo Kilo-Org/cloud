@@ -25,6 +25,7 @@
     "error": "错误：{{error}}",
     "back": "返回",
     "somethingWentWrong": "出了点问题。",
+    "actionNotRecorded": "无法记录此操作。请稍后重试。",
     "couldNotOpen": "无法打开 {{label}}。",
     "link": "链接",
     "takingLonger": "用时比预期更长。你可以关闭此页面，稍后再查看。",
@@ -35,6 +36,8 @@
     "connectGithub": "连接 GitHub",
     "cost": "费用",
     "discard": "放弃",
+    "discardChangesMessage": "您的更改将丢失。",
+    "discardChangesTitle": "放弃更改？",
     "findings": "问题",
     "mergeRequest": "合并请求",
     "notConnected": "未连接",
@@ -109,7 +112,9 @@
     "online": "在线",
     "open": "打开 {{name}}",
     "openPullRequest": "开启拉取请求",
+    "completed": "已完成",
     "pending": "待处理",
+    "running": "运行中",
     "performance": "性能",
     "preferences": "偏好设置",
     "privacyPolicy": "隐私政策",
@@ -990,8 +995,9 @@
       "noProposals": "暂无建议",
       "noProposalsDescription": "Kilo 分析维护者回复后，审查记忆建议会显示在这里。",
       "off": "审查记忆已关闭。",
+      "on": "审查记忆已开启。",
       "offDescription": "启用审查记忆后，Kilo 可以从维护者的回复中学习，并为 REVIEW.md 提出审查准则建议。",
-      "readOnlyDescription": "只有组织所有者和账单管理员可以启用审查记忆。",
+      "readOnlyDescription": "只有组织所有者和账单管理员可以更改审查记忆。",
       "title": "审查记忆"
     },
     "scopeList": {
@@ -1019,8 +1025,6 @@
     "updateFailed": "更新代码审查器失败。",
     "configSaveFailed": "保存审查配置失败。",
     "status": {
-      "running": "运行中",
-      "completed": "已完成",
       "interrupted": "已中断"
     },
     "reviewStyle": {
@@ -1033,7 +1037,8 @@
       "bugs": "缺陷",
       "style": "风格",
       "testing": "测试",
-      "documentation": "文档"
+      "documentation": "文档",
+      "unknown": "其他（{{area}}）"
     },
     "gateThreshold": {
       "warning": "警告"
@@ -1112,7 +1117,14 @@
       "triageReasoning": "初步评估依据",
       "watchInCloudAgent": "在云端智能体中查看",
       "whereFound": "发现位置（{{displayCount}}）",
-      "yes": "是"
+      "yes": "是",
+      "action": {
+        "analyzeCodebase": "分析代码库",
+        "dismiss": "忽略",
+        "manualReview": "人工审查",
+        "monitor": "监控",
+        "openPr": "打开拉取请求"
+      }
     },
     "analysisSettings": {
       "analysisModel": "分析模型",
@@ -1123,6 +1135,9 @@
       "triageModel": "初步评估模型"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo 管理员",
+      "actorMaskedUser": "已隐藏用户",
+      "actorSystem": "Kilo 系统",
       "couldNotLoad": "无法加载审计报告。",
       "events": "事件",
       "generated": "已于 {{generatedAt}} 生成。",
@@ -1134,7 +1149,24 @@
       "summary": "报告摘要",
       "title": "审计报告",
       "unavailable": "审计报告不可用",
-      "unavailableDescription": "只有组织所有者和账单管理员可以查看审计报告。请联系组织所有者或账单管理员获取访问权限。"
+      "unavailableDescription": "只有组织所有者和账单管理员可以查看审计报告。请联系组织所有者或账单管理员获取访问权限。",
+      "eventActions": {
+        "findingAnalysisCompleted": "分析已完成",
+        "findingAnalysisFailed": "分析失败",
+        "findingAutoDismissed": "已自动忽略",
+        "findingCreated": "已导入",
+        "findingDeleted": "已删除",
+        "findingDismissed": "已忽略",
+        "findingSeverityChanged": "严重性已变更",
+        "findingStatusChange": "状态已更改",
+        "findingSuperseded": "已被取代",
+        "remediationBlocked": "修复被阻止",
+        "remediationCancelled": "已取消",
+        "remediationFailed": "修复失败",
+        "remediationNoChangesNeeded": "无需更改",
+        "remediationPrOpened": "已打开拉取请求",
+        "remediationQueued": "已请求修复"
+      }
     },
     "auditReportButton": {
       "viewA11y": "查看审计报告"
@@ -1354,7 +1386,6 @@
       "installApp": "安装 GitHub 应用",
       "reauthorizeButton": "重新授权 GitHub 应用",
       "reauthorizeDescription": "安全智能体需要 vulnerability_alerts 权限才能访问 Dependabot 警报。请重新授权 GitHub 应用以授予此权限。",
-      "reauthorizeFailed": "无法开始重新授权。请重试。",
       "reauthorizeTitle": "需要额外权限",
       "setupFailed": "无法启动 GitHub 配置流程。请重试。"
     },
@@ -1377,6 +1408,7 @@
     "settingsSave": {
       "saveChanges": "保存更改",
       "unsavedMessage": "离开此页面前，要保存更改吗？",
+      "unsavedInvalidMessage": "这些更改暂时无法保存。请修正后再保存，或放弃更改以离开。",
       "unsavedTitle": "未保存的更改"
     },
     "setup": {
@@ -1415,7 +1447,12 @@
       "syncMayNotHaveCompleted": "同步可能尚未完成。请重试以核对同步状态，或放弃此次同步。",
       "syncInProgress": "已有安全同步正在进行。请重试。",
       "dismissalInProgress": "此忽略操作正在进行中。请重试。",
-      "couldNotReadPendingSyncs": "无法读取待处理的同步。请重试。"
+      "couldNotReadPendingSyncs": "无法读取待处理的同步。请重试。",
+      "ambiguous": "无法确认操作结果，请先查看安全审查再重试。",
+      "settleFailed": "操作已完成，但我们无法记录结果。请重试。",
+      "replayFailed": "此操作未完成。请重试。",
+      "actionFailed": "无法完成此操作。请重试。",
+      "actionBlocked": "无法完成此操作。必须先修复此问题，才能重试。"
     },
     "analysisState": {
       "queued": "分析排队中",
@@ -1700,6 +1737,7 @@
       "prefillModelUnavailable": "{{model}} 已不可用。当前使用你的默认模型。",
       "couldNotReadPendingSessions": "无法读取待处理的会话。请重试。",
       "failedToCreate": "创建会话失败。",
+      "checkOrganizationAccess": "请检查你对该组织的访问权限，然后重试。",
       "couldNotRefreshRepositories": "无法刷新仓库。请重试。",
       "discardDraftTitle": "丢弃草稿？",
       "discardDraftMessage": "你输入的提示词将丢失。",
@@ -1769,7 +1807,8 @@
       "linesBadge_other": "{{displayCount}} 行",
       "matchesBadge_one": "{{displayCount}} 项匹配",
       "matchesBadge_other": "{{displayCount}} 项匹配",
-      "noOutput": "没有输出。"
+      "noOutput": "没有输出。",
+      "translationFailed": "翻译失败"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截断）",
@@ -2220,6 +2259,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "加载完成后，才能查看当前登录的设备。",
     "currentDeviceUnidentified": "无法识别当前设备。",
+    "kiloApp": "Kilo 应用",
     "noSessions": "暂无已登录的设备",
     "noSessionsDescription": "在其他设备上登录 Kilo 应用后，即可在这里看到该设备。",
     "onlyKiloAppSignIns": "这里仅列出 Kilo 应用的登录会话，不含编辑器和 CLI 的登录会话。",
@@ -2228,7 +2268,7 @@
     "webBrowser": "浏览器",
     "viewProfile": "查看个人资料",
     "signOutThisDevice": "在此设备上退出登录",
-    "signOutThisSession": "退出此登录会话",
+    "signOutSessionLabel": "在{{device}}上退出登录，登录于 {{signedIn}}",
     "sessionSignedOut": "会话已退出登录。",
     "signOutThisDeviceTitle": "在此设备上退出登录？",
     "signOutThisSessionTitle": "退出此登录会话？",
@@ -2372,6 +2412,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "开始之前",
+    "summaryTitle": "数据共享偏好设置",
     "introDescription": "Kilo 会将你的消息发送给 AI 提供商，以生成回复。下方列出了共享的数据及其接收方。",
     "required": "使用 Kilo 的必要授权",
     "promptsTitle": "你的提示词和对话",
@@ -2380,7 +2421,6 @@
     "accountDescription": "你的 Kilo 账户 ID 和请求元数据，用于验证身份并统计用量。",
     "diagnosticsTitle": "应用诊断",
     "diagnosticsDescription": "移除应用内容后的崩溃和错误报告，用于保障应用稳定运行。",
-    "optional": "可选",
     "helpImprove": "帮助改进 Kilo",
     "helpImproveDescription": "共享匿名的产品分析数据和安装来源。你可以随时在设置中更改此选项。",
     "seeFullDetails": "查看完整详情",
@@ -2505,7 +2545,8 @@
       "description": "连接 GitHub 账号，即可在手机上审查拉取请求。",
       "gitlabDescription": "连接你的 GitLab 账户，以便在移动端审查合并请求。",
       "bitbucketDescription": "将 Bitbucket 连接到此组织，以便在移动端审查拉取请求。",
-      "bitbucketOrgOnlyDescription": "在你的个人资料中选择一个组织，以审查其 Bitbucket 拉取请求。"
+      "bitbucketOrgOnlyDescription": "将上方的账户切换为某个组织，以便审查其 Bitbucket 拉取请求。",
+      "contextLine": "适用于 {{organization}}"
     },
     "connectionExpired": "GitHub 连接已过期。",
     "couldNotLoadPullRequest": "无法加载拉取请求。",
@@ -2932,7 +2973,9 @@
       "reviewNotSubmitted": "当前无法提交此审查。可能是 PR 已有更新，或你正在审查自己创建的拉取请求。",
       "reviewNotSubmittedTerm": "此审查无法按现状提交。{{term}}可能已变更，或者你不能审查自己的{{term}}。",
       "couldNotPostComment": "无法发布评论。",
-      "couldNotSubmitReview": "无法提交审查。请检查网络连接后重试。"
+      "couldNotSubmitReview": "无法提交审查。请检查网络连接后重试。",
+      "rateLimited": "请求过多。请稍后重试。",
+      "conflict": "此项在您编辑时已被更改。请重新加载并重试。"
     },
     "operation": {
       "couldNotReply": "无法回复。",
@@ -2940,7 +2983,6 @@
       "mergeResultDefaultError": "GitHub 未完成合并。",
       "mergeResultNotCompleted": "{{term}}未合并。检查其状态后重试。",
       "ambiguous": "无法确认操作结果，请先检查 PR 再重试。",
-      "persistenceFailed": "无法记录此操作。请稍后重试。",
       "forbidden": "无权执行此操作。"
     },
     "capabilities": {
@@ -2969,11 +3011,23 @@
     "boundary": {
       "backToProfile": "返回个人资料",
       "loadErrorMessage": "请检查网络连接后重试。",
+
+      "chooseAccount": "选择账户",
       "loadErrorTitle": "无法加载你的组织列表。",
+      "membershipLostNotice": "你已无法访问此组织。已切换至 {{target}}。",
+      "noOrganization": "无组织",
+
+      "noOrganizationDescription": "此账户不属于任何组织。请在网页版创建或加入组织，以使用成员邀请和低余额提醒等组织功能。",
+
+      "openWebOrganizations": "在网页版打开组织",
+
       "organizationUnavailable": "此组织不可用。",
-      "selectDescription": "请前往个人资料页面，选择一个组织后继续。",
+      "selectDescriptionWithOrganizations": "您属于一个或多个组织。请选择此屏幕应使用的账户。",
+
       "selectOrganization": "选择组织",
       "unavailableDescription": "此组织已不可用。请前往个人资料页面，选择其他组织后继续。",
+
+      "unavailableSessionsDescription": "此组织已不可用。无法加载其会话。",
       "accessDeniedDescription": "你无权访问此组织。"
     },
     "creditActivity": {
@@ -3032,7 +3086,11 @@
       "separateEmailsHint": "多个邮箱请用逗号分隔。",
       "thresholdLabel": "余额低于此金额时提醒（USD）",
       "title": "余额不足提醒",
-      "emailsError": "请输入至少一个有效的邮箱地址，多个地址用逗号分隔。",
+      "emailsInvalid": "有一个或多个邮箱地址无效。",
+      "emailsRequired": "请输入至少一个邮箱地址。",
+      "saveEmailsError": "部分邮箱地址未被接受，请检查后重试。",
+      "saveError": "无法保存余额不足提醒。",
+      "thresholdPlaceholder": "请输入金额",
       "thresholdError": "请输入大于 0 的金额。"
     },
     "memberLimit": {
@@ -3043,6 +3101,7 @@
       "removeLimit": "取消限制",
       "title": "每日用量上限",
       "blankError": "请输入金额，或点击下方的“取消限制”。",
+      "blankWithoutLimitError": "请输入 0 到 {{max}} 之间的每日上限。",
       "rangeError": "请输入 0 到 {{max}} 之间的金额。"
     },
     "members": {
@@ -3471,6 +3530,9 @@
     "localModels": {
       "title": "本机模型",
       "help": "本机模型在这部手机上运行。你的提示和回复都会保留在设备上。",
+      "switchTitle": "切换到本机模型？",
+      "switchMessage": "切换到 {{name}} 后，此对话的提示和上下文将在这部手机上处理，而不是在远程服务器上。",
+      "switchConfirm": "切换模型",
       "systemPurpose": "此设备系统内置的模型。它在设备上运行。",
       "apple": "Apple 智能（本机）",
       "checking": "正在检查可用性…",
@@ -3508,6 +3570,7 @@
   "appActions": {
     "start": {
       "promptRequired": "启动智能体需要提示词。请添加提示词后重新运行。",
+      "repositoryRequired": "启动智能体需要一个仓库。请打开 Kilo，选择一个仓库，然后重新运行。",
       "repositoryUnknown": "Kilo 无法将 {{repository}} 识别为 GitHub 或 GitLab 仓库。请在 Kilo 中选择其他仓库。",
       "repositoryUnsupported": "{{repository}} 是 Bitbucket 仓库——启动智能体暂时无法使用它。请在 Kilo 中选择其他仓库。"
     }
@@ -3567,7 +3630,6 @@
     "personalDefaultDescription": "当没有存储库具有固定配置文件时自动加载。",
     "organizationDefaultDescription": "为没有个人默认值的会员自动加载。",
     "setAsDefault": "设为默认",
-    "removeDefault": "取消默认",
     "saveFailed": "无法保存配置文件",
     "deleteTitle": "删除配置文件",
     "deleteMessage": "这将永久删除配置文件及其设置。此操作无法撤消。",
@@ -3580,7 +3642,6 @@
     "keyTooLong": "键不能超过 256 个字符",
     "keyDuplicate": "此键已存在于配置文件中",
     "valueLabel": "值",
-    "secretLabel": "秘密",
     "secrets": {
       "markSecret": "标记为秘密",
       "masked": "隐藏值",
@@ -3593,11 +3654,13 @@
     "commandsTitle": "设置命令",
     "addCommand": "添加命令",
     "commandLabel": "命令",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "例如 pnpm install",
     "commandsEmpty": "还没有设置命令",
     "commandsSaveFailed": "无法保存设置命令",
     "moveUp": "向上移动",
     "moveDown": "下移",
+    "moveCommandUp": "上移命令 {{position}}",
+    "moveCommandDown": "下移命令 {{position}}",
     "skillsTitle": "技能",
     "addSkill": "添加技能",
     "skillNameLabel": "技能名称",
@@ -3637,7 +3700,9 @@
       "jsonTooLarge": "最多使用 50 个条目，键最多 128 个字符，值最多 4096 个字符",
       "timeoutInvalid": "超时必须是整数毫秒",
       "edit": "编辑 MCP 服务器",
-      "saveFailed": "无法保存 MCP 服务器"
+      "saveFailed": "无法保存 MCP 服务器",
+      "deleteFailed": "无法删除 MCP 服务器",
+      "updateFailed": "无法更新 MCP 服务器"
     },
     "agents": {
       "title": "配置文件代理",
@@ -3664,6 +3729,7 @@
       "visibilitySubagent": "子代理——只能从其他人调用",
       "visibilityAll": "全部 — 两者",
       "saveFailed": "无法保存代理",
+      "deleteFailed": "无法删除代理",
       "nameRequired": "输入代理名称",
       "slugRequired": "输入代理 slug",
       "slugInvalid": "Slug 必须以字母开头，并且只能使用小写字母、数字和破折号",
@@ -3678,10 +3744,12 @@
       "description": "命令说明",
       "template": "模板",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "解释$ARGUMENTS",
       "subtask": "作为子任务运行",
       "edit": "编辑斜杠命令",
       "saveFailed": "无法保存命令",
+      "deleteFailed": "无法删除命令",
       "nameRequired": "输入命令名称",
       "nameInvalid": "名称必须以小写字母开头，并且只能使用小写字母、数字和破折号",
       "templateRequired": "输入命令模板",
@@ -3828,7 +3896,7 @@
     "view": "阅读简报",
     "viewWithPreview": "$t(agentBriefing.view)。{{preview}}",
     "scheduleTimeLabel": "{{label}}，{{time}}",
-    "dismiss": "显示实时状态",
+    "dismiss": "忽略简报",
     "offline": "离线 · 已保存的简报",
     "cached": "已保存的报告 · 无法刷新",
     "revised": "已修订 · {{revision}}",

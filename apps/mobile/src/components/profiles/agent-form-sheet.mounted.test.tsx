@@ -1,9 +1,9 @@
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
 import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
 import { type AgentSource } from '@/components/profiles/profile-agents-model';
+import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   useAvailableModels: vi.fn(),
   onSave: vi.fn(),
   onClose: vi.fn(),
+  confirm: vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/use-available-models', () => ({
@@ -30,6 +31,14 @@ vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'Se
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: (request: unknown) => {
+      h.confirm(request);
+    },
+    dialog: null,
+  }),
+}));
 
 function agentSource(overrides: Partial<AgentSource> = {}): AgentSource {
   return {
@@ -88,6 +97,41 @@ function pressDone(root: ReactTestInstance): void {
   act(() => {
     (findOne(root, 'SheetHeader').props as { onDone: () => void }).onDone();
   });
+}
+
+function pressCancel(root: ReactTestInstance): void {
+  const onCancel = voidHandler(findOne(root, 'SheetHeader').props.onCancel);
+  act(() => {
+    onCancel();
+  });
+}
+
+/** A host stub keeps the component's own props untyped; these suites call one handler each. */
+function voidHandler(value: unknown): () => void {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => void;
+}
+
+/** The sheet's dismissal request answers whether it may close. */
+function booleanHandler(value: unknown): () => boolean {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => boolean;
+}
+
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+};
+
+function confirmRequest(index: number): ConfirmRequest | undefined {
+  return h.confirm.mock.calls[index]?.[0];
 }
 
 function modelOption(id: string, variants: string[]) {
@@ -208,6 +252,57 @@ describe('AgentFormSheet parity fields', () => {
         String(node.props.accessibilityLabel).includes('thinking effort')
       )
     ).toBe(false);
+
+    unmount();
+  });
+
+  it('closes without asking when nothing changed', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    pressCancel(renderer.root);
+
+    expect(h.onClose).toHaveBeenCalledTimes(1);
+    expect(h.confirm).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('asks Keep editing / Discard when Cancel would drop typed fields', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    changeText(renderer.root, 'Max steps', '50');
+    pressCancel(renderer.root);
+
+    expect(h.onClose).not.toHaveBeenCalled();
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    const request = h.confirm.mock.calls[0]?.[0];
+    expect(request).toMatchObject({
+      title: i18n.t('common.discardChangesTitle'),
+      message: i18n.t('common.discardChangesMessage'),
+      confirmLabel: i18n.t('common.discard'),
+      cancelLabel: i18n.t('common.keepEditing'),
+    });
+
+    // Discard closes; Keep editing never reaches this callback.
+    confirmRequest(0)?.onConfirm();
+    expect(h.onClose).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('keeps Android Back while dirty for the confirm, and lets it close a clean form', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+    const requestDismiss = booleanHandler(
+      findOne(renderer.root, 'SessionPageSheet').props.onRequestDismiss
+    );
+
+    expect(requestDismiss()).toBe(true);
+    expect(h.confirm).not.toHaveBeenCalled();
+
+    changeText(renderer.root, 'Max steps', '50');
+    expect(requestDismiss()).toBe(false);
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    expect(h.onClose).not.toHaveBeenCalled();
 
     unmount();
   });

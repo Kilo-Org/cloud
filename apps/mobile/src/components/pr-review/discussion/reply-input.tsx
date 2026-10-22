@@ -221,7 +221,7 @@ export function ReplyInput({
       // The ledger persistence-failure marker is retry-blocking: the row never
       // became `reconcile_pending`, so the same key must not be retried.
       if (isPrOperationPersistenceFailed(reply.error)) {
-        setInlineError(i18n.t('prReview.operation.persistenceFailed'));
+        setInlineError(i18n.t('common.actionNotRecorded'));
         setInlineErrorKind('bad-request');
         return;
       }
@@ -246,7 +246,7 @@ export function ReplyInput({
             setInlineError(t('prReview.discussion.termsCheckRetryCopy'));
             setInlineErrorKind('retryable');
           } else {
-            setInlineError(t('prReview.discussion.termsCopy'));
+            setInlineError(t('prReview.discussion.termsAcceptRequired'));
             setInlineErrorKind(null);
           }
         })();

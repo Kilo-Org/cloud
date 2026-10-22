@@ -214,6 +214,7 @@ jobs:
             services/kiloclaw  # Docker-based deploy in deploy-kiloclaw.yml (manual-only)
             services/gastown   # Deployed separately
             services/wasteland # Deployed separately
+            services/user-data-export # Automatic deploy suspended
             services/deploy-infra/builder-docker-container/container-files  # Build artifact template, not a deployable worker
           )
 

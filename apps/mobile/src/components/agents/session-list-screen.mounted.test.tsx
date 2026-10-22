@@ -746,7 +746,7 @@ describe('AgentSessionListScreen live presentation', () => {
     const createAction = action('New session');
     const label = createAction.findByType(Text);
     expect(createAction.props.className).toContain('max-w-full');
-    expect(createAction.props.className).toContain('min-h-[44px]');
+    expect(createAction.props.className).toContain('min-h-[48px]');
     expect(label.props.className).toBe('shrink text-center');
     expect(label.props.numberOfLines).toBeUndefined();
     expect(label.props.allowFontScaling).not.toBe(false);

@@ -51,21 +51,24 @@ export function getAgentsListBottomInset({
  * The full empty-state stack's fixed chrome and its `fontScale === 1` text
  * metrics: the icon bubble, a block gap, a `text-lg` title line, the
  * title-to-description gap, a `text-sm` description line per wrapped line, a
- * block gap, and the action's `min-h-[44px]` plus the button's `py-2`.
+ * block gap, and the action's `min-h-[48px]` plus the button's `py-2`.
  *
  * Every rem-based value is 14dp, not 16dp: NativeWind v5 fixes 1rem at 14pt
  * (`button.tsx`, and the compiled `gap-4 === 14` assertion in
  * `session-list-header-actions.mounted.test.tsx`). So `h-14` (3.5rem) is 49,
  * `gap-4` (1rem) 14, the `text-lg` line-height (1.75rem) 24.5, `gap-1`
  * (0.25rem) 3.5, the `text-sm` line-height (1.25rem) 17.5 and `py-2` (0.5rem
- * per side) 14. `min-h-[44px]` is a px literal and does not scale with rem.
+ * per side) 14. The `48` is the shared state-action floor
+ * (`STATE_ACTION_TARGET_DP` in `a11y/tap-target.ts`, a px literal that does not
+ * scale with rem); it is spelled here rather than imported so this module stays
+ * free of the `react-native` import that module carries.
  */
 const EMPTY_STATE_BUBBLE_HEIGHT = 49;
 const EMPTY_STATE_BLOCK_GAP = 14;
 const EMPTY_STATE_TITLE_LINE_HEIGHT = 24.5;
 const EMPTY_STATE_DESCRIPTION_GAP = 3.5;
 const EMPTY_STATE_DESCRIPTION_LINE_HEIGHT = 17.5;
-const EMPTY_STATE_ACTION_MIN_HEIGHT = 44;
+const EMPTY_STATE_ACTION_MIN_HEIGHT = 48;
 const EMPTY_STATE_ACTION_PADDING = 14;
 // The live empty state stacks a second action (its See-all history link) under
 // the primary button: a `gap-3` block gap (0.75rem, 10.5dp, fixed) plus one
@@ -122,8 +125,8 @@ export function getEmptyStateFullHeight({
   const title = EMPTY_STATE_TITLE_LINE_HEIGHT * wrappedLines(titleLines) * fontScale;
   const description =
     EMPTY_STATE_DESCRIPTION_LINE_HEIGHT * wrappedLines(descriptionLines) * fontScale;
-  // `Button`'s `text-sm` label scales; its `min-h-[44px]` is the floor below
-  // that point, and its `py-2` does not scale with the label.
+  // `Button`'s `text-sm` label scales; its `min-h-[48px]` floor is the shared
+  // state-action target and `py-2` does not scale with the label.
   const action = Math.max(
     EMPTY_STATE_ACTION_MIN_HEIGHT,
     EMPTY_STATE_DESCRIPTION_LINE_HEIGHT * fontScale + EMPTY_STATE_ACTION_PADDING

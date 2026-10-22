@@ -10,6 +10,7 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { Shield, X } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { revokeImageHost, useTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { revokeHost, useTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
@@ -118,6 +119,7 @@ export function TrustedHostsScreen() {
           action={
             <Button
               variant="outline"
+              className={STATE_ACTION_CLASS}
               onPress={() => {
                 // The only caller pushes this screen from Account, so `back()`
                 // would land one row short of the Preferences hub the label

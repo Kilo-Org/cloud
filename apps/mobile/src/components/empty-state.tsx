@@ -16,6 +16,9 @@ type EmptyStateProps = {
   /** Optional muted text, or a node that carries its own styling (e.g. AccessibleStatus). */
   description?: ReactNode;
   className?: string;
+  /** The state's way out. It renders as given, so the action's own node carries
+   *  the shared `STATE_ACTION_CLASS` floor (Android measures the pressed node,
+   *  and `hitSlop` does not move its rect); see `apps/mobile/AGENTS.md`. */
   action?: ReactNode;
   /** `center` scrolls the content inside a measured `StateSurface`; `top`
    *  pins it to the surface top without a scroller; `static` renders the plain

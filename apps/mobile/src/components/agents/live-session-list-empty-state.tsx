@@ -8,7 +8,9 @@ import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { Bot, Plus } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 type LiveSessionListEmptyStateProps = {
   organizationId: string | null;
@@ -40,7 +42,7 @@ export function LiveSessionListEmptyState({
           <Button
             variant="default"
             size={compact ? 'sm' : 'default'}
-            className="max-w-full"
+            className={cn('max-w-full', STATE_ACTION_CLASS)}
             accessibilityLabel={t('common.newSession')}
             onPress={() => {
               router.push(getNewAgentSessionPath(organizationId) as Href);

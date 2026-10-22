@@ -1,10 +1,10 @@
 import * as SecureStore from '@/lib/auth/secure-store';
 
 import { API_BASE_URL } from '@/lib/config';
-import { getAdmission } from '@/lib/auth/admission';
+import { clearAttestKeyOnRefusal, getAdmission } from '@/lib/auth/admission';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
-import { parseTokenPair } from '@/lib/auth/native-auth-contract';
+import { parseAuthError, parseTokenPair } from '@/lib/auth/native-auth-contract';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import { AUTH_TOKEN_KEY, LEGACY_EXCHANGE_DONE_KEY } from '@/lib/storage-keys';
 
@@ -68,6 +68,12 @@ export async function exchangeLegacyToken(): Promise<{
     });
 
     if (!response.ok) {
+      // A refusal can name a key the server does not know, for example when a
+      // first exchange verified but its response was lost. Drop the stored key
+      // id so the next launch attests again instead of replaying an assertion
+      // the server can never accept.
+      const refused: unknown = await response.json().catch(() => undefined);
+      await clearAttestKeyOnRefusal(parseAuthError(refused)?.code);
       // One-time exchange failure: retain old token, do not set the done
       // marker. Retry on the next app launch.
       return null;

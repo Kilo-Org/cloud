@@ -102,13 +102,13 @@ const callerFor =
     }
     return Effect.runPromise(
       client.call(params.name, params.arguments ?? {}).pipe(
-        Effect.map(callToolResultOf),
-        Effect.catchAll(failure =>
-          Effect.succeed({
-            content: [{ type: 'text' as const, text: explain(failure) }],
+        Effect.match({
+          onFailure: error => ({
+            content: [{ type: 'text' as const, text: explain(error) }],
             isError: true,
-          })
-        )
+          }),
+          onSuccess: callToolResultOf,
+        })
       )
     );
   };

@@ -359,9 +359,8 @@ touched again.
   The e2e Worker provisions only the `Sandbox` container class with
   `max_instances: 40`; that is a cap, not a reservation, and it gives
   parallelism headroom for later parallel runs. Capacity is not guaranteed.
-- Session starts require the e2e key in addition to a valid Kilo token, so only
-  a caller holding the key reaches `start` or `createWorktreeChat`. Concurrent
-  runs are still not isolated from each other.
+- Session-start procedures require the e2e key in addition to a valid Kilo token.
+  Concurrent runs are still not isolated from each other.
 - Capacity is capped but there is no total-spending cap.
 - The supported profile is short streams only. `gate`/`hang` directives are
   reachable on the deployed fake (they need a valid model token and, for

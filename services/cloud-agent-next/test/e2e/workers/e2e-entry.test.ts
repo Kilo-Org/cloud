@@ -192,7 +192,7 @@ describe('e2e surface auth chain', () => {
 });
 
 describe('internal tRPC reachability (deliberately widened by the single secret)', () => {
-  const ABSENT_SESSION_ID = `agent_${crypto.randomUUID()}`;
+  const ABSENT_SESSION_ID = `workspace_${crypto.randomUUID()}`;
 
   it('reaches updateSession with the secret and a valid JWT and reports the handler error', async () => {
     // Intentional: with the e2e secret plus any valid JWT, `updateSession` is

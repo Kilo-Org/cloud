@@ -71,7 +71,11 @@ import {
   generateCloudAgentAttachmentDownloadUrl,
   generateImageUploadUrl,
 } from '@/lib/r2/cloud-agent-attachments';
-import { linkPendingUploads, releasePendingUploads } from '@/lib/r2/cloud-agent-pending-uploads';
+import {
+  linkAttachmentsForDispatch,
+  linkPendingUploads,
+  releasePendingUploads,
+} from '@/lib/r2/cloud-agent-pending-uploads';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { signPreviewTicket, signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
@@ -79,7 +83,6 @@ import { buildPreviewOpenUrl, buildPreviewUrlTemplate } from '@/lib/cloud-agent/
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
-import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
 import { buildCloudAgentNextEligibility } from './cloud-agent-next-eligibility';
@@ -238,7 +241,15 @@ export const cloudAgentNextRouter = createTRPCRouter({
       }
 
       try {
-        const result = await client.prepareSession({
+        // New-session flows (mobile, continue-cloud-create) call prepareSession
+        // without a follow-up sendMessage, so the attachment rows must be
+        // linked before prepare can accept the session; otherwise the reaper
+        // deletes new-session objects. Only ATTACHMENT rows are admitted
+        // (images are never admitted; only
+        // generateCloudAgentAttachmentUploadUrl admits).
+        await linkAttachmentsForDispatch(ctx.user.id, attachments);
+
+        return await client.prepareSession({
           ...restInput,
           ...gitParams,
           attachments: attachments ?? images,
@@ -246,21 +257,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
           githubAccessPurpose: 'agent',
           clientProvenance: isMobileClient(ctx.headersList) ? 'mobile' : 'browser',
         });
-
-        // New-session flows (mobile, continue-cloud-create) call prepareSession
-        // without a follow-up sendMessage, so the server must link the admitted
-        // attachment rows here too; otherwise the reaper deletes new-session
-        // objects. Only ATTACHMENT rows are admitted (images are never admitted;
-        // only generateCloudAgentAttachmentUploadUrl admits).
-        if (attachments && attachments.files.length > 0) {
-          await linkPendingUploads(
-            ctx.user.id,
-            attachments.path,
-            attachments.files.map(file => `${ctx.user.id}/cloud-agent/${attachments.path}/${file}`)
-          );
-        }
-
-        return result;
       } catch (error) {
         rethrowCloudAgentError(error);
       }
@@ -350,29 +346,21 @@ export const cloudAgentNextRouter = createTRPCRouter({
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab).
       try {
         const { attachments, images } = input;
-        const result = await client.sendMessage({
+        // Link the attachment rows before the worker can accept the turn: the
+        // link is what keeps their objects out of the abandoned-upload reaper,
+        // and once the worker has answered there is no ledger work left that
+        // could report an accepted send as failed. Only ATTACHMENT rows are
+        // admitted (images are never admitted; only
+        // generateCloudAgentAttachmentUploadUrl admits).
+        await linkAttachmentsForDispatch(ctx.user.id, attachments);
+
+        return await client.sendMessage({
           cloudAgentSessionId: input.cloudAgentSessionId,
           payload: input.payload,
           autoCommit: input.autoCommit,
           attachments: attachments ?? images,
-          messageId: input.messageId ?? generateMessageId(),
+          messageId: input.messageId,
         });
-
-        // Compatibility: the server links authoritatively so any client whose
-        // send goes through sendMessage keeps its objects (mobile, old tabs).
-        // The client does not link pre-send, so a failed or abandoned send
-        // leaves rows 'pending' for the reaper. Only ATTACHMENT rows are
-        // admitted (images are never admitted; only
-        // generateCloudAgentAttachmentUploadUrl admits).
-        if (attachments && attachments.files.length > 0) {
-          await linkPendingUploads(
-            ctx.user.id,
-            attachments.path,
-            attachments.files.map(file => `${ctx.user.id}/cloud-agent/${attachments.path}/${file}`)
-          );
-        }
-
-        return result;
       } catch (error) {
         rethrowCloudAgentError(error);
       }

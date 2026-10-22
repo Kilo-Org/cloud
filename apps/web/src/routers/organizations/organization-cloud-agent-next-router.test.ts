@@ -35,6 +35,7 @@ import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
 import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import type { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
+import type * as PendingUploadsModule from '@/lib/r2/cloud-agent-pending-uploads';
 import type * as StreamTicketModule from '@/lib/cloud-agent/stream-ticket';
 import type {
   organizationPrepareSessionNextSchema,
@@ -53,6 +54,9 @@ import type { GetSandboxSelectionOptionsInput } from '@/lib/cloud-agent-next/clo
 const ORGANIZATION_ID = '9a283301-b75d-4375-a1ba-e319a02e18b7';
 
 type AttachmentReference = { path: string; files: string[] };
+
+/** A valid client message id; the send schema requires one. */
+const SEND_MESSAGE_ID = 'msg_123456789abc123456789ABCDE';
 
 const mockPrepareSession = jest.fn<
   (input: {
@@ -277,6 +281,7 @@ jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
 }));
 
 jest.mock('@/lib/r2/cloud-agent-pending-uploads', () => ({
+  linkAttachmentsForDispatch: jest.fn(async () => {}),
   linkPendingUploads: jest.fn(),
   releasePendingUploads: jest.fn(),
 }));
@@ -334,7 +339,7 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     organizationId: string;
     cloudAgentSessionId: string;
     expectedWorktreeId?: `worktree_${string}`;
-    messageId?: string;
+    messageId: string;
     payload:
       | { type: 'prompt'; prompt: string; mode: string; model: string }
       | { type: 'command'; command: string; arguments: string };
@@ -965,6 +970,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
       caller.sendMessage({
         organizationId: ORGANIZATION_ID,
         cloudAgentSessionId: 'agent_123',
+        messageId: SEND_MESSAGE_ID,
         payload: { type: 'prompt', prompt: 'Read notes', mode: 'code', model: 'test' },
       })
     ).rejects.toThrow('Organization does not own this session');
@@ -982,6 +988,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     await caller.sendMessage({
       organizationId: ORGANIZATION_ID,
       cloudAgentSessionId: 'agent_123',
+      messageId: SEND_MESSAGE_ID,
       payload: { type: 'prompt', prompt: 'Read notes', mode: 'code', model: 'test' },
       attachments,
     });
@@ -989,6 +996,31 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ attachments }));
     expect(mockSendMessage).not.toHaveBeenCalledWith(
       expect.objectContaining({ organizationId: ORGANIZATION_ID })
+    );
+  });
+
+  it('links the attachment rows before dispatching the send to the Worker', async () => {
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+    const attachments = {
+      path: '12345678-1234-4234-9234-123456789abc',
+      files: ['87654321-4321-4321-8321-cba987654321.md'],
+    };
+    const pendingUploads = jest.requireMock<typeof PendingUploadsModule>(
+      '@/lib/r2/cloud-agent-pending-uploads'
+    );
+    const linkAttachmentsForDispatch = jest.mocked(pendingUploads.linkAttachmentsForDispatch);
+
+    await caller.sendMessage({
+      organizationId: ORGANIZATION_ID,
+      cloudAgentSessionId: 'agent_123',
+      messageId: SEND_MESSAGE_ID,
+      payload: { type: 'prompt', prompt: 'Read notes', mode: 'code', model: 'test' },
+      attachments,
+    });
+
+    expect(linkAttachmentsForDispatch).toHaveBeenCalledWith('user-1', attachments);
+    expect(linkAttachmentsForDispatch.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSendMessage.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     );
   });
 
@@ -1002,6 +1034,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     await caller.sendMessage({
       organizationId: ORGANIZATION_ID,
       cloudAgentSessionId: 'agent_123',
+      messageId: SEND_MESSAGE_ID,
       payload: { type: 'prompt', prompt: 'Read image', mode: 'code', model: 'test' },
       images,
     });
@@ -1020,6 +1053,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     await caller.sendMessage({
       organizationId: ORGANIZATION_ID,
       cloudAgentSessionId: 'agent_123',
+      messageId: SEND_MESSAGE_ID,
       payload: {
         type: 'prompt',
         prompt: 'Follow up on this',
@@ -1052,6 +1086,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     await caller.sendMessage({
       organizationId: ORGANIZATION_ID,
       cloudAgentSessionId: 'agent_123',
+      messageId: SEND_MESSAGE_ID,
       payload: { type: 'command', command: 'review', arguments: '' },
     });
 
@@ -1075,6 +1110,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     await caller.sendMessage({
       organizationId: ORGANIZATION_ID,
       cloudAgentSessionId: 'agent_123',
+      messageId: SEND_MESSAGE_ID,
       payload: { type: 'command', command: 'review', arguments: '' },
     });
 
@@ -1098,6 +1134,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     await caller.sendMessage({
       organizationId: ORGANIZATION_ID,
       cloudAgentSessionId: 'agent_123',
+      messageId: SEND_MESSAGE_ID,
       payload: { type: 'command', command: 'review', arguments: '' },
     });
 
@@ -1116,6 +1153,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     await caller.sendMessage({
       organizationId: ORGANIZATION_ID,
       cloudAgentSessionId: 'agent_123',
+      messageId: SEND_MESSAGE_ID,
       payload: { type: 'command', command: 'review', arguments: '' },
     });
 
@@ -2136,6 +2174,7 @@ describe('organizationCloudAgentNextRouter Worker error codes', () => {
         return caller.sendMessage({
           organizationId: ORGANIZATION_ID,
           cloudAgentSessionId: 'agent_123',
+          messageId: SEND_MESSAGE_ID,
           payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'kilo/test-model' },
         });
     }

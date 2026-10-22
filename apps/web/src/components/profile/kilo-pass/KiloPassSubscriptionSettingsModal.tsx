@@ -289,6 +289,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
             isMutating={isMutating}
             updateSummary={updateSummary}
             planChangeBlockedReason={planChangeBlockedReason}
+            onOpenSubscriptionDetails={closeModal}
             hasScheduledChange={Boolean(scheduledChange)}
             effectiveAtLabel={effectiveAtLabel}
             onSelectTier={setTargetTier}

@@ -1,4 +1,5 @@
 import { ArrowRight, Check, Loader2 } from 'lucide-react';
+import Link from 'next/link';
 
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -27,6 +28,7 @@ type UpdatePanelProps = {
   isMutating: boolean;
   updateSummary: UpdateSummary;
   planChangeBlockedReason: string | null;
+  onOpenSubscriptionDetails: () => void;
   hasScheduledChange: boolean;
   effectiveAtLabel: string | null;
   onSelectTier: (tier: KiloPassTier) => void;
@@ -44,6 +46,7 @@ export function UpdatePanel(props: UpdatePanelProps) {
     isMutating,
     updateSummary,
     planChangeBlockedReason,
+    onOpenSubscriptionDetails,
     hasScheduledChange,
     effectiveAtLabel,
     onSelectTier,
@@ -112,7 +115,16 @@ export function UpdatePanel(props: UpdatePanelProps) {
 
       {planChangeBlockedReason ? (
         <Alert variant="warning">
-          <AlertDescription>{planChangeBlockedReason}</AlertDescription>
+          <AlertDescription>
+            <p>{planChangeBlockedReason}</p>
+            <Link
+              href="/subscriptions/kilo-pass"
+              onClick={onOpenSubscriptionDetails}
+              className="font-medium underline underline-offset-2"
+            >
+              Go to your Kilo Pass subscription
+            </Link>
+          </AlertDescription>
         </Alert>
       ) : null}
 

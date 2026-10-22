@@ -3074,8 +3074,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   /** Builds the transport callbacks and the session for one prepared open. */
   function createOpenSession(open: SessionOpen): CloudAgentSession {
-    const { kiloSessionId, initialPageGeneration, storage } = open;
-    const { resolvedFailures } = open;
+    const { kiloSessionId, initialPageGeneration, storage, resolvedFailures } = open;
 
     // Persist the bounded page's cursor / hasOlderMessages / omittedItemCount
     // so `loadOlderMessages` can continue from where the transport left off.

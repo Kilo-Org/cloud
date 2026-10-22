@@ -9,7 +9,7 @@ import { createConnection, type Connection } from './cloud-agent-connection';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import { normalize, isChatEvent } from './normalizer';
 import type { ServiceEvent } from './normalizer';
-import { partSettledAt } from './part-utils';
+import { replaySnapshot, replaySnapshotPage, sessionSnapshotFailureMessage } from './snapshot-page';
 import type {
   CloudAgentSessionId,
   KiloSessionId,
@@ -133,34 +133,6 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       connection = null;
     }
 
-    function replayPage(page: SessionSnapshotPage): void {
-      sink.onServiceEvent({ type: 'session.created', info: page.info });
-
-      for (const msg of page.messages) {
-        sink.onChatEvent({ type: 'message.updated', info: msg.info });
-
-        for (const part of msg.parts) {
-          const settledAt = partSettledAt(part);
-          sink.onChatEvent({
-            type: 'message.part.updated',
-            part,
-            ...(settledAt === undefined ? {} : { time: settledAt }),
-          });
-        }
-      }
-    }
-
-    function replaySnapshot(snapshot: SessionSnapshot): void {
-      // The legacy full-snapshot path is retained for callers that haven't
-      // migrated to the paginated endpoint yet. Same shape; same effect.
-      replayPage({
-        info: snapshot.info,
-        messages: snapshot.messages,
-        nextCursor: null,
-        omittedItemCount: 0,
-      });
-    }
-
     /** Fetch the initial bounded page (newest 50) and replay it. */
     async function fetchAndReplayInitial(
       expectedGeneration: number
@@ -186,22 +158,13 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           // the live cursor takes over.
           lastEventId = page.watermarkEventId != null ? 0 : null;
           config.onInitialPageLoaded?.(page);
-          replayPage(page);
+          replaySnapshotPage(sink, page);
           return { ticket };
         }
         // Typed failure on initial load — surface via the standard error
         // channel (same path as a thrown fetch failure) and still try to
         // connect so the user can recover via live events.
-        handleTicketError(
-          new Error(
-            page.kind === 'retryable_failure'
-              ? 'Session history temporarily unavailable'
-              : page.kind === 'too_large'
-                ? 'Session history too large to load'
-                : 'Session history is unavailable'
-          ),
-          expectedGeneration
-        );
+        handleTicketError(new Error(sessionSnapshotFailureMessage(page.kind)), expectedGeneration);
         // Even on a typed failure, the websocket is still useful — connect
         // without a snapshot replay. The manager will surface the error.
         return { ticket };
@@ -211,7 +174,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         config.fetchSnapshot(config.kiloSessionId),
       ]);
       if (expectedGeneration !== lifecycleGeneration) return null;
-      replaySnapshot(snapshot);
+      replaySnapshot(sink, snapshot);
       return { ticket };
     }
 
@@ -309,7 +272,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
                 page => {
                   if (expectedGeneration !== lifecycleGeneration) return;
                   if (page && page.kind === 'success') {
-                    replayPage(page);
+                    replaySnapshotPage(sink, page);
                   }
                 },
                 () => undefined
@@ -317,7 +280,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
             : config.fetchSnapshot(config.kiloSessionId).then(
                 snapshot => {
                   if (expectedGeneration !== lifecycleGeneration) return;
-                  replaySnapshot(snapshot);
+                  replaySnapshot(sink, snapshot);
                 },
                 () => undefined
               );

@@ -7,6 +7,7 @@
 
 import { consoleLoggingIntegration, init } from '@sentry/nextjs';
 import { RESTRICTED_DATA_COLLECTION } from '@kilocode/web-shared/lib/observability/sentry-data-collection';
+import { sanitizeSentryRequestData } from '@kilocode/web-shared/lib/observability/sentry-server';
 
 if (process.env.NODE_ENV !== 'development') {
   init({
@@ -25,5 +26,13 @@ if (process.env.NODE_ENV !== 'development') {
       // send console.log, console.error, and console.warn calls as logs to Sentry
       consoleLoggingIntegration({ levels: ['log', 'error', 'warn'] }),
     ],
+
+    // Apply the same request-data strip the server initializer runs, so an event
+    // from an edge runtime entry leaves this process with the same request
+    // metadata as a server event.
+    beforeSend(event) {
+      sanitizeSentryRequestData(event);
+      return event;
+    },
   });
 }

@@ -15,7 +15,7 @@ import {
   listDiscussions,
   listInbox,
 } from './gitlab-read';
-import { GitLabReviewError } from './gitlab-authorization';
+import { GitLabApiStatusError, GitLabReviewError } from './gitlab-authorization';
 
 // The bound transport runs through Node https.request; mirror adapter.test.ts.
 jest.mock('https', () => ({
@@ -724,6 +724,32 @@ describe('listInbox', () => {
     const page = await listInbox(OWNER);
 
     expect(page.items).toEqual([]);
+  });
+
+  it('reports a provider permission refusal as a reconnect, never as the caller permission', async () => {
+    mockFetchGitLabUser.mockRejectedValue(new GitLabApiStatusError(403, 'GitLab user fetch: 403'));
+
+    const error = await captureRejection(listInbox(OWNER));
+
+    // The inbox lists the account's own review requests: a 403 there is the
+    // connection's, not the organization member's permission.
+    expect(error).toBeInstanceOf(GitLabReviewError);
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toMatch(/reconnect/i);
+  });
+
+  it('wraps an organization connection refusal with inbox copy', async () => {
+    mockFetchGitLabUser.mockRejectedValue(new GitLabApiStatusError(403, 'GitLab user fetch: 403'));
+
+    const error = await captureRejection(listInbox(ORG_OWNER));
+
+    // The owner-aware classifier resolves the organization connection's 403 to
+    // a reconnect on its own; the inbox keeps copy that names the list the
+    // reader asked for instead of a merge request the request never mentioned.
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toMatch(/review requests/i);
   });
 });
 

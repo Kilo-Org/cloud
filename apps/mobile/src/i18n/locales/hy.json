@@ -224,7 +224,7 @@
     "hideBalance": "Թաքցնել մնացորդը",
     "showBalance": "Ցուցադրել մնացորդը",
     "balanceHidden": "Մնացորդը թաքցված է",
-    "bonusCreditsExpiring": "{{amount}} բոնուսային կրեդիտի ժամկետը լրանում է՝ {{date}}։",
+    "bonusCreditsExpiring": "{{amount}} կրեդիտի ժամկետը լրանում է՝ {{date}}։",
     "signOutTitle": "Դո՞ւրս գալ հաշվից",
     "signOutMessage": "Աշխատանքային տարածքից օգտվելու համար պետք է նորից մուտք գործես։",
     "deleteAccountTitle": "Ջնջե՞լ հաշիվը",

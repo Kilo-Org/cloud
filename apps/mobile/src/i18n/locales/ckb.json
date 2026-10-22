@@ -224,7 +224,7 @@
     "hideBalance": "شاردنەوەی باڵانس",
     "showBalance": "پیشاندانی باڵانس",
     "balanceHidden": "باڵانس شاردراوەتەوە",
-    "bonusCreditsExpiring": "{{amount}} کرێدیتی پاداشت لە {{date}} بەسەر دەچێت.",
+    "bonusCreditsExpiring": "{{amount}} کرێدیت لە {{date}} بەسەر دەچێت.",
     "signOutTitle": "دەرچوون؟",
     "signOutMessage": "بۆ دەستگەیشتن بە شوێنی کارەکەت، پێویستە دووبارە بچیتە ژوورەوە.",
     "deleteAccountTitle": "سڕینەوەی هەژمار؟",

@@ -863,9 +863,10 @@ function deliveryStatesEqual(a: MessageDeliveryState, b: MessageDeliveryState): 
  */
 function scheduleUnrefdTimer(callback: () => void, delayMs: number): ReturnType<typeof setTimeout> {
   const timer = setTimeout(callback, delayMs);
-  if (typeof timer === 'object' && timer !== null && 'unref' in timer) {
-    const unref = timer.unref;
-    if (typeof unref === 'function') unref.call(timer);
+  const handle: unknown = timer;
+  if (typeof handle === 'object' && handle !== null && 'unref' in handle) {
+    const unref = handle.unref;
+    if (typeof unref === 'function') unref.call(handle);
   }
   return timer;
 }

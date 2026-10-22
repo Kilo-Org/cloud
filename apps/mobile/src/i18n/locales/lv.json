@@ -224,7 +224,7 @@
     "hideBalance": "Slēpt atlikumu",
     "showBalance": "Rādīt atlikumu",
     "balanceHidden": "Atlikums ir paslēpts",
-    "bonusCreditsExpiring": "Bonusa kredītu {{amount}} apmērā derīguma termiņš beidzas {{date}}.",
+    "bonusCreditsExpiring": "Kredītu {{amount}} apmērā derīguma termiņš beidzas {{date}}.",
     "signOutTitle": "Izrakstīties?",
     "signOutMessage": "Lai piekļūtu savai darbvietai, tev būs jāpierakstās vēlreiz.",
     "deleteAccountTitle": "Dzēst kontu?",

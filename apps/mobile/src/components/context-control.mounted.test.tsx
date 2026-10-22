@@ -211,8 +211,8 @@ beforeEach(() => {
   list.mockReset().mockResolvedValue(orgs);
   storage.read.mockReset().mockResolvedValue(null);
   storage.write.mockReset().mockImplementation(async (key: string, value: string) => {
-    // Only the organization key is the selection under test here: an explicit
-    // Personal choice also writes the marker key beside it.
+    // Only the organization key carries the selection; the Personal choice is
+    // one of its values.
     if (key === ORGANIZATION_STORAGE_KEY) {
       persisted = value;
     }

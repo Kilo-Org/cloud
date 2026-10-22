@@ -7,16 +7,19 @@
  */
 
 export const AUTH_TOKEN_KEY = 'auth-token';
-export const ORGANIZATION_STORAGE_KEY = 'selected-organization';
 /**
- * Settled "Personal was chosen" marker, beside `ORGANIZATION_STORAGE_KEY`.
- * That key keeps deleting on a Personal choice because every other reader
- * treats a stored value as an organization id; this marker tells an explicit
- * Personal choice apart from an absent key ("not chosen yet"), which the
- * organization-context default rule resolves from the organization list.
+ * The organization selection: one value holding an organization id, or the
+ * Personal selection, or nothing ("not chosen yet", resolved from the
+ * organization list). Encode and decode through `lib/organization-selection`.
  * Account-scoped selection state: deleted with the rest of the account
  * metadata on sign-out and on a direct account switch, so the next account on
  * the device resolves its own default instead of inheriting this choice.
+ */
+export const ORGANIZATION_STORAGE_KEY = 'selected-organization';
+/**
+ * Legacy marker for the Personal choice, kept for upgrade and sign-out cleanup
+ * only. The selection value carries the Personal choice itself, and a selection
+ * made after an upgrade removes this key.
  */
 export const ORGANIZATION_PERSONAL_STORAGE_KEY = 'selected-organization-personal';
 /** Filter record for the session history page. */

@@ -1,3 +1,4 @@
+import { decodeSelection } from '@/lib/organization-selection';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 /**
@@ -46,7 +47,10 @@ export async function readStoredContext(): Promise<StoredContext> {
     if (userId === null) {
       return null;
     }
-    return { userId, organizationId: await getItemAsync(ORGANIZATION_STORAGE_KEY) };
+    return {
+      userId,
+      organizationId: decodeSelection(await getItemAsync(ORGANIZATION_STORAGE_KEY)),
+    };
   } catch {
     // The next foreground or push reads it again.
     return 'unavailable';

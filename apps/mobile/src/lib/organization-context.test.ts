@@ -147,7 +147,7 @@ describe('OrganizationProvider.setOrganizationId', () => {
     unmount();
   });
 
-  it('clears the persisted org, unregisters tokens, and marks Personal on the way to personal', async () => {
+  it('stores the Personal choice as the selection value', async () => {
     const { getCtx, unmount } = await mountProvider();
 
     await act(() => {
@@ -157,11 +157,8 @@ describe('OrganizationProvider.setOrganizationId', () => {
       getCtx().setOrganizationId(null);
     });
 
-    expect(hoisted.deleteAccountMetadata).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY);
-    expect(hoisted.setAccountMetadata).toHaveBeenCalledWith(
-      ORGANIZATION_PERSONAL_STORAGE_KEY,
-      'personal'
-    );
+    expect(hoisted.setAccountMetadata).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY, 'personal');
+    expect(hoisted.deleteAccountMetadata).toHaveBeenCalledWith(ORGANIZATION_PERSONAL_STORAGE_KEY);
     expect(hoisted.unregisterActivityTokensAndTombstone).toHaveBeenCalledTimes(2);
     expect(getCtx().organizationId).toBeNull();
 
@@ -182,10 +179,7 @@ describe('OrganizationProvider.setOrganizationId', () => {
     });
 
     expect(getCtx().organizationId).toBeNull();
-    expect(hoisted.setAccountMetadata).toHaveBeenCalledWith(
-      ORGANIZATION_PERSONAL_STORAGE_KEY,
-      'personal'
-    );
+    expect(hoisted.setAccountMetadata).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY, 'personal');
 
     unmount();
   });
@@ -250,7 +244,7 @@ describe('OrganizationProvider lost-membership recovery', () => {
     unmount();
   });
 
-  it('falls back to Personal, writes the marker, and names Personal when no membership remains', async () => {
+  it('falls back to Personal, stores the choice, and names Personal when no membership remains', async () => {
     storeSelection();
     hoisted.list.mockResolvedValue([
       { organizationId: 'org-lost', organizationName: 'Doomed org', role: 'member' },
@@ -261,11 +255,7 @@ describe('OrganizationProvider lost-membership recovery', () => {
 
     await waitFor(() => getCtx().organizationId === null);
     expect(getCtx().organizationId).toBeNull();
-    expect(hoisted.deleteAccountMetadata).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY);
-    expect(hoisted.setAccountMetadata).toHaveBeenCalledWith(
-      ORGANIZATION_PERSONAL_STORAGE_KEY,
-      'personal'
-    );
+    expect(hoisted.setAccountMetadata).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY, 'personal');
     expect(hoisted.toastWarning).toHaveBeenCalledWith(
       'You no longer have access to this organization. Switched to Personal.'
     );

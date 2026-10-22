@@ -21,20 +21,18 @@ import { unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup'
 import { writePrivacySnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
+import { chainSave } from '@/lib/hooks/save-chain';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { i18n } from '@/i18n';
+import { decodeSelection, encodeSelection, PERSONAL_SELECTION } from '@/lib/organization-selection';
 import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 /**
- * `ORGANIZATION_PERSONAL_STORAGE_KEY` is a SECOND key beside
- * `ORGANIZATION_STORAGE_KEY`. Every other reader of that key (glanceable
- * scope, widget actions, voice input, tool-summary) treats the stored value as
- * an organization id, so an explicit Personal choice keeps deleting it; the
- * settled "Personal was chosen" marker lives beside it. An absent organization
- * key alone now means "not chosen yet", which the default rule resolves from
- * the organization list.
+ * One queue slot for the selection: every save runs through it in call order,
+ * so the stored value always matches the selection the provider last published.
+ * The stored form itself is one value; see `lib/organization-selection`.
  */
-const PERSONAL_MARKER = 'personal';
+const SELECTION_QUEUE_KEY = 'organization-selection';
 
 type OrganizationContextValue = {
   /** null = personal, string = org UUID */
@@ -94,6 +92,42 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
   // the membership vanished server-side.
   const selectionListSeen = useRef<readonly OrgListEntry[] | undefined>(undefined);
 
+  const persist = useCallback(async (id: string | null) => {
+    generation.current += 1;
+    const operation = generation.current;
+    const epoch = currentAuthEpoch();
+    setState(current => ({ ...current, isSaving: true }));
+    let error: 'save' | null = null;
+    try {
+      // Serialized per selection and fenced after the queue settles: only the
+      // selection the provider still publishes is written, in the order the
+      // selections were made.
+      await chainSave(SELECTION_QUEUE_KEY, async () => {
+        if (generation.current !== operation || !isCurrentAuthEpoch(epoch)) {
+          return;
+        }
+        await setAccountMetadata(ORGANIZATION_STORAGE_KEY, encodeSelection(id));
+        if (generation.current !== operation || !isCurrentAuthEpoch(epoch)) {
+          return;
+        }
+        // The account stores one selection value; this legacy key is cleared so
+        // only that value answers which account is selected. A failed delete is
+        // reported by the storage layer and retried by the next selection; it
+        // must not turn a stored selection into a save error.
+        try {
+          await deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY);
+        } catch {
+          // Cleanup only: the selection value is already stored.
+        }
+      });
+    } catch {
+      error = 'save';
+    }
+    if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
+      setState(current => ({ ...current, error, isSaving: false }));
+    }
+  }, []);
+
   const restore = useCallback(async () => {
     generation.current += 1;
     const operation = generation.current;
@@ -104,26 +138,38 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     selectionListSeen.current = undefined;
     setState(current => ({ ...current, token, isLoaded: false, isSaving: false, error: null }));
     try {
-      // A stored organization is an explicit choice; the marker beside it is an
-      // explicit Personal choice. An absent value is 'not chosen yet': the
-      // organization list decides the default and the effect below publishes it.
-      // A legacy absent value is treated the same way.
-      // The two reads are kept apart: a stored organization stands alone, so a
-      // marker-read failure must not discard it. The marker is only consulted
-      // when no organization is stored, and a failure there stays a restore
-      // error — the selection is then genuinely undetermined.
+      // A stored value is the whole selection: an organization id or the
+      // Personal choice. It is one key, so the read is already atomic and needs
+      // no queue; chaining it would let a slow keychain read hold up the saves
+      // behind it. An absent value is 'not chosen yet' unless the legacy marker
+      // is still present, which the fold below replaces with the value itself.
+      // The marker is read only when nothing is stored, so a marker-read
+      // failure cannot discard a stored selection, and a value a save lands
+      // meanwhile replaces this read through the fence below.
       const stored = await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
-      const marker =
-        stored === null ? await SecureStore.getItemAsync(ORGANIZATION_PERSONAL_STORAGE_KEY) : null;
+      const personalMarker =
+        stored === null
+          ? await SecureStore.getItemAsync(ORGANIZATION_PERSONAL_STORAGE_KEY)
+          : null;
       if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
         if (stored) {
-          activeId.current = stored;
-          personalExplicit.current = false;
-          setState({ token, organizationId: stored, isLoaded: true, isSaving: false, error: null });
-        } else if (marker === PERSONAL_MARKER) {
+          const selected = decodeSelection(stored);
+          activeId.current = selected;
+          personalExplicit.current = selected === null;
+          setState({
+            token,
+            organizationId: selected,
+            isLoaded: true,
+            isSaving: false,
+            error: null,
+          });
+        } else if (personalMarker === PERSONAL_SELECTION) {
           activeId.current = null;
           personalExplicit.current = true;
           setState({ token, organizationId: null, isLoaded: true, isSaving: false, error: null });
+          // Record the choice as the selection value so one value answers it
+          // from the next launch on.
+          void persist(null);
         } else {
           personalExplicit.current = false;
           awaitingDefault.current = true;
@@ -139,28 +185,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
         setState(current => ({ ...current, error: 'restore' }));
       }
     }
-  }, [token]);
-
-  const persist = useCallback(async (id: string | null) => {
-    generation.current += 1;
-    const operation = generation.current;
-    const epoch = currentAuthEpoch();
-    setState(current => ({ ...current, isSaving: true }));
-    let error: 'save' | null = null;
-    try {
-      await (id
-        ? setAccountMetadata(ORGANIZATION_STORAGE_KEY, id)
-        : deleteAccountMetadata(ORGANIZATION_STORAGE_KEY));
-      await (id
-        ? deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY)
-        : setAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY, PERSONAL_MARKER));
-    } catch {
-      error = 'save';
-    }
-    if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
-      setState(current => ({ ...current, error, isSaving: false }));
-    }
-  }, []);
+  }, [token, persist]);
 
   // Publish the default organization once the shared list has settled. Fenced
   // by the generation and auth epoch captured in `restore()`, so a sign-out or

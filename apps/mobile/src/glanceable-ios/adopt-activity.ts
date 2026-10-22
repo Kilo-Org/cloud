@@ -6,6 +6,7 @@ import * as SecureStore from '@/lib/auth/secure-store';
 // would reach the no-op delivery and the card would stay orphaned.
 import '@/lib/glanceable/delivery-registration';
 import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
+import { decodeSelection } from '@/lib/organization-selection';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 import { adoptNativeActivity, sweepStrayActivities } from './ios-sink';
@@ -26,7 +27,7 @@ async function readStoredContext(): Promise<SessionFollowContext | null> {
   if (userId === null) {
     return null;
   }
-  return { userId, organizationId: await readKey(ORGANIZATION_STORAGE_KEY) };
+  return { userId, organizationId: decodeSelection(await readKey(ORGANIZATION_STORAGE_KEY)) };
 }
 
 /**

@@ -10,6 +10,7 @@ import { type GlanceableApproveResult, runGlanceableApprove } from '@/lib/glance
 import { restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { republishAnsweredAsk } from '@/lib/glanceable/republish-ask';
 import { readWaitingAsk, recordWaitingAsk } from '@/lib/glanceable/waiting-ask';
+import { decodeSelection } from '@/lib/organization-selection';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 import { ActiveAgentsLiveActivity, LIVE_ACTIVITY_NAME } from './active-agents-live-activity';
@@ -199,7 +200,7 @@ async function answerSessionCard(
   approvalKey: string
 ): Promise<GlanceableApproveResult> {
   try {
-    const organizationId = await readStoredValue(ORGANIZATION_STORAGE_KEY);
+    const organizationId = decodeSelection(await readStoredValue(ORGANIZATION_STORAGE_KEY));
     return await runGlanceableApprove({
       now: () => Date.now(),
       target: { kiloSessionId, organizationId, approvalKey },

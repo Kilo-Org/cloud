@@ -215,38 +215,37 @@ describe('OrganizationProvider default organization', () => {
     expect(scope().organizationId).toBe('org-a');
   });
 
-  it('writes the explicit Personal marker when Personal is chosen while already auto-resolved', async () => {
+  it('stores the explicit Personal selection when Personal is chosen while already auto-resolved', async () => {
     list.mockResolvedValue([]);
     await mount();
     await waitFor(() => scope().isLoaded);
     expect(scope()).toMatchObject({ organizationId: null, isLoaded: true });
     // Auto-resolved Personal from an empty list is not an explicit choice, so
-    // no marker is written yet.
-    expect(savedMetadata.has(MARKER_KEY)).toBe(false);
+    // nothing is stored yet.
+    expect(savedMetadata.has(ORG_KEY)).toBe(false);
     await act(() => {
       scope().setOrganizationId(null);
     });
-    // Selecting Personal explicitly must record the choice even though the
-    // published id did not change, or a later list with organizations would
-    // move the person back to one on the next launch.
-    await waitFor(() => savedMetadata.get(MARKER_KEY) === 'personal');
-    expect(savedMetadata.has(ORG_KEY)).toBe(false);
+    // Selecting Personal explicitly records the choice even though the
+    // published id does not change, so the next launch resolves to Personal.
+    await waitFor(() => savedMetadata.get(ORG_KEY) === 'personal');
+    expect(savedMetadata.has(MARKER_KEY)).toBe(false);
     expect(scope()).toMatchObject({ organizationId: null, isLoaded: true });
   });
 
-  it('keeps an explicit Personal marker across a re-mount with organizations available', async () => {
-    savedMetadata.set(MARKER_KEY, 'personal');
+  it('keeps the stored Personal selection across a re-mount with organizations available', async () => {
+    savedMetadata.set(ORG_KEY, 'personal');
     list.mockResolvedValue([orgA]);
     const first = await mount();
     await waitFor(() => scope().isLoaded);
     expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: null });
-    // An explicit Personal choice is not overridden by the default, so the
-    // organization key stays absent for every other scope reader too.
-    expect(savedMetadata.has(ORG_KEY)).toBe(false);
+    // An explicit Personal choice is not overridden by the default.
+    expect(savedMetadata.get(ORG_KEY)).toBe('personal');
     unmount(first);
     await mount();
     await waitFor(() => scope().isLoaded);
     expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: null });
+    expect(savedMetadata.get(ORG_KEY)).toBe('personal');
   });
 
   it('publishes nothing stale when a sign-out lands during the list fetch', async () => {
@@ -399,7 +398,7 @@ describe('OrganizationProvider restoration fencing', () => {
       names.resolve([orgA]);
     });
     expect(scope()).toMatchObject({ organizationId: null, isLoaded: true });
-    expect(savedMetadata.get(MARKER_KEY)).toBe('personal');
+    expect(savedMetadata.get(ORG_KEY)).toBe('personal');
   });
 });
 
@@ -416,7 +415,7 @@ describe('OrganizationProvider persistence', () => {
     expect(scope()).toMatchObject({ organizationId: 'org-a', error: null });
   });
 
-  it('deletes the organization key and writes the Personal marker', async () => {
+  it('stores the Personal choice as the organization value', async () => {
     savedMetadata.set(ORG_KEY, 'org-a');
     await mount();
     await waitFor(() => scope().isLoaded);
@@ -424,8 +423,8 @@ describe('OrganizationProvider persistence', () => {
       scope().setOrganizationId(null);
     });
     await waitFor(() => !scope().isSaving);
-    expect(savedMetadata.has(ORG_KEY)).toBe(false);
-    expect(savedMetadata.get(MARKER_KEY)).toBe('personal');
+    expect(savedMetadata.get(ORG_KEY)).toBe('personal');
+    expect(savedMetadata.has(MARKER_KEY)).toBe(false);
     expect(scope()).toMatchObject({ organizationId: null, error: null });
   });
 
@@ -464,5 +463,73 @@ describe('OrganizationProvider persistence', () => {
     });
     await waitFor(() => !scope().isSaving);
     expect(scope()).toMatchObject({ organizationId: 'org-a', error: null });
+  });
+
+  it('applies saves in call order and stores the last selection', async () => {
+    const firstWrite = Promise.withResolvers<undefined>();
+    const started: string[] = [];
+    storage.write.mockImplementation(async (key: string, value: string) => {
+      started.push(value);
+      if (started.length === 1) {
+        await firstWrite.promise;
+      }
+      savedMetadata.set(key, value);
+      await Promise.resolve();
+    });
+    await mount();
+    await waitFor(() => scope().isLoaded);
+    await act(() => {
+      scope().setOrganizationId('org-a');
+    });
+    await act(() => {
+      scope().setOrganizationId('org-b');
+    });
+    // Saves run in call order: the second starts only after the first settles.
+    expect(started).toEqual(['org-a']);
+    await act(() => {
+      firstWrite.resolve(undefined);
+    });
+    await waitFor(() => savedMetadata.get(ORG_KEY) === 'org-b' && !scope().isSaving);
+    expect(started).toEqual(['org-a', 'org-b']);
+    expect(scope()).toMatchObject({ organizationId: 'org-b', isLoaded: true, error: null });
+    expect(savedMetadata.has(MARKER_KEY)).toBe(false);
+  });
+
+  it('stores the Personal choice when two selections are made back to back', async () => {
+    const firstWrite = Promise.withResolvers<undefined>();
+    const started: string[] = [];
+    storage.write.mockImplementation(async (key: string, value: string) => {
+      started.push(value);
+      if (started.length === 1) {
+        await firstWrite.promise;
+      }
+      savedMetadata.set(key, value);
+      await Promise.resolve();
+    });
+    await mount();
+    await waitFor(() => scope().isLoaded);
+    await act(() => {
+      scope().setOrganizationId('org-a');
+    });
+    await act(() => {
+      scope().setOrganizationId(null);
+    });
+    expect(started).toEqual(['org-a']);
+    await act(() => {
+      firstWrite.resolve(undefined);
+    });
+    await waitFor(() => savedMetadata.get(ORG_KEY) === 'personal' && !scope().isSaving);
+    expect(started).toEqual(['org-a', 'personal']);
+    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: null });
+    expect(savedMetadata.has(MARKER_KEY)).toBe(false);
+  });
+
+  it('records a legacy Personal choice as the selection value', async () => {
+    savedMetadata.set(MARKER_KEY, 'personal');
+    await mount();
+    await waitFor(() => scope().isLoaded);
+    await waitFor(() => savedMetadata.get(ORG_KEY) === 'personal');
+    expect(scope()).toMatchObject({ organizationId: null, error: null });
+    expect(savedMetadata.has(MARKER_KEY)).toBe(false);
   });
 });

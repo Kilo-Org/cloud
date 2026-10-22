@@ -153,12 +153,23 @@ function tableRows(context: ConvertContext, table: HtmlElement): TableRow[] | nu
   return rows;
 }
 
+/**
+ * A pipe splits a cell unless a backslash escapes it. The text escape leaves
+ * backslashes doubled, so count the run before a pipe: an even one has no
+ * escape of its own.
+ */
+function escapeCellPipes(content: string): string {
+  return content.replaceAll(/(\\*)\|/g, (run: string, slashes: string) =>
+    slashes.length % 2 === 0 ? `${slashes}\\|` : run
+  );
+}
+
 function cellMarkdown(context: ConvertContext, cell: HtmlElement): string | null {
   const content =
     cell.attributes.size > 0 || cell.malformed
       ? null
       : inlineContent(context, cell.children, SINGLE_LINE);
-  return content === null ? null : content.trim().replaceAll(/(?<!\\)\|/g, String.raw`\|`);
+  return content === null ? null : escapeCellPipes(content.trim());
 }
 
 /** A GFM table for a table of plain rows; null for spans, attributes, or block cells. */

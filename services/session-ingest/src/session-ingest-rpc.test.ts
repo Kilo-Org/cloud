@@ -1,5 +1,4 @@
 import type * as DrizzleOrm from 'drizzle-orm';
-import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -71,7 +70,7 @@ import {
   partIdSchema,
   validateKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
-import { desc, gte, isNotNull, lt, or } from 'drizzle-orm';
+import { desc, gte, isNotNull, lt, or, SQL } from 'drizzle-orm';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { SessionIngestRPC } from './session-ingest-rpc';
@@ -126,7 +125,7 @@ function makeDbFakes(rows: MappingRow[]) {
   let whereCondition: SQL | undefined;
   const select = {
     from: vi.fn(() => select),
-    leftJoin: vi.fn(() => select),
+    leftJoin: vi.fn((_table: unknown, _condition?: unknown) => select),
     where: vi.fn((condition: SQL) => {
       whereCondition = condition;
       return select;
@@ -2958,6 +2957,28 @@ describe('SessionIngestRPC.getSessionMessages (authorized generic history)', () 
       limit: DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
       before: undefined,
     });
+  });
+
+  it('requires the session organization to be live before reading messages', async () => {
+    const { db, select } = makeDbFakes([{ kiloSessionId: sdkSessionInfoFixture.id }]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => null),
+    } as never);
+    const rpc = makeRpc(db);
+
+    await rpc.getSessionMessages({
+      kiloUserId: 'usr_owner',
+      kiloSessionId: sdkSessionInfoFixture.id,
+    });
+
+    expect(select.leftJoin).toHaveBeenCalledWith(organization_memberships, expect.anything());
+    expect(select.leftJoin).toHaveBeenCalledWith(organizations, expect.anything());
+    const condition = select.where.mock.calls[0]?.[0];
+    if (!(condition instanceof SQL)) {
+      throw new Error('Expected where condition');
+    }
+    const generated = new PgDialect().sqlToQuery(condition);
+    expect(generated.sql).toMatch(/"organizations"\."deleted_at" is null/i);
   });
 
   it('defaults omitted limit to the shared page size and pairs it with a continuation cursor', async () => {

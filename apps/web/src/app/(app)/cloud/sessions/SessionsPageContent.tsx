@@ -32,6 +32,7 @@ import { PageContainer } from '@/components/layouts/PageContainer';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm';
 import { useCloudSessionFork } from '@/components/cloud-agent-next/use-cloud-session-fork';
+import { ShareSessionDialog } from '@/components/cloud-agent-next/ShareSessionDialog';
 
 /** Platform filter options matching the badge logic in SessionsList */
 const PLATFORM_OPTIONS: readonly {
@@ -74,6 +75,7 @@ export function SessionsPageContent() {
   };
   const [selectedSession, setSelectedSession] = useState<SessionWithSource | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [sharingSessionId, setSharingSessionId] = useState<string | null>(null);
 
   // Debounce search query (300ms delay)
   useEffect(() => {
@@ -133,8 +135,6 @@ export function SessionsPageContent() {
     })
   );
 
-  const shareMutation = useMutation(trpc.cliSessionsV2.share.mutationOptions());
-
   const setSessionPending = (sessionId: string, pending: boolean) => {
     setPendingSessionIds(prev => {
       const next = new Set(prev);
@@ -145,19 +145,6 @@ export function SessionsPageContent() {
       }
       return next;
     });
-  };
-
-  const handleCopyLink = async (sessionId: string) => {
-    setSessionPending(sessionId, true);
-    try {
-      const result = await shareMutation.mutateAsync({ session_id: sessionId });
-      await navigator.clipboard.writeText(`${window.location.origin}/s/${result.share_token}`);
-      toast.success('Link copied to clipboard');
-    } catch {
-      toast.error('Could not copy the share link');
-    } finally {
-      setSessionPending(sessionId, false);
-    }
   };
 
   const handleUnshare = async (sessionId: string) => {
@@ -308,9 +295,9 @@ export function SessionsPageContent() {
                         variant="outline"
                         size="sm"
                         disabled={isPending}
-                        onClick={() => void handleCopyLink(session.sessionId)}
+                        onClick={() => setSharingSessionId(session.sessionId)}
                       >
-                        Copy link
+                        Create new link
                       </Button>
                       <Button
                         type="button"
@@ -326,6 +313,17 @@ export function SessionsPageContent() {
                 }
               : undefined
           }
+        />
+      )}
+
+      {sharingSessionId && (
+        <ShareSessionDialog
+          key={sharingSessionId}
+          open
+          onOpenChange={open => {
+            if (!open) setSharingSessionId(null);
+          }}
+          kiloSessionId={sharingSessionId}
         />
       )}
 

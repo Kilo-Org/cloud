@@ -47,7 +47,11 @@ const queryClient = new ReactQuery.QueryClient();
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
   useQueryClient: () => queryClient,
-  useQuery: () => ({ data: state.memberships }),
+  // The account control on the header reads its memberships through useQuery:
+  // a disabled query (signed out) stays pending, exactly as the live one does.
+  useQuery: (options: { enabled?: boolean }) => ({
+    data: options.enabled === false ? undefined : state.memberships,
+  }),
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ organizations: { list: { queryOptions: () => ({}) } } }),
@@ -308,18 +312,18 @@ describe('HomeScreen composition', () => {
   });
 
   it.each([null, 'org-1'])(
-    'keeps the selected query scope without a context control for %s',
+    'shows the switchable account control for %s and keeps the live query scope',
     async organizationId => {
       state.organization.organizationId = organizationId;
-      state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
+      state.memberships = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
+      state.boundary.orgs = state.memberships;
       state.boundary.org = state.boundary.orgs[0];
       state.live.activeSessions = [row];
       await renderHome();
       expect(
         nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
-      ).toHaveLength(0);
-      expect(text()).not.toContain('Home organization');
-      expect(text()).not.toContain('Personal');
+      ).toHaveLength(1);
+      expect(text()).toContain(organizationId === null ? 'Personal' : 'Home organization');
       expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId, enabled: true });
       expect(text()).toContain('Live task');
       expect(nodes('NewTaskButton')[0]?.props.organizationId).toBe(organizationId);
@@ -374,7 +378,9 @@ describe('HomeScreen composition', () => {
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: loaded });
     expect(hasLoadedCard()).toBe(loaded);
     expect(nodes('NewTaskButton')).toHaveLength(loaded ? 1 : 0);
-    expect(nodes('Skeleton')).toHaveLength(loaded ? 0 : 15);
+    // The header account control adds one skeleton while the organization
+    // selection is unresolved.
+    expect(nodes('Skeleton')).toHaveLength(loaded ? 0 : 16);
   });
 
   it.each([false, true])(
@@ -483,6 +489,18 @@ describe('Home live presentation', () => {
       expect(text().includes('Connection lost')).toBe(mode === 'exhausted');
       expect(text().includes('Reconnecting…')).toBe(mode === 'reconnecting' || mode === 'unknown');
       expect(text()).not.toContain('Internet connection restored');
+      if (mode === 'exhausted') {
+        // Device defect (Android portrait, pt-BR): the notice beside `Retry`
+        // and the header action ellipsized "Connection lost" to "Connection
+        // …". The message must keep no `numberOfLines` cap, so it wraps to a
+        // second line instead of clipping.
+        const message = nodes('Text').find(node => node.children.includes('Connection lost'));
+        expect(message).toBeDefined();
+        expect(message?.props.numberOfLines).toBeUndefined();
+        expect(String(message?.props.className).split(' ')).toEqual(
+          expect.arrayContaining(['min-w-0', 'shrink'])
+        );
+      }
     }
   );
 
@@ -823,10 +841,16 @@ describe('Home admission', () => {
       expect(nodes('NewTaskButton')).toHaveLength(0);
       expect(text()).not.toContain('Code Reviewer');
       expect(text()).not.toContain('Security Agent');
-      expect(text()).not.toContain('Engineering');
+      // The header account control still names the account on purpose (it owns
+      // its own error and pending presentation); the protected rows must not,
+      // so the name may appear at most once on the whole screen.
+      expect(text().split('Engineering').length - 1).toBeLessThanOrEqual(1);
     }
     if (mode === 'membership paused') {
+      // The sessions body pauses on skeleton, but the shared membership list
+      // the header control reads is settled, so it renders the name itself.
       expect(nodes('Skeleton')).toHaveLength(15);
+      expect(text()).toContain('Engineering');
       expect(text()).not.toContain('Organization unavailable');
     }
     if (

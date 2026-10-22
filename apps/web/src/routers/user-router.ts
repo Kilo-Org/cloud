@@ -31,6 +31,10 @@ import { assertNoTrpcError, successResult } from '@kilocode/web-shared/lib/maybe
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
+  listNotificationHistory,
+  NOTIFICATION_HISTORY_MAX_PAGE_SIZE,
+} from '@/lib/notification-history';
+import {
   kilocode_users,
   microdollar_usage,
   credit_transactions,
@@ -1632,6 +1636,32 @@ export const userRouter = createTRPCRouter({
       capabilities,
     };
   }),
+
+  // ─── Notification History ──────────────────────────────────────────
+
+  getNotificationHistory: baseProcedure
+    .input(
+      z.object({
+        /**
+         * Settings category to filter by, or omitted for every recorded kind.
+         * Bounded rather than enumerated: the column only ever holds a category
+         * the recorder mapped, and a chip for a category with no rows must
+         * answer an empty page, not a validation error.
+         */
+        category: z.string().min(1).max(64).optional(),
+        /** Opaque cursor from a previous page's `nextCursor`. */
+        cursor: z.string().min(1).max(512).optional(),
+        limit: z.number().int().min(1).max(NOTIFICATION_HISTORY_MAX_PAGE_SIZE).optional(),
+      })
+    )
+    .query(({ ctx, input }) =>
+      listNotificationHistory({
+        userId: ctx.user.id,
+        category: input.category,
+        cursor: input.cursor,
+        limit: input.limit,
+      })
+    ),
 
   setNotificationPreferences: baseProcedure
     .input(

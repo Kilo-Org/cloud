@@ -2052,6 +2052,13 @@
       "when": 1792612549366,
       "tag": "0292_direct_byok_sync_state",
       "breakpoints": true
+    },
+    {
+      "idx": 293,
+      "version": "7",
+      "when": 1792662627809,
+      "tag": "0293_lucky_maggott",
+      "breakpoints": true
     }
   ]
 }

@@ -10057,6 +10057,64 @@ export const user_notification_preferences = pgTable('user_notification_preferen
 export type UserNotificationPreference = typeof user_notification_preferences.$inferSelect;
 export type NewUserNotificationPreference = typeof user_notification_preferences.$inferInsert;
 
+// ─── Notification History ─────────────────────────────────────────────
+//
+// One row per accepted push, written by the notifications worker after the
+// provider (or the local push sink) accepts it. Rows are account-wide rather
+// than per device, so history survives a reinstall, and they hold the content
+// the push carried — the rendered copy lives on the client, which re-renders
+// from `i18n_key`/`i18n_params` in the reader's language and falls back to
+// `fallback_title`/`fallback_body`. Rows never enter a log line.
+//
+// `idempotency_key` is the dispatch key, so a retried dispatch cannot write a
+// second row. A scheduled prune drops rows older than the 90-day retention
+// window; the query applies the same window.
+
+export const user_notification_history = pgTable(
+  'user_notification_history',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    // Notification-settings key the push belongs to; null for kinds that have
+    // no category (agent briefings).
+    category: text(),
+    // The `data.type` discriminator of the push.
+    push_type: text().notNull(),
+    // The push `data` object, kept whole so a row can reopen the same
+    // destination a push tap opens.
+    payload: jsonb().$type<Record<string, unknown>>().notNull(),
+    i18n_key: text(),
+    i18n_params: jsonb().$type<Record<string, string>>(),
+    fallback_title: text().notNull(),
+    fallback_body: text().notNull(),
+    idempotency_key: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    // A retried dispatch reuses its key, so at most one row per accepted push.
+    uniqueIndex('UQ_user_notification_history_user_idempotency').on(
+      table.user_id,
+      table.idempotency_key
+    ),
+    // Newest-first page of one user's history.
+    index('IDX_user_notification_history_user_created').on(table.user_id, table.created_at),
+    // Same page with a category chip selected.
+    index('IDX_user_notification_history_user_category_created').on(
+      table.user_id,
+      table.category,
+      table.created_at
+    ),
+  ]
+);
+
+export type UserNotificationHistory = typeof user_notification_history.$inferSelect;
+export type NewUserNotificationHistory = typeof user_notification_history.$inferInsert;
+
 // ─── Spend Alerts ─────────────────────────────────────────────────────
 // Owner-scoped spend alert configuration, the hourly counter the sweep rolls
 // up, and the durable delivery outbox. `scope_key` is `user:<kilocode_users.id>`

@@ -25,6 +25,7 @@ import {
 } from '../lib/glanceable-refresh';
 import { expoPushExtrasForPushData } from '../lib/push-message-extras';
 import { agentBriefingDispatchGate, pushIdempotencyTtlMs } from '../lib/agent-briefing-push';
+import { recordNotificationHistory } from '../lib/notification-history';
 
 type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
@@ -269,6 +270,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
       });
       await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'delivered', ts });
       await this.ensureCleanupAlarm(ts);
+      // The sink stands in for an accepted send, so it records history the
+      // same way. Never throws: a failed write cannot change the outcome.
+      await recordNotificationHistory(db, input);
       return { kind: 'delivered', tokenCount: tokens.length };
     }
 
@@ -397,6 +401,14 @@ export class NotificationChannelDO extends DurableObject<Env> {
         staleTokens: result.staleTokens,
         finalStage: result.ticketErrors.length > 0 ? 'failed' : 'delivered',
       } satisfies AcceptedDeliveryIdemRecord;
+
+      // Record history before the acceptance marker. After the marker a replay
+      // answers `duplicate` and would never write the row again, so a crash
+      // between the two would lose that push from history for good. The insert
+      // is idempotent on the dispatch key, so writing it first cannot double it.
+      if (result.ticketErrors.length === 0) {
+        await recordNotificationHistory(db, input);
+      }
 
       // Persist acceptance before side effects that can fail independently. A
       // replay then repairs bookkeeping rather than sending another OS push.

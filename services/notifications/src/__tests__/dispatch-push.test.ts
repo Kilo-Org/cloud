@@ -1,7 +1,7 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { getTableName } from 'drizzle-orm';
-import type { DispatchPushInput } from '@kilocode/notifications';
+import type { DispatchPushInput, PushData } from '@kilocode/notifications';
 
 import { sendPushNotifications } from '../lib/expo-push';
 import { setPushSinkModeForTesting } from '../lib/push-sink';
@@ -29,6 +29,10 @@ type DbState = {
   briefingReadThrows?: boolean;
   briefingReports?: { facts: unknown; morningEndAt: string }[];
   onBriefingReportRead?: () => void;
+  /** Rows the DO wrote to `user_notification_history`, in insert order. */
+  historyInserts?: Record<string, unknown>[];
+  /** When set, a history insert throws this error instead of recording. */
+  historyInsertError?: Error;
 };
 
 function installDbMock(state: DbState) {
@@ -65,8 +69,15 @@ function installDbMock(state: DbState) {
         return { where, leftJoin: () => ({ where }) };
       },
     }),
-    insert: () => ({
-      values: () => ({ onConflictDoUpdate: async () => undefined }),
+    insert: (table: Parameters<typeof getTableName>[0]) => ({
+      values: (row: Record<string, unknown>) => ({
+        onConflictDoUpdate: async () => undefined,
+        onConflictDoNothing: async () => {
+          if (getTableName(table) !== 'user_notification_history') return;
+          if (state.historyInsertError) throw state.historyInsertError;
+          (state.historyInserts ??= []).push(row);
+        },
+      }),
     }),
     delete: () => ({
       where: async () => {
@@ -1833,5 +1844,169 @@ describe('NotificationChannelDO morning briefing', () => {
     expect(
       await runInDurableObject(stub, (_instance, state) => state.storage.get(key))
     ).toBeUndefined();
+  });
+});
+
+describe('NotificationChannelDO.dispatchPush — notification history', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setPushSinkModeForTesting(undefined);
+    vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue('test-token');
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+  });
+
+  afterEach(() => {
+    setPushSinkModeForTesting(undefined);
+  });
+
+  const chatPush = (idempotencyKey: string): DispatchPushInput =>
+    baseInput({
+      presenceContext: null,
+      badge: null,
+      idempotencyKey,
+      push: {
+        title: 'Fallback title',
+        body: 'Fallback body',
+        data: { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
+        i18nKey: 'chat.message',
+        i18nParams: { conversationTitle: 'Private conversation' },
+      },
+    });
+
+  it('writes one row carrying the row content for an accepted dispatch', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+
+    const input = chatPush('history-accepted');
+    const result = await getDO('history-accepted').dispatchPush(input);
+
+    expect(result.kind).toBe('delivered');
+    expect(state.historyInserts).toEqual([
+      {
+        user_id: 'user-1',
+        category: 'chatMessages',
+        push_type: 'chat.message',
+        payload: input.push.data,
+        i18n_key: 'chat.message',
+        i18n_params: { conversationTitle: 'Private conversation' },
+        fallback_title: 'Fallback title',
+        fallback_body: 'Fallback body',
+        idempotency_key: 'history-accepted',
+      },
+    ]);
+  });
+
+  it('writes no second row for a replay with the same idempotency key', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+    const stub = getDO('history-replay');
+    const input = chatPush('history-replay-key');
+
+    expect((await stub.dispatchPush(input)).kind).toBe('delivered');
+    expect((await stub.dispatchPush(input)).kind).toBe('duplicate');
+
+    expect(state.historyInserts).toHaveLength(1);
+  });
+
+  it('writes no row when a presence context suppresses the push', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(true);
+
+    const result = await getDO('history-presence').dispatchPush({
+      ...chatPush('history-presence-key'),
+      presenceContext: '/presence/sb1/conv1',
+    });
+
+    expect(result.kind).toBe('suppressed_presence');
+    expect(state.historyInserts ?? []).toHaveLength(0);
+  });
+
+  it('writes no row when the account has no device token', async () => {
+    const state: DbState = { tokens: [] };
+    installDbMock(state);
+
+    const result = await getDO('history-no-tokens').dispatchPush(chatPush('history-no-tokens-key'));
+
+    expect(result.kind).toBe('no_tokens');
+    expect(state.historyInserts ?? []).toHaveLength(0);
+  });
+
+  it('writes no row for a push the rate limit suppresses', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+    const stub = getDO('history-rate-limit');
+    const rateLimit = { key: 'history-rate-limit', limit: 1, windowSeconds: 60 };
+
+    expect((await stub.dispatchPush({ ...chatPush('history-rl-1'), rateLimit })).kind).toBe(
+      'delivered'
+    );
+    expect((await stub.dispatchPush({ ...chatPush('history-rl-2'), rateLimit })).kind).toBe(
+      'suppressed_rate_limit'
+    );
+
+    expect(state.historyInserts).toHaveLength(1);
+  });
+
+  it('writes no row for a kind that has no message list', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+
+    const result = await getDO('history-os-only').dispatchPush(
+      baseInput({
+        presenceContext: null,
+        badge: null,
+        idempotencyKey: 'history-os-only-key',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: {
+            type: 'session_live_update',
+            schemaVersion: 1,
+            event: 'end',
+            content: {},
+          } as unknown as PushData,
+        },
+      })
+    );
+
+    expect(result.kind).toBe('delivered');
+    expect(state.historyInserts ?? []).toHaveLength(0);
+  });
+
+  it('keeps the delivery outcome and writes no row when the history write fails', async () => {
+    const state: DbState = {
+      tokens: [{ user_id: 'user-1', token: 'tok1' }],
+      historyInsertError: new Error('insert failed for user-1 secret body'),
+    };
+    installDbMock(state);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const result = await getDO('history-write-fails').dispatchPush(
+      chatPush('history-write-fails-key')
+    );
+
+    expect(result.kind).toBe('delivered');
+    expect(state.historyInserts ?? []).toHaveLength(0);
+    // The failure is logged content-free: never the row, the user, or the
+    // provider error text.
+    expect(warn).toHaveBeenCalledWith('notification_history_write_failed', {
+      pushType: 'chat.message',
+      errorName: 'Error',
+    });
+    warn.mockRestore();
+  });
+
+  it('records the row through the local push sink as well', async () => {
+    setPushSinkModeForTesting('log');
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    const result = await getDO('history-sink').dispatchPush(chatPush('history-sink-key'));
+
+    expect(result.kind).toBe('delivered');
+    expect(state.historyInserts).toHaveLength(1);
+    log.mockRestore();
   });
 });

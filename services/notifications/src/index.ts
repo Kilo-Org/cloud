@@ -57,6 +57,10 @@ import { sendPushNotifications } from './lib/expo-push';
 import { dispatchInstanceLifecyclePush } from './lib/instance-lifecycle-push';
 import { dispatchInternalPushCore } from './lib/internal-dispatch-push';
 import {
+  NOTIFICATION_HISTORY_PRUNE_CRON,
+  pruneNotificationHistory,
+} from './lib/notification-history-prune';
+import {
   dispatchScheduledActionPush,
   type SendScheduledActionNoticeParams,
   type SendScheduledActionNoticeResult,
@@ -295,6 +299,20 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
 
   override async queue(batch: MessageBatch): Promise<void> {
     return queue(batch as Parameters<typeof queue>[0], this.env);
+  }
+
+  /**
+   * Retention sweep for the notification history this worker writes. Any other
+   * cron warns rather than running a sweep the trigger did not ask for.
+   */
+  async scheduled(controller: ScheduledController): Promise<void> {
+    if (controller.cron !== NOTIFICATION_HISTORY_PRUNE_CRON) {
+      console.warn('notifications_worker_unrecognized_cron', { cron: controller.cron });
+      return;
+    }
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const { deleted, hasMore } = await pruneNotificationHistory(db);
+    console.log('notification_history_prune_complete', { deleted, hasMore });
   }
 
   async sendPushForConversation(

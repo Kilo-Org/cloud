@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 import { type ProviderPrTriple, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 
-type PrDiffStateCopy = {
+export type PrDiffStateCopy = {
   readonly unavailableTitle: string;
   readonly unavailableMessage: string;
   readonly accessDeniedMessage: string;

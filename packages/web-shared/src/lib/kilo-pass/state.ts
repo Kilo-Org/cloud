@@ -87,15 +87,12 @@ function isExpiredAtOrBeforeNow(expiresAt: string | null, nowIso: string): boole
  * Active subscriptions are preferred, then pending cancellation, then ended.
  */
 function getStatusPriority(row: KiloPassSubscriptionRowForState): number {
-  // Active and not pending cancellation is highest priority
   if (row.status === 'active' && !row.cancelAtPeriodEnd) return 0;
-  // Active but pending cancellation
   if (row.status === 'active' && row.cancelAtPeriodEnd) return 1;
   // Trialing is also considered active-ish
   if (row.status === 'trialing') return 2;
   // Past due - still has access but payment issues
   if (row.status === 'past_due') return 3;
-  // Paused
   if (row.status === 'paused') return 4;
   // Incomplete - initial payment pending
   if (row.status === 'incomplete') return 5;

@@ -5750,6 +5750,8 @@ export const ai_gateway_sync_providers_state = pgTable(
     id: integer().primaryKey().default(1),
     last_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
     stale_alert_last_posted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    direct_byok_last_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    direct_byok_stale_alert_last_posted_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [check('ai_gateway_sync_providers_state_singleton', sql`${table.id} = 1`)]
 );

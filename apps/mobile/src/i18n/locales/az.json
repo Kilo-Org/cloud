@@ -25,6 +25,7 @@
     "error": "xəta: {{error}}",
     "back": "Geri",
     "somethingWentWrong": "Xəta baş verdi.",
+    "actionNotRecorded": "Bu əməliyyatı qeydə almaq mümkün olmadı. Bir az sonra yenidən cəhd et.",
     "couldNotOpen": "{{label}} açılmadı.",
     "link": "keçid",
     "takingLonger": "Bu, gözləniləndən çox vaxt aparır. Bu ekranı bağlayıb yenidən yoxlaya bilərsən.",
@@ -35,6 +36,8 @@
     "connectGithub": "GitHub-u qoş",
     "cost": "Xərc",
     "discard": "Ləğv et",
+    "discardChangesMessage": "Dəyişiklikləriniz itiriləcək.",
+    "discardChangesTitle": "Dəyişiklikləri ləğv et?",
     "findings": "Aşkarlanan problemlər",
     "mergeRequest": "merge sorğusu",
     "notConnected": "Qoşulmayıb",
@@ -109,7 +112,9 @@
     "online": "Onlayn",
     "open": "{{name}} aç",
     "openPullRequest": "Açıq birləşdirmə sorğusu",
+    "completed": "Tamamlanıb",
     "pending": "Gözləyir",
+    "running": "İşləyir",
     "performance": "Məhsuldarlıq",
     "preferences": "Seçimlər",
     "privacyPolicy": "Məxfilik siyasəti",
@@ -586,6 +591,8 @@
     "installKiloGitHubApp": "Kilo GitHub tətbiqini quraşdır",
     "checkConnection": "Bağlantını yoxla",
     "couldNotLoadPullRequest": "Birləşdirmə sorğusunu yükləmək mümkün olmadı.",
+    "reviewServiceUnavailable": "Xidmət əlçatmazdır",
+    "reviewServiceUnavailableDescription": "Xidmət müvəqqəti əlçatmazdır. Qısa müddətdən sonra yenidən cəhd edin.",
     "description": "Təsvir",
     "noDescriptionProvided": "Təsvir əlavə edilməyib.",
     "review": "Yoxlama",
@@ -661,7 +668,8 @@
       "description": "Mobil cihazda birləşdirmə sorğularını nəzərdən keçirmək üçün GitHub hesabını qoş.",
       "gitlabDescription": "Mobil cihazda merge sorğularına baxış keçirmək üçün GitLab hesabını qoş.",
       "bitbucketDescription": "Mobil cihazda birləşdirmə sorğularına baxış keçirmək üçün Bitbucket-ı bu təşkilata qoş.",
-      "bitbucketOrgOnlyDescription": "Profilində bir təşkilat seç və onun Bitbucket birləşdirmə sorğularına baxış keçir."
+      "bitbucketOrgOnlyDescription": "Yuxarıdakı hesabı təşkilata keçir ki, onun Bitbucket birləşdirmə sorğularına baxış keçirəsən.",
+      "contextLine": "{{organization}} üçün"
     },
     "screen": {
       "title": "#{{number}}",
@@ -756,6 +764,7 @@
       "truncationBanner_other": "Dəyişdirilmiş {{total}} fayldan ilk {{limit}} fayl göstərilir — bu, GitHub API məhdudiyyətidir."
     },
     "linkPasteClipboardEmpty": "Mübadilə buferi boşdur.",
+    "linkPasteDenied": "Yapışdırma girişi rədd edildi. Yapışdırmaya icazə verin və yenidən cəhd edin.",
     "linkPasteNotAPullRequest": "Bu, birləşdirmə sorğusu və ya merge sorğusu keçidi deyil",
     "announce": {
       "commentPosted": "Şərh göndərildi",
@@ -769,7 +778,9 @@
       "reviewNotSubmitted": "Bu kod baxışını indiki vəziyyətdə göndərmək mümkün deyil. PR dəyişmiş ola bilər və ya öz birləşdirmə sorğuna kod baxışı göndərməyə çalışırsan.",
       "reviewNotSubmittedTerm": "Bu baxış olduğu kimi göndərilə bilmir. {{term}} dəyişmiş ola bilər və ya öz {{term}}na baxış keçirə bilməzsən.",
       "couldNotPostComment": "Şərhi göndərmək mümkün olmadı.",
-      "couldNotSubmitReview": "Kod baxışını göndərmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et."
+      "couldNotSubmitReview": "Kod baxışını göndərmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
+      "rateLimited": "Çoxlu sorğu göndərilib. Bir az sonra yenidən cəhd et.",
+      "conflict": "Bu, siz üzərində işləyərkən dəyişildi. Yenidən yükləyin və yenidən cəhd edin."
     },
     "operation": {
       "couldNotReply": "Cavab vermək mümkün olmadı.",
@@ -777,7 +788,6 @@
       "mergeResultDefaultError": "GitHub birləşdirməni tamamlamadı.",
       "mergeResultNotCompleted": "{{term}} birləşdirilmədi. Vəziyyətini yoxla və yenidən cəhd et.",
       "ambiguous": "Nəticəni təsdiqləmək mümkün olmadı — yenidən cəhd etməzdən əvvəl PR-i yoxla.",
-      "persistenceFailed": "Bu əməliyyatı qeydə almaq mümkün olmadı. Bir az sonra yenidən cəhd et.",
       "forbidden": "İcazə yoxdur."
     },
     "capabilities": {
@@ -1449,8 +1459,9 @@
       "loading": "Kod yoxlaması yaddaşı yüklənir",
       "couldNotLoad": "Kod yoxlaması yaddaşını yükləmək mümkün olmadı.",
       "off": "Kod yoxlaması yaddaşı deaktivdir.",
+      "on": "Kod yoxlaması yaddaşı aktivdir.",
       "offDescription": "Kilo-nun layihəyə cavabdeh şəxslərin cavablarından öyrənməsi və REVIEW.md üçün təlimatlar təklif etməsi üçün yaddaşı aktivləşdir.",
-      "readOnlyDescription": "Kod yoxlaması yaddaşını yalnız təşkilat sahibləri və ödəniş menecerləri aktivləşdirə bilər.",
+      "readOnlyDescription": "Kod yoxlaması yaddaşını yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri dəyişə bilər.",
       "enable": "Kod yoxlaması yaddaşını aktivləşdir",
       "loadingProposals": "Təkliflər yüklənir",
       "couldNotLoadProposals": "Təklifləri yükləmək mümkün olmadı.",
@@ -1470,7 +1481,10 @@
       "starting": "Kod yoxlaması başlayır…",
       "start": "Yoxlamaya başla"
     },
-    "notConnectedReadOnly": "{{platform}} qoşulmayıb. Onu yalnız təşkilat sahibləri və ödəniş menecerləri qoşa bilər.",
+    "notConnectedReadOnly": "{{platform}} qoşulmayıb. Onu yalnız təşkilat sahibləri və inzibatçılar qoşa bilər.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} qoşulmayıb. Onu qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin."
+    },
     "webhookSetup": "Vebhuk quraşdırması tamamlanmayıb.",
     "webhookSetupDescription": "Bəzi repozitoriyalarda avtomatik kod yoxlaması aparılmaya bilər.",
     "autoReviews": "Avtomatik kod yoxlamaları",
@@ -1478,7 +1492,7 @@
     "followReviewMd": "REVIEW.md təlimatlarına əməl et",
     "followReviewMdSubtitle": "Hər repozitoriyanın REVIEW.md faylındakı təlimatlara əməl et",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri və ödəniş menecerləri qoşa bilər.",
+      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
       "setupIncomplete": "Quraşdırma tamamlanmayıb. Tənzimləməni kilo.ai saytında tamamla.",
       "setup": "Bitbucket quraşdırması"
     },
@@ -1531,8 +1545,6 @@
     "updateFailed": "Kod yoxlayıcısını yeniləmək mümkün olmadı.",
     "configSaveFailed": "Kod yoxlamasının parametrlərini yadda saxlamaq mümkün olmadı.",
     "status": {
-      "running": "İşləyir",
-      "completed": "Tamamlanıb",
       "interrupted": "Yarımçıq qalıb"
     },
     "reviewStyle": {
@@ -1545,7 +1557,8 @@
       "bugs": "Səhvlər",
       "style": "Stil",
       "testing": "Testlər",
-      "documentation": "Sənədləşdirmə"
+      "documentation": "Sənədləşdirmə",
+      "unknown": "Digər ({{area}})"
     },
     "gateThreshold": {
       "warning": "Xəbərdarlıq"
@@ -1657,7 +1670,14 @@
       "whereFound": "Aşkar edildiyi yerlər ({{displayCount}})",
       "fullReport": "Hazırlanmış tam hesabat",
       "yes": "Bəli",
-      "no": "Xeyr"
+      "no": "Xeyr",
+      "action": {
+        "analyzeCodebase": "Kod bazasını təhlil et",
+        "dismiss": "Rədd et",
+        "manualReview": "Əl ilə kod yoxlaması",
+        "monitor": "İzlə",
+        "openPr": "PR aç"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} tapıntı",
@@ -1732,7 +1752,7 @@
       "couldNotLoad": "Bu problem barədə məlumatı yükləmək mümkün olmadı.",
       "couldNotCheckPermissions": "Rədd etmə icazələrini yoxlamaq mümkün olmadı.",
       "cannotDismissTitle": "Bu tapıntını rədd etmək olmur",
-      "cannotDismissDescription": "Tapıntıları yalnız təşkilat sahibləri və ödəniş menecerləri rədd edə bilər.",
+      "cannotDismissDescription": "Tapıntıları yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri rədd edə bilər.",
       "alreadyResolvedDescription": "Bu tapıntı artıq həll edilib və onu rədd etmək mümkün deyil."
     },
     "findingDetails": {
@@ -1774,7 +1794,7 @@
       "automationAllOff": "Hamısı deaktivdir",
       "automationCount": "3 seçimdən {{displayCount}} seçim aktivdir",
       "notificationsCount": "2 seçimdən {{displayCount}} seçim aktivdir",
-      "disabledNoManage": "Təhlükəsizlik agenti deaktivdir. Onu yalnız təşkilat sahibləri və ödəniş menecerləri aktivləşdirə bilər.",
+      "disabledNoManage": "Təhlükəsizlik agenti deaktivdir. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri aktivləşdirə bilər.",
       "disabledNoRepo": "Təhlükəsizlik agentini aktivləşdirməzdən əvvəl ən azı bir repozitoriya seç.",
       "disabledPrompt": "Dependabot bildirişlərini sinxronlaşdırmaq, repozitoriyaları seçmək və avtomatlaşdırmanı tənzimləmək üçün təhlükəsizlik agentini aktivləşdir."
     },
@@ -1823,7 +1843,7 @@
       "invalidDayCount": "gün sayını 1–365 aralığında tam ədədlə göstər.",
       "remediationDeadlineA11y": "{{label}} üçün düzəliş müddəti, günlə",
       "enterWholeNumber": "1-Dən 365-ə qədər tam ədəd daxil et",
-      "permissionNote": "Bu parametrləri yalnız təşkilat sahibləri və ödəniş menecerləri dəyişə bilər.",
+      "permissionNote": "Bu parametrləri yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri dəyişə bilər.",
       "enableTracking": "SLA izləməsini aktivləşdir",
       "enableTrackingSubtitle": "Tapıntıların ciddilik dərəcəsinə görə düzəliş müddətlərini təyin et.",
       "deadlinesHeading": "Düzəliş müddətləri (gün)"
@@ -1859,12 +1879,16 @@
     "settingsSave": {
       "saveChanges": "Dəyişiklikləri yadda saxla",
       "unsavedTitle": "Yadda saxlanılmamış dəyişikliklər",
-      "unsavedMessage": "Bu ekrandan çıxmazdan əvvəl dəyişikliklər yadda saxlanılsın?"
+      "unsavedMessage": "Bu ekrandan çıxmazdan əvvəl dəyişikliklər yadda saxlanılsın?",
+      "unsavedInvalidMessage": "Bu dəyişiklikləri hələ yadda saxlamaq olmaz. Yadda saxlamaq üçün onları düzəlt və ya çıxmaq üçün ləğv et."
     },
     "auditReportButton": {
       "viewA11y": "Audit hesabatına bax"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administratoru",
+      "actorMaskedUser": "Maskalı istifadəçi",
+      "actorSystem": "Kilo sistemi",
       "couldNotLoad": "Audit hesabatını yükləmək mümkün olmadı.",
       "events": "Hadisələr",
       "generated": "Hesabat {{generatedAt}} tarixində yaradılıb.",
@@ -1875,8 +1899,25 @@
       "summary": "Hesabatın xülasəsi",
       "title": "Audit hesabatı",
       "unavailable": "Audit hesabatı mövcud deyil",
-      "unavailableDescription": "Audit hesabatlarına yalnız təşkilat sahibləri və ödəniş menecerləri baxa bilər. Giriş icazəsi üçün təşkilat sahibinə və ya ödəniş menecerinə müraciət et.",
-      "queryFailed": "Hesabat sorğusu tamamlanmadı. Yenidən cəhd et."
+      "unavailableDescription": "Audit hesabatlarına yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri baxa bilər. Giriş icazəsi üçün sahibdən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
+      "queryFailed": "Hesabat sorğusu tamamlanmadı. Yenidən cəhd et.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiz tamamlandı",
+        "findingAnalysisFailed": "Təhlil uğursuz oldu",
+        "findingAutoDismissed": "Avtomatik rədd edildi",
+        "findingCreated": "İdxal edildi",
+        "findingDeleted": "Silindi",
+        "findingDismissed": "Rədd edilib",
+        "findingSeverityChanged": "Ağırlıq dərəcəsi dəyişdirildi",
+        "findingStatusChange": "Status dəyişdirildi",
+        "findingSuperseded": "Əvəz edilib",
+        "remediationBlocked": "Düzəliş bloklandı",
+        "remediationCancelled": "Ləğv edildi",
+        "remediationFailed": "Düzəliş uğursuz oldu",
+        "remediationNoChangesNeeded": "Dəyişiklik lazım deyil",
+        "remediationPrOpened": "PR açıldı",
+        "remediationQueued": "Düzəliş tələb edildi"
+      }
     },
     "notifications": {
       "couldNotLoad": "Bildiriş parametrlərini yükləmək mümkün olmadı.",
@@ -1908,7 +1949,6 @@
       "installApp": "GitHub tətbiqini quraşdır",
       "reauthorizeButton": "GitHub tətbiqinə yenidən icazə ver",
       "reauthorizeDescription": "Təhlükəsizlik agentinə Dependabot bildirişlərinə giriş üçün vulnerability_alerts icazəsi lazımdır. Bu icazəni vermək üçün GitHub tətbiqinə yenidən icazə ver.",
-      "reauthorizeFailed": "Yenidən icazə vermə prosesini başlatmaq mümkün olmadı. Yenidən cəhd et.",
       "reauthorizeTitle": "Əlavə icazələr tələb olunur",
       "setupFailed": "GitHub quraşdırmasını başlatmaq mümkün olmadı. Yenidən cəhd et."
     },
@@ -1927,7 +1967,12 @@
       "syncMayNotHaveCompleted": "Sinxronlaşdırma tamamlanmamış ola bilər. Vəziyyəti dəqiqləşdirmək üçün yenidən cəhd et və ya ləğv et.",
       "syncInProgress": "Təhlükəsizlik məlumatlarının sinxronlaşdırılması artıq davam edir. Yenidən cəhd et.",
       "dismissalInProgress": "Bu tapıntının rədd edilməsi artıq davam edir. Yenidən cəhd et.",
-      "couldNotReadPendingSyncs": "Gözləyən sinxronlaşdırmaları oxumaq mümkün olmadı. Yenidən cəhd et."
+      "couldNotReadPendingSyncs": "Gözləyən sinxronlaşdırmaları oxumaq mümkün olmadı. Yenidən cəhd et.",
+      "ambiguous": "Nəticəni təsdiqləmək mümkün olmadı — yenidən cəhd etməzdən əvvəl təhlükəsizlik icmalını yoxla.",
+      "settleFailed": "İş tamamlandı, lakin nəticəni qeyd edə bilmədik. Yenidən cəhd et.",
+      "replayFailed": "Bu iş tamamlanmadı. Yenidən cəhd et.",
+      "actionFailed": "Bu işi tamamlamaq mümkün olmadı. Yenidən cəhd et.",
+      "actionBlocked": "Bu işi tamamlamaq mümkün olmadı. Problemi həll etmədən yenidən cəhd etmək olmaz."
     },
     "analysisState": {
       "queued": "Təhlil növbəyə alınıb",
@@ -2204,6 +2249,8 @@
       "commitAndPush": "Təsdiqlə və göndər",
       "startSession": "Sessiyanı başlat",
       "selectRepositoryToStart": "Başlamaq üçün repozitoriya seç.",
+      "enterPromptToStart": "Başlamaq üçün prompt əlavə et.",
+      "enterPromptOrFileToStart": "Başlamaq üçün prompt və ya fayl əlavə et.",
       "connectProviderToStart": "Başlamaq üçün provayder qoş.",
       "promptPlaceholder": "Nə üzərində işləmək istəyirsən?",
       "couldNotLoadModels": "Modelləri yükləmək mümkün olmadı.",
@@ -2212,6 +2259,7 @@
       "prefillModelUnavailable": "{{model}} artıq əlçatan deyil. Standart modelindən istifadə olunur.",
       "couldNotReadPendingSessions": "Gözləyən sessiyaları oxumaq mümkün olmadı. Yenidən cəhd et.",
       "failedToCreate": "Sessiya yaratmaq mümkün olmadı.",
+      "checkOrganizationAccess": "Təşkilata giriş icazəni yoxla və yenidən cəhd et.",
       "couldNotRefreshRepositories": "Repozitoriyaları yeniləmək mümkün olmadı. Yenidən cəhd et.",
       "discardDraftTitle": "Qaralama silinsin?",
       "discardDraftMessage": "Sorğun silinəcək.",
@@ -2281,7 +2329,8 @@
       "linesBadge_other": "{{displayCount}} sətir",
       "matchesBadge_one": "{{displayCount}} uyğunluq",
       "matchesBadge_other": "{{displayCount}} uyğunluq",
-      "noOutput": "Çıxış yoxdur."
+      "noOutput": "Çıxış yoxdur.",
+      "translationFailed": "Tərcümə alınmadı"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} sətirləri (qısaldılıb)",
@@ -2741,7 +2790,7 @@
     "webBrowser": "Veb brauzer",
     "viewProfile": "Profilə bax",
     "signOutThisDevice": "Bu cihazdan çıxış et",
-    "signOutThisSession": "Bu sessiyadan çıxış et",
+    "signOutSessionLabel": "{{device}} cihazından çıxış et, Giriş: {{signedIn}}",
     "sessionSignedOut": "Sessiyadan çıxıldı.",
     "signOutThisDeviceTitle": "Bu cihazdan çıxış edilsin?",
     "signOutThisSessionTitle": "Bu sessiyadan çıxış edilsin?",
@@ -2978,11 +3027,23 @@
     "boundary": {
       "backToProfile": "Profilə qayıt",
       "loadErrorMessage": "Bağlantını yoxla və yenidən cəhd et.",
+
+      "chooseAccount": "Hesab seç",
       "loadErrorTitle": "Təşkilatlarını yükləmək mümkün olmadı.",
+      "membershipLostNotice": "Bu təşkilata artıq giriş icazən yoxdur. Keçid edildi: {{target}}.",
+      "noOrganization": "Təşkilat yoxdur",
+
+      "noOrganizationDescription": "Bu hesab heç bir təşkilatın üzvü deyil. Üzv dəvətləri və aşağı balans xəbərdarlıqları kimi təşkilat funksiyalarından istifadə etmək üçün saytda təşkilat yarat və ya ona qoşul.",
+
+      "openWebOrganizations": "Təşkilatları saytda aç",
+
       "organizationUnavailable": "Təşkilat əlçatan deyil.",
-      "selectDescription": "Davam etmək üçün profilindən təşkilat seç.",
+      "selectDescriptionWithOrganizations": "Sən bir və ya bir neçə təşkilatın üzvüsən. Bu ekranın istifadə etməli olduğu hesabı seç.",
+
       "selectOrganization": "Təşkilat seç",
       "unavailableDescription": "Bu təşkilat artıq əlçatan deyil. Davam etmək üçün profilindən başqa təşkilat seç.",
+
+      "unavailableSessionsDescription": "Bu təşkilat artıq əlçatan deyil. Onun sessiyalarını yükləmək mümkün deyil.",
       "accessDeniedDescription": "Bu təşkilata giriş icazən yoxdur."
     },
     "creditActivity": {
@@ -3034,7 +3095,11 @@
       "separateEmailsHint": "Bir neçə e-poçt ünvanını vergüllə ayır.",
       "thresholdLabel": "Xəbərdarlıq həddi (USD)",
       "title": "Aşağı balans xəbərdarlığı",
-      "emailsError": "Ən azı bir düzgün e-poçt ünvanı daxil et. Bir neçə ünvanı vergüllə ayır.",
+      "emailsInvalid": "Bir və ya bir neçə e-poçt ünvanı düzgün deyil.",
+      "emailsRequired": "Ən azı bir e-poçt ünvanı daxil et.",
+      "saveEmailsError": "Bəzi e-poçt ünvanları qəbul edilmədi. Onları yoxlayıb yenidən cəhd et.",
+      "saveError": "Aşağı balans xəbərdarlığını yadda saxlamaq alınmadı.",
+      "thresholdPlaceholder": "Məbləğ daxil et",
       "thresholdError": "0-Dan böyük məbləğ daxil et."
     },
     "memberLimit": {
@@ -3045,12 +3110,13 @@
       "removeLimit": "Limiti götür",
       "title": "Gündəlik istifadə limiti",
       "blankError": "Məbləğ daxil et və ya aşağıdakı «Limiti götür» düyməsindən istifadə et.",
+      "blankWithoutLimitError": "0 İlə {{max}} arasında gündəlik limit daxil et.",
       "rangeError": "0 İlə {{max}} arasında məbləğ daxil et."
     },
     "members": {
       "changeRole": "Rolu dəyiş",
       "emptyDescriptionCanInvite": "Bu təşkilatda birlikdə işləməyə başlamaq üçün komanda yoldaşlarını dəvət et.",
-      "emptyDescriptionCannotInvite": "Təşkilat sahibindən və ya ödəniş menecerindən komanda yoldaşlarını dəvət etməsini istə.",
+      "emptyDescriptionCannotInvite": "Komanda yoldaşlarını dəvət etmək üçün sahibdən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
       "emptyTitle": "Hələ üzv yoxdur",
       "invitedDate": "{{date}} tarixində dəvət edilib",
       "limitPerDay": "gündə {{amount}}",
@@ -3314,7 +3380,8 @@
       "settingsToolsOn": "Aktiv — parametr alətləri modelə göndərilir",
       "settingsToolsOff": "Deaktiv — modelə heç bir parametr aləti göndərilmir",
       "serverChecking": "Bu server yoxlanılır…",
-      "serverToolCount": "{{count}} alət",
+      "serverToolCount_one": "{{count}} alət",
+      "serverToolCount_other": "{{count}} alət",
       "serverUnreachable": "Bu serverə çatmaq mümkün olmadı",
       "serverOff": "Bu server söndürülüb"
     },
@@ -3512,6 +3579,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agenti başlatmaq üçün sorğu lazımdır. Sorğu əlavə et və yenidən işə sal.",
+      "repositoryRequired": "Agenti başlatmaq üçün repozitoriya lazımdır. Kilo-nu aç və bir repozitoriya seç, sonra yenidən işə sal.",
       "repositoryUnknown": "Kilo {{repository}} adını GitHub və ya GitLab repozitoriyası kimi tanımır. Kilo-da başqa repozitoriya seç.",
       "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasıdır — Agenti başlat hələ ondan istifadə edə bilmir. Kilo-da başqa repozitoriya seç."
     }
@@ -3549,10 +3617,13 @@
     "emptyDescription": "Mühit dəyişənlərindən, quraşdırma əmrlərindən və sessiyalar arasında bacarıqlardan təkrar istifadə etmək üçün profil yaradın.",
     "loadFailed": "Profilləri yükləmək mümkün olmadı",
     "counts": {
-      "vars": "{{count}} dəyişən",
+      "vars_one": "{{count}} dəyişən",
+      "vars_other": "{{count}} dəyişən",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} bacarıq",
-      "commands": "{{count}} əmr",
+      "skills_one": "{{count}} bacarıq",
+      "skills_other": "{{count}} bacarıq",
+      "commands_one": "{{count}} əmr",
+      "commands_other": "{{count}} əmr",
       "varsShort": "{{count}}d",
       "skillsShort": "{{count}}b",
       "commandsShort": "{{count}}ə"
@@ -3583,7 +3654,6 @@
     "keyTooLong": "Açar 256 simvol və ya daha az olmalıdır",
     "keyDuplicate": "Bu açar artıq profildə mövcuddur",
     "valueLabel": "Dəyər",
-    "secretLabel": "Gizli",
     "secrets": {
       "markSecret": "Gizli olaraq qeyd edin",
       "masked": "Gizli dəyər",
@@ -3642,7 +3712,9 @@
       "jsonTooLarge": "Ən çoxu 50 giriş, 128-ə qədər açar və 4096 simvola qədər dəyər istifadə edin",
       "timeoutInvalid": "Taymout tam sayda millisaniyə olmalıdır",
       "edit": "MCP serverini redaktə edin",
-      "saveFailed": "MCP serverini saxlamaq mümkün olmadı"
+      "saveFailed": "MCP serverini saxlamaq mümkün olmadı",
+      "deleteFailed": "MCP serverini silmək mümkün olmadı",
+      "updateFailed": "MCP serverini yeniləmək mümkün olmadı"
     },
     "agents": {
       "title": "Profil agentləri",
@@ -3668,7 +3740,11 @@
       "visibilityPrimary": "Əsas — seçicidə göstərilir",
       "visibilitySubagent": "Subagent — yalnız başqalarından zəng etmək olar",
       "visibilityAll": "Hamısı - hər ikisi",
+      "modePrimary": "Yalnız əsas",
+      "modeSubagent": "Yalnız subagent",
+      "modeAll": "Hamısı",
       "saveFailed": "Agenti saxlamaq mümkün olmadı",
+      "deleteFailed": "Agenti silmək mümkün olmadı",
       "nameRequired": "Agent adını daxil edin",
       "slugRequired": "Agent slug daxil edin",
       "slugInvalid": "Slug hərflə başlamalı və yalnız kiçik hərflərdən, rəqəmlərdən və tirelərdən istifadə etməlidir",
@@ -3683,10 +3759,12 @@
       "description": "Komandanın təsviri",
       "template": "Şablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS-i izah edin",
       "subtask": "Alt tapşırıq kimi işləyin",
       "edit": "Slash əmrini redaktə edin",
       "saveFailed": "Komandanı saxlamaq mümkün olmadı",
+      "deleteFailed": "Komandanı silmək mümkün olmadı",
       "nameRequired": "Komanda adını daxil edin",
       "nameInvalid": "Ad kiçik hərflə başlamalı və yalnız kiçik hərflərdən, rəqəmlərdən və tirelərdən istifadə etməlidir",
       "templateRequired": "Komanda şablonu daxil edin",
@@ -3725,6 +3803,8 @@
     "empty": "Kredit paketləri hazırda əlçatan deyil.",
     "noMatchingProducts": "App Store tərəfindən uyğun kredit paketi qaytarılmadı.",
     "noMatchingProductsPlay": "Google Play tərəfindən uyğun kredit paketi qaytarılmadı.",
+    "storeTimedOut": "App Store vaxtında cavab vermədi. Yenidən cəhd et.",
+    "storeTimedOutPlay": "Google Play vaxtında cavab vermədi. Yenidən cəhd et.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil ol.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil olun."
   },
@@ -3833,7 +3913,7 @@
     "view": "Brifinqi oxu",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Canlı statusu göstər",
+    "dismiss": "Brifinqi rədd et",
     "offline": "Oflayn · saxlanmış brifinq",
     "cached": "Saxlanmış hesabat · yeniləmə mümkün deyil",
     "revised": "Yenilənib · {{revision}}",

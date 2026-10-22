@@ -77,9 +77,9 @@ export const glanceableAgentsSnapshotSchema = z.object({
   needsInput: z.number().int().min(0),
   /**
    * Sessions waiting on a permission prompt: the needs-input rows that can be
-   * approved without choosing an option. Optional on the wire — an older
-   * producer omits it and the parse fills 0, the same convention as
-   * `scheduled` — and every reader treats absent as 0.
+   * approved without choosing an option. Optional on input with a zero
+   * default — an older producer omits it — so the parsed snapshot carries a
+   * total count like the push schema.
    */
   needsApproval: z.number().int().min(0).default(0),
   /** Sessions connected but doing nothing. */

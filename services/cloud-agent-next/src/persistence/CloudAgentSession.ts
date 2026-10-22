@@ -52,12 +52,7 @@ import {
   type LeaseQueries,
   type LeaseAcquireError,
 } from '../session/queries/index.js';
-import {
-  type ExecutionId,
-  type EventSourceId,
-  type EventId,
-  type SessionId,
-} from '../types/ids.js';
+import { type ExecutionId, type EventSourceId, type SessionId } from '../types/ids.js';
 import type {
   ExecutionMetadata,
   AddExecutionParams,
@@ -1484,7 +1479,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     timestamp: number;
   }): void {
     this.broadcastEvent({
-      id: 0 as EventId,
+      id: 0,
       execution_id: params.executionId,
       session_id: params.sessionId,
       stream_event_type: params.streamEventType,
@@ -2399,7 +2394,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const sessionId = await this.requireSessionId();
     const payload = JSON.stringify({ messageId });
     const eventId = this.eventQueries.insertUnique({
-      executionId: '' as EventSourceId,
+      executionId: '',
       entityId: `canceled-message/${messageId}`,
       sessionId,
       streamEventType: 'cloud.message.canceled',
@@ -2409,7 +2404,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (eventId !== null) {
       this.broadcastEvent({
         id: eventId,
-        execution_id: '' as EventSourceId,
+        execution_id: '',
         session_id: sessionId,
         stream_event_type: 'cloud.message.canceled',
         payload,
@@ -3414,7 +3409,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   ): Promise<void> {
     const sessionId = await this.requireSessionId();
     const eventId = this.eventQueries.insertUnique({
-      executionId: '' as EventSourceId,
+      executionId: '',
       entityId: `sent-message/${messageId}`,
       sessionId,
       streamEventType: 'cloud.message.sent',
@@ -3424,7 +3419,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (eventId !== null) {
       this.broadcastEvent({
         id: eventId,
-        execution_id: '' as EventSourceId,
+        execution_id: '',
         session_id: sessionId,
         stream_event_type: 'cloud.message.sent',
         payload: JSON.stringify({ messageId, delivery: 'sent' }),

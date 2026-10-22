@@ -38,9 +38,8 @@ function withoutImages(request: ModelRequest): ModelRequest {
         hasImage(message.parts)
           ? {
               ...message,
-              parts: message.parts.map(
-                (part): PromptPart =>
-                  part.kind === 'image' ? { kind: 'text', text: IMAGE_OMITTED } : part
+              parts: message.parts.map((part): PromptPart =>
+                part.kind === 'image' ? { kind: 'text', text: IMAGE_OMITTED } : part
               ),
             }
           : message

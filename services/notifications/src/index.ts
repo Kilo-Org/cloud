@@ -154,9 +154,7 @@ app.post('/internal/v1/dispatch', async c => {
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const result = await dispatchInternalPushCore(parsed.data, {
     getRecipientDOStub: (userId: string) =>
-      c.env.NOTIFICATION_CHANNEL_DO.get(
-        c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
-      ) as unknown as RecipientDOStub,
+      c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)),
     readPreferences: async userId => readPreferencesRow(db, userId),
   });
   const failedRecipients = result.perRecipient.filter(r => r.outcome === 'failed').length;
@@ -321,9 +319,7 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     return sendPushForConversationCore(input, {
       getRecipientDOStub: (userId: string) =>
-        this.env.NOTIFICATION_CHANNEL_DO.get(
-          this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
-        ) as unknown as RecipientDOStub,
+        this.env.NOTIFICATION_CHANNEL_DO.get(this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)),
       readPreferences: async userId => readPreferencesRow(db, userId),
     });
   }

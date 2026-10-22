@@ -707,6 +707,22 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['/chat/completions', 'true', { messages: makeBody().messages }],
+    ['/responses', 1, { input: 'hello' }],
+    ['/messages', 'yes', { messages: makeBody().messages, max_tokens: 100 }],
+  ])('forces a truthy stream on %s (%j) to true', async (path, stream, input) => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({ model: 'openai/gpt-4o', ...input, stream }, undefined, path) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.stream).toBe(true);
+    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].isStreaming).toBe(true);
+  });
+
   it('accepts the ai-gateway app /api/v1 path', async () => {
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 

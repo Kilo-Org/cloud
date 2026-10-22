@@ -19,7 +19,11 @@ import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
 
 import { Skeleton } from '@/components/ui/skeleton';
-import type { SessionCommit } from '@kilocode/cloud-agent-sdk';
+import {
+  shouldOfferSessionRetry,
+  type KiloSessionId,
+  type SessionCommit,
+} from '@kilocode/cloud-agent-sdk';
 import { useCloudAgent, useManager } from './CloudAgentProvider';
 import { useWorktreeChatCreation, useWorktreeChatTabs } from './CloudSidebarLayout';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
@@ -1644,11 +1648,14 @@ export default function CloudChatPage({
   ]);
   // A running preparation row already shows live progress inline, so the
   // trailing progress row would repeat the same message beneath it.
+  // Reconnecting remains visible because preparation cannot report connection loss.
   const preparationRowShowsProgress = preparationAttempts.some(
     attempt => attempt.status === 'running'
   );
   const visibleStatusIndicator =
-    (statusIndicator?.type === 'progress' && preparationRowShowsProgress) ||
+    (statusIndicator?.type === 'progress' &&
+      statusIndicator.code !== 'reconnecting-to-agent' &&
+      preparationRowShowsProgress) ||
     isCommitSummaryRepresented(statusIndicator, commitsAfterMessage)
       ? null
       : statusIndicator;
@@ -2125,16 +2132,6 @@ export default function CloudChatPage({
                                   },
                                 }}
                               />
-                              {transcriptPhase !== 'opening' &&
-                                !billingFailure &&
-                                statusIndicator?.type === 'error' && (
-                                  <div
-                                    className="px-[max(1rem,calc(50%_-_27rem))] pb-2"
-                                    role="alert"
-                                  >
-                                    <SessionStatusIndicator indicator={statusIndicator} />
-                                  </div>
-                                )}
                               <ComposerContextLine
                                 reserve={Boolean(sessionIdFromParams)}
                                 repository={composerRepository}
@@ -2143,6 +2140,35 @@ export default function CloudChatPage({
                                 contextWindow={contextWindow}
                               />
                             </div>
+                            {/* The error row lives outside the question/permission
+                                hide above: a pending question or permission must
+                                not hide a session error or its Retry. The composer
+                                stays hidden while the user is answering. */}
+                            {transcriptPhase !== 'opening' &&
+                              !billingFailure &&
+                              statusIndicator?.type === 'error' && (
+                                <div
+                                  className="flex items-center gap-2 px-[max(1rem,calc(50%_-_27rem))] pb-2"
+                                  role="alert"
+                                >
+                                  <SessionStatusIndicator indicator={statusIndicator} />
+                                  {shouldOfferSessionRetry(statusIndicator) &&
+                                    sessionIdFromParams && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={isLoading}
+                                        onClick={() =>
+                                          void manager.switchSession(
+                                            sessionIdFromParams as KiloSessionId
+                                          )
+                                        }
+                                      >
+                                        Retry
+                                      </Button>
+                                    )}
+                                </div>
+                              )}
                           </>
                         )}
                       </div>

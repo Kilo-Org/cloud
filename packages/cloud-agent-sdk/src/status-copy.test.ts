@@ -6,7 +6,12 @@
 import { createStore } from 'jotai';
 import { createServiceState } from './service-state';
 import type { ServiceStateConfig } from './service-state';
-import { createSessionManager, formatError, formatErrorDetail } from './session-manager';
+import {
+  createSessionManager,
+  formatError,
+  formatErrorDetail,
+  shouldOfferSessionRetry,
+} from './session-manager';
 import type { FetchedSessionData, SessionManagerConfig } from './session-manager';
 import type {
   AgentStatus,
@@ -43,6 +48,7 @@ const EXPECTED_COPY: Record<SdkStatusMessageCode, string> = {
   'generic-error': 'Something went wrong. Please retry in a moment.',
   'connection-lost': 'Connection lost. Please retry in a moment.',
   'connection-failed': 'Connection failed. Please retry in a moment.',
+  'reconnecting-to-agent': 'Reconnecting to agent…',
 };
 
 /** Codes observed while driving the emitters. Filled by `record`. */
@@ -390,6 +396,57 @@ describe('session manager indicator copy codes', () => {
         mgr.atoms.statusIndicator
       )
     );
+  });
+
+  it('codes the reconnecting progress indicator', async () => {
+    const config = createMockConfig();
+    mockSession.state.getActivity.mockReturnValue({ type: 'reconnecting' });
+    const mgr = createSessionManager(config);
+    await mgr.switchSession(kiloId('ses-1'));
+
+    const indicator = atomValue<{
+      type: string;
+      message: string;
+      code?: SdkStatusMessageCode;
+    } | null>(config.store, mgr.atoms.statusIndicator);
+    expect(indicator).toEqual(
+      expect.objectContaining({ type: 'progress', code: 'reconnecting-to-agent' })
+    );
+    recordIndicator(indicator);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Retry visibility — one predicate, written once in the manager.
+// ---------------------------------------------------------------------------
+
+describe('shouldOfferSessionRetry', () => {
+  it('is true for an error indicator and false for reconnecting progress', () => {
+    expect(
+      shouldOfferSessionRetry({
+        type: 'error',
+        message: 'Agent connection lost',
+        timestamp: 0,
+        code: 'agent-connection-lost',
+      })
+    ).toBe(true);
+    expect(
+      shouldOfferSessionRetry({
+        type: 'error',
+        message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+        timestamp: 0,
+        code: 'insufficient-credits',
+      })
+    ).toBe(true);
+    expect(
+      shouldOfferSessionRetry({
+        type: 'progress',
+        message: 'Reconnecting to agent…',
+        timestamp: 0,
+        code: 'reconnecting-to-agent',
+      })
+    ).toBe(false);
+    expect(shouldOfferSessionRetry(null)).toBe(false);
   });
 });
 

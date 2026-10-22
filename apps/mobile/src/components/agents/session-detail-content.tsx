@@ -1805,7 +1805,9 @@ export function SessionDetailContent({
     shouldShowFooterWorking,
     hasStatusIndicator: !cachedMetadataRefresh && footerStatusIndicator !== null,
     hasSendReason: sendDisabledReason !== null && !isReadOnlyTranscript,
-    messageCount: messages.length,
+    statusIndicatorCode: footerStatusIndicator?.code,
+    statusIndicatorType: footerStatusIndicator?.type,
+    transcriptItemCount: transcript.length,
   });
 
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
@@ -2503,7 +2505,13 @@ export function SessionDetailContent({
               <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
             ) : null}
             {sessionFooterItem === 'status' && footerStatusIndicator !== null ? (
-              <SessionStatusIndicator indicator={footerStatusIndicator} />
+              <SessionStatusIndicator
+                indicator={footerStatusIndicator}
+                onRetry={() => {
+                  void manager.switchSession(sessionId);
+                }}
+                disabled={isLoading}
+              />
             ) : null}
             {sessionFooterItem === 'reason' && sendDisabledReason !== null ? (
               <AccessibleStatus
@@ -2723,7 +2731,13 @@ export function SessionDetailContent({
         return (
           <CenteredState>
             <View className="items-center px-6">
-              <SessionStatusIndicator indicator={statusIndicator} />
+              <SessionStatusIndicator
+                indicator={statusIndicator}
+                onRetry={() => {
+                  void manager.switchSession(sessionId);
+                }}
+                disabled={isLoading}
+              />
             </View>
           </CenteredState>
         );

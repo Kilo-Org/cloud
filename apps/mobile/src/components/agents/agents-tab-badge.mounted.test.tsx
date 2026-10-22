@@ -136,12 +136,12 @@ describe('Agents needs-input badge and shared live count', () => {
       const cached = result.queryClient.getQueryData(key());
       const fetchCount = fetchSessions.mock.calls.length;
       act(() => {
-        ackSessionAttention('personal-0');
+        ackSessionAttention('personal-0', status);
       });
       expectCounts(result.renderer, 1, 3);
       expect(__peekSessionAttentionForTests('personal-0')).toEqual({ raiseId: status });
       act(() => {
-        ackSessionAttention('personal-1');
+        ackSessionAttention('personal-1', status);
       });
       expectCounts(result.renderer, undefined, 3);
       expect(result.queryClient.getQueryData(key())).toBe(cached);
@@ -155,7 +155,7 @@ describe('Agents needs-input badge and shared live count', () => {
       const result = await mount();
       await updateSessions(result, sessions(['question']));
       act(() => {
-        ackSessionAttention('personal-0');
+        ackSessionAttention('personal-0', 'question');
       });
       expectCounts(result.renderer, undefined, 1);
       await updateSessions(result, sessions([status]));
@@ -167,12 +167,15 @@ describe('Agents needs-input badge and shared live count', () => {
   );
 
   it.each([
-    { status: 'question', raiseId: 'question' },
-    { status: 'question', raiseId: null },
-    { status: 'busy', raiseId: 'question' },
+    { status: 'question', raiseId: 'question', suppresses: true },
+    // A blob from a build that stored unbound acks names no raise, so it is
+    // dropped on hydration and suppresses nothing.
+    { status: 'question', raiseId: null, suppresses: false },
+    // The raise it names is gone: the busy row deletes the entry.
+    { status: 'busy', raiseId: 'question', suppresses: false },
   ] as const)(
     'reconciles hydrated $raiseId acknowledgments against $status',
-    async ({ status, raiseId }) => {
+    async ({ status, raiseId, suppresses }) => {
       const pending = Promise.withResolvers<string | null>();
       attentionKv.getItem.mockReturnValueOnce(pending.promise);
       const hydration = __hydrateSessionAttentionForTests();
@@ -193,12 +196,12 @@ describe('Agents needs-input badge and shared live count', () => {
         );
         await hydration;
       });
-      expectCounts(result.renderer, 1, 2);
+      expectCounts(result.renderer, suppresses ? 1 : status === 'question' ? 2 : 1, 2);
       expect(__peekSessionAttentionForTests('personal-0')).toEqual(
-        status === 'question' ? { raiseId: 'question' } : undefined
+        suppresses ? { raiseId: 'question' } : undefined
       );
       await updateSessions(result, sessions(['question', 'permission']));
-      expectCounts(result.renderer, status === 'question' ? 1 : 2, 2);
+      expectCounts(result.renderer, suppresses ? 1 : 2, 2);
     }
   );
 
@@ -275,7 +278,7 @@ describe('Agents needs-input badge and shared live count', () => {
     const result = await mount(queryClient);
     expectCounts(result.renderer, 2, 3);
     act(() => {
-      ackSessionAttention('org-a-0');
+      ackSessionAttention('org-a-0', 'question');
     });
     expectCounts(result.renderer, 1, 3);
     const pending = Promise.withResolvers<{ sessions: ActiveSession[] }>();

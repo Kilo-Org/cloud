@@ -207,6 +207,7 @@ import {
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
 import { useRemoteModelCatalogRetry } from '@/lib/hooks/use-remote-model-catalog-retry';
+import { useSessionRaiseReader } from '@/lib/hooks/use-session-raise-reader';
 import {
   buildContinueHref,
   buildContinuePrefillParams,
@@ -481,6 +482,7 @@ export function SessionDetailContent({
   const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
     ? 'cloud-agent'
     : 'remote-session';
+  const readObservedRaise = useSessionRaiseReader();
 
   const {
     isAnswering,
@@ -496,6 +498,7 @@ export function SessionDetailContent({
     activeQuestion,
     activePermission,
     surface: analyticsSurface,
+    readObservedRaise,
   });
 
   const autoApproveState = resolveSessionAutoApproveState({

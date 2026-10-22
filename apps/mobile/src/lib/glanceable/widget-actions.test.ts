@@ -287,6 +287,26 @@ describe('runWidgetApprove', () => {
     });
   });
 
+  it('acks the raise the press answered, not the next one', async () => {
+    wireTrpc({
+      sessions: [
+        { id: 'waiting', status: 'permission', statusUpdatedAt: '2026-09-18T21:00:00.000Z' },
+      ],
+      cloudAgentSessionId: 'workspace_agent_1',
+      permissions: [{ id: 'perm-1' }],
+    });
+    const { release } = collectSink();
+
+    await expect(runWidgetApprove(keyFor('waiting', 'perm-1'))).resolves.toEqual({
+      kind: 'approved',
+    });
+
+    expect(isAttentionAcked('waiting', '2026-09-18T21:00:00.000Z')).toBe(true);
+    // A permission raised after the answered one keeps its badge.
+    expect(isAttentionAcked('waiting', '2026-09-18T21:30:00.000Z')).toBe(false);
+    release();
+  });
+
   it('answers nothing when the displayed session is not a cloud-agent session', async () => {
     const rpc = wireTrpc({
       sessions: [{ id: 'waiting', status: 'permission' }],

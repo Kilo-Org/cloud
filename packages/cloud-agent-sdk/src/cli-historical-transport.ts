@@ -9,7 +9,7 @@ import type {
   SessionSnapshotPage,
   SessionSnapshotPageOutcome,
 } from './types';
-import { partSettledAt } from './part-utils';
+import { replayStoredMessages } from './stored-message-replay';
 import type { TransportFactory, TransportSink } from './transport';
 
 type CliHistoricalTransportConfig = {
@@ -43,18 +43,7 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
     function replayPage(page: SessionSnapshotPage): void {
       sink.onServiceEvent({ type: 'session.created', info: page.info });
 
-      for (const msg of page.messages) {
-        sink.onChatEvent({ type: 'message.updated', info: msg.info });
-
-        for (const part of msg.parts) {
-          const settledAt = partSettledAt(part);
-          sink.onChatEvent({
-            type: 'message.part.updated',
-            part,
-            ...(settledAt === undefined ? {} : { time: settledAt }),
-          });
-        }
-      }
+      replayStoredMessages(page.messages, event => sink.onChatEvent(event));
 
       sink.onServiceEvent({ type: 'stopped', reason: 'complete' });
     }

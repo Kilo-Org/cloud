@@ -30,7 +30,7 @@ import {
 } from './session';
 import type { CloudAgentSession } from './session';
 import { createChatProcessor } from './chat-processor';
-import { partSettledAt } from './part-utils';
+import { replayStoredMessages } from './stored-message-replay';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
 import type { SessionStorage } from './storage/types';
@@ -1521,6 +1521,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   /**
+   * Replay a stored message page into the active storage through a fresh chat
+   * processor. Root pages (initial, cached, older) and child pages both land
+   * here, so the processor options the replay needs are built in one place.
+   */
+  function replayMessagesIntoStorage(
+    storage: SessionStorage,
+    messages: SessionSnapshot['messages']
+  ): void {
+    const chatProcessor = createChatProcessor(storage, {
+      onToolAttachment: config.onToolAttachment,
+      onFilePart: config.onFilePart,
+    });
+    replayStoredMessages(messages, event => chatProcessor.process(event));
+  }
+
+  /**
    * Replay a child page/snapshot's messages into the active storage through
    * the chat processor. Child pages must never go through `applyPage`: that
    * path drops any page whose `info.id` is not the root session id, and a
@@ -1530,21 +1546,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     storage: JotaiSessionStorage,
     messages: SessionSnapshot['messages']
   ): void {
-    const chatProcessor = createChatProcessor(storage, {
-      onToolAttachment: config.onToolAttachment,
-      onFilePart: config.onFilePart,
-    });
-    for (const message of messages) {
-      chatProcessor.process({ type: 'message.updated', info: message.info });
-      for (const part of message.parts) {
-        const settledAt = partSettledAt(part);
-        chatProcessor.process({
-          type: 'message.part.updated',
-          part,
-          ...(settledAt === undefined ? {} : { time: settledAt }),
-        });
-      }
-    }
+    replayMessagesIntoStorage(storage, messages);
   }
 
   async function hydrateChildSession(childSessionId: KiloSessionId): Promise<void> {
@@ -2025,21 +2027,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const storage = store.get(sessionStorageAtom);
     if (!storage) return false;
 
-    const chatProcessor = createChatProcessor(storage, {
-      onToolAttachment: config.onToolAttachment,
-      onFilePart: config.onFilePart,
-    });
-    for (const message of outcome.messages) {
-      chatProcessor.process({ type: 'message.updated', info: message.info });
-      for (const part of message.parts) {
-        const settledAt = partSettledAt(part);
-        chatProcessor.process({
-          type: 'message.part.updated',
-          part,
-          ...(settledAt === undefined ? {} : { time: settledAt }),
-        });
-      }
-    }
+    replayMessagesIntoStorage(storage, outcome.messages);
 
     olderMessagesCursor = outcome.nextCursor;
     store.set(hasOlderMessagesAtom, outcome.nextCursor !== null);

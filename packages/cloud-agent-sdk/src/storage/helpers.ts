@@ -334,20 +334,14 @@ function createReadonlyPartView(part: Part): Part {
   });
 }
 
-function applyTextDelta(part: Part, delta: string): Part {
-  if (!('text' in part) || typeof part.text !== 'string') {
-    return part;
-  }
-  return { ...part, text: part.text + delta };
-}
-
 /**
  * Append a batch of streamed chunks to a text part with a single allocation.
  *
  * The delta path buffers every `message.part.delta` and joins the batch once
  * per publication, so the per-token cost stays O(1) (a buffer push) instead of
  * re-copying the whole accumulated text — which is O(n) per token and
- * quadratic over a long reasoning/text stream.
+ * quadratic over a long reasoning/text stream. A single-chunk batch is the
+ * same code path, so an adapter that applies one delta per call shares it.
  */
 function applyTextDeltas(part: Part, deltas: readonly string[]): Part {
   if (!('text' in part) || typeof part.text !== 'string') {
@@ -361,6 +355,57 @@ function applyTextDeltas(part: Part, deltas: readonly string[]): Part {
     return part;
   }
   return { ...part, text: part.text + delta };
+}
+
+/**
+ * Apply streamed text chunks to the stored parts of one message: find the part
+ * and append, or seed it with the first chunk when the message or the part is
+ * not stored yet.
+ *
+ * Returns the message's current array untouched when the chunks change
+ * nothing, so a caller can skip its snapshot invalidation and publication on a
+ * no-op. The append is the only part mutation, so `partsSnapshot` stays
+ * authoritative until a caller publishes.
+ */
+function appendPartTextChunks(
+  arr: Part[] | undefined,
+  messageId: string,
+  partId: string,
+  chunks: readonly string[]
+): Part[] {
+  if (!arr) {
+    // First delta for this message — bootstrap a minimal text part.
+    return [createSeedTextPart(messageId, partId, chunks.join(''))];
+  }
+  const idx = arr.findIndex(p => p.id === partId);
+  const existing = idx >= 0 ? arr[idx] : undefined;
+  if (!existing) {
+    // Part not yet known for this message — create it with the chunks as seed.
+    return insertPartSorted(arr, createSeedTextPart(messageId, partId, chunks.join('')));
+  }
+  const updatedPart = applyTextDeltas(existing, chunks);
+  if (updatedPart === existing) {
+    return arr;
+  }
+  const nextArr = [...arr];
+  nextArr[idx] = updatedPart;
+  return nextArr;
+}
+
+/**
+ * Publish a change to one message's parts: drop the cached read-only snapshot
+ * so the next `getParts` rebuilds it, then notify that message's subscribers.
+ *
+ * Both adapters own a snapshot cache and a subscriber set, so the pair lives
+ * here; when each adapter publishes is its own contract (`SessionStorage`).
+ */
+function publishPartsChanged(
+  snapshot: Map<string, Part[] | null>,
+  subscribers: Map<string, Set<() => void>>,
+  messageId: string
+): void {
+  snapshot.set(messageId, null);
+  notify(subscribers, `parts:${messageId}`);
 }
 
 function createSeedTextPart(messageId: string, partId: string, text: string): TextPart {
@@ -384,7 +429,7 @@ const EMPTY_PARTS: readonly Part[] = Object.freeze([]);
 
 export {
   EMPTY_PARTS,
-  applyTextDelta,
+  appendPartTextChunks,
   applyTextDeltas,
   clonePart,
   createReadonlyPartView,
@@ -395,6 +440,7 @@ export {
   orderMessageIds,
   isSupportedDeltaField,
   notify,
+  publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
 };
 export type { PartOrderingEvidence };

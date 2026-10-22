@@ -9,7 +9,7 @@ import { createConnection, type Connection } from './cloud-agent-connection';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import { normalize, isChatEvent } from './normalizer';
 import type { ServiceEvent } from './normalizer';
-import { partSettledAt } from './part-utils';
+import { replayStoredMessages } from './stored-message-replay';
 import type {
   CloudAgentSessionId,
   KiloSessionId,
@@ -136,18 +136,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     function replayPage(page: SessionSnapshotPage): void {
       sink.onServiceEvent({ type: 'session.created', info: page.info });
 
-      for (const msg of page.messages) {
-        sink.onChatEvent({ type: 'message.updated', info: msg.info });
-
-        for (const part of msg.parts) {
-          const settledAt = partSettledAt(part);
-          sink.onChatEvent({
-            type: 'message.part.updated',
-            part,
-            ...(settledAt === undefined ? {} : { time: settledAt }),
-          });
-        }
-      }
+      replayStoredMessages(page.messages, event => sink.onChatEvent(event));
     }
 
     function replaySnapshot(snapshot: SessionSnapshot): void {

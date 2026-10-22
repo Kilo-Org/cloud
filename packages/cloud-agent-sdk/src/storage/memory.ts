@@ -3,15 +3,14 @@ import type { MessageInfo } from '../types';
 import type { SessionStorage } from './types';
 import {
   EMPTY_PARTS,
-  applyTextDelta,
+  appendPartTextChunks,
   clonePart,
   createReadonlyPartView,
-  createSeedTextPart,
   forgetPartUpdateTime,
-  insertPartSorted,
   insertSorted,
   isSupportedDeltaField,
   notify,
+  publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
 
@@ -53,8 +52,7 @@ function createMemoryStorage(): SessionStorage {
         messageId,
         upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence)
       );
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
 
     applyPartDelta(messageId, partId, field, delta) {
@@ -63,43 +61,25 @@ function createMemoryStorage(): SessionStorage {
       }
 
       const arr = parts.get(messageId);
-
-      if (!arr) {
-        // First delta for this message — bootstrap a minimal text part
-        parts.set(messageId, [createSeedTextPart(messageId, partId, delta)]);
-        partsSnapshot.set(messageId, null);
-        notify(subscribers, `parts:${messageId}`);
+      // This adapter applies one chunk per call, so each applied chunk
+      // publishes on its own; `SessionStorage` lets an adapter coalesce.
+      const nextArr = appendPartTextChunks(arr, messageId, partId, [delta]);
+      if (nextArr === arr) {
         return;
       }
-      const idx = arr.findIndex(p => p.id === partId);
-      const existing = idx >= 0 ? arr[idx] : undefined;
-      if (!existing) {
-        // Part not yet known for this message — create it with the delta as seed
-        parts.set(messageId, insertPartSorted(arr, createSeedTextPart(messageId, partId, delta)));
-        partsSnapshot.set(messageId, null);
-        notify(subscribers, `parts:${messageId}`);
-        return;
-      }
-
-      const updatedPart = applyTextDelta(existing, delta);
-      if (updatedPart === existing) {
-        return;
-      }
-      const nextArr = [...arr];
-      nextArr[idx] = updatedPart;
       parts.set(messageId, nextArr);
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
 
     deletePart(messageId, partId) {
       const arr = parts.get(messageId);
       if (!arr) return;
-      const filtered = arr.filter(p => p.id !== partId);
-      parts.set(messageId, filtered);
+      parts.set(
+        messageId,
+        arr.filter(p => p.id !== partId)
+      );
       forgetPartUpdateTime(partEvidence, messageId, partId);
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
 
     getParts(messageId) {

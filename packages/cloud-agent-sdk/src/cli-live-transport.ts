@@ -3,7 +3,7 @@
  * one remote CLI session into normalized transport events and commands.
  */
 import { normalizeCliEvent, isChatEvent } from './normalizer';
-import { partSettledAt } from './part-utils';
+import { replayStoredMessages } from './stored-message-replay';
 import { parseRemoteCommandCatalog, type RemoteCommandState } from './remote-command-catalog';
 import { parseCreateSessionResponse } from './create-session';
 import { cloudAgentSdkRuntime } from './runtime';
@@ -585,18 +585,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     function replayPage(page: SessionSnapshotPage): void {
       sink.onServiceEvent({ type: 'session.created', info: page.info });
 
-      for (const msg of page.messages) {
-        sink.onChatEvent({ type: 'message.updated', info: msg.info });
-
-        for (const part of msg.parts) {
-          const settledAt = partSettledAt(part);
-          sink.onChatEvent({
-            type: 'message.part.updated',
-            part,
-            ...(settledAt === undefined ? {} : { time: settledAt }),
-          });
-        }
-      }
+      replayStoredMessages(page.messages, event => sink.onChatEvent(event));
     }
 
     function handleEventMessage(

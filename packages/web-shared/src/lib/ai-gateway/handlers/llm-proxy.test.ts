@@ -3138,4 +3138,53 @@ describe('custom LLM requests', () => {
     await expect(response.json()).resolves.toMatchObject({ error_type: 'provider_not_allowed' });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
+
+  function multiProviderCustomLlm(): CustomLlm {
+    return {
+      public_id: 'acme/public-model',
+      encrypted_api_key: null,
+      definition: {
+        display_name: 'Custom model',
+        context_length: 1000,
+        max_completion_tokens: 100,
+        base_url: 'https://upstream.example.com/v1',
+        public: { inference_providers: ['acme', 'other'], description: 'Public model' },
+      },
+    };
+  }
+
+  it('rejects a request when the caller and organization allow disjoint providers', async () => {
+    setOrganizationAuth();
+    mockedGetEffectiveModelDecision.mockResolvedValueOnce({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['other']),
+    });
+    mockCustomLlm(multiProviderCustomLlm());
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({ ...makeBody('acme/public-model'), provider: { only: ['acme'] } }) as never
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error_type: 'provider_not_allowed' });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('forwards only the providers that the caller and organization both allow', async () => {
+    setOrganizationAuth();
+    mockedGetEffectiveModelDecision.mockResolvedValueOnce({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['acme', 'other']),
+    });
+    mockCustomLlm(multiProviderCustomLlm());
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({ ...makeBody('acme/public-model'), provider: { ignore: ['other'] } }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toMatchObject({
+      only: ['acme'],
+    });
+  });
 });

@@ -67,7 +67,8 @@ import {
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
   checkExclusiveModelProviderAllowed,
-  checkInferenceProvidersAllowed,
+  allowedInferenceProviders,
+  inferenceProvidersNotAllowedResponse,
   modelDoesNotExistOnOpenRouterResponse,
   chatGptReconnectResponse,
   lastUserPromptText,
@@ -996,24 +997,32 @@ export async function handleLlmProxyRequest(
     return dataCollectionRequiredResponse();
   }
 
-  // Organization policy replaces the request's provider object, so the caller's
-  // own only/ignore lists are checked separately from the effective config.
-  const providerNotAllowedError = customLlm
-    ? customLlm.definition.public
-      ? (checkInferenceProvidersAllowed(
-          customLlm.definition.public.inference_providers,
-          requestProvider
-        ) ??
-        checkInferenceProvidersAllowed(
-          customLlm.definition.public.inference_providers,
-          requestBodyParsed.body.provider
-        ))
-      : null
-    : checkExclusiveModelProviderAllowed(
-        effectiveModelIdLowerCased,
-        requestBodyParsed.body.provider
-      );
-  if (providerNotAllowedError) return providerNotAllowedError;
+  if (customLlm?.definition.public) {
+    // Organization policy replaces the request's provider object, so intersect
+    // the caller's own only/ignore lists, the organization's, and the declared
+    // providers, and forward only that intersection.
+    const declaredProviders = customLlm.definition.public.inference_providers;
+    const eligibleProviders = allowedInferenceProviders(
+      declaredProviders,
+      requestProvider,
+      requestBodyParsed.body.provider
+    );
+    if (eligibleProviders.length === 0) {
+      return inferenceProvidersNotAllowedResponse(declaredProviders);
+    }
+    if (eligibleProviders.length < declaredProviders.length) {
+      requestBodyParsed.body.provider = {
+        ...requestBodyParsed.body.provider,
+        only: eligibleProviders,
+      };
+    }
+  } else if (!customLlm) {
+    const providerNotAllowedError = checkExclusiveModelProviderAllowed(
+      effectiveModelIdLowerCased,
+      requestBodyParsed.body.provider
+    );
+    if (providerNotAllowedError) return providerNotAllowedError;
+  }
 
   sentryRootSpan()?.setAttribute(
     'openrouter.time_to_request_start_ms',

@@ -245,15 +245,27 @@ export function checkInferenceProvidersAllowed(
   inferenceProviders: readonly string[],
   provider: OpenRouterProviderConfig | undefined
 ) {
-  if (!provider) return null;
-  if (
-    inferenceProviders.some(
-      inferenceProvider =>
-        (!provider.only || provider.only.includes(inferenceProvider)) &&
-        (!provider.ignore || !provider.ignore.includes(inferenceProvider))
+  return allowedInferenceProviders(inferenceProviders, provider).length > 0
+    ? null
+    : inferenceProvidersNotAllowedResponse(inferenceProviders);
+}
+
+/** The inference providers that every given provider config's only/ignore lists allow. */
+export function allowedInferenceProviders(
+  inferenceProviders: readonly string[],
+  ...providerConfigs: ReadonlyArray<OpenRouterProviderConfig | undefined>
+): string[] {
+  return inferenceProviders.filter(inferenceProvider =>
+    providerConfigs.every(
+      provider =>
+        !provider ||
+        ((!provider.only || provider.only.includes(inferenceProvider)) &&
+          (!provider.ignore || !provider.ignore.includes(inferenceProvider)))
     )
-  )
-    return null;
+  );
+}
+
+export function inferenceProvidersNotAllowedResponse(inferenceProviders: readonly string[]) {
   const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProviders.join(', ')}`;
   return NextResponse.json(
     {

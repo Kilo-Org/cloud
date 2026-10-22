@@ -32,9 +32,9 @@ git lfs install --skip-repo
 
 The `--skip-repo` flag avoids conflicts with the project's Husky hooks. Git LFS is used for large binary files (videos).
 
-### Node.js 24.14.1 (via nvm)
+### Node.js 24.22.1 (via nvm)
 
-The project requires Node.js 24.14.1 locally (see `.nvmrc`) and accepts any Node.js 24.x runtime in `package.json` `engines`.
+The project requires Node.js 24.22.1 locally (see `.nvmrc`) and accepts any Node.js 24.x runtime in `package.json` `engines`.
 
 ```bash
 brew install nvm
@@ -553,7 +553,7 @@ If you see errors about unsupported Node.js versions, ensure you're using the pi
 
 ```bash
 nvm use
-node --version  # Should output v24.14.1
+node --version  # Should output v24.22.1
 ```
 
 ### Database connection errors

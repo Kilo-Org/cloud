@@ -2049,8 +2049,15 @@
     {
       "idx": 292,
       "version": "7",
-      "when": 1792583071924,
-      "tag": "0292_useful_moonstone",
+      "when": 1792612549366,
+      "tag": "0292_direct_byok_sync_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 293,
+      "version": "7",
+      "when": 1792661787108,
+      "tag": "0293_true_scarlet_spider",
       "breakpoints": true
     }
   ]

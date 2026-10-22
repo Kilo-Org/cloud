@@ -182,7 +182,6 @@ describe('D6 heartbeat re-admission guard', () => {
     const filteredFirst = filterActiveSessionsByOrganization(afterFirst, null);
     expect(filteredFirst.map(r => r.id)).toEqual(['personal']);
 
-    // Second heartbeat: still only the personal row survives the filter.
     const afterSecond = mergeHeartbeatForActiveSessions(afterFirst, heartbeat);
     const filteredSecond = filterActiveSessionsByOrganization(afterSecond, null);
     expect(filteredSecond.map(r => r.id)).toEqual(['personal']);

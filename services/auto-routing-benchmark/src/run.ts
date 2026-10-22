@@ -94,6 +94,7 @@ import {
   isRetryableContainerAvailabilityError,
   isExactModelUnavailableResult,
   isCatalogLoadFailureResult,
+  isUnsupportedModelResult,
   parseContainerRunResponse,
   runDeciderCaseViaCli,
   warmUpCliContainer,
@@ -1255,7 +1256,14 @@ class AmbiguousBenchmarkExecutionError extends Error {
 
 class BenchmarkThrottleError extends Error {}
 
-class BenchmarkCatalogLoadError extends Error {}
+class BenchmarkCatalogLoadError extends Error {
+  constructor(
+    message: string,
+    readonly category: 'catalog_load' | 'model_resolution'
+  ) {
+    super(message);
+  }
+}
 
 class BenchmarkModelUnavailableError extends Error {}
 
@@ -1456,12 +1464,19 @@ async function recoverPendingOutputJob(env: Env, message: BenchmarkJobMessage): 
   }
   if (
     isCatalogLoadFailureResult(pending.result) ||
+    isUnsupportedModelResult(pending.result, message.model) ||
     (pending.result.text.length === 0 &&
       (pending.result.costUsd ?? 0) === 0 &&
       /(?:\b429\b|rate.?limit|throttl)/i.test(pending.result.stderrTail))
   ) {
     await deletePendingDeciderOutput(env.BENCH_DB, key);
-    skipRecovery(isCatalogLoadFailureResult(pending.result) ? 'catalog_load' : 'provider_throttle');
+    skipRecovery(
+      isCatalogLoadFailureResult(pending.result)
+        ? 'catalog_load'
+        : isUnsupportedModelResult(pending.result, message.model)
+          ? 'model_resolution'
+          : 'provider_throttle'
+    );
     return;
   }
   const judge =
@@ -1686,7 +1701,7 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
               : error instanceof AmbiguousBenchmarkExecutionError
                 ? 'ambiguous_execution'
                 : error instanceof BenchmarkCatalogLoadError
-                  ? 'catalog_load'
+                  ? error.category
                   : error instanceof DeciderGraderRetryError
                     ? 'grading'
                     : isRetryableContainerAvailabilityError(error)
@@ -2121,6 +2136,7 @@ async function processDeciderJob(
         if (
           isExactModelUnavailableResult(first, message.model) ||
           isCatalogLoadFailureResult(first) ||
+          isUnsupportedModelResult(first, message.model) ||
           first.exitCode !== 0 ||
           first.text.length > 0 ||
           /(?:\b429\b|rate.?limit|throttl)/i.test(first.stderrTail)
@@ -2167,7 +2183,8 @@ async function processDeciderJob(
           result.text.length === 0 &&
           (result.costUsd ?? 0) === 0 &&
           /(?:\b429\b|rate.?limit|throttl)/i.test(result.stderrTail);
-        if (isCatalogLoadFailureResult(result) || throttled) {
+        const unsupported = isUnsupportedModelResult(result, message.model);
+        if (isCatalogLoadFailureResult(result) || unsupported || throttled) {
           const { token: _token, ...unbilled } = execution;
           if (attemptStartedAt !== undefined) {
             await clearUnbilledCase(env.BENCH_DB, { ...unbilled, attemptStartedAt });
@@ -2178,7 +2195,12 @@ async function processDeciderJob(
           if (throttled) {
             throw new BenchmarkThrottleError('Provider throttled an unbilled benchmark request');
           }
-          throw new BenchmarkCatalogLoadError('Benchmark model catalog could not be loaded.');
+          throw new BenchmarkCatalogLoadError(
+            unsupported
+              ? 'Gateway rejected the exact model for an unbilled call.'
+              : 'Benchmark model catalog could not be loaded.',
+            unsupported ? 'model_resolution' : 'catalog_load'
+          );
         }
         if (!pending) {
           await savePendingDeciderOutput(env.BENCH_DB, pendingKey, output).catch(() => {

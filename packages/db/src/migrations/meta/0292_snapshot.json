@@ -1,5 +1,5 @@
 {
-  "id": "409d8df4-917f-4046-bf50-808a03f449ee",
+  "id": "48da44e5-b482-4eae-a823-83defe1a305a",
   "prevId": "140eaf3d-3dc3-47a6-8127-257c20dfa20d",
   "version": "7",
   "dialect": "postgresql",
@@ -2250,6 +2250,18 @@
         },
         "stale_alert_last_posted_at": {
           "name": "stale_alert_last_posted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_byok_last_completed_at": {
+          "name": "direct_byok_last_completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_byok_stale_alert_last_posted_at": {
+          "name": "direct_byok_stale_alert_last_posted_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -12971,12 +12983,6 @@
           "type": "bigint",
           "primaryKey": false,
           "notNull": true
-        },
-        "charged_microdollars": {
-          "name": "charged_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
         },
         "charged_to_balance": {
           "name": "charged_to_balance",

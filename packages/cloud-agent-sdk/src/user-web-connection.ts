@@ -552,8 +552,8 @@ function createUserWebConnection(
       // Bound the series the same way the base connection bounds socket
       // reconnects: once the cap is reached, publish the exhaustion edge so the
       // recovery surface renders instead of retrying silently forever. The
-      // counter is deliberately left at the cap: lifecycle recovery still gets
-      // one attempt per event, and only `retryConnection()` restarts the budget.
+      // counter stays spent here; only `retryConnection()` or a lifecycle
+      // resume restarts the series, and both go through `clearInitialAuthRetry`.
       if (initialAuthRetryAttempt + 1 >= maxInitialAuthAttempts) {
         setExhausted(true);
         return;

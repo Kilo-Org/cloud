@@ -207,30 +207,27 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
   // Provider arms derive the method list from the platform, not the GitHub
   // repo settings: GitLab offers merge + squash, Bitbucket Cloud only the
   // merge commit. GitHub keeps the repo-settings list unchanged.
-  const providerMethodOptions = useMemo(() => {
-    if (!prRef) {
-      return null;
-    }
-    return mergeMethodOptionsFor({
-      ...repoSettings,
-      allowMergeCommit: true,
-      allowSquashMerge: prRef.platform === 'gitlab',
-      allowRebaseMerge: false,
-      allowAutoMerge: prRef.platform === 'gitlab',
-    });
-  }, [prRef, repoSettings]);
-  const methodOptions = useMemo(
-    () => providerMethodOptions ?? mergeMethodOptionsFor(repoSettings),
-    [providerMethodOptions, repoSettings]
-  );
-  const safeInitial: AllowedMergeMethod = useMemo(
-    () =>
-      methodOptions.find(o => o.value === initialMethod)?.value ??
-      (providerMethodOptions
-        ? (providerMethodOptions[0]?.value ?? defaultMergeMethodOptionFor(repoSettings))
-        : defaultMergeMethodOptionFor(repoSettings)),
-    [initialMethod, methodOptions, providerMethodOptions, repoSettings]
-  );
+  //
+  // The list is built on every render, not memoized: its labels are resolved
+  // copy, so a reader switching language with the sheet open must see the new
+  // catalog. A memo would cache the previous language's strings, because
+  // `mergeMethodOptionsFor` translates through the module i18n instance rather
+  // than the render's `t`. Three options per render cost nothing.
+  const providerMethodOptions = prRef
+    ? mergeMethodOptionsFor({
+        ...repoSettings,
+        allowMergeCommit: true,
+        allowSquashMerge: prRef.platform === 'gitlab',
+        allowRebaseMerge: false,
+        allowAutoMerge: prRef.platform === 'gitlab',
+      })
+    : null;
+  const methodOptions = providerMethodOptions ?? mergeMethodOptionsFor(repoSettings);
+  const safeInitial: AllowedMergeMethod =
+    methodOptions.find(o => o.value === initialMethod)?.value ??
+    (providerMethodOptions
+      ? (providerMethodOptions[0]?.value ?? defaultMergeMethodOptionFor(repoSettings))
+      : defaultMergeMethodOptionFor(repoSettings));
   const [method, setMethod] = useState<AllowedMergeMethod>(safeInitial);
 
   const showDeleteBranchToggle = prRef ? true : !isCrossRepo;

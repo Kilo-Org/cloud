@@ -230,3 +230,18 @@ describe('starting a chat from the list', () => {
     });
   });
 });
+
+describe('the list header', () => {
+  it('lets the title shrink beside the beta pill instead of growing the header', async () => {
+    const tree = await mount();
+    const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
+    const row = header.props.titleContent as {
+      props: { className: string; children: { props: Record<string, unknown> }[] };
+    };
+    const [title] = row.props.children;
+
+    expect(row.props.className).toContain('min-w-0');
+    expect(title?.props.className).toContain('shrink');
+    expect(title?.props.numberOfLines).toBe(1);
+  });
+});

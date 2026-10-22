@@ -277,9 +277,9 @@ function ScopedChatListScreen() {
         <ScreenHeader
           title={t('common.chat')}
           titleContent={
-            <View className="flex-row items-center gap-2">
+            <View className="min-w-0 flex-row items-center gap-2">
               <Text
-                className="text-[30px] font-semibold leading-9 text-foreground"
+                className="shrink text-[30px] font-bold tracking-tight text-foreground"
                 numberOfLines={1}
               >
                 {t('common.chat')}

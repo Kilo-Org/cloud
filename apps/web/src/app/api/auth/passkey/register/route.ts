@@ -1,13 +1,13 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
-import type { RegistrationResponseJSON } from '@simplewebauthn/server';
 
 import {
   createRegistrationOptions,
   verifyRegistration,
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
+import { registrationResponseSchema } from '@/lib/auth/passkey-response';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 /**
@@ -24,7 +24,7 @@ const requestSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('verify'),
     challengeId: z.string().uuid(),
-    response: z.record(z.string(), z.unknown()),
+    response: registrationResponseSchema,
   }),
 ]);
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     const credential = await verifyRegistration(
       user.id,
       parsed.data.challengeId,
-      parsed.data.response as unknown as RegistrationResponseJSON
+      parsed.data.response
     );
     return NextResponse.json({ credentialId: credential.credential_id });
   } catch (error) {

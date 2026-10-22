@@ -1,4 +1,4 @@
-import type { CloudAgentEvent } from '../event-types';
+import type { CloudAgentEvent } from '../schemas';
 
 function createEventHelpers(defaultSessionId = 'ses-1') {
   let eventCounter = 0;

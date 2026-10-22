@@ -19,7 +19,7 @@ import {
 import { sendAutoTopUpFailedEmail } from '@kilocode/web-shared/lib/email';
 import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
-  ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
+  DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
 import {
@@ -39,6 +39,7 @@ import Stripe from 'stripe';
 
 // Convert dollars to microdollars
 const toMicrodollars = (dollars: number) => dollars * 1_000_000;
+const ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS = DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS / 100;
 
 // Mock email sending to avoid CustomerIO errors in tests
 jest.mock('@kilocode/web-shared/lib/email', () => ({
@@ -530,6 +531,68 @@ describe('autoTopUp', () => {
       await maybePerformOrganizationAutoTopUp(org);
 
       // Should NOT have attempted - auto_top_up_enabled should still be true
+      const updatedOrg = await db.query.organizations.findFirst({
+        where: eq(organizations.id, testOrg.id),
+      });
+      expect(updatedOrg?.auto_top_up_enabled).toBe(true);
+    });
+
+    it('triggers auto-top-up below a configured threshold above the default', async () => {
+      const balance = toMicrodollars(200);
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_org_123',
+        amount_cents: 100000,
+        threshold_cents: 50000,
+      });
+      await db
+        .update(organizations)
+        .set({
+          auto_top_up_enabled: true,
+          stripe_customer_id: null,
+          total_microdollars_acquired: balance,
+          microdollars_used: 0,
+        })
+        .where(eq(organizations.id, testOrg.id));
+
+      await maybePerformOrganizationAutoTopUp({
+        id: testOrg.id,
+        auto_top_up_enabled: true,
+        total_microdollars_acquired: balance,
+        microdollars_used: 0,
+      });
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
+      });
+      expect(config?.disabled_reason).toBe('no_stripe_customer');
+    });
+
+    it('does not trigger auto-top-up above a configured threshold', async () => {
+      const balance = toMicrodollars(99);
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_org_123',
+        amount_cents: 100000,
+        threshold_cents: 5000,
+      });
+      await db
+        .update(organizations)
+        .set({ auto_top_up_enabled: true })
+        .where(eq(organizations.id, testOrg.id));
+
+      await maybePerformOrganizationAutoTopUp({
+        id: testOrg.id,
+        auto_top_up_enabled: true,
+        total_microdollars_acquired: balance,
+        microdollars_used: 0,
+      });
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
+      });
+      expect(config?.attempt_started_at).toBeNull();
+      expect(config?.disabled_reason).toBeNull();
       const updatedOrg = await db.query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });

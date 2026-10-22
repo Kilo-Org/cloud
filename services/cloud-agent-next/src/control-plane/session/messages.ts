@@ -1,5 +1,6 @@
 import type { ControlPlanePromptPayload } from '../../shared/control-plane-protocol.js';
 import type { ControlPlaneTimers } from '../../shared/control-plane-timers.js';
+import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 
 /**
  * Spec §5 message state: `queued → accepted → completed | failed | cancelled`.
@@ -37,6 +38,7 @@ export type SessionMessage = {
   acceptedAt: number | null;
   settledAt: number | null;
   reason: string | null;
+  container?: CloudAgentRunContainer;
 };
 
 /** The messages a reducer changed, so the caller can emit their events. */

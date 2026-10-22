@@ -218,7 +218,7 @@ export function CreateBeadDrawer({ rigId, townId, isOpen, onClose }: CreateBeadD
                 {aiLabels.map(label => (
                   <span
                     key={`ai-${label}`}
-                    className="inline-flex items-center gap-1 rounded-md border border-[color:oklch(0.95_0.15_108_/_0.25)] bg-[color:oklch(0.95_0.15_108_/_0.08)] px-2 py-0.5 text-[11px] text-[color:oklch(0.95_0.15_108_/_0.8)]"
+                    className="inline-flex items-center gap-1 rounded-md border border-primary/25 bg-primary/8 px-2 py-0.5 text-[11px] text-primary/80"
                   >
                     <Sparkles className="size-2.5" />
                     {label}
@@ -295,7 +295,7 @@ export function CreateBeadDrawer({ rigId, townId, isOpen, onClose }: CreateBeadD
                   type="checkbox"
                   checked={startImmediately}
                   onChange={e => setStartImmediately(e.target.checked)}
-                  className="mt-0.5 size-4 cursor-pointer rounded border-white/20 bg-white/5 accent-[color:oklch(0.95_0.15_108)]"
+                  className="mt-0.5 size-4 cursor-pointer rounded border-white/20 bg-white/5 accent-primary"
                 />
                 <div>
                   <span className="text-sm text-white/75">Start immediately</span>

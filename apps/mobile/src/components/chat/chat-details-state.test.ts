@@ -1,6 +1,7 @@
-import { zeroUsage } from '@kilocode/harness-sdk';
+import { type ModelUsage, zeroUsage } from '@kilocode/harness-sdk';
 import { describe, expect, it } from 'vitest';
 
+import { countSessionUsage, parseChatUsage, totalUsage } from '@/lib/chat/chat-usage';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import {
@@ -114,6 +115,51 @@ describe('chatModelUsages', () => {
       },
       { model: LOCAL, name: 'system', usage: zeroUsage, cost: { kind: 'onDevice' } },
     ]);
+  });
+
+  it('shows the routed model names and persisted billed, estimated and unknown costs instead of Auto', () => {
+    const unpriced = 'vendor/unpriced';
+    const auto = 'kilo-auto/balanced';
+    const recorded = countSessionUsage({
+      usage: {},
+      requested: auto,
+      totals: new Map<string, ModelUsage>([
+        [KILO, { ...usage, cost: 0.02 }],
+        [CUSTOM, usage],
+        [unpriced, usage],
+      ]),
+      counted: new Map(),
+    });
+    const reopened = parseChatUsage(JSON.stringify(recorded));
+    const models = chatModelUsages(reopened, [
+      option(auto, { pricing: { prompt: '0', completion: '0' } }),
+      option(KILO, { name: 'Claude Sonnet', pricing }),
+      option(CUSTOM, { name: 'Direct model' }),
+      option(unpriced, { name: 'Estimated model', pricing }),
+    ]);
+
+    expect(models.map(model => model.name)).toEqual([
+      'Claude Sonnet',
+      'Direct model',
+      'Estimated model',
+    ]);
+    expect(models.map(model => model.cost)).toEqual([
+      { kind: 'billed', usd: 0.02 },
+      { kind: 'unknown' },
+      { kind: 'estimated', usd: estimatedCost(usage, pricing) },
+    ]);
+    expect(chatCost(models.map(model => model.cost))).toEqual({
+      kind: 'known',
+      usd: 0.02 + (estimatedCost(usage, pricing) ?? 0),
+      estimated: true,
+      partial: true,
+    });
+    expect(totalUsage(reopened)).toMatchObject({
+      inputTokens: 3000,
+      outputTokens: 300,
+      cacheReadTokens: 30_000,
+      cost: 0.02,
+    });
   });
 });
 

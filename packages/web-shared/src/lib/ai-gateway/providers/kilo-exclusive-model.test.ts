@@ -5,7 +5,7 @@ import {
   applyKiloExclusiveModelSettings,
   calculateCost_mUsd,
   convertFromKiloExclusiveModel,
-  getInferenceProvider,
+  getInferenceProviders,
   type KiloExclusiveModel,
   type PricingTiers,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
@@ -27,11 +27,10 @@ function makeModel(
     description: '',
     context_length: 0,
     max_completion_tokens: 0,
-    status: 'public',
     flags: [],
     provider: OPENROUTER,
     pricing: null,
-    inference_provider_restriction: [],
+    inference_providers: [],
     ...overrides,
   };
 }
@@ -140,35 +139,47 @@ describe('convertFromKiloExclusiveModel', () => {
   });
 });
 
-describe('getInferenceProvider', () => {
-  it('uses a single inference provider restriction before the gateway', () => {
+describe('getInferenceProviders', () => {
+  it('describes each listed inference provider', () => {
     const model = makeModel({
       internal_id: 'vendor/x',
       provider: VERCEL_AI_GATEWAY,
-      inference_provider_restriction: ['openai'],
+      inference_providers: ['anthropic', 'amazon-bedrock'],
     });
 
-    expect(getInferenceProvider(model)).toEqual({
-      slug: 'openai',
-      name: 'OPENAI',
-      training: false,
-      retainsPrompts: true,
-    });
+    expect(getInferenceProviders(model)).toEqual([
+      { slug: 'anthropic', name: 'ANTHROPIC', training: false, retainsPrompts: true },
+      { slug: 'amazon-bedrock', name: 'AMAZON-BEDROCK', training: false, retainsPrompts: true },
+    ]);
   });
 
-  it('reports data collection for a concrete gateway provider', () => {
+  it('reports data collection for a direct provider', () => {
     const model = makeModel({
       internal_id: 'vendor/x',
       provider: { ...OPENROUTER, id: 'mistral' },
       flags: ['requires-data-collection'],
+      inference_providers: ['mistral'],
     });
 
-    expect(getInferenceProvider(model)).toEqual({
-      slug: 'mistral',
-      name: 'MISTRAL',
-      training: true,
-      retainsPrompts: true,
+    expect(getInferenceProviders(model)).toEqual([
+      { slug: 'mistral', name: 'MISTRAL', training: true, retainsPrompts: true },
+    ]);
+  });
+
+  it('reports the stealth identity for stealth models', () => {
+    const model = makeModel({
+      internal_id: 'vendor/x',
+      provider: { ...OPENROUTER, id: 'martian' },
+      inference_providers: ['stealth'],
     });
+
+    expect(getInferenceProviders(model)).toEqual([
+      { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true },
+    ]);
+  });
+
+  it('reports no providers for unrestricted models', () => {
+    expect(getInferenceProviders(makeModel({ internal_id: 'vendor/x' }))).toEqual([]);
   });
 });
 
@@ -213,10 +224,7 @@ describe('applyKiloExclusiveModelSettings', () => {
       req,
       makeModel({
         internal_id: 'vendor/x',
-        inference_provider_restriction: [
-          'anthropic',
-          'amazon-bedrock',
-        ] as OpenRouterInferenceProviderId[],
+        inference_providers: ['anthropic', 'amazon-bedrock'] as OpenRouterInferenceProviderId[],
       })
     );
     expect(req.body.provider).toEqual({ only: ['anthropic', 'amazon-bedrock'] });
@@ -228,7 +236,7 @@ describe('applyKiloExclusiveModelSettings', () => {
       req,
       makeModel({
         internal_id: 'vendor/x',
-        inference_provider_restriction: ['anthropic'] as OpenRouterInferenceProviderId[],
+        inference_providers: ['anthropic'] as OpenRouterInferenceProviderId[],
       })
     );
     expect(req.body.provider).toEqual({ zdr: true, only: ['anthropic'] });
@@ -241,7 +249,7 @@ describe('applyKiloExclusiveModelSettings', () => {
       req,
       makeModel({
         internal_id: 'vendor/x',
-        inference_provider_restriction: ['anthropic'] as OpenRouterInferenceProviderId[],
+        inference_providers: ['anthropic'] as OpenRouterInferenceProviderId[],
       })
     );
     expect(req.body.provider).toEqual({ only: ['anthropic'] });
@@ -253,10 +261,7 @@ describe('applyKiloExclusiveModelSettings', () => {
       req,
       makeModel({
         internal_id: 'vendor/x',
-        inference_provider_restriction: [
-          'anthropic',
-          'amazon-bedrock',
-        ] as OpenRouterInferenceProviderId[],
+        inference_providers: ['anthropic', 'amazon-bedrock'] as OpenRouterInferenceProviderId[],
       })
     );
     expect(req.body.provider?.only?.sort()).toEqual(['amazon-bedrock', 'anthropic']);
@@ -268,10 +273,36 @@ describe('applyKiloExclusiveModelSettings', () => {
       req,
       makeModel({
         internal_id: 'vendor/x',
-        inference_provider_restriction: ['anthropic'] as OpenRouterInferenceProviderId[],
+        inference_providers: ['anthropic'] as OpenRouterInferenceProviderId[],
       })
     );
     expect(req.body.provider?.only).toEqual([]);
+  });
+
+  it('does not route stealth models by inference provider', () => {
+    const req = makeRequest({ zdr: true });
+    applyKiloExclusiveModelSettings(
+      req,
+      makeModel({
+        internal_id: 'vendor/x',
+        provider: VERCEL_AI_GATEWAY,
+        inference_providers: ['stealth'],
+      })
+    );
+    expect(req.body.provider).toEqual({ zdr: true });
+  });
+
+  it('does not route direct-provider models by inference provider', () => {
+    const req = makeRequest(undefined);
+    applyKiloExclusiveModelSettings(
+      req,
+      makeModel({
+        internal_id: 'vendor/x',
+        provider: { ...OPENROUTER, id: 'mistral' },
+        inference_providers: ['mistral'],
+      })
+    );
+    expect(req.body.provider).toBeUndefined();
   });
 
   it('does not clone shared configuration when there is no restriction', () => {

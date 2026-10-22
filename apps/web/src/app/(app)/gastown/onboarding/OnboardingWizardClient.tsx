@@ -47,13 +47,11 @@ function StepIndicator({ currentIndex }: { currentIndex: number }) {
                       initial={{ scale: 0.8, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                      className="flex size-6 items-center justify-center rounded-full border-2 border-[color:oklch(95%_0.15_108)] bg-[color:oklch(95%_0.15_108_/_0.15)]"
+                      className="flex size-6 items-center justify-center rounded-full border-2 border-primary bg-primary/15"
                     >
-                      <span className="text-xs font-bold text-[color:oklch(95%_0.15_108)]">
-                        {i + 1}
-                      </span>
+                      <span className="text-xs font-bold text-primary">{i + 1}</span>
                     </motion.div>
-                    <span className="absolute -inset-1 animate-ping rounded-full bg-[color:oklch(95%_0.15_108_/_0.12)]" />
+                    <span className="absolute -inset-1 animate-ping rounded-full bg-primary/12" />
                   </div>
                 ) : (
                   <div className="flex size-6 items-center justify-center rounded-full border border-white/15">
@@ -252,7 +250,7 @@ function FinalStepNav() {
   if (!handlers) return null;
 
   if (handlers.isSubmitting) {
-    return <Loader2 className="size-5 animate-spin text-[color:oklch(95%_0.15_108_/_0.7)]" />;
+    return <Loader2 className="size-5 animate-spin text-primary/70" />;
   }
 
   return (

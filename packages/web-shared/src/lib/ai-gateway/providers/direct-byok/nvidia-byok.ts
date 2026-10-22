@@ -1,3 +1,5 @@
+import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
@@ -6,17 +8,15 @@ export default {
   base_url: 'https://integrate.api.nvidia.com/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],
-  default_ai_sdk_provider: 'openai-compatible',
+  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
   transformRequest(context) {
     const { request } = context;
     if (request.kind !== 'chat_completions') {
       return;
     }
 
-    request.body.reasoning_effort ??= request.body.reasoning?.effort ?? undefined;
-
+    replaceReasoningObjectWithReasoningEffort(request, { disableWithNoneEffort: true });
     delete request.body.transforms;
-    delete request.body.reasoning;
     delete request.body.safety_identifier;
     delete request.body.prompt_cache_key;
   },

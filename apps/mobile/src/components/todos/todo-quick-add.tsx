@@ -1,12 +1,13 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, type TextInput, View } from 'react-native';
+import { type TextInput, View } from 'react-native';
 
+import { Button } from '@/components/ui/button';
 import { Plus } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
+import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { TODO_TITLE_MAX_LENGTH } from '@/lib/todos/todo-model';
-import { cn } from '@/lib/utils';
 
 /**
  * The add row at the top of a list. Submitting adds the to-do and clears the
@@ -47,19 +48,15 @@ export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => voi
         maxLength={TODO_TITLE_MAX_LENGTH}
         className="min-w-0 flex-1 text-base text-foreground"
       />
-      <Pressable
-        onPress={submit}
+      <Button
+        size="sm"
         disabled={!hasText}
-        accessibilityRole="button"
+        onPress={submit}
         accessibilityLabel={t('todos.list.add')}
-        accessibilityState={{ disabled: !hasText }}
-        className={cn(
-          'size-9 items-center justify-center rounded-md active:opacity-70',
-          hasText ? 'bg-primary' : 'bg-muted'
-        )}
       >
-        <Plus size={18} color={hasText ? colors.primaryForeground : colors.mutedForeground} />
-      </Pressable>
+        <Plus size={16} color={colors.primaryForeground} />
+        <Text>{t('todos.list.add')}</Text>
+      </Button>
     </View>
   );
 }

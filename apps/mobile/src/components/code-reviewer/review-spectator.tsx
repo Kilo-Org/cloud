@@ -41,7 +41,7 @@ const renderSpectatorRow: ListRenderItem<SpectatorRow> = ({ item }) => (
 
 function SpectatorCopy({ message }: Readonly<{ message: string }>) {
   return (
-    <CenteredState className="px-6">
+    <CenteredState contentContainerClassName="px-6">
       <Text variant="muted" className="text-center text-xs">
         {message}
       </Text>

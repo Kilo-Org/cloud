@@ -12,7 +12,10 @@ import * as z from 'zod';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import {
   OrgAutoTopUpAmountCentsSchema,
+  OrgAutoTopUpThresholdCentsSchema,
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
+  isValidOrgAutoTopUpSettings,
+  parseOrgAutoTopUpThresholdCents,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import type { OrgAutoTopUpAmountCents } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { createOrgAutoTopUpSetupCheckoutSession } from '@/lib/organizations/organization-auto-top-up';
@@ -54,6 +57,15 @@ async function reportOrgAutoTopUpAttempt(params: {
   });
 }
 
+function assertValidSettings(amountCents: number, thresholdCents: number): void {
+  if (!isValidOrgAutoTopUpSettings(amountCents, thresholdCents)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Top up amount must be at least the balance threshold',
+    });
+  }
+}
+
 export const organizationAutoTopUpRouter = createTRPCRouter({
   getConfig: organizationBillingProcedure.query(async ({ input }) => {
     const { organizationId } = input;
@@ -70,7 +82,8 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
     const paymentMethod = await retrievePaymentMethodInfo(config?.stripe_payment_method_id);
     const amountCents =
       (config?.amount_cents as OrgAutoTopUpAmountCents) ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
-    return { enabled: org.auto_top_up_enabled, amountCents, paymentMethod };
+    const thresholdCents = parseOrgAutoTopUpThresholdCents(config?.threshold_cents);
+    return { enabled: org.auto_top_up_enabled, amountCents, thresholdCents, paymentMethod };
   }),
 
   toggle: organizationBillingMutationProcedure
@@ -78,10 +91,11 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
       OrganizationIdInputSchema.extend({
         currentEnabled: z.boolean(),
         amountCents: OrgAutoTopUpAmountCentsSchema.optional(),
+        thresholdCents: OrgAutoTopUpThresholdCentsSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { organizationId, currentEnabled, amountCents } = input;
+      const { organizationId, currentEnabled, amountCents, thresholdCents } = input;
 
       if (currentEnabled) {
         // Disabling auto-top-up
@@ -96,6 +110,12 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
           where: eq(auto_top_up_configs.owned_by_organization_id, organizationId),
         });
 
+        const selectedAmount =
+          amountCents ?? config?.amount_cents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
+        const selectedThreshold =
+          thresholdCents ?? parseOrgAutoTopUpThresholdCents(config?.threshold_cents);
+        assertValidSettings(selectedAmount, selectedThreshold);
+
         if (config?.stripe_payment_method_id) {
           // Has existing payment method - enable directly
           await db
@@ -108,13 +128,13 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
               disabled_reason: null,
               attempt_started_at: null,
               ...(amountCents != null ? { amount_cents: amountCents } : {}),
+              ...(thresholdCents != null ? { threshold_cents: thresholdCents } : {}),
             })
             .where(eq(auto_top_up_configs.owned_by_organization_id, organizationId));
           return { enabled: true } as const;
         } else {
           // No payment method - redirect to Stripe checkout
           const stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
-          const selectedAmount = amountCents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
 
           await reportOrgAutoTopUpAttempt({
             organizationId,
@@ -128,7 +148,8 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
             ctx.user.id,
             organizationId,
             stripeCustomerId,
-            selectedAmount
+            selectedAmount,
+            selectedThreshold
           );
 
           if (!redirectUrl) {
@@ -147,11 +168,19 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
     .input(
       OrganizationIdInputSchema.extend({
         amountCents: OrgAutoTopUpAmountCentsSchema.optional(),
+        thresholdCents: OrgAutoTopUpThresholdCentsSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { organizationId, amountCents } = input;
-      const selectedAmount = amountCents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
+      const { organizationId, amountCents, thresholdCents } = input;
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_organization_id, organizationId),
+      });
+      const selectedAmount =
+        amountCents ?? config?.amount_cents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
+      const selectedThreshold =
+        thresholdCents ?? parseOrgAutoTopUpThresholdCents(config?.threshold_cents);
+      assertValidSettings(selectedAmount, selectedThreshold);
 
       const stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
 
@@ -167,7 +196,8 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
         ctx.user.id,
         organizationId,
         stripeCustomerId,
-        selectedAmount
+        selectedAmount,
+        selectedThreshold
       );
 
       if (!redirectUrl) {
@@ -189,9 +219,41 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { organizationId, amountCents } = input;
 
+      const config = await db.query.auto_top_up_configs.findFirst({
+        columns: { threshold_cents: true },
+        where: eq(auto_top_up_configs.owned_by_organization_id, organizationId),
+      });
+      assertValidSettings(amountCents, parseOrgAutoTopUpThresholdCents(config?.threshold_cents));
+
       await db
         .update(auto_top_up_configs)
         .set({ amount_cents: amountCents })
+        .where(eq(auto_top_up_configs.owned_by_organization_id, organizationId));
+
+      return successResult();
+    }),
+
+  updateThreshold: organizationBillingMutationProcedure
+    .input(
+      OrganizationIdInputSchema.extend({
+        thresholdCents: OrgAutoTopUpThresholdCentsSchema,
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { organizationId, thresholdCents } = input;
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        columns: { amount_cents: true },
+        where: eq(auto_top_up_configs.owned_by_organization_id, organizationId),
+      });
+      assertValidSettings(
+        config?.amount_cents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
+        thresholdCents
+      );
+
+      await db
+        .update(auto_top_up_configs)
+        .set({ threshold_cents: thresholdCents })
         .where(eq(auto_top_up_configs.owned_by_organization_id, organizationId));
 
       return successResult();

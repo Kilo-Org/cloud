@@ -1,9 +1,11 @@
 import type { SandboxBillingInput } from '../container-usage-context.js';
+import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { SessionCredentialGrant } from './session-credentials.js';
 import {
   CLOUDFLARE_CONTAINERS_INSTANCES,
   vercelSandboxResourcesSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
+import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../sandbox-containers/instance-size.js';
 import { z } from 'zod';
 import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
 import type { CredentialContainmentRequirements } from './credential-containment.js';
@@ -50,7 +52,9 @@ export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider
   z
     .object({
       provider: z.literal('cloudflare-containers'),
-      instance: z.enum(CLOUDFLARE_CONTAINERS_INSTANCES).optional(),
+      instance: z
+        .enum([...CLOUDFLARE_CONTAINERS_INSTANCES, CODE_REVIEW_CONTAINERS_INSTANCE] as const)
+        .optional(),
     })
     .strict(),
 ]);
@@ -102,12 +106,16 @@ export type ProviderLaunchResult = {
   snapshotFailed?: true;
 };
 
+/** The first process that a provider runs in a new or restored sandbox. */
+export type ProviderStartupCommand = { argv: readonly string[] };
+
 export type ProviderAdapter = {
+  describeRuntime?(ref: string): CloudAgentRunContainer | undefined;
   ensureBillingAdmission(ref: string, billing?: SandboxBillingInput): Promise<void>;
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
   launch(
     ref: string,
-    env: Record<string, string>,
+    startup: { command: ProviderStartupCommand; env: Record<string, string> },
     options?: ProviderLaunchOptions
   ): Promise<ProviderLaunchResult>;
   observe(

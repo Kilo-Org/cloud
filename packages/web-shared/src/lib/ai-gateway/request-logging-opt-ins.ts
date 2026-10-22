@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { ai_gateway_request_logging_opt_ins } from '@kilocode/db/schema';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
 
 export const RequestLoggingOptInSchema = z.object({
@@ -11,27 +11,35 @@ export const RequestLoggingOptInSchema = z.object({
   reason: z.string().trim().min(1).max(1000),
   added_by_email: z.string().email(),
   added_at: z.string().datetime(),
+  errors_only: z.boolean().default(false),
 });
 
 export const RequestLoggingOptInsSchema = z.array(RequestLoggingOptInSchema).max(500);
 
 export type RequestLoggingOptIn = z.infer<typeof RequestLoggingOptInSchema>;
 
+export type RequestLoggingMode = 'all' | 'errors_only';
+
 const REQUEST_LOGGING_OPT_INS_CACHE_TTL_MS = process.env.NODE_ENV === 'test' ? 0 : 10_000;
 
-export function hasMatchingRequestLoggingOptIn(
+/** A matching opt-in that logs all requests takes precedence over an errors-only one. */
+export function resolveRequestLoggingMode(
   optIns: RequestLoggingOptIn[],
   params: { accountId: string | null; organizationId: string | null }
-): boolean {
-  return optIns.some(
+): RequestLoggingMode | null {
+  const matching = optIns.filter(
     entry =>
       (entry.target_type === 'account' && entry.target_id === params.accountId) ||
       (entry.target_type === 'organization' && entry.target_id === params.organizationId)
   );
+  if (matching.length === 0) return null;
+  return matching.every(entry => entry.errors_only) ? 'errors_only' : 'all';
 }
 
-export async function getRequestLoggingOptIns(): Promise<RequestLoggingOptIn[]> {
-  const [row] = await db
+export async function getRequestLoggingOptIns(
+  fromDb: typeof db = db
+): Promise<RequestLoggingOptIn[]> {
+  const [row] = await fromDb
     .select({ optIns: ai_gateway_request_logging_opt_ins.opt_ins })
     .from(ai_gateway_request_logging_opt_ins)
     .where(eq(ai_gateway_request_logging_opt_ins.id, 1))
@@ -40,7 +48,7 @@ export async function getRequestLoggingOptIns(): Promise<RequestLoggingOptIn[]> 
 }
 
 const getCachedRequestLoggingOptIns = createCachedFetch<RequestLoggingOptIn[]>(
-  getRequestLoggingOptIns,
+  () => getRequestLoggingOptIns(readDb),
   REQUEST_LOGGING_OPT_INS_CACHE_TTL_MS,
   []
 );
@@ -102,14 +110,14 @@ export async function deleteRequestLoggingOptIn(id: string): Promise<boolean> {
   });
 }
 
-export async function isDynamicallyOptedIntoRequestLogging(params: {
+export async function getDynamicRequestLoggingMode(params: {
   accountId: string | null;
   organizationId: string | null;
-}): Promise<boolean> {
+}): Promise<RequestLoggingMode | null> {
   try {
     const optIns = await getCachedRequestLoggingOptIns();
-    return hasMatchingRequestLoggingOptIn(optIns, params);
+    return resolveRequestLoggingMode(optIns, params);
   } catch {
-    return false;
+    return null;
   }
 }

@@ -4,6 +4,9 @@ import {
   listBenchmarkRuns,
   startBenchmarkRun,
   getBenchmarkRoutingTable,
+  getBenchmarkRegistry,
+  requeueBenchmarkRegistry,
+  registerOwnerBenchmarkProfiles,
 } from './auto-routing-benchmark-admin-client';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -16,20 +19,22 @@ global.fetch = mockFetch;
 
 const configResponse = {
   config: {
+    router: 'efficient' as const,
+    accuracyNoiseBand: 0.05,
+    frontierMinAccuracyDelta: 0,
     classifierModels: ['anthropic/claude-haiku-4'],
     deciderModels: [{ id: 'anthropic/claude-sonnet-4' }],
     minAccuracy: 0.8,
     switchCostFactor: 3,
     bestAccuracySwitchThreshold: 0.05,
-    maxConcurrency: 4,
-    userMaxConcurrency: 100,
+    productionTokenProfile: null,
+    switchHorizonTurns: null,
+    lowConfidenceThreshold: null,
     benchmarkUserId: null,
     benchmarkOrgId: null,
     classifierRepetitions: 1,
     deciderRepetitions: 1,
     classifierMaxP95LatencyMs: 1000,
-    autoDeciderMinCostUsd: 15,
-    autoDeciderMaxCostUsd: 25,
     updatedAt: null,
     updatedBy: null,
   },
@@ -39,6 +44,7 @@ const runsResponse = {
   runs: [
     {
       id: 'run-1',
+      router: 'efficient',
       kind: 'classifier',
       purpose: 'platform',
       status: 'completed',
@@ -77,15 +83,18 @@ describe('auto routing benchmark admin client', () => {
 
     await updateBenchmarkConfig(configResponse.config, 'admin@kilocode.ai');
 
-    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/config', {
-      method: 'PUT',
-      headers: {
-        authorization: 'Bearer test-internal-secret',
-        'content-type': 'application/json',
-        'x-updated-by': 'admin@kilocode.ai',
-      },
-      body: JSON.stringify(configResponse.config),
-    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://benchmark-worker.example.com/admin/config?router=efficient',
+      {
+        method: 'PUT',
+        headers: {
+          authorization: 'Bearer test-internal-secret',
+          'content-type': 'application/json',
+          'x-updated-by': 'admin@kilocode.ai',
+        },
+        body: JSON.stringify(configResponse.config),
+      }
+    );
   });
 
   it('lists benchmark runs', async () => {
@@ -100,12 +109,15 @@ describe('auto routing benchmark admin client', () => {
       body: runsResponse,
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs', {
-      method: 'GET',
-      headers: {
-        authorization: 'Bearer test-internal-secret',
-      },
-    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://benchmark-worker.example.com/admin/runs?router=efficient',
+      {
+        method: 'GET',
+        headers: {
+          authorization: 'Bearer test-internal-secret',
+        },
+      }
+    );
   });
 
   it('propagates error body from listBenchmarkRuns on non-OK status', async () => {
@@ -139,14 +151,22 @@ describe('auto routing benchmark admin client', () => {
       },
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer test-internal-secret',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ kind: 'classifier', force: false, queue: 'platform' }),
-    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://benchmark-worker.example.com/admin/runs?router=efficient',
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer test-internal-secret',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          kind: 'classifier',
+          force: false,
+          queue: 'platform',
+          router: 'efficient',
+        }),
+      }
+    );
   });
 
   it('starts a run for both registry queues', async () => {
@@ -167,14 +187,17 @@ describe('auto routing benchmark admin client', () => {
 
     const result = await startBenchmarkRun('decider', false, 'both');
 
-    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer test-internal-secret',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ kind: 'decider', force: false, queue: 'both' }),
-    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://benchmark-worker.example.com/admin/runs?router=efficient',
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer test-internal-secret',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ kind: 'decider', force: false, queue: 'both', router: 'efficient' }),
+      }
+    );
     expect(result.body).toMatchObject({
       startedRuns: [
         { runId: 'decider-1', purpose: 'platform', entryCount: 2 },
@@ -196,7 +219,7 @@ describe('auto routing benchmark admin client', () => {
     });
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://benchmark-worker.example.com/admin/routing-table',
+      'https://benchmark-worker.example.com/admin/routing-table?router=efficient',
       {
         method: 'GET',
         headers: {
@@ -204,5 +227,146 @@ describe('auto routing benchmark admin client', () => {
         },
       }
     );
+  });
+
+  it('passes frontier on every selectable endpoint', async () => {
+    mockFetch.mockResolvedValue({
+      status: 404,
+      ok: false,
+      json: () => Promise.resolve({ error: 'not configured' }),
+    });
+    await getBenchmarkConfig('frontier');
+    await updateBenchmarkConfig(
+      { ...configResponse.config, router: 'frontier' },
+      'admin@kilocode.ai'
+    );
+    await listBenchmarkRuns({ router: 'frontier' });
+    await startBenchmarkRun('decider', false, 'platform', 'frontier');
+    await getBenchmarkRegistry('frontier');
+    await requeueBenchmarkRegistry('platform', 'frontier');
+    await getBenchmarkRoutingTable('frontier');
+    expect(mockFetch.mock.calls.map(([url]) => url)).toEqual([
+      'https://benchmark-worker.example.com/admin/config?router=frontier',
+      'https://benchmark-worker.example.com/admin/config?router=frontier',
+      'https://benchmark-worker.example.com/admin/runs?router=frontier',
+      'https://benchmark-worker.example.com/admin/runs?router=frontier',
+      'https://benchmark-worker.example.com/admin/registry?router=frontier',
+      'https://benchmark-worker.example.com/admin/registry/requeue?router=frontier',
+      'https://benchmark-worker.example.com/admin/routing-table?router=frontier',
+    ]);
+  });
+
+  it('registers owner profiles for the requested base router', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ statuses: [] }),
+    });
+
+    const result = await registerOwnerBenchmarkProfiles({
+      router: 'frontier',
+      ownerType: 'org',
+      ownerId: 'org-1',
+      entries: [{ model: 'anthropic/claude-sonnet-4' }],
+    });
+
+    expect(result).toEqual({ ok: true });
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      'https://benchmark-worker.example.com/admin/profiles/register?router=frontier'
+    );
+    expect(JSON.parse(init.body as string)).toEqual({
+      router: 'frontier',
+      ownerType: 'org',
+      ownerId: 'org-1',
+      entries: [{ model: 'anthropic/claude-sonnet-4' }],
+    });
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('keeps the worker error for a rejected profile registration', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'Custom profiles are only supported by the efficient router' }),
+    });
+
+    const result = await registerOwnerBenchmarkProfiles({
+      router: 'frontier',
+      ownerType: 'user',
+      ownerId: 'user-1',
+      entries: [{ model: 'anthropic/claude-sonnet-4' }],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      error: { error: 'Custom profiles are only supported by the efficient router' },
+    });
+  });
+
+  it('applies an abort deadline to profile registration', async () => {
+    const controller = new AbortController();
+    const timeout = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
+    mockFetch.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+            once: true,
+          });
+        })
+    );
+
+    try {
+      const pending = registerOwnerBenchmarkProfiles({
+        router: 'efficient',
+        ownerType: 'user',
+        ownerId: 'user-1',
+        entries: [{ model: 'anthropic/claude-sonnet-4' }],
+      });
+      const rejection = expect(pending).rejects.toThrow('Benchmark admission timed out');
+      controller.abort(new DOMException('Benchmark admission timed out', 'TimeoutError'));
+
+      await rejection;
+      expect(timeout).toHaveBeenCalledWith(5_000);
+      expect(mockFetch.mock.calls[0]?.[1].signal).toBe(controller.signal);
+    } finally {
+      timeout.mockRestore();
+    }
+  });
+
+  it('keeps the caller deadline active while reading the registration response body', async () => {
+    const controller = new AbortController();
+    const bodyStarted = Promise.withResolvers<void>();
+    mockFetch.mockImplementation(async (_url: string, init: RequestInit) => ({
+      ok: true,
+      status: 200,
+      json: () =>
+        new Promise<never>((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+            once: true,
+          });
+          bodyStarted.resolve();
+        }),
+    }));
+
+    const pending = registerOwnerBenchmarkProfiles(
+      {
+        router: 'efficient',
+        ownerType: 'user',
+        ownerId: 'user-1',
+        entries: [{ model: 'anthropic/claude-sonnet-4' }],
+      },
+      controller.signal
+    );
+    await bodyStarted.promise;
+    controller.abort(new DOMException('Benchmark admission timed out', 'TimeoutError'));
+
+    await expect(pending).resolves.toEqual({
+      ok: false,
+      status: 502,
+      error: { error: 'Request failed: 200' },
+    });
+    expect(mockFetch.mock.calls[0]?.[1].signal).toBe(controller.signal);
   });
 });

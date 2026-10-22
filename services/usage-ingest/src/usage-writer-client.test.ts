@@ -4,7 +4,7 @@ import {
   MAX_WRITER_RESPONSE_BYTES,
   recordUsage,
   USAGE_WRITER_TIMEOUT_MS,
-} from './usage-writer-client';
+} from '@kilocode/worker-utils/usage-writer-client';
 
 const config = {
   url: 'https://writer.example.test/api/internal/usage/record',
@@ -68,6 +68,26 @@ describe('usage writer client', () => {
     });
     pending.resolve(Response.json({ status: 'recorded', result }));
     expect(await outcome).toEqual({ kind: 'recorded', result });
+  });
+
+  it('marks explicitly queued requests without changing the event or acknowledgement', async () => {
+    fetchMock.mockResolvedValue(Response.json({ status: 'recorded', result }));
+    expect(await recordUsage(usage, { ...config, source: 'queue' })).toEqual({
+      kind: 'recorded',
+      result,
+    });
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(config.url, {
+      method: 'POST',
+      redirect: 'manual',
+      headers: {
+        'content-type': 'application/json',
+        'x-internal-api-key': config.secret,
+        'x-usage-write-source': 'queue',
+        'x-vercel-protection-bypass': config.protectionBypass,
+      },
+      body: JSON.stringify(usage),
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it('accepts a matching duplicate without requiring a new balance update', async () => {

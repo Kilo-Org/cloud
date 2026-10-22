@@ -148,15 +148,30 @@ const CLASSIFIER_QUESTIONS = {
   },
 } as const;
 
+function classifierPromptPrefix(
+  value: string | null | undefined,
+  maxLength: number
+): string | null {
+  if (value == null) return null;
+  const prefix = value.slice(0, maxLength);
+  const finalCodeUnit = prefix.charCodeAt(prefix.length - 1);
+  return finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff ? prefix.slice(0, -1) : prefix;
+}
+
 export function buildClassifierState(input: NormalizedClassifierInput) {
   return {
     apiKind: input.apiKind,
-    systemPromptPrefix: input.systemPromptPrefix?.slice(0, SYSTEM_PROMPT_PREFIX_MAX_LENGTH) ?? null,
-    initialUserPromptPrefix:
-      input.userPromptPrefix?.slice(0, USER_PROMPT_PREFIX_MAX_LENGTH) ?? null,
+    systemPromptPrefix: classifierPromptPrefix(
+      input.systemPromptPrefix,
+      SYSTEM_PROMPT_PREFIX_MAX_LENGTH
+    ),
+    initialUserPromptPrefix: classifierPromptPrefix(
+      input.userPromptPrefix,
+      USER_PROMPT_PREFIX_MAX_LENGTH
+    ),
     latestUserPromptPrefix:
       input.latestUserPromptPrefix && input.latestUserPromptPrefix !== input.userPromptPrefix
-        ? input.latestUserPromptPrefix.slice(0, USER_PROMPT_PREFIX_MAX_LENGTH)
+        ? classifierPromptPrefix(input.latestUserPromptPrefix, USER_PROMPT_PREFIX_MAX_LENGTH)
         : null,
     messageCount: input.messageCount,
     hasTools: input.hasTools,
@@ -248,7 +263,8 @@ const ATTEMPT_TIMEOUT_MS = 2_000;
 async function postSystemOne(
   client: SystemOneClient,
   body: string,
-  classifierModel: string
+  classifierModel: string,
+  timeoutMs: number
 ): Promise<Response | ClassifierRunError> {
   try {
     return await fetch(OPENROUTER_SYSTEM_ONE_URL, {
@@ -259,7 +275,7 @@ async function postSystemOne(
         'Content-Type': 'application/json',
       },
       body,
-      signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
     return new ClassifierRunError(
@@ -275,13 +291,15 @@ function isTransientFailure(response: Response | ClassifierRunError): boolean {
   );
 }
 
-export async function classifyWithSystemOne(
+export async function requestSystemOne(
   client: SystemOneClient,
-  input: NormalizedClassifierInput,
-  classifierModel: string
-): Promise<ClassifierRunResult> {
-  const body = JSON.stringify(buildClassifierRequest(input, classifierModel));
-  let response = await postSystemOne(client, body, classifierModel);
+  request: unknown,
+  model: string,
+  options: { timeoutMs?: number } = {}
+): Promise<Response> {
+  const body = JSON.stringify(request);
+  const timeoutMs = options.timeoutMs ?? ATTEMPT_TIMEOUT_MS;
+  let response = await postSystemOne(client, body, model, timeoutMs);
   // One quick retry absorbs a rate-limit or provider blip; the gateway waits on
   // this decision, so the retry stays single and short. Failed HTTP calls are
   // not billed, so no cost is carried over.
@@ -290,7 +308,7 @@ export async function classifyWithSystemOne(
     const { promise, resolve } = Promise.withResolvers<void>();
     setTimeout(resolve, TRANSIENT_RETRY_DELAY_MS);
     await promise;
-    response = await postSystemOne(client, body, classifierModel);
+    response = await postSystemOne(client, body, model, timeoutMs);
   }
   if (response instanceof ClassifierRunError) throw response;
 
@@ -299,10 +317,23 @@ export async function classifyWithSystemOne(
     await response.body?.cancel();
     throw new ClassifierRunError(`System One returned HTTP ${response.status}`, {
       cost: null,
-      classifierModel,
+      classifierModel: model,
       failureStage: `http_${response.status}`,
     });
   }
+  return response;
+}
+
+export async function classifyWithSystemOne(
+  client: SystemOneClient,
+  input: NormalizedClassifierInput,
+  classifierModel: string
+): Promise<ClassifierRunResult> {
+  const response = await requestSystemOne(
+    client,
+    buildClassifierRequest(input, classifierModel),
+    classifierModel
+  );
 
   const responseBody: unknown = await response.json().catch(() => null);
   const parsed = SystemOneClassifierResponseSchema.safeParse(responseBody);

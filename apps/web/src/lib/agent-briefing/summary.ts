@@ -589,12 +589,12 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
       throw new Error('permission_unavailable');
     if (row.kind === 'one_off' || row.summary.manualRequested === true) {
       const reviewed = summaryAuthorizationSchema.safeParse(row.summary.authorization);
-      const summary = briefingSummarySchema.parse(row.summary);
+      briefingSummarySchema.parse(row.summary);
       const authorizedPrior = z
         .number()
         .nonnegative()
         .catch(reviewed.success ? reviewed.data.priorCost : 0)
-        .parse(summary.priorCostMicrodollars);
+        .parse(row.summary.priorCostMicrodollars);
       if (
         !reviewed.success ||
         reviewed.data.model !== setting.model ||

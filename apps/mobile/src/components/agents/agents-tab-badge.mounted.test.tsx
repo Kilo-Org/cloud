@@ -94,7 +94,7 @@ describe('Agents needs-input badge and shared live count', () => {
     'updates to %i from the shared cache while Home has focus',
     async count => {
       const queryClient = makeTestQueryClient();
-      await queryClient.fetchQuery({
+      await queryClient.query({
         queryKey: key(),
         queryFn: makeQueryFn(),
       });

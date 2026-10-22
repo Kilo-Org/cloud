@@ -111,6 +111,7 @@ import {
 import {
   getBitbucketRepositoryRefreshFailureMessage,
   refreshSessionRepositories,
+  resolveRepositoryStatus,
   shouldCacheBitbucketRepositoryRefreshResult,
   shouldIncludeBitbucketRepositoryRefresh,
 } from '@/components/cloud-agent-next/repository-refresh';
@@ -726,14 +727,16 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     async (statusOverride?: typeof bitbucketStatusData) => {
       if (!organizationId) return;
 
-      const bitbucketStatus =
-        statusOverride ??
-        bitbucketStatusData ??
-        (await queryClient.fetchQuery(
-          trpc.organizations.bitbucket.getStatus.queryOptions({
-            organizationId,
-          })
-        ));
+      const bitbucketStatus = await resolveRepositoryStatus({
+        override: statusOverride,
+        cached: bitbucketStatusData,
+        // The tRPC option type widens the result to include undefined; `query`
+        // resolves with the fetched data or rejects.
+        load: () =>
+          queryClient.query(
+            trpc.organizations.bitbucket.getStatus.queryOptions({ organizationId })
+          ) as Promise<NonNullable<typeof bitbucketStatusData>>,
+      });
 
       if (bitbucketStatus.integrationId && bitbucketStatus.canManage) {
         const result = await refreshBitbucketRepositoriesFromProvider({
@@ -746,7 +749,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         return;
       }
 
-      const result = await queryClient.fetchQuery({
+      const result = await queryClient.query({
         ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
           organizationId,
           forceRefresh: true,

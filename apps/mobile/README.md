@@ -25,6 +25,13 @@ Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
 
+## Remote session recovery
+
+A response that fails before producing any content still shows its failure and
+Retry action, including after reopening the session. Retry resends the original
+user prompt as a new turn in the same session; the original prompt remains in
+the transcript.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.

@@ -320,22 +320,4 @@ describe('lastVisibleMessageFailure', () => {
       })
     ).toBeNull();
   });
-
-  it('falls back past a message the transcript drops, which states no failure', () => {
-    // `mergeSessionTranscript` drops an assistant row whose parts render
-    // nothing (no delivery failure keeps it), so it owns no row and cannot
-    // state a failure. Treating it as the last row suppressed the footer's own
-    // line and left the failure with no surface at all.
-    const dropped = assistantMessageWithError('m2', 'APIError');
-    dropped.parts = [];
-    const messages: StoredMessage[] = [userMessage('m1'), dropped];
-    expect(
-      lastVisibleMessageFailure({
-        displayedMessages: messages,
-        messages,
-        pendingMessages: noPending,
-        canceledQueuedMessages: nothingCanceled,
-      })
-    ).toBeNull();
-  });
 });

@@ -132,12 +132,8 @@ export function lastVisibleMessageFailure({
   pendingMessages,
   canceledQueuedMessages,
 }: LastVisibleFailureInput): MessageFailure | null {
-  // The transcript drops a message whose parts render nothing (unless its
-  // delivery failed and its typed footer is the row's surface), so such a
-  // message owns no row and cannot state a failure. Walk back to the last row
-  // `mergeSessionTranscript` actually renders: reading `displayedMessages.at(-1)`
-  // let a dropped failure suppress the footer's own line and leave the failure
-  // with no surface at all.
+  // Only a rendered row can own the failure statement. Contentless assistant
+  // errors render their failure footer; other invisible messages are skipped.
   const last = lastRenderedMessage(displayedMessages, pendingMessages);
   if (last === undefined) {
     return null;

@@ -118,9 +118,9 @@ export function getSessionTranscriptItemMessageId(item: SessionTranscriptItem): 
 }
 
 /**
- * Whether `mergeSessionTranscript` emits a row for this message: it renders
- * content, or its delivery failed and its typed footer is the row's own
- * surface. Everything else is dropped and cannot own a failure row.
+ * Whether `mergeSessionTranscript` emits a row for this message: visible
+ * content or a failure footer. A response can fail before producing any parts;
+ * its stored assistant error must keep the failure and Retry visible on reopen.
  *
  * An unconfirmed row with no parts at all stays invisible: unlike a confirmed
  * user row (whose parts may still stream in, so a zero-part row stays
@@ -139,7 +139,9 @@ export function transcriptRendersMessage(
   message: StoredMessage,
   deliveryStates?: ReadonlyMap<string, MessageDeliveryState>
 ): boolean {
-  const failed = deliveryStates?.get(message.info.id)?.status === 'failed';
+  const failed =
+    (message.info.role === 'assistant' && message.info.error !== undefined) ||
+    deliveryStates?.get(message.info.id)?.status === 'failed';
   const unconfirmedWithoutParts =
     isUnconfirmedSubmission(message) && !failed && message.parts.length === 0;
   return !unconfirmedWithoutParts && (messageRendersContent(message) || failed);

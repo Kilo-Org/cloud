@@ -4141,25 +4141,49 @@ describe('session detail duplicate failure state', () => {
     expect(labels).toContain(i18n.t('agentChat.messageBubble.copyToComposer'));
   });
 
-  it('keeps the footer line when the transcript drops the failed row it names', async () => {
-    // A failed assistant row whose parts render nothing is dropped by
-    // `mergeSessionTranscript`; it owns no row, so the footer is the failure's
-    // only surface and must not be suppressed by it.
-    const dropped = rootFailedAssistantMessage('partial reply');
-    dropped.parts = [];
-    const view = await mountDetails([rootUserMessage('please refactor'), dropped]);
-    act(() => {
-      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
-        view.manager.atoms.statusIndicator,
-        { type: 'error', message: 'simulated error', timestamp: 0 }
+  it.each([false, true])(
+    'keeps a response that failed before producing content recoverable after reopen (condensed: %s)',
+    async condensed => {
+      goalMountOptions.resolvedType = 'cloud-agent';
+      sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+      condensePreference.value = condensed;
+      const prompt = 'أجب بكلمة جاهز. لا تستخدم الأدوات.';
+      const failed = rootFailedAssistantMessage('');
+      failed.parts = [];
+      const view = await mountDetails([rootUserMessage(prompt), failed]);
+
+      expect(renderedText(view.renderer.root)).toContain(
+        i18n.t('agentChat.messageFailure.assistantTitle')
       );
-    });
-    const nodes = indicatorNodes(view);
-    expect(nodes).toHaveLength(1);
-    expect(nodes[0]?.props).toMatchObject({
-      indicator: { message: 'simulated error' },
-    });
-  });
+      expect(indicatorNodes(view)).toHaveLength(0);
+      const retry = view.renderer.root.find(
+        node =>
+          Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+      );
+      act(() => {
+        (retry.props.onPress as () => void)();
+      });
+      await waitFor(
+        () =>
+          view.store.get(view.manager.atoms.messagesList).filter(row => row.info.role === 'user')
+            .length === 2
+      );
+      const prompts = view.store
+        .get(view.manager.atoms.messagesList)
+        .filter(row => row.info.role === 'user')
+        .map(row =>
+          row.parts
+            .filter(part => part.type === 'text')
+            .map(part => part.text)
+            .join('')
+        );
+      expect(prompts).toEqual([prompt, prompt]);
+      expect(
+        view.store.get(view.manager.atoms.messagesList).find(row => row.info.id === ASSISTANT_ID)
+          ?.info
+      ).toMatchObject({ role: 'assistant', error: { name: 'APIError' } });
+    }
+  );
 
   it('draws the fixed footer on an opaque, non-absolute surface above the transcript', async () => {
     // Explorer `session-working` showed the fixed footer line printed over the

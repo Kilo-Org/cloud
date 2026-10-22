@@ -11,6 +11,7 @@ import { TRPCError } from '@trpc/server';
 import { requireNumericPlatformRepositories, type Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { updateRepositoriesForIntegration } from '@/lib/integrations/db/platform-integrations';
+import { ownerCondition } from '@/lib/integrations/db/predicates';
 import { resetCodeReviewConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import {
   fetchGitLabProjects,
@@ -141,10 +142,7 @@ function requireGitLabProjectId(projectId: string | number): string {
  * Get GitLab integration for an owner
  */
 export async function getGitLabIntegration(owner: Owner): Promise<PlatformIntegration | null> {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
@@ -288,10 +286,7 @@ export async function listGitLabRepositories(
   actor: GitLabCredentialActor,
   forceRefresh: boolean = false
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
@@ -343,10 +338,7 @@ export async function listGitLabBranches(
   actor: GitLabCredentialActor,
   projectPath: string // e.g., "group/project" or project ID
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
@@ -390,10 +382,7 @@ export async function listGitLabBranches(
  * configurations continue to work.
  */
 export async function disconnectGitLabIntegration(owner: Owner) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
@@ -465,10 +454,7 @@ export async function disconnectGitLabIntegration(owner: Owner) {
  * their GitLab webhook settings
  */
 export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSecret: string }> {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()

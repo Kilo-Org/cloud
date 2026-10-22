@@ -18,6 +18,16 @@ export type StoreCreditProductListing = {
 };
 
 /**
+ * Options for one store product fetch.
+ *
+ * `signal` aborts once the caller's bounded call has settled without an answer.
+ * A store that already missed the deadline stays silent for every further call,
+ * and the SDK has no cancellation, so whoever would retry has to check this
+ * before asking again.
+ */
+export type StoreProductFetchOptions = { signal?: AbortSignal };
+
+/**
  * One backend credit pack joined with the store product that sells it. The
  * store fields are `null` when the store does not sell that pack: unlike the
  * Kilo Pass join, every backend pack is kept so the four preset amounts always

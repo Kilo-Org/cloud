@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   decidePrLinkOpen,
   decidePrLinkPaste,
+  prLinkToastClipboardEmptyCopy,
+  prLinkToastPasteDeniedCopy,
   selectPrLinkClearButtonVisible,
+  selectPrLinkPasteEmptyReason,
 } from './pr-link-paste';
 
 describe('decidePrLinkPaste', () => {
@@ -117,6 +120,23 @@ describe('decidePrLinkOpen', () => {
   });
 });
 
+describe('selectPrLinkPasteEmptyReason', () => {
+  it('reports denied when the read is empty but the clipboard still has text', () => {
+    expect(selectPrLinkPasteEmptyReason('', true)).toBe('denied');
+    expect(selectPrLinkPasteEmptyReason(null, true)).toBe('denied');
+    expect(selectPrLinkPasteEmptyReason(undefined, true)).toBe('denied');
+  });
+
+  it('reports empty when the clipboard has no text either', () => {
+    expect(selectPrLinkPasteEmptyReason('', false)).toBe('empty');
+    expect(selectPrLinkPasteEmptyReason(null, false)).toBe('empty');
+  });
+
+  it('reports empty for a whitespace-only read even when the clipboard has text', () => {
+    expect(selectPrLinkPasteEmptyReason('  \n ', true)).toBe('empty');
+  });
+});
+
 describe('selectPrLinkClearButtonVisible', () => {
   it('is present when the field has content', () => {
     expect(selectPrLinkClearButtonVisible({ hasInput: true })).toBe(true);
@@ -124,5 +144,13 @@ describe('selectPrLinkClearButtonVisible', () => {
 
   it('is absent when the field is empty', () => {
     expect(selectPrLinkClearButtonVisible({ hasInput: false })).toBe(false);
+  });
+});
+describe('PR link toast copy', () => {
+  it('exports the pinned toast copy strings', () => {
+    expect(prLinkToastClipboardEmptyCopy()).toBe('Clipboard is empty');
+    expect(prLinkToastPasteDeniedCopy()).toBe(
+      'Paste access was denied. Allow paste and try again.'
+    );
   });
 });

@@ -628,6 +628,32 @@ export type GitLabWebhook = {
 };
 
 /**
+ * The event configuration Kilo needs on a project hook. Create and update send
+ * the same properties so a project is configured identically either way.
+ */
+function buildProjectWebhookPayload(webhookUrl: string, webhookSecret: string) {
+  return {
+    name: 'Kilo Code Reviews',
+    description: 'Auto-configured webhook for Kilo AI code reviews',
+    url: webhookUrl,
+    token: webhookSecret,
+    merge_requests_events: true,
+    push_events: false,
+    issues_events: false,
+    confidential_issues_events: false,
+    tag_push_events: false,
+    note_events: false,
+    confidential_note_events: false,
+    job_events: false,
+    pipeline_events: false,
+    wiki_page_events: false,
+    deployment_events: false,
+    releases_events: false,
+    enable_ssl_verification: true,
+  };
+}
+
+/**
  * Lists all webhooks for a GitLab project
  *
  * @param accessToken - OAuth access token
@@ -712,25 +738,7 @@ export async function createProjectWebhook(
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        name: 'Kilo Code Reviews',
-        description: 'Auto-configured webhook for Kilo AI code reviews',
-        url: webhookUrl,
-        token: webhookSecret,
-        merge_requests_events: true,
-        push_events: false,
-        issues_events: false,
-        confidential_issues_events: false,
-        tag_push_events: false,
-        note_events: false,
-        confidential_note_events: false,
-        job_events: false,
-        pipeline_events: false,
-        wiki_page_events: false,
-        deployment_events: false,
-        releases_events: false,
-        enable_ssl_verification: true,
-      }),
+      body: JSON.stringify(buildProjectWebhookPayload(webhookUrl, webhookSecret)),
     }
   );
 
@@ -803,25 +811,7 @@ export async function updateProjectWebhook(
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        name: 'Kilo Code Reviews',
-        description: 'Auto-configured webhook for Kilo AI code reviews',
-        url: webhookUrl,
-        token: webhookSecret,
-        merge_requests_events: true,
-        push_events: false,
-        issues_events: false,
-        confidential_issues_events: false,
-        tag_push_events: false,
-        note_events: false,
-        confidential_note_events: false,
-        job_events: false,
-        pipeline_events: false,
-        wiki_page_events: false,
-        deployment_events: false,
-        releases_events: false,
-        enable_ssl_verification: true,
-      }),
+      body: JSON.stringify(buildProjectWebhookPayload(webhookUrl, webhookSecret)),
     }
   );
 
@@ -1394,25 +1384,7 @@ export async function getMRHeadCommit(
   mrIid: number,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<string> {
-  const encodedProjectId =
-    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
-
-  const response = await fetchGitLab(
-    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}`),
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab MR fetch failed:', { status: response.status, error });
-    throw new Error(`GitLab MR fetch failed: ${response.status}`);
-  }
-
-  const mr = (await response.json()) as GitLabMergeRequest;
+  const mr = await fetchGitLabMergeRequest({ accessToken, projectId, mrIid, instanceUrl });
 
   logExceptInTest('[getMRHeadCommit] Got HEAD commit', {
     projectId,
@@ -1432,25 +1404,7 @@ export async function getMRDiffRefs(
   mrIid: number,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<{ baseSha: string; headSha: string; startSha: string }> {
-  const encodedProjectId =
-    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
-
-  const response = await fetchGitLab(
-    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}`),
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab MR fetch failed:', { status: response.status, error });
-    throw new Error(`GitLab MR fetch failed: ${response.status}`);
-  }
-
-  const mr = (await response.json()) as GitLabMergeRequest;
+  const mr = await fetchGitLabMergeRequest({ accessToken, projectId, mrIid, instanceUrl });
 
   logExceptInTest('[getMRDiffRefs] Got diff refs', {
     projectId,

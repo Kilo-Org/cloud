@@ -68,6 +68,27 @@ describe('writing a remote MCP server OAuth state', () => {
     });
   });
 
+  it('reads a write the disk has not taken yet', async () => {
+    const { store, epoch } = await fresh();
+    heldDiskRead(null)();
+    const landing = Promise.withResolvers<void>();
+    setItemAsync.mockReturnValue(landing.promise);
+
+    await store.writeRemoteMcpOAuth(
+      { ...SERVER, epoch: epoch.currentAuthEpoch() },
+      { tokens: TOKENS }
+    );
+
+    // The store holds the choice before the disk does, and the endpoint match
+    // applies to that choice too.
+    expect(await store.readRemoteMcpOAuth(SERVER.id, 'https://demo.example/mcp/')).toEqual({
+      url: SERVER.url,
+      tokens: TOKENS,
+    });
+    expect(await store.readRemoteMcpOAuth(SERVER.id, 'https://other.example/mcp')).toBeUndefined();
+    landing.resolve();
+  });
+
   it('drops a write that a sign-out overtook while it waited on the disk read', async () => {
     const { store, epoch } = await fresh();
     const answer = heldDiskRead(null);

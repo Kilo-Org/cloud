@@ -1,10 +1,22 @@
 import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
 import { unfilteredKiloEvents } from '../control/feed.js';
-import type { KiloFeedEvent } from '../control/worktree-feed.js';
 import { logToFile } from '../utils.js';
 import { kiloClientConfig, type KiloServer } from '../kilo-server-auth.js';
 
-export type { KiloFeedEvent };
+export type KiloFeedEvent = {
+  type: string;
+  properties: Record<string, unknown>;
+  directory?: string;
+  nativeRuntimeId: string;
+  /**
+   * Runtime key of the runtime that emitted the event: the route's session id
+   * under per-session isolation, or the directory under directory-shared
+   * isolation. Lets the turn manager attribute an event to the route that
+   * produced it instead of trusting a descendant's reported parent, which can
+   * point at another route in the same worktree.
+   */
+  runtimeKey?: string;
+};
 
 export type KiloEventFeedSource = Readonly<{
   directory: string;

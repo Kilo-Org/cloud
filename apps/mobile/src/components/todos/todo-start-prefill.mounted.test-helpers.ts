@@ -15,18 +15,16 @@ type Handoff = {
   toastInfo: ReturnType<typeof vi.fn>;
 };
 
-const handoff: Handoff = vi.hoisted(
-  (): Handoff => ({
-    organizationId: null,
-    params: {},
-    lists: [],
-    items: [],
-    models: [],
-    repositories: [],
-    reposSettled: false,
-    toastInfo: vi.fn(),
-  })
-);
+const handoff: Handoff = vi.hoisted((): Handoff => ({
+  organizationId: null,
+  params: {},
+  lists: [],
+  items: [],
+  models: [],
+  repositories: [],
+  reposSettled: false,
+  toastInfo: vi.fn(),
+}));
 
 export function getHandoff() {
   return handoff;

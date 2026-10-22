@@ -79,7 +79,7 @@ const refusedCall = (mode: Fixture['mode']): Answered | undefined => {
 
 /** What `resources/read` is answered with, under the same rules as a call. */
 const answeredResource = (message: Wire, { tools }: Fixture): Answered => {
-  const uri = message.params?.['uri'];
+  const uri = message.params?.uri;
   const answered = typeof uri === 'string' ? tools.read?.(uri) : undefined;
   if (answered === undefined) {
     return [

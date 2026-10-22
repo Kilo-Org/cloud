@@ -1,6 +1,13 @@
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: {} }));
 
 import { aggregateBriefingEvidence } from './evidence';
+import {
+  freezeBriefingEvidence,
+  ONE_OFF_ANCESTRY_LIMIT,
+  ONE_OFF_BUCKETS,
+  ONE_OFF_ROWS_PER_BUCKET,
+  ONE_OFF_SESSION_LIMIT,
+} from './one-off-evidence';
 import type { agent_briefing_events } from '@kilocode/db/schema';
 
 const start = '2026-10-14T22:00:00.000Z';
@@ -30,6 +37,29 @@ function event(
     ...overrides,
   };
 }
+
+describe('freezeBriefingEvidence', () => {
+  it('keeps complete provenance at the collection caps without failing the snapshot', () => {
+    const report = aggregateBriefingEvidence(rows, [event('activity')], [], start, cutoff, {
+      collectionStartedAt: collectedBeforeNight,
+      legacyStatusInWindow: false,
+    });
+    const eventIds = Array.from(
+      {
+        length:
+          ONE_OFF_BUCKETS * ONE_OFF_ROWS_PER_BUCKET +
+          ONE_OFF_SESSION_LIMIT +
+          ONE_OFF_ANCESTRY_LIMIT,
+      },
+      (_, index) => JSON.stringify(['oauth/user', `ses_${'x'.repeat(140)}`, 'activity', index])
+    );
+    const sessionIds = Array.from({ length: ONE_OFF_ANCESTRY_LIMIT }, (_, index) => `ses_${index}`);
+    const frozen = freezeBriefingEvidence(report, { eventIds, sessionIds, partial: false });
+    expect(frozen.evidenceEventIds).toEqual(eventIds);
+    expect(frozen.evidenceSessionIds).toEqual(sessionIds);
+    expect(frozen.sessions.map(session => session.sessionId)).toEqual(['root']);
+  });
+});
 
 describe('aggregateBriefingEvidence', () => {
   it('rolls children into their root and counts each real usage id once within the night', () => {

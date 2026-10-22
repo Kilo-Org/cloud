@@ -32,7 +32,9 @@ export function BriefingScorecard({ report }: { readonly report: BriefingReport 
   const { t, i18n } = useTranslation();
   const rows = [
     {
-      label: t('agentBriefing.sessions'),
+      label: t(
+        report.kind === 'one_off' ? 'agentBriefing.periodSessions' : 'agentBriefing.sessions'
+      ),
       amount: report.scorecard.sessions,
       coverage: report.coverage.activity,
     },
@@ -47,7 +49,7 @@ export function BriefingScorecard({ report }: { readonly report: BriefingReport 
       coverage: report.coverage.blockers,
     },
     {
-      label: t('agentBriefing.spend'),
+      label: t(report.kind === 'one_off' ? 'agentBriefing.periodSpend' : 'agentBriefing.spend'),
       amount: report.scorecard.spendMicrodollars,
       coverage: report.coverage.spend,
       money: true,
@@ -92,7 +94,7 @@ export function useHomeBriefing() {
             now,
           })
         : undefined,
-    frameReport: isLoaded ? query.reports[0] : undefined,
+    frameReport: isLoaded ? query.reports.find(report => report.kind !== 'one_off') : undefined,
   };
 }
 

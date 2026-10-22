@@ -44,29 +44,6 @@ function ownerIcon(profile: AgentProfileListItem): LucideIcon {
   return profileOwnerType(profile) === 'organization' ? Building2 : User;
 }
 
-/** Profile name plus the default marker, for the star's accessibility label. */
-function defaultStarLabel(name: string, defaultLabel: string): string {
-  return [name, defaultLabel].join(', ');
-}
-
-/**
- * The effective-default marker. Returns `undefined` when the profile is not
- * the default, so `ConfigureRow` falls back to its chevron.
- */
-function renderDefaultStar({
-  isDefault,
-  name,
-  label,
-  color,
-}: Readonly<{ isDefault: boolean; name: string; label: string; color: string }>) {
-  if (!isDefault) {
-    return undefined;
-  }
-  return (
-    <Star size={16} color={color} fill={color} accessibilityLabel={defaultStarLabel(name, label)} />
-  );
-}
-
 /**
  * Content-shaped loading rows. Each mirrors a loaded `ConfigureRow` (py-3 +
  * the 30pt icon tile beside the two-line text block) so the swap to real rows
@@ -190,12 +167,18 @@ export function ProfilesListScreen() {
                       subtitle={subtitle || undefined}
                       className="rounded-lg bg-secondary px-3"
                       last={index === section.profiles.length - 1}
-                      trailing={renderDefaultStar({
-                        isDefault: isEffectiveDefault(profile, effectiveDefaultId),
-                        name: profile.name,
-                        label: t('profiles.defaultSectionTitle'),
-                        color: colors.primary,
-                      })}
+                      trailing={
+                        isEffectiveDefault(profile, effectiveDefaultId) ? (
+                          // The row already announces the profile name; the
+                          // star adds only the state it marks.
+                          <Star
+                            size={16}
+                            color={colors.primary}
+                            fill={colors.primary}
+                            accessibilityLabel={t('profiles.defaultSectionTitle')}
+                          />
+                        ) : undefined
+                      }
                       onPress={() => {
                         openProfile(profile);
                       }}

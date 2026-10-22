@@ -29,6 +29,7 @@ import { clearDraft, prConversationCommentDraftKey, saveDraft } from '@/lib/pers
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { reconnectExpiredMessage } from '@/lib/pr-review/mutation-error-display';
 import {
   isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,
@@ -73,6 +74,9 @@ export function PrConversationCommentComposer({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const addComment = useAddPrCommentMutation(prRef);
+  // The provider platform as a stable primitive: the error effect names the
+  // connected provider without depending on the `prRef` object identity.
+  const providerPlatform = prRef?.platform;
 
   // Durable comment draft, keyed by account and PR. Nothing is saved or
   // restored while the user id is unknown.
@@ -177,7 +181,7 @@ export function PrConversationCommentComposer({
       setInlineError(t('prReview.discussion.commentForbidden'));
       setInlineErrorKind('forbidden');
     } else if (classification.kind === 'reconnect') {
-      setInlineError(t('prReview.connectionExpired'));
+      setInlineError(reconnectExpiredMessage(providerPlatform));
       setInlineErrorKind('reconnect');
     } else {
       // A generic/transient failure shows the specified retryable copy, never
@@ -188,7 +192,7 @@ export function PrConversationCommentComposer({
       setInlineError(t('prReview.mutationError.couldNotPostComment'));
       setInlineErrorKind('retryable');
     }
-  }, [addComment.error, t]);
+  }, [addComment.error, t, providerPlatform]);
 
   function handleBodyChange(value: string) {
     bodyRef.current = value;

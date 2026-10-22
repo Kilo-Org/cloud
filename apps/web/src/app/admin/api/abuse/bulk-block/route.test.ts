@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { bulkBlockUsers } from '@/lib/abuse/bulkBlock';
 import { POST } from './route';
 
-jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
 jest.mock('@/lib/abuse/bulkBlock', () => ({ bulkBlockUsers: jest.fn() }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);

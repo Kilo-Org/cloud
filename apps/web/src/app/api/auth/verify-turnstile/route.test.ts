@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server';
 import { POST } from './route';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'test-secret',
   NEXTAUTH_URL: 'http://localhost:3000',
+}));
+jest.mock('@/lib/web-config.server', () => ({
   TURNSTILE_SECRET_KEY: 'test-turnstile-secret',
 }));
 

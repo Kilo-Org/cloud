@@ -5,6 +5,13 @@ import { createRoot, type Root } from 'react-dom/client';
 import type { TriggerForm as TriggerFormComponent, TriggerFormProps } from './TriggerForm';
 
 jest.mock('sonner', () => ({ toast: { error: jest.fn(), success: jest.fn() } }));
+jest.mock('next-auth/react', () => ({
+  useSession: () => ({
+    data: {
+      user: { id: 'oauth/github/creator', name: 'test-creator', email: 'creator@example.com' },
+    },
+  }),
+}));
 jest.mock('lucide-react', () => new Proxy({}, { get: () => () => null }));
 jest.mock('@/components/ui/card', () => ({
   Card: ({ children }: { children: React.ReactNode }) => createElement('div', {}, children),
@@ -344,21 +351,16 @@ describe('TriggerForm variants', () => {
 
   it('does not offer creator mode for personal triggers', () => {
     const { container } = render({ mode: 'create' });
-    expect(container.querySelector('#runAsCreator')).toBeNull();
+    expect(container.textContent).not.toContain('Organization bot');
+    expect(container.textContent).not.toContain('test-creator');
   });
 
   it('requires authentication when selecting creator mode for an organization webhook', () => {
     const { container, onSubmit } = render({ mode: 'create', organizationId: 'org-1' });
-    const checkbox = container.querySelector<HTMLInputElement>('#runAsCreator');
-    if (!checkbox) throw new Error('creator checkbox missing');
-    act(() => {
-      const reactPropsKey = Object.keys(checkbox).find(key => key.startsWith('__reactProps'));
-      if (!reactPropsKey) throw new Error('checkbox props missing');
-      const props = (checkbox as unknown as Record<string, { onChange: (event: unknown) => void }>)[
-        reactPropsKey
-      ];
-      props.onChange({ target: { checked: true } });
-    });
+    expect(
+      container.querySelector('[data-container-allocation="organization-bot"]')
+    ).not.toBeNull();
+    click(container, 'test-creator');
     expect(container.querySelector('#webhookAuthHeader')).not.toBeNull();
     submit(container);
     expect(onSubmit).not.toHaveBeenCalled();
@@ -388,9 +390,13 @@ describe('TriggerForm variants', () => {
         executionUserId: 'oauth/github/creator',
       },
     });
-    const checkbox = container.querySelector<HTMLInputElement>('#runAsCreator');
-    expect(checkbox?.checked).toBe(true);
-    expect(checkbox?.disabled).toBe(true);
+    expect(
+      container
+        .querySelector('[data-container-allocation="creator"]')
+        ?.getAttribute('data-disabled')
+    ).toBe('true');
+    expect(container.textContent).toContain('test-creator');
+    click(container, 'Organization bot');
     submit(container);
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ runAsCreator: true }));
   });

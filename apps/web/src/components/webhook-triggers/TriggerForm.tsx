@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -136,8 +137,13 @@ export function TriggerForm({
   isLoadingCapabilities = false,
   inboundUrl,
 }: TriggerFormProps) {
+  const { data: session } = useSession();
   const isEditMode = formMode === 'edit';
   const [runAsCreator, setRunAsCreator] = useState(!!initialData?.executionUserId);
+  const creatorLabel =
+    isEditMode && initialData?.executionUserId !== session?.user?.id
+      ? 'Webhook creator'
+      : session?.user?.name || session?.user?.email || 'Your account';
 
   // Form state
   const [activationMode, setActivationMode] = useState<'webhook' | 'scheduled'>(
@@ -670,21 +676,27 @@ export function TriggerForm({
 
             {organizationId && (
               <div className="space-y-2">
-                <div className="flex min-h-11 items-center gap-3">
-                  <Checkbox
+                <Label htmlFor="runAsCreator">Run as</Label>
+                <Select
+                  value={runAsCreator ? 'creator' : 'organization-bot'}
+                  onValueChange={value => {
+                    setRunAsCreator(value === 'creator');
+                    if (value === 'creator') setWebhookAuthEnabled(true);
+                  }}
+                  disabled={isEditMode || isLoading}
+                >
+                  <SelectTrigger
                     id="runAsCreator"
-                    checked={runAsCreator}
-                    onCheckedChange={checked => {
-                      setRunAsCreator(checked === true);
-                      if (checked) setWebhookAuthEnabled(true);
-                    }}
-                    disabled={isEditMode || isLoading}
+                    className="min-h-11 w-full sm:w-80"
                     aria-describedby="runAsCreatorHelp"
-                  />
-                  <Label htmlFor="runAsCreator" className="cursor-pointer font-normal">
-                    Run as webhook creator
-                  </Label>
-                </div>
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="organization-bot">Organization bot</SelectItem>
+                    <SelectItem value="creator">{creatorLabel}</SelectItem>
+                  </SelectContent>
+                </Select>
                 <p id="runAsCreatorHelp" className="text-muted-foreground max-w-prose text-xs">
                   {runAsCreator
                     ? 'Runs as the user who created this trigger, using organization credits. Only the creator can edit it. Execution stops if they leave the organization or their account is blocked.'

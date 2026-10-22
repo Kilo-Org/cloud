@@ -77,6 +77,7 @@ describe('parseLocalizedNumber', () => {
     expect(parseLocalizedNumber('1,234.5', 'de-DE')).toBeNull();
     expect(parseLocalizedNumber('1,234,5', 'en-US')).toBeNull();
     expect(parseLocalizedNumber('1 5', 'en-US')).toBeNull();
+    expect(parseLocalizedNumber('18,5', 'ar')).toBeNull();
     expect(parseLocalizedNumber('twelve', 'en')).toBeNull();
   });
 

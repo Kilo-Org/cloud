@@ -786,6 +786,10 @@ pnpm --filter cloud-agent-next test:all
 
 **When to use:** Testing Durable Object behavior, queue consumers, WebSocket handling, SQLite storage, alarms, and any functionality that depends on the Cloudflare Workers runtime. Integration tests use utilities like `runInDurableObject`, `createMessageBatch`, and `getQueueResult` from `cloudflare:test`.
 
+Terminal lifecycle fixtures use `installFakeRuntimeProxyPeer` for credential
+issuance while retaining real Session DO notifications. A fake wrapper answers
+`session.prepare` with `session.ready` before terminal operations begin.
+
 #### Other Quality Checks
 
 ```bash

@@ -2,6 +2,9 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { areThreadsBlocking, type SCMContext } from './town-scm';
 import { TownConfigSchema } from '../../types';
 
+vi.mock('../GastownUser.do', () => ({ getGastownUserStub: vi.fn() }));
+vi.mock('../GastownOrg.do', () => ({ getGastownOrgStub: vi.fn() }));
+
 const THREADS = [
   {
     isResolved: false,

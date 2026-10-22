@@ -181,17 +181,6 @@ describe('buildGlanceableLiveActivityContentState needsApproval', () => {
     expect(buildGlanceableLiveActivityContentState(built).needsApproval).toBe(0);
   });
 
-  it('reads an absent field on an old snapshot as 0, never undefined', () => {
-    // An older producer omits `needsApproval` from the pushed shape. The
-    // content state must still carry a number: the layout compares it with
-    // `> 0` and must not draw the control for a value it cannot read.
-    const { needsApproval: _omitted, ...oldSnapshot } = snapshotFor([PERMISSION_ROW]);
-    const contentState = buildGlanceableLiveActivityContentState(
-      oldSnapshot as GlanceableAgentsSnapshot
-    );
-    expect(contentState.needsApproval).toBe(0);
-  });
-
   it('expires to a frame with no counts while keeping the approvable count', () => {
     // The fetch-error path (`handleFetchError`) advances the retained card with
     // `withStatus(..., 'stale', now)`: past `expiresAt` it zeroes every count

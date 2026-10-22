@@ -276,7 +276,8 @@ describe('buildGlanceableSnapshot', () => {
     });
     expect(glanceableAgentsSnapshotSchema.safeParse(snapshot).success).toBe(true);
     const { needsApproval: _needsApproval, ...withoutCount } = snapshot;
-    expect(glanceableAgentsSnapshotSchema.safeParse(withoutCount).success).toBe(true);
+    // The parse fills the zero, so every reader downstream sees a total count.
+    expect(glanceableAgentsSnapshotSchema.parse(withoutCount).needsApproval).toBe(0);
   });
 
   // The release before the newest-result fact wrote schema version 1 records

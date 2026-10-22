@@ -22,7 +22,7 @@ const countUsage = (
   wiring: Wiring,
   call: { readonly usage: ModelUsage; readonly model?: string }
 ): Effect.Effect<void> =>
-  Effect.zipRight(
+  Effect.andThen(
     Ref.update(wiring.totals, held => add(held, call.usage)),
     Ref.update(wiring.modelTotals, held => {
       const model = call.model ?? wiring.model;

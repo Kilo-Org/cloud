@@ -63,7 +63,7 @@ export function errorResponse(
  */
 export function requireAdminAuth(c: Context<{ Bindings: Env }>): Response | null {
   if (!verifyAdminToken(c)) {
-    return errorResponse(c, 'UNAUTHORIZED', 'Invalid or missing admin token', 401) as Response;
+    return errorResponse(c, 'UNAUTHORIZED', 'Invalid or missing admin token', 401);
   }
   return null;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AUTO_DECISION_HEADER,
+  AUTO_DECISION_TTL_MS,
   CUSTOM_ROUTER_ERROR_HTTP_STATUS,
   ClientCustomRouterEntrySchema,
   ClientEvalPlanResponseSchema,
@@ -279,6 +280,23 @@ describe('public decide API', () => {
     ).toBe(true);
   });
 
+  it('keeps the classification on a fallback decision', () => {
+    const decision = {
+      entry: { kind: 'gateway', model: 'anthropic/claude-sonnet-4' },
+      model: 'anthropic/claude-sonnet-4',
+      variant: null,
+      stale: false,
+      fallback: true,
+      sticky: false,
+      taskType: 'debugging',
+      subtaskType: 'bug_fixing',
+      tableVersion: null,
+    };
+    expect(
+      CustomRouterDecideResponseSchema.parse({ decision, decisionId: 'v1.abc.def' }).decision
+    ).toMatchObject({ fallback: true, taskType: 'debugging', subtaskType: 'bug_fixing' });
+  });
+
   it('maps every error code to a status', () => {
     for (const code of CustomRouterErrorCodeSchema.options) {
       expect(CUSTOM_ROUTER_ERROR_HTTP_STATUS[code]).toBeGreaterThanOrEqual(400);
@@ -337,6 +355,25 @@ describe('auto decision tokens', () => {
     await expect(verifyAutoDecision(token, DECISION_SECRET, 1_000)).resolves.toEqual({
       ok: false,
       reason: 'bad_signature',
+    });
+  });
+
+  it('rejects a token whose expiry exceeds the decision lifetime', async () => {
+    const nowMs = 1_000;
+    const longLived = await signAutoDecision(
+      { ...decisionPayload, expiresAt: nowMs + AUTO_DECISION_TTL_MS + 60_000 },
+      DECISION_SECRET
+    );
+    await expect(verifyAutoDecision(longLived, DECISION_SECRET, nowMs)).resolves.toEqual({
+      ok: false,
+      reason: 'malformed',
+    });
+    const fullLifetime = await signAutoDecision(
+      { ...decisionPayload, expiresAt: nowMs + AUTO_DECISION_TTL_MS },
+      DECISION_SECRET
+    );
+    await expect(verifyAutoDecision(fullLifetime, DECISION_SECRET, nowMs)).resolves.toMatchObject({
+      ok: true,
     });
   });
 

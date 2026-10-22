@@ -7,7 +7,7 @@ import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -179,6 +179,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     kiloUserId: user.id,
     provider: editProvider,
     requested_model: requestBody.model,
+    is_free: isFreeModelExcludingCustomLlms(requestBody.model),
     promptInfo,
     max_tokens: requestBody.max_tokens ?? null,
     has_middle_out_transform: null,
@@ -222,7 +223,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     readDb
   );
 
-  if (!canSpendPaidUsage(balance) && !isFreeModel(requestBody.model) && !userByok) {
+  if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
     return NextResponse.json(
       {
         error: { message: 'Insufficient credits' },
@@ -237,6 +238,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
       organizationId,
       kiloUserId: user.id,
       modelId: requestBody.model,
+      fromDb: readDb,
     });
     if (
       !decision.allowed ||

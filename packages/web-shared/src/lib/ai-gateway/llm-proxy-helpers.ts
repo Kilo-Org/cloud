@@ -48,7 +48,6 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { computeOpenRouterCostFields } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import { getInferenceProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   AUTO_DECISION_HEADER,
@@ -232,14 +231,17 @@ export function checkExclusiveModelProviderAllowed(
   if (!provider) return null;
   const exclusiveModel = findKiloExclusiveModel(model);
   if (!exclusiveModel) return null;
-  const inferenceProvider = getInferenceProvider(exclusiveModel)?.slug;
-  if (!inferenceProvider) return null;
+  const inferenceProviders = exclusiveModel.inference_providers;
+  if (inferenceProviders.length === 0) return null;
   if (
-    (!provider.only || provider.only.includes(inferenceProvider)) &&
-    (!provider.ignore || !provider.ignore.includes(inferenceProvider))
+    inferenceProviders.some(
+      inferenceProvider =>
+        (!provider.only || provider.only.includes(inferenceProvider)) &&
+        (!provider.ignore || !provider.ignore.includes(inferenceProvider))
+    )
   )
     return null;
-  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProvider}`;
+  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProviders.join(', ')}`;
   return NextResponse.json(
     {
       error: error,
@@ -289,29 +291,49 @@ const byokUpstreamErrorSchema = z.object({
   message: z.string().optional().catch(undefined),
 });
 
-async function byokErrorMessage(
-  response: Response,
-  userByokProviderIds: UserByokProviderId[]
-): Promise<string | undefined> {
-  if (response.status === 403 && userByokProviderIds.includes('opencode-go')) {
-    return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
-  }
-  const specificMessage = byokErrorMessages[response.status];
-  if (specificMessage) return specificMessage;
-  if (response.status < 400 || response.status >= 500) return undefined;
-
+async function readByokProviderMessage(response: Response): Promise<string | undefined> {
   const body: unknown = await response
     .clone()
     .json()
     .catch(() => null);
   const parsed = byokUpstreamErrorSchema.safeParse(body);
-  const providerMessage = parsed.success ? (parsed.data.error?.message ?? parsed.data.message) : '';
-  const message = providerMessage
-    ?.replace(/\p{Cc}/gu, ' ')
-    .trim()
-    .slice(0, 300);
-  return message
-    ? `[BYOK] ${message}`
+  if (!parsed.success) return undefined;
+  const providerMessage = parsed.data.error?.message ?? parsed.data.message;
+  return (
+    providerMessage
+      ?.replace(/\p{Cc}/gu, ' ')
+      .trim()
+      .slice(0, 300) || undefined
+  );
+}
+
+function specificByokErrorMessage(
+  status: number,
+  userByokProviderIds: UserByokProviderId[]
+): string | undefined {
+  if (status === 403 && userByokProviderIds.includes('opencode-go')) {
+    return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
+  }
+  return byokErrorMessages[status];
+}
+
+async function byokErrorMessage(
+  response: Response,
+  userByokProviderIds: UserByokProviderId[]
+): Promise<string | undefined> {
+  const specificMessage = specificByokErrorMessage(response.status, userByokProviderIds);
+  if (!specificMessage && (response.status < 400 || response.status >= 500)) return undefined;
+
+  // The provider's own explanation (for example an expired rather than revoked
+  // key) is often more actionable than our status-based summary.
+  const providerMessage = await readByokProviderMessage(response);
+  if (specificMessage) {
+    return providerMessage
+      ? `${specificMessage} Provider message: ${providerMessage}`
+      : specificMessage;
+  }
+  return providerMessage
+    ? `[BYOK] ${providerMessage}`
     : '[BYOK] Your provider rejected the request. Check your provider account and settings.';
 }
 
@@ -399,9 +421,11 @@ export async function makeErrorReadable({
   const vertexByokResponse = vertexByokModelNotFoundResponse(response, userByokProviderIds);
   if (vertexByokResponse) return vertexByokResponse;
 
-  const hasSpecificByokMessage =
-    userByokProviderIds !== null && byokErrorMessages[response.status] !== undefined;
-  if (!hasSpecificByokMessage) {
+  const specificByokMessage =
+    userByokProviderIds === null
+      ? undefined
+      : specificByokErrorMessage(response.status, userByokProviderIds);
+  if (specificByokMessage === undefined) {
     const providerErrorResponse = await providerNotAllowedResponse(providerId, response);
     if (providerErrorResponse) return providerErrorResponse;
 
@@ -412,8 +436,10 @@ export async function makeErrorReadable({
   if (userByokProviderIds !== null) {
     const byokMessage = await byokErrorMessage(response, userByokProviderIds);
     if (byokMessage) {
-      if (hasSpecificByokMessage) {
-        warnExceptInTest(`Responding with ${response.status} ${byokMessage}`);
+      if (specificByokMessage !== undefined) {
+        // Log only the fixed text so this line stays stable to search on;
+        // captureProxyError already logs the upstream body.
+        warnExceptInTest(`Responding with ${response.status} ${specificByokMessage}`);
       }
       return NextResponse.json(
         {
@@ -586,6 +612,9 @@ export function getOutputHeaders(response: Response) {
   }
   outputHeaders.set('Content-Encoding', 'identity');
   // Content-Encoding: identity is here because Vercel modifies encoding/compression and causes issues
+  // no-transform keeps a proxy in front of the gateway, such as the web app's rewrite to the
+  // ai-gateway app in local dev, from compressing a stream and holding it until the end.
+  outputHeaders.set('Cache-Control', 'no-cache, no-transform');
 
   return outputHeaders;
 }
@@ -932,7 +961,7 @@ function parseMistralFimUsageFromString(
   provider: ProviderId,
   statusCode: number
 ): MicrodollarUsageStats {
-  const json: MistralFimCompletion = JSON.parse(response);
+  const json = JSON.parse(response) as MistralFimCompletion;
   const cost_mUsd = computeFimMicrodollarCost(json.usage, provider);
 
   return {
@@ -959,7 +988,7 @@ function parseMistralFimUsageFromString(
 }
 
 async function parseMistralFimUsageFromStream(
-  stream: ReadableStream,
+  stream: ReadableStream<Uint8Array>,
   requestSpan: Span | undefined,
   provider: ProviderId,
   statusCode: number
@@ -996,7 +1025,7 @@ async function parseMistralFimUsageFromStream(
       if (event.data === '[DONE]') return;
 
       try {
-        const json: MistralFimStreamChunk = JSON.parse(event.data);
+        const json = JSON.parse(event.data) as MistralFimStreamChunk;
 
         model = json.model ?? model;
         messageId = json.id ?? messageId;
@@ -1095,7 +1124,7 @@ export function countAndStoreFimUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      if (usageContext.is_free || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }
@@ -1169,7 +1198,7 @@ export function parseEditUsageFromResponse(
   provider: ProviderId,
   statusCode: number
 ): MicrodollarUsageStats {
-  const json: MercuryEditCompletionResponse = JSON.parse(response);
+  const json = JSON.parse(response) as MercuryEditCompletionResponse;
   const usage = json.usage;
   const cacheHitTokens = usage ? getEditCacheHitTokens(usage) : 0;
   return {
@@ -1232,7 +1261,7 @@ export function countAndStoreEditUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      if (usageContext.is_free || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }
@@ -1280,7 +1309,7 @@ export function parseEmbeddingUsageFromResponse(
   responseText: string,
   statusCode: number
 ): MicrodollarUsageStats {
-  const json: EmbeddingResponse = JSON.parse(responseText);
+  const json = JSON.parse(responseText) as EmbeddingResponse;
 
   // Upstream providers (OpenRouter, Vercel) include cost in USD → convert to microdollars.
   const cost_mUsd = json.usage.cost != null ? toMicrodollars(json.usage.cost) : 0;
@@ -1313,7 +1342,7 @@ export function parseTranscriptionUsageFromResponse(
   statusCode: number,
   requestedModel: string
 ): MicrodollarUsageStats {
-  const json: TranscriptionResponse = JSON.parse(responseText);
+  const json = JSON.parse(responseText) as TranscriptionResponse;
   const base = {
     messageId: json.id ?? null,
     model: json.model ?? requestedModel,
@@ -1389,10 +1418,10 @@ export function countAndStoreEmbeddingUsage(
         return;
       }
 
-      // Preserve the real upstream cost for analytics before zeroing for BYOK
+      // Preserve the real upstream cost before free-model or BYOK zeroing.
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      if (usageContext.is_free || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
       }
 
@@ -1489,6 +1518,6 @@ export async function sendProxiedChatCompletion<T>(
     return { ok: false, status: response.status, error: errorText };
   }
 
-  const data: T = await response.json();
+  const data = (await response.json()) as T;
   return { ok: true, data };
 }

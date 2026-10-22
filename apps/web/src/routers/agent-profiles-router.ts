@@ -28,6 +28,7 @@ import { AgentConfigSchema } from '@kilocode/db/schema-types';
 import type { ProfileOwner } from '@kilocode/cloud-agent-profile';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
+import { isUniqueViolation } from '@/lib/db-errors';
 
 function isForeignKeyViolation(error: unknown): boolean {
   return (
@@ -335,7 +336,6 @@ export const agentProfilesRouter = createTRPCRouter({
         profileService.listProfiles(db, { type: 'user', id: ctx.user.id }),
       ]);
 
-      // Effective default: personal default takes precedence over org default
       const effectiveDefault =
         personalProfiles.find(p => p.isDefault) ?? orgProfiles.find(p => p.isDefault);
 
@@ -368,7 +368,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       return profileService.createProfile(db, owner, ctx.user.id, input.name, input.description);
@@ -813,16 +813,26 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      return profileAgentsService.createAgent(
-        db,
-        input.profileId,
-        {
-          slug: input.slug,
-          name: input.name,
-          config: input.config,
-        },
-        owner
-      );
+      try {
+        return await profileAgentsService.createAgent(
+          db,
+          input.profileId,
+          {
+            slug: input.slug,
+            name: input.name,
+            config: input.config,
+          },
+          owner
+        );
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'An agent with this slug already exists in this profile',
+          });
+        }
+        throw error;
+      }
     }),
 
   /**
@@ -841,17 +851,27 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      await profileAgentsService.updateAgent(
-        db,
-        input.profileId,
-        input.agentId,
-        {
-          slug: input.slug,
-          name: input.name,
-          config: input.config,
-        },
-        owner
-      );
+      try {
+        await profileAgentsService.updateAgent(
+          db,
+          input.profileId,
+          input.agentId,
+          {
+            slug: input.slug,
+            name: input.name,
+            config: input.config,
+          },
+          owner
+        );
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'An agent with this slug already exists in this profile',
+          });
+        }
+        throw error;
+      }
       return { success: true };
     }),
 

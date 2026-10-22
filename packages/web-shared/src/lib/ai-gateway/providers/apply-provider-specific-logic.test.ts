@@ -24,13 +24,12 @@ const nonFlexExclusiveModel: KiloExclusiveModel = {
   internal_id: 'test/non-flex',
   display_name: 'Non-Flex test model',
   description: 'Test model',
-  status: 'public',
   context_length: 8_192,
   max_completion_tokens: 4_096,
   provider: OPENROUTER,
   flags: [],
   pricing: null,
-  inference_provider_restriction: [],
+  inference_providers: [],
 };
 
 const flexExclusiveModel: KiloExclusiveModel = {
@@ -510,15 +509,99 @@ describe('applyReasoningDetailsTransform', () => {
 
 describe('removeModelsFallback', () => {
   it.each(['anthropic/claude-fable-5', 'anthropic/claude-opus-5', 'openai/gpt-4o'])(
-    'removes caller-provided fallbacks for %s',
+    'removes and logs caller-provided fallbacks for %s',
     requestedModel => {
       const request = makeRequest(requestedModel, ['caller/fallback']);
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeModelsFallback(request);
+      removeModelsFallback(requestedModel, request, 'user-1');
 
       expect(request.body.models).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        '[applyProviderSpecificLogic] Removed caller-provided fallback models',
+        {
+          userId: 'user-1',
+          model: requestedModel,
+          requestKind: 'chat_completions',
+          models: ['caller/fallback'],
+          fallbacks: undefined,
+        }
+      );
+      warn.mockRestore();
     }
   );
+
+  it.each([[[{ model: 'anthropic/claude-opus-4.6' }]], ['default']])(
+    'removes and logs caller-provided Messages API fallbacks %j',
+    fallbacks => {
+      const model = 'thinkingmachines/inkling-small:free';
+      const request = makeMessagesRequest(model);
+      request.body.fallbacks = fallbacks;
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      removeModelsFallback(model, request, 'user-1');
+
+      expect(request.body).not.toHaveProperty('fallbacks');
+      expect(warn).toHaveBeenCalledWith(
+        '[applyProviderSpecificLogic] Removed caller-provided fallback models',
+        {
+          userId: 'user-1',
+          model,
+          requestKind: 'messages',
+          models: undefined,
+          fallbacks,
+        }
+      );
+      warn.mockRestore();
+    }
+  );
+
+  it.each([
+    ['no fallback fields', {}],
+    ['empty models', { models: [] }],
+    ['null fallbacks', { fallbacks: null }],
+    ['empty fallbacks', { fallbacks: [] }],
+  ])('does not log when there is nothing to remove (%s)', (_, fields) => {
+    const model = 'anthropic/claude-opus-5';
+    const request = makeMessagesRequest(model);
+    Object.assign(request.body, fields);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    removeModelsFallback(model, request, 'user-1');
+
+    expect(request.body).not.toHaveProperty('models');
+    expect(request.body).not.toHaveProperty('fallbacks');
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('removes Messages API fallbacks before a free model request is sent upstream', async () => {
+    const model = 'thinkingmachines/inkling-small:free';
+    const request = makeMessagesRequest(model);
+    request.body.fallbacks = [{ model: 'anthropic/claude-opus-4.6' }];
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+
+    expect(request.body).not.toHaveProperty('fallbacks');
+    expect(warn).toHaveBeenCalledWith(
+      '[applyProviderSpecificLogic] Removed caller-provided fallback models',
+      expect.objectContaining({ userId: 'user-1', model, requestKind: 'messages' })
+    );
+    warn.mockRestore();
+  });
 });
 
 describe('applyPreferredProvider', () => {

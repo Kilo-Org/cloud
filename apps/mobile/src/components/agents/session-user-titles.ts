@@ -206,7 +206,6 @@ function bumpRevision(): void {
   }
 }
 
-/** Notify subscribers and persist the new titles map. */
 function commit(): void {
   bumpRevision();
   persistTitles();

@@ -1294,6 +1294,9 @@ export function ChatComposer({
           userId,
           surface: 'agent-chat',
           sessionId: sessionId ?? null,
+          // Carried so a launch this composer loses to an Activity recreation
+          // reopens the same session in the same organization scope.
+          organizationId: organizationId ?? null,
         },
         themedSheet
       )
@@ -1304,6 +1307,7 @@ export function ChatComposer({
     showActionSheetWithOptions,
     userId,
     sessionId,
+    organizationId,
     themedSheet,
   ]);
 

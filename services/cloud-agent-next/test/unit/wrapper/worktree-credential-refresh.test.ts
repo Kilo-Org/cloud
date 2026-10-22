@@ -119,6 +119,33 @@ describe('cloud runtime feature configuration', () => {
     expect(JSON.parse(env.KILO_CONFIG_CONTENT).snapshot).toBe(false);
     expect(JSON.parse(env.OPENCODE_CONFIG_CONTENT).snapshot).toBe(false);
   });
+
+  it('limits code review runtimes to platform-provided Kilo configuration', () => {
+    const overrides = { KILO_DISABLE_PROJECT_CONFIG: '', KILO_DISABLE_EXTERNAL_SKILLS: '0' };
+    const reviewEnv = buildWorktreeKiloEnvironment(
+      identity.directory,
+      '/runtime-home',
+      auth,
+      overrides,
+      overrides,
+      undefined,
+      { createdOnPlatform: 'code-review' }
+    );
+    expect(reviewEnv.KILO_DISABLE_PROJECT_CONFIG).toBe('1');
+    expect(reviewEnv.KILO_DISABLE_EXTERNAL_SKILLS).toBe('1');
+
+    const webEnv = buildWorktreeKiloEnvironment(
+      identity.directory,
+      '/runtime-home',
+      auth,
+      {},
+      {},
+      undefined,
+      { createdOnPlatform: 'cloud-agent-web' }
+    );
+    expect(webEnv.KILO_DISABLE_PROJECT_CONFIG).toBeUndefined();
+    expect(webEnv.KILO_DISABLE_EXTERNAL_SKILLS).toBeUndefined();
+  });
 });
 
 function createFeedConnection(sseMaxRetryAttempts: number): {

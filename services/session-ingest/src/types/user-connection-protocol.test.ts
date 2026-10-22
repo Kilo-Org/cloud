@@ -246,8 +246,11 @@ describe('CLIOutboundMessageSchema', () => {
     ['ASCII', 'a'.repeat(24), 'a'.repeat(25)],
     ['escaped characters', '\\"'.repeat(12), '\\"'.repeat(12) + '\\'],
     ['CJK', '界'.repeat(24), '界'.repeat(25)],
-    ['surrogate pairs', '\u{10400}'.repeat(12), '\u{10400}'.repeat(12) + 'a'],
-  ])('bounds %s branches by UTF-16 units, not JSON bytes', (_label, valid, invalid) => {
+    // zod 4.6 measures string bounds in Unicode code points, so a surrogate
+    // pair counts once: 24 astral characters fit even though they are 48
+    // UTF-16 units.
+    ['surrogate pairs', '\u{10400}'.repeat(24), '\u{10400}'.repeat(25)],
+  ])('bounds %s branches by Unicode code points, not JSON bytes', (_label, valid, invalid) => {
     const heartbeat = {
       type: 'heartbeat',
       sessions: [],

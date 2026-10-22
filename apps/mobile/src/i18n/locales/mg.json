@@ -25,6 +25,7 @@
     "error": "hadisoana: {{error}}",
     "back": "Miverena",
     "somethingWentWrong": "Nisy olana.",
+    "actionNotRecorded": "Tsy vitanay ny nandrakitra ity hetsika ity. Andramo indray azafady any aoriana.",
     "couldNotOpen": "Tsy voasokatra ny {{label}}.",
     "link": "rohy",
     "takingLonger": "Maharitra ela noho ny nandrasana izany. Azonao akatona ity ary jerena indray avy eo.",
@@ -35,6 +36,8 @@
     "connectGithub": "Ampifandraiso ny GitHub",
     "cost": "Sarany",
     "discard": "Ario",
+    "discardChangesMessage": "Ho very ny fanovanao.",
+    "discardChangesTitle": "Ario ny fanovana?",
     "findings": "Olana hita",
     "mergeRequest": "fangatahana fampiraisana",
     "notConnected": "Tsy mifandray",
@@ -109,7 +112,9 @@
     "online": "An-tserasera",
     "open": "Sokafy ny {{name}}",
     "openPullRequest": "Sokafy ny PR",
+    "completed": "Vita",
     "pending": "Miandry",
+    "running": "Mandeha",
     "performance": "Fahombiazana",
     "preferences": "Safidy",
     "privacyPolicy": "Politika momba ny fiainana manokana",
@@ -586,6 +591,8 @@
     "installKiloGitHubApp": "Apetraho ny rindranasa Kilo ho an'ny GitHub",
     "checkConnection": "Jereo ny fifandraisana",
     "couldNotLoadPullRequest": "Tsy tafiditra ny fangatahana fampiraisana.",
+    "reviewServiceUnavailable": "Tsy misy ny serivisy",
+    "reviewServiceUnavailableDescription": "Tsy misy ny serivisy vetivety. Andramo indray tsy ho ela.",
     "description": "Famaritana",
     "noDescriptionProvided": "Tsy nisy famaritana nomena.",
     "review": "Fandinihana",
@@ -661,7 +668,8 @@
       "description": "Ampifandraiso ny kaontinao GitHub mba handinihana fangatahana fampiraisana amin'ny finday.",
       "gitlabDescription": "Ampifandraiso ny kaonty GitLab-nao mba hijerena ny fangatahana fampiraisana amin'ny finday.",
       "bitbucketDescription": "Ampifandraiso amin'ity fikambanana ity ny Bitbucket mba hijerena ny fangatahana fampiraisana amin'ny finday.",
-      "bitbucketOrgOnlyDescription": "Safidio fikambanana ao amin'ny mombamomba-nao mba hijerena ny fangatahana fampiraisana Bitbucket-ny."
+      "bitbucketOrgOnlyDescription": "Ampifandraiso amin'ny fikambanana ny kaonty etsy ambony mba hijerena ny fangatahana fampiraisana Bitbucket'ny.",
+      "contextLine": "Ho an'ny {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -756,6 +764,7 @@
       "truncationBanner_other": "Ny rakitra {{limit}} voalohany amin'ny {{total}} novaina no aseho — fetran'ny API GitHub."
     },
     "linkPasteClipboardEmpty": "Foana ny fitahirizana vonjimaika.",
+    "linkPasteDenied": "Nolavina ny alalana hampiditra. Omeo alalana ny fampidirana ary andramo indray.",
     "linkPasteNotAPullRequest": "Tsy rohy fangatahana fampiraisana izany",
     "announce": {
       "commentPosted": "Navoaka ny hevitra",
@@ -769,7 +778,9 @@
       "reviewNotSubmitted": "Tsy azo alefa amin'izao endriny izao ity fandinihana ity. Mety niova ny PR, na tsy azonao atao ny mandinika ny fangatahana fampiraisana nataonao.",
       "reviewNotSubmittedTerm": "Tsy azo alefa toy izao ny fandinihana. Mety io {{term}} io, na tsy afaka mamandrika ny {{term}}-anao manokana ianao.",
       "couldNotPostComment": "Tsy navoaka ny hevitra.",
-      "couldNotSubmitReview": "Tsy nalefa ny fandinihana. Jereo ny fifandraisanao ary andramo indray."
+      "couldNotSubmitReview": "Tsy nalefa ny fandinihana. Jereo ny fifandraisanao ary andramo indray.",
+      "rateLimited": "Be loatra ny fangatahana. Andramo indray azafady rehefa afara kelikely.",
+      "conflict": "Niova ity nandritra ny nampiasanao azy. Ampidiro indray ary andramo indray azafady."
     },
     "operation": {
       "couldNotReply": "Tsy tafalefa ny valiny.",
@@ -777,7 +788,6 @@
       "mergeResultDefaultError": "Tsy vitan'ny GitHub ny fampiraisana.",
       "mergeResultNotCompleted": "Tsy nampidirina ny {{term}}. Jereo ny toerany ary andramo indray.",
       "ambiguous": "Tsy voamarina ny vokatra — jereo ny PR alohan'ny hanandramana indray.",
-      "persistenceFailed": "Tsy vitanay ny nandrakitra ity hetsika ity. Andramo indray azafady any aoriana.",
       "forbidden": "Voarara izany."
     },
     "capabilities": {
@@ -1413,6 +1423,9 @@
       "couldNotGetLatest": "Tsy nety nalaina ny angona farany.",
       "byline": "{{repo}} #{{number}} nataon'i {{author}}",
       "noFindings": "Tsy misy olana hita.",
+      "findingsUnavailable": "Tsy misy valiny azo jerena satria tsy nahomby ity fanamarinana ity.",
+      "serviceUnavailable": "Tsy afaka nifandray tamin'ny tolotra fanamarinana kaody. Andramo indray ny fanamarinana rehefa azo ampiasaina ny tolotra.",
+      "reviewFailed": "Tsy nahomby ny fanamarinana. Andramo indray azafady.",
       "showMore": "Asehoy bebe kokoa",
       "created": "Noforonina",
       "started": "Nanomboka",
@@ -1446,8 +1459,9 @@
       "loading": "Mampiditra ny fitadidiana ny fanamarinana",
       "couldNotLoad": "Tsy nety nampidirina ny fitadidiana ny fanamarinana.",
       "off": "Tsy mandeha ny fitadidiana ny fanamarinana.",
+      "on": "Mandeha ny fitadidiana ny fanamarinana.",
       "offDescription": "Alefaso izany mba hahafahan'i Kilo mianatra avy amin'ny valin'ny mpikojakoja sy manolotra torolalana ho an'ny REVIEW.md.",
-      "readOnlyDescription": "Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka mandefa ny fitadidiana ny fanamarinana.",
+      "readOnlyDescription": "Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka manova ny fitadidiana ny fanamarinana.",
       "enable": "Alefaso ny fitadidiana ny fanamarinana",
       "loadingProposals": "Mampiditra soso-kevitra",
       "couldNotLoadProposals": "Tsy nety nampidirina ny soso-kevitra.",
@@ -1467,7 +1481,10 @@
       "starting": "Manomboka ny fanamarinana…",
       "start": "Atombohy ny fanamarinana"
     },
-    "notConnectedReadOnly": "Tsy mifandray ny {{platform}}. Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
+    "notConnectedReadOnly": "Tsy mifandray ny {{platform}}. Ny tompon'ny fikambanana sy ny mpitantana ihany no afaka mampifandray azy.",
+    "gitlab": {
+      "notConnectedReadOnly": "Tsy mifandray ny {{platform}}. Mangataha ny Tompony, Mpitantana, na Mpitantana faktiora ao amin'ny fikambanana mba hampifandray azy."
+    },
     "webhookSetup": "Tsy vita ny fametrahana ny rohy fampandrenesana.",
     "webhookSetupDescription": "Mety tsy hahazo fanamarinana mandeha ho azy ny tahirin-kaody sasany.",
     "autoReviews": "Fanamarinana mandeha ho azy",
@@ -1475,7 +1492,7 @@
     "followReviewMd": "Araho ny REVIEW.md",
     "followReviewMdSubtitle": "Araho ny torolalana ao amin'ny rakitra REVIEW.md isaky ny tahirin-kaody",
     "bitbucket": {
-      "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
+      "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
       "setupIncomplete": "Tsy vita ny fametrahana. Vitao ao amin'ny kilo.ai ny fikirana.",
       "setup": "Fametrahana ny Bitbucket"
     },
@@ -1528,8 +1545,6 @@
     "updateFailed": "Tsy nahomby ny fanavaozana ny mpanamarina.",
     "configSaveFailed": "Tsy nahomby ny fitahirizana ny fikiran'ny fanamarinana.",
     "status": {
-      "running": "Mandeha",
-      "completed": "Vita",
       "interrupted": "Tapaka"
     },
     "reviewStyle": {
@@ -1542,7 +1557,8 @@
       "bugs": "Lesoka",
       "style": "Fomba fanoratana",
       "testing": "Fitsapana",
-      "documentation": "Tahirin-kevitra"
+      "documentation": "Tahirin-kevitra",
+      "unknown": "Hafa ({{area}})"
     },
     "gateThreshold": {
       "warning": "Fampitandremana"
@@ -1654,7 +1670,14 @@
       "whereFound": "Toerana nahitana ilay olana ({{displayCount}})",
       "fullReport": "Tatitra feno noforonina",
       "yes": "Eny",
-      "no": "Tsia"
+      "no": "Tsia",
+      "action": {
+        "analyzeCodebase": "Diniho ny kaody",
+        "dismiss": "Lavina",
+        "manualReview": "Fanamarinana an-tanana",
+        "monitor": "Araho",
+        "openPr": "Sokafy PR"
+      }
     },
     "dashboard": {
       "findingsCount": "Olana hita {{displayCount}}",
@@ -1729,7 +1752,7 @@
       "couldNotLoad": "Tsy tafiditra ny antsipirian'ity olana ity.",
       "couldNotCheckPermissions": "Tsy nety nohamarinina ny alalana hanilihana olana hita.",
       "cannotDismissTitle": "Tsy azo ailika ity olana hita ity",
-      "cannotDismissDescription": "Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka manilika olana hita.",
+      "cannotDismissDescription": "Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka manilika olana hita.",
       "alreadyResolvedDescription": "Efa voavaha ity olana hita ity ka tsy azo ailika intsony."
     },
     "findingDetails": {
@@ -1771,7 +1794,7 @@
       "automationAllOff": "Tsy mandeha avokoa",
       "automationCount": "{{displayCount}} amin'ny 3 no mandeha",
       "notificationsCount": "{{displayCount}} amin'ny 2 no mandeha",
-      "disabledNoManage": "Tsy mandeha ny Security Agent. Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka mandefa azy.",
+      "disabledNoManage": "Tsy mandeha ny Security Agent. Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mandefa azy.",
       "disabledNoRepo": "Mifidiana tahirin-kaody iray farafahakeliny alohan'ny handefasana ny Security Agent.",
       "disabledPrompt": "Alefaso ny Security Agent mba hampifanarahana ny fampandrenesan'ny Dependabot, hifidianana tahirin-kaody ary hametrahana ny fikirana ho an'ny asa mandeha ho azy."
     },
@@ -1820,7 +1843,7 @@
       "invalidDayCount": "tokony ho 1–365 andro ny fe-potoana, ary isa feno ihany no ekena.",
       "remediationDeadlineA11y": "Fe-potoana fanarenana ho an'ny hamafy {{label}}, refesina amin'ny andro",
       "enterWholeNumber": "Ampidiro ny isa feno eo anelanelan'ny 1 sy 365",
-      "permissionNote": "Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka manova ireo fikirana ireo.",
+      "permissionNote": "Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka manova ireo fikirana ireo.",
       "enableTracking": "Alefaso ny fanaraha-maso ny SLA",
       "enableTrackingSubtitle": "Farito araka ny hamafin'ny olana hita ny fe-potoana fanarenana.",
       "deadlinesHeading": "Fe-potoana fanarenana (andro)"
@@ -1856,12 +1879,16 @@
     "settingsSave": {
       "saveChanges": "Tehirizo ny fiovana",
       "unsavedTitle": "Fiovana tsy voatahiry",
-      "unsavedMessage": "Hotehirizina ve ny fanovanao alohan'ny hialana amin'ity efijery ity?"
+      "unsavedMessage": "Hotehirizina ve ny fanovanao alohan'ny hialana amin'ity efijery ity?",
+      "unsavedInvalidMessage": "Tsy afaka tehirizina ireo fiovana ireo aloha. Amboary izy ireo raha hotehirizina, na ario raha hialana."
     },
     "auditReportButton": {
       "viewA11y": "Jereo ny tatitra fanaraha-maso"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Mpitantana Kilo",
+      "actorMaskedUser": "Mpampiasa voatafina",
+      "actorSystem": "Rafitra Kilo",
       "couldNotLoad": "Tsy nety nampidirina ny tatitra fanaraha-maso.",
       "events": "Zava-nitranga",
       "generated": "Noforonina tamin'ny {{generatedAt}}.",
@@ -1872,8 +1899,25 @@
       "summary": "Famintinana ny tatitra",
       "title": "Tatitra fanaraha-maso",
       "unavailable": "Tsy azo jerena ny tatitra fanaraha-maso",
-      "unavailableDescription": "Ny tompon'ny fikambanana sy ny mpitantana ny faktiora ihany no afaka mijery tatitra fanaraha-maso. Mangataha alalana hijery izany amin'ny iray amin'izy ireo.",
-      "queryFailed": "Tsy vita ny fangatahana ny tatitra. Andramo indray."
+      "unavailableDescription": "Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mijery tatitra fanaraha-maso. Mangataha amin'ny tompony, mpitantana, na mpitantana faktiora mba hanome anao alalana.",
+      "queryFailed": "Tsy vita ny fangatahana ny tatitra. Andramo indray.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Vita ny fanadihadiana",
+        "findingAnalysisFailed": "Tsy nahomby ny fanadihadiana",
+        "findingAutoDismissed": "Nolavina ho azy",
+        "findingCreated": "Nampidirina",
+        "findingDeleted": "Voafafa",
+        "findingDismissed": "Nolavina",
+        "findingSeverityChanged": "Voaova ny hamafy",
+        "findingStatusChange": "Niova ny sata",
+        "findingSuperseded": "Nosoloina",
+        "remediationBlocked": "Voasakana ny fanarenana",
+        "remediationCancelled": "Nofoanana",
+        "remediationFailed": "Tsy nahomby ny fanarenana",
+        "remediationNoChangesNeeded": "Tsy mila fanovana",
+        "remediationPrOpened": "Nosokafana ny PR",
+        "remediationQueued": "Nangatahana ny fanarenana"
+      }
     },
     "notifications": {
       "couldNotLoad": "Tsy nety nampidirina ny fikiran'ny fampandrenesana.",
@@ -1905,7 +1949,6 @@
       "installApp": "Apetraho ny rindranasa GitHub",
       "reauthorizeButton": "Omeo alalana indray ny rindranasa GitHub",
       "reauthorizeDescription": "Mila ny alalana vulnerability_alerts ny Security Agent mba hijery ny fampandrenesan'ny Dependabot. Omeo alalana indray ny rindranasa GitHub mba hanomezana azy io alalana io.",
-      "reauthorizeFailed": "Tsy nety natomboka ny fanomezana alalana indray. Andramo indray azafady.",
       "reauthorizeTitle": "Ilaina ny alalana fanampiny",
       "setupFailed": "Tsy nety natomboka ny fametrahana ny GitHub. Andramo indray azafady."
     },
@@ -1924,7 +1967,12 @@
       "syncMayNotHaveCompleted": "Mety tsy vita ny fampifanarahana iray. Andramo indray mba hampifanaraka ny angona, na ario ilay fangatahana.",
       "syncInProgress": "Efa mandeha ny fampifanarahana ny angon'ny fiarovana. Andramo indray azafady.",
       "dismissalInProgress": "Efa mandeha ity fanilihana ity. Andramo indray azafady.",
-      "couldNotReadPendingSyncs": "Tsy nety novakina ny fampifanarahana mbola miandry. Andramo indray."
+      "couldNotReadPendingSyncs": "Tsy nety novakina ny fampifanarahana mbola miandry. Andramo indray.",
+      "ambiguous": "Tsy voamarina ny vokatra — jereo ny fanamarinana ny fiarovana alohan'ny hanandramana indray.",
+      "settleFailed": "Vita ny hetsika, fa tsy voatahiry ny vokatra. Andramo indray azafady.",
+      "replayFailed": "Tsy vita ity hetsika ity. Andramo indray azafady.",
+      "actionFailed": "Tsy azo vitaina ity hetsika ity. Andramo indray azafady.",
+      "actionBlocked": "Tsy azo vitaina ity hetsika ity. Mila vahana aloha ny olana."
     },
     "analysisState": {
       "queued": "Voalahatra ny famakafakana",
@@ -2201,6 +2249,8 @@
       "commitAndPush": "Raketo sy alefaso",
       "startSession": "Atombohy ny fotoam-piasana",
       "selectRepositoryToStart": "Safidio ny tahirin-kaody hanombohana.",
+      "enterPromptToStart": "Ampio baiko hanombohana.",
+      "enterPromptOrFileToStart": "Ampio baiko na rakitra hanombohana.",
       "connectProviderToStart": "Ampifandraiso ny mpanome tolotra hanombohana.",
       "promptPlaceholder": "Inona no tianao hiasana?",
       "couldNotLoadModels": "Tsy voaray ny modely.",
@@ -2209,6 +2259,7 @@
       "prefillModelUnavailable": "Tsy azo ampiasaina intsony ny {{model}}. Ny modely voafidinao mialoha no ampiasaina.",
       "couldNotReadPendingSessions": "Tsy voavaky ny fotoam-piasana miandry. Andramo indray.",
       "failedToCreate": "Tsy nahomby ny famoronana fotoam-piasana.",
+      "checkOrganizationAccess": "Jereo ny fidiranao amin'ity fikambanana ity, avy eo andramo indray azafady.",
       "couldNotRefreshRepositories": "Tsy nahomby ny fanavaozana ny lisitry ny tahirin-kaody. Andramo indray azafady.",
       "discardDraftTitle": "Hariana ve ny volavola?",
       "discardDraftMessage": "Ho very ny toromarikanao.",
@@ -2278,7 +2329,8 @@
       "linesBadge_other": "Andalana {{displayCount}}",
       "matchesBadge_one": "Valiny mifanaraka {{displayCount}}",
       "matchesBadge_other": "Valiny mifanaraka {{displayCount}}",
-      "noOutput": "Tsy misy vokatra."
+      "noOutput": "Tsy misy vokatra.",
+      "translationFailed": "Tsy nahomby ny fandikana"
     },
     "readToolMarkdown": {
       "linesTruncated": "andalana {{start}}–{{end}} (nohafohezina)",
@@ -2729,6 +2781,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Tsy azo aseho ny fotoam-piasanao mandeha raha tsy voaray ny angona.",
     "currentDeviceUnidentified": "Tsy fantatra ny fitaovana ampiasaina izao.",
+    "kiloApp": "Rindranasa Kilo",
     "noSessions": "Tsy misy fotoam-piasana mandeha",
     "noSessionsDescription": "Midira amin'ny rindranasa Kilo amin'ny fitaovana hafa, dia hiseho eto izany.",
     "onlyKiloAppSignIns": "Ny fidirana amin'ny rindranasa Kilo ihany no hita eto. Tsy voatanisa ny fidirana amin'ny mpanova kaody sy ny CLI.",
@@ -2737,7 +2790,7 @@
     "viewProfile": "Jereo ny mombamomba anao",
     "webBrowser": "Mpitety tranonkala",
     "signOutThisDevice": "Mivoaha amin'ity fitaovana ity",
-    "signOutThisSession": "Mivoaha amin'ity fotoam-piasana ity",
+    "signOutSessionLabel": "Mivoaha amin'ny {{device}}, niditra {{signedIn}}",
     "sessionSignedOut": "Nifarana ny fidirana tamin'ity fotoam-piasana ity.",
     "signOutThisDeviceTitle": "Hivoaka amin'ity fitaovana ity ve?",
     "signOutThisSessionTitle": "Hivoaka amin'ity fotoam-piasana ity ve?",
@@ -2881,6 +2934,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Alohan'ny hanombohana",
+    "summaryTitle": "Safidy momba ny fizaràna angona",
     "introDescription": "Mandefa ny hafatrao any amin'ny mpamatsy AI ny Kilo mba hamoronana valiny. Ireto ny angona zaraina sy ny mpandray azy.",
     "required": "Ilaina amin'ny fampiasana Kilo",
     "promptsTitle": "Ny toromarikanao sy ny resakao",
@@ -2889,7 +2943,6 @@
     "accountDescription": "Ny famantarana ny kaontinao Kilo sy ny angona mamaritra ny fangatahana, ampiasaina hanamarinana anao sy handrefesana ny fampiasana.",
     "diagnosticsTitle": "Fitiliana ny rindranasa",
     "diagnosticsDescription": "Tatitry ny fijanonana tampoka sy ny hadisoana, izay nesorina ny votoatin'ny rindranasa, mba hiantohana ny fiasan'ny rindranasa.",
-    "optional": "Tsy voatery",
     "helpImprove": "Ampio hanatsara ny Kilo",
     "helpImproveDescription": "Zarao ny antontanisa fampiasana tsy ahafantarana anao sy ny loharanon'ny fametrahana. Azonao ovaina ao amin'ny Fikirana izany amin'ny fotoana rehetra.",
     "seeFullDetails": "Jereo ny antsipiriany feno",
@@ -2974,11 +3027,23 @@
     "boundary": {
       "backToProfile": "Miverena amin'ny mombamomba anao",
       "loadErrorMessage": "Jereo ny fifandraisanao ary andramo indray.",
+
+      "chooseAccount": "Misafidiana kaonty",
       "loadErrorTitle": "Tsy voaray ny fikambananao.",
+      "membershipLostNotice": "Tsy manana alalana hiditra amin'ity fikambanana ity intsony ianao. Nafindra tany amin'ny {{target}}.",
+      "noOrganization": "Tsy misy fikambanana",
+
+      "noOrganizationDescription": "Ity kaonty ity dia tsy anisan'ny fikambanana. Mamorona na midira ao amin'ny fikambanana ao amin'ny tranonkala mba hampiasa ny endriky ny fikambanana toy ny fanasana mpikambana sy ny fampitandremana momba ny fifandanjana ambany.",
+
+      "openWebOrganizations": "Manokatra fikambanana ao amin'ny tranonkala",
+
       "organizationUnavailable": "Tsy azo idirana ny fikambanana.",
-      "selectDescription": "Misafidiana fikambanana ao amin'ny mombamomba anao mba hanohizana.",
+      "selectDescriptionWithOrganizations": "Anisan'ny fikambanana iray na maromaro ianao. Misafidiana ny kaonty tokony hampiasain'ity efijery ity.",
+
       "selectOrganization": "Misafidiana fikambanana",
       "unavailableDescription": "Tsy azo idirana intsony ity fikambanana ity. Misafidiana iray ao amin'ny mombamomba anao mba hanohizana.",
+
+      "unavailableSessionsDescription": "Tsy azo idirana intsony ity fikambanana ity. Tsy azo alaina ny sesiony azy.",
       "accessDeniedDescription": "Tsy manana alalana hiditra amin'ity fikambanana ity ianao."
     },
     "creditActivity": {
@@ -3030,7 +3095,11 @@
       "separateEmailsHint": "Saraho amin'ny faingo ny adiresy mailaka maromaro.",
       "thresholdLabel": "Ampandreneso raha latsaky ny (USD)",
       "title": "Fampandrenesana ambim-bola kely",
-      "emailsError": "Mampidira adiresy mailaka manan-kery iray farafahakeliny. Raha maromaro dia saraho amin'ny faingo.",
+      "emailsInvalid": "Tsy manan-kery ny adiresy mailaka iray na maromaro.",
+      "emailsRequired": "Mampidira adiresy mailaka iray farafahakeliny.",
+      "saveEmailsError": "Tsy nekena ny adiresy mailaka sasany. Hamarino izy ireo ary andramo indray.",
+      "saveError": "Tsy voatahiry ny fampandrenesana ambim-bola kely.",
+      "thresholdPlaceholder": "Mampidira vola",
       "thresholdError": "Mampidira vola mihoatra ny 0."
     },
     "memberLimit": {
@@ -3041,12 +3110,13 @@
       "removeLimit": "Esory ny fetra",
       "title": "Fetran'ny fampiasana isan'andro",
       "blankError": "Mampidira vola, na tsindrio ny Esory ny fetra etsy ambany.",
+      "blankWithoutLimitError": "Mampidira fetra isan'andro eo anelanelan'ny 0 sy {{max}}.",
       "rangeError": "Mampidira vola eo anelanelan'ny 0 sy {{max}}."
     },
     "members": {
       "changeRole": "Ovao ny andraikitra",
       "emptyDescriptionCanInvite": "Manasà mpiara-miasa mba hanombohana fiaraha-miasa ao amin'ity fikambanana ity.",
-      "emptyDescriptionCannotInvite": "Angataho ny tompony na ny mpitantana faktiora hanasa mpiara-miasa.",
+      "emptyDescriptionCannotInvite": "Angataho ny tompony, mpitantana, na mpitantana faktiora hanasa mpiara-miasa.",
       "emptyTitle": "Mbola tsy misy mpikambana",
       "invitedDate": "Nasaina tamin'ny {{date}}",
       "limitPerDay": "{{amount}}/andro",
@@ -3310,7 +3380,8 @@
       "settingsToolsOn": "Alefa — alefa any amin'ny maodely ny fitaovana parametatra",
       "settingsToolsOff": "Vono — tsy misy fitaovana parametatra alefa any amin'ny maodely",
       "serverChecking": "Manamarina ity server ity…",
-      "serverToolCount": "fitaovana {{count}}",
+      "serverToolCount_one": "fitaovana {{count}}",
+      "serverToolCount_other": "fitaovana {{count}}",
       "serverUnreachable": "Tsy tratra ity server ity",
       "serverOff": "Mihidy ity server ity"
     },
@@ -3470,6 +3541,9 @@
     "localModels": {
       "title": "Modely ao amin'ny fitaovana",
       "help": "Mandeha ao amin'ity finday ity ny modely ao amin'ny fitaovana. Mijanona ao amin'ny fitaovana ny fangatahanao sy ny valiny.",
+      "switchTitle": "Hifindra amin'ny modely ao amin'ny fitaovana?",
+      "switchMessage": "Ny fifindrana amin'ny {{name}} dia mahatonga ny baiko sy ny toe-javatra ao amin'ity resaka ity hokarakaraina ao amin'ity finday ity, fa tsy any amin'ny rafitra mpizara lavitra.",
+      "switchConfirm": "Miova modely",
       "systemPurpose": "Ilay modely tafiditra ao amin'ny rafitry ity fitaovana ity. Mandeha ao amin'ny fitaovana izy.",
       "apple": "Apple Intelligence (ao amin'ny fitaovana)",
       "checking": "Manamarina raha misy…",
@@ -3507,6 +3581,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Ny Atombohy ny mpanampy dia mila toromarika. Manampia toromarika ary avereno indray izy.",
+      "repositoryRequired": "Ny Atombohy ny mpanampy dia mila tahirin-kaody. Sokafy ny Kilo ary mifidiana iray, avy eo avereno indray izy.",
       "repositoryUnknown": "Tsy fantatr'i Kilo ny {{repository}} ho tahirin-kaody GitHub na GitLab. Mifidiana tahirin-kaody hafa ao amin'ny Kilo.",
       "repositoryUnsupported": "Tahirin-kaody Bitbucket ny {{repository}} — Tsy mbola afaka mampiasa azy ny Atombohy ny mpanampy. Mifidiana tahirin-kaody hafa ao amin'ny Kilo."
     }
@@ -3544,10 +3619,13 @@
     "emptyDescription": "Mamorona mombamomba hampiasaina indray ny fari-piainan'ny tontolo iainana, baiko fanamboarana ary fahaiza-manao mandritra ny fotoam-pivoriana.",
     "loadFailed": "Tsy afaka mampiditra ny mombamomba",
     "counts": {
-      "vars": "{{count}} miovaova",
+      "vars_one": "{{count}} miovaova",
+      "vars_other": "{{count}} miovaova",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} fahaiza-manao",
-      "commands": "{{count}} baiko",
+      "skills_one": "{{count}} fahaiza-manao",
+      "skills_other": "{{count}} fahaiza-manao",
+      "commands_one": "{{count}} baiko",
+      "commands_other": "{{count}} baiko",
       "varsShort": "{{count}}m",
       "skillsShort": "{{count}}f",
       "commandsShort": "{{count}}b"
@@ -3566,7 +3644,6 @@
     "personalDefaultDescription": "Ampidiro mandeha ho azy rehefa tsy misy tahiry misy piraofilina voafantina.",
     "organizationDefaultDescription": "Auto-loaded ho an'ny mpikambana tsy manana default manokana.",
     "setAsDefault": "Ataovy ho default",
-    "removeDefault": "Esory ho default",
     "saveFailed": "Tsy afaka mitahiry piraofilina",
     "deleteTitle": "Fafao ny mombamomba",
     "deleteMessage": "Izany dia manala tanteraka ny mombamomba sy ny firafiny. Tsy azo averina izany.",
@@ -3579,7 +3656,6 @@
     "keyTooLong": "Tokony tsy mihoatra ny 256 tarehintsoratra ny fanalahidy",
     "keyDuplicate": "Efa ao amin'ny profil ity fanalahidy ity",
     "valueLabel": "Sanda",
-    "secretLabel": "zava-miafina",
     "secrets": {
       "markSecret": "Mariho ho tsiambaratelo",
       "masked": "Sanda miafina",
@@ -3592,11 +3668,13 @@
     "commandsTitle": "Mametraka baiko",
     "addCommand": "Ampio baiko",
     "commandLabel": "didy",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "oh. pnpm install",
     "commandsEmpty": "Tsy mbola misy baiko fanamboarana",
     "commandsSaveFailed": "Tsy afaka mitahiry baiko fanamboarana",
     "moveUp": "Miakatra",
     "moveDown": "Mandrosoa midina",
+    "moveCommandUp": "Afindra baiko {{position}} miakatra",
+    "moveCommandDown": "Afindra baiko {{position}} midina",
     "skillsTitle": "fahaiza-manao",
     "addSkill": "Ampio fahaizana",
     "skillNameLabel": "Anarana fahaizana",
@@ -3636,7 +3714,9 @@
       "jsonTooLarge": "Ampiasao farafahabetsany 50 fidirana, fanalahidy hatramin'ny 128 ary sanda hatramin'ny 4096 tarehintsoratra",
       "timeoutInvalid": "Tokony ho milisegondra iray manontolo ny fotoana fiatoana",
       "edit": "Ahitsio MCP server",
-      "saveFailed": "Tsy afaka nitahiry mpizara MCP"
+      "saveFailed": "Tsy afaka nitahiry mpizara MCP",
+      "deleteFailed": "Tsy afaka namafa mpizara MCP",
+      "updateFailed": "Tsy afaka nanavao mpizara MCP"
     },
     "agents": {
       "title": "Mpampiasa mombamomba",
@@ -3662,11 +3742,15 @@
       "visibilityPrimary": "Kilonga - aseho ao amin'ny mpanangona",
       "visibilitySubagent": "Subagent - azo antsoina amin'ny hafa ihany",
       "visibilityAll": "Rehetra - izy roa",
+      "modePrimary": "Kilonga ihany",
+      "modeSubagent": "Subagent ihany",
+      "modeAll": "Fomba rehetra",
       "saveFailed": "Tsy afaka namonjy mpandraharaha",
+      "deleteFailed": "Tsy afaka namafa mpandraharaha",
       "nameRequired": "Ampidiro anarana mpandraharaha",
       "slugRequired": "Ampidiro ny slug mpandraharaha",
       "slugInvalid": "Ny slug dia tsy maintsy manomboka amin'ny litera ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
-      "slugConflict": "Io slug io dia natokana ho an'ny mpandraharaha iray",
+      "slugConflict": "Etra io slug io efa ampiasain'ny azy ao anatiny na azy hafa amin'ity profil ity",
       "edit": "Ahitsio mpandraharaha"
     },
     "slashCommands": {
@@ -3677,10 +3761,12 @@
       "description": "Famaritana ny baiko",
       "template": "Endrika",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Hazavao ny $ARGUMENTS",
       "subtask": "Mihazakazaka toy ny subtask",
       "edit": "Ahitsio slash command",
       "saveFailed": "Tsy afaka mitahiry baiko",
+      "deleteFailed": "Tsy afaka namafa baiko",
       "nameRequired": "Ampidiro anarana baiko",
       "nameInvalid": "Ny anarana dia tsy maintsy manomboka amin'ny litera kely ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
       "templateRequired": "Ampidiro môdely baiko",
@@ -3719,6 +3805,8 @@
     "empty": "Tsy misy ny fonosana kireditra amin'izao fotoana izao.",
     "noMatchingProducts": "Tsy nisy fonosana kireditra mifanaraka naverin'ny App Store.",
     "noMatchingProductsPlay": "Tsy nisy fonosana kireditra mifanaraka naverin'ny Google Play.",
+    "storeTimedOut": "Tsy namaly tamin'ny fotoana ilay App Store. Andramo indray.",
+    "storeTimedOutPlay": "Tsy namaly tamin'ny fotoana ilay Google Play. Andramo indray.",
     "purchaseOwnedByAnotherAccount": "Ny kireditra amin'ity Apple Account ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy.",
     "purchaseOwnedByAnotherAccountPlay": "Ny kireditra amin'ity kaonty Google Play ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy."
   },
@@ -3827,7 +3915,7 @@
     "view": "Vakio ny tatitra",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Asehoy ny sata ankehitriny",
+    "dismiss": "Esory ny tatitra",
     "offline": "Tsy misy tambajotra · tatitra voatahiry",
     "cached": "Tatitra voatahiry · tsy azo havaozina",
     "revised": "Nohavaozina · {{revision}}",

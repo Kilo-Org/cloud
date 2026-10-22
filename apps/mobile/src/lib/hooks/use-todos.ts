@@ -21,7 +21,7 @@ const TODO_UNDO_WINDOW_MS = 5000;
 export const PENDING_TODO_ID_PREFIX = 'pending:';
 let pendingTodoSequence = 0;
 
-/** To-dos whose delete is held for the undo toast; every read hides them. */
+/** To-dos whose delete is held for the undo toast; the item-list read hides them. */
 const heldDeletes = new Set<string>();
 
 function showMutationError(error: { message: string }) {

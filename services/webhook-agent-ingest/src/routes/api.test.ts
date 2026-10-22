@@ -9,6 +9,7 @@ vi.mock('../util/do-retry', () => ({
 }));
 
 import { api, TriggerConfigInput, TriggerConfigUpdateInput } from './api';
+import type { CapturedRequest } from '../dos/TriggerDO';
 
 describe('trigger variant validation', () => {
   const createInput = {
@@ -122,6 +123,7 @@ type StoredConfig = {
   targetType: 'cloud_agent' | 'kiloclaw_chat';
   activationMode: string;
   sandboxAllocation?: 'isolated-standard';
+  isActive?: boolean;
 };
 
 type ScheduledInvocation = { success: true; requestId: string } | { success: false; error: string };
@@ -129,11 +131,13 @@ type ScheduledInvocation = { success: true; requestId: string } | { success: fal
 function existingConfig(
   targetType: StoredConfig['targetType'],
   activationMode = 'webhook',
-  sandboxAllocation?: StoredConfig['sandboxAllocation']
+  sandboxAllocation?: StoredConfig['sandboxAllocation'],
+  isActive = true
 ): StoredConfig {
   return {
     targetType,
     activationMode,
+    isActive,
     ...(sandboxAllocation ? { sandboxAllocation } : {}),
   };
 }
@@ -142,6 +146,13 @@ function createRouteHarness(initialConfig: StoredConfig | null) {
   const config = initialConfig;
   const configure = vi.fn(async () => ({ success: true }));
   const getConfig = vi.fn(async () => config);
+  const exists = vi.fn(async () => config !== null);
+  const isActive = vi.fn(async () => config?.isActive ?? false);
+  const listRequests = vi.fn(async (_limit: number): Promise<{ requests: CapturedRequest[] }> => ({
+    requests: [],
+  }));
+  const getRequest = vi.fn(async (_requestId: string): Promise<CapturedRequest | null> => null);
+  const deleteTrigger = vi.fn(async () => ({ success: true }));
   const updateConfig = vi.fn(
     async (updates: { sandboxAllocation?: 'isolated-standard' | null }) => {
       if (config && updates.sandboxAllocation !== undefined) {
@@ -156,10 +167,22 @@ function createRouteHarness(initialConfig: StoredConfig | null) {
   );
   const getConfigForResponse = vi.fn(async () => config);
   const idFromName = vi.fn((name: string) => name);
-  const invokeScheduled = vi.fn(
-    async (): Promise<ScheduledInvocation> => ({ success: true, requestId: crypto.randomUUID() })
-  );
-  const stub = { configure, getConfig, updateConfig, getConfigForResponse, invokeScheduled };
+  const invokeScheduled = vi.fn(async (): Promise<ScheduledInvocation> => ({
+    success: true,
+    requestId: crypto.randomUUID(),
+  }));
+  const stub = {
+    configure,
+    getConfig,
+    exists,
+    isActive,
+    listRequests,
+    getRequest,
+    deleteTrigger,
+    updateConfig,
+    getConfigForResponse,
+    invokeScheduled,
+  };
   const env = {
     INTERNAL_API_SECRET: { get: vi.fn(async () => INTERNAL_API_SECRET) },
     TRIGGER_DO: {
@@ -170,11 +193,16 @@ function createRouteHarness(initialConfig: StoredConfig | null) {
 
   return {
     configure,
+    deleteTrigger,
     env,
+    exists,
     getConfig,
     getConfigForResponse,
+    getRequest,
     idFromName,
     invokeScheduled,
+    isActive,
+    listRequests,
     updateConfig,
   };
 }
@@ -371,5 +399,103 @@ describe('scheduled trigger invocation routes', () => {
 
     expect(response.status).toBe(500);
     expect(invokeScheduled).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('request routes for paused triggers', () => {
+  const headers = { 'X-Internal-API-Key': INTERNAL_API_SECRET };
+  const requestsPath = `/triggers/user/user-1/${TRIGGER_ID}/requests`;
+  const requestPath = `${requestsPath}/00000000-0000-4000-8000-000000000005`;
+  const capturedRequest: CapturedRequest = {
+    id: '00000000-0000-4000-8000-000000000005',
+    timestamp: '2026-01-01T00:00:00.000Z',
+    method: 'POST',
+    path: '/webhook',
+    queryString: null,
+    headers: {},
+    body: '{}',
+    contentType: 'application/json',
+    sourceIp: null,
+    startedAt: null,
+    completedAt: null,
+    processStatus: 'captured',
+    cloudAgentSessionId: null,
+    errorMessage: null,
+    triggerSource: 'webhook',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('lists captured requests for a paused trigger', async () => {
+    const pausedConfig = existingConfig('cloud_agent', 'webhook', undefined, false);
+    const { env, exists, isActive, listRequests } = createRouteHarness(pausedConfig);
+    listRequests.mockResolvedValueOnce({ requests: [capturedRequest] });
+
+    const response = await api.request(requestsPath, { headers }, env);
+
+    expect(response.status).toBe(200);
+    expect(exists).toHaveBeenCalledOnce();
+    expect(isActive).not.toHaveBeenCalled();
+    expect(listRequests).toHaveBeenCalledOnce();
+    expect(await response.json()).toMatchObject({
+      success: true,
+      data: { requests: [capturedRequest] },
+    });
+  });
+
+  it('gets a captured request for a paused trigger', async () => {
+    const pausedConfig = existingConfig('cloud_agent', 'webhook', undefined, false);
+    const { env, exists, getRequest, isActive } = createRouteHarness(pausedConfig);
+    getRequest.mockResolvedValueOnce(capturedRequest);
+
+    const response = await api.request(requestPath, { headers }, env);
+
+    expect(response.status).toBe(200);
+    expect(exists).toHaveBeenCalledOnce();
+    expect(isActive).not.toHaveBeenCalled();
+    expect(getRequest).toHaveBeenCalledOnce();
+  });
+
+  it('deletes a paused trigger so its Durable Object config is not orphaned', async () => {
+    const pausedConfig = existingConfig('cloud_agent', 'webhook', undefined, false);
+    const { env, deleteTrigger, exists, isActive } = createRouteHarness(pausedConfig);
+
+    const response = await api.request(
+      `/triggers/user/user-1/${TRIGGER_ID}`,
+      {
+        method: 'DELETE',
+        headers,
+      },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(exists).toHaveBeenCalledOnce();
+    expect(isActive).not.toHaveBeenCalled();
+    expect(deleteTrigger).toHaveBeenCalledOnce();
+  });
+
+  it('still returns 404 for missing triggers without reading requests', async () => {
+    const { deleteTrigger, env, getRequest, listRequests } = createRouteHarness(null);
+
+    const listResponse = await api.request(requestsPath, { headers }, env);
+    const getResponse = await api.request(requestPath, { headers }, env);
+    const deleteResponse = await api.request(
+      `/triggers/user/user-1/${TRIGGER_ID}`,
+      {
+        method: 'DELETE',
+        headers,
+      },
+      env
+    );
+
+    expect(listResponse.status).toBe(404);
+    expect(getResponse.status).toBe(404);
+    expect(deleteResponse.status).toBe(404);
+    expect(listRequests).not.toHaveBeenCalled();
+    expect(getRequest).not.toHaveBeenCalled();
+    expect(deleteTrigger).not.toHaveBeenCalled();
   });
 });

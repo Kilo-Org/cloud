@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Switch, View } from 'react-native';
+import { Pressable, Switch, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -12,6 +12,7 @@ import {
 } from '@/components/profiles/profile-mcp-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Lock, Pencil, Server, Trash2 } from '@/components/ui/icons';
@@ -23,6 +24,8 @@ import {
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_MCP_SERVERS: AgentProfileDetail['mcpServers'] = [];
@@ -93,7 +96,7 @@ function McpServerRowView({
       </View>
       <Switch value={server.enabled} accessibilityLabel={server.name} onValueChange={onToggle} />
       <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('profiles.mcp.edit')}
         onPress={onEdit}
@@ -101,7 +104,7 @@ function McpServerRowView({
         <Pencil size={18} color={colors.mutedForeground} />
       </Pressable>
       <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('common.delete')}
         onPress={onDelete}
@@ -165,7 +168,7 @@ export function ProfileMcpScreen({
       await deleteMcp.mutateAsync({ profileId, mcpServerId });
     } catch (error) {
       if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.mcp.saveFailed'));
+        toast.error(t('profiles.mcp.deleteFailed'));
       }
     }
   };
@@ -228,7 +231,7 @@ export function ProfileMcpScreen({
                   {
                     onError: error => {
                       if (!hasUsableMessage(error)) {
-                        toast.error(t('profiles.mcp.saveFailed'));
+                        toast.error(t('profiles.mcp.updateFailed'));
                       }
                     },
                   }
@@ -253,7 +256,7 @@ export function ProfileMcpScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profiles.mcp.title')} />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -261,7 +264,7 @@ export function ProfileMcpScreen({
         showsVerticalScrollIndicator={false}
       >
         {content}
-      </ScrollView>
+      </TabScreenScrollView>
 
       {form !== null ? (
         <McpFormSheet

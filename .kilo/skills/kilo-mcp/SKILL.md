@@ -51,7 +51,7 @@ to send platform feedback and bug reports rather than a support channel.
 The first path segment names an area. Search to learn an area's vocabulary:
 each row's `summary` and `tags` are what the search matches.
 
-**856 procedures** — **362 queries**, **494 mutations** — under **51 prefixes**.
+**836 procedures** — **357 queries**, **479 mutations** — under **49 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations |
 |---|---:|---:|---:|
@@ -64,12 +64,11 @@ each row's `summary` and `tags` are what the search matches.
 | `kiloPass` | 21 | 11 | 10 |
 | `githubPrReview` | 20 | 6 | 14 |
 | `githubApps` | 19 | 9 | 10 |
-| `cliSessionsV2` | 18 | 10 | 8 |
+| `cliSessionsV2` | 17 | 10 | 7 |
 | `appBuilder` | 16 | 6 | 10 |
-| `cliSessions` | 16 | 7 | 9 |
-| `mcpGateway` | 16 | 4 | 12 |
 | `providerReview` | 16 | 8 | 8 |
 | `todos` | 16 | 6 | 10 |
+| `cliSessions` | 15 | 7 | 8 |
 | `deployments` | 14 | 6 | 8 |
 | `moderation` | 11 | 3 | 8 |
 | `codeReviews` | 9 | 6 | 3 |
@@ -95,7 +94,6 @@ each row's `summary` and `tags` are what the search matches.
 | `credits` | 3 | 1 | 2 |
 | `linear` | 3 | 1 | 2 |
 | `unifiedSessions` | 3 | 3 | 0 |
-| `mcpGatewayAuthorizations` | 2 | 1 | 1 |
 | `models` | 2 | 2 | 0 |
 | `openAiChatGpt` | 2 | 1 | 1 |
 | `spendAlerts` | 2 | 1 | 1 |

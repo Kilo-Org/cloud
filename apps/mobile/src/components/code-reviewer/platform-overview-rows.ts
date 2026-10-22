@@ -81,11 +81,12 @@ export function buildOverviewRows({
       subtitle:
         data.focusAreas.length > 0
           ? formatList(
-              // An area the app does not know yet reads as its raw code.
+              // A stored area the app does not know still names itself, wrapped
+              // in localized copy so no bare English code leaks into the list.
               data.focusAreas.map(area =>
-                area in focusAreaLabels
+                Object.hasOwn(focusAreaLabels, area)
                   ? i18n.t(focusAreaLabels[area as keyof typeof focusAreaLabels])
-                  : area
+                  : i18n.t('codeReviewer.focusArea.unknown', { area })
               ),
               i18n.language
             )

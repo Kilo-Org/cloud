@@ -280,13 +280,18 @@ describe('CreditPurchaseScreen', () => {
     await waitFor(() => allText(renderer).includes('App Store products unavailable'));
 
     expect(packRows(renderer)).toHaveLength(4);
-    expect(allText(renderer)).toContain('No matching credit packs were returned by App Store.');
+    expect(allText(renderer)).toContain(
+      'Could not connect to the App Store. Check your connection and try again.'
+    );
     // The iOS card names the App Store for both its title and its body; the
     // Google Play copy must never leak onto it.
     expect(allText(renderer)).not.toContain('Google Play products unavailable');
     expect(allText(renderer)).not.toContain(
-      'No matching credit packs were returned by Google Play.'
+      'Could not connect to Google Play. Check your connection and try again.'
     );
+    // A store failure is not a catalog claim: the no-match body belongs to a
+    // store that answered and priced no pack.
+    expect(allText(renderer)).not.toContain('No matching credit packs were returned by App Store.');
     expect(allText(renderer)).toContain('Price unavailable');
     // The store SDK's own wording never reaches the screen.
     expect(allText(renderer)).not.toContain('Failed to query product');
@@ -313,10 +318,60 @@ describe('CreditPurchaseScreen', () => {
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => allText(renderer).includes('Google Play products unavailable'));
 
-    expect(allText(renderer)).toContain('No matching credit packs were returned by Google Play.');
+    expect(allText(renderer)).toContain(
+      'Could not connect to Google Play. Check your connection and try again.'
+    );
     // The App Store copy must never leak onto the Android card.
     expect(allText(renderer)).not.toContain('App Store products unavailable');
-    expect(allText(renderer)).not.toContain('No matching credit packs were returned by App Store.');
+    expect(allText(renderer)).not.toContain(
+      'Could not connect to the App Store. Check your connection and try again.'
+    );
+    expect(packRows(renderer)).toHaveLength(4);
+    unmount();
+  });
+
+  it('timeout: a store that never answers shows the timeout copy, not a catalog claim', async () => {
+    mockedPlatform.OS = 'android';
+    owner.fetchStoreProducts.mockImplementation(
+      // eslint-disable-next-line @typescript-eslint/promise-function-async -- the store never answers, which is the scenario under test
+      () => new Promise<never>(() => undefined)
+    );
+    vi.useFakeTimers();
+    try {
+      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+      // Let the mount reach the store call and arm the loader's deadline.
+      await settleTimers(() => owner.fetchStoreProducts.mock.calls.length === 1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+      });
+      await settleTimers(() => allText(renderer).includes('Google Play products unavailable'));
+
+      expect(allText(renderer)).toContain('Google Play products unavailable');
+      expect(allText(renderer)).toContain("Google Play didn't respond in time. Try again.");
+      expect(allText(renderer)).not.toContain(
+        'No matching credit packs were returned by Google Play.'
+      );
+      expect(allText(renderer)).not.toContain(
+        'Could not connect to Google Play. Check your connection and try again.'
+      );
+      // The backend amounts stay on screen, unpriced, with a retry to offer.
+      expect(packRows(renderer)).toHaveLength(4);
+      expect(allText(renderer)).toContain('Price unavailable');
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('no match: a store that answers without pricing a pack keeps the catalog claim', async () => {
+    mockedPlatform.OS = 'android';
+    owner.fetchStoreProducts.mockResolvedValue([{ id: 'credits_usd250', displayPrice: '$249.99' }]);
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('Google Play products unavailable'));
+
+    expect(allText(renderer)).toContain('No matching credit packs were returned by Google Play.');
+    expect(allText(renderer)).not.toContain("Google Play didn't respond in time. Try again.");
     expect(packRows(renderer)).toHaveLength(4);
     unmount();
   });
@@ -390,7 +445,9 @@ describe('CreditPurchaseScreen', () => {
     expect(owner.fetchStoreProducts.mock.calls.length).toBe(2);
     expect(packRows(renderer)).toHaveLength(4);
     expect(allText(renderer)).toContain('App Store products unavailable');
-    expect(allText(renderer)).toContain('No matching credit packs were returned by App Store.');
+    expect(allText(renderer)).toContain(
+      'Could not connect to the App Store. Check your connection and try again.'
+    );
     expect(allText(renderer)).toContain('Price unavailable');
     expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
     // The button that started the retry stays on screen, busy and disabled.

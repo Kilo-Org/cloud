@@ -134,6 +134,7 @@ import {
   SESSION_SLOW_LOAD_MS,
   useSessionSlowLoadPhase,
 } from '@/components/agents/session-slow-load';
+import { getLanguageSnapshot } from '@/i18n';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
   collectTranscriptItemKeysByPart,
@@ -212,6 +213,7 @@ import {
 } from '@/components/agents/new-session-prefill';
 import { type ForkCut, resolveForkCut } from '@/components/agents/fork-cut';
 import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -1596,7 +1598,10 @@ export function SessionDetailContent({
   }, [manager, t]);
 
   const handleBackToSessions = useCallback(() => {
-    router.replace('/(app)/(tabs)/(2_agents)' as Href);
+    // POP_TO reuses the `(tabs)` route under this screen and truncates every
+    // `agent-chat` route above it, so a composer still on the stack under a
+    // missing session is gone with it.
+    router.dismissTo(AGENTS_SESSIONS_HREF);
   }, [router]);
 
   const handleModelSelect = useCallback(
@@ -1744,7 +1749,12 @@ export function SessionDetailContent({
         pendingMessages,
         canceledQueuedMessages,
       }),
-    [displayedMessages, messages, pendingMessages, canceledQueuedMessages]
+    // `getLanguageSnapshot()` re-resolves the captured copy (`selectMessageFailure`
+    // resolves titles through module-level `i18n.t`) when the app language
+    // changes while the session is mounted; the failure is otherwise stable on
+    // its message inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- language drives the resolved copy inside selectMessageFailure
+    [displayedMessages, messages, pendingMessages, canceledQueuedMessages, getLanguageSnapshot()]
   );
   const footerStatusIndicator =
     statusIndicator !== null &&
@@ -2257,7 +2267,7 @@ export function SessionDetailContent({
             // line ("Moving-average empty windo…").
             reserveTitleSpace
             titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
-            backFallback={'/(app)/(tabs)/(2_agents)' as Href}
+            backFallback={AGENTS_SESSIONS_HREF}
             headerRight={headerRight}
             headerRightShrinks
             className="pb-1"

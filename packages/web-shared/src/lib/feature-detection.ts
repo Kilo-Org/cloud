@@ -24,7 +24,6 @@ export const FEATURE_VALUES = [
   'cloud-agent-web',
   'code-review',
   'code-review-memory',
-  'auto-triage',
   'app-builder',
   'agent-manager',
   'security-agent',
@@ -62,17 +61,17 @@ export function validateFeatureHeader(headerValue: string | null): FeatureValue 
 }
 
 /**
- * Server-side products that rate-limit free models per user instead of per IP.
- * These products share infrastructure IPs, so IP-based limits would be too restrictive.
+ * Server-side products that reach the gateway from shared Kilo infrastructure
+ * (Cloudflare Workers), so their source IP says nothing about the user.
  */
-const USER_RATE_LIMITED_FEATURES: ReadonlySet<FeatureValue> = new Set([
+const SERVER_SIDE_PRODUCT_FEATURES: ReadonlySet<FeatureValue> = new Set([
   'cloud-agent',
   'code-review',
   'app-builder',
   'gastown',
 ]);
 
-export function isUserRateLimitedFeature(feature: FeatureValue | null): boolean {
+export function isServerSideProductFeature(feature: FeatureValue | null): boolean {
   if (!feature) return false;
-  return USER_RATE_LIMITED_FEATURES.has(feature);
+  return SERVER_SIDE_PRODUCT_FEATURES.has(feature);
 }

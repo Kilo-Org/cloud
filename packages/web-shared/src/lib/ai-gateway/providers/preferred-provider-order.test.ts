@@ -4,38 +4,10 @@ import {
   type PreferredProviderOrderConfig,
 } from '@kilocode/db/schema-types';
 import {
-  PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG,
+  EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG,
   findPreferredProviderOrderRuleIndex,
   resolvePreferredProviderOrder,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
-
-describe('PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG', () => {
-  it('is a valid configuration', () => {
-    expect(
-      PreferredProviderOrderConfigSchema.safeParse(PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG).success
-    ).toBe(true);
-  });
-
-  it.each([
-    ['openai/gpt-5.5', ['openai']],
-    ['openai/o3', ['openai']],
-    ['gpt-5.5', ['openai']],
-    ['openai/gpt-oss-120b', []],
-    ['anthropic/claude-sonnet-4.5', ['google-vertex', 'amazon-bedrock']],
-    ['minimax/minimax-m3', ['minimax/fp8']],
-    ['mistralai/mistral-large', ['mistral']],
-    ['moonshotai/kimi-k3', ['amazon-bedrock', 'alibaba']],
-    ['stepfun/step-4', ['stepfun']],
-    ['deepseek/deepseek-v4-pro', ['novita']],
-    ['z-ai/glm-5.2', ['friendli', 'novita']],
-    ['qwen/qwen3.7-coder', ['alibaba']],
-    ['google/gemini-3-pro', []],
-  ])('resolves %s to %j', (model, providers) => {
-    expect(resolvePreferredProviderOrder(PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG, model)).toEqual(
-      providers
-    );
-  });
-});
 
 describe('resolvePreferredProviderOrder', () => {
   const config: PreferredProviderOrderConfig = {
@@ -59,6 +31,12 @@ describe('resolvePreferredProviderOrder', () => {
 
   it('returns no providers when nothing matches', () => {
     expect(resolvePreferredProviderOrder(config, 'other/model-z-lite')).toEqual([]);
+  });
+
+  it('returns no providers for the empty config', () => {
+    expect(
+      resolvePreferredProviderOrder(EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG, 'vendor/model-x')
+    ).toEqual([]);
   });
 
   it('returns a copy that callers can mutate', () => {

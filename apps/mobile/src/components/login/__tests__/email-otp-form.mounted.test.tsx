@@ -136,6 +136,11 @@ describe('EmailOtpForm destination layout', () => {
       i18n.t('login.enterCodeSentTo', { email: displayedEmail })
     );
     expect(text).not.toContain(email);
+    const node = destination(mounted.root, displayedEmail);
+    expect(node.props.numberOfLines).toBeUndefined();
+    expect(node.props.ellipsizeMode).toBeUndefined();
+    expect(node.props.allowFontScaling).not.toBe(false);
+    expect(node.props.adjustsFontSizeToFit).not.toBe(true);
     const input = mounted.root.findByType('TextInput');
     act(() => {
       (input.props.onChangeText as (value: string) => void)('123456');

@@ -66,6 +66,7 @@ import {
   checkExclusiveModelProviderAllowed,
   modelDoesNotExistOnOpenRouterResponse,
   chatGptReconnectResponse,
+  openAiChatGptLimitResponse,
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
@@ -88,6 +89,8 @@ import {
   type FreeModelRateLimitSubject,
 } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { isOpenAiChatGptRateLimited } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/rate-limit';
+import { openAiChatGptOwnerKey } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
@@ -841,6 +844,14 @@ export async function handleLlmProxyRequest(
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
   }
   const effectiveProviderContext = providerResult;
+
+  const chatGptOwner = effectiveProviderContext.provider.chatGptOwner;
+  if (chatGptOwner && (await isOpenAiChatGptRateLimited(request, chatGptOwner))) {
+    console.warn(
+      `ChatGPT connection rate limit exceeded, ${openAiChatGptOwnerKey(chatGptOwner)}, model: ${effectiveModelIdLowerCased}, feature: ${feature ?? 'none'}`
+    );
+    return openAiChatGptLimitResponse();
+  }
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
     try {

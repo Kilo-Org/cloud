@@ -59,6 +59,7 @@ import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/provider
 import { rewriteModelResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import { isOpenAiChatGptRateLimited } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/rate-limit';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
@@ -116,6 +117,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
   ),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/rate-limit');
 jest.mock(
   '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server',
   () => ({
@@ -230,6 +232,7 @@ const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
 const mockedRewriteModelResponse = jest.mocked(rewriteModelResponse);
 const mockedIsFreeModelRateLimited = jest.mocked(isFreeModelRateLimited);
+const mockedIsOpenAiChatGptRateLimited = jest.mocked(isOpenAiChatGptRateLimited);
 const mockedIsCustomLlm = jest.mocked(isCustomLlm);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedDecide = jest.mocked(decide);
@@ -1503,6 +1506,59 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(body.error).toContain('/byok');
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
+
+  describe('ChatGPT connection rate limit', () => {
+    const chatGptOwner = { kiloUserId: 'user-123', organizationId: null };
+
+    beforeEach(() => {
+      mockedGetProvider.mockResolvedValue({
+        kind: 'provider',
+        provider: { ...provider, id: 'openai-chatgpt', chatGptOwner },
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+        skipBalanceCheck: true,
+      });
+    });
+
+    it('refuses a connection over its limit without falling back to another billing path', async () => {
+      mockedIsOpenAiChatGptRateLimited.mockResolvedValue(true);
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get('x-should-retry')).toBe('false');
+      expect(await response.json()).toMatchObject({ error_type: 'rate_limit_exceeded' });
+      expect(mockedIsOpenAiChatGptRateLimited).toHaveBeenCalledWith(
+        expect.anything(),
+        chatGptOwner
+      );
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it('serves a connection under its limit', async () => {
+      mockedIsOpenAiChatGptRateLimited.mockResolvedValue(false);
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('does not apply the ChatGPT connection rate limit to other providers', async () => {
+    mockedIsOpenAiChatGptRateLimited.mockResolvedValue(true);
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedIsOpenAiChatGptRateLimited).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
   it('answers an inaccessible custom LLM like an unknown model instead of falling back', async () => {
     mockedGetProvider.mockResolvedValue({ kind: 'custom-llm-unavailable' });
 

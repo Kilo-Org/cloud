@@ -596,6 +596,15 @@ export function accountFreeModelLimitResponse() {
   );
 }
 
+export function openAiChatGptLimitResponse() {
+  const message =
+    'ChatGPT connection request rate limit reached. Please try again later, or switch to a different model.';
+  return NextResponse.json(
+    { error: 'Rate limit exceeded', error_type: ProxyErrorType.rate_limit_exceeded, message },
+    { status: 429, headers: DO_NOT_RETRY_HEADERS }
+  );
+}
+
 export function customRouterErrorResponse(code: CustomRouterErrorCode, message: string) {
   return NextResponse.json(
     { error: { code, message }, error_type: ProxyErrorType.custom_router, message },

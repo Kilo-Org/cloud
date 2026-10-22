@@ -151,7 +151,7 @@ export const refreshed = layerKilo({
 /* The README's stop button. */
 export const stopped = Effect.gen(function* () {
   const session = yield* openSession({ system: 'sys', model: 'm' });
-  const reading = yield* Effect.fork(Stream.runDrain(session.ask('Count to 300.')));
+  const reading = yield* Effect.forkChild(Stream.runDrain(session.ask('Count to 300.')));
   yield* Fiber.interrupt(reading);
 });
 

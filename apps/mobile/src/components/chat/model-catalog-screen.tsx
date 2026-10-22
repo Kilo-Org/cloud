@@ -12,7 +12,7 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { SearchX } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
-import { deviceFit } from '@/lib/chat/device-fit';
+import { deviceFit, fitsDevice } from '@/lib/chat/device-fit';
 import { GGUF_CATALOG } from '@/lib/chat/gguf-catalog';
 import { type HfListedModel } from '@/lib/chat/hf-catalog';
 import { useDeviceBudget, useHfModelSearch } from '@/lib/chat/use-hf-catalog';
@@ -51,7 +51,7 @@ export function ModelCatalogScreen() {
     search.query === ''
       ? GGUF_CATALOG.filter(model => {
           const fit = deviceFit(downloadBytes(model), budget);
-          return tab === 'all' || fit === 'fits' || fit === 'tight' || fit === undefined;
+          return tab === 'all' || fitsDevice(fit);
         })
       : [];
   const hasPages = (models.data?.pages.length ?? 0) > 0;

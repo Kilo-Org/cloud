@@ -8,6 +8,7 @@ import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
+import { connectNoticeKey } from '@/components/code-reviewer/connect-notice-key';
 import {
   buildOverviewRows,
   resolveRowOnPress,
@@ -148,12 +149,12 @@ export function PlatformOverviewScreen({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-        <CenteredState className="px-6">
+        <CenteredState contentContainerClassName="px-6">
           {canEdit ? (
             <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
           ) : (
             <Text className="text-center text-xs text-muted-foreground">
-              {t('codeReviewer.notConnectedReadOnly', { platform: capabilities.label })}
+              {t(connectNoticeKey(platform), { platform: capabilities.label })}
             </Text>
           )}
         </CenteredState>

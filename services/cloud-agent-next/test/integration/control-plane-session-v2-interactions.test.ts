@@ -1,3 +1,4 @@
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
@@ -18,6 +19,7 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import {
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
   installFakeCredentialEnv,
@@ -31,7 +33,7 @@ type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
 const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace }).SANDBOX_CONTROL;
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
 
-const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
+const NATIVE_KILO_TOKEN = FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN;
 const USER_ID = 'user_123';
 const ORG_ID = 'org_123';
 
@@ -131,6 +133,7 @@ async function installSandbox(
       KILO_OPENROUTER_BASE: 'https://control.test',
       KILO_SESSION_INGEST_URL: 'https://control.test',
     });
+    installFakeRuntimeProxyPeer(instance);
     Object.assign(instance, { createProviderAdapter: () => provider, provider });
   });
   return sandboxStub;

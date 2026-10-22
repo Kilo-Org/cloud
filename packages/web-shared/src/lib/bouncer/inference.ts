@@ -6,7 +6,7 @@ import { after, NextResponse, type NextRequest } from 'next/server';
 
 import { isCloudflareIP } from '@kilocode/web-shared/lib/cloudflare-ip';
 import {
-  isUserRateLimitedFeature,
+  isServerSideProductFeature,
   type FeatureValue,
 } from '@kilocode/web-shared/lib/feature-detection';
 import {
@@ -73,7 +73,7 @@ export function payerSharingIp(
   ip: string | undefined,
   feature: FeatureValue | null
 ): string | undefined {
-  if (ip !== undefined && isUserRateLimitedFeature(feature) && isCloudflareIP(ip)) {
+  if (ip !== undefined && isServerSideProductFeature(feature) && isCloudflareIP(ip)) {
     return undefined;
   }
   return ip;

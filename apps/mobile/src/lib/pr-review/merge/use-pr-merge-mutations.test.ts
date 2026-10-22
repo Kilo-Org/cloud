@@ -24,6 +24,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import type * as OperationKeyModule from '@/lib/operation-key';
 import type * as AnnounceModule from '@/lib/a11y/announce';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
@@ -468,6 +469,39 @@ describe('useMergePullRequestMutation (s6 bitbucket arm)', () => {
 
     await expect(lastCapturedOptions?.mutationFn?.(PROVIDER_MERGE_VARS)).rejects.toMatchObject({
       message: 'The pull request was not merged. Check its state and try again.',
+    });
+  });
+});
+
+describe('merge failure wording (localized provider noun)', () => {
+  beforeEach(() => {
+    resetMocks();
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+    vi.clearAllMocks();
+  });
+
+  it('renders the Finnish sentence from the catalog with its own merge-request noun', async () => {
+    await i18n.changeLanguage('fi');
+    providerMergeMutateMock.mockResolvedValueOnce({ done: false, replayed: false });
+    useMergePullRequestMutation(GITLAB_REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(PROVIDER_MERGE_VARS)).rejects.toMatchObject({
+      message:
+        'Yhdistäminen ei onnistunut: yhdistämispyyntö jäi yhdistämättä. Tarkista sen tila ja yritä uudelleen.',
+    });
+  });
+
+  it('capitalizes the noun when the catalog opens the sentence with it', async () => {
+    await i18n.changeLanguage('ru');
+    providerMergeMutateMock.mockResolvedValueOnce({ done: false, replayed: false });
+    useMergePullRequestMutation(GITLAB_REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(PROVIDER_MERGE_VARS)).rejects.toMatchObject({
+      message: 'Запрос на слияние не был слит. Проверьте его состояние и повторите попытку.',
     });
   });
 });

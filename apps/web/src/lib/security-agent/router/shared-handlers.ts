@@ -911,9 +911,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           existingConfig?.config.remediation_model_slug ??
           analysisModelSlug;
 
-        // Enqueue backlog findings when include_existing becomes active — either
-        // because it was just toggled ON, or because auto-analysis was re-enabled
-        // while include_existing was already ON.
         const wasAutoAnalysisOn = existingConfig?.config.auto_analysis_enabled ?? false;
         const isAutoAnalysisOn =
           input.autoAnalysisEnabled ?? existingConfig?.config.auto_analysis_enabled ?? false;

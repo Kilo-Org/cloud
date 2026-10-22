@@ -45,29 +45,35 @@ When enabled, Cloudflare uses contained sandbox classes and the existing credent
 broker; Vercel uses native network policies. Each worktree has stable credential
 aliases shared by its registered Kilo roots, while different worktrees have
 separate Kilo authentication contexts. Containment failures never fall back to
-raw credentials. When disabled, authorized Kilo and repository credentials are
-provided directly to the sandbox without alias redemption or credential injection.
-Control-plane ownership, attachment scope, terminal authorization, and billing
-checks still apply; direct API credentials retain their underlying access scope.
-Expired direct-credential terminal leases require a session reattachment rather
-than renewing only the server-side grant.
+raw credentials. When disabled, a session whose token has modern runtime
+authorization uses the session-bound runtime credential proxy; managed SCM
+credentials may still be resolved directly for the repository scope. A session
+without either safe Kilo path is refused rather than receiving a native user
+token. Control-plane ownership, attachment scope, terminal authorization, and
+billing checks still apply.
 
 Cloudflare's native outbound handler intercepts ports 80 and 443. With containment
 enabled, local targets such as `http://host.docker.internal:<offset-port>` can
 bypass interception and reject aliases with HTTP 401. Contained E2E runs therefore
 need sandbox-facing endpoints that traverse the native handler, plus the running
-`cloudflare-git-token-service` and its capability-encryption configuration. The
-local-dev direct-credential mode supports the generated high-port HTTP endpoints.
+`cloudflare-git-token-service` and its capability-encryption configuration. Local
+development requires modern resource-token issuance in either containment mode
+so sessions receive a runtime credential proxy. Direct Kilo tokens and
+legacy Kilo broker capabilities are not supported execution paths.
 
 For new legacy sessions (`agent_*`), `CREDENTIAL_CONTAINMENT_ENABLED` controls
 GitHub, GitLab, Bitbucket, and Kilo credential containment together. Containment
 is enabled unless this variable is set to `false`. Local `dev` defaults to
 `false`; set `CREDENTIAL_CONTAINMENT_ENABLED=true` in `.dev.vars` when using
-proxy-compatible upstreams. Devcontainer support is retired; existing sessions
-can be stopped or deleted but cannot start or resume.
+proxy-compatible upstreams. Enable modern resource-token issuance for the
+runtime credential proxy in either containment mode. Devcontainer support is
+retired; existing sessions can be stopped or deleted but cannot start or resume.
 
 Legacy containment flags are persisted at session creation, so changing the
-variable affects new legacy sessions, not existing ones.
+variable affects new legacy sessions, not existing ones. Existing sessions without
+modern runtime authorization fail on start/restore/resume, including contained
+sessions. Their metadata remains readable for viewing, Stop, deletion, and
+cleanup. Start a new session to continue execution.
 
 ## Running
 
@@ -102,7 +108,7 @@ timer or sandbox acceptance:
 
 ```bash
 cd services/cloud-agent-next/wrapper
-KILO_781_BINARY=/path/to/isolated/kilo-7.8.15 bun test --max-concurrency=1 src/control-plane/kilo-supervision-fixture.real.test.ts
+KILO_781_BINARY=/path/to/isolated/kilo-7.8.1 bun test --max-concurrency=1 src/control-plane/kilo-supervision-fixture.real.test.ts
 ```
 
 The local production-timer driver discovers this worktree's ports, uses the seeded
@@ -150,7 +156,7 @@ and post-Stop follow-ups.
 Private reports and transcripts are retained; chats and sandboxes are not deleted
 automatically. See the known CLI 7.4.20 limitation under Troubleshooting.
 
-Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.8.15`):
+Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.8.1`):
 
 ```bash
 pnpm --filter cloud-agent-next exec tsx test/e2e/sdk-basic-chat.ts

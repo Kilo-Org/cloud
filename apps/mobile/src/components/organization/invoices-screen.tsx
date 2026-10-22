@@ -22,6 +22,7 @@ import {
   useOrgBoundary,
   useOrgInvoicesPage,
 } from '@/lib/hooks/use-organization-queries';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -29,6 +30,7 @@ import {
   selectInvoiceRowState,
   shareOrganizationInvoicePdf,
 } from '@/lib/organization-invoice-download';
+import { selectInvoiceErrorVariant } from '@/lib/organization-invoice-error-variant';
 import { cn, firstNonEmpty } from '@/lib/utils';
 
 // FlashList takes `contentContainerStyle` (no className), so the FlatList's
@@ -206,6 +208,7 @@ export function OrganizationInvoicesScreen() {
   const { query, entries: invoices, hasMore } = useOrgInvoicesPage(organizationId);
   const paddingBottom = useTabBarBottomPadding();
   useRouteForegroundRefresh([[['organizations']]]);
+  const committedConnectivity = useCommittedConnectivityStatus();
 
   // `InvoiceRow` is memoized at module scope, so the renderer keeps one identity
   // across data updates and only the changed rows re-render.
@@ -229,13 +232,9 @@ export function OrganizationInvoicesScreen() {
     errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED';
 
   // NOT_FOUND maps to the not-found state; FORBIDDEN/UNAUTHORIZED map to the
-  // permission state. Any other error stays the retryable neutral state.
-  let errorVariant: 'neutral' | 'server' | 'not-found' | 'permission' = 'neutral';
-  if (errorCode === 'NOT_FOUND') {
-    errorVariant = 'not-found';
-  } else if (errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED') {
-    errorVariant = 'permission';
-  }
+  // permission state. A read that settled by failing on a confirmed-offline
+  // device is a connectivity failure; `unknown` keeps the retryable neutral.
+  const errorVariant = selectInvoiceErrorVariant(errorCode, committedConnectivity);
 
   // A later-page failure must keep the already-loaded rows and offer an inline
   // retry instead of replacing the list. Read `isFetchNextPageError`, not

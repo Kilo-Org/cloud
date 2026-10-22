@@ -21,7 +21,7 @@ export {
 } from './organization-base-types';
 
 import type { OrganizationRole, OrganizationPlan } from './organization-base-types';
-import { OrganizationPlanSchema, OrganizationSettingsSchema } from './organization-base-types';
+import { OrganizationSettingsSchema } from './organization-base-types';
 import { EnkryptPublishedBenchmarkSchema, OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
 
 export const OrganizationRoleSchema = z.enum(ORGANIZATION_ROLES);

@@ -227,6 +227,7 @@ function saveButton(renderer: TestRenderer.ReactTestRenderer): Record<string, un
 }
 
 const rangeMessage = i18n.t('organization.memberLimit.rangeError', {
+  min: formatNumber(0, i18n.language),
   max: formatNumber(2000, i18n.language),
 });
 const blankWithoutLimitMessage = i18n.t('organization.memberLimit.blankWithoutLimitError', {

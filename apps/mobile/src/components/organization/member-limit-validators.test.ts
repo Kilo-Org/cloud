@@ -5,7 +5,10 @@ import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 
 const max = formatNumber(2000, i18n.language);
-const rangeMessage = i18n.t('organization.memberLimit.rangeError', { max });
+const rangeMessage = i18n.t('organization.memberLimit.rangeError', {
+  min: formatNumber(0, i18n.language),
+  max,
+});
 
 describe('limitError', () => {
   it('disables save on a blank field instead of treating it as "remove"', () => {

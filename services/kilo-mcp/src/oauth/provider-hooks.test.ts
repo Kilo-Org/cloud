@@ -108,7 +108,11 @@ describe('onError', () => {
       ['invalid_grant', 'Refresh token has expired', 'refresh_token_expired'],
       ['invalid_client', 'Client not found', 'client_not_found'],
       ['invalid_token', 'Access token expired', 'access_token_expired'],
-      ['invalid_token', 'Token audience does not match resource server', 'resource_audience_mismatch'],
+      [
+        'invalid_token',
+        'Token audience does not match resource server',
+        'resource_audience_mismatch',
+      ],
     ];
     for (const [code, description, detail] of cases) {
       const { analytics, calls } = fakeAnalytics();
@@ -120,7 +124,12 @@ describe('onError', () => {
   it('reports a description outside the vocabulary as other, never the raw text', () => {
     const { analytics, calls } = fakeAnalytics();
     onError(
-      { code: 'invalid_request', description: 'Request parameter "x" must not be repeated', status: 400, headers: {} },
+      {
+        code: 'invalid_request',
+        description: 'Request parameter "x" must not be repeated',
+        status: 400,
+        headers: {},
+      },
       { analytics }
     );
     expect(calls).toEqual([

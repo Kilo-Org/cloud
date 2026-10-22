@@ -38,11 +38,11 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
 
   const history = historyQuery.data;
 
-  if (!enabled || !history) {
+  if (!enabled) {
     return null;
   }
 
-  if (historyQuery.isError) {
+  if (historyQuery.isError && !history) {
     return (
       <section
         className="border-border bg-muted/30 space-y-3 rounded-lg border p-4 text-sm"
@@ -59,6 +59,10 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
     );
   }
 
+  if (!history) {
+    return null;
+  }
+
   const summary = summarizeSessionFailureHistory(history);
 
   if (!summary.hasFailures) {
@@ -68,6 +72,8 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
   const handleDownload = async (format: 'json' | 'csv') => {
     setIsDownloading(true);
     setDownloadError(null);
+    let url: string | null = null;
+    let anchor: HTMLAnchorElement | null = null;
     try {
       const file = await queryClient.fetchQuery(
         trpc.cloudAgentNextFailures.exportSessionDiagnostics.queryOptions({
@@ -76,17 +82,17 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
         })
       );
       const blob = new Blob([file.content], { type: file.contentType });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
+      url = URL.createObjectURL(blob);
+      anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = file.fileName;
       document.body.appendChild(anchor);
       anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
     } catch {
       setDownloadError('Could not prepare the diagnostics file. Try again.');
     } finally {
+      anchor?.remove();
+      if (url !== null) URL.revokeObjectURL(url);
       setIsDownloading(false);
     }
   };

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive mounted suite: the tab badge, the live header, and the ack store share the mock harness */
 import { createElement } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, type ReactTestInstance } from '@/test/renderer';
@@ -26,6 +27,27 @@ import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 type Mount = Awaited<ReturnType<typeof renderWithProviders>>;
 const mounts: Mount[] = [];
+
+/** The tray rows a dated raise renders: one waiting permission, one working. */
+function datedRaise(statusUpdatedAt: string): ActiveSession[] {
+  return [
+    {
+      id: 'personal-0',
+      connectionId: 'cli',
+      title: 'Session 0',
+      status: 'permission',
+      organizationId: null,
+      statusUpdatedAt,
+    },
+    {
+      id: 'personal-1',
+      connectionId: 'cli',
+      title: 'Session 1',
+      status: 'busy',
+      organizationId: null,
+    },
+  ];
+}
 
 async function mount(queryClient = makeTestQueryClient()) {
   const result = await renderWithProviders(createElement(CountSurfaces), { queryClient });
@@ -206,6 +228,23 @@ describe('Agents needs-input badge and shared live count', () => {
       expectCounts(result.renderer, suppresses ? 1 : 2, 2);
     }
   );
+
+  it('counts a same-status re-raise after an ack once the row names its raise', async () => {
+    const result = await mount();
+
+    await updateSessions(result, datedRaise('2026-09-18T21:00:00.000Z'));
+    expectCounts(result.renderer, 1, 2);
+
+    // The answer path acks the raise its row names.
+    act(() => {
+      ackSessionAttention('personal-0', 'permission', '2026-09-18T21:00:00.000Z');
+    });
+    expectCounts(result.renderer, undefined, 2);
+
+    // A permission raised later reads as its own raise, not the answered one.
+    await updateSessions(result, datedRaise('2026-09-18T21:30:00.000Z'));
+    expectCounts(result.renderer, 1, 2);
+  });
 
   it('hides counts while the initial live query loads', async () => {
     const { renderer, queryClient } = await mount();

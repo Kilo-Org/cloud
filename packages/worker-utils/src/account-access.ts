@@ -8,7 +8,7 @@ import {
   type OrganizationUserLimitType,
 } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@kilocode/db/schema-types';
-import { and, eq, not, sql } from 'drizzle-orm';
+import { and, eq, isNull, not, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
 // Account access rules shared by the Next.js gateway and Workers that authenticate Kilo users.
@@ -32,6 +32,8 @@ export function isApiTokenPepperCurrent(
   return !accountPepper || accountPepper === tokenPepper;
 }
 
+// A membership resolves only for a live organization: the join excludes a soft-deleted
+// organization, so the caller sees no role (and therefore no membership).
 export async function findOrganizationMemberRole(
   db: AccountDb,
   organizationId: string,
@@ -40,10 +42,12 @@ export async function findOrganizationMemberRole(
   const [membership] = await db
     .select({ role: organization_memberships.role })
     .from(organization_memberships)
+    .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
     .where(
       and(
         eq(organization_memberships.organization_id, organizationId),
-        eq(organization_memberships.kilo_user_id, userId)
+        eq(organization_memberships.kilo_user_id, userId),
+        isNull(organizations.deleted_at)
       )
     )
     .limit(1);
@@ -126,6 +130,7 @@ export async function findOrganizationMemberBalanceRow(
       and(
         eq(organizations.id, organizationId),
         eq(organization_memberships.kilo_user_id, userId),
+        isNull(organizations.deleted_at),
         not(eq(organization_memberships.role, 'billing_manager'))
       )
     )

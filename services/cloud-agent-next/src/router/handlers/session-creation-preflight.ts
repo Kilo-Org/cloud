@@ -1,18 +1,28 @@
 import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
+  loadEnvironmentForSession,
   mergeProfileConfiguration,
   profileMcpServersToClientRecord,
   ProfileNotFoundError,
+  type EnvironmentForSession,
+  type EnvironmentInlineArgs,
+  type EnvironmentOwner,
+  type EnvironmentRepositoryIdentity,
+  type EnvironmentSessionLayer,
   type InlineAgentInput,
   type MergeProfileConfigurationResult,
   type ProfileOwner,
 } from '@kilocode/cloud-agent-profile';
-import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
+import { canonicalGitLabCloneUrl, repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import { getPgDb } from '../../db/pg.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
+import { SessionProfileBundleSchema } from '../../persistence/schemas.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
-import type { SessionCreateRequest } from '../../session/session-requests.js';
+import type {
+  SessionCreateRequest,
+  SessionRepositoryRequest,
+} from '../../session/session-requests.js';
 import { isPolicyBearingAuthToken } from '../../session/policy-bearing-token.js';
 import { assertRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
 import type { TRPCContext } from '../../types.js';
@@ -57,21 +67,88 @@ function repoFullNameForBindingLookup(input: SessionCreateRequest): string | und
   return undefined;
 }
 
-async function resolveProfileForSessionCreateRequest(
+function environmentOwnerForSession(
+  ctx: Pick<TRPCContext, 'userId'>,
+  input: SessionCreateRequest
+): EnvironmentOwner {
+  const organizationId = input.options?.kilocodeOrganizationId;
+  return organizationId
+    ? { type: 'organization', id: organizationId }
+    : { type: 'user', id: ctx.userId };
+}
+
+/** The identity an environment is keyed by; none for a generic git repository. */
+function environmentRepositoryIdentity(
+  repository: SessionRepositoryRequest
+): EnvironmentRepositoryIdentity | undefined {
+  switch (repository.type) {
+    case 'github':
+      return { platform: 'github', repoFullName: repository.repo };
+    case 'gitlab': {
+      const cloneUrl = canonicalGitLabCloneUrl(repository.url);
+      return cloneUrl ? { platform: 'gitlab', cloneUrl } : undefined;
+    }
+    case 'bitbucket':
+      return {
+        platform: 'bitbucket',
+        workspaceUuid: repository.workspaceUuid,
+        repositoryUuid: repository.repositoryUuid,
+      };
+    case 'git':
+      return undefined;
+  }
+}
+
+/**
+ * The environment of the session's repository. It applies on the same origins
+ * as the implicit profile defaults; other origins (for example code review and
+ * the security agent) run without it.
+ */
+async function resolveEnvironment(
   ctx: Pick<TRPCContext, 'env' | 'userId'>,
   input: SessionCreateRequest,
   policy: ProfileResolutionPolicy,
   db?: WorkerDb
-): Promise<MergeProfileConfigurationResult | null> {
-  const shouldResolve =
-    input.profile?.id !== undefined || policy.defaultProfileResolution === 'include-web-defaults';
-  if (!shouldResolve) return null;
+): Promise<EnvironmentForSession | null> {
+  if (policy.defaultProfileResolution !== 'include-web-defaults') return null;
+  const repository = environmentRepositoryIdentity(input.repository);
+  if (!repository) return null;
 
-  const owner: ProfileOwner = input.options?.kilocodeOrganizationId
-    ? { type: 'organization', id: input.options.kilocodeOrganizationId }
-    : { type: 'user', id: ctx.userId };
-  const userId = input.options?.kilocodeOrganizationId ? ctx.userId : undefined;
+  return loadEnvironmentForSession(db ?? getPgDb(ctx.env), {
+    owner: environmentOwnerForSession(ctx, input),
+    repository,
+  });
+}
+
+function inlineOverridesForResolution(input: SessionCreateRequest): EnvironmentInlineArgs {
   const overrides = input.profile?.overrides;
+  return {
+    envVars: overrides?.envVars,
+    setupCommands: overrides?.setupCommands,
+    encryptedSecrets: overrides?.encryptedSecrets,
+    mcpServers: overrides?.mcpServers,
+    runtimeSkills: overrides?.runtimeSkills,
+    runtimeAgents: overrides?.runtimeAgents as InlineAgentInput[] | undefined,
+  };
+}
+
+function shouldResolveProfile(
+  input: SessionCreateRequest,
+  policy: ProfileResolutionPolicy
+): boolean {
+  return (
+    input.profile?.id !== undefined || policy.defaultProfileResolution === 'include-web-defaults'
+  );
+}
+
+async function resolveProfileForSessionCreateRequest(
+  ctx: Pick<TRPCContext, 'env' | 'userId'>,
+  input: SessionCreateRequest,
+  environment: EnvironmentSessionLayer | undefined,
+  db?: WorkerDb
+): Promise<MergeProfileConfigurationResult> {
+  const owner: ProfileOwner = environmentOwnerForSession(ctx, input);
+  const userId = input.options?.kilocodeOrganizationId ? ctx.userId : undefined;
 
   try {
     return await mergeProfileConfiguration(db ?? getPgDb(ctx.env), {
@@ -85,12 +162,8 @@ async function resolveProfileForSessionCreateRequest(
           : input.repository.type === 'github'
             ? 'github'
             : undefined,
-      envVars: overrides?.envVars,
-      setupCommands: overrides?.setupCommands,
-      encryptedSecrets: overrides?.encryptedSecrets,
-      mcpServers: overrides?.mcpServers,
-      runtimeSkills: overrides?.runtimeSkills,
-      runtimeAgents: overrides?.runtimeAgents as InlineAgentInput[] | undefined,
+      environment,
+      ...inlineOverridesForResolution(input),
     });
   } catch (err) {
     if (err instanceof ProfileNotFoundError) {
@@ -144,14 +217,43 @@ function applyProfileResolution(
   };
 }
 
+function assertResolvedConfigurationWithinSessionLimits(
+  resolved: SessionProfileBundle | undefined
+): void {
+  const parsed = SessionProfileBundleSchema.safeParse({
+    envVars: resolved?.envVars,
+    encryptedSecrets: resolved?.encryptedSecrets,
+    setupCommands: resolved?.setupCommands,
+  });
+  if (!parsed.success) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'resolved configuration exceeds session limits',
+    });
+  }
+}
+
 export async function resolveEffectiveSessionConfiguration(
   ctx: Pick<TRPCContext, 'env' | 'userId'>,
   input: SessionCreateRequest,
   policy: ProfileResolutionPolicy,
   db?: WorkerDb
 ): Promise<SessionCreateRequest> {
-  const resolved = await resolveProfileForSessionCreateRequest(ctx, input, policy, db);
-  return applyProfileResolution(input, resolved);
+  const environment = await resolveEnvironment(ctx, input, policy, db);
+  // An environment resolves only under the implicit-defaults policy, so the
+  // profile path always runs when one exists.
+  const resolved = shouldResolveProfile(input, policy)
+    ? await resolveProfileForSessionCreateRequest(ctx, input, environment?.layer, db)
+    : null;
+
+  const resolvedRequest = applyProfileResolution(input, resolved);
+  assertResolvedConfigurationWithinSessionLimits(resolvedRequest.profile?.resolved);
+  // The allocation travels beside the merged configuration; a client cannot
+  // set it.
+  const { environmentSandboxAllocation: _clientAllocation, ...withoutEnvironment } =
+    resolvedRequest;
+  if (!environment?.sandboxAllocation) return withoutEnvironment;
+  return { ...withoutEnvironment, environmentSandboxAllocation: environment.sandboxAllocation };
 }
 
 export function assertModeAvailableForProfile(mode: string, profile: SessionProfileBundle): void {

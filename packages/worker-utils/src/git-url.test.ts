@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { isValidGitUrl, sanitizeGitUrl, parseGitUrl, repoFullNameFromGitUrl } from './git-url.js';
+import {
+  isValidGitUrl,
+  sanitizeGitUrl,
+  parseGitUrl,
+  repoFullNameFromGitUrl,
+  canonicalGitLabCloneUrl,
+} from './git-url.js';
 
 describe('isValidGitUrl', () => {
   it('accepts HTTPS URLs', () => {
@@ -194,5 +200,80 @@ describe('repoFullNameFromGitUrl', () => {
 
   it('returns undefined for unrecognized URLs', () => {
     expect(repoFullNameFromGitUrl('https://example.com/team/repo.git')).toBeUndefined();
+  });
+});
+
+describe('canonicalGitLabCloneUrl', () => {
+  it('appends .git to a project path', () => {
+    expect(canonicalGitLabCloneUrl('https://gitlab.com/group/project')).toBe(
+      'https://gitlab.com/group/project.git'
+    );
+  });
+
+  it('does not append .git twice', () => {
+    expect(canonicalGitLabCloneUrl('https://gitlab.com/group/project.git')).toBe(
+      'https://gitlab.com/group/project.git'
+    );
+  });
+
+  it('strips a default port', () => {
+    expect(canonicalGitLabCloneUrl('https://git.example:443/group/project')).toBe(
+      'https://git.example/group/project.git'
+    );
+  });
+
+  it('keeps a non-default port', () => {
+    expect(canonicalGitLabCloneUrl('https://git.example:8443/gitlab/group/project')).toBe(
+      'https://git.example:8443/gitlab/group/project.git'
+    );
+  });
+
+  it('keeps a base path', () => {
+    expect(canonicalGitLabCloneUrl('https://git.example/gitlab/group/project')).toBe(
+      'https://git.example/gitlab/group/project.git'
+    );
+  });
+
+  it('strips trailing slashes', () => {
+    expect(canonicalGitLabCloneUrl('https://gitlab.com/group/project///')).toBe(
+      'https://gitlab.com/group/project.git'
+    );
+  });
+
+  it('strips userinfo, query, and hash', () => {
+    expect(
+      canonicalGitLabCloneUrl('https://oauth2:token@gitlab.com/group/project.git?ref=main#readme')
+    ).toBe('https://gitlab.com/group/project.git');
+  });
+
+  it('lowercases the host', () => {
+    expect(canonicalGitLabCloneUrl('https://GIT.EXAMPLE/group/project')).toBe(
+      'https://git.example/group/project.git'
+    );
+  });
+
+  it('keeps http URLs', () => {
+    expect(canonicalGitLabCloneUrl('http://git.example/group/project')).toBe(
+      'http://git.example/group/project.git'
+    );
+  });
+
+  it('rejects non-http(s) URLs', () => {
+    expect(canonicalGitLabCloneUrl('git@git.example:group/project.git')).toBeNull();
+    expect(canonicalGitLabCloneUrl('ftp://git.example/group/project')).toBeNull();
+  });
+
+  it('rejects an empty path', () => {
+    expect(canonicalGitLabCloneUrl('https://git.example')).toBeNull();
+    expect(canonicalGitLabCloneUrl('https://git.example/')).toBeNull();
+  });
+
+  it('rejects dot path segments', () => {
+    expect(canonicalGitLabCloneUrl('https://git.example/group/%2e%2e/project')).toBeNull();
+    expect(canonicalGitLabCloneUrl('https://git.example/group/%2e/project')).toBeNull();
+  });
+
+  it('rejects an unparseable URL', () => {
+    expect(canonicalGitLabCloneUrl('not-a-url')).toBeNull();
   });
 });

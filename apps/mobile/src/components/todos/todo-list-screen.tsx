@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Pressable, type ScrollViewInstance, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import { TodoItemRow } from '@/components/todos/todo-item-row';
 import { TodoQuickAdd } from '@/components/todos/todo-quick-add';
 import { useStartTodo } from '@/components/todos/use-start-todo';
 import { useTodoListDefaultsSummary } from '@/components/todos/use-todo-list-defaults-summary';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { ChevronDown, ChevronRight, Settings2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -53,12 +54,13 @@ function ListDefaultsLine({ list, onPress }: Readonly<{ list: TodoList; onPress:
       accessibilityRole="button"
       accessibilityLabel={t('todos.listSettings.title')}
       accessibilityHint={summary ?? undefined}
-      className="mx-4 mb-1 flex-row items-center gap-2 py-1 active:opacity-70"
+      className="mx-4 mb-1 min-h-11 flex-row items-center gap-2 py-2 active:opacity-70"
     >
-      <Settings2 size={14} color={colors.mutedForeground} />
-      <Text className="min-w-0 shrink text-sm text-muted-foreground" numberOfLines={1}>
+      <Settings2 size={16} color={colors.mutedForeground} />
+      <Text className="min-w-0 flex-1 text-sm leading-5 text-ink2">
         {summary ?? t('todos.list.setDefaults')}
       </Text>
+      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
     </Pressable>
   );
 }
@@ -76,7 +78,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
   const { create, update, move, removeWithUndo } = useTodoItemMutations(listId);
   const { review, startNow, startingTodoId } = useStartTodo();
   const [showCompleted, setShowCompleted] = useState(false);
-  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const scrollRef = useAnimatedRef<ScrollViewInstance>();
 
   const openItems = useMemo(
     () => (items.data ?? []).filter(item => item.doneAt === null),

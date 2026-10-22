@@ -1,9 +1,10 @@
 import 'server-only';
 import { client } from '@kilocode/web-shared/lib/stripe-client';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { formatCents } from '@/lib/utils';
 import {
-  ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
+  DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { isFeatureFlagEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import {
@@ -47,9 +48,11 @@ export async function createOrgAutoTopUpSetupCheckoutSession(
   kiloUserId: string,
   organizationId: string,
   stripeCustomerId: string,
-  amountCents: number = DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS
+  amountCents: number = DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
+  thresholdCents: number = DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS
 ): Promise<string | null> {
-  const amountDollars = amountCents / 100;
+  const amountLabel = formatCents(amountCents);
+  const thresholdLabel = formatCents(thresholdCents);
   const feeDeps = createOrgAutoTopUpFeeDeps();
   const prepared = await prepareTopUpCheckoutFee({
     flow: 'organization_auto_top_up_setup',
@@ -73,7 +76,7 @@ export async function createOrgAutoTopUpSetupCheckoutSession(
             currency: 'usd',
             product_data: {
               name: 'Organization Credit Top-Up with Auto-Refill Setup',
-              description: `Initial $${amountDollars} top-up. Your card will be saved for automatic $${amountDollars} top ups when balance drops below $${ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS}.`,
+              description: `Initial ${amountLabel} top-up. Your card will be saved for automatic ${amountLabel} top ups when balance drops below ${thresholdLabel}.`,
             },
             unit_amount: amountCents,
           },
@@ -105,6 +108,7 @@ export async function createOrgAutoTopUpSetupCheckoutSession(
             kiloUserId,
             organizationId,
             amountCents: String(amountCents),
+            thresholdCents: String(thresholdCents),
           },
           prepared.commercialMetadata
         ),

@@ -1,3 +1,4 @@
+import { selectedRuntimeCli } from '../../../src/shared/runtime-distribution.js';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
@@ -10,6 +11,8 @@ import type {
   KiloRestartFaultReason,
 } from '../../../src/shared/control-diagnostics.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
+import { RUNTIME_CREDENTIAL_PROXY_AUDIENCE } from '../../../src/shared/runtime-credential-proxy-handle.js';
+import type { ControlPlaneSessionCredentialsPayload } from '../../../src/shared/control-plane-protocol.js';
 import { createWrapperKiloClient, type WrapperKiloClient } from '../kilo-api.js';
 import { createOwnedProcessScope, type OwnedProcessScope } from '../control/owned-processes.js';
 import { isKiloServerProcess } from '../tool-cgroup.js';
@@ -38,6 +41,14 @@ import {
 } from './runtime-activity.js';
 import type { readSessionSnapshot } from './session-snapshot.js';
 import type { ExecutionIdentity, ExecutionFailure, ExecutionRetry } from './session-supervisor.js';
+import { writeCloudAgentRulesFile } from '../cloud-agent-rules-file.js';
+import type { AgentSandboxProvider } from '../../../src/shared/sandbox-provider.js';
+import {
+  createKiloServerCredential,
+  fetchKiloServer,
+  kiloClientConfig,
+  type KiloServer,
+} from '../kilo-server-auth.js';
 
 const PIDFILE_SUFFIX = '.pid.json';
 const KILO_STARTUP_READY_PATTERN = /^kilo server listening on (http:\/\/127\.0\.0\.1:\d+)\r?\n/m;
@@ -197,9 +208,10 @@ const defaultScheduler: KiloRuntimeScheduler = {
   clearInterval: handle => clearInterval(handle as ReturnType<typeof setInterval>),
 };
 
-export type KiloProcess = {
+export type KiloProcess = KiloServer & {
   readonly pid: number;
-  readonly url: string;
+  /** Every `kilo serve` the wrapper starts requires this credential. */
+  readonly authorization: string;
   /** Resolves when the process exits, for any reason. */
   readonly exited: Promise<void>;
   stop(deadlineAt: number): Promise<boolean>;
@@ -220,11 +232,16 @@ async function defaultSpawnKiloProcess(input: KiloProcessSpawnInput): Promise<Ki
   const placement = admitControlWorkload(input.workload);
   const processes = createOwnedProcessScope(placement);
   input.onProcessScope?.(processes);
+  const credential = createKiloServerCredential();
   // Own process group via the owned-process scope's detached spawn.
-  const proc = processes.spawn('kilo', ['serve', '--hostname=127.0.0.1', '--port=0'], {
-    cwd: input.directory,
-    env: input.env,
-  });
+  const proc = processes.spawn(
+    selectedRuntimeCli(process.env),
+    ['serve', '--hostname=127.0.0.1', '--port=0'],
+    {
+      cwd: input.directory,
+      env: { ...input.env, ...credential.env },
+    }
+  );
   proc.stderr.resume();
   const exited = new Promise<void>(resolve => {
     proc.once('exit', () => resolve());
@@ -264,7 +281,13 @@ async function defaultSpawnKiloProcess(input: KiloProcessSpawnInput): Promise<Ki
     if (proc.pid === undefined) throw new Error('Kilo server has no pid');
     await processes.captureBaseline(isKiloServerProcess);
     const pid = proc.pid;
-    return { pid, url, exited, stop: deadlineAt => processes.stop(deadlineAt) };
+    return {
+      pid,
+      url,
+      authorization: credential.authorization,
+      exited,
+      stop: deadlineAt => processes.stop(deadlineAt),
+    };
   } catch (error) {
     void processes.stop(Date.now() + KILO_STOP_TIMEOUT_MS);
     throw error;
@@ -309,8 +332,14 @@ export type KiloRuntimeOptions = {
   readProcessStartTime?: (pid: number) => string | undefined;
   /** True when every session is idle and no PTY is open (credential install gate). */
   isIdle?: (client: WrapperKiloClient, directory: string, signal: AbortSignal) => Promise<boolean>;
+  /** Names the reserved port in the agent rules; unknown leaves that rule out. */
+  sandboxProvider?: AgentSandboxProvider;
   /** Creates the Kilo home/auth/runtime directories before spawn (spec §7). */
-  prepareFilesystem?: (env: Record<string, string>, directory: string) => Promise<void>;
+  prepareFilesystem?: (
+    env: Record<string, string>,
+    directory: string,
+    sandboxProvider?: AgentSandboxProvider
+  ) => Promise<void>;
 };
 
 export type KiloFeedCallbacks = {
@@ -328,7 +357,10 @@ export type KiloRuntime = {
   /**
    * Stores the env immediately; the turn owner authorizes an idle restart.
    */
-  installCredentials(env: Record<string, string>): Promise<void>;
+  installCredentials(
+    env: Record<string, string>,
+    cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp']
+  ): Promise<void>;
   /** Restarts with the pending credentials when the runtime is idle. B8 calls this. */
   applyPendingCredentials(canRestart: () => boolean): Promise<boolean>;
   isRetiredClient(client: WrapperKiloClient): boolean;
@@ -342,6 +374,21 @@ export type KiloRuntime = {
   refreshActivity(): Promise<void>;
   shutdown(): Promise<void>;
 };
+
+/**
+ * The runtime's client only while it is live. A restarting or unavailable
+ * runtime has no client, and reading `.client` throws; a clean-up caller must
+ * resolve through this so a release during a restart is a no-op instead of an
+ * exception that escapes the frame handler.
+ */
+export function liveRuntimeClient(runtime: KiloRuntime | undefined): WrapperKiloClient | undefined {
+  if (!runtime || runtime.isRestarting() || runtime.isUnavailable()) return undefined;
+  try {
+    return runtime.client;
+  } catch {
+    return undefined;
+  }
+}
 
 type HealthProbeObservation = {
   startedAt: number;
@@ -369,12 +416,12 @@ export type HealthRestartTrigger =
 type HealthDecisionResolution = 'fulfilled_false' | 'rejected' | 'not_applicable';
 
 function createHealthProbe(
-  url: string,
+  server: KiloServer,
   directory: string,
   timeoutMs: number,
   observe: (observation: HealthProbeObservation) => void
 ): (signal: AbortSignal) => Promise<boolean> {
-  const client = createKiloEventClient({ baseUrl: url, directory });
+  const client = createKiloEventClient(kiloClientConfig(server, directory));
   return async (): Promise<boolean> => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -451,7 +498,7 @@ async function defaultIsIdle(
       (async () => {
         const url = new URL('/pty', client.serverUrl);
         url.searchParams.set('directory', directory);
-        const response = await fetch(url, { signal: probeSignal });
+        const response = await fetchKiloServer(client.server, url, { signal: probeSignal });
         if (!response.ok) return false;
         const ptys: unknown = await response.json();
         return Array.isArray(ptys) && ptys.length === 0;
@@ -470,14 +517,22 @@ async function defaultIsIdle(
 
 /**
  * Spec §7 "Preparation" (legacy `worktree-runtime.ts` pre-spawn): create the
- * Kilo home and runtime directories and write auth.json before Kilo starts.
- * Kilo reads auth.json from disk, and a route with no git and no setup
- * commands never created the worktree directory itself.
+ * Kilo home and runtime directories and write auth.json and the Cloud Agent
+ * rules before Kilo starts. Kilo reads both from disk, and a route with no git
+ * and no setup commands never created the worktree directory itself.
  */
-async function defaultPrepareFilesystem(
+export async function prepareKiloFilesystem(
   env: Record<string, string>,
-  directory: string
+  directory: string,
+  sandboxProvider?: AgentSandboxProvider
 ): Promise<void> {
+  const home = env.HOME;
+  if (home !== undefined && home.length > 0) {
+    await writeCloudAgentRulesFile(home, {
+      bashDefaultTimeoutMs: env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
+      ...(sandboxProvider ? { sandboxProvider } : {}),
+    });
+  }
   const dataHome = env.XDG_DATA_HOME;
   if (dataHome !== undefined && dataHome.length > 0) {
     const authDirectory = path.join(dataHome, 'kilo');
@@ -499,7 +554,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   const scheduler = options.scheduler ?? defaultScheduler;
   const log = options.log ?? logToFile;
   const spawnKilo = options.spawnKilo ?? defaultSpawnKiloProcess;
-  const prepareFilesystem = options.prepareFilesystem ?? defaultPrepareFilesystem;
+  const prepareFilesystem = options.prepareFilesystem ?? prepareKiloFilesystem;
   const isIdle = options.isIdle ?? defaultIsIdle;
   const openFeed =
     options.openFeed ??
@@ -600,7 +655,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
    * `healthRequestMs` bound resolves `false`. The runtime owns the hang rule,
    * so the feed runs no watchdog of its own.
    */
-  function openAttempt(url: string, signal?: AbortSignal): Promise<boolean> {
+  function openAttempt(server: KiloServer, signal?: AbortSignal): Promise<boolean> {
     const attempt = ++feedAttempt;
     const processId = nativeRuntimeId;
     const currentActivity = activity;
@@ -632,7 +687,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         finish(false);
       };
       const next = openFeed(
-        { directory: options.directory, serverUrl: url, nativeRuntimeId: processId },
+        { directory: options.directory, server, nativeRuntimeId: processId },
         {
           signal: controller.signal,
           onEvent: event => {
@@ -692,7 +747,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       const previous = feed;
       feed = undefined;
       previous?.close();
-      if (await openAttempt(current.url)) return;
+      if (await openAttempt(current)) return;
     }
   }
 
@@ -853,7 +908,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     // Spec §7 pre-spawn filesystem: Kilo reads auth.json from disk, and a route
     // with no git and no setup commands never created the worktree directory.
     const env = options.env;
-    await prepareFilesystem(env, options.directory);
+    await prepareFilesystem(env, options.directory, options.sandboxProvider);
     if (currentPhase() === 'stopped') throw new Error('Kilo runtime is shutting down');
     const controller = new AbortController();
     startAbort = controller;
@@ -899,9 +954,10 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       throw new Error('Kilo runtime is shutting down');
     }
     pidfilePath = file;
+    const server: KiloServer = { url: spawned.url, authorization: spawned.authorization };
     const kilo = createWrapperKiloClient(
-      createKiloClient({ baseUrl: spawned.url, directory: options.directory }),
-      spawned.url,
+      createKiloClient(kiloClientConfig(server, options.directory)),
+      server,
       options.directory
     );
     const processId = nativeRuntimeId;
@@ -933,7 +989,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         return true;
       },
     });
-    if (!(await openAttempt(spawned.url, controller.signal))) {
+    if (!(await openAttempt(server, controller.signal))) {
       // A failed start must not leave a usable-looking handle behind: clean up
       // so `ensure` re-spawns instead of returning a Kilo without a feed.
       await stopProcess();
@@ -951,7 +1007,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     healthObservation = undefined;
     probeHealth =
       options.probeHealth ??
-      createHealthProbe(spawned.url, options.directory, timers.healthRequestMs, observation => {
+      createHealthProbe(server, options.directory, timers.healthRequestMs, observation => {
         healthObservation = observation;
       });
     pendingCredentials = options.env !== env;
@@ -1175,11 +1231,37 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     },
     ensure,
     isRetiredClient: candidate => retiredClients.has(candidate),
-    async installCredentials(env: Record<string, string>): Promise<void> {
-      // Store the refreshed env immediately; the running process keeps the old
-      // grant (valid below 1 h) until an idle restart applies the new one.
+    async installCredentials(env, cloudAgentMcp): Promise<void> {
+      const installedHandle = options.env.KILOCODE_TOKEN;
+      const incomingHandle = env.KILOCODE_TOKEN;
+      const installedExp = proxyHandleExpiry(installedHandle);
+      const incomingExp = proxyHandleExpiry(incomingHandle);
+      if (installedExp !== undefined && incomingExp !== undefined) {
+        // Stale handles cannot replace the current environment or MCP grant.
+        if (installedHandle !== incomingHandle && incomingExp <= installedExp) return;
+        if (installedHandle !== incomingHandle) pendingCredentials = true;
+      } else {
+        pendingCredentials = true;
+      }
+      // Repeated proxy handles can still carry a renewed MCP credential.
       options.env = env;
-      pendingCredentials = true;
+      if (client && cloudAgentMcp) {
+        try {
+          await withTimeoutAndAbort(
+            client.updateCloudAgentMcp(
+              cloudAgentMcp,
+              AbortSignal.timeout(KILO_CONTROL_REQUEST_TIMEOUT_MS)
+            ),
+            {
+              timeoutMs: KILO_CONTROL_REQUEST_TIMEOUT_MS,
+              timeoutMessage: 'Cloud Agent MCP credential refresh timed out',
+              abortMessage: 'Cloud Agent MCP credential refresh aborted',
+            }
+          );
+        } catch {
+          log('control-plane MCP credential refresh failed; retaining pending credential restart');
+        }
+      }
     },
     applyPendingCredentials,
     needsCompute: () => activity?.needsCompute() ?? false,
@@ -1254,10 +1336,11 @@ export type KiloRuntimes = {
 };
 
 /**
- * A per-session route asked to reuse a warm runtime whose materialized MCP
- * servers differ. The route must fail rather than silently accept the change
- * (legacy `worktree-runtime.ts` `mcpSignature` drift rejection). Non-retryable:
- * the caller must not drop and recreate the runtime to "fix" it.
+ * A route asked to reuse a warm shared runtime whose materialized MCP servers
+ * differ. MCP is workspace configuration, so the route must fail rather than
+ * silently run with another session's servers (legacy `worktree-runtime.ts`
+ * `mcpSignature` drift rejection). Non-retryable: the caller must not drop and
+ * recreate the runtime to "fix" it.
  */
 export class KiloWorktreeMcpMismatchError extends Error {
   constructor() {
@@ -1267,9 +1350,62 @@ export class KiloWorktreeMcpMismatchError extends Error {
 }
 
 /**
+ * A route asked to share a runtime with another route whose Kilo credential is
+ * a different class: one side carries a runtime-credential-proxy handle, the
+ * other a legacy alias. The runtime holds exactly one credential source, so
+ * reusing it would serve a route through the wrong authorization path.
+ * Non-retryable: the caller must not drop and recreate the runtime to "fix" it.
+ */
+export class KiloWorktreeCredentialClassMismatchError extends Error {
+  constructor() {
+    super('Kilo worktree credential class mismatch');
+    this.name = 'KiloWorktreeCredentialClassMismatchError';
+  }
+}
+
+/**
+ * The runtime-credential-proxy handle audience. A handle is an HS256 JWT the
+ * Worker mints; the wrapper decodes it locally (no Worker import) only to tell
+ * a modern proxy credential from a legacy alias, never to verify it.
+ */
+function decodeProxyHandlePayload(token: string | undefined): Record<string, unknown> | undefined {
+  if (!token) return undefined;
+  const parts = token.split('.');
+  if (parts.length !== 3) return undefined;
+  try {
+    const decoded = Buffer.from(parts[1], 'base64url').toString('utf8');
+    const value: unknown = JSON.parse(decoded);
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+    return value as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Whether an env token is a runtime-credential-proxy handle. Presence only:
+ * grant ids and handle strings are never compared.
+ */
+export function isProxyHandleToken(token: string | undefined): boolean {
+  return proxyHandleExpiry(token) !== undefined;
+}
+
+/**
+ * The handle expiry in milliseconds, or undefined when the token is not a
+ * decodable proxy handle. Undecodable tokens are treated as "different/newer"
+ * by callers, so this deliberately returns undefined rather than throwing.
+ */
+export function proxyHandleExpiry(token: string | undefined): number | undefined {
+  const payload = decodeProxyHandlePayload(token);
+  if (!payload || payload.aud !== RUNTIME_CREDENTIAL_PROXY_AUDIENCE) return undefined;
+  const exp = payload.exp;
+  return typeof exp === 'number' && Number.isFinite(exp) && exp > 0 ? exp * 1000 : undefined;
+}
+
+/**
  * The MCP portion of the runtime configuration. Credential refreshes rotate the
  * Kilo alias inside `KILO_CONFIG_CONTENT`, so comparing the whole config would
- * false-positive; only `mcp` identifies the session's server set.
+ * false-positive; only `mcp` identifies the runtime's server set.
  */
 function mcpConfigurationSignature(env: Record<string, string>): string {
   const raw = env.KILO_CONFIG_CONTENT;
@@ -1284,7 +1420,7 @@ function mcpConfigurationSignature(env: Record<string, string>): string {
 }
 
 /**
- * One Kilo runtime per directory (or per session under per-session isolation).
+ * One Kilo runtime per directory.
  * A fresh `ensure` after the restart budget is spent replaces the runtime,
  * which resets the budget (spec §7 "Preparation": a re-prepare starts fresh).
  */
@@ -1299,7 +1435,16 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
     async ensure(input) {
       const existing = runtimes.get(input.key);
       if (existing && !existing.isUnavailable()) {
-        // A per-session MCP route must own its runtime: reuse only when the
+        // One runtime holds one credential source: a proxy handle and a legacy
+        // alias must never share it. Compare presence only; a proxy handle's
+        // grant id or string is deliberately ignored.
+        if (
+          isProxyHandleToken(existing.env.KILOCODE_TOKEN) !==
+          isProxyHandleToken(input.env.KILOCODE_TOKEN)
+        ) {
+          throw new KiloWorktreeCredentialClassMismatchError();
+        }
+        // A runtime is shared by every route on its key: reuse only when the
         // materialized servers are unchanged.
         if (mcpConfigurationSignature(existing.env) !== mcpConfigurationSignature(input.env)) {
           throw new KiloWorktreeMcpMismatchError();

@@ -1,175 +1,108 @@
-import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { db } from '@kilocode/web-shared/lib/drizzle';
-import { cloud_agent_feedback } from '@kilocode/db/schema';
-import { inArray, eq } from 'drizzle-orm';
+import { cloudAgentNextFeedbackRouter } from './cloud-agent-next-feedback-router';
 import type { User } from '@kilocode/db/schema';
+import type * as TRPC from '@trpc/server';
 
-let regularUser: User;
-let otherUser: User;
+const mockInsert = jest.fn(() => ({
+  values: () => ({ returning: async () => [{ id: 'feedback-id' }] }),
+}));
 
-async function cleanupFeedback() {
-  await db
-    .delete(cloud_agent_feedback)
-    .where(inArray(cloud_agent_feedback.kilo_user_id, [regularUser.id, otherUser.id]));
-}
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
+  db: { insert: () => mockInsert() },
+}));
 
-beforeAll(async () => {
-  regularUser = await insertTestUser({
-    google_user_email: 'feedback-history-user@example.com',
-    google_user_name: 'Feedback History User',
-    is_admin: false,
-  });
-  otherUser = await insertTestUser({
-    google_user_email: 'feedback-history-other@example.com',
-    google_user_name: 'Feedback History Other',
-    is_admin: false,
-  });
-  await cleanupFeedback();
+jest.mock('@kilocode/web-shared/lib/trpc/init', () => {
+  const { initTRPC } = jest.requireActual<typeof TRPC>('@trpc/server');
+  const t = initTRPC.context<{ user: { id: string } }>().create();
+  return { baseProcedure: t.procedure, createTRPCRouter: t.router };
 });
 
-afterEach(cleanupFeedback);
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
+  ensureOrganizationAccess: jest.fn(),
+}));
 
-describe('cloudAgentNextFeedback.list', () => {
-  it("returns only the caller's own feedback, newest first", async () => {
-    await db.insert(cloud_agent_feedback).values([
-      {
-        kilo_user_id: regularUser.id,
-        feedback_text: 'older submission',
-        created_at: '2026-01-01 00:00:00.000+00',
-      },
-      {
-        kilo_user_id: regularUser.id,
-        feedback_text: 'newer submission',
-        created_at: '2026-02-01 00:00:00.000+00',
-      },
-      {
-        kilo_user_id: otherUser.id,
-        feedback_text: 'someone else',
-        created_at: '2026-03-01 00:00:00.000+00',
-      },
-    ]);
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  SLACK_USER_FEEDBACK_WEBHOOK_URL: 'https://hooks.slack.invalid/feedback',
+}));
 
-    const caller = await createCallerForUser(regularUser.id);
-    const result = await caller.cloudAgentNextFeedback.list();
-
-    expect(result.map(row => row.feedback_text)).toEqual(['newer submission', 'older submission']);
+describe('Cloud Agent feedback Slack notification', () => {
+  let fetchMock: jest.SpiedFunction<typeof fetch>;
+  const caller = cloudAgentNextFeedbackRouter.createCaller({
+    user: { id: 'oauth/feedback-user' } as User,
   });
 
-  it('defaults to the five newest submissions', async () => {
-    await db.insert(cloud_agent_feedback).values(
-      Array.from({ length: 6 }, (_, index) => ({
-        kilo_user_id: regularUser.id,
-        feedback_text: `submission ${index}`,
-        created_at: `2026-01-0${index + 1} 00:00:00.000+00`,
-      }))
-    );
-
-    const caller = await createCallerForUser(regularUser.id);
-    const result = await caller.cloudAgentNextFeedback.list();
-
-    expect(result.map(row => row.feedback_text)).toEqual([
-      'submission 5',
-      'submission 4',
-      'submission 3',
-      'submission 2',
-      'submission 1',
-    ]);
+  beforeEach(() => {
+    mockInsert.mockClear();
+    fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response());
   });
 
-  it('returns ISO timestamps without internal context fields', async () => {
-    await db.insert(cloud_agent_feedback).values({
-      kilo_user_id: regularUser.id,
-      feedback_text: 'shaped submission',
-      cloud_agent_session_id: 'agent_123',
-      session_type: 'cloud-agent',
-      model: 'test-model',
-      repository: 'org/repo',
-      recent_messages: [{ role: 'user', text: 'hello', ts: 1 }],
-      created_at: '2026-01-01 00:00:00.000+00',
-    });
-
-    const caller = await createCallerForUser(regularUser.id);
-    const [row] = await caller.cloudAgentNextFeedback.list();
-
-    expect(row?.created_at).toBe('2026-01-01T00:00:00.000Z');
-    expect(row).not.toHaveProperty('recent_messages');
-    expect(row).not.toHaveProperty('session_type');
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
-  it('honours an explicit limit', async () => {
-    await db.insert(cloud_agent_feedback).values(
-      Array.from({ length: 3 }, (_, index) => ({
-        kilo_user_id: regularUser.id,
-        feedback_text: `limited ${index}`,
-        created_at: `2026-01-0${index + 1} 00:00:00.000+00`,
-      }))
-    );
+  it.each([
+    ['ses_35fc6b339ffeaf91IozzdnLtJ7', 'ses_35fc6b339ffeaf91IozzdnLtJ7'],
+    [undefined, 'unknown'],
+  ])('renders session %s and feedback only as plain text', async (sessionId, expectedSession) => {
+    const feedback = '``` <https://attacker.invalid|admin> <!channel> :smile:';
+    await caller.create({ kilo_session_id: sessionId, feedback_text: feedback });
 
-    const caller = await createCallerForUser(regularUser.id);
-    const result = await caller.cloudAgentNextFeedback.list({ limit: 2 });
-
-    expect(result.map(row => row.feedback_text)).toEqual(['limited 2', 'limited 1']);
-  });
-
-  it('accepts the maximum limit and rejects out-of-range input', async () => {
-    await db.insert(cloud_agent_feedback).values(
-      Array.from({ length: 25 }, (_, index) => ({
-        kilo_user_id: regularUser.id,
-        feedback_text: `capped ${index}`,
-        // Distinct, increasing instants so the cap is observable.
-        created_at: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
-      }))
-    );
-
-    const caller = await createCallerForUser(regularUser.id);
-
-    await expect(caller.cloudAgentNextFeedback.list({ limit: 20 })).resolves.toHaveLength(20);
-    await expect(caller.cloudAgentNextFeedback.list({ limit: 0 })).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-    });
-    await expect(caller.cloudAgentNextFeedback.list({ limit: 1.5 })).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-    });
-  });
-
-  it('rejects a limit above the maximum', async () => {
-    const caller = await createCallerForUser(regularUser.id);
-
-    await expect(caller.cloudAgentNextFeedback.list({ limit: 21 })).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-    });
-  });
-
-  it('returns an empty list for a user with no feedback', async () => {
-    const caller = await createCallerForUser(regularUser.id);
-
-    await expect(caller.cloudAgentNextFeedback.list()).resolves.toEqual([]);
-  });
-
-  it('excludes orphaned rows whose owning user was deleted', async () => {
-    const [orphan] = await db
-      .insert(cloud_agent_feedback)
-      .values({
-        kilo_user_id: null,
-        feedback_text: 'orphaned owner',
-        created_at: '2026-02-01 00:00:00.000+00',
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://hooks.slack.invalid/feedback',
+      expect.objectContaining({
+        body: JSON.stringify({
+          text: 'New Cloud Agent feedback',
+          unfurl_links: false,
+          unfurl_media: false,
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'plain_text',
+                text: `New Cloud Agent feedback:\n• session: ${expectedSession}\n• session type: unknown\n• feedback:\n${feedback}`,
+                emoji: false,
+              },
+            },
+          ],
+        }),
       })
-      .returning({ id: cloud_agent_feedback.id });
-
-    try {
-      await db.insert(cloud_agent_feedback).values({
-        kilo_user_id: regularUser.id,
-        feedback_text: 'kept',
-        created_at: '2026-01-01 00:00:00.000+00',
-      });
-
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.cloudAgentNextFeedback.list();
-
-      expect(result.map(row => row.feedback_text)).toEqual(['kept']);
-    } finally {
-      await db.delete(cloud_agent_feedback).where(eq(cloud_agent_feedback.id, orphan.id));
-    }
+    );
   });
-});
+
+  it.each([
+    { kilo_session_id: 'x><!channel> <!here> <https://attacker.invalid|Review session trace>' },
+    { kilo_session_id: 'ses_' + '<'.repeat(26) },
+    { kilo_session_id: 'ses_tooShort' },
+    { kilo_session_id: '' },
+    { cloud_agent_session_id: 'workspace_><!channel>' },
+    { cloud_agent_session_id: 'workspace_not-a-uuid' },
+    { cloud_agent_session_id: '' },
+  ])('rejects invalid session metadata %j before storage or Slack', async metadata => {
+    await expect(caller.create({ ...metadata, feedback_text: 'feedback' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'agent_12345678-1234-1234-1234-123456789abc',
+    'workspace_12345678-1234-1234-1234-123456789abc',
+  ])('accepts existing Cloud Agent ID format %s', async cloudAgentSessionId => {
+    await expect(
+      caller.create({ cloud_agent_session_id: cloudAgentSessionId, feedback_text: 'feedback' })
+    ).resolves.toEqual({ id: 'feedback-id' });
+  });
+
+  it.each(['cloud-agent', 'remote', 'read-only'] as const)(
+    'accepts %s feedback without requiring a Cloud Agent ID',
+    async sessionType => {
+      await expect(
+        caller.create({
+          kilo_session_id: 'ses_35fc6b339ffeaf91IozzdnLtJ7',
+          session_type: sessionType,
+          feedback_text: 'feedback',
+        })
+      ).resolves.toEqual({ id: 'feedback-id' });
+    }
+  );

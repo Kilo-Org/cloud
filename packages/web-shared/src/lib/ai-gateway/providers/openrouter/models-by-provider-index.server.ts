@@ -163,40 +163,57 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
     return (await loadState()).dataCollectionRequiredModelIds;
   }
 
+  async function getProviderSlugsForModels(
+    modelIds: readonly string[]
+  ): Promise<ReadonlyMap<string, ReadonlySet<string>>> {
+    const [index, storedModels, vercelModels] = await Promise.all([
+      loadIndex(),
+      options.fetchOpenRouterModels(),
+      options.fetchVercelModels(),
+    ]);
+    const providersByModel = new Map<string, ReadonlySet<string>>();
+    for (const modelId of new Set(modelIds)) {
+      const snapshotProviderSlugs = index.get(normalizeModelId(modelId));
+      if (!snapshotProviderSlugs) {
+        providersByModel.set(modelId, new Set());
+        continue;
+      }
+      const openRouterProviderSlugs = narrowProviderSlugsToVariant(
+        snapshotProviderSlugs,
+        storedModels[modelId]
+      );
+      const vercelModel = vercelModels[await mapModelIdToVercel(modelId)];
+      const vercelProviders = new Set(
+        vercelModel?.endpoints.map(endpoint =>
+          normalizeVercelInferenceProviderIdForRouting(endpoint.provider_name ?? endpoint.tag)
+        )
+      );
+      providersByModel.set(
+        modelId,
+        new Set(
+          [...snapshotProviderSlugs].filter(
+            slug =>
+              openRouterProviderSlugs.has(slug) ||
+              vercelProviders.has(openRouterToVercelInferenceProviderId(slug))
+          )
+        )
+      );
+    }
+    return providersByModel;
+  }
+
   /**
    * Providers that can serve `modelId`. Accepts variant-suffixed ids such as
    * `x/y:free`; see `narrowProviderSlugsToVariant`.
    */
   async function getProviderSlugsForModel(modelId: string): Promise<ReadonlySet<string>> {
-    const index = await loadIndex();
-    const snapshotProviderSlugs = index.get(normalizeModelId(modelId));
-    if (!snapshotProviderSlugs) return new Set();
-    const [storedModels, vercelModels] = await Promise.all([
-      options.fetchOpenRouterModels(),
-      options.fetchVercelModels(),
-    ]);
-    const openRouterProviderSlugs = narrowProviderSlugsToVariant(
-      snapshotProviderSlugs,
-      storedModels[modelId]
-    );
-    const vercelModel = vercelModels[await mapModelIdToVercel(modelId)];
-    const vercelProviders = new Set(
-      vercelModel?.endpoints.map(endpoint =>
-        normalizeVercelInferenceProviderIdForRouting(endpoint.provider_name ?? endpoint.tag)
-      )
-    );
-    return new Set(
-      [...snapshotProviderSlugs].filter(
-        slug =>
-          openRouterProviderSlugs.has(slug) ||
-          vercelProviders.has(openRouterToVercelInferenceProviderId(slug))
-      )
-    );
+    return (await getProviderSlugsForModels([modelId])).get(modelId) ?? new Set();
   }
 
   return {
     getIndex: loadIndex,
     getProviderSlugsForModel,
+    getProviderSlugsForModels,
     getDataCollectionRequiredModelIds,
   };
 }
@@ -225,6 +242,12 @@ const defaultLoader = createModelsByProviderIndexLoader({
 
 export async function getProviderSlugsForModel(modelId: string): Promise<ReadonlySet<string>> {
   return defaultLoader.getProviderSlugsForModel(modelId);
+}
+
+export async function getProviderSlugsForModels(
+  modelIds: readonly string[]
+): Promise<ReadonlyMap<string, ReadonlySet<string>>> {
+  return defaultLoader.getProviderSlugsForModels(modelIds);
 }
 
 export async function getModelIdToProviderSlugsIndex(): Promise<ModelIdToProviderSlugsIndex> {

@@ -6,9 +6,11 @@ import {
   MetadataSchema,
   modelIdSchema,
   RuntimeAgentSchema,
-  SessionProfileBundleSchema,
+  RuntimeInstructionSchema,
+  RuntimeInstructionsSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
+  SessionProfileBundleSchema,
 } from './schemas.js';
 import type { MCPServerConfig } from './types.js';
 
@@ -130,7 +132,7 @@ describe('ImagesSchema', () => {
 
   it('rejects client-provided R2 service prefixes', () => {
     const result = ImagesSchema.safeParse({
-      path: 'app-builder/123e4567-e89b-12d3-a456-426614174000',
+      path: 'images/123e4567-e89b-12d3-a456-426614174000',
       files: ['123e4567-e89b-12d3-a456-426614174001.png'],
     });
 
@@ -1053,6 +1055,51 @@ describe('RuntimeSkillSchema', () => {
       rawMarkdown: 'body',
     }));
     expect(RuntimeSkillsSchema.safeParse(many).success).toBe(false);
+  });
+});
+
+describe('RuntimeInstructionSchema', () => {
+  it('accepts a well-formed instruction', () => {
+    const instruction = { name: 'repo-rules', content: '# Rules\nFollow the repo policy.' };
+    expect(RuntimeInstructionSchema.parse(instruction)).toEqual(instruction);
+  });
+
+  it('rejects the reserved cloud-agent rules filename', () => {
+    const result = RuntimeInstructionSchema.safeParse({
+      name: 'cloud-agent',
+      content: 'overwrite the reserved rules file',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects unsafe or uppercase instruction names', () => {
+    for (const name of ['Repo-Rules', 'repo rules', '../escape', 'repo.rules', '-leading']) {
+      expect(RuntimeInstructionSchema.safeParse({ name, content: 'body' }).success).toBe(false);
+    }
+  });
+
+  it('rejects empty content and content over the size limit', () => {
+    expect(RuntimeInstructionSchema.safeParse({ name: 'rules', content: '' }).success).toBe(false);
+    expect(
+      RuntimeInstructionSchema.safeParse({ name: 'rules', content: 'x'.repeat(100_001) }).success
+    ).toBe(false);
+  });
+
+  it('caps the runtime instructions array at 50 entries', () => {
+    const many = Array.from({ length: 51 }, (_, i) => ({
+      name: `rules-${i}`,
+      content: 'body',
+    }));
+    expect(RuntimeInstructionsSchema.safeParse(many).success).toBe(false);
+  });
+
+  it('carries instructions on a session profile bundle', () => {
+    const bundle = {
+      runtimeInstructions: [{ name: 'repo-rules', content: 'body' }],
+    };
+    expect(SessionProfileBundleSchema.parse(bundle).runtimeInstructions).toEqual(
+      bundle.runtimeInstructions
+    );
   });
 });
 

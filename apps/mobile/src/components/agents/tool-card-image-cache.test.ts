@@ -9,13 +9,14 @@ import {
   extensionForMime,
   getToolCardImageUri,
   stripDataUrlBase64Prefix,
-  useToolCardImageUri,
 } from '@/components/agents/tool-card-image-cache';
 
 type FileInstance = {
   exists: boolean;
   uri: string;
-  write: ReturnType<typeof vi.fn>;
+  written?: { content: string; encoding?: string };
+  writeSync: (content: string, options?: { encoding?: string }) => void;
+  directory?: { name?: string };
   filename: string;
 };
 
@@ -33,10 +34,12 @@ const expoFileSystemMock = vi.hoisted(() => {
     };
   });
   const File = vi.fn(function FileMock(directory: { name?: string }, filename: string) {
-    const instance = {
+    const instance: FileInstance = {
       exists: false,
       uri: `file:///cache/tool-card-images/${filename}`,
-      write: vi.fn(),
+      writeSync(content, options) {
+        this.written = { content, encoding: options?.encoding };
+      },
       filename,
       directory,
     };
@@ -122,7 +125,7 @@ describe('cacheToolCardImage', () => {
     expect(expoFileSystemMock.File).toHaveBeenCalled();
     const file = fileInstances[0];
     expect(file?.filename).toBe('part-1.png');
-    expect(file?.write).toHaveBeenCalledWith('QUJD', { encoding: 'base64' });
+    expect(file?.written).toEqual({ content: 'QUJD', encoding: 'base64' });
     expect(getToolCardImageUri('part-1')).toBe('file:///cache/tool-card-images/part-1.png');
   });
 
@@ -136,8 +139,7 @@ describe('cacheToolCardImage', () => {
     cacheToolCardImage('part-1', 'image/png', 'data:image/png;base64,BBB');
 
     expect(fileInstances).toHaveLength(1);
-    expect(fileInstances[0]?.write).toHaveBeenCalledTimes(1);
-    expect(fileInstances[0]?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
+    expect(fileInstances[0]?.written).toEqual({ content: 'AAA', encoding: 'base64' });
   });
 
   it('skips the write when the file already exists and still records the URI', () => {
@@ -150,7 +152,7 @@ describe('cacheToolCardImage', () => {
       const instance = {
         exists: true,
         uri: `file:///cache/tool-card-images/${filename}`,
-        write: vi.fn(),
+        writeSync: vi.fn(),
         filename,
         directory,
       };
@@ -160,7 +162,7 @@ describe('cacheToolCardImage', () => {
 
     cacheToolCardImage('part-exists', 'image/png', 'data:image/png;base64,AAA');
 
-    expect(fileInstances[0]?.write).not.toHaveBeenCalled();
+    expect(fileInstances[0]?.written).toBeUndefined();
     expect(getToolCardImageUri('part-exists')).toBe(
       'file:///cache/tool-card-images/part-exists.png'
     );
@@ -177,7 +179,7 @@ describe('cacheToolCardImage', () => {
       const instance = {
         exists: false,
         uri: `file:///cache/tool-card-images/${filename}`,
-        write: vi.fn(() => {
+        writeSync: vi.fn(() => {
           throw new Error('disk full');
         }),
         filename,
@@ -191,13 +193,12 @@ describe('cacheToolCardImage', () => {
       cacheToolCardImage('part-fail', 'image/png', 'data:image/png;base64,AAA');
     }).not.toThrow();
 
-    expect(fileInstances[0]?.write).toHaveBeenCalled();
     expect(getToolCardImageUri('part-fail')).toBeUndefined();
 
     // Failure cleared the mark — a retry is allowed and should attempt again.
     cacheToolCardImage('part-fail', 'image/png', 'data:image/png;base64,AAA');
     expect(fileInstances).toHaveLength(2);
-    expect(fileInstances[1]?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
+    expect(fileInstances[1]?.written).toEqual({ content: 'AAA', encoding: 'base64' });
     expect(getToolCardImageUri('part-fail')).toBe('file:///cache/tool-card-images/part-fail.png');
   });
 
@@ -227,7 +228,7 @@ describe('cacheToolAttachment', () => {
     // getSafeCacheFilename({ id: 'part-send', filename: 'report.pdf' })
     //  → 'part-send-report.pdf' (after sanitization)
     expect(file?.filename).toBe('part-send-report.pdf');
-    expect(file?.write).toHaveBeenCalledWith('QUJD', { encoding: 'base64' });
+    expect(file?.written).toEqual({ content: 'QUJD', encoding: 'base64' });
     expect(getToolCardImageUri('part-send')).toBe(
       'file:///cache/tool-card-images/part-send-report.pdf'
     );
@@ -238,7 +239,7 @@ describe('cacheToolAttachment', () => {
 
     const file = fileInstances[0];
     expect(file?.filename).toBe('part-img.png');
-    expect(file?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
+    expect(file?.written).toEqual({ content: 'AAA', encoding: 'base64' });
   });
 
   it('preserves _DOT_ in the partId, replacing only the appended final -_DOT_ suffix', () => {
@@ -253,7 +254,7 @@ describe('cacheToolAttachment', () => {
     //   _DOT_ in partId must survive; only final -_DOT_ before ext is replaced →
     //   "part-_DOT_42.png"
     expect(file?.filename).toBe('part-_DOT_42.png');
-    expect(file?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
+    expect(file?.written).toEqual({ content: 'AAA', encoding: 'base64' });
   });
 
   it('deduplicates same part id across cacheToolAttachment calls', () => {
@@ -269,7 +270,7 @@ describe('cacheToolAttachment', () => {
     });
 
     expect(fileInstances).toHaveLength(1);
-    expect(fileInstances[0]?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
+    expect(fileInstances[0]?.written).toEqual({ content: 'AAA', encoding: 'base64' });
     expect(getToolCardImageUri('part-dup')).toBe('file:///cache/tool-card-images/part-dup-img.png');
   });
 
@@ -285,7 +286,7 @@ describe('cacheToolAttachment', () => {
     // getSafeCacheFilename({ id: 'part-xss', filename: 'vnd.<script>alert' })
     // mock sanitizes → 'vnd._script_alert'
     expect(file?.filename).toBe('part-xss.vnd._script_alert');
-    expect(file?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
+    expect(file?.written).toEqual({ content: 'AAA', encoding: 'base64' });
   });
 
   it('routes a very long MIME subtype through the safe filename function', () => {
@@ -300,7 +301,7 @@ describe('cacheToolAttachment', () => {
     // to 255 bytes.  This test verifies the code path routes through the safe
     // function instead of raw concatenation.
     expect(file?.filename).toMatch(/^part-long\./);
-    expect(file?.write).toHaveBeenCalled();
+    expect(file?.written).toEqual({ content: 'AAA', encoding: 'base64' });
   });
 
   it('shares the dedupe set with cacheToolCardImage', () => {
@@ -316,15 +317,6 @@ describe('cacheToolAttachment', () => {
     expect(getToolCardImageUri('part-shared')).toBe(
       'file:///cache/tool-card-images/part-shared.png'
     );
-  });
-});
-
-describe('useToolCardImageUri', () => {
-  it('is the Slice 4 lookup export and reads the same store as getToolCardImageUri', () => {
-    expect(typeof useToolCardImageUri).toBe('function');
-    expect(getToolCardImageUri('missing')).toBeUndefined();
-    cacheToolCardImage('part-hook', 'image/png', 'data:image/png;base64,AAA');
-    expect(getToolCardImageUri('part-hook')).toBe('file:///cache/tool-card-images/part-hook.png');
   });
 });
 

@@ -430,14 +430,6 @@ export function useSessionListAutoScroll<ItemT>({
     [scheduleScrollToLatestMessage, scrollToLatestMessage]
   );
 
-  const handleKeyboardShow = useCallback(() => {
-    // Reuse the guarded scheduler so a keyboard opening never yanks the list
-    // back to the bottom when the user has scrolled away. The guard inside
-    // `scheduleScrollToLatestMessage` honours the follow, user-scroll, and
-    // in-flight programmatic-scroll refs.
-    scheduleScrollToLatestMessage();
-  }, [scheduleScrollToLatestMessage]);
-
   return {
     isAtBottom,
     listRef,
@@ -469,7 +461,6 @@ export function useSessionListAutoScroll<ItemT>({
      */
     sendTakeoverRef,
     handleContentSizeChange,
-    handleKeyboardShow,
     handleListLayout,
     handleScroll,
     handleScrollBeginDrag,

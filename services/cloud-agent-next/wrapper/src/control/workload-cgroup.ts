@@ -71,6 +71,7 @@ export type WorkloadFailure =
   | 'controller_unavailable'
   | 'readback_mismatch'
   | 'write_failed'
+  | 'oom_score_write_failed'
   | 'unavailable'
   | 'pid_changed'
   | 'membership_unconfirmed';
@@ -1129,7 +1130,7 @@ export function applyManagedWorkloadLimits(input: {
 
 /**
  * Kilo is never an OOM victim, wherever its children's early memory is charged. Its children
- * inherit this until the sweep moves them into tools and makes them killable again.
+ * inherit this until the sweep makes them killable, independently of cgroup migration.
  */
 export const KILO_OOM_SCORE_ADJ = '-1000';
 export const TOOL_OOM_SCORE_ADJ = '0';

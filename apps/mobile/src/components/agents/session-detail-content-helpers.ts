@@ -4,6 +4,31 @@ import { type MessageFailure, selectMessageFailure } from './message-failure-sta
 import { firstHumanText } from './part-types';
 import { transcriptRendersMessage } from './session-transcript';
 
+export function restoreCanceledQueuedMessages(
+  messages: StoredMessage[],
+  canceled: ReadonlyMap<string, StoredMessage>
+): StoredMessage[] {
+  const ids = new Set(messages.map(message => message.info.id));
+  let result = messages;
+  for (const message of canceled.values()) {
+    if (!ids.has(message.info.id)) {
+      if (result === messages) {
+        result = [...messages];
+      }
+      const index = result.findIndex(
+        candidate =>
+          candidate.info.id > message.info.id ||
+          (candidate.info.role === 'assistant' &&
+            candidate.info.parentID === message.info.id &&
+            candidate.info.sessionID === message.info.sessionID)
+      );
+      result.splice(index === -1 ? result.length : index, 0, message);
+      ids.add(message.info.id);
+    }
+  }
+  return result;
+}
+
 /**
  * Counts pending messages that are still in flight. A terminal delivery
  * failure must not count: after `status === 'failed'` the working spinner and

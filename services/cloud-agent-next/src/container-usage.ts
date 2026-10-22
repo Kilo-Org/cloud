@@ -7,6 +7,9 @@ import {
 } from '@kilocode/container-usage';
 import { Sandbox as StockSandbox } from '@cloudflare/sandbox';
 import type { Env } from './types.js';
+import { fetchPreviewPort, previewNotRunningResponse } from './preview/container-port-fetch.js';
+import { isReservedPreviewPort } from './shared/reserved-ports.js';
+import { PREVIEW_MARKER_PORT_HEADER } from './shared/preview-headers.js';
 import {
   usageServiceForSandboxClass,
   type SandboxBillingAdmissionResult,
@@ -144,6 +147,22 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
 
   override async onActivityExpired(): Promise<void> {
     return this.billing.onActivityExpired(this.billingIdentity, () => super.onActivityExpired());
+  }
+
+  /**
+   * A preview port fetch carries the internal marker and is handled here, never
+   * by `super.fetch`: the SDK's fetch can start a stopped container. Any other
+   * request keeps the stock behavior. This path deliberately does not touch the
+   * activity lease, so an idle allocation still stops on schedule.
+   */
+  override async fetch(request: Request): Promise<Response> {
+    const marker = request.headers.get(PREVIEW_MARKER_PORT_HEADER);
+    if (marker === null) return super.fetch(request);
+    const container = this.ctx.container;
+    if (!container) return previewNotRunningResponse();
+    return fetchPreviewPort(container, Number.parseInt(marker, 10), request, port =>
+      isReservedPreviewPort('cloudflare', port)
+    );
   }
 
   async forceDestroyForControlPlane(): Promise<void> {

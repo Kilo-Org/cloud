@@ -27,22 +27,23 @@
     "./bouncer-usage-event-outbox": "./src/bouncer-usage-event-outbox.ts"
   },
   "dependencies": {
+    "@kilocode/ai-gateway-secure-proxy-contracts": "workspace:*",
     "@kilocode/app-shared": "workspace:*",
     "@kilocode/kiloclaw-instance-tiers": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/usage-contracts": "workspace:*",
     "drizzle-orm": "catalog:",
-    "pg": "8.20.0",
+    "pg": "8.23.1",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@jest/globals": "30.3.0",
+    "@jest/globals": "30.5.2",
     "@swc/jest": "0.2.39",
-    "@types/pg": "8.18.0",
+    "@types/pg": "8.23.1",
     "@typescript/native-preview": "catalog:",
-    "dotenv": "17.3.1",
+    "dotenv": "18.0.8",
     "drizzle-kit": "catalog:",
-    "jest": "30.3.0",
+    "jest": "30.5.2",
     "typescript": "catalog:"
   }
 }

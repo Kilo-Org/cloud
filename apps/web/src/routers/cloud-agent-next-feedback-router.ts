@@ -7,7 +7,9 @@ import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizat
 import * as z from 'zod';
 import { desc, eq } from 'drizzle-orm';
 import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@kilocode/web-shared/lib/config.server';
+import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { toIsoTimestamp } from '@/lib/feedback/feedback-history';
+import { feedbackPlainTextBlocks } from '@/lib/feedback/slack';
 
 const DEFAULT_FEEDBACK_HISTORY_LIMIT = 5;
 const MAX_FEEDBACK_HISTORY_LIMIT = 20;
@@ -31,8 +33,13 @@ const feedbackSessionTypeLabels = {
 } as const satisfies Record<z.infer<typeof feedbackSessionTypeSchema>, string>;
 
 const CreateCloudAgentFeedbackInputSchema = z.object({
-  cloud_agent_session_id: z.string().max(500).optional(),
-  kilo_session_id: z.string().max(500).optional(),
+  cloud_agent_session_id: z
+    .string()
+    .regex(
+      /^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+    )
+    .optional(),
+  kilo_session_id: containedKiloSessionIdSchema.optional(),
   session_type: feedbackSessionTypeSchema.optional(),
   organization_id: z.string().uuid().optional(),
   feedback_text: z.string().min(1).max(10_000),
@@ -96,14 +103,10 @@ export const cloudAgentNextFeedbackRouter = createTRPCRouter({
 
       // Best-effort Slack notification
       if (SLACK_USER_FEEDBACK_WEBHOOK_URL) {
-        const sessionLink = input.kilo_session_id
-          ? `<https://app.kilo.ai/admin/session-traces?sessionId=${input.kilo_session_id}|${input.kilo_session_id}>`
-          : '_unknown_';
-
         const metadataLines = [
-          `• session: ${sessionLink}`,
+          `• session: ${input.kilo_session_id ?? 'unknown'}`,
           `• session type: ${
-            input.session_type ? feedbackSessionTypeLabels[input.session_type] : '_unknown_'
+            input.session_type ? feedbackSessionTypeLabels[input.session_type] : 'unknown'
           }`,
         ];
 
@@ -118,24 +121,14 @@ export const cloudAgentNextFeedbackRouter = createTRPCRouter({
             text: 'New Cloud Agent feedback',
             unfurl_links: false,
             unfurl_media: false,
-            blocks: [
-              {
-                type: 'section',
-                text: { type: 'mrkdwn', text: '*New Cloud Agent feedback:* :robot_face:' },
-              },
-              {
-                type: 'section',
-                text: { type: 'mrkdwn', text: metadataLines.join('\n') },
-              },
-              {
-                type: 'section',
-                text: { type: 'mrkdwn', text: '• feedback:' },
-              },
-              {
-                type: 'section',
-                text: { type: 'plain_text', text: feedbackText || '<empty>' },
-              },
-            ],
+            blocks: feedbackPlainTextBlocks(
+              [
+                'New Cloud Agent feedback:',
+                ...metadataLines,
+                '• feedback:',
+                feedbackText || '<empty>',
+              ].join('\n')
+            ),
           }),
         }).catch(error => {
           console.error('[CloudAgentFeedback] Failed to post to Slack webhook', error);

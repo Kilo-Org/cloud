@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk/v2';
 import { z } from 'zod';
+import { kiloClientConfig, type KiloServer } from '../kilo-server-auth.js';
 import {
   worktreeDeletePayloadSchema,
   type WorktreeDeletePayload,
@@ -14,13 +15,9 @@ import {
 } from '../../../src/shared/control-diagnostics.js';
 import { fenceDirectoryOperations } from './worktree-operations';
 import { directoryForSession, forgetAttachedRoot } from './session-directories';
+import { sessionChildSchema, type SessionChild } from './session-child-schema';
 
-const sessionSchema = z.object({
-  id: z.string().startsWith('ses_').length(30),
-  directory: z.string(),
-});
-
-type CleanupSession = z.infer<typeof sessionSchema>;
+type CleanupSession = SessionChild;
 
 export type WorktreeKiloCleanupClient = {
   listSessionIds(directory: string): Promise<string[]>;
@@ -49,8 +46,8 @@ function requireTrue(result: { data?: boolean; error?: unknown; response?: Respo
   if (requireData(result) !== true) throw new Error('Kilo worktree cleanup was not confirmed');
 }
 
-export function createWorktreeKiloCleanupClient(serverUrl: string): WorktreeKiloCleanupClient {
-  const client = createKiloClient({ baseUrl: serverUrl });
+export function createWorktreeKiloCleanupClient(server: KiloServer): WorktreeKiloCleanupClient {
+  const client = createKiloClient(kiloClientConfig(server));
   const options = () => ({ signal: AbortSignal.timeout(60_000) });
   return {
     async listSessionIds(directory) {
@@ -72,11 +69,11 @@ export function createWorktreeKiloCleanupClient(serverUrl: string): WorktreeKilo
     async getSession(directory, sessionId) {
       const result = await client.session.get({ sessionID: sessionId, directory }, options());
       if (result.response?.status === 404) return null;
-      return sessionSchema.parse(requireData(result));
+      return sessionChildSchema.parse(requireData(result));
     },
     async children(directory, sessionId) {
       return z
-        .array(sessionSchema)
+        .array(sessionChildSchema)
         .parse(
           requireData(await client.session.children({ sessionID: sessionId, directory }, options()))
         );

@@ -14,15 +14,14 @@ import { createDrizzleClient, cloud_agent_session_runs } from '@kilocode/db';
 import { and, eq } from 'drizzle-orm';
 import {
   captureControlPlaneWrapperProcess,
-  captureControlWrapperProcess,
   containerGitRemoteUrl,
   containerProcessEnvironment,
   containerProcessIsLive,
   CONTROL_PLANE_WRAPPER_BASENAME,
+  executeDockerCommand,
   findControlPlaneKiloRuntime,
   inspectControlPlaneSummaryCount,
   inspectControlPlaneUserMessageParts,
-  LEGACY_CONTROL_WRAPPER_BASENAME,
   recycleControlConnection,
   signalKiloServerProcess,
   waitForNewSandboxPresent,
@@ -47,10 +46,13 @@ import {
   type SandboxFaultReapEvidence,
 } from './sandbox-fault-evidence.js';
 import { startCallbackServer, type CallbackRecord } from './callback-server.js';
+import { isReservedPreviewPort } from '../../src/shared/reserved-ports.js';
+import { PREVIEW_FIXTURE_PORT_CANDIDATES, PREVIEW_FIXTURE_SCRIPT } from './preview-fixture.js';
 import type {
   CallbackObservation,
   CallbackPayload,
   ControlPlaneRuntimeObservation,
+  PreviewFixtureHandle,
   ReportRow,
   ReportsObservation,
   SandboxFaultAllocation,
@@ -169,7 +171,10 @@ export function createLocalCallbacks(): CallbackObservation {
  */
 function createLocalSandboxFaults(): SandboxFaultObservation {
   /** Frozen wrapper handles keyed by cloudAgentSessionId, for exact `CONT`. */
-  const frozenHandles = new Map<string, Awaited<ReturnType<typeof captureControlWrapperProcess>>>();
+  const frozenHandles = new Map<
+    string,
+    Awaited<ReturnType<typeof captureControlPlaneWrapperProcess>>
+  >();
   /**
    * Frozen Kilo-server handles keyed by cloudAgentSessionId. A stopped Kilo
    * cannot answer discovery, so `unfreezeKiloServerProcess` must reuse this
@@ -177,7 +182,7 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
    */
   const frozenKiloHandles = new Map<
     string,
-    Awaited<ReturnType<typeof captureControlWrapperProcess>>
+    Awaited<ReturnType<typeof captureControlPlaneWrapperProcess>>
   >();
 
   const requireOwnedContainer = async (
@@ -223,24 +228,19 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
     `${handle.containerId}:${handle.processId}`;
 
   /**
-   * Capture a control wrapper by plane. Absent basename means the legacy
-   * wrapper; new-plane scenarios pass the control-plane basename so a legacy
-   * container is never matched and vice versa.
+   * Capture only the control-plane wrapper. Reject unknown requested basenames.
    */
   const captureWrapper = async (
     containerId: string,
     wrapperProcessBasename?: string
   ): Promise<KiloServerProcessHandle> => {
-    if (wrapperProcessBasename === CONTROL_PLANE_WRAPPER_BASENAME) {
-      return captureControlPlaneWrapperProcess(containerId);
-    }
     if (
       wrapperProcessBasename !== undefined &&
-      wrapperProcessBasename !== LEGACY_CONTROL_WRAPPER_BASENAME
+      wrapperProcessBasename !== CONTROL_PLANE_WRAPPER_BASENAME
     ) {
       throw new Error(`sandboxFaults: unsupported wrapper basename ${wrapperProcessBasename}`);
     }
-    return captureControlWrapperProcess(containerId);
+    return captureControlPlaneWrapperProcess(containerId);
   };
 
   /**
@@ -710,6 +710,45 @@ export function createLocalReports(databaseUrl: string): ReportsObservation {
   };
 }
 
+/** Budget and cadence for waiting on the in-container fixture's readiness probe. */
+const PREVIEW_FIXTURE_READY_BUDGET_MS = 10_000;
+const PREVIEW_FIXTURE_POLL_MS = 250;
+
+/**
+ * In-container readiness probe: the fixture's pidfile exists and one `GET /`
+ * returns the fixture HTML. Requiring both means an unrelated listener on the
+ * port (or an EADDRINUSE that never wrote the pidfile) is not counted ready.
+ */
+const PREVIEW_FIXTURE_READY_SCRIPT = `
+const http = require('node:http');
+const fs = require('node:fs');
+if (!fs.existsSync(process.env.PREVIEW_FIXTURE_PIDFILE)) process.exit(1);
+const req = http.get('http://127.0.0.1:' + process.env.PREVIEW_FIXTURE_PORT + '/', res => {
+  let body = '';
+  res.setEncoding('utf8');
+  res.on('data', chunk => { body += chunk; });
+  res.on('end', () => {
+    process.exit(res.statusCode === 200 && body.includes('preview-fixture') ? 0 : 1);
+  });
+});
+req.on('error', () => process.exit(1));
+req.setTimeout(1000, () => { req.destroy(); process.exit(1); });
+`.trim();
+
+/** In-container stop: kill the pid recorded by the fixture, then drop its pidfile. */
+const PREVIEW_FIXTURE_STOP_SCRIPT = `
+const fs = require('node:fs');
+try {
+  const pid = Number(fs.readFileSync(process.env.PREVIEW_FIXTURE_PIDFILE, 'utf8').trim());
+  if (Number.isSafeInteger(pid) && pid > 0) process.kill(pid, 'SIGKILL');
+} catch {}
+try { fs.unlinkSync(process.env.PREVIEW_FIXTURE_PIDFILE); } catch {}
+`.trim();
+
+function previewFixturePidfile(port: number): string {
+  return `/tmp/cloud-agent-preview-fixture-${port}.pid`;
+}
+
 /**
  * The local profile's new-plane runtime proof. `proveNewPlane` captures the
  * new-plane control wrapper in the owned container; a legacy container has no
@@ -740,6 +779,67 @@ export function createLocalControlPlaneRuntime(): ControlPlaneRuntimeObservation
       );
     }
     return container;
+  };
+
+  const stopPreviewFixture = async (containerId: string, port: number): Promise<void> => {
+    const pidfile = previewFixturePidfile(port);
+    try {
+      await executeDockerCommand([
+        'exec',
+        '-e',
+        `PREVIEW_FIXTURE_PIDFILE=${pidfile}`,
+        containerId,
+        'node',
+        '-e',
+        PREVIEW_FIXTURE_STOP_SCRIPT,
+      ]);
+    } catch {
+      // Best effort: the container or the fixture process may already be gone.
+    }
+  };
+
+  const startPreviewFixtureOnPort = async (
+    containerId: string,
+    port: number
+  ): Promise<PreviewFixtureHandle> => {
+    const pidfile = previewFixturePidfile(port);
+    await executeDockerCommand([
+      'exec',
+      '-d',
+      '-e',
+      `PREVIEW_FIXTURE_PORT=${port}`,
+      '-e',
+      `PREVIEW_FIXTURE_PIDFILE=${pidfile}`,
+      containerId,
+      'node',
+      '-e',
+      PREVIEW_FIXTURE_SCRIPT,
+    ]);
+    const readyDeadline = Date.now() + PREVIEW_FIXTURE_READY_BUDGET_MS;
+    for (;;) {
+      try {
+        await executeDockerCommand([
+          'exec',
+          '-e',
+          `PREVIEW_FIXTURE_PORT=${port}`,
+          '-e',
+          `PREVIEW_FIXTURE_PIDFILE=${pidfile}`,
+          containerId,
+          'node',
+          '-e',
+          PREVIEW_FIXTURE_READY_SCRIPT,
+        ]);
+        return { port, stop: () => stopPreviewFixture(containerId, port) };
+      } catch {
+        if (Date.now() >= readyDeadline) {
+          await stopPreviewFixture(containerId, port);
+          throw new Error(
+            `preview fixture on port ${port} did not become ready within ${PREVIEW_FIXTURE_READY_BUDGET_MS}ms`
+          );
+        }
+        await sleep(PREVIEW_FIXTURE_POLL_MS);
+      }
+    }
   };
 
   return {
@@ -783,6 +883,55 @@ export function createLocalControlPlaneRuntime(): ControlPlaneRuntimeObservation
       }
       const inspection = await inspectControlPlaneSummaryCount(runtime);
       return inspection.summaryCount;
+    },
+    kiloServerPort: async allocation => {
+      await requireContainer(allocation);
+      const runtime = await findControlPlaneKiloRuntime(allocation.kiloSessionId);
+      if (!runtime) {
+        throw new Error(`controlPlaneRuntime: no Kilo runtime for ${allocation.kiloSessionId}`);
+      }
+      return Number(new URL(runtime.serverUrl).port);
+    },
+    startPreviewFixture: async (allocation, options) => {
+      const container = await requireContainer(allocation);
+      try {
+        await executeDockerCommand(['exec', container.id, 'node', '-v']);
+      } catch {
+        throw new Error('preview fixture: the owned container has no node runtime');
+      }
+      const runtime = await findControlPlaneKiloRuntime(allocation.kiloSessionId);
+      if (runtime && runtime.container.id !== container.id) {
+        throw new Error(
+          `preview fixture: Kilo runtime container ${runtime.container.id} does not match owned ${container.id}`
+        );
+      }
+      const kiloPort = runtime ? Number(new URL(runtime.serverUrl).port) : null;
+      const candidates =
+        options?.port !== undefined ? [options.port] : [...PREVIEW_FIXTURE_PORT_CANDIDATES];
+      for (const port of candidates) {
+        if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+          throw new Error(`preview fixture: port ${port} is outside 1024..65535`);
+        }
+        if (isReservedPreviewPort('cloudflare', port)) {
+          throw new Error(`preview fixture: port ${port} is reserved by the sandbox provider`);
+        }
+        if (kiloPort !== null && port === kiloPort) {
+          throw new Error(`preview fixture: port ${port} is the owned Kilo runtime's port`);
+        }
+      }
+      let lastError: unknown;
+      for (const port of candidates) {
+        try {
+          return await startPreviewFixtureOnPort(container.id, port);
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw new Error(
+        `preview fixture failed to start: ${
+          lastError instanceof Error ? lastError.message : String(lastError)
+        }`
+      );
     },
   };
 }
@@ -862,9 +1011,7 @@ export function createLocalScenarioEnvironment(options?: {
     // The report row lives in Postgres; without a connection string the
     // report-dependent scenario is `unsupported`.
     ...(databaseUrl ? { reports: createLocalReports(databaseUrl) } : {}),
-    // V2 is inert until C1 routes and launches it, so the operator opts in
-    // explicitly; without the flag V2 scenarios report `unsupported`.
-    ...(process.env.E2E_CONTROL_PLANE_V2 === '1' ? { controlPlaneV2: { ready: true } } : {}),
+    controlPlaneV2: { ready: true },
     // Containment is a Worker `.dev.vars` setting; the harness reads the same
     // source (passed in by the driver) instead of a second env flag.
     ...(options?.credentialContainmentEnabled ? { credentialContainment: { enabled: true } } : {}),

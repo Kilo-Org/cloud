@@ -36,12 +36,37 @@ const SUB = 'apple-sub-001';
 // kiloUserId/version on JwtPayload; Apple's payload has neither, so cast fixtures.
 const applePayload = (fields: Record<string, unknown>) => fields as unknown as jwt.JwtPayload;
 
+const ROUTE_URL = 'http://localhost/api/auth/apple-notifications';
+
 function applePost() {
   const formData = new FormData();
   formData.set('payload', 'fake-apple-jwt');
-  return new NextRequest('http://localhost/api/auth/apple-notifications', {
+  return new NextRequest(ROUTE_URL, {
     method: 'POST',
     body: formData,
+  });
+}
+
+function rawPost(init: { body?: string; contentType?: string }) {
+  const headers = new Headers();
+  if (init.contentType !== undefined) headers.set('content-type', init.contentType);
+  return new NextRequest(ROUTE_URL, { method: 'POST', headers, body: init.body });
+}
+
+/** A POST whose body arrives as a stream, so it carries no content-length. */
+function streamedPost(contentType: string, chunks: string[]) {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+      controller.close();
+    },
+  });
+  return new NextRequest(ROUTE_URL, {
+    method: 'POST',
+    headers: { 'content-type': contentType },
+    body,
+    duplex: 'half',
   });
 }
 
@@ -187,5 +212,97 @@ describe('POST /api/auth/apple-notifications', () => {
     expect(await providerRow(SUB)).toBeDefined();
     expect(await userWebPepper(user.id)).toBe('old-web-pepper');
     expect((await sessionRow(session.id))?.revoked_at).toBeNull();
+  });
+
+  describe('rejecting requests that are not a form payload', () => {
+    const OVER_LIMIT_FORM_BODY = `payload=${'a'.repeat(70 * 1024)}`;
+
+    it('rejects a JSON body without verifying or capturing', async () => {
+      const response = await POST(
+        rawPost({ contentType: 'application/json', body: JSON.stringify({ payload: 'x' }) })
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'Unsupported content type' });
+      expect(mockVerifyAppleJwtWithJwks).not.toHaveBeenCalled();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rejects a POST without a content type', async () => {
+      const response = await POST(rawPost({}));
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'Unsupported content type' });
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rejects a form body that carries no payload field', async () => {
+      const response = await POST(
+        rawPost({ contentType: 'application/x-www-form-urlencoded', body: '' })
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'Missing payload' });
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unparsable form body', async () => {
+      const response = await POST(
+        rawPost({ contentType: 'multipart/form-data', body: 'payload=x' })
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'Invalid form data' });
+      expect(mockVerifyAppleJwtWithJwks).not.toHaveBeenCalled();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rejects a body over the size limit declared by content-length', async () => {
+      const response = await POST(
+        rawPost({
+          contentType: 'application/x-www-form-urlencoded',
+          body: OVER_LIMIT_FORM_BODY,
+        })
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'Payload too large' });
+      expect(mockVerifyAppleJwtWithJwks).not.toHaveBeenCalled();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rejects a streamed body over the size limit without a content-length', async () => {
+      const response = await POST(
+        streamedPost('application/x-www-form-urlencoded', [
+          'payload=',
+          'a'.repeat(40 * 1024),
+          'a'.repeat(40 * 1024),
+        ])
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'Payload too large' });
+      expect(mockVerifyAppleJwtWithJwks).not.toHaveBeenCalled();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('processes a form payload with a charset parameter', async () => {
+      mockVerifyAppleJwtWithJwks.mockResolvedValue(
+        applePayload({
+          events: JSON.stringify({ type: 'email-enabled', sub: SUB, event_time: 1_700_000_000 }),
+        })
+      );
+
+      const response = await POST(
+        rawPost({
+          contentType: 'application/x-www-form-urlencoded; charset=utf-8',
+          body: 'payload=fake-apple-jwt',
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockVerifyAppleJwtWithJwks).toHaveBeenCalledWith('fake-apple-jwt', expect.anything());
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
   });
 });

@@ -78,6 +78,63 @@ async function handleAppleEvent(event: AppleEvent): Promise<void> {
   // email-disabled and email-enabled are informational — no action needed
 }
 
+const MAX_NOTIFICATION_BODY_BYTES = 64 * 1024;
+
+const FORM_CONTENT_TYPES: Record<string, true> = {
+  'application/x-www-form-urlencoded': true,
+  'multipart/form-data': true,
+};
+
+/** True when the media type of `contentType` is a form encoding, ignoring parameters. */
+function isFormContentType(contentType: string): boolean {
+  const [mediaType] = contentType.split(';', 1);
+  return FORM_CONTENT_TYPES[mediaType.trim().toLowerCase()] === true;
+}
+
+class NotificationBodyTooLargeError extends Error {}
+
+async function readBoundedBody(request: NextRequest): Promise<ArrayBuffer> {
+  const contentLength = request.headers.get('content-length');
+  if (
+    contentLength !== null &&
+    (!/^\d+$/.test(contentLength) || Number(contentLength) > MAX_NOTIFICATION_BODY_BYTES)
+  ) {
+    throw new NotificationBodyTooLargeError();
+  }
+  if (!request.body) return new ArrayBuffer(0);
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      totalBytes += chunk.value.byteLength;
+      if (totalBytes > MAX_NOTIFICATION_BODY_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The request remains rejected when stream cancellation fails.
+        }
+        throw new NotificationBodyTooLargeError();
+      }
+      chunks.push(chunk.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new ArrayBuffer(totalBytes);
+  const view = new Uint8Array(body);
+  let offset = 0;
+  for (const chunk of chunks) {
+    view.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
 /**
  * Apple Sign in with Apple server-to-server notification endpoint.
  * Apple sends a POST with a signed JWT when users change their
@@ -86,14 +143,30 @@ async function handleAppleEvent(event: AppleEvent): Promise<void> {
  * See: https://developer.apple.com/documentation/sign_in_with_apple/processing_changes_for_sign_in_with_apple_accounts
  */
 export async function POST(request: NextRequest) {
+  const contentType = request.headers.get('content-type');
+  if (!contentType || !isFormContentType(contentType)) {
+    return NextResponse.json({ error: 'Unsupported content type' }, { status: 400 });
+  }
+
+  // Form parsing answers a client error on its own, without reaching the
+  // server-fault path below.
+  let formData: FormData;
   try {
-    const formData = await request.formData();
-    const payload = formData.get('payload');
-
-    if (typeof payload !== 'string') {
-      return NextResponse.json({ error: 'Missing payload' }, { status: 400 });
+    const body = await readBoundedBody(request);
+    formData = await new Response(body, { headers: { 'content-type': contentType } }).formData();
+  } catch (error) {
+    if (error instanceof NotificationBodyTooLargeError) {
+      return NextResponse.json({ error: 'Payload too large' }, { status: 400 });
     }
+    return NextResponse.json({ error: 'Invalid form data' }, { status: 400 });
+  }
 
+  const payload = formData.get('payload');
+  if (typeof payload !== 'string') {
+    return NextResponse.json({ error: 'Missing payload' }, { status: 400 });
+  }
+
+  try {
     const jwtPayload = await verifyAppleJwtWithJwks(payload, APPLE_CLIENT_ID);
     const event = extractAppleEvent(jwtPayload);
     await handleAppleEvent(event);

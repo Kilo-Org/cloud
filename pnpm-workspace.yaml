@@ -154,6 +154,12 @@ overrides:
   source-map-js: 1.2.2
   tinypool: 2.1.2
   postcss: '>=8.5.23'
+  # @modelcontextprotocol/sdk declares zod as a peer and packages/harness-sdk
+  # relies on the auto-installed peer. Without this line, a dependency that
+  # brings a newer zod into the dev graph (knip) would silently change the zod
+  # the shipped MCP client is built against. Follow the catalog pin so the two
+  # cannot drift apart.
+  '@modelcontextprotocol/sdk>zod': 'catalog:'
   picomatch@^2: 2.3.2
   picomatch@^4: 4.0.4
   yaml: 2.8.4

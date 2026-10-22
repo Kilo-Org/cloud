@@ -25,6 +25,7 @@
     "error": "fout: {{error}}",
     "back": "Terug",
     "somethingWentWrong": "Iets het verkeerd geloop.",
+    "actionNotRecorded": "Ons kon nie hierdie aksie aanteken nie. Probeer asseblief later weer.",
     "couldNotOpen": "Kon nie {{label}} oopmaak nie.",
     "link": "skakel",
     "takingLonger": "Dit neem langer as verwag. Jy kan dit toemaak en weer nagaan.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub het nie die samevoeging voltooi nie.",
       "mergeResultNotCompleted": "Die {{term}} is nie saamgevoeg nie. Gaan sy status na en probeer weer.",
       "ambiguous": "Kon nie bevestig nie — kyk na die PR voordat jy weer probeer.",
-      "persistenceFailed": "Ons kon nie hierdie aksie aanteken nie. Probeer asseblief later weer.",
       "forbidden": "Toegang is verbode."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "Laai hersieningsgeheue",
       "couldNotLoad": "Die hersieningsgeheue kon nie gelaai word nie.",
       "off": "Die hersieningsgeheue is af.",
+      "on": "Die hersieningsgeheue is aan.",
       "offDescription": "Skakel dit aan sodat Kilo uit instandhouers se antwoorde kan leer en riglyne vir REVIEW.md kan voorstel.",
-      "readOnlyDescription": "Slegs organisasie-eienaars en faktureringsbestuurders kan hersieningsgeheue aktiveer.",
+      "readOnlyDescription": "Slegs organisasie-eienaars en faktureringsbestuurders kan hersieningsgeheue verander.",
       "enable": "Aktiveer hersieningsgeheue",
       "loadingProposals": "Laai voorstelle",
       "couldNotLoadProposals": "Die voorstelle kon nie gelaai word nie.",
@@ -1879,6 +1880,9 @@
       "viewA11y": "Bekyk ouditverslag"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-administrateur",
+      "actorMaskedUser": "Gemaskeerde gebruiker",
+      "actorSystem": "Kilo-stelsel",
       "couldNotLoad": "Die ouditverslag kon nie gelaai word nie.",
       "events": "Gebeure",
       "generated": "Die verslag is op {{generatedAt}} gegenereer.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "'N Sinkronisasie is dalk nie voltooi nie. Probeer weer om die status daarvan na te gaan en by te werk, of laat vaar dit.",
       "syncInProgress": "'N Sekuriteitsinkronisasie is reeds aan die gang. Probeer asseblief weer.",
       "dismissalInProgress": "Hierdie verwerping is reeds aan die gang. Probeer asseblief weer.",
-      "couldNotReadPendingSyncs": "Kon nie hangende sinkronisasies lees nie. Probeer weer."
+      "couldNotReadPendingSyncs": "Kon nie hangende sinkronisasies lees nie. Probeer weer.",
+      "ambiguous": "Kon nie bevestig nie — kyk na die sekuriteitshersiening voordat jy weer probeer.",
+      "settleFailed": "Die aksie is voltooi, maar ons kon nie die resultaat vaslê nie. Probeer asseblief weer.",
+      "replayFailed": "Hierdie aksie het nie voltooi nie. Probeer asseblief weer.",
+      "actionFailed": "Kon nie hierdie aksie voltooi nie. Probeer asseblief weer.",
+      "actionBlocked": "Hierdie aksie kon nie voltooi word nie. Die probleem moet eers reggemaak word voordat jy weer kan probeer."
     },
     "analysisState": {
       "queued": "Ontleding in die tou",
@@ -2774,7 +2783,7 @@
     "thisDevice": "Hierdie toestel",
     "webBrowser": "Webblaaier",
     "signOutThisDevice": "Teken hierdie toestel uit",
-    "signOutThisSession": "Teken hierdie sessie uit",
+    "signOutSessionLabel": "Teken {{device}} uit, ingeteken {{signedIn}}",
     "sessionSignedOut": "Sessie uitgeteken.",
     "signOutThisDeviceTitle": "Hierdie toestel uitteken?",
     "signOutThisSessionTitle": "Hierdie sessie uitteken?",
@@ -3011,11 +3020,22 @@
     "boundary": {
       "backToProfile": "Terug na profiel",
       "loadErrorMessage": "Kontroleer jou verbinding en probeer weer.",
+
+      "chooseAccount": "Kies 'n rekening",
       "loadErrorTitle": "Jou organisasies kon nie gelaai word nie.",
+      "noOrganization": "Geen organisasie",
+
+      "noOrganizationDescription": "Hierdie rekening is nie deel van 'n organisasie nie. Skep of sluit by een aan op die web om organisasiefunksies soos lede-uitnodigings en waarskuwings oor lae saldo te gebruik.",
+
+      "openWebOrganizations": "Maak organisasies op die web oop",
+
       "organizationUnavailable": "Die organisasie is nie beskikbaar nie.",
-      "selectDescription": "Kies 'n organisasie uit jou profiel om voort te gaan.",
+      "selectDescriptionWithOrganizations": "Jy behoort aan een of meer organisasies. Kies die rekening wat hierdie skerm moet gebruik.",
+
       "selectOrganization": "Kies 'n organisasie",
       "unavailableDescription": "Hierdie organisasie is nie meer beskikbaar nie. Kies een uit jou profiel om voort te gaan.",
+
+      "unavailableSessionsDescription": "Hierdie organisasie is nie meer beskikbaar nie. Sessies daarvoor kan nie gelaai word nie.",
       "accessDeniedDescription": "Jy het nie toegang tot hierdie organisasie nie."
     },
     "creditActivity": {
@@ -3067,7 +3087,11 @@
       "separateEmailsHint": "Skei verskeie e-posadresse met kommas.",
       "thresholdLabel": "Waarsku onder (USD)",
       "title": "Waarskuwing vir lae saldo",
-      "emailsError": "Voer minstens een geldige e-posadres in. Skei verskeie adresse met kommas.",
+      "emailsInvalid": "Een of meer e-posadresse is nie geldig nie.",
+      "emailsRequired": "Voer minstens een e-posadres in.",
+      "saveEmailsError": "Sommige e-posadresse is nie aanvaar nie. Kontroleer hulle en probeer weer.",
+      "saveError": "Die waarskuwing vir lae saldo kon nie gestoor word nie.",
+      "thresholdPlaceholder": "Voer 'n bedrag in",
       "thresholdError": "Voer 'n bedrag groter as 0 in."
     },
     "memberLimit": {
@@ -3078,6 +3102,7 @@
       "removeLimit": "Verwyder perk",
       "title": "Daaglikse gebruiksperk",
       "blankError": "Voer 'n bedrag in of tik hieronder op Verwyder perk.",
+      "blankWithoutLimitError": "Voer 'n daaglikse perk tussen 0 en {{max}} in.",
       "rangeError": "Voer 'n bedrag tussen 0 en {{max}} in."
     },
     "members": {
@@ -3616,7 +3641,6 @@
     "keyTooLong": "Sleutel moet 256 karakters of minder wees",
     "keyDuplicate": "Hierdie sleutel bestaan reeds in die profiel",
     "valueLabel": "Waarde",
-    "secretLabel": "Geheim",
     "secrets": {
       "markSecret": "Merk as geheim",
       "masked": "Versteekte waarde",
@@ -3675,7 +3699,9 @@
       "jsonTooLarge": "Gebruik hoogstens 50 inskrywings, sleutels tot 128 en waardes tot 4096 karakters",
       "timeoutInvalid": "Uitteltyd moet 'n hele aantal millisekondes wees",
       "edit": "Wysig MCP-bediener",
-      "saveFailed": "Kon nie MCP-bediener stoor nie"
+      "saveFailed": "Kon nie MCP-bediener stoor nie",
+      "deleteFailed": "Kon nie MCP-bediener verwyder nie",
+      "updateFailed": "Kon nie MCP-bediener opdateer nie"
     },
     "agents": {
       "title": "Profiel agente",
@@ -3702,6 +3728,7 @@
       "visibilitySubagent": "Subagent - slegs oproepbaar vanaf ander",
       "visibilityAll": "Almal - albei",
       "saveFailed": "Kon nie agent stoor nie",
+      "deleteFailed": "Kon nie agent verwyder nie",
       "nameRequired": "Voer 'n agentnaam in",
       "slugRequired": "Voer 'n agentslak in",
       "slugInvalid": "Slak moet met 'n letter begin en slegs kleinletters, syfers en strepe gebruik",
@@ -3721,6 +3748,7 @@
       "subtask": "Hardloop as subtaak",
       "edit": "Wysig skuinsstreep opdrag",
       "saveFailed": "Kon nie opdrag stoor nie",
+      "deleteFailed": "Kon nie opdrag verwyder nie",
       "nameRequired": "Voer 'n opdragnaam in",
       "nameInvalid": "Naam moet met 'n kleinletter begin en slegs kleinletters, syfers en strepe gebruik",
       "templateRequired": "Voer 'n opdragsjabloon in",

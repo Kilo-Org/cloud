@@ -948,7 +948,7 @@ describe('credential exchange bearer authentication guard', () => {
 
   test('rejects absent and mismatched pepper claims, including a null database pepper', async () => {
     const user = await insertTestUser({ api_token_pepper: null });
-    const noPepper = await signPolicyClaims({
+    const noPepper = signPolicyClaims({
       version: 3,
       kiloUserId: user.id,
       env: process.env.NODE_ENV,
@@ -1054,7 +1054,7 @@ describe('credential exchange bearer authentication guard', () => {
     ],
   ])('rejects an eligible-looking token with %s', async (_name, claimsFor) => {
     const user = await insertTestUser({ api_token_pepper: 'ineligible-claim-pepper' });
-    const token = await signPolicyClaims(claimsFor(user, Math.floor(Date.now() / 1000)));
+    const token = signPolicyClaims(claimsFor(user, Math.floor(Date.now() / 1000)));
 
     const result = await getUserFromBearerForCredentialExchange(
       new Headers({ authorization: `Bearer ${token}` }),
@@ -1138,7 +1138,7 @@ describe('credential exchange bearer authentication guard', () => {
 
   test('rejects a valid token for a missing user', async () => {
     const now = Math.floor(Date.now() / 1000);
-    const token = await signPolicyClaims({
+    const token = signPolicyClaims({
       version: 3,
       kiloUserId: 'missing-credential-exchange-user',
       apiTokenPepper: 'pepper',
@@ -1197,7 +1197,7 @@ describe('credential exchange bearer authentication guard', () => {
 
     for (const claims of invalidClaims) {
       const result = await getUserFromBearerForCredentialExchange(
-        new Headers({ authorization: `Bearer ${await signPolicyClaims(claims)}` }),
+        new Headers({ authorization: `Bearer ${signPolicyClaims(claims)}` }),
         { legacy: 'deny' }
       );
       expect(result.authFailedResponse?.status).toBe(401);

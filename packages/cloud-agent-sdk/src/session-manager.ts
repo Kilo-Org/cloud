@@ -160,6 +160,14 @@ const TRANSCRIPT_CLEARED_INDICATOR = 'View cleared — earlier messages are stil
 const RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS = 20;
 
 /**
+ * Maximum number of sessions with an in-memory record of a prompt a failed send
+ * could not deliver. Bounded like the delivery-failure record: a long-lived
+ * manager would otherwise keep a prompt string for every session that ever
+ * failed a send.
+ */
+const FAILED_PROMPT_MEMORY_MAX_SESSIONS = 20;
+
+/**
  * Maximum number of retained messages. Once the loaded transcript exceeds this,
  * `trimRetainedHistory` drops the oldest loaded older-page from local storage.
  */
@@ -1244,6 +1252,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * sessions with a re-send in flight and needs no eviction bound.
    */
   const supersededInFlightBySession = new Map<KiloSessionId, Set<string>>();
+  /**
+   * Prompt text a failed send removed from the transcript, keyed by the session
+   * that owned the optimistic row. The composer clears its draft when the row is
+   * inserted, so a failure has to hand the text back to the session that sent
+   * it — and `switchSession` may already have retargeted the manager to another
+   * session by then. The record is restored into the composer when that session
+   * becomes active again and is dropped by a send from it that the server
+   * accepts.
+   */
+  const failedPromptBySession = new Map<KiloSessionId, string>();
   let activeSessionType: ActiveSessionType | null = null;
   /**
    * Latest per-session capabilities reported by the live CLI transport's
@@ -1299,7 +1317,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // Pagination state for `loadOlderMessages`. Reset on every switchSession.
   let olderMessagesCursor: string | null = null;
   // Monotonically increasing per-session generation; older-page results
-  // whose `expectedLoadOlderGeneration` doesn't match are dropped.
+  // whose captured `expectedGeneration` no longer matches are dropped.
   let loadOlderGeneration = 0;
   // In-flight older-page load, used to dedupe concurrent calls and to let
   // late callers await the same result.
@@ -2045,7 +2063,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (olderMessagesTerminal) return;
     // `/clear` keeps the local view empty for this visit — do not page history back in.
     if (store.get(transcriptClearedAtom)) return;
-    // No cursor means nothing left to load.
     if (olderMessagesCursor === null) return;
     // Dedupe: if a load is already in flight, every caller awaits the
     // same result instead of starting a parallel backend request.
@@ -2231,6 +2248,83 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     bumpSupersededInFlight(ownerSessionId);
   }
 
+  /**
+   * Remember a prompt a failed send could not deliver, under the session that
+   * owned the optimistic row (see `failedPromptBySession`). Refreshes insertion
+   * order so the most recently touched sessions survive eviction.
+   */
+  function recordFailedPrompt(kiloSessionId: KiloSessionId, messageText: string): void {
+    failedPromptBySession.delete(kiloSessionId);
+    failedPromptBySession.set(kiloSessionId, messageText);
+    if (failedPromptBySession.size <= FAILED_PROMPT_MEMORY_MAX_SESSIONS) return;
+    for (const key of failedPromptBySession.keys()) {
+      if (key !== kiloSessionId && key !== activeSessionId) {
+        failedPromptBySession.delete(key);
+        return;
+      }
+    }
+  }
+
+  /**
+   * A switch away caches the outgoing session's page, and that cache write can
+   * already hold the optimistic row a send inserted before it settled. Drop the
+   * row from that session's cached first page so returning to it does not paint
+   * a prompt the server never received.
+   */
+  function forgetCachedOptimisticRow(kiloSessionId: KiloSessionId, messageId: string): void {
+    const read = config.readCachedSnapshotPage;
+    const write = config.writeCachedSnapshotPage;
+    if (!read || !write) return;
+    const drop = (page: CachedSessionSnapshotPage | null): void => {
+      if (!page || !page.messages.some(message => message.info.id === messageId)) return;
+      write({
+        ...page,
+        messages: page.messages.filter(message => message.info.id !== messageId),
+      });
+    };
+    try {
+      const page = read(kiloSessionId);
+      if (page instanceof Promise) {
+        void page.then(drop).catch(() => {
+          // An unreadable cache keeps its page; the row is still gone from the
+          // transcript that owned it.
+        });
+        return;
+      }
+      drop(page);
+    } catch {
+      // A cache failure must not turn a send failure into a thrown one.
+    }
+  }
+
+  /**
+   * Whether the chat's cached first page holds the confirmed record of a
+   * message. `switchSession` clears the storage of the session it leaves, so
+   * after a mid-send switch the cached page is the only place a confirmation
+   * that landed before the switch survives.
+   */
+  async function pageShowsConfirmedUserMessage(
+    kiloSessionId: KiloSessionId,
+    messageId: string
+  ): Promise<boolean> {
+    const read = config.readCachedSnapshotPage;
+    if (!read) return false;
+    try {
+      const page = await read(kiloSessionId);
+      return (
+        page?.messages.some(
+          message =>
+            message.info.id === messageId &&
+            message.info.role === 'user' &&
+            message.info.synthetic !== true
+        ) ?? false
+      );
+    } catch {
+      // An unreadable cache is a miss, never a failed send.
+      return false;
+    }
+  }
+
   /** Caches the loaded session's page before it is left, so a return paints at once. */
   function cacheActiveSessionPage(): void {
     if (
@@ -2330,6 +2424,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // previous session state and show a loading indicator.
     clearAllAtoms(preserveTranscript);
     remoteOptimisticIds.clear();
+    // A prompt this session failed to deliver is this session's draft: restore
+    // it so returning to the chat offers the retry.
+    store.set(failedPromptAtom, failedPromptBySession.get(kiloSessionId) ?? null);
     store.set(rootSessionIdAtom, kiloSessionId);
     store.set(isLoadingAtom, true);
     // A retry that keeps the transcript mounted must also keep advertising that
@@ -2930,6 +3027,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     //     authoritative user message lands (see the onEvent handler).
     const optimisticStorage = store.get(sessionStorageAtom);
     const optimisticSessionId = store.get(rootSessionIdAtom) ?? kiloSessionId;
+    const insertedOptimisticRow = Boolean(
+      sessionAtSend && optimisticStorage && optimisticSessionId
+    );
     try {
       if (sessionAtSend && optimisticStorage && optimisticSessionId) {
         insertOptimisticUserMessage({
@@ -2986,6 +3086,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           ? { attachmentParts: input.attachmentParts }
           : {}),
       });
+      // A prompt the server accepted is no longer a draft, whether or not the
+      // user is still on the session that sent it.
+      if (kiloSessionId) failedPromptBySession.delete(kiloSessionId);
       if (currentSession !== sessionAtSend || activeSessionId !== kiloSessionId) return true;
       store.set(billingFailureAtom, null);
       store.set(failedPromptAtom, null);
@@ -3003,11 +3106,49 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       return true;
     } catch (err) {
-      if (currentSession !== sessionAtSend || activeSessionId !== kiloSessionId) return false;
-      // Delete the optimistic row on failure so the transcript does not keep a
-      // ghost prompt. The composer keeps the draft for a retry.
-      optimisticStorage?.deleteMessage(messageId);
+      // The optimistic row belongs to the chat that sent it, not to whichever
+      // chat is active by the time the send settles: a switch mid-send must not
+      // leave the row behind. The chat may also have been reopened while the
+      // send was in flight, so the mounted storage is cleaned too — its row can
+      // come back from the page cached on the way out. The composer cleared its
+      // draft when the row was inserted, so the text goes back to the sending
+      // chat as well. The atom writes and the callback speak for the chat the
+      // user is looking at, so they need that chat to still be the sending one;
+      // the session object identity is deliberately not part of that test,
+      // because reopening a chat replaces it.
+      const stillOnSendingChat = activeSessionId === kiloSessionId;
+      const mountedStorage = store.get(sessionStorageAtom);
+      const mountedRow = mountedStorage?.getMessageInfo(messageId);
+      // A confirmed record under this id is server history: the server accepted
+      // the prompt and only the response was lost, so there is nothing to retry.
+      // `switchSession` clears the storage it leaves, so after a switch the
+      // confirmation survives only in the page cached on the way out.
+      const delivered =
+        (stillOnSendingChat && mountedRow?.role === 'user' && mountedRow.synthetic !== true) ||
+        (!stillOnSendingChat &&
+          kiloSessionId !== null &&
+          (await pageShowsConfirmedUserMessage(kiloSessionId, messageId)));
+      if (optimisticStorage && optimisticStorage !== mountedStorage && !delivered) {
+        optimisticStorage.deleteMessage(messageId);
+      }
+      if (mountedStorage && mountedRow?.role === 'user' && mountedRow.synthetic === true) {
+        mountedStorage.deleteMessage(messageId);
+      }
       remoteOptimisticIds.delete(messageId);
+      if (insertedOptimisticRow && kiloSessionId) {
+        if (delivered) {
+          failedPromptBySession.delete(kiloSessionId);
+        } else {
+          recordFailedPrompt(kiloSessionId, messageText);
+          forgetCachedOptimisticRow(kiloSessionId, messageId);
+        }
+      }
+      if (!stillOnSendingChat) return false;
+      if (delivered) {
+        store.set(failedPromptAtom, null);
+        store.set(billingFailureAtom, null);
+        return false;
+      }
       store.set(failedPromptAtom, messageText);
       store.set(billingFailureAtom, parseCustomerBillingFailure(err));
       const detail = formatErrorDetail(err);
@@ -3315,6 +3456,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     remoteOptimisticIds.clear();
     resolvedDeliveryFailuresBySession.clear();
     supersededInFlightBySession.clear();
+    failedPromptBySession.clear();
     activeSessionId = null;
     activeSessionType = null;
     store.set(

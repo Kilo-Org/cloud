@@ -25,6 +25,7 @@
     "error": "problema: {{error}}",
     "back": "Bumalik",
     "somethingWentWrong": "Nagkaroon ng problema.",
+    "actionNotRecorded": "Hindi namin maitala ang aksiyong ito. Pakisubukan muli mamaya.",
     "couldNotOpen": "Hindi mabuksan ang {{label}}.",
     "link": "link sa pahina",
     "takingLonger": "Mas tumatagal ito kaysa sa inaasahan. Maaari mong isara ito at tingnan muli.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "Hindi nakumpleto ng GitHub ang pag-merge.",
       "mergeResultNotCompleted": "Hindi na-merge ang {{term}}. Suriin ang katayuan nito at subukang muli.",
       "ambiguous": "Hindi makumpirma — suriin ang PR bago subukan muli.",
-      "persistenceFailed": "Hindi namin maitala ang aksiyong ito. Pakisubukan muli mamaya.",
       "forbidden": "Hindi pinapayagan ang aksiyong ito."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "Nilo-load ang memorya ng pagsusuri",
       "couldNotLoad": "Hindi ma-load ang memorya ng pagsusuri.",
       "off": "Hindi pinagana ang memorya ng pagsusuri.",
+      "on": "Pinagana ang memorya ng pagsusuri.",
       "offDescription": "Paganahin ito para matuto ang Kilo mula sa mga tugon ng tagapangalaga ng code at magmungkahi ng mga gabay para sa REVIEW.md.",
-      "readOnlyDescription": "Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring magpagana ng memorya ng pagsusuri.",
+      "readOnlyDescription": "Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring baguhin ang memorya ng pagsusuri.",
       "enable": "Paganahin ang memorya ng pagsusuri",
       "loadingProposals": "Nilo-load ang mga mungkahi",
       "couldNotLoadProposals": "Hindi ma-load ang mga mungkahi.",
@@ -1879,6 +1880,9 @@
       "viewA11y": "Tingnan ang ulat ng audit"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Tagapangasiwa ng Kilo",
+      "actorMaskedUser": "Naka-mask na user",
+      "actorSystem": "Kilo system",
       "couldNotLoad": "Hindi ma-load ang ulat ng audit.",
       "events": "Mga kaganapan",
       "generated": "Nabuo noong {{generatedAt}}.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "Maaaring hindi natapos ang isang pag-sync. Subukang muli para maitugma ang data, o itapon ito.",
       "syncInProgress": "May pag-sync na ng data ng seguridad na kasalukuyang isinasagawa. Pakisubukang muli.",
       "dismissalInProgress": "Isinasagawa na ang pagbalewalang ito. Pakisubukang muli.",
-      "couldNotReadPendingSyncs": "Hindi mabasa ang mga nakabinbing pag-sync. Subukang muli."
+      "couldNotReadPendingSyncs": "Hindi mabasa ang mga nakabinbing pag-sync. Subukang muli.",
+      "ambiguous": "Hindi makumpirma — suriin ang pagsusuri sa seguridad bago subukan muli.",
+      "settleFailed": "Nagawa ang aksyon, ngunit hindi namin mai-record ang resulta. Pakisubukang muli.",
+      "replayFailed": "Hindi natapos ang aksyon na ito. Pakisubukang muli.",
+      "actionFailed": "Hindi magawang matapos ang aksyon na ito. Pakisubukang muli.",
+      "actionBlocked": "Hindi magawang matapos ang aksyon na ito. Kailangang ayusin muna ang problema bago mo ito muling subukan."
     },
     "analysisState": {
       "queued": "Nakapila ang pagsusuri",
@@ -2773,7 +2782,7 @@
     "signedIn": "Nag-sign in: {{signedIn}} · Huling nakita: {{lastSeen}}",
     "thisDevice": "Device na ito",
     "signOutThisDevice": "I-sign out ang device na ito",
-    "signOutThisSession": "I-sign out ang sesyong ito",
+    "signOutSessionLabel": "I-sign out ang {{device}}, nag-sign in: {{signedIn}}",
     "sessionSignedOut": "Na-sign out ang sesyon.",
     "signOutThisDeviceTitle": "I-sign out ang device na ito?",
     "signOutThisSessionTitle": "I-sign out ang sesyong ito?",
@@ -3011,11 +3020,22 @@
     "boundary": {
       "backToProfile": "Bumalik sa profile",
       "loadErrorMessage": "Suriin ang koneksyon mo at subukan muli.",
+
+      "chooseAccount": "Pumili ng account",
       "loadErrorTitle": "Hindi ma-load ang iyong mga organisasyon.",
+      "noOrganization": "Walang organisasyon",
+
+      "noOrganizationDescription": "Ang account na ito ay hindi bahagi ng isang organisasyon. Gumawa o sumali sa isang organisasyon sa web upang magamit ang mga feature ng organisasyon tulad ng mga imbitasyon ng miyembro at mga alerto sa mababang balanse.",
+
+      "openWebOrganizations": "Buksan ang mga organisasyon sa web",
+
       "organizationUnavailable": "Hindi ma-access ang organisasyon.",
-      "selectDescription": "Pumili ng organisasyon mula sa iyong profile para magpatuloy.",
+      "selectDescriptionWithOrganizations": "Kasapi ka ng isa o higit pang organisasyon. Piliin ang account na dapat gamitin ng screen na ito.",
+
       "selectOrganization": "Pumili ng organisasyon",
       "unavailableDescription": "Hindi na ma-access ang organisasyong ito. Pumili ng isa mula sa iyong profile para magpatuloy.",
+
+      "unavailableSessionsDescription": "Hindi na ma-access ang organisasyong ito. Hindi ma-load ang mga session nito.",
       "accessDeniedDescription": "Wala kang access sa organisasyong ito."
     },
     "creditActivity": {
@@ -3067,7 +3087,11 @@
       "separateEmailsHint": "Paghiwalayin ang mga email gamit ang kuwit.",
       "thresholdLabel": "Magbabala kapag mas mababa sa (USD)",
       "title": "Babala sa mababang balanse",
-      "emailsError": "Maglagay ng kahit isang wastong email address. Kung higit sa isa, paghiwalayin ang mga ito ng kuwit.",
+      "emailsInvalid": "Isa o higit pang email address ang hindi wasto.",
+      "emailsRequired": "Maglagay ng kahit isang email address.",
+      "saveEmailsError": "May mga email address na hindi natanggap. Suriin ang mga ito at subukang muli.",
+      "saveError": "Hindi nai-save ang babala sa mababang balanse.",
+      "thresholdPlaceholder": "Maglagay ng halaga",
       "thresholdError": "Maglagay ng halagang mas malaki sa 0."
     },
     "memberLimit": {
@@ -3078,6 +3102,7 @@
       "removeLimit": "Alisin ang limitasyon",
       "title": "Pang-araw-araw na limitasyon sa paggamit",
       "blankError": "Maglagay ng halaga, o piliin ang Alisin ang limitasyon sa ibaba.",
+      "blankWithoutLimitError": "Maglagay ng pang-araw-araw na limitasyon na nasa pagitan ng 0 at {{max}}.",
       "rangeError": "Maglagay ng halagang nasa pagitan ng 0 at {{max}}."
     },
     "members": {
@@ -3616,7 +3641,6 @@
     "keyTooLong": "Ang susi ay dapat 256 na character o mas kaunti",
     "keyDuplicate": "Umiiral na ang key na ito sa profile",
     "valueLabel": "Halaga",
-    "secretLabel": "Lihim",
     "secrets": {
       "markSecret": "Markahan bilang sikreto",
       "masked": "Nakatagong halaga",
@@ -3675,7 +3699,9 @@
       "jsonTooLarge": "Gumamit ng hindi hihigit sa 50 entry, mga key hanggang 128 at mga value hanggang 4096 character",
       "timeoutInvalid": "Ang timeout ay dapat na isang buong bilang ng mga millisecond",
       "edit": "I-edit ang MCP server",
-      "saveFailed": "Hindi ma-save ang MCP server"
+      "saveFailed": "Hindi ma-save ang MCP server",
+      "deleteFailed": "Hindi ma-delete ang MCP server",
+      "updateFailed": "Hindi ma-update ang MCP server"
     },
     "agents": {
       "title": "Mga ahente ng profile",
@@ -3702,6 +3728,7 @@
       "visibilitySubagent": "Subagent — matatawag lang mula sa iba",
       "visibilityAll": "Lahat - pareho",
       "saveFailed": "Hindi ma-save ang ahente",
+      "deleteFailed": "Hindi ma-delete ang ahente",
       "nameRequired": "Maglagay ng pangalan ng ahente",
       "slugRequired": "Maglagay ng agent slug",
       "slugInvalid": "Ang slug ay dapat magsimula sa isang titik at gumamit lamang ng maliliit na titik, digit, at gitling",
@@ -3721,6 +3748,7 @@
       "subtask": "Patakbuhin bilang subtask",
       "edit": "I-edit ang slash command",
       "saveFailed": "Hindi ma-save ang command",
+      "deleteFailed": "Hindi ma-delete ang command",
       "nameRequired": "Maglagay ng command name",
       "nameInvalid": "Ang pangalan ay dapat magsimula sa maliit na titik at gumamit lamang ng maliliit na titik, digit, at gitling",
       "templateRequired": "Maglagay ng command template",

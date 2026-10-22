@@ -25,6 +25,7 @@
     "error": "fel: {{error}}",
     "back": "Tillbaka",
     "somethingWentWrong": "Något gick fel.",
+    "actionNotRecorded": "Vi kunde inte registrera den här åtgärden. Försök igen senare.",
     "couldNotOpen": "Kunde inte öppna {{label}}.",
     "link": "länk",
     "takingLonger": "Det här tar längre tid än väntat. Du kan stänga vyn och kontrollera igen.",
@@ -59,7 +60,7 @@
     "draft": "Utkast",
     "enabled": "Aktiverad",
     "github": "GitHub",
-    "imageUnavailable": "Bilden är inte tillgänglig.",
+    "imageUnavailable": "Bilden är inte tillgänglig",
     "loading": "Läser in…",
     "loadMore": "Visa fler",
     "message": "Meddelande",
@@ -140,7 +141,7 @@
     "generating": "Genererar…",
     "working": "Arbetar",
     "yourOwnRepositories": "Dina egna kodarkiv",
-    "dismissed": "Avskriven",
+    "dismissed": "Avfärdad",
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub slutförde inte sammanslagningen.",
       "mergeResultNotCompleted": "{{term}} slogs inte samman. Kontrollera statusen och försök igen.",
       "ambiguous": "Kunde inte bekräfta resultatet. Kontrollera PR:en innan du försöker igen.",
-      "persistenceFailed": "Vi kunde inte registrera den här åtgärden. Försök igen senare.",
       "forbidden": "Du saknar behörighet."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "Läser in granskningsminne",
       "couldNotLoad": "Kunde inte läsa in granskningsminnet",
       "off": "Granskningsminnet är avstängt",
+      "on": "Granskningsminnet är påslaget",
       "offDescription": "Aktivera det så att Kilo kan lära sig av de projektansvarigas svar och föreslå riktlinjer för REVIEW.md.",
-      "readOnlyDescription": "Endast organisationsägare och faktureringsansvariga kan aktivera granskningsminne.",
+      "readOnlyDescription": "Endast organisationsägare och faktureringsansvariga kan ändra granskningsminne.",
       "enable": "Aktivera granskningsminne",
       "loadingProposals": "Läser in förslag",
       "couldNotLoadProposals": "Kunde inte läsa in förslagen",
@@ -1879,6 +1880,9 @@
       "viewA11y": "Visa revisionsrapport"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-administratör",
+      "actorMaskedUser": "Maskerad användare",
+      "actorSystem": "Kilo-system",
       "couldNotLoad": "Kunde inte läsa in revisionsrapporten",
       "events": "Händelser",
       "generated": "Rapporten skapades {{generatedAt}}",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "En synkronisering kanske inte har slutförts. Försök igen för att stämma av statusen, eller kasta begäran.",
       "syncInProgress": "En säkerhetssynkronisering pågår redan. Försök igen.",
       "dismissalInProgress": "Det här avfärdandet pågår redan. Försök igen.",
-      "couldNotReadPendingSyncs": "Kunde inte läsa väntande synkroniseringar. Försök igen."
+      "couldNotReadPendingSyncs": "Kunde inte läsa väntande synkroniseringar. Försök igen.",
+      "ambiguous": "Kunde inte bekräfta resultatet. Kontrollera säkerhetsgranskningen innan du försöker igen.",
+      "settleFailed": "Åtgärden slutfördes, men vi kunde inte registrera resultatet. Försök igen.",
+      "replayFailed": "Den här åtgärden slutfördes inte. Försök igen.",
+      "actionFailed": "Det gick inte att slutföra den här åtgärden. Försök igen.",
+      "actionBlocked": "Det gick inte att slutföra den här åtgärden. Problemet måste åtgärdas innan du kan försöka igen."
     },
     "analysisState": {
       "queued": "Analys i kö",
@@ -2773,7 +2782,7 @@
     "signedIn": "Inloggad {{signedIn}} · Senast aktiv {{lastSeen}}",
     "thisDevice": "Den här enheten",
     "signOutThisDevice": "Logga ut från den här enheten",
-    "signOutThisSession": "Logga ut den här sessionen",
+    "signOutSessionLabel": "Logga ut från {{device}}, inloggad {{signedIn}}",
     "sessionSignedOut": "Sessionen är utloggad.",
     "signOutThisDeviceTitle": "Logga ut från den här enheten?",
     "signOutThisSessionTitle": "Logga ut den här sessionen?",
@@ -2940,7 +2949,7 @@
     "aiProvidersTitle": "Leverantörer av AI-modeller",
     "gatewayTitle": "Kilo Gateway (vår servertjänst)",
     "crashReportingTitle": "Kraschrapportering",
-    "crashReportingNote": "Kraschrapporter innehåller bara skärmbilder om du har aktiverat den valfria delningen (se nedan). Vi registrerar aldrig skärmens vyhierarki.",
+    "crashReportingNote": "Kraschrapporter innehåller inga skärmbilder om du inte har aktiverat den valfria delningen (se nedan). Vi registrerar aldrig skärmens vyhierarki.",
     "productAnalyticsTitle": "Produktanalys",
     "productAnalyticsNote": "Innehållet i dina prompter och konversationer skickas aldrig till produktanalysen.",
     "errorScreenshotsTitle": "Skärmbilder vid fel och sessionsuppspelning",
@@ -3011,11 +3020,21 @@
     "boundary": {
       "backToProfile": "Tillbaka till profilen",
       "loadErrorMessage": "Kontrollera anslutningen och försök igen.",
-      "loadErrorTitle": "Det gick inte att läsa in dina organisationer",
-      "organizationUnavailable": "Organisationen är inte tillgänglig",
-      "selectDescription": "Välj en organisation i din profil för att fortsätta.",
+
+      "chooseAccount": "Välj ett konto",
+      "loadErrorTitle": "Det gick inte att läsa in dina organisationer.",
+      "noOrganization": "Ingen organisation",
+
+      "noOrganizationDescription": "Det här kontot tillhör ingen organisation. Skapa eller gå med i en organisation på webben för att använda organisationsfunktioner som medlemsinbjudningar och varningar om lågt saldo.",
+
+      "openWebOrganizations": "Öppna organisationer på webben",
+
+      "organizationUnavailable": "Organisationen är inte tillgänglig.",
+      "selectDescriptionWithOrganizations": "Du tillhör en eller flera organisationer. Välj det konto som den här skärmen ska använda.",
       "selectOrganization": "Välj en organisation",
       "unavailableDescription": "Den här organisationen är inte längre tillgänglig. Välj en annan i din profil för att fortsätta.",
+
+      "unavailableSessionsDescription": "Den här organisationen är inte längre tillgänglig. Det går inte att läsa in sessioner för den.",
       "accessDeniedDescription": "Du har inte åtkomst till den här organisationen."
     },
     "creditActivity": {
@@ -3067,7 +3086,11 @@
       "separateEmailsHint": "Separera flera e-postadresser med kommatecken.",
       "thresholdLabel": "Varna under (USD)",
       "title": "Varning för lågt saldo",
-      "emailsError": "Ange minst en giltig e-postadress. Skilj flera adresser åt med kommatecken.",
+      "emailsInvalid": "En eller flera e-postadresser är inte giltiga.",
+      "emailsRequired": "Ange minst en e-postadress.",
+      "saveEmailsError": "Vissa e-postadresser accepterades inte. Kontrollera dem och försök igen.",
+      "saveError": "Det gick inte att spara varningen för lågt saldo.",
+      "thresholdPlaceholder": "Ange ett belopp",
       "thresholdError": "Ange ett belopp större än 0."
     },
     "memberLimit": {
@@ -3078,6 +3101,7 @@
       "removeLimit": "Ta bort gräns",
       "title": "Daglig användningsgräns",
       "blankError": "Ange ett belopp eller ta bort gränsen med knappen nedan.",
+      "blankWithoutLimitError": "Ange en daglig gräns mellan 0 och {{max}}.",
       "rangeError": "Ange ett belopp mellan 0 och {{max}}."
     },
     "members": {
@@ -3622,7 +3646,6 @@
     "keyTooLong": "Nyckeln får innehålla högst 256 tecken",
     "keyDuplicate": "Den här nyckeln finns redan i profilen",
     "valueLabel": "Värde",
-    "secretLabel": "Hemlighet",
     "secrets": {
       "markSecret": "Markera som hemlig",
       "masked": "Dolt värde",
@@ -3681,7 +3704,9 @@
       "jsonTooLarge": "Använd högst 50 poster, nycklar upp till 128 och värden upp till 4096 tecken",
       "timeoutInvalid": "Timeout måste vara ett helt antal millisekunder",
       "edit": "Redigera MCP-server",
-      "saveFailed": "Det gick inte att spara MCP-servern"
+      "saveFailed": "Det gick inte att spara MCP-servern",
+      "deleteFailed": "Det gick inte att ta bort MCP-servern",
+      "updateFailed": "Det gick inte att uppdatera MCP-servern"
     },
     "agents": {
       "title": "Profilagenter",
@@ -3708,6 +3733,7 @@
       "visibilitySubagent": "Subagent — endast anropsbar från andra",
       "visibilityAll": "Alla — båda",
       "saveFailed": "Det gick inte att spara agenten",
+      "deleteFailed": "Det gick inte att ta bort agenten",
       "nameRequired": "Ange ett agentnamn",
       "slugRequired": "Ange agentens slug",
       "slugInvalid": "Slug måste börja med en bokstav och endast använda små bokstäver, siffror och bindestreck",
@@ -3727,6 +3753,7 @@
       "subtask": "Kör som deluppgift",
       "edit": "Redigera snedstreckskommando",
       "saveFailed": "Det gick inte att spara kommandot",
+      "deleteFailed": "Det gick inte att ta bort kommandot",
       "nameRequired": "Ange ett kommandonamn",
       "nameInvalid": "Namnet måste börja med en liten bokstav och endast använda små bokstäver, siffror och bindestreck",
       "templateRequired": "Ange en kommandomall",

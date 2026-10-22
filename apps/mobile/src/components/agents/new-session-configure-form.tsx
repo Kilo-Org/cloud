@@ -165,6 +165,15 @@ export function NewSessionConfigureForm({
   // `0` against that padding-free wrapper, dropping the content container's
   // `pt-4` gap and overstating the room the frame leaves for the input.
   const [composerTop, setComposerTop] = useState(0);
+  // The Run on block's height, reported by the wrapper below and threaded to
+  // the prompt as `belowCardHeight`, which reserves the row inside the frame
+  // while the composer can still keep its floor. The block starts at the
+  // Organization section (when the entry point renders one) and sits directly
+  // under the card, and its height does not depend on the card, so the frame
+  // fit converges without a second layout pass. Zero until it lays out, which
+  // owes nothing below the card; the corrected pass lands in the same commit
+  // chain.
+  const [runTargetHeight, setRunTargetHeight] = useState(0);
   // The remote surface (launch folder, remote hint, no repository section)
   // covers both a bound computer and the tour's computer target with none
   // connected yet — the target is the computer either way.
@@ -222,23 +231,35 @@ export function NewSessionConfigureForm({
           initialPrompt={initialPrompt}
           frameHeight={frameHeight}
           cardTop={composerTop}
+          belowCardHeight={runTargetHeight}
           onStartSession={isStartDisabled ? undefined : onStartSession}
           isCloneEntry={isCloneEntry}
         />
       </View>
 
-      {organizationSection}
-      <NewSessionRunTarget
-        showRunOnSelector={showRunOnSelector}
-        runOnInstance={runOnInstance}
-        instanceList={instanceList}
-        isLoadingInstances={isLoadingInstances}
-        isFetchingInstances={isFetchingInstances}
-        onChangeRunOnInstance={onChangeRunOnInstance}
-        onRefreshInstances={onRefreshInstances}
-        pendingComputer={pendingComputer}
-        disabled={isStarting}
-      />
+      {/* The block under the card the frame must still show: the Organization
+          section when the entry point renders one, then the Run on row and its
+          refresh control. Each child's own `mt-*` lives inside this wrapper, so
+          the prompt's frame fit reserves the block's whole footprint. */}
+      <View
+        onLayout={event => {
+          const next = Math.max(Math.round(event.nativeEvent.layout.height), 0);
+          setRunTargetHeight(current => (current === next ? current : next));
+        }}
+      >
+        {organizationSection}
+        <NewSessionRunTarget
+          showRunOnSelector={showRunOnSelector}
+          runOnInstance={runOnInstance}
+          instanceList={instanceList}
+          isLoadingInstances={isLoadingInstances}
+          isFetchingInstances={isFetchingInstances}
+          onChangeRunOnInstance={onChangeRunOnInstance}
+          onRefreshInstances={onRefreshInstances}
+          pendingComputer={pendingComputer}
+          disabled={isStarting}
+        />
+      </View>
 
       {isRemote ? (
         <LaunchFolderField

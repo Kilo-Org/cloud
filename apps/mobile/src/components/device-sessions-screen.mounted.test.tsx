@@ -20,6 +20,9 @@ const hosts = vi.hoisted(() => ({ trustedHosts: [] as string[], hasLoaded: true 
 const imageHosts = vi.hoisted(() => ({ trustedImageHosts: [] as string[], hasLoaded: true }));
 const openExternalUrl = vi.hoisted(() => vi.fn());
 const router = vi.hoisted(() => ({ back: vi.fn(), dismissTo: vi.fn() }));
+const confirmations = vi.hoisted(() => ({
+  requests: [] as { title: string; message: string; confirmLabel: string }[],
+}));
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
   useQuery: () => query,
@@ -40,6 +43,14 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: (request: { title: string; message: string; confirmLabel: string }) => {
+      confirmations.requests.push(request);
+    },
+    dialog: null,
+  }),
+}));
 vi.mock('@/components/ui/icons', () => ({
   LogOut: 'LogOut',
   Smartphone: 'Smartphone',
@@ -72,7 +83,9 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/lib/utils', () => ({ parseTimestamp: (value: string) => new Date(value) }));
-vi.mock('@/lib/format', () => ({ formatDate: () => 'Date' }));
+vi.mock('@/lib/format', () => ({
+  formatDate: (value: Date) => value.toISOString().slice(0, 10),
+}));
 
 beforeEach(() => {
   query.data = undefined;
@@ -87,6 +100,7 @@ beforeEach(() => {
   hosts.trustedHosts = [];
   imageHosts.hasLoaded = true;
   imageHosts.trustedImageHosts = [];
+  confirmations.requests = [];
 });
 
 describe('account surface states', () => {
@@ -209,6 +223,97 @@ describe('account surface states', () => {
     const { renderer, unmount } = await renderWithProviders(createElement(TrustedHostsScreen));
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(4);
+    unmount();
+  });
+});
+
+const FIRST_STRONG_ISOLATE = '\u2068';
+const POP_DIRECTIONAL_ISOLATE = '\u2069';
+
+type SessionFixture = {
+  id: string;
+  userAgent: string;
+  isCurrent?: boolean;
+  signedIn?: string;
+};
+
+function session({
+  id,
+  userAgent,
+  isCurrent = false,
+  signedIn = '2026-01-01T00:00:00Z',
+}: SessionFixture): DeviceSession {
+  return {
+    id,
+    user_agent: userAgent,
+    isCurrent,
+    created_at: signedIn,
+    last_seen_at: signedIn,
+  };
+}
+
+describe('device session sign-out controls', () => {
+  it('names the device in each non-current label and isolates it in the confirmation', async () => {
+    query.data = [
+      session({
+        id: 'current',
+        userAgent: 'Kilo-Code/1.2.3 (android)',
+        isCurrent: true,
+        signedIn: '2026-01-03T00:00:00Z',
+      }),
+      session({ id: 'phone', userAgent: 'هاتف-قديم', signedIn: '2026-02-28T09:15:00Z' }),
+      session({ id: 'cli', userAgent: 'axios/1.7.0', signedIn: '2026-03-04T11:00:00Z' }),
+    ];
+    const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
+    const buttons = renderer.root.findAll(node => String(node.type) === 'Pressable');
+    expect(buttons.map(button => button.props.accessibilityLabel)).toStrictEqual([
+      'Sign out this device',
+      `Sign out ${FIRST_STRONG_ISOLATE}هاتف-قديم${POP_DIRECTIONAL_ISOLATE}, signed in 2026-02-28`,
+      `Sign out ${FIRST_STRONG_ISOLATE}axios${POP_DIRECTIONAL_ISOLATE}, signed in 2026-03-04`,
+    ]);
+
+    (buttons[1]?.props.onPress as (() => void) | undefined)?.();
+    expect(confirmations.requests).toHaveLength(1);
+    // The device name reorders the sentence it sits in unless it is isolated:
+    // without the pair, an RTL run pulls the rest of the German line with it.
+    expect(confirmations.requests[0]?.message).toBe(
+      `${FIRST_STRONG_ISOLATE}هاتف-قديم${POP_DIRECTIONAL_ISOLATE} will be signed out. It can keep API access for up to an hour.`
+    );
+
+    const rowLabels = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Text' &&
+        typeof node.props.children === 'string' &&
+        node.props.children.includes('هاتف-قديم')
+    );
+    expect(rowLabels.map(label => label.props.children)).toStrictEqual(['هاتف-قديم']);
+    unmount();
+  });
+
+  // `deviceSessionLabel` collapses browser user agents and app sessions to one
+  // name each, so two browsers would otherwise share a control label.
+  it('keeps same-class sessions apart by their sign-in date', async () => {
+    query.data = [
+      session({
+        id: 'browser-1',
+        userAgent: 'Mozilla/5.0 (Macintosh) Safari/605.1.15',
+        signedIn: '2026-03-10T08:00:00Z',
+      }),
+      session({
+        id: 'browser-2',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0) Chrome/130.0',
+        signedIn: '2026-03-12T09:30:00Z',
+      }),
+    ];
+    const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
+    const labels = renderer.root
+      .findAll(node => String(node.type) === 'Pressable')
+      .map(button => button.props.accessibilityLabel as string);
+    expect(labels).toStrictEqual([
+      `Sign out ${FIRST_STRONG_ISOLATE}Web browser${POP_DIRECTIONAL_ISOLATE}, signed in 2026-03-10`,
+      `Sign out ${FIRST_STRONG_ISOLATE}Web browser${POP_DIRECTIONAL_ISOLATE}, signed in 2026-03-12`,
+    ]);
+    expect(new Set(labels).size).toBe(2);
     unmount();
   });
 });

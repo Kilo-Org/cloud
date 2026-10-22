@@ -25,6 +25,7 @@
     "error": "erro: {{error}}",
     "back": "Atrás",
     "somethingWentWrong": "Produciuse un erro.",
+    "actionNotRecorded": "Non puidemos rexistrar esta acción. Téntao de novo máis tarde.",
     "couldNotOpen": "Non se puido abrir {{label}}.",
     "link": "ligazón",
     "takingLonger": "Isto leva máis tempo do esperado. Podes pechalo e comprobalo de novo.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub non completou a fusión.",
       "mergeResultNotCompleted": "A {{term}} non se fusionou. Comproba o seu estado e inténtao de novo.",
       "ambiguous": "Non se puido confirmar. Comproba a PR antes de tentalo de novo.",
-      "persistenceFailed": "Non puidemos rexistrar esta acción. Téntao de novo máis tarde.",
       "forbidden": "Non tes permiso para realizar esta acción."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "Cargando a memoria de revisión",
       "couldNotLoad": "Non se puido cargar a memoria de revisión.",
       "off": "A memoria de revisión está desactivada.",
+      "on": "A memoria de revisión está activada.",
       "offDescription": "Actívaa para que Kilo aprenda das respostas dos responsables do mantemento e propoña pautas para REVIEW.md.",
-      "readOnlyDescription": "Só os propietarios da organización e os xestores de facturación poden activar a memoria de revisión.",
+      "readOnlyDescription": "Só os propietarios da organización e os xestores de facturación poden cambiar a memoria de revisión.",
       "enable": "Activar a memoria de revisión",
       "loadingProposals": "Cargando propostas",
       "couldNotLoadProposals": "Non se puideron cargar as propostas.",
@@ -1879,6 +1880,9 @@
       "viewA11y": "Ver informe de auditoría"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrador de Kilo",
+      "actorMaskedUser": "Usuario enmascarado",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "Non se puido cargar o informe de auditoría.",
       "events": "Eventos",
       "generated": "O informe xerouse o {{generatedAt}}.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "É posible que unha sincronización non rematase. Téntaa de novo para actualizar o seu estado ou descártaa.",
       "syncInProgress": "Xa hai unha sincronización de seguridade en curso. Téntao de novo.",
       "dismissalInProgress": "Este descarte xa está en curso. Téntao de novo.",
-      "couldNotReadPendingSyncs": "Non se puideron ler as sincronizacións pendentes. Téntao de novo."
+      "couldNotReadPendingSyncs": "Non se puideron ler as sincronizacións pendentes. Téntao de novo.",
+      "ambiguous": "Non se puido confirmar. Comproba a revisión de seguridade antes de tentalo de novo.",
+      "settleFailed": "A acción completouse, pero non puidemos rexistrar o resultado. Téntao de novo.",
+      "replayFailed": "Esta acción non se completou. Téntao de novo.",
+      "actionFailed": "Non se puido completar esta acción. Téntao de novo.",
+      "actionBlocked": "Non se puido completar esta acción. Tes que resolver o problema antes de tentalo de novo."
     },
     "analysisState": {
       "queued": "Análise na cola",
@@ -2773,7 +2782,7 @@
     "signedIn": "Inicio de sesión: {{signedIn}} · Última actividade: {{lastSeen}}",
     "thisDevice": "Este dispositivo",
     "signOutThisDevice": "Pechar a sesión deste dispositivo",
-    "signOutThisSession": "Pechar esta sesión",
+    "signOutSessionLabel": "Pechar a sesión de {{device}}, inicio de sesión: {{signedIn}}",
     "sessionSignedOut": "Sesión pechada.",
     "signOutThisDeviceTitle": "Pechar a sesión deste dispositivo?",
     "signOutThisSessionTitle": "Pechar esta sesión?",
@@ -3011,11 +3020,22 @@
     "boundary": {
       "backToProfile": "Volver ao perfil",
       "loadErrorMessage": "Comproba a túa conexión e téntao de novo.",
+
+      "chooseAccount": "Seleccionar unha conta",
       "loadErrorTitle": "Non se puideron cargar as túas organizacións.",
+      "noOrganization": "Sen organización",
+
+      "noOrganizationDescription": "Esta conta non forma parte dunha organización. Crea unha ou únete a unha na web para usar funcións de organización como as invitacións de membros e as alertas de saldo baixo.",
+
+      "openWebOrganizations": "Abrir as organizacións na web",
+
       "organizationUnavailable": "A organización non está dispoñible.",
-      "selectDescription": "Escolle unha organización desde o teu perfil para continuar.",
+      "selectDescriptionWithOrganizations": "Pertences a unha ou máis organizacións. Escolle a conta que debe usar esta pantalla.",
+
       "selectOrganization": "Seleccionar unha organización",
       "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar.",
+
+      "unavailableSessionsDescription": "Esta organización xa non está dispoñible. Non se poden cargar as súas sesións.",
       "accessDeniedDescription": "Non tes acceso a esta organización."
     },
     "creditActivity": {
@@ -3067,7 +3087,11 @@
       "separateEmailsHint": "Se introduces varios enderezos de correo, sepáraos con comas.",
       "thresholdLabel": "Alertar por baixo de (USD)",
       "title": "Alerta de saldo baixo",
-      "emailsError": "Introduce polo menos un enderezo de correo válido. Se introduces varios, sepáraos con comas.",
+      "emailsInvalid": "Un ou máis enderezos de correo non son válidos.",
+      "emailsRequired": "Introduce polo menos un enderezo de correo.",
+      "saveEmailsError": "Algúns enderezos de correo non foron aceptados. Compróbaos e téntao de novo.",
+      "saveError": "Non se puido gardar a alerta de saldo baixo.",
+      "thresholdPlaceholder": "Introduce unha cantidade",
       "thresholdError": "Introduce unha cantidade maior que 0."
     },
     "memberLimit": {
@@ -3078,6 +3102,7 @@
       "removeLimit": "Eliminar límite",
       "title": "Límite de uso diario",
       "blankError": "Introduce unha cantidade ou elimina o límite coa opción que aparece abaixo.",
+      "blankWithoutLimitError": "Introduce un límite diario entre 0 e {{max}}.",
       "rangeError": "Introduce unha cantidade entre 0 e {{max}}."
     },
     "members": {
@@ -3616,7 +3641,6 @@
     "keyTooLong": "A chave debe ter 256 caracteres ou menos",
     "keyDuplicate": "Esta chave xa existe no perfil",
     "valueLabel": "Valor",
-    "secretLabel": "Segredo",
     "secrets": {
       "markSecret": "Marcar como segredo",
       "masked": "Valor oculto",
@@ -3675,7 +3699,9 @@
       "jsonTooLarge": "Usa como máximo 50 entradas, chaves de ata 128 e valores de ata 4096 caracteres",
       "timeoutInvalid": "O tempo de espera debe ser dun número enteiro de milisegundos",
       "edit": "Editar servidor MCP",
-      "saveFailed": "Non se puido gardar o servidor MCP"
+      "saveFailed": "Non se puido gardar o servidor MCP",
+      "deleteFailed": "Non se puido eliminar o servidor MCP",
+      "updateFailed": "Non se puido actualizar o servidor MCP"
     },
     "agents": {
       "title": "Axentes de perfil",
@@ -3702,6 +3728,7 @@
       "visibilitySubagent": "Subaxente: só se pode chamar desde outros",
       "visibilityAll": "Todos - ambos",
       "saveFailed": "Non se puido gardar o axente",
+      "deleteFailed": "Non se puido eliminar o axente",
       "nameRequired": "Introduza un nome de axente",
       "slugRequired": "Introduza unha babosa de axente",
       "slugInvalid": "Slug debe comezar cunha letra e usar só letras minúsculas, díxitos e guións",
@@ -3721,6 +3748,7 @@
       "subtask": "Executar como subtarefa",
       "edit": "Comando de edición de barra",
       "saveFailed": "Non se puido gardar o comando",
+      "deleteFailed": "Non se puido eliminar o comando",
       "nameRequired": "Introduza un nome de comando",
       "nameInvalid": "O nome debe comezar cunha letra minúscula e usar só letras minúsculas, díxitos e guións",
       "templateRequired": "Introduza un modelo de comando",

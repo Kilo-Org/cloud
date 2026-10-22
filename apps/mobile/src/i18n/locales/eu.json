@@ -25,6 +25,7 @@
     "error": "errorea: {{error}}",
     "back": "Atzera",
     "somethingWentWrong": "Zerbait gaizki joan da.",
+    "actionNotRecorded": "Ezin izan dugu ekintza hau erregistratu. Saiatu berriro geroago.",
     "couldNotOpen": "Ezin izan da {{label}} ireki.",
     "link": "esteka",
     "takingLonger": "Uste baino denbora gehiago behar da. Hau itxi eta geroago berriro begira dezakezu.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub-ek ez du bateratzea amaitu.",
       "mergeResultNotCompleted": "{{term}} ez da bateratu. Egiaztatu egoera eta saiatu berriro.",
       "ambiguous": "Ezin izan da berretsi — egiaztatu PR-a berriro saiatu aurretik.",
-      "persistenceFailed": "Ezin izan dugu ekintza hau erregistratu. Saiatu berriro geroago.",
       "forbidden": "Ez dago baimenduta."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "Berrikuspen-memoria kargatzen",
       "couldNotLoad": "Ezin izan da berrikuspen-memoria kargatu.",
       "off": "Berrikuspen-memoria desgaituta dago.",
+      "on": "Berrikuspen-memoria gaituta dago.",
       "offDescription": "Gaitu aukera hau Kilok mantentzaileen erantzunetatik ikas dezan eta REVIEW.md fitxategirako jarraibideak proposa ditzan.",
-      "readOnlyDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik gaitu dezakete berrikuspen-memoria.",
+      "readOnlyDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik alda dezakete berrikuspen-memoria.",
       "enable": "Gaitu berrikuspen-memoria",
       "loadingProposals": "Proposamenak kargatzen",
       "couldNotLoadProposals": "Ezin izan dira proposamenak kargatu.",
@@ -1879,6 +1880,9 @@
       "viewA11y": "Ikusi auditoria-txostena"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administratzailea",
+      "actorMaskedUser": "Ezkutuko erabiltzailea",
+      "actorSystem": "Kilo sistema",
       "couldNotLoad": "Ezin izan da auditoria-txostena kargatu.",
       "events": "Gertaerak",
       "generated": "Txostena sortu da: {{generatedAt}}.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "Baliteke sinkronizazioa amaitu gabe geratu izana. Saiatu berriro haren egoera eguneratzeko, edo baztertu.",
       "syncInProgress": "Segurtasun-sinkronizazio bat jada martxan dago. Saiatu berriro.",
       "dismissalInProgress": "Baztertze hau jada martxan dago. Saiatu berriro.",
-      "couldNotReadPendingSyncs": "Ezin izan dira zain dauden sinkronizazioak irakurri. Saiatu berriro."
+      "couldNotReadPendingSyncs": "Ezin izan dira zain dauden sinkronizazioak irakurri. Saiatu berriro.",
+      "ambiguous": "Ezin izan da berretsi — egiaztatu segurtasun-azterketa berriro saiatu aurretik.",
+      "settleFailed": "Ekintza burutu da, baina ezin izan dugu emaitza erregistratu. Saiatu berriro.",
+      "replayFailed": "Ekintza hau ez da burutu. Saiatu berriro.",
+      "actionFailed": "Ezin izan da ekintza hau burutu. Saiatu berriro.",
+      "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik."
     },
     "analysisState": {
       "queued": "Azterketa ilaran",
@@ -2773,7 +2782,7 @@
     "signedIn": "Saio-hasiera: {{signedIn}} · Azken jarduera: {{lastSeen}}",
     "thisDevice": "Gailu hau",
     "signOutThisDevice": "Itxi saioa gailu honetan",
-    "signOutThisSession": "Itxi saio hau",
+    "signOutSessionLabel": "Itxi saioa: {{device}}, saio-hasiera: {{signedIn}}",
     "sessionSignedOut": "Saioa itxi da.",
     "signOutThisDeviceTitle": "Itxi saioa gailu honetan?",
     "signOutThisSessionTitle": "Itxi saio hau?",
@@ -3011,11 +3020,22 @@
     "boundary": {
       "backToProfile": "Itzuli profilera",
       "loadErrorMessage": "Egiaztatu konexioa eta saiatu berriro.",
+
+      "chooseAccount": "Hautatu kontu bat",
       "loadErrorTitle": "Ezin izan dira zure erakundeak kargatu.",
+      "noOrganization": "Erakunderik ez",
+
+      "noOrganizationDescription": "Kontu hau ez da erakunde baten parte. Sortu edo batu erakunde bat webgunean, kideen gonbidapenak eta saldo baxuaren abisuak bezalako erakunde-funtzioak erabiltzeko.",
+
+      "openWebOrganizations": "Ireki erakundeak webgunean",
+
       "organizationUnavailable": "Erakundea ez dago erabilgarri.",
-      "selectDescription": "Aukeratu erakunde bat zure profiletik jarraitzeko.",
+      "selectDescriptionWithOrganizations": "Erakunde bateko edo gehiagoko kide zara. Hautatu pantaila honek erabili behar duen kontua.",
+
       "selectOrganization": "Hautatu erakunde bat",
       "unavailableDescription": "Erakunde hau jada ez dago erabilgarri. Aukeratu bat zure profiletik jarraitzeko.",
+
+      "unavailableSessionsDescription": "Erakunde hau jada ez dago erabilgarri. Ezin dira kargatu haren saioak.",
       "accessDeniedDescription": "Ez duzu erakunde honetarako sarbiderik."
     },
     "creditActivity": {
@@ -3067,7 +3087,11 @@
       "separateEmailsHint": "Bereizi helbide elektronikoak komaz.",
       "thresholdLabel": "Alerta atalase honen azpitik (USD)",
       "title": "Saldo baxuko alerta",
-      "emailsError": "Sartu baliozko helbide elektroniko bat gutxienez. Bat baino gehiago sartuz gero, bereizi komaz.",
+      "emailsInvalid": "Helbide elektroniko bat edo gehiago ez dira baliozkoak.",
+      "emailsRequired": "Sartu helbide elektroniko bat gutxienez.",
+      "saveEmailsError": "Helbide elektroniko batzuk ez dira onartuak izan. Berrikusi eta saiatu berriro.",
+      "saveError": "Ezin izan da saldo baxuko alerta gorde.",
+      "thresholdPlaceholder": "Sartu zenbateko bat",
       "thresholdError": "Sartu 0 baino handiagoa den zenbateko bat."
     },
     "memberLimit": {
@@ -3078,6 +3102,7 @@
       "removeLimit": "Kendu muga",
       "title": "Eguneko erabilera-muga",
       "blankError": "Sartu zenbateko bat edo sakatu beheko Kendu muga botoia.",
+      "blankWithoutLimitError": "Sartu eguneroko muga bat 0 eta {{max}} artean.",
       "rangeError": "Sartu 0 eta {{max}} arteko zenbateko bat."
     },
     "members": {
@@ -3616,7 +3641,6 @@
     "keyTooLong": "Gakoak 256 karaktere edo gutxiago izan behar ditu",
     "keyDuplicate": "Gako hau jada badago profilean",
     "valueLabel": "Balioa",
-    "secretLabel": "Sekretua",
     "secrets": {
       "markSecret": "Markatu sekretu gisa",
       "masked": "Ezkutuko balioa",
@@ -3675,7 +3699,9 @@
       "jsonTooLarge": "Erabili gehienez 50 sarrera, gakoak 128 arte eta balioak 4096 karaktere arte",
       "timeoutInvalid": "Denbora-mugak milisegundo kopuru osoa izan behar du",
       "edit": "Editatu MCP zerbitzaria",
-      "saveFailed": "Ezin izan da MCP zerbitzaria gorde"
+      "saveFailed": "Ezin izan da MCP zerbitzaria gorde",
+      "deleteFailed": "Ezin izan da MCP zerbitzaria ezabatu",
+      "updateFailed": "Ezin izan da MCP zerbitzaria eguneratu"
     },
     "agents": {
       "title": "Profileko agenteak",
@@ -3702,6 +3728,7 @@
       "visibilitySubagent": "Azpi-agentea - besteengandik bakarrik dei daiteke",
       "visibilityAll": "Guztiak - biak",
       "saveFailed": "Ezin izan da agentea gorde",
+      "deleteFailed": "Ezin izan da agentea ezabatu",
       "nameRequired": "Sartu agentearen izena",
       "slugRequired": "Sartu agente bare bat",
       "slugInvalid": "Slug-ek letra batekin hasi behar du eta letra xeheak, zifrak eta marratxoak soilik erabili behar ditu",
@@ -3721,6 +3748,7 @@
       "subtask": "Exekutatu azpizeregin gisa",
       "edit": "Editatu barra komandoa",
       "saveFailed": "Ezin izan da gorde komandoa",
+      "deleteFailed": "Ezin izan da komandoa ezabatu",
       "nameRequired": "Sartu komando-izen bat",
       "nameInvalid": "Izenak letra xehe batekin hasi behar du eta letra xeheak, zifrak eta marra baino ez ditu erabili",
       "templateRequired": "Sartu komando txantiloia",

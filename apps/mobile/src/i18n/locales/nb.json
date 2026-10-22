@@ -25,6 +25,7 @@
     "error": "feil: {{error}}",
     "back": "Tilbake",
     "somethingWentWrong": "Noe gikk galt.",
+    "actionNotRecorded": "Vi kunne ikke registrere denne handlingen. Prøv igjen senere.",
     "couldNotOpen": "Kunne ikke åpne {{label}}.",
     "link": "lenke",
     "takingLonger": "Dette tar lengre tid enn forventet. Du kan lukke denne siden og sjekke igjen senere.",
@@ -784,7 +785,6 @@
       "mergeResultDefaultError": "GitHub fullførte ikke flettingen.",
       "mergeResultNotCompleted": "{{term}} ble ikke flettet. Sjekk statusen og prøv på nytt.",
       "ambiguous": "Kunne ikke bekrefte resultatet. Sjekk PR-en før du prøver igjen.",
-      "persistenceFailed": "Vi kunne ikke registrere denne handlingen. Prøv igjen senere.",
       "forbidden": "Du har ikke tilgang."
     },
     "capabilities": {
@@ -1456,8 +1456,9 @@
       "loading": "Laster inn minnet for kodegjennomganger",
       "couldNotLoad": "Kunne ikke laste inn minnet for kodegjennomganger.",
       "off": "Minnet for kodegjennomganger er deaktivert.",
+      "on": "Minnet for kodegjennomganger er aktivert.",
       "offDescription": "Aktiver minnet for å la Kilo lære av svar fra vedlikeholderne og foreslå retningslinjer til REVIEW.md.",
-      "readOnlyDescription": "Bare organisasjonseiere og faktureringsansvarlige kan aktivere minnet for kodegjennomganger.",
+      "readOnlyDescription": "Bare organisasjonseiere og faktureringsansvarlige kan endre minnet for kodegjennomganger.",
       "enable": "Aktiver minne for kodegjennomganger",
       "loadingProposals": "Laster inn forslag",
       "couldNotLoadProposals": "Kunne ikke laste inn forslagene.",
@@ -1879,6 +1880,9 @@
       "viewA11y": "Vis revisjonsrapport"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-administrator",
+      "actorMaskedUser": "Maskert bruker",
+      "actorSystem": "Kilo-system",
       "couldNotLoad": "Kunne ikke laste inn revisjonsrapporten.",
       "events": "Hendelser",
       "generated": "Rapporten ble generert {{generatedAt}}.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "En synkronisering er kanskje ikke fullført. Prøv igjen for å avklare statusen, eller forkast forsøket.",
       "syncInProgress": "En sikkerhetssynkronisering pågår allerede. Prøv igjen.",
       "dismissalInProgress": "Denne avvisningen pågår allerede. Prøv igjen.",
-      "couldNotReadPendingSyncs": "Kunne ikke hente synkroniseringene som venter. Prøv igjen."
+      "couldNotReadPendingSyncs": "Kunne ikke hente synkroniseringene som venter. Prøv igjen.",
+      "ambiguous": "Kunne ikke bekrefte resultatet. Sjekk sikkerhetsgjennomgangen før du prøver igjen.",
+      "settleFailed": "Handlingen ble fullført, men vi kunne ikke registrere resultatet. Prøv igjen.",
+      "replayFailed": "Denne handlingen ble ikke fullført. Prøv igjen.",
+      "actionFailed": "Kunne ikke fullføre denne handlingen. Prøv igjen.",
+      "actionBlocked": "Kunne ikke fullføre denne handlingen. Problemet må løses før du kan prøve igjen."
     },
     "analysisState": {
       "queued": "Analyse i kø",
@@ -2773,7 +2782,7 @@
     "signedIn": "Logget inn {{signedIn}} · Sist sett {{lastSeen}}",
     "thisDevice": "Denne enheten",
     "signOutThisDevice": "Logg ut denne enheten",
-    "signOutThisSession": "Logg ut denne økten",
+    "signOutSessionLabel": "Logg ut {{device}}, logget inn {{signedIn}}",
     "sessionSignedOut": "Økten er logget ut.",
     "signOutThisDeviceTitle": "Logge ut denne enheten?",
     "signOutThisSessionTitle": "Logge ut denne økten?",
@@ -3011,11 +3020,22 @@
     "boundary": {
       "backToProfile": "Tilbake til profil",
       "loadErrorMessage": "Sjekk tilkoblingen og prøv igjen.",
+
+      "chooseAccount": "Velg en konto",
       "loadErrorTitle": "Kunne ikke laste inn organisasjonene dine.",
+      "noOrganization": "Ingen organisasjon",
+
+      "noOrganizationDescription": "Denne kontoen er ikke en del av en organisasjon. Opprett eller bli med i en organisasjon i nettleseren for å bruke organisasjonsfunksjoner som medlemsinvitasjoner og varsler om lav saldo.",
+
+      "openWebOrganizations": "Åpne organisasjoner i nettleseren",
+
       "organizationUnavailable": "Organisasjonen er ikke tilgjengelig.",
-      "selectDescription": "Velg en organisasjon fra profilen din for å fortsette.",
+      "selectDescriptionWithOrganizations": "Du tilhører én eller flere organisasjoner. Velg kontoen som denne skjermen skal bruke.",
+
       "selectOrganization": "Velg en organisasjon",
       "unavailableDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Velg en fra profilen din for å fortsette.",
+
+      "unavailableSessionsDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Øktene dens kan ikke lastes inn.",
       "accessDeniedDescription": "Du har ikke tilgang til denne organisasjonen."
     },
     "creditActivity": {
@@ -3067,7 +3087,11 @@
       "separateEmailsHint": "Skill flere e-postadresser med komma.",
       "thresholdLabel": "Varsle under (USD)",
       "title": "Varsel om lav saldo",
-      "emailsError": "Angi minst én gyldig e-postadresse. Skill flere adresser med komma.",
+      "emailsInvalid": "Én eller flere e-postadresser er ikke gyldige.",
+      "emailsRequired": "Angi minst én e-postadresse.",
+      "saveEmailsError": "Noen e-postadresser ble ikke godtatt. Kontroller dem og prøv igjen.",
+      "saveError": "Kunne ikke lagre varselet om lav saldo.",
+      "thresholdPlaceholder": "Angi et beløp",
       "thresholdError": "Angi et beløp større enn 0."
     },
     "memberLimit": {
@@ -3078,6 +3102,7 @@
       "removeLimit": "Fjern grense",
       "title": "Daglig bruksgrense",
       "blankError": "Angi et beløp, eller fjern grensen med knappen nedenfor.",
+      "blankWithoutLimitError": "Angi en daglig grense mellom 0 og {{max}}.",
       "rangeError": "Angi et beløp mellom 0 og {{max}}."
     },
     "members": {
@@ -3616,7 +3641,6 @@
     "keyTooLong": "Nøkkelen kan ha høyst 256 tegn",
     "keyDuplicate": "Denne nøkkelen finnes allerede i profilen",
     "valueLabel": "Verdi",
-    "secretLabel": "Hemmelig",
     "secrets": {
       "markSecret": "Merk som hemmelig",
       "masked": "Skjult verdi",
@@ -3675,7 +3699,9 @@
       "jsonTooLarge": "Bruk maks 50 oppføringer, nøkler opptil 128 og verdier opptil 4096 tegn",
       "timeoutInvalid": "Tidsavbrudd må være et helt antall millisekunder",
       "edit": "Rediger MCP-server",
-      "saveFailed": "Kunne ikke lagre MCP-serveren"
+      "saveFailed": "Kunne ikke lagre MCP-serveren",
+      "deleteFailed": "Kunne ikke slette MCP-serveren",
+      "updateFailed": "Kunne ikke oppdatere MCP-serveren"
     },
     "agents": {
       "title": "Profil agenter",
@@ -3702,6 +3728,7 @@
       "visibilitySubagent": "Subagent — kan kun ringes opp fra andre",
       "visibilityAll": "Alle - begge",
       "saveFailed": "Kunne ikke lagre agenten",
+      "deleteFailed": "Kunne ikke slette agenten",
       "nameRequired": "Skriv inn et agentnavn",
       "slugRequired": "Skriv inn en agentsnegl",
       "slugInvalid": "Slug må starte med en bokstav og kun bruke små bokstaver, sifre og bindestreker",
@@ -3721,6 +3748,7 @@
       "subtask": "Kjør som deloppgave",
       "edit": "Rediger skråstrek-kommando",
       "saveFailed": "Kunne ikke lagre kommandoen",
+      "deleteFailed": "Kunne ikke slette kommandoen",
       "nameRequired": "Skriv inn et kommandonavn",
       "nameInvalid": "Navnet må begynne med en liten bokstav og kun bruke små bokstaver, sifre og bindestreker",
       "templateRequired": "Skriv inn en kommandomal",

@@ -5,8 +5,12 @@ import { DISCORD_BOT_TOKEN } from '@kilocode/web-shared/lib/config.server';
 import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
-import { eq } from 'drizzle-orm';
 import { discord_gateway_listener } from '@kilocode/db';
+import {
+  parseForwardedGatewayMessageEvent,
+  type ForwardedGatewayEvent,
+} from '@/lib/discord-bot/forwarded-gateway-event';
+import { shouldProcessGatewayMessage } from '@/lib/discord-bot/gateway-message';
 
 export const maxDuration = 800;
 
@@ -22,6 +26,8 @@ const GATEWAY_DURATION_MS = 770 * 1000; // ~12.8 minutes (30s buffer before 800s
  * Lower = faster handoff, but more DB queries.
  */
 const HEARTBEAT_INTERVAL_MS = 10_000; // 10 seconds
+const MAX_IN_FLIGHT_FORWARDS = 8;
+const FORWARD_TIMEOUT_MS = 10_000;
 
 /**
  * Discord Gateway listener with Postgres-based coordination.
@@ -29,18 +35,18 @@ const HEARTBEAT_INTERVAL_MS = 10_000; // 10 seconds
  * Architecture:
  * - This route is triggered by a cron job (every 9 minutes)
  * - It connects to Discord's Gateway via WebSocket using discord.js
- * - When it receives MESSAGE_CREATE events, it forwards them as HTTP POST
- *   requests to the webhook handler (/discord/webhook) for unified processing
+ * - Eligible bot mentions are sent to /discord/webhook for processing
  * - The listener runs for GATEWAY_DURATION_MS, then cleanly disconnects
  *
  * Coordination:
  * - On startup, the listener first connects to Discord and waits for ClientReady
  * - Only after a healthy connection does it claim the "active listener" slot in Postgres
  * - This prevents a failed startup from killing the previous active listener
- * - While running, it periodically checks if it's still the active listener
- * - If a new listener has taken over, it aborts and disconnects cleanly
- * - This ensures only one Gateway connection is active at a time, preventing
- *   duplicate message processing from overlapping cron invocations
+ * - Each forward confirms current ownership on the primary database
+ * - Heartbeats also check ownership while the connection is idle
+ * - Listener shutdown cancels outstanding requests
+ * - The webhook admits message IDs through a shared, expiring Redis claim
+ * - Forwarding has a fixed in-flight limit and a per-request deadline
  */
 export async function GET(request: NextRequest) {
   // Verify cron secret to prevent unauthorized invocations
@@ -113,6 +119,17 @@ async function claimActiveListener(listenerId: string, expiresAt: string): Promi
   console.log('[DiscordGateway] Claimed active listener slot', { listenerId });
 }
 
+async function isActiveListener(listenerId: string): Promise<boolean> {
+  const rows = await db
+    .select({ listener_id: discord_gateway_listener.listener_id })
+    .from(discord_gateway_listener)
+    .where(
+      sql`${discord_gateway_listener.id} = 1 AND ${discord_gateway_listener.expires_at} > now()`
+    )
+    .limit(1);
+  return rows[0]?.listener_id === listenerId;
+}
+
 /**
  * Periodically check if this listener is still the active one.
  * If a newer listener has taken over, trigger the abort signal.
@@ -132,25 +149,13 @@ async function runHeartbeat(listenerId: string, abortController: AbortController
     if (abortController.signal.aborted) break;
 
     try {
-      const rows = await db
-        .select({ listener_id: discord_gateway_listener.listener_id })
-        .from(discord_gateway_listener)
-        .where(eq(discord_gateway_listener.id, 1))
-        .limit(1);
-
-      const currentListenerId = rows[0]?.listener_id;
-
-      if (currentListenerId && currentListenerId !== listenerId) {
-        console.log('[DiscordGateway] Superseded by new listener, shutting down', {
-          myId: listenerId,
-          newId: currentListenerId,
-        });
+      if (!(await isActiveListener(listenerId))) {
+        console.log('[DiscordGateway] Listener ownership ended', { listenerId });
         abortController.abort();
         break;
       }
     } catch (error) {
-      // Log but don't crash on heartbeat failures — a missed heartbeat is not fatal,
-      // it just means we might overlap briefly until the next check
+      abortController.abort();
       console.error('[DiscordGateway] Heartbeat check failed:', error);
     }
   }
@@ -187,100 +192,124 @@ async function runGatewayListener(
 
   let isShuttingDown = false;
   let botUserId: string | null = null;
-  // Only forward events after we've claimed leadership
   let isLeader = false;
+  const inFlight = new Set<Promise<void>>();
+  let droppedEvents = 0;
+  let nextDropLogAt = 0;
 
-  return new Promise<void>((resolve, reject) => {
-    const cleanup = () => {
-      if (isShuttingDown) return;
-      isShuttingDown = true;
-      void client.destroy();
-      resolve();
-    };
-
-    // Duration timeout
-    const timeout = setTimeout(() => {
-      console.log('[DiscordGateway] Duration reached, disconnecting');
-      cleanup();
-    }, durationMs);
-
-    // Abort signal (from heartbeat detecting supersession)
-    if (abortSignal.aborted) {
-      clearTimeout(timeout);
-      cleanup();
+  async function forwardMessage(event: ForwardedGatewayEvent): Promise<void> {
+    try {
+      if (!(await isActiveListener(listenerId))) {
+        abortController.abort();
+        return;
+      }
+    } catch (error) {
+      console.error('[DiscordGateway] Ownership check failed:', error);
+      abortController.abort();
       return;
     }
-    abortSignal.addEventListener(
-      'abort',
-      () => {
-        console.log('[DiscordGateway] Abort signal received, disconnecting');
-        clearTimeout(timeout);
-        cleanup();
-      },
-      { once: true }
-    );
 
-    client.once(Events.ClientReady, readyClient => {
-      console.log(`[DiscordGateway] Connected as ${readyClient.user.tag}`);
-      botUserId = readyClient.user.id;
+    if (abortSignal.aborted) return;
 
-      // Connection is healthy — now claim leadership and start heartbeat.
-      const expiresAt = new Date(Date.now() + durationMs).toISOString();
-      claimActiveListener(listenerId, expiresAt)
-        .then(() => {
-          isLeader = true;
-          onHeartbeatStarted(runHeartbeat(listenerId, abortController));
-        })
-        .catch(error => {
-          console.error('[DiscordGateway] Failed to claim leader slot:', error);
-          clearTimeout(timeout);
-          cleanup();
-        });
-    });
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-discord-gateway-token': DISCORD_BOT_TOKEN,
+        },
+        body: JSON.stringify(event),
+        signal: AbortSignal.any([abortSignal, AbortSignal.timeout(FORWARD_TIMEOUT_MS)]),
+      });
 
-    client.on(Events.Error, error => {
-      console.error('[DiscordGateway] Client error:', error.message);
-    });
-
-    // Listen to raw events and forward MESSAGE_CREATE to the webhook
-    client.on('raw', async (packet: { t: string; d: unknown }) => {
-      if (isShuttingDown || !isLeader) return;
-
-      if (packet.t === 'MESSAGE_CREATE') {
-        const forwardedEvent = {
-          type: `GATEWAY_${packet.t}`,
-          timestamp: Date.now(),
-          data: packet.d,
-          botUserId,
-        };
-
-        try {
-          const response = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-discord-gateway-token': DISCORD_BOT_TOKEN,
-            },
-            body: JSON.stringify(forwardedEvent),
-          });
-
-          if (!response.ok) {
-            console.error(
-              '[DiscordGateway] Failed to forward event:',
-              response.status,
-              await response.text()
-            );
-          }
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          console.error('[DiscordGateway] Error forwarding event:', errorMessage);
-        }
+      if (!response.ok) {
+        console.error('[DiscordGateway] Failed to forward event:', response.status);
       }
-    });
+      await response.body?.cancel();
+    } catch (error) {
+      if (!abortSignal.aborted) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('[DiscordGateway] Error forwarding event:', errorMessage);
+      }
+    }
+  }
 
-    client.login(DISCORD_BOT_TOKEN).catch(error => {
-      clearTimeout(timeout);
-      reject(error as Error);
-    });
+  const { promise, resolve, reject } = Promise.withResolvers<void>();
+  const onAbort = () => cleanup();
+  const cleanup = (error?: unknown) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    isLeader = false;
+    clearTimeout(timeout);
+    abortSignal.removeEventListener('abort', onAbort);
+    abortController.abort();
+    console.log('[DiscordGateway] Listener stopped', { listenerId, droppedEvents });
+    void (async () => {
+      await client.destroy();
+      await Promise.allSettled(inFlight);
+      if (error !== undefined) reject(error);
+      else resolve();
+    })().catch(reject);
+  };
+
+  const timeout = setTimeout(() => {
+    console.log('[DiscordGateway] Duration reached, disconnecting');
+    cleanup();
+  }, durationMs);
+
+  if (abortSignal.aborted) {
+    cleanup();
+    return promise;
+  }
+  abortSignal.addEventListener('abort', onAbort, { once: true });
+
+  client.once(Events.ClientReady, readyClient => {
+    if (isShuttingDown) return;
+    console.log('[DiscordGateway] Connected');
+    botUserId = readyClient.user.id;
+
+    const expiresAt = new Date(Date.now() + durationMs).toISOString();
+    claimActiveListener(listenerId, expiresAt)
+      .then(() => {
+        if (isShuttingDown) return;
+        isLeader = true;
+        onHeartbeatStarted(runHeartbeat(listenerId, abortController));
+      })
+      .catch(error => {
+        console.error('[DiscordGateway] Failed to claim leader slot:', error);
+        cleanup(error);
+      });
   });
+
+  client.on(Events.Error, error => {
+    console.error('[DiscordGateway] Client error:', error.message);
+  });
+
+  client.on('raw', (packet: { t: string; d: unknown }) => {
+    if (isShuttingDown || !isLeader || packet.t !== 'MESSAGE_CREATE') return;
+
+    const event = parseForwardedGatewayMessageEvent({
+      type: 'GATEWAY_MESSAGE_CREATE',
+      timestamp: Date.now(),
+      data: packet.d,
+      botUserId,
+    });
+    if (!event || !shouldProcessGatewayMessage(event)) return;
+
+    if (inFlight.size >= MAX_IN_FLIGHT_FORWARDS) {
+      droppedEvents++;
+      if (Date.now() >= nextDropLogAt) {
+        nextDropLogAt = Date.now() + HEARTBEAT_INTERVAL_MS;
+        console.warn('[DiscordGateway] Forward capacity reached', { listenerId, droppedEvents });
+      }
+      return;
+    }
+
+    const forward = forwardMessage(event);
+    inFlight.add(forward);
+    void forward.finally(() => inFlight.delete(forward));
+  });
+
+  client.login(DISCORD_BOT_TOKEN).catch(cleanup);
+  return promise;
 }

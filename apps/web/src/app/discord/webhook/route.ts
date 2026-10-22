@@ -4,6 +4,8 @@ import { after, NextResponse } from 'next/server';
 import { InteractionType, InteractionResponseType } from 'discord-interactions';
 import { verifyDiscordRequest } from '@/lib/discord/verify-request';
 import { DISCORD_BOT_TOKEN, DISCORD_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { discordGatewayMessageRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 import { processDiscordBotMessage } from '@/lib/discord-bot';
 import {
   postDiscordMessage,
@@ -13,7 +15,6 @@ import {
 import {
   stripDiscordBotMention,
   replaceDiscordUserMentionsWithNames,
-  isDiscordBotMessage,
   truncateForDiscord,
 } from '@/lib/discord-bot/discord-utils';
 import { getDevUserSuffix } from '@/lib/slack-bot/dev-user-info';
@@ -21,6 +22,7 @@ import {
   parseForwardedGatewayMessageEvent,
   type ForwardedGatewayEvent,
 } from '@/lib/discord-bot/forwarded-gateway-event';
+import { shouldProcessGatewayMessage } from '@/lib/discord-bot/gateway-message';
 
 export const maxDuration = 800;
 
@@ -29,6 +31,7 @@ export const maxDuration = 800;
  */
 const PROCESSING_EMOJI = '\u23f3'; // hourglass
 const COMPLETE_EMOJI = '\u2705'; // white check mark
+const MESSAGE_ACCEPTANCE_TTL_SECONDS = 900;
 
 /**
  * Discord webhook handler.
@@ -58,7 +61,25 @@ export async function POST(request: NextRequest) {
       return new NextResponse('Invalid gateway event', { status: 400 });
     }
 
-    after(processGatewayMessage(event));
+    if (!shouldProcessGatewayMessage(event)) {
+      return new NextResponse(null, { status: 200 });
+    }
+
+    try {
+      const accepted = await redisClient.set(
+        discordGatewayMessageRedisKey(event.botUserId, event.data.id),
+        '1',
+        { nx: true, ex: MESSAGE_ACCEPTANCE_TTL_SECONDS }
+      );
+      if (accepted !== 'OK') {
+        return new NextResponse(null, { status: 200 });
+      }
+    } catch {
+      console.error('[DiscordBot:Webhook] Message admission unavailable');
+      return new NextResponse('Service unavailable', { status: 503 });
+    }
+
+    after(() => processGatewayMessage(event));
     return new NextResponse(null, { status: 200 });
   }
 
@@ -112,35 +133,9 @@ async function processGatewayMessage(event: ForwardedGatewayEvent) {
     message.guild_id
   );
 
-  // Ignore bot messages
-  if (isDiscordBotMessage(message)) {
-    console.log('[DiscordBot:Webhook] Ignoring bot message');
-    return;
-  }
-
-  // Ignore messages without a guild (DMs are not yet supported)
-  if (!message.guild_id) {
-    console.log('[DiscordBot:Webhook] Ignoring non-guild message');
-    return;
-  }
-
-  // Check if this message mentions the bot
-  const botUserId = event.botUserId;
-  const mentionsBot = botUserId && message.mentions?.some(m => m.id === botUserId);
-  if (!mentionsBot) {
-    // Message doesn't mention the bot, ignore it
-    return;
-  }
-
   const { content, channel_id: channelId, guild_id: guildId, author, id: messageId } = message;
 
-  // Strip the bot mention and check if there's remaining text
-  const cleanedText = stripDiscordBotMention(content, botUserId);
-
-  if (!cleanedText) {
-    console.log('[DiscordBot:Webhook] No text after removing mention, ignoring');
-    return;
-  }
+  const cleanedText = stripDiscordBotMention(content, event.botUserId);
 
   // Resolve user mentions to display names
   const resolvedText = await replaceDiscordUserMentionsWithNames(cleanedText, guildId);

@@ -230,6 +230,14 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 ### Redis & Queue
 
 - `REDIS_URL` - Redis connection URL; used by `packages/web-shared/src/lib/redis.ts` and bot state. `[SECRET]`
+- `UPSTASH_REDIS_REST_URL` - Shared Redis REST endpoint, including Discord message admission. Locally provided by `redis-http`. [SERVER]
+- `UPSTASH_REDIS_REST_TOKEN` - Redis REST credential used by the shared client. `[SECRET]`
+
+Discord message admission requires the shared Redis REST service. Accepted message
+claims are scoped to the bot and message, expire after 15 minutes, and remain
+accepted through background processing completion or failure. The gateway uses
+eight forwarding slots, a 10-second request deadline, and primary-database
+ownership checks. Capacity drops are counted in listener logs.
 
 ### Encryption & Secrets
 

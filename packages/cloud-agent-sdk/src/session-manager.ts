@@ -54,7 +54,6 @@ import type {
   PermissionState,
   SlashCommandInfo,
   SlashCommandCatalogStatus,
-  SuggestionAction,
   SuggestionState,
   MessageDeliveryState,
   MessageInfo,
@@ -95,21 +94,14 @@ type WorktreeChangesRefresh = {
 };
 type ActiveSessionType = ResolvedSession['type'];
 type ObservedModelSource = 'session' | 'message' | 'catalog';
-type StandaloneQuestion = { requestId: string; questions: QuestionInfo[] };
-type StandalonePermission = {
-  requestId: string;
-  permission: string;
-  patterns: string[];
-  metadata: Record<string, unknown>;
-  always: string[];
-};
-type StandaloneSuggestion = {
-  requestId: string;
-  text: string;
-  actions: SuggestionAction[];
-  /** Tool call ID that emitted this suggestion, when available. */
-  callId?: string | undefined;
-};
+/**
+ * A pending question together with the options it offers. `question.asked` may
+ * arrive without options; the manager only raises this state when they are
+ * present, so the narrowing is guaranteed at the atom.
+ */
+type StandaloneQuestion = QuestionState & { questions: QuestionInfo[] };
+type StandalonePermission = PermissionState;
+type StandaloneSuggestion = SuggestionState;
 type ChildSessionHydrationState =
   | { status: 'idle' }
   | { status: 'loading' }

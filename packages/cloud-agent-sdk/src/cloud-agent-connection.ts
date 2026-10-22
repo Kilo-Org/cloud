@@ -3,7 +3,7 @@ import {
   isStreamError,
   type CloudAgentEvent,
   type StreamError,
-} from './event-types';
+} from './schemas';
 import {
   createBaseConnection,
   type Connection,

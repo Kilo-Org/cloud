@@ -4,10 +4,7 @@
 // so the merge and discussion hooks reach these builders without loading the
 // review-mutation hook module.
 
-import {
-  type BitbucketPrRef,
-  type GitLabMrRef,
-} from '@kilocode/app-shared/provider-review';
+import { type BitbucketPrRef, type GitLabMrRef } from '@kilocode/app-shared/provider-review';
 
 import { type ProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 

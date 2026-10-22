@@ -10,7 +10,10 @@
 // the PR surface's share of these markers.
 
 import { i18n } from '@/i18n';
-import { isOperationInProgress, OPERATION_KEY_REUSE_MISMATCH_MESSAGE } from '@/lib/operation-markers';
+import {
+  isOperationInProgress,
+  OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
+} from '@/lib/operation-markers';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 
 /** A settled `failed` row replayed under the same key: no recovery, fresh key. */

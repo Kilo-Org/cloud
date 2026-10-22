@@ -11,7 +11,7 @@ export function feedbackPlainTextBlocks(text: string): SectionBlock[] {
   const preview = text.slice(0, previewEnd) + (truncated ? TRUNCATION_NOTICE : '');
   const blocks: SectionBlock[] = [];
 
-  for (let offset = 0; offset < preview.length; ) {
+  for (let offset = 0; offset < preview.length;) {
     let end = Math.min(offset + SECTION_TEXT_LIMIT, preview.length);
     if (end < preview.length && /[\uD800-\uDBFF]/.test(preview.charAt(end - 1))) end--;
     blocks.push({

@@ -243,7 +243,7 @@ describe('saved worktree changes cache', () => {
   it('does not let an in-flight saved read overwrite a newer refresh', async () => {
     queryClient.setQueryData(queryKey, { snapshot });
     const read = Promise.withResolvers<GetWorktreeChangesOutput>();
-    const pendingRead = queryClient.fetchQuery({ queryKey, queryFn: () => read.promise });
+    const pendingRead = queryClient.query({ queryKey, queryFn: () => read.promise });
     const newer = { ...snapshot, revision: 4 };
     queryClient.setQueryData(queryKey, { snapshot: newer });
     read.resolve({ snapshot });
@@ -260,7 +260,7 @@ describe('saved worktree changes cache', () => {
     queryClient.setQueryData(queryKey, { snapshot });
     expect(queryClient.getQueryData(siblingKey)).toEqual({ snapshot });
     const read = Promise.withResolvers<GetWorktreeChangesOutput>();
-    const pendingRead = queryClient.fetchQuery({ queryKey, queryFn: () => read.promise });
+    const pendingRead = queryClient.query({ queryKey, queryFn: () => read.promise });
     const newer = { ...snapshot, revision: 4 };
     queryClient.setQueryData(siblingKey, { snapshot: newer });
     read.resolve({ snapshot });

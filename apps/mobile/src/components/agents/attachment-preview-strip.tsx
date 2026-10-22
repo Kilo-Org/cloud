@@ -8,6 +8,7 @@ import {
   Pressable,
   ScrollView,
   View,
+  type ViewInstance,
 } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import {
@@ -167,7 +168,7 @@ function AttachmentChip({
 
   // The chip body is the single accessible element; focus restoration targets
   // it after a move so VoiceOver/TalkBack stays on the chip that changed slot.
-  const bodyRef = useRef<View>(null);
+  const bodyRef = useRef<ViewInstance>(null);
   const focusPendingRef = useRef(false);
   const [focusEpoch, setFocusEpoch] = useState(0);
 

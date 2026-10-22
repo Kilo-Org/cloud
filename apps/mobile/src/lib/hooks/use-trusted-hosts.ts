@@ -46,14 +46,14 @@ export function useTrustedHosts() {
 }
 
 export function isTrustedHost(host: string): boolean {
-  return store.get().includes(host);
+  return store.getRequested().includes(host);
 }
 
 export function trustHost(host: string): void {
   // Start the disk read if it has not run, so the Trust write merges with the
   // persisted list instead of replacing it with the empty default.
   store.preload();
-  const current = store.get();
+  const current = store.getRequested();
   if (current.includes(host)) {
     return;
   }
@@ -61,7 +61,7 @@ export function trustHost(host: string): void {
 }
 
 export function getTrustedHosts(): string[] {
-  return store.get();
+  return store.getRequested();
 }
 
 /** Replace the trusted-host list. Destructive: a caller confirms before writing. */
@@ -71,7 +71,7 @@ export async function setTrustedHosts(next: string[]): Promise<void> {
 }
 
 export function revokeHost(host: string): void {
-  store.set(store.get().filter(item => item !== host));
+  store.set(store.getRequested().filter(item => item !== host));
 }
 
 export function clearTrustedHosts(): void {

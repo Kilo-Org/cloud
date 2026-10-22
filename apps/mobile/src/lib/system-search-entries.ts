@@ -50,10 +50,11 @@ export type SystemSearchDocument = {
    */
   route: string;
   /**
-   * Stable JSON of the content fields and the route. It changes when title,
-   * description, keywords or the route change and never otherwise, so a
-   * renamed row is re-indexed, an entry indexed before the route existed is
-   * re-indexed, and an unrelated re-render is not.
+   * Stable JSON of the content fields, the route, and the source when the
+   * entry has one. It changes when title, description, keywords, the route or
+   * the source change, so a renamed row is re-indexed, an entry indexed before
+   * the route or the source existed is re-indexed, and an unrelated re-render
+   * is not.
    */
   fingerprint: string;
 };
@@ -62,15 +63,15 @@ export type SystemSearchDocument = {
 export type SystemSearchFamily = 'sessions' | 'pullRequests' | 'findings';
 
 /**
- * The three route groups an indexed id is allowed to name, with the source
- * family each belongs to. The family lets the sync keep an indexed id whose
- * source could not be enumerated this run (a cold start hydrates only some
- * queries), so a valid entry is not dropped just because its query is absent.
+ * The three route groups an indexed id is allowed to name. A valid entry is
+ * kept even when its source could not be enumerated this run (a cold start
+ * hydrates only some queries); {@link planSystemSearchUpdate} decides removal
+ * from the source scopes the run did observe.
  */
-const HREF_FAMILIES: readonly { prefix: string; family: SystemSearchFamily }[] = [
-  { prefix: SESSION_HREF_PREFIX, family: 'sessions' },
-  { prefix: PULL_REQUEST_HREF_PREFIX, family: 'pullRequests' },
-  { prefix: FINDING_HREF_PREFIX, family: 'findings' },
+const HREF_FAMILIES: readonly { prefix: string }[] = [
+  { prefix: SESSION_HREF_PREFIX },
+  { prefix: PULL_REQUEST_HREF_PREFIX },
+  { prefix: FINDING_HREF_PREFIX },
 ];
 
 /** The route groups an indexed id is allowed to name. */

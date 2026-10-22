@@ -10,6 +10,15 @@ import {
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
+  authorizeCloudAgentChild,
+  issueCloudAgentMcpGrant,
+  assertCloudAgentParentAuthority,
+} from '../../cloud-agent-authority.js';
+import {
+  CloudAgentAuthoritySchema,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
+import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
   type CloudAgentChildSessionLineage,
@@ -23,7 +32,7 @@ import { resolveSecret } from '../../auth.js';
 import type { CallbackTarget } from '../../callbacks/index.js';
 import type { DurableAdmissionAck } from '../../execution/types.js';
 import { logger } from '../../logger.js';
-import type { WrapperPty } from '../../kilo/wrapper-client.js';
+import type { WrapperPty } from '../../terminal/types.js';
 import type { OperationResult } from '../../persistence/types.js';
 import {
   CurrentSessionMetadataSchema,
@@ -61,7 +70,7 @@ import type {
 import type { LatestAssistantMessage } from '../../session/types.js';
 import { createEventQueries, type EventQueries } from '../../session/queries/index.js';
 import { createPreparationProgressRecorder } from '../../session/preparation-progress.js';
-import { sessionIdFromDoName } from '../../session-plane.js';
+import { sessionIdFromDoName } from '../../session-identity.js';
 import {
   finalizePreparationAttempt,
   getPreparationSnapshots,
@@ -110,7 +119,7 @@ import {
 } from '../../shared/control-plane-protocol.js';
 import { resolveControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
-import type { EventId, SessionId } from '../../types/ids.js';
+import type { SessionId } from '../../types/ids.js';
 import type { Env } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import type { StreamEvent, StoredEvent } from '../../websocket/types.js';
@@ -173,7 +182,6 @@ import {
 } from '../../sandbox-session/report-outbox.js';
 import {
   CloudAgentRunContainerSchema,
-  type CloudAgentQueueReport,
   type CloudAgentRunContainer,
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type {
@@ -613,7 +621,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.eventQueries = createEventQueries(this.db, ctx.storage.sql);
     this.reportOutbox = createReportOutbox({
       storage: ctx.storage,
-      getQueue: () => this.env.CLOUD_AGENT_REPORT_QUEUE as Queue<CloudAgentQueueReport> | undefined,
+      getQueue: () => this.env.CLOUD_AGENT_REPORT_QUEUE,
     });
     this.messageCallbacks = createMessageCallbacks({
       storage: ctx.storage,
@@ -920,6 +928,59 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   async getMetadata(): Promise<SessionMetadata | null> {
     await this.initialized;
     return this.metadata;
+  }
+
+  async getCloudAgentSpawnRuntimeToken(authority: CloudAgentAuthority): Promise<string> {
+    await this.initialized;
+    const scope = CloudAgentAuthoritySchema.parse(authority);
+    const authorization = RuntimeAuthorizationSchema.parse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    assertCloudAgentParentAuthority(this.metadata, authorization, scope);
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    const issued = await renewRuntimeAuthorization({
+      authorization,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+    });
+    const current = RuntimeAuthorizationSchema.parse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    assertCloudAgentParentAuthority(this.metadata, current, scope);
+    return issued.token;
+  }
+
+  async authorizeCloudAgentChild(input: {
+    authority: CloudAgentAuthority;
+    childSessionId: string;
+  }): Promise<{ token: string; seal: string }> {
+    await this.initialized;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    return authorizeCloudAgentChild({
+      ...input,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+      metadata: () => this.getMetadata(),
+      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+  }
+
+  async issueCloudAgentMcpGrant(): Promise<
+    { url: string; token: string; expiresAt: number } | undefined
+  > {
+    await this.initialized;
+    if (this.metadata?.allowSubagentSessions !== true) return undefined;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    return issueCloudAgentMcpGrant({
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+      metadata: () => this.getMetadata(),
+      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      mcpUrl: this.env.CLOUD_AGENT_MCP_URL_OVERRIDE,
+    });
   }
 
   /**
@@ -1236,6 +1297,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return (
       existing.identity.userId === metadata.identity.userId &&
       (existing.identity.orgId ?? null) === (metadata.identity.orgId ?? null) &&
+      (existing.allowSubagentSessions ?? false) === (metadata.allowSubagentSessions ?? false) &&
+      existing.parentCloudAgentSessionId === metadata.parentCloudAgentSessionId &&
       sameRepository(existing.repository, metadata.repository) &&
       this.registration.sandboxId === metadata.workspace?.sandboxId &&
       (existing.workspace?.egressMode ?? 'unrestricted') ===
@@ -2041,7 +2104,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   /**
    * C1c security: closes this session's stream sockets when its owner leaves an
    * organization (legacy `closeOrgStreams`). Reads the org from the same
-   * persisted metadata both planes use and only closes on a match.
+   * persisted session metadata and only closes on a match.
    */
   async closeOrgStreams(organizationId: string): Promise<number> {
     await this.initialized;
@@ -2058,7 +2121,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   /**
    * C1c: updates a prepared session's callback target (legacy `tryUpdate`,
    * retained for `services/code-review-infra`). Stores the same grouped
-   * metadata both planes persist.
+   * persisted session metadata.
    */
   async tryUpdate(updates: { callbackTarget?: CallbackTarget | null }): Promise<OperationResult> {
     await this.initialized;
@@ -3129,7 +3192,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     timestamp: number = Date.now()
   ): void {
     this.broadcast({
-      id: 0 as EventId,
+      id: 0,
       execution_id: '',
       session_id: this.sessionId,
       stream_event_type: streamEventType,

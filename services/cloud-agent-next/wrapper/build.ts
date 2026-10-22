@@ -14,19 +14,13 @@ function argValue(name: string): string | undefined {
 const installDir = argValue('install-dir');
 const linkDir = argValue('link-dir');
 
-async function buildBundle(
-  entry: string,
-  outdir: string,
-  naming: string,
-  sourcemap: boolean
-): Promise<void> {
+async function buildBundle(entry: string, outdir: string, naming: string): Promise<void> {
   const result = await Bun.build({
     entrypoints: [`./${entry}`],
     outdir,
     naming,
     target: 'bun',
     minify: true,
-    ...(sourcemap ? { sourcemap: 'external' as const } : {}),
   });
   if (!result.success) throw new Error(`bun build failed for ${entry}`);
 }
@@ -46,7 +40,7 @@ if (installDir) {
   await mkdir(installDir, { recursive: true });
   const installed: string[] = [];
   for (const bundle of WRAPPER_BUNDLES) {
-    await buildBundle(bundle.entry, installDir, bundle.installName, false);
+    await buildBundle(bundle.entry, installDir, bundle.installName);
     if (bundle.executable) await chmod(`${installDir}/${bundle.installName}`, 0o755);
     installed.push(bundle.installName);
   }
@@ -64,7 +58,7 @@ if (installDir) {
   if (linkDir) throw new Error('--link-dir requires --install-dir');
   await rm('./dist/kilo-bitbucket-review', { force: true });
   for (const bundle of WRAPPER_BUNDLES) {
-    await buildBundle(bundle.entry, './dist', bundle.distName, bundle.entry === 'src/main.ts');
+    await buildBundle(bundle.entry, './dist', bundle.distName);
     if (bundle.executable) await chmod(`./dist/${bundle.distName}`, 0o755);
   }
   console.log(

@@ -54,7 +54,6 @@ import type {
   PermissionState,
   SlashCommandInfo,
   SlashCommandCatalogStatus,
-  SuggestionAction,
   SuggestionState,
   MessageDeliveryState,
   MessageInfo,
@@ -95,27 +94,23 @@ type WorktreeChangesRefresh = {
 };
 type ActiveSessionType = ResolvedSession['type'];
 type ObservedModelSource = 'session' | 'message' | 'catalog';
-type StandaloneQuestion = { requestId: string; questions: QuestionInfo[] };
-type StandalonePermission = {
-  requestId: string;
-  permission: string;
-  patterns: string[];
-  metadata: Record<string, unknown>;
-  always: string[];
-};
-type StandaloneSuggestion = {
-  requestId: string;
-  text: string;
-  actions: SuggestionAction[];
-  /** Tool call ID that emitted this suggestion, when available. */
-  callId?: string | undefined;
-};
+/**
+ * A pending question together with the options it offers. `question.asked` may
+ * arrive without options; the manager only raises this state when they are
+ * present, so the narrowing is guaranteed at the atom.
+ */
+type StandaloneQuestion = QuestionState & { questions: QuestionInfo[] };
+type StandalonePermission = PermissionState;
+type StandaloneSuggestion = SuggestionState;
 type ChildSessionHydrationState =
   | { status: 'idle' }
   | { status: 'loading' }
   | {
       status: 'ready';
-      /** Opaque cursor for the child's next older page, or null when fully read. */
+      /**
+       * Opaque cursor for the child's next older page, or null when fully read
+       * or when the next older page failed terminally.
+       */
       cursor: string | null;
       /** True when the child has more older history to load. */
       hasOlder: boolean;
@@ -157,10 +152,27 @@ const TRANSCRIPT_CLEARED_INDICATOR = 'View cleared — earlier messages are stil
 const RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS = 20;
 
 /**
+ * Maximum number of sessions with an in-memory record of a prompt a failed send
+ * could not deliver. Bounded like the delivery-failure record: a long-lived
+ * manager would otherwise keep a prompt string for every session that ever
+ * failed a send.
+ */
+const FAILED_PROMPT_MEMORY_MAX_SESSIONS = 20;
+
+/**
  * Maximum number of retained messages. Once the loaded transcript exceeds this,
  * `trimRetainedHistory` drops the oldest loaded older-page from local storage.
  */
 const RETAINED_MESSAGE_WINDOW = 200;
+
+/**
+ * How long a matching `Aborted` error stays suppressed after an interrupt RPC
+ * settles. The service can deliver the abort before the HTTP acknowledgement or
+ * later, for example replayed after a reconnect (the transport backs off up to
+ * 30s per attempt). Past this window the error belongs to something else and
+ * must reach `errorAtom` again.
+ */
+export const INTERRUPT_ABORT_SUPPRESSION_MS = 30_000;
 
 /**
  * Shared empty-parts sentinel. `memoizedStoredMessage` compares `cached.parts
@@ -267,7 +279,6 @@ type FetchedSessionData = {
   variant: string | null;
   repository: string | null;
   isInitiated: boolean;
-  needsLegacyPrepare: boolean;
   isPreparingAsync: boolean;
   /**
    * Whether the session currently has a ready route that can own a terminal.
@@ -548,7 +559,9 @@ type SessionManager = {
    * that child's own cursor. Replays through the child apply path, updates
    * only per-child pagination state, and never touches the root session's
    * cursor or atoms. No-op when `fetchSnapshotPage` is absent, the child is
-   * not ready, or the child has no cursor.
+   * not ready, or the child has no cursor. A terminal older-page failure
+   * clears the child's cursor, so later calls are no-ops until the next
+   * `switchSession` resets the per-child hydration state.
    */
   loadOlderChildMessages(childSessionId: KiloSessionId): Promise<void>;
   /**
@@ -831,6 +844,51 @@ function modelSelectionsEqual(a: ModelSelection | null, b: ModelSelection | null
   if (a === b) return true;
   if (!a || !b) return false;
   return modelRefsEqual(a.model, b.model) && a.variant === b.variant;
+}
+
+function deliveryStatesEqual(a: MessageDeliveryState, b: MessageDeliveryState): boolean {
+  if (a === b) return true;
+  if (a.status !== b.status) return false;
+  if (a.status === 'queued' || b.status === 'queued') return true;
+  return (
+    a.error === b.error && a.reason === b.reason && (a.attempts ?? null) === (b.attempts ?? null)
+  );
+}
+
+/**
+ * Schedule a timer that must not keep a Node process alive on its own. The
+ * interrupt guard's expiry only withholds a possible error, so a host that is
+ * otherwise done must be able to shut down while it is pending. Browsers and
+ * React Native expose no `unref`, and there the choice is moot.
+ */
+function scheduleUnrefdTimer(callback: () => void, delayMs: number): ReturnType<typeof setTimeout> {
+  const timer = setTimeout(callback, delayMs);
+  const handle: unknown = timer;
+  if (typeof handle === 'object' && handle !== null && 'unref' in handle) {
+    const unref = handle.unref;
+    if (typeof unref === 'function') unref.call(handle);
+  }
+  return timer;
+}
+
+/**
+ * True when two delivery maps describe the same queue. The service state mutates
+ * one shared map in place, so its identity says nothing about change; only the
+ * entries do. Comparing them keeps unrelated notifications (a streamed step
+ * output, a stale preparation event) from replacing `pendingMessagesAtom` with
+ * an equivalent new map and invalidating every dependent atom.
+ */
+function pendingDeliveryStatesEqual(
+  a: ReadonlyMap<string, MessageDeliveryState>,
+  b: ReadonlyMap<string, MessageDeliveryState>
+): boolean {
+  if (a === b) return true;
+  if (a.size !== b.size) return false;
+  for (const [messageId, state] of a) {
+    const other = b.get(messageId);
+    if (other === undefined || !deliveryStatesEqual(state, other)) return false;
+  }
+  return true;
 }
 
 function upsertPendingRequest<T extends { requestId: string }>(
@@ -1239,6 +1297,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * sessions with a re-send in flight and needs no eviction bound.
    */
   const supersededInFlightBySession = new Map<KiloSessionId, Set<string>>();
+  /**
+   * Prompt text a failed send removed from the transcript, keyed by the session
+   * that owned the optimistic row. The composer clears its draft when the row is
+   * inserted, so a failure has to hand the text back to the session that sent
+   * it — and `switchSession` may already have retargeted the manager to another
+   * session by then. The record is restored into the composer when that session
+   * becomes active again and is dropped by a send from it that the server
+   * accepts.
+   */
+  const failedPromptBySession = new Map<KiloSessionId, string>();
   let activeSessionType: ActiveSessionType | null = null;
   /**
    * Latest per-session capabilities reported by the live CLI transport's
@@ -1262,9 +1330,43 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * Session captured at the start of an interrupt call. While non-null, an
    * `onError("Aborted")` from this session is suppressed — it was produced by
    * the manager's own `interrupt()`. A real transport error or an Aborted from
-   * a different/late session still sets errorAtom normally.
+   * a different/late session still sets errorAtom normally. The guard lives
+   * until that Aborted arrives, the interrupt rejects, the session resets, or
+   * `INTERRUPT_ABORT_SUPPRESSION_MS` passes after the interrupt settled.
    */
   let pendingInterruptSession: CloudAgentSession | null = null;
+  let pendingInterruptClearTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Drop the one-shot abort guard, including a scheduled expiry of it. Every
+   * path that ends the guard's relevance (the expected `Aborted`, a rejected
+   * interrupt, a session reset/destroy) goes through here so no timer outlives
+   * the state it would clear.
+   */
+  function clearPendingInterrupt(): void {
+    pendingInterruptSession = null;
+    if (pendingInterruptClearTimer !== null) {
+      clearTimeout(pendingInterruptClearTimer);
+      pendingInterruptClearTimer = null;
+    }
+  }
+
+  /**
+   * Start the suppression window for the guard currently armed. Overlapping
+   * interrupt calls re-arm the same guard, so the previous expiry is dropped
+   * here rather than left running: its callback would otherwise end a newer
+   * call's window early.
+   */
+  function armPendingInterruptExpiry(): void {
+    if (pendingInterruptClearTimer !== null) {
+      clearTimeout(pendingInterruptClearTimer);
+      pendingInterruptClearTimer = null;
+    }
+    pendingInterruptClearTimer = scheduleUnrefdTimer(
+      clearPendingInterrupt,
+      INTERRUPT_ABORT_SUPPRESSION_MS
+    );
+  }
   /**
    * Message ids already in local storage when a reconnect replay starts while
    * `/clear` is active. Those are live post-clear turns for this visit and
@@ -1294,7 +1396,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // Pagination state for `loadOlderMessages`. Reset on every switchSession.
   let olderMessagesCursor: string | null = null;
   // Monotonically increasing per-session generation; older-page results
-  // whose `expectedLoadOlderGeneration` doesn't match are dropped.
+  // whose captured `expectedGeneration` no longer matches are dropped.
   let loadOlderGeneration = 0;
   // In-flight older-page load, used to dedupe concurrent calls and to let
   // late callers await the same result.
@@ -1417,7 +1519,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     lastPromptMode = null;
     olderMessagesTerminal = false;
     currentCapabilities = undefined;
-    pendingInterruptSession = null;
+    clearPendingInterrupt();
   }
 
   function setChildSessionHydrationState(
@@ -1606,7 +1708,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     const state = store.get(childSessionHydrationStatesAtom).get(childSessionId);
     if (!state || state.status !== 'ready') return;
-    if (state.cursor === null) return;
+    // A terminal older-page outcome clears the cursor and `hasOlder`, so a
+    // later call is a no-op instead of refetching a page already known to be
+    // unavailable. Like the root transcript's terminal latch, it holds until
+    // the next switchSession resets the per-child state.
+    if (state.cursor === null || !state.hasOlder) return;
     if (state.isLoadingOlder) return;
 
     const storage = store.get(sessionStorageAtom);
@@ -1640,9 +1746,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (!current || current.status !== 'ready') return;
 
     if (outcome === null) {
-      // Access-not-found (worker 404): terminal for this child.
+      // Access-not-found (worker 404): terminal for this child. Clearing the
+      // cursor alongside `hasOlder` keeps the state the guard reads honest.
       setChildSessionHydrationState(childSessionId, {
         ...current,
+        cursor: null,
         isLoadingOlder: false,
         hasOlder: false,
         olderError: { kind: 'invalid_data' },
@@ -1665,13 +1773,24 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     // Typed failure. A later-page failure only writes `olderError`; it never
     // changes the hydration status (a first-page failure is handled by
-    // `hydrateChildSession`). `retryable_failure` maps to the retryable kind;
-    // `invalid_data` and `too_large` map directly.
+    // `hydrateChildSession`). `retryable_failure` keeps the cursor so a retry
+    // continues from the same page. `invalid_data` and `too_large` are
+    // terminal for this child: clear the cursor and `hasOlder` so a later call
+    // is a no-op until the next switchSession resets the per-child state.
+    if (outcome.kind === 'retryable_failure') {
+      setChildSessionHydrationState(childSessionId, {
+        ...current,
+        isLoadingOlder: false,
+        olderError: { kind: 'retryable' },
+      });
+      return;
+    }
     setChildSessionHydrationState(childSessionId, {
       ...current,
+      cursor: null,
+      hasOlder: false,
       isLoadingOlder: false,
-      olderError:
-        outcome.kind === 'retryable_failure' ? { kind: 'retryable' } : { kind: outcome.kind },
+      olderError: { kind: outcome.kind },
     });
   }
 
@@ -1864,7 +1983,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(permissionAtom, session.state.getPermission());
       store.set(suggestionAtom, session.state.getSuggestion());
       store.set(sessionInfoAtom, session.state.getSessionInfo());
-      store.set(pendingMessagesAtom, new Map(session.state.getPendingMessages()));
+      const nextPendingMessages = session.state.getPendingMessages();
+      if (!pendingDeliveryStatesEqual(store.get(pendingMessagesAtom), nextPendingMessages)) {
+        store.set(pendingMessagesAtom, new Map(nextPendingMessages));
+      }
 
       // Disconnect clears the interrupt unlock latch so normal
       // (!session.canSend) semantics take over for unresolved/null sessions.
@@ -2023,7 +2145,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (olderMessagesTerminal) return;
     // `/clear` keeps the local view empty for this visit — do not page history back in.
     if (store.get(transcriptClearedAtom)) return;
-    // No cursor means nothing left to load.
     if (olderMessagesCursor === null) return;
     // Dedupe: if a load is already in flight, every caller awaits the
     // same result instead of starting a parallel backend request.
@@ -2209,6 +2330,83 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     bumpSupersededInFlight(ownerSessionId);
   }
 
+  /**
+   * Remember a prompt a failed send could not deliver, under the session that
+   * owned the optimistic row (see `failedPromptBySession`). Refreshes insertion
+   * order so the most recently touched sessions survive eviction.
+   */
+  function recordFailedPrompt(kiloSessionId: KiloSessionId, messageText: string): void {
+    failedPromptBySession.delete(kiloSessionId);
+    failedPromptBySession.set(kiloSessionId, messageText);
+    if (failedPromptBySession.size <= FAILED_PROMPT_MEMORY_MAX_SESSIONS) return;
+    for (const key of failedPromptBySession.keys()) {
+      if (key !== kiloSessionId && key !== activeSessionId) {
+        failedPromptBySession.delete(key);
+        return;
+      }
+    }
+  }
+
+  /**
+   * A switch away caches the outgoing session's page, and that cache write can
+   * already hold the optimistic row a send inserted before it settled. Drop the
+   * row from that session's cached first page so returning to it does not paint
+   * a prompt the server never received.
+   */
+  function forgetCachedOptimisticRow(kiloSessionId: KiloSessionId, messageId: string): void {
+    const read = config.readCachedSnapshotPage;
+    const write = config.writeCachedSnapshotPage;
+    if (!read || !write) return;
+    const drop = (page: CachedSessionSnapshotPage | null): void => {
+      if (!page || !page.messages.some(message => message.info.id === messageId)) return;
+      write({
+        ...page,
+        messages: page.messages.filter(message => message.info.id !== messageId),
+      });
+    };
+    try {
+      const page = read(kiloSessionId);
+      if (page instanceof Promise) {
+        void page.then(drop).catch(() => {
+          // An unreadable cache keeps its page; the row is still gone from the
+          // transcript that owned it.
+        });
+        return;
+      }
+      drop(page);
+    } catch {
+      // A cache failure must not turn a send failure into a thrown one.
+    }
+  }
+
+  /**
+   * Whether the chat's cached first page holds the confirmed record of a
+   * message. `switchSession` clears the storage of the session it leaves, so
+   * after a mid-send switch the cached page is the only place a confirmation
+   * that landed before the switch survives.
+   */
+  async function pageShowsConfirmedUserMessage(
+    kiloSessionId: KiloSessionId,
+    messageId: string
+  ): Promise<boolean> {
+    const read = config.readCachedSnapshotPage;
+    if (!read) return false;
+    try {
+      const page = await read(kiloSessionId);
+      return (
+        page?.messages.some(
+          message =>
+            message.info.id === messageId &&
+            message.info.role === 'user' &&
+            message.info.synthetic !== true
+        ) ?? false
+      );
+    } catch {
+      // An unreadable cache is a miss, never a failed send.
+      return false;
+    }
+  }
+
   /** Caches the loaded session's page before it is left, so a return paints at once. */
   function cacheActiveSessionPage(): void {
     if (
@@ -2308,6 +2506,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // previous session state and show a loading indicator.
     clearAllAtoms(preserveTranscript);
     remoteOptimisticIds.clear();
+    // A prompt this session failed to deliver is this session's draft: restore
+    // it so returning to the chat offers the retry.
+    store.set(failedPromptAtom, failedPromptBySession.get(kiloSessionId) ?? null);
     store.set(rootSessionIdAtom, kiloSessionId);
     store.set(isLoadingAtom, true);
     // A retry that keeps the transcript mounted must also keep advertising that
@@ -2633,7 +2834,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // restoreAfterInterrupt. The guard is consumed on match (one-shot) so
         // unrelated or subsequent Aborted events still surface.
         if (message === 'Aborted' && pendingInterruptSession === session) {
-          pendingInterruptSession = null;
+          clearPendingInterrupt();
           return;
         }
         // An open that fails before the stream connects (for example, a refused
@@ -2908,6 +3109,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     //     authoritative user message lands (see the onEvent handler).
     const optimisticStorage = store.get(sessionStorageAtom);
     const optimisticSessionId = store.get(rootSessionIdAtom) ?? kiloSessionId;
+    const insertedOptimisticRow = Boolean(
+      sessionAtSend && optimisticStorage && optimisticSessionId
+    );
     try {
       if (sessionAtSend && optimisticStorage && optimisticSessionId) {
         insertOptimisticUserMessage({
@@ -2964,6 +3168,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           ? { attachmentParts: input.attachmentParts }
           : {}),
       });
+      // A prompt the server accepted is no longer a draft, whether or not the
+      // user is still on the session that sent it.
+      if (kiloSessionId) failedPromptBySession.delete(kiloSessionId);
       if (currentSession !== sessionAtSend || activeSessionId !== kiloSessionId) return true;
       store.set(billingFailureAtom, null);
       store.set(failedPromptAtom, null);
@@ -2981,11 +3188,49 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       return true;
     } catch (err) {
-      if (currentSession !== sessionAtSend || activeSessionId !== kiloSessionId) return false;
-      // Delete the optimistic row on failure so the transcript does not keep a
-      // ghost prompt. The composer keeps the draft for a retry.
-      optimisticStorage?.deleteMessage(messageId);
+      // The optimistic row belongs to the chat that sent it, not to whichever
+      // chat is active by the time the send settles: a switch mid-send must not
+      // leave the row behind. The chat may also have been reopened while the
+      // send was in flight, so the mounted storage is cleaned too — its row can
+      // come back from the page cached on the way out. The composer cleared its
+      // draft when the row was inserted, so the text goes back to the sending
+      // chat as well. The atom writes and the callback speak for the chat the
+      // user is looking at, so they need that chat to still be the sending one;
+      // the session object identity is deliberately not part of that test,
+      // because reopening a chat replaces it.
+      const stillOnSendingChat = activeSessionId === kiloSessionId;
+      const mountedStorage = store.get(sessionStorageAtom);
+      const mountedRow = mountedStorage?.getMessageInfo(messageId);
+      // A confirmed record under this id is server history: the server accepted
+      // the prompt and only the response was lost, so there is nothing to retry.
+      // `switchSession` clears the storage it leaves, so after a switch the
+      // confirmation survives only in the page cached on the way out.
+      const delivered =
+        (stillOnSendingChat && mountedRow?.role === 'user' && mountedRow.synthetic !== true) ||
+        (!stillOnSendingChat &&
+          kiloSessionId !== null &&
+          (await pageShowsConfirmedUserMessage(kiloSessionId, messageId)));
+      if (optimisticStorage && optimisticStorage !== mountedStorage && !delivered) {
+        optimisticStorage.deleteMessage(messageId);
+      }
+      if (mountedStorage && mountedRow?.role === 'user' && mountedRow.synthetic === true) {
+        mountedStorage.deleteMessage(messageId);
+      }
       remoteOptimisticIds.delete(messageId);
+      if (insertedOptimisticRow && kiloSessionId) {
+        if (delivered) {
+          failedPromptBySession.delete(kiloSessionId);
+        } else {
+          recordFailedPrompt(kiloSessionId, messageText);
+          forgetCachedOptimisticRow(kiloSessionId, messageId);
+        }
+      }
+      if (!stillOnSendingChat) return false;
+      if (delivered) {
+        store.set(failedPromptAtom, null);
+        store.set(billingFailureAtom, null);
+        return false;
+      }
       store.set(failedPromptAtom, messageText);
       store.set(billingFailureAtom, parseCustomerBillingFailure(err));
       const detail = formatErrorDetail(err);
@@ -3055,8 +3300,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (session.canInterrupt) {
         // Mark this session as the expected source of any "Aborted" error
         // so onError can suppress it without hiding real transport failures.
+        // The guard expires on its own once this call settles: a service that
+        // acknowledges the stop without ever reporting the abort must not
+        // swallow a later genuine one.
+        clearPendingInterrupt();
         pendingInterruptSession = session;
         await session.interrupt();
+        if (pendingInterruptSession === session) {
+          armPendingInterruptExpiry();
+        }
       }
       if (currentSession === session) {
         const activityType = session.state.getActivity().type;
@@ -3072,6 +3324,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       }
     } catch {
+      // A rejected interrupt never aborts the turn, so nothing will report it.
+      if (pendingInterruptSession === session) {
+        clearPendingInterrupt();
+      }
       if (currentSession === session) {
         // Prefer unlock over a stuck composer when the session is still writable.
         restoreAfterInterrupt(session);
@@ -3293,6 +3549,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     remoteOptimisticIds.clear();
     resolvedDeliveryFailuresBySession.clear();
     supersededInFlightBySession.clear();
+    failedPromptBySession.clear();
     activeSessionId = null;
     activeSessionType = null;
     store.set(

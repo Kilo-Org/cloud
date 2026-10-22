@@ -4,6 +4,7 @@
  * budget. Both are pure: they read a content state and a tray row only.
  */
 
+import { parseTimestamp } from '@kilocode/app-shared/utils';
 import {
   SESSION_CARD_QUIET_AFTER_MS,
   type SessionLiveActivityContentState,
@@ -71,7 +72,9 @@ export function isOlderThanCard(
   row: SessionLiveActivityRow,
   card: SessionLiveActivityProps | null
 ): boolean {
-  const rowAt = row.statusUpdatedAt == null ? Number.NaN : Date.parse(row.statusUpdatedAt);
-  const cardAt = card?.statusSince == null ? Number.NaN : Date.parse(card.statusSince);
+  const rowAt =
+    row.statusUpdatedAt == null ? Number.NaN : parseTimestamp(row.statusUpdatedAt).getTime();
+  const cardAt =
+    card?.statusSince == null ? Number.NaN : parseTimestamp(card.statusSince).getTime();
   return Number.isFinite(rowAt) && Number.isFinite(cardAt) && rowAt < cardAt;
 }

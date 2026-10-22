@@ -17,7 +17,6 @@ import {
   renderedLabels,
   resetGuardHarness,
   toastErrorMock,
-  triggerPreventRemove,
   triggerPreventRemoveInAct,
   usePreventRemoveHolder,
   usePreventRemoveMock,
@@ -111,7 +110,7 @@ describe('useNewSessionDiscardGuard', () => {
     expect(usePreventRemoveMock).toHaveBeenCalledTimes(1);
     expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(true);
 
-    const action = triggerPreventRemove();
+    const action = triggerPreventRemoveInAct();
     // The removal was already prevented, so the guard replays the action.
     expect(dispatchMock).toHaveBeenCalledTimes(1);
     expect(dispatchMock).toHaveBeenCalledWith(action);
@@ -119,6 +118,7 @@ describe('useNewSessionDiscardGuard', () => {
     expect(renderedLabels(renderer)).not.toContain('Discard draft?');
     // The bypass is one-shot: consumed on the removal it armed.
     expect(skipRef.current).toBe(false);
+    expect(usePreventRemoveHolder.preventRemove).toBe(false);
 
     act(() => {
       renderer.unmount();
@@ -135,12 +135,20 @@ describe('useNewSessionDiscardGuard', () => {
       // abandon, so the discard confirm must not hijack it (spot check
       // e12-tap-prefs: the dialog blocked the Preferences screen from opening).
       const action = { type: actionType };
-      usePreventRemoveHolder.callback?.({ data: { action } });
+      act(() => {
+        usePreventRemoveHolder.callback?.({
+          data: { action },
+          repeat: () => {
+            dispatchMock(action);
+          },
+        });
+      });
 
       expect(alertMock).not.toHaveBeenCalled();
       expect(renderedLabels(renderer)).not.toContain('Discard draft?');
       expect(dispatchMock).toHaveBeenCalledTimes(1);
       expect(dispatchMock).toHaveBeenCalledWith(action);
+      expect(usePreventRemoveHolder.preventRemove).toBe(false);
 
       act(() => {
         renderer.unmount();
@@ -183,6 +191,7 @@ describe('useNewSessionDiscardGuard', () => {
       expect(dispatchMock).toHaveBeenCalledWith(action);
       // The draft clear must finish before the captured leave is replayed.
       expect(order).toEqual(['discard', 'dispatch']);
+      expect(usePreventRemoveHolder.preventRemove).toBe(false);
 
       act(() => {
         renderer.unmount();
@@ -212,6 +221,7 @@ describe('useNewSessionDiscardGuard', () => {
       expect(onDiscard).toHaveBeenCalledTimes(1);
       expect(dispatchMock).not.toHaveBeenCalled();
       expect(toastErrorMock).toHaveBeenCalledWith('Could not discard the draft. Please try again.');
+      expect(usePreventRemoveHolder.preventRemove).toBe(true);
       // Closed, so the user can retry by leaving again with the draft intact.
       expect(renderedLabels(renderer)).not.toContain('Discard draft?');
 
@@ -240,6 +250,7 @@ describe('useNewSessionDiscardGuard', () => {
     expect(onDiscard).not.toHaveBeenCalled();
     expect(dispatchMock).not.toHaveBeenCalled();
     expect(renderedLabels(renderer)).not.toContain('Discard draft?');
+    expect(usePreventRemoveHolder.preventRemove).toBe(true);
 
     act(() => {
       renderer.unmount();

@@ -28,7 +28,6 @@ import {
   BRIEFING_MAX_SOURCES_PER_SESSION,
   BRIEFING_MAX_TITLE_LENGTH,
   BRIEFING_MAX_URL_LENGTH,
-  BRIEFING_MAX_EXCERPT_LENGTH,
   redactBriefingExcerpt,
   type BriefingSource,
 } from '@kilocode/app-shared/agent-briefing';
@@ -45,7 +44,7 @@ import {
 export const BRIEFING_MAX_EVENT_ROWS = 2048;
 export const BRIEFING_MAX_USAGE_ROWS = 2048;
 const BRIEFING_MAX_ACTIVE_SESSIONS = 256;
-const BRIEFING_MAX_ANCESTRY_ROWS = 256;
+const BRIEFING_MAX_ANCESTRY_ROWS = 512;
 
 type Session = Pick<
   typeof cli_sessions_v2.$inferSelect,
@@ -98,10 +97,6 @@ export function aggregateBriefingEvidence(
     collectionStartedAt !== null && Date.parse(collectionStartedAt) <= start;
   let untimestampedStatus = coverageContext.legacyStatusInWindow === true;
   let truncated = coverageContext.truncated === true;
-  const boundedText = (value: string, limit: number) => {
-    truncated ||= value.length > limit;
-    return value.slice(0, limit);
-  };
   const activityRoots = new Set<string>();
   const spendRoots = new Set<string>();
   const byId = new Map(rows.map(row => [row.session_id, row]));
@@ -135,9 +130,9 @@ export function aggregateBriefingEvidence(
     if (!group) {
       group = {
         sessionId: root.session_id,
-        title: boundedText(root.title ?? 'Coding session', BRIEFING_MAX_TITLE_LENGTH),
-        url: boundedText(
-          `/cloud/sessions/${encodeURIComponent(root.session_id)}`,
+        title: (root.title ?? 'Coding session').slice(0, BRIEFING_MAX_TITLE_LENGTH),
+        url: `/cloud/sessions/${encodeURIComponent(root.session_id)}`.slice(
+          0,
           BRIEFING_MAX_URL_LENGTH
         ),
         status: null,
@@ -149,8 +144,8 @@ export function aggregateBriefingEvidence(
     return group;
   };
   const addSource = (group: { sources: BriefingSource[] }, source: BriefingSource) => {
-    source.title = boundedText(source.title, BRIEFING_MAX_TITLE_LENGTH);
-    source.url = boundedText(source.url, BRIEFING_MAX_URL_LENGTH);
+    source.title = source.title.slice(0, BRIEFING_MAX_TITLE_LENGTH);
+    source.url = source.url.slice(0, BRIEFING_MAX_URL_LENGTH);
     group.sources.push(source);
   };
   const statuses = new Map<string, { latest: Event; blockedSince: Event | null }>();
@@ -225,7 +220,6 @@ export function aggregateBriefingEvidence(
       occurredAt: new Date(at).toISOString(),
     };
     if (event.kind === 'activity' && typeof event.payload?.excerpt === 'string') {
-      truncated ||= event.payload.excerpt.length > BRIEFING_MAX_EXCERPT_LENGTH;
       source.excerpt = redactBriefingExcerpt(event.payload.excerpt);
     }
     if (event.kind === 'pull_request') {
@@ -320,27 +314,23 @@ export function aggregateBriefingEvidence(
   const selectedSources = new Set(sources);
   for (const session of sessions) {
     session.sources = session.sources.filter(source => selectedSources.has(source));
-    if (
-      coverageContext.truncated &&
-      session.status !== 'question' &&
-      session.status !== 'permission'
-    ) {
+    if (truncated && session.status !== 'question' && session.status !== 'permission') {
       session.status = null;
     }
   }
   const everyActiveSessionCharged = [...activityRoots].every(root => spendRoots.has(root));
+  let spendCoverage: BriefingEvidenceCoverage['spend'];
+  if (used.size > 0) {
+    spendCoverage =
+      collectionCovered && everyActiveSessionCharged && !truncated ? 'complete' : 'partial';
+  } else if (collectionCovered && activityRoots.size === 0) {
+    spendCoverage = truncated ? 'partial' : 'complete';
+  } else {
+    spendCoverage = 'unavailable';
+  }
   const coverage: BriefingEvidenceCoverage = {
     activity: collectionCovered && !truncated ? 'complete' : 'partial',
-    spend:
-      used.size === 0
-        ? collectionCovered && activityRoots.size === 0
-          ? truncated
-            ? 'partial'
-            : 'complete'
-          : 'unavailable'
-        : collectionCovered && everyActiveSessionCharged && !truncated
-          ? 'complete'
-          : 'partial',
+    spend: spendCoverage,
     blockers: collectionCovered && !untimestampedStatus && !truncated ? 'complete' : 'partial',
     pullRequests: collectionCovered && !truncated ? 'complete' : 'partial',
   };
@@ -547,14 +537,16 @@ export async function collectBriefingEvidence(
       >();
       const requested = new Set(activeSessionIds);
       const queried = new Set<string>();
+      let ancestryReads = 0;
       let pending = activeSessionIds;
       while (pending.length > 0) {
         const ancestryLimit = freeze ? ONE_OFF_ANCESTRY_LIMIT : BRIEFING_MAX_ANCESTRY_ROWS;
-        const queryIds = pending.slice(0, Math.max(0, ancestryLimit - queried.size));
+        const queryIds = pending.slice(0, Math.max(0, ancestryLimit - ancestryReads));
         if (queryIds.length === 0) {
           truncated = true;
           break;
         }
+        ancestryReads += queryIds.length;
         for (const id of queryIds) queried.add(id);
         const found = await tx
           .select({

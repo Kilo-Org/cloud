@@ -361,6 +361,35 @@ describe('scheduled briefing evidence collection', () => {
     expect(refreshed.summary).toMatchObject({ status: 'outdated', text: null, canRetry: false });
   });
 
+  it('resolves parents when every active session is a child', async () => {
+    const roots = Array.from({ length: 256 }, (_, index) => `ses_root_${index}`);
+    const children = roots.map((_, index) => `ses_child_${index}`);
+    await seedSessions(roots);
+    await db.insert(cli_sessions_v2).values(
+      children.map((sessionId, index) => ({
+        session_id: sessionId,
+        kilo_user_id: user.id,
+        parent_session_id: roots[index],
+        title: `Child ${index}`,
+        created_on_platform: 'cli',
+      }))
+    );
+    await db.insert(agent_briefing_events).values(
+      children.map((sessionId, index) => ({
+        id: `child-activity-${index}`,
+        kilo_user_id: user.id,
+        session_id: sessionId,
+        kind: 'activity',
+        occurred_at: new Date(Date.parse(activityAt) + index).toISOString(),
+      }))
+    );
+    const facts = await collect();
+    expect(facts.scorecard.sessions).toBe(256);
+    expect(facts.sessions).toHaveLength(BRIEFING_MAX_SESSIONS);
+    expect(facts.sessions.every(session => session.sessionId.startsWith('ses_root_'))).toBe(true);
+    expect(await expectStoredAndReadable(await persistFacts(facts), facts)).toBeTruthy();
+  });
+
   it('selects recently active sessions for the report', async () => {
     const sessionIds = Array.from({ length: 257 }, (_, index) => `ses_recent_${index}`);
     await seedSessions(sessionIds);

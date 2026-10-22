@@ -37,6 +37,13 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     return null;
   }
   if (__DEV__) {
+    const reviewCopyFixture =
+      /(?:^|\/)dev\/pr-review-copy-fixture\/(checks|navigator|files|merge)\/?(?:[?#].*)?$/.exec(
+        path
+      );
+    if (reviewCopyFixture) {
+      return `/(auth)/pr-review-copy-fixture?surface=${reviewCopyFixture[1]}`;
+    }
     if (/(?:^|\/)dev\/button-label-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/button-label-fixture';
     }

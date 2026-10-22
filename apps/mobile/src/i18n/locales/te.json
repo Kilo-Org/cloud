@@ -2243,6 +2243,8 @@
       "commitAndPush": "కమిట్ చేసి పుష్ చేయండి",
       "startSession": "సెషన్ ప్రారంభించండి",
       "selectRepositoryToStart": "ప్రారంభించడానికి రిపోజిటరీని ఎంచుకోండి.",
+      "enterPromptToStart": "ప్రారంభించడానికి ఒక ప్రాంప్ట్‌ను జోడించండి.",
+      "enterPromptOrFileToStart": "ప్రారంభించడానికి ఒక ప్రాంప్ట్‌ను లేదా ఫైల్‌ను జోడించండి.",
       "connectProviderToStart": "ప్రారంభించడానికి ప్రొవైడర్‌ను కనెక్ట్ చేయండి.",
       "promptPlaceholder": "మీరు దేనిపై పని చేయాలనుకుంటున్నారు?",
       "couldNotLoadModels": "మోడళ్లను లోడ్ చేయలేకపోయాము.",

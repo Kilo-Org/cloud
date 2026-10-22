@@ -2243,6 +2243,8 @@
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sesión",
       "selectRepositoryToStart": "Selecciona un repositorio para comezar.",
+      "enterPromptToStart": "Engade un prompt para comezar.",
+      "enterPromptOrFileToStart": "Engade un prompt ou un ficheiro para comezar.",
       "connectProviderToStart": "Conecta un provedor para comezar.",
       "promptPlaceholder": "En que che gustaría traballar?",
       "couldNotLoadModels": "Non se puideron cargar os modelos.",

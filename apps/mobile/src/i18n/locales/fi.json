@@ -2243,6 +2243,8 @@
       "commitAndPush": "Tee muutostallennus ja pushaa",
       "startSession": "Aloita istunto",
       "selectRepositoryToStart": "Valitse koodivarasto aloittaaksesi.",
+      "enterPromptToStart": "Lisää kehote aloittaaksesi.",
+      "enterPromptOrFileToStart": "Lisää kehote tai tiedosto aloittaaksesi.",
       "connectProviderToStart": "Yhdistä palveluntarjoaja aloittaaksesi.",
       "promptPlaceholder": "Mitä haluaisit tehdä?",
       "couldNotLoadModels": "Malleja ei voitu ladata.",

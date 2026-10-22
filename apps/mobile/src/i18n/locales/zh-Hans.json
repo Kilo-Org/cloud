@@ -1729,6 +1729,8 @@
       "commitAndPush": "提交并推送",
       "startSession": "开始会话",
       "selectRepositoryToStart": "选择仓库以开始。",
+      "enterPromptToStart": "添加提示词以开始。",
+      "enterPromptOrFileToStart": "添加提示词或文件以开始。",
       "connectProviderToStart": "连接代码托管平台以开始。",
       "promptPlaceholder": "你想完成什么任务？",
       "couldNotLoadModels": "无法加载模型。",

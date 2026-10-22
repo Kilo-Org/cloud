@@ -2243,6 +2243,8 @@
       "commitAndPush": "Véglegesítés és feltöltés",
       "startSession": "Munkamenet indítása",
       "selectRepositoryToStart": "Válassz egy adattárat az indításhoz.",
+      "enterPromptToStart": "Adj hozzá egy promptot az indításhoz.",
+      "enterPromptOrFileToStart": "Adj hozzá egy promptot vagy egy fájlt az indításhoz.",
       "connectProviderToStart": "Csatlakoztass egy szolgáltatót az indításhoz.",
       "promptPlaceholder": "Min szeretnél dolgozni?",
       "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",

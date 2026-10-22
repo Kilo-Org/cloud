@@ -2243,6 +2243,8 @@
       "commitAndPush": "Skrá og senda",
       "startSession": "Byrja lotu",
       "selectRepositoryToStart": "Veldu kóðasafn til að byrja.",
+      "enterPromptToStart": "Bættu við skipun til að byrja.",
+      "enterPromptOrFileToStart": "Bættu við skipun eða skrá til að byrja.",
       "connectProviderToStart": "Tengdu þjónustuveitanda til að byrja.",
       "promptPlaceholder": "Hvað viltu vinna að?",
       "couldNotLoadModels": "Ekki tókst að hlaða líkönum.",

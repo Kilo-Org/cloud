@@ -2243,6 +2243,8 @@
       "commitAndPush": "Hifadhi na utume",
       "startSession": "Anza kikao",
       "selectRepositoryToStart": "Chagua hazina ili kuanza.",
+      "enterPromptToStart": "Ongeza maelekezo ili kuanza.",
+      "enterPromptOrFileToStart": "Ongeza maelekezo au faili ili kuanza.",
       "connectProviderToStart": "Unganisha mtoa huduma ili kuanza.",
       "promptPlaceholder": "Ungependa kufanya kazi gani?",
       "couldNotLoadModels": "Imeshindikana kupakia modeli.",

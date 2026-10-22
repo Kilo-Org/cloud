@@ -1729,6 +1729,8 @@
       "commitAndPush": "Committen en pushen",
       "startSession": "Sessie starten",
       "selectRepositoryToStart": "Selecteer een repository om te starten.",
+      "enterPromptToStart": "Voeg een prompt toe om te starten.",
+      "enterPromptOrFileToStart": "Voeg een prompt of een bestand toe om te starten.",
       "connectProviderToStart": "Koppel een platform om te starten.",
       "promptPlaceholder": "Waar wil je aan werken?",
       "couldNotLoadModels": "De modellen konden niet worden geladen.",

@@ -2243,6 +2243,8 @@
       "commitAndPush": "کۆمیت و ناردن",
       "startSession": "دەستپێکردنی سێشن",
       "selectRepositoryToStart": "بۆ دەستپێکردن کۆگایەک هەڵبژێرە.",
+      "enterPromptToStart": "بۆ دەستپێکردن پرۆمپتێک زیاد بکە.",
+      "enterPromptOrFileToStart": "بۆ دەستپێکردن پرۆمپتێک یان فایلێک زیاد بکە.",
       "connectProviderToStart": "بۆ دەستپێکردن پەیوەندی بە دابینکەرێک بکە.",
       "promptPlaceholder": "حەز دەکەیت لەسەر چی کار بکەیت؟",
       "couldNotLoadModels": "نەتوانرا مۆدێلەکان بار بکرێن.",

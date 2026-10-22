@@ -2243,6 +2243,8 @@
       "commitAndPush": "कमिट आणि पुश करा",
       "startSession": "सत्र सुरू करा",
       "selectRepositoryToStart": "प्रारंभ करण्यासाठी रिपॉझिटरी निवडा.",
+      "enterPromptToStart": "प्रारंभ करण्यासाठी प्रॉम्प्ट जोडा.",
+      "enterPromptOrFileToStart": "प्रारंभ करण्यासाठी प्रॉम्प्ट किंवा फाइल जोडा.",
       "connectProviderToStart": "प्रारंभ करण्यासाठी सेवा पुरवठादार जोडा.",
       "promptPlaceholder": "तुम्हाला कशावर काम करायचे आहे?",
       "couldNotLoadModels": "मॉडेल लोड करता आली नाहीत.",

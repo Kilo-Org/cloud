@@ -2243,6 +2243,8 @@
       "commitAndPush": "Adana ka tura",
       "startSession": "Fara zama",
       "selectRepositoryToStart": "Zaɓi ma'ajiya don farawa.",
+      "enterPromptToStart": "Ƙara umarni don farawa.",
+      "enterPromptOrFileToStart": "Ƙara umarni ko fayil don farawa.",
       "connectProviderToStart": "Haɗa mai ba da sabis don farawa.",
       "promptPlaceholder": "Me kake so ka yi aiki a kai?",
       "couldNotLoadModels": "An kasa loda samfura.",

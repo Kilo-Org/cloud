@@ -1710,6 +1710,8 @@
       "commitAndPush": "Registrar e enviar",
       "startSession": "Iniciar sessão",
       "selectRepositoryToStart": "Selecione um repositório para começar.",
+      "enterPromptToStart": "Adicione um prompt para começar.",
+      "enterPromptOrFileToStart": "Adicione um prompt ou um arquivo para começar.",
       "connectProviderToStart": "Conecte um provedor para começar.",
       "promptPlaceholder": "No que você quer trabalhar?",
       "couldNotLoadModels": "Não foi possível carregar os modelos.",

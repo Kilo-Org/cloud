@@ -1729,6 +1729,8 @@
       "commitAndPush": "Ghi nhận và đẩy",
       "startSession": "Bắt đầu phiên",
       "selectRepositoryToStart": "Chọn một kho mã để bắt đầu.",
+      "enterPromptToStart": "Thêm một lời nhắc để bắt đầu.",
+      "enterPromptOrFileToStart": "Thêm một lời nhắc hoặc tệp để bắt đầu.",
       "connectProviderToStart": "Kết nối nhà cung cấp để bắt đầu.",
       "promptPlaceholder": "Bạn muốn làm gì?",
       "couldNotLoadModels": "Không thể tải danh sách mô hình.",

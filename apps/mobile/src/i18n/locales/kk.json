@@ -2243,6 +2243,8 @@
       "commitAndPush": "Коммит жасап, жіберу",
       "startSession": "Сессияны бастау",
       "selectRepositoryToStart": "Бастау үшін репозиторий таңдаңыз.",
+      "enterPromptToStart": "Бастау үшін сұрау қосыңыз.",
+      "enterPromptOrFileToStart": "Бастау үшін сұрау немесе файл қосыңыз.",
       "connectProviderToStart": "Бастау үшін провайдерді қосыңыз.",
       "promptPlaceholder": "Немен жұмыс істегіңіз келеді?",
       "couldNotLoadModels": "Модельдерді жүктеу мүмкін болмады.",

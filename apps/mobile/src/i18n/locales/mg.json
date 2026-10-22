@@ -2243,6 +2243,8 @@
       "commitAndPush": "Raketo sy alefaso",
       "startSession": "Atombohy ny fotoam-piasana",
       "selectRepositoryToStart": "Safidio ny tahirin-kaody hanombohana.",
+      "enterPromptToStart": "Ampio baiko hanombohana.",
+      "enterPromptOrFileToStart": "Ampio baiko na rakitra hanombohana.",
       "connectProviderToStart": "Ampifandraiso ny mpanome tolotra hanombohana.",
       "promptPlaceholder": "Inona no tianao hiasana?",
       "couldNotLoadModels": "Tsy voaray ny modely.",

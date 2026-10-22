@@ -1777,6 +1777,8 @@
       "commitAndPush": "إيداع ودفع",
       "startSession": "بدء الجلسة",
       "selectRepositoryToStart": "اختر مستودعًا للبدء.",
+      "enterPromptToStart": "أضِف موجِّهًا للبدء.",
+      "enterPromptOrFileToStart": "أضِف موجِّهًا أو ملفًا للبدء.",
       "connectProviderToStart": "اربط مزوّدًا للبدء.",
       "promptPlaceholder": "ما الذي تريد العمل عليه؟",
       "couldNotLoadModels": "تعذّر تحميل النماذج.",

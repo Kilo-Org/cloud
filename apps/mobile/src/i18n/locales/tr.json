@@ -1729,6 +1729,8 @@
       "commitAndPush": "İşle ve gönder",
       "startSession": "Oturumu başlat",
       "selectRepositoryToStart": "Başlamak için bir depo seç.",
+      "enterPromptToStart": "Başlamak için bir istem ekle.",
+      "enterPromptOrFileToStart": "Başlamak için bir istem veya dosya ekle.",
       "connectProviderToStart": "Başlamak için bir sağlayıcı bağla.",
       "promptPlaceholder": "Ne üzerinde çalışmak istersin?",
       "couldNotLoadModels": "Modeller yüklenemedi.",

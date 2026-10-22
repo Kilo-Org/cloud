@@ -2243,6 +2243,8 @@
       "commitAndPush": "Lagre og send",
       "startSession": "Start økt",
       "selectRepositoryToStart": "Velg et kodelager for å starte.",
+      "enterPromptToStart": "Legg til en prompt for å starte.",
+      "enterPromptOrFileToStart": "Legg til en prompt eller en fil for å starte.",
       "connectProviderToStart": "Koble til en leverandør for å starte.",
       "promptPlaceholder": "Hva vil du jobbe med?",
       "couldNotLoadModels": "Kunne ikke laste inn modellene.",

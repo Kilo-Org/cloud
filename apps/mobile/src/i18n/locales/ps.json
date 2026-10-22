@@ -2243,6 +2243,8 @@
       "commitAndPush": "کمیټ او پش کړئ",
       "startSession": "ناسته پیل کړئ",
       "selectRepositoryToStart": "د پیل لپاره یو زېرمتون وټاکئ.",
+      "enterPromptToStart": "د پیل لپاره یو پرومپټ اضافه کړئ.",
+      "enterPromptOrFileToStart": "د پیل لپاره یو پرومپټ یا فایل اضافه کړئ.",
       "connectProviderToStart": "د پیل لپاره د خدمت چمتو کوونکی ونښلوئ.",
       "promptPlaceholder": "غواړئ پر څه کار وکړئ؟",
       "couldNotLoadModels": "ماډلونه بار نه شول.",

@@ -2243,6 +2243,8 @@
       "commitAndPush": "မှတ်တမ်းတင်ပြီး တင်ပို့",
       "startSession": "စက်ရှင် စတင်ပါ",
       "selectRepositoryToStart": "စတင်ရန် ကုဒ်သိုလှောင်ခန်းတစ်ခုကို ရွေးပါ။",
+      "enterPromptToStart": "စတင်ရန် ညွှန်ကြားချက်တစ်ခု ထည့်ပါ။",
+      "enterPromptOrFileToStart": "စတင်ရန် ညွှန်ကြားချက် သို့မဟုတ် ဖိုင်တစ်ခု ထည့်ပါ။",
       "connectProviderToStart": "စတင်ရန် ဝန်ဆောင်မှုပေးသူတစ်ဦးကို ချိတ်ဆက်ပါ။",
       "promptPlaceholder": "ဘာလုပ်ချင်ပါသလဲ။",
       "couldNotLoadModels": "မော်ဒယ်များကို ရယူ၍မရပါ။",

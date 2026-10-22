@@ -2243,6 +2243,8 @@
       "commitAndPush": "კომიტი და ატვირთვა",
       "startSession": "სესიის დაწყება",
       "selectRepositoryToStart": "დასაწყებად აირჩიეთ რეპოზიტორია.",
+      "enterPromptToStart": "დასაწყებად დაამატეთ პრომპტი.",
+      "enterPromptOrFileToStart": "დასაწყებად დაამატეთ პრომპტი ან ფაილი.",
       "connectProviderToStart": "დასაწყებად დააკავშირეთ პროვაიდერი.",
       "promptPlaceholder": "რაზე გსურთ მუშაობა?",
       "couldNotLoadModels": "მოდელების ჩატვირთვა ვერ მოხერხდა.",

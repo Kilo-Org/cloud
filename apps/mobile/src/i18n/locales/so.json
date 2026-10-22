@@ -2243,6 +2243,8 @@
       "commitAndPush": "Diiwaangeli oo dir",
       "startSession": "Bilow kalfadhiga",
       "selectRepositoryToStart": "Dooro kayd si aad u bilowdo.",
+      "enterPromptToStart": "Ku dar fariin si aad u bilowdo.",
+      "enterPromptOrFileToStart": "Ku dar fariin ama fayl si aad u bilowdo.",
       "connectProviderToStart": "Ku xidh bixiye si aad u bilowdo.",
       "promptPlaceholder": "Maxaad rabtaa inaad ka shaqayso?",
       "couldNotLoadModels": "Moodeellada lama soo shubi karin.",

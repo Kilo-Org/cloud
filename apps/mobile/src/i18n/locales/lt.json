@@ -2299,6 +2299,8 @@
       "commitAndPush": "Įrašyti ir išsiųsti",
       "startSession": "Pradėti sesiją",
       "selectRepositoryToStart": "Norėdami pradėti, pasirinkite saugyklą.",
+      "enterPromptToStart": "Norėdami pradėti, pridėkite promptą.",
+      "enterPromptOrFileToStart": "Norėdami pradėti, pridėkite promptą arba failą.",
       "connectProviderToStart": "Norėdami pradėti, prijunkite paslaugų teikėją.",
       "promptPlaceholder": "Ką norėtumėte atlikti?",
       "couldNotLoadModels": "Nepavyko įkelti modelių.",

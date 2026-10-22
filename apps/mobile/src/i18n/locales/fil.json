@@ -2243,6 +2243,8 @@
       "commitAndPush": "I-commit at i-push",
       "startSession": "Simulan ang sesyon",
       "selectRepositoryToStart": "Pumili ng imbakan ng code para magsimula.",
+      "enterPromptToStart": "Magdagdag ng prompt para magsimula.",
+      "enterPromptOrFileToStart": "Magdagdag ng prompt o file para magsimula.",
       "connectProviderToStart": "Ikonekta ang isang provider para magsimula.",
       "promptPlaceholder": "Ano ang gusto mong gawin?",
       "couldNotLoadModels": "Hindi ma-load ang mga modelo.",

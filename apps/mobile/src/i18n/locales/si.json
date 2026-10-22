@@ -2243,6 +2243,8 @@
       "commitAndPush": "කමිට් කර පුෂ් කරන්න",
       "startSession": "සැසිය ආරම්භ කරන්න",
       "selectRepositoryToStart": "ආරම්භ කිරීමට ගබඩාවක් තෝරන්න.",
+      "enterPromptToStart": "ආරම්භ කිරීමට ප්‍රොම්ප්ට් එකක් එකතු කරන්න.",
+      "enterPromptOrFileToStart": "ආරම්භ කිරීමට ප්‍රොම්ප්ට් එකක් හෝ ගොනුවක් එකතු කරන්න.",
       "connectProviderToStart": "ආරම්භ කිරීමට සැපයුම්කරුවෙකු සම්බන්ධ කරන්න.",
       "promptPlaceholder": "ඔබට කිරීමට අවශ්‍ය කාර්යය කුමක්ද?",
       "couldNotLoadModels": "මාදිලි පූරණය කළ නොහැකි විය.",

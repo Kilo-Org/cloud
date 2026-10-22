@@ -2307,6 +2307,8 @@
       "commitAndPush": "Commit and push",
       "startSession": "Start session",
       "selectRepositoryToStart": "Select a repository to start.",
+      "enterPromptToStart": "Add a prompt to start.",
+      "enterPromptOrFileToStart": "Add a prompt or a file to start.",
       "connectProviderToStart": "Connect a provider to start.",
       "promptPlaceholder": "What would you like to work on?",
       "couldNotLoadModels": "Couldn't load models",

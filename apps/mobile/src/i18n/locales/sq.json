@@ -2243,6 +2243,8 @@
       "commitAndPush": "Regjistro dhe dërgo",
       "startSession": "Nis seancën",
       "selectRepositoryToStart": "Zgjidh një depo për të filluar.",
+      "enterPromptToStart": "Shto një kërkesë për të filluar.",
+      "enterPromptOrFileToStart": "Shto një kërkesë ose një skedar për të filluar.",
       "connectProviderToStart": "Lidh një ofrues për të filluar.",
       "promptPlaceholder": "Me çfarë do të punosh?",
       "couldNotLoadModels": "Nuk u ngarkuan modelet.",

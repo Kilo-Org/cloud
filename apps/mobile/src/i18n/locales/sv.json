@@ -2243,6 +2243,8 @@
       "commitAndPush": "Committa och pusha",
       "startSession": "Starta session",
       "selectRepositoryToStart": "Välj ett kodarkiv för att starta.",
+      "enterPromptToStart": "Lägg till en uppmaning för att starta.",
+      "enterPromptOrFileToStart": "Lägg till en uppmaning eller en fil för att starta.",
       "connectProviderToStart": "Anslut en leverantör för att starta.",
       "promptPlaceholder": "Vad vill du arbeta med?",
       "couldNotLoadModels": "Det gick inte att läsa in modellerna.",

@@ -2243,6 +2243,8 @@
       "commitAndPush": "Egin commit eta igo",
       "startSession": "Hasi saioa",
       "selectRepositoryToStart": "Hautatu biltegi bat hasteko.",
+      "enterPromptToStart": "Gehitu eskaera bat hasteko.",
+      "enterPromptOrFileToStart": "Gehitu eskaera bat edo fitxategi bat hasteko.",
       "connectProviderToStart": "Konektatu hornitzaile bat hasteko.",
       "promptPlaceholder": "Zertan lan egin nahi zenuke?",
       "couldNotLoadModels": "Ezin izan dira modeloak kargatu.",

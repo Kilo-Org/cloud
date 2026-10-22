@@ -2243,6 +2243,8 @@
       "commitAndPush": "መዝግበው ይላኩ",
       "startSession": "ክፍለ ጊዜውን ያስጀምሩ",
       "selectRepositoryToStart": "ለመጀመር ማከማቻ ይምረጡ።",
+      "enterPromptToStart": "ለመጀመር ትዕዛዝ ያክሉ።",
+      "enterPromptOrFileToStart": "ለመጀመር ትዕዛዝ ወይም ፋይል ያክሉ።",
       "connectProviderToStart": "ለመጀመር አቅራቢ ያገናኙ።",
       "promptPlaceholder": "በምን ላይ መስራት ይፈልጋሉ?",
       "couldNotLoadModels": "ሞዴሎችን መጫን አልተቻለም።",

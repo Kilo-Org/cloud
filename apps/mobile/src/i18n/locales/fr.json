@@ -1642,6 +1642,8 @@
       "commitAndPush": "Valider et envoyer",
       "startSession": "Démarrer la session",
       "selectRepositoryToStart": "Sélectionnez un dépôt pour commencer.",
+      "enterPromptToStart": "Ajoutez une invite pour commencer.",
+      "enterPromptOrFileToStart": "Ajoutez une invite ou un fichier pour commencer.",
       "connectProviderToStart": "Connectez un fournisseur pour commencer.",
       "promptPlaceholder": "Sur quoi souhaitez-vous travailler ?",
       "couldNotLoadModels": "Impossible de charger les modèles.",

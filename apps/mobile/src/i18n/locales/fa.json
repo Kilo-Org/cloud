@@ -2243,6 +2243,8 @@
       "commitAndPush": "کامیت و پوش",
       "startSession": "شروع نشست",
       "selectRepositoryToStart": "برای شروع یک مخزن انتخاب کنید.",
+      "enterPromptToStart": "برای شروع یک پرامپت اضافه کنید.",
+      "enterPromptOrFileToStart": "برای شروع یک پرامپت یا فایل اضافه کنید.",
       "connectProviderToStart": "برای شروع یک ارائه‌دهنده را متصل کنید.",
       "promptPlaceholder": "می‌خواهید روی چه چیزی کار کنید؟",
       "couldNotLoadModels": "بارگذاری مدل‌ها ممکن نشد.",

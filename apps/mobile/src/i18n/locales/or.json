@@ -2243,6 +2243,8 @@
       "commitAndPush": "କମିଟ୍ ଓ ପୁଶ୍ କରନ୍ତୁ",
       "startSession": "ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ",
       "selectRepositoryToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ।",
+      "enterPromptToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ପ୍ରମ୍ପ୍ଟ ଯୋଗ କରନ୍ତୁ।",
+      "enterPromptOrFileToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ପ୍ରମ୍ପ୍ଟ କିମ୍ବା ଫାଇଲ୍ ଯୋଗ କରନ୍ତୁ।",
       "connectProviderToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ସେବା ପ୍ରଦାତାଙ୍କୁ ସଂଯୋଗ କରନ୍ତୁ।",
       "promptPlaceholder": "କେଉଁ କାମ କରିବାକୁ ଚାହୁଁଛନ୍ତି?",
       "couldNotLoadModels": "ମଡେଲ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",

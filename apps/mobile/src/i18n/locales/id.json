@@ -1729,6 +1729,8 @@
       "commitAndPush": "Commit dan kirim",
       "startSession": "Mulai sesi",
       "selectRepositoryToStart": "Pilih repositori untuk memulai.",
+      "enterPromptToStart": "Tambahkan prompt untuk memulai.",
+      "enterPromptOrFileToStart": "Tambahkan prompt atau file untuk memulai.",
       "connectProviderToStart": "Hubungkan penyedia untuk memulai.",
       "promptPlaceholder": "Apa yang ingin kamu kerjakan?",
       "couldNotLoadModels": "Tidak dapat memuat model.",

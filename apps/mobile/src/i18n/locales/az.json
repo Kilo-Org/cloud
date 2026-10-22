@@ -2243,6 +2243,8 @@
       "commitAndPush": "Təsdiqlə və göndər",
       "startSession": "Sessiyanı başlat",
       "selectRepositoryToStart": "Başlamaq üçün repozitoriya seç.",
+      "enterPromptToStart": "Başlamaq üçün prompt əlavə et.",
+      "enterPromptOrFileToStart": "Başlamaq üçün prompt və ya fayl əlavə et.",
       "connectProviderToStart": "Başlamaq üçün provayder qoş.",
       "promptPlaceholder": "Nə üzərində işləmək istəyirsən?",
       "couldNotLoadModels": "Modelləri yükləmək mümkün olmadı.",

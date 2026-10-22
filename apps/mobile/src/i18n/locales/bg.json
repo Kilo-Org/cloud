@@ -2243,6 +2243,8 @@
       "commitAndPush": "Комитни и изпрати",
       "startSession": "Започни сесия",
       "selectRepositoryToStart": "Избери хранилище, за да започнеш.",
+      "enterPromptToStart": "Добави заявка, за да започнеш.",
+      "enterPromptOrFileToStart": "Добави заявка или файл, за да започнеш.",
       "connectProviderToStart": "Свържи доставчик, за да започнеш.",
       "promptPlaceholder": "Върху какво искаш да работиш?",
       "couldNotLoadModels": "Не успяхме да заредим моделите.",

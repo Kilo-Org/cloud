@@ -1729,6 +1729,8 @@
       "commitAndPush": "コミットしてプッシュ",
       "startSession": "セッションを開始",
       "selectRepositoryToStart": "開始するにはリポジトリを選択してください。",
+      "enterPromptToStart": "開始するにはプロンプトを追加してください。",
+      "enterPromptOrFileToStart": "開始するにはプロンプトまたはファイルを追加してください。",
       "connectProviderToStart": "開始するにはプロバイダーを接続してください。",
       "promptPlaceholder": "何に取り組みますか？",
       "couldNotLoadModels": "モデルを読み込めませんでした。",

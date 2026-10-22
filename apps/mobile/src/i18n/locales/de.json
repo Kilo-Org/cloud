@@ -1729,6 +1729,8 @@
       "commitAndPush": "Committen und pushen",
       "startSession": "Sitzung starten",
       "selectRepositoryToStart": "Wähle ein Repository aus, um zu starten.",
+      "enterPromptToStart": "Füge einen Prompt hinzu, um zu starten.",
+      "enterPromptOrFileToStart": "Füge einen Prompt oder eine Datei hinzu, um zu starten.",
       "connectProviderToStart": "Verbinde einen Anbieter, um zu starten.",
       "promptPlaceholder": "Woran möchtest du arbeiten?",
       "couldNotLoadModels": "Die Modelle konnten nicht geladen werden.",

@@ -215,8 +215,6 @@ describe('resolveRetryPrompt', () => {
 describe('lastVisibleMessageFailure', () => {
   function assistantMessageWithText(id: string): StoredMessage {
     const message = assistantMessage(id);
-    // `mergeSessionTranscript` keeps a message only when a part renders content,
-    // so a row that states a failure needs a part the transcript renders.
     message.parts = [
       { id: `${id}-text`, sessionID: 'ses_1', messageID: id, type: 'text', text: 'reply' },
     ] as typeof message.parts;

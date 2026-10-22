@@ -19,6 +19,14 @@ import {
 const auth = vi.hoisted(() => ({ token: 't' as string | undefined, isLoading: false }));
 const navigate = vi.hoisted(() => vi.fn());
 
+// The provider now announces the lost-membership recovery through the
+// toast adapter, whose module graph reaches react-native's Flow source
+// the mounted transform cannot parse. Suites mock the adapter (not the
+// sonner package) so the mock sits at the edge that imports it.
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
+
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
@@ -31,7 +39,13 @@ vi.mock('@/lib/trpc', () => ({
       list: {
         queryOptions: () => ({
           queryKey: ['organizations', 'list'],
-          queryFn: () => [],
+          // The seeded selection must stay in the fetched list, or the
+          // provider's lost-membership recovery switches it away before the
+          // deep link under test runs.
+          queryFn: () => [
+            { organizationId: 'org-1', organizationName: 'Org 1', role: 'owner' },
+            { organizationId: 'org-2', organizationName: 'Org 2', role: 'owner' },
+          ],
         }),
       },
     },

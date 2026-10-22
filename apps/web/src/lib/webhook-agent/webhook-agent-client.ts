@@ -11,6 +11,7 @@ export type TriggerConfigResponse = {
   namespace: string;
   userId: string | null;
   orgId: string | null;
+  executionUserId?: string | null;
   createdAt: string;
   isActive: boolean;
   targetType: 'cloud_agent' | 'kiloclaw_chat';
@@ -38,6 +39,7 @@ export type TriggerConfigResponse = {
  * Profile is referenced by ID - resolved at runtime in the worker.
  */
 export type CreateTriggerInput = {
+  executionUserId?: string;
   targetType?: 'cloud_agent' | 'kiloclaw_chat';
   kiloclawInstanceId?: string;
   githubRepo?: string;

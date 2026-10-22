@@ -117,6 +117,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     async (formData: TriggerFormData) => {
       await createTrigger({
         triggerId: formData.triggerId,
+        runAsCreator: formData.runAsCreator,
         activationMode: formData.activationMode,
         cronExpression: formData.cronExpression,
         cronTimezone: formData.cronTimezone,

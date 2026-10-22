@@ -25,6 +25,7 @@
     "error": "erro: {{error}}",
     "back": "Voltar",
     "somethingWentWrong": "Algo correu mal.",
+    "actionNotRecorded": "Não foi possível registar esta ação. Tenta novamente mais tarde.",
     "couldNotOpen": "Não foi possível abrir {{label}}.",
     "link": "ligação",
     "takingLonger": "Está a demorar mais do que o esperado. Podes fechar este ecrã e voltar a verificar.",
@@ -601,6 +602,8 @@
     "installKiloGitHubApp": "Instalar a aplicação do Kilo para o GitHub",
     "checkConnection": "Verificar ligação",
     "couldNotLoadPullRequest": "Não foi possível carregar o PR.",
+    "reviewServiceUnavailable": "Serviço indisponível",
+    "reviewServiceUnavailableDescription": "O serviço está temporariamente indisponível. Tente novamente em breve.",
     "description": "Descrição",
     "noDescriptionProvided": "Não foi fornecida nenhuma descrição.",
     "review": "Revisão",
@@ -777,6 +780,7 @@
       "truncationBanner_many": "São apresentados os primeiros {{limit}} de {{total}} ficheiros alterados devido ao limite da API do GitHub."
     },
     "linkPasteClipboardEmpty": "A área de transferência está vazia.",
+    "linkPasteDenied": "O acesso para colar foi negado. Permita colar e tente novamente.",
     "linkPasteNotAPullRequest": "Esta ligação não corresponde a um PR ou merge request",
     "announce": {
       "commentPosted": "Comentário publicado",
@@ -800,7 +804,6 @@
       "mergeResultDefaultError": "O GitHub não concluiu a integração.",
       "mergeResultNotCompleted": "O {{term}} não foi integrado. Verifica o estado e tenta novamente.",
       "ambiguous": "Não foi possível confirmar o resultado. Verifica o PR antes de tentar novamente.",
-      "persistenceFailed": "Não foi possível registar esta ação. Tenta novamente mais tarde.",
       "forbidden": "Não tens permissão para executar esta ação."
     },
     "capabilities": {
@@ -1475,8 +1478,9 @@
       "loading": "A carregar a memória de revisão",
       "couldNotLoad": "Não foi possível carregar a memória de revisão.",
       "off": "A memória de revisão está desativada.",
+      "on": "A memória de revisão está ativada.",
       "offDescription": "Ativa-a para o Kilo aprender com as respostas dos responsáveis pelo projeto e propor orientações para o ficheiro REVIEW.md.",
-      "readOnlyDescription": "Apenas os proprietários da organização e os gestores de faturação podem ativar a memória de revisão.",
+      "readOnlyDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação podem alterar a memória de revisão.",
       "enable": "Ativar memória de revisão",
       "loadingProposals": "A carregar propostas",
       "couldNotLoadProposals": "Não foi possível carregar as propostas.",
@@ -1496,7 +1500,10 @@
       "starting": "A iniciar a revisão…",
       "start": "Iniciar revisão"
     },
-    "notConnectedReadOnly": "O {{platform}} não está ligado. Apenas os proprietários da organização e os gestores de faturação o podem ligar.",
+    "notConnectedReadOnly": "O {{platform}} não está ligado. Apenas os proprietários da organização e os administradores o podem ligar.",
+    "gitlab": {
+      "notConnectedReadOnly": "O {{platform}} não está ligado. Peça a um proprietário, administrador ou gestor de faturação da organização que o ligue."
+    },
     "webhookSetup": "A configuração do webhook está incompleta.",
     "webhookSetupDescription": "Alguns repositórios podem não receber revisões automáticas.",
     "autoReviews": "Revisões automáticas",
@@ -1504,7 +1511,7 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Respeitar as instruções do ficheiro REVIEW.md de cada repositório",
     "bitbucket": {
-      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização e os gestores de faturação o podem ligar.",
+      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
       "setupIncomplete": "A configuração está incompleta. Conclui-a em kilo.ai.",
       "setup": "Configuração do Bitbucket"
     },
@@ -1767,7 +1774,7 @@
       "couldNotLoad": "Não foi possível carregar esta ocorrência.",
       "couldNotCheckPermissions": "Não foi possível verificar as permissões para descartar ocorrências.",
       "cannotDismissTitle": "Não é possível descartar esta ocorrência",
-      "cannotDismissDescription": "Apenas os proprietários da organização e os gestores de faturação podem descartar ocorrências.",
+      "cannotDismissDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação podem descartar ocorrências.",
       "alreadyResolvedDescription": "Esta ocorrência já foi resolvida e já não pode ser descartada."
     },
     "findingDetails": {
@@ -1809,7 +1816,7 @@
       "automationAllOff": "Todas desativadas",
       "automationCount": "{{displayCount}} de 3 ativadas",
       "notificationsCount": "{{displayCount}} de 2 ativadas",
-      "disabledNoManage": "O agente de segurança está desativado. Apenas os proprietários da organização e os gestores de faturação o podem ativar.",
+      "disabledNoManage": "O agente de segurança está desativado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ativar.",
       "disabledNoRepo": "Seleciona pelo menos um repositório antes de ativar o agente de segurança.",
       "disabledPrompt": "Ativa o agente de segurança para sincronizar os alertas do Dependabot, escolher repositórios e configurar a automação.",
       "repositoriesCount_many": "{{displayCount}} repositórios selecionados"
@@ -1859,7 +1866,7 @@
       "invalidDayCount": "o prazo tem de ser um número inteiro entre 1 e 365 dias.",
       "remediationDeadlineA11y": "Prazo de correção para gravidade {{label}}, em dias",
       "enterWholeNumber": "Introduz um número inteiro entre 1 e 365",
-      "permissionNote": "Apenas os proprietários da organização e os gestores de faturação podem alterar estas definições.",
+      "permissionNote": "Apenas os proprietários da organização, os administradores e os gestores de faturação podem alterar estas definições.",
       "enableTracking": "Ativar acompanhamento do SLA",
       "enableTrackingSubtitle": "Define prazos de correção com base na gravidade das ocorrências.",
       "deadlinesHeading": "Prazos de correção (dias)"
@@ -1902,6 +1909,9 @@
       "viewA11y": "Ver relatório de auditoria"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrador Kilo",
+      "actorMaskedUser": "Utilizador mascarado",
+      "actorSystem": "Sistema Kilo",
       "couldNotLoad": "Não foi possível carregar o relatório de auditoria.",
       "events": "Eventos",
       "generated": "Relatório gerado em {{generatedAt}}.",
@@ -1912,7 +1922,7 @@
       "summary": "Resumo do relatório",
       "title": "Relatório de auditoria",
       "unavailable": "Relatório de auditoria indisponível",
-      "unavailableDescription": "Apenas os proprietários da organização e os gestores de faturação podem ver relatórios de auditoria. Pede a um deles que te dê acesso.",
+      "unavailableDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação podem ver relatórios de auditoria. Peça a um proprietário, administrador ou gestor de faturação que lhe dê acesso.",
       "queryFailed": "A consulta do relatório não foi concluída. Tenta novamente.",
       "eventActions": {
         "findingAnalysisCompleted": "Análise concluída",
@@ -1980,7 +1990,12 @@
       "syncMayNotHaveCompleted": "Uma sincronização pode ter ficado incompleta. Tenta novamente para atualizar o estado ou descarta a operação.",
       "syncInProgress": "Já está em curso uma sincronização de segurança. Tenta novamente.",
       "dismissalInProgress": "Esta ocorrência já está a ser descartada. Tenta novamente.",
-      "couldNotReadPendingSyncs": "Não foi possível ler as sincronizações pendentes. Tenta novamente."
+      "couldNotReadPendingSyncs": "Não foi possível ler as sincronizações pendentes. Tenta novamente.",
+      "ambiguous": "Não foi possível confirmar o resultado. Verifica a revisão de segurança antes de tentar novamente.",
+      "settleFailed": "A ação foi concluída, mas não foi possível registar o resultado. Tenta novamente.",
+      "replayFailed": "Esta ação não foi concluída. Tenta novamente.",
+      "actionFailed": "Não foi possível concluir esta ação. Tenta novamente.",
+      "actionBlocked": "Não foi possível concluir esta ação. O problema tem de ser resolvido antes de tentares novamente."
     },
     "analysisState": {
       "queued": "Análise na fila",
@@ -2262,6 +2277,8 @@
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sessão",
       "selectRepositoryToStart": "Seleciona um repositório para começar.",
+      "enterPromptToStart": "Adiciona um prompt para começar.",
+      "enterPromptOrFileToStart": "Adiciona um prompt ou um ficheiro para começar.",
       "connectProviderToStart": "Liga um fornecedor para começar.",
       "promptPlaceholder": "Em que quer trabalhar?",
       "couldNotLoadModels": "Não foi possível carregar os modelos.",
@@ -2811,7 +2828,7 @@
     "thisDevice": "Este dispositivo",
     "viewProfile": "Ver perfil",
     "signOutThisDevice": "Terminar sessão neste dispositivo",
-    "signOutThisSession": "Terminar esta sessão",
+    "signOutSessionLabel": "Terminar sessão em {{device}}, início de sessão: {{signedIn}}",
     "sessionSignedOut": "Sessão terminada.",
     "signOutThisDeviceTitle": "Terminar sessão neste dispositivo?",
     "signOutThisSessionTitle": "Terminar esta sessão?",
@@ -3053,6 +3070,7 @@
 
       "chooseAccount": "Selecionar uma conta",
       "loadErrorTitle": "Não foi possível carregar as suas organizações.",
+      "membershipLostNotice": "Já não tem acesso a esta organização. Mudou para {{target}}.",
       "noOrganization": "Sem organização",
 
       "noOrganizationDescription": "Esta conta não faz parte de uma organização. Crie ou ingresse em uma organização na web para usar recursos de organização como convites de membros e alertas de saldo baixo.",
@@ -3117,7 +3135,11 @@
       "separateEmailsHint": "Separe os endereços de email com vírgulas.",
       "thresholdLabel": "Alertar se o saldo for inferior a (USD)",
       "title": "Alerta de saldo baixo",
-      "emailsError": "Introduza pelo menos um endereço de email válido. Se introduzir vários, separe-os com vírgulas.",
+      "emailsInvalid": "Um ou mais endereços de email não são válidos.",
+      "emailsRequired": "Introduza pelo menos um endereço de email.",
+      "saveEmailsError": "Alguns endereços de email não foram aceites. Verifique-os e tente novamente.",
+      "saveError": "Não foi possível guardar o alerta de saldo baixo.",
+      "thresholdPlaceholder": "Introduza um valor",
       "thresholdError": "Introduza um valor superior a 0."
     },
     "memberLimit": {
@@ -3128,12 +3150,13 @@
       "removeLimit": "Remover limite",
       "title": "Limite diário de utilização",
       "blankError": "Introduza um valor ou remova o limite através da opção abaixo.",
+      "blankWithoutLimitError": "Introduza um limite diário entre 0 e {{max}}.",
       "rangeError": "Introduza um valor entre 0 e {{max}}."
     },
     "members": {
       "changeRole": "Alterar função",
       "emptyDescriptionCanInvite": "Convide colegas para começar a colaborar nesta organização.",
-      "emptyDescriptionCannotInvite": "Peça a um proprietário ou gestor de faturação que convide colegas.",
+      "emptyDescriptionCannotInvite": "Peça a um proprietário, administrador ou gestor de faturação que convide colegas.",
       "emptyTitle": "Ainda sem membros",
       "invitedDate": "Convidado em {{date}}",
       "limitPerDay": "{{amount}}/dia",
@@ -3398,7 +3421,9 @@
       "settingsToolsOn": "Ativado — as ferramentas de definições são enviadas ao modelo",
       "settingsToolsOff": "Desativado — nenhuma ferramenta de definições é enviada ao modelo",
       "serverChecking": "A verificar este servidor…",
-      "serverToolCount": "{{count}} ferramentas",
+      "serverToolCount_many": "{{count}} ferramentas",
+      "serverToolCount_one": "{{count}} ferramenta",
+      "serverToolCount_other": "{{count}} ferramentas",
       "serverUnreachable": "Não foi possível contactar este servidor",
       "serverOff": "Este servidor está desativado"
     },
@@ -3545,6 +3570,8 @@
       "quantizationsHelp": "Os ficheiros mais pequenos usam menos memória e armazenamento. Os ficheiros maiores costumam dar melhores respostas.",
       "quantDetail": "Transferência de {{size}} · cerca de {{memory}} de memória",
       "downloadQuant": "Transferir {{quant}}",
+      "downloadModelA11y": "Transferir {{name}}",
+      "detailsA11y": "Detalhes: {{name}}",
       "loadingModel": "A carregar detalhes do modelo",
       "couldNotLoadModel": "Não foi possível carregar este modelo",
       "noFiles": "Nenhum ficheiro que esta app possa executar",
@@ -3596,6 +3623,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Iniciar agente precisa de um pedido. Adiciona um pedido e executa-o novamente.",
+      "repositoryRequired": "Iniciar agente precisa de um repositório. Abre o Kilo e escolhe um, depois executa-o novamente.",
       "repositoryUnknown": "O Kilo não reconhece {{repository}} como um repositório GitHub ou GitLab. Escolhe outro repositório no Kilo.",
       "repositoryUnsupported": "{{repository}} é um repositório Bitbucket — Iniciar agente ainda não o pode usar. Escolhe outro repositório no Kilo."
     }
@@ -3633,10 +3661,16 @@
     "emptyDescription": "Crie um perfil para reutilizar variáveis de ambiente, comandos de configuração e competências entre sessões.",
     "loadFailed": "Não foi possível carregar perfis",
     "counts": {
-      "vars": "{{count}} variáveis",
+      "vars_many": "{{count}} variáveis",
+      "vars_one": "{{count}} variável",
+      "vars_other": "{{count}} variáveis",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} competências",
-      "commands": "{{count}} comandos",
+      "skills_many": "{{count}} competências",
+      "skills_one": "{{count}} competência",
+      "skills_other": "{{count}} competências",
+      "commands_many": "{{count}} comandos",
+      "commands_one": "{{count}} comando",
+      "commands_other": "{{count}} comandos",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}comp",
       "commandsShort": "{{count}}cmd"
@@ -3667,7 +3701,6 @@
     "keyTooLong": "A chave deve ter 256 caracteres ou menos",
     "keyDuplicate": "Esta chave já existe no perfil",
     "valueLabel": "Valor",
-    "secretLabel": "Segredo",
     "secrets": {
       "markSecret": "Marcar como secreto",
       "masked": "Valor oculto",
@@ -3711,7 +3744,7 @@
       "environment": "Ambiente (JSON)",
       "headers": "Cabeçalhos (JSON)",
       "timeout": "Tempo limite",
-      "secretCount": "Número de segredos",
+      "secretCount": "Número de segredos: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3754,6 +3787,9 @@
       "visibilityPrimary": "Primário — mostrado no seletor",
       "visibilitySubagent": "Subagente — só pode ser invocado por outros",
       "visibilityAll": "Todos — ambos",
+      "modePrimary": "Apenas primário",
+      "modeSubagent": "Apenas subagente",
+      "modeAll": "Todos os modos",
       "saveFailed": "Não foi possível guardar o agente",
       "deleteFailed": "Não foi possível eliminar o agente",
       "nameRequired": "Introduza um nome de agente",
@@ -3814,6 +3850,8 @@
     "empty": "Os pacotes de créditos estão indisponíveis de momento.",
     "noMatchingProducts": "A App Store não devolveu nenhum pacote de créditos correspondente.",
     "noMatchingProductsPlay": "O Google Play não devolveu nenhum pacote de créditos correspondente.",
+    "storeTimedOut": "A App Store não respondeu a tempo. Tenta novamente.",
+    "storeTimedOutPlay": "O Google Play não respondeu a tempo. Tenta novamente.",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Apple Account pertencem a outra conta Kilo. Inicia sessão nessa conta Kilo para os usares.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos desta conta do Google Play pertencem a uma conta Kilo diferente. Inicie sessão nessa conta Kilo para os usar."
   },

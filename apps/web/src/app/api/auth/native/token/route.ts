@@ -13,7 +13,10 @@ import {
   releaseSignInCode,
   consumeSignInCode,
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
-import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
+import {
+  hosted_domain_specials,
+  SIGNUP_STEP_UP_METHODS,
+} from '@kilocode/web-shared/lib/auth/constants';
 import { consumeSignInTicket } from '@/lib/auth/passkey';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
@@ -75,6 +78,13 @@ function eligibilityResponse(
 function settlementFailureResponse(failure: Extract<CreateOrUpdateUserResult, { success: false }>) {
   if (failure.error === 'SIGNUP-STEP-UP') {
     return NextResponse.json({ error: failure.error, methods: failure.methods }, { status: 403 });
+  }
+  // Shipped apps only understand step-up, which offers their native Google and Apple sign-in.
+  if (failure.error === 'EMAIL-SIGNUP-DISABLED') {
+    return NextResponse.json(
+      { error: 'SIGNUP-STEP-UP', methods: [...SIGNUP_STEP_UP_METHODS] },
+      { status: 403 }
+    );
   }
   return NextResponse.json(
     { error: failure.error },

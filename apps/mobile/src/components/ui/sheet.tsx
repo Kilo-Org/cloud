@@ -1,6 +1,6 @@
 import { BottomSheet } from '@expo/ui/community/bottom-sheet';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { Platform, View } from 'react-native';
+import { BackHandler, Platform, View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -106,6 +106,33 @@ export function Sheet({
       setDismissalPending(true);
     }
   }, [visible]);
+
+  // Before the sheet's own window takes focus, Android Back reaches the app
+  // instead of the sheet's native handler, so a press in that window of the
+  // opening animation is answered here. Once the window has focus the sheet
+  // receives Back natively and this listener does not run.
+  const requestSelfDismissRef = useRef<() => void>(() => undefined);
+  requestSelfDismissRef.current = () => {
+    if (onRequestDismiss?.() === false) {
+      return;
+    }
+    if (visible && dismissalPending) {
+      return;
+    }
+    onClose();
+  };
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !mounted || !visible) {
+      return undefined;
+    }
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      requestSelfDismissRef.current();
+      return true;
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [mounted, visible]);
 
   if (!mounted) {
     return null;

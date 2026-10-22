@@ -135,7 +135,7 @@ index 7dfe0a9dc9fafb625067dbb29f80d82f767d63e1..2d8e9da616dc4d8dc3f2a390e4f0f350
        text = Text(date, style: props.dateStyle?.toSwiftUI() ?? .date)
      } else {
 diff --git a/src/community/bottom-sheet/BottomSheet.android.tsx b/src/community/bottom-sheet/BottomSheet.android.tsx
-index ac8ae4af0a1fee8afbea2b9a5393d8eae271b108..a477e60837726f49582b72d637d259b268e87e36 100644
+index ac8ae4a..d2403c9 100644
 --- a/src/community/bottom-sheet/BottomSheet.android.tsx
 +++ b/src/community/bottom-sheet/BottomSheet.android.tsx
 @@ -61,6 +61,11 @@ export function BottomSheet(props: BottomSheetProps) {
@@ -159,17 +159,91 @@ index ac8ae4af0a1fee8afbea2b9a5393d8eae271b108..a477e60837726f49582b72d637d259b2
  
    const fireCloseCallbacks = useCallback(() => {
      if (closedRef.current) return;
-@@ -120,6 +127,9 @@ export function BottomSheet(props: BottomSheetProps) {
-   }, [clampIndex, indexProp, fireCloseCallbacks]);
+@@ -106,32 +113,47 @@ export function BottomSheet(props: BottomSheetProps) {
+     onChangeRef.current?.(-1);
+   }, []);
+ 
++  /**
++   * Dismiss through the native sheet, then unmount. Removing the dialog while
++   * its presentation animation is still running leaves the dialog scrim behind,
++   * which covers the app until the process restarts.
++   */
++  const hideThenClose = useCallback(() => {
++    const finish = () => {
++      setIsOpen(false);
++      pendingIndexRef.current = null;
++      fireCloseCallbacks();
++    };
++    const sheet = sheetRef.current;
++    if (!sheet) {
++      finish();
++      return;
++    }
++    void sheet.hide().then(finish, finish);
++  }, [fireCloseCallbacks]);
++
+   // Sync with external index prop changes
+   useEffect(() => {
+     if (indexProp === -1) {
+-      pendingIndexRef.current = null;
+-      setIsOpen(false);
+-      fireCloseCallbacks();
++      hideThenClose();
+     } else if (indexProp >= 0) {
+       pendingIndexRef.current = clampIndex(indexProp);
+       closedRef.current = false;
+       setIsOpen(true);
+     }
+-  }, [clampIndex, indexProp, fireCloseCallbacks]);
++  }, [clampIndex, hideThenClose, indexProp]);
  
    const handleDismiss = useCallback(() => {
+-    setIsOpen(false);
+-    fireCloseCallbacks();
+-  }, [fireCloseCallbacks]);
 +    // A back press or scrim tap asks; it does not have to be obeyed. Keeping the
 +    // native sheet mounted leaves the dialog up, so the caller can confirm first.
 +    if (onRequestDismissRef.current?.() === false) return;
-     setIsOpen(false);
-     fireCloseCallbacks();
-   }, [fireCloseCallbacks]);
-@@ -193,7 +203,7 @@ export function BottomSheet(props: BottomSheetProps) {
++    hideThenClose();
++  }, [hideThenClose]);
+ 
+   const methods: BottomSheetMethods = useMemo(() => {
+     const snapToIndex = (index: number) => {
+       if (index === -1) {
+-        sheetRef.current?.hide().then(() => {
+-          setIsOpen(false);
+-          pendingIndexRef.current = null;
+-          fireCloseCallbacks();
+-        });
++        hideThenClose();
+         return;
+       }
+       const clampedIndex = clampIndex(index);
+@@ -152,13 +174,7 @@ export function BottomSheet(props: BottomSheetProps) {
+       onChangeRef.current?.(clampedIndex);
+     };
+ 
+-    const close = () => {
+-      sheetRef.current?.hide().then(() => {
+-        setIsOpen(false);
+-        pendingIndexRef.current = null;
+-        fireCloseCallbacks();
+-      });
+-    };
++    const close = hideThenClose;
+ 
+     return {
+       snapToIndex,
+@@ -171,7 +187,7 @@ export function BottomSheet(props: BottomSheetProps) {
+       present: () => snapToIndex(0),
+       dismiss: close,
+     };
+-  }, [clampIndex, maxIndex, hasMultipleSnapPoints, fireCloseCallbacks, snapPointsProp]);
++  }, [clampIndex, hideThenClose, maxIndex, hasMultipleSnapPoints, snapPointsProp]);
+ 
+   useImperativeHandle(ref, () => methods, [methods]);
+ 
+@@ -193,7 +209,7 @@ export function BottomSheet(props: BottomSheetProps) {
              skipPartiallyExpanded={skipPartially}
              initialFullyExpanded={hasMultipleSnapPoints && pendingIndexRef.current === maxIndex}
              showDragHandle={handleComponent !== null}

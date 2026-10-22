@@ -19,6 +19,8 @@ const safeAreaMock = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   Modal: 'Modal',
   View: 'View',
   Pressable: 'Pressable',

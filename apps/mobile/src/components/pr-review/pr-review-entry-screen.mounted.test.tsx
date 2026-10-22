@@ -51,6 +51,8 @@ vi.mock('@/lib/pr-review/recent-prs', () => ({
   providerRefFromRecentPr: () => ({ platform: 'github', owner: 'kilo', repo: 'cloud', number: 1 }),
 }));
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   Modal: (props: { visible?: boolean; children?: ReactNode }) =>
     props.visible ? createElement('Modal', null, props.children) : null,
   Platform: { OS: 'android' },

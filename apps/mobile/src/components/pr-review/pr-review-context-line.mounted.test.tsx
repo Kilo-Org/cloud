@@ -31,6 +31,8 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   Modal: (props: { visible?: boolean; children?: ReactNode }) =>
     props.visible ? createElement('Modal', null, props.children) : null,
   Platform: { OS: 'android' },

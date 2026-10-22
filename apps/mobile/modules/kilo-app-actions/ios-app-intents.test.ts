@@ -236,7 +236,6 @@ describe('the Swift action URLs', () => {
   });
 });
 
-
 describe('the App Intent copy', () => {
   it('holds exactly the keys the plugin renders', () => {
     expect(Object.keys(ENGLISH_COPY).toSorted()).toEqual([...INTENT_COPY_KEYS].toSorted());

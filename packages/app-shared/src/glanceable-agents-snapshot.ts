@@ -136,12 +136,30 @@ export type GlanceableCounts = {
 };
 
 /**
+ * The snapshot fields that describe the frame rather than the work in it. A
+ * blank-work record must cover every other field of the snapshot, so a work
+ * field added to the schema fails to compile here until it is either listed as
+ * non-work or blanked by `NO_GLANCEABLE_WORK`.
+ */
+type GlanceableFrameField =
+  | 'schemaVersion'
+  | 'revision'
+  | 'updatedAt'
+  | 'expiresAt'
+  | 'scopeKey'
+  | 'accountEpoch'
+  | 'organizationBound'
+  | 'status'
+  | 'newestResultKind'
+  | 'newestResultAt';
+
+/**
  * The work fields a frame carries when it asserts no work at all: one that has
  * lapsed, and one built for a terminal scope. Both producers spread this one
- * record instead of listing the fields again, so a field added to the snapshot
- * cannot be blanked by one path and survive the other.
+ * record instead of listing the fields again, so no path can blank a field the
+ * other keeps.
  */
-export const NO_GLANCEABLE_WORK = {
+export const NO_GLANCEABLE_WORK: Omit<GlanceableAgentsSnapshot, GlanceableFrameField> = {
   running: 0,
   needsInput: 0,
   needsApproval: 0,
@@ -149,16 +167,7 @@ export const NO_GLANCEABLE_WORK = {
   scheduled: 0,
   needsInputSince: null,
   scheduledAt: null,
-} as const satisfies Pick<
-  GlanceableAgentsSnapshot,
-  | 'running'
-  | 'needsInput'
-  | 'needsApproval'
-  | 'idle'
-  | 'scheduled'
-  | 'needsInputSince'
-  | 'scheduledAt'
->;
+};
 
 /** One session row, as both producers read it from the active-sessions list. */
 export type GlanceableSessionRow = {

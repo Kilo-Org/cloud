@@ -2530,6 +2530,18 @@ describe('refreshing an adopted repository snapshot', () => {
   });
 });
 
+function recordPath(root: string, spec: ControlPlaneRouteSpec): string {
+  const home = path.join(
+    root,
+    createHash('sha256')
+      .update(spec.kilo?.scopeId ?? spec.sessionId)
+      .update('\0')
+      .update(spec.directory)
+      .digest('hex')
+  );
+  return path.join(home, '.local/share/kilo/cloud-agent/git-credentials');
+}
+
 describe('capturing a repository snapshot', () => {
   function captureSpec(overrides: Partial<ControlPlaneRouteSpec> = {}) {
     return routeSpec({
@@ -2540,45 +2552,64 @@ describe('capturing a repository snapshot', () => {
     });
   }
 
-  it('leaves the credential-free origin bare around the capture', async () => {
-    const harness = createHarness(FAST_TIMERS, { capture: true });
-    const order: string[] = [];
-    harness.setGit(args => {
-      if (args[0] === 'remote' && args[1] === 'set-url') {
-        order.push(args[3]?.includes('@') ? 'origin:credential' : 'origin:bare');
-      }
-      if (args[0] === 'reflog') order.push('reflog');
-      if (args[0] === 'rev-parse') return { stdout: 'abc123\n', stderr: '', exitCode: 0 };
-      return result(0);
-    });
-    const spec = captureSpec();
+  it('captures with a bare origin and no credential record, then restores the record', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-capture-credentials-'));
+    try {
+      const spec = captureSpec();
+      let recordAtCapture: boolean | undefined;
+      const harness = createHarness(FAST_TIMERS, {
+        capture: true,
+        homeRoot: root,
+        captureRequest: async () => {
+          recordAtCapture = await fs
+            .access(recordPath(root, spec))
+            .then(() => true)
+            .catch(() => false);
+          return true;
+        },
+      });
+      const order: string[] = [];
+      harness.setGit(args => {
+        if (args[0] === 'remote' && args[1] === 'set-url') {
+          order.push(args[3]?.includes('@') ? 'origin:credential' : 'origin:bare');
+        }
+        if (args[0] === 'reflog') order.push('reflog');
+        if (args[0] === 'rev-parse') return { stdout: 'abc123\n', stderr: '', exitCode: 0 };
+        return result(0);
+      });
 
-    await harness.manager.prepare(spec);
+      await harness.manager.prepare(spec);
 
-    expect(harness.captureRequests).toEqual([
-      { sessionId: spec.sessionId, commit: 'abc123', timeoutMs: FAST_TIMERS.wrapper.captureMs },
-    ]);
-    expect(order).toEqual(['origin:bare', 'reflog']);
-    expect(harness.gitCalls.filter(args => args[0] === 'remote' && args[1] === 'set-url')).toEqual([
-      ['remote', 'set-url', 'origin', REPO],
-    ]);
-    expect(progressSteps(harness.frames)).toEqual([
-      'clone',
-      'checkout',
-      'setup',
-      'snapshot',
-      'kilo_runtime',
-      'kilo_session',
-    ]);
-    expect(harness.stamp()).toEqual({
-      allocationId: 'alloc-current',
-      commit: 'abc123',
-      capturedAt: NOW,
-      generation: 0,
-    });
-    expect(harness.truncations()).toBe(1);
-    expect(harness.clearedHomes).toEqual([]);
-    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'cloned' });
+      expect(harness.captureRequests).toHaveLength(1);
+      expect(order).toEqual(['origin:bare', 'reflog']);
+      // The snapshot is the whole container: the record only comes back after it.
+      expect(recordAtCapture).toBe(false);
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-1\n'
+      );
+      expect(
+        harness.gitCalls.filter(args => args[0] === 'remote' && args[1] === 'set-url')
+      ).toEqual([['remote', 'set-url', 'origin', REPO]]);
+      expect(progressSteps(harness.frames)).toEqual([
+        'clone',
+        'checkout',
+        'setup',
+        'snapshot',
+        'kilo_runtime',
+        'kilo_session',
+      ]);
+      expect(harness.stamp()).toEqual({
+        allocationId: 'alloc-current',
+        commit: 'abc123',
+        capturedAt: NOW,
+        generation: 0,
+      });
+      expect(harness.truncations()).toBe(1);
+      expect(harness.clearedHomes).toEqual([]);
+      expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'cloned' });
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 
   it('writes the stamp before it asks for the capture', async () => {
@@ -2688,18 +2719,6 @@ describe('capturing a repository snapshot', () => {
 });
 
 describe('workspace Git credentials', () => {
-  function recordPath(root: string, spec: ControlPlaneRouteSpec): string {
-    const home = path.join(
-      root,
-      createHash('sha256')
-        .update(spec.kilo?.scopeId ?? spec.sessionId)
-        .update('\0')
-        .update(spec.directory)
-        .digest('hex')
-    );
-    return path.join(home, '.local/share/kilo/cloud-agent/git-credentials');
-  }
-
   it('clones with the credential-free URL and records the token for the helper', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
     try {

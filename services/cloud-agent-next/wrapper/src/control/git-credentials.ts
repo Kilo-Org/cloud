@@ -24,25 +24,29 @@ const CREDENTIAL_RECORD_PATH = '.local/share/kilo/cloud-agent/git-credentials';
 /**
  * The URL a worktree may hold. Git stores `remote.origin.url` verbatim, so the
  * platform VCS credential never appears in it: credentials reach git through the
- * pinned helper. SCP-style remotes (`git@host:path`) carry no secret and are
- * returned unchanged.
+ * pinned helper.
+ *
+ * Only HTTP(S) userinfo is a secret. An `ssh://git@host/...` remote needs its
+ * username to pick the login, so only its password is dropped; SCP-style remotes
+ * (`git@host:path`) carry no secret and are returned unchanged.
  */
 export function credentialFreeGitUrl(gitUrl: string): string {
   try {
     const url = new URL(gitUrl);
-    url.username = '';
     url.password = '';
+    if (url.protocol === 'http:' || url.protocol === 'https:') url.username = '';
     return url.toString();
   } catch {
     return gitUrl;
   }
 }
 
-/** True when a remote URL still carries userinfo; an unparsable URL does not. */
-export function gitUrlCarriesUserinfo(gitUrl: string): boolean {
+/** True when a remote URL carries a secret in its userinfo; an unparsable URL does not. */
+export function gitUrlCarriesCredential(gitUrl: string): boolean {
   try {
     const url = new URL(gitUrl);
-    return url.username !== '' || url.password !== '';
+    if (url.password !== '') return true;
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.username !== '';
   } catch {
     return false;
   }
@@ -117,6 +121,11 @@ async function replaceCredentialRecord(home: string, record: string): Promise<vo
  * only an HTTPS remote gets a record. `requireGitCredentialRecord` is the strict
  * form for a caller that has already rejected an authenticated non-HTTPS repository.
  */
+/** Drop the record without touching the rest of the runtime home. */
+export async function removeGitCredentialRecord(home: string): Promise<void> {
+  await fs.rm(gitCredentialRecordPath(home), { force: true });
+}
+
 export async function writeGitCredentialRecord(
   input: RepositoryCredential & { home: string }
 ): Promise<void> {
@@ -166,7 +175,7 @@ export async function normalizeOriginCredential(input: {
   if (!current) return 'failed';
   if (current.exitCode !== 0) return 'absent';
   const origin = current.stdout.trim();
-  if (!gitUrlCarriesUserinfo(origin)) return 'clean';
+  if (!gitUrlCarriesCredential(origin)) return 'clean';
   const rewritten = await input
     .git(['remote', 'set-url', 'origin', credentialFreeGitUrl(origin)])
     .catch(() => undefined);

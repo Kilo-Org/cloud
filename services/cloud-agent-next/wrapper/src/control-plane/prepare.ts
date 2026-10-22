@@ -38,6 +38,7 @@ import {
 import {
   credentialFreeGitUrl,
   normalizeOriginCredential,
+  removeGitCredentialRecord,
   writeGitCredentialRecord,
 } from '../control/git-credentials.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from '../git-review-ref.js';
@@ -895,16 +896,17 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   }
 
   /**
-   * Save the prepared workspace as a repository snapshot. `origin` already carries
-   * no credential, and is set to the bare URL again while the Sandbox DO snapshots
-   * the container so an agent-chosen remote URL cannot reach the snapshot; a failed
-   * capture is logged and preparation continues.
+   * Save the prepared workspace as a repository snapshot. The snapshot is the whole
+   * container, so both the remote and the credential record are cleared from disk
+   * for the capture and the record is written back afterwards; a failed capture is
+   * logged and preparation continues.
    */
   async function captureWorkspace(
     spec: ControlPlaneRouteSpec,
     directory: string,
     env: Record<string, string>,
-    commit: string
+    commit: string,
+    home: string
   ): Promise<void> {
     const git = spec.git;
     const capture = deps.capture;
@@ -923,6 +925,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         log(`control-plane capture skipped, origin not bare session=${spec.sessionId}`);
         return;
       }
+      await removeGitCredentialRecord(home).catch(() => undefined);
       const saved = await capture.request(spec.sessionId, commit, timers.captureMs);
       log(`control-plane capture ${saved ? 'saved' : 'not saved'} session=${spec.sessionId}`);
     } catch (error) {
@@ -931,6 +934,16 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           error instanceof Error ? createSecretRedactor(env)(error.message) : 'unknown'
         }`
       );
+    } finally {
+      const url = credentialFreeGitUrl(git.url);
+      await writeGitCredentialRecord({
+        home,
+        url,
+        token: git.token,
+        platform: git.platform,
+      }).catch(() => {
+        log(`control-plane Git credential record restore failed session=${spec.sessionId}`);
+      });
     }
   }
 
@@ -1015,7 +1028,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     await writeStamp(directory, { allocationId: deps.allocationId, commit, ...plan.lineage });
     if (plan.capture && spec.capture === true) {
       setStep('snapshot');
-      await captureWorkspace(spec, directory, env, commit);
+      await captureWorkspace(spec, directory, env, commit, home);
     }
     log(
       `control-plane workspace prepared session=${spec.sessionId} outcome=${adopted ? 'adopted' : 'cloned'} elapsedMs=${Date.now() - workspaceStartedAt}`

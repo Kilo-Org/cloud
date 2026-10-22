@@ -15,7 +15,6 @@ import {
   CONTROL_PLANE_WRAPPER_BASENAME,
   isControlWrapperArgv,
   isLiveProcessState,
-  LEGACY_CONTROL_WRAPPER_BASENAME,
   processStateFromStat,
   signalKiloServerProcess,
   type DockerCommandExecutor,
@@ -49,13 +48,11 @@ describe('signalKiloServerProcess', () => {
 
 describe('isControlWrapperArgv', () => {
   const basenameOf = (value: string) => path.basename(value);
-  const legacyArgv = ['bun', 'run', `/usr/local/bin/${LEGACY_CONTROL_WRAPPER_BASENAME}`];
+  const legacyArgv = ['bun', 'run', `/usr/local/bin/kilocode-control-wrapper.js`];
   const controlPlaneargv = ['bun', 'run', `/usr/local/bin/${CONTROL_PLANE_WRAPPER_BASENAME}`];
 
   it('matches the legacy wrapper only under the legacy basename', () => {
-    expect(isControlWrapperArgv(legacyArgv, basenameOf, LEGACY_CONTROL_WRAPPER_BASENAME)).toBe(
-      true
-    );
+    expect(isControlWrapperArgv(legacyArgv, basenameOf, 'kilocode-control-wrapper.js')).toBe(true);
     expect(isControlWrapperArgv(legacyArgv, basenameOf, CONTROL_PLANE_WRAPPER_BASENAME)).toBe(
       false
     );
@@ -65,22 +62,20 @@ describe('isControlWrapperArgv', () => {
     expect(isControlWrapperArgv(controlPlaneargv, basenameOf, CONTROL_PLANE_WRAPPER_BASENAME)).toBe(
       true
     );
-    expect(
-      isControlWrapperArgv(controlPlaneargv, basenameOf, LEGACY_CONTROL_WRAPPER_BASENAME)
-    ).toBe(false);
-  });
-
-  it('requires a Bun argv element', () => {
-    const withoutBun = ['node', `/usr/local/bin/${LEGACY_CONTROL_WRAPPER_BASENAME}`];
-    expect(isControlWrapperArgv(withoutBun, basenameOf, LEGACY_CONTROL_WRAPPER_BASENAME)).toBe(
+    expect(isControlWrapperArgv(controlPlaneargv, basenameOf, 'kilocode-control-wrapper.js')).toBe(
       false
     );
   });
 
+  it('requires a Bun argv element', () => {
+    const withoutBun = ['node', `/usr/local/bin/kilocode-control-wrapper.js`];
+    expect(isControlWrapperArgv(withoutBun, basenameOf, 'kilocode-control-wrapper.js')).toBe(false);
+  });
+
   it('does not match the Kilo server or the supervisor', () => {
-    expect(
-      isControlWrapperArgv(['kilo', 'serve'], basenameOf, LEGACY_CONTROL_WRAPPER_BASENAME)
-    ).toBe(false);
+    expect(isControlWrapperArgv(['kilo', 'serve'], basenameOf, 'kilocode-control-wrapper.js')).toBe(
+      false
+    );
     expect(
       isControlWrapperArgv(
         ['sh', '/usr/local/bin/kilocode-control-plane-supervisor.sh'],

@@ -24,6 +24,10 @@ import {
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { consumeMergePartialSuccess } from '@/lib/pr-review/merge/merge-result-banner-store';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  usePrReviewInboxBack,
+  usePrReviewInboxHardwareBack,
+} from '@/lib/pr-review/pr-review-inbox-back';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { providerPrTriple, providerPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
 import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
@@ -66,6 +70,10 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<PrReviewTabId>('overview');
   const [refreshing, setRefreshing] = useState(false);
+  // Deep-linked PRs mount on top of the tab anchor, where a plain pop would
+  // leave PR review for Home; both Back affordances dismiss to the inbox.
+  const backToInbox = usePrReviewInboxBack();
+  usePrReviewInboxHardwareBack();
 
   // P1-F-46b: push the review-submit route with the same params the
   // Files-tab `PrDiffFloatingActions` uses, so a clean PR (no queued
@@ -292,6 +300,8 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
         eyebrow={`${owner}/${repo}`}
         eyebrowNumberOfLines={1}
         titleNumberOfLines={1}
+        showBackButton
+        onBack={backToInbox}
         allowHeaderRightStacking={false}
         headerRight={
           <View className="flex-row items-center gap-1">

@@ -25,6 +25,7 @@
     "error": "fehler: {{error}}",
     "back": "Zurück",
     "somethingWentWrong": "Etwas ist schiefgelaufen.",
+    "actionNotRecorded": "Wir konnten diese Aktion nicht speichern. Bitte versuche es später erneut.",
     "couldNotOpen": "{{label}} konnte nicht geöffnet werden.",
     "link": "link",
     "takingLonger": "Das dauert länger als erwartet. Du kannst diese Ansicht schließen und später erneut nachsehen.",
@@ -893,7 +894,7 @@
     },
     "autoReviews": "Automatische Reviews",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber und Abrechnungsmanager können die Verbindung herstellen.",
+      "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen.",
       "setupIncomplete": "Die Einrichtung ist unvollständig. Schließe die Konfiguration auf kilo.ai ab.",
       "setup": "Bitbucket-Einrichtung"
     },
@@ -917,7 +918,10 @@
       "starting": "Review wird gestartet …",
       "title": "Manuelles Review"
     },
-    "notConnectedReadOnly": "{{platform}} ist nicht verbunden. Nur Organisationsinhaber und Abrechnungsmanager können die Verbindung herstellen.",
+    "notConnectedReadOnly": "{{platform}} ist nicht verbunden. Nur Organisationsinhaber und Admins können die Verbindung herstellen.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} ist nicht verbunden. Bitte einen Inhaber, Admin oder Abrechnungsmanager, es zu verbinden."
+    },
     "platformList": {
       "activity": "Aktivität",
       "checking": "Wird geprüft …",
@@ -994,8 +998,9 @@
       "noProposals": "Keine Vorschläge",
       "noProposalsDescription": "Hier erscheinen Vorschläge zu den gespeicherten Prüfhinweisen, sobald Kilo die Antworten der Projektverantwortlichen analysiert hat.",
       "off": "Gespeicherte Prüfhinweise sind deaktiviert.",
+      "on": "Gespeicherte Prüfhinweise sind aktiviert.",
       "offDescription": "Aktiviere sie, damit Kilo aus den Antworten der Projektverantwortlichen lernt und Richtlinien für REVIEW.md vorschlägt.",
-      "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können gespeicherte Prüfhinweise aktivieren.",
+      "readOnlyDescription": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können gespeicherte Prüfhinweise ändern.",
       "title": "Gespeicherte Prüfhinweise"
     },
     "scopeList": {
@@ -1133,6 +1138,9 @@
       "triageModel": "Modell für die Ersteinschätzung"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo-Administrator",
+      "actorMaskedUser": "Maskierter Benutzer",
+      "actorSystem": "Kilo-System",
       "couldNotLoad": "Der Auditbericht konnte nicht geladen werden.",
       "events": "Ereignisse",
       "generated": "Der Bericht wurde am {{generatedAt}} erstellt.",
@@ -1144,7 +1152,7 @@
       "summary": "Zusammenfassung des Berichts",
       "title": "Auditbericht",
       "unavailable": "Auditbericht nicht verfügbar",
-      "unavailableDescription": "Nur Organisationsinhaber und Abrechnungsmanager können Auditberichte ansehen. Bitte einen Inhaber oder Abrechnungsmanager, dir Zugriff zu gewähren.",
+      "unavailableDescription": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können Auditberichte ansehen. Bitte einen Inhaber, Admin oder Abrechnungsmanager, dir Zugriff zu gewähren.",
       "eventActions": {
         "findingAnalysisCompleted": "Analyse abgeschlossen",
         "findingAnalysisFailed": "Analyse fehlgeschlagen",
@@ -1258,7 +1266,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Dieser Befund wurde bereits behoben und kann nicht mehr verworfen werden.",
-      "cannotDismissDescription": "Nur Organisationsinhaber und Abrechnungsmanager können Befunde verwerfen.",
+      "cannotDismissDescription": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können Befunde verwerfen.",
       "cannotDismissTitle": "Dieser Befund kann nicht verworfen werden",
       "commentAccessibility": "Kommentar zum Verwerfen",
       "commentLabel": "Kommentar (optional)",
@@ -1390,7 +1398,7 @@
       "automationCount": "{{displayCount}} von 3 aktiviert",
       "couldNotLoadPermissions": "Die Berechtigungen konnten nicht geladen werden.",
       "couldNotLoadSettings": "Die Einstellungen für Security Agent konnten nicht geladen werden.",
-      "disabledNoManage": "Security Agent ist deaktiviert. Nur Organisationsinhaber und Abrechnungsmanager können ihn aktivieren.",
+      "disabledNoManage": "Security Agent ist deaktiviert. Nur Organisationsinhaber, Admins und Abrechnungsmanager können ihn aktivieren.",
       "disabledNoRepo": "Wähle mindestens ein Repository aus, bevor du Security Agent aktivierst.",
       "disabledPrompt": "Aktiviere Security Agent, um Dependabot-Warnungen zu synchronisieren, Repositories auszuwählen und die Automatisierung einzurichten.",
       "notificationsCount": "{{displayCount}} von 2 aktiviert",
@@ -1423,7 +1431,7 @@
       "lowDescription": "Minimale Auswirkungen auf die Sicherheit.",
       "medium": "Mittel",
       "mediumDescription": "Begrenzte Auswirkungen oder nur unter bestimmten Bedingungen ausnutzbar.",
-      "permissionNote": "Nur Organisationsinhaber und Abrechnungsmanager können diese Einstellungen ändern.",
+      "permissionNote": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können diese Einstellungen ändern.",
       "remediationDeadlineA11y": "Behebungsfrist für {{label}} in Tagen",
       "title": "SLA-Richtlinie"
     },
@@ -1442,7 +1450,12 @@
       "syncMayNotHaveCompleted": "Eine Synchronisierung wurde möglicherweise nicht abgeschlossen. Wiederhole sie zum Abgleich oder verwirf sie.",
       "syncInProgress": "Die Sicherheitsbefunde werden bereits synchronisiert. Bitte versuche es erneut.",
       "dismissalInProgress": "Dieser Befund wird bereits verworfen. Bitte versuche es erneut.",
-      "couldNotReadPendingSyncs": "Ausstehende Synchronisierungen konnten nicht gelesen werden. Versuche es erneut."
+      "couldNotReadPendingSyncs": "Ausstehende Synchronisierungen konnten nicht gelesen werden. Versuche es erneut.",
+      "ambiguous": "Die Aktion konnte nicht bestätigt werden. Prüfe die Sicherheitsüberprüfung, bevor du es erneut versuchst.",
+      "settleFailed": "Die Aktion wurde abgeschlossen, aber wir konnten das Ergebnis nicht speichern. Bitte versuche es erneut.",
+      "replayFailed": "Diese Aktion wurde nicht abgeschlossen. Bitte versuche es erneut.",
+      "actionFailed": "Diese Aktion konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
+      "actionBlocked": "Diese Aktion konnte nicht abgeschlossen werden. Das Problem muss behoben werden, bevor du es erneut versuchen kannst."
     },
     "analysisState": {
       "queued": "Analyse in der Warteschlange",
@@ -1645,7 +1658,7 @@
       "failedToCreate": "Die Remote-Sitzung konnte nicht erstellt werden.",
       "failedToExit": "Die Sitzung konnte nicht beendet werden.",
       "exitTitle": "Sitzung beenden?",
-      "exitMessage": "Die laufende Sitzung wird beendet. Ihr Verlauf bleibt erhalten.",
+      "exitMessage": "Die laufende Sitzung wird beendet. Der Verlauf bleibt erhalten.",
       "keepSessionRunning": "Sitzung weiterlaufen lassen",
       "exitSession": "Sitzung beenden",
       "restartExitFailed": "Eine neue Sitzung wurde gestartet. Die vorherige Sitzung ist noch geöffnet.",
@@ -1719,6 +1732,8 @@
       "commitAndPush": "Committen und pushen",
       "startSession": "Sitzung starten",
       "selectRepositoryToStart": "Wähle ein Repository aus, um zu starten.",
+      "enterPromptToStart": "Füge einen Prompt hinzu, um zu starten.",
+      "enterPromptOrFileToStart": "Füge einen Prompt oder eine Datei hinzu, um zu starten.",
       "connectProviderToStart": "Verbinde einen Anbieter, um zu starten.",
       "promptPlaceholder": "Woran möchtest du arbeiten?",
       "couldNotLoadModels": "Die Modelle konnten nicht geladen werden.",
@@ -1742,19 +1757,19 @@
       "forkCutNotSynced": "Diese Nachricht ist noch nicht gespeichert. Versuche es gleich noch einmal.",
       "forkFilesFromBaseBranch": "Die Dateien basieren auf dem Basis-Branch.",
       "forkFilesUnchangedOnComputer": "Die Dateien auf diesem Computer werden nicht geändert.",
-      "pickProfile": "Wählen Sie ein Profil",
+      "pickProfile": "Wähle ein Profil",
       "noProfile": "Kein Profil",
       "manageProfiles": "Profile verwalten",
-      "noProfiles": "Noch keine Profile. Erstellen Sie eine, um Umgebungsvariablen, MCP-Server und Fähigkeiten hinzuzufügen.",
+      "noProfiles": "Noch keine Profile. Erstelle eins, um Umgebungsvariablen, MCP-Server und Fähigkeiten hinzuzufügen.",
       "advancedConfig": "Erweiterte Konfiguration",
-      "advancedConfigDescription": "Wählen Sie ein Profil aus, um gespeicherte Konfigurationen zu laden und zusätzliche Umgebungsvariablen und Setup-Befehle manuell zu konfigurieren",
+      "advancedConfigDescription": "Wähle ein Profil aus, um gespeicherte Konfigurationen zu laden und zusätzliche Umgebungsvariablen und Setup-Befehle manuell zu konfigurieren",
       "saveAsProfile": "Als Profil speichern",
-      "saveProfileDescription": "Speichern Sie die aktuellen Umgebungsvariablen und Setup-Befehle als wiederverwendbares Profil.",
+      "saveProfileDescription": "Speichere die aktuellen Umgebungsvariablen und Setup-Befehle als wiederverwendbares Profil.",
       "profileSummary": "{{vars}} Umgebungsvariablen · {{commands}} Setup-Befehle",
       "profileSaved": "Profil „{{name}}“ gespeichert",
       "organizationProfiles": "Organisationsprofile",
       "personalProfiles": "Persönliche Profile",
-      "yourProfiles": "Ihre Profile",
+      "yourProfiles": "Deine Profile",
       "nameTooLong": "Der Profilname ist zu lang",
       "descriptionTooLong": "Beschreibung ist zu lang",
       "secretsEncrypted": "Geheimnisse werden vor der Speicherung verschlüsselt.",
@@ -1765,7 +1780,7 @@
       "repoProfile": "Repo-Profil",
       "selectedProfile": "Ausgewähltes Profil",
       "manualOverrides": "Manuelle Überschreibungen",
-      "openSettingsToReview": "Öffnen Sie die Einstellungen, um sie zu überprüfen",
+      "openSettingsToReview": "Öffne die Einstellungen, um sie zu überprüfen",
       "profileSelection": "Profilauswahl"
     },
     "partRenderer": {
@@ -2089,7 +2104,7 @@
       "selectModelBeforeSending": "Wähle vor dem Senden ein Modell aus.",
       "preparingPlaceholder": "Umgebung wird eingerichtet…",
       "finalizingPlaceholder": "Wird abgeschlossen…",
-      "sessionLoadFailed": "Die Sitzung konnte nicht geladen werden. Versuchen Sie es zuerst erneut.",
+      "sessionLoadFailed": "Die Sitzung konnte nicht geladen werden. Versuche es zuerst erneut.",
       "cannotReceiveFiles": "Diese Sitzung kann keine Dateien empfangen. Entferne die Anhänge, um deine Nachricht zu senden.",
       "couldNotAttachFiles": "Die Dateien konnten nicht angehängt werden. Tippe auf „Senden“, um es erneut zu versuchen.",
       "imagesOnly": "Hier können nur Bilder angehängt werden.",
@@ -2257,7 +2272,7 @@
     "thisDevice": "Dieses Gerät",
     "viewProfile": "Profil ansehen",
     "signOutThisDevice": "Dieses Gerät abmelden",
-    "signOutThisSession": "Diese Sitzung abmelden",
+    "signOutSessionLabel": "{{device}} abmelden, angemeldet: {{signedIn}}",
     "sessionSignedOut": "Sitzung abgemeldet.",
     "signOutThisDeviceTitle": "Dieses Gerät abmelden?",
     "signOutThisSessionTitle": "Diese Sitzung abmelden?",
@@ -2540,6 +2555,8 @@
     },
     "connectionExpired": "Die GitHub-Verbindung ist abgelaufen.",
     "couldNotLoadPullRequest": "Der Pull-Request konnte nicht geladen werden.",
+    "reviewServiceUnavailable": "Dienst nicht verfügbar",
+    "reviewServiceUnavailableDescription": "Der Dienst ist vorübergehend nicht verfügbar. Versuche es gleich erneut.",
     "couldNotOpenGitHubAppSettings": "Die Einstellungen der GitHub-App konnten nicht geöffnet werden.",
     "description": "Beschreibung",
     "discussion": {
@@ -2950,6 +2967,7 @@
       "truncationBanner_other": "Aufgrund einer Begrenzung der GitHub-API werden nur die ersten {{limit}} von {{total}} geänderten Dateien angezeigt."
     },
     "linkPasteClipboardEmpty": "Die Zwischenablage ist leer.",
+    "linkPasteDenied": "Der Zugriff zum Einfügen wurde abgelehnt. Erlaube das Einfügen und versuche es erneut.",
     "linkPasteNotAPullRequest": "Dieser Link führt nicht zu einem Pull-Request oder Merge-Request.",
     "announce": {
       "commentPosted": "Kommentar veröffentlicht",
@@ -2973,7 +2991,6 @@
       "mergeResultDefaultError": "GitHub hat die Zusammenführung nicht abgeschlossen.",
       "mergeResultNotCompleted": "Der {{term}} wurde nicht zusammengeführt. Prüfe seinen Status und versuche es erneut.",
       "ambiguous": "Die Aktion konnte nicht bestätigt werden. Prüfe den PR, bevor du es erneut versuchst.",
-      "persistenceFailed": "Wir konnten diese Aktion nicht speichern. Bitte versuche es später erneut.",
       "forbidden": "Du hast keine Berechtigung für diese Aktion."
     },
     "capabilities": {
@@ -3005,6 +3022,7 @@
 
       "chooseAccount": "Konto auswählen",
       "loadErrorTitle": "Deine Organisationen konnten nicht geladen werden.",
+      "membershipLostNotice": "Du hast keinen Zugriff mehr auf diese Organisation. Gewechselt zu {{target}}.",
       "noOrganization": "Keine Organisation",
 
       "noOrganizationDescription": "Dieses Konto gehört keiner Organisation an. Erstelle eine Organisation oder tritt einer auf der Website bei, um Organisationsfunktionen wie Mitgliedseinladungen und Warnungen bei niedrigem Guthaben zu nutzen.",
@@ -3017,7 +3035,7 @@
       "selectOrganization": "Organisation auswählen",
       "unavailableDescription": "Diese Organisation ist nicht mehr verfügbar. Wähle in deinem Profil eine andere Organisation aus, um fortzufahren.",
 
-      "unavailableSessionsDescription": "Diese Organisation ist nicht mehr verfügbar. Ihre Sitzungen können nicht geladen werden.",
+      "unavailableSessionsDescription": "Diese Organisation ist nicht mehr verfügbar. Deren Sitzungen können nicht geladen werden.",
       "accessDeniedDescription": "Du hast keinen Zugriff auf diese Organisation."
     },
     "creditActivity": {
@@ -3076,7 +3094,11 @@
       "separateEmailsHint": "Trenne mehrere E-Mail-Adressen durch Kommas.",
       "thresholdLabel": "Warnung unter (USD)",
       "title": "Warnung bei niedrigem Guthaben",
-      "emailsError": "Gib mindestens eine gültige E-Mail-Adresse ein. Trenne mehrere Adressen durch Kommas.",
+      "emailsInvalid": "Eine oder mehrere E-Mail-Adressen sind ungültig.",
+      "emailsRequired": "Gib mindestens eine E-Mail-Adresse ein.",
+      "saveEmailsError": "Einige E-Mail-Adressen wurden nicht akzeptiert. Prüfe sie und versuche es erneut.",
+      "saveError": "Die Warnung bei niedrigem Guthaben konnte nicht gespeichert werden.",
+      "thresholdPlaceholder": "Betrag eingeben",
       "thresholdError": "Gib einen Betrag größer als 0 ein."
     },
     "memberLimit": {
@@ -3087,12 +3109,13 @@
       "removeLimit": "Limit entfernen",
       "title": "Tägliches Nutzungslimit",
       "blankError": "Gib einen Betrag ein oder tippe unten auf „Limit entfernen“.",
+      "blankWithoutLimitError": "Gib ein tägliches Limit zwischen 0 und {{max}} ein.",
       "rangeError": "Gib einen Betrag zwischen 0 und {{max}} ein."
     },
     "members": {
       "changeRole": "Rolle ändern",
       "emptyDescriptionCanInvite": "Lade Teammitglieder ein, um in dieser Organisation zusammenzuarbeiten.",
-      "emptyDescriptionCannotInvite": "Bitte einen Inhaber oder Abrechnungsmanager, Teammitglieder einzuladen.",
+      "emptyDescriptionCannotInvite": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, Teammitglieder einzuladen.",
       "emptyTitle": "Noch keine Mitglieder",
       "invitedDate": "Eingeladen am {{date}}",
       "limitPerDay": "{{amount}}/Tag",
@@ -3357,7 +3380,8 @@
       "settingsToolsOn": "An — die Einstellungs-Tools werden an das Modell gesendet",
       "settingsToolsOff": "Aus — kein Einstellungs-Tool wird an das Modell gesendet",
       "serverChecking": "Dieser Server wird geprüft…",
-      "serverToolCount": "{{count}} Tools",
+      "serverToolCount_one": "{{count}} Tool",
+      "serverToolCount_other": "{{count}} Tools",
       "serverUnreachable": "Dieser Server konnte nicht erreicht werden",
       "serverOff": "Dieser Server ist ausgeschaltet"
     },
@@ -3433,7 +3457,7 @@
       "switchConfirm": "Backend wechseln",
       "deleteTitle": "Dieses Chat-Backend löschen?",
       "deleteMessage": "{{name}} und die gespeicherten Zugangsdaten löschen? Chats, die dieses Backend verwenden, benötigen ein neues Backend, bevor sie fortgesetzt werden können.",
-      "completionTokenFieldHelp": "Feld für Ausgabetokens: Verwenden Sie max_completion_tokens für moderne APIs oder max_tokens, wenn Ihr Endpunkt das ältere Feld erfordert."
+      "completionTokenFieldHelp": "Feld für Ausgabetokens: Verwende max_completion_tokens für moderne APIs oder max_tokens, wenn dein Endpunkt das ältere Feld erfordert."
     },
     "gguf": {
       "title": "Herunterladbare Modelle",
@@ -3504,6 +3528,8 @@
       "quantizationsHelp": "Kleinere Dateien benötigen weniger Arbeitsspeicher und Speicherplatz. Größere Dateien liefern meist bessere Antworten.",
       "quantDetail": "{{size}} Download · ca. {{memory}} Arbeitsspeicher",
       "downloadQuant": "{{quant}} herunterladen",
+      "downloadModelA11y": "{{name}} herunterladen",
+      "detailsA11y": "Einzelheiten: {{name}}",
       "loadingModel": "Modelldetails werden geladen",
       "couldNotLoadModel": "Dieses Modell konnte nicht geladen werden",
       "noFiles": "Keine Dateien, die diese App ausführen kann",
@@ -3555,6 +3581,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agent starten benötigt einen Prompt. Füge einen Prompt hinzu und führe die Aktion erneut aus.",
+      "repositoryRequired": "Agent starten benötigt ein Repository. Öffne Kilo, wähle eines und führe die Aktion erneut aus.",
       "repositoryUnknown": "Kilo erkennt {{repository}} nicht als GitHub- oder GitLab-Repository. Wähle ein anderes Repository in Kilo.",
       "repositoryUnsupported": "{{repository}} ist ein Bitbucket-Repository — Agent starten kann es noch nicht verwenden. Wähle ein anderes Repository in Kilo."
     }
@@ -3589,13 +3616,16 @@
     "entrySubtitle": "Umgebungseinstellungen sitzungsübergreifend wiederverwenden",
     "newProfile": "Neues Profil",
     "emptyTitle": "Noch keine Profile",
-    "emptyDescription": "Erstellen Sie ein Profil, um Umgebungsvariablen, Setup-Befehle und Fähigkeiten sitzungsübergreifend wiederzuverwenden.",
+    "emptyDescription": "Erstelle ein Profil, um Umgebungsvariablen, Setup-Befehle und Fähigkeiten sitzungsübergreifend wiederzuverwenden.",
     "loadFailed": "Profile konnten nicht geladen werden",
     "counts": {
-      "vars": "{{count}} Variablen",
+      "vars_one": "{{count}} Variable",
+      "vars_other": "{{count}} Variablen",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} Fähigkeiten",
-      "commands": "{{count}} Befehle",
+      "skills_one": "{{count}} Fähigkeit",
+      "skills_other": "{{count}} Fähigkeiten",
+      "commands_one": "{{count}} Befehl",
+      "commands_other": "{{count}} Befehle",
       "varsShort": "{{count}}Var",
       "skillsShort": "{{count}}Fäh",
       "commandsShort": "{{count}}Bef"
@@ -3605,7 +3635,7 @@
     "descriptionLabel": "Profilbeschreibung",
     "descriptionPlaceholder": "Optionale Beschreibung",
     "ownerLabel": "Profilinhaber",
-    "nameRequired": "Geben Sie einen Profilnamen ein",
+    "nameRequired": "Gib einen Profilnamen ein",
     "createAction": "Profil erstellen",
     "createFailed": "Profil konnte nicht erstellt werden",
     "createdToast": "Profil „{{name}}“ erstellt",
@@ -3618,7 +3648,7 @@
     "deleteTitle": "Profil löschen",
     "deleteMessage": "Dadurch werden das Profil und seine Einstellungen dauerhaft entfernt. Dies kann nicht rückgängig gemacht werden.",
     "deleteFailed": "Profil konnte nicht gelöscht werden",
-    "deleteBlocked": "Dieses Profil wird von einem Webhook-Trigger verwendet. Entfernen Sie es zuerst von diesen Auslösern.",
+    "deleteBlocked": "Dieses Profil wird von einem Webhook-Trigger verwendet. Entferne es zuerst von diesen Auslösern.",
     "deletedToast": "Profil „{{name}}“ gelöscht",
     "variablesTitle": "Umgebungsvariablen",
     "addVariable": "Variable hinzufügen",
@@ -3626,7 +3656,6 @@
     "keyTooLong": "Der Schlüssel darf höchstens 256 Zeichen lang sein",
     "keyDuplicate": "Dieser Schlüssel ist bereits im Profil vorhanden",
     "valueLabel": "Wert",
-    "secretLabel": "Geheimnis",
     "secrets": {
       "markSecret": "Als geheim markieren",
       "masked": "Versteckter Wert",
@@ -3642,8 +3671,8 @@
     "commandPlaceholder": "z. B. pnpm install",
     "commandsEmpty": "Noch keine Setup-Befehle",
     "commandsSaveFailed": "Setup-Befehle konnten nicht gespeichert werden",
-    "moveUp": "Bewegen Sie sich nach oben",
-    "moveDown": "Bewegen Sie sich nach unten",
+    "moveUp": "Nach oben verschieben",
+    "moveDown": "Nach unten verschieben",
     "moveCommandUp": "Befehl {{position}} nach oben verschieben",
     "moveCommandDown": "Befehl {{position}} nach unten verschieben",
     "skillsTitle": "Fähigkeiten",
@@ -3651,11 +3680,11 @@
     "skillNameLabel": "Fähigkeitsname",
     "skillMarkdownLabel": "Kompetenzinhalte",
     "skillsEmpty": "Noch keine Fähigkeiten",
-    "skillNameRequired": "Geben Sie einen Skill-Namen ein",
+    "skillNameRequired": "Gib einen Skill-Namen ein",
     "skillNameInvalid": "Der Fertigkeitsname muss mit einem Buchstaben oder einer Ziffer beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten",
     "skillContentRequired": "Kompetenzinhalte sind erforderlich",
     "skillSaveFailed": "Fertigkeit konnte nicht gespeichert werden",
-    "skillsHint": "Fügen Sie eine SKILL.md ein und der Name wird ausgefüllt. Fügen Sie einen Skill von Ihrem Telefon aus ohne Drag & Drop hinzu.",
+    "skillsHint": "Füge eine SKILL.md ein und der Name wird ausgefüllt. Füge einen Skill von deinem Telefon aus ohne Drag & Drop hinzu.",
     "skillEditTitle": "Fertigkeit bearbeiten",
     "mcp": {
       "title": "MCP-Server",
@@ -3670,21 +3699,21 @@
       "environment": "Umgebung (JSON)",
       "headers": "Header (JSON)",
       "timeout": "Time-out",
-      "secretCount": "Geheime Zählung",
+      "secretCount": "Geheime Zählung: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
-      "nameRequired": "Geben Sie einen Servernamen ein",
+      "nameRequired": "Gib einen Servernamen ein",
       "nameInvalid": "Der Name darf nur Buchstaben, Zahlen, Unterstriche und Bindestriche enthalten",
-      "commandRequired": "Geben Sie einen Befehl ein",
-      "commandTooLong": "Verwenden Sie höchstens 50 Argumente mit je 500 Zeichen",
-      "urlRequired": "Geben Sie eine URL ein",
-      "urlInvalid": "Geben Sie eine gültige URL ein",
+      "commandRequired": "Gib einen Befehl ein",
+      "commandTooLong": "Verwende höchstens 50 Argumente mit je 500 Zeichen",
+      "urlRequired": "Gib eine URL ein",
+      "urlInvalid": "Gib eine gültige URL ein",
       "urlTooLong": "Die URL darf höchstens 2048 Zeichen lang sein",
-      "jsonInvalid": "Geben Sie gültiges JSON ein – ein Objekt mit Zeichenfolgenwerten",
-      "jsonTooLarge": "Verwenden Sie höchstens 50 Einträge, Schlüssel bis 128 und Werte bis 4096 Zeichen",
+      "jsonInvalid": "Gib gültiges JSON ein – ein Objekt mit Zeichenfolgenwerten",
+      "jsonTooLarge": "Verwende höchstens 50 Einträge, Schlüssel bis 128 und Werte bis 4096 Zeichen",
       "timeoutInvalid": "Das Zeitlimit muss eine ganze Zahl von Millisekunden betragen",
-      "edit": "Bearbeiten Sie den MCP-Server",
+      "edit": "Bearbeite den MCP-Server",
       "saveFailed": "Der MCP-Server konnte nicht gespeichert werden",
       "deleteFailed": "Der MCP-Server konnte nicht gelöscht werden",
       "updateFailed": "Der MCP-Server konnte nicht aktualisiert werden"
@@ -3713,10 +3742,13 @@
       "visibilityPrimary": "Primär – wird im Picker angezeigt",
       "visibilitySubagent": "Subagent – nur von anderen aufrufbar",
       "visibilityAll": "Alle – beides",
+      "modePrimary": "Nur primär",
+      "modeSubagent": "Nur Subagent",
+      "modeAll": "Alle Modi",
       "saveFailed": "Der Agent konnte nicht gespeichert werden",
       "deleteFailed": "Der Agent konnte nicht gelöscht werden",
-      "nameRequired": "Geben Sie einen Agentennamen ein",
-      "slugRequired": "Geben Sie einen Agenten-Slug ein",
+      "nameRequired": "Gib einen Agentennamen ein",
+      "slugRequired": "Gib einen Agenten-Slug ein",
       "slugInvalid": "Slug muss mit einem Buchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche verwenden",
       "slugConflict": "Dieser Slug wird bereits von einem integrierten Agenten oder einem anderen Agenten in diesem Profil verwendet",
       "edit": "Agent bearbeiten"
@@ -3730,21 +3762,21 @@
       "template": "Vorlage",
       "namePlaceholder": "explain",
       "agentPlaceholder": "reviewer",
-      "templatePlaceholder": "Erklären Sie $ARGUMENTS",
+      "templatePlaceholder": "Erkläre $ARGUMENTS",
       "subtask": "Als Unteraufgabe ausführen",
       "edit": "Slash-Befehl bearbeiten",
       "saveFailed": "Der Befehl konnte nicht gespeichert werden",
       "deleteFailed": "Der Befehl konnte nicht gelöscht werden",
-      "nameRequired": "Geben Sie einen Befehlsnamen ein",
+      "nameRequired": "Gib einen Befehlsnamen ein",
       "nameInvalid": "Der Name muss mit einem Kleinbuchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten",
-      "templateRequired": "Geben Sie eine Befehlsvorlage ein",
+      "templateRequired": "Gib eine Befehlsvorlage ein",
       "nameConflict": "Dieser Name wird durch einen integrierten Befehl reserviert"
     },
     "repoBindings": {
       "title": "Standardprofile für Repos",
       "add": "Standard hinzufügen",
       "empty": "Keine Standardeinstellungen konfiguriert",
-      "emptyDescription": "Fügen Sie einen Standard hinzu, um beim Starten von Sitzungen für ein Repo automatisch ein Profil anzuwenden.",
+      "emptyDescription": "Füge einen Standard hinzu, um beim Starten von Sitzungen für ein Repo automatisch ein Profil anzuwenden.",
       "repo": "Repository auswählen…",
       "profile": "Profil auswählen",
       "remove": "Lösen",
@@ -3773,6 +3805,8 @@
     "empty": "Guthaben-Pakete sind derzeit nicht verfügbar.",
     "noMatchingProducts": "Der App Store hat keine passenden Guthaben-Pakete zurückgegeben.",
     "noMatchingProductsPlay": "Google Play hat keine passenden Guthaben-Pakete zurückgegeben.",
+    "storeTimedOut": "Der App Store hat nicht rechtzeitig geantwortet. Erneut versuchen.",
+    "storeTimedOutPlay": "Google Play hat nicht rechtzeitig geantwortet. Erneut versuchen.",
     "purchaseOwnedByAnotherAccount": "Das Guthaben dieses Apple Accounts gehört zu einem anderen Kilo-Konto. Melde dich bei dem zugehörigen Kilo-Konto an, um es zu nutzen.",
     "purchaseOwnedByAnotherAccountPlay": "Das Guthaben auf diesem Google-Konto gehört zu einem anderen Kilo-Konto. Melde dich bei diesem Kilo-Konto an, um es zu nutzen."
   },

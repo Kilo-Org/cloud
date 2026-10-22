@@ -267,4 +267,31 @@ describe('mutationErrorDisplay', () => {
       message: serverMessage,
     });
   });
+
+  it('names the connected provider in the reconnect copy', () => {
+    const revoked = makeError('PRECONDITION_FAILED', 'revoked');
+    const classification = classifyPrReviewMutationError(revoked);
+    expect(classification.kind).toBe('reconnect');
+
+    // GitHub (and a surface that carries no platform) keeps the exact copy.
+    expect(mutationErrorDisplay('submit', classification)).toEqual({
+      kind: 'reconnect',
+      message: 'GitHub connection expired.',
+    });
+    expect(mutationErrorDisplay('submit', classification, { platform: 'github' })).toEqual({
+      kind: 'reconnect',
+      message: 'GitHub connection expired.',
+    });
+
+    // A provider surface names its own connection, matching the notice it
+    // renders below the status.
+    expect(mutationErrorDisplay('submit', classification, { platform: 'gitlab' })).toEqual({
+      kind: 'reconnect',
+      message: 'GitLab connection expired',
+    });
+    expect(mutationErrorDisplay('composer', classification, { platform: 'bitbucket' })).toEqual({
+      kind: 'reconnect',
+      message: 'Bitbucket connection expired',
+    });
+  });
 });

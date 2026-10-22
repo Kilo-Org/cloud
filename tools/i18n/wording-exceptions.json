@@ -369,6 +369,7 @@
     "open pull request",
     "reactions",
     "review",
+    "search sessions",
     "stopped",
     "superseded",
     "tokens"
@@ -473,6 +474,7 @@
     "github connection expired",
     "manual review",
     "no changes needed",
+    "open pull request",
     "pr opened",
     "remediation failed",
     "review",

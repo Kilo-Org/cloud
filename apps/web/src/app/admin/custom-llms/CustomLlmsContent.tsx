@@ -380,9 +380,9 @@ export function CustomLlmsContent() {
 
       <p className="text-muted-foreground">
         Manage custom LLM definitions stored in the <code>custom_llm2</code> table. Each entry has a{' '}
-        <code>public_id</code>, encrypted credentials (such as API keys or Google Cloud
-        service-account keys), and a JSON <code>definition</code> validated against{' '}
-        <code>CustomLlmDefinitionSchema</code>.
+        <code>public_id</code>, encrypted credentials (such as API keys, Google Cloud
+        service-account keys, or Amazon Bedrock IAM access keys), and a JSON <code>definition</code>{' '}
+        validated against <code>CustomLlmDefinitionSchema</code>.
       </p>
 
       {isLoading ? (
@@ -556,6 +556,26 @@ export function CustomLlmsContent() {
     "url": "https://upstream.example.com/v1",
     "extra_headers": { "Authorization": "Bearer YOUR_API_KEY" }
   }
+}`}
+                  </pre>
+                  <p className="mt-2">
+                    For Amazon Bedrock with IAM access keys, set the definition&apos;s{' '}
+                    <code className="text-foreground">base_url</code> to a Bedrock endpoint such as{' '}
+                    <code className="text-foreground">
+                      https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1
+                    </code>{' '}
+                    and use the following. Requests are signed with AWS SigV4. Bedrock API keys use{' '}
+                    <code className="text-foreground">&quot;type&quot;: &quot;api_key&quot;</code>{' '}
+                    on OpenAI-compatible routes and{' '}
+                    <code className="text-foreground">&quot;type&quot;: &quot;x-api-key&quot;</code>{' '}
+                    on Anthropic Messages routes.
+                  </p>
+                  <pre className="text-foreground mt-2 overflow-x-auto font-mono whitespace-pre-wrap">
+                    {`{
+  "type": "aws_bedrock",
+  "region": "us-east-1",
+  "access_key_id": "AKIA...",
+  "secret_access_key": "YOUR_SECRET_ACCESS_KEY"
 }`}
                   </pre>
                 </div>

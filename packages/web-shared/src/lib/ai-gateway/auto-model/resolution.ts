@@ -95,8 +95,9 @@ async function getEligibleAutoFreeModels(
   ]);
   const eligibleModels = configuredModels.filter(({ model }, index) => {
     if (!isAutoFreeEligibleModelId(model)) return false;
-    // A custom LLM may replace a configured Kilo-exclusive id; anonymous
-    // callers cannot use it, so it is never a candidate, even while unknown.
+    // A custom LLM may replace a configured Kilo-exclusive id. It must not
+    // silently take over that auto-free slot, so it is never a candidate, even
+    // while the custom LLM catalog cannot be read.
     if (customLlmLookups[index]?.kind !== 'none') return false;
     if (isKiloExclusiveFreeModel(model)) {
       const kiloModel = findKiloExclusiveModel(model);

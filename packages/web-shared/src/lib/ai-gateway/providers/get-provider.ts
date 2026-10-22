@@ -142,6 +142,8 @@ async function resolveCustomLlmAuth(
       };
     case 'secure_proxy':
       return { type: 'secure_proxy', credentials };
+    case 'aws_bedrock':
+      return { type: 'aws_bedrock', credentials };
   }
 }
 

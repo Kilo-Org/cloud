@@ -529,9 +529,9 @@ describe('GET /api/v1/models', () => {
     expect(responseData.data.some(item => item.id === 'acme/private-model')).toBe(false);
     // Routing serves a definition without opencode settings over Chat Completions,
     // so the catalog must not guess a protocol from the id.
-    expect(responseData.data.find(item => item.id === 'acme/claude-review')?.opencode).toBe(
-      undefined
-    );
+    const claudeReviewModel = responseData.data.find(item => item.id === 'acme/claude-review');
+    expect(claudeReviewModel).toBeDefined();
+    expect(claudeReviewModel).not.toHaveProperty('opencode');
     const sameIdModels = responseData.data.filter(item => item.id === exclusiveModel.public_id);
     expect(sameIdModels).toHaveLength(1);
     expect(sameIdModels[0].name).toBe(`Custom ${exclusiveModel.public_id}`);

@@ -59,6 +59,7 @@ import { clearCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-
 import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
+import { clearTrackingPromptDismissed } from '@/lib/hooks/use-tracking-permission-prompt';
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
@@ -68,6 +69,7 @@ import {
 } from '@/lib/auth/session-scoped-state';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
+import { clearLastRoute } from '@/lib/last-route';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
 import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
@@ -93,6 +95,7 @@ import {
   ORGANIZATION_STORAGE_KEY,
   PENDING_DEEP_LINK_KEY,
   PICKER_LAUNCH_CONTEXT_KEY,
+  PICKER_RESTORE_RECORD_KEY,
   REFRESH_TOKEN_KEY,
   SESSION_FILTERS_KEY,
   TOKEN_EXPIRES_AT_KEY,
@@ -576,6 +579,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY),
             deleteAccountMetadata(PENDING_DEEP_LINK_KEY),
             deleteAccountMetadata(PICKER_LAUNCH_CONTEXT_KEY),
+            deleteAccountMetadata(PICKER_RESTORE_RECORD_KEY),
             // Phase 4b read-cache cleanup: capture the authoritative user
             // id from the getMe cache while it is still present (the batch
             // expression runs before queryClient.clear()), then remove that
@@ -619,6 +623,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearHideThinkingPreference();
           clearKeepScreenOnPreference();
           clearLiveActivityPreference();
+          clearTrackingPromptDismissed();
           clearSessionScopedState();
           // The remote MCP connection and the servers stored behind it (which
           // hold bearer tokens) belong to the account that is leaving. The
@@ -636,6 +641,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // throw into sign-out.
           runBestEffortTeardown(clearLauncherSurfaces);
           runBestEffortTeardown(clearLastOpenedSession);
+          runBestEffortTeardown(clearLastRoute);
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

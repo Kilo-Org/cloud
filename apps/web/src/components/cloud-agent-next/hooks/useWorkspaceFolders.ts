@@ -129,10 +129,17 @@ export function useWorkspaceFolders(
           }),
         folderId ? 'Session moved to folder' : 'Session moved to Ungrouped'
       );
-      if (moved && folderId) setCollapsedFolderIds(ids => ids.filter(id => id !== folderId));
+      if (moved) {
+        // The destination folder changes how the sidebar groups the session,
+        // so the sessions and worktree-details queries must refetch too.
+        void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
+        void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
+        void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter());
+        if (folderId) setCollapsedFolderIds(ids => ids.filter(id => id !== folderId));
+      }
       return moved;
     },
-    [assignSession, organizationId, run, setCollapsedFolderIds]
+    [assignSession, organizationId, queryClient, run, setCollapsedFolderIds, trpc]
   );
 
   const reorderFolders = useCallback(

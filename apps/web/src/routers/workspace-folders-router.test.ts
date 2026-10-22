@@ -923,13 +923,31 @@ describe('workspaceFolders session moves', () => {
 
   it('rejects cross-scope or foreign-member destinations before touching session metadata', async () => {
     const crossScopeDestination = await createFolder(ORGANIZATION_ID);
-    const otherMemberDestination = await createFolder(ORGANIZATION_ID, 'Private', otherUser);
-    for (const folderId of [crossScopeDestination.id, otherMemberDestination.id]) {
-      await expect(
-        callerFor().moveSession({ organizationId: null, sessionId: WORKSPACE_ID, folderId })
-      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
-    }
+    await expect(
+      callerFor().moveSession({
+        organizationId: null,
+        sessionId: WORKSPACE_ID,
+        folderId: crossScopeDestination.id,
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect(await readWorktree()).toBeUndefined();
+
+    // A destination owned by another member of the same organization must be
+    // rejected for ownership, not because the caller is in the wrong scope.
+    const otherMemberDestination = await createFolder(ORGANIZATION_ID, 'Private', otherUser);
+    const organizationWorkspaceId = `workspace_${crypto.randomUUID()}`;
+    await insertSession({
+      organization_id: ORGANIZATION_ID,
+      cloud_agent_session_id: organizationWorkspaceId,
+      cloud_agent_worktree_id: null,
+    });
+    await expect(
+      callerFor().moveSession({
+        organizationId: ORGANIZATION_ID,
+        sessionId: organizationWorkspaceId,
+        folderId: otherMemberDestination.id,
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });
 

@@ -328,20 +328,26 @@ export const workspaceFoldersRouter = createTRPCRouter({
         if (!folder) throw new TRPCError({ code: 'NOT_FOUND', message: 'Folder not found' });
       }
 
-      const [session] = await ctx.folderDb
-        .select({
-          createdAt: cli_sessions_v2.created_at,
-          cloudAgentWorktreeId: cli_sessions_v2.cloud_agent_worktree_id,
-        })
-        .from(cli_sessions_v2)
-        .where(
-          and(
-            ownerScopeCondition(cli_sessions_v2, ctx.folderScope),
-            eq(cli_sessions_v2.cloud_agent_session_id, input.sessionId),
-            isNull(cli_sessions_v2.parent_session_id)
-          )
-        )
-        .for('update');
+      const readSession = () =>
+        ctx.folderDb
+          .select({
+            createdAt: cli_sessions_v2.created_at,
+            cloudAgentWorktreeId: cli_sessions_v2.cloud_agent_worktree_id,
+          })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              ownerScopeCondition(cli_sessions_v2, ctx.folderScope),
+              eq(cli_sessions_v2.cloud_agent_session_id, input.sessionId),
+              isNull(cli_sessions_v2.parent_session_id)
+            )
+          );
+
+      // Read first so an ungrouped session can derive its worktree id without
+      // taking a row lock. The authoritative lock is taken below in the same
+      // order worktree deletion uses (worktree row, then root rows), which
+      // avoids the ABBA deadlock of locking the root before its worktree.
+      const [session] = await readSession();
       if (!session) throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
 
       const groupedWorktreeId = session.cloudAgentWorktreeId;
@@ -349,6 +355,13 @@ export const workspaceFoldersRouter = createTRPCRouter({
         groupedWorktreeId ?? `worktree_${input.sessionId.slice('workspace_'.length)}`;
       if (groupedWorktreeId) {
         await lockMovableWorktree(ctx.folderDb, ctx.folderScope, groupedWorktreeId);
+        const [lockedSession] = await readSession().for('update');
+        if (!lockedSession || lockedSession.cloudAgentWorktreeId !== groupedWorktreeId) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Session moved. Refresh and try again.',
+          });
+        }
       } else {
         await ctx.folderDb
           .insert(cloud_agent_worktrees)
@@ -359,15 +372,47 @@ export const workspaceFoldersRouter = createTRPCRouter({
             created_at: session.createdAt,
           })
           .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
-        await ctx.folderDb
+        // The insert may have conflicted with an existing row, so lock it and
+        // re-validate ownership and the deletion fence before linking the
+        // session. Without this, a conflicting foreign or deleting worktree
+        // would be linked and the mutation could report success.
+        const [worktree] = await ctx.folderDb
+          .select({
+            kiloUserId: cloud_agent_worktrees.kilo_user_id,
+            organizationId: cloud_agent_worktrees.organization_id,
+            deletionStartedAt: cloud_agent_worktrees.deletion_started_at,
+            deletionCompletedAt: cloud_agent_worktrees.deletion_completed_at,
+          })
+          .from(cloud_agent_worktrees)
+          .where(eq(cloud_agent_worktrees.worktree_id, worktreeId))
+          .for('update');
+        if (
+          !worktree ||
+          worktree.kiloUserId !== ctx.folderScope.userId ||
+          worktree.organizationId !== ctx.folderScope.organizationId
+        ) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
+        }
+        if (worktree.deletionStartedAt !== null || worktree.deletionCompletedAt !== null) {
+          throw new TRPCError({ code: 'CONFLICT', message: 'Worktree is being deleted' });
+        }
+        const linked = await ctx.folderDb
           .update(cli_sessions_v2)
           .set({ cloud_agent_worktree_id: worktreeId })
           .where(
             and(
               ownerScopeCondition(cli_sessions_v2, ctx.folderScope),
-              eq(cli_sessions_v2.cloud_agent_session_id, input.sessionId)
+              eq(cli_sessions_v2.cloud_agent_session_id, input.sessionId),
+              isNull(cli_sessions_v2.cloud_agent_worktree_id)
             )
-          );
+          )
+          .returning({ sessionId: cli_sessions_v2.session_id });
+        if (linked.length === 0) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Session moved. Refresh and try again.',
+          });
+        }
       }
 
       await ctx.folderDb

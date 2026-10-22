@@ -10,6 +10,17 @@ export type StoredWebhookAuth = {
   secretHash: string;
 };
 
+// Keep in sync with apps/web/src/lib/webhook-trigger-validation.ts.
+export const MIN_CREATOR_WEBHOOK_SECRET_LENGTH = 16;
+
+export function assertCreatorWebhookSecretStrength(secret: string | null | undefined): void {
+  if (typeof secret === 'string' && secret.trim().length < MIN_CREATOR_WEBHOOK_SECRET_LENGTH) {
+    throw new Error(
+      `Webhook auth secret must be at least ${MIN_CREATOR_WEBHOOK_SECRET_LENGTH} characters for creator execution`
+    );
+  }
+}
+
 const HEX_TABLE = Array.from({ length: 256 }, (_, index) => index.toString(16).padStart(2, '0'));
 
 export function normalizeAuthHeader(header: string): string {

@@ -5,13 +5,6 @@ import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
-/**
- * Generates a service-specific SHA256 hash.
- *
- * @param payload - The string to hash
- * @param provider - The provider to generate the hash for
- * @returns Base64-encoded SHA256 hash
- */
 export function generateProviderSpecificHash(payload: string, provider: Provider): string {
   const salt = 'd20250815';
   const pepper =
@@ -69,7 +62,7 @@ export function applyTrackingIds(
   const taskHash = taskId ? generateProviderSpecificSessionHash(userId, taskId, provider) : '';
   if (request.kind === 'messages') {
     request.body.metadata = { ...request.body.metadata, user_id: userHash };
-    if (provider.id === 'openrouter') {
+    if (provider.id === 'openrouter' || provider.id === 'vercel') {
       request.body.user = userHash;
       if (taskHash) {
         request.body.session_id = taskHash;

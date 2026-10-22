@@ -1,7 +1,6 @@
 import type { PreparingEventDataV2, PreparingStep } from '../shared/protocol.js';
 import type { EventQueries } from './queries/index.js';
 import type { StoredEvent } from '../websocket/types.js';
-import type { EventId } from '../types/ids.js';
 import {
   finalizePreparationAttempt,
   materializePreparationEvent,
@@ -63,7 +62,7 @@ export function createPreparationProgressRecorder(options: {
       ...action,
     };
     const stored: StoredEvent = {
-      id: 0 as EventId,
+      id: 0,
       execution_id: '',
       session_id: sessionId,
       stream_event_type: 'preparing',

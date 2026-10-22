@@ -180,7 +180,7 @@ export function ShareDestinationList({
 
   if (state.kind === 'stale-share' || state.kind === 'non-retryable-classification') {
     body = (
-      <CenteredState className="bg-background px-6">
+      <CenteredState className="bg-background" contentContainerClassName="px-6">
         <Text className="text-center text-sm text-muted-foreground">{state.message}</Text>
       </CenteredState>
     );
@@ -191,7 +191,7 @@ export function ShareDestinationList({
     (state.kind === 'empty' || (state.kind === 'happy' && filtered.length === 0))
   ) {
     body = (
-      <CenteredState className="bg-background px-6">
+      <CenteredState className="bg-background" contentContainerClassName="px-6">
         <Text className="text-center text-sm text-muted-foreground">
           {state.kind === 'empty' ? state.message : t('share.noMatchingSessions')}
         </Text>

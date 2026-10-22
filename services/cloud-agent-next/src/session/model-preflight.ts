@@ -1,8 +1,8 @@
 import { TRPCError } from '@trpc/server';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import type { CloudAgentSessionState, PersistenceEnv } from '../persistence/types.js';
-import { fetchSessionMetadata } from '../session-service.js';
-import { resolveSessionStub } from '../sandbox-session/session-stub.js';
+import { fetchSessionMetadata } from './metadata.js';
+import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { hasModernRuntimeAuthorization } from './runtime-authorization-persistence.js';
 import {
@@ -47,7 +47,7 @@ async function assertModelFromStoredContext(
   if (hasModernRuntimeAuthorization(metadata)) {
     // The owning DO renews short-lived backing tokens within the existing delegation.
     const runtimeToken = await withDORetry(
-      () => resolveSessionStub(input.env, input.userId, input.cloudAgentSessionId),
+      () => getSandboxSessionStub(input.env, input.userId, input.cloudAgentSessionId),
       stub => stub.getRuntimeToken(),
       'getRuntimeTokenForModelPreflight'
     );

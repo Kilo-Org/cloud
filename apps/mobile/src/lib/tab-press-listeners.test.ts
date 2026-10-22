@@ -6,7 +6,7 @@ import {
   markTabSwitchPending,
   TAB_SWITCH_ACTIVE_TAB_SETTLE_MS,
 } from '@/lib/tab-switch-input-gate';
-import { tabPressListeners, profileTabPressListeners } from '@/lib/tab-press-listeners';
+import { profileTabPressListeners, tabPressListeners } from '@/lib/tab-press-listeners';
 
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 
@@ -43,9 +43,9 @@ describe('tab press listeners', () => {
         getState: () => ({
           routes: [{ name: '(3_profile)', state: { key: 'profile-stack', index: 0 } }],
         }),
-        dispatch: vi.fn(),
+        dispatch: vi.fn<(action: { type: string; target?: string }) => void>(),
       },
-    }).tabPress({ preventDefault: vi.fn() });
+    }).tabPress({ preventDefault: vi.fn<() => void>() });
     vi.advanceTimersByTime(TAB_SWITCH_ACTIVE_TAB_SETTLE_MS);
 
     expect(isTabSwitchPending()).toBe(false);

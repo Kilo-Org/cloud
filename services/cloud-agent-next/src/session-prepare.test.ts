@@ -18,6 +18,7 @@ const {
   organizationMembershipLimitMock,
   assertKiloModelAvailableMock,
   getSandboxAllocationCandidatesMock,
+  loadEnvironmentForSessionMock,
 } = vi.hoisted(() => ({
   generateSessionIdMock: vi.fn(() => 'workspace_12345678-1234-1234-1234-123456789abc'),
   selectControlPlaneSandboxMock: vi.fn(),
@@ -27,6 +28,8 @@ const {
   organizationMembershipLimitMock: vi.fn(),
   assertKiloModelAvailableMock: vi.fn(),
   getSandboxAllocationCandidatesMock: vi.fn(),
+  // Approved origins look up the repository environment; these tests have none.
+  loadEnvironmentForSessionMock: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@kilocode/cloud-agent-profile', async importActual => {
@@ -35,6 +38,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
     getSandboxAllocationCandidates: getSandboxAllocationCandidatesMock,
+    loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
 });
 

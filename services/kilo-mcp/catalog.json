@@ -6394,7 +6394,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "maxLength": 500
+                "maxLength": 16000
               }
             },
             "mcpServers": {
@@ -7050,7 +7050,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "maxLength": 500
+                "maxLength": 16000
               }
             },
             "mcpServers": {
@@ -8056,6 +8056,461 @@
       "allocation"
     ],
     "searchBlob": "cloudAgentSettings.setRepositorySettings Save Cloud Agent sandbox settings for a specific repository, setting or clearing its assigned profile and allocation. cloudagentsettings setrepositorysettings organizationid repofullname platform profileid allocation organizationId repoFullName platform profileId allocation"
+  },
+  "cloudEnvironments.create": {
+    "path": "cloudEnvironments.create",
+    "kind": "mutation",
+    "summary": "Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can have only one.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "repository": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "github"
+                },
+                "fullName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "fullName"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "gitlab"
+                },
+                "projectPath": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "projectPath"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "bitbucket"
+                },
+                "fullName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "workspaceUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "repositoryUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "platform",
+                "fullName",
+                "workspaceUuid",
+                "repositoryUuid"
+              ]
+            }
+          ]
+        },
+        "plainVars": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8192
+          }
+        },
+        "commands": {
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
+        "sandboxAllocation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "cloudflare-single",
+                "cloudflare-shared",
+                "cloudflare-containers-standard-3",
+                "cloudflare-containers-standard-4",
+                "vercel-small",
+                "vercel-large"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "repository"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "create",
+      "organizationid",
+      "name",
+      "repository",
+      "plainvars",
+      "secrets",
+      "commands",
+      "sandboxallocation"
+    ],
+    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can have only one. cloudenvironments create organizationid name repository plainvars secrets commands sandboxallocation organizationId name repository plainVars secrets commands sandboxAllocation"
+  },
+  "cloudEnvironments.delete": {
+    "path": "cloudEnvironments.delete",
+    "kind": "mutation",
+    "summary": "Delete a Cloud Agent repository environment. New sessions in the repository then start without it.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "delete",
+      "organizationid",
+      "environmentid"
+    ],
+    "searchBlob": "cloudEnvironments.delete Delete a Cloud Agent repository environment. New sessions in the repository then start without it. cloudenvironments delete organizationid environmentid organizationId environmentId"
+  },
+  "cloudEnvironments.get": {
+    "path": "cloudEnvironments.get",
+    "kind": "query",
+    "summary": "Get one Cloud Agent repository environment with its setup commands, plain variables, secret names, and sandbox size.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "get",
+      "organizationid",
+      "environmentid"
+    ],
+    "searchBlob": "cloudEnvironments.get Get one Cloud Agent repository environment with its setup commands, plain variables, secret names, and sandbox size. cloudenvironments get organizationid environmentid organizationId environmentId"
+  },
+  "cloudEnvironments.list": {
+    "path": "cloudEnvironments.list",
+    "kind": "query",
+    "summary": "List the Cloud Agent repository environment for one repository, with setup command, variable, secret, and sandbox size details.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "repository": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "github"
+                },
+                "fullName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "fullName"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "gitlab"
+                },
+                "projectPath": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "projectPath"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "bitbucket"
+                },
+                "workspaceUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "repositoryUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "platform",
+                "workspaceUuid",
+                "repositoryUuid"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "repository"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "list",
+      "organizationid",
+      "repository"
+    ],
+    "searchBlob": "cloudEnvironments.list List the Cloud Agent repository environment for one repository, with setup command, variable, secret, and sandbox size details. cloudenvironments list organizationid repository organizationId repository"
+  },
+  "cloudEnvironments.listAll": {
+    "path": "cloudEnvironments.listAll",
+    "kind": "query",
+    "summary": "List every Cloud Agent repository environment for the user or organization, across all repositories.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "cloudenvironments",
+      "listall",
+      "organizationid"
+    ],
+    "searchBlob": "cloudEnvironments.listAll List every Cloud Agent repository environment for the user or organization, across all repositories. cloudenvironments listall organizationid organizationId"
+  },
+  "cloudEnvironments.update": {
+    "path": "cloudEnvironments.update",
+    "kind": "mutation",
+    "summary": "Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "plainVars": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "value": {
+                    "type": "string",
+                    "maxLength": 8192
+                  }
+                },
+                "required": [
+                  "key",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "delete": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "key",
+                  "delete"
+                ]
+              }
+            ]
+          }
+        },
+        "commands": {
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
+        "sandboxAllocation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "cloudflare-single",
+                "cloudflare-shared",
+                "cloudflare-containers-standard-3",
+                "cloudflare-containers-standard-4",
+                "vercel-small",
+                "vercel-large"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "update",
+      "organizationid",
+      "environmentid",
+      "name",
+      "plainvars",
+      "secrets",
+      "commands",
+      "sandboxallocation"
+    ],
+    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name plainvars secrets commands sandboxallocation organizationId environmentId name plainVars secrets commands sandboxAllocation"
   },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",
@@ -16946,7 +17401,7 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "maxLength": 500
+                    "maxLength": 16000
                   }
                 },
                 "mcpServers": {
@@ -17608,7 +18063,7 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "maxLength": 500
+                    "maxLength": 16000
                   }
                 },
                 "mcpServers": {

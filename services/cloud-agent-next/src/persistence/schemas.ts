@@ -1,3 +1,4 @@
+import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script';
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
@@ -288,7 +289,7 @@ const SharedSessionProfileFields = {
     })
     .optional(),
   encryptedSecrets: EncryptedSecretsSchema.optional(),
-  setupCommands: z.array(z.string().max(500)).max(Limits.MAX_SETUP_COMMANDS).optional(),
+  setupCommands: setupCommandsSchema.optional(),
   mcpServers: z
     .record(z.string().max(100), MCPServerConfigSchema)
     .refine(obj => Object.keys(obj).length <= Limits.MAX_MCP_SERVERS, {

@@ -2,7 +2,6 @@ import { describe, expect, it } from '@jest/globals';
 import {
   getLastUsedModelStorageKey,
   getLastUsedRepoStorageKey,
-  getLastUsedSandboxAllocationStorageKey,
   getLastUsedVariantsStorageKey,
   getPreferredInitialModel,
   getPreferredInitialRepo,
@@ -73,17 +72,6 @@ describe('getLastUsedVariantsStorageKey', () => {
     expect(getLastUsedVariantsStorageKey()).toBe('cloud-agent:last-used-variants:personal');
     expect(getLastUsedVariantsStorageKey('org_123')).toBe(
       'cloud-agent:last-used-variants:organization:org_123'
-    );
-  });
-});
-
-describe('getLastUsedSandboxAllocationStorageKey', () => {
-  it('uses separate keys for personal and organization contexts', () => {
-    expect(getLastUsedSandboxAllocationStorageKey()).toBe(
-      'cloud-agent:last-used-sandbox-allocation:personal'
-    );
-    expect(getLastUsedSandboxAllocationStorageKey('org_123')).toBe(
-      'cloud-agent:last-used-sandbox-allocation:organization:org_123'
     );
   });
 });

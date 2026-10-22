@@ -1,3 +1,4 @@
+import { runSetupScript } from '../setup-script.js';
 import { materializeRuntimeProfile, withRuntimeProfileEnvironment } from './runtime-profile.js';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -21,7 +22,6 @@ import type { WrapperKiloClient } from '../kilo-api.js';
 import { fetchKiloServer } from '../kilo-server-auth.js';
 import {
   git,
-  runProcess,
   withTimeoutAndAbort,
   type ExecResult,
   type ProcessOptions,
@@ -430,7 +430,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   const runSetup =
     deps.runSetup ??
     ((command, directory, env, onOutput, signal) =>
-      runProcess('sh', ['-c', command], {
+      runSetupScript(command, {
         cwd: directory,
         env,
         inheritEnv: false,

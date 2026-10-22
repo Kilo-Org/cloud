@@ -16,7 +16,11 @@ requirements remain in force.
 
 Draft -- created 2026-08-24, revised 2026-08-27 to define the passive sandbox
 status contract alongside shared worktree navigation and durability; revised
-2026-09-11 to add the continuity contract for long-lived, recoverable chats.
+2026-09-11 to add the continuity contract for long-lived, recoverable chats;
+revised 2026-10-07 to add the optional repository environment; revised
+2026-10-21 to apply the repository environment automatically and move the
+sandbox size into it; revised 2026-10-22 to simplify environment editing and
+show profile conflicts before saving.
 
 ## Conventions
 
@@ -29,6 +33,9 @@ they appear in all capitals, as shown here.
 
 - **Session**: one chat bound to one repository and one environment.
 - **Environment**: the isolated workspace where the agent runs.
+- **Repository environment**: an optional saved setup for one repository --
+  setup commands, plaintext variables, secrets, and a sandbox size -- distinct
+  from the sandbox Environment. An owner has at most one per repository.
 - **Worktree**: a group of independent browser chats that share the same
   checked-out repository files while their environment exists.
 - **Preparation**: visible setup of that environment -- clone, branch, setup
@@ -59,6 +66,44 @@ repository.
 4. A first prompt that is exactly a known slash command MUST run as that
    command, not as free text.
 5. An over-long prompt, or an attachment still uploading, MUST block submission.
+6. A session started from Cloud Agent web, Slack, GitHub, Linear, Discord, App
+   Builder, a webhook, or a schedule MUST use the owner's repository environment
+   for the chosen repository when one exists. The user does not select it. Code
+   review and security sessions MUST NOT use it. A repository without one
+   launches unchanged. Its setup commands MUST run as preparation steps and
+   MUST NOT reveal secret values.
+7. While a repository environment applies, profile setup commands MUST NOT run.
+   Profile variables, and variables and commands sent with the request, still
+   apply over the environment.
+8. The new-session form MUST show the chosen repository's environment beside
+   the repository. Organization owners and admins, and personal owners, MAY
+   create, edit, or delete it. Other organization members, including billing
+   managers, MAY only see it. The API MUST enforce these permissions. The form
+   MUST NOT offer a sandbox choice.
+9. A session MUST start on the environment's sandbox size when the owner can
+   use it. Otherwise the repository override applies, then the owner default,
+   then the platform default. A request that names a sandbox wins over all of
+   them.
+10. Saving an environment with a new sandbox size MUST fail when the owner
+    cannot use that size for the repository. A saved size that later becomes
+    unavailable MUST NOT block other edits to the environment.
+11. The environment editor MUST identify the applicable profiles whose setup
+    commands will not run, including when the environment has no setup script.
+    When a profile overrides an environment variable, the editor MUST identify
+    the winning profile and variable name without revealing its value.
+12. New or replaced variables entered in the environment editor MUST be saved
+    as secrets. Untouched plaintext values and saved secrets MUST be retained.
+    The editor MUST NOT show saved secret values. A saved secret appears as
+    `KEY=<unchanged>` in the editor. Keeping this marker retains the value;
+    replacing it changes the value; deleting its line removes the variable.
+    The marker MUST NOT be saved as the secret value.
+13. The environment editor MUST offer one setup script. New or edited setup
+    MUST save at most one script. Existing multi-script setups MUST remain
+    intact when the user changes only variables or the sandbox size.
+    Setup scripts MUST run with Bash and stop on an unhandled command or
+    pipeline failure without requiring `set -e` in the script. A failed script
+    MUST stop preparation and show the failure. Each script MAY contain up to
+    16,000 characters.
 
 ### Preparation
 
@@ -429,6 +474,34 @@ The following use SHOULD and are not enforced today:
    ready with setup half-done.)
 
 ## Changelog
+
+### 2026-10-22 -- Environment editor and profile transition
+
+- Added focused setup script and variable editors, with readable sandbox sizes.
+- New environments use the repository name without a separate name field.
+- Added notices for skipped profile commands and overridden variable keys.
+- New and replaced variable values are encrypted. Existing configuration stays
+  intact until the user changes or removes it.
+- Saved variables remain in the editor with explicit retention markers.
+- Setup uses Bash with automatic failure handling and supports scripts up to
+  16,000 characters.
+
+### 2026-10-21 -- Automatic repository environments
+
+- A repository has at most one environment per owner, and approved origins
+  apply it automatically. The user no longer selects one.
+- Moved the sandbox size into the environment and removed the sandbox choice
+  from the new-session form.
+- Profile setup commands do not run while an environment applies, so a setup
+  moved into the environment never runs twice.
+- Saving a sandbox size that the owner cannot use for the repository fails.
+
+### 2026-10-07 -- Repository environments
+
+- Added the repository environment definition and a Start rule: an optional
+  saved setup for the chosen repository, distinct from the sandbox Environment.
+  Omitting it leaves launch unchanged; its setup commands run as preparation
+  steps and never reveal secret values.
 
 ### 2026-09-26 -- Bounded workspace control recovery
 

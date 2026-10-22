@@ -82,6 +82,7 @@ import {
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
   cloud_agent_sandbox_allocation_settings,
+  cloud_agent_environments,
   deleted_user_email_tombstones,
   impact_attribution_touches,
   impact_advocate_participants,
@@ -323,6 +324,7 @@ describe('User', () => {
     await db.delete(kiloclaw_instances);
     await db.delete(agent_environment_profile_skills);
     await db.delete(agent_environment_profile_mcp_servers);
+    await db.delete(cloud_agent_environments);
     await db.delete(agent_environment_profiles);
     await db.delete(github_branch_pull_requests);
     await db.delete(code_review_memory_proposals);
@@ -5366,6 +5368,40 @@ describe('User', () => {
         .from(agent_environment_profile_skills)
         .where(eq(agent_environment_profile_skills.profile_id, profile.id));
       expect(skills).toHaveLength(0);
+    });
+
+    it('deletes user-owned repository environments without touching another owner', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      await db.insert(cloud_agent_environments).values([
+        {
+          owned_by_user_id: user.id,
+          name: 'mine',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        },
+        {
+          owned_by_user_id: otherUser.id,
+          name: 'theirs',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const environments = await db
+        .select()
+        .from(cloud_agent_environments)
+        .where(eq(cloud_agent_environments.owned_by_user_id, otherUser.id));
+      expect(environments.map(environment => environment.name)).toEqual(['theirs']);
+
+      const deletedUserEnvironments = await db
+        .select()
+        .from(cloud_agent_environments)
+        .where(eq(cloud_agent_environments.owned_by_user_id, user.id));
+      expect(deletedUserEnvironments).toHaveLength(0);
     });
 
     it('should nullify user_feedback FK', async () => {

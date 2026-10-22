@@ -18,7 +18,10 @@ import {
   type SessionAttachPayload,
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
-import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
+import {
+  CONTROL_RUNTIME_RESERVED_ENV_VARS,
+  RESERVED_ENV_VAR_PREFIXES,
+} from '../../../src/shared/runtime-environment.js';
 import { kiloServerEnvForOrigin } from '../../../src/shared/kilo-server-env.js';
 import { type WrapperKiloClient } from '../kilo-api.js';
 
@@ -81,9 +84,7 @@ export function buildWorktreeKiloEnvironment(
   const isRuntimeOwned = (name: string): boolean =>
     reserved.has(name) ||
     name === 'HOME' ||
-    name.startsWith('XDG_') ||
-    name.startsWith('KILO') ||
-    name.startsWith('OPENCODE');
+    RESERVED_ENV_VAR_PREFIXES.some(prefix => name.startsWith(prefix));
 
   for (const [name, value] of Object.entries(inherited)) {
     if (value !== undefined && !isRuntimeOwned(name) && !INHERITED_GIT_CREDENTIALS.has(name)) {

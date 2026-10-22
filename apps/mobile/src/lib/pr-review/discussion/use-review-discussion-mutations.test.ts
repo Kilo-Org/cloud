@@ -169,18 +169,6 @@ vi.mock('sonner-native', () => ({
   toast: { error: (msg: string) => toastErrorMock(msg) },
 }));
 
-// Rolldown (Vitest's bundler) cannot parse React Native's Flow source.
-// `use-review-discussion-mutations` imports `announce`, which imports
-// `react-native`. Mock only the symbols `announce.ts` imports so the module
-// graph loads under Node.
-vi.mock('react-native', () => ({
-  AccessibilityInfo: {
-    announceForAccessibility: vi.fn(),
-    setAccessibilityFocus: vi.fn(),
-  },
-  findNodeHandle: vi.fn(() => null),
-}));
-
 const REPLY_INPUT = {
   owner: 'octocat',
   repo: 'hello',

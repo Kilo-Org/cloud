@@ -132,6 +132,10 @@ export async function getOpenAiChatGptConnection(
  * requests, which also execute in sfo1, so it is the documented correctness
  * exception for the round trip it costs. A refresh re-reads the row on the
  * primary under a lock.
+ *
+ * The catalog's BYOK badge reads through this same accessor, so a model list
+ * reports the same state the route decides on. That read runs once per
+ * model-list request, not per token.
  */
 export async function getOpenAiChatGptStoredConnection(
   owner: OpenAiChatGptOwner

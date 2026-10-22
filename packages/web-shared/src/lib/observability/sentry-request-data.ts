@@ -30,8 +30,9 @@ type SentryRequest = NonNullable<Event['request']>;
 type SentryQueryString = NonNullable<SentryRequest['query_string']>;
 type SentryHeaders = NonNullable<SentryRequest['headers']>;
 
-// The proxy forwards the request query in this header, so the header value
-// follows the same query policy as the URL.
+// The proxy forwards the request pathname and query in these headers, so the
+// header values follow the same policy as the URL.
+const PATHNAME_HEADER = 'x-pathname';
 const SEARCH_HEADER = 'x-search';
 
 function sanitizeStringQuery(queryString: string): string {
@@ -41,14 +42,19 @@ function sanitizeStringQuery(queryString: string): string {
     .join('&');
 }
 
-function sanitizeSearchHeaders(headers: SentryHeaders): void {
+function sanitizeForwardedHeaders(headers: SentryHeaders): void {
   for (const name of Object.keys(headers)) {
-    if (name.toLowerCase() !== SEARCH_HEADER) {
-      continue;
-    }
     const value = headers[name];
-    const prefix = value.startsWith('?') ? '?' : '';
-    headers[name] = `${prefix}${sanitizeStringQuery(value.slice(prefix.length))}`;
+    switch (name.toLowerCase()) {
+      case PATHNAME_HEADER:
+        headers[name] = sanitizeAnalyticsPathname(value);
+        break;
+      case SEARCH_HEADER: {
+        const prefix = value.startsWith('?') ? '?' : '';
+        headers[name] = `${prefix}${sanitizeStringQuery(value.slice(prefix.length))}`;
+        break;
+      }
+    }
   }
 }
 
@@ -110,7 +116,7 @@ export function sanitizeSentryRequestData(event: Event): Event {
     request.query_string = sanitizeQueryString(request.query_string);
   }
   if (request.headers) {
-    sanitizeSearchHeaders(request.headers);
+    sanitizeForwardedHeaders(request.headers);
   }
   return event;
 }

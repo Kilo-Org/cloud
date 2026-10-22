@@ -319,6 +319,22 @@ describe('sanitizeSentryRequestData', () => {
     expect(result.request?.headers?.accept).toBe('*/*');
   });
 
+  test('redacts a session share path in the forwarded pathname header', () => {
+    const event: Event = {
+      request: {
+        headers: {
+          'x-pathname': '/s/eyJhbGciOiJIUzI1NiJ9.share.token',
+          accept: '*/*',
+        },
+      },
+    };
+
+    const result = sanitizeSentryRequestData(event);
+
+    expect(result.request?.headers?.['x-pathname']).toBe('/s/:share_token');
+    expect(result.request?.headers?.accept).toBe('*/*');
+  });
+
   test('matches the search header name case-insensitively', () => {
     const event: Event = {
       request: { headers: { 'X-Search': 'state=raw-state-token&tab=usage' } },

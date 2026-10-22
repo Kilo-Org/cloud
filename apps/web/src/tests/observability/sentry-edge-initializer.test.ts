@@ -96,11 +96,15 @@ describe('edge Sentry initializer request data', () => {
 
     const result = beforeSend({
       request: {
-        headers: { 'x-search': '?organizationId=org_123&installState=abc-token-123&fromApp=1' },
+        headers: {
+          'x-search': '?organizationId=org_123&installState=abc-token-123&fromApp=1',
+          'x-pathname': '/s/eyJhbGciOiJIUzI1NiJ9.share.token',
+        },
       },
     });
 
     expect(result?.request?.headers?.['x-search']).toBe('?organizationId=org_123&fromApp=1');
+    expect(result?.request?.headers?.['x-pathname']).toBe('/s/:share_token');
   });
 
   test('keeps request data without the policy keys unchanged', async () => {

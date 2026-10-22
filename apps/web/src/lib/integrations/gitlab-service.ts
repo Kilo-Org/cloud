@@ -1065,6 +1065,8 @@ async function cacheConnectedGitLabRepositories(
  * If an existing integration exists, this function will update it instead of
  * creating a new one. This preserves webhook secrets and configured webhooks
  * so existing webhook configurations continue to work.
+ * Replacing a credential clears its authentication invalidation in the same
+ * transaction; connection health does not depend on the repository-cache sync.
  *
  * @param owner - User or organization owner
  * @param token - Personal Access Token
@@ -1177,6 +1179,8 @@ export async function connectWithPAT(
           platform_account_login: validatedUser.username,
           scopes: validation.tokenInfo?.scopes ?? ['api'],
           integration_status: INTEGRATION_STATUS.ACTIVE,
+          auth_invalid_at: null,
+          auth_invalid_reason: null,
           updated_at: new Date().toISOString(),
         })
         .where(eq(platform_integrations.id, existingIntegration.id));

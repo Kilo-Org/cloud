@@ -1035,6 +1035,53 @@ describe('GitLab encrypted credential persistence', () => {
     );
   });
 
+  it('restores credential health on reconnect even when repository sync fails', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user', id: user.id } as const;
+    const initial = await connectWithPAT(
+      owner,
+      'glpat-initial-token',
+      'https://gitlab.com',
+      user.id
+    );
+    await db
+      .update(platform_integrations)
+      .set({
+        integration_status: 'suspended',
+        auth_invalid_at: new Date().toISOString(),
+        auth_invalid_reason: 'authorizing_user_deleted',
+      })
+      .where(eq(platform_integrations.id, initial.integration.id));
+    await db
+      .delete(platform_access_token_credentials)
+      .where(eq(platform_access_token_credentials.platform_integration_id, initial.integration.id));
+    mockFetchGitLabProjects.mockRejectedValueOnce(new Error('GitLab projects fetch failed: 502'));
+
+    const result = await connectWithPAT(
+      owner,
+      'glpat-replacement-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, initial.integration.id));
+    const [credential] = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(eq(platform_access_token_credentials.platform_integration_id, initial.integration.id));
+
+    expect(result.success).toBe(true);
+    expect(result.warnings).toEqual([
+      'Connected, but the repository list could not be loaded. Refresh the project list from the GitLab integration page.',
+    ]);
+    expect(integration.integration_status).toBe('active');
+    expect(integration.auth_invalid_at).toBeNull();
+    expect(integration.auth_invalid_reason).toBeNull();
+    expect(credential.authorized_by_user_id).toBe(user.id);
+  });
+
   it('discards the previous instance cache when the repository list cannot be loaded', async () => {
     const user = await insertTestUser();
     mockFetchGitLabProjects.mockResolvedValueOnce([

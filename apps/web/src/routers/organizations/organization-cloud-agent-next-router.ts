@@ -759,7 +759,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(ImageUploadUrlInput)
     .mutation(async ({ ctx, input }) => {
       return generateImageUploadUrl({
-        service: 'cloud-agent',
         userId: ctx.user.id,
         messageUuid: input.messageUuid,
         imageId: input.imageId,

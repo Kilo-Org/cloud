@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+
 import jwt from 'jsonwebtoken';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,14 +11,9 @@ vi.mock('../sandbox-session/session-stub.js', () => ({
     getRuntimeAuthorizationStatus,
     recoverExpiredRuntimeAuthorization,
   }),
-  resolveLegacySessionStub: () => ({
-    getRuntimeAuthorizationRecoveryState: getRuntimeAuthorizationStatus,
-    recoverExpiredRuntimeAuthorization,
-  }),
-  resolveSessionStub: () => ({}),
 }));
 
-vi.mock('../session-service.js', () => ({
+vi.mock('./metadata.js', () => ({
   fetchSessionMetadata: vi.fn(async () => ({
     identity: { sessionId: 'workspace_12345678-1234-1234-1234-123456789abc', userId: 'usr_1' },
   })),
@@ -60,6 +56,12 @@ describe('preflightRuntimeAuthorizationRecovery', () => {
 
   it('does nothing for an active authorization', async () => {
     getRuntimeAuthorizationStatus.mockResolvedValue({ state: 'active', id: 'authorization-1' });
+    await preflightRuntimeAuthorizationRecovery('workspace_a', ctx);
+    expect(recoverExpiredRuntimeAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('does nothing for the legacy credential-compatibility status', async () => {
+    getRuntimeAuthorizationStatus.mockResolvedValue({ state: 'legacy' });
     await preflightRuntimeAuthorizationRecovery('workspace_a', ctx);
     expect(recoverExpiredRuntimeAuthorization).not.toHaveBeenCalled();
   });

@@ -33,7 +33,7 @@ type MergeBlockedReasonSeverity = 'info' | 'warn' | 'destructive';
 
 export type MergeBlockedReason = {
   id: MergeBlockedReasonId;
-  /** Stable identifier the section uses to look up an icon (see pr-merge-icons.ts). */
+  /** Stable identifier the section uses to look up an icon (see pr-merge-icons.tsx). */
   iconKind: MergeBlockedReasonId;
   severity: MergeBlockedReasonSeverity;
   title: string;
@@ -258,6 +258,14 @@ const PR_MERGE_LABEL_KEYS = {
   rebase: 'prReview.merge.methodLabels.rebase',
 } satisfies Record<AllowedMergeMethod, string>;
 
+// The chip's own copy: the method name alone, which is what fits a pill. The
+// long `methodLabels` sentence is the spoken label above.
+const PR_MERGE_SHORT_LABEL_KEYS = {
+  merge: 'prReview.merge.methods.merge',
+  squash: 'prReview.merge.methods.squash',
+  rebase: 'prReview.merge.methods.rebase',
+} satisfies Record<AllowedMergeMethod, string>;
+
 const PR_MERGE_DESCRIPTION_KEYS = {
   merge: 'prReview.merge.methodDescriptions.merge',
   squash: 'prReview.merge.methodDescriptions.squash',
@@ -266,6 +274,10 @@ const PR_MERGE_DESCRIPTION_KEYS = {
 
 export function prMergeLabel(method: AllowedMergeMethod): string {
   return i18n.t(PR_MERGE_LABEL_KEYS[method]);
+}
+
+export function prMergeShortLabel(method: AllowedMergeMethod): string {
+  return i18n.t(PR_MERGE_SHORT_LABEL_KEYS[method]);
 }
 
 export function prMergeDescription(method: AllowedMergeMethod): string {

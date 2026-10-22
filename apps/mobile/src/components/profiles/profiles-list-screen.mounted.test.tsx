@@ -31,6 +31,7 @@ type ProfileSummary = {
 
 const refetchFn = vi.hoisted(() => vi.fn());
 const routerPush = vi.hoisted(() => vi.fn());
+const connectivityState = vi.hoisted(() => ({ value: 'online' as string }));
 const organizationState = vi.hoisted(() => ({ organizationId: 'org-1' as string | null }));
 const listState = vi.hoisted<ListResult>(() => ({
   orgProfiles: [],
@@ -46,6 +47,11 @@ const listState = vi.hoisted<ListResult>(() => ({
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileList: () => listState,
+}));
+
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => connectivityState.value,
+  useCommittedConnectivityStatus: () => connectivityState.value,
 }));
 
 vi.mock('@/lib/organization-context', () => ({
@@ -226,7 +232,7 @@ describe('ProfilesListScreen', () => {
       props: { accessibilityLabel: string };
     };
     expect(star.type).toBe('Star');
-    expect(star.props.accessibilityLabel).toBe('Personal profile, Default profile');
+    expect(star.props.accessibilityLabel).toBe('Default profile');
 
     const orgRow = findAll(renderer.root, 'ConfigureRow').find(
       row => row.props.title === 'Org profile'
@@ -276,6 +282,32 @@ describe('ProfilesListScreen', () => {
     expect(textChildren(renderer.root)).not.toContain('Organization');
     // `agentProfiles.list` does not tag owner, so every row is personal.
     expect(findOne(renderer.root, 'ConfigureRow').props.icon).toBe('User');
+
+    unmount();
+  });
+
+  it('offline refetch failure keeps the cached rows and names connectivity', async () => {
+    listState.personalProfiles = [profile({ id: 'personal-1', name: 'Personal profile' })];
+    listState.isError = true;
+    connectivityState.value = 'offline';
+
+    const { renderer, unmount } = await mount();
+
+    expect(findOne(renderer.root, 'QueryError').props.variant).toBe('offline');
+    // The cached rows stay usable under the banner.
+    expect(rowTitles(renderer.root)).toEqual(['Personal profile']);
+
+    unmount();
+  });
+
+  it('error without cached rows renders no rows, and connectivity unknown keeps server variant', async () => {
+    listState.isError = true;
+    connectivityState.value = 'unknown';
+
+    const { renderer, unmount } = await mount();
+
+    expect(findOne(renderer.root, 'QueryError').props.variant).toBe('server');
+    expect(findAll(renderer.root, 'ConfigureRow')).toHaveLength(0);
 
     unmount();
   });

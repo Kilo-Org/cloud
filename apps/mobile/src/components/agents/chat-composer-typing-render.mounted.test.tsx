@@ -98,10 +98,6 @@ vi.mock('sonner-native', () => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useNavigation: () => ({ dispatch: vi.fn() }),
-}));
-
-vi.mock('@/lib/navigation/prevent-remove', () => ({
   usePreventRemove: vi.fn(),
 }));
 

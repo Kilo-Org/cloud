@@ -94,8 +94,12 @@ function tenantPredicateForOwner(owner: WebhookInstallationOwner) {
  *   - the session stored neither head field (pre-headRef CLI) and its
  *     `git_branch` equals the payload head ref.
  *
- * In every case a stored `pr_head_ref` or `git_branch` that names another
- * branch than the payload head ref blocks the match. This is the same rule as
+ * Alongside that, the branch evidence the session reported must name the
+ * payload head ref: its `pr_head_ref` when it stored one, otherwise its
+ * `git_branch`. A stored branch that names another branch is expected when the
+ * session pushed its PR from a branch other than the one it recorded, so it
+ * does not block a matching stored `pr_head_ref`; a stored `pr_head_ref` that
+ * names another branch still blocks the match. This is the same rule as
  * `verifySessionPullRequestLink`, so a link the webhook verifies is never
  * revoked by the next refresh.
  *
@@ -138,15 +142,17 @@ export async function markSessionsVerifyingPullRequest(
       : sql`false`
   );
 
-  // A stored head ref or session branch that contradicts the payload head ref
-  // rejects the session, and at least one of them must name the payload head
-  // ref, as `verifySessionPullRequestLink` requires on refresh.
-  const noContradictingRef =
+  // The ref evidence is the branch the session reported pushing
+  // (`pr_head_ref`), or — for a link that carries no head ref — the session's
+  // stored `git_branch`. That ref must name the payload head ref, as
+  // `verifySessionPullRequestLink` requires on refresh. A stored branch that
+  // differs is expected when the session pushed its PR from another branch;
+  // a stored head ref that differs still rejects the session.
+  const matchingHeadRef =
     payloadHeadRef !== null
-      ? and(
-          or(isNull(cli_sessions_v2.pr_head_ref), eq(cli_sessions_v2.pr_head_ref, payloadHeadRef)),
-          or(isNull(cli_sessions_v2.git_branch), eq(cli_sessions_v2.git_branch, payloadHeadRef)),
-          or(isNotNull(cli_sessions_v2.pr_head_ref), isNotNull(cli_sessions_v2.git_branch))
+      ? eq(
+          sql`coalesce(nullif(${cli_sessions_v2.pr_head_ref}, ''), nullif(${cli_sessions_v2.git_branch}, ''))`,
+          payloadHeadRef
         )
       : sql`false`;
 
@@ -156,7 +162,7 @@ export async function markSessionsVerifyingPullRequest(
     isNotNull(cli_sessions_v2.pr_url),
     tenantPredicateForOwner(owner),
     headEvidence,
-    noContradictingRef
+    matchingHeadRef
   );
 
   // The stored link itself must name this PR: a `pr_url` on another repository

@@ -22,48 +22,25 @@
                   line-height: 24px;
                 "
               >
-                <h1 style="margin: 0 0 16px; color: #1a1a1a; font-size: 24px; line-height: 32px">
-                  Your custom Auto pool is ready now
-                </h1>
+                <p style="margin: 0 0 18px">Hello,</p>
                 <p style="margin: 0 0 18px">
-                  We have moved your saved Efficient Auto pool into a custom router. Your saved
-                  models are preserved. Select the new model ID below now to keep using your own
-                  pool after the upcoming change.
+                  We have moved your customized Auto Efficient model pool to its own model ID. Your
+                  users will need to update the model they use in order to continue using this pool.
                 </p>
                 <ul style="margin: 0 0 18px; padding-left: 20px">
                   {{ routers }}
                 </ul>
                 <p style="margin: 0 0 18px">
-                  Until <strong>{{ cutover_at }}</strong>, your current
-                  <code>kilo-auto/efficient</code> model ID continues to use your saved pool. During
-                  this notice period, pool membership and benchmark difficulty changes under Custom
-                  routers apply to both model IDs. Platform and custom routing modes are configured
-                  separately.
+                  Switch to the new model ID above before <strong>{{ cutover_at }}</strong>. If
+                  users continue to use the old model ID after that date, the default model pool
+                  will be used instead of yours.
                 </p>
                 <p style="margin: 0 0 18px">
-                  At that time, <code>kilo-auto/efficient</code> will switch to Kilo's
-                  platform-managed pool. Your custom router will keep your own pool, so update your
-                  model selection and any integrations to the new ID before the date above. There is
-                  no need to recreate your pool.
+                  We are making this change in order to bring significant improvements to auto model
+                  routing, primarily the ability to define multiple auto model IDs, each with their
+                  own custom pool of models.
                 </p>
-                <p style="margin: 0 0 18px">
-                  If your old pool inherited a routing mode, choose the desired mode explicitly
-                  under Custom routers. Custom routers use their own mode rather than inheriting
-                  platform settings. Without a saved custom selection, the mode is Best accuracy per
-                  dollar.
-                </p>
-                <p style="margin: 0 0 18px">
-                  You can still choose the routing mode for Kilo's platform routers after this
-                  change. Platform routers use Kilo's model pool; custom routers let you choose the
-                  benchmark difficulty, routing mode, and model pool independently.
-                </p>
-                <p style="margin: 0 0 18px">
-                  For organization pools, share the new organization model ID with your team and
-                  update its shared integrations.
-                </p>
-                <p style="margin: 0 0 22px">
-                  Questions? Reply to this email or contact {{ support_email }}.
-                </p>
+                <p style="margin: 0 0 22px">Questions? Just reply to this email.</p>
               </td>
             </tr>
           </table>

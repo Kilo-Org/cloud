@@ -1,4 +1,5 @@
 import type {
+  SandboxControlV2,
   ControlPlaneSessionPeer,
   ControlRuntimeCredentialProxyFence,
 } from '../../../src/control-plane/sandbox/sandbox-do.js';
@@ -12,6 +13,9 @@ import type {
   ControlPlaneRouteUpdate,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { Env } from '../../../src/types.js';
+import type { WorktreeChangesReady } from '../../../src/control-plane/worktree-changes-ready.js';
+import { CurrentSessionMetadataSchema } from '../../../src/persistence/session-metadata.js';
+import { sessionDoName } from '../../../src/session-identity.js';
 
 export type RecordedRouteUpdate = { sessionId: string; update: ControlPlaneRouteUpdate };
 export type RecordedEvents = { sessionId: string; notification: ControlPlaneEventsNotification };
@@ -24,10 +28,15 @@ export class FakeSessionPeer {
   readonly routeUpdates: RecordedRouteUpdate[] = [];
   readonly events: RecordedEvents[] = [];
   readonly outcomes: ControlPlaneOutcome[] = [];
+  readonly worktreeChanges: Array<{ sessionId: string; notification: WorktreeChangesReady }> = [];
   /** Every notification in arrival order, across kinds. */
-  readonly received: Array<{ kind: 'route' | 'events' | 'outcome'; sessionId: string }> = [];
+  readonly received: Array<{
+    kind: 'route' | 'events' | 'outcome' | 'worktree_changes';
+    sessionId: string;
+  }> = [];
   /** Delegation expiry this peer reports, so handoff selection is controllable. */
   delegationExpiresAt: number | null = null;
+  runtimeProxyForSession?: ReturnType<typeof createRuntimeProxyMintingPeer>;
 
   forSession(sessionId: string): ControlPlaneSessionPeer {
     return {
@@ -44,7 +53,14 @@ export class FakeSessionPeer {
         this.outcomes.push(outcome);
       },
       getRuntimeProxyDelegationExpiresAt: async () => this.delegationExpiresAt,
-      issueRuntimeCredentialProxyGrant: async () => null,
+      onWorktreeChangesReady: async notification => {
+        this.received.push({ kind: 'worktree_changes', sessionId });
+        this.worktreeChanges.push({ sessionId, notification });
+        return true;
+      },
+      issueRuntimeCredentialProxyGrant: async fence =>
+        (await this.runtimeProxyForSession?.(sessionId).issueRuntimeCredentialProxyGrant(fence)) ??
+        null,
     };
   }
 
@@ -71,6 +87,7 @@ export function createRuntimeProxyMintingPeer(
     // A deliberately long, live delegation so handoff selection can pick this
     // synthetic member without a real authorization store.
     getRuntimeProxyDelegationExpiresAt: async () => Date.now() + 24 * 60 * 60_000,
+    onWorktreeChangesReady: async () => true,
     issueRuntimeCredentialProxyGrant: async (fence: ControlRuntimeCredentialProxyFence) => {
       const { userId, kiloSessionId } = identity(sessionId);
       const now = Date.now();
@@ -97,4 +114,45 @@ export function createRuntimeProxyMintingPeer(
       return issueRuntimeCredentialProxyHandle(env, grant, now);
     },
   });
+}
+
+/** Lifecycle tests fake credential issuance while preserving the real Session DO notifications. */
+export function installFakeRuntimeProxyPeer(
+  instance: SandboxControlV2,
+  identityFor?: (
+    ownerId: string,
+    sessionId: string
+  ) => Promise<{ userId: string; kiloSessionId: string } | null>
+): void {
+  const peerFor = instance.sessionPeerFor.bind(instance);
+  instance.sessionPeerFor = (ownerId, sessionId) => {
+    const peer = peerFor(ownerId, sessionId);
+    if (peer === null) return null;
+    return {
+      onRoute: update => peer.onRoute(update),
+      onEvents: notification => peer.onEvents(notification),
+      onOutcome: outcome => peer.onOutcome(outcome),
+      onWorktreeChangesReady: notification => peer.onWorktreeChangesReady(notification),
+      getRuntimeProxyDelegationExpiresAt: async () => Date.now() + 24 * 60 * 60_000,
+      issueRuntimeCredentialProxyGrant: async fence => {
+        let identity;
+        if (identityFor) {
+          identity = await identityFor(ownerId, sessionId);
+        } else {
+          const metadata = CurrentSessionMetadataSchema.safeParse(
+            await instance.env.SANDBOX_SESSION.getByName(
+              sessionDoName(ownerId, sessionId)
+            ).getMetadata()
+          );
+          identity =
+            metadata.success && metadata.data.auth.kiloSessionId
+              ? { userId: ownerId, kiloSessionId: metadata.data.auth.kiloSessionId }
+              : null;
+        }
+        if (!identity) throw new Error('Missing registered Kilo session');
+        const mint = createRuntimeProxyMintingPeer(instance.env, () => identity);
+        return mint(sessionId).issueRuntimeCredentialProxyGrant(fence);
+      },
+    };
+  };
 }

@@ -24,9 +24,9 @@ export const CONTROL_PLANE_SANDBOX_PERMISSION = {
 } as const;
 
 /**
- * Only a Cloud Agent web session has a person who can answer a question or a
- * CLI-enforced human approval. Every other origin runs unattended.
+ * Only interactive Cloud Agent clients have a person who can answer a question
+ * or a CLI-enforced human approval. Every other origin runs unattended.
  */
 export function isInteractiveSessionOrigin(createdOnPlatform: string | undefined): boolean {
-  return createdOnPlatform === 'cloud-agent-web';
+  return createdOnPlatform === 'cloud-agent-web' || createdOnPlatform === 'desktop';
 }

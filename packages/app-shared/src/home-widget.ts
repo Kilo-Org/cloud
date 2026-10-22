@@ -1,3 +1,4 @@
+import { sessionDisplayLine } from '@kilocode/session-ingest-contracts/session-live-summary';
 import { z } from 'zod';
 import {
   buildGlanceableSnapshot,
@@ -121,8 +122,7 @@ function usableTime(value: string | undefined | null): number | null {
 }
 
 function safeTitle(value: string | undefined | null): string {
-  // eslint-disable-next-line no-control-regex
-  const title = (value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
+  const title = sessionDisplayLine(value ?? '').trim();
   const bounded = title.slice(0, HOME_WIDGET_TITLE_LIMIT);
   // Do not end a truncated title in the middle of a UTF-16 surrogate pair.
   const last = bounded.charCodeAt(bounded.length - 1);

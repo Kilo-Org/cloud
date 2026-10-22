@@ -49,6 +49,17 @@ describe('Home-only widget policy', () => {
     expect(buildHomeWidgetDetails([{ status: 'permission' }]).waitingAgents[0]?.title).toBe('');
   });
 
+  it('keeps row titles to the characters they draw', () => {
+    const details = buildHomeWidgetDetails([
+      {
+        status: 'permission',
+        title: 'src/report\u202Efdp.exe \u2066deploy\u2069',
+        approvalKey: 'a'.repeat(64),
+      },
+    ]);
+    expect(details.waitingAgents[0]?.title).toBe('src/reportfdp.exe deploy');
+  });
+
   it('uses one priority and excludes every zero-count secondary row', () => {
     const data = buildHomeWidgetData({
       ...scope,

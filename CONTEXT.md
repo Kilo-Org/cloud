@@ -76,7 +76,7 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 ## Relationships
 
 - A **Code Review Finding** belongs to one captured Code Reviewer review result and contains only controlled taxonomy values in Review Analytics.
-- **Code Reviewer** owners configure GitHub automation through review settings. `skip_external_pull_requests` defaults to `true`: automatic reviews use GitHub's `OWNER`, `MEMBER`, or `COLLABORATOR` author association. Owners may set it to `false` for broader participation. The bot preference is independent, and manual reviews retain their own policy.
+- **Code Reviewer** owners configure GitHub automation through review settings. `skip_external_pull_requests` defaults to `true`: automatic reviews use GitHub's `OWNER`, `MEMBER`, or `COLLABORATOR` author association. Owners may set it to `false` for broader participation. All selected automation preferences apply together, and manual reviews retain their own policy.
 - After the bot preference is satisfied, a GitHub author-preference skip reports a completed neutral check on the current head commit without starting review execution. The lite app retains its check-free behavior.
 - **Review Analytics** enrollment is available only to organization-owned reviews and is snapshotted when a Code Reviewer execution attempt is dispatched; changing the setting does not change an in-flight attempt.
 - **AI-estimated impact** describes a reviewed change and remains independent from Code Review Finding counts.

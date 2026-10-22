@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { createOutputRedactor, createSecretRedactor, redactSecrets } from './redact-output';
+import {
+  collectSecretValues,
+  createOutputRedactor,
+  createSecretRedactor,
+  redactSecrets,
+} from './redact-output';
 
 describe('redactSecrets', () => {
   it('redacts bearer tokens in Authorization headers', () => {
@@ -100,6 +105,15 @@ describe('redactSecrets', () => {
 });
 
 describe('known setup secret redaction', () => {
+  it('extracts configuration credentials while retaining malformed and explicitly named secrets', () => {
+    const malformed = '{unparsed configuration secret';
+    const config = JSON.stringify({ apiKey: 'configuration-token', model: 'public-model' });
+    expect(collectSecretValues({ KILO_CONFIG_CONTENT: config })).toEqual(['configuration-token']);
+    expect(collectSecretValues({ KILO_AUTH_CONTENT: malformed })).toEqual([malformed]);
+    expect(collectSecretValues({ PROFILE_VALUE: config }, [], ['PROFILE_VALUE'])).toEqual([config]);
+    expect(createSecretRedactor({ KILO_CONFIG_CONTENT: config })(config)).toBe('[REDACTED]');
+  });
+
   const environment = {
     KILO_AUTH_CONTENT: JSON.stringify({
       kilo: {

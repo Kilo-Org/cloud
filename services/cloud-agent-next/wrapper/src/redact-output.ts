@@ -13,6 +13,10 @@ const SECRET_PATTERNS: { pattern: RegExp; replacement: string }[] = [
     replacement: `$1=${REDACTED}`,
   },
   {
+    pattern: /("(?:KILO_AUTH|KILO_CONFIG|OPENCODE_CONFIG)_CONTENT"\s*:\s*)"(?:\\.|[^"\\])*"/gi,
+    replacement: `$1"${REDACTED}"`,
+  },
+  {
     pattern: /(Authorization\s*:\s*Bearer\s+)(\S+)/gi,
     replacement: `$1${REDACTED}`,
   },
@@ -56,10 +60,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Collects the values of every environment whose name
- * matches `SECRET_NAME`, plus the values of `secretEnvKeys` regardless of name.
- * Later environments override earlier ones for a named key, mirroring how the
- * caller layers them.
+ * Collects named secrets and credentials inside known configuration JSON.
+ * Explicit secretEnvKeys retain opaque values; malformed configurations do too.
  */
 export function collectSecretValues(
   environment: Record<string, string | undefined>,
@@ -93,10 +95,10 @@ export function collectSecretValues(
     for (const [name, value] of Object.entries(source)) {
       if (!value) continue;
       if (CONFIG_ENV_NAME.test(name)) {
-        remember(value);
         try {
           const parsed: unknown = JSON.parse(value);
-          collect(parsed);
+          if (isRecord(parsed) || Array.isArray(parsed)) collect(parsed);
+          else remember(value);
         } catch {
           remember(value);
         }
@@ -144,9 +146,14 @@ export function createSecretRedactor(
   additionalEnvironments: readonly Record<string, string | undefined>[] = [],
   secretEnvKeys: readonly string[] = []
 ): (text: string) => string {
-  return createSecretValueRedactor(
-    collectSecretValues(environment, additionalEnvironments, secretEnvKeys)
-  );
+  const values = collectSecretValues(environment, additionalEnvironments, secretEnvKeys);
+  // Setup output can mask whole configurations without retaining every historical copy.
+  for (const source of [environment, ...additionalEnvironments]) {
+    for (const [name, value] of Object.entries(source)) {
+      if (value && CONFIG_ENV_NAME.test(name)) values.push(value);
+    }
+  }
+  return createSecretValueRedactor(values);
 }
 
 export function createOutputRedactor(

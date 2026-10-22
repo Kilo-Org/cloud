@@ -224,7 +224,7 @@
     "hideBalance": "બેલેન્સ છુપાવો",
     "showBalance": "બેલેન્સ બતાવો",
     "balanceHidden": "બેલેન્સ છુપાયેલ છે",
-    "bonusCreditsExpiring": "{{amount}}ના બોનસ ક્રેડિટની મુદત {{date}}ના રોજ પૂરી થાય છે.",
+    "bonusCreditsExpiring": "{{amount}}ના ક્રેડિટની મુદત {{date}}ના રોજ પૂરી થાય છે.",
     "signOutTitle": "સાઇન આઉટ કરવું છે?",
     "signOutMessage": "તમારા વર્કસ્પેસનો ઉપયોગ કરવા માટે તમારે ફરી સાઇન ઇન કરવું પડશે.",
     "deleteAccountTitle": "એકાઉન્ટ કાઢી નાખવું છે?",

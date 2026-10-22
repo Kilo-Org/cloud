@@ -224,7 +224,7 @@
     "hideBalance": "शिल्लक लपवा",
     "showBalance": "शिल्लक दाखवा",
     "balanceHidden": "शिल्लक लपवली आहे",
-    "bonusCreditsExpiring": "{{amount}} इतक्या बोनस क्रेडिटची मुदत {{date}} रोजी संपते.",
+    "bonusCreditsExpiring": "{{amount}} इतक्या क्रेडिटची मुदत {{date}} रोजी संपते.",
     "signOutTitle": "साइन आउट करायचे?",
     "signOutMessage": "तुमच्या वर्कस्पेसमध्ये प्रवेश करण्यासाठी तुम्हाला पुन्हा साइन इन करावे लागेल.",
     "deleteAccountTitle": "खाते हटवायचे?",

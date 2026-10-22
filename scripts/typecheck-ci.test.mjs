@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -19,6 +27,77 @@ const extension = JSON.parse(
 );
 const rootScript = fileURLToPath(new URL('./typecheck-all.sh', import.meta.url));
 const harnessBuild = 'pnpm --filter @kilocode/harness-sdk run build';
+const pnpmCleanup = fileURLToPath(
+  new URL('../.github/actions/pnpm-store/cleanup/cleanup.cjs', import.meta.url)
+);
+
+test('dependency cache keeps only the content store on the mounted filesystem', t => {
+  const action = load(
+    readFileSync(new URL('../.github/actions/pnpm-store/action.yml', import.meta.url), 'utf8')
+  );
+  const mount = action.runs.steps.find(step => step.uses?.startsWith('useblacksmith/stickydisk@'));
+  assert.equal(mount.with.path, './node_modules');
+  assert.equal(
+    mount.with.key,
+    '${{ github.repository }}-node-modules-${{ runner.os }}-${{ runner.arch }}'
+  );
+
+  const mountIndex = action.runs.steps.indexOf(mount);
+  const cleanupIndex = action.runs.steps.findIndex(
+    step => step.name === 'Reset pnpm installed graph'
+  );
+  const configureIndex = action.runs.steps.findIndex(step => step.name === 'Configure pnpm store');
+  assert.ok(mountIndex < cleanupIndex && cleanupIndex < configureIndex);
+
+  const workspace = mkdtempSync(join(tmpdir(), 'pnpm-cache-cleanup-'));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+  const modules = join(workspace, 'node_modules');
+  const store = join(modules, '.pnpm-store');
+  mkdirSync(join(store, 'v11/files'), { recursive: true });
+  writeFileSync(join(store, 'v11/files/content'), 'cached package');
+  mkdirSync(join(modules, '.pnpm/node_modules'), { recursive: true });
+  mkdirSync(join(modules, '.bin'), { recursive: true });
+  writeFileSync(join(modules, '.modules.yaml'), 'stale metadata');
+  writeFileSync(join(modules, '.pnpm/lock.yaml'), 'stale graph');
+  symlinkSync('../package', join(modules, 'stale-package'));
+
+  const cleanup = action.runs.steps.find(step => step.name === 'Reset pnpm installed graph');
+  assert.equal(cleanup.uses, './.github/actions/pnpm-store/cleanup');
+  const cleanupAction = load(
+    readFileSync(
+      new URL('../.github/actions/pnpm-store/cleanup/action.yml', import.meta.url),
+      'utf8'
+    )
+  );
+  assert.equal(cleanupAction.runs.main, 'cleanup.cjs');
+  assert.equal(cleanupAction.runs.post, 'cleanup.cjs');
+  assert.equal(cleanupAction.runs['post-if'], 'always()');
+
+  const result = spawnSync(process.execPath, [pnpmCleanup], {
+    encoding: 'utf8',
+    env: { ...process.env, GITHUB_WORKSPACE: workspace },
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(join(store, 'v11/files/content'), 'utf8'), 'cached package');
+  assert.equal(existsSync(join(modules, '.pnpm')), false);
+  assert.equal(existsSync(join(modules, '.modules.yaml')), false);
+  assert.equal(existsSync(join(modules, '.bin')), false);
+  assert.equal(existsSync(join(modules, 'stale-package')), false);
+  assert.ok(
+    action.runs.steps.some(step =>
+      step.run?.includes('pnpm_config_store_dir=$GITHUB_WORKSPACE/node_modules/.pnpm-store')
+    )
+  );
+
+  const missingMountWorkspace = mkdtempSync(join(tmpdir(), 'pnpm-cache-missing-mount-'));
+  t.after(() => rmSync(missingMountWorkspace, { recursive: true, force: true }));
+  const missingMountResult = spawnSync(process.execPath, [pnpmCleanup], {
+    encoding: 'utf8',
+    env: { ...process.env, GITHUB_WORKSPACE: missingMountWorkspace },
+  });
+  assert.equal(missingMountResult.status, 0, missingMountResult.stderr);
+});
 
 for (const [file, name, command, condition] of [
   ['ci.yml', 'typecheck-groups', 'scripts/typecheck-all.sh --group ${{ matrix.group }}'],

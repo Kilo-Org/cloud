@@ -49,7 +49,7 @@ jobs:
   deploy-manual:
     if: inputs.worker != ''
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 25
+    timeout-minutes: ${{ inputs.worker == 'services/cloud-agent-next' && 75 || inputs.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
     name: Deploy ${{ inputs.worker }}
     environment: ${{ inputs.target_environment }}
     steps:
@@ -71,7 +71,38 @@ jobs:
         working-directory: ${{ inputs.worker }}
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare downloaded Cloud Agent runtime
+        if: inputs.worker == 'services/cloud-agent-next'
+        id: runtime
+        working-directory: services/cloud-agent-next
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+          RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
+          RUNTIME_PUBLICATION_ENABLED: ${{ vars.CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED }}
+          RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_READ_ACCESS_KEY_ID }}
+          RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_READ_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -f scripts/prepare-runtime-deploy.ts ] || [ -f runtime-targets.json ]; then
+            pnpm exec tsx scripts/prepare-runtime-deploy.ts "$TARGET_ENVIRONMENT" "$SOURCE_SHA"
+          fi
+
+      - name: Drain and deploy benchmark
+        if: inputs.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production'
+        working-directory: ${{ inputs.worker }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm run deploy
+
       - name: Deploy to Cloudflare Workers
+        id: deploy
+        if: inputs.worker != 'services/auto-routing-benchmark' || inputs.target_environment != 'production'
+        # One bounded retry for Cloudflare's flaky upload validation; the matrix
+        # job below carries the evidence. A real failure fails both attempts.
+        continue-on-error: true
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -80,7 +111,17 @@ jobs:
           # right before deploy; all other workers are unaffected.
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}
+
+      - name: Deploy to Cloudflare Workers (retry)
+        if: steps.deploy.outcome == 'failure'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: ${{ inputs.worker }}
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}
 
   detect-changes:
     if: inputs.worker == '' && inputs.base_sha != ''
@@ -187,6 +228,7 @@ jobs:
             services/kiloclaw  # Docker-based deploy in deploy-kiloclaw.yml (manual-only)
             services/gastown   # Deployed separately
             services/wasteland # Deployed separately
+            services/user-data-export # Automatic deploy suspended
             services/deploy-infra/builder-docker-container/container-files  # Build artifact template, not a deployable worker
           )
 
@@ -254,7 +296,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != ''
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 25
+    timeout-minutes: ${{ matrix.worker == 'services/cloud-agent-next' && 75 || matrix.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
     environment: ${{ inputs.target_environment }}
     strategy:
       fail-fast: false
@@ -280,7 +322,42 @@ jobs:
         working-directory: ${{ matrix.worker }}
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare downloaded Cloud Agent runtime
+        if: matrix.worker == 'services/cloud-agent-next'
+        id: runtime
+        working-directory: services/cloud-agent-next
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+          RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
+          RUNTIME_PUBLICATION_ENABLED: ${{ vars.CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED }}
+          RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_READ_ACCESS_KEY_ID }}
+          RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_READ_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -f scripts/prepare-runtime-deploy.ts ] || [ -f runtime-targets.json ]; then
+            pnpm exec tsx scripts/prepare-runtime-deploy.ts "$TARGET_ENVIRONMENT" "$SOURCE_SHA"
+          fi
+
+      - name: Drain and deploy benchmark
+        if: matrix.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production'
+        working-directory: ${{ matrix.worker }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm run deploy
+
       - name: Deploy to Cloudflare Workers
+        id: deploy
+        if: matrix.worker != 'services/auto-routing-benchmark' || inputs.target_environment != 'production'
+        # Cloudflare's upload validation is flaky for a script that sits close to
+        # its startup budget: a byte-identical cloud-agent-next bundle reported
+        # widely different startup times, and a rejection with "Script startup
+        # exceeded CPU time limit" or "Pipeline binding error" cleared on the next
+        # attempt. The retry below absorbs that noise. A real failure fails both
+        # attempts, so the job still fails.
+        continue-on-error: true
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -289,4 +366,14 @@ jobs:
           # right before deploy; all other workers are unaffected.
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}
+
+      - name: Deploy to Cloudflare Workers (retry)
+        if: steps.deploy.outcome == 'failure'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: ${{ matrix.worker }}
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}

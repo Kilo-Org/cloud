@@ -28,11 +28,7 @@ import {
 export const WORKTREE_CHANGES_KEY = 'worktree_changes';
 export const WORKTREE_FILE_PREFIX = 'worktree_file:';
 
-/**
- * Transport-neutral outcome of one worktree-change request. The legacy plane
- * maps its `ResponseFrame` into this shape at the call site; the V2 Session DO
- * maps the new control-plane result. The manager itself carries no old frame.
- */
+/** Result of a control-plane worktree capture. */
 export type WorktreeCaptureOutcome =
   | { ok: true; result: unknown }
   | { ok: false; code: string; message: string; retryable: boolean };
@@ -62,6 +58,9 @@ type WorktreeChangesDependencies = {
     transactionSync<T>(callback: () => T): T;
   };
   saveSnapshotEvent?(snapshot: WorktreeChangesSnapshot): (() => void) | undefined;
+  refreshSnapshot?(
+    context: WorktreeChangesContext
+  ): Promise<RefreshWorktreeChangesOutput | undefined>;
   readContext(): Promise<WorktreeChangesContext | null>;
   requestCapture(
     context: WorktreeChangesContext,
@@ -176,6 +175,16 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
       if (trigger.context && !sameContext(trigger.context, context)) {
         return { status: 'failed', snapshot };
       }
+      const shared = await deps.refreshSnapshot?.(context);
+      if (shared !== undefined) {
+        if (trigger.generation !== generation || suppressed || preparing) {
+          return { status: 'failed', snapshot: shared.snapshot };
+        }
+        if (shared.status === 'refreshed' && shared.snapshot) {
+          deps.saveSnapshotEvent?.(shared.snapshot)?.();
+        }
+        return shared;
+      }
       revision = Math.max(revision, snapshot?.revision ?? 0) + 1;
       if (!Number.isSafeInteger(revision)) return { status: 'failed', snapshot };
       const requestedRevision = revision;
@@ -284,6 +293,17 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
   }
 
   return {
+    saved(): { snapshot: WorktreeChangesSnapshot; files: WorktreeFileRecord[] } | undefined {
+      const snapshot = readSnapshot();
+      if (!snapshot) return undefined;
+      return {
+        snapshot,
+        files: snapshot.files.flatMap(file => {
+          const selected = readRecordAgainstManifest(snapshot, file.path);
+          return selected ? [selected.record] : [];
+        }),
+      };
+    },
     recovery(): WorktreeRecovery | undefined {
       const snapshot = readSnapshot();
       if (!snapshot || snapshot.files.length === 0 || suppressed) return undefined;

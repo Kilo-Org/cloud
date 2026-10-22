@@ -147,13 +147,11 @@ export { default as SmilePlus } from 'lucide-react-native/icons/face-slightly-sm
 export { default as Sparkles } from 'lucide-react-native/icons/sparkles';
 export { default as Square } from 'lucide-react-native/icons/square';
 export { default as Star } from 'lucide-react-native/icons/star';
-export { default as Table2 } from 'lucide-react-native/icons/table-2';
 export { default as Telescope } from 'lucide-react-native/icons/telescope';
 export { default as Terminal } from 'lucide-react-native/icons/terminal';
 export { default as Trash2 } from 'lucide-react-native/icons/trash';
 export { default as TriangleAlert } from 'lucide-react-native/icons/triangle-alert';
 export { default as Unlock } from 'lucide-react-native/icons/lock-open';
-export { default as Unlink } from 'lucide-react-native/icons/unlink';
 export { default as Unplug } from 'lucide-react-native/icons/unplug';
 export { default as User } from 'lucide-react-native/icons/user';
 export { default as UserPlus } from 'lucide-react-native/icons/user-plus';

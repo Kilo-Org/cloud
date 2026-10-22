@@ -17,7 +17,7 @@ import type { Images } from '@/lib/images-schema';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
+import { parseCustomerBillingFailure, type PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import {
   getWorktreeChangesOutputSchema,
@@ -41,18 +41,6 @@ import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 export type { SendMessagePayload } from './types.js';
 
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL') || '';
-
-function isConnectionResetError(error: unknown): boolean {
-  const seen = new Set<object>();
-  while (typeof error === 'object' && error !== null && !seen.has(error)) {
-    seen.add(error);
-    if ('code' in error && error.code === 'ECONNRESET') {
-      return true;
-    }
-    error = 'cause' in error ? error.cause : undefined;
-  }
-  return false;
-}
 
 // MCP server config types — CLI-native local/remote format.
 // Each env/header value is either a plain string (passed through verbatim)
@@ -123,6 +111,7 @@ export type AgentMode = string;
 
 /** Shared fields for prepareSession, present on both the non-clone and clone variants. */
 type PrepareSessionSharedFields = {
+  allowSubagentSessions?: boolean;
   githubAccessPurpose?: 'workflow' | 'agent';
   mode: AgentMode;
   model: string;
@@ -184,6 +173,8 @@ export type PrepareSessionNonCloneInput = PrepareSessionSharedFields & {
   autoInitiate?: boolean;
   /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
   operationKey?: string;
+  /** Client-proposed Kilo session ID, so the client can show the session before prepare returns. */
+  kiloSessionId?: string;
   cloneFromKiloSessionId?: undefined;
   cloneUpToMessageId?: undefined;
 };
@@ -221,6 +212,7 @@ export type CreateWorktreeChatInput = {
   sourceKiloSessionId: string;
   sourceCloudAgentSessionId: string;
   operationKey: string;
+  kiloSessionId?: string;
   kilocodeOrganizationId?: string;
   clientProvenance: 'browser';
 };
@@ -473,23 +465,6 @@ export type HealthOutput = {
   version: string;
 };
 
-export type ComputeBillingStatus = {
-  payer: { type: 'user' | 'org'; id: string };
-  attribution: 'payer_shared' | 'session';
-  phase: 'idle' | 'active' | 'stopping' | 'settling' | 'unavailable';
-  estimatedHourlyRateMicrodollars: number | null;
-  estimatedIntervalAmountMicrodollars: number | null;
-  billingMode: 'shadow' | 'paid' | null;
-  interval: {
-    id: string;
-    startedAt: string;
-    lastSeenAt: string;
-    stoppedAt: string | null;
-    confirmedSeconds: number;
-    settledBillableSeconds: number;
-  } | null;
-};
-
 /**
  * Custom error class for payment-related errors from cloud-agent.
  */
@@ -630,6 +605,9 @@ type CloudAgentNextTRPCClient = {
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
   };
+  getPreparationAttempts: {
+    query: (input: GetSessionInput) => Promise<PreparationAttempt[]>;
+  };
   getPendingInteractions: {
     query: (input: GetSessionInput) => Promise<GetPendingInteractionsOutput>;
   };
@@ -641,9 +619,6 @@ type CloudAgentNextTRPCClient = {
   };
   getWorktreeFile: {
     query: (input: GetWorktreeFileInput) => Promise<unknown>;
-  };
-  getComputeBillingStatus: {
-    query: (input: GetSessionInput) => Promise<ComputeBillingStatus>;
   };
   getSandboxSelectionOptions: {
     query: (input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>;
@@ -868,6 +843,19 @@ export class CloudAgentNextClient {
     }
   }
 
+  /** The session's preparation attempts, as its stream replays them. */
+  async getPreparationAttempts(cloudAgentSessionId: string): Promise<PreparationAttempt[]> {
+    try {
+      return await this.client.getPreparationAttempts.query({ cloudAgentSessionId });
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'getPreparationAttempts' },
+        extra: { cloudAgentSessionId },
+      });
+      throw error;
+    }
+  }
+
   async getSandboxStatus(cloudAgentSessionId: string): Promise<SandboxStatusSnapshot> {
     try {
       return SandboxStatusSnapshotSchema.parse(
@@ -935,18 +923,6 @@ export class CloudAgentNextClient {
       throw new Error('Saved worktree file does not match the query');
     }
     return result;
-  }
-
-  async getComputeBillingStatus(cloudAgentSessionId: string): Promise<ComputeBillingStatus> {
-    try {
-      return await this.client.getComputeBillingStatus.query({ cloudAgentSessionId });
-    } catch (error) {
-      if (!isConnectionResetError(error)) {
-        throw error;
-      }
-      await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 100));
-      return await this.client.getComputeBillingStatus.query({ cloudAgentSessionId });
-    }
   }
 
   async createWorktreeChat(input: CreateWorktreeChatInput): Promise<CreateWorktreeChatOutput> {

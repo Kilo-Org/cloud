@@ -231,6 +231,7 @@ function vercelAccessError(error: unknown): Error {
   return new Error(
     [
       'Could not verify Vercel access for the kilocode team.',
+      'Install workspace tools with `pnpm install --frozen-lockfile` in the checkout.',
       `Run \`${VERCEL_COMMAND} login\` with an account that has access to the kilocode team.`,
       `Verify access with \`${VERCEL_COMMAND} whoami --scope kilocode --format=json\`.`,
       details ? `Vercel reported:\n${details}` : undefined,

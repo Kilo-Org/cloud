@@ -148,9 +148,9 @@ function createRouteHarness(initialConfig: StoredConfig | null) {
   const getConfig = vi.fn(async () => config);
   const exists = vi.fn(async () => config !== null);
   const isActive = vi.fn(async () => config?.isActive ?? false);
-  const listRequests = vi.fn(
-    async (_limit: number): Promise<{ requests: CapturedRequest[] }> => ({ requests: [] })
-  );
+  const listRequests = vi.fn(async (_limit: number): Promise<{ requests: CapturedRequest[] }> => ({
+    requests: [],
+  }));
   const getRequest = vi.fn(async (_requestId: string): Promise<CapturedRequest | null> => null);
   const deleteTrigger = vi.fn(async () => ({ success: true }));
   const updateConfig = vi.fn(
@@ -167,9 +167,10 @@ function createRouteHarness(initialConfig: StoredConfig | null) {
   );
   const getConfigForResponse = vi.fn(async () => config);
   const idFromName = vi.fn((name: string) => name);
-  const invokeScheduled = vi.fn(
-    async (): Promise<ScheduledInvocation> => ({ success: true, requestId: crypto.randomUUID() })
-  );
+  const invokeScheduled = vi.fn(async (): Promise<ScheduledInvocation> => ({
+    success: true,
+    requestId: crypto.randomUUID(),
+  }));
   const stub = {
     configure,
     getConfig,
@@ -220,6 +221,83 @@ async function requestTrigger(env: Env, method: 'POST' | 'PUT', payload: Record<
     env
   );
 }
+
+describe('creator execution contract', () => {
+  const input = {
+    githubRepo: 'owner/repo',
+    mode: 'code',
+    model: 'model-1',
+    promptTemplate: 'Process {{body}}',
+    profileId: '5d08c60b-7755-4dd3-b3fc-7ae96bf50e22',
+    executionUserId: 'oauth/creator',
+  };
+  const webhookAuth = { header: 'x-secret', secret: 'secret' };
+
+  it('requires webhook authentication but exempts scheduled creator triggers', () => {
+    expect(TriggerConfigInput.safeParse(input).success).toBe(false);
+    expect(TriggerConfigInput.parse({ ...input, webhookAuth }).executionUserId).toBe(
+      'oauth/creator'
+    );
+    expect(
+      TriggerConfigInput.parse({
+        ...input,
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+      }).executionUserId
+    ).toBe('oauth/creator');
+    expect(
+      TriggerConfigInput.safeParse({ ...input, executionUserId: '', webhookAuth }).success
+    ).toBe(false);
+  });
+
+  it('rejects creator execution for KiloClaw or personal triggers', async () => {
+    expect(
+      TriggerConfigInput.safeParse({
+        targetType: 'kiloclaw_chat',
+        kiloclawInstanceId: input.profileId,
+        promptTemplate: 'test',
+        executionUserId: 'creator',
+        webhookAuth,
+      }).success
+    ).toBe(false);
+    const { env, configure } = createRouteHarness(null);
+    const response = await requestTrigger(env, 'POST', { ...input, webhookAuth });
+    expect(response.status).toBe(400);
+    expect(configure).not.toHaveBeenCalled();
+  });
+
+  it('forwards a trusted organization creator identity on create', async () => {
+    const { env, configure } = createRouteHarness(null);
+    const response = await api.request(
+      '/triggers/org/org-1/trigger-1',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Internal-API-Key': INTERNAL_API_SECRET },
+        body: JSON.stringify({ ...input, webhookAuth }),
+      },
+      env
+    );
+    expect(response.status).toBe(201);
+    expect(configure).toHaveBeenCalledWith(
+      'org/org-1',
+      'trigger-1',
+      expect.objectContaining({ executionUserId: 'oauth/creator' })
+    );
+  });
+
+  it.each(['another-user', null])(
+    'rejects attempts to change execution identity to %s',
+    async executionUserId => {
+      const { env, updateConfig } = createRouteHarness(existingConfig('cloud_agent'));
+      const response = await requestTrigger(env, 'PUT', {
+        executionUserId,
+        promptTemplate: 'changed',
+      });
+      expect(response.status).toBe(400);
+      expect(updateConfig).not.toHaveBeenCalled();
+    }
+  );
+});
 
 describe('trigger sandbox allocation routes', () => {
   beforeEach(() => {

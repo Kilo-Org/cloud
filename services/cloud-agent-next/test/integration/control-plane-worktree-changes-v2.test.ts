@@ -30,6 +30,7 @@ import {
   WORKTREE_CHANGES_KEY,
   WORKTREE_FILE_PREFIX,
   worktreeChangesContext,
+  WORKTREE_RECOVERY_KEY,
 } from '../../src/sandbox-session/worktree-changes.js';
 import { WORKTREE_DELETION_PREFIX } from '../../src/control-plane/sandbox/worktree-deletion.js';
 import { waitFor } from './wait-for.js';
@@ -205,6 +206,7 @@ async function startSessionWithSandbox(input: {
   savedRevision?: number;
   savedCapturedAt?: string;
   worktreeId?: string;
+  seed?: (storage: DurableObjectStorage) => void;
 }): Promise<DurableObjectStub<SandboxSessionV2>> {
   await injectProvider(input.sandboxId, input.provider);
   const sessionStub = sessions.getByName(sessionDoName(USER_ID, input.sessionId));
@@ -238,6 +240,12 @@ async function startSessionWithSandbox(input: {
         diff: { status: 'available', patch },
         content: { status: 'available', source: 'current', text: 'lost\n' },
       });
+    });
+  }
+  if (input.seed) {
+    await sessionStub.getSession();
+    await runInDurableObject(sessionStub, async (_instance, state) => {
+      input.seed?.(state.storage);
     });
   }
   await sessionStub.createSessionWithInitialAdmission({
@@ -893,6 +901,81 @@ describe('control-plane worktree changes (B10)', () => {
       sibling.getWorktreeFile({ path: 'lost.txt', expectedRevision: 1 })
     ).resolves.toMatchObject({ status: 'available', file: { diff: { patch } } });
   });
+  it('seeds scoped file identities and net recovery to a fresh shared owner', async () => {
+    const sessionId = newSessionId();
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const provider = createFakeProvider();
+    const revision = 4;
+    const scopes = ['uncommitted', 'against-base-branch'] as const;
+    const recovery = {
+      files: [{ path: 'same.txt', status: 'modified' as const, patch: 'net patch' }],
+    };
+    const first = await startSessionWithSandbox({
+      sessionId,
+      sandboxId,
+      provider,
+      worktreeId,
+      seed: storage => {
+        storage.kv.put(WORKTREE_CHANGES_KEY, {
+          ...SNAPSHOT_SUMMARY,
+          revision,
+          schemaVersion: 2,
+          capturedAt: '2026-01-01T00:00:00.000Z',
+          files: scopes.map(scope => ({
+            path: 'same.txt',
+            scope,
+            status: 'modified' as const,
+            additions: 1,
+            deletions: 1,
+            tracked: true,
+            binary: false,
+            countsComplete: true,
+            revision,
+          })),
+        });
+        for (const scope of scopes) {
+          storage.kv.put(`${WORKTREE_FILE_PREFIX}${scope}\0same.txt`, {
+            schemaVersion: 1,
+            revision,
+            path: 'same.txt',
+            scope,
+            diff: { status: 'available', patch: `${scope} patch` },
+            content: { status: 'available', source: 'current', text: `${scope} content` },
+          });
+        }
+        storage.kv.put(WORKTREE_RECOVERY_KEY, { revision, recovery });
+      },
+    });
+
+    await expect(first.getWorktreeChanges()).resolves.toMatchObject({
+      snapshot: { revision, files: scopes.map(scope => ({ path: 'same.txt', scope, revision })) },
+    });
+    await runInDurableObject(sandboxes.getByName(sandboxId), (_instance, state) => {
+      const keys = [...state.storage.kv.list({ prefix: `worktree_changes/${worktreeId}/` })].map(
+        ([key]) => key
+      );
+      for (const scope of scopes) {
+        expect(keys).toContain(
+          `worktree_changes/${worktreeId}/${WORKTREE_FILE_PREFIX}${scope}\0same.txt`
+        );
+      }
+      expect(keys).toContain(`worktree_changes/${worktreeId}/${WORKTREE_RECOVERY_KEY}`);
+    });
+    for (const scope of scopes) {
+      await expect(
+        first.getWorktreeFile({ path: 'same.txt', scope, expectedRevision: revision })
+      ).resolves.toMatchObject({
+        status: 'available',
+        file: { scope, content: { text: `${scope} content` } },
+      });
+    }
+    // The net recovery is promoted through the same seed and reaches the wrapper unchanged.
+    const wrapper = await connectAndHello(provider, sandboxId, 'wr_scoped_recovery');
+    const prepare = await awaitFrame(wrapper, 'session.prepare');
+    expect(prepare.spec.worktreeRecovery).toEqual(recovery);
+    wrapper.close();
+  });
   it('carries saved DO patches through credential projection to session.prepare without consuming them', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
@@ -1078,6 +1161,81 @@ describe('control-plane worktree changes (B10)', () => {
     expect(
       readyEvents.some(event => event.stream_event_type === 'cloud.worktree.changes.ready')
     ).toBe(true);
+    wrapper.close();
+  });
+
+  it('persists and retrieves the same path in both scopes through the wrapper and Session DO', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const provider = createFakeProvider();
+    const sessionStub = await startSessionWithSandbox({ sessionId, sandboxId, provider });
+    const wrapper = await connectAndHello(provider, sandboxId, 'wr_scoped');
+    await markRouteReady(sessionStub, wrapper, sessionId);
+    await settleCaptures(wrapper);
+    const refresh = sessionStub.refreshWorktreeChanges();
+    const frame = await awaitFrame(wrapper, 'worktree.snapshot');
+    const result = snapshotReply(frame.payload.revision, 'refs/remotes/origin/main');
+    const scopes = ['uncommitted', 'against-base-branch'] as const;
+    const summaryFiles = scopes.map(scope => ({
+      path: 'same.txt',
+      scope,
+      status: 'modified' as const,
+      additions: 1,
+      deletions: 1,
+      tracked: true,
+      binary: false,
+      countsComplete: true,
+    }));
+    wrapper.send({
+      type: 'worktree.result',
+      requestId: frame.requestId,
+      ok: true,
+      result: {
+        summary: { ...result.summary, files: summaryFiles },
+        recovery: { files: [{ path: 'same.txt', status: 'modified', patch: 'net patch' }] },
+        files: scopes.map(scope => ({
+          schemaVersion: 1,
+          revision: frame.payload.revision,
+          path: 'same.txt',
+          scope,
+          diff: { status: 'available', patch: `${scope} patch` },
+          content: { status: 'available', source: 'current', text: `${scope} content` },
+        })),
+      },
+    });
+    await expect(refresh).resolves.toMatchObject({ status: 'refreshed' });
+    for (const scope of scopes) {
+      await expect(
+        sessionStub.getWorktreeFile({
+          path: 'same.txt',
+          scope,
+          expectedRevision: frame.payload.revision,
+        })
+      ).resolves.toMatchObject({
+        status: 'available',
+        file: { scope, content: { text: `${scope} content` } },
+      });
+    }
+    await expect(
+      sessionStub.getWorktreeFile({
+        path: 'same.txt',
+        expectedRevision: frame.payload.revision,
+      })
+    ).resolves.toEqual({ status: 'no_longer_listed', currentRevision: frame.payload.revision });
+    const keys = await runInDurableObject(sessionStub, (_instance, state) =>
+      [...state.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })].map(([key]) => key)
+    );
+    expect(keys).toHaveLength(2);
+    expect(keys).toContain(`${WORKTREE_FILE_PREFIX}uncommitted\0same.txt`);
+    expect(keys).toContain(`${WORKTREE_FILE_PREFIX}against-base-branch\0same.txt`);
+    expect(
+      await runInDurableObject(sessionStub, (_instance, state) =>
+        state.storage.kv.get(WORKTREE_RECOVERY_KEY)
+      )
+    ).toEqual({
+      revision: frame.payload.revision,
+      recovery: { files: [{ path: 'same.txt', status: 'modified', patch: 'net patch' }] },
+    });
     wrapper.close();
   });
 

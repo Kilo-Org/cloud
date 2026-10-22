@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type {
   GetWorktreeChangesOutput,
   GetWorktreeFileOutput,
+  WorktreeChangesSnapshot,
+  WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { useWorktreeFile as UseWorktreeFile } from './useWorktreeFile';
 import { getWorktreeChangesQueryKey, getWorktreeFileQueryKey } from './worktree-changes';
@@ -25,6 +27,7 @@ const readFile = jest.fn<
       cloudAgentSessionId: string;
       organizationId?: string;
       path: string;
+      scope?: WorktreeFileQuery['scope'];
       expectedRevision: number;
     },
     options: ReadOptions
@@ -52,41 +55,66 @@ beforeAll(async () => {
   ({ useWorktreeFile } = await import('./useWorktreeFile'));
 });
 
-function saved(revision: number): GetWorktreeChangesOutput {
+const comparison = { baseRef: 'origin/main', mergeBase: 'a'.repeat(40), head: 'b'.repeat(40) };
+
+function listEntry(
+  path: string,
+  revision: number,
+  scope?: WorktreeFileQuery['scope']
+): WorktreeChangesSnapshot['files'][number] {
+  return {
+    path,
+    ...(scope === undefined ? {} : { scope }),
+    revision,
+    status: 'modified',
+    additions: 1,
+    deletions: 1,
+    tracked: true,
+    binary: false,
+    countsComplete: true,
+  };
+}
+
+function savedWith(
+  files: WorktreeChangesSnapshot['files'],
+  revision: number
+): GetWorktreeChangesOutput {
   return {
     snapshot: {
       schemaVersion: 2,
       revision,
       capturedAt: '2026-10-14T12:00:00.000Z',
-      comparison: { baseRef: 'origin/main', mergeBase: 'a'.repeat(40), head: 'b'.repeat(40) },
-      files: [
-        {
-          path: 'src/file.ts',
-          revision,
-          status: 'modified',
-          additions: 1,
-          deletions: 1,
-          tracked: true,
-          binary: false,
-          countsComplete: true,
-        },
-      ],
+      comparison,
+      files,
       truncated: false,
     },
   };
 }
 
-function file(revision: number, path = 'src/file.ts'): GetWorktreeFileOutput {
+function saved(revision: number): GetWorktreeChangesOutput {
+  return savedWith([listEntry('src/file.ts', revision)], revision);
+}
+
+function file(
+  revision: number,
+  path = 'src/file.ts',
+  scope?: WorktreeFileQuery['scope']
+): GetWorktreeFileOutput {
   return {
     status: 'available',
     capturedAt: '2026-10-14T12:00:00.000Z',
-    comparison: { baseRef: 'origin/main', mergeBase: 'a'.repeat(40), head: 'b'.repeat(40) },
+    comparison,
     file: {
       schemaVersion: 1,
       revision,
       path,
+      ...(scope === undefined ? {} : { scope }),
       diff: { status: 'available', patch: '@@ -1 +1 @@\n-old\n+new' },
-      content: { status: 'available', source: 'current', text: `revision ${revision}` },
+      content: {
+        status: 'available',
+        source: 'current',
+        text: scope === undefined ? `revision ${revision}` : `revision ${revision} ${scope}`,
+      },
     },
   };
 }
@@ -167,7 +195,9 @@ describe('worktree-scoped saved changes and file hooks', () => {
     readChanges.mockReset().mockResolvedValue(saved(3));
     readFile
       .mockReset()
-      .mockImplementation(async input => file(input.expectedRevision, input.path));
+      .mockImplementation(async input =>
+        file(input.expectedRevision, input.path, input.scope as WorktreeFileQuery['scope'])
+      );
   });
 
   afterEach(() => {
@@ -350,5 +380,96 @@ describe('worktree-scoped saved changes and file hooks', () => {
     await settle();
     expect(readFile).toHaveBeenCalledTimes(1);
     expect(results.get(scope.cloudAgentSessionId)?.state).toEqual({ status: 'error' });
+  });
+
+  it('keeps uncommitted and against-base-branch layers in separate caches', async () => {
+    readChanges.mockResolvedValue(
+      savedWith(
+        [
+          listEntry('src/file.ts', 3, 'against-base-branch'),
+          listEntry('src/file.ts', 3, 'uncommitted'),
+        ],
+        3
+      )
+    );
+    const uncommitted: Scope = { ...scope, scope: 'uncommitted' };
+    const base: Scope = {
+      ...scope,
+      cloudAgentSessionId: 'workspace-chat-b',
+      scope: 'against-base-branch',
+    };
+    render([uncommitted, base]);
+    await settle();
+
+    expect(readFile).toHaveBeenCalledTimes(2);
+    expect(results.get(uncommitted.cloudAgentSessionId)?.state).toEqual(
+      file(3, 'src/file.ts', 'uncommitted')
+    );
+    expect(results.get(base.cloudAgentSessionId)?.state).toEqual(
+      file(3, 'src/file.ts', 'against-base-branch')
+    );
+    expect(
+      queryClient.getQueryData(getWorktreeFileQueryKey({ ...uncommitted, expectedRevision: 3 }))
+    ).toEqual(file(3, 'src/file.ts', 'uncommitted'));
+    expect(
+      queryClient.getQueryData(getWorktreeFileQueryKey({ ...base, expectedRevision: 3 }))
+    ).toEqual(file(3, 'src/file.ts', 'against-base-branch'));
+  });
+
+  it('prefers the uncommitted layer for an unscoped selection', async () => {
+    readChanges.mockResolvedValue(
+      savedWith(
+        [
+          listEntry('src/file.ts', 3, 'against-base-branch'),
+          listEntry('src/file.ts', 3, 'uncommitted'),
+        ],
+        3
+      )
+    );
+    render([scope]);
+    await settle();
+    expect(readFile).toHaveBeenCalledTimes(1);
+    expect(readFile.mock.calls[0]?.[0]).toEqual({
+      cloudAgentSessionId: scope.cloudAgentSessionId,
+      path: scope.path,
+      scope: 'uncommitted',
+      expectedRevision: 3,
+    });
+    expect(results.get(scope.cloudAgentSessionId)?.state).toEqual(
+      file(3, 'src/file.ts', 'uncommitted')
+    );
+  });
+
+  it('disables an explicit scope that is missing and keeps the unscoped selection', async () => {
+    readChanges.mockResolvedValue(savedWith([listEntry('src/file.ts', 3)], 3));
+    const scoped: Scope = {
+      ...scope,
+      cloudAgentSessionId: 'workspace-chat-b',
+      scope: 'uncommitted',
+    };
+    render([scope, scoped]);
+    await settle();
+    expect(readFile).toHaveBeenCalledTimes(1);
+    expect(readFile.mock.calls[0]?.[0].scope).toBeUndefined();
+    expect(results.get(scope.cloudAgentSessionId)?.state).toEqual(file(3));
+    expect(results.get(scoped.cloudAgentSessionId)?.state).toEqual({ status: 'no_longer_listed' });
+  });
+
+  it('recovers a stale layer by refetching the same scope', async () => {
+    readChanges.mockResolvedValue(
+      savedWith(
+        [
+          listEntry('src/file.ts', 3, 'uncommitted'),
+          listEntry('src/file.ts', 3, 'against-base-branch'),
+        ],
+        3
+      )
+    );
+    readFile.mockResolvedValue({ status: 'stale', currentRevision: 3 });
+    const uncommitted: Scope = { ...scope, scope: 'uncommitted' };
+    render([uncommitted]);
+    await settle();
+    expect(readFile).toHaveBeenCalledTimes(2);
+    expect(readFile.mock.calls.every(([input]) => input.scope === 'uncommitted')).toBe(true);
   });
 });

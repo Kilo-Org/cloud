@@ -7,6 +7,7 @@ import type { PersistedWorktreeReviewDraft, WorktreeReviewScope } from './worktr
 import type { WorktreeReviewAnchor } from './worktree-review';
 import type { WorktreeReviewSendApi, WorktreeReviewSubmission } from './worktree-review-send';
 import type { useWorktreeReview as UseWorktreeReview } from './useWorktreeReview';
+import type { WorktreeFileQuery } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 
 const mockLoad = jest.fn<(key: string) => Promise<PersistedWorktreeReviewDraft | null>>();
 const mockSave = jest.fn();
@@ -37,7 +38,11 @@ const snapshot = {
     mergeBase: 'a'.repeat(40),
     head: 'b'.repeat(40),
   },
-  files: [{ path: 'src/example.ts', revision: 3 }],
+  files: [{ path: 'src/example.ts', revision: 3 }] as Array<{
+    path: string;
+    revision: number;
+    scope?: WorktreeFileQuery['scope'];
+  }>,
   truncated: false,
 };
 const worktreeId = 'worktree_5b07b5d0-c89d-48b1-96c8-dde3ddcfb282';
@@ -80,7 +85,9 @@ const mockTrpc = {
       queryOptions: jest.fn(() => ({ queryFn: async () => ({ snapshot }) })),
     },
     getWorktreeFile: {
-      queryOptions: jest.fn(() => ({ queryKey: ['file'] })),
+      queryOptions: jest.fn<(input: unknown) => { queryKey: string[] }>(() => ({
+        queryKey: ['file'],
+      })),
     },
   },
   organizations: {
@@ -89,7 +96,9 @@ const mockTrpc = {
         queryOptions: jest.fn(() => ({ queryFn: async () => ({ snapshot }) })),
       },
       getWorktreeFile: {
-        queryOptions: jest.fn(() => ({ queryKey: ['file'] })),
+        queryOptions: jest.fn<(input: unknown) => { queryKey: string[] }>(() => ({
+          queryKey: ['file'],
+        })),
       },
     },
   },
@@ -488,6 +497,152 @@ describe('useWorktreeReview hydration', () => {
     } finally {
       snapshot.revision = originalRevision;
       snapshot.files = originalFiles;
+    }
+  });
+
+  it('forwards the scoped review entry revision, not the first same-path entry or global revision', async () => {
+    const scopedAnchor = {
+      ...anchor,
+      capture: { ...anchor.capture, scope: 'against-base-branch' as const },
+    };
+    mockLoad.mockResolvedValue({
+      version: 1,
+      comments: [{ id: 'scoped', anchor: scopedAnchor, text: 'Scoped feedback' }],
+      editor: null,
+      overall: '',
+      destinationKiloSessionId: targetSession.session_id,
+      allowOlderCapture: false,
+    });
+    const originalFiles = snapshot.files;
+    snapshot.files = [
+      { path: anchor.path, revision: 70, scope: 'uncommitted' },
+      { path: anchor.path, revision: 7, scope: 'against-base-branch' },
+    ];
+    mockTrpc.cloudAgentNext.getWorktreeFile.queryOptions.mockClear();
+    try {
+      const mounted = mount();
+      ({ cleanup } = mounted.dom);
+      root = mounted.root;
+      await flushAsyncWork();
+      act(() => latest?.setOpen(true));
+      await flushAsyncWork();
+      expect(mockTrpc.cloudAgentNext.getWorktreeFile.queryOptions).toHaveBeenCalledWith({
+        cloudAgentSessionId: 'workspace_target',
+        path: anchor.path,
+        scope: 'against-base-branch',
+        expectedRevision: 7,
+      });
+      expect(latest?.draft?.comments[0].anchor.capture.scope).toBe('against-base-branch');
+    } finally {
+      snapshot.files = originalFiles;
+    }
+  });
+
+  it('exposes disappeared scoped comments for individual discard without rebasing into a same-path layer', async () => {
+    const prepareReviewSubmission = jest.fn<WorktreeReviewSendApi['prepareReviewSubmission']>(
+      async input => ({
+        destinationKiloSessionId:
+          targetSession.session_id as WorktreeReviewSubmission['destinationKiloSessionId'],
+        destinationCloudAgentSessionId:
+          targetSession.cloud_agent_session_id as WorktreeReviewSubmission['destinationCloudAgentSessionId'],
+        expectedWorktreeId: worktreeId,
+        messageId: 'message-scoped-review',
+        payload: { type: 'prompt', prompt: input.prompt, mode: 'code', model: 'model-a' },
+      })
+    );
+    const submitReview = jest.fn<WorktreeReviewSendApi['submitReview']>(async () => ({
+      status: 'accepted',
+      delivery: 'sent',
+    }));
+    const scopedAnchor = {
+      ...anchor,
+      capture: { ...anchor.capture, scope: 'against-base-branch' as const },
+    };
+    const otherAnchor = {
+      ...anchor,
+      capture: { ...anchor.capture, scope: 'uncommitted' as const },
+    };
+    mockLoad.mockResolvedValue({
+      version: 1,
+      comments: [
+        { id: 'gone', anchor: scopedAnchor, text: 'Committed feedback' },
+        { id: 'kept', anchor: otherAnchor, text: 'Uncommitted feedback' },
+      ],
+      editor: null,
+      overall: '',
+      destinationKiloSessionId: targetSession.session_id,
+      allowOlderCapture: false,
+    });
+    const originalFiles = snapshot.files;
+    snapshot.files = [{ path: anchor.path, revision: 3, scope: 'uncommitted' }];
+    mockTrpc.cloudAgentNext.getWorktreeFile.queryOptions.mockClear();
+    try {
+      const mounted = mount({ api: { prepareReviewSubmission, submitReview } });
+      ({ cleanup } = mounted.dom);
+      root = mounted.root;
+      await flushAsyncWork();
+      act(() => latest?.setOpen(true));
+      await flushAsyncWork();
+      expect(latest?.unappliedCommentIds).toEqual(new Set(['gone']));
+      expect(mockTrpc.cloudAgentNext.getWorktreeFile.queryOptions).not.toHaveBeenCalled();
+      expect(latest?.draft?.comments[0].anchor).toEqual(scopedAnchor);
+      await act(async () => {
+        await latest?.send();
+      });
+      expect(prepareReviewSubmission).not.toHaveBeenCalled();
+      expect(latest?.draft?.error).toMatch(/could not be applied/);
+      act(() => {
+        latest?.removeComment('gone');
+      });
+      expect(latest?.draft?.comments.map(comment => comment.id)).toEqual(['kept']);
+      expect(latest?.unappliedCommentIds.size).toBe(0);
+      await act(async () => {
+        await latest?.send();
+      });
+      expect(prepareReviewSubmission).toHaveBeenCalledTimes(1);
+      expect(prepareReviewSubmission.mock.calls[0][0].prompt).toContain('Uncommitted feedback');
+      expect(prepareReviewSubmission.mock.calls[0][0].prompt).not.toContain('Committed feedback');
+      expect(submitReview).toHaveBeenCalledTimes(1);
+      expect(latest?.draft?.comments).toEqual([]);
+    } finally {
+      snapshot.files = originalFiles;
+    }
+  });
+
+  it('does not offer scoped discard for truncated summaries and clears absence when the entry returns', async () => {
+    const scopedAnchor = {
+      ...anchor,
+      capture: { ...anchor.capture, scope: 'against-base-branch' as const },
+    };
+    mockLoad.mockResolvedValue({
+      version: 1,
+      comments: [{ id: 'scoped', anchor: scopedAnchor, text: 'Scoped feedback' }],
+      editor: null,
+      overall: '',
+      destinationKiloSessionId: targetSession.session_id,
+      allowOlderCapture: false,
+    });
+    const originalFiles = snapshot.files;
+    const originalTruncated = snapshot.truncated;
+    snapshot.files = [];
+    snapshot.truncated = true;
+    try {
+      const mounted = mount();
+      ({ cleanup } = mounted.dom);
+      root = mounted.root;
+      await flushAsyncWork();
+      act(() => latest?.setOpen(true));
+      expect(latest?.unappliedCommentIds.size).toBe(0);
+      snapshot.truncated = false;
+      act(() => mounted.root.render(createElement(Probe, { props: mounted.props })));
+      expect(latest?.unappliedCommentIds).toEqual(new Set(['scoped']));
+      snapshot.files = [{ path: anchor.path, revision: 3, scope: 'against-base-branch' }];
+      act(() => mounted.root.render(createElement(Probe, { props: mounted.props })));
+      expect(latest?.unappliedCommentIds.size).toBe(0);
+      expect(latest?.draft?.comments[0].anchor.capture.scope).toBe('against-base-branch');
+    } finally {
+      snapshot.files = originalFiles;
+      snapshot.truncated = originalTruncated;
     }
   });
 

@@ -918,7 +918,9 @@ export class CloudAgentNextClient {
     const result = parsed.data;
     if (
       (result.status === 'available' || result.status === 'omitted') &&
-      (result.file.path !== input.path || result.file.revision !== input.expectedRevision)
+      (result.file.path !== input.path ||
+        result.file.revision !== input.expectedRevision ||
+        (input.scope !== undefined && result.file.scope !== input.scope))
     ) {
       throw new Error('Saved worktree file does not match the query');
     }

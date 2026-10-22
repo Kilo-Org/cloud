@@ -15,11 +15,16 @@ import type { WorktreeChangesView } from './WorktreeChanges';
 import type { ConversationMessages } from './ConversationMessages';
 import type { StoredMessage, StoredSession } from './types';
 import type { SessionCommit } from '@kilocode/cloud-agent-sdk';
+import type { useWorktreeReview } from './useWorktreeReview';
+import type { WorktreeReviewDialog } from './WorktreeReviewDialog';
+import type { WorktreeReviewComment } from './worktree-review';
+import { worktreeFileIdentity } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import {
   CHAT_TAB_ID,
   addTerminalTab,
   closeTerminalTab,
   createWorkspaceTabsState,
+  fileTabId,
   getWorkspaceTabScope,
   resetWorkspaceTabs,
   selectWorkspaceTab,
@@ -33,6 +38,9 @@ let mockSessionId: string | null = 'ses_recent';
 let mockAtParam: string | null = null;
 let mockWorktreeId: string | null = 'worktree_shared';
 let mockTabs: ComponentProps<typeof CloudAgentWorkspaceTabs>;
+let mockReview: Partial<ReturnType<typeof useWorktreeReview>> = { scope: null };
+let mockReviewDialog: ComponentProps<typeof WorktreeReviewDialog>;
+let mockChanges: ComponentProps<typeof WorktreeChangesView>;
 let mockConversation: ComponentProps<typeof ConversationMessages>;
 let mockAtomValues: Record<string, unknown>;
 const mockClosedPtys: string[] = [];
@@ -49,6 +57,7 @@ const mockChats = [
   },
 ] as StoredSession[];
 const mockSetAtom = jest.fn();
+const mockOpenSession = jest.fn();
 const mockRequestOlderMessages = jest.fn();
 let mockChatInput: Record<string, unknown> | null = null;
 const mockManager = {
@@ -92,8 +101,13 @@ jest.mock('./CloudAgentProvider', () => ({
   useManager: () => mockManager,
   useCloudAgent: () => ({}),
 }));
-jest.mock('./useWorktreeReview', () => ({ useWorktreeReview: () => ({ scope: null }) }));
-jest.mock('./WorktreeReviewDialog', () => ({ WorktreeReviewDialog: () => null }));
+jest.mock('./useWorktreeReview', () => ({ useWorktreeReview: () => mockReview }));
+jest.mock('./WorktreeReviewDialog', () => ({
+  WorktreeReviewDialog: (props: ComponentProps<typeof WorktreeReviewDialog>) => {
+    mockReviewDialog = props;
+    return null;
+  },
+}));
 jest.mock('./CloudSidebarLayout', () => ({
   useWorktreeChatCreation: () => ({
     createWorktreeChat: jest.fn(),
@@ -106,7 +120,7 @@ jest.mock('./CloudSidebarLayout', () => ({
     openWorktreeChats: mockWorktreeId ? mockChats : [],
     closedWorktreeChats: [],
     deletingSessionIds: [],
-    openSession: jest.fn(),
+    openSession: mockOpenSession,
     closeSession: jest.fn(),
     renameSession: jest.fn(),
   }),
@@ -170,11 +184,9 @@ jest.mock('./ChatHeader', () => ({
       : null,
 }));
 jest.mock('./WorktreeChanges', () => ({
-  WorktreeChangesView: ({
-    cloudAgentSessionId,
-    organizationId,
-    open,
-  }: ComponentProps<typeof WorktreeChangesView>) => {
+  WorktreeChangesView: (props: ComponentProps<typeof WorktreeChangesView>) => {
+    mockChanges = props;
+    const { cloudAgentSessionId, organizationId, open } = props;
     const [selected, setSelected] = useState(false);
     useEffect(() => {
       if (!open) setSelected(false);
@@ -198,13 +210,19 @@ jest.mock('./WorktreeFilePane', () => ({
   WorktreeFilePane: ({
     cloudAgentSessionId,
     organizationId,
+    path,
+    scope,
   }: {
     cloudAgentSessionId: string;
     organizationId?: string;
+    path: string;
+    scope?: WorktreeReviewComment['anchor']['capture']['scope'];
   }) =>
     createElement('pre', {
       'data-file-owner': cloudAgentSessionId,
       'data-file-organization': organizationId ?? 'personal',
+      'data-file-path': path,
+      'data-file-scope': scope,
     }),
 }));
 jest.mock('./ChatInput', () => ({
@@ -407,6 +425,8 @@ describe('CloudChatPage terminal ownership across navigation', () => {
   });
 
   beforeEach(() => {
+    mockReview = { scope: null };
+    mockOpenSession.mockClear();
     mockSessionId = 'ses_recent';
     mockAtParam = null;
     mockWorktreeId = 'worktree_shared';
@@ -467,6 +487,132 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     mockAtomValues.sessionId = `workspace_${mockSessionId}`;
     render();
   }
+
+  function reviewComment(
+    id: string,
+    scope?: WorktreeReviewComment['anchor']['capture']['scope'],
+    source = 'workspace_recent'
+  ): WorktreeReviewComment {
+    return {
+      id,
+      text: 'Feedback',
+      anchor: {
+        capture: {
+          userId: 'owner',
+          organizationId: undefined,
+          workspaceScope: 'worktree:worktree_shared',
+          sourceCloudAgentSessionId: source,
+          revision: 1,
+          scope,
+          capturedAt: '2026-10-13T10:00:00Z',
+          comparison: { baseRef: 'origin/main', mergeBase: 'a'.repeat(40), head: 'b'.repeat(40) },
+        },
+        path: 'src/example.ts',
+        range: { side: 'additions', startLine: 1, endLine: 1 },
+        quote: {
+          source: 'saved-patch',
+          lines: [{ lineNumber: 1, kind: 'addition', text: 'new\n' }],
+        },
+      },
+    };
+  }
+
+  function enableReview(comments: WorktreeReviewComment[]) {
+    const scope = {
+      userId: 'owner',
+      organizationId: undefined,
+      workspaceScope: 'worktree:worktree_shared',
+    };
+    mockReview = {
+      scope,
+      locked: false,
+      setOpen: jest.fn(),
+      destinations: mockChats.map(chat => ({
+        sessionId: chat.sessionId,
+        cloudAgentSessionId: chat.cloudAgentSessionId ?? '',
+        title: 'Chat',
+      })),
+      draft: {
+        scope,
+        comments,
+        editor: null,
+        overall: '',
+        destinationKiloSessionId: 'ses_recent',
+        allowOlderCapture: false,
+        delivery: { phase: 'idle' },
+      },
+    };
+  }
+
+  it('opens the exact review scope and preserves separate modes and closing at the same path', () => {
+    const uncommitted = reviewComment('uncommitted', 'uncommitted');
+    const committed = reviewComment('committed', 'against-base-branch');
+    enableReview([uncommitted, committed]);
+    render();
+    act(() => mockReviewDialog.onOpenComment(uncommitted));
+    expect(mockTabs.activeTabId).toBe(fileTabId(uncommitted.anchor.path, 'uncommitted'));
+    act(() => mockReviewDialog.onOpenComment(committed));
+    expect(mockTabs.activeTabId).toBe(fileTabId(committed.anchor.path, 'against-base-branch'));
+    expect(mockTabs.files).toEqual([
+      { path: committed.anchor.path, scope: 'uncommitted', mode: 'diff' },
+      { path: committed.anchor.path, scope: 'against-base-branch', mode: 'diff' },
+    ]);
+    expect(
+      dom.container
+        .querySelector('[data-file-scope="against-base-branch"]')
+        ?.getAttribute('data-file-path')
+    ).toBe(committed.anchor.path);
+    act(() => mockTabs.onCloseFile(committed.anchor.path, 'against-base-branch'));
+    expect(mockTabs.files).toEqual([
+      { path: committed.anchor.path, scope: 'uncommitted', mode: 'diff' },
+    ]);
+    expect(dom.container.querySelector('[data-file-scope="uncommitted"]')).not.toBeNull();
+  });
+
+  it('preserves review scope while navigating to its source chat before opening the file', () => {
+    const committed = reviewComment('committed', 'against-base-branch', 'workspace_historical');
+    enableReview([committed]);
+    render();
+    act(() => mockReviewDialog.onOpenComment(committed));
+    expect(mockOpenSession).toHaveBeenCalledWith('ses_historical');
+    expect(mockTabs.files).toEqual([]);
+    mockSessionId = 'ses_historical';
+    mockAtomValues.sessionId = 'workspace_historical';
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_historical',
+      organizationId: null,
+      worktreeId: 'worktree_shared',
+    };
+    render();
+    expect(mockTabs.activeTabId).toBe(fileTabId(committed.anchor.path, 'against-base-branch'));
+    expect(mockTabs.files).toEqual([
+      { path: committed.anchor.path, scope: 'against-base-branch', mode: 'diff' },
+    ]);
+    expect(
+      dom.container
+        .querySelector('[data-file-scope="against-base-branch"]')
+        ?.getAttribute('data-file-owner')
+    ).toBe('workspace_historical');
+  });
+
+  it('counts review comments by exact layer and source while preserving legacy path keys', () => {
+    const comments = [
+      reviewComment('uncommitted-1', 'uncommitted'),
+      reviewComment('uncommitted-2', 'uncommitted'),
+      reviewComment('committed', 'against-base-branch'),
+      reviewComment('legacy'),
+      reviewComment('other-source', 'uncommitted', 'workspace_historical'),
+    ];
+    enableReview(comments);
+    render();
+    expect(mockChanges.commentCounts).toEqual(
+      new Map([
+        [worktreeFileIdentity({ path: comments[0].anchor.path, scope: 'uncommitted' }), 2],
+        [worktreeFileIdentity({ path: comments[0].anchor.path, scope: 'against-base-branch' }), 1],
+        [comments[0].anchor.path, 1],
+      ])
+    );
+  });
 
   it('binds the terminal to the viewed worktree session when its route is ready', () => {
     mockAtomValues.sessionId = 'workspace_recent';

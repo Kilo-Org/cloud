@@ -116,6 +116,20 @@ function campaignAuditMetadata(campaign: CreditCampaign): Record<string, unknown
   };
 }
 
+/** Fields an update can change, in the order the audit log lists them. */
+const mutableCampaignFields = [
+  'amount_microdollars',
+  'credit_expiry_hours',
+  'campaign_ends_at',
+  'total_redemptions_allowed',
+  'active',
+  'description',
+] as const;
+
+function changedCampaignFields(previous: CreditCampaign, next: CreditCampaign): string[] {
+  return mutableCampaignFields.filter(field => previous[field] !== next[field]);
+}
+
 export const creditCampaignsRouter = createTRPCRouter({
   /**
    * List all campaigns alongside per-campaign stats. Stats query is
@@ -223,31 +237,49 @@ export const creditCampaignsRouter = createTRPCRouter({
       // they're immutable after create to keep historical credit_transactions
       // rows tied to a stable category. See updateCampaignInputSchema.
       //
-      // Atomic guard-then-act: the WHERE clause restricts the update to the
-      // single targeted row; the RETURNING clause gives us the authoritative
-      // post-update state. A missing row means the campaign was deleted
-      // concurrently — treat as NOT_FOUND rather than silently inserting.
-      const [row] = await db
-        .update(credit_campaigns)
-        .set({
-          amount_microdollars: toMicrodollars(input.amount_usd),
-          credit_expiry_hours: input.credit_expiry_hours ?? null,
-          campaign_ends_at: input.campaign_ends_at ?? null,
-          total_redemptions_allowed: input.total_redemptions_allowed,
-          active: input.active,
-          description: input.description,
-          updated_at: new Date().toISOString(),
-        })
-        .where(eq(credit_campaigns.id, input.id))
-        .returning();
-      if (!row) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Campaign not found' });
-      }
+      // The previous row is read under a row lock so the audit entry can
+      // list which fields changed; the UPDATE then writes the single targeted
+      // row and RETURNING gives the authoritative post-update state. A missing
+      // row means the campaign was deleted concurrently — treat as NOT_FOUND
+      // rather than silently inserting.
+      const { previous, row } = await db.transaction(async tx => {
+        const [existing] = await tx
+          .select()
+          .from(credit_campaigns)
+          .where(eq(credit_campaigns.id, input.id))
+          .limit(1)
+          .for('update');
+        if (!existing) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Campaign not found' });
+        }
+
+        const [updated] = await tx
+          .update(credit_campaigns)
+          .set({
+            amount_microdollars: toMicrodollars(input.amount_usd),
+            credit_expiry_hours: input.credit_expiry_hours ?? null,
+            campaign_ends_at: input.campaign_ends_at ?? null,
+            total_redemptions_allowed: input.total_redemptions_allowed,
+            active: input.active,
+            description: input.description,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(credit_campaigns.id, existing.id))
+          .returning();
+        if (!updated) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Campaign not found' });
+        }
+        return { previous: existing, row: updated };
+      });
       await recordAdminAction(ctx, {
         action: 'credit_campaign.update',
         target: null,
         message: `Updated credit campaign ${row.slug}`,
-        metadata: campaignAuditMetadata(row),
+        metadata: {
+          ...campaignAuditMetadata(row),
+          changedFields: changedCampaignFields(previous, row),
+          previous: campaignAuditMetadata(previous),
+        },
       });
       return row;
     }),

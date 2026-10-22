@@ -485,6 +485,8 @@ describe('admin action audit', () => {
     expect(byAction.get('credit_campaign.update')?.metadata).toMatchObject({
       amountUsd: 7,
       totalRedemptionsAllowed: 100,
+      changedFields: ['amount_microdollars'],
+      previous: { amountUsd: 5, creditExpiryHours: 48, campaignEndsAt: null },
     });
     expect(byAction.get('credit_campaign.set_active')?.metadata).toMatchObject({ active: false });
   });

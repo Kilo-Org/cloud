@@ -56,6 +56,12 @@ const mockSeedUserGithubToken =
   >();
 const mockListIntegrations = jest.fn<(owner: Owner) => Promise<PlatformIntegration[]>>();
 const mockUninstallApp = jest.fn<() => Promise<{ success: boolean; message: string }>>();
+const mockCheckUserPendingInstallation =
+  jest.fn<
+    (userId: string) => Promise<{ id: string; owned_by_organization_id: string | null } | null>
+  >();
+const mockCancelPendingInstallation =
+  jest.fn<(owner: Owner, integrationId: string) => Promise<{ success: boolean }>>();
 const mockEnsureOrganizationAccess =
   jest.fn<
     (
@@ -82,6 +88,9 @@ const mockBindGitHubIntegrationToCanonicalInstallation = jest.fn();
 jest.mock('@/lib/integrations/github-apps-service', () => ({
   listIntegrations: (owner: Owner) => mockListIntegrations(owner),
   uninstallApp: () => mockUninstallApp(),
+  checkUserPendingInstallation: (userId: string) => mockCheckUserPendingInstallation(userId),
+  cancelPendingInstallation: (owner: Owner, integrationId: string) =>
+    mockCancelPendingInstallation(owner, integrationId),
 }));
 
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
@@ -187,6 +196,15 @@ let createCaller: (ctx: { user: User }) => {
   }) => Promise<{ authorizationUrl: string }>;
   disconnectConnection: (input: {
     organizationId: string;
+    integrationId: string;
+  }) => Promise<{ success: boolean }>;
+  checkUserPendingInstallation: (input?: { organizationId?: string }) => Promise<{
+    hasPending: boolean;
+    pendingOrganizationId: string | null;
+    pendingIntegrationId: string | null;
+  }>;
+  cancelPendingInstallation: (input: {
+    organizationId?: string;
     integrationId: string;
   }) => Promise<{ success: boolean }>;
 };
@@ -715,5 +733,67 @@ describe('githubAppsRouter.devAddInstallation', () => {
     const [, details] = mockUpsertPlatformIntegrationForOwner.mock.calls[0] ?? [];
     expect(details).not.toHaveProperty('kiloUserId');
     expect(details).not.toHaveProperty('githubUserId');
+  });
+});
+
+describe('githubAppsRouter pending installation cancel', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockGetIntegrationForOwner.mockResolvedValue({
+      id: integrationId,
+      platform_installation_id: '98765',
+      platform_account_login: 'existing-org',
+      github_app_type: 'standard',
+    });
+    mockCancelPendingInstallation.mockResolvedValue({ success: true });
+  });
+
+  it('reports the pending row id it describes', async () => {
+    mockCheckUserPendingInstallation.mockResolvedValue({
+      id: integrationId,
+      owned_by_organization_id: null,
+    });
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(caller.checkUserPendingInstallation()).resolves.toEqual({
+      hasPending: true,
+      pendingOrganizationId: null,
+      pendingIntegrationId: integrationId,
+    });
+  });
+
+  it('rejects a cancel without an integration id instead of choosing a pending row', async () => {
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(
+      caller.cancelPendingInstallation({} as { integrationId: string })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(mockCancelPendingInstallation).not.toHaveBeenCalled();
+  });
+
+  it('cancels the named request for the requesting user', async () => {
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(caller.cancelPendingInstallation({ integrationId })).resolves.toEqual({
+      success: true,
+    });
+
+    expect(mockCancelPendingInstallation).toHaveBeenCalledWith(
+      { type: 'user', id: 'user-1' },
+      integrationId
+    );
+  });
+
+  it('refuses an id that matches no integration for the owner', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(null);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(caller.cancelPendingInstallation({ integrationId })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+
+    expect(mockCancelPendingInstallation).not.toHaveBeenCalled();
   });
 });

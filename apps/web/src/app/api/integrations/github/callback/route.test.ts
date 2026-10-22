@@ -93,7 +93,6 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   findGitHubBotLinkIntegrations: jest.fn(),
   findIntegrationByInstallationId: jest.fn(),
   findIntegrationByInstallationIdForOwner: jest.fn(),
-  findPendingInstallationByRequesterId: jest.fn(),
   upsertPlatformIntegrationForOwner: jest.fn(async () => ({ ok: true })),
 }));
 jest.mock('@/lib/integrations/db/github-installations', () => ({

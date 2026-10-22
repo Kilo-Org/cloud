@@ -1,6 +1,8 @@
 import { type ModelUsage, zeroUsage } from '@kilocode/harness-sdk';
 import { z } from 'zod';
 
+import { chatTargetKind } from './backend-target';
+
 /**
  * What a chat has used, per model it was answered by.
  *
@@ -75,6 +77,41 @@ export function usageSince(now: ModelUsage, counted: ModelUsage): ModelUsage {
 
 export function countUsage(usage: ChatUsage, model: string, part: ModelUsage) {
   return { ...usage, [model]: sumUsage(usage[model] ?? zeroUsage, part) } satisfies ChatUsage;
+}
+
+export function countSessionUsage({
+  usage,
+  requested,
+  totals,
+  counted,
+}: {
+  usage: ChatUsage;
+  requested: string;
+  totals: ReadonlyMap<string, ModelUsage>;
+  counted: ReadonlyMap<string, ModelUsage>;
+}): ChatUsage {
+  let next = usage;
+  for (const [served, total] of totals) {
+    const spent = usageSince(total, counted.get(served) ?? zeroUsage);
+    if (
+      !counted.has(served) ||
+      spent.inputTokens !== 0 ||
+      spent.outputTokens !== 0 ||
+      spent.cacheReadTokens !== 0 ||
+      spent.cacheWriteTokens !== 0 ||
+      (spent.cost ?? 0) !== 0
+    ) {
+      const kind = chatTargetKind(requested);
+      let model = requested;
+      if (kind === 'kilo') {
+        model = served;
+      } else if (kind === 'custom' && served !== requested) {
+        model = requested.slice(0, requested.lastIndexOf(':') + 1) + encodeURIComponent(served);
+      }
+      next = countUsage(next, model, spent);
+    }
+  }
+  return next;
 }
 
 export function totalUsage(usage: ChatUsage): ModelUsage {

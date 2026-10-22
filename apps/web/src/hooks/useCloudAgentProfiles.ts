@@ -23,6 +23,7 @@ export type ProfileSummary = {
   skillCount: number;
   agentCount: number;
   kiloCommandCount: number;
+  instructionCount: number;
 };
 
 // Profile summary with owner type for combined listings
@@ -94,6 +95,15 @@ export type ProfileKiloCommand = {
   updatedAt: string;
 };
 
+export type ProfileInstruction = {
+  id: string;
+  name: string;
+  content: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ProfileDetails = {
   id: string;
   name: string;
@@ -107,6 +117,7 @@ export type ProfileDetails = {
   skills: ProfileSkill[];
   agents: ProfileAgent[];
   kiloCommands: ProfileKiloCommand[];
+  instructions: ProfileInstruction[];
 };
 
 // Combined profiles result for org context
@@ -380,6 +391,18 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
     })
   );
 
+  const previewConfigImport = useMutation(
+    trpc.agentProfiles.previewConfigImport.mutationOptions({})
+  );
+
+  const applyConfigImport = useMutation(
+    trpc.agentProfiles.applyConfigImport.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+
   return {
     createProfile,
     updateProfile,
@@ -405,6 +428,8 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
     deleteKiloCommand,
     setKiloCommandEnabled,
     reorderKiloCommands,
+    previewConfigImport,
+    applyConfigImport,
     /** Manually invalidate profiles list */
     invalidateProfiles,
     /** Manually invalidate specific profile */
@@ -680,6 +705,18 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
     })
   );
 
+  const previewConfigImport = useMutation(
+    trpc.agentProfiles.previewConfigImport.mutationOptions({})
+  );
+
+  const applyConfigImport = useMutation(
+    trpc.agentProfiles.applyConfigImport.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+
   return {
     createProfile,
     updateProfile,
@@ -705,6 +742,8 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
     deleteKiloCommand,
     setKiloCommandEnabled,
     reorderKiloCommands,
+    previewConfigImport,
+    applyConfigImport,
     /** Manually invalidate combined profiles */
     invalidateCombinedProfiles,
     /** Manually invalidate specific profile */

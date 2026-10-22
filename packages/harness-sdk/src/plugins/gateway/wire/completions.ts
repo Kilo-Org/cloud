@@ -1,19 +1,13 @@
 import { createIs } from 'typia';
 import type { ModelUsage, StopReason } from '../../../core/model.js';
 import { stopFrom, type Wire, type WirePart } from './wire.js';
-import { readCached, type TokenCount } from './usage.js';
+import { costOf, type CostFields, readCached, type TokenCount } from './usage.js';
 import { toBody } from './completions-body.js';
 
-/**
- * `cost` is the Kilo gateway's and OpenRouter's own field: what the call cost in
- * US dollars. It is read apart from the check, so a provider that sends it in
- * another form loses the cost and keeps its token counts.
- */
-interface Counts {
+interface Counts extends CostFields {
   prompt_tokens: TokenCount;
   completion_tokens: TokenCount;
   prompt_tokens_details?: { cached_tokens?: TokenCount | null } | null;
-  cost?: unknown;
 }
 
 const stopReasons: Readonly<Record<string, StopReason>> = {
@@ -70,9 +64,7 @@ const isCall = createIs<CallEvent>();
 const isReasoning = createIs<ReasoningEvent>();
 const isUsage = createIs<UsageEvent>();
 const isStop = createIs<StopEvent>();
-
-const costOf = (cost: unknown): { readonly cost?: number } =>
-  typeof cost === 'number' && Number.isFinite(cost) && cost >= 0 ? { cost } : {};
+const isModel = createIs<{ model: string }>();
 
 const readUsage = (usage: Counts): Partial<ModelUsage> => ({
   ...readCached(
@@ -80,7 +72,7 @@ const readUsage = (usage: Counts): Partial<ModelUsage> => ({
     usage.completion_tokens,
     usage.prompt_tokens_details?.cached_tokens ?? 0
   ),
-  ...costOf(usage.cost),
+  ...costOf(usage),
 });
 
 /**
@@ -129,11 +121,15 @@ const toUsage = (event: unknown): Partial<ModelUsage> | undefined =>
 const toStop = (event: unknown): StopReason | undefined =>
   isStop(event) ? asStop(event.choices[0]?.finish_reason) : undefined;
 
+const toModel = (event: unknown): string | undefined =>
+  isModel(event) && event.model.length > 0 ? event.model : undefined;
+
 const completionsWire: Wire = {
   path: '/api/gateway/v1/chat/completions',
   toBody,
   toDelta,
   toUsage,
+  toModel,
   toStop,
 };
 

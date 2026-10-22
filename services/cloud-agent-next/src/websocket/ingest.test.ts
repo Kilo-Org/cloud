@@ -185,8 +185,6 @@ describe('createIngestHandler', () => {
       });
     }
 
-    // --- kilocode events: upsert path ---
-
     it('message.updated is upserted by entity ID', async () => {
       const eventQueries = createFakeEventQueries();
       (eventQueries as unknown as Record<string, unknown>).upsert = vi.fn().mockReturnValue(42);
@@ -362,8 +360,6 @@ describe('createIngestHandler', () => {
       });
     });
 
-    // --- kilocode events: plain insert path (PERSISTED_KILO_EVENT_NAMES) ---
-
     it.each([
       'message.part.removed',
       'session.created',
@@ -390,8 +386,6 @@ describe('createIngestHandler', () => {
       expect(eventQueries.insert).toHaveBeenCalled();
       expect(broadcastFn).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
     });
-
-    // --- kilocode events: broadcast-only (not in any allowlist) ---
 
     it.each([
       'question.asked',
@@ -422,8 +416,6 @@ describe('createIngestHandler', () => {
       );
     });
 
-    // --- non-kilocode: plain insert path (PERSISTED_STREAM_EVENT_TYPES) ---
-
     it.each(['complete', 'interrupted', 'error', 'autocommit_started', 'autocommit_completed'])(
       'stream event %s is plain-inserted',
       async eventType => {
@@ -444,8 +436,6 @@ describe('createIngestHandler', () => {
         expect(broadcastFn).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
       }
     );
-
-    // --- non-kilocode: broadcast-only (not in PERSISTED_STREAM_EVENT_TYPES) ---
 
     it.each(['heartbeat', 'pong', 'output', 'status', 'started', 'wrapper_resumed'])(
       'stream event %s is broadcast-only',
@@ -1169,30 +1159,52 @@ describe('createIngestHandler', () => {
     );
 
     it.each([
-      ['ContextOverflowError', undefined, 'context_limit', 'The model context limit was exceeded'],
-      ['MessageOutputLengthError', undefined, 'output_limit', 'The model output limit was reached'],
+      [
+        'ContextOverflowError',
+        undefined,
+        'context_limit',
+        'The model context limit was exceeded',
+        undefined,
+      ],
+      [
+        'MessageOutputLengthError',
+        undefined,
+        'output_limit',
+        'The model output limit was reached',
+        undefined,
+      ],
       [
         'ContentFilterError',
         undefined,
         'content_filter',
         'The model provider blocked the response under its content policy',
+        undefined,
       ],
       [
         'StructuredOutputError',
         undefined,
         'structured_output',
         'The model response did not match the required format',
+        undefined,
       ],
-      ['APIError', 504, 'timeout', 'Assistant request timed out'],
+      ['APIError', 504, 'timeout', 'Assistant request timed out', undefined],
       [
         'APIError',
         400,
         'invalid_request',
         'Your provider rejected the request. Check your provider account and settings.',
+        undefined,
+      ],
+      [
+        'APIError',
+        undefined,
+        'timeout',
+        'Assistant request timed out',
+        '{"type":"error","error":{"type":"timeout","code":504}}',
       ],
     ] as const)(
       'classifies %s/%s transiently before and after compaction',
-      async (name, statusCode, assistantFailureReason, safeFailureMessage) => {
+      async (name, statusCode, assistantFailureReason, safeFailureMessage, responseBody) => {
         for (const oversized of [false, true]) {
           const doContext = createNewPathDOContext();
           const eventQueries = createFakeEventQueries();
@@ -1213,13 +1225,14 @@ describe('createIngestHandler', () => {
                   id: 'asst_classified',
                   role: 'assistant',
                   parentID: 'msg_user_classified',
+                  ...(oversized ? { metadata: 'poison-metadata'.repeat(100_000) } : {}),
                   error: {
                     name,
                     data: {
                       message: '[BYOK] opaque failure',
                       statusCode,
                       isRetryable: false,
-                      responseBody: 'poison-body'.repeat(oversized ? 200_000 : 1),
+                      responseBody: responseBody ?? 'poison-body',
                       responseHeaders: { authorization: 'poison-header' },
                     },
                   },

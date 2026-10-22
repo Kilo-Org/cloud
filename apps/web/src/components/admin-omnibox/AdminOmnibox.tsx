@@ -127,18 +127,18 @@ function AdminOmniboxInner({ open, setOpen }: AdminOmniboxInnerProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
-        className="overflow-hidden border-2 border-yellow-500/50 bg-zinc-900 p-0 shadow-2xl shadow-yellow-500/20"
+        className="overflow-hidden border-2 border-primary/50 bg-zinc-900 p-0 shadow-2xl shadow-primary/20"
         showCloseButton={false}
       >
         <DialogTitle className="sr-only">Admin Omnibox</DialogTitle>
 
         {/* Admin Header Banner */}
-        <div className="flex items-center gap-2 border-b border-yellow-500/30 bg-yellow-500/10 px-4 py-3">
-          <Zap className="h-5 w-5 text-yellow-400" />
-          <span className="font-mono text-sm font-bold tracking-wider text-yellow-400">
+        <div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-4 py-3">
+          <Zap className="h-5 w-5 text-primary" />
+          <span className="font-mono text-sm font-bold tracking-wider text-primary">
             KILO ADMIN
           </span>
-          <span className="ml-auto font-mono text-xs text-yellow-500/70">v{BUILD_VERSION}</span>
+          <span className="ml-auto font-mono text-xs text-primary/70">v{BUILD_VERSION}</span>
         </div>
 
         {/* Info Panel */}
@@ -163,7 +163,7 @@ function AdminOmniboxInner({ open, setOpen }: AdminOmniboxInnerProps) {
               <div className="flex items-center gap-2 text-zinc-300">
                 <Shield className="h-4 w-4 text-zinc-500" />
                 <span className="text-zinc-500">Role:</span>
-                <span className="font-medium text-yellow-400">
+                <span className="font-medium text-primary">
                   {assumedRole || originalRole || 'Unknown'}
                 </span>
                 {assumedRole && originalRole && assumedRole !== originalRole && (
@@ -262,7 +262,7 @@ function ActionGroupRenderer({ group, context, onClose, showSeparator }: ActionG
               onSelect={() => handleSelect(action)}
               className="cursor-pointer"
             >
-              {Icon && <Icon className="mr-2 h-4 w-4 text-yellow-500" />}
+              {Icon && <Icon className="mr-2 h-4 w-4 text-primary" />}
               <div className="flex flex-col">
                 <span>{action.label}</span>
                 {action.description && (

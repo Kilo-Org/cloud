@@ -15,6 +15,8 @@ import {
   COMPOSER_CONTROL_GAP_DP,
   COMPOSER_CONTROL_HIT_SLOP_DP,
   composerControlClearanceDp,
+  ICON_TARGET_BOX_CLASS,
+  ICON_TARGET_DP,
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
   INLINE_LINK_FACING_HIT_SLOP_DP,
@@ -80,6 +82,14 @@ describe('shared tap-target geometry', () => {
     expect(COMPACT_CONTROL_BOX_CLASS).toContain('h-[32px]');
     expect(COMPACT_CONTROL_BOX_CLASS).toContain('w-[32px]');
     expect(COMPACT_CONTROL_BOX_CLASS).toContain('items-center');
+  });
+
+  it('renders the icon target box at Android 48dp minimum from whole pixels', () => {
+    expect(ICON_TARGET_DP).toBe(48);
+    expect(ICON_TARGET_BOX_CLASS).toContain('h-[48px]');
+    expect(ICON_TARGET_BOX_CLASS).toContain('w-[48px]');
+    expect(ICON_TARGET_BOX_CLASS).toContain('items-center');
+    expect(ICON_TARGET_BOX_CLASS).toContain('justify-center');
   });
 
   it('reaches the design touch target with the compact box plus its slop', () => {

@@ -119,6 +119,33 @@ describe('cloud runtime feature configuration', () => {
     expect(JSON.parse(env.KILO_CONFIG_CONTENT).snapshot).toBe(false);
     expect(JSON.parse(env.OPENCODE_CONFIG_CONTENT).snapshot).toBe(false);
   });
+
+  it('limits code review runtimes to platform-provided Kilo configuration', () => {
+    const overrides = { KILO_DISABLE_PROJECT_CONFIG: '', KILO_DISABLE_EXTERNAL_SKILLS: '0' };
+    const reviewEnv = buildWorktreeKiloEnvironment(
+      identity.directory,
+      '/runtime-home',
+      auth,
+      overrides,
+      overrides,
+      undefined,
+      { createdOnPlatform: 'code-review' }
+    );
+    expect(reviewEnv.KILO_DISABLE_PROJECT_CONFIG).toBe('1');
+    expect(reviewEnv.KILO_DISABLE_EXTERNAL_SKILLS).toBe('1');
+
+    const webEnv = buildWorktreeKiloEnvironment(
+      identity.directory,
+      '/runtime-home',
+      auth,
+      {},
+      {},
+      undefined,
+      { createdOnPlatform: 'cloud-agent-web' }
+    );
+    expect(webEnv.KILO_DISABLE_PROJECT_CONFIG).toBeUndefined();
+    expect(webEnv.KILO_DISABLE_EXTERNAL_SKILLS).toBeUndefined();
+  });
 });
 
 function createFeedConnection(sseMaxRetryAttempts: number): {
@@ -155,9 +182,10 @@ function fixture() {
   const statuses = vi.fn<WrapperKiloClient['getSessionStatuses']>(async () => ({}));
   const createPty = vi.fn<WrapperKiloClient['createPty']>();
   const clients: WrapperKiloClient[] = [];
-  vi.mocked(createWrapperKiloClient).mockImplementation((_client, serverUrl) => {
+  vi.mocked(createWrapperKiloClient).mockImplementation((_client, server) => {
     const partial: Partial<WrapperKiloClient> = {
-      serverUrl,
+      serverUrl: server.url,
+      server,
       getSessionStatuses: statuses,
       createPty,
     };
@@ -179,6 +207,7 @@ function fixture() {
     } as never);
     return {
       url: `http://127.0.0.1:${10000 + clients.length}`,
+      authorization: 'Basic test',
       stopped: stopped.promise,
       close: () => {
         close();
@@ -653,7 +682,12 @@ describe('direct worktree credential refresh', () => {
     const stopped = Promise.withResolvers<void>();
     f.startServer.mockImplementationOnce(async options => {
       options.onProcessScope?.({ stop: async () => true, verify: async () => true } as never);
-      return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+      return {
+        url: 'http://127.0.0.1:10000',
+        authorization: 'Basic test',
+        close: f.close,
+        stopped: stopped.promise,
+      };
     });
     const runtime = await f.attach();
     const attachment = f.registry.attach(
@@ -678,7 +712,12 @@ describe('direct worktree credential refresh', () => {
       if (failure === 'process-stop-timeout') {
         f.startServer.mockImplementationOnce(async options => {
           options.onProcessScope?.({ stop: async () => false, verify: async () => false } as never);
-          return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+          return {
+            url: 'http://127.0.0.1:10000',
+            authorization: 'Basic test',
+            close: f.close,
+            stopped: stopped.promise,
+          };
         });
       }
       const runtime = await f.attach();
@@ -725,6 +764,7 @@ describe('direct worktree credential refresh', () => {
       options.onProcessScope?.({ stop: async () => stopResult.promise } as never);
       return {
         url: 'http://127.0.0.1:10000',
+        authorization: 'Basic test',
         close: f.close,
         stopped: new Promise<void>(() => {}),
       };
@@ -757,7 +797,12 @@ describe('direct worktree credential refresh', () => {
     const stopped = Promise.withResolvers<void>();
     f.startServer.mockImplementationOnce(async options => {
       options.onProcessScope?.({ stop: async () => true, verify: async () => true } as never);
-      return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+      return {
+        url: 'http://127.0.0.1:10000',
+        authorization: 'Basic test',
+        close: f.close,
+        stopped: stopped.promise,
+      };
     });
     const runtime = await f.attach();
     stopped.resolve();

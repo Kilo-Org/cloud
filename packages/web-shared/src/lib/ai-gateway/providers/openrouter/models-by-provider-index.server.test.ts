@@ -1,5 +1,7 @@
-import { describe, expect, it } from '@jest/globals';
+import { beforeAll, describe, expect, it } from '@jest/globals';
+import { ai_gateway_config } from '@kilocode/db/schema';
 import type { StoredModel } from '@kilocode/db/schema-types';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
@@ -15,6 +17,19 @@ import { getSnapshotModelVariantId } from '@kilocode/web-shared/lib/ai-gateway/m
 
 const MODEL = 'nvidia/nemotron-3.5-lightning';
 const FREE_MODEL = `${MODEL}:free`;
+const OVERRIDDEN_MODEL = 'anthropic/claude-sonnet-4-6';
+const OVERRIDDEN_VERCEL_MODEL = 'anthropic/claude-sonnet-4.6';
+
+beforeAll(async () => {
+  await cleanupDbForTest();
+  await db.insert(ai_gateway_config).values({
+    vercel_model_id_overrides: {
+      overrides: [
+        { openrouter_model_id: OVERRIDDEN_MODEL, vercel_model_id: OVERRIDDEN_VERCEL_MODEL },
+      ],
+    },
+  });
+});
 
 function snapshotModel(slug: string, variant: string | null): OpenRouterModel {
   return {
@@ -230,6 +245,35 @@ describe('createModelsByProviderIndexLoader', () => {
     await expect(getProviderSlugsForModel('unknown/model:free')).resolves.toEqual(new Set());
   });
 
+  it('resolves a whole catalog with one metadata read per source', async () => {
+    let openRouterReads = 0;
+    let vercelReads = 0;
+    const { getProviderSlugsForModels } = createModelsByProviderIndexLoader({
+      fetchSnapshot: async () => makeSnapshot(),
+      fetchOpenRouterModels: async () => {
+        openRouterReads += 1;
+        return storedModels;
+      },
+      fetchVercelModels: async () => {
+        vercelReads += 1;
+        return {};
+      },
+      ttlMs: 60_000,
+      nowMs: () => 0,
+    });
+
+    await expect(
+      getProviderSlugsForModels([MODEL, FREE_MODEL, 'unknown/model', MODEL])
+    ).resolves.toEqual(
+      new Map([
+        [MODEL, new Set(['deepinfra', 'coreweave'])],
+        [FREE_MODEL, new Set(['nvidia'])],
+        ['unknown/model', new Set()],
+      ])
+    );
+    expect({ openRouterReads, vercelReads }).toEqual({ openRouterReads: 1, vercelReads: 1 });
+  });
+
   it.each(['provider_name', 'tag'] as const)(
     'retains Vercel-only Bedrock and Alibaba endpoints identified by %s',
     async providerField => {
@@ -271,8 +315,8 @@ describe('createModelsByProviderIndexLoader', () => {
   });
 
   it('maps model and provider IDs when retaining Vercel endpoints', async () => {
-    const modelId = 'anthropic/claude-sonnet-4-6';
-    const vercelModelId = 'anthropic/claude-sonnet-4.6';
+    const modelId = OVERRIDDEN_MODEL;
+    const vercelModelId = OVERRIDDEN_VERCEL_MODEL;
     const snapshot = makeSnapshot();
     snapshot.providers = ['anthropic', 'google-vertex'].map(slug => ({
       name: slug,

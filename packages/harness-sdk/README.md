@@ -117,7 +117,7 @@ polyfill.
 | `redacted` | Thinking the provider encrypted. There is nothing here to show a reader |
 | `toolCall` | A tool the model asked for, whole: its id, its name, its arguments |
 | `toolResult` | What that tool said, and whether it failed |
-| `done` | This call's token counts, and why the model stopped |
+| `done` | This call's token counts, reported cost and served model when available, and why the model stopped |
 
 When only the answer matters, `said` folds the stream into it:
 
@@ -137,6 +137,12 @@ context window — because both leave half a sentence. `unknown` means no frame
 said why, which on the shapes served here means the stream ended early; treat
 it the same way.
 
+`done.model` is the model the provider reports serving, which can differ from
+the requested Auto target. It never changes the model requested on the next
+call. All three gateway shapes read the billed cost in US dollars when present:
+`usage.cost`, or `usage.cost_details.upstream_inference_cost` when `is_byok` is
+true. An absent cost is unknown, not zero, and the SDK never estimates a price.
+
 ```ts
 yield* Stream.runForEach(session.ask('Name three fruits.'), event =>
   Effect.sync(() => {
@@ -154,8 +160,11 @@ yield* Stream.runForEach(session.ask('Name three fruits.'), event =>
 ```
 
 The handle also carries `history` (every turn, as a plain array), `usage` (the
-counts of every call so far — pass it to `hitRatio`), `compact`, and the three
-that work the queue: `queue`, `cancel` and `queued`.
+counts of every call so far — pass it to `hitRatio`), `usageByModel` (a readonly
+map of those counts grouped by served model, or requested model when none was
+reported), `compact`, and the three that work the queue: `queue`, `cancel` and
+`queued`. Both usage totals include summary calls and start from zero when a
+session is opened or continued.
 
 One session does one thing at a time. A second question, or a `compact`,
 started while the first answer is still streaming fails with
@@ -698,6 +707,19 @@ happened and decides what to do about it. A caller wiring the client by hand
 gets the same failures as a tagged `RemoteMcpError`, whose `kind` tells
 `unreachable`, `unauthorized`, `missing` and `protocol` apart.
 
+A tool may carry an MCP Apps view: the server names a `ui://` resource in the
+tool's `_meta`, and the host renders it beside the conversation. Discovery
+carries each tool's `_meta` as it stands, and `uiResourceUriOf(tool)` reads the
+uri out of it — the nested form the Apps specification defines, with the
+deprecated flat `_meta['ui/resourceUri']` beside it — or answers `undefined`
+when the tool names no view. `remoteMcpClient(...).resource(uri)` reads the
+resource off the same server, under the same deadline and credential rules as a
+call, and answers its first content: the `mimeType` and, for an app, the HTML
+in `text`. The read of the metadata is the official
+`@modelcontextprotocol/ext-apps` bridge package, pinned to the 1.x line that
+speaks this package's `@modelcontextprotocol/sdk`; its 2.x peers on the v2 SDK
+split and moves when the client does.
+
 ## Entry points
 
 | Import | Holds |
@@ -708,7 +730,7 @@ gets the same failures as a tagged `RemoteMcpError`, whose `kind` tells
 | `@kilocode/harness-sdk/plugins/gateway` | The gateway plugin on its own |
 | `@kilocode/harness-sdk/plugins/remote-model` | Direct Chat Completions, Responses and Messages: `remoteModelClient`, `layerRemoteModel` |
 | `@kilocode/harness-sdk/plugins/prompt` | The assembler on its own |
-| `@kilocode/harness-sdk/plugins/remote-mcp` | Remote MCP servers: `remoteMcpTools`, and the Streamable HTTP client under it |
+| `@kilocode/harness-sdk/plugins/remote-mcp` | Remote MCP servers: `remoteMcpTools`, `uiResourceUriOf`, and the Streamable HTTP client under it |
 | `@kilocode/harness-sdk/plugins/tools` | The tools the package ships |
 | `@kilocode/harness-sdk/plugins/store/node` | The store on `node:sqlite` |
 | `@kilocode/harness-sdk/plugins/store/expo` | The store on `expo-sqlite` |

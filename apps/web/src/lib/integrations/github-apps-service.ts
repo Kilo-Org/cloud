@@ -10,6 +10,7 @@ import { platformIntegrationHealthSql } from '@/lib/integrations/core/health';
 import {
   findPendingInstallationByKiloUserId,
   getGitHubIntegrationById,
+  personalGitHubIntegrationOrder,
   updateIntegrationMetadataForOwner,
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
@@ -54,11 +55,13 @@ export async function getInstallation(owner: Owner): Promise<PlatformIntegration
     .from(platform_integrations)
     .where(and(ownershipCondition, eq(platform_integrations.platform, 'github')))
     .orderBy(
-      desc(platformIntegrationHealthSql()),
-      owner.type === 'org'
-        ? asc(platform_integrations.created_at)
-        : desc(platform_integrations.updated_at),
-      asc(platform_integrations.id)
+      ...(owner.type === 'org'
+        ? [
+            desc(platformIntegrationHealthSql()),
+            asc(platform_integrations.created_at),
+            asc(platform_integrations.id),
+          ]
+        : personalGitHubIntegrationOrder())
     )
     .limit(1);
 
@@ -188,7 +191,6 @@ export async function listRepositories(
   }
 
   const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-  // If forceRefresh, no cached repos, or never synced before, fetch from GitHub and update cache
   if (forceRefresh || !cachedRepositories?.length || !integration.repositories_synced_at) {
     const appType = integration.github_app_type || 'standard';
     const repos = await fetchGitHubRepositories(
@@ -204,7 +206,6 @@ export async function listRepositories(
     };
   }
 
-  // Return cached repos
   return {
     repositories: cachedRepositories,
     syncedAt: integration.repositories_synced_at,

@@ -200,7 +200,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       }
       if (path.startsWith('pool') && issue.message.toLowerCase().includes('duplicate')) {
         return NextResponse.json(
-          { error: poolValidationMessage('duplicate_pair'), reason: 'duplicate_pair' },
+          { error: poolValidationMessage('duplicate_model'), reason: 'duplicate_model' },
           { status: 400 }
         );
       }

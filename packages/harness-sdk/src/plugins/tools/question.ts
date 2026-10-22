@@ -1,4 +1,4 @@
-import { type Duration, Effect } from 'effect';
+import { type Duration, Effect, Semaphore } from 'effect';
 import { createAssert } from 'typia';
 import { type Tool, ToolFailure, type ToolCall, type JsonSchema } from '../../core/tool.js';
 
@@ -166,7 +166,7 @@ interface QuestionOptions {
    * back to the session's own deadline, which is what most callers want: the
    * person is asked either way, and only the waiting is cut short.
    */
-  readonly inlineFor?: Duration.DurationInput;
+  readonly inlineFor?: Duration.Input;
   /**
    * Whether the model waits for an answer, as it is told by default. True,
    * because a model asks in order to find something out. A harness whose
@@ -191,7 +191,7 @@ interface QuestionOptions {
  * over one asker is two permits and two dialogs, which is a reason to build one.
  */
 const questionTool = (ask: Asker, options?: QuestionOptions): Tool => {
-  const permit = Effect.unsafeMakeSemaphore(1);
+  const permit = Semaphore.makeUnsafe(1);
   return {
     definition: { name: options?.name ?? 'question', description, parameters },
     /* The model asked because it cannot go on without the answer, so waiting is

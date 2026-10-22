@@ -31,9 +31,26 @@ export const streamErrorSchema = z.object({
 });
 export type StreamError = z.infer<typeof streamErrorSchema>;
 
-export const sessionStatusSchema = z.discriminatedUnion('type', [
+const KNOWN_SESSION_STATUS_TYPES = [
+  'busy',
+  'idle',
+  'retry',
+  'scheduled',
+  'question',
+  'permission',
+] as const;
+
+/**
+ * The live status types this SDK reads precisely. `question` and `permission`
+ * carry no payload here: the pending interaction itself arrives on
+ * `question.asked` / `permission.asked`, and a status-only report names the
+ * state without repeating it.
+ */
+const knownSessionStatusSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('busy') }),
   z.object({ type: z.literal('idle') }),
+  z.object({ type: z.literal('question') }),
+  z.object({ type: z.literal('permission') }),
   z.object({
     type: z.literal('retry'),
     attempt: z.number(),
@@ -47,7 +64,34 @@ export const sessionStatusSchema = z.discriminatedUnion('type', [
   // absent instead of failing the parse.
   z.object({ type: z.literal('scheduled'), scheduledAt: z.string().optional().catch(undefined) }),
 ]);
+export type KnownSessionStatus = z.infer<typeof knownSessionStatusSchema>;
+
+/**
+ * A live status type this SDK does not know yet. It parses so the event is
+ * never dropped and the type is never re-labelled, and its payload is kept as
+ * sent. Known types are excluded so a malformed known variant fails instead of
+ * reading as unrecognized.
+ */
+const unrecognizedSessionStatusSchema = z
+  .object({ type: z.string() })
+  .passthrough()
+  .refine(status => !KNOWN_SESSION_STATUS_TYPES.some(type => type === status.type));
+
+export const sessionStatusSchema = z.union([
+  knownSessionStatusSchema,
+  unrecognizedSessionStatusSchema,
+]);
 export type SessionStatus = z.infer<typeof sessionStatusSchema>;
+
+/**
+ * Read a live status as one of the variants this SDK knows, so callers can use
+ * its payload fields. An unrecognized status still reaches consumers, but it
+ * has no variant payload to read and yields null here.
+ */
+export function knownSessionStatus(status: SessionStatus): KnownSessionStatus | null {
+  const parsed = knownSessionStatusSchema.safeParse(status);
+  return parsed.success ? parsed.data : null;
+}
 
 export const cloudStatusSchema = z.discriminatedUnion('type', [
   z.object({
@@ -385,13 +429,7 @@ export const remoteCommandCatalogV1Schema = z
   .transform(catalog => ({
     protocolVersion: 1 as const,
     canExitSession: catalog.canExitSession,
-    commands: catalog.commands
-      // SlashCommandInfo requires a `hints` array; remote commands with no
-      // hints still have an empty array after the strict shape parse above.
-      .map(command => ({
-        ...command,
-        hints: command.hints,
-      })),
+    commands: catalog.commands,
   }));
 export type RemoteCommandCatalogV1 = z.output<typeof remoteCommandCatalogV1Schema>;
 
@@ -531,6 +569,30 @@ export const listDirectoriesV1Schema = z
   })
   .strict();
 export type ListDirectoriesV1 = z.infer<typeof listDirectoriesV1Schema>;
+
+const REMOTE_AGENT_MAX_ENTRIES = 128;
+const REMOTE_AGENT_MAX_NAME_LENGTH = 256;
+const REMOTE_AGENT_MAX_DESCRIPTION_LENGTH = 1_000;
+
+/**
+ * `list_agents` success body (protocol v1): the agents a CLI can start or
+ * continue a session with, resolved in the requested directory. Unknown keys
+ * are stripped, not rejected, so a CLI can add optional agent fields without
+ * hiding every agent from an older app. Out-of-range values still fail.
+ */
+export const listAgentsV1Schema = z.object({
+  protocolVersion: z.literal(1),
+  agents: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(REMOTE_AGENT_MAX_NAME_LENGTH),
+        displayName: z.string().min(1).max(REMOTE_AGENT_MAX_NAME_LENGTH).optional(),
+        description: z.string().max(REMOTE_AGENT_MAX_DESCRIPTION_LENGTH).optional(),
+      })
+    )
+    .max(REMOTE_AGENT_MAX_ENTRIES),
+});
+export type ListAgentsV1 = z.infer<typeof listAgentsV1Schema>;
 
 /**
  * Permissive status value for v2 session rows and status-updated payloads.

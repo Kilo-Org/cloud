@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { type BackendModule, createInstance, type ReadCallback } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
@@ -42,7 +43,13 @@ void i18n
     lng: 'en',
     fallbackLng: 'en',
     compatibilityJSON: 'v4',
-    interpolation: { escapeValue: false },
+    interpolation: { escapeValue: false, defaultVariables: { supportEmail: SUPPORT_EMAIL } },
     initAsync: false,
     returnNull: false,
   });
+
+/** The active language tag as a plain value, for effect/memo dependencies that
+ * re-resolve captured copy when the app language changes. */
+export function getLanguageSnapshot(): string {
+  return i18n.language;
+}

@@ -37,6 +37,12 @@ export type ChatSummary = {
   readonly model: string;
   /** The name the person gave it, else the first thing they said, else empty. */
   readonly title: string;
+  /**
+   * The newest thing said in the conversation, from either side. Two chats
+   * opened from the same first message share a title, so the row shows this
+   * beside it whenever the two differ.
+   */
+  readonly preview: string;
   readonly updatedAt: number;
 };
 
@@ -44,6 +50,7 @@ type SummaryRow = {
   readonly session_id: string;
   readonly model: string;
   readonly title: string | null;
+  readonly preview: string | null;
   readonly updated_at: number;
 };
 
@@ -69,7 +76,13 @@ const LIST = `
       where turns.session_id = chats.session_id
         and turns.role = 'user' and parts.kind = 'text'
       order by parts.id limit 1
-    )) as title
+    )) as title,
+    (
+      select parts.body from parts
+      join turns on parts.turn_id = turns.id
+      where turns.session_id = chats.session_id and parts.kind = 'text'
+      order by parts.id desc limit 1
+    ) as preview
   from chats
   join sessions on sessions.id = chats.session_id
   where chats.scope = ?
@@ -81,6 +94,7 @@ export function listChats(db: ChatDatabase, scope: string): ChatSummary[] {
     sessionId: row.session_id,
     model: row.model,
     title: row.title ?? '',
+    preview: row.preview ?? '',
     updatedAt: row.updated_at,
   }));
 }

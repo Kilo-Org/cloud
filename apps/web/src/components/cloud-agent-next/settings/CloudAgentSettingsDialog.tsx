@@ -37,7 +37,7 @@ export function CloudAgentSettingsDialog({
 }: CloudAgentSettingsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(44rem,90vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[1120px]">
+      <DialogContent className="flex h-[min(60rem,calc(100dvh-4rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-[1440px]">
         <CloudAgentSettings
           key={organizationId ?? 'personal'}
           organizationId={organizationId}

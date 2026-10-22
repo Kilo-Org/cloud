@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -19,6 +20,8 @@ import {
 import { securityFindingTemplateVars } from '@/lib/security-notification-email-vars';
 import { USER_DELETION_COMPLETION_HTML } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import * as z from 'zod';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
+import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { format } from 'date-fns';
 
 const templateNames = Object.keys(subjects) as [TemplateName, ...TemplateName[]];
@@ -45,6 +48,13 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${orgId}/code-reviews`;
 
   switch (template) {
+    case 'autoRoutingPoolNotice':
+      return {
+        cutover_at: 'Sunday, November 1, 2099 at 12:00 UTC',
+        routers: new RawHtml(
+          `<li><strong>Your personal pool:</strong> <code>kilo-auto/custom/efficient</code> · <a href="${NEXTAUTH_URL}/profile">Manage</a></li>`
+        ),
+      };
     case 'orgSubscription':
       return { seats: '5 seats', organization_url, invoices_url };
     case 'orgRenewed':
@@ -86,9 +96,8 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
       return { reason: 'Card declined', credits_url: `${NEXTAUTH_URL}/credits?show-auto-top-up` };
     case 'codeReviewDisabled':
       return {
-        reason:
-          'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilo.ai for help, then enable Code Reviewer again.',
-        recovery_url: 'mailto:hi@kilo.ai?subject=Repository%20clone%20timeouts',
+        reason: `Code Reviewer was disabled after three repository clone timeouts today. Contact ${SUPPORT_EMAIL} for help, then enable Code Reviewer again.`,
+        recovery_url: `mailto:${SUPPORT_EMAIL}?subject=Repository%20clone%20timeouts`,
         recovery_label: 'Contact support',
       };
     case 'ossInviteNewUser':
@@ -250,7 +259,7 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
         manage_url: `${NEXTAUTH_URL}/organizations/${orgId}/subscriptions/kilo-pass`,
       };
     case 'kiloPassDuplicateCardCanceled':
-      return { support_url: 'mailto:hi@kilo.ai' };
+      return { support_url: `mailto:${SUPPORT_EMAIL}` };
     case 'userDataExportReady':
       return {
         data_exports_url: `${NEXTAUTH_URL}/data-exports`,
@@ -346,7 +355,7 @@ export const emailTestingRouter = createTRPCRouter({
         recipient: z.string().email(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const verificationRecipient = getEmailVerificationRecipient(input.recipient);
       if (verificationRecipient) {
         const isSafeToSend = await verifyEmail(verificationRecipient);
@@ -377,6 +386,17 @@ export const emailTestingRouter = createTRPCRouter({
           message: 'MAILGUN_API_KEY/MAILGUN_DOMAIN is not configured — email was not sent',
         });
       }
+      // Store the recipient domain only; the full address is not needed to
+      // spot misuse and would put arbitrary email addresses in the audit log.
+      await recordAdminAction(ctx, {
+        action: 'email_test.send',
+        target: null,
+        message: `Sent test email: ${input.template}`,
+        metadata: {
+          template: input.template,
+          recipientDomain: getLowerDomainFromEmail(input.recipient),
+        },
+      });
       return { recipient: input.recipient };
     }),
 });

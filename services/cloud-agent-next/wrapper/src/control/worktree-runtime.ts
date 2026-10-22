@@ -5,7 +5,10 @@ import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk';
 import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
 import { CONTROL_PLANE_SANDBOX_PERMISSION } from '../../../src/shared/control-plane-permission.js';
-import type { ControlPlaneRouteSpec } from '../../../src/shared/control-plane-protocol.js';
+import type {
+  ControlPlaneRouteSpec,
+  ControlPlaneSessionCredentialsPayload,
+} from '../../../src/shared/control-plane-protocol.js';
 import {
   GITHUB_REVIEW_MCP_BINARY,
   GITHUB_REVIEW_MCP_SERVER_NAME,
@@ -27,12 +30,19 @@ import {
   type SessionEventIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
+import { kiloServerEnvForOrigin } from '../../../src/shared/kilo-server-env.js';
 import {
   createWrapperKiloClient,
   type KiloServerHandle,
   type WrapperKiloClient,
 } from '../kilo-api.js';
 import { logToFile, withTimeoutAndAbort } from '../utils.js';
+import {
+  createKiloServerCredential,
+  fetchKiloServer,
+  kiloClientConfig,
+  type KiloServer,
+} from '../kilo-server-auth.js';
 import { isKiloServerProcess } from '../tool-cgroup.js';
 import {
   createOwnedProcessScope,
@@ -208,6 +218,8 @@ type ServerOptions = {
 };
 
 type WorktreeKiloServerHandle = Omit<KiloServerHandle, 'close'> & {
+  /** Basic credential the server requires; see `kilo-server-auth.ts`. */
+  authorization: string;
   close(deadlineAt?: number): void;
   stopped?: Promise<void>;
   exited?: Promise<void>;
@@ -312,7 +324,12 @@ export function buildWorktreeKiloEnvironment(
   environment: Record<string, string> = {},
   inherited: NodeJS.ProcessEnv = process.env,
   mcp?: SessionAttachPayload['mcp'],
-  runtimeConfig?: Pick<ControlPlaneRouteSpec, 'permission' | 'githubReviewTarget'>
+  runtimeConfig?: Pick<
+    ControlPlaneRouteSpec,
+    'permission' | 'githubReviewTarget' | 'createdOnPlatform'
+  > & {
+    cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
+  }
 ): Record<string, string> {
   const env: Record<string, string> = {};
   const reserved = new Set<string>(CONTROL_RUNTIME_RESERVED_ENV_VARS);
@@ -346,11 +363,25 @@ export function buildWorktreeKiloEnvironment(
         },
       },
     },
-    ...(mcp
+    ...(mcp || runtimeConfig?.cloudAgentMcp
       ? {
-          mcp: Object.fromEntries(
-            Object.entries(mcp).filter(([name]) => name !== GITHUB_REVIEW_MCP_SERVER_NAME)
-          ),
+          mcp: {
+            ...Object.fromEntries(
+              Object.entries(mcp ?? {}).filter(
+                ([name]) => name !== GITHUB_REVIEW_MCP_SERVER_NAME && name !== 'kilo-cloud-agent'
+              )
+            ),
+            ...(runtimeConfig?.cloudAgentMcp
+              ? {
+                  'kilo-cloud-agent': {
+                    type: 'remote',
+                    url: runtimeConfig.cloudAgentMcp.url,
+                    oauth: false,
+                    headers: { Authorization: `Bearer ${runtimeConfig.cloudAgentMcp.token}` },
+                  },
+                }
+              : {}),
+          },
         }
       : {}),
   });
@@ -390,6 +421,7 @@ export function buildWorktreeKiloEnvironment(
     KILO_DISABLE_CODEBASE_INDEXING: 'vscode-no-workspace',
     KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'false',
     KILO_DEBUG_SESSION_INGEST: '1',
+    ...kiloServerEnvForOrigin(runtimeConfig?.createdOnPlatform),
     KILOCODE_TOKEN: kilo.token,
     ...(kilo.organizationId ? { KILOCODE_ORGANIZATION_ID: kilo.organizationId } : {}),
     KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: kilo.token } }),
@@ -409,9 +441,10 @@ export async function startWorktreeKiloServer(
   const placement = admitControlWorkload(options.workload);
   const processes = createOwnedProcessScope(placement);
   options.onProcessScope?.(processes);
+  const credential = createKiloServerCredential();
   const proc = processes.spawn('kilo', ['serve', '--hostname=127.0.0.1', '--port=0'], {
     cwd: options.directory,
-    env: options.env,
+    env: { ...options.env, ...credential.env },
   });
   const processObserver = processes.observeChild(proc);
   if (processObserver) options.onProcessObserver?.(processObserver);
@@ -482,7 +515,15 @@ export async function startWorktreeKiloServer(
     proc.once('exit', close);
     await processes.captureBaseline(isKiloServerProcess);
     options.signal.throwIfAborted();
-    return { url, close: closeAt, stopped, exited, processes, processObserver };
+    return {
+      url,
+      authorization: credential.authorization,
+      close: closeAt,
+      stopped,
+      exited,
+      processes,
+      processObserver,
+    };
   } catch {
     const deadlineAt = claimCleanupDeadline();
     const cleanup = stopWithinCleanupBudget(processes, true, deadlineAt);
@@ -1290,8 +1331,9 @@ export function createWorktreeKiloRuntimes(options: {
         if (!abort.signal.aborted) failRuntime(entry, 'process_exited');
       });
       abort.signal.throwIfAborted();
-      const client = createKiloClient({ baseUrl: server.url, directory: entry.directory });
-      const kiloClient = createWrapperKiloClient(client, server.url, entry.directory);
+      const kiloServer: KiloServer = { url: server.url, authorization: server.authorization };
+      const client = createKiloClient(kiloClientConfig(kiloServer, entry.directory));
+      const kiloClient = createWrapperKiloClient(client, kiloServer, entry.directory);
       const runtimeKiloClient: WrapperKiloClient = {
         ...kiloClient,
         async createPty(options) {
@@ -1355,10 +1397,7 @@ export function createWorktreeKiloRuntimes(options: {
       });
       abort.signal.throwIfAborted();
       entry.runtime = runtime;
-      const eventClient = createKiloEventClient({
-        baseUrl: server.url,
-        directory: entry.directory,
-      });
+      const eventClient = createKiloEventClient(kiloClientConfig(kiloServer, entry.directory));
       void withKiloRequestDeadline(
         signal => eventClient.global.health({ signal }),
         abort.signal
@@ -1414,7 +1453,7 @@ export function createWorktreeKiloRuntimes(options: {
         const url = new URL('/pty', client.serverUrl);
         url.searchParams.set('directory', entry.directory);
         probeStep = 'pty';
-        const response = await fetch(url, { signal });
+        const response = await fetchKiloServer(client.server, url, { signal });
         if (!response.ok) throw new Error(`Worktree PTY probe failed: HTTP ${response.status}`);
         probeStep = 'pty_body';
         let ptys: unknown;

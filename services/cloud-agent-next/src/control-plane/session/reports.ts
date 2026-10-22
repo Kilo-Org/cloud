@@ -153,6 +153,7 @@ export function buildControlPlaneMessageReport(params: {
       queuedAt: timestamp(message.createdAt),
       ...(message.acceptedAt === null ? {} : { dispatchAcceptedAt: timestamp(message.acceptedAt) }),
       terminalAt: timestamp(message.settledAt),
+      ...(message.container === undefined ? {} : { container: message.container }),
     };
     if (message.state === 'failed' || message.state === 'cancelled') {
       const classification = classifySettledMessageFailure(message, facts);

@@ -3,11 +3,11 @@ import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
 import { Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RenameModal } from '@/components/rename-modal';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { SessionRow } from '@/components/ui/session-row';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { CHAT_TITLE_MAX_LENGTH, type ChatSummary } from '@/lib/chat/store';
 import { useChatStatus } from '@/lib/chat/use-chat';
 import { timeAgo } from '@/lib/utils';
@@ -43,12 +43,16 @@ export function ChatRow({
   const { t } = useTranslation();
   // The answer may be arriving on another screen: the chat says so, not the row.
   const working = useChatStatus(chat.sessionId) === 'working';
-  const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
+  const themedSheet = useThemedActionSheetOptions();
   const { confirm, dialog } = useConfirmDialog();
   const [renaming, setRenaming] = useState(false);
   const title = chat.title === '' ? t('chat.conversation.untitled') : chat.title;
   const label = modelName === '' ? t('common.chat') : modelName;
+  // Two chats opened from the same first message share a title. The newest
+  // message in each tells them apart, and repeating one that is already the
+  // title would say nothing.
+  const preview = chat.preview.trim() === chat.title.trim() ? '' : chat.preview;
 
   function confirmDelete() {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -66,11 +70,11 @@ export function ChatRow({
     void Haptics.selectionAsync();
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         title,
         options: [t('common.rename'), t('common.delete'), t('common.cancel')],
         cancelButtonIndex: 2,
         destructiveButtonIndex: 1,
-        containerStyle: { paddingBottom: bottom },
       },
       index => {
         if (index === 0) {
@@ -97,6 +101,8 @@ export function ChatRow({
         <SessionRow
           agentLabel={label}
           title={title}
+          subtitle={preview}
+          subtitleVariant="default"
           meta={timeAgo(new Date(chat.updatedAt))}
           live={working}
           metaWhileLive

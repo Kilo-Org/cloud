@@ -84,9 +84,12 @@ The session never decides how a request is sent, retried, or parsed. The
 example above is a whole one.
 
 Every stream must end with exactly one `done`, carrying that call's counts and
-why the model stopped. The session reads nothing else to close a turn. Emit
-`toolCall` whole — the id, the name, and the complete arguments — rather than in
-fragments; collecting the fragments is the transport's job.
+why the model stopped. Include `done.model` when the provider reports the served
+model, especially when it differs from the requested routing target. Leave it
+absent when the provider does not report one. `usage.cost` is the reported USD
+cost, never a catalog estimate. The session reads `done` to close a turn and
+group usage. Emit `toolCall` whole — the id, the name, and the complete arguments —
+rather than in fragments; collecting the fragments is the transport's job.
 
 Fail with `ModelError`. A transport that throws instead of failing takes the
 session down with it.

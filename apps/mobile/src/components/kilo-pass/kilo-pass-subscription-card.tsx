@@ -76,8 +76,6 @@ export function KiloPassSubscriptionCard({
     void presentationQuery.refetch();
   };
 
-  const isUnavailable = presentationQuery.data?.kind === 'unavailable';
-
   // The card body's one row: icon tile + text block + an optional trailing
   // label, stacked when a narrow window cannot fit the fixed siblings.
   const iconTile = (
@@ -166,7 +164,6 @@ export function KiloPassSubscriptionCard({
           accessibilityRole="button"
           className="rounded-lg border border-border bg-card p-3 active:opacity-80"
           onPress={handlePress}
-          testID={isUnavailable ? 'kilo-pass-unavailable-card' : undefined}
         >
           {cardBody(
             <>

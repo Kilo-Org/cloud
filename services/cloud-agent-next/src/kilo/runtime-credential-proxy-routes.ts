@@ -20,6 +20,11 @@ type ResolveRuntimeCredentialProxyRouteInput = {
   bodyText?: string;
 };
 
+type ResolveRuntimeCredentialProxyScopedV2Input = Omit<
+  ResolveRuntimeCredentialProxyRouteInput,
+  'kiloSessionId'
+>;
+
 const ID = /^[A-Za-z0-9_-]{1,256}$/;
 const ORGANIZATION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
@@ -205,6 +210,29 @@ function isAllowedIngestRoute(
   );
 }
 
+function parseScopeCreateBody(input: {
+  contentType?: string | null;
+  bodyText?: string;
+}): Record<string, unknown> | null {
+  if (
+    input.contentType?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json' ||
+    input.bodyText === undefined ||
+    input.bodyText.length > 8192
+  ) {
+    return null;
+  }
+  try {
+    const body: unknown = JSON.parse(input.bodyText);
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
+    const values = body as Record<string, unknown>;
+    if (Object.keys(values).some(key => key !== 'sessionId' && key !== 'parentSessionId'))
+      return null;
+    return values;
+  } catch {
+    return null;
+  }
+}
+
 export function resolveRuntimeCredentialProxyScopedIngestRoute(
   input: ResolveRuntimeCredentialProxyRouteInput
 ): URL | null {
@@ -220,29 +248,15 @@ export function resolveRuntimeCredentialProxyScopedIngestRoute(
   if (!path) return null;
   let sessionId: unknown;
   if (path === '/api/session') {
+    const values = parseScopeCreateBody(input);
+    if (values === null) return null;
     if (
-      input.contentType?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json' ||
-      input.bodyText === undefined ||
-      input.bodyText.length > 8192
+      values.parentSessionId !== undefined &&
+      !containedKiloSessionIdSchema.safeParse(values.parentSessionId).success
     ) {
       return null;
     }
-    try {
-      const body: unknown = JSON.parse(input.bodyText);
-      if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
-      const values = body as Record<string, unknown>;
-      if (Object.keys(values).some(key => key !== 'sessionId' && key !== 'parentSessionId'))
-        return null;
-      if (
-        values.parentSessionId !== undefined &&
-        !containedKiloSessionIdSchema.safeParse(values.parentSessionId).success
-      ) {
-        return null;
-      }
-      sessionId = values.sessionId;
-    } catch {
-      return null;
-    }
+    sessionId = values.sessionId;
   } else {
     sessionId = /^\/api\/session\/([A-Za-z0-9_-]+)\/ingest$/.exec(path)?.[1];
   }
@@ -253,6 +267,107 @@ export function resolveRuntimeCredentialProxyScopedIngestRoute(
     return null;
   }
   return targetUrl(input.targets.sessionIngestBaseUrl, path, input.search);
+}
+
+/**
+ * Resolves a child session-scope route for an adopted scope handle: the facade
+ * forwards create, ingest, export and title on any non-member session id as a
+ * v2 assertion. The path id is not required to differ from the handle's own
+ * root; membership is the facade's decision.
+ */
+export function resolveRuntimeCredentialProxyScopedV2IngestRoute(
+  input: ResolveRuntimeCredentialProxyScopedV2Input
+): URL | null {
+  if (input.route !== 'ingest') return null;
+  const path = safePathname(input.pathname);
+  if (!path) return null;
+
+  if (path === '/api/session') {
+    if (input.method !== 'POST') return null;
+    const values = parseScopeCreateBody(input);
+    if (values === null) return null;
+    if (
+      !containedKiloSessionIdSchema.safeParse(values.sessionId).success ||
+      !containedKiloSessionIdSchema.safeParse(values.parentSessionId).success
+    ) {
+      return null;
+    }
+    return targetUrl(input.targets.sessionIngestBaseUrl, path, input.search);
+  }
+
+  const match = /^\/api\/session\/([A-Za-z0-9_-]+)\/(ingest|export|title)$/.exec(path);
+  if (!match?.[1] || !match[2]) return null;
+  if (!containedKiloSessionIdSchema.safeParse(match[1]).success) return null;
+  const methodAllowed =
+    (match[2] === 'ingest' && input.method === 'POST') ||
+    (match[2] === 'export' && input.method === 'GET') ||
+    (match[2] === 'title' && input.method === 'POST');
+  if (!methodAllowed) return null;
+  return targetUrl(input.targets.sessionIngestBaseUrl, path, input.search);
+}
+
+/**
+ * Decides, for one adopted scope handle, whether an ingest-plane request is a
+ * member-root request served on the public path or a child candidate forwarded
+ * as a v2 assertion. This is the single owner of that decision: the caller
+ * passes the current member roots and receives either the public URL or the
+ * scoped URL. A `{sessionId}`-only create whose id is a current member root
+ * stays public; every other create needs a `parentSessionId` and goes scoped.
+ */
+export function resolveRuntimeCredentialProxyScopeIngestRoute(input: {
+  targets: RuntimeCredentialProxyTargets;
+  route: RuntimeCredentialProxyRoute;
+  method: string;
+  pathname: string;
+  search: string;
+  memberRootKiloSessionIds: readonly string[];
+  organizationId?: string;
+  contentType?: string | null;
+  bodyText?: string;
+}): { kind: 'public'; upstream: URL } | { kind: 'scoped'; upstream: URL } | null {
+  if (input.route !== 'ingest') return null;
+  const path = safePathname(input.pathname);
+  if (!path) return null;
+  const memberRoots = new Set(input.memberRootKiloSessionIds);
+  const shared = {
+    targets: input.targets,
+    route: 'ingest' as const,
+    method: input.method,
+    pathname: path,
+    search: input.search,
+    ...(input.organizationId === undefined ? {} : { organizationId: input.organizationId }),
+    ...(input.contentType === undefined ? {} : { contentType: input.contentType }),
+    ...(input.bodyText === undefined ? {} : { bodyText: input.bodyText }),
+  };
+  const publicUrl = (kiloSessionId: string): URL | null =>
+    resolveRuntimeCredentialProxyRoute({ ...shared, kiloSessionId });
+  const scopedUrl = (): URL | null => resolveRuntimeCredentialProxyScopedV2IngestRoute(shared);
+
+  if (path === '/api/session') {
+    if (input.method !== 'POST') return null;
+    const values = parseScopeCreateBody(input);
+    if (values === null) return null;
+    const sessionId = values.sessionId;
+    if (
+      Object.keys(values).length === 1 &&
+      typeof sessionId === 'string' &&
+      memberRoots.has(sessionId)
+    ) {
+      const upstream = publicUrl(sessionId);
+      return upstream === null ? null : { kind: 'public', upstream };
+    }
+    const upstream = scopedUrl();
+    return upstream === null ? null : { kind: 'scoped', upstream };
+  }
+
+  const match = /^\/api\/session\/([A-Za-z0-9_-]+)\/(ingest|export|title)$/.exec(path);
+  if (!match?.[1]) return null;
+  if (memberRoots.has(match[1])) {
+    const upstream = publicUrl(match[1]);
+    return upstream === null ? null : { kind: 'public', upstream };
+  }
+  const upstream = scopedUrl();
+  return upstream === null ? null : { kind: 'scoped', upstream };
 }
 
 /** Resolves only exact credential-bearing routes; unrecognized input fails closed. */

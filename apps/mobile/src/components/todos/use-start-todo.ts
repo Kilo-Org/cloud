@@ -8,7 +8,7 @@ import { appendNewSessionPrefill } from '@/components/agents/new-session-prefill
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { startAgent } from '@/lib/app-actions/start-agent';
-import { linkStartedTodoSession } from '@/lib/hooks/use-todos';
+import { linkStartedTodoSession } from '@/lib/hooks/todo-session-link';
 import { todoSessionPrompt } from '@/lib/todos/todo-model';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
@@ -28,6 +28,7 @@ function todoNewSessionHref(todo: StartableTodo, list: StartDefaults): Href {
     variant: list.variant ?? undefined,
     prompt: todoSessionPrompt(todo),
     todoId: todo.id,
+    todoTitle: todo.title,
   }) as Href;
 }
 
@@ -78,6 +79,7 @@ export function useStartTodo() {
             trpc,
             todoId: todo.id,
             sessionId: result.sessionId,
+            title: todo.title,
           }),
           invalidateAgentSessionQueries(queryClient, trpc),
         ]);

@@ -12,6 +12,7 @@
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 
 import { type AgentMode } from '@/components/agents/mode-normalize';
+import { cloudPrepareFailureMessage } from '@/components/agents/cloud-prepare-error-display';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import {
   getSelectedBranchOverride,
@@ -218,10 +219,7 @@ export async function prepareAgentSession(
     return { ok: true, sessionId: result.kiloSessionId };
   } catch (error) {
     const retryable = isCloudPrepareRetryableError(error);
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : i18n.t('agentChat.newSession.failedToCreate');
+    const message = cloudPrepareFailureMessage(error);
     // A typed terminal rejection ends the intent; a retryable one keeps the key.
     if (!retryable) {
       deps.rotateKey();

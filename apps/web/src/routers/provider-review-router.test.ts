@@ -11,6 +11,7 @@ import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User, OperationLedgerRow } from '@kilocode/db/schema';
 import { providerPrRefKey } from '@kilocode/app-shared/provider-review';
 import { GitLabReviewError } from '@/lib/provider-review/gitlab-authorization';
+import { BitbucketReviewError } from '@/lib/provider-review/bitbucket-authorization';
 import { GITLAB_STALE_HEAD_REASON } from '@/lib/provider-review/gitlab-write';
 import {
   BITBUCKET_AUTO_MERGE_UNSUPPORTED_REASON,
@@ -392,6 +393,37 @@ describe('providerReviewRouter connection failures', () => {
     await expect(caller.getPullRequest({ ...gitlabBase })).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
+  });
+});
+
+// The inbox reads every enabled provider, so each provider's connection
+// failure has to reach the same mobile state; a refusal of the reader's own
+// role stays FORBIDDEN.
+describe('providerReviewRouter inbox connection failures', () => {
+  it('maps a reconnect-classified GitLab inbox failure to PRECONDITION_FAILED', async () => {
+    gitlabRead.listInbox.mockRejectedValueOnce(new GitLabReviewError('reconnect', 'reconnect it'));
+
+    await expect(
+      caller.listInbox({ platform: 'gitlab', organizationId: ORG_ID })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', message: 'reconnect it' });
+  });
+
+  it('maps a reconnect-classified Bitbucket inbox failure to PRECONDITION_FAILED', async () => {
+    bitbucketRead.listInbox.mockRejectedValueOnce(
+      new BitbucketReviewError('reconnect', 'reconnect it')
+    );
+
+    await expect(
+      caller.listInbox({ platform: 'bitbucket', organizationId: ORG_ID })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', message: 'reconnect it' });
+  });
+
+  it('still maps a genuine permission refusal to FORBIDDEN', async () => {
+    gitlabRead.listInbox.mockRejectedValueOnce(new GitLabReviewError('forbidden', 'denied'));
+
+    await expect(
+      caller.listInbox({ platform: 'gitlab', organizationId: ORG_ID })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });
 

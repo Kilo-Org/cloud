@@ -11,10 +11,15 @@ import {
 import { saveDraft, SESSION_SEARCH_DRAFT_KEY } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 
-/** TextInput remount key while the durable draft is still loading / empty. */
-const SESSION_SEARCH_DEFAULT_INPUT_KEY = 'session-search-empty';
-/** TextInput remount key applied once to render a restored non-empty draft. */
-const SESSION_SEARCH_RESTORED_INPUT_KEY = 'session-search-restored';
+/**
+ * TextInput remount key prefix. The visible text of this field changes only
+ * through a remount: the field is uncontrolled, so a value written by native
+ * code (a restored draft's `defaultValue`) is invisible to the JS TextInput's
+ * event count, and the imperative `clear()` command that count gates is then
+ * dropped on Android. Every replacement of the visible text therefore bumps the
+ * epoch and mounts a fresh input with that text as its `defaultValue`.
+ */
+const SESSION_SEARCH_INPUT_KEY_PREFIX = 'session-search-input';
 
 export type UseSessionSearchInputParams = {
   /** Signed-in user id; persistence is skipped when empty. */
@@ -25,7 +30,7 @@ export type UseSessionSearchInputParams = {
   restoreSettled: boolean;
 };
 
-type UseSessionSearchInputResult = {
+export type UseSessionSearchInputResult = {
   /** Committed (debounced) search query that drives the list body. */
   searchQuery: string;
   /** Ref for the uncontrolled search TextInput. */
@@ -34,15 +39,15 @@ type UseSessionSearchInputResult = {
   hasText: boolean;
   /** True while typed text is ahead of the committed (debounced) query. */
   awaitingCommit: boolean;
-  /** TextInput remount key; changes once to render a restored draft. */
+  /** TextInput remount key; a new value mounts the input with `searchDefaultValue`. */
   searchInputKey: string;
-  /** Initial content for the TextInput, set only on the restore remount. */
+  /** Content the next remounted TextInput shows; '' after a clear. */
   searchDefaultValue: string | undefined;
   /** Call on every `onChangeText` from the search TextInput. */
   handleSearchInputChange: (text: string) => void;
-  /** In-field X: imperatively clear the typed text, blur, and drop the query. */
+  /** In-field X: empty the visible text through a remount, blur, drop the query. */
   handleClearSearchInput: () => void;
-  /** Imperatively clear the typed text and reset `hasText` (no blur). */
+  /** Empty the visible text through a remount and reset `hasText` (no blur). */
   clearSearchInput: () => void;
   /** Pure search controller for broader clear semantics (e.g. empty-state CTA). */
   searchController: SessionSearchController;
@@ -72,6 +77,12 @@ export function useSessionSearchInput({
   // indicator.
   const lastTypedRef = useRef('');
 
+  // Whether the user has touched this field in this mount (typed or cleared).
+  // Separate from `lastTypedRef`, whose emptiness also means "the user cleared
+  // it": a late draft settle must not seed a field the user has already
+  // emptied, and it must not undo a clear.
+  const userInteractedRef = useRef(false);
+
   // Boolean state whose setter returns its previous value while it stays
   // true, so extra keystrokes before the debounce commits are free of
   // SectionList re-renders.
@@ -94,10 +105,17 @@ export function useSessionSearchInput({
   });
   const searchController = searchControllerRef.current;
 
-  // Restore remount state: starts empty; flips to a restore key exactly once
-  // when a non-empty durable draft settles and the user has not typed.
-  const [searchInputKey, setSearchInputKey] = useState(SESSION_SEARCH_DEFAULT_INPUT_KEY);
+  // Visible-text state. The field is uncontrolled, so the only way to replace
+  // its text is a remount: `inputEpoch` makes every replacement a new mount,
+  // and `searchDefaultValue` is what that mount shows. Typing never touches
+  // these, so a keystroke never remounts the field.
+  const [inputEpoch, setInputEpoch] = useState(0);
   const [searchDefaultValue, setSearchDefaultValue] = useState<string | undefined>(undefined);
+  const replaceInputText = useCallback((text: string) => {
+    setSearchDefaultValue(text);
+    setInputEpoch(epoch => epoch + 1);
+  }, []);
+  const searchInputKey = `${SESSION_SEARCH_INPUT_KEY_PREFIX}-${inputEpoch}`;
 
   // Persist the visible typed string through the 500 ms durable draft
   // debounce — the per-key pending timer is left to commit on its own so
@@ -130,6 +148,7 @@ export function useSessionSearchInput({
   // query without touching the persisted platform/project narrowing
   // filters — the broad empty-state clear still owns that.
   const handleClearSearchOnly = useCallback(() => {
+    userInteractedRef.current = true;
     searchController.clearSearchOnly();
     lastTypedRef.current = '';
     setAwaitingCommit(false);
@@ -144,6 +163,7 @@ export function useSessionSearchInput({
   const handleSearchInputChange = useCallback(
     (text: string) => {
       const hasTextNow = text.length > 0;
+      userInteractedRef.current = true;
       setHasText(hasTextNow);
       lastTypedRef.current = text;
       handleSearchChange(text);
@@ -164,36 +184,40 @@ export function useSessionSearchInput({
     [handleSearchChange, saveSearchDraft]
   );
 
-  // In-field X: imperatively clear what's visibly typed + dismiss the
-  // keyboard, then drop the debounced query. Persisted filters are left
+  // In-field X: empty the visible text through a remount, dismiss the
+  // keyboard, then drop the debounced query. The remount is what makes the
+  // field empty: the dropped native `clear()` left a restored draft's text on
+  // screen while the state already said "no text". Persisted filters are left
   // alone — the empty-state "Clear filters" CTA still owns the broad reset.
   const handleClearSearchInput = useCallback(() => {
-    searchInputRef.current?.clear();
     searchInputRef.current?.blur();
+    replaceInputText('');
     setHasText(false);
     handleClearSearchOnly();
-  }, [handleClearSearchOnly]);
+  }, [handleClearSearchOnly, replaceInputText]);
 
-  // Broad clear primitive: reset the uncontrolled TextInput's visible text
-  // and `hasText` flag without blurring. The caller still orchestrates the
-  // query reset and any filter reset itself.
+  // Broad clear primitive: empty the visible text through a remount and reset
+  // `hasText` without blurring. The caller still orchestrates the query reset
+  // and any filter reset itself.
   const clearSearchInput = useCallback(() => {
-    searchInputRef.current?.clear();
+    userInteractedRef.current = true;
+    replaceInputText('');
     setHasText(false);
     lastTypedRef.current = '';
     setAwaitingCommit(false);
     saveSearchDraft('');
-  }, [saveSearchDraft]);
+  }, [replaceInputText, saveSearchDraft]);
 
-  // Seed the input once the durable draft settles and the user has not typed.
-  // An empty persisted value (including '' persisted by a clear) seeds empty,
-  // so a previously committed non-empty query is never reloaded. A non-empty
-  // restored value also flips the remount key so the uncontrolled input shows
-  // the restored text; the key never changes on later commits.
+  // Seed the input once the durable draft settles and the user has not touched
+  // it. An empty persisted value (including '' persisted by a clear) seeds
+  // empty, so a previously committed non-empty query is never reloaded, and a
+  // settle that lands after a clear is ignored rather than restoring the text
+  // the user just removed. A non-empty restored value remounts the uncontrolled
+  // input so it shows the restored text.
   useEffect(() => {
     const decision = resolveSearchRestoreDecision({
       settled: restoreSettled,
-      hasTyped: lastTypedRef.current !== '',
+      hasInteracted: userInteractedRef.current,
       restoredQuery,
     });
     if (!decision.shouldSeed) {
@@ -203,10 +227,9 @@ export function useSessionSearchInput({
     setHasText(decision.hasText);
     setSearchQuery(decision.query);
     if (decision.shouldRemount) {
-      setSearchInputKey(SESSION_SEARCH_RESTORED_INPUT_KEY);
-      setSearchDefaultValue(decision.query);
+      replaceInputText(decision.query);
     }
-  }, [restoreSettled, restoredQuery]);
+  }, [restoreSettled, restoredQuery, replaceInputText]);
 
   useEffect(
     () => () => {

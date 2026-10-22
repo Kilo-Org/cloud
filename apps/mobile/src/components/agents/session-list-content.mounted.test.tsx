@@ -177,8 +177,10 @@ function contentProps(overrides: Partial<ContentProps> = {}): ContentProps {
     nonPullRefreshes: 0,
     hasActiveQuery: false,
     isSearching: false,
+    isRetrying: false,
     searchQuery: '',
     onClearQuery: () => undefined,
+    onCreateSession: () => undefined,
     ...overrides,
   };
 }
@@ -422,12 +424,11 @@ describe('AgentSessionListContent liveness', () => {
     expect(rows(renderer).map(item => item.id)).toEqual(['recovered']);
   });
 
-  it('keeps empty history without a creation action even when active IDs exist', () => {
+  it('renders empty history as its own surface, not a list of active rows', () => {
     const renderer = mount(
       contentProps({ hasAnySessions: false, activeSessionIds: new Set(['active-only']) })
     );
     expect(hosts(renderer, 'Text').map(node => node.props.children)).toContain('No past sessions');
-    expect(hosts(renderer, 'Button')).toHaveLength(0);
     expect(hosts(renderer, 'FlashList')).toHaveLength(0);
     expect(rows(renderer)).toEqual([]);
   });
@@ -692,5 +693,25 @@ describe('AgentSessionListContent liveness', () => {
     ];
     const renderer = mount(contentProps({ sections }));
     expect(hosts(renderer, 'SessionListSectionHeader')).toHaveLength(2);
+  });
+
+  it('shows the retry in flight while the history refetch runs', () => {
+    const renderer = mount(
+      contentProps({ hasAnySessions: false, isError: true, isRetrying: true })
+    );
+    const retry = hosts(renderer, 'Button')[0];
+    expect(retry?.props.loading).toBe(true);
+  });
+
+  it('starts a session from the empty history body instead of dead-ending', () => {
+    const onCreateSession = vi.fn<() => void>();
+    const renderer = mount(contentProps({ hasAnySessions: false, onCreateSession }));
+    const start = hosts(renderer, 'Button')[0];
+    if (!start) {
+      throw new Error('the empty history body rendered no action');
+    }
+    expect(start.props.loading).toBeUndefined();
+    press(start);
+    expect(onCreateSession).toHaveBeenCalledOnce();
   });
 });

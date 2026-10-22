@@ -112,8 +112,10 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ accentSoftForeground: '#1a1a10' }),
 }));
+const routerPush = vi.hoisted(() => vi.fn());
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => focusState.current }),
+  useRouter: () => ({ push: routerPush }),
   useFocusEffect: (effect: () => void) => {
     focusCallbacks.current.add(effect);
   },
@@ -319,6 +321,7 @@ describe('SessionHistoryScreen', () => {
     focusCallbacks.current = new Set();
     handleRefetchSpy.mockClear();
     handleRefetchSpy.mockResolvedValue(undefined);
+    routerPush.mockClear();
   });
 
   afterEach(() => {
@@ -431,6 +434,26 @@ describe('SessionHistoryScreen', () => {
     expect(options.map(option => option.gitUrl)).toEqual(gitUrls);
   });
 
+  it('keeps Retry busy until the history refetch settles', async () => {
+    const { promise: pendingRefetch, resolve: settleRefetch } = Promise.withResolvers<undefined>();
+    handleRefetchSpy.mockReturnValueOnce(pendingRefetch);
+    listState.isError = true;
+    const renderer = await renderScreen();
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isRetrying).toBe(false);
+
+    act(() => {
+      (content.props.onRetry as () => void)();
+    });
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isRetrying).toBe(true);
+
+    await act(async () => {
+      settleRefetch(undefined);
+      await pendingRefetch;
+    });
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isRetrying).toBe(false);
+  });
+
   it('keeps a selected project row that is no longer in the recent repositories', async () => {
     const recent = 'https://github.com/kilo/alpha.git';
     const stale = 'https://github.com/kilo/removed.git';
@@ -453,6 +476,26 @@ describe('SessionHistoryScreen', () => {
     const modal = findNodeByType(renderer, 'SessionFilterModal');
     const options = modal.props.projectOptions as { gitUrl: string }[];
     expect(options.map(option => option.gitUrl)).toEqual([recent, stale]);
+  });
+
+  it('opens the new-session composer from the empty history body', async () => {
+    const renderer = await renderScreen();
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.hasAnySessions).toBe(false);
+    act(() => {
+      (content.props.onCreateSession as () => void)();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/agent-chat/new');
+  });
+
+  it('keeps the current organization when the empty history starts a session', async () => {
+    Object.assign(listState.organization, { organizationId: 'org-drain', isLoaded: true });
+    const renderer = await renderScreen();
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    act(() => {
+      (content.props.onCreateSession as () => void)();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/agent-chat/new?organizationId=org-drain');
   });
 
   it('keeps saved repository and platform selections after a successful history retry', async () => {

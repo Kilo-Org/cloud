@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { PostMessageAsUserParams, PostMessageAsUserResult } from '@kilocode/kilo-chat';
+import type * as TokenMintingModule from './services/token-minting-service.js';
 
 // Mock module-level imports before importing the unit under test. These mocks
 // stand in for: DB lookup of sandbox id, the kilo-chat service binding cast
@@ -9,6 +10,12 @@ const mockFindActiveSandboxIdForInstance =
   vi.fn<(db: unknown, instanceId: string, userId: string) => Promise<string | null>>();
 const mockPostMessageAsUser =
   vi.fn<(params: PostMessageAsUserParams) => Promise<PostMessageAsUserResult>>();
+const { mockMintToken } = vi.hoisted(() => ({ mockMintToken: vi.fn() }));
+
+vi.mock('./services/token-minting-service.js', async importOriginal => {
+  const original = await importOriginal<typeof TokenMintingModule>();
+  return { ...original, getTokenMintingService: () => ({ mintToken: mockMintToken }) };
+});
 
 vi.mock('./db/queries', () => ({
   findActiveSandboxIdForInstance: (db: unknown, instanceId: string, userId: string) =>
@@ -34,6 +41,7 @@ vi.mock('./util/do-retry', () => ({
 
 import { handleWebhookDeliveryBatch, processKiloclawChatMessage } from './queue-consumer';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
+import { CreatorExecutionAuthorizationError } from './services/token-minting-service.js';
 
 type UpdateCall = { requestId: string; patch: Record<string, unknown> };
 
@@ -92,6 +100,120 @@ function makeEnv() {
     KILO_CHAT: {} as unknown,
   } as unknown as Env;
 }
+
+describe('creator Cloud Agent dispatch', () => {
+  function harness(processStatus = 'captured', cloudAgentSessionId: string | null = null) {
+    const config = makeTriggerConfig({
+      userId: null,
+      orgId: 'org-1',
+      executionUserId: 'oauth/creator',
+      targetType: 'cloud_agent',
+      mode: 'code',
+      model: 'model-1',
+      githubRepo: 'owner/repo',
+      profileId: 'profile-1',
+    });
+    const stub = {
+      getRequest: vi.fn(async () => ({ ...makeRequest(processStatus), cloudAgentSessionId })),
+      getConfig: vi.fn(async () => config),
+      updateRequest: vi.fn(async () => ({ success: true })),
+    };
+    const cache = { get: vi.fn(async () => 'cached-bot-token'), put: vi.fn() };
+    const calls: Request[] = [];
+    const fetch = vi.fn(async (request: Request) => {
+      calls.push(request);
+      return request.url.includes('/trpc/prepareSession')
+        ? Response.json({ result: { data: { cloudAgentSessionId: 'session-1' } } })
+        : Response.json({ result: { data: { status: 'running' } } });
+    });
+    const env = {
+      WEBHOOK_AGENT_URL: 'https://hooks.test',
+      WEBHOOK_TOKEN_CACHE: cache,
+      INTERNAL_API_SECRET: 'internal-secret',
+      CALLBACK_TOKEN_SECRET: 'callback-secret',
+      TRIGGER_DO: { idFromName: (name: string) => name, get: () => stub },
+      CLOUD_AGENT: { fetch },
+    } as unknown as Env;
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const batch = {
+      queue: 'webhook-delivery',
+      messages: [{ body: { ...makeWebhook(), namespace: 'org/org-1' }, attempts: 1, ack, retry }],
+    } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>;
+    return { env, batch, stub, cache, calls, fetch, ack, retry };
+  }
+
+  beforeEach(() => {
+    mockMintToken.mockReset();
+    mockMintToken.mockResolvedValue({
+      token: 'creator-token',
+      userId: 'oauth/creator',
+      isBot: false,
+    });
+  });
+
+  it('bypasses cached bot tokens and forwards creator authorization with organization billing', async () => {
+    const h = harness();
+    await handleWebhookDeliveryBatch(h.batch, h.env);
+    expect(mockMintToken).toHaveBeenCalledWith({
+      userId: null,
+      orgId: 'org-1',
+      executionUserId: 'oauth/creator',
+      triggerId: 'trigger-1',
+    });
+    expect(h.cache.get).not.toHaveBeenCalled();
+    expect(h.cache.put).not.toHaveBeenCalled();
+    expect(h.calls).toHaveLength(2);
+    for (const request of h.calls)
+      expect(request.headers.get('Authorization')).toBe('Bearer creator-token');
+    expect(await h.calls[0].json()).toMatchObject({ kilocodeOrganizationId: 'org-1' });
+    expect(h.ack).toHaveBeenCalledOnce();
+    expect(h.retry).not.toHaveBeenCalled();
+  });
+
+  it('mints fresh authorization again for an initiate-only retry', async () => {
+    const h = harness('inprogress', 'session-1');
+    await handleWebhookDeliveryBatch(h.batch, h.env);
+    expect(mockMintToken).toHaveBeenCalledOnce();
+    expect(h.calls).toHaveLength(1);
+    expect(h.calls[0].url).toContain('/trpc/initiateFromKilocodeSessionV2');
+    expect(h.calls[0].headers.get('Authorization')).toBe('Bearer creator-token');
+    expect(h.cache.get).not.toHaveBeenCalled();
+  });
+
+  it.each(['captured', 'inprogress'])(
+    'fails %s requests explicitly after membership revocation without fallback or dispatch',
+    async status => {
+      const h = harness(status, status === 'inprogress' ? 'session-1' : null);
+      mockMintToken.mockRejectedValue(
+        new CreatorExecutionAuthorizationError(
+          'Creator execution user is no longer a direct organization member'
+        )
+      );
+      await handleWebhookDeliveryBatch(h.batch, h.env);
+      expect(h.stub.updateRequest).toHaveBeenCalledWith(
+        'req-1',
+        expect.objectContaining({
+          process_status: 'failed',
+          error_message: 'Creator execution user is no longer a direct organization member',
+        })
+      );
+      expect(h.fetch).not.toHaveBeenCalled();
+      expect(h.cache.get).not.toHaveBeenCalled();
+      expect(h.ack).toHaveBeenCalledOnce();
+      expect(h.retry).not.toHaveBeenCalled();
+    }
+  );
+
+  it('still retries transient authorization database failures', async () => {
+    const h = harness();
+    mockMintToken.mockRejectedValue(new Error('database temporarily unavailable'));
+    await handleWebhookDeliveryBatch(h.batch, h.env);
+    expect(h.retry).toHaveBeenCalledOnce();
+    expect(h.fetch).not.toHaveBeenCalled();
+    expect(h.ack).not.toHaveBeenCalled();
+  });
+});
 
 describe('processKiloclawChatMessage', () => {
   beforeEach(() => {

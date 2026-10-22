@@ -245,9 +245,6 @@ export async function applyGlanceablePushData(
 
   const snapshot: GlanceableAgentsSnapshot = {
     ...fields,
-    // The push schema keeps `needsApproval` optional for older servers; the
-    // snapshot it feeds is total and every reader treats absent as 0.
-    needsApproval: fields.needsApproval ?? 0,
     revision: current === null ? fields.revision : current.revision + 1,
     accountEpoch: authEpoch,
   };
@@ -267,7 +264,9 @@ export async function applyGlanceablePushData(
     // asynchronous surface submission landed. A native failure rejects here,
     // which the background path relies on so the OS retries the push.
     await Promise.all(
-      getGlanceableSinks().map((sink): Promise<void> | undefined => sink.waitForNativeStart?.())
+      getGlanceableSinks()
+        .map(sink => sink.waitForNativeStart?.())
+        .filter((pending): pending is Promise<void> => pending !== undefined)
     );
   } else {
     for (const sink of getGlanceableSinks()) {
@@ -284,7 +283,9 @@ export async function applyGlanceablePushData(
   // Idle work keeps the same card, so only ineligible snapshots wait here.
   if (!eligible) {
     await Promise.all(
-      getGlanceableSinks().map((sink): Promise<void> | undefined => sink.waitForNativeTerminal?.())
+      getGlanceableSinks()
+        .map(sink => sink.waitForNativeTerminal?.())
+        .filter((pending): pending is Promise<void> => pending !== undefined)
     );
   }
   return true;

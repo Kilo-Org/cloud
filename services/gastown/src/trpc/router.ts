@@ -94,6 +94,8 @@ function mapContainerBillingError(error: unknown): TRPCError | null {
       return new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message, cause: error });
     case 'BILLING_UNAVAILABLE':
       return new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: error.message, cause: error });
+    case 'ACCESS_REVOKED':
+      return new TRPCError({ code: 'FORBIDDEN', message: error.message, cause: error });
     default:
       return null;
   }

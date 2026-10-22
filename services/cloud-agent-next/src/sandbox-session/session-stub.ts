@@ -44,7 +44,5 @@ export function getSandboxSessionStub(
   ownerId: string,
   sessionId: string
 ): DurableObjectStub<SandboxSessionV2> {
-  return env.SANDBOX_SESSION.get(
-    env.SANDBOX_SESSION.idFromName(sessionDoName(ownerId, sessionId))
-  ) as unknown as DurableObjectStub<SandboxSessionV2>;
+  return env.SANDBOX_SESSION.get(env.SANDBOX_SESSION.idFromName(sessionDoName(ownerId, sessionId)));
 }

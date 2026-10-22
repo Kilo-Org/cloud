@@ -25,6 +25,7 @@
     "error": "خرابی: {{error}}",
     "back": "واپس",
     "somethingWentWrong": "کوئی خرابی پیش آ گئی۔",
+    "actionNotRecorded": "ہم اس کارروائی کو ریکارڈ نہیں کر سکے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
     "couldNotOpen": "{{label}} کھولا نہیں جا سکا۔",
     "link": "لنک",
     "takingLonger": "اس میں توقع سے زیادہ وقت لگ رہا ہے۔ آپ اسے بند کر کے دوبارہ چیک کر سکتے ہیں۔",
@@ -590,6 +591,8 @@
     "installKiloGitHubApp": "Kilo GitHub ایپ انسٹال کریں",
     "checkConnection": "کنکشن چیک کریں",
     "couldNotLoadPullRequest": "پل ریکویسٹ لوڈ نہیں ہو سکی۔",
+    "reviewServiceUnavailable": "سروس دستیاب نہیں ہے",
+    "reviewServiceUnavailableDescription": "سروس عارضی طور پر دستیاب نہیں ہے۔ جلد دوبارہ کوشش کریں۔",
     "description": "تفصیل",
     "noDescriptionProvided": "کوئی تفصیل فراہم نہیں کی گئی۔",
     "review": "جائزہ",
@@ -761,6 +764,7 @@
       "truncationBanner_other": "GitHub API کی حد کے باعث کل {{total}} تبدیل شدہ فائلوں میں سے پہلی {{limit}} دکھائی جا رہی ہیں۔"
     },
     "linkPasteClipboardEmpty": "کلپ بورڈ خالی ہے۔",
+    "linkPasteDenied": "پیسٹ کرنے کی اجازت نہیں دی گئی۔ پیسٹ کی اجازت دیں اور دوبارہ کوشش کریں۔",
     "linkPasteNotAPullRequest": "یہ پل ریکویسٹ یا مرج ریکویسٹ کا لنک نہیں ہے۔",
     "announce": {
       "commentPosted": "تبصرہ پوسٹ ہو گیا",
@@ -784,7 +788,6 @@
       "mergeResultDefaultError": "GitHub نے مرج مکمل نہیں کیا۔",
       "mergeResultNotCompleted": "{{term}} مرج نہیں ہوا۔ اس کی حالت چیک کریں اور دوبارہ کوشش کریں۔",
       "ambiguous": "تصدیق نہیں ہو سکی — دوبارہ کوشش کرنے سے پہلے PR چیک کریں۔",
-      "persistenceFailed": "ہم اس کارروائی کو ریکارڈ نہیں کر سکے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
       "forbidden": "اس کارروائی کی اجازت نہیں ہے۔"
     },
     "capabilities": {
@@ -1456,8 +1459,9 @@
       "loading": "جائزے کی یادداشت لوڈ ہو رہی ہے",
       "couldNotLoad": "جائزے کی یادداشت لوڈ نہیں ہو سکی۔",
       "off": "جائزے کی یادداشت بند ہے۔",
+      "on": "جائزے کی یادداشت فعال ہے۔",
       "offDescription": "اسے فعال کریں تاکہ Kilo دیکھ بھال کرنے والوں کے جوابات سے سیکھ سکے اور REVIEW.md کے لیے ہدایات تجویز کر سکے۔",
-      "readOnlyDescription": "صرف تنظیم کے مالکان اور بلنگ مینیجر جائزے کی یادداشت فعال کر سکتے ہیں۔",
+      "readOnlyDescription": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر جائزے کی یادداشت بدل سکتے ہیں۔",
       "enable": "جائزے کی یادداشت فعال کریں",
       "loadingProposals": "تجاویز لوڈ ہو رہی ہیں",
       "couldNotLoadProposals": "تجاویز لوڈ نہیں ہو سکیں۔",
@@ -1477,7 +1481,10 @@
       "starting": "جائزہ شروع ہو رہا ہے…",
       "start": "جائزہ شروع کریں"
     },
-    "notConnectedReadOnly": "{{platform}} منسلک نہیں ہے۔ صرف تنظیم کے مالکان اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
+    "notConnectedReadOnly": "{{platform}} منسلک نہیں ہے۔ صرف تنظیم کے مالک اور منتظم اسے منسلک کر سکتے ہیں۔",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} منسلک نہیں ہے۔ ادارے کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے منسلک کرنے کی درخواست کریں۔"
+    },
     "webhookSetup": "ویب ہک کا سیٹ اپ نامکمل ہے۔",
     "webhookSetupDescription": "ممکن ہے کچھ ریپوزٹریز کے خودکار جائزے نہ ہوں۔",
     "autoReviews": "خودکار جائزے",
@@ -1485,7 +1492,7 @@
     "followReviewMd": "REVIEW.md کی پیروی کریں",
     "followReviewMdSubtitle": "ہر ریپوزٹری کی REVIEW.md فائل میں دی گئی ہدایات پر عمل کریں",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالکان اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
+      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
       "setupIncomplete": "سیٹ اپ نامکمل ہے — kilo.ai پر ترتیبات مکمل کریں۔",
       "setup": "Bitbucket کا سیٹ اپ"
     },
@@ -1745,7 +1752,7 @@
       "couldNotLoad": "یہ شناخت شدہ مسئلہ لوڈ نہیں ہو سکا۔",
       "couldNotCheckPermissions": "اخراج کی اجازتوں کی جانچ نہیں ہو سکی۔",
       "cannotDismissTitle": "یہ مسئلہ خارج نہیں کیا جا سکتا",
-      "cannotDismissDescription": "صرف تنظیم کے مالکان اور بلنگ مینیجر مسائل خارج کر سکتے ہیں۔",
+      "cannotDismissDescription": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر مسائل خارج کر سکتے ہیں۔",
       "alreadyResolvedDescription": "یہ مسئلہ پہلے ہی حل ہو چکا ہے اور اب اسے خارج نہیں کیا جا سکتا۔"
     },
     "findingDetails": {
@@ -1787,7 +1794,7 @@
       "automationAllOff": "سب بند",
       "automationCount": "3 میں سے {{displayCount}} فعال",
       "notificationsCount": "2 میں سے {{displayCount}} فعال",
-      "disabledNoManage": "سکیورٹی ایجنٹ غیر فعال ہے۔ صرف تنظیم کے مالکان اور بلنگ مینیجر اسے فعال کر سکتے ہیں۔",
+      "disabledNoManage": "سکیورٹی ایجنٹ غیر فعال ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے فعال کر سکتے ہیں۔",
       "disabledNoRepo": "سکیورٹی ایجنٹ فعال کرنے سے پہلے کم از کم ایک ریپوزٹری منتخب کریں۔",
       "disabledPrompt": "Dependabot کی اطلاعات ہم آہنگ کرنے، ریپوزٹریز منتخب کرنے اور خودکار کارروائیوں کی ترتیبات طے کرنے کے لیے سکیورٹی ایجنٹ فعال کریں۔"
     },
@@ -1836,7 +1843,7 @@
       "invalidDayCount": "دنوں کی تعداد 1 سے 365 تک صحیح عدد میں درج کریں۔",
       "remediationDeadlineA11y": "{{label}} کی اصلاح کی مہلت، دنوں میں",
       "enterWholeNumber": "1 سے 365 تک کوئی صحیح عدد درج کریں",
-      "permissionNote": "صرف تنظیم کے مالکان اور بلنگ مینیجر یہ ترتیبات تبدیل کر سکتے ہیں۔",
+      "permissionNote": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر یہ ترتیبات تبدیل کر سکتے ہیں۔",
       "enableTracking": "SLA کی نگرانی فعال کریں",
       "enableTrackingSubtitle": "مسئلے کی شدت کے لحاظ سے اصلاح کی آخری تاریخ مقرر کریں۔",
       "deadlinesHeading": "اصلاح کی مہلت (دن)"
@@ -1879,6 +1886,9 @@
       "viewA11y": "آڈٹ رپورٹ دیکھیں"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo ایڈمن",
+      "actorMaskedUser": "چھپا ہوا صارف",
+      "actorSystem": "Kilo سسٹم",
       "couldNotLoad": "آڈٹ رپورٹ لوڈ نہیں ہو سکی۔",
       "events": "واقعات",
       "generated": "رپورٹ {{generatedAt}} کو تیار کی گئی۔",
@@ -1889,7 +1899,7 @@
       "summary": "رپورٹ کا خلاصہ",
       "title": "آڈٹ رپورٹ",
       "unavailable": "آڈٹ رپورٹ دستیاب نہیں",
-      "unavailableDescription": "صرف تنظیم کے مالکان اور بلنگ مینیجر آڈٹ رپورٹس دیکھ سکتے ہیں۔ رسائی دینے کے لیے کسی مالک یا بلنگ مینیجر سے کہیں۔",
+      "unavailableDescription": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر آڈٹ رپورٹس دیکھ سکتے ہیں۔ رسائی دینے کے لیے کسی مالک، منتظم یا بلنگ مینیجر سے کہیں۔",
       "queryFailed": "رپورٹ کے لیے ڈیٹا حاصل نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
       "eventActions": {
         "findingAnalysisCompleted": "تجزیہ مکمل ہوا",
@@ -1957,7 +1967,12 @@
       "syncMayNotHaveCompleted": "ممکن ہے ہم آہنگی مکمل نہ ہوئی ہو۔ حالت درست کرنے کے لیے دوبارہ کوشش کریں یا درخواست مسترد کر دیں۔",
       "syncInProgress": "سکیورٹی ڈیٹا کی ہم آہنگی پہلے سے جاری ہے۔ براہ کرم دوبارہ کوشش کریں۔",
       "dismissalInProgress": "اخراج کی یہ کارروائی پہلے سے جاری ہے۔ براہ کرم دوبارہ کوشش کریں۔",
-      "couldNotReadPendingSyncs": "ہم آہنگی کی زیر التوا درخواستیں پڑھی نہیں جا سکیں۔ دوبارہ کوشش کریں۔"
+      "couldNotReadPendingSyncs": "ہم آہنگی کی زیر التوا درخواستیں پڑھی نہیں جا سکیں۔ دوبارہ کوشش کریں۔",
+      "ambiguous": "تصدیق نہیں ہو سکی — دوبارہ کوشش کرنے سے پہلے سکیورٹی جائزہ چیک کریں۔",
+      "settleFailed": "کارروائی مکمل ہو گئی، لیکن ہم نتیجہ ریکارڈ نہیں کر سکے۔ براہ کرم دوبارہ کوشش کریں۔",
+      "replayFailed": "یہ کارروائی مکمل نہیں ہوئی۔ براہ کرم دوبارہ کوشش کریں۔",
+      "actionFailed": "یہ کارروائی مکمل نہیں ہو سکی۔ براہ کرم دوبارہ کوشش کریں۔",
+      "actionBlocked": "یہ کارروائی مکمل نہیں ہو سکی۔ دوبارہ کوشش کرنے سے پہلے اس مسئلے کو حل کرنا ضروری ہے۔"
     },
     "analysisState": {
       "queued": "تجزیہ قطار میں ہے",
@@ -2234,6 +2249,8 @@
       "commitAndPush": "کمٹ اور پش کریں",
       "startSession": "سیشن شروع کریں",
       "selectRepositoryToStart": "شروع کرنے کے لیے ایک ریپوزٹری منتخب کریں۔",
+      "enterPromptToStart": "شروع کرنے کے لیے ایک پرومپٹ شامل کریں۔",
+      "enterPromptOrFileToStart": "شروع کرنے کے لیے ایک پرومپٹ یا فائل شامل کریں۔",
       "connectProviderToStart": "شروع کرنے کے لیے ایک فراہم کنندہ منسلک کریں۔",
       "promptPlaceholder": "آپ کس چیز پر کام کرنا چاہیں گے؟",
       "couldNotLoadModels": "ماڈلز لوڈ نہیں ہو سکے۔",
@@ -2773,7 +2790,7 @@
     "webBrowser": "ویب براؤزر",
     "viewProfile": "پروفائل دیکھیں",
     "signOutThisDevice": "اس ڈیوائس سے سائن آؤٹ کریں",
-    "signOutThisSession": "اس سیشن سے سائن آؤٹ کریں",
+    "signOutSessionLabel": "{{device}} سے سائن آؤٹ کریں، سائن ان: {{signedIn}}",
     "sessionSignedOut": "سیشن سائن آؤٹ ہو گیا۔",
     "signOutThisDeviceTitle": "اس ڈیوائس سے سائن آؤٹ کریں؟",
     "signOutThisSessionTitle": "اس سیشن سے سائن آؤٹ کریں؟",
@@ -3013,6 +3030,7 @@
 
       "chooseAccount": "ایک اکاؤنٹ منتخب کریں",
       "loadErrorTitle": "آپ کی تنظیمیں لوڈ نہیں ہو سکیں۔",
+      "membershipLostNotice": "آپ کو اب اس تنظیم تک رسائی حاصل نہیں ہے۔ {{target}} پر منتقل کر دیا گیا۔",
       "noOrganization": "کوئی تنظیم نہیں",
 
       "noOrganizationDescription": "یہ اکاؤنٹ کسی تنظیم کا حصہ نہیں ہے۔ ممبر دعوتیں اور کم بیلنس انتباہات جیسی تنظیمی خصوصیات استعمال کرنے کے لیے ویب پر ایک تنظیم بنائیں یا اس میں شامل ہوں۔",
@@ -3077,7 +3095,11 @@
       "separateEmailsHint": "ایک سے زیادہ ای میل پتے ہوں تو انہیں کوما سے الگ کریں۔",
       "thresholdLabel": "اس رقم سے کم ہونے پر اطلاع دیں (USD)",
       "title": "بیلنس کم ہونے کی اطلاع",
-      "emailsError": "کم از کم ایک درست ای میل پتہ درج کریں۔ ایک سے زیادہ پتے ہوں تو انہیں کوما سے الگ کریں۔",
+      "emailsInvalid": "ایک یا زیادہ ای میل پتے درست نہیں ہیں۔",
+      "emailsRequired": "کم از کم ایک ای میل پتہ درج کریں۔",
+      "saveEmailsError": "کچھ ای میل پتے قبول نہیں ہوئے۔ انہیں چیک کر کے دوبارہ کوشش کریں۔",
+      "saveError": "بیلنس کم ہونے کی اطلاع محفوظ نہیں ہو سکی۔",
+      "thresholdPlaceholder": "رقم درج کریں",
       "thresholdError": "0 سے زیادہ رقم درج کریں۔"
     },
     "memberLimit": {
@@ -3088,12 +3110,13 @@
       "removeLimit": "حد ہٹائیں",
       "title": "روزانہ استعمال کی حد",
       "blankError": "رقم درج کریں یا نیچے «حد ہٹائیں» پر ٹیپ کریں۔",
+      "blankWithoutLimitError": "0 اور {{max}} کے درمیان روزانہ حد درج کریں۔",
       "rangeError": "0 اور {{max}} کے درمیان رقم درج کریں۔"
     },
     "members": {
       "changeRole": "کردار تبدیل کریں",
       "emptyDescriptionCanInvite": "اس تنظیم میں مل کر کام کرنے کے لیے اپنے ساتھیوں کو دعوت دیں۔",
-      "emptyDescriptionCannotInvite": "ٹیم کے ساتھیوں کو دعوت دینے کے لیے مالک یا بلنگ مینیجر سے کہیں۔",
+      "emptyDescriptionCannotInvite": "ٹیم کے ساتھیوں کو دعوت دینے کے لیے کسی مالک، منتظم یا بلنگ مینیجر سے کہیں۔",
       "emptyTitle": "ابھی کوئی رکن نہیں",
       "invitedDate": "{{date}} کو دعوت دی گئی",
       "limitPerDay": "{{amount}}/دن",
@@ -3357,7 +3380,8 @@
       "settingsToolsOn": "آن — سیٹنگز ٹولز ماڈل کو بھیجے جاتے ہیں",
       "settingsToolsOff": "آف — ماڈل کو کوئی سیٹنگز ٹول نہیں بھیجا جاتا",
       "serverChecking": "اس سرور کی جانچ ہو رہی ہے…",
-      "serverToolCount": "{{count}} ٹولز",
+      "serverToolCount_one": "{{count}} ٹول",
+      "serverToolCount_other": "{{count}} ٹولز",
       "serverUnreachable": "اس سرور تک نہیں پہنچ سکا",
       "serverOff": "یہ سرور بند ہے"
     },
@@ -3555,6 +3579,7 @@
   "appActions": {
     "start": {
       "promptRequired": "ایجنٹ شروع کرنے کے لیے پرامپٹ درکار ہے۔ ایک پرامپٹ شامل کریں اور اسے دوبارہ چلائیں۔",
+      "repositoryRequired": "ایجنٹ شروع کرنے کے لیے ریپوزٹری درکار ہے۔ Kilo کھولیں، کوئی ریپوزٹری منتخب کریں، پھر اسے دوبارہ چلائیں۔",
       "repositoryUnknown": "Kilo، {{repository}} کو GitHub یا GitLab ریپوزٹری کے طور پر نہیں پہچانتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔",
       "repositoryUnsupported": "{{repository}} ایک Bitbucket ریپوزٹری ہے — ایجنٹ شروع کریں ابھی اسے استعمال نہیں کر سکتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔"
     }
@@ -3592,10 +3617,13 @@
     "emptyDescription": "سیشنوں میں ماحولیاتی متغیرات، سیٹ اپ کمانڈز، اور مہارتوں کو دوبارہ استعمال کرنے کے لیے ایک پروفائل بنائیں۔",
     "loadFailed": "پروفائلز لوڈ نہیں ہو سکے۔",
     "counts": {
-      "vars": "{{count}} متغیرات",
+      "vars_one": "{{count}} متغیر",
+      "vars_other": "{{count}} متغیرات",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ہنر",
-      "commands": "{{count}} کمانڈز",
+      "skills_one": "{{count}} ہنر",
+      "skills_other": "{{count}} ہنر",
+      "commands_one": "{{count}} کمانڈ",
+      "commands_other": "{{count}} کمانڈز",
       "varsShort": "{{count}}م",
       "skillsShort": "{{count}}ہ",
       "commandsShort": "{{count}}ک"
@@ -3626,7 +3654,6 @@
     "keyTooLong": "چابی 256 حروف یا اس سے کم ہونی چاہیے",
     "keyDuplicate": "یہ چابی پہلے سے پروفائل میں موجود ہے",
     "valueLabel": "قدر",
-    "secretLabel": "خفیہ",
     "secrets": {
       "markSecret": "خفیہ کے طور پر نشان زد کریں۔",
       "masked": "پوشیدہ قدر",
@@ -3713,6 +3740,9 @@
       "visibilityPrimary": "پرائمری - چننے والے میں دکھایا گیا ہے۔",
       "visibilitySubagent": "Subagent — صرف دوسروں سے کال کی جا سکتی ہے۔",
       "visibilityAll": "سبھی — دونوں",
+      "modePrimary": "صرف پرائمری",
+      "modeSubagent": "صرف سب ایجنٹ",
+      "modeAll": "سبھی موڈز",
       "saveFailed": "ایجنٹ کو محفوظ نہیں کیا جا سکا",
       "deleteFailed": "ایجنٹ حذف نہیں کیا جا سکا",
       "nameRequired": "ایجنٹ کا نام درج کریں۔",
@@ -3773,6 +3803,8 @@
     "empty": "کریڈٹ پیک اس وقت دستیاب نہیں ہیں۔",
     "noMatchingProducts": "App Store نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
     "noMatchingProductsPlay": "Google Play نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
+    "storeTimedOut": "App Store نے وقت پر جواب نہیں دیا۔ دوبارہ کوشش کریں۔",
+    "storeTimedOutPlay": "Google Play نے وقت پر جواب نہیں دیا۔ دوبارہ کوشش کریں۔",
     "purchaseOwnedByAnotherAccount": "اس Apple Account کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اسی Kilo اکاؤنٹ میں سائن ان کریں۔",
     "purchaseOwnedByAnotherAccountPlay": "اس Google Play اکاؤنٹ کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اس Kilo اکاؤنٹ میں سائن ان کریں۔"
   },

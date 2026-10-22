@@ -33,8 +33,8 @@
     "@kilocode/encryption": "workspace:*",
     "@sentry/nextjs": "11.7.0",
     "@typescript/native-preview": "catalog:",
-    "rollup": "4.59.1",
-    "rollup-plugin-dts": "6.4.1",
+    "rollup": "4.64.7",
+    "rollup-plugin-dts": "6.5.1",
     "server-only": "0.0.1",
     "typescript": "catalog:"
   }

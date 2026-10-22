@@ -25,7 +25,7 @@ export function setCondenseToolCalls(value: boolean) {
 
 /** The stored condense-tool-calls value for callers with no React tree. */
 export function getCondenseToolCalls(): boolean {
-  return store.get();
+  return store.getRequested();
 }
 
 export function useCondenseToolCallsPreference() {

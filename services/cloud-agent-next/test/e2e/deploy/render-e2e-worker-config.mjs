@@ -179,7 +179,11 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
       return migration;
     })
     .filter(
-      entry => (entry.new_sqlite_classes?.length ?? 0) + (entry.new_classes?.length ?? 0) > 0
+      entry =>
+        (entry.new_sqlite_classes?.length ?? 0) +
+          (entry.new_classes?.length ?? 0) +
+          (entry.deleted_classes?.length ?? 0) >
+        0
     );
   config.migrations = insertCallbackMigration(survivingMigrations);
 

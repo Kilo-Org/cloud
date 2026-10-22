@@ -90,6 +90,12 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'user-1' }),
 }));
 
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => 'online',
+  useCommittedConnectivityStatus: () => 'online',
+  useOfflineBannerState: () => false,
+}));
+
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ destructive: '#B0483A', mutedForeground: '#000000' }),
 }));
@@ -103,9 +109,7 @@ vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
   attemptPushRegistrationReconciliation: vi.fn(),
 }));
 
-// The queries the actions section does not depend on stay deferred, so the
-// sign-out tile is exercised without their interaction-manager flush.
-vi.mock('@/lib/hooks/use-after-interactions', () => ({ useAfterInteractions: () => false }));
+vi.mock('@/lib/hooks/use-after-idle', () => ({ useAfterIdle: () => false }));
 
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getCodeReviewerProfilePath: () => '/code-reviewer',
@@ -140,6 +144,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 
 vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/profile-credits-card', () => ({ CreditsCard: 'CreditsCard' }));
 vi.mock('@/components/language-picker-sheet', () => ({
   LanguagePickerSheet: 'LanguagePickerSheet',

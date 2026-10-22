@@ -43,8 +43,11 @@ const REMOVED_CONTAINER_CLASSES = [
   'SandboxContainers',
 ];
 
+// Exported without a binding until a `deleted_classes` migration removes its
+// stored instances.
+const RETIRED_UNBOUND_DO_CLASSES = ['CloudAgentSession'];
+
 const KEPT_DO_CLASSES = [
-  'CloudAgentSession',
   'StreamTicketNonceDO',
   'UserKiloFacade',
   'SandboxControl',
@@ -102,7 +105,7 @@ describe('buildE2eWorkerConfig', () => {
       ).toBe(false);
       expect(
         config.migrations.some((migration: { new_sqlite_classes: string[] }) =>
-          migration.new_sqlite_classes.includes(className)
+          migration.new_sqlite_classes?.includes(className)
         )
       ).toBe(false);
     }
@@ -127,14 +130,14 @@ describe('buildE2eWorkerConfig', () => {
 
     const productionTagByClass = new Map<string, string>();
     for (const migration of source.migrations) {
-      for (const className of migration.new_sqlite_classes) {
+      for (const className of migration.new_sqlite_classes ?? []) {
         productionTagByClass.set(className, migration.tag);
       }
     }
 
     const productionTags = source.migrations.map((migration: { tag: string }) => migration.tag);
     for (const migration of config.migrations) {
-      for (const className of migration.new_sqlite_classes) {
+      for (const className of migration.new_sqlite_classes ?? []) {
         const productionTag = productionTagByClass.get(className);
         if (productionTag === undefined) continue;
         expect(migration.tag).toBe(productionTag);
@@ -157,14 +160,25 @@ describe('buildE2eWorkerConfig', () => {
 
     const removed = new Set(REMOVED_CONTAINER_CLASSES);
     const survivingProductionMigrations = source.migrations
-      .map((migration: { tag: string; new_sqlite_classes: string[] }) => ({
-        ...migration,
-        new_sqlite_classes: migration.new_sqlite_classes.filter(
-          (className: string) => !removed.has(className)
-        ),
-      }))
+      .map(
+        (migration: {
+          tag: string;
+          new_sqlite_classes?: string[];
+          deleted_classes?: string[];
+        }) => ({
+          ...migration,
+          ...(migration.new_sqlite_classes
+            ? {
+                new_sqlite_classes: migration.new_sqlite_classes.filter(
+                  (className: string) => !removed.has(className)
+                ),
+              }
+            : {}),
+        })
+      )
       .filter(
-        (migration: { new_sqlite_classes: string[] }) => migration.new_sqlite_classes.length > 0
+        migration =>
+          (migration.new_sqlite_classes?.length ?? 0) + (migration.deleted_classes?.length ?? 0) > 0
       );
 
     const renderedTags = config.migrations.map((migration: { tag: string }) => migration.tag);
@@ -177,16 +191,24 @@ describe('buildE2eWorkerConfig', () => {
       config.migrations.filter((migration: { tag: string }) => migration.tag !== 'v10-e2e')
     ).toEqual(survivingProductionMigrations);
 
-    for (const migration of config.migrations as { new_sqlite_classes: string[] }[]) {
-      expect(migration.new_sqlite_classes.length).toBeGreaterThan(0);
+    for (const migration of config.migrations as {
+      new_sqlite_classes?: string[];
+      deleted_classes?: string[];
+    }[]) {
+      expect(
+        (migration.new_sqlite_classes?.length ?? 0) + (migration.deleted_classes?.length ?? 0)
+      ).toBeGreaterThan(0);
     }
 
     const bindingClasses = config.durable_objects.bindings.map(
       (binding: { class_name: string }) => binding.class_name
     );
-    const migratedClasses = config.migrations.flatMap(
-      (migration: { new_sqlite_classes: string[] }) => migration.new_sqlite_classes
-    );
+    const migratedClasses = new Set<string>();
+    for (const migration of config.migrations) {
+      for (const className of migration.new_sqlite_classes ?? []) migratedClasses.add(className);
+      for (const className of migration.deleted_classes ?? []) migratedClasses.delete(className);
+    }
+    for (const className of RETIRED_UNBOUND_DO_CLASSES) migratedClasses.delete(className);
     expect([...migratedClasses].sort()).toEqual([...bindingClasses].sort());
   });
 
@@ -244,7 +266,7 @@ describe('buildE2eWorkerConfig', () => {
       .map((migration: { tag: string; new_sqlite_classes?: string[]; new_classes?: string[] }) => {
         const filtered = { ...migration };
         if (migration.new_sqlite_classes) {
-          filtered.new_sqlite_classes = migration.new_sqlite_classes.filter(
+          filtered.new_sqlite_classes = (migration.new_sqlite_classes ?? []).filter(
             (className: string) => !REMOVED_CONTAINER_CLASSES.includes(className)
           );
         }
@@ -256,8 +278,15 @@ describe('buildE2eWorkerConfig', () => {
         return filtered;
       })
       .filter(
-        (migration: { new_sqlite_classes?: string[]; new_classes?: string[] }) =>
-          (migration.new_sqlite_classes?.length ?? 0) + (migration.new_classes?.length ?? 0) > 0
+        (migration: {
+          new_sqlite_classes?: string[];
+          new_classes?: string[];
+          deleted_classes?: string[];
+        }) =>
+          (migration.new_sqlite_classes?.length ?? 0) +
+            (migration.new_classes?.length ?? 0) +
+            (migration.deleted_classes?.length ?? 0) >
+          0
       )
       .map((migration: { tag: string }) => migration.tag);
     const renderedOrder = config.migrations

@@ -12,12 +12,15 @@ interface Answer {
 }
 
 const ask = (session: SessionHandle, text: string) =>
-  Stream.runFold(session.ask(text), { said: '', usage: undefined } as Answer, (held, event) =>
-    event.kind === 'delta'
-      ? { ...held, said: held.said + event.text }
-      : event.kind === 'done'
-        ? { ...held, usage: event.usage }
-        : held
+  Stream.runFold(
+    session.ask(text),
+    () => ({ said: '', usage: undefined }) as Answer,
+    (held, event) =>
+      event.kind === 'delta'
+        ? { ...held, said: held.said + event.text }
+        : event.kind === 'done'
+          ? { ...held, usage: event.usage }
+          : held
   );
 
 const program = (model: string) =>

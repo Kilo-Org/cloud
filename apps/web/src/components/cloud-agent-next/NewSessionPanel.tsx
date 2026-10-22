@@ -143,6 +143,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const initialComposerFocusedRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
   const creationGuardRef = useRef<FirstChatCreationGuard | null>(null);
@@ -202,6 +203,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   useEffect(() => {
     if (discardedPrompt !== null) clearDiscardedPrompt();
   }, [clearDiscardedPrompt, discardedPrompt]);
+  useEffect(() => {
+    if (initialComposerFocusedRef.current) return;
+    initialComposerFocusedRef.current = true;
+    if (!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
+    textareaRef.current?.focus({ preventScroll: true });
+  }, []);
   const [selectedRepo, setSelectedRepo] = useState('');
   const [selectedGitHubIntegrationId, setSelectedGitHubIntegrationId] = useState<
     string | undefined
@@ -223,7 +230,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       ? 'Enter an https git URL'
       : null;
   const hasPublicRepo = trimmedPublicRepoUrl.length > 0 && publicRepoUrlError === null;
-  const [attachmentMessageUuid, setAttachmentMessageUuid] = useState(() => uuidv4());
+  const [attachmentMessageUuid] = useState(() => uuidv4());
   // Repo profile bindings are only keyed by GitHub/GitLab today.
   const profileBindingPlatform: Exclude<RepositoryPlatform, 'bitbucket'> | undefined =
     selectedPlatform === 'bitbucket' ? undefined : selectedPlatform;
@@ -1132,8 +1139,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         attachmentNames: attachmentUpload.attachments.map(a => a.file.name),
       },
     });
-    attachmentUpload.clearAttachments();
-    setAttachmentMessageUuid(uuidv4());
+    // The local session owns these uploads now; clearing would delete them before prepare links them.
     // The lock stays held: the panel unmounts with this navigation, and a second
     // submit before then would create a second session.
     router.push(`${basePath}/chat?sessionId=${kiloSessionId}`);

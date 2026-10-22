@@ -18,6 +18,7 @@ import {
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { cn } from '@/lib/utils';
 
@@ -37,10 +38,14 @@ const VISIBILITY_OPTIONS: readonly { value: AgentVisibility; labelKey: string }[
 
 type AgentFormSheetProps = Readonly<{
   agent: AgentSource | null;
+  /** Slugs of the profile's other agents, so a duplicate fails validation inline. */
+  existingSlugs: readonly string[];
   organizationId?: string;
   isSaving: boolean;
   onClose: () => void;
   onSave: (payload: { slug: string; name: string; config: Record<string, unknown> }) => void;
+  /** A server-side slug conflict, shown on the slug field like a validation error. */
+  slugConflictFromServer?: boolean;
 }>;
 
 /**
@@ -59,10 +64,12 @@ type AgentFormSheetProps = Readonly<{
  */
 export function AgentFormSheet({
   agent,
+  existingSlugs,
   organizationId,
   isSaving,
   onClose,
   onSave,
+  slugConflictFromServer = false,
 }: Readonly<AgentFormSheetProps>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -88,6 +95,24 @@ export function AgentFormSheet({
     models.find(option => option.id === model.trim())?.variants ?? [];
   const variants = variantsFor(modelValue);
 
+  const hasUnsavedEdits = () =>
+    slugRef.current !== initial.slug ||
+    nameRef.current !== initial.name ||
+    descriptionRef.current !== initial.description ||
+    promptRef.current !== initial.prompt ||
+    modelRef.current !== initial.model ||
+    stepsRef.current !== initial.steps ||
+    temperatureRef.current !== initial.temperature ||
+    topPRef.current !== initial.topP ||
+    visibility !== initial.visibility ||
+    variant !== initial.variant ||
+    disabledTools.length !== initial.disabledTools.length ||
+    disabledTools.some(tool => !initial.disabledTools.includes(tool));
+  const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
+    isDirty: hasUnsavedEdits,
+    onDiscard: onClose,
+  });
+
   const submit = () => {
     const state: AgentFormState = {
       slug: slugRef.current,
@@ -102,7 +127,7 @@ export function AgentFormSheet({
       variant,
       disabledTools,
     };
-    const problem = validateAgentForm(state);
+    const problem = validateAgentForm(state, existingSlugs);
     if (problem !== null) {
       setError(problem);
       return;
@@ -112,13 +137,13 @@ export function AgentFormSheet({
   };
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
       <SheetHeader
         title={agent === null ? t('profiles.agents.add') : agent.name}
         onDone={submit}
-        onCancel={onClose}
+        onCancel={requestClose}
         doneLabel={t('common.save')}
-        disabled={isSaving}
+        doneDisabled={isSaving}
         topInset="ios-page-sheet"
       />
       <ScrollView
@@ -132,8 +157,11 @@ export function AgentFormSheet({
           label={t('profiles.agents.slug')}
           defaultValue={initial.slug}
           error={
-            error === 'slug-required' || error === 'slug-invalid' || error === 'slug-conflict'
-              ? t(ERROR_KEYS[error])
+            error === 'slug-required' ||
+            error === 'slug-invalid' ||
+            error === 'slug-conflict' ||
+            (slugConflictFromServer && error === null)
+              ? t(ERROR_KEYS[error ?? 'slug-conflict'])
               : undefined
           }
           disabled={isSaving}
@@ -299,6 +327,7 @@ export function AgentFormSheet({
         </View>
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
+      {dialog}
     </SessionPageSheet>
   );
 }

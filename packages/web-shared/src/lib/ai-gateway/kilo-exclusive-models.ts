@@ -108,7 +108,7 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
     'Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google DeepMind. Despite 25.2B total parameters, only 3.8B activate per token during inference — delivering near-31B quality at a fraction of the compute cost.',
   context_length: 262144,
   max_completion_tokens: 32768,
-  flags: ['vision', 'vercel-routing', 'rate-limited'],
+  flags: ['vision', 'vercel-routing'],
   provider: OPENROUTER,
   internal_id: GEMMA_4_26B_A4B_IT_ID,
   pricing: null,
@@ -228,10 +228,6 @@ export function isKiloExclusiveFreeModel(model: string): boolean {
 
 export function isKiloExclusiveModel(model: string): boolean {
   return kiloExclusiveModels.some(m => m.public_id === model);
-}
-
-export function isKiloExclusiveRateLimitedModel(model: string): boolean {
-  return kiloExclusiveModels.some(m => m.public_id === model && m.flags.includes('rate-limited'));
 }
 
 export const kiloExclusiveModels = [

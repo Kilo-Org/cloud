@@ -138,7 +138,7 @@ export function PrConversationCommentComposer({
     // The ledger persistence-failure marker is retry-blocking: the same
     // operation key must not be retried.
     if (isPrOperationPersistenceFailed(addComment.error)) {
-      setInlineError(i18n.t('prReview.operation.persistenceFailed'));
+      setInlineError(i18n.t('common.actionNotRecorded'));
       setInlineErrorKind('bad-request');
       setRetryBlocked(true);
       return;
@@ -163,8 +163,9 @@ export function PrConversationCommentComposer({
           setInlineError(t('prReview.discussion.termsCheckRetryCopy'));
           setInlineErrorKind('retryable');
         } else {
-          setInlineError(t('prReview.discussion.termsCopy'));
+          setInlineError(t('prReview.discussion.termsAcceptRequired'));
           setInlineErrorKind(null);
+          setInlineErrorIsLocal(true);
         }
       })();
     } else if (classification.kind === 'bad-request') {

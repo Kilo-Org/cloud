@@ -33,7 +33,7 @@ type MergeBlockedReasonSeverity = 'info' | 'warn' | 'destructive';
 
 export type MergeBlockedReason = {
   id: MergeBlockedReasonId;
-  /** Stable identifier the section uses to look up an icon (see pr-merge-icons.ts). */
+  /** Stable identifier the section uses to look up an icon (see pr-merge-icons.tsx). */
   iconKind: MergeBlockedReasonId;
   severity: MergeBlockedReasonSeverity;
   title: string;

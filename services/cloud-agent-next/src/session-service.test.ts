@@ -202,6 +202,38 @@ describe('SessionService.buildRuntimeEnv', () => {
     });
     expect(overridden.KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS).toBe('false');
   });
+
+  it('limits code review sessions to platform-provided Kilo configuration', () => {
+    const service = new SessionService();
+    const context = service.buildContext({
+      sandboxId: 'usr-test',
+      userId: 'user_test',
+      sessionId: 'agent_test',
+      envVars: { KILO_DISABLE_PROJECT_CONFIG: '', KILO_DISABLE_EXTERNAL_SKILLS: '0' },
+    });
+
+    const reviewEnv = service.buildRuntimeEnv({
+      context,
+      env: createEnv(),
+      kiloCapability: 'kilo-token',
+      createdOnPlatform: 'code-review',
+    });
+    expect(reviewEnv.KILO_DISABLE_PROJECT_CONFIG).toBe('1');
+    expect(reviewEnv.KILO_DISABLE_EXTERNAL_SKILLS).toBe('1');
+
+    const webEnv = service.buildRuntimeEnv({
+      context: service.buildContext({
+        sandboxId: 'usr-test',
+        userId: 'user_test',
+        sessionId: 'agent_test',
+      }),
+      env: createEnv(),
+      kiloCapability: 'kilo-token',
+      createdOnPlatform: 'cloud-agent-web',
+    });
+    expect(webEnv.KILO_DISABLE_PROJECT_CONFIG).toBeUndefined();
+    expect(webEnv.KILO_DISABLE_EXTERNAL_SKILLS).toBeUndefined();
+  });
 });
 
 describe('SessionService GitHub review publication binding', () => {

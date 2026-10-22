@@ -3,25 +3,12 @@ ARG CONTROLLER_COMMIT=unknown
 ARG CONTROLLER_CACHE_BUST=1
 # Bump APT_CACHE_BUST (any value change) to invalidate the base apt layer and
 # pick up the latest chromium / 1password-cli / etc. from Debian + vendor repos.
-# Last bumped 2026-07-31 to refresh chromium, gh, 1password-cli, and base apt
-# security updates (CVE hardening). Measured against the 2026-07-02 layer, this
-# picks up chromium/chromium-common 150.0.7871.124 -> 150.0.7871.181 (17
-# Critical/High each) and libexpat1 2.7.1-2 -> 2.8.2-1~deb13u1 (4).
-#
-# Note: much of the chromium CVE volume has no fixed version available, so it is
-# not fully clearable by a version bump — 117 Critical/High per chromium package
-# currently have no upstream fix. Chromium cannot simply be dropped either: it
-# backs OpenClaw's browser tool (see controller/src/config-writer.ts).
-#
-# 1password-cli is NOT improved by this bump: 2.35.0 -> 2.38.1 is still built
-# with go1.25.7, so its 28 Go-stdlib Critical/High findings persist until
-# 1Password ships a build on go1.25.10+. Do not re-investigate that each cycle.
-ARG APT_CACHE_BUST=2026-07-31
+ARG APT_CACHE_BUST=2026-10-21
 
 FROM debian:trixie-slim AS runtime
 
 # Install Node.js 24 (required by OpenClaw)
-ENV NODE_VERSION=24.15.0
+ENV NODE_VERSION=24.22.1
 ENV OPENCLAW_PLUGIN_STAGE_DIR=/usr/local/share/openclaw-plugin-runtime-deps
 ENV COMPOSIO_INSTALL_DIR=/usr/local/lib/composio
 ENV PATH="${COMPOSIO_INSTALL_DIR}:${PATH}"
@@ -32,6 +19,7 @@ RUN echo "apt cache bust: ${APT_CACHE_BUST}" \
     && apt-get install -y --no-install-recommends \
        ca-certificates curl gnupg git xz-utils unzip jq ripgrep rsync zstd \
        build-essential python3 ffmpeg tmux chromium \
+    && update-ca-certificates \
     && ARCH="$(dpkg --print-architecture)" \
     && case "${ARCH}" in \
          amd64) NODE_ARCH="x64" ;; \
@@ -148,7 +136,7 @@ RUN cd /usr/local/lib/node_modules/openclaw \
 # Install Go (available at runtime for users to `go install` additional tools).
 # Keep on the latest patch release so the toolchain and the tools built with it
 # below do not ship stale Go stdlib CVEs.
-ENV GO_VERSION=1.26.4
+ENV GO_VERSION=1.26.10
 RUN ARCH="$(dpkg --print-architecture)" \
     && curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz -o /tmp/go.tar.gz \
     && EXPECTED_SHA256="$(curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz.sha256)" \
@@ -163,15 +151,14 @@ RUN ARCH="$(dpkg --print-architecture)" \
 # - npm/Node (installed to /usr/local) and apt packages (/usr/bin) are unaffected.
 ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
 # gogcli ships PREBUILT binaries, so its Go stdlib is whatever upstream built it
-# with — unlike the `go install` tools below, which this image compiles with
-# GO_VERSION above. v0.31.1 was built with go1.26.2 and carried 17 Critical/High
-# stdlib findings; v0.34.1 is built with go1.26.5, which clears them. When
-# bumping GO_VERSION for CVE hygiene, check this pin too: it does not follow.
+# with, not GO_VERSION. Its embedded verifier (like gh, 1password-cli,
+# Composio and the Kilo CLI) needs independent validation after a CA incident.
 RUN ARCH="$(dpkg --print-architecture)" \
     && curl -fsSL "https://github.com/openclaw/gogcli/releases/download/v0.34.1/gogcli_0.34.1_linux_${ARCH}.tar.gz" \
        | tar xz -C /usr/local/bin gog \
     && /usr/local/bin/gog --version \
     && mv /usr/local/bin/gog /usr/local/bin/gog.real \
+    && export GOTOOLCHAIN=local \
     && GOBIN=/usr/local/bin go install github.com/steipete/goplaces/cmd/goplaces@v0.4.3 \
     && GOBIN=/usr/local/bin go install github.com/Hyaxia/blogwatcher/cmd/blogwatcher@v0.0.3 \
     && GOBIN=/usr/local/bin go install github.com/xdevplatform/xurl@v1.2.2 \
@@ -180,7 +167,7 @@ RUN ARCH="$(dpkg --print-architecture)" \
 
 # Install uv (Python package manager, available at runtime).
 # Install to /usr/local/bin so the binary survives the Fly Volume mount at /root.
-RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh \
+RUN curl -LsSf https://astral.sh/uv/0.13.4/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh \
     && uv --version
 
 # ── Builder stage: package custom plugins ───────────────────────────
@@ -234,9 +221,12 @@ RUN npm install --global pnpm@11.1.2 \
 # Fly Volume mount at /root, so it was unreachable at runtime anyway.
 FROM debian:trixie-slim AS controller-builder
 
-ENV NODE_VERSION=24.15.0
-RUN apt-get update \
+ENV NODE_VERSION=24.22.1
+ARG APT_CACHE_BUST
+RUN echo "apt cache bust: ${APT_CACHE_BUST}" \
+    && apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils \
+    && update-ca-certificates \
     && ARCH="$(dpkg --print-architecture)" \
     && case "${ARCH}" in \
          amd64) NODE_ARCH="x64" ;; \

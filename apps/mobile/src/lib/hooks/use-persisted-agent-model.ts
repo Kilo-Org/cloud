@@ -34,7 +34,7 @@ export function clearAgentModelPreference() {
 export function getStoredModelPreference(
   organizationId?: string
 ): ModelPreferenceEntry | undefined {
-  return store.get()[contextKey(organizationId)];
+  return store.getRequested()[contextKey(organizationId)];
 }
 
 /** Persist the model/variant default for one organization context. */
@@ -42,7 +42,7 @@ export function setDefaultModelForContext(
   organizationId: string | undefined,
   entry: ModelPreferenceEntry
 ): void {
-  store.set({ ...store.get(), [contextKey(organizationId)]: entry });
+  store.set({ ...store.getRequested(), [contextKey(organizationId)]: entry });
 }
 
 export function usePersistedAgentModel() {

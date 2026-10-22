@@ -90,6 +90,12 @@ export type SecurityAgentAuditReportActor =
       id: string | null;
       displayName: string;
       masked: boolean;
+      /**
+       * Present only on a masked actor: which identity the report hides. A
+       * localized client picks its label from this rather than from the
+       * English `displayName`, and an older client simply ignores it.
+       */
+      maskedKind?: 'kilo_admin' | 'user';
     }
   | { type: 'system'; displayName: string; masked: false };
 
@@ -997,12 +1003,14 @@ function buildReportActor(
     !isRequestingUserKiloAdmin &&
     (row.actor_type === SecurityAuditLogActorType.KiloAdmin || row.actor_type === null)
   ) {
+    const maskedKind =
+      row.actor_type === SecurityAuditLogActorType.KiloAdmin ? 'kilo_admin' : 'user';
     return {
       type: 'user',
       id: '00000000-0000-0000-0000-000000000000',
-      displayName:
-        row.actor_type === SecurityAuditLogActorType.KiloAdmin ? 'Kilo Admin' : 'Masked user',
+      displayName: maskedKind === 'kilo_admin' ? 'Kilo Admin' : 'Masked user',
       masked: true,
+      maskedKind,
     };
   }
 

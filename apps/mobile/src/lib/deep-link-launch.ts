@@ -52,7 +52,9 @@ const PENDING_DEEP_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
 let pendingDeepLink: string | null = null;
 let pendingSource: DeepLinkSource | null = null;
-let launchLinkHandled = false;
+// The href the cold-start capture stashed; 'none' once handled without one;
+// null until the capture has run.
+let launchCapturedHref: string | null = null;
 
 // True while the pending slot holds a universal link the cold-launch capture
 // derived from an app-scheme (`kiloapp://`) launch URL. On Android a tap on one
@@ -501,7 +503,7 @@ export function resumeDeepLinkHref({ href, anchorMessageId }: IncomingResume): s
  * the bare href here would open a resumed session at the bottom.
  */
 export function captureLaunchDeepLink(): void {
-  if (launchLinkHandled) {
+  if (launchCapturedHref !== null) {
     return;
   }
   const url = readLaunchUrl();
@@ -516,17 +518,21 @@ export function captureLaunchDeepLink(): void {
     // An app-scheme URL that names a family the phone's search indexes is a
     // search result's identifier, so it is session-bound: it must not open for
     // the account that signs in after the one that indexed it.
-    setPendingDeepLink(resumeDeepLinkHref(resume), 'universal-link', {
+    launchCapturedHref = resumeDeepLinkHref(resume);
+    setPendingDeepLink(launchCapturedHref, 'universal-link', {
       fromLaunchAppScheme: url.startsWith(APP_SCHEME),
       sessionBound: isSystemSearchFamilyLink(url),
     });
-    launchLinkHandled = true;
   }
 }
 
-/** Whether the synchronous launch capture already stashed this process's launch link. */
-export function wasLaunchLinkHandled(): boolean {
-  return launchLinkHandled;
+/**
+ * The href the synchronous launch capture stashed, or null once handled. A
+ * truthy result the caller compares against the pending slot tells the OS's
+ * stale replay (same destination) apart from a live tap (different one).
+ */
+export function wasLaunchLinkHandled(): string | null {
+  return launchCapturedHref === 'none' ? null : launchCapturedHref;
 }
 
 /** Test-only: reset module-private latch, pending slot, and listeners between cases. */
@@ -537,7 +543,7 @@ export function _resetDeepLinkLaunchForTests(): void {
   pendingUniversalLinkFromLaunch = false;
   pendingDeepLinkSessionBound = false;
   pendingDeepLinkOrganizationId = null;
-  launchLinkHandled = false;
+  launchCapturedHref = null;
   getLinkingURLForTests = null;
   pendingDeepLinkListeners.clear();
   currentDeepLinkUserId = null;

@@ -93,6 +93,7 @@ import {
   type WrapperWorkspaceReady,
 } from './shared/wrapper-bootstrap.js';
 import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
+import { kiloServerEnvForOrigin } from './shared/kilo-server-env.js';
 import {
   isStrippedGitConfigEnvVar,
   PNPM_STORE_DIR,
@@ -1254,6 +1255,7 @@ export class SessionService {
       KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'false',
       // Feature attribution for microdollar usage tracking
       KILOCODE_FEATURE: createdOnPlatform ?? 'cloud-agent',
+      ...kiloServerEnvForOrigin(createdOnPlatform),
     };
 
     for (const key of Object.keys(envVars)) {

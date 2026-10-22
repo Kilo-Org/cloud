@@ -737,6 +737,22 @@ describe('POST /api/auth/native/token', () => {
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
     });
 
+    it('presents a disabled email signup as the step-up shipped apps understand', async () => {
+      mockCreateOrUpdateUser.mockResolvedValue({ success: false, error: 'EMAIL-SIGNUP-DISABLED' });
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'SIGNUP-STEP-UP',
+        methods: ['google', 'apple'],
+      });
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+
     it('releases the code on DIFFERENT-OAUTH settlement failure so retry succeeds', async () => {
       mockCreateOrUpdateUser.mockResolvedValue({
         success: false,

@@ -25,7 +25,7 @@ import {
 import { sessionPlaneFromId } from '../session-plane.js';
 import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
-import { agentSandboxProviderSchema, type AgentSandboxProvider, type SandboxId } from '../types.js';
+import { agentSandboxProviderSchema, type AgentSandboxProvider } from '../types.js';
 import {
   AttachmentsSchema,
   branchNameSchema,
@@ -37,12 +37,12 @@ import {
 const SandboxIdSchema = z
   .string()
   .refine(isValidSandboxId, 'Invalid sandboxId format')
-  .transform(s => s as SandboxId);
+  .transform(s => s);
 
 const SharedSandboxIdSchema = z
   .string()
   .refine(isGeneratedSharedSandboxId, 'Invalid shared sandbox ID format')
-  .transform(s => s as SandboxId);
+  .transform(s => s);
 
 const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
 const SandboxProviderSchema = agentSandboxProviderSchema;
@@ -429,6 +429,8 @@ const MetadataCloneSchema = z
 export const CurrentSessionMetadataSchema = z
   .object({
     metadataSchemaVersion: z.literal(2),
+    allowSubagentSessions: z.boolean().optional(),
+    parentCloudAgentSessionId: z.string().min(1).optional(),
     identity: MetadataIdentitySchema,
     auth: MetadataAuthSchema,
     repository: MetadataRepositorySchema.optional(),
@@ -569,7 +571,7 @@ function profileFromLegacy(metadata: LegacySessionMetadata): SessionMetadata['pr
       runtimeSkills: metadata.runtimeSkills,
       runtimeAgents: metadata.runtimeAgents,
     })
-  ) as SessionMetadata['profile'];
+  );
 }
 
 function repositoryFromLegacy(

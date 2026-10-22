@@ -37,7 +37,7 @@ import {
   assertRuntimeIsolationAdmission,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
 } from '../../session/session-registration.js';
-import type { SandboxId, TRPCContext } from '../../types.js';
+import type { TRPCContext } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
@@ -240,6 +240,7 @@ async function loadWorktreeSource(
     metadata.auth.kiloSessionId !== input.sourceKiloSessionId ||
     metadata.identity.createdOnPlatform !== 'cloud-agent-web' ||
     metadata.identity.botId !== undefined ||
+    metadata.allowSubagentSessions === true ||
     metadata.devcontainer !== undefined ||
     workspace.devcontainerRequested === true ||
     workspace.worktreeId !== worktreeId ||
@@ -428,11 +429,7 @@ function buildRegistrationInput(
 
   return {
     metadata,
-    sandboxSelection: buildControlPlaneSandboxSelection(
-      metadata,
-      ctx.env,
-      workspace.sandboxId as SandboxId
-    ),
+    sandboxSelection: buildControlPlaneSandboxSelection(metadata, ctx.env, workspace.sandboxId),
     ...(runtimeAuthorization ? { runtimeAuthorizationSeal: runtimeAuthorization.seal } : {}),
   };
 }

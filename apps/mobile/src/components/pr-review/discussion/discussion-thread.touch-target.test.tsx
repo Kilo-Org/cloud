@@ -7,7 +7,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { DiscussionThread } from './discussion-thread';
-import { COMPACT_H11_FRAME_DP, COMPACT_H11_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, ICON_TARGET_DP } from '@/lib/a11y/tap-target';
 import { type ReviewThread } from '@/lib/pr-review/discussion/review-discussion-types';
 
 vi.mock('react-native', () => ({
@@ -87,7 +87,7 @@ async function render(): Promise<TestRenderer.ReactTestRenderer> {
 }
 
 describe('DiscussionThread resolve toggle touch target', () => {
-  it('measures the frame, not the 14pt glyph, and reaches 44pt with its slop', async () => {
+  it('measures the frame, not the 14pt glyph, and the frame alone is the 48dp target', async () => {
     const renderer = await render();
 
     const resolveButton = renderer.root.find(
@@ -99,11 +99,11 @@ describe('DiscussionThread resolve toggle touch target', () => {
 
     // h-7 measured 24.5dp on device (NativeWind's 14pt rem) and was reported as
     // too small to tap; the frame is what a size audit measures.
-    expect(resolveButton.props.className).toContain('h-11 w-11');
+    expect(resolveButton.props.className).toContain(ICON_TARGET_BOX_CLASS);
     expect(resolveButton.props.className).toContain('items-center');
     expect(resolveButton.props.className).toContain('justify-center');
-    expect(resolveButton.props.hitSlop).toBe(COMPACT_H11_HIT_SLOP_DP);
-    expect(COMPACT_H11_FRAME_DP + 2 * COMPACT_H11_HIT_SLOP_DP).toBeGreaterThanOrEqual(44);
+    expect(resolveButton.props.hitSlop).toBeUndefined();
+    expect(ICON_TARGET_DP).toBeGreaterThanOrEqual(48);
 
     // The visible circle keeps its compact 28pt size inside the frame.
     const circle = resolveButton.find(

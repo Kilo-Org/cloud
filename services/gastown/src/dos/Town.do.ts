@@ -24,6 +24,12 @@ import * as scheduling from './town/scheduling';
 import * as events from './town/events';
 import { stopContainerIfIdle as _stopContainerIfIdle } from './town/container-idle-stop';
 import {
+  OWNER_ACCESS_STORAGE_KEY,
+  refreshOwnerAccess as _refreshOwnerAccess,
+  type OwnerAccessState,
+} from './town/owner-access';
+import { evaluateGastownAccessFlag } from '../util/gastown-access-flag.util';
+import {
   CONTAINER_HEALTH_STORAGE_KEYS,
   recoverContainerIfWedged as _recoverContainerIfWedged,
   type ContainerHealthPingOutcome,
@@ -761,6 +767,8 @@ export class TownDO extends DurableObject<Env> {
     this._drainNonce = (await this.ctx.storage.get<string>('town:drainNonce')) ?? null;
     this._drainStartedAt = (await this.ctx.storage.get<number>('town:drainStartedAt')) ?? null;
     this._billingBlocked = (await this.ctx.storage.get<boolean>('billing:blocked')) ?? false;
+    this._accessRevoked =
+      (await this.ctx.storage.get<OwnerAccessState>(OWNER_ACCESS_STORAGE_KEY))?.revoked ?? false;
     this._containerRunPolicy =
       (await this.ctx.storage.get<ContainerRunPolicy>('container:runPolicy')) ?? 'automatic';
 
@@ -812,6 +820,7 @@ export class TownDO extends DurableObject<Env> {
   private _drainNonce: string | null = null;
   private _drainStartedAt: number | null = null;
   private _billingBlocked = false;
+  private _accessRevoked = false;
   private _containerRunPolicy: ContainerRunPolicy = 'automatic';
   /** Instance UUID of the current container, set by the first heartbeat. */
   private _containerInstanceId: string | null = null;
@@ -954,7 +963,29 @@ export class TownDO extends DurableObject<Env> {
   }
 
   private containerStartsBlocked(): boolean {
-    return this._billingBlocked || this._containerRunPolicy === 'paused_by_user';
+    return (
+      this._accessRevoked || this._billingBlocked || this._containerRunPolicy === 'paused_by_user'
+    );
+  }
+
+  private async refreshOwnerAccess(): Promise<void> {
+    this._accessRevoked = await _refreshOwnerAccess({
+      // Same user the mayor runs as. Towns created over HTTP have no owner_user_id.
+      getOwnerUserId: async () => {
+        const townConfig = await this.getTownConfig();
+        return (
+          townConfig.owner_user_id ??
+          (await this.getMayorRigConfig())?.userId ??
+          townConfig.created_by_user_id
+        );
+      },
+      evaluateAccess: userId => evaluateGastownAccessFlag(this.env, userId),
+      getState: () => this.ctx.storage.get<OwnerAccessState>(OWNER_ACCESS_STORAGE_KEY),
+      setState: state => this.ctx.storage.put(OWNER_ACCESS_STORAGE_KEY, state),
+      applyToContainer: revoked =>
+        getTownContainerStub(this.env, this.townId).setAccessRevoked(revoked),
+      now: () => Date.now(),
+    });
   }
 
   private async prepareContainerBilling(
@@ -4231,6 +4262,14 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
+    try {
+      await this.refreshOwnerAccess();
+    } catch (err) {
+      logger.warn('alarm: owner access check failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     if (hasRigs && !this.containerStartsBlocked()) {
       try {
         await this.ensureContainerReady(rigList);
@@ -4561,7 +4600,9 @@ export class TownDO extends DurableObject<Env> {
       })
     );
 
-    const interval = activeWork ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
+    // A revoked town cannot run its work, so it does not need the fast cadence.
+    const interval =
+      activeWork && !this._accessRevoked ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
     await this.ctx.storage.setAlarm(Date.now() + interval);
 
     // Broadcast status snapshot to connected WebSocket clients (skip if nobody is listening)

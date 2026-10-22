@@ -25,6 +25,7 @@
     "error": "ତ୍ରୁଟି: {{error}}",
     "back": "ପଛକୁ",
     "somethingWentWrong": "କିଛି ତ୍ରୁଟି ହୋଇଛି।",
+    "actionNotRecorded": "ଏହି କାର୍ଯ୍ୟର ରେକର୍ଡ୍ ରଖିହେଲା ନାହିଁ। ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "couldNotOpen": "{{label}} ଖୋଲିହେଲା ନାହିଁ।",
     "link": "ଲିଙ୍କ୍",
     "takingLonger": "ଏଥିପାଇଁ ଭାବିଥିବାଠାରୁ ଅଧିକ ସମୟ ଲାଗୁଛି। ଆପଣ ଏହାକୁ ବନ୍ଦ କରି ପୁଣି ଯାଞ୍ଚ କରିପାରିବେ।",
@@ -35,6 +36,8 @@
     "connectGithub": "GitHub ସହ ସଂଯୋଗ କରନ୍ତୁ",
     "cost": "ଖର୍ଚ୍ଚ",
     "discard": "ଛାଡ଼ିଦିଅନ୍ତୁ",
+    "discardChangesMessage": "ଆପଣଙ୍କର ପରିବର୍ତ୍ତନଗୁଡ଼ିକ ନଷ୍ଟ ହୋଇଯିବ।",
+    "discardChangesTitle": "ପରିବର୍ତ୍ତନଗୁଡ଼ିକ ଛାଡ଼ିଦିଅନ୍ତୁ?",
     "findings": "ଚିହ୍ନଟ ସମସ୍ୟା",
     "mergeRequest": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ",
     "notConnected": "ସଂଯୋଗ ହୋଇନାହିଁ",
@@ -109,7 +112,9 @@
     "online": "ଅନଲାଇନ୍",
     "open": "{{name}} ଖୋଲନ୍ତୁ",
     "openPullRequest": "ଖୋଲା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
+    "completed": "ସମାପ୍ତ",
     "pending": "ଅପେକ୍ଷାରତ",
+    "running": "ଚାଲୁଛି",
     "performance": "କାର୍ଯ୍ୟଦକ୍ଷତା",
     "preferences": "ପସନ୍ଦ",
     "privacyPolicy": "ଗୋପନୀୟତା ନୀତି",
@@ -586,6 +591,8 @@
     "installKiloGitHubApp": "Kilo GitHub ଆପ୍ ଇନଷ୍ଟଲ୍ କରନ୍ତୁ",
     "checkConnection": "ସଂଯୋଗ ଯାଞ୍ଚ କରନ୍ତୁ",
     "couldNotLoadPullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "reviewServiceUnavailable": "ସେବା ଅନୁପଲବ୍ଧ",
+    "reviewServiceUnavailableDescription": "ସେବା ଅସ୍ଥାୟୀ ଭାବରେ ଅନୁପଲବ୍ଧ। ଶୀଘ୍ର ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "description": "ବିବରଣୀ",
     "noDescriptionProvided": "କୌଣସି ବିବରଣୀ ଦିଆଯାଇ ନାହିଁ।",
     "review": "ସମୀକ୍ଷା",
@@ -661,7 +668,8 @@
       "description": "ମୋବାଇଲ୍‌ରେ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ସମୀକ୍ଷା କରିବାକୁ ଆପଣଙ୍କ GitHub ଆକାଉଣ୍ଟ ସଂଯୋଗ କରନ୍ତୁ।",
       "gitlabDescription": "ମୋବାଇଲରେ ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଆପଣଙ୍କ GitLab ଖାତା ସଂଯୋଗ କରନ୍ତୁ।",
       "bitbucketDescription": "ମୋବାଇଲରେ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଏହି ସଂଗଠନକୁ Bitbucket ସହ ସଂଯୋଗ କରନ୍ତୁ।",
-      "bitbucketOrgOnlyDescription": "ଏହାର Bitbucket ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରେ ଗୋଟିଏ ସଂଗଠନ ବାଛନ୍ତୁ।"
+      "bitbucketOrgOnlyDescription": "ଏହାର Bitbucket ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଉପର ଖାତାକୁ ଏକ ସଂଗଠନକୁ ବଦଳାନ୍ତୁ।",
+      "contextLine": "{{organization}} ପାଇଁ"
     },
     "screen": {
       "title": "#{{number}}",
@@ -756,6 +764,7 @@
       "truncationBanner_other": "GitHub API ସୀମା ଯୋଗୁଁ ମୋଟ {{total}} ପରିବର୍ତ୍ତିତ ଫାଇଲ୍ ମଧ୍ୟରୁ ପ୍ରଥମ {{limit}} ଦେଖାଯାଉଛି।"
     },
     "linkPasteClipboardEmpty": "କ୍ଲିପବୋର୍ଡ ଖାଲି ଅଛି।",
+    "linkPasteDenied": "ପେଷ୍ଟ କରିବା ପାଇଁ ଅନୁମତି ଦିଆଗଲି ନାହିଁ। ପେଷ୍ଟ କରିବାକୁ ଅନୁମତି ଦିଅନ୍ତୁ ଏବଂ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "linkPasteNotAPullRequest": "ଏହା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ କିମ୍ବା ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ନୁହେଁ",
     "announce": {
       "commentPosted": "ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା",
@@ -769,7 +778,9 @@
       "reviewNotSubmitted": "ଏହି ସମୀକ୍ଷାକୁ ବର୍ତ୍ତମାନ ସ୍ଥିତିରେ ଦାଖଲ କରିହେବ ନାହିଁ। PR ବଦଳିଥାଇପାରେ କିମ୍ବା ଏହା ଆପଣଙ୍କ ନିଜ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ହୋଇଥିବାରୁ ଆପଣ ସମୀକ୍ଷା କରିପାରିବେ ନାହିଁ।",
       "reviewNotSubmittedTerm": "ଏହି ସମୀକ୍ଷା ଯେମିତି ଅଛି ସେମିତି ଜମା ହୋଇପାରିବ ନାହିଁ। {{term}} ବଦଳିଯାଇଥିବ, କିମ୍ବା ଆପଣ ନିଜର {{term}}କୁ ସମୀକ୍ଷା କରିପାରିବେ ନାହିଁ।",
       "couldNotPostComment": "ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହୋଇପାରିଲା ନାହିଁ।",
-      "couldNotSubmitReview": "ସମୀକ୍ଷା ଦାଖଲ ହୋଇପାରିଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+      "couldNotSubmitReview": "ସମୀକ୍ଷା ଦାଖଲ ହୋଇପାରିଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "rateLimited": "ବହୁତ ଅଧିକ ଅନୁରୋଧ। ଦୟାକରି ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "conflict": "ଆପଣ ଏହା ଉପରେ କାମ କରୁଥିବା ସମୟରେ ଏହା ବଦଳିଯାଇଛି। ଦୟାକରି ଏହାକୁ ପୁଣି ଲୋଡ୍ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
     "operation": {
       "couldNotReply": "ଉତ୍ତର ଦିଆଯାଇପାରିଲା ନାହିଁ।",
@@ -777,7 +788,6 @@
       "mergeResultDefaultError": "GitHub ମର୍ଜ୍ ସମ୍ପୂର୍ଣ୍ଣ କଲା ନାହିଁ।",
       "mergeResultNotCompleted": "{{term}} ମର୍ଜ୍ ହୋଇନାହିଁ। ଏହାର ଅବସ୍ଥା ଯାଞ୍ଚ କରନ୍ତୁ ଏବଂ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "ambiguous": "କାର୍ଯ୍ୟ ସଫଳ ହୋଇଛି କି ନାହିଁ ନିଶ୍ଚିତ କରିହେଲା ନାହିଁ — ପୁଣି ଚେଷ୍ଟା କରିବା ପୂର୍ବରୁ PR ଯାଞ୍ଚ କରନ୍ତୁ।",
-      "persistenceFailed": "ଏହି କାର୍ଯ୍ୟର ରେକର୍ଡ୍ ରଖିହେଲା ନାହିଁ। ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "forbidden": "ଏହି କାର୍ଯ୍ୟ ପାଇଁ ଅନୁମତି ନାହିଁ।"
     },
     "capabilities": {
@@ -1449,8 +1459,9 @@
       "loading": "ସମୀକ୍ଷା ସ୍ମୃତି ଲୋଡ୍ ହେଉଛି",
       "couldNotLoad": "ସମୀକ୍ଷା ସ୍ମୃତି ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "off": "ସମୀକ୍ଷା ସ୍ମୃତି ବନ୍ଦ ଅଛି।",
+      "on": "ସମୀକ୍ଷା ସ୍ମୃତି ଚାଲୁ ଅଛି।",
       "offDescription": "ରକ୍ଷଣାବେକ୍ଷକଙ୍କ ଉତ୍ତରରୁ ଶିଖି REVIEW.md ପାଇଁ ନିର୍ଦ୍ଦେଶାବଳୀ ପ୍ରସ୍ତାବ କରିବାକୁ Kilo କୁ ସୁଯୋଗ ଦେବା ପାଇଁ ଏହାକୁ ଚାଲୁ କରନ୍ତୁ।",
-      "readOnlyDescription": "କେବଳ ସଂଗଠନର ମାଲିକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ସମୀକ୍ଷା ସ୍ମୃତି ଚାଲୁ କରିପାରିବେ।",
+      "readOnlyDescription": "କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ସମୀକ୍ଷା ସ୍ମୃତି ବଦଳାଇପାରିବେ।",
       "enable": "ସମୀକ୍ଷା ସ୍ମୃତି ଚାଲୁ କରନ୍ତୁ",
       "loadingProposals": "ପ୍ରସ୍ତାବ ଲୋଡ୍ ହେଉଛି",
       "couldNotLoadProposals": "ପ୍ରସ୍ତାବ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
@@ -1470,7 +1481,10 @@
       "starting": "ସମୀକ୍ଷା ଆରମ୍ଭ ହେଉଛି…",
       "start": "ସମୀକ୍ଷା ଆରମ୍ଭ କରନ୍ତୁ"
     },
-    "notConnectedReadOnly": "{{platform}} ସଂଯୋଗ ହୋଇନାହିଁ। କେବଳ ସଂଗଠନର ମାଲିକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ସଂଯୋଗ କରିପାରିବେ।",
+    "notConnectedReadOnly": "{{platform}} ସଂଯୋଗ ହୋଇନାହିଁ। କେବଳ ସଂଗଠନର ମାଲିକ ଏବଂ ପ୍ରଶାସକମାନେ ଏହାକୁ ସଂଯୋଗ କରିପାରିବେ।",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} ସଂଯୋଗ ହୋଇନାହିଁ। ଏହାକୁ ସଂଯୋଗ କରିବା ପାଇଁ ଜଣେ ସଂଗଠନ ମାଲିକ, ପ୍ରଶାସକ କିମ୍ବା ବିଲିଂ ପରିଚାଳକଙ୍କୁ ଅନୁରୋଧ କରନ୍ତୁ।"
+    },
     "webhookSetup": "ୱେବ୍‌ହୁକ୍ ସେଟଅପ୍ ସମ୍ପୂର୍ଣ୍ଣ ହୋଇନାହିଁ।",
     "webhookSetupDescription": "କିଛି ରିପୋଜିଟୋରୀରେ ସ୍ୱୟଂଚାଳିତ ସମୀକ୍ଷା ନହୋଇପାରେ।",
     "autoReviews": "ସ୍ୱୟଂଚାଳିତ ସମୀକ୍ଷା",
@@ -1478,7 +1492,7 @@
     "followReviewMd": "REVIEW.md ଅନୁସରଣ କରନ୍ତୁ",
     "followReviewMdSubtitle": "ପ୍ରତ୍ୟେକ ରିପୋଜିଟୋରୀର REVIEW.md ଫାଇଲ୍‌ରେ ଥିବା ନିର୍ଦ୍ଦେଶ ମାନନ୍ତୁ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ସଂଯୋଗ ହୋଇନାହିଁ। କେବଳ ସଂଗଠନର ମାଲିକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ସଂଯୋଗ କରିପାରିବେ।",
+      "notConnectedReadOnly": "Bitbucket ସଂଯୋଗ ହୋଇନାହିଁ। କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ସଂଯୋଗ କରିପାରିବେ।",
       "setupIncomplete": "ସେଟଅପ୍ ଅସମ୍ପୂର୍ଣ୍ଣ ଅଛି — kilo.ai ରେ ସେଟଅପ୍ ସମ୍ପୂର୍ଣ୍ଣ କରନ୍ତୁ।",
       "setup": "Bitbucket ସେଟଅପ୍"
     },
@@ -1531,8 +1545,6 @@
     "updateFailed": "କୋଡ୍ ସମୀକ୍ଷକ ଅପଡେଟ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "configSaveFailed": "ସମୀକ୍ଷା ସେଟିଂସ୍ ସଂରକ୍ଷଣ ହୋଇପାରିଲା ନାହିଁ।",
     "status": {
-      "running": "ଚାଲୁଛି",
-      "completed": "ସମାପ୍ତ",
       "interrupted": "ବ୍ୟାହତ"
     },
     "reviewStyle": {
@@ -1545,7 +1557,8 @@
       "bugs": "ବଗ୍",
       "style": "ଶୈଳୀ",
       "testing": "ପରୀକ୍ଷା",
-      "documentation": "ଡକ୍ୟୁମେଣ୍ଟେସନ୍"
+      "documentation": "ଡକ୍ୟୁମେଣ୍ଟେସନ୍",
+      "unknown": "ଅନ୍ୟ ({{area}})"
     },
     "gateThreshold": {
       "warning": "ଚେତାବନୀ"
@@ -1657,7 +1670,14 @@
       "whereFound": "ଚିହ୍ନଟ ହୋଇଥିବା ସ୍ଥାନ ({{displayCount}})",
       "fullReport": "ତିଆରି ହୋଇଥିବା ସମ୍ପୂର୍ଣ୍ଣ ରିପୋର୍ଟ",
       "yes": "ହଁ",
-      "no": "ନା"
+      "no": "ନା",
+      "action": {
+        "analyzeCodebase": "କୋଡବେସ୍ ବିଶ୍ଳେଷଣ କରନ୍ତୁ",
+        "dismiss": "ଖାରଜ କରନ୍ତୁ",
+        "manualReview": "ମାନୁଆଲ୍ ସମୀକ୍ଷା",
+        "monitor": "ନିରୀକ୍ଷଣ କରନ୍ତୁ",
+        "openPr": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲନ୍ତୁ"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}}ଟି ଚିହ୍ନଟ ସମସ୍ୟା",
@@ -1732,7 +1752,7 @@
       "couldNotLoad": "ଏହି ଚିହ୍ନଟ ସମସ୍ୟା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotCheckPermissions": "ଖାରଜ କରିବାର ଅନୁମତି ଯାଞ୍ଚ ହୋଇପାରିଲା ନାହିଁ।",
       "cannotDismissTitle": "ଏହି ଚିହ୍ନଟ ସମସ୍ୟା ଖାରଜ କରାଯାଇପାରିବ ନାହିଁ",
-      "cannotDismissDescription": "କେବଳ ସଂଗଠନର ମାଲିକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଚିହ୍ନଟ ସମସ୍ୟା ଖାରଜ କରିପାରିବେ।",
+      "cannotDismissDescription": "କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଚିହ୍ନଟ ସମସ୍ୟା ଖାରଜ କରିପାରିବେ।",
       "alreadyResolvedDescription": "ଏହି ଚିହ୍ନଟ ସମସ୍ୟାର ସମାଧାନ ହୋଇସାରିଛି। ଏହାକୁ ଆଉ ଖାରଜ କରାଯାଇପାରିବ ନାହିଁ।"
     },
     "findingDetails": {
@@ -1774,7 +1794,7 @@
       "automationAllOff": "ସବୁ ବନ୍ଦ",
       "automationCount": "3ଟି ମଧ୍ୟରୁ {{displayCount}}ଟି ଚାଲୁ",
       "notificationsCount": "2ଟି ମଧ୍ୟରୁ {{displayCount}}ଟି ଚାଲୁ",
-      "disabledNoManage": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ବନ୍ଦ ଅଛି। କେବଳ ସଂଗଠନର ମାଲିକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ଚାଲୁ କରିପାରିବେ।",
+      "disabledNoManage": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ବନ୍ଦ ଅଛି। କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ଚାଲୁ କରିପାରିବେ।",
       "disabledNoRepo": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ଚାଲୁ କରିବା ପୂର୍ବରୁ ଅତି କମରେ ଗୋଟିଏ ରିପୋଜିଟୋରୀ ଚୟନ କରନ୍ତୁ।",
       "disabledPrompt": "Dependabot ସତର୍କତା ସିଙ୍କ୍ କରିବାକୁ, ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏବଂ ସ୍ୱୟଂଚାଳନ ସେଟିଂସ୍ ନିର୍ଦ୍ଧାରଣ କରିବାକୁ ସୁରକ୍ଷା ଏଜେଣ୍ଟ ଚାଲୁ କରନ୍ତୁ।"
     },
@@ -1823,7 +1843,7 @@
       "invalidDayCount": "ଦିନ ସଂଖ୍ୟା 1–365 ମଧ୍ୟରେ ଏକ ପୂର୍ଣ୍ଣ ସଂଖ୍ୟା ହେବା ଆବଶ୍ୟକ।",
       "remediationDeadlineA11y": "{{label}} ସ୍ତରର ସମାଧାନ ସମୟସୀମା, ଦିନରେ",
       "enterWholeNumber": "1ରୁ 365 ମଧ୍ୟରେ ଏକ ପୂର୍ଣ୍ଣ ସଂଖ୍ୟା ଲେଖନ୍ତୁ",
-      "permissionNote": "କେବଳ ସଂଗଠନର ମାଲିକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହି ସେଟିଂସ୍ ବଦଳାଇପାରିବେ।",
+      "permissionNote": "କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହି ସେଟିଂସ୍ ବଦଳାଇପାରିବେ।",
       "enableTracking": "SLA ଟ୍ରାକିଂ ଚାଲୁ କରନ୍ତୁ",
       "enableTrackingSubtitle": "ଚିହ୍ନଟ ସମସ୍ୟାର ତୀବ୍ରତା ଅନୁସାରେ ସମାଧାନର ସମୟସୀମା ଧାର୍ଯ୍ୟ କରନ୍ତୁ।",
       "deadlinesHeading": "ସମାଧାନର ସମୟସୀମା (ଦିନ)"
@@ -1859,12 +1879,16 @@
     "settingsSave": {
       "saveChanges": "ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରନ୍ତୁ",
       "unsavedTitle": "ସଂରକ୍ଷିତ ହୋଇନଥିବା ପରିବର୍ତ୍ତନ",
-      "unsavedMessage": "ଏହି ସ୍କ୍ରିନରୁ ବାହାରିବା ପୂର୍ବରୁ ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରିବେ?"
+      "unsavedMessage": "ଏହି ସ୍କ୍ରିନରୁ ବାହାରିବା ପୂର୍ବରୁ ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରିବେ?",
+      "unsavedInvalidMessage": "ଏହି ପରିବର୍ତ୍ତନଗୁଡ଼ିକ ଏବେ ସଂରକ୍ଷଣ କରାଯାଇପାରିବ ନାହିଁ। ସଂରକ୍ଷଣ କରିବାକୁ ସେଗୁଡ଼ିକୁ ସଜାଡ଼ନ୍ତୁ, କିମ୍ବା ବାହାରିଯିବାକୁ ସେଗୁଡ଼ିକୁ ଛାଡ଼ିଦିଅନ୍ତୁ।"
     },
     "auditReportButton": {
       "viewA11y": "ଅଡିଟ୍ ରିପୋର୍ଟ ଦେଖନ୍ତୁ"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo ଆଡମିନ୍",
+      "actorMaskedUser": "ଲୁଚାଯାଇଥିବା ଉପଭୋକ୍ତା",
+      "actorSystem": "Kilo ସିଷ୍ଟମ୍",
       "couldNotLoad": "ଅଡିଟ୍ ରିପୋର୍ଟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "events": "ଘଟଣା",
       "generated": "{{generatedAt}} ରେ ତିଆରି ହୋଇଛି।",
@@ -1875,8 +1899,25 @@
       "summary": "ରିପୋର୍ଟର ସାରାଂଶ",
       "title": "ଅଡିଟ୍ ରିପୋର୍ଟ",
       "unavailable": "ଅଡିଟ୍ ରିପୋର୍ଟ ଉପଲବ୍ଧ ନୁହେଁ",
-      "unavailableDescription": "କେବଳ ସଂଗଠନର ମାଲିକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଅଡିଟ୍ ରିପୋର୍ଟ ଦେଖିପାରିବେ। ଅନୁମତି ପାଇଁ ମାଲିକ କିମ୍ବା ବିଲିଂ ପରିଚାଳକଙ୍କୁ ଅନୁରୋଧ କରନ୍ତୁ।",
-      "queryFailed": "ରିପୋର୍ଟ ପାଇଁ ତଥ୍ୟ ଆଣିବା ସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+      "unavailableDescription": "କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଅଡିଟ୍ ରିପୋର୍ଟ ଦେଖିପାରିବେ। ଅନୁମତି ପାଇଁ ଜଣେ ମାଲିକ, ପ୍ରଶାସକ କିମ୍ବା ବିଲିଂ ପରିଚାଳକଙ୍କୁ ଅନୁରୋଧ କରନ୍ତୁ।",
+      "queryFailed": "ରିପୋର୍ଟ ପାଇଁ ତଥ୍ୟ ଆଣିବା ସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "eventActions": {
+        "findingAnalysisCompleted": "ବିଶ୍ଳେଷଣ ସମ୍ପୂର୍ଣ୍ଣ ହୋଇଛି",
+        "findingAnalysisFailed": "ବିଶ୍ଳେଷଣ ବିଫଳ ହୋଇଛି",
+        "findingAutoDismissed": "ସ୍ୱୟଂଚାଳିତ ଭାବେ ଖାରଜ କରାଯାଇଛି",
+        "findingCreated": "ଆମଦାନୀ ହୋଇଛି",
+        "findingDeleted": "ଅପସାରିତ ହୋଇଛି",
+        "findingDismissed": "ଖାରଜ କରାଯାଇଛି",
+        "findingSeverityChanged": "ଗମ୍ଭୀରତା ବଦଳିଛି",
+        "findingStatusChange": "ସ୍ଥିତି ବଦଳିଛି",
+        "findingSuperseded": "ପ୍ରତିସ୍ଥାପିତ ହୋଇଛି",
+        "remediationBlocked": "ସମାଧାନ ଅବରୋଧିତ ହୋଇଛି",
+        "remediationCancelled": "ରଦ୍ଦ କରାଯାଇଛି",
+        "remediationFailed": "ସମାଧାନ ବିଫଳ ହୋଇଛି",
+        "remediationNoChangesNeeded": "କୌଣସି ପରିବର୍ତ୍ତନ ଆବଶ୍ୟକ ନାହିଁ",
+        "remediationPrOpened": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲାଯାଇଛି",
+        "remediationQueued": "ସମାଧାନ ପାଇଁ ଅନୁରୋଧ କରାଯାଇଛି"
+      }
     },
     "notifications": {
       "couldNotLoad": "ବିଜ୍ଞପ୍ତି ସେଟିଂସ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
@@ -1908,7 +1949,6 @@
       "installApp": "GitHub ଆପ୍ ସଂସ୍ଥାପନ କରନ୍ତୁ",
       "reauthorizeButton": "GitHub ଆପ୍‌କୁ ପୁଣି ଅନୁମତି ଦିଅନ୍ତୁ",
       "reauthorizeDescription": "Dependabot ସତର୍କତା ଦେଖିବାକୁ ସୁରକ୍ଷା ଏଜେଣ୍ଟକୁ vulnerability_alerts ଅନୁମତି ଆବଶ୍ୟକ। ଏହି ଅନୁମତି ଦେବାକୁ GitHub ଆପ୍‌କୁ ପୁଣି ଅନୁମତି ଦିଅନ୍ତୁ।",
-      "reauthorizeFailed": "ପୁଣି ଅନୁମତି ଦେବା ପ୍ରକ୍ରିୟା ଆରମ୍ଭ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "reauthorizeTitle": "ଅତିରିକ୍ତ ଅନୁମତି ଆବଶ୍ୟକ",
       "setupFailed": "GitHub ସେଟଅପ୍ ଆରମ୍ଭ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
@@ -1927,7 +1967,12 @@
       "syncMayNotHaveCompleted": "ଏକ ସିଙ୍କ୍ ସମ୍ପୂର୍ଣ୍ଣ ହୋଇନଥାଇପାରେ। ଏହାର ସ୍ଥିତି ମେଳାଇବାକୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ କିମ୍ବା ଏହାକୁ ବାଦ ଦିଅନ୍ତୁ।",
       "syncInProgress": "ଏକ ସୁରକ୍ଷା ସିଙ୍କ୍ ପୂର୍ବରୁ ଚାଲିଛି। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "dismissalInProgress": "ଏହି ଖାରଜ ପ୍ରକ୍ରିୟା ପୂର୍ବରୁ ଚାଲିଛି। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "couldNotReadPendingSyncs": "ଅସମାପ୍ତ ସିଙ୍କ୍‌ଗୁଡ଼ିକର ତଥ୍ୟ ପଢ଼ାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+      "couldNotReadPendingSyncs": "ଅସମାପ୍ତ ସିଙ୍କ୍‌ଗୁଡ଼ିକର ତଥ୍ୟ ପଢ଼ାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "ambiguous": "ନିଶ୍ଚିତ କରିହେଲା ନାହିଁ — ପୁଣି ଚେଷ୍ଟା କରିବା ପୂର୍ବରୁ ସୁରକ୍ଷା ସମୀକ୍ଷା ଯାଞ୍ଚ କରନ୍ତୁ।",
+      "settleFailed": "କାର୍ଯ୍ୟଟି ସମ୍ପୂର୍ଣ୍ଣ ହେଲା, କିନ୍ତୁ ଆମେ ଫଳାଫଳ ରେକର୍ଡ କରିପାରିଲୁ ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "replayFailed": "ଏହି କାର୍ଯ୍ୟଟି ସମ୍ପୂର୍ଣ୍ଣ ହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "actionFailed": "ଏହି କାର୍ଯ୍ୟଟି ସମ୍ପୂର୍ଣ୍ଣ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "actionBlocked": "ଏହି କାର୍ଯ୍ୟଟି ସମ୍ପୂର୍ଣ୍ଣ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବା ପୂର୍ବରୁ ସମସ୍ୟାଟି ସମାଧାନ କରିବାକୁ ହେବ।"
     },
     "analysisState": {
       "queued": "ବିଶ୍ଳେଷଣ ଅପେକ୍ଷା ତାଲିକାରେ",
@@ -2204,6 +2249,8 @@
       "commitAndPush": "କମିଟ୍ ଓ ପୁଶ୍ କରନ୍ତୁ",
       "startSession": "ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ",
       "selectRepositoryToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ।",
+      "enterPromptToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ପ୍ରମ୍ପ୍ଟ ଯୋଗ କରନ୍ତୁ।",
+      "enterPromptOrFileToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ପ୍ରମ୍ପ୍ଟ କିମ୍ବା ଫାଇଲ୍ ଯୋଗ କରନ୍ତୁ।",
       "connectProviderToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ସେବା ପ୍ରଦାତାଙ୍କୁ ସଂଯୋଗ କରନ୍ତୁ।",
       "promptPlaceholder": "କେଉଁ କାମ କରିବାକୁ ଚାହୁଁଛନ୍ତି?",
       "couldNotLoadModels": "ମଡେଲ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
@@ -2212,6 +2259,7 @@
       "prefillModelUnavailable": "{{model}} ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଆପଣଙ୍କ ଡିଫଲ୍ଟ ମଡେଲ୍ ବ୍ୟବହାର କରାଯାଉଛି।",
       "couldNotReadPendingSessions": "ଅପେକ୍ଷାରେ ଥିବା ସେସନ୍ ପଢ଼ି ହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "failedToCreate": "ସେସନ୍ ତିଆରି ହୋଇପାରିଲା ନାହିଁ।",
+      "checkOrganizationAccess": "ଏହି ସଂଗଠନକୁ ଆପଣଙ୍କର ପ୍ରବେଶ ଅନୁମତି ଯାଞ୍ଚ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "couldNotRefreshRepositories": "ରିପୋଜିଟୋରୀ ତାଲିକା ରିଫ୍ରେସ୍ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "discardDraftTitle": "ଡ୍ରାଫ୍ଟ ହଟାଇବେ?",
       "discardDraftMessage": "ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ ହଟିଯିବ।",
@@ -2281,7 +2329,8 @@
       "linesBadge_other": "{{displayCount}}ଟି ଧାଡ଼ି",
       "matchesBadge_one": "{{displayCount}}ଟି ମେଳ",
       "matchesBadge_other": "{{displayCount}}ଟି ମେଳ",
-      "noOutput": "କୌଣସି ଆଉଟପୁଟ୍ ନାହିଁ।"
+      "noOutput": "କୌଣସି ଆଉଟପୁଟ୍ ନାହିଁ।",
+      "translationFailed": "ଅନୁବାଦ ବିଫଳ ହେଲା"
     },
     "readToolMarkdown": {
       "linesTruncated": "ଧାଡ଼ି {{start}}–{{end}} (କାଟି ଦିଆଯାଇଛି)",
@@ -2740,7 +2789,7 @@
     "thisDevice": "ଏହି ଡିଭାଇସ୍",
     "viewProfile": "ପ୍ରୋଫାଇଲ୍ ଦେଖନ୍ତୁ",
     "signOutThisDevice": "ଏହି ଡିଭାଇସରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ",
-    "signOutThisSession": "ଏହି ସେସନରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ",
+    "signOutSessionLabel": "{{device}} ରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ, ସାଇନ୍ ଇନ୍: {{signedIn}}",
     "sessionSignedOut": "ସେସନ୍ ସାଇନ୍ ଆଉଟ୍ ହେଲା।",
     "signOutThisDeviceTitle": "ଏହି ଡିଭାଇସରୁ ସାଇନ୍ ଆଉଟ୍ କରିବେ?",
     "signOutThisSessionTitle": "ଏହି ସେସନରୁ ସାଇନ୍ ଆଉଟ୍ କରିବେ?",
@@ -2978,11 +3027,23 @@
     "boundary": {
       "backToProfile": "ପ୍ରୋଫାଇଲକୁ ଫେରନ୍ତୁ",
       "loadErrorMessage": "ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+
+      "chooseAccount": "ଏକ ଖାତା ବାଛନ୍ତୁ",
       "loadErrorTitle": "ଆପଣଙ୍କ ସଂଗଠନଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "membershipLostNotice": "ଆପଣଙ୍କର ଏହି ସଂଗଠନରେ ଆଉ ପ୍ରବେଶ ଅଧିକାର ନାହିଁ। {{target}} କୁ ସ୍ୱିଚ୍ ହୋଇଛି।",
+      "noOrganization": "କୋଣସି ସଂଗଠନ ନାହିଁ",
+
+      "noOrganizationDescription": "ଏହି ଖାତା କୌଣସି ସଂଗଠନର ଅଂଶ ନୁହେଁ। ସଦସ୍ୟ ଆମନ୍ତ୍ରଣ ଏବଂ କମ୍ ବାଲାନ୍ସ ସତର୍କତା ପରି ସଂଗଠନ ସୁବିଧାଗୁଡ଼ିକ ବ୍ୟବହାର କରିବାକୁ ୱେବ୍‌ରେ ଏକ ସଂଗଠନ ସୃଷ୍ଟି କରନ୍ତୁ କିମ୍ବା ଯୋଗ ଦିଅନ୍ତୁ।",
+
+      "openWebOrganizations": "ୱେବ୍‌ରେ ସଂଗଠନଗୁଡ଼ିକ ଖୋଲନ୍ତୁ",
+
       "organizationUnavailable": "ସଂଗଠନ ଉପଲବ୍ଧ ନାହିଁ।",
-      "selectDescription": "ଆଗକୁ ବଢ଼ିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଏକ ସଂଗଠନ ବାଛନ୍ତୁ।",
+      "selectDescriptionWithOrganizations": "ଆପଣ ଏକ କିମ୍ବା ଅଧିକ ସଂଗଠନର ସଦସ୍ୟ। ଏହି ସ୍କ୍ରିନ୍ ବ୍ୟବହାର କରିବା ଉଚିତ ଖାତା ବାଛନ୍ତୁ।",
+
       "selectOrganization": "ଏକ ସଂଗଠନ ବାଛନ୍ତୁ",
       "unavailableDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଆଗକୁ ବଢ଼ିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଅନ୍ୟ ଏକ ସଂଗଠନ ବାଛନ୍ତୁ।",
+
+      "unavailableSessionsDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଏହାର ସେସନ୍ ଲୋଡ୍ କରାଯାଇପାରିବ ନାହିଁ।",
       "accessDeniedDescription": "ଆପଣଙ୍କର ଏହି ସଂଗଠନରେ ପ୍ରବେଶ ଅଧିକାର ନାହିଁ।"
     },
     "creditActivity": {
@@ -3034,7 +3095,11 @@
       "separateEmailsHint": "ଏକାଧିକ ଇମେଲ୍ ଠିକଣା ମଧ୍ୟରେ କମା ଦିଅନ୍ତୁ।",
       "thresholdLabel": "ଏହି ରାଶିରୁ କମ୍ ହେଲେ ସତର୍କତା (USD)",
       "title": "କମ୍ ବ୍ୟାଲାନ୍ସ ସତର୍କତା",
-      "emailsError": "ଅତି କମରେ ଗୋଟିଏ ବୈଧ ଇମେଲ୍ ଠିକଣା ଲେଖନ୍ତୁ। ଏକାଧିକ ଠିକଣା ମଧ୍ୟରେ କମା ଦିଅନ୍ତୁ।",
+      "emailsInvalid": "ଏକ କିମ୍ବା ଅଧିକ ଇମେଲ୍ ଠିକଣା ବୈଧ ନୁହେଁ।",
+      "emailsRequired": "ଅତି କମରେ ଗୋଟିଏ ଇମେଲ୍ ଠିକଣା ଲେଖନ୍ତୁ।",
+      "saveEmailsError": "କିଛି ଇମେଲ୍ ଠିକଣା ଗ୍ରହଣ କରାଯାଇନାହିଁ। ସେଗୁଡ଼ିକୁ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "saveError": "କମ୍ ବ୍ୟାଲାନ୍ସ ସତର୍କତା ସଞ୍ଚୟ କରାଯାଇପାରିଲା ନାହିଁ।",
+      "thresholdPlaceholder": "ଏକ ରାଶି ଲେଖନ୍ତୁ",
       "thresholdError": "0 ରୁ ଅଧିକ ରାଶି ଲେଖନ୍ତୁ।"
     },
     "memberLimit": {
@@ -3045,12 +3110,13 @@
       "removeLimit": "ସୀମା ଅପସାରଣ କରନ୍ତୁ",
       "title": "ଦୈନିକ ବ୍ୟବହାର ସୀମା",
       "blankError": "ଏକ ରାଶି ଲେଖନ୍ତୁ କିମ୍ବା ତଳେ ଥିବା “ସୀମା ଅପସାରଣ କରନ୍ତୁ” ଟାପ୍ କରନ୍ତୁ।",
+      "blankWithoutLimitError": "0 ଓ {{max}} ମଧ୍ୟରେ ଏକ ଦୈନିକ ସୀମା ଲେଖନ୍ତୁ।",
       "rangeError": "0 ଓ {{max}} ମଧ୍ୟରେ ଏକ ରାଶି ଲେଖନ୍ତୁ।"
     },
     "members": {
       "changeRole": "ଭୂମିକା ପରିବର୍ତ୍ତନ କରନ୍ତୁ",
       "emptyDescriptionCanInvite": "ଏହି ସଂଗଠନରେ ମିଶି କାମ କରିବାକୁ ସହକର୍ମୀଙ୍କୁ ନିମନ୍ତ୍ରଣ କରନ୍ତୁ।",
-      "emptyDescriptionCannotInvite": "ସହକର୍ମୀଙ୍କୁ ନିମନ୍ତ୍ରଣ କରିବାକୁ ଜଣେ ମାଲିକ କିମ୍ବା ବିଲିଂ ପରିଚାଳକଙ୍କୁ କୁହନ୍ତୁ।",
+      "emptyDescriptionCannotInvite": "ସହକର୍ମୀଙ୍କୁ ନିମନ୍ତ୍ରଣ କରିବାକୁ ଜଣେ ମାଲିକ, ପ୍ରଶାସକ କିମ୍ବା ବିଲିଂ ପରିଚାଳକଙ୍କୁ କୁହନ୍ତୁ।",
       "emptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସଦସ୍ୟ ନାହିଁ",
       "invitedDate": "{{date}}ରେ ନିମନ୍ତ୍ରିତ",
       "limitPerDay": "{{amount}}/ଦିନ",
@@ -3314,7 +3380,8 @@
       "settingsToolsOn": "ଚାଲୁ — ସେଟିଂସ୍ ସାଧନ ମଡେଲ୍‌କୁ ପଠାଯାଏ",
       "settingsToolsOff": "ବନ୍ଦ — ମଡେଲ୍‌କୁ କୌଣସି ସେଟିଂସ୍ ସାଧନ ପଠାଯାଏ ନାହିଁ",
       "serverChecking": "ଏହି ସର୍ଭର ଯାଞ୍ଚ କରାଯାଉଛି…",
-      "serverToolCount": "{{count}} ସାଧନ",
+      "serverToolCount_one": "{{count}} ସାଧନ",
+      "serverToolCount_other": "{{count}} ସାଧନ",
       "serverUnreachable": "ଏହି ସର୍ଭର ପର୍ଯ୍ୟନ୍ତ ପହଞ୍ଚି ପାରିଲା ନାହିଁ",
       "serverOff": "ଏହି ସର୍ଭର ବନ୍ଦ ଅଛି"
     },
@@ -3461,6 +3528,8 @@
       "quantizationsHelp": "ଛୋଟ ଫାଇଲଗୁଡ଼ିକ କମ ମେମୋରୀ ଓ ଷ୍ଟୋରେଜ ବ୍ୟବହାର କରେ। ବଡ଼ ଫାଇଲଗୁଡ଼ିକ ସାଧାରଣତଃ ଭଲ ଉତ୍ତର ଦିଏ।",
       "quantDetail": "{{size}} ଡାଉନଲୋଡ଼ · ପ୍ରାୟ {{memory}} ମେମୋରୀ",
       "downloadQuant": "{{quant}} ଡାଉନଲୋଡ଼ କରନ୍ତୁ",
+      "downloadModelA11y": "{{name}} ଡାଉନଲୋଡ଼ କରନ୍ତୁ",
+      "detailsA11y": "ବିବରଣୀ: {{name}}",
       "loadingModel": "ମଡେଲ ବିବରଣୀ ଲୋଡ଼ ହେଉଛି",
       "couldNotLoadModel": "ଏହି ମଡେଲ ଲୋଡ଼ କରାଯାଇପାରିଲା ନାହିଁ",
       "noFiles": "ଏହି ଆପ ଚଲାଇପାରୁଥିବା କୌଣସି ଫାଇଲ ନାହିଁ",
@@ -3512,6 +3581,7 @@
   "appActions": {
     "start": {
       "promptRequired": "ଏଜେଣ୍ଟ ଆରମ୍ଭ କରିବାକୁ ଏକ ପ୍ରମ୍ପ୍ଟ ଆବଶ୍ୟକ। ଏକ ପ୍ରମ୍ପ୍ଟ ଯୋଡ଼ନ୍ତୁ ଏବଂ ଏହାକୁ ପୁଣି ଚଲାନ୍ତୁ।",
+      "repositoryRequired": "ଏଜେଣ୍ଟ ଆରମ୍ଭ କରିବାକୁ ଏକ ରିପୋଜିଟୋରୀ ଆବଶ୍ୟକ। Kilo ଖୋଲନ୍ତୁ ଏବଂ ଗୋଟିଏ ବାଛନ୍ତୁ, ତାପରେ ଏହାକୁ ପୁଣି ଚଲାନ୍ତୁ।",
       "repositoryUnknown": "Kilo, {{repository}} କୁ GitHub କିମ୍ବା GitLab ରିପୋଜିଟୋରୀ ଭାବରେ ଚିହ୍ନଟ କରେ ନାହିଁ। Kilo ରେ ଅନ୍ୟ ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ।",
       "repositoryUnsupported": "{{repository}} ଏକ Bitbucket ରିପୋଜିଟୋରୀ — ଏଜେଣ୍ଟ ଆରମ୍ଭ କରନ୍ତୁ ଏପର୍ଯ୍ୟନ୍ତ ଏହାକୁ ବ୍ୟବହାର କରିପାରିବ ନାହିଁ। Kilo ରେ ଅନ୍ୟ ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ।"
     }
@@ -3549,10 +3619,13 @@
     "emptyDescription": "ପରିବେଶ ଭେରିଏବଲ୍, ସେଟଅପ୍ କମାଣ୍ଡ, ଏବଂ ଅଧିବେଶନରେ କୌଶଳ ପୁନଃ ବ୍ୟବହାର କରିବାକୁ ଏକ ପ୍ରୋଫାଇଲ୍ ସୃଷ୍ଟି କରନ୍ତୁ।",
     "loadFailed": "ପ୍ରୋଫାଇଲ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "counts": {
-      "vars": "{{count}} ଭେରିଏବଲ୍",
+      "vars_one": "{{count}} ଭେରିଏବଲ୍",
+      "vars_other": "{{count}} ଭେରିଏବଲ୍",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ଦକ୍ଷତା",
-      "commands": "{{count}} କମାଣ୍ଡ୍",
+      "skills_one": "{{count}} ଦକ୍ଷତା",
+      "skills_other": "{{count}} ଦକ୍ଷତା",
+      "commands_one": "{{count}} କମାଣ୍ଡ୍",
+      "commands_other": "{{count}} କମାଣ୍ଡ୍",
       "varsShort": "{{count}}ଭ",
       "skillsShort": "{{count}}ଦ",
       "commandsShort": "{{count}}କ"
@@ -3583,7 +3656,6 @@
     "keyTooLong": "ଚାବି 256 ଅକ୍ଷର କିମ୍ବା କମ୍ ହେବା ଉଚିତ୍",
     "keyDuplicate": "ଏହି ଚାବି ପୂର୍ବରୁ ପ୍ରୋଫାଇଲରେ ଅଛି",
     "valueLabel": "ମୂଲ୍ୟ",
-    "secretLabel": "ଗୁପ୍ତ",
     "secrets": {
       "markSecret": "ଗୁପ୍ତ ଭାବରେ ଚିହ୍ନିତ କର।",
       "masked": "ଲୁକ୍କାୟିତ ମୂଲ୍ୟ",
@@ -3627,7 +3699,7 @@
       "environment": "ପରିବେଶ (JSON)",
       "headers": "ହେଡର୍ସ (JSON)",
       "timeout": "ସମୟ ସମାପ୍ତ",
-      "secretCount": "ଗୁପ୍ତ ଗଣନା",
+      "secretCount": "ଗୁପ୍ତ ଗଣନା: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3642,7 +3714,9 @@
       "jsonTooLarge": "ସର୍ବାଧିକ 50 ଏଣ୍ଟ୍ରି ବ୍ୟବହାର କରନ୍ତୁ, ଚାବି 128 ପର୍ଯ୍ୟନ୍ତ ଏବଂ ମୂଲ୍ୟ 4096 ଅକ୍ଷର ପର୍ଯ୍ୟନ୍ତ",
       "timeoutInvalid": "ସମୟ ସମାପ୍ତ ହେବା ନିଶ୍ଚିତ ଭାବରେ ଏକ ମିଲିସେକେଣ୍ଡ।",
       "edit": "MCP ସର୍ଭର ସଂପାଦନ କରନ୍ତୁ।",
-      "saveFailed": "MCP ସର୍ଭର ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ।"
+      "saveFailed": "MCP ସର୍ଭର ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ।",
+      "deleteFailed": "MCP ସର୍ଭର ଡିଲିଟ୍ କରିପାରିଲା ନାହିଁ।",
+      "updateFailed": "MCP ସର୍ଭର ଅପଡେଟ୍ କରିପାରିଲା ନାହିଁ।"
     },
     "agents": {
       "title": "ପ୍ରୋଫାଇଲ୍ ଏଜେଣ୍ଟଗୁଡିକ।",
@@ -3668,7 +3742,11 @@
       "visibilityPrimary": "ପ୍ରାଥମିକ - ପିକଚରରେ ଦର୍ଶାଯାଇଛି।",
       "visibilitySubagent": "ସବଜେଣ୍ଟ୍ - କେବଳ ଅନ୍ୟମାନଙ୍କଠାରୁ କଲ୍ ଯୋଗ୍ୟ।",
       "visibilityAll": "ସମସ୍ତ - ଉଭୟ",
+      "modePrimary": "କେବଳ ପ୍ରାଥମିକ",
+      "modeSubagent": "କେବଳ ସବଜେଣ୍ଟ୍",
+      "modeAll": "ସମସ୍ତ ମୋଡ୍",
       "saveFailed": "ଏଜେଣ୍ଟ ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ।",
+      "deleteFailed": "ଏଜେଣ୍ଟ ଡିଲିଟ୍ କରିପାରିଲା ନାହିଁ।",
       "nameRequired": "ଏକ ଏଜେଣ୍ଟ ନାମ ପ୍ରବେଶ କରନ୍ତୁ।",
       "slugRequired": "ଏକ ଏଜେଣ୍ଟ ସ୍ଲଗ୍ ପ୍ରବେଶ କରନ୍ତୁ।",
       "slugInvalid": "ସ୍ଲଗ୍ ନିଶ୍ଚିତ ଭାବରେ ଏକ ଅକ୍ଷରରୁ ଆରମ୍ଭ ହେବ ଏବଂ କେବଳ ଲୋୟର କେସ୍ ଅକ୍ଷର, ସଂଖ୍ୟା, ଏବଂ ଡ୍ୟାସ୍ ବ୍ୟବହାର କରିବ।",
@@ -3683,10 +3761,12 @@
       "description": "ନିର୍ଦ୍ଦେଶ ବର୍ଣ୍ଣନା",
       "template": "ଟେମ୍ପଲେଟ୍।",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ବ୍ୟାଖ୍ୟା କର।",
       "subtask": "ସବଟାସ୍କ ଭାବରେ ଚଲାନ୍ତୁ।",
       "edit": "ସ୍ଲାସ୍ କମାଣ୍ଡ୍ ଏଡିଟ୍ କରନ୍ତୁ।",
       "saveFailed": "କମାଣ୍ଡ୍ ସେଭ୍ କରିପାରିଲା ନାହିଁ।",
+      "deleteFailed": "କମାଣ୍ଡ୍ ଡିଲିଟ୍ କରିପାରିଲା ନାହିଁ।",
       "nameRequired": "ଏକ ନିର୍ଦ୍ଦେଶ ନାମ ପ୍ରବେଶ କରନ୍ତୁ।",
       "nameInvalid": "ନାମ ନିଶ୍ଚିତ ଭାବରେ ଏକ ଛୋଟ ଅକ୍ଷରରୁ ଆରମ୍ଭ ହେବ ଏବଂ କେବଳ ଲୋୟର କେସ୍ ଅକ୍ଷର, ସଂଖ୍ୟା ଏବଂ ଡ୍ୟାସ୍ ବ୍ୟବହାର କରିବ।",
       "templateRequired": "ଏକ ନିର୍ଦ୍ଦେଶ ଟେମ୍ପଲେଟ୍ ପ୍ରବେଶ କରନ୍ତୁ।",
@@ -3725,6 +3805,8 @@
     "empty": "କ୍ରେଡିଟ୍ ପ୍ୟାକ୍ ବର୍ତ୍ତମାନ ଉପଲବ୍ଧ ନାହିଁ।",
     "noMatchingProducts": "App Store କୌଣସି ମେଳ ଖାଉଥିବା କ୍ରେଡିଟ୍ ପ୍ୟାକ୍ ଫେରାଇ ନାହିଁ।",
     "noMatchingProductsPlay": "Google Play କୌଣସି ମେଳ ଖାଉଥିବା କ୍ରେଡିଟ୍ ପ୍ୟାକ୍ ଫେରାଇ ନାହିଁ।",
+    "storeTimedOut": "App Store ସମୟରେ ଉତ୍ତର ଦେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "storeTimedOutPlay": "Google Play ସମୟରେ ଉତ୍ତର ଦେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "purchaseOwnedByAnotherAccount": "ଏହି Apple Account ରେ ଥିବା କ୍ରେଡିଟ୍ ଅନ୍ୟ ଏକ Kilo ଆକାଉଣ୍ଟର। ଏହାକୁ ବ୍ୟବହାର କରିବାକୁ ସେହି Kilo ଆକାଉଣ୍ଟରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
     "purchaseOwnedByAnotherAccountPlay": "ଏହି Google Play ଆକାଉଣ୍ଟରେ ଥିବା କ୍ରେଡିଟ୍ ଅନ୍ୟ ଏକ Kilo ଆକାଉଣ୍ଟର ଅଟେ। ଏହାକୁ ବ୍ୟବହାର କରିବାକୁ ସେହି Kilo ଆକାଉଣ୍ଟରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।"
   },
@@ -3833,7 +3915,7 @@
     "view": "ସାରାଂଶ ପଢନ୍ତୁ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "ଲାଇଭ ସ୍ଥିତି ଦେଖାନ୍ତୁ",
+    "dismiss": "ସାରାଂଶ ଖାରଜ କରନ୍ତୁ",
     "offline": "ଅଫଲାଇନ · ସଂରକ୍ଷିତ ସାରାଂଶ",
     "cached": "ସଂରକ୍ଷିତ ରିପୋର୍ଟ · ରିଫ୍ରେସ ଉପଲବ୍ଧ ନାହିଁ",
     "revised": "ସଂଶୋଧିତ · {{revision}}",

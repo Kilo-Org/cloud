@@ -123,6 +123,19 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
   const [height, setHeight] = useState(MIN_HEIGHT);
   const [failed, setFailed] = useState(false);
   const [host, setHost] = useState<MermaidHost | null>(null);
+  // A recycled row hands a new diagram to a mounted instance, so the previous
+  // source's failure and measured height must not outlive it. Reset
+  // synchronously during render (React's "adjust state when a prop changes"
+  // pattern) so no frame shows the fallback or the height of the old diagram.
+  const [prevSource, setPrevSource] = useState(source);
+  if (prevSource !== source) {
+    setPrevSource(source);
+    setFailed(false);
+    setHeight(MIN_HEIGHT);
+  }
+  // The host is prepared once per process, so a source change only re-runs this
+  // after a failed copy: a failure clears the cached promise, and the retry then
+  // either recovers the host or re-asserts the fallback.
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -141,7 +154,7 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
     return () => {
       active = false;
     };
-  }, []);
+  }, [source]);
   const webSource = useMemo(() => (host === null ? null : { uri: host.pageUri }), [host]);
   const webViewStyle = useMemo(
     () => ({ backgroundColor: palette.codeBackground }),

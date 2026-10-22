@@ -1724,6 +1724,7 @@
       "branchLoadError": "無法載入分支",
       "branchUnavailable": "此存放庫沒有可用的分支。檢查你在供應商處的存取權限，然後選取另一個存放庫。",
       "branchEmpty": "沒有可用的分支",
+      "branchListIncomplete": "只顯示部分分支。此存放庫的分支數量多於此清單所能包含的數量。",
       "branchPlaceholder": "選取一個分支",
       "runOnWithTarget": "執行環境：{{target}}",
       "environment": "環境",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} 個工具",
       "serverToolCount_other": "{{count}} 個工具",
       "serverUnreachable": "無法連線至此伺服器",
-      "serverOff": "此伺服器已關閉"
+      "serverOff": "此伺服器已關閉",
+      "app": {
+        "label": "工具介面",
+        "failed": "無法載入此工具的介面。",
+        "empty": "此工具的介面沒有可顯示的內容。"
+      }
     },
     "mcpOAuth": {
       "authMethod": "驗證",

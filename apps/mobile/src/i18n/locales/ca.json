@@ -2260,6 +2260,7 @@
       "branchLoadError": "No s'han pogut carregar les branques",
       "branchUnavailable": "No hi ha branques disponibles per a aquest repositori. Comprova el teu accés amb el proveïdor i tria un altre repositori.",
       "branchEmpty": "No hi ha branques disponibles",
+      "branchListIncomplete": "Només es mostren algunes branques. Aquest repositori té més branques de les que aquesta llista pot incloure.",
       "branchPlaceholder": "Selecciona una branca",
       "runOnWithTarget": "Execució a: {{target}}",
       "environment": "Entorn",

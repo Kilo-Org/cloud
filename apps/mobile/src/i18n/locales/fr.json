@@ -1631,6 +1631,7 @@
       "branchLoadError": "Impossible de charger les branches",
       "branchUnavailable": "Aucune branche n'est disponible pour ce dépôt. Vérifiez votre accès auprès du fournisseur, puis choisissez un autre dépôt.",
       "branchEmpty": "Aucune branche disponible",
+      "branchListIncomplete": "Seules certaines branches sont affichées. Le dépôt contient plus de branches que cette liste ne peut en inclure.",
       "branchPlaceholder": "Sélectionner une branche",
       "runOnWithTarget": "Exécution sur : {{target}}",
       "environment": "Environnement",

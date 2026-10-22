@@ -2232,6 +2232,7 @@
       "branchLoadError": "Hindi ma-load ang mga sangay",
       "branchUnavailable": "Walang available na sangay para sa repositoryong ito. Suriin ang access mo sa provider, tapos pumili ng ibang repositoryo.",
       "branchEmpty": "Walang available na sangay",
+      "branchListIncomplete": "Iilan lamang sa mga sangay ang ipinapakita. May mas maraming sangay ang repositoryo kaysa sa kayang isama ng listahang ito.",
       "branchPlaceholder": "Pumili ng sangay",
       "runOnWithTarget": "Patakbuhin sa: {{target}}",
       "environment": "Kapaligiran",

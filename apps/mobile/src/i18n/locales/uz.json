@@ -2232,6 +2232,7 @@
       "branchLoadError": "Tarmoqlarni yuklab bo‘lmadi",
       "branchUnavailable": "Ushbu repozitoriy uchun tarmoqlar mavjud emas. Provayderdagi kirish huquqingizni tekshiring, so‘ng boshqa repozitoriy tanlang.",
       "branchEmpty": "Mavjud tarmoqlar yo‘q",
+      "branchListIncomplete": "Faqat ba'zi tarmoqlar ko‘rsatilgan. Repozitoriyda bu ro‘yxat sig‘dira oladiganidan ko‘proq tarmoq bor.",
       "branchPlaceholder": "Tarmoq tanlang",
       "runOnWithTarget": "Ishga tushirish muhiti: {{target}}",
       "environment": "Muhit",

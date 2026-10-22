@@ -1718,6 +1718,7 @@
       "branchLoadError": "Không tải được các nhánh",
       "branchUnavailable": "Không có nhánh khả dụng cho kho mã nguồn này. Kiểm tra quyền truy cập của bạn với nhà cung cấp, rồi chọn kho mã nguồn khác.",
       "branchEmpty": "Không có nhánh khả dụng",
+      "branchListIncomplete": "Chỉ một số nhánh được hiển thị. Kho mã nguồn có nhiều nhánh hơn mức danh sách này có thể chứa.",
       "branchPlaceholder": "Chọn một nhánh",
       "runOnWithTarget": "Chạy trên: {{target}}",
       "environment": "Môi trường",

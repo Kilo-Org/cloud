@@ -1718,6 +1718,7 @@
       "branchLoadError": "無法載入分支",
       "branchUnavailable": "此存放庫沒有可用的分支。檢查你在供應商處的存取權限，然後選取另一個存放庫。",
       "branchEmpty": "沒有可用的分支",
+      "branchListIncomplete": "只顯示部分分支。此存放庫的分支數量多於此清單所能包含的數量。",
       "branchPlaceholder": "選取一個分支",
       "runOnWithTarget": "執行環境：{{target}}",
       "environment": "環境",

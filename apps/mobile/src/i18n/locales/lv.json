@@ -2260,6 +2260,7 @@
       "branchLoadError": "Neizdevās ielādēt atzarus",
       "branchUnavailable": "Šim repozitorijam atzari nav pieejami. Pārbaudi savas tiesības pie pakalpojumu sniedzēja un izvēlies citu repozitoriju.",
       "branchEmpty": "Nav pieejamu atzaru",
+      "branchListIncomplete": "Tiek rādīti tikai daži atzari. Repozitorijā ir vairāk atzaru, nekā šis saraksts var ietvert.",
       "branchPlaceholder": "Izvēlēties atzaru",
       "runOnWithTarget": "Izpildes vide: {{target}}",
       "environment": "Vide",

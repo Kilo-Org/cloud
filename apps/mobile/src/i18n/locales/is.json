@@ -2232,6 +2232,7 @@
       "branchLoadError": "Ekki tókst að hlaða kvistum",
       "branchUnavailable": "Engir kvistar eru tiltækir fyrir þetta kóðasafn. Athugaðu aðganginn þinn hjá veitunni og veldu annað kóðasafn.",
       "branchEmpty": "Engir kvistar tiltækir",
+      "branchListIncomplete": "Aðeins sumir kvistar eru sýndir. Kóðasafnið hefur fleiri kvista en þessi listi getur innihaldið.",
       "branchPlaceholder": "Veldu kvist",
       "runOnWithTarget": "Keyra á: {{target}}",
       "environment": "Umhverfi",

@@ -2232,6 +2232,7 @@
       "branchLoadError": "Laamaha lama soo dejin karin",
       "branchUnavailable": "Laamo kuma jiraan kaydkan. Xiriirkaaga bixiyaha hubi, kadibna dooro kayd kale.",
       "branchEmpty": "Laamo la heli karo ma jiraan",
+      "branchListIncomplete": "Laamo qaar oo keliya ayaa la muujiyay. Kaydku waxa uu leeyahay laamo ka badan inta liiskani qaadi karo.",
       "branchPlaceholder": "Dooro laan",
       "runOnWithTarget": "Ku socodsii: {{target}}",
       "environment": "Deegaanka",

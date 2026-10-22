@@ -2344,6 +2344,7 @@
       "branchLoadError": "Ni lwyddwyd i lwytho ceangau",
       "branchUnavailable": "Nid yw ceangau ar gael ar gyfer yr ystorfa hon. Gwiriwch eich mynediad gyda'r darparwr, yna dewiswch ystorfa arall.",
       "branchEmpty": "Dim ceangau ar gael",
+      "branchListIncomplete": "Dangosir rhai ceangau'n unig. Mae gan yr ystorfa hon fwy o geangau nag y gall y rhestr hon gynnwys.",
       "branchPlaceholder": "Dewiswch gangen",
       "runOnWithTarget": "Rhedeg ar: {{target}}",
       "environment": "Amgylchedd",

@@ -2232,6 +2232,7 @@
       "branchLoadError": "Dameewwan fe'uu hin danda'amne",
       "branchUnavailable": "Kuusaa koodii kanaaf dameewwan hin argaman. Hayyama waltajjii waliin qabdu ilaali, erga kanaan booda kuusaa koodii bira filadhu.",
       "branchEmpty": "Damee hin jiru",
+      "branchListIncomplete": "Dameewwan muraasni qofa ni mul'atu. Kuusaan koodii dameewwan listiin kun hammachuu danda'u caalaa baay'ee qaba.",
       "branchPlaceholder": "Damee tokko filadhu",
       "runOnWithTarget": "{{target}} irratti hojjechiisi",
       "environment": "Naannoo",

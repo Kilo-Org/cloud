@@ -2288,6 +2288,7 @@
       "branchLoadError": "Vetvy sa nepodarilo načítať",
       "branchUnavailable": "Pre tento repozitár nie sú vetvy dostupné. Skontroluj svoj prístup u poskytovateľa a vyber iný repozitár.",
       "branchEmpty": "Žiadne dostupné vetvy",
+      "branchListIncomplete": "Zobrazujú sa len niektoré vetvy. Repozitár má viac vetiev, než dokáže tento zoznam zahrnúť.",
       "branchPlaceholder": "Vybrať vetvu",
       "runOnWithTarget": "Spustiť na: {{target}}",
       "environment": "Prostredie",

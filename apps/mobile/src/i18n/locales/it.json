@@ -1699,6 +1699,7 @@
       "branchLoadError": "Impossibile caricare i branch",
       "branchUnavailable": "Nessun branch disponibile per questo repository. Verifica i tuoi accessi con il provider, poi scegli un altro repository.",
       "branchEmpty": "Nessun branch disponibile",
+      "branchListIncomplete": "Vengono mostrati solo alcuni branch. Il repository contiene più branch di quanti questo elenco possa includerne.",
       "branchPlaceholder": "Seleziona un branch",
       "runOnWithTarget": "Esegui su: {{target}}",
       "environment": "Ambiente",

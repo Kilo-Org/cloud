@@ -2232,6 +2232,7 @@
       "branchLoadError": "Budaqları yükləmək mümkün olmadı",
       "branchUnavailable": "Bu repozitoriya üçün budaq əlçatan deyil. Provayderdəki icazələrini yoxla, sonra başqa repozitoriya seç.",
       "branchEmpty": "Əlçatan budaq yoxdur",
+      "branchListIncomplete": "Yalnız bəzi budaqlar göstərilir. Bu repozitoriyada bu siyahının daxil edə bildiyindən daha çox budaq var.",
       "branchPlaceholder": "Budaq seç",
       "runOnWithTarget": "İcra mühiti: {{target}}",
       "environment": "Mühit",

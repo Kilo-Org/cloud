@@ -2260,6 +2260,7 @@
       "branchLoadError": "Não foi possível carregar os ramos",
       "branchUnavailable": "Não há ramos disponíveis para este repositório. Verifica o teu acesso junto do fornecedor e escolhe outro repositório.",
       "branchEmpty": "Nenhum ramo disponível",
+      "branchListIncomplete": "Apenas alguns ramos são mostrados. O repositório tem mais ramos do que esta lista pode incluir.",
       "branchPlaceholder": "Selecionar um ramo",
       "runOnWithTarget": "Executar em: {{target}}",
       "environment": "Ambiente",

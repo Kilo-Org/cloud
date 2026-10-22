@@ -2232,6 +2232,7 @@
       "branchLoadError": "Tidak dapat memuatkan cabang",
       "branchUnavailable": "Cabang tidak tersedia untuk repositori ini. Semak akses anda dengan penyedia, kemudian pilih repositori lain.",
       "branchEmpty": "Tiada cabang tersedia",
+      "branchListIncomplete": "Hanya sebahagian cabang dipaparkan. Repositori ini mempunyai lebih banyak cabang daripada yang boleh dimuatkan dalam senarai ini.",
       "branchPlaceholder": "Pilih satu cabang",
       "runOnWithTarget": "Jalankan pada: {{target}}",
       "environment": "Persekitaran",

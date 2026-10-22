@@ -2232,6 +2232,7 @@
       "branchLoadError": "Kunde inte läsa in grenar",
       "branchUnavailable": "Inga grenar är tillgängliga för det här kodarkivet. Kontrollera din åtkomst hos leverantören och välj ett annat kodarkiv.",
       "branchEmpty": "Inga grenar tillgängliga",
+      "branchListIncomplete": "Endast vissa grenar visas. Kodarkivet har fler grenar än den här listan kan innehålla.",
       "branchPlaceholder": "Välj en gren",
       "runOnWithTarget": "Kör på: {{target}}",
       "environment": "Miljö",

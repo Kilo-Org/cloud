@@ -2288,6 +2288,7 @@
       "branchLoadError": "Větve se nepodařilo načíst",
       "branchUnavailable": "Pro tento repozitář nejsou větve dostupné. Zkontroluj svůj přístup u poskytovatele a vyber jiný repozitář.",
       "branchEmpty": "Žádné dostupné větve",
+      "branchListIncomplete": "Zobrazeny jsou jen některé větve. Tento repozitář má více větví, než kolik jich tento seznam může obsahovat.",
       "branchPlaceholder": "Vybrat větev",
       "runOnWithTarget": "Spustit na: {{target}}",
       "environment": "Prostředí",

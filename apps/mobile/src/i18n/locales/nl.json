@@ -1718,6 +1718,7 @@
       "branchLoadError": "Branches konden niet worden geladen",
       "branchUnavailable": "Er zijn geen branches beschikbaar voor deze repository. Controleer je toegang bij de provider en kies een andere repository.",
       "branchEmpty": "Geen branches beschikbaar",
+      "branchListIncomplete": "Slechts enkele branches worden weergegeven. De repository heeft meer branches dan deze lijst kan bevatten.",
       "branchPlaceholder": "Een branch selecteren",
       "runOnWithTarget": "Uitvoeren op: {{target}}",
       "environment": "Omgeving",

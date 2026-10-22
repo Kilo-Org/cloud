@@ -1718,6 +1718,7 @@
       "branchLoadError": "Dallar yüklenemedi",
       "branchUnavailable": "Bu depo için dal kullanılamıyor. Sağlayıcıdaki erişimini kontrol et, ardından başka bir depo seç.",
       "branchEmpty": "Kullanılabilir dal yok",
+      "branchListIncomplete": "Yalnızca bazı dallar gösteriliyor. Depoda bu listenin içerebileceğinden daha fazla dal var.",
       "branchPlaceholder": "Bir dal seç",
       "runOnWithTarget": "Çalıştırma yeri: {{target}}",
       "environment": "Ortam",

@@ -1730,6 +1730,7 @@
       "branchLoadError": "No se pudieron cargar las ramas",
       "branchUnavailable": "No hay ramas disponibles para este repositorio. Comprueba tu acceso con el proveedor y elige otro repositorio.",
       "branchEmpty": "No hay ramas disponibles",
+      "branchListIncomplete": "Solo se muestran algunas ramas. Este repositorio tiene más ramas de las que esta lista puede incluir.",
       "branchPlaceholder": "Seleccionar una rama",
       "runOnWithTarget": "Ejecutar en: {{target}}",
       "environment": "Entorno",

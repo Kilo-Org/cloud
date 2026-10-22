@@ -2232,6 +2232,7 @@
       "branchLoadError": "Tsy tafiditra ny sampana",
       "branchUnavailable": "Tsy azo ny sampana amin'ity tahirin-kaody ity. Hamarino ny alalana ananao amin'ny mpanome tolotra, dia safidio tahirin-kaody hafa.",
       "branchEmpty": "Tsy misy sampana azo",
+      "branchListIncomplete": "Ny sampana sasany ihany no aseho. Manana sampana mihoatra noho izay azon'ity lisitra ity ampidirina ny tahirin-kaody.",
       "branchPlaceholder": "Safidio sampana iray",
       "runOnWithTarget": "Ampandeho amin'ny: {{target}}",
       "environment": "Tontolo fiasana",

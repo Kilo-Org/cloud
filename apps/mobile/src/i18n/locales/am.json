@@ -2232,6 +2232,7 @@
       "branchLoadError": "ቅርንጫፎችን መጫን አልተቻለም",
       "branchUnavailable": "ለዚህ ማከማቻ ቅርንጫፎች አይገኙም። ከአቅራቢው ጋር ያለዎትን መዳረስ ያረጋግጡ፣ ከዚያ ሌላ ማከማቻ ይምረጡ።",
       "branchEmpty": "ምንም ቅርንጫፎች አይገኙም",
+      "branchListIncomplete": "የተዘረዘሩት የተወሰኑ ቅርንጫፎች ብቻ ናቸው። ይህ ዝርዝር የሚያካትታቸው በላይ ሆኖ ማከማቻው ተጨማሪ ቅርንጫፎች አሉት።",
       "branchPlaceholder": "አንድ ቅርንጫፍ ይምረጡ",
       "runOnWithTarget": "ማስኬጃ፦ {{target}}",
       "environment": "የሥራ አካባቢ",

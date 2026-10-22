@@ -1699,6 +1699,7 @@
       "branchLoadError": "Não foi possível carregar os branches",
       "branchUnavailable": "Não há branches disponíveis para este repositório. Verifique seu acesso com o provedor e escolha outro repositório.",
       "branchEmpty": "Nenhum branch disponível",
+      "branchListIncomplete": "Apenas alguns branches são mostrados. O repositório tem mais branches do que esta lista pode incluir.",
       "branchPlaceholder": "Selecionar um branch",
       "runOnWithTarget": "Executar em: {{target}}",
       "environment": "Ambiente",

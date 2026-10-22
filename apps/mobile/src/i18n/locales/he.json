@@ -1730,6 +1730,7 @@
       "branchLoadError": "לא ניתן היה לטעון את הענפים",
       "branchUnavailable": "הענפים אינם זמינים למאגר הזה. בדקו את הגישה שלך מול הספק, ואז בחרו מאגר אחר.",
       "branchEmpty": "אין ענפים זמינים",
+      "branchListIncomplete": "מוצגים רק חלק מהענפים. במאגר הזה יש יותר ענפים ממה שהרשימה הזו יכולה לכלול.",
       "branchPlaceholder": "בחרו ענף",
       "runOnWithTarget": "יעד ההרצה: {{target}}",
       "environment": "סביבה",

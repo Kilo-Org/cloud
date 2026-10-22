@@ -2232,6 +2232,7 @@
       "branchLoadError": "Pa t ka chaje branch yo",
       "branchUnavailable": "Pa gen branch disponib pou depo sa a. Tcheke aksè ou ak founisè a, epi chwazi yon lòt depo.",
       "branchEmpty": "Pa gen branch disponib",
+      "branchListIncomplete": "Se sèlman kèk branch ki montre. Depo a gen plis branch pase sa lis sa a ka enkli.",
       "branchPlaceholder": "Chwazi yon branch",
       "runOnWithTarget": "Egzekite sou: {{target}}",
       "environment": "Anviwònman",

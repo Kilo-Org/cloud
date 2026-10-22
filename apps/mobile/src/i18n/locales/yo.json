@@ -2232,6 +2232,7 @@
       "branchLoadError": "A kò lè gbé àwọn ẹ̀ka wọlé",
       "branchUnavailable": "Àwọn ẹ̀ka kò sí fún ibi ìpamọ́ kóòdù yìí. Ṣàyẹ̀wò àṣẹ rẹ pẹ̀lú olùpèsè, lẹ́yìn náà yan ibi ìpamọ́ kóòdù mìíràn.",
       "branchEmpty": "Kò sí ẹ̀ka kankan",
+      "branchListIncomplete": "A fihàn àwọn ẹ̀ka kan ṣoṣo. Ibi ìpamọ́ kóòdù ní àwọn ẹ̀ka púpọ̀ ju bí àkójọ yìí ṣe lè gbà lọ.",
       "branchPlaceholder": "Yan ẹ̀ka kan",
       "runOnWithTarget": "Ṣiṣẹ́ lórí: {{target}}",
       "environment": "Àyíká iṣẹ́",

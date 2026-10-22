@@ -120,9 +120,20 @@ function usableTime(value: string | undefined | null): number | null {
   return Number.isFinite(at) ? at : null;
 }
 
+/**
+ * Code points that occupy no display width: directional marks and embeddings, the invisible
+ * operators, and the zero-width space. ZWNJ and ZWJ stay, because they join the glyphs of
+ * Persian and Indic words and of emoji sequences.
+ */
+const NON_PRINTING_TITLE_CHARACTERS =
+  /[\u061c\u200b\u200e\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/g;
+
 function safeTitle(value: string | undefined | null): string {
-  // eslint-disable-next-line no-control-regex
-  const title = (value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
+  const title = (value ?? '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(NON_PRINTING_TITLE_CHARACTERS, '')
+    .trim();
   const bounded = title.slice(0, HOME_WIDGET_TITLE_LIMIT);
   // Do not end a truncated title in the middle of a UTF-16 surrogate pair.
   const last = bounded.charCodeAt(bounded.length - 1);

@@ -49,6 +49,50 @@ describe('Home-only widget policy', () => {
     expect(buildHomeWidgetDetails([{ status: 'permission' }]).waitingAgents[0]?.title).toBe('');
   });
 
+  it('carries only printed characters in a title', () => {
+    const primary = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Review \u202econfig files' }],
+    });
+    expect(primary.details.primaryTitle).toBe('Review config files');
+    expect(homeWidgetDataSchema.safeParse(primary).success).toBe(true);
+    const scheduled = buildHomeWidgetData({
+      ...scope,
+      sessions: [
+        {
+          status: 'scheduled',
+          title: '\u2066Deploy\u2069 \u200bnow\u2060',
+          scheduledAt: '2026-10-09T11:00:00Z',
+        },
+      ],
+    });
+    expect(scheduled.details.scheduledAgents[0]?.title).toBe('Deploy now');
+  });
+
+  it('drops every non-printing code point and keeps joining characters', () => {
+    const dropped = [
+      0x061c, 0x200b, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2060, 0x2061,
+      0x2062, 0x2063, 0x2064, 0x2066, 0x2067, 0x2068, 0x2069, 0xfeff,
+    ];
+    const title = `${dropped.map(code => `a${String.fromCodePoint(code)}`).join('')}z`;
+    const details = buildHomeWidgetDetails([{ status: 'permission', title }]);
+    expect(details.waitingAgents[0]?.title).toBe(`${'a'.repeat(dropped.length)}z`);
+    const joined = 'می\u200cخواهم 👨\u200d👩\u200d👧';
+    expect(
+      buildHomeWidgetDetails([{ status: 'permission', title: joined }]).waitingAgents[0]?.title
+    ).toBe(joined);
+  });
+
+  it('bounds the title by printed characters', () => {
+    const details = buildHomeWidgetDetails([
+      {
+        status: 'permission',
+        title: `${'\u200b'.repeat(400)}${'y'.repeat(HOME_WIDGET_TITLE_LIMIT + 10)}`,
+      },
+    ]);
+    expect(details.waitingAgents[0]?.title).toHaveLength(HOME_WIDGET_TITLE_LIMIT);
+  });
+
   it('uses one priority and excludes every zero-count secondary row', () => {
     const data = buildHomeWidgetData({
       ...scope,

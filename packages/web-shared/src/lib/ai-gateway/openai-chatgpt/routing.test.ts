@@ -508,8 +508,8 @@ describe('checkOpenAiChatGptByok', () => {
     expect(result.subscription_sharing_activity_id).toBe('sess_limit');
   });
 
-  it.each(['flex', 'priority', 'scale', null] as const)(
-    'drops service_tier %s, which subscription sharing rejects',
+  it.each(['auto', 'default', 'flex', 'priority', 'scale', null] as const)(
+    'drops service_tier %s',
     async serviceTier => {
       const provider = await buildProviderForTest();
       const body: GatewayResponsesRequest = {
@@ -523,19 +523,6 @@ describe('checkOpenAiChatGptByok', () => {
       expect('service_tier' in body).toBe(false);
     }
   );
-
-  it.each(['auto', 'default'] as const)('keeps service_tier %s', async serviceTier => {
-    const provider = await buildProviderForTest();
-    const body: GatewayResponsesRequest = {
-      model: 'openai/gpt-5-nano',
-      input: 'hello',
-      service_tier: serviceTier,
-    };
-
-    await transformResponsesRequest(provider, body);
-
-    expect(body.service_tier).toBe(serviceTier);
-  });
 
   it.each([
     [1, 16],

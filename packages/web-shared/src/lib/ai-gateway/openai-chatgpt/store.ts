@@ -335,30 +335,6 @@ export async function markOpenAiChatGptConnectionErrored(
 }
 
 /**
- * Marks the stored access token expired after OpenAI rejected it, so the next
- * request refreshes it instead of sending it again. A refresh that OpenAI also
- * rejects then disables the connection with the reconnect message. Only the
- * rejected token is expired: a refresh or reconnect that landed while the
- * request was in flight already holds a different token.
- */
-export async function expireOpenAiChatGptAccessToken(
-  owner: OpenAiChatGptOwner,
-  rejectedAccessToken: string
-): Promise<void> {
-  await db.transaction(async tx => {
-    const row = await readOpenAiChatGptConnectionRow(tx, owner, { forUpdate: true });
-    if (!row) return;
-    const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
-    if (!connection || connection.access_token !== rejectedAccessToken) return;
-    const expired: OpenAiChatGptConnection = { ...connection, expires_at: 0 };
-    await tx
-      .update(openai_chatgpt_connections)
-      .set({ encrypted_connection: encryptApiKey(JSON.stringify(expired), BYOK_ENCRYPTION_KEY) })
-      .where(openAiChatGptOwnerWhere(owner));
-  });
-}
-
-/**
  * Records OpenAI's refusal of the connected account. Only the connection whose
  * access token served the refused request is marked: a reconnect that landed
  * while the request was in flight can hold a different, eligible account, and

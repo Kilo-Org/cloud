@@ -51,13 +51,6 @@ const OPENAI_CHATGPT_PURPOSE = "Run the user's coding task in Kilo Code.";
 const METADATA_ENTRY_LIMIT = 16;
 const METADATA_VALUE_LIMIT = 512;
 
-/**
- * Subscription sharing rejects every other tier with
- * `subscription_sharing_unsupported_capability`; without one the plan's
- * default tier applies.
- */
-const SUPPORTED_SERVICE_TIERS: ReadonlySet<unknown> = new Set(['auto', 'default']);
-
 /** OpenAI rejects a smaller `max_output_tokens` with `integer_below_min_value`. */
 const MIN_MAX_OUTPUT_TOKENS = 16;
 
@@ -291,9 +284,9 @@ export function buildOpenAiChatGptProvider(
       // api.openai.com rejects unknown request arguments, exactly like the
       // other raw upstream providers strip it.
       delete body.provider;
-      if (body.service_tier !== undefined && !SUPPORTED_SERVICE_TIERS.has(body.service_tier)) {
-        delete body.service_tier;
-      }
+      // Subscription sharing accepts only `auto` and `default`, which match the
+      // behavior without a tier, and rejects every other tier.
+      delete body.service_tier;
       if (
         typeof body.max_output_tokens === 'number' &&
         body.max_output_tokens < MIN_MAX_OUTPUT_TOKENS

@@ -11,7 +11,6 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
 import { OPENAI_ON_BEHALF_OF_TOKEN_HEADER } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import {
-  expireOpenAiChatGptAccessToken,
   getOpenAiChatGptStoredConnection,
   saveOpenAiChatGptConnection,
   type OpenAiChatGptOwner,
@@ -104,57 +103,5 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
     const stored = await getOpenAiChatGptStoredConnection(owner);
     expect(stored?.isEnabled).toBe(true);
     expect(stored?.connection.status).toBe('connected');
-  });
-
-  it.each(['token_expired', 'token_revoked'])(
-    'expires the stored token when OpenAI answers 401 %s, and passes the 401 on',
-    async code => {
-      const result = await send(jsonResponse(401, { error: { code }, status: 401 }));
-
-      expect(result.type === 'success' && result.response.status).toBe(401);
-      const stored = await getOpenAiChatGptStoredConnection(owner);
-      expect(stored?.isEnabled).toBe(true);
-      expect(stored?.connection).toMatchObject({
-        status: 'connected',
-        access_token: ACCESS_TOKEN,
-        refresh_token: 'refresh',
-        expires_at: 0,
-      });
-    }
-  );
-
-  it('keeps the stored expiry on another 401', async () => {
-    await send(jsonResponse(401, { error: { code: 'subscription_sharing_invalid_user' } }));
-
-    const stored = await getOpenAiChatGptStoredConnection(owner);
-    expect(stored?.connection.expires_at).toBe(1_800_000_000);
-  });
-});
-
-describe('expireOpenAiChatGptAccessToken (real database)', () => {
-  it('leaves a token refreshed after the rejected request untouched', async () => {
-    const user = await insertTestUser({
-      google_user_email: `expire-token-${randomUUID()}@example.com`,
-    });
-    const owner: OpenAiChatGptOwner = { kiloUserId: user.id, organizationId: null };
-    await saveOpenAiChatGptConnection(
-      owner,
-      {
-        access_token: 'refreshed-access-token',
-        refresh_token: 'refresh',
-        expires_at: 1_800_000_000,
-        issuer: 'https://auth.openai.com',
-        client_id: 'client-id',
-        subject: 'subject',
-        connected_at: '2026-10-05T00:00:00.000Z',
-        status: 'connected',
-      },
-      user.id
-    );
-
-    await expireOpenAiChatGptAccessToken(owner, ACCESS_TOKEN);
-
-    const stored = await getOpenAiChatGptStoredConnection(owner);
-    expect(stored?.connection.expires_at).toBe(1_800_000_000);
   });
 });

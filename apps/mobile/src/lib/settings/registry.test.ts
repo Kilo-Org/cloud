@@ -62,7 +62,7 @@ vi.mock('@/lib/trpc', () => ({
 
 const queryClientMock = vi.hoisted(() => ({
   getQueryData: vi.fn(),
-  ensureQueryData: vi.fn(async ({ queryFn }: { queryFn: () => Promise<unknown> }) => {
+  query: vi.fn(async ({ queryFn }: { queryFn: () => Promise<unknown> }) => {
     const result = await queryFn();
     return result;
   }),

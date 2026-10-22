@@ -7,7 +7,7 @@ import {
   SESSION_QUEUE_MAX_IDS,
   SESSION_QUESTION_MAX_QUESTIONS,
 } from './schemas';
-import type { CloudAgentEvent } from './event-types';
+import type { CloudAgentEvent } from './schemas';
 
 function createRaw(streamEventType: string, data: unknown, sessionId = 'ses-1'): CloudAgentEvent {
   return {

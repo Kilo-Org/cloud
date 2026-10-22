@@ -17,7 +17,7 @@ import { TRPCError } from '@trpc/server';
 import { PARENT_SESSION_CALLBACK_URL } from '@kilocode/worker-utils/cloud-agent-authority';
 import type * as z from 'zod';
 import { logger, withLogTags } from '../../logger.js';
-import { resolveSessionStub } from '../../sandbox-session/session-stub.js';
+import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 
 import { internalApiProtectedProcedure } from '../auth.js';
 import {
@@ -278,7 +278,7 @@ const updateSessionHandler = internalApiProtectedProcedure
       });
       logger.info('Updating session');
 
-      const stub = resolveSessionStub(ctx.env, ctx.userId, input.cloudAgentSessionId);
+      const stub = getSandboxSessionStub(ctx.env, ctx.userId, input.cloudAgentSessionId);
 
       const result = await stub.tryUpdate({ callbackTarget: input.callbackTarget });
 

@@ -148,6 +148,8 @@ pnpm dev:env
 
 The setup covers: `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `POSTGRES_URL`, `CALLBACK_TOKEN_SECRET`, `BYOK_ENCRYPTION_KEY`, `INTERNAL_API_SECRET`, `STRIPE_SECRET_KEY`, and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
 
+It also provisions the credential-envelope keypairs that the code-review providers need. The GitHub user-token and Bitbucket/GitLab platform-credential envelopes each keep a public half in the web app and a private half in `git-token-service`, so setup generates a local 4096-bit RSA keypair for each one that is unconfigured and writes the key ID plus both halves into `.env.local`; `pnpm dev:env` copies the private halves into the Worker's `.dev.vars`. An envelope that already carries any value is a keypair you supplied and is left untouched. Without them the web app still reports a connected provider, but every review read answers 503 from the Worker.
+
 These changes will allow you to do local testing with a fake account.
 
 #### c. Add or rotate shared web environment variables
@@ -222,6 +224,7 @@ pnpm dev:start
 ```
 
 This generates the local environment files and launches a tmux dashboard with the Next.js app and local infrastructure. It does not run database migrations.
+It also starts `git-token-service`, because every code-review read and write resolves the caller's GitHub, GitLab or Bitbucket credential through that Worker; without it the web app reports a connected provider while the review inbox and overview fail as a service outage.
 Port offset selection is automatic by default, keeping secondary worktrees from colliding with the root checkout. This setup order assumes no port conflicts; if startup selects a different offset, run `pnpm test:db` again in another terminal in the same worktree.
 When the Stripe CLI is installed, the command also starts the Stripe webhook forwarder. Run `pnpm dev:status` to get the web app's port.
 

@@ -3,6 +3,8 @@ import * as path from 'node:path';
 import * as readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 
+import { LOCAL_ENVELOPE_KEY_SPECS, planEnvelopeProvisioning } from './envelope-keys';
+
 // ---------------------------------------------------------------------------
 // ANSI color constants
 // ---------------------------------------------------------------------------
@@ -233,6 +235,12 @@ async function main(): Promise<void> {
 
   const exampleContent = fs.readFileSync(examplePath, 'utf-8');
   const exampleValues = parseExampleFile(exampleContent);
+  // Read the current file too: re-running setup must not rotate the credential
+  // envelopes, because a new keypair cannot decrypt the credentials the Worker
+  // already stored under the old one.
+  const previousEnvValues = fs.existsSync(envLocalPath)
+    ? parseExampleFile(fs.readFileSync(envLocalPath, 'utf-8'))
+    : new Map<string, string>();
 
   // -----------------------------------------------------------------------
   // Step 1: Check for existing .env.local
@@ -297,6 +305,34 @@ async function main(): Promise<void> {
     } else {
       collected.set(key, answer);
     }
+  }
+
+  // -----------------------------------------------------------------------
+  // Step 4: Provision the local credential-envelope keypairs
+  // -----------------------------------------------------------------------
+
+  // The provider envelopes are not simple secrets: the web app needs the key ID
+  // and public half, and git-token-service needs the private half, so they are
+  // generated as a pair instead of one `openssl rand` value.
+  for (const spec of LOCAL_ENVELOPE_KEY_SPECS) {
+    const existing = (key: string) =>
+      previousEnvValues.get(key) ?? collected.get(key) ?? exampleValues.get(key);
+    const provisioning = planEnvelopeProvisioning(spec, existing);
+    if (provisioning.status === 'incomplete') {
+      console.log(
+        `  ${YELLOW}⚠ ${spec.keyIdEnv} has ${provisioning.configured} of 3 values; leaving it unchanged${RESET}`
+      );
+      continue;
+    }
+    const { keypair } = provisioning;
+    collected.set(spec.keyIdEnv, keypair.keyId);
+    collected.set(spec.publicKeyEnv, keypair.publicKey);
+    collected.set(spec.privateKeyEnv, keypair.privateKey);
+    console.log(
+      provisioning.status === 'keep'
+        ? `  ${DIM}Keeping the existing ${keypair.keyId} keypair${RESET}`
+        : `  ${GREEN}✓ Generated ${keypair.keyId}${RESET}`
+    );
   }
 
   // -----------------------------------------------------------------------

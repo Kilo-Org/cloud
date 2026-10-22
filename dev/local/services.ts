@@ -94,6 +94,12 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // gets a 412 PRECONDITION_FAILED. Same precedent as mobile -> latency-ingest.
   // The web app rewrites its AI gateway routes to the ai-gateway app (see
   // apps/web/ai-gateway-rewrites.mjs), so it pulls that app in too.
+  // Every code-review read and write reaches git-token-service for the caller's
+  // provider credential (apps/web/src/lib/integrations/platforms/{github,gitlab,
+  // bitbucket}/ plus lib/provider-review/), so the web stack must pull the
+  // worker in transitively — otherwise those fetches hit a dead
+  // `GIT_TOKEN_SERVICE_API_URL` and a connected GitHub account renders as a
+  // service outage with no pull requests.
   nextjs: {
     group: 'core',
     dependsOn: [
@@ -103,6 +109,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
       'stripe',
       'cloudflare-session-ingest',
       'ai-gateway',
+      'cloudflare-git-token-service',
     ],
   },
   postgres: { group: 'core', dependsOn: [] },

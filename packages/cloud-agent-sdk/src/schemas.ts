@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
+import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
 import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 
@@ -765,19 +766,38 @@ export const sessionQueueChangedDataSchema = z
 export type SessionQueueChangedData = z.infer<typeof sessionQueueChangedDataSchema>;
 
 /** Runtime mirror of `QuestionInfo` in `@kilocode/app-shared/opencode`. */
+const questionOptionSchema = z.object({
+  label: z.string(),
+  description: z.string(),
+  mode: z.string().optional(),
+});
+
 const questionInfoSchema = z.object({
   question: z.string(),
   header: z.string(),
-  options: z.array(
-    z.object({
-      label: z.string(),
-      description: z.string(),
-      mode: z.string().optional(),
-    })
-  ),
+  options: z.array(questionOptionSchema),
   multiple: z.boolean().optional(),
   custom: z.boolean().optional(),
 });
+
+/**
+ * Convert a parsed entry to the shared type. Zod types an absent optional
+ * property as `T | undefined`, which `exactOptionalPropertyTypes` rejects
+ * against `QuestionInfo`, so the optionals are only added when present.
+ */
+function toQuestionInfo(parsed: z.infer<typeof questionInfoSchema>): QuestionInfo {
+  return {
+    question: parsed.question,
+    header: parsed.header,
+    options: parsed.options.map(option => ({
+      label: option.label,
+      description: option.description,
+      ...(option.mode === undefined ? {} : { mode: option.mode }),
+    })),
+    ...(parsed.multiple === undefined ? {} : { multiple: parsed.multiple }),
+    ...(parsed.custom === undefined ? {} : { custom: parsed.custom }),
+  };
+}
 
 /**
  * A question list is positional: the answer payload mirrors the CLI's question
@@ -787,12 +807,12 @@ const questionInfoSchema = z.object({
  * answer sliding onto the wrong question. No usable entry means the payload
  * carries no questions the client can render.
  */
-const questionListSchema = z.array(z.unknown()).transform(entries => {
-  const questions: z.infer<typeof questionInfoSchema>[] = [];
+const questionListSchema = z.array(z.unknown()).transform((entries): QuestionInfo[] | undefined => {
+  const questions: QuestionInfo[] = [];
   for (const entry of entries) {
     const parsed = questionInfoSchema.safeParse(entry);
     if (!parsed.success) break;
-    questions.push(parsed.data);
+    questions.push(toQuestionInfo(parsed.data));
   }
   return questions.length > 0 ? questions : entries.length > 0 ? undefined : [];
 });

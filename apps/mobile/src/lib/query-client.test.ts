@@ -45,6 +45,7 @@ describe('query retry policy', () => {
   it.each([
     { code: 'UNPROCESSABLE_CONTENT', expectedAttempts: 1 },
     { code: 'INTERNAL_SERVER_ERROR', expectedAttempts: 3 },
+    { code: 'SERVICE_UNAVAILABLE', expectedAttempts: 3 },
   ])(
     'invokes the query function $expectedAttempts time(s) for $code',
     async ({ code, expectedAttempts }) => {

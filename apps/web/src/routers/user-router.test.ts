@@ -1182,23 +1182,32 @@ describe('user router - notification capabilities', () => {
 
 describe('user router - register push token', () => {
   let tokenUser: User;
+  let otherTokenUser: User;
 
   beforeAll(async () => {
     tokenUser = await insertTestUser({
       google_user_email: 'push-token-register@example.com',
       google_user_name: 'Push Token Register',
     });
+    otherTokenUser = await insertTestUser({
+      google_user_email: 'push-token-register-other@example.com',
+      google_user_name: 'Push Token Register Other',
+    });
   });
 
   afterEach(async () => {
-    await db.delete(user_push_tokens).where(eq(user_push_tokens.user_id, tokenUser.id));
+    await db
+      .delete(user_push_tokens)
+      .where(inArray(user_push_tokens.user_id, [tokenUser.id, otherTokenUser.id]));
     await db
       .delete(user_notification_preferences)
-      .where(eq(user_notification_preferences.user_id, tokenUser.id));
+      .where(inArray(user_notification_preferences.user_id, [tokenUser.id, otherTokenUser.id]));
   });
 
   afterAll(async () => {
-    await db.delete(kilocode_users).where(eq(kilocode_users.id, tokenUser.id));
+    await db
+      .delete(kilocode_users)
+      .where(inArray(kilocode_users.id, [tokenUser.id, otherTokenUser.id]));
   });
 
   it('stores the app version when provided', async () => {
@@ -1292,6 +1301,69 @@ describe('user router - register push token', () => {
       .where(eq(user_push_tokens.user_id, tokenUser.id));
     expect(rows).toHaveLength(1);
     expect(rows[0]?.locale).toBeNull();
+  });
+
+  it('updates platform, app version, and locale on re-registration by the same account', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'ExponentPushToken[token-same-account-update]';
+
+    await caller.user.registerPushToken({
+      token,
+      platform: 'android',
+      appVersion: '1.0.4',
+      locale: 'es',
+    });
+    await expect(
+      caller.user.registerPushToken({ token, platform: 'ios', appVersion: '1.0.6', locale: 'fr' })
+    ).resolves.toEqual({ success: true });
+
+    const [row] = await db.select().from(user_push_tokens).where(eq(user_push_tokens.token, token));
+    expect(row).toMatchObject({
+      user_id: tokenUser.id,
+      platform: 'ios',
+      app_version: '1.0.6',
+      locale: 'fr',
+    });
+  });
+
+  it('keeps one row when the same account registers a token twice', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'ExponentPushToken[token-idempotent]';
+
+    await caller.user.registerPushToken({ token, platform: 'ios', appVersion: '1.0.5' });
+    await expect(
+      caller.user.registerPushToken({ token, platform: 'ios', appVersion: '1.0.5' })
+    ).resolves.toEqual({ success: true });
+
+    const rows = await db.select().from(user_push_tokens).where(eq(user_push_tokens.token, token));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.user_id).toBe(tokenUser.id);
+  });
+
+  it('rejects a token registered by another account and leaves the row with its owner', async () => {
+    const owner = await createCallerForUser(tokenUser.id);
+    const otherCaller = await createCallerForUser(otherTokenUser.id);
+    const token = 'ExponentPushToken[token-owned-elsewhere]';
+
+    await owner.user.registerPushToken({ token, platform: 'ios', appVersion: '1.0.4' });
+
+    await expect(
+      otherCaller.user.registerPushToken({
+        token,
+        platform: 'android',
+        appVersion: '1.0.6',
+        locale: 'fr',
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    const rows = await db.select().from(user_push_tokens).where(eq(user_push_tokens.token, token));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      user_id: tokenUser.id,
+      platform: 'ios',
+      app_version: '1.0.4',
+      locale: null,
+    });
   });
 
   it('registerPushToken and unregisterPushToken never read or write user_notification_preferences', async () => {

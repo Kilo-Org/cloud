@@ -11,12 +11,16 @@ const {
   assertKiloModelAvailableMock,
   assertRepositoryAccessMock,
   assertOrganizationMembershipMock,
+  parentRuntimeTokenMock,
+  balanceMock,
 } = vi.hoisted(() => ({
   db: { mockedDb: true },
   mergeProfileConfigurationMock: vi.fn(),
   assertKiloModelAvailableMock: vi.fn(),
   assertRepositoryAccessMock: vi.fn(),
   assertOrganizationMembershipMock: vi.fn(),
+  parentRuntimeTokenMock: vi.fn(),
+  balanceMock: vi.fn(),
 }));
 
 vi.mock('@kilocode/cloud-agent-profile', async importActual => {
@@ -42,6 +46,11 @@ vi.mock('../../session/validate-repository-access.js', () => ({
 vi.mock('./organization-membership.js', () => ({
   assertOrganizationMembership: assertOrganizationMembershipMock,
 }));
+
+vi.mock('../../sandbox-session/session-stub.js', () => ({
+  getSandboxSessionStub: () => ({ getCloudAgentSpawnRuntimeToken: parentRuntimeTokenMock }),
+}));
+vi.mock('../../balance-validation.js', () => ({ validateBalanceOnly: balanceMock }));
 
 import {
   preflightSessionCreation,
@@ -72,6 +81,96 @@ describe('session creation preflight', () => {
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertRepositoryAccessMock.mockResolvedValue(undefined);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);
+    parentRuntimeTokenMock.mockResolvedValue('trusted-parent-model-token');
+    balanceMock.mockResolvedValue({ success: true });
+  });
+
+  it('checks current parent authority and billing using trusted runtime credentials, not the scoped bearer', async () => {
+    const authority = {
+      version: 1 as const,
+      ownerId: context.userId,
+      parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+      organizationId: null,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    const creation = request({
+      parentCloudAgentSessionId: authority.parentSessionId,
+      options: { createdOnPlatform: 'cloud-agent' },
+    });
+    const scopedContext = {
+      ...context,
+      authToken: jwt.sign({ aud: 'cloud-agent-next' }, 'fixture'),
+      cloudAgentAuthority: authority,
+    };
+    const resolved = await preflightSessionCreation(creation, scopedContext, 'prepareSession');
+    expect(parentRuntimeTokenMock).toHaveBeenCalledWith(authority);
+    expect(balanceMock).toHaveBeenCalledWith('trusted-parent-model-token', undefined, context.env);
+    expect(assertRepositoryAccessMock).toHaveBeenCalled();
+    expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
+    expect(resolved.parentCloudAgentSessionId).toBe(authority.parentSessionId);
+    expect(resolved.allowSubagentSessions).not.toBe(true);
+    balanceMock.mockClear();
+    const freeContext = {
+      ...scopedContext,
+      env: { ...context.env, INTERNAL_API_SECRET: 'fixture-internal-secret' },
+      request: new Request('https://fixture.invalid/trpc/prepareSession', {
+        headers: {
+          'x-internal-api-key': 'fixture-internal-secret',
+          'x-skip-balance-check': 'true',
+        },
+      }),
+    };
+    await preflightSessionCreation(creation, freeContext, 'prepareSession');
+    expect(balanceMock).not.toHaveBeenCalled();
+    await preflightSessionCreation(
+      creation,
+      {
+        ...freeContext,
+        request: new Request('https://fixture.invalid/trpc/prepareSession', {
+          headers: { 'x-internal-api-key': 'forged', 'x-skip-balance-check': 'true' },
+        }),
+      },
+      'prepareSession'
+    );
+    expect(balanceMock).toHaveBeenCalledOnce();
+    parentRuntimeTokenMock.mockRejectedValueOnce(new Error('parent revoked'));
+    assertRepositoryAccessMock.mockClear();
+    await expect(
+      preflightSessionCreation(creation, scopedContext, 'prepareSession')
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(assertRepositoryAccessMock).not.toHaveBeenCalled();
+  });
+
+  it('does not bypass existing billing or accept mismatched lineage', async () => {
+    const authority = {
+      version: 1 as const,
+      ownerId: context.userId,
+      parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+      organizationId: null,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    const scopedContext = { ...context, cloudAgentAuthority: authority };
+    const creation = request({ parentCloudAgentSessionId: authority.parentSessionId });
+    balanceMock.mockResolvedValueOnce({
+      success: false,
+      status: 402,
+      message: 'Insufficient credits',
+    });
+    await expect(
+      preflightSessionCreation(creation, scopedContext, 'prepareSession')
+    ).rejects.toMatchObject({ code: 'PAYMENT_REQUIRED' });
+    for (const parentCloudAgentSessionId of ['workspace_other', undefined]) {
+      await expect(
+        preflightSessionCreation(
+          request({ parentCloudAgentSessionId }),
+          scopedContext,
+          'prepareSession'
+        )
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    }
   });
 
   it('owns the ordered admission path and returns profile-resolved configuration', async () => {

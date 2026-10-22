@@ -169,6 +169,41 @@ describe('Button native target contract', () => {
     }
   );
 
+  it('names a loading button from its visible text so the settled state reads the label again', () => {
+    // No caller label: Button derives one from the child text, so the
+    // `busy: true → false` transition rewrites the Android node's accessible
+    // name from the busy state back to the visible label. Passing
+    // `accessibilityLabel: undefined` overrides the default renderButton label
+    // so these assertions only pass when the derivation itself runs.
+    const busy = renderButton({ loading: true, accessibilityLabel: undefined });
+    expect(busy.props.accessibilityLabel).toBe('Retry');
+
+    const ready = renderButton({ loading: false, accessibilityLabel: undefined });
+    expect(ready.props.accessibilityState).toEqual({
+      disabled: false,
+      busy: false,
+    });
+    expect(ready.props.accessibilityLabel).toBe('Retry');
+
+    // An explicit caller label always wins.
+    const named = renderButton({ loading: true, accessibilityLabel: 'Retry request' });
+    expect(named.props.accessibilityLabel).toBe('Retry request');
+
+    // A button that never opted into loading is untouched: no derived label.
+    const plain = renderButton({ accessibilityLabel: undefined });
+    expect(plain.props.accessibilityLabel).toBeUndefined();
+  });
+
+  it('does not name an icon-only loading button from its non-text children', () => {
+    const button = renderButton({
+      size: 'icon',
+      children: null,
+      loading: true,
+      accessibilityLabel: undefined,
+    });
+    expect(button.props.accessibilityLabel).toBeUndefined();
+  });
+
   it('reserves a fixed-size slot for the busy spinner so the label never moves', async () => {
     const button = renderButton({ loading: true });
     const slots = button.findAllByProps({ className: BUTTON_BUSY_SLOT_CLASS });
@@ -282,6 +317,14 @@ describe('Button native target contract', () => {
     expect(classes).toContain('bg-primary');
     expect(classes).not.toContain('bg-primary-disabled');
     expect(classes).not.toContain('opacity-50');
+  });
+
+  it('centers the label so a wrapped label stays under its own lines', () => {
+    // Android can paint a wrapped label even when the layout reports one line;
+    // centered text keeps the wrapped lines aligned under each other instead
+    // of hanging from the start edge. Single-line labels are unaffected.
+    const label = renderButton({ variant: 'outline' }).findByType(NativeText);
+    expect((label.props.className as string).split(' ')).toContain('text-center');
   });
 
   it('keeps the dimmed treatment for a disabled non-primary variant', () => {

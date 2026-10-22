@@ -1,13 +1,7 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import {
-  findKiloExclusiveModel,
-  isDisabledKiloExclusiveModel,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
-import type {
-  GatewayRequest,
-  GatewayResponsesRequest,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
 import {
@@ -124,14 +118,7 @@ export type OpenAiChatGptRoutingResult =
 
 function isOpenAiChatGptModel(requestedModel: string): boolean {
   const model = requestedModel.trim().toLowerCase();
-  // Disabling a Kilo-only alias must not turn it into a delegated OpenAI model;
-  // retired Kilo aliases are not upstream model IDs either.
-  return (
-    OPENAI_MODEL_PREFIX.test(model) &&
-    !isGptOssModel(model) &&
-    !findKiloExclusiveModel(model) &&
-    !isDisabledKiloExclusiveModel(model)
-  );
+  return OPENAI_MODEL_PREFIX.test(model) && !isGptOssModel(model) && !findKiloExclusiveModel(model);
 }
 
 /**
@@ -281,7 +268,7 @@ export function buildOpenAiChatGptProvider(
       // captured token is still the fresh one.
       context.extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = accessToken;
 
-      const body = context.request.body as GatewayResponsesRequest;
+      const body = context.request.body;
       if (typeof body.model === 'string') {
         body.model = body.model.trim().replace(OPENAI_MODEL_PREFIX, '');
       }

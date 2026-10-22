@@ -54,7 +54,6 @@ function TodoNotesBody({
         onPress={onEdit}
         accessibilityRole="button"
         accessibilityLabel={t('todos.item.editNotes')}
-        accessibilityHint={t('chat.messageActions.edit')}
       >
         <MarkdownText value={notes} />
       </Pressable>

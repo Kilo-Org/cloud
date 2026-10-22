@@ -14,7 +14,6 @@ import { createDrizzleClient, cloud_agent_session_runs } from '@kilocode/db';
 import { and, eq } from 'drizzle-orm';
 import {
   captureControlPlaneWrapperProcess,
-  captureControlWrapperProcess,
   containerGitRemoteUrl,
   containerProcessEnvironment,
   containerProcessIsLive,
@@ -23,7 +22,6 @@ import {
   findControlPlaneKiloRuntime,
   inspectControlPlaneSummaryCount,
   inspectControlPlaneUserMessageParts,
-  LEGACY_CONTROL_WRAPPER_BASENAME,
   recycleControlConnection,
   signalKiloServerProcess,
   waitForNewSandboxPresent,
@@ -173,7 +171,10 @@ export function createLocalCallbacks(): CallbackObservation {
  */
 function createLocalSandboxFaults(): SandboxFaultObservation {
   /** Frozen wrapper handles keyed by cloudAgentSessionId, for exact `CONT`. */
-  const frozenHandles = new Map<string, Awaited<ReturnType<typeof captureControlWrapperProcess>>>();
+  const frozenHandles = new Map<
+    string,
+    Awaited<ReturnType<typeof captureControlPlaneWrapperProcess>>
+  >();
   /**
    * Frozen Kilo-server handles keyed by cloudAgentSessionId. A stopped Kilo
    * cannot answer discovery, so `unfreezeKiloServerProcess` must reuse this
@@ -181,7 +182,7 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
    */
   const frozenKiloHandles = new Map<
     string,
-    Awaited<ReturnType<typeof captureControlWrapperProcess>>
+    Awaited<ReturnType<typeof captureControlPlaneWrapperProcess>>
   >();
 
   const requireOwnedContainer = async (
@@ -227,24 +228,19 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
     `${handle.containerId}:${handle.processId}`;
 
   /**
-   * Capture a control wrapper by plane. Absent basename means the legacy
-   * wrapper; new-plane scenarios pass the control-plane basename so a legacy
-   * container is never matched and vice versa.
+   * Capture only the control-plane wrapper. Reject unknown requested basenames.
    */
   const captureWrapper = async (
     containerId: string,
     wrapperProcessBasename?: string
   ): Promise<KiloServerProcessHandle> => {
-    if (wrapperProcessBasename === CONTROL_PLANE_WRAPPER_BASENAME) {
-      return captureControlPlaneWrapperProcess(containerId);
-    }
     if (
       wrapperProcessBasename !== undefined &&
-      wrapperProcessBasename !== LEGACY_CONTROL_WRAPPER_BASENAME
+      wrapperProcessBasename !== CONTROL_PLANE_WRAPPER_BASENAME
     ) {
       throw new Error(`sandboxFaults: unsupported wrapper basename ${wrapperProcessBasename}`);
     }
-    return captureControlWrapperProcess(containerId);
+    return captureControlPlaneWrapperProcess(containerId);
   };
 
   /**
@@ -1015,9 +1011,7 @@ export function createLocalScenarioEnvironment(options?: {
     // The report row lives in Postgres; without a connection string the
     // report-dependent scenario is `unsupported`.
     ...(databaseUrl ? { reports: createLocalReports(databaseUrl) } : {}),
-    // V2 is inert until C1 routes and launches it, so the operator opts in
-    // explicitly; without the flag V2 scenarios report `unsupported`.
-    ...(process.env.E2E_CONTROL_PLANE_V2 === '1' ? { controlPlaneV2: { ready: true } } : {}),
+    controlPlaneV2: { ready: true },
     // Containment is a Worker `.dev.vars` setting; the harness reads the same
     // source (passed in by the driver) instead of a second env flag.
     ...(options?.credentialContainmentEnabled ? { credentialContainment: { enabled: true } } : {}),

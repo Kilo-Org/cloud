@@ -1,19 +1,10 @@
 import type { CustomRouterDefinition, CustomRouterScope } from '@kilocode/auto-routing-contracts';
 import { auto_routing_custom_routers, type AutoRoutingCustomRouter } from '@kilocode/db/schema';
 import { and, asc, eq, or } from 'drizzle-orm';
-import { readDb, type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
-
-export const CUSTOM_ROUTERS_FLAG = 'kilo-auto-custom-routers';
+import { db, readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 
 export type CustomRouterOwner = { type: CustomRouterScope; id: string };
-
-export async function isCustomRoutersEnabled(userId: string): Promise<boolean> {
-  return (
-    process.env.NODE_ENV === 'development' ||
-    (await isReleaseToggleEnabled(CUSTOM_ROUTERS_FLAG, userId))
-  );
-}
 
 export function customRouterOwnerCondition(owner: CustomRouterOwner) {
   return owner.type === 'user'
@@ -39,6 +30,8 @@ export function toCustomRouterDefinition(row: AutoRoutingCustomRouter): CustomRo
     mode: row.mode,
     entries: row.entries,
     defaultEntryKey: row.default_entry_key,
+    legacyPool: row.legacy_pool,
+    legacyModeInherited: row.legacy_mode_inherited,
   };
 }
 
@@ -58,7 +51,7 @@ export async function listCustomRouters(
 export async function findCustomRouter(
   owner: CustomRouterOwner,
   slug: string,
-  fromDb: typeof db | DrizzleTransaction = readDb
+  fromDb: typeof db | DrizzleTransaction = db
 ): Promise<CustomRouterDefinition | null> {
   const [row] = await fromDb
     .select()
@@ -68,18 +61,45 @@ export async function findCustomRouter(
   return row ? toCustomRouterDefinition(row) : null;
 }
 
-/**
- * Custom routers usable in a request context (ADR 0005): the user's personal routers, plus the
- * organization's routers in an organization context. Only flagged users create routers, so the
- * flag lookup is skipped when there is nothing to show.
- */
+export async function findLegacyPoolRouter(
+  owner: CustomRouterOwner,
+  fromDb: typeof db | DrizzleTransaction = db
+): Promise<CustomRouterDefinition | null> {
+  const [row] = await fromDb
+    .select()
+    .from(auto_routing_custom_routers)
+    .where(
+      and(customRouterOwnerCondition(owner), eq(auto_routing_custom_routers.legacy_pool, true))
+    )
+    .limit(1);
+  return row ? toCustomRouterDefinition(row) : null;
+}
+
+export async function findEffectiveLegacyPoolRouter(params: {
+  userId: string;
+  organizationId: string | null;
+}): Promise<CustomRouterDefinition | null> {
+  const [personal, organization] = await Promise.all([
+    findLegacyPoolRouter({ type: 'user', id: params.userId }),
+    params.organizationId ? findLegacyPoolRouter({ type: 'org', id: params.organizationId }) : null,
+  ]);
+  if (organization) return organization;
+  if (!personal || !params.organizationId) return personal;
+  const settings = await getAutoRoutingSettings({
+    ownerType: 'org',
+    ownerId: params.organizationId,
+  });
+  if (settings.status === 200 && 'configuredPool' in settings.body) {
+    return settings.body.configuredPool?.length ? null : personal;
+  }
+  throw new Error('Could not resolve the organization pool during the migration notice period');
+}
+
 export async function listUsableCustomRouters(params: {
   userId: string;
   organizationId: string | null;
 }): Promise<CustomRouterDefinition[]> {
   const owners: CustomRouterOwner[] = [{ type: 'user', id: params.userId }];
   if (params.organizationId) owners.push({ type: 'org', id: params.organizationId });
-  const routers = await listCustomRouters(owners);
-  if (routers.length === 0 || !(await isCustomRoutersEnabled(params.userId))) return [];
-  return routers;
+  return listCustomRouters(owners, db);
 }

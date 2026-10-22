@@ -256,7 +256,6 @@ describe('AgentFormSheet parity fields', () => {
     unmount();
   });
 
-<<<<<<< HEAD
   it('refuses an over-long description inline and keeps the sheet open', async () => {
     const { renderer, unmount } = await mountSheet(agentSource());
 
@@ -282,7 +281,6 @@ describe('AgentFormSheet parity fields', () => {
     unmount();
   });
 
-<<<<<<< HEAD
   it('refuses a non-ASCII slug with the character rule instead of calling it empty', async () => {
     const { renderer, unmount } = await mountSheet(agentSource());
 

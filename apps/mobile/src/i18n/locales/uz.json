@@ -25,6 +25,7 @@
     "error": "xato: {{error}}",
     "back": "Orqaga",
     "somethingWentWrong": "Xatolik yuz berdi.",
+    "actionNotRecorded": "Bu amalni qayd etib bo'lmadi. Keyinroq qayta urinib ko'ring.",
     "couldNotOpen": "{{label}}ni ochib bo'lmadi.",
     "link": "havola",
     "takingLonger": "Bu kutilganidan uzoqroq davom etmoqda. Bu oynani yopib, keyin qayta tekshirishingiz mumkin.",
@@ -590,6 +591,8 @@
     "installKiloGitHubApp": "Kilo GitHub ilovasini o'rnatish",
     "checkConnection": "Ulanishni tekshirish",
     "couldNotLoadPullRequest": "PRni yuklab bo'lmadi.",
+    "reviewServiceUnavailable": "Xizmat mavjud emas",
+    "reviewServiceUnavailableDescription": "Xizmat vaqtincha mavjud emas. Yaqinda qayta urinib ko'ring.",
     "description": "Tavsif",
     "noDescriptionProvided": "Tavsif berilmagan.",
     "review": "Ko‘rib chiqish",
@@ -761,6 +764,7 @@
       "truncationBanner_other": "O'zgargan {{total}} ta fayldan dastlabki {{limit}} tasi ko'rsatilmoqda — bu GitHub API cheklovi."
     },
     "linkPasteClipboardEmpty": "Nusxalash buferi bo'sh.",
+    "linkPasteDenied": "Joylashga kirish rad etildi. Joylashga ruxsat bering va qaytadan urinib ko'ring.",
     "linkPasteNotAPullRequest": "Bu PR yoki merge so‘rovi havolasi emas",
     "announce": {
       "commentPosted": "Izoh joylashtirildi",
@@ -784,7 +788,6 @@
       "mergeResultDefaultError": "GitHub birlashtirishni yakunlamadi.",
       "mergeResultNotCompleted": "{{term}} birlashtirilmadi. Holatini tekshiring va qayta urinib ko‘ring.",
       "ambiguous": "Amal natijasini tasdiqlab bo'lmadi — qayta urinishdan oldin PRni tekshiring.",
-      "persistenceFailed": "Bu amalni qayd etib bo'lmadi. Keyinroq qayta urinib ko'ring.",
       "forbidden": "Bu amalni bajarishga ruxsat yo'q."
     },
     "capabilities": {
@@ -1456,8 +1459,9 @@
       "loading": "Ko'rib chiqish xotirasi yuklanmoqda",
       "couldNotLoad": "Ko'rib chiqish xotirasini yuklab bo'lmadi.",
       "off": "Ko'rib chiqish xotirasi o'chiq.",
+      "on": "Ko'rib chiqish xotirasi yoniq.",
       "offDescription": "Kilo loyiha mas'ullarining javoblaridan o'rganishi va REVIEW.md uchun ko'rsatmalar taklif qilishi uchun bu funksiyani yoqing.",
-      "readOnlyDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari ko'rib chiqish xotirasini yoqishi mumkin.",
+      "readOnlyDescription": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari ko'rib chiqish xotirasini o'zgartirishi mumkin.",
       "enable": "Ko'rib chiqish xotirasini yoqish",
       "loadingProposals": "Takliflar yuklanmoqda",
       "couldNotLoadProposals": "Takliflarni yuklab bo'lmadi.",
@@ -1477,7 +1481,10 @@
       "starting": "Ko'rib chiqish boshlanmoqda…",
       "start": "Ko'rib chiqishni boshlash"
     },
-    "notConnectedReadOnly": "{{platform}} ulanmagan. Faqat tashkilot egalari va hisob-kitob menejerlari uni ulashi mumkin.",
+    "notConnectedReadOnly": "{{platform}} ulanmagan. Faqat tashkilot egalar va administratorlar uni ulashi mumkin.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} ulanmagan. Uni ulashni tashkilot Egasi, Administrator yoki To'lov menejeridan so'rang."
+    },
     "webhookSetup": "Vebhukni sozlash yakunlanmagan.",
     "webhookSetupDescription": "Ba'zi repozitoriyalarda avtomatik ko'rib chiqish ishlamasligi mumkin.",
     "autoReviews": "Avtomatik ko'rib chiqishlar",
@@ -1485,7 +1492,7 @@
     "followReviewMd": "REVIEW.md fayliga amal qilish",
     "followReviewMdSubtitle": "Har bir repozitoriyaning REVIEW.md faylidagi ko'rsatmalarga amal qilish",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalari va hisob-kitob menejerlari uni ulashi mumkin.",
+      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin.",
       "setupIncomplete": "Sozlash yakunlanmagan. Uni kilo.ai saytida yakunlang.",
       "setup": "Bitbucketni sozlash"
     },
@@ -1745,7 +1752,7 @@
       "couldNotLoad": "Bu muammo haqidagi ma’lumotlarni yuklab bo‘lmadi.",
       "couldNotCheckPermissions": "Rad etish huquqini tekshirib bo'lmadi.",
       "cannotDismissTitle": "Bu muammoni rad etib bo'lmaydi",
-      "cannotDismissDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari muammolarni rad etishi mumkin.",
+      "cannotDismissDescription": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari muammolarni rad etishi mumkin.",
       "alreadyResolvedDescription": "Bu muammo allaqachon hal qilingan. Endi uni rad etib bo'lmaydi."
     },
     "findingDetails": {
@@ -1787,7 +1794,7 @@
       "automationAllOff": "Hammasi o'chiq",
       "automationCount": "3 tadan {{displayCount}} tasi yoqilgan",
       "notificationsCount": "2 tadan {{displayCount}} tasi yoqilgan",
-      "disabledNoManage": "Xavfsizlik agenti o'chirilgan. Faqat tashkilot egalari va hisob-kitob menejerlari uni yoqishi mumkin.",
+      "disabledNoManage": "Xavfsizlik agenti o'chirilgan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni yoqishi mumkin.",
       "disabledNoRepo": "Xavfsizlik agentini yoqishdan oldin kamida bitta repozitoriyani tanlang.",
       "disabledPrompt": "Dependabot ogohlantirishlarini sinxronlash, repozitoriyalarni tanlash va avtomatlashtirishni sozlash uchun Xavfsizlik agentini yoqing."
     },
@@ -1836,7 +1843,7 @@
       "invalidDayCount": "kunlar soni 1 dan 365 gacha bo'lgan butun son bo'lishi kerak.",
       "remediationDeadlineA11y": "{{label}} darajasidagi muammoni tuzatish muddati, kun hisobida",
       "enterWholeNumber": "1 Dan 365 gacha bo‘lgan butun sonni kiriting",
-      "permissionNote": "Faqat tashkilot egalari va hisob-kitob menejerlari bu sozlamalarni o'zgartira oladi.",
+      "permissionNote": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari bu sozlamalarni o'zgartira oladi.",
       "enableTracking": "SLA kuzatuvini yoqish",
       "enableTrackingSubtitle": "Muammoning xavf darajasiga qarab tuzatish muddatlarini belgilaydi.",
       "deadlinesHeading": "Tuzatish muddatlari (kun)"
@@ -1879,6 +1886,9 @@
       "viewA11y": "Audit hisobotini ko'rish"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administratori",
+      "actorMaskedUser": "Yashirilgan foydalanuvchi",
+      "actorSystem": "Kilo tizimi",
       "couldNotLoad": "Audit hisobotini yuklab bo'lmadi.",
       "events": "Hodisalar",
       "generated": "Yaratilgan vaqt: {{generatedAt}}.",
@@ -1889,7 +1899,7 @@
       "summary": "Hisobot xulosasi",
       "title": "Audit hisoboti",
       "unavailable": "Audit hisoboti mavjud emas",
-      "unavailableDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari audit hisobotlarini ko'rishi mumkin. Tashkilot egasi yoki hisob-kitob menejeridan sizga kirish huquqini berishni so'rang.",
+      "unavailableDescription": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari audit hisobotlarini ko'rishi mumkin. Tashkilot egasi, administrator yoki to'lov menejeridan sizga kirish huquqini berishni so'rang.",
       "queryFailed": "Hisobot so'rovi tugallanmadi. Qayta urinib ko'ring.",
       "eventActions": {
         "findingAnalysisCompleted": "Tahlil yakunlandi",
@@ -1957,7 +1967,12 @@
       "syncMayNotHaveCompleted": "Sinxronlash yakunlanmagan bo'lishi mumkin. Uning holatini aniqlashtirish uchun qayta urinib ko'ring yoki bekor qiling.",
       "syncInProgress": "Xavfsizlik ma'lumotlari allaqachon sinxronlanmoqda. Iltimos, qayta urinib ko'ring.",
       "dismissalInProgress": "Bu muammo allaqachon rad etilmoqda. Iltimos, qayta urinib ko'ring.",
-      "couldNotReadPendingSyncs": "Kutilayotgan sinxronlashlar haqidagi ma'lumotlarni o'qib bo'lmadi. Qayta urinib ko'ring."
+      "couldNotReadPendingSyncs": "Kutilayotgan sinxronlashlar haqidagi ma'lumotlarni o'qib bo'lmadi. Qayta urinib ko'ring.",
+      "ambiguous": "Amal natijasini tasdiqlab bo'lmadi — qayta urinishdan oldin xavfsizlik ko'rigini tekshiring.",
+      "settleFailed": "Amal bajarildi, ammo natijani qayd etishimiz mumkin bo'lmadi. Iltimos, qayta urinib ko'ring.",
+      "replayFailed": "Bu amal tugallanmadi. Iltimos, qayta urinib ko'ring.",
+      "actionFailed": "Bu amalni tugallab bo'lmadi. Iltimos, qayta urinib ko'ring.",
+      "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak."
     },
     "analysisState": {
       "queued": "Tahlil navbatda",
@@ -2234,6 +2249,8 @@
       "commitAndPush": "Kommit va yuborish",
       "startSession": "Sessiyani boshlash",
       "selectRepositoryToStart": "Boshlash uchun repozitoriya tanlang.",
+      "enterPromptToStart": "Boshlash uchun so'rov qo'shing.",
+      "enterPromptOrFileToStart": "Boshlash uchun so'rov yoki fayl qo'shing.",
       "connectProviderToStart": "Boshlash uchun provayderni ulang.",
       "promptPlaceholder": "Nima ustida ishlashni xohlaysiz?",
       "couldNotLoadModels": "Modellarni yuklab bo'lmadi.",
@@ -2773,7 +2790,7 @@
     "webBrowser": "Veb-brauzer",
     "viewProfile": "Profilni ko'rish",
     "signOutThisDevice": "Bu qurilmada tizimdan chiqish",
-    "signOutThisSession": "Bu sessiyani tugatish",
+    "signOutSessionLabel": "{{device}} qurilmasida tizimdan chiqish, kirilgan vaqt: {{signedIn}}",
     "sessionSignedOut": "Sessiyadan chiqildi.",
     "signOutThisDeviceTitle": "Bu qurilmada tizimdan chiqilsinmi?",
     "signOutThisSessionTitle": "Bu sessiya tugatilsinmi?",
@@ -3013,6 +3030,7 @@
 
       "chooseAccount": "Hisobni tanlang",
       "loadErrorTitle": "Tashkilotlaringizni yuklab bo'lmadi.",
+      "membershipLostNotice": "Sizda ushbu tashkilotga kirish huquqi endi yo'q. {{target}} ga o'tkazildi.",
       "noOrganization": "Tashkilot yo'q",
 
       "noOrganizationDescription": "Bu hisob hech qanday tashkilotga tegishli emas. A'zolarni taklif qilish va kam balans haqidagi ogohlantirishlar kabi tashkilot funksiyalaridan foydalanish uchun saytda tashkilot yarating yoki unga qo'shiling.",
@@ -3077,7 +3095,11 @@
       "separateEmailsHint": "Elektron pochta manzillarini vergul bilan ajrating.",
       "thresholdLabel": "Ogohlantirish chegarasi (USD)",
       "title": "Balans kamayishi haqida ogohlantirish",
-      "emailsError": "Kamida bitta to'g'ri elektron pochta manzilini kiriting. Bir nechta manzilni vergul bilan ajrating.",
+      "emailsInvalid": "Bir yoki bir nechta elektron pochta manzili noto'g'ri.",
+      "emailsRequired": "Kamida bitta elektron pochta manzilini kiriting.",
+      "saveEmailsError": "Ba'zi elektron pochta manzillari qabul qilinmadi. Ularni tekshirib, qayta urinib ko'ring.",
+      "saveError": "Balans kamayishi haqida ogohlantirishni saqlab bo'lmadi.",
+      "thresholdPlaceholder": "Miqdor kiriting",
       "thresholdError": "0 Dan katta miqdorni kiriting."
     },
     "memberLimit": {
@@ -3088,12 +3110,13 @@
       "removeLimit": "Limitni olib tashlash",
       "title": "Kunlik foydalanish limiti",
       "blankError": "Miqdor kiriting yoki quyidagi Limitni olib tashlash tugmasini bosing.",
+      "blankWithoutLimitError": "0 Va {{max}} oralig'idagi kunlik limitni kiriting.",
       "rangeError": "0 Va {{max}} oralig'idagi miqdorni kiriting."
     },
     "members": {
       "changeRole": "Rolni o'zgartirish",
       "emptyDescriptionCanInvite": "Bu tashkilotda hamkorlikni boshlash uchun hamkasblarni taklif qiling.",
-      "emptyDescriptionCannotInvite": "Tashkilot egasidan yoki to'lov menejeridan hamkasblarni taklif qilishni so'rang.",
+      "emptyDescriptionCannotInvite": "Tashkilot egasidan, administratordan yoki to'lov menejeridan hamkasblarni taklif qilishni so'rang.",
       "emptyTitle": "Hali a'zolar yo'q",
       "invitedDate": "Taklif qilingan sana: {{date}}",
       "limitPerDay": "kuniga {{amount}}",
@@ -3357,7 +3380,8 @@
       "settingsToolsOn": "Yoniq — sozlama vositalari modelga yuboriladi",
       "settingsToolsOff": "Oʻchiq — modelga hech qanday sozlama vositasi yuborilmaydi",
       "serverChecking": "Bu server tekshirilmoqda…",
-      "serverToolCount": "{{count}} vosita",
+      "serverToolCount_one": "{{count}} vosita",
+      "serverToolCount_other": "{{count}} vosita",
       "serverUnreachable": "Bu serverga yetib boʻlmadi",
       "serverOff": "Bu server oʻchirilgan"
     },
@@ -3555,6 +3579,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agentni ishga tushirish uchun so'rov kerak. So'rov qo'shing va qayta ishga tushiring.",
+      "repositoryRequired": "Agentni ishga tushirish uchun repozitoriya kerak. Kilo'ni oching, bir repozitoriy tanlang va qayta ishga tushiring.",
       "repositoryUnknown": "Kilo {{repository}} ni GitHub yoki GitLab repozitoriyasi deb tanimaydi. Kilo'da boshqa repozitoriy tanlang.",
       "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasi — Agentni ishga tushirish hali undan foydalana olmaydi. Kilo'da boshqa repozitoriy tanlang."
     }
@@ -3592,10 +3617,13 @@
     "emptyDescription": "Seanslar davomida muhit o'zgaruvchilari, sozlash buyruqlari va ko'nikmalarni qayta ishlatish uchun profil yarating.",
     "loadFailed": "Profillarni yuklab bo‘lmadi",
     "counts": {
-      "vars": "{{count}} o'zgaruvchi",
+      "vars_one": "{{count}} o'zgaruvchi",
+      "vars_other": "{{count}} o'zgaruvchi",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ko'nikma",
-      "commands": "{{count}} buyruq",
+      "skills_one": "{{count}} ko'nikma",
+      "skills_other": "{{count}} ko'nikma",
+      "commands_one": "{{count}} buyruq",
+      "commands_other": "{{count}} buyruq",
       "varsShort": "{{count}}o'",
       "skillsShort": "{{count}}k",
       "commandsShort": "{{count}}b"
@@ -3626,7 +3654,6 @@
     "keyTooLong": "Kalit 256 ta belgi yoki undan kam bo'lishi kerak",
     "keyDuplicate": "Bu kalit profilda allaqachon mavjud",
     "valueLabel": "Qiymat",
-    "secretLabel": "Sir",
     "secrets": {
       "markSecret": "Sir sifatida belgilang",
       "masked": "Yashirin qiymat",
@@ -3713,6 +3740,9 @@
       "visibilityPrimary": "Asosiy - tanlovchida ko'rsatilgan",
       "visibilitySubagent": "Subagent - faqat boshqalar tomonidan chaqirilishi mumkin",
       "visibilityAll": "Hammasi - ikkalasi ham",
+      "modePrimary": "Faqat asosiy",
+      "modeSubagent": "Faqat subagent",
+      "modeAll": "Hamma rejimlar",
       "saveFailed": "Agentni saqlab boʻlmadi",
       "deleteFailed": "Agentni oʻchirib boʻlmadi",
       "nameRequired": "Agent nomini kiriting",
@@ -3773,6 +3803,8 @@
     "empty": "Kredit paketlari hozircha mavjud emas.",
     "noMatchingProducts": "App Store mos keladigan kredit paketlarini qaytarmadi.",
     "noMatchingProductsPlay": "Google Play mos keladigan kredit paketlarini qaytarmadi.",
+    "storeTimedOut": "App Store o'z vaqtida javob bermadi. Qayta urinish.",
+    "storeTimedOutPlay": "Google Play o'z vaqtida javob bermadi. Qayta urinish.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring."
   },

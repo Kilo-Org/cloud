@@ -116,7 +116,12 @@ export function PrReviewOverview({
   }, [t]);
 
   const state = pr.isError ? classifyPrReviewQueryState(pr.error) : null;
-  if (state && (!pr.data || state.kind !== 'retryable')) {
+  // A retryable gateway-class failure (retryable or service-unavailable)
+  // with cached data keeps it on screen: a failed background refetch of a
+  // previously loaded PR must not blank the overview. Every other state, or
+  // a first load with no data, renders the error states below.
+  const keepCachedData = state?.kind === 'retryable' || state?.kind === 'service-unavailable';
+  if (state && (!pr.data || !keepCachedData)) {
     if (state.kind === 'not-found') {
       return (
         <EmptyState
@@ -203,15 +208,28 @@ export function PrReviewOverview({
         />
       );
     }
-    // retryable
+    // retryable / service-unavailable: the review read path could not serve
+    // the request. A BAD_GATEWAY (service-unavailable) — the authorization
+    // layer in front of GitHub, a GitHub 5xx, or a provider transport
+    // failure — names its own cause, while every other failure keeps the
+    // generic server-error copy. Both offer Retry. This arm runs only on a
+    // first load; a failed background refetch with cached data keeps the
+    // loaded overview (see the guard above).
+    let errorTitle = t('prReview.couldNotLoadPullRequest');
+    if (state.kind === 'service-unavailable') {
+      errorTitle = t('prReview.reviewServiceUnavailable');
+    } else if (isMergeRequest) {
+      errorTitle = t('prReview.terms.couldNotLoadMergeRequest');
+    }
     return (
       <QueryError
         refreshControl={refreshControl}
         variant="server"
-        title={
-          isMergeRequest
-            ? t('prReview.terms.couldNotLoadMergeRequest')
-            : t('prReview.couldNotLoadPullRequest')
+        title={errorTitle}
+        message={
+          state.kind === 'service-unavailable'
+            ? t('prReview.reviewServiceUnavailableDescription')
+            : undefined
         }
         onRetry={() => {
           void pr.refetch();

@@ -51,7 +51,6 @@ const mockTrackSecurityAgentUiInteraction = jest.fn();
 const mockTrackSecurityAgentRemediationAction = jest.fn();
 const mockLogSecurityAudit = jest.fn();
 const mockCreateSecurityAuditLog = jest.fn();
-const mockUpsertSecurityAgentConfig = jest.fn();
 const mockSaveSecurityAgentConfigWithRevision = jest.fn<
   (params: unknown) => Promise<{
     newRevision: number;
@@ -134,7 +133,6 @@ jest.mock('../services/audit-log-service', () => ({
 }));
 jest.mock('../db/security-config', () => ({
   getSecurityAgentConfigWithStatus: mockGetSecurityAgentConfigWithStatus,
-  upsertSecurityAgentConfig: mockUpsertSecurityAgentConfig,
   saveSecurityAgentConfigWithRevision: mockSaveSecurityAgentConfigWithRevision,
   setSecurityAgentEnabled: mockSetSecurityAgentEnabled,
 }));
@@ -353,7 +351,7 @@ describe('trackUiInteraction', () => {
       input: { interaction: 'findings_filtered' },
     });
 
-    expect(mockUpsertSecurityAgentConfig).not.toHaveBeenCalled();
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
     expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
     expect(mockCreateSecurityAuditLog).not.toHaveBeenCalled();
     expect(mockLogSecurityAudit).not.toHaveBeenCalled();
@@ -487,12 +485,209 @@ describe('getConfig', () => {
 });
 
 describe('setEnabled', () => {
+  const acceptedSync = {
+    accepted: true as const,
+    commandId,
+    runId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    messageId: 'enable-sync-message-123',
+  };
+  const orgScopeResourceKey = 'security:manual_sync:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:*';
+
+  function storedConfig(
+    overrides: {
+      repositorySelectionMode?: 'all' | 'selected';
+      selectedRepositoryIds?: number[];
+    } = {}
+  ) {
+    return {
+      isEnabled: true,
+      configRevision: 2,
+      storedConfig: {},
+      config: {
+        repository_selection_mode: overrides.repositorySelectionMode ?? 'all',
+        selected_repository_ids: overrides.selectedRepositoryIds ?? [],
+      },
+    };
+  }
+
+  function createHandlersWithRepositories(repositories: { id: number; full_name: string }[]) {
+    return createSecurityAgentHandlers({
+      resolveOwner: () => ({
+        type: 'org',
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        userId: 'user-123',
+      }),
+      resolveSecurityOwner: () => ({ organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }),
+      resolveResourceId: () => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      verifyFindingOwnership: () => true,
+      getIntegration: async () =>
+        ({
+          id: 'integration-123',
+          integration_status: 'active',
+          platform_installation_id: 'installation-123',
+          repositories: repositories.map(repository => ({
+            ...repository,
+            name: repository.full_name.split('/')[1],
+            private: true,
+          })),
+        }) as never,
+      trackingExtras: () => ({}),
+    });
+  }
+
+  function admitSyncLedgerRow() {
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'admitted',
+      row: {
+        id: 'ledger-row-id',
+        intent: 'manual_sync',
+        resource_key: orgScopeResourceKey,
+        taxonomy: 'reconcile-first',
+        status: 'admitted',
+        outcome_code: null,
+        canonical_result: null,
+        admitted_at: '2026-06-17T10:00:00.000Z',
+        settled_at: null,
+        lease_expires_at: '2026-06-17T10:02:00.000Z',
+        expires_at: '2026-07-17T10:00:00.000Z',
+      },
+    });
+  }
+
   it('returns initial sync command correlation after enable', async () => {
-    mockSubmitManualSecuritySync.mockResolvedValue({
-      accepted: true,
-      commandId,
-      runId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-      messageId: 'enable-sync-message-123',
+    admitSyncLedgerRow();
+    mockSubmitManualSecuritySync.mockResolvedValue(acceptedSync);
+
+    await expect(
+      createHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+    ).resolves.toEqual({
+      success: true,
+      initialSync: acceptedSync,
+      initialSyncAdmissionFailed: false,
+    });
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedRevision: null })
+    );
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        origin: 'enable_initial_sync',
+        operationKey: expect.stringMatching(/^enable_sync:[0-9a-f]{64}$/),
+      })
+    );
+  });
+
+  it('keeps the stored selection when an enable repeats it', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue(storedConfig());
+
+    await expect(
+      createHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+    ).resolves.toEqual({ success: true });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
+    expect(mockAdmitOperation).not.toHaveBeenCalled();
+    expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+    expect(mockLogSecurityAudit).not.toHaveBeenCalled();
+  });
+
+  it('submits one sync when the effective repositories change', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue(
+      storedConfig({ repositorySelectionMode: 'selected', selectedRepositoryIds: [1] })
+    );
+    admitSyncLedgerRow();
+    mockSubmitManualSecuritySync.mockResolvedValue(acceptedSync);
+
+    await expect(
+      createHandlersWithRepositories([
+        { id: 1, full_name: 'kilo/repo' },
+        { id: 2, full_name: 'kilo/other' },
+      ]).setEnabled.handler({
+        ctx: context,
+        input: {
+          isEnabled: true,
+          repositorySelectionMode: 'selected',
+          selectedRepositoryIds: [1, 2],
+        },
+      })
+    ).resolves.toEqual({
+      success: true,
+      initialSync: acceptedSync,
+      initialSyncAdmissionFailed: false,
+    });
+
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedRevision: 2 })
+    );
+  });
+
+  it('saves a new selection mode without a sync when the repositories match', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue(
+      storedConfig({ repositorySelectionMode: 'selected', selectedRepositoryIds: [1] })
+    );
+
+    await expect(
+      createHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [1] },
+      })
+    ).resolves.toEqual({
+      success: true,
+      initialSync: undefined,
+      initialSyncAdmissionFailed: false,
+    });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: { repository_selection_mode: 'all', selected_repository_ids: [1] },
+      })
+    );
+    expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+  });
+
+  it('submits one sync for a re-enable after disable', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      ...storedConfig(),
+      isEnabled: false,
+    });
+    admitSyncLedgerRow();
+    mockSubmitManualSecuritySync.mockResolvedValue(acceptedSync);
+
+    await expect(
+      createHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+    ).resolves.toMatchObject({ success: true, initialSyncAdmissionFailed: false });
+
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedRevision: 2 })
+    );
+  });
+
+  it('returns partial success when the sync ledger reports an in-flight command', async () => {
+    admitSyncLedgerRow();
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'duplicate_in_flight',
+      row: {
+        id: 'ledger-row-id',
+        intent: 'manual_sync',
+        resource_key: orgScopeResourceKey,
+        taxonomy: 'reconcile-first',
+        status: 'admitted',
+        outcome_code: null,
+        canonical_result: null,
+        admitted_at: '2026-06-17T10:00:00.000Z',
+        settled_at: null,
+        lease_expires_at: '2026-06-17T10:02:00.000Z',
+        expires_at: '2026-07-17T10:00:00.000Z',
+      },
     });
 
     await expect(
@@ -502,20 +697,15 @@ describe('setEnabled', () => {
       })
     ).resolves.toEqual({
       success: true,
-      initialSync: {
-        accepted: true,
-        commandId,
-        runId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-        messageId: 'enable-sync-message-123',
-      },
-      initialSyncAdmissionFailed: false,
+      initialSync: undefined,
+      initialSyncAdmissionFailed: true,
     });
-    expect(mockSubmitManualSecuritySync).toHaveBeenCalledWith(
-      expect.objectContaining({ origin: 'enable_initial_sync' })
-    );
+
+    expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
   });
 
   it('reports partial success when initial sync admission fails after enable', async () => {
+    admitSyncLedgerRow();
     mockSubmitManualSecuritySync.mockRejectedValue(new Error('queue unavailable'));
 
     await expect(
@@ -530,6 +720,46 @@ describe('setEnabled', () => {
     });
   });
 
+  it('propagates a stale config revision instead of submitting a sync', async () => {
+    mockSaveSecurityAgentConfigWithRevision.mockRejectedValue(
+      new TRPCError({
+        code: 'CONFLICT',
+        message:
+          'This configuration changed in another tab. Review the latest settings and save again.',
+      })
+    );
+
+    await expect(
+      createHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+    expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
+  });
+
+  it('disables without writing the selection or submitting a sync', async () => {
+    await expect(
+      createHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: false },
+      })
+    ).resolves.toEqual({ success: true });
+
+    expect(mockSetSecurityAgentEnabled).toHaveBeenCalledWith(
+      {
+        type: 'org',
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        userId: 'user-123',
+      },
+      false
+    );
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
+    expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+  });
+
   it('refuses enabling with an empty selected repo set', async () => {
     await expect(
       createHandlers().setEnabled.handler({
@@ -540,7 +770,7 @@ describe('setEnabled', () => {
       code: 'PRECONDITION_FAILED',
       message: 'Select at least one repository before enabling Security Agent.',
     });
-    expect(mockUpsertSecurityAgentConfig).not.toHaveBeenCalled();
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
     expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
   });
 
@@ -554,7 +784,7 @@ describe('setEnabled', () => {
       code: 'PRECONDITION_FAILED',
       message: 'Select at least one repository before enabling Security Agent.',
     });
-    expect(mockUpsertSecurityAgentConfig).not.toHaveBeenCalled();
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
     expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
   });
 });

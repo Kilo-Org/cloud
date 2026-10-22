@@ -215,6 +215,17 @@ await trpc.securityReviews.triggerSync.mutate({
 });
 ```
 
+### Enabling (from UI)
+
+`setEnabled` persists the requested repository selection with a revisioned
+compare-and-set and reports the result as `initialSync` /
+`initialSyncAdmissionFailed`. An initial sync is submitted when the owner
+transitions to enabled or when the effective repository set changes. The
+submission is admitted through the `security` operation ledger under a
+server-generated key derived from the owner and the committed config revision,
+so one configuration revision produces at most one sync command; an enable that
+matches the stored configuration returns without writing or submitting.
+
 ### Automated Sync (cron)
 
 The cron job at `/api/cron/sync-security-alerts` runs every 6 hours and:

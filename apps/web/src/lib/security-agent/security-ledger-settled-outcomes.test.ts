@@ -73,7 +73,6 @@ jest.mock('./services/audit-log-service', () => ({
 }));
 jest.mock('./db/security-config', () => ({
   getSecurityAgentConfigWithStatus: jest.fn(),
-  upsertSecurityAgentConfig: jest.fn(),
   saveSecurityAgentConfigWithRevision: jest.fn(),
   setSecurityAgentEnabled: jest.fn(),
 }));

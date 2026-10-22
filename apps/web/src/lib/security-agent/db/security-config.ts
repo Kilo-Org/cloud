@@ -1,6 +1,5 @@
 import {
   getAgentConfigForOwner,
-  upsertAgentConfigForOwner,
   setAgentEnabledForOwner,
 } from '@/lib/agent-config/db/agent-configs';
 import type { Owner } from '@/lib/code-reviews/core';
@@ -98,42 +97,6 @@ function computeMergedSecurityConfig(
   }
 
   return fullConfig;
-}
-
-export async function upsertSecurityAgentConfig(
-  owner: Owner,
-  config: Partial<SecurityAgentConfig>,
-  createdBy: string,
-  platform: string = DEFAULT_PLATFORM
-): Promise<void> {
-  const existingConfig = await getSecurityAgentConfigWithStatus(owner, platform);
-  const fullConfig = computeMergedSecurityConfig(existingConfig, config);
-
-  const wasAutoAnalysisEnabled = existingConfig?.config.auto_analysis_enabled ?? false;
-  const isNowAutoAnalysisEnabled = fullConfig.auto_analysis_enabled;
-
-  await upsertAgentConfigForOwner({
-    owner,
-    agentType: AGENT_TYPE,
-    platform,
-    config: fullConfig,
-    isEnabled: true,
-    createdBy,
-  });
-
-  const securityOwner = owner.type === 'org' ? { organizationId: owner.id } : { userId: owner.id };
-
-  if (isNowAutoAnalysisEnabled) {
-    if (!wasAutoAnalysisEnabled) {
-      // Transitioning OFF → ON: unconditionally reset the timestamp so the
-      // time boundary reflects this activation, not a previous one.
-      await resetOwnerAutoAnalysisEnabledAt(securityOwner);
-    } else {
-      // Already enabled: idempotent set (only writes when null) to guard
-      // against a prior save where the config committed but timestamp failed.
-      await setOwnerAutoAnalysisEnabledAtNow(securityOwner);
-    }
-  }
 }
 
 function toCommandOwner(owner: SecurityReviewOwner): SecurityAgentCommandOwner {

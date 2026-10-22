@@ -37,8 +37,8 @@ export type EncryptedEnvelope = {
 
 /**
  * Validates the serialized envelope shape, naming the field that is wrong.
- * Used by construction, parsing and decryption so the accepted and decryptable
- * shapes cannot diverge.
+ * Parsing and decryption validate through it; construction builds from the same
+ * constants, so the accepted and decryptable shapes cannot diverge.
  */
 export function assertEncryptedEnvelope(value: unknown): asserts value is EncryptedEnvelope {
   if (value === null || typeof value !== 'object') {

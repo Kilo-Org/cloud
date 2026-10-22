@@ -8,7 +8,8 @@
  *   `oauthSignIn succeeded` with the identity bound into the grant props by
  *   GET|POST /authorize/org. Refresh exchanges stay silent.
  * - `onError` fires for every OAuth error response the provider produces; it
- *   emits `oauthSignIn failed` with the OAuth error code as `reason`.
+ *   emits `oauthSignIn failed` with the OAuth error code as `reason` and a
+ *   fixed-vocabulary `detail` naming the cause behind that code.
  *
  * Analytics is best-effort (src/analytics.ts never throws), so a hook can
  * never affect the token response.
@@ -66,13 +67,49 @@ export function tokenExchangeCallback(
 }
 
 /**
+ * The library's `error_description` values, mapped to a fixed slug vocabulary.
+ *
+ * `onError` sees the library's own description strings (`oauth-provider.js`
+ * `createErrorResponse`), which are what separate a revoked grant from an
+ * expired one, a client/refresh-token mismatch from a malformed token, and a
+ * resource-audience problem from a genuinely invalid bearer. The raw text is
+ * never captured: it is free text the library may interpolate into, so only a
+ * slug from this table leaves the worker. An unlisted description reports
+ * `other`, which keeps the vocabulary bounded without losing the reason code.
+ */
+const OAUTH_ERROR_DETAILS: Record<string, string> = {
+  'Client ID mismatch': 'client_id_mismatch',
+  'Client not found': 'client_not_found',
+  'Grant not found': 'grant_not_found',
+  'Invalid refresh token': 'invalid_refresh_token',
+  'Refresh token has expired': 'refresh_token_expired',
+  'Invalid token format': 'invalid_token_format',
+  'Grant not found or authorization code expired': 'authorization_code_grant_missing',
+  'Invalid authorization code': 'invalid_authorization_code',
+  'Invalid authorization code format': 'invalid_authorization_code_format',
+  'Authorization code already used': 'authorization_code_reused',
+  'Invalid PKCE code_verifier': 'invalid_pkce_verifier',
+  'Invalid access token': 'invalid_access_token',
+  'Access token expired': 'access_token_expired',
+  'Token audience does not match resource server': 'resource_audience_mismatch',
+  'Access token is not bound to the configured resource': 'access_token_resource_mismatch',
+};
+
+/** The slug for one library error, or `other` for a description outside the table. */
+export function oauthErrorDetail(description: string): string {
+  return OAUTH_ERROR_DETAILS[description] ?? 'other';
+}
+
+/**
  * Emit `oauthSignIn failed` for a provider error response. The `reason` is the
- * OAuth error code; no identity is known at the error boundary.
+ * OAuth error code and `detail` narrows it to a cause; no identity is known at
+ * the error boundary, so it is always anonymous.
  */
 export function onError(error: OAuthProviderError, deps: ProviderHookDeps = {}): void {
   deps.analytics?.oauthSignIn({
     phase: 'failed',
     identity: null,
     reason: error.code,
+    detail: oauthErrorDetail(error.description),
   });
 }

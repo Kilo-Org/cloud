@@ -95,7 +95,37 @@ describe('onError', () => {
       headers: {},
     };
     errorHook(error, { analytics });
-    expect(calls).toEqual([{ phase: 'failed', identity: null, reason: 'invalid_grant' }]);
+    expect(calls).toEqual([
+      { phase: 'failed', identity: null, reason: 'invalid_grant', detail: 'other' },
+    ]);
+  });
+
+  it('names the library cause as a fixed-vocabulary detail', () => {
+    const cases: Array<[string, string, string]> = [
+      ['invalid_grant', 'Client ID mismatch', 'client_id_mismatch'],
+      ['invalid_grant', 'Grant not found', 'grant_not_found'],
+      ['invalid_grant', 'Invalid refresh token', 'invalid_refresh_token'],
+      ['invalid_grant', 'Refresh token has expired', 'refresh_token_expired'],
+      ['invalid_client', 'Client not found', 'client_not_found'],
+      ['invalid_token', 'Access token expired', 'access_token_expired'],
+      ['invalid_token', 'Token audience does not match resource server', 'resource_audience_mismatch'],
+    ];
+    for (const [code, description, detail] of cases) {
+      const { analytics, calls } = fakeAnalytics();
+      onError({ code, description, status: 400, headers: {} }, { analytics });
+      expect(calls).toEqual([{ phase: 'failed', identity: null, reason: code, detail }]);
+    }
+  });
+
+  it('reports a description outside the vocabulary as other, never the raw text', () => {
+    const { analytics, calls } = fakeAnalytics();
+    onError(
+      { code: 'invalid_request', description: 'Request parameter "x" must not be repeated', status: 400, headers: {} },
+      { analytics }
+    );
+    expect(calls).toEqual([
+      { phase: 'failed', identity: null, reason: 'invalid_request', detail: 'other' },
+    ]);
   });
 
   it('is a no-op without an analytics emitter and never throws', () => {

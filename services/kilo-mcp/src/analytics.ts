@@ -103,6 +103,8 @@ export type OAuthSignInInput = {
   phase: OAuthSignInPhase;
   clientId?: string;
   reason?: string;
+  /** Why the reason fired, as a fixed vocabulary slug; never free text. */
+  detail?: string;
 };
 
 /** `kilo_mcp_session_started`. */
@@ -158,6 +160,7 @@ export function oauthSignInEvent(input: OAuthSignInInput): McpAnalyticsEvent {
   const properties: Record<string, unknown> = { phase: input.phase };
   if (input.clientId !== undefined) properties['clientId'] = input.clientId;
   if (input.reason !== undefined) properties['reason'] = input.reason;
+  if (input.detail !== undefined) properties['detail'] = input.detail;
   return { event: OAUTH_EVENT_BY_PHASE[input.phase], identity: input.identity, properties };
 }
 

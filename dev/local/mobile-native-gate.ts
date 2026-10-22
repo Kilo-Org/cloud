@@ -134,9 +134,10 @@ type ArtifactRecord = {
 
 // The API lists every artifact under a name, newest first, expired ones
 // included. A durable artifact wins; otherwise the newest live one is what a
-// promote copies.
+// promote copies. The page holds 100: one nativeHash was observed with 11
+// uploads, and the durable one must not fall off the page behind them.
 function lookupArtifact(repository: string, name: string): ArtifactLookup {
-  const raw = gh(['api', `repos/${repository}/actions/artifacts?name=${name}&per_page=10`]);
+  const raw = gh(['api', `repos/${repository}/actions/artifacts?name=${name}&per_page=100`]);
   const parsed = JSON.parse(raw) as { artifacts?: ArtifactRecord[] };
   if (!Array.isArray(parsed.artifacts)) {
     throw new Error(`unexpected artifact listing for ${name}: ${raw.trim()}`);

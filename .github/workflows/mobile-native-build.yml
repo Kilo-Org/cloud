@@ -127,14 +127,16 @@ jobs:
   # pull_request one, copies it instead of rebuilding. The copy carries the
   # same name, so hosts and the gate look it up exactly as they look up a
   # build.
+  #
+  # No job-level concurrency here on purpose. A cancelled promote reports
+  # `result == 'cancelled'`, which the build jobs read as "not success" and
+  # answer with a full build — the cost this job exists to remove. A duplicate
+  # promote is a one-minute re-upload of the same bytes.
   promote_ios:
     needs: gate
     if: needs.gate.outputs.promote_ios == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    concurrency:
-      group: ${{ github.workflow }}-ios-${{ needs.gate.outputs.ios_hash }}
-      cancel-in-progress: false
     steps:
       - name: Download the short-lived artifact
         env:
@@ -160,9 +162,6 @@ jobs:
     if: needs.gate.outputs.promote_android == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    concurrency:
-      group: ${{ github.workflow }}-android-${{ needs.gate.outputs.android_hash }}
-      cancel-in-progress: false
     steps:
       - name: Download the short-lived artifact
         env:
@@ -196,8 +195,14 @@ jobs:
        (needs.gate.outputs.promote_ios == 'true' && needs.promote_ios.result != 'success'))
     runs-on: macos-26
     timeout-minutes: 90
+    # Serialized on the nativeHash so a sibling build of the same inputs makes
+    # this job wait and then exit at the re-check. The event name is part of the
+    # key so a push build is never the pending job that a later pull_request
+    # job cancels: main would then keep no durable artifact for that hash. The
+    # measured duplicates were all pull_request runs, and those still share one
+    # group.
     concurrency:
-      group: ${{ github.workflow }}-ios-${{ needs.gate.outputs.ios_hash }}
+      group: ${{ github.workflow }}-${{ github.event_name }}-ios-${{ needs.gate.outputs.ios_hash }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -302,8 +307,11 @@ jobs:
        (needs.gate.outputs.promote_android == 'true' && needs.promote_android.result != 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Same serialization as the ios job: pull_request runs of one nativeHash
+    # queue behind each other, and a push build keeps its own group so a later
+    # pull_request job cannot cancel it while it waits.
     concurrency:
-      group: ${{ github.workflow }}-android-${{ needs.gate.outputs.android_hash }}
+      group: ${{ github.workflow }}-${{ github.event_name }}-android-${{ needs.gate.outputs.android_hash }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

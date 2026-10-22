@@ -154,12 +154,16 @@ test('the gate job exposes the promote outputs the workflow reads', () => {
 // One native build takes longer than the gap between two pushes of the same
 // native inputs, so the gate's artifact lookup cannot see the build in
 // flight. The job-level slot plus the re-check is what stops the duplicate.
+// The slot is keyed on the event as well: a push build must not be the pending
+// job that a later pull_request job cancels, or main keeps no durable artifact.
 test('each heavy job is serialized on its nativeHash and re-checks its artifact', () => {
   const workflow = readWorkflow();
   for (const platform of ['ios', 'android'] as const) {
     const job = workflow.jobs[platform];
     assert.deepEqual(job.concurrency, {
-      group: `\${{ github.workflow }}-${platform}-\${{ needs.gate.outputs.${platform}_hash }}`,
+      group:
+        `\${{ github.workflow }}-\${{ github.event_name }}-${platform}` +
+        `-\${{ needs.gate.outputs.${platform}_hash }}`,
       'cancel-in-progress': false,
     });
     const published = step(job, 'published');
@@ -186,6 +190,10 @@ test('a promote job copies the short-lived artifact under the durable name', () 
     assert.ok(promote, `promote_${platform} job is missing`);
     assert.equal(promote.needs, 'gate');
     assert.equal(promote.if, `needs.gate.outputs.promote_${platform} == 'true'`);
+    // A cancelled promote reports result == 'cancelled', which the build job
+    // reads as "not success" and answers with a full build. So the promote job
+    // must never take a slot that GitHub can cancel.
+    assert.equal(promote.concurrency, undefined, `promote_${platform} must not take a slot`);
     const upload = promote.steps.find(item =>
       (item.uses ?? '').startsWith('actions/upload-artifact')
     );

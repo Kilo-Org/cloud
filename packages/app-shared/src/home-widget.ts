@@ -13,6 +13,7 @@ import {
   type GlanceableSessionRow,
   type GlanceableStatusKind,
 } from './glanceable-agents-snapshot';
+import { parseTimestamp } from './utils';
 
 export const HOME_WIDGET_DETAIL_LIMIT = 3;
 export const HOME_WIDGET_TITLE_LIMIT = 120;
@@ -116,8 +117,17 @@ function refreshInterval(snapshot: GlanceableAgentsSnapshot): number {
 }
 
 function usableTime(value: string | undefined | null): number | null {
-  const at = value == null ? NaN : Date.parse(value);
+  if (value == null) {
+    return null;
+  }
+  const at = parseTimestamp(value).getTime();
   return Number.isFinite(at) ? at : null;
+}
+
+/** ISO 8601 form of a row time, or null when it does not parse. */
+function isoTime(value: string | undefined | null): string | null {
+  const at = usableTime(value);
+  return at === null ? null : new Date(at).toISOString();
 }
 
 function safeTitle(value: string | undefined | null): string {
@@ -172,8 +182,7 @@ export function buildHomeWidgetDetails(
     }),
     scheduledAgents: scheduled.slice(0, HOME_WIDGET_DETAIL_LIMIT).map(row => ({
       title: safeTitle(row.title),
-      scheduledAt:
-        usableTime(row.scheduledAt) === null ? null : new Date(row.scheduledAt ?? '').toISOString(),
+      scheduledAt: isoTime(row.scheduledAt),
     })),
   };
 }
@@ -203,10 +212,8 @@ export function buildHomeWidgetPresentation(
   const checkedAt =
     terminal || (primaryKind === null && snapshot.status !== 'empty') ? null : snapshot.updatedAt;
   const confirmedAt = usableTime(checkedAt);
-  const scheduledAt =
-    snapshot.scheduled > 0 && usableTime(snapshot.scheduledAt) !== null
-      ? snapshot.scheduledAt
-      : null;
+  const wake = snapshot.scheduled > 0 ? usableTime(snapshot.scheduledAt) : null;
+  const scheduledAt = wake === null ? null : new Date(wake).toISOString();
   return {
     status: terminal
       ? snapshot.status === 'privacy'
@@ -235,7 +242,7 @@ export function buildHomeWidgetPresentation(
         (confirmedAt !== null && now >= confirmedAt + refreshInterval(snapshot))),
     scheduledAt: terminal ? null : scheduledAt,
     approvalKey: terminal || snapshot.needsInput === 0 ? null : details.approvalKey,
-    awaitingUpdate: !terminal && scheduledAt !== null && now >= Date.parse(scheduledAt),
+    awaitingUpdate: !terminal && wake !== null && now >= wake,
     primaryTitle: terminal || primaryKind === null ? null : details.primaryTitle,
     waitingAgents: terminal || snapshot.needsInput === 0 ? [] : details.waitingAgents,
     scheduledAgents: terminal || snapshot.scheduled === 0 ? [] : details.scheduledAgents,

@@ -4,10 +4,7 @@ import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import { createLogUploader, type LogUploader } from './log-uploader';
-import { createSessionReadyHandler, type ServerDependencies } from './server';
-import { WrapperState } from './state';
-import type { WrapperKiloClient } from './kilo-api';
+import { createLogArchiveId, createLogUploader, type LogUploader } from './log-uploader';
 import {
   materializePromptAttachments,
   prepareWrapperBootstrapWorkspace,
@@ -1196,75 +1193,58 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         return new Response(null, { status: 204 });
       });
 
-      const state = new WrapperState();
       let uploader: LogUploader | undefined;
       let bootstrapError: unknown;
-      const deps: ServerDependencies = {
-        state,
-        kiloClient: {} as WrapperKiloClient,
-        openConnection: async () => {},
-        closeConnection: async () => {},
-        setAborted: () => {},
-        resetLifecycle: () => {},
-        readySession: async (readyRequest, archiveId) => {
-          const attemptUploader = createLogUploader({
-            archiveId,
-            context: {
-              workerBaseUrl: 'https://worker.example.com',
-              kiloSessionId: readyRequest.kiloSessionId,
-              workerAuthToken: readyRequest.session.workerAuthToken,
+      const readySession = async (
+        readyRequest: WrapperSessionReadyRequest,
+        archiveId: string
+      ): Promise<{ status: 'error' }> => {
+        const attemptUploader = createLogUploader({
+          archiveId,
+          context: {
+            workerBaseUrl: 'https://worker.example.com',
+            kiloSessionId: readyRequest.kiloSessionId,
+            workerAuthToken: readyRequest.session.workerAuthToken,
+          },
+          sessionId: readyRequest.agentSessionId,
+          userId: readyRequest.userId,
+          cliLogDir,
+          wrapperLogPath,
+        });
+        uploader = attemptUploader;
+        uploaders.push(attemptUploader);
+        attemptUploader.start();
+        await attemptUploader.uploadNow();
+        try {
+          await prepareWrapperBootstrapWorkspace(readyRequest, undefined, {
+            git: async args => {
+              if (args[0] === 'clone') {
+                await fsp.mkdir(path.join(readyRequest.workspace.workspacePath, '.git'), {
+                  recursive: true,
+                });
+              }
+              if (args[0] === 'fetch') {
+                await fsp.appendFile(cliLogPath, 'final CLI failure evidence\n');
+                return { stdout: '', stderr: '', exitCode: 1 };
+              }
+              return { stdout: '', stderr: '', exitCode: 0 };
             },
-            sessionId: readyRequest.agentSessionId,
-            userId: readyRequest.userId,
-            cliLogDir,
-            wrapperLogPath,
+            beforeFailureCleanup: async () => {
+              beforeCleanupCalls++;
+              await attemptUploader.finalize(uploadResult === 'timeout' ? 100 : 5_000);
+              cliPresentAfterFinalUpload = fs.existsSync(cliLogPath);
+            },
           });
-          uploader = attemptUploader;
-          uploaders.push(attemptUploader);
-          state.setLogUploader(attemptUploader);
-          attemptUploader.start();
-          await attemptUploader.uploadNow();
-          try {
-            await prepareWrapperBootstrapWorkspace(readyRequest, undefined, {
-              git: async args => {
-                if (args[0] === 'clone') {
-                  await fsp.mkdir(path.join(readyRequest.workspace.workspacePath, '.git'), {
-                    recursive: true,
-                  });
-                }
-                if (args[0] === 'fetch') {
-                  await fsp.appendFile(cliLogPath, 'final CLI failure evidence\n');
-                  return { stdout: '', stderr: '', exitCode: 1 };
-                }
-                return { stdout: '', stderr: '', exitCode: 0 };
-              },
-              beforeFailureCleanup: async () => {
-                beforeCleanupCalls++;
-                await attemptUploader.finalize(uploadResult === 'timeout' ? 100 : 5_000);
-                cliPresentAfterFinalUpload = fs.existsSync(cliLogPath);
-              },
-            });
-          } catch (error) {
-            bootstrapError = error;
-            return {
-              status: 'error',
-              error: {
-                code: 'WORKSPACE_SETUP_FAILED',
-                message: 'Workspace preparation failed',
-              },
-            };
-          }
-          throw new Error('Expected bootstrap failure');
-        },
+        } catch (error) {
+          bootstrapError = error;
+          return { status: 'error' };
+        }
+        throw new Error('Expected bootstrap failure');
       };
 
+      const archiveId = createLogArchiveId(request.session.wrapperRunId);
       const startedAt = Date.now();
-      const response = await createSessionReadyHandler(deps)(
-        new Request('http://wrapper.test/session/ready', {
-          method: 'POST',
-          body: JSON.stringify(request),
-        })
-      );
+      const response = await readySession(request, archiveId);
       const elapsedMs = Date.now() - startedAt;
       if (!uploader) throw new Error('Expected attempt uploader');
       const archivePath = `/sessions/${request.userId}/${request.agentSessionId}/logs/${uploader.archiveId}/logs.tar.gz`;
@@ -1272,7 +1252,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       await uploader.finalize();
       await uploader.uploadNow();
 
-      expect(response.status).toBe(503);
+      expect(response.status).toBe('error');
       expect(bootstrapError).toBeDefined();
       expect(retainedArchive?.includes('earlier CLI evidence')).toBe(true);
       expect(beforeCleanupCalls).toBe(1);
@@ -1280,7 +1260,6 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       expect(cliPresentAfterFinalUpload).toBe(true);
       expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
       expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
-      expect(state.logUploader).toBeNull();
       expect(uploadCalls).toBe(2);
       expect(archives.size).toBe(1);
       expect(archives.get(archivePath)).toBe(retainedArchive);

@@ -2,8 +2,8 @@
 
 This is the single design and acceptance spec for the `workspace_*` control plane: the Session DO
 (`SandboxSession`), the Sandbox DO (`SandboxControl`), the in-container supervisor and the control
-wrapper. Product rules stay in `.specs/cloud-agent-session.md`. The legacy `agent_*` plane
-(`CloudAgentSession`, legacy wrapper `wrapper/src/main.ts`) is out of scope.
+wrapper. Product rules stay in `.specs/cloud-agent-session.md`. The retired `agent_*` plane is
+out of scope; old session IDs are rejected.
 
 ## 1. Principles
 
@@ -965,8 +965,26 @@ Worker forwards an admitted report to the Sandbox DO as `startup-failed`.
 Modern runtime authorization uses the existing Worker facade for model, backend and native
 ingest/export requests on every supported provider. Each outbound request resolves the current
 Session-owned token through its renewing authorization path. No modern backing token reaches the
-wrapper, and no capability or direct-token fallback can redeem the registration snapshot. Legacy
-non-policy-bearing tokens retain their existing credential paths and access limits.
+wrapper, and no capability or direct-token fallback can redeem the registration snapshot.
+
+Kilo execution requires modern runtime authorization, whether credential containment is enabled
+or disabled. The wrapper receives only a session-bound runtime credential proxy handle. The
+legacy Kilo broker capability and direct-token execution paths are retired. Git credential
+containment and managed SCM direct-token paths keep their existing behavior.
+
+### Compatibility and rollout
+
+Persisted sessions and credential grants without modern runtime authorization remain readable
+for viewing, Stop, deletion, and cleanup. Their next start, restore, resume, or warm message
+delivery fails with `credential_upgrade_required` and asks the user to start a new session.
+Messages and callbacks receive the same failure guidance. There is no production data migration
+or automatic termination of an existing sandbox.
+
+New session producers must issue modern control tokens. Web and workflow issuance requires
+both `SHARED_RESOURCE_TOKENS_ENABLED=true` and `CLOUD_AGENT_RESOURCE_TOKENS_ENABLED=true`.
+Worker-local producers use their existing modern issuance settings. Local development must
+also enable modern issuance and configure a reachable Worker runtime proxy endpoint; enabling
+containment alone does not enable legacy Kilo execution.
 
 Handles are per worktree scope, including in a shared checkout: one handle serves every member of
 the scope. A handle is bound to the user, organization, authorization, worktree scope, current
@@ -1414,4 +1432,4 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
   the desired environment after the next restart. This predates the directory-key flip for legacy
   shared directories.
 - Out of scope: Kilo and model-provider retry policy, workspace file recovery after sandbox loss,
-  the legacy plane.
+  the retired legacy plane.

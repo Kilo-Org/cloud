@@ -14,7 +14,14 @@
 // dismisses (cancel) or the mutation succeeds (auto-dismiss).
 
 import * as Haptics from 'expo-haptics';
-import { Keyboard, ScrollView, type TextInput, useWindowDimensions, View } from 'react-native';
+import {
+  Keyboard,
+  ScrollView,
+  type ScrollViewInstance,
+  type TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -42,6 +49,7 @@ import {
   useMergePullRequestMutation,
 } from '@/lib/pr-review/merge/use-pr-merge-mutations';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { reconnectExpiredMessage } from '@/lib/pr-review/mutation-error-display';
 import {
   isPrOperationPersistenceFailed,
   PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
@@ -242,7 +250,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
   // read the ref on submit. `defaultValue` is for the first commit only.
   const titleInputRef = useRef<TextInput>(null);
   const messageInputRef = useRef<TextInput>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
   const titleRef = useRef(defaultCommitTitle(title, number));
   const messageRef = useRef(defaultCommitMessage(bodyMarkdown));
   const { height: windowHeight } = useWindowDimensions();
@@ -337,7 +345,9 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
         );
         setInlineErrorKind('non-retryable');
       } else if (classification.kind === 'reconnect') {
-        setInlineError(t('prReview.connectionExpired'));
+        // The status line sits above the reconnect notice on the provider
+        // arms, so it must name that provider's connection too.
+        setInlineError(reconnectExpiredMessage(providerPlatform));
         setInlineErrorKind('reconnect');
       } else {
         setInlineError(
@@ -415,9 +425,6 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       return 'REBASE';
     })();
     return {
-      owner,
-      repo: repoName,
-      number,
       prNodeId,
       method: autoMethod,
       commitTitle: titleRef.current.trim().length > 0 ? titleRef.current.trim() : undefined,

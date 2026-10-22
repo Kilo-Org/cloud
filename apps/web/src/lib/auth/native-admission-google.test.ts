@@ -1,15 +1,11 @@
 /**
- * Tests for findings #9 (cert digest enforcement), #12 (simulator bypass
- * production guard), and the Play Integrity decode endpoint fix (the resource
- * path must carry the configured package name, not the project number).
+ * Tests for findings #9 (cert digest enforcement), the Play Integrity decode
+ * endpoint fix (the resource path must carry the configured package name, not
+ * the project number), and the cached access token with bounded provider calls.
  */
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
 import { createHash, generateKeyPairSync } from 'node:crypto';
-import {
-  isProductionInternal,
-  resetAccessTokenCacheForTests,
-  verifyPlayIntegrity,
-} from './native-admission-google';
+import { resetAccessTokenCacheForTests, verifyPlayIntegrity } from './native-admission-google';
 
 // Values are read lazily (via getters) so tests can vary the configuration.
 const mockConfig = {
@@ -37,71 +33,15 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
-// ── Simulator bypass production guard (finding #12) ──────────────────────
+// ── Missing credentials fail closed ───────────────────────────────────────
 
-describe('isProductionInternal (internal guard)', () => {
-  const originalEnv = process.env.NODE_ENV;
-
-  afterEach(() => {
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: originalEnv,
-      writable: false,
-    });
-  });
-
-  test('returns false in test environment', () => {
-    expect(isProductionInternal()).toBe(false);
-  });
-
-  test('returns true when NODE_ENV is production', () => {
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: 'production',
-      writable: false,
-    });
-    expect(isProductionInternal()).toBe(true);
-  });
-});
-
-describe('verifyPlayIntegrity production bypass guard', () => {
-  const originalNodeEnv = process.env.NODE_ENV;
-  const originalBypass = process.env.NATIVE_ADMISSION_SIMULATOR_BYPASS;
-
-  afterEach(() => {
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: originalNodeEnv,
-      writable: false,
-    });
-    if (originalBypass === undefined) {
-      delete process.env.NATIVE_ADMISSION_SIMULATOR_BYPASS;
-    } else {
-      process.env.NATIVE_ADMISSION_SIMULATOR_BYPASS = originalBypass;
-    }
-  });
-
-  test('bypass is NOT taken in production even with NATIVE_ADMISSION_SIMULATOR_BYPASS=true', async () => {
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: 'production',
-      writable: false,
-    });
-    process.env.NATIVE_ADMISSION_SIMULATOR_BYPASS = 'true';
-
-    // In production with bypass=true and no credentials configured,
-    // verifyPlayIntegrity must throw (fail-closed), NOT return the
-    // simulator bypass result.
+describe('verifyPlayIntegrity without credentials', () => {
+  test('throws so the route surfaces a retryable 5xx', async () => {
+    // Missing credentials mean the verdict cannot be checked. Throwing keeps
+    // this an infrastructure fault instead of a refusal of the device.
     await expect(verifyPlayIntegrity('fake-token', 'fake-challenge')).rejects.toThrow(
       'Google Play Integrity credentials not configured'
     );
-  });
-
-  test('bypass is taken in non-production with NATIVE_ADMISSION_SIMULATOR_BYPASS=true', async () => {
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: 'development',
-      writable: false,
-    });
-    process.env.NATIVE_ADMISSION_SIMULATOR_BYPASS = 'true';
-
-    const result = await verifyPlayIntegrity('fake-token', 'fake-challenge');
-    expect(result).toEqual({ ok: true, packageName: 'com.example.simulator' });
   });
 });
 

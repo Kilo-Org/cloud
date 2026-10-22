@@ -13,7 +13,9 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { ScopeEntryScreen } from './scope-entry-screen';
 import { SettingsOverviewScreen } from './settings-overview-screen';
 
-const transport = vi.hoisted(() => vi.fn<typeof fetch>());
+const transport = vi.hoisted(() =>
+  vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+);
 let permissionData = {
   hasIntegration: true,
   hasPermissions: true,
@@ -84,7 +86,7 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 function host(root: TestRenderer.ReactTestInstance, type: string) {
   return root.findAll(node => node.type === type);
 }
-function procedureFor(input: Parameters<typeof fetch>[0]) {
+function procedureFor(input: RequestInfo | URL) {
   return new URL(input instanceof Request ? input.url : input).pathname.split('.').at(-1) ?? '';
 }
 async function advanceBy() {
@@ -300,7 +302,7 @@ describe.each([
       expect(host(root, 'ConfigureRow')).toHaveLength(0);
       expect(host(root, 'ScreenHeader')[0]?.props.headerRight).toBeNull();
       expect(host(root, 'Text').map(node => node.props.children)).toContain(
-        'Security Agent is disabled. Only organization owners and billing managers can turn it on.'
+        'Security Agent is disabled. Only organization owners, admins, and billing managers can turn it on.'
       );
       expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
     }
@@ -313,7 +315,13 @@ describe.each([
       organizationId: 'org_123',
     });
     const other = trpc.securityAgent.getConfig.queryOptions();
-    void queryClient.prefetchQuery(other);
+    void (async () => {
+      try {
+        await queryClient.query(other);
+      } catch {
+        // Offline: the fetch stays paused for the retry path.
+      }
+    })();
     queryClient.setQueryData(configKey, configData);
     const root = await mount('org_123', Screen);
     const error = host(root, 'PlatformErrorScreen')[0];

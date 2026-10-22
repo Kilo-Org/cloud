@@ -3,13 +3,17 @@ import { readFileSync } from 'node:fs';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only guard, runs in node, never bundled into the app
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   findingDetailBackTarget,
   findingDetailHasLocalHistory,
   PROFILE_TAB_ROOT,
 } from './finding-detail-back';
+import { profileTabPressListeners } from './tab-press-listeners';
+import { __resetTabSwitchInputForTests } from './tab-switch-input-gate';
+
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 
 // The `showBackButton` wiring itself (that `FindingDetailScreen` passes
 // `showBackButton` to `ScreenHeader` in the loaded/notFound/error/loading
@@ -80,31 +84,68 @@ describe('profile tab anchor', () => {
     new URL('../app/(app)/(tabs)/(3_profile)/_layout.tsx', import.meta.url)
   );
   const layoutSource = readFileSync(layoutPath, 'utf8');
-  const tabsLayoutPath = fileURLToPath(new URL('../app/(app)/(tabs)/_layout.tsx', import.meta.url));
-  const tabsLayoutSource = readFileSync(tabsLayoutPath, 'utf8');
-
   it("declares initialRouteName: 'index'", () => {
     expect(layoutSource).toMatch(/initialRouteName:\s*'index'/);
   });
+});
 
-  it('returns to the profile root when the profile tab is pressed', () => {
-    const profileTab = tabsLayoutSource.split('name="(3_profile)"')[1];
+describe('profile tab press', () => {
+  // The re-press resets through the shared plan (`planProfileTabPress`), which
+  // dispatches a targeted stack pop so the unsaved-changes guard can intercept
+  // it; a cross-tab press and a form-sheet leaf are left to the navigator, which
+  // keeps the tab's stack.
+  const PROFILE_SEGMENTS = ['(app)', '(tabs)', '(3_profile)'];
+  const HOME_SEGMENTS = ['(app)', '(tabs)', '(0_home)'];
 
-    // The re-press resets through the shared plan (`planProfileTabPress`), which
-    // dispatches a targeted stack pop so the unsaved-changes guard can
-    // intercept it; a cross-tab press and a form-sheet leaf are left to the
-    // navigator, which keeps the tab's stack.
-    expect(profileTab).toContain('planProfileTabPress(');
-    expect(profileTab).toContain("plan !== 'reset-to-root'");
-    expect(profileTab).toContain("'POP_TO_TOP'");
+  function pressProfileTab({
+    segments,
+    stackKey = 'profile-stack',
+    stackIndex = 0,
+  }: Readonly<{ segments: string[]; stackKey?: string; stackIndex?: number }>) {
+    const preventDefault = vi.fn<() => void>();
+    const dispatch = vi.fn<(action: { type: string; target?: string }) => void>();
+
+    profileTabPressListeners(segments)({
+      navigation: {
+        isFocused: () => true,
+        getState: () => ({
+          routes: [{ name: '(3_profile)', state: { key: stackKey, index: stackIndex } }],
+        }),
+        dispatch,
+      },
+    }).tabPress({ preventDefault });
+
+    return { preventDefault, dispatch };
+  }
+
+  afterEach(() => {
+    __resetTabSwitchInputForTests();
   });
 
-  it('does not force-navigate the profile root on a tab press', () => {
-    // A forced `router.navigate(profileRoot)` pushes the root above the current
-    // screen: the sheet closes, the stack is dropped from view, and the
-    // unsaved-changes guard never sees a removal.
-    const profileTab = tabsLayoutSource.split('name="(3_profile)"')[1];
+  it('leaves a cross-tab press to the navigator so the tab keeps its stack', () => {
+    const { preventDefault, dispatch } = pressProfileTab({
+      segments: HOME_SEGMENTS,
+      stackIndex: 2,
+    });
 
-    expect(profileTab).not.toContain('router.navigate');
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('leaves a re-press at the profile root to the navigator', () => {
+    const { preventDefault, dispatch } = pressProfileTab({ segments: PROFILE_SEGMENTS });
+
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('pops back to the profile root from a screen above it', () => {
+    const { preventDefault, dispatch } = pressProfileTab({
+      segments: PROFILE_SEGMENTS,
+      stackIndex: 2,
+    });
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith({ type: 'POP_TO_TOP', target: 'profile-stack' });
   });
 });

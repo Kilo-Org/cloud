@@ -101,6 +101,22 @@ describe('baseSendMessageNextSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('accepts follow-up command arguments at the shared cap', () => {
+    const result = baseSendMessageNextSchema.safeParse({
+      cloudAgentSessionId: 'cloud-session-1',
+      payload: commandPayload(atCap),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects follow-up command arguments one character over the shared cap', () => {
+    const result = baseSendMessageNextSchema.safeParse({
+      cloudAgentSessionId: 'cloud-session-1',
+      payload: commandPayload(overCap),
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('basePrepareSessionNextSchema initialPayload', () => {

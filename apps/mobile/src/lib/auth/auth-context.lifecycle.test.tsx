@@ -8,7 +8,12 @@ import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 
 import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
 import type * as TokenOwnerModule from './token-owner';
-import { CHAT_BACKENDS_KEY, ORGANIZATION_PERSONAL_STORAGE_KEY } from '@/lib/storage-keys';
+import {
+  AUTH_TOKEN_KEY,
+  CHAT_BACKENDS_KEY,
+  ORGANIZATION_PERSONAL_STORAGE_KEY,
+  REFRESH_TOKEN_KEY,
+} from '@/lib/storage-keys';
 
 // The mobile-app gate runs `vitest related` over ~170 files concurrently with
 // the device stack, so every real timer in this file stretches several-fold.
@@ -2938,8 +2943,8 @@ describe('session restoration after provider remount', () => {
   });
 
   it('does not restore an initial session after explicit sign-out', async () => {
-    store.set('auth-token', 'initial-token');
-    store.set('refresh-token', 'initial-refresh');
+    store.set(AUTH_TOKEN_KEY, 'initial-token');
+    store.set(REFRESH_TOKEN_KEY, 'initial-refresh');
     const mod = await loadAuthModule();
     const first = await mountAndGetContext(mod);
     expect(first.getCtx().token).toBe('initial-token');

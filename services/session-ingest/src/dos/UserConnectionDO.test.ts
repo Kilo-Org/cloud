@@ -574,6 +574,356 @@ describe('UserConnectionDO', () => {
       expect(cliWs.send).not.toHaveBeenCalled();
     });
 
+    it('persists authoritative idle over a question heartbeat before broadcasting and after hibernation', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      const changedAt = '2026-10-22T10:00:02.000Z';
+      const snapshotsAtDelivery: Array<Array<{ id: string; status: string }>> = [];
+      webWs.send.mockImplementation(() => {
+        snapshotsAtDelivery.push(doInstance.getActiveSessions());
+        const restored = new UserConnectionDO(ctx as never, {} as Env);
+        snapshotsAtDelivery.push(restored.getActiveSessions());
+      });
+
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'question',
+          status: 'idle',
+          statusUpdatedAt: changedAt,
+          changedAt,
+        },
+      });
+
+      expect(snapshotsAtDelivery).toMatchObject([
+        [{ id: 's1', status: 'idle' }],
+        [{ id: 's1', status: 'idle' }],
+      ]);
+      expect(doInstance.getActiveSessions()).toMatchObject([{ id: 's1', status: 'idle' }]);
+      const restored = new UserConnectionDO(ctx as never, {} as Env);
+      expect(restored.getActiveSessions()).toMatchObject([{ id: 's1', status: 'idle' }]);
+      expect(allSent(webWs).at(-1)).toMatchObject({
+        event: 'session.status.updated',
+        data: { sessionId: 's1', status: 'idle' },
+      });
+    });
+
+    it('allows a later undated heartbeat to raise a genuine new question after authoritative idle', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      const changedAt = '2026-10-22T10:00:02.000Z';
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'question',
+          status: 'idle',
+          statusUpdatedAt: changedAt,
+          changedAt,
+        },
+      });
+      const restored = new UserConnectionDO(ctx as never, {} as Env);
+
+      sendHeartbeat(restored, cliWs, [makeSession('s1', 'question')]);
+
+      expect(restored.getActiveSessions()).toMatchObject([{ id: 's1', status: 'question' }]);
+      expect(allSent(webWs).at(-1)).toMatchObject({
+        event: 'sessions.heartbeat',
+        data: { sessions: [{ id: 's1', status: 'question' }] },
+      });
+      expect(new UserConnectionDO(ctx as never, {} as Env).getActiveSessions()).toMatchObject([
+        { id: 's1', status: 'question' },
+      ]);
+    });
+
+    it('preserves distinct same-millisecond explicit transitions in arrival order after hibernation', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'question',
+          status: 'idle',
+          statusUpdatedAt: '2026-10-22T10:00:02.000Z',
+          changedAt: '2026-10-22T10:00:03.000Z',
+        },
+      });
+      webWs.send.mockClear();
+      const restored = new UserConnectionDO(ctx as never, {} as Env);
+
+      const result = await restored.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'busy',
+          status: 'question',
+          statusUpdatedAt: '2026-10-22T10:00:02.000Z',
+          changedAt: '2026-10-22T10:00:04.000Z',
+        },
+      });
+
+      expect(result).toEqual({ delivered: 1 });
+      expect(allSent(webWs)).toMatchObject([
+        { event: 'session.status.updated', data: { sessionId: 's1', status: 'question' } },
+      ]);
+      expect(restored.getActiveSessions()).toMatchObject([{ id: 's1', status: 'question' }]);
+    });
+
+    it('updates full-row child statuses without erasing another live child raise', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cliWs, [
+        { ...makeSession('root', 'scheduled'), scheduledAt: '2026-10-22T11:00:00.000Z' },
+        makeSession('child-1', 'question', 'First child', 'root'),
+        makeSession('child-2', 'permission', 'Second child', 'root'),
+      ]);
+      for (const [sessionId, changedAt] of [
+        ['child-2', '2026-10-22T10:00:02.000Z'],
+        ['child-1', '2026-10-22T10:00:03.000Z'],
+      ]) {
+        await doInstance.notifySessionEvent({
+          type: 'session.status.updated',
+          data: {
+            source: 'v2',
+            session: {
+              source: 'v2',
+              sessionId,
+              createdAt: '2026-10-22T10:00:00.000Z',
+              updatedAt: changedAt,
+              title: 'Child',
+              createdOnPlatform: 'linux',
+              organizationId: null,
+              gitUrl: null,
+              gitBranch: null,
+              parentSessionId: 'root',
+              status: 'idle',
+              statusUpdatedAt: changedAt,
+            },
+            previousStatus: sessionId === 'child-2' ? 'permission' : 'question',
+            status: 'idle',
+            statusUpdatedAt: changedAt,
+            changedAt,
+          },
+        });
+        const restored = new UserConnectionDO(ctx as never, {} as Env);
+        expect(restored.getActiveSessions()).toMatchObject([
+          { id: 'root', status: sessionId === 'child-2' ? 'question' : 'scheduled' },
+        ]);
+        expect(allSent(webWs).at(-1)).toMatchObject({
+          event: 'session.status.updated',
+          data: {
+            sessionId: 'root',
+            status: sessionId === 'child-2' ? 'question' : 'scheduled',
+            statusUpdatedAt: null,
+            ...(sessionId === 'child-1' ? { scheduledAt: '2026-10-22T11:00:00.000Z' } : {}),
+          },
+        });
+      }
+    });
+
+    it('keeps independent child attention when the root itself becomes idle', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('root', 'question'),
+        makeSession('child', 'permission', 'Child', 'root'),
+      ]);
+      webWs.send.mockClear();
+
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 'root',
+          previousStatus: 'question',
+          status: 'idle',
+          statusUpdatedAt: '2026-10-22T10:00:02.000Z',
+          changedAt: '2026-10-22T10:00:03.000Z',
+        },
+      });
+
+      expect(doInstance.getActiveSessions()).toMatchObject([{ id: 'root', status: 'permission' }]);
+      expect(new UserConnectionDO(ctx as never, {} as Env).getActiveSessions()).toMatchObject([
+        { id: 'root', status: 'permission' },
+      ]);
+      expect(allSent(webWs)).toMatchObject([
+        {
+          event: 'session.status.updated',
+          data: { sessionId: 'root', status: 'permission', statusUpdatedAt: null },
+        },
+      ]);
+    });
+
+    it('does not change the live snapshot or broadcast when attachment persistence fails', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      webWs.send.mockClear();
+      vi.spyOn(cliWs, 'serializeAttachment').mockImplementation(() => {
+        throw new Error('Attachment too large');
+      });
+
+      await expect(
+        doInstance.notifySessionEvent({
+          type: 'session.status.updated',
+          data: {
+            source: 'v2',
+            sessionId: 's1',
+            previousStatus: 'question',
+            status: 'idle',
+            statusUpdatedAt: null,
+            changedAt: '2026-10-22T10:00:03.000Z',
+          },
+        })
+      ).rejects.toThrow('Attachment too large');
+
+      expect(webWs.send).not.toHaveBeenCalled();
+      expect(doInstance.getActiveSessions()).toMatchObject([{ id: 's1', status: 'question' }]);
+      expect(new UserConnectionDO(ctx as never, {} as Env).getActiveSessions()).toMatchObject([
+        { id: 's1', status: 'question' },
+      ]);
+    });
+
+    it('updates only the current owner when another connected CLI retains an old session row', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const firstCli = addCliSocket(mockCtx, 'cli-1');
+      const currentCli = addCliSocket(mockCtx, 'cli-2');
+      sendHeartbeat(doInstance, firstCli, [makeSession('s1', 'question')]);
+      sendHeartbeat(doInstance, currentCli, [makeSession('s1', 'permission')]);
+
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'permission',
+          status: 'idle',
+          statusUpdatedAt: null,
+          changedAt: '2026-10-22T10:00:03.000Z',
+        },
+      });
+
+      expect(doInstance.getActiveSessions()).toMatchObject([
+        { id: 's1', status: 'idle', connectionId: 'cli-2' },
+      ]);
+      expect(new UserConnectionDO(ctx as never, {} as Env).getActiveSessions()).toMatchObject([
+        { id: 's1', status: 'idle', connectionId: 'cli-2' },
+      ]);
+      expect(firstCli.deserializeAttachment()).toMatchObject({
+        sessions: [{ id: 's1', status: 'question' }],
+      });
+    });
+
+    it('persists into the open replacement when a closing socket retains the same connection id', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const oldCli = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, oldCli, [makeSession('s1', 'question')]);
+      oldCli.readyState = WebSocket.CLOSING;
+      const replacement = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, replacement, [makeSession('s1', 'question')]);
+
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'question',
+          status: 'idle',
+          statusUpdatedAt: null,
+          changedAt: '2026-10-22T10:00:03.000Z',
+        },
+      });
+      mockCtx.removeSocket(oldCli);
+      mockCtx.addSocket(oldCli);
+      expect(new UserConnectionDO(ctx as never, {} as Env).getActiveSessions()).toMatchObject([
+        { id: 's1', status: 'idle' },
+      ]);
+      mockCtx.removeSocket(oldCli);
+
+      expect(doInstance.getActiveSessions()).toMatchObject([{ id: 's1', status: 'idle' }]);
+      expect(new UserConnectionDO(ctx as never, {} as Env).getActiveSessions()).toMatchObject([
+        { id: 's1', status: 'idle' },
+      ]);
+    });
+
+    it('does not clear the current root owner attention when a former owner child resolves', async () => {
+      const { doInstance, mockCtx } = setup();
+      const firstCli = addCliSocket(mockCtx, 'cli-1');
+      const currentCli = addCliSocket(mockCtx, 'cli-2');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, firstCli, [
+        makeSession('root', 'idle'),
+        makeSession('old-child', 'permission', 'Old child', 'root'),
+      ]);
+      sendHeartbeat(doInstance, currentCli, [
+        makeSession('root', 'busy'),
+        makeSession('current-child', 'question', 'Current child', 'root'),
+      ]);
+      webWs.send.mockClear();
+
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 'old-child',
+          previousStatus: 'permission',
+          status: 'idle',
+          statusUpdatedAt: null,
+          changedAt: '2026-10-22T10:00:03.000Z',
+        },
+      });
+
+      expect(doInstance.getActiveSessions()).toMatchObject([
+        { id: 'root', status: 'question', connectionId: 'cli-2' },
+      ]);
+      expect(allSent(webWs)).toMatchObject([
+        { event: 'session.status.updated', data: { sessionId: 'old-child', status: 'idle' } },
+      ]);
+    });
+
+    it('clears unknown authoritative status and obsolete scheduled wake times without inventing idle', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [
+        {
+          ...makeSession('s1', 'scheduled'),
+          scheduledAt: '2026-10-22T11:00:00.000Z',
+        },
+      ]);
+
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'scheduled',
+          status: null,
+          statusUpdatedAt: null,
+          changedAt: '2026-10-22T10:00:03.000Z',
+        },
+      });
+
+      expect(doInstance.getActiveSessions()).toMatchObject([{ id: 's1', status: '' }]);
+      const restored = new UserConnectionDO(ctx as never, {} as Env);
+      expect(restored.getActiveSessions()).toMatchObject([{ id: 's1', status: '' }]);
+      expect(restored.getActiveSessions()[0]).not.toHaveProperty('scheduledAt');
+    });
+
     it('rejects invalid session event payloads without broadcasting', async () => {
       const { doInstance, mockCtx } = setup();
       const webWs = addWebSocket(mockCtx);
@@ -2012,6 +2362,37 @@ describe('UserConnectionDO', () => {
       expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
         true
       );
+    });
+
+    it('reconstructs a lone closing owner after hibernation before scheduling disconnect cleanup', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const otherCli = addCliSocket(mockCtx, 'cli-other');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cliWs, [makeSession('s-question', 'question')]);
+      sendHeartbeat(doInstance, otherCli, [makeSession('s-other', 'busy')]);
+      webWs.send.mockClear();
+      cliWs.readyState = WebSocket.CLOSING;
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const restored = new UserConnectionDO(ctx as never, {} as Env);
+
+      await disconnectCli(restored, cliWs);
+
+      expect(ctx.storage.store.get('attentionReset:s-question')).toEqual({
+        kiloUserId: 'usr_1',
+        dueAt: now + CLI_ABSENCE_ATTENTION_RESET_MS,
+        connectionId: 'cli-1',
+      });
+      expect(ctx.storage.store.has('attentionReset:s-other')).toBe(false);
+      expect(restored.getActiveSessions()).toMatchObject([
+        { id: 's-other', status: 'busy', connectionId: 'cli-other' },
+      ]);
+      expect(allSent(webWs)).toContainEqual({
+        type: 'system',
+        event: 'cli.disconnected',
+        data: { connectionId: 'cli-1' },
+      });
     });
 
     it('does not hold attention when kiloUserId is missing on the attachment', async () => {

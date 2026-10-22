@@ -1724,6 +1724,7 @@
       "branchLoadError": "Dallar yüklenemedi",
       "branchUnavailable": "Bu depo için dal kullanılamıyor. Sağlayıcıdaki erişimini kontrol et, ardından başka bir depo seç.",
       "branchEmpty": "Kullanılabilir dal yok",
+      "branchListIncomplete": "Yalnızca bazı dallar gösteriliyor. Depoda bu listenin içerebileceğinden daha fazla dal var.",
       "branchPlaceholder": "Bir dal seç",
       "runOnWithTarget": "Çalıştırma yeri: {{target}}",
       "environment": "Ortam",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} araç",
       "serverToolCount_other": "{{count}} araç",
       "serverUnreachable": "Bu sunucuya ulaşılamadı",
-      "serverOff": "Bu sunucu kapalı"
+      "serverOff": "Bu sunucu kapalı",
+      "app": {
+        "label": "Araç arayüzü",
+        "failed": "Bu aracın arayüzü yüklenemedi.",
+        "empty": "Bu aracın arayüzünde gösterilecek bir şey yok."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Kimlik doğrulama",

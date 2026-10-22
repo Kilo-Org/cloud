@@ -1724,6 +1724,7 @@
       "branchLoadError": "Branches konden niet worden geladen",
       "branchUnavailable": "Er zijn geen branches beschikbaar voor deze repository. Controleer je toegang bij de provider en kies een andere repository.",
       "branchEmpty": "Geen branches beschikbaar",
+      "branchListIncomplete": "Slechts enkele branches worden weergegeven. De repository heeft meer branches dan deze lijst kan bevatten.",
       "branchPlaceholder": "Een branch selecteren",
       "runOnWithTarget": "Uitvoeren op: {{target}}",
       "environment": "Omgeving",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} tool",
       "serverToolCount_other": "{{count}} tools",
       "serverUnreachable": "Kon deze server niet bereiken",
-      "serverOff": "Deze server staat uit"
+      "serverOff": "Deze server staat uit",
+      "app": {
+        "label": "Interface van de tool",
+        "failed": "De interface van deze tool kon niet worden geladen.",
+        "empty": "De interface van deze tool heeft niets te tonen."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Authenticatie",

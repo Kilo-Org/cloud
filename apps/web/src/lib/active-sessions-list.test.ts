@@ -203,4 +203,60 @@ describe('listActiveSessions cloud candidates', () => {
     expect(verified?.associatedPr).toMatchObject({ number: 7, verified: true });
     expect(unverified?.associatedPr).toBeUndefined();
   });
+
+  it.each([
+    ['idle', true, 'busy', undefined],
+    ['busy', true, 'busy', '2026-09-22T09:15:00.000Z'],
+    ['question', true, 'question', '2026-09-22T09:15:00.000Z'],
+    ['permission', true, 'permission', '2026-09-22T09:15:00.000Z'],
+    ['idle', false, 'idle', '2026-09-22T09:15:00.000Z'],
+  ])(
+    'dates stored %s with run_open=%s only when the resolved %s status matches',
+    async (storedStatus, runOpen, resolvedStatus, statusUpdatedAt) => {
+      limitMock.mockResolvedValue([
+        {
+          session_id: 'candidate',
+          created_on_platform: null,
+          created_at: '2026-09-22T09:00:00.000Z',
+          updated_at: '2026-09-22T09:30:00.000Z',
+          status: storedStatus,
+          title: 'candidate',
+          organization_id: null,
+          git_url: null,
+          git_branch: null,
+          last_activity_at: null,
+          status_updated_at: '2026-09-22 09:15:00+00',
+          total_cost_microdollars: null,
+          cloud_agent_session_id: 'cas-1',
+          run_open: runOpen,
+          session_pr_platform: null,
+          session_pr_url: null,
+          session_pr_number: null,
+          session_pr_verified_at: null,
+          pr_url: null,
+          pr_number: null,
+          pr_state: null,
+          pr_title: null,
+          pr_head_sha: null,
+          pr_last_synced_at: null,
+          pr_review_decision: null,
+          review_decision_pending: null,
+        },
+      ]);
+
+      const result = await listActiveSessions({
+        userId: 'user-1',
+        organizationId: undefined,
+        includeCloudAgentSessions: true,
+      });
+
+      expect(result.sessions).toHaveLength(1);
+      expect(result.sessions[0].status).toBe(resolvedStatus);
+      if (statusUpdatedAt === undefined) {
+        expect(result.sessions[0]).not.toHaveProperty('statusUpdatedAt');
+      } else {
+        expect(result.sessions[0].statusUpdatedAt).toBe(statusUpdatedAt);
+      }
+    }
+  );
 });

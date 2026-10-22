@@ -23,10 +23,9 @@ import {
   applyMoonshotModelSettings,
   isKimiModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
-import {
-  PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG,
-  resolvePreferredProviderOrder,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
+import { resolvePreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
+import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
 import {
   ReasoningDetailsTransform,
   type BYOKResult,
@@ -141,10 +140,6 @@ function applyGeminiReasoningTransform(request: OpenRouterChatCompletionRequest)
   mapGeminiReasoningDetails(request);
 }
 
-export function getPreferredProviderOrder(requestedModel: string): string[] {
-  return resolvePreferredProviderOrder(PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG, requestedModel);
-}
-
 /**
  * Claude goes to Anthropic directly only for non-trial enterprise
  * organizations; everyone else is served by the other Claude providers.
@@ -170,6 +165,7 @@ export function withIgnoredProviders(
 }
 
 export function applyPreferredProvider(
+  preferredProviderOrderConfig: PreferredProviderOrderConfig,
   requestedModel: string,
   requestToMutate:
     | OpenRouterChatCompletionRequest
@@ -177,7 +173,10 @@ export function applyPreferredProvider(
     | GatewayMessagesRequest,
   isAnthropicProviderAllowed: boolean
 ) {
-  const preferredProviderOrder = getPreferredProviderOrder(requestedModel);
+  const preferredProviderOrder = resolvePreferredProviderOrder(
+    preferredProviderOrderConfig,
+    requestedModel
+  );
   const ignoredProviders = getIgnoredProviders(requestedModel, isAnthropicProviderAllowed);
   if (preferredProviderOrder.length === 0 && ignoredProviders.length === 0) {
     return;
@@ -345,6 +344,7 @@ export async function applyProviderSpecificLogic(
   if (provider.id === 'openrouter' || provider.id === 'vercel') {
     // A user's own BYOK credential is never ignored.
     applyPreferredProvider(
+      await getPreferredProviderOrderConfig(),
       requestedModel,
       requestToMutate.body,
       isNonTrialEnterprise || userByok !== null

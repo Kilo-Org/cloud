@@ -195,8 +195,8 @@ export async function subscribeToCodingPlan(
   const requestKey = idempotencyFingerprint(idempotencyKey);
   const outcome = await db.transaction(async tx => {
     const { rows: lockedUsers } = await tx.execute<{
-      total_microdollars_acquired: number;
-      microdollars_used: number;
+      total_microdollars_acquired: string;
+      microdollars_used: string;
     }>(sql`
       SELECT total_microdollars_acquired, microdollars_used
       FROM kilocode_users
@@ -267,7 +267,7 @@ export async function subscribeToCodingPlan(
     const periodEndIso = periodEnd.toISOString();
     const transactionId = crypto.randomUUID();
 
-    const { rows: chargedUsers } = await tx.execute<{ microdollars_used: number }>(sql`
+    const { rows: chargedUsers } = await tx.execute<{ microdollars_used: string }>(sql`
       UPDATE kilocode_users
       SET microdollars_used = microdollars_used + ${plan.costMicrodollars}
       WHERE id = ${userId}
@@ -286,7 +286,7 @@ export async function subscribeToCodingPlan(
       description: `Coding plan: ${plan.providerName} ${plan.name}`,
       credit_category: `coding-plan:${plan.planId}:${requestKey}`,
       check_category_uniqueness: true,
-      original_baseline_microdollars_used: lockedUser.microdollars_used,
+      original_baseline_microdollars_used: Number(lockedUser.microdollars_used),
       created_at: periodStartIso,
     });
     const { rows: inventoryRows } = await tx.execute<{

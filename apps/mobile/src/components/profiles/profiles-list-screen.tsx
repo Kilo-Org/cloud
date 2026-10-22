@@ -27,6 +27,7 @@ import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { formatProfileCountItemsShort } from '@/lib/profile-count-labels';
 import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganization } from '@/lib/organization-context';
@@ -102,6 +103,8 @@ export function ProfilesListScreen() {
     isRefetching,
     refetch,
   } = useAgentProfileList(organizationId ?? undefined);
+  // Reactive: a connectivity commit re-renders the error variant selection.
+  const committedConnectivity = useCommittedConnectivityStatus();
 
   const sections = buildProfileSections({ orgProfiles, personalProfiles, isOrgContext });
   // Wait for the stored organization before choosing the list context, so a
@@ -132,9 +135,13 @@ export function ProfilesListScreen() {
           />
         }
       >
+        {/* A failed refetch keeps the cached rows usable: the error banner sits
+            above the content and only replaces it when there is nothing to
+            show. A confirmed-offline device is a connectivity failure, not a
+            server one; `unknown` connectivity keeps the server variant. */}
         {isError && (
           <QueryError
-            variant="server"
+            variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
             placement="top"
             title={t('profiles.loadFailed')}
             onRetry={() => void refetch()}
@@ -155,7 +162,7 @@ export function ProfilesListScreen() {
             }
           />
         )}
-        {!isError && !isListLoading && sections.length > 0 && (
+        {!isListLoading && sections.length > 0 && (
           <>
             {sections.map(section => (
               <View key={section.key} className="gap-3">

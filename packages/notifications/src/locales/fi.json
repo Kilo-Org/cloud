@@ -41,7 +41,7 @@
   "internal": {
     "lowBalance": {
       "title": "Matalan saldon hälytys",
-      "body": "{{organizationName}} saldo laski alle ${{minimumBalanceUsd}}"
+      "body": "Organisaation {{organizationName}} saldo laski alle ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Kulutushälytys",

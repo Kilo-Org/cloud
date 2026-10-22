@@ -1,3 +1,4 @@
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { FileDiff } from 'lucide-react';
 import { ToolCardShell } from './ToolCardShell';
 import { ToolDiff, ToolDiffStats, ToolFilePath } from './ToolDiff';
@@ -43,7 +44,9 @@ export function ApplyPatchToolCard({ toolPart }: ApplyPatchToolCardProps) {
       status={state.status}
     >
       {files.map((file, index) => {
-        const filePath = file.relativePath ?? file.movePath ?? file.filePath;
+        const filePath = cloudAgentFileLabel(
+          file.relativePath ?? file.movePath ?? file.filePath ?? ''
+        );
         return (
           <section key={`${index}:${filePath}`} className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs">
@@ -56,12 +59,17 @@ export function ApplyPatchToolCard({ toolPart }: ApplyPatchToolCardProps) {
             {file.type === 'move' && (
               <div className="text-muted-foreground space-y-1 text-xs">
                 <div>
-                  From: <code className="break-all">{file.filePath ?? 'Unknown source'}</code>
+                  From:{' '}
+                  <code className="break-all">
+                    {file.filePath ? cloudAgentFileLabel(file.filePath) : 'Unknown source'}
+                  </code>
                 </div>
                 <div>
                   To:{' '}
                   <code className="break-all">
-                    {file.movePath ?? file.relativePath ?? 'Unknown destination'}
+                    {(file.movePath ?? file.relativePath)
+                      ? cloudAgentFileLabel(file.movePath ?? file.relativePath ?? '')
+                      : 'Unknown destination'}
                   </code>
                 </div>
               </div>

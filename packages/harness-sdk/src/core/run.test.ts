@@ -1,4 +1,4 @@
-import { Chunk, Effect, Fiber, Layer, Stream } from 'effect';
+import { Effect, Fiber, Layer, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import { layerSeededEntropy } from '../plugins/entropy/seeded.js';
 import { fakeModel } from '../plugins/model/fake.js';
@@ -11,7 +11,7 @@ import { hitRatio } from './usage.js';
 
 it('keeps the question and the answer as two turns, in order', async () => {
   const { value } = await run([{ deltas: ['he', 'llo'] }], session =>
-    Effect.zipRight(Stream.runDrain(session.ask('hi')), session.history)
+    Effect.andThen(Stream.runDrain(session.ask('hi')), session.history)
   );
   expect(texts(value)).toEqual(['user:hi', 'assistant:hello']);
 });
@@ -19,7 +19,7 @@ it('keeps the question and the answer as two turns, in order', async () => {
 it('takes the question back out when the stream fails part way', async () => {
   const failure = new ModelError({ reason: 'transport', cause: 'cut' });
   const { value } = await run([{ deltas: ['par'], fail: failure }], session =>
-    Effect.zipRight(
+    Effect.andThen(
       Effect.ignore(Stream.runDrain(session.ask('hi'))),
       Effect.map(session.history, texts)
     )
@@ -33,7 +33,7 @@ it('takes the question back out when the stream fails part way', async () => {
 it('takes the question back out when the caller walks away mid-stream', async () => {
   const { value } = await run([{ deltas: ['par'], stall: true }, { deltas: ['ok'] }], session =>
     Effect.gen(function* () {
-      const reading = yield* Effect.fork(Stream.runDrain(session.ask('a')));
+      const reading = yield* Effect.forkChild(Stream.runDrain(session.ask('a')));
       yield* Effect.sleep('10 millis');
       yield* Fiber.interrupt(reading);
       /* The session must still take a question: a `busy` flag left set by the
@@ -65,7 +65,7 @@ it('takes the next question after a caller walks away mid-compaction', async () 
     use: session =>
       Effect.gen(function* () {
         yield* Stream.runDrain(session.ask('one'));
-        const reading = yield* Effect.fork(Stream.runDrain(session.ask('two')));
+        const reading = yield* Effect.forkChild(Stream.runDrain(session.ask('two')));
         yield* Effect.sleep('10 millis');
         yield* Fiber.interrupt(reading);
         yield* Stream.runDrain(session.ask('three'));
@@ -80,7 +80,7 @@ it('takes the next question after a caller walks away mid-compaction', async () 
 
 it('asks the second question with the first exchange already in the prompt', async () => {
   const { calls } = await run([{ deltas: ['one'] }, { deltas: ['two'] }], session =>
-    Effect.zipRight(Stream.runDrain(session.ask('a')), Stream.runDrain(session.ask('b')))
+    Effect.andThen(Stream.runDrain(session.ask('a')), Stream.runDrain(session.ask('b')))
   );
   expect(calls[0]?.prompt.messages.map(textIn)).toEqual(['a']);
   expect(calls[1]?.prompt.messages.map(textIn)).toEqual(['a', 'one', 'b']);
@@ -89,8 +89,8 @@ it('asks the second question with the first exchange already in the prompt', asy
 it('adds up the token counts of every call', async () => {
   const usage = { inputTokens: 5, cacheReadTokens: 95 };
   const { value } = await run([{ deltas: ['x'], usage }], session =>
-    Effect.zipRight(
-      Effect.zipRight(Stream.runDrain(session.ask('a')), Stream.runDrain(session.ask('b'))),
+    Effect.andThen(
+      Effect.andThen(Stream.runDrain(session.ask('a')), Stream.runDrain(session.ask('b'))),
       session.usage
     )
   );
@@ -101,8 +101,8 @@ it('adds up the token counts of every call', async () => {
 it('adds up the cost the provider reported, and reports none when it never did', async () => {
   const twice = (usage: { readonly cost?: number }) =>
     run([{ deltas: ['x'], usage }], session =>
-      Effect.zipRight(
-        Effect.zipRight(Stream.runDrain(session.ask('a')), Stream.runDrain(session.ask('b'))),
+      Effect.andThen(
+        Effect.andThen(Stream.runDrain(session.ask('a')), Stream.runDrain(session.ask('b'))),
         session.usage
       )
     );
@@ -121,7 +121,7 @@ it('asks with the same effort on every question of a session', async () => {
     Effect.provide(
       Effect.scoped(
         Effect.flatMap(openSession({ ...options, effort: 'low' }), session =>
-          Effect.zipRight(Stream.runDrain(session.ask('a')), Stream.runDrain(session.ask('b')))
+          Effect.andThen(Stream.runDrain(session.ask('a')), Stream.runDrain(session.ask('b')))
         )
       ),
       layers
@@ -135,13 +135,11 @@ it('refuses a second question asked while the first is still streaming', async (
     Stream.runCollect(
       Stream.merge(
         Stream.map(session.ask('a'), () => 'a'),
-        Stream.catchTag(
-          Stream.map(session.ask('b'), () => 'b'),
-          'harness/SessionBusyError',
-          () => Stream.succeed('refused')
+        Stream.map(session.ask('b'), () => 'b').pipe(
+          Stream.catchTag('harness/SessionBusyError', () => Stream.succeed('refused'))
         )
       )
-    ).pipe(Effect.map(chunk => [...new Set(Chunk.toReadonlyArray(chunk))].toSorted()))
+    ).pipe(Effect.map(collected => [...new Set(collected)].toSorted()))
   );
 
   expect(value).toEqual(['a', 'refused']);
@@ -149,8 +147,8 @@ it('refuses a second question asked while the first is still streaming', async (
 
 it('takes the next question once the first stream has ended', async () => {
   const { value } = await run([{ deltas: ['one'] }, { deltas: ['two'] }], session =>
-    Effect.zipRight(
-      Effect.zipRight(Stream.runDrain(session.ask('a')), Stream.runDrain(session.ask('b'))),
+    Effect.andThen(
+      Effect.andThen(Stream.runDrain(session.ask('a')), Stream.runDrain(session.ask('b'))),
       Effect.map(session.history, texts)
     )
   );
@@ -161,8 +159,8 @@ it('takes the next question once the first stream has ended', async () => {
 it('takes the next question after one fails part way', async () => {
   const failure = new ModelError({ reason: 'transport', cause: 'cut' });
   const { value } = await run([{ deltas: ['par'], fail: failure }, { deltas: ['ok'] }], session =>
-    Effect.zipRight(
-      Effect.zipRight(
+    Effect.andThen(
+      Effect.andThen(
         Effect.ignore(Stream.runDrain(session.ask('a'))),
         Stream.runDrain(session.ask('b'))
       ),

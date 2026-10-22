@@ -45,7 +45,6 @@ import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { destroyOrgInstancesForUser } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
-import { revokeGatewayStateForOrganizationMember } from '@/lib/mcp-gateway/lifecycle-service';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
 import {
   OrganizationRoleSchema,
@@ -418,7 +417,6 @@ export const organizationsMembersRouter = createTRPCRouter({
             tx
           );
           if ((result.rowCount ?? 0) === 0) return false;
-          await revokeGatewayStateForOrganizationMember(tx, membership.organizationId, memberId);
           await createAuditLog({
             action: 'organization.member.remove',
             actor_email: user.google_user_email,
@@ -525,7 +523,6 @@ export const organizationsMembersRouter = createTRPCRouter({
         organization_id: organizationId,
       });
 
-      await revokeGatewayStateForOrganizationMember(db, organizationId, memberId);
       await cleanupRemovedMemberInstances(memberId, organizationId);
 
       await recordElevatedOrganizationAdminAction(ctx, {

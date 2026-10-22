@@ -84,6 +84,7 @@ describe('SharedSessionPage', () => {
     expect(mockFetchSharedSessionMetadata).toHaveBeenCalledWith(shareToken);
     expect(mockFetchSharedSessionSnapshot).toHaveBeenCalledWith(shareToken);
     expect(html).toContain('Shared by Ada Lovelace');
+    expect(html).toContain('ph-no-capture');
     expect(html).toContain('A shared session');
     expect(html).toContain('owner/repo');
     expect(html).toContain('main');

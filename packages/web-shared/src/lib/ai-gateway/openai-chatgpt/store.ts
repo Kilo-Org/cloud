@@ -37,7 +37,7 @@ export type OpenAiChatGptOwner =
 
 /**
  * The organization's shared-services connection. It is the connection the
- * platform's own callers (code reviewer, Slack bot, auto-triage) use instead of
+ * platform's own callers (code reviewer, Slack bot) use instead of
  * a member's personal connection.
  */
 export function openAiChatGptSharedServicesOwner(organizationId: string): OpenAiChatGptOwner {
@@ -332,21 +332,6 @@ export async function markOpenAiChatGptConnectionErrored(
       is_enabled: false,
     })
     .where(openAiChatGptOwnerWhere(owner));
-}
-
-/**
- * Terminal-failure write for callers outside a transaction. A missing row is a
- * no-op. The refresh path uses `markOpenAiChatGptConnectionErrored` directly so
- * the write stays inside the row lock.
- */
-export async function markOpenAiChatGptError(
-  owner: OpenAiChatGptOwner,
-  message: string
-): Promise<void> {
-  const connection = await getOpenAiChatGptConnection(owner);
-  if (!connection) return;
-
-  await markOpenAiChatGptConnectionErrored(db, owner, connection, message);
 }
 
 /**

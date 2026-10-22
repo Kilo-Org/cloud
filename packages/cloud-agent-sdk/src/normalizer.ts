@@ -450,7 +450,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       return {
         type: 'question.asked',
         requestId: r.data.id,
-        questions: r.data.questions as QuestionInfo[] | undefined,
+        questions: r.data.questions,
       };
     }
 

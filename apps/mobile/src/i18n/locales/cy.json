@@ -2353,6 +2353,7 @@
       "branchLoadError": "Ni lwyddwyd i lwytho ceangau",
       "branchUnavailable": "Nid yw ceangau ar gael ar gyfer yr ystorfa hon. Gwiriwch eich mynediad gyda'r darparwr, yna dewiswch ystorfa arall.",
       "branchEmpty": "Dim ceangau ar gael",
+      "branchListIncomplete": "Dangosir rhai ceangau'n unig. Mae gan yr ystorfa hon fwy o geangau nag y gall y rhestr hon gynnwys.",
       "branchPlaceholder": "Dewiswch gangen",
       "runOnWithTarget": "Rhedeg ar: {{target}}",
       "environment": "Amgylchedd",
@@ -3554,7 +3555,12 @@
       "serverToolCount_two": "{{count}} offeryn",
       "serverToolCount_zero": "{{count}} offeryn",
       "serverUnreachable": "Ni ellid cyrraedd y gweinydd hwn",
-      "serverOff": "Mae'r gweinydd hwn i ffwrdd"
+      "serverOff": "Mae'r gweinydd hwn i ffwrdd",
+      "app": {
+        "label": "Rhyngwyneb yr offeryn",
+        "failed": "Methwyd llwytho rhyngwyneb yr offeryn hwn.",
+        "empty": "Does dim byd i'w ddangos yng rhyngwyneb yr offeryn hwn."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Dilysu",

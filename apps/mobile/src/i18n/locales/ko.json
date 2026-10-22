@@ -1724,6 +1724,7 @@
       "branchLoadError": "브랜치를 불러오지 못했습니다",
       "branchUnavailable": "이 저장소에서는 브랜치를 사용할 수 없습니다. 공급업체에서의 접근 권한을 확인한 후 다른 저장소를 선택하세요.",
       "branchEmpty": "사용 가능한 브랜치가 없습니다",
+      "branchListIncomplete": "일부 브랜치만 표시됩니다. 이 저장소에는 이 목록에 담을 수 있는 것보다 더 많은 브랜치가 있습니다.",
       "branchPlaceholder": "브랜치 선택",
       "runOnWithTarget": "실행 위치: {{target}}",
       "environment": "환경",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "도구 {{count}}개",
       "serverToolCount_other": "도구 {{count}}개",
       "serverUnreachable": "이 서버에 연결할 수 없습니다",
-      "serverOff": "이 서버는 꺼져 있습니다"
+      "serverOff": "이 서버는 꺼져 있습니다",
+      "app": {
+        "label": "도구 인터페이스",
+        "failed": "이 도구의 인터페이스를 불러올 수 없습니다.",
+        "empty": "이 도구의 인터페이스에 표시할 항목이 없습니다."
+      }
     },
     "mcpOAuth": {
       "authMethod": "인증",

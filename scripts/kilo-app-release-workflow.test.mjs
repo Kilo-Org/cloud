@@ -66,6 +66,13 @@ function validateEasCli(workflow, mobilePackage, easConfig) {
       /\bpnpm exec eas (?:env:|build|submit)\b/,
       `the workflow must run the installed CLI: ${line.trim()}`
     );
+    // A step may nest one call inside another, as the build does inside
+    // env:exec, so every call on the line has to name the installed binary.
+    assert.doesNotMatch(
+      line.replace(/\bpnpm exec eas (?=env:|build|submit)/g, ''),
+      /\b(?:pnpx\s+)?eas(?:-cli)?\b/,
+      `every EAS CLI call must run the installed binary: ${line.trim()}`
+    );
   }
 }
 

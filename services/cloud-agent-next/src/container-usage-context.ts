@@ -434,7 +434,7 @@ export function billingAdmissionFailureFromError(error: unknown): SandboxBilling
 }
 
 export async function isSandboxBillingBlocked(
-  sandbox: SandboxInstance | DurableObjectStub<SandboxInstance>,
+  sandbox: SandboxInstance,
   enforcementRequested = false
 ): Promise<boolean> {
   const isBillingBlocked = (sandbox as Partial<MeteredSandboxInstance>).isBillingBlocked;

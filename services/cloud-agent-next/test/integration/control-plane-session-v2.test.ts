@@ -1607,6 +1607,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       provider.adapter.ensureLeaseAtLeast = async () => {
         leaseCalls++;
       };
+      provider.adapter.isBillingBlocked = async () => {
+        billingReads++;
+        if (blocked && frame === 'unavailable') throw new Error('State unavailable');
+        return blocked;
+      };
       const sandboxStub = sandboxes.getByName(sandboxId);
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
@@ -1622,13 +1627,6 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
             ...instance['env'],
             SANDBOX_CONTAINERS: {
               idFromName: (name: string) => ({ toString: () => `oc_${name}` }),
-              getByName: () => ({
-                isBillingBlocked: async () => {
-                  billingReads++;
-                  if (blocked && frame === 'unavailable') throw new Error('State unavailable');
-                  return blocked;
-                },
-              }),
             },
           },
         });

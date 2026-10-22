@@ -23,7 +23,6 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import {
   forceDestroyControlPlaneSandbox,
   parseSandboxBillingInput,
-  isSandboxBillingBlocked,
   type SandboxBillingInput,
 } from '../../container-usage-context.js';
 import { resolveSecret } from '../../auth.js';
@@ -4811,22 +4810,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async readWrapperBillingBlock(state: AllocationState): Promise<boolean> {
-    switch (this.currentProvider()) {
-      case 'vercel':
-        return (await this.ensureVercelBillingRuntime())?.lifecycle.isBillingBlocked() ?? false;
-      case 'cloudflare-containers':
-        return this.env.SANDBOX_CONTAINERS.getByName(this.sandboxId).isBillingBlocked();
-      case 'cloudflare': {
-        const ref =
-          state.providerRef === null ? null : decodeCloudflareProviderRef(state.providerRef);
-        if (ref === null) return false;
-        return isSandboxBillingBlocked(
-          this.sandboxNamespace(this.providerPin, ref.sandboxId, ref.containment).getByName(
-            ref.sandboxId
-          )
-        );
-      }
+    if (this.currentProvider() === 'vercel') {
+      return (await this.ensureVercelBillingRuntime())?.lifecycle.isBillingBlocked() ?? false;
     }
+    return (await this.provider.isBillingBlocked?.(state.providerRef)) ?? false;
   }
 
   private async handleFrame(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {

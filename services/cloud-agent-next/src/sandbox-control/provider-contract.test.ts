@@ -120,6 +120,10 @@ type ContractHarness = {
   grantReads?(): number;
   /** Vercel-only: policy bodies the adapter sent to the backend. */
   appliedPolicies?(): unknown[];
+  /** Container providers: set the backend's stored billing block. */
+  billingBlock?(blocked: boolean): void;
+  /** Container providers: how many backend billing reads the adapter made. */
+  billingReads?(): number;
 };
 
 async function requireRef(adapter: ProviderAdapter): Promise<string> {
@@ -137,13 +141,18 @@ function cloudflareHarness(): ContractHarness {
     startEnvs: [] as Record<string, string>[],
     startPaths: [] as string[],
     leaseCalls: 0,
+    billingBlocked: false,
+    billingReads: 0,
   };
   const sandbox = {
     isContainerRunning: async () => {
       if (state.observeThrows) throw new Error('cloudflare inspect failed');
       return state.running;
     },
-    isBillingBlocked: async () => false,
+    isBillingBlocked: async () => {
+      state.billingReads += 1;
+      return state.billingBlocked;
+    },
     ensureBillingAdmission: () => state.admission(),
     configureBilling: async () => {},
     setOutboundHandler: async () => {},
@@ -189,6 +198,10 @@ function cloudflareHarness(): ContractHarness {
     launchInvocation: () => state.startPaths.at(-1),
     leaseCalls: () => state.leaseCalls,
     leaseMs: () => [],
+    billingBlock: blocked => {
+      state.billingBlocked = blocked;
+    },
+    billingReads: () => state.billingReads,
   };
 }
 
@@ -208,9 +221,14 @@ function containersHarness(
     launchInputs: [] as ContainersLaunchInput[],
     leaseMs: [] as number[],
     captures: [] as { ref: string; repoKey: string; commit?: string }[],
+    billingBlocked: false,
+    billingReads: 0,
   };
   const container = {
-    isBillingBlocked: async () => false,
+    isBillingBlocked: async () => {
+      state.billingReads += 1;
+      return state.billingBlocked;
+    },
     ensureBillingAdmission: () => state.admission(),
     configureBilling: async () => {},
     launchWrapper: async (input: ContainersLaunchInput) => {
@@ -282,6 +300,10 @@ function containersHarness(
     setStopOutcome: outcome => {
       state.stopResult = outcome;
     },
+    billingBlock: blocked => {
+      state.billingBlocked = blocked;
+    },
+    billingReads: () => state.billingReads,
   };
 }
 function vercelHarness(): ContractHarness {
@@ -603,6 +625,25 @@ describe('provider-specific contract differences', () => {
     // The launch establishes the initial lease at the shared minimum.
     expect(harness.leaseMs()).toEqual([leaseAtLeastMs()]);
     expect(harness.launchSupervisor()).toBeUndefined();
+  });
+
+  it.each([
+    ['cloudflare', cloudflareHarness],
+    ['cloudflare-containers', containersHarness],
+  ] as const)('reads the stored %s billing block for an owned ref only', async (_name, factory) => {
+    const harness = factory();
+    const ref = await harness.create();
+    const initialReads = harness.billingReads?.();
+
+    await expect(harness.adapter.isBillingBlocked?.(ref)).resolves.toBe(false);
+    harness.billingBlock?.(true);
+    await expect(harness.adapter.isBillingBlocked?.(ref)).resolves.toBe(true);
+    expect(harness.billingReads?.()).toBe((initialReads ?? 0) + 2);
+
+    const reads = harness.billingReads?.();
+    await expect(harness.adapter.isBillingBlocked?.(harness.foreignRef())).resolves.toBe(false);
+    await expect(harness.adapter.isBillingBlocked?.(null)).resolves.toBe(false);
+    expect(harness.billingReads?.()).toBe(reads);
   });
 
   it('reads Vercel grants on every create and applies a contained-credential policy', async () => {

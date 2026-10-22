@@ -161,7 +161,7 @@ describe('new-session preference resolution', () => {
   it('publishes the explicit pick before the first preference read settles', async () => {
     const pendingRead = Promise.withResolvers<{
       favorites: string[];
-      lastSelected: { model: string };
+      lastSelected: { model: string; variant?: string };
     }>();
     fixture.read = () => pendingRead.promise;
     const pendingSave = Promise.withResolvers<undefined>();

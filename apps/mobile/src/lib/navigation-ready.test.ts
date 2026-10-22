@@ -7,10 +7,9 @@ import { useRootNavigationReady } from './navigation-ready';
 const isReadyMock = vi.hoisted(() => vi.fn((): boolean => false));
 const listeners = vi.hoisted(() => ({
   state: undefined as (() => void) | undefined,
-  ready: undefined as (() => void) | undefined,
 }));
 
-function addListenerMock(event: 'state' | 'ready', listener: () => void): () => void {
+function addListenerMock(event: 'state', listener: () => void): () => void {
   listeners[event] = listener;
   const remove = (): void => {
     listeners[event] = undefined;
@@ -48,7 +47,6 @@ describe('useRootNavigationReady', () => {
     isReadyMock.mockClear();
     isReadyMock.mockReturnValue(false);
     listeners.state = undefined;
-    listeners.ready = undefined;
     latestReady = undefined;
   });
 
@@ -64,16 +62,6 @@ describe('useRootNavigationReady', () => {
     expect(latestReady).toBe(true);
   });
 
-  it('flips when the container emits ready', () => {
-    mount();
-    expect(latestReady).toBe(false);
-    isReadyMock.mockReturnValue(true);
-    act(() => {
-      listeners.ready?.();
-    });
-    expect(latestReady).toBe(true);
-  });
-
   it('re-reads on the state event, matching the screen-tracking subscription pattern', () => {
     mount();
     isReadyMock.mockReturnValue(true);
@@ -83,10 +71,9 @@ describe('useRootNavigationReady', () => {
     expect(latestReady).toBe(true);
   });
 
-  it('unsubscribes both listeners on unmount', () => {
+  it('unsubscribes the state listener on unmount', () => {
     const renderer = mount();
     renderer.unmount();
     expect(listeners.state).toBeUndefined();
-    expect(listeners.ready).toBeUndefined();
   });
 });

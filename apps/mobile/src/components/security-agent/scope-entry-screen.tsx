@@ -6,6 +6,7 @@ import { View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { selectScopeEntryView } from '@/components/security-agent/scope-entry-render';
+import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardScreen } from '@/components/security-agent/dashboard-screen';
@@ -23,6 +24,7 @@ import {
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 
 function ScopeEntrySkeleton() {
   const { t } = useTranslation();
@@ -48,10 +50,14 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   const permission = useSecurityAgentPermissionStatus(scope);
   const config = useSecurityAgentConfig(scope);
-  useSecurityAgentRepositories(scope);
+  const repositories = useSecurityAgentRepositories(scope);
   const capability = useSecurityAgentCapability(scope);
   const recovery = useRetrySecurityAgentSettings(scope);
   const isConnectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const access = classifyOrganizationScopeAccess({
+    isOrganizationScope: !isPersonalSecurityScope(scope),
+    errors: [permission.error, config.error, repositories.error],
+  });
 
   // Pending includes uncached queries paused by NetInfo. Cached query errors
   // must not replace usable settings or a resolved capability with an error screen.
@@ -72,6 +78,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const view = selectScopeEntryView({
     isLoading,
     isError,
+    isDenied: access !== 'granted',
     hasIntegration,
     hasPermissions,
     isEnabled,
@@ -147,6 +154,17 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const connectUrl = mintUrl;
 
   const refetchAll = recovery.retry;
+
+  if (view === 'denied') {
+    return (
+      <ScopeAccessDeniedScreen
+        title={t('common.securityAgent')}
+        kind={access === 'not-found' ? 'not-found' : 'denied'}
+        onRetry={() => void recovery.retry()}
+        isRetrying={recovery.isRetrying}
+      />
+    );
+  }
 
   if (
     view === 'error' ||

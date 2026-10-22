@@ -371,20 +371,6 @@ export function useUpdateSuppressTrialMessaging() {
   );
 }
 
-export function useAdminToggleCodeIndexing() {
-  const trpc = useTRPC();
-  const invalidate = useInvalidateAllOrganizationData();
-  const queryClient = useQueryClient();
-  return useMutation(
-    trpc.organizations.settings.updateCodeIndexingFeatureFlag.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
-        void invalidate();
-      },
-    })
-  );
-}
-
 export function useUpdateMinimumBalanceAlert() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

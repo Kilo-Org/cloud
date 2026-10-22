@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import { Alert } from 'react-native';
 
 import {
   buildSessionActionMenuItems,
@@ -84,7 +83,7 @@ type PromptButton = {
 
 /** Invoke the confirm button of the last `Alert.prompt` with `value`. */
 function confirmWith(value: string) {
-  const call = vi.mocked(Alert.prompt).mock.calls.at(-1);
+  const call = reactNativeMock.prompt.mock.calls.at(-1);
   if (!call) {
     throw new Error('Alert.prompt was not called');
   }
@@ -95,7 +94,7 @@ function confirmWith(value: string) {
 
 describe('showRenamePrompt', () => {
   afterEach(() => {
-    vi.mocked(Alert.prompt).mockClear();
+    reactNativeMock.prompt.mockClear();
   });
 
   it('does not rename when the prefilled title is confirmed unchanged', () => {

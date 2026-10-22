@@ -316,8 +316,6 @@ async function mountFixtures(
           worktreeFileRequests.push(worktreeFileRequest);
           return worktreeFileReply(worktreeFileRequest);
         }
-        if (procedure.endsWith('.getComputeBillingStatus'))
-          return success({ phase: 'unavailable' });
         if (procedure.endsWith('.sendMessage'))
           return success({ messageId: 'msg_controlled', delivery: 'sent' });
         const upstreamUrl = new URL(`/api/trpc/${procedure}`, url.origin);

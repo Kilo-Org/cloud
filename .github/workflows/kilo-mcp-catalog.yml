@@ -454,15 +454,30 @@ jobs:
             exit 1
           fi
 
-      # Vectorize upsert (requirement 9). The index name and account id match
-      # the production bindings in services/kilo-mcp/wrangler.jsonc; the
-      # account id is not a secret (it is committed there). The script then
-      # prunes every vector whose procedure path left the catalog, so a removed
-      # or renamed procedure stops competing for kNN slots.
-      - name: Upsert Vectorize index and prune stale vectors
+      # The ids to delete are the procedures the index was ever built from that
+      # the current catalog no longer has. That union comes from git history, not
+      # from listing the index: a full list of the production index through the
+      # REST API times out, and a single-step diff would strand the ids of a run
+      # whose prune failed (the next run no longer sees them in its base).
+      # Deleting an id the index never had is a no-op.
+      - name: Collect every id the index was ever built from
+        id: prune_ids
+        if: steps.merge_changes.outputs.catalog == 'true'
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/catalog-ever-ids.txt"
+          : > "$out"
+          for sha in $(git log --format=%H -- services/kilo-mcp/catalog.json); do
+            git show "${sha}:services/kilo-mcp/catalog.json" 2>/dev/null | jq -r 'keys[]' >> "$out" || true
+          done
+          sort -u "$out" -o "$out"
+          echo "file=$out" >> "$GITHUB_OUTPUT"
+
+      - name: Upsert Vectorize index and prune removed procedures
         if: steps.merge_changes.outputs.catalog == 'true'
         run: node services/kilo-mcp/scripts/embed-catalog.ts upsert
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: e115e769bcdd4c3d66af59d3332cb394
           VECTORIZE_INDEX_NAME: kilo-mcp-catalog
+          MCP_CATALOG_PRUNE_IDS: ${{ steps.prune_ids.outputs.file }}

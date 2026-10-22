@@ -14,7 +14,7 @@ import {
   type SandboxIdClass,
   type SandboxSelectionEnv,
 } from './sandbox-id.js';
-import { isCodeReviewContainersOwner, type ControlPlaneOwnerEnv } from './session-plane.js';
+import { isCodeReviewContainersOwner, type CodeReviewContainersEnv } from './session-identity.js';
 import type { AgentSandboxProvider, Env, SandboxId } from './types.js';
 
 /**
@@ -63,7 +63,7 @@ export type ControlPlaneSandboxDecision = {
 
 /** The one sandbox decision for a new control-plane session: kind, provider and neutral key. */
 export async function selectControlPlaneSandbox(input: {
-  env: SandboxSelectionEnv & ControlPlaneOwnerEnv;
+  env: SandboxSelectionEnv & CodeReviewContainersEnv;
   sessionId: string;
   userId: string;
   orgId?: string;
@@ -82,7 +82,6 @@ export async function selectControlPlaneSandbox(input: {
             env: input.env,
             orgId: input.orgId,
             userId: input.userId,
-            plane: 'control',
             isolated: sandboxKind === 'isolated',
           });
   return { sandboxId: await placedSandboxKey(sandboxKind, input), provider, sandboxKind };

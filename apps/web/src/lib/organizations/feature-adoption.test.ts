@@ -11,7 +11,6 @@ function buildState(
     securityAgentEnabled: false,
     teamIntegrationConnected: false,
     cloudAgentUsed: false,
-    projectDeployed: false,
     ...overrides,
   };
 }
@@ -26,7 +25,6 @@ describe('buildFeatureAdoptionChecks', () => {
       'security-agent',
       'team-integration',
       'cloud-agent-used',
-      'project-deployed',
     ]);
     expect(checks.every(check => !check.adopted)).toBe(true);
   });
@@ -40,7 +38,6 @@ describe('buildFeatureAdoptionChecks', () => {
         securityAgentEnabled: true,
         teamIntegrationConnected: true,
         cloudAgentUsed: true,
-        projectDeployed: true,
       })
     );
 
@@ -62,10 +59,6 @@ describe('buildFeatureAdoptionChecks', () => {
       adoptedLabel: 'Used',
       notAdoptedLabel: 'Not used',
     });
-    expect(checks.find(check => check.key === 'project-deployed')).toMatchObject({
-      adoptedLabel: 'Deployed',
-      notAdoptedLabel: 'Not deployed',
-    });
   });
 
   it('keeps individual checks independent', () => {
@@ -83,7 +76,6 @@ describe('buildFeatureAdoptionChecks', () => {
     expect(checks.find(check => check.key === 'cloud-agent-used')?.adopted).toBe(true);
     expect(checks.find(check => check.key === 'code-reviewer')?.adopted).toBe(false);
     expect(checks.find(check => check.key === 'team-integration')?.adopted).toBe(false);
-    expect(checks.find(check => check.key === 'project-deployed')?.adopted).toBe(false);
   });
 
   it('returns organization-scoped actions', () => {

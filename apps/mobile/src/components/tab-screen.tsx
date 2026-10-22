@@ -4,6 +4,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   ScrollView,
+  type ScrollViewInstance,
   type ScrollViewProps,
   useWindowDimensions,
   View,
@@ -45,7 +46,7 @@ export function TabScreenScrollView({
   ref,
   ...props
 }: ScrollViewProps & {
-  ref?: Ref<ScrollView>;
+  ref?: Ref<ScrollViewInstance>;
   /**
    * Reports the IME occlusion this scroll view reserves, `0` while the keyboard
    * is down. A caller that must reveal its own pinned bottom action once the
@@ -61,8 +62,12 @@ export function TabScreenScrollView({
   const keyboardOcclusion = useKeyboardState(state => state.height);
   // The wrapper's own scroll-view ref, so the reveal below can drive the
   // responder even when the caller passes none.
-  const internalRef = useRef<ScrollView | null>(null);
-  useImperativeHandle<ScrollView | null, ScrollView | null>(ref, () => internalRef.current, []);
+  const internalRef = useRef<ScrollViewInstance | null>(null);
+  useImperativeHandle<ScrollViewInstance | null, ScrollViewInstance | null>(
+    ref,
+    () => internalRef.current,
+    []
+  );
   const onKeyboardOcclusionChangeRef = useRef(onKeyboardOcclusionChange);
   useEffect(() => {
     onKeyboardOcclusionChangeRef.current = onKeyboardOcclusionChange;

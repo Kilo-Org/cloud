@@ -24,6 +24,7 @@ import {
   validateProjectAccessToken,
   validatePersonalAccessToken,
   type GitLabProjectAccessToken,
+  type GitLabProjectAccessTokenValidation,
   type GitLabPATValidationResult,
   GitLabProjectAccessTokenPermissionError,
 } from '@/lib/integrations/platforms/gitlab/adapter';
@@ -587,6 +588,40 @@ async function getStoredProjectCredential(integrationId: string, projectId: stri
 }
 
 /**
+ * Raised when GitLab does not answer whether the stored project credential is
+ * usable. The request is retryable and the stored credential is left in place.
+ */
+export class GitLabProjectAccessTokenUnverifiedError extends Error {
+  constructor(
+    readonly projectId: string | number,
+    readonly reason: 'instance-url' | 'transport' | 'http-error',
+    readonly httpStatus?: number
+  ) {
+    super(
+      `GitLab could not confirm the stored credential for project ${projectId}` +
+        `${httpStatus === undefined ? '' : ` (HTTP ${httpStatus})`}. Retry the operation.`
+    );
+    this.name = 'GitLabProjectAccessTokenUnverifiedError';
+  }
+}
+
+async function validateStoredProjectAccessToken(
+  token: string,
+  instanceUrl: string
+): Promise<GitLabProjectAccessTokenValidation> {
+  const first = await validateProjectAccessToken(token, instanceUrl);
+  if (first.status !== 'unverified') {
+    return first;
+  }
+
+  logExceptInTest('[validateStoredProjectAccessToken] Retrying unconfirmed token probe', {
+    reason: first.reason,
+    status: first.httpStatus,
+  });
+  return validateProjectAccessToken(token, instanceUrl);
+}
+
+/**
  * Gets or creates a Project Access Token for a GitLab project
  *
  * This function:
@@ -618,9 +653,23 @@ export async function getOrCreateProjectAccessToken(
     if (!isExpiringSoon) {
       // Validate the token is still valid on GitLab (might have been manually revoked)
       const projectToken = await getValidGitLabProjectAccessToken(integration, projectIdStr, actor);
-      const isValid = await validateProjectAccessToken(projectToken, instanceUrl);
+      const validation = await validateStoredProjectAccessToken(projectToken, instanceUrl);
 
-      if (isValid) {
+      if (validation.status === 'unverified') {
+        logExceptInTest('[getOrCreateProjectAccessToken] Token health is unconfirmed', {
+          projectId,
+          tokenId: storedCredential.tokenId,
+          reason: validation.reason,
+          status: validation.httpStatus,
+        });
+        throw new GitLabProjectAccessTokenUnverifiedError(
+          projectIdStr,
+          validation.reason,
+          validation.httpStatus
+        );
+      }
+
+      if (validation.status === 'valid') {
         logExceptInTest('[getOrCreateProjectAccessToken] Using existing token', {
           projectId,
           tokenId: storedCredential.tokenId,
@@ -629,11 +678,16 @@ export async function getOrCreateProjectAccessToken(
         return projectToken;
       }
 
-      // Token is invalid (revoked), remove from storage and create a new one
-      logExceptInTest('[getOrCreateProjectAccessToken] Stored token is invalid, creating new one', {
-        projectId,
-        tokenId: storedCredential.tokenId,
-      });
+      // Token is denied or revoked, remove from storage and create a new one
+      logExceptInTest(
+        '[getOrCreateProjectAccessToken] Stored token is unusable, creating new one',
+        {
+          projectId,
+          tokenId: storedCredential.tokenId,
+          reason: validation.reason,
+          status: validation.httpStatus,
+        }
+      );
 
       // Remove the invalid token from storage and skip to creating a new one
       await removeInvalidStoredToken(integration.id, projectIdStr, storedCredential);

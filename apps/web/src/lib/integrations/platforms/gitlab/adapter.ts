@@ -2115,50 +2115,71 @@ export function isProjectAccessTokenExpiringSoon(
   return daysUntilExpiry <= withinDays;
 }
 
+export type GitLabProjectAccessTokenValidation =
+  | { status: 'valid' }
+  | { status: 'invalid'; reason: 'unauthorized' | 'forbidden'; httpStatus: number }
+  | {
+      status: 'unverified';
+      reason: 'instance-url' | 'transport' | 'http-error';
+      httpStatus?: number;
+    };
+
 /**
  * Checks whether a stored token is still valid on GitLab
  * (e.g., it might have been manually revoked by the user).
+ *
+ * Only a successful authenticated response reports `valid`. Explicit denials
+ * report `invalid`; anything that leaves the token's health unknown reports
+ * `unverified`, which callers must treat as unusable but must not remove the
+ * stored credential for.
  */
 export async function validateProjectAccessToken(
   token: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
-): Promise<boolean> {
+): Promise<GitLabProjectAccessTokenValidation> {
+  let userUrl: string;
   try {
-    const response = await fetchGitLab(buildGitLabUrl(instanceUrl, '/api/v4/user'), {
+    userUrl = buildGitLabUrl(instanceUrl, '/api/v4/user');
+  } catch (error) {
+    logExceptInTest('[validateProjectAccessToken] Invalid GitLab instance URL', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { status: 'unverified', reason: 'instance-url' };
+  }
+
+  let response: Response;
+  try {
+    response = await fetchGitLab(userUrl, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
-
-    if (response.ok) {
-      logExceptInTest('[validateProjectAccessToken] Token is valid');
-      return true;
-    }
-
-    if (response.status === 401) {
-      logExceptInTest('[validateProjectAccessToken] Token is invalid (401)');
-      return false;
-    }
-
-    // Other errors - log but assume token might still be valid
-    logExceptInTest('[validateProjectAccessToken] Unexpected response', {
-      status: response.status,
-    });
-    return true;
   } catch (error) {
-    if (error instanceof GitLabInstanceUrlError) {
-      logExceptInTest('[validateProjectAccessToken] Invalid GitLab instance URL', {
-        error: error.message,
-      });
-      return false;
-    }
-
-    // Network errors - assume token might still be valid
-    logExceptInTest('[validateProjectAccessToken] Error validating token', {
+    logExceptInTest('[validateProjectAccessToken] Token validation request failed', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return true;
+    return { status: 'unverified', reason: 'transport' };
   }
+
+  if (response.ok) {
+    logExceptInTest('[validateProjectAccessToken] Token is valid');
+    return { status: 'valid' };
+  }
+
+  if (response.status === 401) {
+    logExceptInTest('[validateProjectAccessToken] Token is invalid (401)');
+    return { status: 'invalid', reason: 'unauthorized', httpStatus: 401 };
+  }
+
+  if (response.status === 403) {
+    logExceptInTest('[validateProjectAccessToken] Token is denied (403)');
+    return { status: 'invalid', reason: 'forbidden', httpStatus: 403 };
+  }
+
+  logExceptInTest('[validateProjectAccessToken] Token health is unconfirmed', {
+    status: response.status,
+  });
+  return { status: 'unverified', reason: 'http-error', httpStatus: response.status };
 }
 
 /**

@@ -65,6 +65,7 @@ let connectWithPAT: typeof GitLabService.connectWithPAT;
 let getValidGitLabToken: typeof GitLabService.getValidGitLabToken;
 let getValidGitLabProjectAccessToken: typeof GitLabService.getValidGitLabProjectAccessToken;
 let getOrCreateProjectAccessToken: typeof GitLabService.getOrCreateProjectAccessToken;
+let GitLabProjectAccessTokenUnverifiedError: typeof GitLabService.GitLabProjectAccessTokenUnverifiedError;
 let removeStoredProjectAccessToken: typeof GitLabService.removeStoredProjectAccessToken;
 let disconnectGitLabIntegration: typeof GitLabService.disconnectGitLabIntegration;
 
@@ -95,6 +96,7 @@ describe('GitLab encrypted credential persistence', () => {
       getValidGitLabToken,
       getValidGitLabProjectAccessToken,
       getOrCreateProjectAccessToken,
+      GitLabProjectAccessTokenUnverifiedError,
       removeStoredProjectAccessToken,
       disconnectGitLabIntegration,
     } = await import('./gitlab-service'));
@@ -130,7 +132,7 @@ describe('GitLab encrypted credential persistence', () => {
       last_used_at: null,
       user_id: 123,
     });
-    mockValidateProjectAccessToken.mockResolvedValue(true);
+    mockValidateProjectAccessToken.mockResolvedValue({ status: 'valid' });
     mockRevokeProjectAccessToken.mockResolvedValue();
     mockFetchGitLabCredential.mockImplementation(async (_actor, selector) => ({
       status: 'available' as const,
@@ -778,7 +780,11 @@ describe('GitLab encrypted credential persistence', () => {
       .select()
       .from(platform_integrations)
       .where(eq(platform_integrations.id, connected.integration.id));
-    mockValidateProjectAccessToken.mockResolvedValueOnce(false);
+    mockValidateProjectAccessToken.mockResolvedValueOnce({
+      status: 'invalid',
+      reason: 'unauthorized',
+      httpStatus: 401,
+    });
     mockCreateProjectAccessToken.mockRejectedValueOnce(new Error('replacement failed'));
 
     await expect(
@@ -798,6 +804,145 @@ describe('GitLab encrypted credential persistence', () => {
 
     expect(projectCredentials.map(credential => credential.provider_resource_id)).toEqual(['43']);
     expect(updatedIntegration.metadata).toEqual(expect.objectContaining({ project_tokens: {} }));
+  });
+
+  it('replaces a project credential GitLab denies with a fresh one', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    let [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    mockValidateProjectAccessToken.mockResolvedValueOnce({
+      status: 'invalid',
+      reason: 'forbidden',
+      httpStatus: 403,
+    });
+    mockCreateProjectAccessToken.mockResolvedValueOnce({
+      id: 888,
+      name: 'Kilo Code Review Bot',
+      token: 'glpat-rotated-project-token',
+      expires_at: '2027-07-13',
+      scopes: ['api', 'self_rotate'],
+      access_level: 30,
+      active: true,
+      revoked: false,
+      created_at: '2026-07-13T00:00:00.000Z',
+      last_used_at: null,
+      user_id: 123,
+    });
+
+    await expect(getOrCreateProjectAccessToken(integration, 42, { userId: user.id })).resolves.toBe(
+      'glpat-rotated-project-token'
+    );
+
+    const credentials = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        eq(platform_access_token_credentials.provider_credential_type, 'project_access_token')
+      );
+    const [updatedIntegration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+
+    expect(mockCreateProjectAccessToken).toHaveBeenCalledTimes(2);
+    expect(credentials).toHaveLength(1);
+    expect(credentials[0]).toEqual(
+      expect.objectContaining({
+        provider_resource_id: '42',
+        provider_metadata: expect.objectContaining({ providerCredentialId: '888' }),
+      })
+    );
+    expect(updatedIntegration.metadata).toEqual(expect.objectContaining({ project_tokens: {} }));
+  });
+
+  it('keeps the stored project credential when its health cannot be confirmed', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    let [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    const [initialCredential] = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(eq(platform_access_token_credentials.provider_resource_id, '42'));
+    mockValidateProjectAccessToken.mockClear();
+    mockValidateProjectAccessToken.mockResolvedValue({
+      status: 'unverified',
+      reason: 'http-error',
+      httpStatus: 500,
+    });
+
+    await expect(
+      getOrCreateProjectAccessToken(integration, 42, { userId: user.id })
+    ).rejects.toThrow(GitLabProjectAccessTokenUnverifiedError);
+
+    const credentials = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(eq(platform_access_token_credentials.provider_resource_id, '42'));
+
+    expect(mockValidateProjectAccessToken).toHaveBeenCalledTimes(2);
+    expect(mockCreateProjectAccessToken).toHaveBeenCalledTimes(1);
+    expect(credentials).toEqual([
+      expect.objectContaining({
+        id: initialCredential.id,
+        credential_version: initialCredential.credential_version,
+      }),
+    ]);
+  });
+
+  it('reuses the stored project credential when a retried probe succeeds', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    let [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    mockValidateProjectAccessToken.mockClear();
+    mockValidateProjectAccessToken
+      .mockResolvedValueOnce({ status: 'unverified', reason: 'transport' })
+      .mockResolvedValueOnce({ status: 'valid' });
+
+    await expect(getOrCreateProjectAccessToken(integration, 42, { userId: user.id })).resolves.toBe(
+      'glpat-created-project-token'
+    );
+
+    expect(mockValidateProjectAccessToken).toHaveBeenCalledTimes(2);
+    expect(mockCreateProjectAccessToken).toHaveBeenCalledTimes(1);
   });
 
   it('removes the exact encrypted project credential after explicit revocation', async () => {
@@ -908,7 +1053,7 @@ describe('GitLab encrypted credential persistence', () => {
         .update(platform_access_token_credentials)
         .set({ credential_version: 2 })
         .where(eq(platform_access_token_credentials.provider_resource_id, '42'));
-      return false;
+      return { status: 'invalid', reason: 'unauthorized', httpStatus: 401 };
     });
 
     await expect(

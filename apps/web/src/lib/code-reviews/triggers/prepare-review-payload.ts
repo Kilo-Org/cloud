@@ -45,6 +45,7 @@ import {
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   getOrCreateProjectAccessToken,
+  GitLabProjectAccessTokenUnverifiedError,
   type GitLabIntegrationMetadata,
 } from '@/lib/integrations/gitlab-service';
 import type {
@@ -557,6 +558,12 @@ export async function prepareReviewPayload(
             projectId,
           });
         } catch (pratError) {
+          if (pratError instanceof GitLabProjectAccessTokenUnverifiedError) {
+            throw new Error(
+              `GitLab did not answer the credential check for ${review.repo_full_name}, ` +
+                `so this review did not start. Retry the review.`
+            );
+          }
           if (pratError instanceof GitLabProjectAccessTokenPermissionError) {
             throw new Error(
               `Cannot create Project Access Token for GitLab code review. ` +

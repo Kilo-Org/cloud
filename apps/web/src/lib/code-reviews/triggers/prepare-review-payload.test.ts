@@ -43,6 +43,7 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   getOrCreateProjectAccessToken: (...args: unknown[]) => mockGetOrCreateProjectAccessToken(...args),
+  GitLabProjectAccessTokenUnverifiedError: class GitLabProjectAccessTokenUnverifiedError extends Error {},
 }));
 
 jest.mock('@/lib/code-reviews/prompts/generate-prompt', () => ({
@@ -75,6 +76,7 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { eq, or } from 'drizzle-orm';
+import { GitLabProjectAccessTokenUnverifiedError } from '@/lib/integrations/gitlab-service';
 import { prepareReviewPayload } from './prepare-review-payload';
 
 const REPO = `test-org/prepare-review-payload-${Date.now()}`;
@@ -723,6 +725,33 @@ describe('prepareReviewPayload', () => {
         platform: 'gitlab',
       })
     ).rejects.toThrow('is missing its integration');
+  });
+
+  it('reports an unconfirmed GitLab credential as a retryable failure', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, gitlabIntegration.id, {
+          platform: 'gitlab',
+          platform_project_id: 456,
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
+        })
+      )
+      .returning();
+    mockGetOrCreateProjectAccessToken.mockRejectedValueOnce(
+      new GitLabProjectAccessTokenUnverifiedError(456, 'http-error', 500)
+    );
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'gitlab',
+      })
+    ).rejects.toThrow(
+      `GitLab did not answer the credential check for ${REPO}, so this review did not start. Retry the review.`
+    );
   });
 
   it('prepares a fresh tokenless Bitbucket review from exact organization integration identity', async () => {

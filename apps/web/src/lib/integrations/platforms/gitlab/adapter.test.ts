@@ -14,6 +14,7 @@ import {
   exchangeGitLabOAuthCode,
   validateGitLabInstance,
   validatePersonalAccessToken,
+  validateProjectAccessToken,
   createProjectWebhook,
   deleteProjectWebhook,
   fetchGitLabProjects,
@@ -678,6 +679,63 @@ describe('validatePersonalAccessToken', () => {
       valid: false,
       error: 'GitLab instance URL host resolves to an address that is not allowed.',
     });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('validateProjectAccessToken', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('reports the token valid only after an authenticated response', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'valid' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a revoked token as unauthorized', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'invalid', reason: 'unauthorized', httpStatus: 401 });
+  });
+
+  it('reports a denied token as forbidden', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 403 });
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'invalid', reason: 'forbidden', httpStatus: 403 });
+  });
+
+  it('leaves a server error unverified instead of usable', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'unverified', reason: 'http-error', httpStatus: 500 });
+  });
+
+  it('leaves a transport failure unverified', async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError('fetch failed'));
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'unverified', reason: 'transport' });
+  });
+
+  it('leaves an unusable instance URL unverified without probing', async () => {
+    const result = await validateProjectAccessToken(
+      'glpat-project-token',
+      'http://gitlab.example.com'
+    );
+
+    expect(result).toEqual({ status: 'unverified', reason: 'instance-url' });
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });

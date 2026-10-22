@@ -99,10 +99,8 @@ export const CLOUD_AGENT_CONNECTION_ID = 'cloud-agent';
 /**
  * Recency window shared by the two time-bounded liveness proofs for a cloud
  * session: a warm `idle` session that just finished, and session activity that
- * session-ingest recorded in `last_activity_at`. Mirrors
- * `KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT` in
- * services/cloud-agent-next/src/persistence/CloudAgentSession.ts:189-190.
- * Env override drift is accepted (A2).
+ * session-ingest recorded in `last_activity_at`. Recent cloud sessions stay
+ * visible in the tray for 15 minutes.
  */
 const CLOUD_AGENT_LIVE_CUTOFF = sql`now() - interval '15 minutes'`;
 

@@ -423,7 +423,7 @@ async function listBitbucketBranches(
   let defaultBranch: string | null = null;
   try {
     const metadata = BitbucketRepositoryMetadataSchema.safeParse(
-      await requestBitbucketJson<unknown>(access, repositoryApiPath(access))
+      await requestBitbucketJson(access, repositoryApiPath(access))
     );
     defaultBranch = metadata.success ? (metadata.data.mainbranch?.name ?? null) : null;
   } catch {

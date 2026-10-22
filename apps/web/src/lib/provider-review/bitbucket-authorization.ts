@@ -45,6 +45,15 @@ export type BitbucketReviewOwner =
 export const BITBUCKET_ORGANIZATION_ONLY_MESSAGE =
   'Bitbucket pull requests are available in an organization context only. Switch to an organization with a connected Bitbucket workspace.';
 
+/**
+ * The stale-head reason, declared beside the status classification that
+ * produces it: a provider 409 (the refs moved while merging) and the write
+ * layer's own head fence both answer with this exact copy, so a locally
+ * detected moved head and a provider-detected one read identically.
+ */
+export const BITBUCKET_STALE_HEAD_REASON =
+  'The pull request changed since it was loaded. Reload the pull request and try again.';
+
 export type BitbucketReviewErrorKind = ProviderReviewErrorKind;
 
 /**
@@ -85,10 +94,7 @@ export function classifyBitbucketStatus(status: number): BitbucketReviewError {
     );
   }
   if (status === 409) {
-    return new BitbucketReviewError(
-      'stale_head',
-      'The pull request changed since it was loaded. Reload the pull request and try again.'
-    );
+    return new BitbucketReviewError('stale_head', BITBUCKET_STALE_HEAD_REASON);
   }
   if (status === 400 || status === 405 || status === 422) {
     return new BitbucketReviewError('bad_request', 'Bitbucket rejected this request.');

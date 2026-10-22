@@ -214,6 +214,10 @@ function mapUser(user: z.infer<typeof BitbucketUserSchema> | null | undefined) {
  * Cloud is SaaS-only — there is no self-managed URL to resolve) and the
  * bearer token is the server-derived workspace access token. Only the status
  * survives a provider failure, so no response body can leak into the error.
+ *
+ * `undefined` is part of the result on purpose: a bodyless 204/205/304 — or a
+ * response without a body reader — carries no JSON, so the type says so and
+ * every caller validates the payload it needs before reading it.
  */
 export async function requestBitbucketJson<T>(
   access: { accessToken: string },
@@ -223,7 +227,7 @@ export async function requestBitbucketJson<T>(
     query?: Record<string, string | number | boolean | undefined>;
     body?: unknown;
   } = {}
-): Promise<T> {
+): Promise<T | undefined> {
   if (!path.startsWith('/2.0/')) {
     throw new BitbucketReviewError('bad_request', 'Bitbucket request paths must use the 2.0 API.');
   }
@@ -239,7 +243,7 @@ export async function requestBitbucketJson<T>(
       method: request.method ?? 'GET',
       body: request.body,
     });
-    if (text === null || text === '') return undefined as T;
+    if (text === null || text === '') return undefined;
     return JSON.parse(text) as T;
   } catch (error) {
     throw classifyBitbucketError(error);
@@ -476,7 +480,7 @@ export async function fetchPage(
       throw classifyBitbucketError(error);
     }
   } else {
-    payload = await requestBitbucketJson<unknown>(access, basePath, {
+    payload = await requestBitbucketJson(access, basePath, {
       query: { pagelen: BITBUCKET_PAGE_SIZE, ...extraQuery },
     });
   }
@@ -500,7 +504,7 @@ async function fetchPullRequestDetail(
   access: BitbucketRepositoryAccess,
   prId: number
 ): Promise<BitbucketPullRequestDetail> {
-  const payload = await requestBitbucketJson<unknown>(
+  const payload = await requestBitbucketJson(
     access,
     `/2.0/repositories/${repositorySegment(access.repository)}/pullrequests/${prId}`
   );
@@ -979,7 +983,7 @@ export async function listInbox(
         const batch = slugs.slice(offset, offset + INBOX_REPOSITORY_CONCURRENCY);
         const pages = await Promise.all(
           batch.map(slug =>
-            requestBitbucketJson<unknown>(
+            requestBitbucketJson(
               access,
               `/2.0/repositories/${encodeURIComponent(access.workspace.slug)}/${encodeURIComponent(slug)}/pullrequests`,
               {
@@ -1081,7 +1085,7 @@ async function listWorkspaceRepositorySlugs(
 ): Promise<string[]> {
   const slugs: string[] = [];
   for (let repoPage = 1; repoPage <= INBOX_REPOSITORY_PAGES; repoPage += 1) {
-    const payload = await requestBitbucketJson<unknown>(
+    const payload = await requestBitbucketJson(
       access,
       `/2.0/repositories/${encodeURIComponent(workspaceSlug)}`,
       { query: { pagelen: INBOX_REPOSITORY_PAGE_SIZE, page: repoPage } }

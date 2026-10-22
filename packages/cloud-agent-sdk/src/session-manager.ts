@@ -3365,6 +3365,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession.state.clearCommits();
     olderMessagesCursor = null;
     store.set(hasOlderMessagesAtom, false);
+    // The cleared view holds nothing, so the omitted-history accounting starts
+    // from zero exactly as a non-preserved `clearAllAtoms` does: a stale count
+    // would keep the omitted banner up, and a stale initial-page baseline would
+    // subtract the wrong contribution from the next first page.
+    store.set(olderMessagesOmittedItemCountAtom, 0);
+    initialPageOmittedItemCount = 0;
     // Reset the retained-history stack so a later `trimRetainedHistory`
     // cannot restore a pre-clear cursor.
     retainedHistoryStack = [];
@@ -3418,7 +3424,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (owner === null) return;
     const ownerIsActive = owner === activeSessionId;
     if (ownerIsActive) {
-      currentSession?.state.clearFailedMessage(messageId);
+      // The service reports when the pruned entry held the terminal error and
+      // has undone it. That error reached `errorAtom` through `config.onError`,
+      // which the service state cannot reach, so a retry that resolves the
+      // failure must clear it here — the durable-seed path does the same.
+      if (currentSession?.state.clearFailedMessage(messageId)) {
+        store.set(errorAtom, null);
+      }
       // A client-materialised row is a local ghost: the accepted re-send
       // supersedes its content and materialises its own row, so leaving the
       // original would render the prompt twice — once for the failed

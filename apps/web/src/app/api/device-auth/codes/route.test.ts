@@ -189,6 +189,14 @@ describe('POST /api/device-auth/codes', () => {
       'a redirect origin that is prose',
       { client_id: 'client-abc', client_name: 'Acme', redirect_origin: 'the trusted app' },
     ],
+    [
+      'a bare web scheme',
+      { client_id: 'client-abc', client_name: 'Acme', redirect_origin: 'https:' },
+    ],
+    [
+      'a bare script scheme',
+      { client_id: 'client-abc', client_name: 'Acme', redirect_origin: 'javascript:' },
+    ],
   ])('refuses a client description with %s', async (_label, requesting_client) => {
     const response = await POST(
       new NextRequest('http://localhost:3000/api/device-auth/codes', {

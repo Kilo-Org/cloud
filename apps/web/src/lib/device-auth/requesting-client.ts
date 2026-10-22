@@ -27,6 +27,24 @@ const displayField = z
   .refine(value => !/\p{Cc}/u.test(value), 'must not contain control characters');
 
 /**
+ * Schemes a browser handles itself. A bare scheme is only accepted for a native
+ * app that takes the code without a host, never for one of these.
+ */
+const browserSchemes: Readonly<Record<string, true>> = {
+  'about:': true,
+  'blob:': true,
+  'data:': true,
+  'file:': true,
+  'ftp:': true,
+  'http:': true,
+  'https:': true,
+  'javascript:': true,
+  'vbscript:': true,
+  'ws:': true,
+  'wss:': true,
+};
+
+/**
  * An absolute origin: `scheme://host[:port]` for a web redirect, or a bare
  * `scheme:` / `scheme://host` for a native app. A path, query, fragment,
  * userinfo or whitespace means the value is not an origin, and the approval
@@ -35,7 +53,7 @@ const displayField = z
 function isRedirectOrigin(value: string): boolean {
   const scheme = /^[a-z][a-z0-9+.-]*:/iu.exec(value)?.[0];
   if (scheme === undefined) return false;
-  if (value === scheme) return true;
+  if (value === scheme) return browserSchemes[scheme.toLowerCase()] !== true;
   if (/[\s@]/u.test(value)) return false;
   let url: URL;
   try {

@@ -2808,6 +2808,9 @@ export const microdollar_usage_metadata = pgTable(
     auto_model_id: integer(),
     reasoning_setting_id: integer(),
     market_cost: bigint({ mode: 'number' }),
+    // Microdollars the gateway itself charged on top of BYOK inference, such as
+    // server tools, plugins and PDF parsing. Null when it is not reported separately.
+    addon_cost: bigint({ mode: 'number' }),
     is_free: boolean(),
     abuse_delay: integer(),
     abuse_downgraded_from: text(),

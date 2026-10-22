@@ -21,6 +21,8 @@ import {
   reportUsageEvent,
 } from '@kilocode/web-shared/lib/bouncer/client';
 import type { OpenRouterGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { verifyApproval } from '@kilocode/web-shared/tests/helpers/approval.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
@@ -92,6 +94,18 @@ describe('processOpenRouterUsage', () => {
     status_code: 200,
   };
 
+  const tokenUsage = {
+    completion_tokens: 100,
+    completion_tokens_details: { reasoning_tokens: 0 },
+    prompt_tokens: 50,
+    prompt_tokens_details: { cached_tokens: 0 },
+    total_tokens: 150,
+  };
+
+  beforeEach(() => {
+    jest.mocked(captureMessage).mockClear();
+  });
+
   test('should correctly process usage for a non-byok case', () => {
     const usage = {
       cost: 0.001,
@@ -104,7 +118,7 @@ describe('processOpenRouterUsage', () => {
       total_tokens: 150,
     };
 
-    const result = processOpenRouterUsage(usage, coreProps);
+    const result = processOpenRouterUsage(usage, coreProps, undefined, 'openrouter');
 
     expect(result.cost_mUsd).toBe(1000);
     expect(result.is_byok).toBe(false);
@@ -122,10 +136,81 @@ describe('processOpenRouterUsage', () => {
       total_tokens: 150,
     };
 
-    const result = processOpenRouterUsage(usage, coreProps);
+    const result = processOpenRouterUsage(usage, coreProps, undefined, 'openrouter');
 
     expect(result.cost_mUsd).toBe(20000);
+    expect(result.addonCost_mUsd).toBe(0);
     expect(result.is_byok).toBe(true);
+  });
+
+  // Usage figures below were returned by real BYOK requests with one web search.
+  test('charges OpenRouter BYOK add-ons without the 5% BYOK fee', () => {
+    const usage = {
+      ...tokenUsage,
+      is_byok: true,
+      cost: 0.0072658, // $0.007 Exa search + 5% of the upstream cost
+      cost_details: { upstream_inference_cost: 0.005316 },
+    };
+
+    const result = processOpenRouterUsage(usage, coreProps, undefined, 'openrouter');
+
+    expect(result.addonCost_mUsd).toBe(7000);
+    expect(result.cost_mUsd).toBe(5316 + 7000);
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  test('charges Vercel BYOK add-ons in full, since Vercel has no BYOK fee', () => {
+    const usage = {
+      ...tokenUsage,
+      is_byok: true,
+      cost: 0.025, // five $0.005 Perplexity searches
+      cost_details: { upstream_inference_cost: 0.041388 },
+    };
+
+    const result = processOpenRouterUsage(usage, coreProps, undefined, 'vercel');
+
+    expect(result.addonCost_mUsd).toBe(25000);
+    expect(result.cost_mUsd).toBe(41388 + 25000);
+  });
+
+  test('undercharges OpenRouter add-ons by the fee while OpenRouter waives it', () => {
+    const usage = {
+      ...tokenUsage,
+      is_byok: true,
+      cost: 0.005,
+      cost_details: { upstream_inference_cost: 0.04 },
+    };
+
+    const result = processOpenRouterUsage(usage, coreProps, undefined, 'openrouter');
+
+    expect(result.addonCost_mUsd).toBe(5000 - 2000);
+    expect(result.cost_mUsd).toBe(40000 + 3000);
+  });
+
+  test('does not separate add-ons from the cost of a non-BYOK request', () => {
+    const usage = { ...tokenUsage, is_byok: false, cost: 0.0123 };
+
+    const result = processOpenRouterUsage(usage, coreProps, undefined, 'vercel');
+
+    expect(result.addonCost_mUsd).toBeUndefined();
+    expect(result.cost_mUsd).toBe(12300);
+  });
+
+  test('reports a BYOK charge below the OpenRouter fee as suspicious', () => {
+    const usage = {
+      ...tokenUsage,
+      is_byok: true,
+      cost: 0.0001,
+      cost_details: { upstream_inference_cost: 0.04 },
+    };
+
+    const result = processOpenRouterUsage(usage, coreProps, undefined, 'openrouter');
+
+    expect(result.addonCost_mUsd).toBe(0);
+    expect(captureMessage).toHaveBeenCalledWith(
+      "SUSPICIOUS: openrouters cost accounting doesn't make sense",
+      expect.anything()
+    );
   });
 });
 
@@ -175,6 +260,26 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     await verifyApproval(resultString, approvalFilePath);
   });
 
+  // Real BYOK streams with web search: OpenRouter bills an Exa search plus its 5%
+  // BYOK fee to its own credits, Vercel bills an Exa search without a fee.
+  test.each([
+    ['openrouter-byok-web-search.log.resp.sse', 'openrouter'],
+    ['vercel-byok-web-search.log.resp.sse', 'vercel'],
+  ] as const)('%s', async (sample, provider) => {
+    const inputFile = join(sampleDir, sample);
+    const nodeStream = createReadStream(inputFile);
+    const stream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      provider,
+      200
+    );
+    const resultString = JSON.stringify(result, null, 2);
+    await verifyApproval(resultString, inputFile + '.approved.json');
+  });
+
   const outOfCredits = 'openrouter-key-out-of-credits.log.resp.sse';
   test(outOfCredits, async () => {
     const inputFile = join(sampleDir, outOfCredits);
@@ -196,7 +301,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
   test(nonStreaming, async () => {
     const inputFile = join(sampleDir, nonStreaming);
     const jsonString = await readFile(inputFile, 'utf-8');
-    const result = parseMicrodollarUsageFromString(jsonString, 'fake-user-id', 200);
+    const result = parseMicrodollarUsageFromString(jsonString, 'fake-user-id', 200, 'openrouter');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
@@ -535,7 +640,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
     });
 
-    const result = parseMicrodollarUsageFromString(response, 'fake-user-id', 200);
+    const result = parseMicrodollarUsageFromString(response, 'fake-user-id', 200, 'openrouter');
 
     expect(result.upstream_id).toBe('chatcmpl-non-streamed');
     expect(result.inference_provider).toBe('fireworks');
@@ -652,6 +757,31 @@ describe('mapToUsageStats', () => {
 
     // Verify that the cost is not multiplied
     expect(result.cost_mUsd).toBe(toMicrodollars(0.1)); // Just convert to microdollars without multiplier
+  });
+
+  test.each([
+    // A real OpenRouter Responses request with one $0.007 Exa search and the 5% BYOK fee.
+    { provider: 'openrouter', total_cost: 0.00765975, upstream: 0.013195, addon: 7000 },
+    // A real Vercel request with five $0.005 Perplexity searches; Vercel has no BYOK fee.
+    { provider: 'vercel', total_cost: 0.025, upstream: 0.041388, addon: 25000 },
+  ] as const)('charges $provider BYOK add-ons from the generation', input => {
+    const generation: OpenRouterGeneration = {
+      data: {
+        id: 'test-byok-addon-id',
+        total_cost: input.total_cost,
+        upstream_inference_cost: input.upstream,
+        is_byok: true,
+        created_at: '2026-10-22T00:00:00Z',
+        model: 'test-model',
+        origin: 'test-origin',
+        usage: input.total_cost,
+      },
+    };
+
+    const result = mapToUsageStats(generation, '', 'fake-user-id', input.provider);
+
+    expect(result.addonCost_mUsd).toBe(input.addon);
+    expect(result.cost_mUsd).toBe(toMicrodollars(input.upstream) + input.addon);
   });
 });
 
@@ -1543,6 +1673,74 @@ describe('logMicrodollarUsage', () => {
       market_cost: 700,
     });
     expect((await findUserById(user.id))?.microdollars_used).toBe(userByok ? 1000 : 1700);
+  });
+
+  test.each([false, true])('records BYOK add-ons with user BYOK=%s', async userByok => {
+    const user = await insertTestUser({
+      id: `test-byok-addon-${userByok}`,
+      microdollars_used: 1000,
+      google_user_email: `byok-addon-${userByok}@example.com`,
+    });
+
+    const result = await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 12_316, addonCost_mUsd: 7000 },
+      { ...createBaseUsageContext(user), user_byok: userByok }
+    );
+
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord?.cost).toBe(userByok ? 0 : 12_316);
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, result.usageId),
+    });
+    expect(metadataRecord).toMatchObject({ addon_cost: 7000, market_cost: 12_316 });
+    expect((await findUserById(user.id))?.microdollars_used).toBe(userByok ? 1000 : 13_316);
+  });
+
+  test('records no add-on cost when it is not reported separately', async () => {
+    const user = await insertTestUser({
+      id: 'test-no-addon',
+      microdollars_used: 0,
+      google_user_email: 'no-addon@example.com',
+    });
+
+    const result = await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: null },
+      createBaseUsageContext(user)
+    );
+
+    assert(result);
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, result.usageId),
+    });
+    expect(metadataRecord?.addon_cost).toBeNull();
+  });
+
+  test('charges BYOK add-ons on top of custom pricing', async () => {
+    const user = await insertTestUser({
+      id: 'test-byok-addon-custom-pricing',
+      microdollars_used: 0,
+      google_user_email: 'byok-addon-custom-pricing@example.com',
+    });
+    const usageStats = { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 12_316 };
+    const customInferenceCost_mUsd = calculateCustomCost_mUsd(GEMINI_FLASH_CURRENT_MODEL_ID, {
+      ...usageStats,
+      cost_mUsd: 5316,
+    });
+    assert(customInferenceCost_mUsd !== undefined);
+
+    const result = await processTokenData(
+      { ...usageStats, addonCost_mUsd: 7000 },
+      { ...createBaseUsageContext(user), requested_model: GEMINI_FLASH_CURRENT_MODEL_ID }
+    );
+
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord?.cost).toBe(customInferenceCost_mUsd + 7000);
   });
 
   test('preserves a paid snapshot when the requested id later becomes a custom model', async () => {

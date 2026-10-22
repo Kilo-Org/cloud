@@ -4,10 +4,12 @@ import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
 import type {
+  JustTheCostsUsageStats,
   NotYetCostedUsageStats,
   VercelProviderAttempt,
   VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
 type OpenRouterCostFields = {
   cost?: number;
@@ -15,24 +17,55 @@ type OpenRouterCostFields = {
   cost_details?: { upstream_inference_cost: number };
 };
 
+function byokFee_USD(provider: ProviderId, upstreamInferenceCost_USD: number) {
+  return provider === 'vercel' ? 0 : upstreamInferenceCost_USD / OPENROUTER_BYOK_COST_MULTIPLIER;
+}
+
 /**
- * Computes cost_mUsd and is_byok from OpenRouter usage cost fields, and emits a
- * Sentry warning when the accounting looks suspicious.
+ * On a BYOK request the provider bills inference to the key, and the gateway's
+ * own `cost` is what it charged on top: add-ons such as server tools, plugins
+ * and PDF parsing, plus OpenRouter's BYOK fee of 5% of the upstream cost. The
+ * fee is not passed on. OpenRouter does not report it separately and waives it
+ * for the first requests of a month, so add-ons are undercharged by up to the
+ * fee then. Vercel charges no fee.
+ */
+export function byokAddonCost_mUsd(
+  provider: ProviderId,
+  gatewayCost_USD: number,
+  upstreamInferenceCost_USD: number
+): number {
+  return Math.max(
+    0,
+    toMicrodollars(gatewayCost_USD - byokFee_USD(provider, upstreamInferenceCost_USD))
+  );
+}
+
+/**
+ * Computes the cost and BYOK status from OpenRouter-style usage cost fields,
+ * which Vercel also returns, and emits a Sentry warning when the accounting
+ * looks suspicious.
  */
 export function computeOpenRouterCostFields(
   usage: OpenRouterCostFields,
   coreProps: NotYetCostedUsageStats,
-  source: string
-): { cost_mUsd: number; is_byok: boolean | null } {
+  source: string,
+  provider: ProviderId
+): Pick<JustTheCostsUsageStats, 'cost_mUsd' | 'addonCost_mUsd' | 'is_byok'> {
   const is_byok = usage.is_byok ?? null;
   const openrouterCost_USD = usage.cost ?? 0;
   const upstream_inference_cost_USD = usage.cost_details?.upstream_inference_cost ?? 0;
-  const cost_mUsd = toMicrodollars(is_byok ? upstream_inference_cost_USD : openrouterCost_USD);
-  const inferredUpstream_USD = openrouterCost_USD * OPENROUTER_BYOK_COST_MULTIPLIER;
-  const microdollar_error = (inferredUpstream_USD - upstream_inference_cost_USD) * 1000000;
+  const addonCost_mUsd = is_byok
+    ? byokAddonCost_mUsd(provider, openrouterCost_USD, upstream_inference_cost_USD)
+    : undefined;
+  const cost_mUsd =
+    addonCost_mUsd === undefined
+      ? toMicrodollars(openrouterCost_USD)
+      : toMicrodollars(upstream_inference_cost_USD) + addonCost_mUsd;
+  const fee_USD = byokFee_USD(provider, upstream_inference_cost_USD);
   if (
     (is_byok == null && (openrouterCost_USD || upstream_inference_cost_USD)) || // unknown byok status but known non-zero costs? We're borked!
-    (is_byok && usage.cost !== 0 && 1.1 < Math.abs(microdollar_error)) // byok and cost is not 5% of upstream? Weird, EXCEPT sometimes cost is 0 due to openrouter promo.
+    // A BYOK charge is 0 while the fee is waived, and at least the fee otherwise.
+    (is_byok && openrouterCost_USD > 0 && (fee_USD - openrouterCost_USD) * 1_000_000 > 1.1)
   ) {
     const { responseContent: _ignore, ...corePropsCopy } = coreProps;
     captureMessage("SUSPICIOUS: openrouters cost accounting doesn't make sense", {
@@ -40,27 +73,44 @@ export function computeOpenRouterCostFields(
       tags: { source },
       extra: {
         ...corePropsCopy,
+        provider,
         cost_mUsd,
+        addonCost_mUsd,
         is_byok,
         openrouterCost_USD,
         upstream_inference_cost_USD,
-        inferredUpstream_USD,
-        microdollar_error,
+        fee_USD,
       },
     });
   }
-  return { cost_mUsd, is_byok };
+  return { cost_mUsd, addonCost_mUsd, is_byok };
+}
+
+function parseUsd(value: string | undefined): number {
+  const usd = parseFloat(value ?? '0');
+  return isNaN(usd) ? 0 : usd;
 }
 
 /**
- * Parses the Vercel gateway cost fields and returns cost in microdollars.
- * Prefers marketCost over cost; returns 0 if neither is a valid number.
+ * Computes the cost from the Vercel gateway metadata. `marketCost` is what the
+ * request costs at list price, including native provider tools. On a BYOK
+ * request the provider bills that to the key, and `cost` is what Vercel charged
+ * on top for its own tools; otherwise `cost` already includes everything.
  */
-export function computeVercelCostMicrodollars(
-  vercelGateway: NonNullable<VercelProviderMetaData['gateway']>
-): number {
-  const marketCost_USD = parseFloat(vercelGateway.marketCost ?? vercelGateway.cost ?? '0');
-  return toMicrodollars(isNaN(marketCost_USD) ? 0 : marketCost_USD);
+export function computeVercelCostFields(
+  vercelGateway: NonNullable<VercelProviderMetaData['gateway']>,
+  isByok: boolean | null
+): Pick<JustTheCostsUsageStats, 'cost_mUsd' | 'addonCost_mUsd'> {
+  if (isByok && vercelGateway.marketCost != null) {
+    const marketCost_USD = parseUsd(vercelGateway.marketCost);
+    const addonCost_mUsd = byokAddonCost_mUsd(
+      'vercel',
+      parseUsd(vercelGateway.cost),
+      marketCost_USD
+    );
+    return { cost_mUsd: toMicrodollars(marketCost_USD) + addonCost_mUsd, addonCost_mUsd };
+  }
+  return { cost_mUsd: toMicrodollars(parseUsd(vercelGateway.marketCost ?? vercelGateway.cost)) };
 }
 
 /**

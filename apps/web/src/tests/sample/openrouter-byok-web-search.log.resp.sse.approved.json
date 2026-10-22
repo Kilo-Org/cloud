@@ -1,0 +1,23 @@
+{
+  "kiloUserId": "fake-user-id",
+  "messageId": "gen-1792678004-E9pLJ2Zqb8jsdCWnzkTw",
+  "hasError": false,
+  "model": "x-ai/grok-4.7",
+  "responseContent": "Max Verstappen won the most recent Formula 1 race, the 2026 Singapore Grand Prix.",
+  "inference_provider": "xAI",
+  "finish_reason": "stop",
+  "upstream_id": null,
+  "latency": null,
+  "moderation_latency": null,
+  "generation_time": null,
+  "streamed": true,
+  "cancelled": null,
+  "status_code": 200,
+  "inputTokens": 6562,
+  "cacheHitTokens": 3456,
+  "cacheWriteTokens": 0,
+  "outputTokens": 328,
+  "cost_mUsd": 16908,
+  "addonCost_mUsd": 7000,
+  "is_byok": true
+}

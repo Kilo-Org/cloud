@@ -1,0 +1,23 @@
+{
+  "kiloUserId": "fake-user-id",
+  "messageId": "gen_01M5HY4NS17BJ99TZP222PRG27",
+  "hasError": false,
+  "model": "spacexai/grok-4.7",
+  "responseContent": "Kimi Antonelli won the most recent Formula 1 race, the 2026 Spanish Grand Prix.",
+  "inference_provider": "xai",
+  "finish_reason": "stop",
+  "upstream_id": "2c9ea317-3454-9ff0-ac64-fff0521a1704",
+  "latency": null,
+  "moderation_latency": null,
+  "generation_time": 2184,
+  "streamed": true,
+  "cancelled": null,
+  "status_code": 200,
+  "inputTokens": 5437,
+  "cacheHitTokens": 2304,
+  "cacheWriteTokens": 0,
+  "outputTokens": 113,
+  "cost_mUsd": 16096,
+  "addonCost_mUsd": 4000,
+  "is_byok": true
+}

@@ -97,6 +97,7 @@ export async function POST(
     auto_model: null,
     reasoning_setting: null,
     market_cost: cost_mUsd,
+    addon_cost: null,
     is_free: false,
     abuse_delay: null,
     abuse_downgraded_from: null,

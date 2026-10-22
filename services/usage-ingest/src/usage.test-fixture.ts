@@ -56,6 +56,7 @@ export const usage: UsageRecordRequest = {
     auto_model: null,
     reasoning_setting: null,
     market_cost: null,
+    addon_cost: null,
     is_free: null,
     abuse_delay: null,
     abuse_downgraded_from: null,

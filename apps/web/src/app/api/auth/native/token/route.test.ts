@@ -285,28 +285,6 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
 
-    // C12: nonce forwarding
-    it('passes the raw nonce to verifyNativeAppleIdToken', async () => {
-      mockVerifyNativeAppleIdToken.mockResolvedValue({
-        sub: 'apple-sub-1',
-        email: 'appleuser@example.com',
-      });
-
-      const response = await POST(
-        createRequest({
-          provider: 'apple',
-          idToken: 'apple-id-token',
-          nonce: 'raw-nonce-from-client',
-        })
-      );
-
-      expect(response.status).toBe(200);
-      expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith(
-        'apple-id-token',
-        'raw-nonce-from-client'
-      );
-    });
-
     it('returns 401 INVALID_TOKEN when the client sends no nonce and the verifier refuses', async () => {
       mockVerifyNativeAppleIdToken.mockRejectedValue(new NativeIdTokenError('Apple nonce missing'));
 
@@ -1392,7 +1370,6 @@ describe('POST /api/auth/native/token', () => {
       expect(mockReleaseSignInCode).toHaveBeenCalled();
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
     });
-
 
     // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────
 

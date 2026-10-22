@@ -351,6 +351,23 @@ describe('verifyNativeAppleIdToken', () => {
     expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 
+  it('applies the transition deadline', async () => {
+    const now = new Date('2026-10-22T12:00:00.000Z');
+    jest.useFakeTimers({ now });
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = now.toISOString();
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+    );
+
+    try {
+      await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
+      expect(mockCaptureMessage).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE;
+      jest.useRealTimers();
+    }
+  });
+
   it('keeps the requirement when the toggle check cannot complete', async () => {
     process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
     mockIsReleaseToggleEnabled.mockRejectedValue(new Error('posthog down'));

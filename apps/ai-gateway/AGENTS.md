@@ -21,9 +21,11 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
   includes this app as a root. Import from this app and `@kilocode/web-shared`
   only; `@/` resolves to `apps/web` there.
 - `sfo1` is far from the Frankfurt primary database. Read-write connections in
-  gateway paths are generally not permissible: they add `sfo1` -> `fra1` latency
-  and hold primary pool connections longer. Replica lag is acceptable for auth.
-  Follow "AI gateway database access" in `packages/web-shared/AGENTS.md`.
+  gateway paths before the upstream request starts are generally not
+  permissible: they add `sfo1` -> `fra1` latency and hold primary pool
+  connections longer. Replica lag is acceptable for auth. Asynchronous access,
+  access after the upstream request starts, and exceptional code paths are
+  allowed. Follow "AI gateway database access" in `packages/web-shared/AGENTS.md`.
 - Route files are thin facades over handlers in `packages/web-shared`. Keep the
   `apps/web` `maxDuration` and `withRestTiming` usage, with route patterns that
   match this app's paths. Import them as `@kilocode/web-shared/…`; see

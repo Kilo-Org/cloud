@@ -148,9 +148,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       // meanwhile replaces this read through the fence below.
       const stored = await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
       const personalMarker =
-        stored === null
-          ? await SecureStore.getItemAsync(ORGANIZATION_PERSONAL_STORAGE_KEY)
-          : null;
+        stored === null ? await SecureStore.getItemAsync(ORGANIZATION_PERSONAL_STORAGE_KEY) : null;
       if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
         if (stored) {
           const selected = decodeSelection(stored);

@@ -1,6 +1,7 @@
 // The method chips render resolved copy: an open merge sheet must follow a
 // live language change, not keep the strings its option list was built with at
-// mount. The options memo is keyed to the active language for that reason.
+// mount. The sheet builds that list on every render for exactly that reason, so
+// this case fails if it is cached again.
 
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';

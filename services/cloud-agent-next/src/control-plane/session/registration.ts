@@ -11,7 +11,10 @@ import {
   controlPlaneSandboxSelectionSchema,
   type ControlPlaneSandboxSelection,
 } from './sandbox-selection.js';
-import { credentialSourceFromMetadata } from '../../sandbox-control/session-credentials.js';
+import {
+  credentialSourceFromMetadata,
+  SessionCredentialUpgradeRequiredError,
+} from '../../sandbox-control/session-credentials.js';
 import {
   buildSessionAttachPayload,
   isReadOnlyBitbucketReview,
@@ -227,8 +230,10 @@ export function buildControlPlaneSessionRegistration(
   if (sandboxProvider === 'vercel' && !containment.kilocode && !containment.github) {
     throw new Error('Vercel requires credential containment');
   }
+  if (!hasModernRuntimeAuthorization(metadata)) {
+    throw new SessionCredentialUpgradeRequiredError();
+  }
   if (
-    hasModernRuntimeAuthorization(metadata) &&
     runtimeConfiguration &&
     (!runtimeConfiguration.workerUrl ||
       !runtimeCredentialProxyFacadeBaseUrl(runtimeConfiguration.workerUrl))

@@ -16,6 +16,7 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import {
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
   installFakeCredentialEnv,
@@ -57,7 +58,7 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
       orgId: ORG_ID,
       createdOnPlatform: 'cloud-agent-web',
     },
-    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: 'native-token' },
+    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
     workspace: {

@@ -106,14 +106,12 @@ const selectTurns = async (db: Db, sessionId: string): Promise<readonly Turn[]> 
     db.select().from(parts).where(eq(parts.sessionId, sessionId)).orderBy(asc(parts.id)),
   ]);
   const held = byTurn(assertParts(partRows));
-  return assertTurns(turnRows).map(
-    (turn): Turn => ({
-      id: turn.id,
-      sessionId: turn.sessionId,
-      role: turn.role,
-      parts: held.get(turn.id) ?? [],
-    })
-  );
+  return assertTurns(turnRows).map((turn): Turn => ({
+    id: turn.id,
+    sessionId: turn.sessionId,
+    role: turn.role,
+    parts: held.get(turn.id) ?? [],
+  }));
 };
 
 /**

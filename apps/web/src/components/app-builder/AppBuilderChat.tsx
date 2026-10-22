@@ -1,14 +1,3 @@
-/**
- * App Builder Chat
- *
- * Chat pane component with messages and input.
- * Uses ProjectSession context hooks for state and actions.
- * Supports model selection during chat via inline model selector.
- *
- * Renders sessions from state.sessions — each session subscribes to its
- * own store via useSyncExternalStore and renders V1 or V2 messages.
- */
-
 'use client';
 
 import React, {
@@ -63,9 +52,6 @@ type AppBuilderChatProps = {
 
 const isDev = process.env.NODE_ENV === 'development';
 
-/**
- * Timestamp display with optional tooltip showing full time in dev mode
- */
 function TimestampDisplay({ ts }: { ts: number }) {
   if (isDev) {
     const fullTime = format(new Date(ts), 'yyyy-MM-dd HH:mm:ss.SSS');
@@ -84,9 +70,6 @@ function TimestampDisplay({ ts }: { ts: number }) {
   return <TimeAgo timestamp={ts} className="text-muted-foreground text-xs" />;
 }
 
-/**
- * User message bubble component
- */
 function UserMessageBubble({ message }: { message: CloudMessage }) {
   return (
     <div className="flex items-start justify-end gap-2 py-4 md:gap-3">
@@ -108,9 +91,6 @@ function UserMessageBubble({ message }: { message: CloudMessage }) {
   );
 }
 
-/**
- * Assistant/System message bubble component
- */
 function AssistantMessageBubble({
   message,
   isStreaming,
@@ -169,9 +149,6 @@ const StaticMessages = memo(function StaticMessages({ messages }: { messages: Cl
   );
 });
 
-/**
- * Dynamic messages - re-render during streaming
- */
 function DynamicMessages({
   messages,
   isStreaming,
@@ -280,9 +257,6 @@ const V2StaticMessages = memo(function V2StaticMessages({
   );
 });
 
-/**
- * V2 dynamic messages (streaming)
- */
 function V2DynamicMessages({
   messages,
   getChildMessages,
@@ -307,9 +281,6 @@ function V2DynamicMessages({
   );
 }
 
-/**
- * Renders a V1 session's messages with filtering and pagination.
- */
 function V1SessionMessages({
   session,
   visibleSessionCount,
@@ -462,9 +433,6 @@ function V2SessionMessages({
   );
 }
 
-/**
- * Renders a single session — expandable if not the active session, or full messages if active.
- */
 function SessionMessages({
   session,
   isLast,
@@ -502,11 +470,7 @@ function SessionMessages({
   );
 }
 
-/**
- * Main chat component
- */
 export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
-  // Get state and manager from ProjectSession context
   const { manager, state } = useProject();
   const { isStreaming, isInterrupting, model: projectModel, sessions, pendingNewSession } = state;
 
@@ -527,7 +491,6 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
 
   const trpc = useTRPC();
 
-  // Reset pagination when project/manager changes
   useEffect(() => {
     setVisibleSessionCount(DEFAULT_VISIBLE_SESSIONS);
   }, [manager]);
@@ -541,7 +504,6 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     }
   }, [sessions.length, sessionCountAtSubmit, isStreaming]);
 
-  // Fetch eligibility to check if user can use App Builder
   const personalEligibilityQuery = useQuery({
     ...trpc.appBuilder.checkEligibility.queryOptions(),
     enabled: !organizationId,
@@ -562,17 +524,14 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
   const hasLimitedAccess = !isEligibilityLoading && accessLevel === 'limited';
   const isBlocked = !isEligibilityLoading && accessLevel === 'blocked';
 
-  // Fetch organization configuration and models for the model selector
   const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
 
   const allModels = modelsData?.data || [];
 
-  // When user has limited access, only show free models
   const availableModels = useMemo(() => {
     let models = allModels;
 
-    // If user has limited access, filter to only free models
     if (hasLimitedAccess) {
       models = models.filter(m => {
         const promptPrice = parseFloat(m.pricing.prompt);
@@ -584,7 +543,6 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     return models;
   }, [allModels, hasLimitedAccess]);
 
-  // Format models for the combobox (ModelOption format: id, name, supportsVision)
   const modelOptions = useMemo<ModelOption[]>(
     () =>
       availableModels.map(m => {
@@ -603,7 +561,6 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     [availableModels]
   );
 
-  // Check if the selected model supports images (vision)
   const selectedModelData = useMemo(
     () => availableModels.find(m => m.id === selectedModel),
     [availableModels, selectedModel]
@@ -615,10 +572,8 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     return inputModalities.includes('image') || inputModalities.includes('image_url');
   }, [selectedModelData]);
 
-  // Warning state: user uploaded images but model doesn't support them
   const hasImageWarning = hasImages && !modelSupportsImages;
 
-  // Sync selectedModel when a different project loads (projectModel changes from initial)
   useEffect(() => {
     if (projectModel && projectModel !== initialProjectModelRef.current) {
       initialProjectModelRef.current = projectModel;
@@ -626,18 +581,15 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     }
   }, [projectModel]);
 
-  // Set fallback model when models load and no valid selection exists
   useEffect(() => {
     if (modelOptions.length === 0) {
       return;
     }
 
-    // If current selection is valid, keep it
     if (selectedModel && modelOptions.some(m => m.id === selectedModel)) {
       return;
     }
 
-    // Pick a default model
     const defaultModel = defaultsData?.defaultModel;
     const isDefaultAllowed = defaultModel && modelOptions.some(m => m.id === defaultModel);
     const newModel = isDefaultAllowed ? defaultModel : modelOptions[0]?.id;
@@ -646,11 +598,9 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     }
   }, [defaultsData?.defaultModel, modelOptions, selectedModel]);
 
-  // Subscribe to active session for auto-scroll
   const activeSession = sessions.length > 0 ? sessions[sessions.length - 1] : undefined;
   const activeSessionMessages = useActiveSessionMessages(activeSession);
 
-  // Auto-scroll effect
   useEffect(() => {
     if (shouldAutoScroll && scrollContainerRef.current) {
       scrollContainerRef.current.scrollTo({
@@ -660,7 +610,6 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     }
   }, [activeSessionMessages, shouldAutoScroll]);
 
-  // Handle scroll events
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
 
@@ -671,7 +620,6 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     setShouldAutoScroll(isNearBottom);
   };
 
-  // Scroll to bottom
   const scrollToBottom = () => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTo({
@@ -683,12 +631,9 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     }
   };
 
-  // Handle send message using ProjectManager
   const handleSendMessage = useCallback(
     async (value: string, images?: Images): Promise<void> => {
       if (pendingNewSession) {
-        // Record current session count so we can keep the placeholder visible
-        // until the new session object actually arrives in state.
         setSessionCountAtSubmit(sessions.length);
       }
       manager.sendMessage(value, images, selectedModel || undefined);
@@ -698,27 +643,22 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     [manager, selectedModel, pendingNewSession, sessions.length]
   );
 
-  // Handle model change - stable callback for PromptInput memoization
   const handleModelChange = useCallback((newModel: string) => {
     setSelectedModel(newModel);
   }, []);
 
-  // Handle images change - stable callback for PromptInput memoization
   const handleImagesChange = useCallback((hasUploadedImages: boolean) => {
     setHasImages(hasUploadedImages);
   }, []);
 
-  // Handle interrupt using ProjectManager
   const handleInterrupt = useCallback(() => {
     manager.interrupt();
   }, [manager]);
 
-  // Handle loading more messages (for V1 pagination)
   const handleLoadMore = useCallback(() => {
     setVisibleSessionCount(prev => prev + 1);
   }, []);
 
-  // Check if input should be disabled (no messages in any session yet)
   const hasAnyMessages = activeSessionMessages.length > 0;
 
   const handleNewChatToggle = useCallback(() => {
@@ -862,11 +802,6 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
   );
 }
 
-// =============================================================================
-// Hooks
-// =============================================================================
-
-/** No-op subscribe for when there's no active session */
 function noopSubscribe() {
   return () => {};
 }

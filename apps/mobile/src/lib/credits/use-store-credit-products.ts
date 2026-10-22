@@ -8,26 +8,28 @@ import {
   getStoreCreditProductsState,
   type StoreCreditProduct,
   type StoreCreditProductListing,
+  type StoreProductFetchOptions,
 } from './store-products';
 import {
   getAuthoredProductsErrorMessageKey,
   loadStoreCreditProducts,
+  STORE_FAILURE_KEY,
+  STORE_FAILURE_PLAY_KEY,
 } from './store-products-loader';
 
 const STORE_CREDIT_PRODUCTS_STALE_TIME_MS = 5 * 60 * 1000;
 // Fixed bound on the store connection handshake — raise if real
 // devices routinely need longer than this to connect.
 const STORE_CONNECTION_TIMEOUT_MS = 8000;
-// Catalog keys, not copy: the screen translates them, and the Kilo Pass copy is
-// identical, so reusing its keys keeps `check:i18n` free of a duplicate string.
-const APP_STORE_CONNECTION_TIMEOUT_KEY = 'kiloPass.couldNotConnectToAppStore';
-const PLAY_CONNECTION_TIMEOUT_KEY = 'kiloPass.couldNotConnectToPlay';
 
 export type StoreCreditProductsOptions = {
   /** Whether the store connection (from the IAP owner) is established. */
   connected: boolean;
   /** Fetches store SKUs. Injected by the IAP owner so this module never imports `expo-iap`. */
-  fetchStoreProducts: (productSkus: string[]) => Promise<readonly StoreCreditProductListing[]>;
+  fetchStoreProducts: (
+    productSkus: string[],
+    options?: StoreProductFetchOptions
+  ) => Promise<readonly StoreCreditProductListing[]>;
   /**
    * Restores the IAP owner's store connection.
    *
@@ -83,7 +85,7 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   // banner shows can never come from two different platform branches.
   const storefront = getCreditStorefront();
   const storeConnectionTimeoutKey =
-    storefront === 'play' ? PLAY_CONNECTION_TIMEOUT_KEY : APP_STORE_CONNECTION_TIMEOUT_KEY;
+    storefront === 'play' ? STORE_FAILURE_PLAY_KEY : STORE_FAILURE_KEY;
 
   const productsQuery = useQuery({
     queryKey: ['credits', 'store-products', userId],

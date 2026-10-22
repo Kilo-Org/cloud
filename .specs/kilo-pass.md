@@ -342,18 +342,12 @@ Rules 51-55 protect against rapid cross-account reuse of a recently first-used c
     no failed cleanup audit is guaranteed.
 61. Successful missing-row cleanup release MUST append a success audit entry. Current behavior MUST NOT be described as
     preserving the original error under every cleanup failure.
-78. A scheduled change MAY be created while a Stripe subscription is `active` with pending cancellation. Because a
-    subscription set to cancel at period end ends instead of switching plans, creating the change MUST first withdraw the
-    pending cancellation on the provider and in the persisted row, and MUST report that it did so. The same eligibility
-    applies to tier changes in either direction and to cadence changes. Subscriptions whose status is not `active` MUST
-    remain ineligible whether or not cancellation is pending, and a rejected request, including a request identical to the
-    current plan, MUST NOT withdraw a pending cancellation.
-79. If creating a scheduled change fails after a pending cancellation was withdrawn, the system MUST attempt to restore
-    the cancellation, including when releasing the partially created provider schedule also fails. The restoration MUST
-    NOT replace the original error. A failed restoration MUST be reported operationally; the subscription webhook
-    reconciles the cancellation flag from provider state, so a failed restoration self-heals on the next event. Until then
-    the user MAY be renewed against their wishes.
-80. Cancelling a subscription MUST release its tracked scheduled change first, so a cancellation and a scheduled change
+78. A scheduled change MUST NOT be created while a Stripe subscription has pending cancellation. A subscription set to
+    cancel at period end ends instead of switching plans, so the user MUST resume the subscription before changing plans.
+    The server MUST reject the request before any provider mutation and tell the user to resume first, and the UI MUST
+    disable plan selection and explain why. A rejected request MUST NOT alter the pending cancellation. Subscriptions
+    whose status is not `active` remain ineligible.
+79. Cancelling a subscription MUST release its tracked scheduled change first, so a cancellation and a scheduled change
     never coexist. Resuming a cancelled subscription does not recreate a released change.
 
 ### Pause, Cancellation, and Store Expiry
@@ -363,8 +357,7 @@ Rules 51-55 protect against rapid cross-account reuse of a recently first-used c
 63. Paused profile and Subscription Center surfaces MUST suppress renewal rows. They continue to render current-period
     usage and bonus progress.
 64. A pending cancellation MUST remain active until period end. UI MUST communicate active-until date. When pause and
-    pending cancellation overlap, current renewal-row UI gives active-until display precedence. Plan changes remain
-    available during pending cancellation under Rule 78.
+    pending cancellation overlap, current renewal-row UI gives active-until display precedence.
 65. On the web read path, a selected store subscription whose latest purchase expired at or before now MUST be returned
     as derived `canceled`, even if provider end notification was not received.
 66. Store-expiry reconciliation MUST scan non-canceled App Store and Google Play rows, skip rows without purchases, and
@@ -464,10 +457,8 @@ promo or Kilo Pass referral conversion.
 
 ### 2026-10-12 -- Plan changes during pending cancellation
 
-- Stripe subscribers whose Kilo Pass is `active` with pending cancellation can now schedule a tier or cadence change. The
-  change withdraws the cancellation, and the UI states this and the billing date before confirming (Rules 78-80).
-- A failed change restores the cancellation rather than leaving an unintended renewal.
-- Immediate or prorated upgrades and extra-credit emulation were evaluated and are not part of this change.
+- Plan changes are rejected while a Stripe Kilo Pass has pending cancellation; the user resumes the subscription first
+  (Rules 78-79). This avoids withdrawing a cancellation and then having to restore it if the change fails partway.
 
 ### 2026-10-08 -- Timestamp-based monthly welcome bonus cutoff
 

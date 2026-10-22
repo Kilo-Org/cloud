@@ -1,6 +1,7 @@
 import { ArrowRight, Check, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { cn } from '@/lib/utils';
@@ -25,7 +26,7 @@ type UpdatePanelProps = {
   targetCadence: KiloPassCadence;
   isMutating: boolean;
   updateSummary: UpdateSummary;
-  cancellationWithdrawalNotice: string | null;
+  planChangeBlockedReason: string | null;
   hasScheduledChange: boolean;
   effectiveAtLabel: string | null;
   onSelectTier: (tier: KiloPassTier) => void;
@@ -42,12 +43,14 @@ export function UpdatePanel(props: UpdatePanelProps) {
     targetCadence,
     isMutating,
     updateSummary,
-    cancellationWithdrawalNotice,
+    planChangeBlockedReason,
     hasScheduledChange,
     effectiveAtLabel,
     onSelectTier,
     onSelectCadence,
   } = props;
+
+  const areOptionsDisabled = isMutating || planChangeBlockedReason !== null;
 
   return (
     <div className="grid gap-4">
@@ -77,7 +80,7 @@ export function UpdatePanel(props: UpdatePanelProps) {
               key={tier}
               tier={tier}
               isSelected={tier === targetTier}
-              isDisabled={isMutating}
+              isDisabled={areOptionsDisabled}
               onSelect={() => onSelectTier(tier)}
             />
           ))}
@@ -92,7 +95,7 @@ export function UpdatePanel(props: UpdatePanelProps) {
               key={cadence}
               cadence={cadence}
               isSelected={cadence === targetCadence}
-              isDisabled={isMutating}
+              isDisabled={areOptionsDisabled}
               onSelect={() => onSelectCadence(cadence)}
             />
           ))}
@@ -107,10 +110,10 @@ export function UpdatePanel(props: UpdatePanelProps) {
         <p className="text-muted-foreground text-sm">{updateSummary.body}</p>
       </div>
 
-      {cancellationWithdrawalNotice ? (
-        <p role="note" className="text-sm text-amber-400">
-          {cancellationWithdrawalNotice}
-        </p>
+      {planChangeBlockedReason ? (
+        <Alert variant="warning">
+          <AlertDescription>{planChangeBlockedReason}</AlertDescription>
+        </Alert>
       ) : null}
 
       {hasScheduledChange && effectiveAtLabel ? (
@@ -129,6 +132,7 @@ type UpdateFooterProps = {
   isCancelingPendingChange: boolean;
   isSchedulingChange: boolean;
   isSameSelection: boolean;
+  isPlanChangeBlocked: boolean;
 };
 
 export function UpdateFooter(props: UpdateFooterProps) {
@@ -141,6 +145,7 @@ export function UpdateFooter(props: UpdateFooterProps) {
     isCancelingPendingChange,
     isSchedulingChange,
     isSameSelection,
+    isPlanChangeBlocked,
   } = props;
 
   return (
@@ -159,7 +164,10 @@ export function UpdateFooter(props: UpdateFooterProps) {
           </Button>
         ) : null}
         {!hasPendingChange ? (
-          <Button onClick={onScheduleChange} disabled={isSameSelection || isMutating}>
+          <Button
+            onClick={onScheduleChange}
+            disabled={isSameSelection || isMutating || isPlanChangeBlocked}
+          >
             {isSchedulingChange ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (

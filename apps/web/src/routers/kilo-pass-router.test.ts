@@ -300,7 +300,7 @@ type KiloPassCaller = {
   scheduleChange: (input: {
     targetTier: KiloPassTier;
     targetCadence: KiloPassCadence;
-  }) => Promise<{ scheduledChangeId: string; effectiveAt: string; cancellationWithdrawn: boolean }>;
+  }) => Promise<{ scheduledChangeId: string; effectiveAt: string }>;
   getScheduledChange: () => Promise<{
     scheduledChange: {
       id: string;
@@ -4825,281 +4825,39 @@ describe('kiloPassRouter', () => {
       expectNoStripeManagementCalls(stripeMock);
     });
 
-    describe('while cancellation is pending', () => {
-      const periodEndSeconds = 1_767_225_600;
+    it('rejects a plan change while cancellation is pending, without touching Stripe', async () => {
+      const stripeMock = getStripeMock();
+      const stripeSubscriptionId = 'sub_test_schedule_while_cancelling';
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-schedule-while-cancelling@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        cancelAtPeriodEnd: true,
+      });
 
-      function mockScheduleCreation(stripeSubscriptionId: string) {
-        const stripeMock = getStripeMock();
-        stripeMock.subscriptions.retrieve.mockResolvedValue({
-          id: stripeSubscriptionId,
-          status: 'active',
-          items: { data: [{ current_period_end: periodEndSeconds }] },
-        });
-        stripeMock.subscriptions.update.mockResolvedValue({});
-        const scheduleId = `sched_${Math.random()}`;
-        stripeMock.subscriptionSchedules.create.mockResolvedValue({
-          id: scheduleId,
-          phases: [{ start_date: periodEndSeconds - 2_592_000 }],
-          current_phase: { start_date: periodEndSeconds - 2_592_000 },
-        });
-        stripeMock.subscriptionSchedules.update.mockResolvedValue({
-          id: scheduleId,
-          status: KiloPassScheduledChangeStatus.NotStarted,
-        });
-        stripeMock.subscriptionSchedules.release.mockResolvedValue({});
-        return { stripeMock, scheduleId };
-      }
-
-      async function readCancelAtPeriodEnd(stripeSubscriptionId: string) {
-        const row = await db.query.kilo_pass_subscriptions.findFirst({
-          columns: { cancel_at_period_end: true },
-          where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId),
-        });
-        return row?.cancel_at_period_end;
-      }
-
-      it('withdraws the cancellation before creating the schedule and reports it', async () => {
-        const stripeSubscriptionId = 'sub_test_schedule_while_cancelling';
-        const { stripeMock, scheduleId } = mockScheduleCreation(stripeSubscriptionId);
-        const user = await insertTestUser({
-          google_user_email: 'kilo-pass-schedule-while-cancelling@example.com',
-        });
-        await insertSubscription({
-          kiloUserId: user.id,
-          stripeSubscriptionId,
-          tier: KiloPassTier.Tier19,
-          cadence: KiloPassCadence.Monthly,
-          status: 'active',
-          cancelAtPeriodEnd: true,
-        });
-
-        const caller = await createCallerForUser(user.id);
-        const result = await caller.kiloPass.scheduleChange({
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.scheduleChange({
           targetTier: KiloPassTier.Tier49,
           targetCadence: KiloPassCadence.Monthly,
-        });
+        })
+      ).rejects.toThrow('Resume your subscription before changing plans.');
 
-        expect(result.cancellationWithdrawn).toBe(true);
-        expect(stripeMock.subscriptions.update).toHaveBeenCalledTimes(1);
-        expect(stripeMock.subscriptions.update).toHaveBeenCalledWith(stripeSubscriptionId, {
-          cancel_at_period_end: false,
-        });
-        expect(stripeMock.subscriptions.update.mock.invocationCallOrder[0]).toBeLessThan(
-          stripeMock.subscriptionSchedules.create.mock.invocationCallOrder[0] ?? 0
-        );
-        expect(await readCancelAtPeriodEnd(stripeSubscriptionId)).toBe(false);
-
-        const rows = await db.query.kilo_pass_scheduled_changes.findMany({
-          where: eq(kilo_pass_scheduled_changes.stripe_subscription_id, stripeSubscriptionId),
-        });
-        expect(rows).toHaveLength(1);
-        expect(rows[0]?.stripe_schedule_id).toBe(scheduleId);
+      expectNoStripeManagementCalls(stripeMock);
+      const rows = await db.query.kilo_pass_scheduled_changes.findMany({
+        where: eq(kilo_pass_scheduled_changes.stripe_subscription_id, stripeSubscriptionId),
       });
-
-      it('does not touch cancel_at_period_end when no cancellation is pending', async () => {
-        const stripeSubscriptionId = 'sub_test_schedule_not_cancelling';
-        const { stripeMock } = mockScheduleCreation(stripeSubscriptionId);
-        const user = await insertTestUser({
-          google_user_email: 'kilo-pass-schedule-not-cancelling@example.com',
-        });
-        await insertSubscription({
-          kiloUserId: user.id,
-          stripeSubscriptionId,
-          tier: KiloPassTier.Tier19,
-          cadence: KiloPassCadence.Monthly,
-          status: 'active',
-          cancelAtPeriodEnd: false,
-        });
-
-        const caller = await createCallerForUser(user.id);
-        const result = await caller.kiloPass.scheduleChange({
-          targetTier: KiloPassTier.Tier49,
-          targetCadence: KiloPassCadence.Monthly,
-        });
-
-        expect(result.cancellationWithdrawn).toBe(false);
-        expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
-        expect(await readCancelAtPeriodEnd(stripeSubscriptionId)).toBe(false);
+      expect(rows).toHaveLength(0);
+      const row = await db.query.kilo_pass_subscriptions.findFirst({
+        columns: { cancel_at_period_end: true },
+        where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId),
       });
-
-      it('restores the cancellation when schedule creation fails', async () => {
-        const stripeSubscriptionId = 'sub_test_schedule_create_fails_cancelling';
-        const { stripeMock } = mockScheduleCreation(stripeSubscriptionId);
-        stripeMock.subscriptionSchedules.create.mockRejectedValue(
-          new Error('stripe create failed')
-        );
-        const user = await insertTestUser({
-          google_user_email: 'kilo-pass-schedule-create-fails@example.com',
-        });
-        await insertSubscription({
-          kiloUserId: user.id,
-          stripeSubscriptionId,
-          tier: KiloPassTier.Tier19,
-          cadence: KiloPassCadence.Monthly,
-          status: 'active',
-          cancelAtPeriodEnd: true,
-        });
-
-        const caller = await createCallerForUser(user.id);
-        await expect(
-          caller.kiloPass.scheduleChange({
-            targetTier: KiloPassTier.Tier49,
-            targetCadence: KiloPassCadence.Monthly,
-          })
-        ).rejects.toThrow('stripe create failed');
-
-        expect(stripeMock.subscriptions.update).toHaveBeenNthCalledWith(1, stripeSubscriptionId, {
-          cancel_at_period_end: false,
-        });
-        expect(stripeMock.subscriptions.update).toHaveBeenNthCalledWith(2, stripeSubscriptionId, {
-          cancel_at_period_end: true,
-        });
-        expect(await readCancelAtPeriodEnd(stripeSubscriptionId)).toBe(true);
-      });
-
-      it('restores the cancellation and releases the schedule when the schedule update fails', async () => {
-        const stripeSubscriptionId = 'sub_test_schedule_update_fails_cancelling';
-        const { stripeMock, scheduleId } = mockScheduleCreation(stripeSubscriptionId);
-        stripeMock.subscriptionSchedules.update.mockRejectedValue(
-          new Error('stripe update failed')
-        );
-        const user = await insertTestUser({
-          google_user_email: 'kilo-pass-schedule-update-fails@example.com',
-        });
-        await insertSubscription({
-          kiloUserId: user.id,
-          stripeSubscriptionId,
-          tier: KiloPassTier.Tier19,
-          cadence: KiloPassCadence.Monthly,
-          status: 'active',
-          cancelAtPeriodEnd: true,
-        });
-
-        const caller = await createCallerForUser(user.id);
-        await expect(
-          caller.kiloPass.scheduleChange({
-            targetTier: KiloPassTier.Tier49,
-            targetCadence: KiloPassCadence.Monthly,
-          })
-        ).rejects.toThrow('stripe update failed');
-
-        expect(stripeMock.subscriptionSchedules.release).toHaveBeenCalledWith(scheduleId);
-        expect(await readCancelAtPeriodEnd(stripeSubscriptionId)).toBe(true);
-      });
-
-      it('still restores the cancellation when releasing the orphaned schedule fails', async () => {
-        const stripeSubscriptionId = 'sub_test_schedule_release_fails_cancelling';
-        const { stripeMock } = mockScheduleCreation(stripeSubscriptionId);
-        stripeMock.subscriptionSchedules.update.mockRejectedValue(
-          new Error('stripe update failed')
-        );
-        stripeMock.subscriptionSchedules.release.mockRejectedValue(new Error('release failed'));
-        const user = await insertTestUser({
-          google_user_email: 'kilo-pass-schedule-release-fails@example.com',
-        });
-        await insertSubscription({
-          kiloUserId: user.id,
-          stripeSubscriptionId,
-          tier: KiloPassTier.Tier19,
-          cadence: KiloPassCadence.Monthly,
-          status: 'active',
-          cancelAtPeriodEnd: true,
-        });
-
-        const caller = await createCallerForUser(user.id);
-        await expect(
-          caller.kiloPass.scheduleChange({
-            targetTier: KiloPassTier.Tier49,
-            targetCadence: KiloPassCadence.Monthly,
-          })
-        ).rejects.toThrow('stripe update failed');
-
-        expect(await readCancelAtPeriodEnd(stripeSubscriptionId)).toBe(true);
-      });
-
-      it('surfaces the original error when restoring the cancellation also fails', async () => {
-        const stripeSubscriptionId = 'sub_test_schedule_restore_fails_cancelling';
-        const { stripeMock } = mockScheduleCreation(stripeSubscriptionId);
-        stripeMock.subscriptionSchedules.create.mockRejectedValue(
-          new Error('stripe create failed')
-        );
-        stripeMock.subscriptions.update
-          .mockResolvedValueOnce({})
-          .mockRejectedValueOnce(new Error('restore failed'));
-        const user = await insertTestUser({
-          google_user_email: 'kilo-pass-schedule-restore-fails@example.com',
-        });
-        await insertSubscription({
-          kiloUserId: user.id,
-          stripeSubscriptionId,
-          tier: KiloPassTier.Tier19,
-          cadence: KiloPassCadence.Monthly,
-          status: 'active',
-          cancelAtPeriodEnd: true,
-        });
-
-        const caller = await createCallerForUser(user.id);
-        await expect(
-          caller.kiloPass.scheduleChange({
-            targetTier: KiloPassTier.Tier49,
-            targetCadence: KiloPassCadence.Monthly,
-          })
-        ).rejects.toThrow('stripe create failed');
-      });
-
-      it('rejects a plan change on a cancelling subscription that is not active', async () => {
-        const stripeSubscriptionId = 'sub_test_schedule_cancelling_past_due';
-        const { stripeMock } = mockScheduleCreation(stripeSubscriptionId);
-        const user = await insertTestUser({
-          google_user_email: 'kilo-pass-schedule-cancelling-past-due@example.com',
-        });
-        await insertSubscription({
-          kiloUserId: user.id,
-          stripeSubscriptionId,
-          tier: KiloPassTier.Tier19,
-          cadence: KiloPassCadence.Monthly,
-          status: 'past_due',
-          cancelAtPeriodEnd: true,
-        });
-
-        const caller = await createCallerForUser(user.id);
-        await expect(
-          caller.kiloPass.scheduleChange({
-            targetTier: KiloPassTier.Tier49,
-            targetCadence: KiloPassCadence.Monthly,
-          })
-        ).rejects.toThrow('Kilo Pass subscription is not active');
-
-        expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
-        expect(await readCancelAtPeriodEnd(stripeSubscriptionId)).toBe(true);
-      });
-
-      it('rejects a no-op change without withdrawing the cancellation', async () => {
-        const stripeSubscriptionId = 'sub_test_schedule_noop_cancelling';
-        const { stripeMock } = mockScheduleCreation(stripeSubscriptionId);
-        const user = await insertTestUser({
-          google_user_email: 'kilo-pass-schedule-noop-cancelling@example.com',
-        });
-        await insertSubscription({
-          kiloUserId: user.id,
-          stripeSubscriptionId,
-          tier: KiloPassTier.Tier19,
-          cadence: KiloPassCadence.Monthly,
-          status: 'active',
-          cancelAtPeriodEnd: true,
-        });
-
-        const caller = await createCallerForUser(user.id);
-        await expect(
-          caller.kiloPass.scheduleChange({
-            targetTier: KiloPassTier.Tier19,
-            targetCadence: KiloPassCadence.Monthly,
-          })
-        ).rejects.toThrow('Target tier/cadence matches current subscription.');
-
-        expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
-        expect(await readCancelAtPeriodEnd(stripeSubscriptionId)).toBe(true);
-      });
+      expect(row?.cancel_at_period_end).toBe(true);
     });
   });
 

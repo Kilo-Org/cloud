@@ -21,11 +21,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 
 import { getTierName } from './utils';
-import {
-  canSchedulePlanChange,
-  getCancellationWithdrawalNotice,
-  willWithdrawCancellation,
-} from './kiloPassPlanChange.logic';
+import { getPlanChangeBlockedReason } from './kiloPassPlanChange.logic';
 import { useKiloPassSubscriptionInfo } from './useKiloPassSubscriptionInfo';
 import { useKiloPassChurnkeyCancelFlow } from './useKiloPassChurnkeyCancelFlow';
 import {
@@ -98,6 +94,8 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
 
   const isSameSelection =
     targetTier === subscription.tier && targetCadence === subscription.cadence;
+
+  const planChangeBlockedReason = getPlanChangeBlockedReason(subscription);
 
   const computedEffectiveAt = useMemo(() => {
     if (scheduledChange?.effectiveAt) {
@@ -215,19 +213,14 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   }, [targetCadence, targetTier]);
 
   const handleScheduleChange = async () => {
-    if (isSameSelection) return;
+    if (isSameSelection || planChangeBlockedReason) return;
 
     try {
       const result = await scheduleChange.mutateAsync({
         targetTier,
         targetCadence,
       });
-      const effectiveLabel = formatIsoDateString_UsaDateOnlyFormat(result.effectiveAt);
-      toast(
-        result.cancellationWithdrawn
-          ? `Cancellation withdrawn. Plan change scheduled for ${effectiveLabel}.`
-          : `Change scheduled for ${effectiveLabel}`
-      );
+      toast(`Change scheduled for ${formatIsoDateString_UsaDateOnlyFormat(result.effectiveAt)}`);
       closeModal();
       await queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() });
       await queryClient.invalidateQueries({
@@ -262,12 +255,9 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   const resumeAction = view.actions.resume;
   const resumePausedAction = view.actions.resumePaused;
 
-  const isUpdateSubscriptionDisabled = !canSchedulePlanChange(subscription);
+  const isUpdateSubscriptionDisabled = view.status.isPendingCancellation;
 
   const pendingChange = Boolean(scheduledChange);
-  const cancellationWithdrawalNotice = willWithdrawCancellation(subscription, pendingChange)
-    ? getCancellationWithdrawalNotice({ effectiveAtLabel })
-    : null;
   const showUpdatePanel = panel === 'update' && !pendingChange;
 
   return (
@@ -303,7 +293,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
             targetCadence={targetCadence}
             isMutating={isMutating}
             updateSummary={updateSummary}
-            cancellationWithdrawalNotice={isSameSelection ? null : cancellationWithdrawalNotice}
+            planChangeBlockedReason={planChangeBlockedReason}
             hasScheduledChange={Boolean(scheduledChange)}
             effectiveAtLabel={effectiveAtLabel}
             onSelectTier={setTargetTier}
@@ -341,6 +331,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
               isCancelingPendingChange={isCancelingPendingChange}
               isSchedulingChange={scheduleChange.isPending}
               isSameSelection={isSameSelection}
+              isPlanChangeBlocked={planChangeBlockedReason !== null}
             />
           ) : (
             <Button variant="outline" onClick={closeModal} disabled={isMutating}>

@@ -1119,7 +1119,6 @@ const ScheduleChangeInputSchema = z.object({
 const ScheduleChangeOutputSchema = z.object({
   scheduledChangeId: z.string(),
   effectiveAt: z.string(),
-  cancellationWithdrawn: z.boolean(),
 });
 
 const CancelScheduledChangeOutputSchema = z.object({
@@ -1141,58 +1140,6 @@ const GetScheduledChangeOutputSchema = z.object({
     })
     .nullable(),
 });
-
-async function setCancelAtPeriodEnd(params: {
-  stripeSubscriptionId: string;
-  cancelAtPeriodEnd: boolean;
-}): Promise<void> {
-  await stripe.subscriptions.update(params.stripeSubscriptionId, {
-    cancel_at_period_end: params.cancelAtPeriodEnd,
-  });
-
-  const updated = await db
-    .update(kilo_pass_subscriptions)
-    .set(
-      params.cancelAtPeriodEnd
-        ? { cancel_at_period_end: true }
-        : { cancel_at_period_end: false, ended_at: null }
-    )
-    .where(eq(kilo_pass_subscriptions.stripe_subscription_id, params.stripeSubscriptionId))
-    .returning({ id: kilo_pass_subscriptions.id });
-
-  if (updated.length === 0) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to update Kilo Pass subscription status.',
-    });
-  }
-}
-
-/**
- * Compensation for a plan change that withdrew a pending cancellation and then failed. Never
- * throws: the original error is the one the caller must see. The subscription webhook
- * reconciles `cancel_at_period_end` from Stripe, so a failure here is self-healing on the next
- * event, but it is reported because the user could be renewed against their wishes meanwhile.
- */
-async function restoreCancelAtPeriodEnd(params: {
-  stripeSubscriptionId: string;
-  kiloUserId: string;
-}): Promise<void> {
-  try {
-    await setCancelAtPeriodEnd({
-      stripeSubscriptionId: params.stripeSubscriptionId,
-      cancelAtPeriodEnd: true,
-    });
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'kilo_pass_scheduled_change', stage: 'restore_cancel_at_period_end' },
-      extra: {
-        stripeSubscriptionId: params.stripeSubscriptionId,
-        kiloUserId: params.kiloUserId,
-      },
-    });
-  }
-}
 
 async function isExpectedCreditHostingActive(params: {
   userId: string;
@@ -2310,10 +2257,24 @@ export const kiloPassRouter = createTRPCRouter({
         });
       }
 
-      await setCancelAtPeriodEnd({
-        stripeSubscriptionId: subscription.stripeSubscriptionId,
-        cancelAtPeriodEnd: false,
+      await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+        cancel_at_period_end: false,
       });
+
+      const updated = await db
+        .update(kilo_pass_subscriptions)
+        .set({ cancel_at_period_end: false, ended_at: null })
+        .where(
+          eq(kilo_pass_subscriptions.stripe_subscription_id, subscription.stripeSubscriptionId)
+        )
+        .returning({ id: kilo_pass_subscriptions.id });
+
+      if (updated.length === 0) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update Kilo Pass subscription status.',
+        });
+      }
 
       return { success: true };
     }),
@@ -2494,6 +2455,16 @@ export const kiloPassRouter = createTRPCRouter({
         });
       }
 
+      // A subscription set to cancel at period end ends instead of switching plans, so the
+      // user has to resume it before changing plans.
+      if (subscription.cancelAtPeriodEnd) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message:
+            'Your Kilo Pass is set to cancel. Resume your subscription before changing plans.',
+        });
+      }
+
       const fromTier = subscription.tier;
       const fromCadence = subscription.cadence;
       const toTier = input.targetTier;
@@ -2585,20 +2556,8 @@ export const kiloPassRouter = createTRPCRouter({
         kiloPassScheduledChangeId: scheduledChangeId,
       };
 
-      // A subscription set to cancel at period end would end instead of switching plans, so a
-      // plan change on one withdraws the cancellation. If anything fails afterwards, the
-      // cancellation is restored so a failed change never turns into an unintended renewal.
-      const cancellationWithdrawn = subscription.cancelAtPeriodEnd;
-
       let stripeScheduleId: string | null = null;
       try {
-        if (cancellationWithdrawn) {
-          await setCancelAtPeriodEnd({
-            stripeSubscriptionId: subscription.stripeSubscriptionId,
-            cancelAtPeriodEnd: false,
-          });
-        }
-
         const schedule = await stripe.subscriptionSchedules.create({
           from_subscription: subscription.stripeSubscriptionId,
         });
@@ -2676,35 +2635,17 @@ export const kiloPassRouter = createTRPCRouter({
           },
         });
 
-        return { scheduledChangeId, effectiveAt: effectiveAtIso, cancellationWithdrawn };
+        return { scheduledChangeId, effectiveAt: effectiveAtIso };
       } catch (error) {
-        try {
-          // Best-effort cleanup: if we created a schedule but failed after that, release it.
-          if (stripeScheduleId) {
-            await releaseScheduledChangeForSubscription({
-              dbOrTx: db,
-              stripe,
-              stripeSubscriptionId: subscription.stripeSubscriptionId,
-              stripeScheduleIdIfMissingRow: stripeScheduleId,
-              kiloUserIdIfMissingRow: ctx.user.id,
-              reason: 'schedule_change_creation_failed',
-            });
-          }
-        } catch (cleanupError) {
-          captureException(cleanupError, {
-            tags: { source: 'kilo_pass_scheduled_change', stage: 'release_after_failed_create' },
-            extra: {
-              stripeSubscriptionId: subscription.stripeSubscriptionId,
-              stripeScheduleId,
-              kiloUserId: ctx.user.id,
-            },
-          });
-        }
-
-        if (cancellationWithdrawn) {
-          await restoreCancelAtPeriodEnd({
+        // Best-effort cleanup: if we created a schedule but failed after that, release it.
+        if (stripeScheduleId) {
+          await releaseScheduledChangeForSubscription({
+            dbOrTx: db,
+            stripe,
             stripeSubscriptionId: subscription.stripeSubscriptionId,
-            kiloUserId: ctx.user.id,
+            stripeScheduleIdIfMissingRow: stripeScheduleId,
+            kiloUserIdIfMissingRow: ctx.user.id,
+            reason: 'schedule_change_creation_failed',
           });
         }
 

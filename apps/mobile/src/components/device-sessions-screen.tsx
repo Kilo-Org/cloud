@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { isolateBidiText } from '@/lib/bidi';
 import {
@@ -165,6 +166,7 @@ export function DeviceSessionsScreen() {
         action={
           <Button
             variant="outline"
+            className={STATE_ACTION_CLASS}
             onPress={() => {
               router.back();
             }}

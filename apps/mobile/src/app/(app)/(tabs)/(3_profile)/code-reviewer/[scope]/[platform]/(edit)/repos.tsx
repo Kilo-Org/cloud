@@ -16,6 +16,7 @@ import { RadioGroup } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -158,6 +159,7 @@ export default function ReposRoute() {
         action={
           manageRepoAccessLabel ? (
             <Button
+              className={STATE_ACTION_CLASS}
               variant="outline"
               onPress={() => {
                 void (async () => {

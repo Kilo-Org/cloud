@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -137,6 +138,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
         description={t('codeReviewer.reviewList.noReviewsDescription')}
         action={
           <Button
+            className={STATE_ACTION_CLASS}
             onPress={() => {
               router.push(
                 (hasConnectedProvider

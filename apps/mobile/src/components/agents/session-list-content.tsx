@@ -33,6 +33,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { moveA11yFocus } from '@/lib/a11y/announce';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { SESSION_LIST_SORT } from '@/lib/agent-session-sort';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -179,7 +180,7 @@ export function AgentSessionListContent({
 
   const clearQueryAction = useMemo(
     () => (
-      <Button variant="outline" onPress={onClearQuery}>
+      <Button variant="outline" onPress={onClearQuery} className={STATE_ACTION_CLASS}>
         <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
       </Button>
     ),

@@ -187,6 +187,7 @@ import {
 } from '@/lib/analytics/posthog';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useMotionPolicy } from '@/lib/a11y/motion';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
@@ -2764,6 +2765,7 @@ export function SessionDetailContent({
                 loading={isLoadingOlderMessages}
                 accessibilityLabel={t('common.retry')}
                 accessibilityHint={t('agentChat.olderMessages.retryHint')}
+                className={STATE_ACTION_CLASS}
               >
                 <Text>{t('common.retry')}</Text>
               </Button>

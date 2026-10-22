@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the picker's five presentations (expired, loading, error, zero instances, list) share one sheet chrome and one refetch, and the error and zero-instance actions both carry the shared state-action floor */
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -14,6 +15,7 @@ import { radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
@@ -272,6 +274,7 @@ export default function InstancePickerScreen() {
           description={t('organization.boundary.loadErrorMessage')}
           action={
             <Button
+              className={STATE_ACTION_CLASS}
               variant="outline"
               onPress={() => {
                 void refetchInstances();
@@ -343,6 +346,7 @@ export default function InstancePickerScreen() {
               )}
               action={
                 <Button
+                  className={STATE_ACTION_CLASS}
                   variant="outline"
                   onPress={() => {
                     void refetchInstances();

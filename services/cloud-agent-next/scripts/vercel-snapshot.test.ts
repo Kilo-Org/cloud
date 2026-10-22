@@ -145,7 +145,7 @@ describe('Vercel snapshot operator pure logic', () => {
 
   it('defaults the wrapper dist directory, wrapper version, and a dated build id', () => {
     const input = resolveSnapshotInputs({});
-    expect(input.buildRoot).toMatch(/cloud-agent-next$/);
+    expect(input.buildRoot).toMatch(/cloud-agent-next\/wrapper$/);
     expect(input.controlPlaneWrapperPath).toMatch(/wrapper\/dist\/control-plane-wrapper\.js$/);
     expect(input.controlPlaneSupervisorPath).toMatch(/wrapper\/control-plane-supervisor\.sh$/);
     expect(input.wrapperVersion).toBe(WRAPPER_VERSION);

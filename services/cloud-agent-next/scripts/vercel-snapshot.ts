@@ -236,7 +236,7 @@ export function resolveSnapshotInputs(args: Args): {
       artifactPaths['kilocode-control-plane-supervisor.sh']
   );
   return {
-    buildRoot: explicitWrapper ? wrapperRoot : PACKAGE_ROOT,
+    buildRoot: wrapperRoot,
     controlPlaneWrapperPath,
     controlPlaneSupervisorPath,
     artifactPaths: {
@@ -1231,7 +1231,7 @@ These may come from the environment, services/cloud-agent-next/.dev.vars, or:
 Build/validate/acceptance arguments:
   --snapshot-id <id>       Required except for build
   --build-id <id>          Defaults to local-YYYYMMDD-HHMMSS
-  --wrapper <path>         Override the built wrapper dist directory
+  --wrapper <path>         A built bundle file; all bundles are read from its directory
   --wrapper-version <semver> Defaults to the current WRAPPER_VERSION
   --timeout-ms <ms>        Optional bounded sandbox timeout (default ${DEFAULT_TIMEOUT_MS})
   --skip-wrapper-build     Build only: use the existing wrapper bundle

@@ -219,7 +219,7 @@
     "hideBalance": "Скриј ја состојбата",
     "showBalance": "Прикажи ја состојбата",
     "balanceHidden": "Состојбата е скриена",
-    "bonusCreditsExpiring": "Бонус-кредитите во износ од {{amount}} истекуваат на {{date}}.",
+    "bonusCreditsExpiring": "Кредитите во износ од {{amount}} истекуваат на {{date}}.",
     "signOutTitle": "Да се одјавиш?",
     "signOutMessage": "Ќе треба повторно да се најавиш за да пристапиш до твојот работен простор.",
     "deleteAccountTitle": "Да се избрише сметката?",

@@ -219,7 +219,7 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
-    "bonusCreditsExpiring": "{{amount}} em créditos de bônus expiram em {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} em créditos expiram em {{date}}.",
     "signOutTitle": "Sair?",
     "signOutMessage": "Você precisará entrar novamente para acessar seu espaço de trabalho.",
     "deleteAccountTitle": "Excluir conta?",

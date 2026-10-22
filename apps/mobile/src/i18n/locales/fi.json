@@ -219,7 +219,7 @@
     "hideBalance": "Piilota saldo",
     "showBalance": "Näytä saldo",
     "balanceHidden": "Saldo piilotettu",
-    "bonusCreditsExpiring": "Bonuskrediittejä vanhenee {{date}}: {{amount}}.",
+    "bonusCreditsExpiring": "Krediittejä vanhenee {{date}}: {{amount}}.",
     "signOutTitle": "Kirjaudutaanko ulos?",
     "signOutMessage": "Pääset takaisin työtilaasi kirjautumalla uudelleen sisään.",
     "deleteAccountTitle": "Poistetaanko tili?",

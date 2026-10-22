@@ -219,7 +219,7 @@
     "hideBalance": "இருப்பை மறை",
     "showBalance": "இருப்பைக் காட்டு",
     "balanceHidden": "இருப்பு மறைக்கப்பட்டது",
-    "bonusCreditsExpiring": "{{amount}} மதிப்புள்ள கூடுதல் கிரெடிட்கள் {{date}} அன்று காலாவதியாகும்.",
+    "bonusCreditsExpiring": "{{amount}} மதிப்புள்ள கிரெடிட்கள் {{date}} அன்று காலாவதியாகும்.",
     "signOutTitle": "வெளியேறவா?",
     "signOutMessage": "உங்கள் பணியிடத்தை அணுக மீண்டும் உள்நுழைய வேண்டும்.",
     "deleteAccountTitle": "கணக்கை நீக்கவா?",

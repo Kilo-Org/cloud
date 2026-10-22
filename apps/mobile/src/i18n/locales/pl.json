@@ -219,7 +219,7 @@
     "hideBalance": "Ukryj saldo",
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",
-    "bonusCreditsExpiring": "Środki promocyjne w kwocie {{amount}} stracą ważność {{date}}.",
+    "bonusCreditsExpiring": "Środki w kwocie {{amount}} stracą ważność {{date}}.",
     "signOutTitle": "Wylogować się?",
     "signOutMessage": "Aby wrócić do swojego obszaru roboczego, musisz zalogować się ponownie.",
     "deleteAccountTitle": "Usunąć konto?",

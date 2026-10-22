@@ -219,7 +219,7 @@
     "hideBalance": "Fihla ibhalansi",
     "showBalance": "Bonisa ibhalansi",
     "balanceHidden": "Ibhalansi ifihliwe",
-    "bonusCreditsExpiring": "Amakhredithi ebhonasi angu-{{amount}} aphelelwa yisikhathi ngo-{{date}}.",
+    "bonusCreditsExpiring": "Amakhredithi angu-{{amount}} aphelelwa yisikhathi ngo-{{date}}.",
     "signOutTitle": "Uyafuna ukuphuma ngemvume?",
     "signOutMessage": "Uzodinga ukungena futhi ukuze ufinyelele indawo yakho yokusebenza.",
     "deleteAccountTitle": "Uyafuna ukususa i-akhawunti?",

@@ -219,7 +219,7 @@
     "hideBalance": "Agochar o saldo",
     "showBalance": "Amosar o saldo",
     "balanceHidden": "Saldo agochado",
-    "bonusCreditsExpiring": "Tes {{amount}} en créditos extra que caducan o {{date}}.",
+    "bonusCreditsExpiring": "Tes {{amount}} en créditos que caducan o {{date}}.",
     "signOutTitle": "Pechar sesión?",
     "signOutMessage": "Terás que iniciar sesión de novo para acceder ao teu espazo de traballo.",
     "deleteAccountTitle": "Eliminar a conta?",

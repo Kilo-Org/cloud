@@ -219,7 +219,7 @@
     "hideBalance": "Aħbi l-bilanċ",
     "showBalance": "Uri l-bilanċ",
     "balanceHidden": "Il-bilanċ huwa moħbi",
-    "bonusCreditsExpiring": "{{amount}} fi krediti bonus jiskadu: {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} fi krediti jiskadu: {{date}}.",
     "signOutTitle": "Toħroġ mill-kont?",
     "signOutMessage": "Ikollok terġa' tidħol biex taċċessa l-ispazju tax-xogħol tiegħek.",
     "deleteAccountTitle": "Tħassar il-kont?",

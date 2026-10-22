@@ -219,7 +219,7 @@
     "hideBalance": "Saldo verbergen",
     "showBalance": "Saldo tonen",
     "balanceHidden": "Saldo verborgen",
-    "bonusCreditsExpiring": "{{amount}} aan bonustegoed verloopt op {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} aan tegoed verloopt op {{date}}.",
     "signOutTitle": "Afmelden?",
     "signOutMessage": "Je moet je opnieuw aanmelden om toegang te krijgen tot je werkruimte.",
     "deleteAccountTitle": "Account verwijderen?",

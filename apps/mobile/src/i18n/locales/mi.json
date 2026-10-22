@@ -219,7 +219,7 @@
     "hideBalance": "Hunaia te toenga",
     "showBalance": "Whakaaturia te toenga",
     "balanceHidden": "Kua huna te toenga",
-    "bonusCreditsExpiring": "Ka mōnehu ā te {{date}} ngā moni tōmua tāpiri {{amount}}.",
+    "bonusCreditsExpiring": "Ka mōnehu ā te {{date}} ngā moni {{amount}}.",
     "signOutTitle": "Takiputa?",
     "signOutMessage": "Me takiuru anō koe kia uru ki tō wāhi mahi.",
     "deleteAccountTitle": "Mukua te pūkete?",

@@ -219,7 +219,7 @@
     "hideBalance": "Peida saldo",
     "showBalance": "Näita saldot",
     "balanceHidden": "Saldo on peidetud",
-    "bonusCreditsExpiring": "Boonuskrediit summas {{amount}} aegub {{date}}.",
+    "bonusCreditsExpiring": "Krediit summas {{amount}} aegub {{date}}.",
     "signOutTitle": "Kas logida välja?",
     "signOutMessage": "Tööruumi kasutamiseks pead uuesti sisse logima.",
     "deleteAccountTitle": "Kas kustutada konto?",

@@ -219,7 +219,7 @@
     "hideBalance": "Скрыть баланс",
     "showBalance": "Показать баланс",
     "balanceHidden": "Баланс скрыт",
-    "bonusCreditsExpiring": "Срок действия бонусных кредитов на сумму {{amount}} истекает {{date}}.",
+    "bonusCreditsExpiring": "Срок действия кредитов на сумму {{amount}} истекает {{date}}.",
     "signOutTitle": "Выйти?",
     "signOutMessage": "Чтобы вернуться в рабочее пространство, нужно будет войти снова.",
     "deleteAccountTitle": "Удалить аккаунт?",

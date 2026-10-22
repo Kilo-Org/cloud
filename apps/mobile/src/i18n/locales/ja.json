@@ -219,7 +219,7 @@
     "hideBalance": "残高を非表示",
     "showBalance": "残高を表示",
     "balanceHidden": "残高は非表示です",
-    "bonusCreditsExpiring": "{{amount}}のボーナスクレジットが{{date}}に失効します。",
+    "bonusCreditsExpiring": "{{amount}}のクレジットが{{date}}に失効します。",
     "signOutTitle": "サインアウトしますか？",
     "signOutMessage": "ワークスペースにアクセスするには、もう一度サインインする必要があります。",
     "deleteAccountTitle": "アカウントを削除しますか？",

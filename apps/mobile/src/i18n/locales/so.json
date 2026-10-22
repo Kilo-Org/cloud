@@ -219,7 +219,7 @@
     "hideBalance": "Qari hadhaaga",
     "showBalance": "Muuji hadhaaga",
     "balanceHidden": "Hadhaaga waa la qariyay",
-    "bonusCreditsExpiring": "Lacag gunno ah oo dhan {{amount}} ayaa dhacaysa {{date}}.",
+    "bonusCreditsExpiring": "Lacag dhan {{amount}} ayaa dhacaysa {{date}}.",
     "signOutTitle": "Ma ka baxaysaa?",
     "signOutMessage": "Si aad goobtaada shaqada u isticmaasho, waa inaad mar kale soo gashaa.",
     "deleteAccountTitle": "Ma tirtiraysaa akoonka?",

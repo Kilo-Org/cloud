@@ -219,7 +219,7 @@
     "hideBalance": "Slėpti likutį",
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
-    "bonusCreditsExpiring": "Papildomi kreditai ({{amount}}) galioja iki {{date}}.",
+    "bonusCreditsExpiring": "Kreditai ({{amount}}) galioja iki {{date}}.",
     "signOutTitle": "Atsijungti?",
     "signOutMessage": "Kad galėtum pasiekti savo darbo sritį, turėsi prisijungti iš naujo.",
     "deleteAccountTitle": "Ištrinti paskyrą?",

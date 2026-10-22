@@ -219,7 +219,7 @@
     "hideBalance": "Ezkutatu saldoa",
     "showBalance": "Erakutsi saldoa",
     "balanceHidden": "Saldoa ezkutatuta dago",
-    "bonusCreditsExpiring": "{{amount}} hobari-kreditu iraungiko dira data honetan: {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} kreditu iraungiko dira data honetan: {{date}}.",
     "signOutTitle": "Itxi saioa?",
     "signOutMessage": "Zure lan-eremura sartzeko berriro hasi beharko duzu saioa.",
     "deleteAccountTitle": "Ezabatu kontua?",

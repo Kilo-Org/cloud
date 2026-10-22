@@ -219,7 +219,7 @@
     "hideBalance": "Guthaben ausblenden",
     "showBalance": "Guthaben anzeigen",
     "balanceHidden": "Guthaben ausgeblendet",
-    "bonusCreditsExpiring": "Dein Bonusguthaben von {{amount}} verfällt am {{date}}.",
+    "bonusCreditsExpiring": "Dein Guthaben von {{amount}} verfällt am {{date}}.",
     "signOutTitle": "Abmelden?",
     "signOutMessage": "Du musst dich erneut anmelden, um auf deinen Arbeitsbereich zuzugreifen.",
     "deleteAccountTitle": "Konto löschen?",

@@ -219,7 +219,7 @@
     "hideBalance": "Απόκρυψη υπολοίπου",
     "showBalance": "Εμφάνιση υπολοίπου",
     "balanceHidden": "Το υπόλοιπο είναι κρυφό",
-    "bonusCreditsExpiring": "Οι πιστώσεις μπόνους ύψους {{amount}} λήγουν {{date}}.",
+    "bonusCreditsExpiring": "Οι πιστώσεις ύψους {{amount}} λήγουν {{date}}.",
     "signOutTitle": "Αποσύνδεση;",
     "signOutMessage": "Θα χρειαστεί να συνδεθείς ξανά για να έχεις πρόσβαση στον χώρο εργασίας σου.",
     "deleteAccountTitle": "Διαγραφή λογαριασμού;",

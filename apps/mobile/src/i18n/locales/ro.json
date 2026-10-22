@@ -219,7 +219,7 @@
     "hideBalance": "Ascunde soldul",
     "showBalance": "Afișează soldul",
     "balanceHidden": "Sold ascuns",
-    "bonusCreditsExpiring": "Creditele bonus în valoare de {{amount}} expiră la {{date}}.",
+    "bonusCreditsExpiring": "Creditele în valoare de {{amount}} expiră la {{date}}.",
     "signOutTitle": "Te deconectezi?",
     "signOutMessage": "Va trebui să te autentifici din nou pentru a accesa spațiul tău de lucru.",
     "deleteAccountTitle": "Ștergi contul?",

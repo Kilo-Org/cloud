@@ -219,7 +219,7 @@
     "hideBalance": "ব্যালেন্স লুকান",
     "showBalance": "ব্যালেন্স দেখান",
     "balanceHidden": "ব্যালেন্স লুকানো আছে",
-    "bonusCreditsExpiring": "{{amount}} বোনাস ক্রেডিটের মেয়াদ শেষ হবে {{date}} তারিখে।",
+    "bonusCreditsExpiring": "{{amount}} ক্রেডিটের মেয়াদ শেষ হবে {{date}} তারিখে।",
     "signOutTitle": "সাইন আউট করবেন?",
     "signOutMessage": "আপনার ওয়ার্কস্পেসে ঢুকতে আবার সাইন ইন করতে হবে।",
     "deleteAccountTitle": "অ্যাকাউন্ট মুছবেন?",

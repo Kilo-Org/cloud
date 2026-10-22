@@ -219,7 +219,7 @@
     "hideBalance": "Ɓoye ragowar kuɗi",
     "showBalance": "Nuna ragowar kuɗi",
     "balanceHidden": "An ɓoye ragowar kuɗi",
-    "bonusCreditsExpiring": "Kuɗin amfani na kyauta {{amount}} za su ƙare {{date}}.",
+    "bonusCreditsExpiring": "Kuɗin amfani {{amount}} za su ƙare {{date}}.",
     "signOutTitle": "Fita?",
     "signOutMessage": "Za ka buƙaci sake shiga don samun damar wurin aikinka.",
     "deleteAccountTitle": "Share asusu?",

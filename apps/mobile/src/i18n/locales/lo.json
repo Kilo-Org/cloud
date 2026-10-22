@@ -219,7 +219,7 @@
     "hideBalance": "ເຊື່ອງຍອດເງິນຄົງເຫຼືອ",
     "showBalance": "ສະແດງຍອດເງິນຄົງເຫຼືອ",
     "balanceHidden": "ເຊື່ອງຍອດເງິນຄົງເຫຼືອແລ້ວ",
-    "bonusCreditsExpiring": "ເຄຣດິດໂບນັດ {{amount}} ຈະໝົດອາຍຸ {{date}}.",
+    "bonusCreditsExpiring": "ເຄຣດິດ {{amount}} ຈະໝົດອາຍຸ {{date}}.",
     "signOutTitle": "ອອກຈາກລະບົບບໍ?",
     "signOutMessage": "ທ່ານຈະຕ້ອງເຂົ້າສູ່ລະບົບໃໝ່ ເພື່ອໃຊ້ພື້ນທີ່ເຮັດວຽກຂອງທ່ານ.",
     "deleteAccountTitle": "ລຶບບັນຊີບໍ?",

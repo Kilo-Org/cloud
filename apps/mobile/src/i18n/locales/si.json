@@ -219,7 +219,7 @@
     "hideBalance": "ශේෂය සඟවන්න",
     "showBalance": "ශේෂය පෙන්වන්න",
     "balanceHidden": "ශේෂය සඟවා ඇත",
-    "bonusCreditsExpiring": "{{amount}} ක ප්‍රසාද ක්‍රෙඩිට් {{date}} දින කල් ඉකුත් වේ.",
+    "bonusCreditsExpiring": "{{amount}} ක්‍රෙඩිට් {{date}} දින කල් ඉකුත් වේ.",
     "signOutTitle": "පිටවන්නද?",
     "signOutMessage": "ඔබේ වැඩබිමට පිවිසීමට නැවත පුරනය විය යුතුය.",
     "deleteAccountTitle": "ගිණුම මකන්නද?",

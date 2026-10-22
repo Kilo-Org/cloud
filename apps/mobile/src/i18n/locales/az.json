@@ -219,7 +219,7 @@
     "hideBalance": "Balansı gizlət",
     "showBalance": "Balansı göstər",
     "balanceHidden": "Balans gizlidir",
-    "bonusCreditsExpiring": "{{amount}} məbləğində bonus kreditin müddəti {{date}} tarixində bitir.",
+    "bonusCreditsExpiring": "{{amount}} məbləğində kreditin müddəti {{date}} tarixində bitir.",
     "signOutTitle": "Hesabdan çıxılsın?",
     "signOutMessage": "İş sahənə daxil olmaq üçün hesabına yenidən giriş etməlisən.",
     "deleteAccountTitle": "Hesab silinsin?",

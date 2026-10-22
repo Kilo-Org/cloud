@@ -219,7 +219,7 @@
     "hideBalance": "Fela inneign",
     "showBalance": "Sýna inneign",
     "balanceHidden": "Inneign falin",
-    "bonusCreditsExpiring": "Bónusinneign að upphæð {{amount}} rennur út {{date}}.",
+    "bonusCreditsExpiring": "Inneign að upphæð {{amount}} rennur út {{date}}.",
     "signOutTitle": "Skrá út?",
     "signOutMessage": "Þú þarft að skrá þig aftur inn til að fá aðgang að vinnusvæðinu þínu.",
     "deleteAccountTitle": "Eyða reikningi?",

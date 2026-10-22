@@ -219,7 +219,7 @@
     "hideBalance": "بیلانس پټ کړه",
     "showBalance": "بیلانس ښکاره کړه",
     "balanceHidden": "بیلانس پټ دی",
-    "bonusCreditsExpiring": "د {{amount}} انعامي کریډیټ موده په {{date}} پای ته رسېږي.",
+    "bonusCreditsExpiring": "د {{amount}} کریډیټ موده په {{date}} پای ته رسېږي.",
     "signOutTitle": "له حسابه ووځم؟",
     "signOutMessage": "خپل کاري ځای ته د لاسرسي لپاره به بیا ننوتلو ته اړتیا ولرئ.",
     "deleteAccountTitle": "حساب ړنګ کړم؟",

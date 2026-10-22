@@ -219,7 +219,7 @@
     "hideBalance": "ବ୍ୟାଲାନ୍ସ ଲୁଚାନ୍ତୁ",
     "showBalance": "ବ୍ୟାଲାନ୍ସ ଦେଖାନ୍ତୁ",
     "balanceHidden": "ବ୍ୟାଲାନ୍ସ ଲୁଚିଛି",
-    "bonusCreditsExpiring": "{{amount}} ବୋନସ୍ କ୍ରେଡିଟ୍‌ର ମିଆଦ {{date}} ରେ ଶେଷ ହେବ।",
+    "bonusCreditsExpiring": "{{amount}} କ୍ରେଡିଟ୍‌ର ମିଆଦ {{date}} ରେ ଶେଷ ହେବ।",
     "signOutTitle": "ସାଇନ୍ ଆଉଟ୍ କରିବେ?",
     "signOutMessage": "ଆପଣଙ୍କ ୱାର୍କସ୍ପେସ୍ ବ୍ୟବହାର କରିବାକୁ ପୁଣି ସାଇନ୍ ଇନ୍ କରିବାକୁ ପଡ଼ିବ।",
     "deleteAccountTitle": "ଆକାଉଣ୍ଟ ବିଲୋପ କରିବେ?",

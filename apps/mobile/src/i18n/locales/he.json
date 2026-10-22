@@ -219,7 +219,7 @@
     "hideBalance": "הסתר יתרה",
     "showBalance": "הצג יתרה",
     "balanceHidden": "היתרה מוסתרת",
-    "bonusCreditsExpiring": "תוקפם של קרדיטי בונוס בסך {{amount}} יפוג ב-{{date}}.",
+    "bonusCreditsExpiring": "תוקפם של קרדיטים בסך {{amount}} יפוג ב-{{date}}.",
     "signOutTitle": "להתנתק?",
     "signOutMessage": "כדי לגשת לסביבת העבודה שלך, צריך להתחבר שוב.",
     "deleteAccountTitle": "למחוק את החשבון?",

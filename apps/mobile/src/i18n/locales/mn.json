@@ -219,7 +219,7 @@
     "hideBalance": "Үлдэгдэл нуух",
     "showBalance": "Үлдэгдэл харуулах",
     "balanceHidden": "Үлдэгдэл нуугдсан",
-    "bonusCreditsExpiring": "{{amount}} урамшууллын кредитийн хугацаа {{date}} өдөр дуусна.",
+    "bonusCreditsExpiring": "{{amount}} кредитийн хугацаа {{date}} өдөр дуусна.",
     "signOutTitle": "Гарах уу?",
     "signOutMessage": "Ажлын орчиндоо хандахын тулд дахин нэвтрэх шаардлагатай.",
     "deleteAccountTitle": "Бүртгэлийг устгах уу?",

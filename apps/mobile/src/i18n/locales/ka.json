@@ -219,7 +219,7 @@
     "hideBalance": "ბალანსის დამალვა",
     "showBalance": "ბალანსის ჩვენება",
     "balanceHidden": "ბალანსი დამალულია",
-    "bonusCreditsExpiring": "ბონუსური კრედიტების ({{amount}}) ვადა იწურება: {{date}}.",
+    "bonusCreditsExpiring": "კრედიტების ({{amount}}) ვადა იწურება: {{date}}.",
     "signOutTitle": "ანგარიშიდან გასვლა?",
     "signOutMessage": "სამუშაო სივრცის გამოსაყენებლად ანგარიშში ხელახლა შესვლა დაგჭირდება.",
     "deleteAccountTitle": "ანგარიშის წაშლა?",

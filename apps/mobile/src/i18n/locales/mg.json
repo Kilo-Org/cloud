@@ -219,7 +219,7 @@
     "hideBalance": "Afeno ny ambim-bola",
     "showBalance": "Aseho ny ambim-bola",
     "balanceHidden": "Voafeno ny ambim-bola",
-    "bonusCreditsExpiring": "Kireditra fanampiny {{amount}} ho lany daty amin'ny {{date}}.",
+    "bonusCreditsExpiring": "Kireditra {{amount}} ho lany daty amin'ny {{date}}.",
     "signOutTitle": "Hivoaka ve?",
     "signOutMessage": "Mila miditra indray ianao vao afaka mampiasa ny sehatra fiasanao.",
     "deleteAccountTitle": "Hofafana ve ny kaonty?",

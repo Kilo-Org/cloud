@@ -219,7 +219,7 @@
     "hideBalance": "Bakiyeyi gizle",
     "showBalance": "Bakiyeyi göster",
     "balanceHidden": "Bakiye gizli",
-    "bonusCreditsExpiring": "{{amount}} tutarındaki bonus kredinin süresi {{date}} tarihinde dolacak.",
+    "bonusCreditsExpiring": "{{amount}} tutarındaki kredinin süresi {{date}} tarihinde dolacak.",
     "signOutTitle": "Oturum kapatılsın mı?",
     "signOutMessage": "Çalışma alanına erişmek için tekrar oturum açman gerekecek.",
     "deleteAccountTitle": "Hesap silinsin mi?",

@@ -219,7 +219,7 @@
     "hideBalance": "Versteek saldo",
     "showBalance": "Wys saldo",
     "balanceHidden": "Saldo versteek",
-    "bonusCreditsExpiring": "Bonuskrediete ter waarde van {{amount}} verval op {{date}}.",
+    "bonusCreditsExpiring": "Krediete ter waarde van {{amount}} verval op {{date}}.",
     "signOutTitle": "Teken uit?",
     "signOutMessage": "Jy sal weer moet aanmeld om toegang tot jou werkruimte te kry.",
     "deleteAccountTitle": "Skrap rekening?",

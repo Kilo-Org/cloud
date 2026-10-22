@@ -219,7 +219,7 @@
     "hideBalance": "Sembunyikan saldo",
     "showBalance": "Tampilkan saldo",
     "balanceHidden": "Saldo tersembunyi",
-    "bonusCreditsExpiring": "Kredit bonus senilai {{amount}} akan kedaluwarsa pada {{date}}.",
+    "bonusCreditsExpiring": "Kredit senilai {{amount}} akan kedaluwarsa pada {{date}}.",
     "signOutTitle": "Keluar?",
     "signOutMessage": "Kamu perlu masuk lagi untuk mengakses ruang kerjamu.",
     "deleteAccountTitle": "Hapus akun?",

@@ -219,7 +219,7 @@
     "hideBalance": "Folaigh an t-iarmhéid",
     "showBalance": "Taispeáin an t-iarmhéid",
     "balanceHidden": "Tá an t-iarmhéid folaithe",
-    "bonusCreditsExpiring": "Rachaidh {{amount}} de chreidmheasanna bónais in éag {{date}}.",
+    "bonusCreditsExpiring": "Rachaidh {{amount}} de chreidmheasanna in éag {{date}}.",
     "signOutTitle": "Ar mhaith leat síniú amach?",
     "signOutMessage": "Beidh ort síniú isteach arís chun rochtain a fháil ar do spás oibre.",
     "deleteAccountTitle": "An scriosfar an cuntas?",

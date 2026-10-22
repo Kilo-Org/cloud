@@ -219,7 +219,7 @@
     "hideBalance": "Dölj saldo",
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",
-    "bonusCreditsExpiring": "{{amount}} i bonuskrediter går ut {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} i krediter går ut {{date}}.",
     "signOutTitle": "Logga ut?",
     "signOutMessage": "Du måste logga in igen för att komma åt din arbetsyta.",
     "deleteAccountTitle": "Ta bort konto?",

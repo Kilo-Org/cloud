@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { briefingMoney, BriefingScorecard } from './briefing-card';
+import { BriefingScorecard } from './briefing-card';
 import { briefingSessionHref, briefingSourceHref } from './briefing-session-href';
 import { BriefingSummary } from './briefing-summary';
 import { BriefingPeriodLabel } from './briefing-period-label';
@@ -22,6 +22,7 @@ import {
   useBriefingInvalidation,
   useBriefingPreferences,
 } from '@/lib/agent-briefing';
+import { briefingMoney } from '@/lib/agent-briefing-format';
 import { briefingAccessDenied, briefingReportMissing } from '@/lib/agent-briefing-state';
 import { openExternalUrl } from '@/lib/external-link';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
@@ -147,16 +148,20 @@ export function BriefingDetailScreen() {
           <View className="gap-2">
             <Text className="font-semibold">{t('common.agents')}</Text>
             {report.sessions.map(session => {
+              const coverage = report.coverage.spend;
+              const lowerBound =
+                coverage !== 'complete' &&
+                coverage !== 'unavailable' &&
+                session.spendMicrodollars > 0;
               let spend = t('common.unknown');
               if (
-                report.coverage.spend !== 'unavailable' &&
-                (report.coverage.spend === 'complete' || session.spendMicrodollars > 0)
+                coverage !== 'unavailable' &&
+                (coverage === 'complete' || session.spendMicrodollars > 0)
               ) {
-                const amount = briefingMoney(session.spendMicrodollars, i18n.language);
-                spend =
-                  report.coverage.spend === 'complete'
-                    ? amount
-                    : t('agentBriefing.atLeast', { value: amount });
+                const amount = briefingMoney(session.spendMicrodollars, i18n.language, {
+                  lowerBound,
+                });
+                spend = lowerBound ? t('agentBriefing.atLeast', { value: amount }) : amount;
               }
               return (
                 <Pressable

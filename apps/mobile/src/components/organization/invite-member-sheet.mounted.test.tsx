@@ -60,7 +60,7 @@ vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'Accessi
 vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 // The sheet's own dirty check: what Cancel and Back would ask about.
-const guard = vi.hoisted(() => ({ isDirty: () => false }));
+const guard = vi.hoisted(() => ({ isDirty: (): boolean => false }));
 vi.mock('@/components/ui/use-sheet-dismiss-guard', () => ({
   useSheetDismissGuard: (options: { isDirty: () => boolean }) => {
     guard.isDirty = options.isDirty;

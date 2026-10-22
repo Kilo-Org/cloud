@@ -460,12 +460,13 @@ export async function refreshBriefingEvidence(row: BriefingReportRow): Promise<B
       .for('update');
     if (!current || hash === current.evidence_hash) return current ?? row;
     const summary = briefingSummarySchema.parse(current.summary);
-    const previousFacts = factsSchema.parse(current.facts);
+    const previousFacts = factsSchema.safeParse(current.facts);
     const sourcesById = new Map(facts.sources.map(source => [source.id, source]));
     const sessionIds = new Set(facts.sessions.map(session => session.sessionId));
     const removedSource =
-      previousFacts.sessions.some(session => !sessionIds.has(session.sessionId)) ||
-      previousFacts.sources.some(source => {
+      !previousFacts.success ||
+      previousFacts.data.sessions.some(session => !sessionIds.has(session.sessionId)) ||
+      previousFacts.data.sources.some(source => {
         const next = sourcesById.get(source.id);
         return (
           next === undefined || (source.excerpt !== undefined && source.excerpt !== next.excerpt)

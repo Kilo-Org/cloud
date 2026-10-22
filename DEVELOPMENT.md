@@ -603,9 +603,10 @@ The CLI status producer must send occurrence timestamps and transition identitie
 Legacy activity remains readable with partial coverage; unknown values must not appear as confirmed zeroes.
 
 Report display contracts allow 64 sessions, 256 sources, and 32 sources per session.
-Titles use 160 characters, URLs 2048, and excerpts 600. Scheduled collection reads
-2048 activity events and 2048 usage records, with up to 256 session ancestry lookups.
-Sampled evidence carries partial coverage; scorecards describe the collected evidence.
+Titles use 160 characters, URLs 2048, and excerpts 600. Scheduled collection selects
+the latest 2048 activity events and 2048 usage records, with up to 256 session ancestry lookups.
+Session selection favors recent activity and sampled evidence carries partial coverage.
+Scorecards describe the collected evidence. Scheduled refresh replaces facts using current collection.
 One-off period sampling and the summary model's 16-source/24-session selection remain independent.
 History pages allow up to 100 reports within a 3 MB JSON response budget.
 Stored reports must satisfy the shared contract; unreadable records are skipped during pagination.

@@ -24,7 +24,7 @@ import {
   BRIEFING_MAX_USAGE_ROWS,
   collectBriefingEvidence,
 } from './evidence';
-import { emptySummary } from './store';
+import { emptySummary, refreshBriefingEvidence } from './store';
 
 type Facts = Pick<BriefingReport, 'sessions' | 'sources' | 'scorecard' | 'coverage'>;
 const factsSchema = briefingReportSchema.pick({
@@ -256,6 +256,24 @@ describe('scheduled briefing evidence collection', () => {
   it('consumes the scheduled event row budget and stores partial bounded facts', async () => {
     const sessionId = 'ses_event_budget';
     await seedSessions([sessionId]);
+    await db.insert(agent_briefing_events).values([
+      {
+        id: 'prior-question',
+        kilo_user_id: user.id,
+        session_id: sessionId,
+        kind: 'status',
+        status: 'question',
+        occurred_at: new Date(Date.parse(nightStartAt) - 1).toISOString(),
+      },
+      {
+        id: 'resolved-question',
+        kilo_user_id: user.id,
+        session_id: sessionId,
+        kind: 'status',
+        status: 'idle',
+        occurred_at: new Date(Date.parse(activityAt) - 1).toISOString(),
+      },
+    ]);
     await db.insert(agent_briefing_events).values(
       Array.from({ length: BRIEFING_MAX_EVENT_ROWS + 1 }, (_, index) => ({
         id: `scheduled-event-${index}`,
@@ -276,19 +294,24 @@ describe('scheduled briefing evidence collection', () => {
       spendMicrodollars: 0,
     });
     expect(facts.coverage).toEqual(partialCoverage);
+    expect(facts.sessions[0]?.status).toBeNull();
+    expect(
+      facts.sources.some(source => source.id === `scheduled-event-${BRIEFING_MAX_EVENT_ROWS}`)
+    ).toBe(true);
+    expect(facts.sources.some(source => source.id === 'scheduled-event-0')).toBe(false);
     expectBoundedFacts(facts);
     const reportId = await persistFacts(facts);
     expectBoundedFacts(await expectStoredAndReadable(reportId, facts));
   });
 
-  it('consumes the scheduled usage row budget without adding the sentinel charge', async () => {
+  it('applies scheduled usage accounting', async () => {
     const sessionId = 'ses_usage_budget';
     await seedSessions([sessionId]);
     await seedUsage(
       Array.from({ length: BRIEFING_MAX_USAGE_ROWS + 1 }, (_, index) => ({
         id: crypto.randomUUID(),
         sessionId,
-        cost: index === BRIEFING_MAX_USAGE_ROWS ? 1_000_000 : 7,
+        cost: index === 0 ? 1_000_000 : 7,
         occurredAt: new Date(Date.parse(activityAt) + index).toISOString(),
       }))
     );
@@ -304,6 +327,58 @@ describe('scheduled briefing evidence collection', () => {
     expectBoundedFacts(facts);
     const reportId = await persistFacts(facts);
     expectBoundedFacts(await expectStoredAndReadable(reportId, facts));
+  });
+
+  it('refreshes scheduled facts and retires the previous summary', async () => {
+    const sessionId = 'ses_refresh_contract';
+    await seedSessions([sessionId]);
+    const facts = await collect();
+    const reportId = await persistFacts(facts);
+    const [stored] = await db
+      .update(agent_briefing_reports)
+      .set({
+        facts: {
+          ...facts,
+          sessions: [
+            {
+              sessionId,
+              title: 'Title '.repeat(40),
+              url: `/cloud/sessions/${sessionId}`,
+              status: null,
+              spendMicrodollars: 0,
+              sources: [],
+            },
+          ],
+        },
+        summary: { ...emptySummary, status: 'ready', text: 'Previous summary' },
+      })
+      .where(eq(agent_briefing_reports.id, reportId))
+      .returning();
+    if (!stored) throw new Error('Missing scheduled fixture');
+    const refreshed = await refreshBriefingEvidence(stored);
+    expect(refreshed.facts).toEqual(facts);
+    expect(refreshed.revision).toBe(stored.revision + 1);
+    expect(refreshed.summary).toMatchObject({ status: 'outdated', text: null, canRetry: false });
+  });
+
+  it('selects recently active sessions for the report', async () => {
+    const sessionIds = Array.from({ length: 257 }, (_, index) => `ses_recent_${index}`);
+    await seedSessions(sessionIds);
+    await db.insert(agent_briefing_events).values(
+      sessionIds.map((sessionId, index) => ({
+        id: `recent-${index}`,
+        kilo_user_id: user.id,
+        session_id: sessionId,
+        kind: 'activity',
+        occurred_at: new Date(Date.parse(activityAt) + index).toISOString(),
+      }))
+    );
+    const facts = await collect();
+    expect(facts.sessions).toHaveLength(BRIEFING_MAX_SESSIONS);
+    expect(facts.sessions.some(session => session.sessionId === 'ses_recent_256')).toBe(true);
+    expect(facts.sessions.some(session => session.sessionId === 'ses_recent_0')).toBe(false);
+    expect(facts.scorecard.sessions).toBe(256);
+    expect(facts.coverage.activity).toBe('partial');
   });
 });
 

@@ -342,6 +342,7 @@ describe('aggregateBriefingEvidence', () => {
           kind: 'artifact',
           title: 'Artifact '.repeat(40),
           url: `https://example.com/${'path/'.repeat(500)}`,
+          occurred_at: row.session_id === 'session-064' ? '2026-10-15T03:00:00.000Z' : night,
         })
       )
     );
@@ -350,6 +351,8 @@ describe('aggregateBriefingEvidence', () => {
     });
     expect(report.scorecard.sessions).toBe(65);
     expect(report.sessions).toHaveLength(64);
+    expect(report.sessions.some(session => session.sessionId === 'session-064')).toBe(true);
+    expect(report.sessions.some(session => session.sessionId === 'session-063')).toBe(false);
     expect(report.sources).toHaveLength(256);
     expect(report.sessions.every(session => session.sources.length <= 32)).toBe(true);
     expect(report.sessions.every(session => session.title.length <= 160)).toBe(true);

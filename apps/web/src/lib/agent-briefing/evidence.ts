@@ -305,8 +305,13 @@ export function aggregateBriefingEvidence(
     group.sources = sampleBriefingItems(group.sources, BRIEFING_MAX_SOURCES_PER_SESSION);
   }
   const activeSessions = [...groups.values()].filter(group => activeRoots.has(group.sessionId));
-  activeSessions.sort((a, b) => a.sessionId.localeCompare(b.sessionId));
+  activeSessions.sort(
+    (a, b) =>
+      (b.sources.at(-1)?.occurredAt ?? '').localeCompare(a.sources.at(-1)?.occurredAt ?? '') ||
+      a.sessionId.localeCompare(b.sessionId)
+  );
   const sessions = activeSessions.slice(0, BRIEFING_MAX_SESSIONS);
+  sessions.sort((a, b) => a.sessionId.localeCompare(b.sessionId));
   truncated ||= sessions.length !== activeSessions.length;
   const allSources = sessions.flatMap(session => session.sources);
   allSources.sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.id.localeCompare(b.id));
@@ -422,7 +427,7 @@ export async function collectBriefingEvidence(
               query(false).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
               query(true).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
             ]
-          : [query(false).limit(BRIEFING_MAX_EVENT_ROWS + 1)];
+          : [query(true).limit(BRIEFING_MAX_EVENT_ROWS + 1)];
       });
       const [firstEvents, secondEvents, ...remainingEvents] = eventQueries;
       if (firstEvents === undefined) throw new Error('Missing briefing event range');
@@ -481,7 +486,7 @@ export async function collectBriefingEvidence(
               query(false).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
               query(true).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
             ]
-          : [query(false).limit(BRIEFING_MAX_USAGE_ROWS + 1)];
+          : [query(true).limit(BRIEFING_MAX_USAGE_ROWS + 1)];
       });
       const [firstUsage, secondUsage, ...remainingUsage] = usageQueries;
       if (firstUsage === undefined) throw new Error('Missing briefing usage range');
@@ -503,7 +508,11 @@ export async function collectBriefingEvidence(
       const activity = [
         ...events.map(event => ({ sessionId: event.session_id, occurredAt: event.occurred_at })),
         ...usage.map(item => ({ sessionId: item.sessionId, occurredAt: item.occurredAt })),
-      ].sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt));
+      ].sort((a, b) =>
+        freeze
+          ? Date.parse(a.occurredAt) - Date.parse(b.occurredAt)
+          : Date.parse(b.occurredAt) - Date.parse(a.occurredAt)
+      );
       const allActiveSessionIds = [...new Set(activity.map(item => item.sessionId))];
       const activeSessionIds = freeze
         ? sampleBriefingItems(allActiveSessionIds, ONE_OFF_SESSION_LIMIT)
@@ -594,7 +603,7 @@ export async function collectBriefingEvidence(
       });
       truncated ||= completeRows.length !== rows.size;
       const latest =
-        freeze && completeRows.length > 0
+        (freeze || truncated) && completeRows.length > 0
           ? await tx
               .selectDistinctOn([agent_briefing_events.session_id])
               .from(agent_briefing_events)

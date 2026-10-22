@@ -63,6 +63,7 @@ type TicketStore = {
   namespace: {
     idFromString: (id: string) => string;
     get: (id: string) => {
+      inspect: (secret: string) => Promise<{ userId: string; deviceSessionId?: string } | null>;
       consume: (secret: string) => Promise<{ userId: string; deviceSessionId?: string } | null>;
     };
   };
@@ -94,6 +95,17 @@ function makeTicketStore(): TicketStore {
         return id;
       },
       get: (id: string) => ({
+        inspect: async (secret: string) => {
+          const entry = tickets.get(id);
+          if (!entry || entry.expiresAt <= Date.now() || entry.secret !== secret) {
+            tickets.delete(id);
+            return null;
+          }
+          return {
+            userId: entry.userId,
+            ...(entry.deviceSessionId ? { deviceSessionId: entry.deviceSessionId } : {}),
+          };
+        },
         consume: async (secret: string) => {
           const entry = tickets.get(id);
           tickets.delete(id);
@@ -418,6 +430,82 @@ describe('kiloJwtAuthMiddleware', () => {
       device_session_id: deviceSessionId,
     });
   });
+
+  it('keeps a web ticket usable after a temporary device lookup failure', async () => {
+    const tickets = makeTicketStore();
+    const ticket = tickets.mint(
+      'usr_123',
+      Date.now() + 60_000,
+      '22222222-2222-4222-8222-222222222222'
+    );
+    const connect = () =>
+      makeApp().fetch(
+        new Request(`http://local/api/user/web?ticket=${ticket}`, {
+          headers: { Upgrade: 'websocket' },
+        }),
+        makeEnv(TEST_JWT_SECRET, tickets)
+      );
+
+    dbState.deviceFails = true;
+    expect((await connect()).status).toBe(503);
+    expect(dbState.downstreamCalls).toBe(0);
+    dbState.deviceFails = false;
+    expect((await connect()).status).toBe(200);
+    expect((await connect()).status).toBe(401);
+    expect(dbState.downstreamCalls).toBe(1);
+  });
+
+  it('refuses and consumes a web ticket for an inactive device session', async () => {
+    const tickets = makeTicketStore();
+    const ticket = tickets.mint(
+      'usr_123',
+      Date.now() + 60_000,
+      '22222222-2222-4222-8222-222222222222'
+    );
+    const connect = () =>
+      makeApp().fetch(
+        new Request(`http://local/api/user/web?ticket=${ticket}`, {
+          headers: { Upgrade: 'websocket' },
+        }),
+        makeEnv(TEST_JWT_SECRET, tickets)
+      );
+    dbState.deviceActive = false;
+    expect((await connect()).status).toBe(401);
+    dbState.deviceActive = true;
+    expect((await connect()).status).toBe(401);
+    expect(dbState.downstreamCalls).toBe(0);
+  });
+
+  it.each(['expired', 'consumed', 'replaced'] as const)(
+    'rejects a web ticket %s after inspection',
+    async change => {
+      const tickets = makeTicketStore();
+      const ticket = tickets.mint('usr_123', Date.now() + 60_000);
+      const get = tickets.namespace.get;
+      tickets.namespace.get = id => {
+        const stub = get(id);
+        return {
+          ...stub,
+          consume: async secret => {
+            const entry = tickets.tickets.get(id)!;
+            if (change === 'expired') entry.expiresAt = Date.now() - 1;
+            if (change === 'consumed') tickets.tickets.delete(id);
+            if (change === 'replaced') entry.userId = 'another-user';
+            return stub.consume(secret);
+          },
+        };
+      };
+
+      const res = await makeApp().fetch(
+        new Request(`http://local/api/user/web?ticket=${ticket}`, {
+          headers: { Upgrade: 'websocket' },
+        }),
+        makeEnv(TEST_JWT_SECRET, tickets)
+      );
+      expect(res.status).toBe(401);
+      expect(dbState.downstreamCalls).toBe(0);
+    }
+  );
 
   it('requires a proxy attestation for a cloud-agent-next runtime bearer after pepper validation', async () => {
     userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });

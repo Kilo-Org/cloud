@@ -260,6 +260,7 @@ app.get('/connect', async c => {
   const shouldEchoProtocol = acceptsWebSocketProtocol(c.req.header('Sec-WebSocket-Protocol'));
 
   const upstreamUrl = new URL(c.req.raw.url);
+  upstreamUrl.searchParams.delete('deviceSessionId');
   if (deviceSessionId) {
     upstreamUrl.searchParams.set('deviceSessionId', deviceSessionId);
   }

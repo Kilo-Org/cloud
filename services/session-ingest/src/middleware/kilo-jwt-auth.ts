@@ -43,19 +43,18 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     }
 
     const resolved = resolveConnectionTicket(c.env.CONNECTION_TICKET_DO, ticket);
-    const consumed = resolved ? await resolved.stub.consume(resolved.secret) : null;
-    if (!consumed) {
+    const inspected = resolved ? await resolved.stub.inspect(resolved.secret) : null;
+    if (!inspected || !resolved) {
       return c.json({ success: false, error: 'Invalid or expired ticket' }, 401);
     }
 
-    c.set('user_id', consumed.userId);
-    if (consumed.deviceSessionId !== undefined) {
+    if (inspected.deviceSessionId !== undefined) {
       let active: boolean;
       try {
         active = await findActiveDeviceSession(
           c.env.HYPERDRIVE.connectionString,
-          consumed.deviceSessionId,
-          consumed.userId
+          inspected.deviceSessionId,
+          inspected.userId
         );
       } catch (error) {
         console.error('Auth infrastructure failure', {
@@ -66,8 +65,21 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
         return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
       }
       if (!active) {
+        await resolved.stub.consume(resolved.secret);
         return c.json({ success: false, error: 'Invalid or expired ticket' }, 401);
       }
+    }
+
+    const consumed = await resolved.stub.consume(resolved.secret);
+    if (
+      !consumed ||
+      consumed.userId !== inspected.userId ||
+      consumed.deviceSessionId !== inspected.deviceSessionId
+    ) {
+      return c.json({ success: false, error: 'Invalid or expired ticket' }, 401);
+    }
+    c.set('user_id', consumed.userId);
+    if (consumed.deviceSessionId !== undefined) {
       c.set('device_session_id', consumed.deviceSessionId);
     }
     return next();

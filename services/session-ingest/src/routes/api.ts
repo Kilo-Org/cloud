@@ -1011,6 +1011,7 @@ api.get('/user/cli', async c => {
   // The DO can't recover the user from its idFromName-derived id; it needs the
   // authenticated user for the session-ready push.
   wsUrl.searchParams.set('kiloUserId', kiloUserId);
+  wsUrl.searchParams.delete('deviceSessionId');
   const deviceSessionId = c.get('device_session_id');
   if (deviceSessionId) {
     wsUrl.searchParams.set('deviceSessionId', deviceSessionId);
@@ -1032,6 +1033,7 @@ api.get('/user/web', async c => {
   // The DO can't recover the user from its idFromName-derived id; the web
   // attachment needs it for command/subscribe access rechecks.
   wsUrl.searchParams.set('kiloUserId', kiloUserId);
+  wsUrl.searchParams.delete('deviceSessionId');
   const deviceSessionId = c.get('device_session_id');
   if (deviceSessionId) {
     wsUrl.searchParams.set('deviceSessionId', deviceSessionId);

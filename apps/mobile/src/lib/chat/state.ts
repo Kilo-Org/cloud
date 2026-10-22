@@ -1,3 +1,4 @@
+import { type Part } from '@kilocode/cloud-agent-sdk';
 import { type Effort, type Turn } from '@kilocode/harness-sdk';
 
 import { type LocalImage } from '@/lib/agent-attachments/local-image';
@@ -30,7 +31,7 @@ export type ChatState = {
   /** Every turn the store holds, oldest first. */
   readonly turns: readonly Turn[];
   /** The answer arriving right now, empty when none is. */
-  readonly answering: string;
+  readonly answering: readonly Part[];
   readonly status: 'opening' | 'idle' | 'working';
   /**
    * A question with no answer: still being asked, or asked and nothing came
@@ -122,7 +123,7 @@ export function watchChats(watcher: () => void): () => void {
 /** A chat with nothing in it, which is what every chat starts as. */
 export const NOTHING = {
   turns: [] as readonly Turn[],
-  answering: '',
+  answering: [] as readonly Part[],
   asked: null,
   askedImages: [] as readonly LocalImage[],
   askedModel: null,

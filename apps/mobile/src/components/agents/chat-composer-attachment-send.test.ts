@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { usePreventRemove } from '@/lib/navigation/prevent-remove';
+import { usePreventRemove } from 'expo-router';
 import { type ChatComposer } from './chat-composer';
 
 // The attachment-only send contract: a ready (`uploaded`) attachment with an
@@ -75,10 +75,7 @@ vi.mock('react-native', () => ({
   AppState: {
     addEventListener: () => ({ remove: vi.fn() }),
   },
-  Keyboard: {
-    addListener: vi.fn(() => ({ remove: vi.fn() })),
-    dismiss: vi.fn(),
-  },
+  Keyboard: { dismiss: vi.fn() },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   Text: 'Text',
@@ -104,10 +101,6 @@ vi.mock('react-native-gesture-handler', () => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useNavigation: () => ({ dispatch: leaveMock.dispatch }),
-}));
-
-vi.mock('@/lib/navigation/prevent-remove', () => ({
   usePreventRemove: vi.fn(),
 }));
 
@@ -119,6 +112,8 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
+  useSharedValue: <T>(value: T) => ({ value }),
+  useAnimatedStyle: (style: () => unknown) => style(),
 }));
 vi.mock('@/lib/a11y/motion', () => ({
   selectReducedMotionEntrance: <T>(_reduced: boolean, entrance: T) => entrance,
@@ -127,6 +122,12 @@ vi.mock('@/lib/a11y/motion', () => ({
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
+}));
+
+// The composer reads the keyboard from the provider, not from a listener of its own.
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: <T>(selector: (state: { height: number }) => T) => selector({ height: 0 }),
+  useReanimatedKeyboardAnimation: () => ({ progress: { value: 0 }, height: { value: 0 } }),
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -488,13 +489,16 @@ describe('ChatComposer unclaimed-attachment leave', () => {
     const guard = vi.mocked(usePreventRemove).mock.calls.at(-1);
     expect(guard?.[0]).toBe(true);
     const action = { type: 'GO_BACK' };
-    const runGuard = guard?.[1] as
-      | ((options: { data: { action: { type: string } } }) => void)
-      | undefined;
+    const runGuard = guard?.[1];
     if (!runGuard) {
       throw new Error('composer did not register its leave guard');
     }
-    runGuard({ data: { action } });
+    runGuard({
+      data: { action },
+      repeat: () => {
+        leaveMock.dispatch(action);
+      },
+    });
 
     expect(leaveMock.confirm).toHaveBeenCalledWith({
       title: 'Discard attachments?',

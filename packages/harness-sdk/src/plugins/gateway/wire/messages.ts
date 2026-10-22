@@ -2,14 +2,14 @@ import { createIs } from 'typia';
 import type { ModelUsage, StopReason } from '../../../core/model.js';
 import { toBody } from './messages-body.js';
 import { stopFrom, type Wire, type WirePart } from './wire.js';
-import { type Counts, set, type TokenCount } from './usage.js';
+import { costOf, type CostFields, type Counts, set, type TokenCount } from './usage.js';
 
 /**
  * The shapes are matched structurally, not by a `type` discriminator: gateways
  * relay a dozen models and only agree on where the numbers sit, not on how the
  * frames are named. Extra fields are allowed; typia's `is` ignores them.
  */
-interface WireUsage {
+interface WireUsage extends CostFields {
   input_tokens?: TokenCount | null;
   output_tokens?: TokenCount | null;
   cache_read_input_tokens?: TokenCount | null;
@@ -21,12 +21,14 @@ interface WireUsage {
  * here has produced one, and naming it would claim a meaning nothing has
  * tested.
  *
- * The keys are strings and not `Anthropic.StopReason`, because the SDK's union
- * is behind its own documentation: at 0.104.1 it does not carry
- * `model_context_window_exceeded`, which the provider documents and sends.
- * Binding to the union would reject a name the provider actually uses. The two
- * OpenAI shapes have no such gap; keeping all three the same way is worth more
- * than one of them typechecking against a vendor list.
+ * The keys are strings and not `Anthropic.StopReason`. The union trails the
+ * provider: at 0.104.1 it did not carry `model_context_window_exceeded`, which
+ * the provider documents and sends, and 0.137.0 adds it. The next name either
+ * the provider or a relay between puts on a stop reason would arrive the same
+ * way, and a shape that drops what it read is worse than one that maps a name
+ * the SDK has not published yet. The two OpenAI shapes have no such gap;
+ * keeping all three the same way is worth more than one of them typechecking
+ * against a vendor list.
  */
 const stopReasons: Readonly<Record<string, StopReason>> = {
   end_turn: 'end',
@@ -108,6 +110,7 @@ const isBlockEnd = createIs<BlockEndEvent>();
 const isUsage = createIs<UsageEvent>();
 const isStop = createIs<StopEvent>();
 const isStart = createIs<StartEvent>();
+const isModel = createIs<{ message: { model: string } }>();
 
 const readUsage = (usage: WireUsage): Partial<ModelUsage> => {
   const counts: Counts = {};
@@ -115,7 +118,7 @@ const readUsage = (usage: WireUsage): Partial<ModelUsage> => {
   set(counts, 'outputTokens', usage.output_tokens);
   set(counts, 'cacheReadTokens', usage.cache_read_input_tokens);
   set(counts, 'cacheWriteTokens', usage.cache_creation_input_tokens);
-  return counts;
+  return { ...counts, ...costOf(usage) };
 };
 
 const toDelta = (event: unknown): WirePart | undefined => {
@@ -155,11 +158,15 @@ const toUsage = (event: unknown): Partial<ModelUsage> | undefined => {
 const toStop = (event: unknown): StopReason | undefined =>
   isStop(event) ? asStop(event.delta.stop_reason) : undefined;
 
+const toModel = (event: unknown): string | undefined =>
+  isModel(event) && event.message.model.length > 0 ? event.message.model : undefined;
+
 const messagesWire: Wire = {
   path: '/api/gateway/v1/messages',
   toBody,
   toDelta,
   toUsage,
+  toModel,
   toStop,
 };
 

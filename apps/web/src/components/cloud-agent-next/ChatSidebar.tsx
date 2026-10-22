@@ -62,6 +62,7 @@ import type { WorkspaceFolder } from '@/lib/cloud-agent/workspace-folders';
 import type { WorkspaceFolderController } from './hooks/useWorkspaceFolders';
 import { WorkspaceFolderSection } from './WorkspaceFolderSection';
 import { WorkspaceFolderDialog } from './WorkspaceFolderDialog';
+import { SidebarListSkeleton } from './SidebarListSkeleton';
 import {
   controlPlaneSessionIdSchema,
   getWorkspaceFolderColor,
@@ -91,9 +92,10 @@ type ChatSidebarProps = {
   onDeleteSession?: (sessionId: string) => void;
   deletingSessionIds?: string[];
   onRenameSession?: (sessionId: string, title: string) => Promise<void>;
-  onCreateWorktreeChat?: (sourceKiloSessionId: string) => Promise<boolean>;
-  creatingWorktreeSourceSessionId?: string | null;
+  onCreateWorktreeChat?: (sourceKiloSessionId: string) => void;
+  isLoading?: boolean;
   worktreeDetails?: Record<string, SidebarWorktreeDetails>;
+  loadingWorktreeIds?: readonly string[];
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
   onDeleteWorktree?: (worktreeId: string) => void;
   deletingWorktreeIds?: readonly string[];
@@ -309,10 +311,10 @@ function WorktreeGroupRow({
   selectedWorktreeId,
   onOpenSession,
   onCreateWorktreeChat,
-  creatingWorktreeSourceSessionId,
   onRenameWorktree,
   onDeleteWorktree,
   isDeleting,
+  isLoadingDetails,
   activeSessionStatuses,
   foregroundSession,
   folderControls,
@@ -321,11 +323,11 @@ function WorktreeGroupRow({
   currentSessionId?: string;
   selectedWorktreeId?: string | null;
   onOpenSession: (sessionId: string) => void;
-  onCreateWorktreeChat?: (sourceKiloSessionId: string) => Promise<boolean>;
-  creatingWorktreeSourceSessionId?: string | null;
+  onCreateWorktreeChat?: (sourceKiloSessionId: string) => void;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
   onDeleteWorktree?: (worktreeId: string) => void;
   isDeleting: boolean;
+  isLoadingDetails: boolean;
   activeSessionStatuses: ReadonlyMap<string, string>;
   foregroundSession?: SidebarForegroundSessionStatus | null;
   folderControls?: WorktreeFolderControls;
@@ -342,7 +344,8 @@ function WorktreeGroupRow({
   const savingRenameRef = useRef(false);
   const restoreFocusRef = useRef(false);
   const renameErrorId = useId();
-  const label = getSidebarWorktreeLabel(group);
+  const worktreeLabel = getSidebarWorktreeLabel(group);
+  const label = isLoadingDetails ? 'Loading worktree…' : worktreeLabel;
   const prSession = getSidebarWorktreePrSession(group);
   const activity = getSidebarWorktreeActivity(
     group.sessions,
@@ -357,11 +360,7 @@ function WorktreeGroupRow({
   const isActive =
     selectedWorktreeId === group.worktreeId ||
     group.sessions.some(session => session.sessionId === currentSessionId);
-  const isCreatingThisGroup = group.sessions.some(
-    session => session.sessionId === creatingWorktreeSourceSessionId
-  );
-  const isCreationPending = creatingWorktreeSourceSessionId != null;
-  const showActions = hasActions && (hovered || menuOpen || isCreatingThisGroup);
+  const showActions = hasActions && (hovered || menuOpen);
 
   useEffect(() => {
     if (isEditing) {
@@ -387,7 +386,7 @@ function WorktreeGroupRow({
   const saveRename = async () => {
     if (!editingRef.current || !onRenameWorktree || savingRenameRef.current || isDeleting) return;
     const name = editName.trim();
-    if (!name || name === label) {
+    if (isLoadingDetails || !name || name === worktreeLabel) {
       finishRename();
       return;
     }
@@ -414,7 +413,7 @@ function WorktreeGroupRow({
       onDragEnd={folderControls?.onDragEnd}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      aria-busy={isDeleting || isSavingRename || isCreatingThisGroup || undefined}
+      aria-busy={isDeleting || isSavingRename || undefined}
       className={cn(
         'hover:bg-accent rounded-lg text-sm transition-colors',
         isDeleting && 'cursor-wait opacity-60',
@@ -459,17 +458,35 @@ function WorktreeGroupRow({
           </>
         ) : (
           <>
-            <button
-              ref={openButtonRef}
-              type="button"
-              disabled={isDeleting}
-              onClick={() => onOpenSession(group.latestSession.sessionId)}
-              aria-label={`Open worktree ${label}`}
-              aria-current={isActive ? 'page' : undefined}
-              className="focus-visible:ring-ring -my-2 -ml-3 flex min-w-0 flex-1 items-center rounded-md py-2 pl-3 text-left focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait"
-            >
-              <span className="line-clamp-1 min-w-0 leading-snug">{label}</span>
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  ref={openButtonRef}
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => onOpenSession(group.latestSession.sessionId)}
+                  aria-label={`Open worktree ${label}`}
+                  aria-current={isActive ? 'page' : undefined}
+                  className="focus-visible:ring-ring -my-2 -ml-3 flex min-w-0 flex-1 items-center rounded-md py-2 pl-3 text-left focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait"
+                >
+                  {isLoadingDetails ? (
+                    <span
+                      className="bg-muted line-clamp-1 w-32 min-w-0 max-w-full rounded leading-snug text-transparent"
+                      aria-hidden="true"
+                    >
+                      Loading worktree…
+                    </span>
+                  ) : (
+                    <span className="line-clamp-1 min-w-0 leading-snug">{label}</span>
+                  )}
+                </button>
+              </TooltipTrigger>
+              {!isLoadingDetails && (
+                <TooltipContent side="right" className="max-w-xs break-words">
+                  {label}
+                </TooltipContent>
+              )}
+            </Tooltip>
             {prSession && <SessionPrIndicator session={prSession} />}
             <span className="group/session-actions relative flex w-6 shrink-0 justify-end [@media(any-pointer:coarse)]:w-auto [@media(hover:none)]:w-auto">
               {isDeleting ? (
@@ -516,14 +533,7 @@ function WorktreeGroupRow({
                         onClick={event => event.stopPropagation()}
                         className="hover:bg-muted focus-visible:ring-ring relative rounded-md p-0.5 before:absolute before:-inset-3 focus-visible:ring-2 focus-visible:outline-none"
                       >
-                        {isCreatingThisGroup ? (
-                          <LoaderCircle
-                            className="text-muted-foreground h-4 w-4 animate-spin"
-                            aria-label="Creating chat"
-                          />
-                        ) : (
-                          <MoreHorizontal className="text-muted-foreground h-4 w-4" />
-                        )}
+                        <MoreHorizontal className="text-muted-foreground h-4 w-4" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
@@ -534,10 +544,7 @@ function WorktreeGroupRow({
                     >
                       {onCreateWorktreeChat && (
                         <DropdownMenuItem
-                          disabled={isCreationPending}
-                          onSelect={() => {
-                            void onCreateWorktreeChat(group.latestSession.sessionId);
-                          }}
+                          onSelect={() => onCreateWorktreeChat(group.latestSession.sessionId)}
                         >
                           <Plus className="h-4 w-4" />
                           New chat
@@ -545,9 +552,10 @@ function WorktreeGroupRow({
                       )}
                       {onRenameWorktree && (
                         <DropdownMenuItem
+                          disabled={isLoadingDetails}
                           onSelect={() => {
                             editingRef.current = true;
-                            setEditName(label);
+                            setEditName(worktreeLabel);
                             setRenameError(null);
                             setIsEditing(true);
                             setMenuOpen(false);
@@ -595,7 +603,6 @@ function WorktreeGroupRow({
                       {onDeleteWorktree && (
                         <DropdownMenuItem
                           variant="destructive"
-                          disabled={isCreatingThisGroup}
                           onSelect={() => onDeleteWorktree(group.worktreeId)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -622,6 +629,7 @@ function WorktreeGroupRow({
 const PLATFORM_FILTERS = [
   'cloud-agent',
   'extension',
+  'desktop',
   'cli',
   'slack',
   'github',
@@ -635,6 +643,8 @@ function platformFilterLabel(p: string): string {
       return 'Cloud';
     case 'extension':
       return 'Extension';
+    case 'desktop':
+      return 'Desktop';
     case 'cli':
       return 'CLI';
     case 'slack':
@@ -660,8 +670,9 @@ export function ChatSidebar({
   deletingSessionIds,
   onRenameSession,
   onCreateWorktreeChat,
-  creatingWorktreeSourceSessionId,
+  isLoading = false,
   worktreeDetails = {},
+  loadingWorktreeIds = [],
   onRenameWorktree,
   onDeleteWorktree,
   deletingWorktreeIds = [],
@@ -945,11 +956,11 @@ export function ChatSidebar({
     <WorktreeGroupRow
       key={group.worktreeId}
       group={group}
+      isLoadingDetails={loadingWorktreeIds.includes(group.worktreeId)}
       currentSessionId={currentSessionId}
       selectedWorktreeId={selectedWorktreeId}
       onOpenSession={handleSessionClick}
       onCreateWorktreeChat={onCreateWorktreeChat}
-      creatingWorktreeSourceSessionId={creatingWorktreeSourceSessionId}
       onRenameWorktree={onRenameWorktree}
       onDeleteWorktree={onDeleteWorktree}
       isDeleting={deletingWorktreeIds.includes(group.worktreeId)}
@@ -1173,11 +1184,6 @@ export function ChatSidebar({
         className="flex-1 space-y-px overflow-y-auto p-2 select-none"
         aria-busy={workspaceFolders?.isSaving || undefined}
       >
-        {workspaceFolders?.isLoading && (
-          <p role="status" className="text-muted-foreground px-2 py-2 text-xs">
-            Loading folders...
-          </p>
-        )}
         {workspaceFolders?.isError && (
           <div
             role="alert"
@@ -1193,8 +1199,10 @@ export function ChatSidebar({
             </button>
           </div>
         )}
-        {sessions.length === 0 && liveOnlySessions.length === 0 && folderGroups.length === 0 ? (
-          <div className="py-8 text-center text-sm text-gray-500">No sessions yet</div>
+        {isLoading || workspaceFolders?.isFirstLoadPending ? (
+          <SidebarListSkeleton />
+        ) : sessions.length === 0 && liveOnlySessions.length === 0 && folderGroups.length === 0 ? (
+          <div className="text-muted-foreground py-8 text-center text-sm">No sessions yet</div>
         ) : (
           <>
             {workspaceFolders &&

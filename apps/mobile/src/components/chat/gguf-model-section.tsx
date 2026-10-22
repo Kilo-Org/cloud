@@ -7,6 +7,7 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { PackageSearch } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { localTargetId } from '@/lib/chat/backend-target';
 import { GGUF_URL_ERROR_KEYS, readGgufLink } from '@/lib/chat/gguf-catalog';
 import { ggufDownloadActions, ggufUrlSource, useGgufModels } from '@/lib/chat/gguf-models';
 import {
@@ -17,6 +18,7 @@ import {
 import { formatFileSize } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { BackendProviderChoice, type ProviderSelection } from './backend-provider-choices';
 import { modelCapabilityKey } from './model-capability';
 
 const FAILURE_KEYS = {
@@ -194,11 +196,15 @@ function DirectLinkForm({ snapshot }: Readonly<{ snapshot: GgufDownloadsSnapshot
   );
 }
 
-/** Downloaded and downloading GGUF models, the catalog entry, and the direct link form. */
-export function GgufModelSection({ onBrowse }: Readonly<{ onBrowse: () => void }>) {
+/** Downloaded and downloading GGUF models, the browse entry, and the direct link form. */
+export function GgufModelSection({
+  onBrowse,
+  ...selection
+}: Readonly<{ onBrowse: () => void }> & ProviderSelection) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const snapshot = useGgufModels();
+  const [advanced, setAdvanced] = useState(false);
   const rows = [
     ...snapshot.models.map(model => ({ fileId: model.fileId, name: model.name })),
     ...(snapshot.download === null ||
@@ -214,13 +220,22 @@ export function GgufModelSection({ onBrowse }: Readonly<{ onBrowse: () => void }
     <View className="gap-2">
       <Text className="font-semibold">{t('modelChat.gguf.title')}</Text>
       <Text className="text-sm text-muted-foreground">{t('modelChat.gguf.help')}</Text>
-      <Button variant="outline" onPress={onBrowse}>
-        <PackageSearch size={18} color={colors.foreground} />
+      <Button onPress={onBrowse}>
+        <PackageSearch size={18} color={colors.primaryForeground} />
         <Text>{t('modelChat.catalog.browse')}</Text>
       </Button>
       {rows.map(row => (
         <View key={row.fileId} className="gap-2 rounded-xl border border-border p-4">
-          <Text className="font-semibold">{row.name}</Text>
+          <BackendProviderChoice
+            {...selection}
+            name={row.name}
+            description={t('modelChat.gguf.localPurpose')}
+            modelId={
+              snapshot.models.some(model => model.fileId === row.fileId)
+                ? localTargetId('gguf', row.fileId)
+                : undefined
+            }
+          />
           <GgufDownloadControls
             fileId={row.fileId}
             name={row.name}
@@ -229,7 +244,16 @@ export function GgufModelSection({ onBrowse }: Readonly<{ onBrowse: () => void }
           />
         </View>
       ))}
-      <DirectLinkForm snapshot={snapshot} />
+      <Button
+        variant="ghost"
+        onPress={() => {
+          setAdvanced(current => !current);
+        }}
+        accessibilityState={{ expanded: advanced }}
+      >
+        <Text>{t('modelChat.gguf.advanced')}</Text>
+      </Button>
+      {advanced && <DirectLinkForm snapshot={snapshot} />}
       {otherFailure !== null && (
         <Text accessibilityRole="alert" className="text-sm text-destructive">
           {t(FAILURE_KEYS[otherFailure.problem])}

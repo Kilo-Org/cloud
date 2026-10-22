@@ -6,6 +6,7 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
+    "replay": "tsx scripts/decide-replay.ts",
     "types": "wrangler types --include-runtime=false",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/auto-routing/src",
@@ -14,6 +15,7 @@
   "dependencies": {
     "@kilocode/auto-routing-contracts": "workspace:*",
     "@kilocode/db": "workspace:*",
+    "@kilocode/usage-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

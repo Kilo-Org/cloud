@@ -157,7 +157,7 @@ export function SSOSignupCard({ organization, role }: SSOSignupCardProps) {
                       <button
                         onClick={handleDomainVerification}
                         disabled={generatePortalLink.isPending}
-                        className="cursor-pointer text-sm text-yellow-400 underline hover:text-yellow-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="cursor-pointer text-sm text-primary underline hover:text-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {generatePortalLink.isPending ? 'Opening...' : 'Verify'}
                       </button>
@@ -193,7 +193,7 @@ export function SSOSignupCard({ organization, role }: SSOSignupCardProps) {
                         <button
                           onClick={handleSSOConfiguration}
                           disabled={generatePortalLink.isPending}
-                          className="cursor-pointer text-sm text-yellow-400 underline hover:text-yellow-300 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="cursor-pointer text-sm text-primary underline hover:text-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {generatePortalLink.isPending ? 'Opening...' : 'Complete setup'}
                         </button>

@@ -8,13 +8,13 @@ import {
   organizations,
   type Organization,
 } from '@kilocode/db/schema';
+import { type OrganizationGroupPolicies } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import {
-  OrganizationGroupPoliciesSchema,
-  type OrganizationGroupPolicies,
-} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
+  DEFAULT_ORGANIZATION_GROUP_POLICIES,
+  parseOrganizationGroupPolicies,
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
 import { and, eq, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { captureException } from '@sentry/nextjs';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 export type OrganizationPolicySubject =
@@ -40,28 +40,6 @@ export type OrganizationGroupPolicyContext = {
   groupPolicies: OrganizationGroupPolicies[];
   policyRevision: number;
 };
-
-const DEFAULT_POLICIES = [
-  { type: 'model_access', data: { mode: 'all' } },
-] satisfies OrganizationGroupPolicies;
-
-function parsePolicies(
-  value: unknown,
-  context: { organizationId: string; source: 'default' | 'group'; groupId?: string }
-) {
-  const parsed = OrganizationGroupPoliciesSchema.safeParse(value);
-  if (!parsed.success) {
-    captureException(parsed.error, {
-      tags: { domain: 'organization-groups', source: context.source },
-      extra: { organizationId: context.organizationId, groupId: context.groupId },
-    });
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Organization group policy data is invalid',
-    });
-  }
-  return parsed.data;
-}
 
 /**
  * Resolve the organization the policy is evaluated against.
@@ -104,9 +82,11 @@ export async function getOrganizationGroupPolicyContext(params: {
   /** Organization row the caller already loaded; avoids re-reading it. */
   organization?: Organization;
   tx?: DrizzleTransaction;
+  /** Ignored when `tx` is given. AI gateway callers pass `readDb`. */
+  fromDb?: typeof db;
 }): Promise<OrganizationGroupPolicyContext> {
   if (!params.tx) {
-    return await db.transaction(
+    return await (params.fromDb ?? db).transaction(
       async tx => await getOrganizationGroupPolicyContext({ ...params, tx }),
       { isolationLevel: 'repeatable read', accessMode: 'read only' }
     );
@@ -142,11 +122,11 @@ export async function getOrganizationGroupPolicyContext(params: {
     .limit(1);
 
   const defaultPolicies = settings
-    ? (parsePolicies(settings.default_policies, {
+    ? parseOrganizationGroupPolicies(settings.default_policies, {
         organizationId: params.organizationId,
         source: 'default',
-      }) as OrganizationGroupPolicies)
-    : DEFAULT_POLICIES;
+      })
+    : DEFAULT_ORGANIZATION_GROUP_POLICIES;
 
   let groupIds: string[] = [];
   let groupPolicies: OrganizationGroupPolicies[] = [];
@@ -170,13 +150,12 @@ export async function getOrganizationGroupPolicyContext(params: {
         )
       );
     groupIds = groups.map(group => group.id);
-    groupPolicies = groups.map(
-      group =>
-        parsePolicies(group.policies, {
-          organizationId: params.organizationId,
-          groupId: group.id,
-          source: 'group',
-        }) as OrganizationGroupPolicies
+    groupPolicies = groups.map(group =>
+      parseOrganizationGroupPolicies(group.policies, {
+        organizationId: params.organizationId,
+        groupId: group.id,
+        source: 'group',
+      })
     );
   }
 

@@ -70,7 +70,7 @@ export function AvailableModelsDialog({
                 return (
                   <div
                     key={model.id}
-                    className="bg-card hover:bg-accent/50 rounded-lg border border-yellow-200/20 p-3 transition-colors"
+                    className="bg-card hover:bg-accent/50 rounded-lg border border-primary/20 p-3 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-4">
                       <code className="font-mono text-sm font-medium">{model.id}</code>

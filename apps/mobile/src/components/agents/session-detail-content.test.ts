@@ -183,6 +183,17 @@ vi.mock('expo-router', () => ({
     replace: (href: string) => {
       navigationRoutes.splice(-1, 1, href);
     },
+    // The POP_TO end state "Back to sessions" relies on: find the destination
+    // at or below the current index, truncate everything above it; with no
+    // match, drop the current route and land on the destination.
+    dismissTo: (href: string) => {
+      const index = navigationRoutes.lastIndexOf(href.split('?')[0] ?? href);
+      if (index === -1) {
+        navigationRoutes.splice(0, navigationRoutes.length, href);
+      } else {
+        navigationRoutes.splice(index + 1);
+      }
+    },
     push: (href: string) => {
       navigationRoutes.push(href);
     },
@@ -687,24 +698,22 @@ function toolRunMessage(
 ): StoredMessage {
   const message = assistantMessage(messageId);
   message.info = { ...message.info, sessionID: sessionId };
-  message.parts = partIds.map(
-    (partId, index): ToolPart => ({
-      id: partId,
-      sessionID: sessionId,
-      messageID: messageId,
-      type: 'tool',
-      callID: `call-${partId}`,
-      tool: 'read',
-      state: {
-        status: 'completed',
-        input: { filePath: `/repo/${partId}.ts` },
-        output: '',
-        title: 'read',
-        metadata: {},
-        time: { start: index, end: index + 1 },
-      },
-    })
-  );
+  message.parts = partIds.map((partId, index): ToolPart => ({
+    id: partId,
+    sessionID: sessionId,
+    messageID: messageId,
+    type: 'tool',
+    callID: `call-${partId}`,
+    tool: 'read',
+    state: {
+      status: 'completed',
+      input: { filePath: `/repo/${partId}.ts` },
+      output: '',
+      title: 'read',
+      metadata: {},
+      time: { start: index, end: index + 1 },
+    },
+  }));
   return message;
 }
 
@@ -907,7 +916,6 @@ async function mountDetails(
         variant: null,
         repository: null,
         isInitiated: true,
-        needsLegacyPrepare: false,
         isPreparingAsync: false,
         prompt: null,
         initialMessageId: null,
@@ -1108,7 +1116,6 @@ describe('SessionDetailContent display scope', () => {
     expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
       'min-h-21'
     );
-    expect(header.props.context).toBeUndefined();
     expect(header.findAllByType(ContextControl)).toHaveLength(0);
     // The PR link shares the goal row now, so the header row holds no badge.
     expect(header.findAllByType('SessionPrBadge')).toHaveLength(0);
@@ -1124,7 +1131,7 @@ describe('SessionDetailContent display scope', () => {
     act(onPress);
     expect(openRenameModal).toHaveBeenCalledOnce();
     pressHeaderBack(renderer);
-    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
     expect(globalContext.organizationId).toBe('global-org');
     expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
   });
@@ -2365,7 +2372,7 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
 
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
     );
   });
 
@@ -2405,7 +2412,7 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
     );
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
     );
   });
 });
@@ -2447,32 +2454,39 @@ describe('shouldRefuseSilentAttachmentDrop', () => {
 
 // These tests run in the existing detail suite with the DOM-free renderer.
 // Request order and rendered state are deterministic; native paint timing is not.
+/** The card's visible and announced state, in the active language. */
+const STATUS_LABEL_KEY = {
+  pending: 'common.pending',
+  running: 'common.running',
+  completed: 'common.completed',
+  error: 'common.failed',
+} satisfies Record<'pending' | 'running' | 'completed' | 'error', string>;
+
 describe('child transcript requests', () => {
   it.each([
     {
       sessionId: SELECTED_ID,
       status: 'completed',
-      text: 'Researcher\nTask ses-selected\ncompleted',
       textRows: 3,
       activity: null,
     },
     {
       sessionId: kiloId('ses-sibling-0'),
       status: 'running',
-      text: 'Researcher\nTask ses-sibling-0\nThinking\nrunning',
       textRows: 4,
       activity: 'Thinking',
     },
     {
       sessionId: kiloId('ses-sibling-1'),
       status: 'error',
-      text: 'Researcher\nTask ses-sibling-1\nerror',
       textRows: 3,
       activity: null,
     },
   ] as const)(
     'renders the $status card without fetching a child transcript for labels',
-    async ({ sessionId, status, text, textRows, activity }) => {
+    async ({ sessionId, status, textRows, activity }) => {
+      const statusLabel = i18n.t(STATUS_LABEL_KEY[status]);
+      const text = `Researcher\nTask ${sessionId}${activity ? `\n${activity}` : ''}\n${statusLabel}`;
       const view = await mountDetails();
       const card = cardFor(view.renderer, sessionId);
       const button = card.findByProps({ accessibilityRole: 'button' }).props as ComponentProps<
@@ -2489,7 +2503,8 @@ describe('child transcript requests', () => {
       });
       expect(button.accessibilityLabel).toContain('Researcher');
       expect(button.accessibilityLabel).toContain(`Task ${sessionId}`);
-      expect(button.accessibilityLabel).toContain(status);
+      expect(button.accessibilityLabel).toContain(statusLabel);
+      expect(button.accessibilityLabel).not.toContain(status);
       expect(button.accessibilityLabel?.includes('Waiting for activity')).toBe(false);
       if (activity) {
         expect(button.accessibilityLabel).toContain(activity);
@@ -2538,7 +2553,7 @@ describe('child transcript requests', () => {
       expect(selectedCard.findAllByType(ChildSessionModelLabel)).toHaveLength(1);
       const nestedCard = cardFor(view.renderer, nestedId);
       expect(renderedText(nestedCard)).toBe(
-        `Researcher\nTask ${nestedId}${isRunning ? '\nThinking' : ''}\n${status}`
+        `Researcher\nTask ${nestedId}${isRunning ? '\nThinking' : ''}\n${i18n.t(STATUS_LABEL_KEY[status])}`
       );
       expect(nestedCard.findAll(node => (node.type as string) === 'Text')).toHaveLength(
         isRunning ? 4 : 3
@@ -2551,7 +2566,7 @@ describe('child transcript requests', () => {
         accessibilityHint: i18n.t('agentChat.childSession.openHint'),
       });
       expect(nestedButton.accessibilityLabel).toContain(`Task ${nestedId}`);
-      expect(nestedButton.accessibilityLabel).toContain(status);
+      expect(nestedButton.accessibilityLabel).toContain(i18n.t(STATUS_LABEL_KEY[status]));
       expect(nestedButton.accessibilityLabel?.includes('Waiting for activity')).toBe(false);
       if (isRunning) {
         expect(nestedButton.accessibilityLabel).toContain('Thinking');

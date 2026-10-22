@@ -10,6 +10,7 @@ import {
 import {
   type LayoutChangeEvent,
   ScrollView,
+  type ScrollViewInstance,
   type ScrollViewProps,
   type ViewProps,
 } from 'react-native';
@@ -24,7 +25,7 @@ import { EmptyState } from './empty-state';
 import { InvalidRouteState } from './invalid-route-state';
 import { QueryError } from './query-error';
 
-type ScrollNode = NonNullable<ReturnType<ScrollView['getNativeScrollRef']>>;
+type ScrollNode = ScrollViewInstance;
 type Measurement = Parameters<ScrollNode['measureInWindow']>[0];
 const native = vi.hoisted(() => {
   const surface: NonNullable<ReturnType<typeof useStateSurface>> = {
@@ -42,7 +43,7 @@ const native = vi.hoisted(() => {
   };
   const measureInWindow = vi.fn<(onMeasure: Measurement) => void>();
   const node: Partial<ScrollNode> = { measureInWindow };
-  const scroll: Partial<ScrollView> = { getNativeScrollRef: () => node as ScrollNode };
+  const scroll: Partial<ScrollViewInstance> = { getNativeScrollRef: () => node as ScrollNode };
   return {
     measurements: [] as Measurement[],
     surface,
@@ -62,7 +63,7 @@ vi.mock('react-native', () => ({
   View: 'View',
   ScrollView: (props: ComponentPropsWithRef<typeof ScrollView>) => {
     const { ref, ...rest } = props;
-    useImperativeHandle(ref, () => native.scroll as ScrollView, []);
+    useImperativeHandle(ref, () => native.scroll as ScrollViewInstance, []);
     return createElement('ScrollView', rest);
   },
 }));
@@ -87,14 +88,18 @@ const contentLayout: Partial<LayoutChangeEvent> = {
   nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 700 } },
 };
 
-async function mount() {
+async function mount(props: Partial<ComponentPropsWithRef<typeof CenteredState>> = {}) {
   let rerender: (() => void) | undefined = undefined;
   function Harness() {
     const [, setVersion] = useState(0);
     rerender = () => {
       setVersion(version => version + 1);
     };
-    return <CenteredState testID="state">{null}</CenteredState>;
+    return (
+      <CenteredState testID="state" {...props}>
+        {null}
+      </CenteredState>
+    );
   }
   const mounted = await renderWithProviders(
     createElement(StrictMode, null, createElement(Harness))
@@ -221,6 +226,20 @@ describe('Shared state placement', () => {
 });
 
 describe('CenteredState measurements', () => {
+  it('keeps a horizontal inset on the content box, not the scroller', async () => {
+    // The scroller's own padding does not narrow the scroll content, so an inset
+    // set through `className` leaves the end side flush in a right-to-left layout.
+    const mounted = await mount({
+      className: 'bg-background',
+      contentContainerClassName: 'px-6',
+    });
+    mounted.settle();
+    expect(mounted.scroll().className).toBe('flex-1 bg-background');
+    expect(mounted.scroll().contentContainerClassName).toBeUndefined();
+    expect(mounted.content().className).toBe('w-full px-6');
+    mounted.unmount();
+  });
+
   it.each([false, true])(
     'applies the provider native fill policy %s',
     async nativeViewportFillsSurface => {
@@ -238,6 +257,22 @@ describe('CenteredState measurements', () => {
       mounted.unmount();
     }
   );
+
+  it('waits for finite native viewport bounds', async () => {
+    const mounted = await mount();
+    act(() => {
+      for (const onMeasure of native.measurements.splice(0)) {
+        onMeasure(0, Number.NaN, 400, Number.NaN);
+      }
+    });
+    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    act(() => {
+      mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
+    });
+    mounted.settle();
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    mounted.unmount();
+  });
 
   it('rejects old viewport results after the surface changes', async () => {
     const mounted = await mount();
@@ -285,7 +320,7 @@ describe('CenteredState measurements', () => {
     });
     expect(mounted.content().accessibilityElementsHidden).toBe(true);
     act(() => {
-      ref(native.scroll as ScrollView);
+      ref(native.scroll as ScrollViewInstance);
     });
     mounted.settle();
     expect(mounted.content().accessibilityElementsHidden).toBe(false);

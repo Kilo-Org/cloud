@@ -24,6 +24,8 @@ export const SESSION_FILTERS_KEY = 'agent-session-filters';
 /** Filter record for the live sessions page. Separate: the pages filter separate lists. */
 export const LIVE_SESSION_FILTERS_KEY = 'live-session-filters';
 export const NOTIFICATION_PROMPT_SEEN_KEY = 'notification-prompt-seen';
+/** The user chose Not now on the iOS install-attribution pre-prompt; do not ask again. */
+export const TRACKING_PROMPT_DISMISSED_KEY = 'tracking-prompt-dismissed';
 export const LAST_ACTIVE_INSTANCE_KEY = 'last-active-chat-instance';
 /** Last "Run on" destination on the new-agent screen. Empty means Cloud Agent. */
 export const LAST_RUN_ON_DESTINATION_KEY = 'last-run-on-destination';
@@ -117,6 +119,15 @@ export const PENDING_DEEP_LINK_KEY = 'pending-deep-link';
  */
 export const PICKER_LAUNCH_CONTEXT_KEY = 'picker-launch-context';
 /**
+ * The composer a camera or library launch belongs to, kept for the launch that
+ * never comes back: Activity recreation rebuilds the app on its opening route
+ * and drops the composer. Written next to `PICKER_LAUNCH_CONTEXT_KEY` before
+ * the launch and cleared by the same JS once the picker returns, so a record
+ * that outlives the launch means the composer did not survive. Deleted on
+ * sign-out: it carries a user id and a session id.
+ */
+export const PICKER_RESTORE_RECORD_KEY = 'picker-restore-record';
+/**
  * Per-user network-fallback consent for voice transcription (P1-I-68a). Not
  * deleted on sign-out — a per-user decision must survive sign-out and sign-in
  * of the same account, matching `CONSENT_USER_KEY_PREFIX`.
@@ -156,6 +167,13 @@ export const USER_SESSION_TITLES_KEY = 'user-session-titles';
  * secret, but it is mirrored through SecureStore like every other record.
  */
 export const LAST_OPENED_SESSION_KEY = 'last-opened-session';
+
+/**
+ * Durable "last focused in-app route" record behind the relaunch restore.
+ * Holds `{ href, userId, storedAt }`; the account id scopes the record so one
+ * account never restores another account's route (see `lib/last-route.ts`).
+ */
+export const LAST_ROUTE_KEY = 'last-route';
 
 /**
  * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,

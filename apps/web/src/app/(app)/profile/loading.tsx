@@ -133,7 +133,7 @@ export default function ProfileLoading() {
         </CardContent>
       </Card>
 
-      {/* Integrations Card */}
+      {/* Support Card */}
       <Card className="w-full">
         <CardHeader>
           <Skeleton className="h-6 w-32" /> {/* Title */}

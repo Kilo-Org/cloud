@@ -26,7 +26,7 @@ const appearance = vi.hoisted((): { colors: Record<string, string>; bottom: numb
     foreground: '#F2F0EB',
     mutedForeground: '#8A8680',
     border: 'rgba(255, 255, 255, 0.07)',
-    primary: '#E8F27A',
+    primary: '#FFDD00',
   },
   bottom: 18,
 }));
@@ -43,6 +43,14 @@ const LIGHT_COLORS = {
   border: 'rgba(20, 15, 10, 0.09)',
   primary: '#4F5A10',
 };
+// The provider now announces the lost-membership recovery through the
+// toast adapter, whose module graph reaches react-native's Flow source
+// the mounted transform cannot parse. Suites mock the adapter (not the
+// sonner package) so the mock sits at the edge that imports it.
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
+
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
@@ -91,7 +99,15 @@ const mounted: Mounted[] = [];
 let persisted: string | null = null;
 let rerender: (() => void) | undefined = undefined;
 
-function Surface({ scope }: { scope?: ContextDisplayScope }) {
+function Surface({
+  scope,
+  value,
+  onSelectionChange,
+}: {
+  scope?: ContextDisplayScope;
+  value?: string | null;
+  onSelectionChange?: (organizationId: string | null) => void;
+}) {
   const { organizationId: id } = useOrganization();
   const [, setVersion] = useState(0);
   useEffect(() => {
@@ -99,11 +115,21 @@ function Surface({ scope }: { scope?: ContextDisplayScope }) {
       setVersion(version => version + 1);
     };
   }, []);
-  return createElement('GlobalScope', { id }, createElement(ContextControl, { scope }));
+  return createElement(
+    'GlobalScope',
+    { id },
+    createElement(ContextControl, { scope, value, onSelectionChange })
+  );
 }
 
-async function mount(scope?: ContextDisplayScope) {
-  const result = await renderWithProviders(createElement(Surface, { scope }), {
+async function mount(
+  props: {
+    scope?: ContextDisplayScope;
+    value?: string | null;
+    onSelectionChange?: (organizationId: string | null) => void;
+  } = {}
+) {
+  const result = await renderWithProviders(createElement(Surface, props), {
     wrapper: OrganizationProvider,
   });
   mounted.push(result);
@@ -241,7 +267,10 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
   it.each([
     { choice: 'Personal', expected: null },
     { choice: name, expected: 'org-a' },
-    { choice: 'Cancel', expected: 'org-missing' },
+    // The stored organization is missing from the list, so the provider
+    // recovers to the first listed membership before the sheet opens; a
+    // Cancel is then a plain dismissal of that recovered scope.
+    { choice: 'Cancel', expected: 'org-a' },
   ])(
     'applies the picked account $choice without an implicit reset',
     async ({ choice, expected }) => {
@@ -260,13 +289,18 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     storage.read.mockResolvedValue('org-missing');
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
+    // The stored organization is missing from the list, so the provider has
+    // already recovered to the first listed membership before the sheet opens.
+    await waitFor(
+      () => ui.renderer.root.findByType('GlobalScope' as ElementType).props.id === 'org-a'
+    );
     await openSheet(ui);
     // The native sheet's dismiss path, not a row: the scope stays as it was.
     await act(() => {
       (backdrop(ui).props.onClose as () => void)();
     });
     expect(rows(ui)).toHaveLength(0);
-    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-missing');
+    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-a');
   });
 
   it('separates the rows and exposes the current account through the radio state', async () => {
@@ -287,12 +321,37 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(cancelRow(ui).props.accessibilityState).toBeUndefined();
   });
 
+  it("names the caller's account while the active one differs, and a pick still switches the active one", async () => {
+    storage.read.mockResolvedValue('org-a');
+    const onSelectionChange = vi.fn<(organizationId: string | null) => void>();
+    const ui = await mount({ value: null, onSelectionChange });
+    await waitFor(() => !picker(ui).props.disabled);
+    // The screen is personal-scoped even though the active account is org-a,
+    // so the control must not name org-a.
+    expect(picker(ui).props.accessibilityLabel).toBe('Personal');
+    await openSheet(ui);
+    expect(rows(ui).map(row => row.checked)).toEqual([true, false]);
+    await chooseRow(ui, name);
+    expect(onSelectionChange).toHaveBeenCalledWith('org-a');
+  });
+
+  it('reports no change when the pick matches the account the caller shows', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const onSelectionChange = vi.fn<(organizationId: string | null) => void>();
+    const ui = await mount({ value: null, onSelectionChange });
+    await waitFor(() => !picker(ui).props.disabled);
+    await openSheet(ui);
+    await chooseRow(ui, 'Personal');
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
   it.each([
     // An absent stored choice is 'not chosen yet': the provider's login default
     // resolves to the first organization, so the picker must mark that row. A
-    // stored organization missing from the list marks no row at all.
+    // stored organization missing from the list recovers to that first
+    // membership before the sheet opens, so its row is marked too.
     { stored: null, checked: name },
-    { stored: 'org-missing', checked: undefined },
+    { stored: 'org-missing', checked: name },
   ])(
     'marks the account the user is actually on when the stored one is missing (stored=$stored)',
     async ({ stored, checked }) => {
@@ -305,7 +364,7 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
         rows(ui)
           .filter(row => row.checked)
           .map(row => row.label)
-      ).toEqual(checked === undefined ? [] : [checked]);
+      ).toEqual([checked]);
     }
   );
 
@@ -353,24 +412,27 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     });
   });
 
-  it('recovers an unavailable organization through Personal after an empty membership result', async () => {
+  it('recovers a stored organization missing from an empty membership list to Personal', async () => {
     storage.read.mockResolvedValue('org-missing');
     list.mockResolvedValue([]);
     const ui = await mount();
-    await waitFor(() => texts(ui).includes('Organization unavailable'));
-    expect(texts(ui)).not.toContain('Retry');
-    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-missing');
+    // The stored organization is missing from the fetched list, so the
+    // provider switches to Personal (no membership remains) on the first
+    // snapshot instead of rendering the dead selection's error surface.
+    await waitFor(
+      () => ui.renderer.root.findByType('GlobalScope' as ElementType).props.id === null
+    );
+    expect(texts(ui)).not.toContain('Organization unavailable');
     await openSheet(ui);
     expect(rows(ui).map(row => row.label)).toEqual(['Personal']);
-    await chooseRow(ui, 'Personal');
-    expect(texts(ui)).toContain('Personal');
-    expect(texts(ui)).not.toContain('Organization unavailable');
   });
 
   it.each([false, true])('retries only the failed name query, read-only=%s', async readOnly => {
     storage.read.mockResolvedValue('org-a');
     list.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(orgs);
-    const ui = await mount(readOnly ? { organizationId: 'org-a', isResolved: true } : undefined);
+    const ui = await mount(
+      readOnly ? { scope: { organizationId: 'org-a', isResolved: true } } : undefined
+    );
     await waitFor(() => texts(ui).includes("Couldn't load your organizations"));
     expect(retry(ui).props.accessibilityHint).toBe("Couldn't load your organizations");
     const status = ui.renderer.root.find(
@@ -463,25 +525,33 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
   it.each([
     { organizationId: null, expected: 'Personal' },
     { organizationId: 'org-a', expected: name },
+    // The stored global scope ('global-org') is missing from the fetched
+    // list, so the provider recovers to the first listed membership; the
+    // explicit per-session scope stays read-only and independent of that.
     { organizationId: 'org-missing', expected: 'Organization unavailable' },
   ])(
     'keeps the resolved session scope $organizationId read-only and independent',
     async ({ organizationId, expected }) => {
       storage.read.mockResolvedValue('global-org');
-      const ui = await mount({ organizationId, isResolved: true });
+      const ui = await mount({ scope: { organizationId, isResolved: true } });
       await waitFor(() => texts(ui).includes(expected));
       expect(ui.renderer.root.findAll(node => node.type === Pressable)).toHaveLength(0);
-      expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('global-org');
+      expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-a');
     }
   );
 
   it('does not infer Personal or offer a picker for unresolved session scope', async () => {
     storage.read.mockResolvedValue('global-org');
-    const ui = await mount({ organizationId: null, isResolved: false });
+    const ui = await mount({ scope: { organizationId: null, isResolved: false } });
+    // The stored global scope is missing from the list, so the provider
+    // recovers to the first listed membership; the unresolved session scope
+    // still infers nothing and offers no picker.
+    await waitFor(
+      () => ui.renderer.root.findByType('GlobalScope' as ElementType).props.id === 'org-a'
+    );
     expect(texts(ui)).not.toContain('Personal');
     expect(ui.renderer.root.findAll(node => node.type === Skeleton)).toHaveLength(1);
     expect(ui.renderer.root.findAll(node => node.type === Pressable)).toHaveLength(0);
-    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('global-org');
   });
 
   it.each(['pending', 'failed'])(
@@ -493,7 +563,7 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
         storage.read.mockRejectedValue(new Error('read failed'));
       }
       list.mockReturnValue(new Promise(() => undefined));
-      const ui = await mount({ organizationId: null, isResolved: true });
+      const ui = await mount({ scope: { organizationId: null, isResolved: true } });
       expect(texts(ui)).toContain('Personal');
       expect(texts(ui)).not.toContain('Something went wrong');
       expect(ui.renderer.root.findAll(node => node.type === Skeleton)).toHaveLength(0);

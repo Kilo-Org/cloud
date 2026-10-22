@@ -138,7 +138,7 @@ export function OrganizationProvidersAndModelsConfigurationCard({
                   {providerCount} {providerText} and{' '}
                   <button
                     onClick={() => setIsAvailableModelsDialogOpen(true)}
-                    className="cursor-pointer text-yellow-400 underline hover:text-yellow-300"
+                    className="cursor-pointer text-primary underline hover:text-primary-hover"
                   >
                     {modelCount} {modelText}
                   </button>{' '}

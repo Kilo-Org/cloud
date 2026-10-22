@@ -39,7 +39,7 @@
   --ink2: #3c382f;
   --muted-soft: #a9a39a;
   --hair-soft: rgba(20, 15, 10, 0.05);
-  --accent-soft: #e8f27a;
+  --accent-soft: #ffdd00;
   --accent-soft-foreground: #1a1a10;
   --good: #24784a;
   --good-foreground: #ffffff;
@@ -82,8 +82,8 @@
 
   /* Curated row-hue palette — the logo yellow's own family.
    * Six steps walk one warm band (50deg -> 105deg, an 11deg step) at one fixed
-   * chroma/value per theme, straddling the brand hue (--primary olive #4f5a10,
-   * h~71, and the yellow #e8f27a). Status hues sit outside the band (danger
+   * chroma/value per theme, around the light primary olive (#4f5a10, h~71).
+   * Status hues sit outside the band (danger
    * 8deg, warn 37deg, good 150deg, info 220deg), so no step reads as a status
    * colour. Tile pairs are the hue + 1a (10%) / + 33 (20%).
    * Growth: a new row takes its section's step, a new section the next step in
@@ -123,9 +123,9 @@
     --secondary-foreground: #f2f0eb;
     --muted: #1f1f24;
     --muted-foreground: #8a8680;
-    --accent: #e8f27a;
+    --accent: #ffdd00;
     --accent-foreground: #1a1a10;
-    --primary: #e8f27a;
+    --primary: #ffdd00;
     --primary-foreground: #1a1a10;
     /* Dark counterpart of the disabled primary fill; near-black ink clears 4.5:1. */
     --primary-disabled: #8a8680;
@@ -133,14 +133,14 @@
     --destructive-foreground: #1a1a10;
     --border: rgba(255, 255, 255, 0.07);
     --input: rgba(255, 255, 255, 0.35);
-    --ring: #e8f27a;
+    --ring: #ffdd00;
     --radius: 0.625rem;
 
     /* Focus-only tokens */
     --ink2: #c4c1b8;
     --muted-soft: #56544f;
     --hair-soft: rgba(255, 255, 255, 0.04);
-    --accent-soft: #e8f27a;
+    --accent-soft: #ffdd00;
     --accent-soft-foreground: #1a1a10;
     --good: #5fcb8e;
     --good-foreground: #0e0e10;
@@ -161,9 +161,9 @@
     --agent-yuki: #a78bfa;
     --agent-yuki-tile-bg: #a78bfa1a;
     --agent-yuki-tile-border: #a78bfa33;
-    --agent-workclaw: #e8f27a;
-    --agent-workclaw-tile-bg: #e8f27a1a;
-    --agent-workclaw-tile-border: #e8f27a33;
+    --agent-workclaw: #ffdd00;
+    --agent-workclaw-tile-bg: #ffdd001a;
+    --agent-workclaw-tile-border: #ffdd0033;
     --agent-cloud: #5fcb8e;
     --agent-cloud-tile-bg: #5fcb8e1a;
     --agent-cloud-tile-border: #5fcb8e33;

@@ -400,7 +400,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // uses. A needs-input card takes both; a progress card keeps the status
     // category and the silent behaviour it had.
     val needsInput = channelId == NEEDS_INPUT_CHANNEL_ID
-    // The system template, coloured with the app's primary (olive by day, lime
+    // The system template, coloured with the app's primary (olive by day, yellow
     // by night). The retry line after a failed approve draws in the destructive
     // red; everything else is the template's own text colour.
     val night = isNight()
@@ -549,7 +549,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
 
     /** The app's primary and destructive colours (`global.css`), day and night. */
     const val PRIMARY_DAY = "#4F5A10"
-    const val PRIMARY_NIGHT = "#E8F27A"
+    const val PRIMARY_NIGHT = "#FFDD00"
     const val ERROR_DAY = "#B0483A"
     const val ERROR_NIGHT = "#F28B7A"
 

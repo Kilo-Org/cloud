@@ -1,7 +1,11 @@
 import { and, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { cli_sessions_v2, github_branch_pull_requests } from '@kilocode/db/schema';
+import {
+  agent_briefing_events,
+  cli_sessions_v2,
+  github_branch_pull_requests,
+} from '@kilocode/db/schema';
 import { GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
@@ -37,6 +41,7 @@ export type PullRequestSessionEvidence = {
   prNumber: number;
   headRef: string | null;
   headSha: string | null;
+  openedAt?: string;
 };
 
 const UPSERT_ACTIONS: ReadonlySet<string> = new Set([
@@ -89,8 +94,12 @@ function tenantPredicateForOwner(owner: WebhookInstallationOwner) {
  *   - the session stored neither head field (pre-headRef CLI) and its
  *     `git_branch` equals the payload head ref.
  *
- * In every case a stored `pr_head_ref` or `git_branch` that names another
- * branch than the payload head ref blocks the match. This is the same rule as
+ * Alongside that, the branch evidence the session reported must name the
+ * payload head ref: its `pr_head_ref` when it stored one, otherwise its
+ * `git_branch`. A stored branch that names another branch is expected when the
+ * session pushed its PR from a branch other than the one it recorded, so it
+ * does not block a matching stored `pr_head_ref`; a stored `pr_head_ref` that
+ * names another branch still blocks the match. This is the same rule as
  * `verifySessionPullRequestLink`, so a link the webhook verifies is never
  * revoked by the next refresh.
  *
@@ -133,15 +142,17 @@ export async function markSessionsVerifyingPullRequest(
       : sql`false`
   );
 
-  // A stored head ref or session branch that contradicts the payload head ref
-  // rejects the session, and at least one of them must name the payload head
-  // ref, as `verifySessionPullRequestLink` requires on refresh.
-  const noContradictingRef =
+  // The ref evidence is the branch the session reported pushing
+  // (`pr_head_ref`), or — for a link that carries no head ref — the session's
+  // stored `git_branch`. That ref must name the payload head ref, as
+  // `verifySessionPullRequestLink` requires on refresh. A stored branch that
+  // differs is expected when the session pushed its PR from another branch;
+  // a stored head ref that differs still rejects the session.
+  const matchingHeadRef =
     payloadHeadRef !== null
-      ? and(
-          or(isNull(cli_sessions_v2.pr_head_ref), eq(cli_sessions_v2.pr_head_ref, payloadHeadRef)),
-          or(isNull(cli_sessions_v2.git_branch), eq(cli_sessions_v2.git_branch, payloadHeadRef)),
-          or(isNotNull(cli_sessions_v2.pr_head_ref), isNotNull(cli_sessions_v2.git_branch))
+      ? eq(
+          sql`coalesce(nullif(${cli_sessions_v2.pr_head_ref}, ''), nullif(${cli_sessions_v2.git_branch}, ''))`,
+          payloadHeadRef
         )
       : sql`false`;
 
@@ -151,7 +162,7 @@ export async function markSessionsVerifyingPullRequest(
     isNotNull(cli_sessions_v2.pr_url),
     tenantPredicateForOwner(owner),
     headEvidence,
-    noContradictingRef
+    matchingHeadRef
   );
 
   // The stored link itself must name this PR: a `pr_url` on another repository
@@ -177,13 +188,46 @@ export async function markSessionsVerifyingPullRequest(
 
   // Re-apply the gate and pin each checked `pr_url` so a link changed after the
   // read is never marked verified.
-  const marked = await db
-    .update(cli_sessions_v2)
-    .set({ pr_link_verified_at: sql`now()` })
-    .where(and(candidatePredicate, or(...linking)))
-    .returning({ session_id: cli_sessions_v2.session_id });
-
-  return marked.length > 0 ? { kind: 'session' } : { kind: 'no_session' };
+  return db.transaction(async tx => {
+    const marked = await tx
+      .update(cli_sessions_v2)
+      .set({ pr_link_verified_at: sql`now()` })
+      .where(and(candidatePredicate, or(...linking)))
+      .returning({
+        session_id: cli_sessions_v2.session_id,
+        kilo_user_id: cli_sessions_v2.kilo_user_id,
+        organization_id: cli_sessions_v2.organization_id,
+        pr_url: cli_sessions_v2.pr_url,
+      });
+    if (evidence.openedAt && Number.isFinite(Date.parse(evidence.openedAt))) {
+      const openedAt = new Date(evidence.openedAt).toISOString();
+      const events = marked.flatMap(session =>
+        session.pr_url
+          ? [
+              {
+                id: JSON.stringify([
+                  session.kilo_user_id,
+                  session.session_id,
+                  'pull_request',
+                  session.pr_url,
+                ]),
+                kilo_user_id: session.kilo_user_id,
+                session_id: session.session_id,
+                organization_id: session.organization_id,
+                kind: 'pull_request',
+                occurred_at: openedAt,
+                title: `Opened pull request #${evidence.prNumber}`,
+                url: `${evidence.gitUrl}/pull/${evidence.prNumber}`,
+                payload: { openedAt },
+              },
+            ]
+          : []
+      );
+      if (events.length > 0)
+        await tx.insert(agent_briefing_events).values(events).onConflictDoNothing();
+    }
+    return marked.length > 0 ? { kind: 'session' } : { kind: 'no_session' };
+  });
 }
 
 /**
@@ -251,6 +295,7 @@ export async function upsertCliSessionPullRequestsFromWebhook(
         prNumber: pull_request.number,
         headRef: branch,
         headSha: pull_request.head.sha ?? null,
+        openedAt: pull_request.created_at,
       },
       owner
     );

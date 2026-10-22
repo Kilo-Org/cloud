@@ -13,7 +13,7 @@ import {
   ensureIndex,
   loadCatalog,
   parseCatalog,
-  loadPreviousCatalog,
+  loadDeleteCandidates,
   pruneRemovedPaths,
 } from '../scripts/embed-catalog.ts';
 
@@ -237,46 +237,49 @@ describe('embedAndUpsert', () => {
 describe('pruneRemovedPaths', () => {
   const deleteUrl = `https://api.cloudflare.com/client/v4/accounts/${ENV.CLOUDFLARE_ACCOUNT_ID}/vectorize/v2/indexes/${ENV.VECTORIZE_INDEX_NAME}/delete_by_ids`;
 
-  it('deletes the ids the previous catalog had and the current one does not', async () => {
+  it('deletes every known id the current catalog no longer has', async () => {
     const { fetchImpl, calls } = fetchFake([
       call => (call.url.endsWith('/delete_by_ids') ? { mutationId: 'm1' } : undefined),
     ]);
-    const previous = {
-      ...catalogOf(1),
-      ...parseCatalog({ 'removed.query': rowOf('removed.query', 'query') }),
-    };
-    const outcome = await pruneRemovedPaths({ ...ENV, catalog: catalogOf(1), fetchImpl }, previous);
-    expect(outcome).toEqual({ deleted: ['removed.query'] });
+    // The history names an id from an older release and one from a run whose
+    // prune failed: both must go, so a failed run cannot strand a vector.
+    const everIndexed = ['proc0.list', 'gone.lastRelease', 'gone.failedRun', 'gone.failedRun'];
+    const outcome = await pruneRemovedPaths(
+      { ...ENV, catalog: catalogOf(1), fetchImpl },
+      everIndexed
+    );
+    expect(outcome).toEqual({ deleted: ['gone.failedRun', 'gone.lastRelease'] });
     const deletes = calls.filter(call => call.url.endsWith('/delete_by_ids'));
     expect(deletes).toHaveLength(1);
     expect(deletes[0]!.url).toBe(deleteUrl);
     expect(deletes[0]!.method).toBe('POST');
     const body: unknown = JSON.parse(deletes[0]!.body!);
     if (!hasIds(body)) throw new Error('delete body has no ids array');
-    expect(body.ids).toEqual(['removed.query']);
+    expect(body.ids).toEqual(['gone.failedRun', 'gone.lastRelease']);
   });
 
-  it('issues no request when no procedure left the catalog', async () => {
+  it('issues no request when every known id is still in the catalog', async () => {
     const { fetchImpl, calls } = fetchFake([
       call => (call.url.endsWith('/delete_by_ids') ? {} : undefined),
     ]);
-    const outcome = await pruneRemovedPaths(
-      { ...ENV, catalog: catalogOf(2), fetchImpl },
-      catalogOf(2)
-    );
+    const outcome = await pruneRemovedPaths({ ...ENV, catalog: catalogOf(2), fetchImpl }, [
+      'proc0.list',
+      'proc1.list',
+    ]);
     expect(outcome).toEqual({ deleted: [] });
     expect(calls).toHaveLength(0);
   });
 
-  it('prunes nothing without a previous catalog', async () => {
+  it('prunes nothing without a known id list', async () => {
     const { fetchImpl, calls } = fetchFake([
       call => (call.url.endsWith('/delete_by_ids') ? {} : undefined),
     ]);
-    const outcome = await pruneRemovedPaths(
-      { ...ENV, catalog: catalogOf(1), fetchImpl },
-      undefined
-    );
-    expect(outcome).toEqual({ deleted: [] });
+    expect(
+      await pruneRemovedPaths({ ...ENV, catalog: catalogOf(1), fetchImpl }, undefined)
+    ).toEqual({ deleted: [] });
+    expect(await pruneRemovedPaths({ ...ENV, catalog: catalogOf(1), fetchImpl }, [])).toEqual({
+      deleted: [],
+    });
     expect(calls).toHaveLength(0);
   });
 
@@ -284,44 +287,43 @@ describe('pruneRemovedPaths', () => {
     const { fetchImpl, calls } = fetchFake([
       call => (call.url.endsWith('/delete_by_ids') ? {} : undefined),
     ]);
-    const outcome = await pruneRemovedPaths({ ...ENV, catalog: {}, fetchImpl }, catalogOf(2));
+    const outcome = await pruneRemovedPaths({ ...ENV, catalog: {}, fetchImpl }, [
+      'proc0.list',
+      'proc1.list',
+    ]);
     expect(outcome).toEqual({ deleted: [] });
     expect(calls).toHaveLength(0);
   });
 
   it('batches deletes at PRUNE_BATCH_SIZE ids', async () => {
     const removedIds = Array.from({ length: PRUNE_BATCH_SIZE + 2 }, (_, i) => `gone${i}.list`);
-    const previous = parseCatalog(
-      Object.fromEntries(
-        [...Object.keys(catalogOf(1)), ...removedIds].map(path => [
-          path,
-          rowOf(path, path === 'proc0.list' ? 'query' : 'mutation'),
-        ])
-      )
-    );
     const { fetchImpl, calls } = fetchFake([
       call => (call.url.endsWith('/delete_by_ids') ? {} : undefined),
     ]);
-    const outcome = await pruneRemovedPaths({ ...ENV, catalog: catalogOf(1), fetchImpl }, previous);
+    const outcome = await pruneRemovedPaths({ ...ENV, catalog: catalogOf(1), fetchImpl }, [
+      'proc0.list',
+      ...removedIds,
+    ]);
+    const ordered = [...removedIds].sort();
     const deletes = calls.filter(call => call.url.endsWith('/delete_by_ids'));
     expect(deletes).toHaveLength(2);
     const firstBatch: unknown = JSON.parse(deletes[0]!.body!);
     const lastBatch: unknown = JSON.parse(deletes[1]!.body!);
     if (!hasIds(firstBatch) || !hasIds(lastBatch)) throw new Error('delete body has no ids array');
     expect(firstBatch.ids).toHaveLength(PRUNE_BATCH_SIZE);
-    expect(lastBatch.ids).toEqual(removedIds.slice(-2));
-    expect(outcome.deleted).toEqual(removedIds);
+    expect(lastBatch.ids).toEqual(ordered.slice(-2));
+    expect(outcome.deleted).toEqual(ordered);
   });
 });
 
-describe('loadPreviousCatalog', () => {
-  it('reads the named previous catalog and reports none when the path is absent', () => {
-    const path = join(tmpdir(), `kilo-catalog-before-${process.pid}.json`);
-    writeFileSync(path, JSON.stringify(catalogOf(1)));
+describe('loadDeleteCandidates', () => {
+  it('reads the newline-delimited id list and reports none when the path is absent', () => {
+    const path = join(tmpdir(), `kilo-catalog-ids-${process.pid}.txt`);
+    writeFileSync(path, 'a.list\nb.get\n\n  c.create  \n');
     try {
-      expect(Object.keys(loadPreviousCatalog(path) ?? {})).toEqual(['proc0.list']);
-      expect(loadPreviousCatalog(undefined)).toBeUndefined();
-      expect(loadPreviousCatalog('')).toBeUndefined();
+      expect(loadDeleteCandidates(path)).toEqual(['a.list', 'b.get', 'c.create']);
+      expect(loadDeleteCandidates(undefined)).toBeUndefined();
+      expect(loadDeleteCandidates('')).toBeUndefined();
     } finally {
       rmSync(path, { force: true });
     }

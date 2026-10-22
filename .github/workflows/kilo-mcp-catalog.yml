@@ -454,31 +454,25 @@ jobs:
             exit 1
           fi
 
-      # The prune compares the catalog this push lands with the one the base
-      # commit carried: the ids of the former minus the latter are the vectors
-      # to delete. The index is not listed — a full list of the production
-      # index through the REST API times out — and the previous committed
-      # artifact already names every id the index was built from.
-      - name: Export the previous catalog for the prune
-        id: previous
+      # The ids to delete are the procedures the index was ever built from that
+      # the current catalog no longer has. That union comes from git history, not
+      # from listing the index: a full list of the production index through the
+      # REST API times out, and a single-step diff would strand the ids of a run
+      # whose prune failed (the next run no longer sees them in its base).
+      # Deleting an id the index never had is a no-op.
+      - name: Collect every id the index was ever built from
+        id: prune_ids
         if: steps.merge_changes.outputs.catalog == 'true'
         run: |
           set -euo pipefail
-          before="${{ github.event.before }}"
-          if git rev-parse --verify "${before}^{commit}" > /dev/null 2>&1 &&
-             git cat-file -e "${before}:services/kilo-mcp/catalog.json" 2>/dev/null; then
-            git show "${before}:services/kilo-mcp/catalog.json" > "$RUNNER_TEMP/catalog-before.json"
-            echo "file=$RUNNER_TEMP/catalog-before.json" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::No committed catalog at ${before}: the upsert has nothing to prune."
-          fi
+          out="$RUNNER_TEMP/catalog-ever-ids.txt"
+          : > "$out"
+          for sha in $(git log --format=%H -- services/kilo-mcp/catalog.json); do
+            git show "${sha}:services/kilo-mcp/catalog.json" 2>/dev/null | jq -r 'keys[]' >> "$out" || true
+          done
+          sort -u "$out" -o "$out"
+          echo "file=$out" >> "$GITHUB_OUTPUT"
 
-      # Vectorize upsert (requirement 9). The index name and account id match
-      # the production bindings in services/kilo-mcp/wrangler.jsonc; the
-      # account id is not a secret (it is committed there). The script then
-      # deletes the vectors whose procedure path the previous catalog had and
-      # this one no longer has, so a removed or renamed procedure stops
-      # competing for kNN slots.
       - name: Upsert Vectorize index and prune removed procedures
         if: steps.merge_changes.outputs.catalog == 'true'
         run: node services/kilo-mcp/scripts/embed-catalog.ts upsert
@@ -486,4 +480,4 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: e115e769bcdd4c3d66af59d3332cb394
           VECTORIZE_INDEX_NAME: kilo-mcp-catalog
-          MCP_CATALOG_PRUNE_FROM: ${{ steps.previous.outputs.file }}
+          MCP_CATALOG_PRUNE_IDS: ${{ steps.prune_ids.outputs.file }}

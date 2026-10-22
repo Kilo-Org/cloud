@@ -441,39 +441,43 @@ function validate(workflow) {
     'kilo-mcp-catalog',
     'upsert targets the prod index'
   );
-  // The prune's stale ids come from the previously committed catalog, never
-  // from listing the index: a full list of the production index times out.
-  const previous = findStep(
+  // The prune's ids come from git history, never from listing the index: a
+  // full list of the production index times out, and a single-step diff would
+  // strand the ids of a run whose prune failed.
+  const ids = findStep(
     merge,
-    step => step.id === 'previous',
-    'merge job exports the previous catalog for the prune'
+    step => step.id === 'prune_ids',
+    'merge job collects every id the index was ever built from'
   );
-  assert.equal(previous.if, mergeChangeGate, 'the export is gated with the upsert');
-  assert.match(previous.run ?? '', /github\.event\.before/, 'the export reads the base commit');
+  assert.equal(ids.if, mergeChangeGate, 'the id collection is gated with the upsert');
   assert.match(
-    previous.run ?? '',
-    /catalog-before\.json/,
-    'the export writes the previous catalog to a file'
+    ids.run ?? '',
+    /git log --format=%H -- services\/kilo-mcp\/catalog\.json/,
+    'the ids come from every version of the committed catalog'
+  );
+  assert.match(ids.run ?? '', /keys\[\]/, 'each version contributes its procedure paths');
+  assert.match(ids.run ?? '', /sort -u/, 'the union is deduped');
+  assert.match(
+    ids.run ?? '',
+    /out="\$RUNNER_TEMP\/catalog-ever-ids\.txt"/,
+    'the collection writes the id list to a file'
   );
   assert.match(
-    previous.run ?? '',
-    /echo "file=\$RUNNER_TEMP\/catalog-before\.json" >> "\$GITHUB_OUTPUT"/,
-    'the export publishes the file path as the step output'
+    ids.run ?? '',
+    /echo "file=\$out" >> "\$GITHUB_OUTPUT"/,
+    'the collection publishes its file as the step output'
   );
   assert.ok(
-    merge.steps.indexOf(previous) < merge.steps.indexOf(upsert),
-    'the previous catalog is exported before the upsert reads it'
+    merge.steps.indexOf(ids) < merge.steps.indexOf(upsert),
+    'the id list is collected before the upsert reads it'
   );
   assert.equal(
-    upsert.env?.MCP_CATALOG_PRUNE_FROM,
-    '${{ steps.previous.outputs.file }}',
-    'the upsert prunes from the exported previous catalog'
+    upsert.env?.MCP_CATALOG_PRUNE_IDS,
+    '${{ steps.prune_ids.outputs.file }}',
+    'the upsert prunes from the collected id list'
   );
-  const ordered = [...merge.steps.slice(merge.steps.indexOf(previous))];
-  assert.ok(
-    ordered.every(step => /prune|previous/i.test(step.name ?? '') || step.run === embedCommand),
-    'nothing else runs between the export and the upsert'
-  );
+  const afterIds = merge.steps.slice(merge.steps.indexOf(ids) + 1);
+  assert.equal(afterIds[0] === upsert, true, 'the upsert runs immediately after the id collection');
 }
 
 /**

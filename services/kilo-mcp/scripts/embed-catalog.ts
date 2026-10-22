@@ -5,15 +5,16 @@
  * Reads services/kilo-mcp/catalog.json, embeds every row's searchBlob via the
  * Cloudflare REST API (Workers AI run endpoint), and upserts the vectors with
  * the procedure path as vector id (requirement 9) and {path, kind, tags} as
- * metadata. Batches at ≤64 rows per request. When `MCP_CATALOG_PRUNE_FROM`
- * names the previously committed catalog, it then deletes every vector whose
- * procedure path that catalog had and this one no longer has, so a removed or
- * renamed procedure stops competing for kNN slots. The prune reads the previous
- * artifact, never the index: listing the whole production index times out.
+ * metadata. Batches at ≤64 rows per request. When `MCP_CATALOG_PRUNE_IDS`
+ * names a file of every procedure path the index was ever built from, it then
+ * deletes the ids that are missing from the current catalog, so a removed or
+ * renamed procedure stops competing for kNN slots. The prune reads git history,
+ * never the index: listing the whole production index times out, and a history
+ * union means one failed run cannot strand a vector.
  *
  * Subcommands:
- *   (none)|upsert  embed + upsert every catalog row, then prune what the
- *                  previous catalog had and this one no longer does
+ *   (none)|upsert  embed + upsert every catalog row, then prune the ids the
+ *                  current catalog no longer has
  *   ensure-index   create the Vectorize index idempotently (pinned dimensions
  *                  and metric from src/embedding.ts), then exit
  *
@@ -26,8 +27,9 @@
  *   VECTORIZE_INDEX_NAME    index name, e.g. kilo-mcp-catalog-dev
  *
  * Env (optional):
- *   MCP_CATALOG_PRUNE_FROM  path to the previously committed catalog.json;
- *                           its paths minus the current ones are deleted
+ *   MCP_CATALOG_PRUNE_IDS   path to a newline-delimited list of every procedure
+ *                           path the index was ever built from; the ids the
+ *                           current catalog does not have are deleted
  *
  * Usage (from services/kilo-mcp):
  *   node scripts/embed-catalog.ts ensure-index
@@ -239,10 +241,14 @@ export async function embedAndUpsert(options: EmbedOptions): Promise<{ vectors: 
 }
 
 /**
- * Delete the vectors whose procedure path the previous catalog had and the
- * current one no longer has. The index is otherwise rebuilt by upsert alone, so
- * a removed or renamed procedure would keep a vector that competes for every
- * future kNN slot.
+ * Delete the vectors whose procedure path the current catalog no longer has.
+ * The index is otherwise rebuilt by upsert alone, so a removed or renamed
+ * procedure would keep a vector that competes for every future kNN slot.
+ *
+ * `everIndexed` is every path any published catalog carried, not only the
+ * previous one: a run whose prune failed would otherwise strand the ids it was
+ * meant to delete, because the next run no longer sees them in its base.
+ * Deleting an id the index never had is a no-op.
  *
  * The previous artifact is the source of stale ids, never the index itself:
  * listing the whole production index through the REST API times out.
@@ -253,12 +259,12 @@ export async function embedAndUpsert(options: EmbedOptions): Promise<{ vectors: 
  */
 export async function pruneRemovedPaths(
   options: EmbedOptions,
-  previousCatalog: Catalog | undefined
+  everIndexed: readonly string[] | undefined
 ): Promise<{ deleted: string[] }> {
   const fetchImpl = options.fetchImpl ?? defaultFetch();
   const log = options.log ?? (() => {});
-  if (!previousCatalog) {
-    log('no previous catalog; nothing to prune');
+  if (!everIndexed || everIndexed.length === 0) {
+    log('no known index ids; nothing to prune');
     return { deleted: [] };
   }
   if (Object.keys(options.catalog).length === 0) {
@@ -266,7 +272,7 @@ export async function pruneRemovedPaths(
     return { deleted: [] };
   }
 
-  const removed = Object.keys(previousCatalog).filter(path => !(path in options.catalog));
+  const removed = [...new Set(everIndexed)].filter(path => !(path in options.catalog)).sort();
   if (removed.length === 0) {
     log('✅ no procedure left the catalog; nothing to prune');
     return { deleted: [] };
@@ -284,7 +290,7 @@ export async function pruneRemovedPaths(
   }
 
   log(
-    `✅ deleted ${removed.length} vectors for procedures the catalog no longer has from "${options.VECTORIZE_INDEX_NAME}"`
+    `✅ deleted ${removed.length} vectors for ids the catalog no longer has from "${options.VECTORIZE_INDEX_NAME}"`
   );
   return { deleted: removed };
 }
@@ -337,15 +343,18 @@ export function parseCatalog(value: unknown): Catalog {
 }
 
 /**
- * The previously committed catalog named by `MCP_CATALOG_PRUNE_FROM`, or
- * undefined when the caller has no previous artifact (first run, or a base
- * commit whose catalog could not be read).
+ * The newline-delimited index ids named by `MCP_CATALOG_PRUNE_IDS`, or
+ * undefined when the caller cannot supply them (a manual run, or a history
+ * walk that failed).
  */
-export function loadPreviousCatalog(
-  path = process.env['MCP_CATALOG_PRUNE_FROM']
-): Catalog | undefined {
+export function loadDeleteCandidates(
+  path = process.env['MCP_CATALOG_PRUNE_IDS']
+): string[] | undefined {
   if (!path) return undefined;
-  return parseCatalog(JSON.parse(readFileSync(path, 'utf8')) as unknown);
+  return readFileSync(path, 'utf8')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line !== '');
 }
 
 /** Read the committed catalog.json that sits next to this script's package. */
@@ -376,7 +385,7 @@ async function main(): Promise<void> {
     );
   }
   await embedAndUpsert(options);
-  await pruneRemovedPaths(options, loadPreviousCatalog());
+  await pruneRemovedPaths(options, loadDeleteCandidates());
 }
 
 const isMain = Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;

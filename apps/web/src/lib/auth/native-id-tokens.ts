@@ -174,10 +174,10 @@ export async function exchangeNativeGoogleAuthCode(
     throw new NativeIdTokenError('Google token response missing id_token');
   }
 
-  // Verify the returned ID token against the web client audience and apply
-  // the same payload checks as the direct idToken path.  Follow the same
-  // cert-fetch-outside / JWT-verify-inside pattern as verifyNativeGoogleIdToken:
-  // cert/network failures surface as 5xx; invalid tokens surface as 401.
+  // Verify the returned ID token against the web client audience through the
+  // shared helper, so both Google paths apply the same payload checks. The
+  // helper fetches the certificates outside its try: cert/network failures
+  // surface as 5xx; invalid tokens surface as 401.
   return verifyGoogleIdTokenWith(client, idToken, [GOOGLE_CLIENT_ID], {
     verificationFailed: 'Google ID token verification failed after code exchange',
     invalidPayload: 'Invalid Google ID token payload from code exchange',

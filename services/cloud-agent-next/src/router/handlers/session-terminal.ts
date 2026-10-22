@@ -11,6 +11,7 @@ import { sessionHasTerminal } from '../../agent-sandbox/capabilities.js';
 import { sessionFor } from '../../session-plane.js';
 import { protectedProcedure } from '../auth.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
+import { SANDBOX_STATUS_DETAIL_MESSAGES } from '../../shared/sandbox-status.js';
 import {
   CloseTerminalInput,
   CloseTerminalOutput,
@@ -28,7 +29,8 @@ function throwTerminalError(result: OperationResult<unknown>): never {
       : message.startsWith('Terminal access denied:') || message.includes('interactive Cloud Agent')
         ? 'FORBIDDEN'
         : message.includes('workspace is prepared') ||
-            message.includes('session wrapper is not running')
+            message.includes('session wrapper is not running') ||
+            message === SANDBOX_STATUS_DETAIL_MESSAGES.sandbox_stopped
           ? 'PRECONDITION_FAILED'
           : 'SERVICE_UNAVAILABLE';
 

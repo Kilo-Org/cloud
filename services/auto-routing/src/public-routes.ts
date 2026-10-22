@@ -22,6 +22,7 @@ import {
 import type { OrganizationRole } from '@kilocode/db';
 import { formatError, getCachedSecret } from '@kilocode/worker-utils';
 import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
+import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import type { Context, Handler } from 'hono';
 import type * as z from 'zod';
 import { customRouterBenchmarkContext, forwardClientEval } from './benchmark-origin';
@@ -64,10 +65,21 @@ function publicHandler(handle: (c: Context<HonoEnv>) => Promise<Response>): Hand
   };
 }
 
-async function readJson(c: Context<HonoEnv>): Promise<{ text: string; json: unknown }> {
-  const text = await c.req.text();
+// A decide request carries the whole conversation, inline images included. The limit matches
+// the largest request an upstream model provider accepts (Anthropic Messages, 32 MB).
+const MAX_PUBLIC_REQUEST_BODY_BYTES = 32 * 1000 * 1000;
+
+async function readJson(c: Context<HonoEnv>): Promise<{ byteLength: number; json: unknown }> {
+  const body = c.req.raw.body;
+  const read = body
+    ? await readBoundedStream(body as ReadableStream<Uint8Array>, MAX_PUBLIC_REQUEST_BODY_BYTES)
+    : { ok: true as const, bytes: new Uint8Array() };
+  if (!read.ok) throw new CustomRouterError('invalid_request', 'Request body is too large');
   try {
-    return { text, json: JSON.parse(text) };
+    return {
+      byteLength: read.bytes.byteLength,
+      json: JSON.parse(new TextDecoder().decode(read.bytes)),
+    };
   } catch {
     throw new CustomRouterError('invalid_request', 'Invalid JSON body');
   }
@@ -92,7 +104,7 @@ function requirePaidUsageBalance(balanceUsd: number): void {
 
 export const publicDecideHandler = publicHandler(async c => {
   const caller = await authenticateCaller(c.env, c.req.raw.headers);
-  const { text, json } = await readJson(c);
+  const { byteLength, json } = await readJson(c);
   const request = parseBody(CustomRouterDecideRequestSchema, json);
   const reference = parseCustomRouterModelId(request.model);
   if (!reference) throw new CustomRouterError('invalid_request', 'Not a custom router model ID');
@@ -160,7 +172,7 @@ export const publicDecideHandler = publicHandler(async c => {
     clientRequestId: request.clientRequestId ?? null,
     mode: request.mode ?? null,
     userAgent: c.req.header('user-agent') ?? null,
-    bodyBytes: new TextEncoder().encode(text).byteLength,
+    bodyBytes: byteLength,
     customRouter: reference,
     clientEntries: request.clientEntries,
   };

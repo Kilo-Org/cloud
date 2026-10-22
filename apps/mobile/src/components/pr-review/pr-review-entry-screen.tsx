@@ -9,6 +9,7 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
 import { PrLinkPlaceholder } from '@/components/pr-review/pr-link-placeholder';
+import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
 import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
 import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
@@ -26,7 +28,6 @@ import {
   decidePrLinkOpen,
   decidePrLinkPaste,
   prLinkToastClipboardEmptyCopy,
-  prLinkToastInvalidCopy,
   selectPrLinkClearButtonVisible,
 } from '@/lib/pr-review/pr-link-paste';
 import {
@@ -44,7 +45,7 @@ export function PrReviewEntryScreen() {
   const { confirm, dialog } = useConfirmDialog();
   // Uncontrolled iOS input — keep the raw text in a ref so the submit
   // handler reads the latest value without re-rendering on every
-  // keystroke. State is only for derived UI (whether there's any text).
+  // keystroke. State is only for derived UI (text presence and validity).
   // The TextInput component ref is for focus() and setNativeProps on
   // programmatic paste.
   const inputRef = useRef<TextInput>(null);
@@ -54,6 +55,7 @@ export function PrReviewEntryScreen() {
   // Order-agnostic membership so double-taps and delayed native echoes work.
   const pendingProgrammaticTextsRef = useRef<string[]>([]);
   const [hasInput, setHasInput] = useState(false);
+  const [linkState, setLinkState] = useState<'empty' | 'invalid' | 'valid'>('empty');
   const [recent, setRecent] = useState<RecentPr[] | null>(null);
 
   useFocusEffect(
@@ -71,6 +73,15 @@ export function PrReviewEntryScreen() {
     }, [])
   );
 
+  const updateInputState = (text: string) => {
+    setHasInput(text.length > 0);
+    if (text.trim().length === 0) {
+      setLinkState('empty');
+    } else {
+      setLinkState(decidePrLinkOpen(text).kind === 'open' ? 'valid' : 'invalid');
+    }
+  };
+
   const applyFieldText = (text: string) => {
     pendingProgrammaticTextsRef.current = pushPrLinkInputEcho(
       pendingProgrammaticTextsRef.current,
@@ -78,13 +89,12 @@ export function PrReviewEntryScreen() {
     );
     inputValueRef.current = text;
     inputRef.current?.setNativeProps({ text });
-    setHasInput(text.length > 0);
+    updateInputState(text);
   };
 
   const handleSubmit = () => {
     const decision = decidePrLinkOpen(inputValueRef.current);
     if (decision.kind === 'invalid') {
-      announcingToast.error(prLinkToastInvalidCopy());
       return;
     }
     // Navigate straight to the ref's own provider route. Recents are written
@@ -103,10 +113,9 @@ export function PrReviewEntryScreen() {
       announcingToast.error(prLinkToastClipboardEmptyCopy());
       return;
     }
-    // Replace entire field (never append-at-cursor): native field + ref + hasInput.
+    // Replace the native field, ref and derived UI together, never append at the cursor.
     applyFieldText(decision.text);
     if (decision.kind === 'non-url-text') {
-      announcingToast.error(prLinkToastInvalidCopy());
       return;
     }
     handleSubmit();
@@ -252,9 +261,7 @@ export function PrReviewEntryScreen() {
             keyboardType="url"
             numberOfLines={1}
             onChangeText={value => {
-              // Don't setState on every keystroke; track only whether the
-              // input has any text. The raw value lives in the ref so
-              // handleSubmit reads the latest text without re-rendering.
+              // Keep the raw value in the ref and update only derived UI.
               const decision = consumePrLinkInputEcho(pendingProgrammaticTextsRef.current, value);
               pendingProgrammaticTextsRef.current = [...decision.pending];
               if (decision.kind === 'echo') {
@@ -264,7 +271,7 @@ export function PrReviewEntryScreen() {
                 return;
               }
               inputValueRef.current = value;
-              setHasInput(value.length > 0);
+              updateInputState(value);
             }}
             // The shared single-line box (`@/components/ui/input`) supplies the
             // height floor, the one line box for the placeholder and the value,
@@ -288,7 +295,7 @@ export function PrReviewEntryScreen() {
                 // applyFieldText('') (paste-only path) and do not push an
                 // echo for '' — a non-arriving echo would stale the FIFO.
                 inputValueRef.current = '';
-                setHasInput(false);
+                updateInputState('');
                 inputRef.current?.clear();
                 inputRef.current?.focus();
               }}
@@ -314,8 +321,23 @@ export function PrReviewEntryScreen() {
           <ClipboardIcon size={18} color={colors.mutedForeground} />
         </Pressable>
       </View>
+      <View>
+        <Text
+          className="text-sm opacity-0"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {t('prReview.linkPasteNotAPullRequest')}
+        </Text>
+        <View className="absolute inset-0">
+          <AccessibleStatus
+            className="text-sm"
+            message={linkState === 'invalid' ? t('prReview.linkPasteNotAPullRequest') : null}
+          />
+        </View>
+      </View>
       <Button
-        disabled={!hasInput}
+        disabled={linkState !== 'valid'}
         onPress={handleSubmit}
         accessibilityLabel={t('prReview.entry.openAccessibility')}
       >
@@ -327,6 +349,7 @@ export function PrReviewEntryScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.prReview')} />
+      <PrReviewContextLine />
       <PrReviewInboxList header={pasteBlock} recents={recentsBody} />
       {dialog}
     </View>

@@ -26,7 +26,7 @@ import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-st
 import { useTargetSupportsImages } from '@/lib/chat/backend-capabilities';
 import { rememberModelFacts } from '@/lib/chat/layers';
 import { requiresBackendDisclosure } from '@/lib/chat/backend-model-options';
-import { resolveChatTarget } from '@/lib/chat/backend-target';
+import { chatTargetKind, resolveChatTarget } from '@/lib/chat/backend-target';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat/effort';
@@ -138,13 +138,18 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     }
     const epoch = currentAuthEpoch();
     const name = availableOptions.find(option => option.id === modelId)?.name ?? modelId;
+    const local = chatTargetKind(modelId) === 'local';
     Alert.alert(
-      t('modelChat.backends.switchTitle'),
-      t('modelChat.backends.switchMessage', { name }),
+      t(local ? 'modelChat.localModels.switchTitle' : 'modelChat.backends.switchTitle'),
+      t(local ? 'modelChat.localModels.switchMessage' : 'modelChat.backends.switchMessage', {
+        name,
+      }),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('modelChat.backends.switchConfirm'),
+          text: t(
+            local ? 'modelChat.localModels.switchConfirm' : 'modelChat.backends.switchConfirm'
+          ),
           onPress: () => {
             if (isCurrentAuthEpoch(epoch)) {
               accept();

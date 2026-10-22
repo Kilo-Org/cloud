@@ -2795,6 +2795,10 @@ describe('router terminal procedures', () => {
       code: 'PRECONDITION_FAILED',
     },
     {
+      error: 'The sandbox is sleeping. Send a message to resume.',
+      code: 'PRECONDITION_FAILED',
+    },
+    {
       error: 'Terminal is only available to interactive Cloud Agent sessions',
       code: 'FORBIDDEN',
     },

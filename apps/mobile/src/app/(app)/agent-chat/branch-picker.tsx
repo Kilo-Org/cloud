@@ -67,9 +67,7 @@ export default function BranchPickerScreen() {
                 handleSelect(bridge, branch);
               }}
             >
-              <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
-                {branch}
-              </Text>
+              <Text className="flex-1 text-base text-foreground">{branch}</Text>
               {isDefault ? (
                 <Text className="text-xs text-muted-foreground">
                   {t('agentChat.newSession.branchDefault')}

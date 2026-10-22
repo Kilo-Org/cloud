@@ -54,7 +54,7 @@ export function LoginScreen() {
   const colors = useThemeColors();
   const insets = useScreenInsets();
   const { t } = useTranslation();
-  const [persistError, setPersistError] = useState<string | undefined>(undefined);
+  const [persistFailed, setPersistFailed] = useState(false);
   const [authFormBusy, setAuthFormBusy] = useState(false);
   const [draft, setDraft] = useState<{
     email: string;
@@ -63,15 +63,17 @@ export function LoginScreen() {
 
   const persistToken = useCallback(
     async (tokenValue: string, refreshTokenValue?: string, expiresInValue?: number) => {
-      setPersistError(undefined);
+      setPersistFailed(false);
       try {
         await signIn(tokenValue, refreshTokenValue, expiresInValue);
         clearLoginDrafts();
       } catch {
-        setPersistError(t('login.couldNotCompleteSignIn'));
+        // The message renders from the catalog at draw time, so a language
+        // switch re-renders it in the new language.
+        setPersistFailed(true);
       }
     },
-    [signIn, t]
+    [signIn]
   );
 
   useEffect(() => {
@@ -116,11 +118,13 @@ export function LoginScreen() {
   const keyboardHeight = useKeyboardState(state => state.height);
 
   if (status === 'approved') {
-    if (persistError) {
+    if (persistFailed) {
       return (
         <CenteredState className="bg-background">
           <View className="items-center gap-3 px-6">
-            <Text className="text-center text-sm text-destructive">{persistError}</Text>
+            <Text className="text-center text-sm text-destructive">
+              {t('login.couldNotCompleteSignIn')}
+            </Text>
             <Button
               onPress={() => {
                 if (token) {

@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { captureException } from '@sentry/nextjs';
 import {
   organization_group_memberships,
   organization_group_policy_settings,
@@ -23,10 +22,10 @@ import { TRPCError } from '@trpc/server';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { normalizeRegisteredOrganizationGroupPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/registry.server';
-
-const DEFAULT_POLICIES = [
-  { type: 'model_access', data: { mode: 'all' } },
-] satisfies OrganizationGroupPolicies;
+import {
+  DEFAULT_ORGANIZATION_GROUP_POLICIES,
+  parseOrganizationGroupPolicies,
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
 
 type OrganizationGroupActor = {
   id: string;
@@ -43,36 +42,6 @@ export type OrganizationGroupWithMembers = OrganizationGroup & {
   policies: OrganizationGroupPolicies;
   memberIds: string[];
 };
-
-function reportInvalidPolicies(params: {
-  error: unknown;
-  organizationId: string;
-  groupId?: string;
-  source: 'group' | 'default';
-}) {
-  captureException(params.error, {
-    tags: { domain: 'organization-groups', source: params.source },
-    extra: {
-      organizationId: params.organizationId,
-      groupId: params.groupId,
-    },
-  });
-}
-
-export function parseOrganizationGroupPolicies(
-  value: unknown,
-  context: { organizationId: string; groupId?: string; source: 'group' | 'default' }
-): OrganizationGroupPolicies {
-  const parsed = OrganizationGroupPoliciesSchema.safeParse(value);
-  if (!parsed.success) {
-    reportInvalidPolicies({ error: parsed.error, ...context });
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Organization group policy data is invalid',
-    });
-  }
-  return parsed.data;
-}
 
 export function normalizeOrganizationGroupPolicy(
   policyInput: OrganizationGroupPolicy
@@ -121,17 +90,31 @@ async function acquireOrganizationPolicyLock(tx: DrizzleTransaction, organizatio
   `);
 }
 
-export async function bumpOrganizationGroupPolicyRevision(
+async function getSettingsRow(organizationId: string, client: typeof db | DrizzleTransaction = db) {
+  const [settings] = await client
+    .select()
+    .from(organization_group_policy_settings)
+    .where(eq(organization_group_policy_settings.organization_id, organizationId))
+    .limit(1);
+  return settings;
+}
+
+/**
+ * Create the organization's settings row with the default policies, or bump its
+ * policy revision. Callers hold the policy advisory lock. The mutation wrapper
+ * writes the revision before running `mutate` so the row exists for mutations
+ * that update `default_policies`.
+ */
+async function writeOrganizationGroupPolicyRevision(
   tx: DrizzleTransaction,
   organizationId: string,
-  actorUserId: string | null
-) {
-  await acquireOrganizationPolicyLock(tx, organizationId);
-  const existing = await getSettingsRow(organizationId, tx);
+  actorUserId: string | null,
+  existing: { policy_revision: number } | undefined
+): Promise<number> {
   if (!existing) {
     await tx.insert(organization_group_policy_settings).values({
       organization_id: organizationId,
-      default_policies: DEFAULT_POLICIES,
+      default_policies: DEFAULT_ORGANIZATION_GROUP_POLICIES,
       policy_revision: 1,
       updated_by_kilo_user_id: actorUserId,
     });
@@ -149,13 +132,14 @@ export async function bumpOrganizationGroupPolicyRevision(
   return policyRevision;
 }
 
-async function getSettingsRow(organizationId: string, client: typeof db | DrizzleTransaction = db) {
-  const [settings] = await client
-    .select()
-    .from(organization_group_policy_settings)
-    .where(eq(organization_group_policy_settings.organization_id, organizationId))
-    .limit(1);
-  return settings;
+export async function bumpOrganizationGroupPolicyRevision(
+  tx: DrizzleTransaction,
+  organizationId: string,
+  actorUserId: string | null
+) {
+  await acquireOrganizationPolicyLock(tx, organizationId);
+  const existing = await getSettingsRow(organizationId, tx);
+  return await writeOrganizationGroupPolicyRevision(tx, organizationId, actorUserId, existing);
 }
 
 export async function getOrganizationGroupPolicySettings(
@@ -166,7 +150,7 @@ export async function getOrganizationGroupPolicySettings(
   const settings = await getSettingsRow(organizationId, client);
   if (!settings) {
     return {
-      defaultPolicies: DEFAULT_POLICIES,
+      defaultPolicies: DEFAULT_ORGANIZATION_GROUP_POLICIES,
       policyRevision: 0,
     };
   }
@@ -201,32 +185,18 @@ export async function withOrganizationGroupPolicyMutation<T>(
           policyRevision: existingSettings.policy_revision,
         }
       : {
-          defaultPolicies: DEFAULT_POLICIES,
+          defaultPolicies: DEFAULT_ORGANIZATION_GROUP_POLICIES,
           policyRevision: 0,
         };
 
-    if (!existingSettings) {
-      await tx.insert(organization_group_policy_settings).values({
-        organization_id: organizationId,
-        default_policies: currentSettings.defaultPolicies,
-        policy_revision: 1,
-        updated_by_kilo_user_id: actorUserId,
-      });
-    }
+    const policyRevision = await writeOrganizationGroupPolicyRevision(
+      tx,
+      organizationId,
+      actorUserId,
+      existingSettings
+    );
 
     const result = await mutate({ tx, organization, currentSettings });
-    const policyRevision = existingSettings ? existingSettings.policy_revision + 1 : 1;
-
-    if (existingSettings) {
-      await tx
-        .update(organization_group_policy_settings)
-        .set({
-          policy_revision: policyRevision,
-          updated_by_kilo_user_id: actorUserId,
-          updated_at: sql`now()`,
-        })
-        .where(eq(organization_group_policy_settings.organization_id, organizationId));
-    }
 
     return { result, policyRevision };
   });
@@ -269,6 +239,34 @@ async function assertDirectMembers(
       code: 'BAD_REQUEST',
       message: 'Every group member must be a direct organization member.',
     });
+  }
+}
+
+/** Replace a group's members with `userIds`, which must already be unique. */
+async function replaceOrganizationGroupMembers(
+  tx: DrizzleTransaction,
+  organizationId: string,
+  groupId: string,
+  userIds: string[],
+  actorId: string
+) {
+  await tx
+    .delete(organization_group_memberships)
+    .where(
+      and(
+        eq(organization_group_memberships.organization_id, organizationId),
+        eq(organization_group_memberships.group_id, groupId)
+      )
+    );
+  if (userIds.length > 0) {
+    await tx.insert(organization_group_memberships).values(
+      userIds.map(userId => ({
+        organization_id: organizationId,
+        group_id: groupId,
+        kilo_user_id: userId,
+        assigned_by_kilo_user_id: actorId,
+      }))
+    );
   }
 }
 
@@ -347,6 +345,16 @@ export async function listOrganizationGroupsForManager(
     .from(organization_group_memberships)
     .where(eq(organization_group_memberships.organization_id, organizationId));
 
+  const memberIdsByGroupId = new Map<string, string[]>();
+  for (const membership of memberships) {
+    const memberIds = memberIdsByGroupId.get(membership.groupId);
+    if (memberIds) {
+      memberIds.push(membership.userId);
+    } else {
+      memberIdsByGroupId.set(membership.groupId, [membership.userId]);
+    }
+  }
+
   return groups.map(group => ({
     ...group,
     policies: parseOrganizationGroupPolicies(group.policies, {
@@ -354,7 +362,7 @@ export async function listOrganizationGroupsForManager(
       groupId: group.id,
       source: 'group',
     }),
-    memberIds: memberships.filter(row => row.groupId === group.id).map(row => row.userId),
+    memberIds: memberIdsByGroupId.get(group.id) ?? [],
   }));
 }
 
@@ -512,24 +520,13 @@ export async function updateOrganizationGroupDetails(params: {
           )
         )
         .returning();
-      await tx
-        .delete(organization_group_memberships)
-        .where(
-          and(
-            eq(organization_group_memberships.organization_id, params.organizationId),
-            eq(organization_group_memberships.group_id, params.groupId)
-          )
-        );
-      if (userIds.length > 0) {
-        await tx.insert(organization_group_memberships).values(
-          userIds.map(userId => ({
-            organization_id: params.organizationId,
-            group_id: params.groupId,
-            kilo_user_id: userId,
-            assigned_by_kilo_user_id: params.actor.id,
-          }))
-        );
-      }
+      await replaceOrganizationGroupMembers(
+        tx,
+        params.organizationId,
+        params.groupId,
+        userIds,
+        params.actor.id
+      );
       await createAuditLog({
         action: 'organization.group.update',
         ...actorAudit(params.actor),
@@ -632,24 +629,13 @@ export async function setOrganizationGroupMembers(params: {
       const group = await getGroupForUpdate(tx, params.organizationId, params.groupId);
       const userIds = [...new Set(params.userIds)];
       await assertDirectMembers(tx, params.organizationId, userIds);
-      await tx
-        .delete(organization_group_memberships)
-        .where(
-          and(
-            eq(organization_group_memberships.organization_id, params.organizationId),
-            eq(organization_group_memberships.group_id, params.groupId)
-          )
-        );
-      if (userIds.length > 0) {
-        await tx.insert(organization_group_memberships).values(
-          userIds.map(userId => ({
-            organization_id: params.organizationId,
-            group_id: params.groupId,
-            kilo_user_id: userId,
-            assigned_by_kilo_user_id: params.actor.id,
-          }))
-        );
-      }
+      await replaceOrganizationGroupMembers(
+        tx,
+        params.organizationId,
+        params.groupId,
+        userIds,
+        params.actor.id
+      );
       await createAuditLog({
         action: 'organization.group.members.set',
         ...actorAudit(params.actor),

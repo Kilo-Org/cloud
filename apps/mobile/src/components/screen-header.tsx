@@ -374,7 +374,10 @@ export function ScreenHeader({
         if (onBack) {
           onBack();
         } else if (backFallback !== undefined && !router.canGoBack()) {
-          router.replace(backFallback);
+          // POP_TO keeps the fallback's contract (land on this destination)
+          // while truncating any routes the app left above the destination;
+          // with no history it still creates the destination, as replace did.
+          router.dismissTo(backFallback);
         } else {
           router.back();
         }

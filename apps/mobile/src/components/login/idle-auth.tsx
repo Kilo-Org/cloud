@@ -57,7 +57,7 @@ export function IdleAuth({
 }>) {
   const {
     busy,
-    emailError,
+    emailErrorKey,
     clearEmailError,
     googleConfigured,
     signInWithApple,
@@ -110,10 +110,10 @@ export function IdleAuth({
   // Both SSO recovery and an address rejected during resend need controls on
   // the main view, rather than leaving their feedback hidden behind OTP entry.
   useEffect(() => {
-    if (ssoRecovery || emailError) {
+    if (ssoRecovery || emailErrorKey) {
       setView('main');
     }
-  }, [emailError, ssoRecovery]);
+  }, [emailErrorKey, ssoRecovery]);
 
   // Restore an SSO-recovery banner that survived an RTL language reload.
   useEffect(() => {
@@ -361,7 +361,9 @@ export function IdleAuth({
 
       <FormField
         label={t('login.emailAddress')}
-        error={emailError}
+        // The hook stores a catalog key, not a message: translating here keeps
+        // the inline error in the active language after the picker switches it.
+        error={emailErrorKey ? t(emailErrorKey) : undefined}
         placeholder={t('login.emailPlaceholder')}
         keyboardType="email-address"
         autoCapitalize="none"

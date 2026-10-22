@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 import { formatSpokenCost } from './session-row-accessibility-label';
 import {
   composeStoredSessionSpokenMeta,
@@ -199,6 +201,19 @@ describe('selectSessionCostInputs', () => {
  * spoken formatter (`formatSpokenCost` → "12 cents").
  */
 describe('composeStoredSessionSpokenMeta (spoken wiring)', () => {
+  it('localizes stored session cost metadata in Hindi', async () => {
+    const previousLanguage = i18n.language;
+    try {
+      await i18n.changeLanguage('hi');
+      expect(composeStoredSessionSpokenMeta(formatSpokenCost(10_000), '2 घंटे पहले')).toBe(
+        'लागत 1 सेंट, 2 घंटे पहले'
+      );
+      expect(composeStoredSessionSpokenMeta(null, '2 घंटे पहले')).toBe('2 घंटे पहले');
+    } finally {
+      await i18n.changeLanguage(previousLanguage);
+    }
+  });
+
   it('composes a humanized cost phrase with the spoken time', () => {
     const result = composeStoredSessionSpokenMeta(formatSpokenCost(120_000), '5 minutes ago');
     expect(result).toBe('cost 12 cents, 5 minutes ago');

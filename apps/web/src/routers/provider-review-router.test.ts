@@ -370,6 +370,31 @@ describe('providerReviewRouter identity derivation', () => {
   });
 });
 
+// ----- provider connection failures -------------------------------------------------
+
+// A connection that must be re-established is the mobile reconnect state
+// (PRECONDITION_FAILED), never FORBIDDEN: the reader's Kilo access is intact.
+describe('providerReviewRouter connection failures', () => {
+  it('maps a reconnect-classified read failure to PRECONDITION_FAILED', async () => {
+    gitlabRead.getMergeRequest.mockRejectedValueOnce(
+      new GitLabReviewError('reconnect', 'reconnect this connection')
+    );
+
+    await expect(caller.getPullRequest({ ...gitlabBase })).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'reconnect this connection',
+    });
+  });
+
+  it('still maps a real permission refusal to FORBIDDEN', async () => {
+    gitlabRead.getMergeRequest.mockRejectedValueOnce(new GitLabReviewError('forbidden', 'denied'));
+
+    await expect(caller.getPullRequest({ ...gitlabBase })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+});
+
 // ----- the shared operation ledger ------------------------------------------------
 
 describe('providerReviewRouter ledger', () => {

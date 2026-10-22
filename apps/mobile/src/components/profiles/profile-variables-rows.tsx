@@ -120,7 +120,7 @@ export function VariableRowView({
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('profiles.secretLabel')}
+          accessibilityLabel={t('profiles.secrets.reveal')}
           accessibilityState={{ selected: revealed }}
           onPress={onToggleReveal}
         >

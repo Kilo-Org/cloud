@@ -10,7 +10,7 @@ import { Text } from '@/components/ui/text';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 import {
   BashToolCard,
@@ -242,6 +242,14 @@ const toolActivities: [string, Record<string, unknown>, string][] = [
     'unknown-tool',
   ].map(tool => [tool, {}, tool] satisfies [string, Record<string, unknown>, string]),
 ];
+/** The card's visible and announced state, in the active language. */
+const STATUS_LABEL_KEY = {
+  pending: 'common.pending',
+  running: 'common.running',
+  completed: 'common.completed',
+  error: 'common.failed',
+} satisfies Record<'pending' | 'running' | 'completed' | 'error', string>;
+
 const activityHistories: [string, StoredMessage[], string][] = [
   ['empty history', [], 'Thinking'],
   ['incomplete history', [makeStoredMessage()], 'Thinking'],
@@ -303,15 +311,16 @@ describe.each(['top-level', 'nested'] as const)('%s child-card initial history',
                 depth: 1,
               });
         const { renderer, unmount } = await renderWithProviders(element);
+        const statusLabel = i18n.t(STATUS_LABEL_KEY[status]);
         try {
           expect(textContent(renderer.root)).toBe(
-            `Generalchild task${modelLabel}${expectedActivity}${status}`
+            `Generalchild task${modelLabel}${expectedActivity}${statusLabel}`
           );
           expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(active ? 1 : 0);
           const button = renderer.root.findByType(Pressable);
           expect(button.props.accessibilityRole).toBe('button');
           expect(button.props.accessibilityLabel).toContain('General, child task');
-          expect(button.props.accessibilityLabel).toContain(status);
+          expect(button.props.accessibilityLabel).toContain(statusLabel);
           if (modelLabel) {
             expect(button.props.accessibilityLabel).toContain(modelLabel);
           }

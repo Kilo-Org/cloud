@@ -8,6 +8,7 @@ import { SheetHeader } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
+import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { Server } from '@/components/ui/icons';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -89,6 +90,18 @@ function BackendSettingsContent({
   );
   const [target, setTarget] = useState<FormTarget | null>(null);
   const [formError, setError] = useState<string | null>(null);
+  const backendDirtyRef = useRef(false);
+  const {
+    requestClose,
+    requestDismiss,
+    dialog: discardDialog,
+  } = useSheetDismissGuard({
+    isDirty: () => backendDirtyRef.current,
+    onDiscard: () => {
+      backendDirtyRef.current = false;
+      setTarget(null);
+    },
+  });
   const epoch = useRef(currentAuthEpoch());
   useEffect(() => {
     if (!isCurrentAuthEpoch(epoch.current)) {
@@ -110,6 +123,7 @@ function BackendSettingsContent({
         addChatBackend(draft);
       }
       setError(null);
+      backendDirtyRef.current = false;
       setTarget(null);
     } catch (error) {
       setError(
@@ -195,6 +209,7 @@ function BackendSettingsContent({
                     variant="outline"
                     onPress={() => {
                       setError(null);
+                      backendDirtyRef.current = false;
                       setTarget({ kind: 'edit', backend });
                     }}
                   >
@@ -217,6 +232,7 @@ function BackendSettingsContent({
               variant="outline"
               onPress={() => {
                 setError(null);
+                backendDirtyRef.current = false;
                 setTarget({ kind: 'add' });
               }}
             >
@@ -229,14 +245,14 @@ function BackendSettingsContent({
         <SessionPageSheet
           visible
           onClose={() => {
+            backendDirtyRef.current = false;
             setTarget(null);
           }}
+          onRequestDismiss={requestDismiss}
         >
           <SheetHeader
             title={t(target.kind === 'add' ? 'modelChat.backends.add' : 'modelChat.backends.edit')}
-            onDone={() => {
-              setTarget(null);
-            }}
+            onDone={requestClose}
             doneLabel={t('common.close')}
             topInset="ios-page-sheet"
           />
@@ -252,9 +268,13 @@ function BackendSettingsContent({
               }
               backend={target.kind === 'edit' ? target.backend : undefined}
               onSave={save}
+              onDirtyChange={dirty => {
+                backendDirtyRef.current = dirty;
+              }}
             />
             {formError !== null && <Text accessibilityRole="alert">{t(formError)}</Text>}
           </ScrollView>
+          {discardDialog}
         </SessionPageSheet>
       )}
       {dialog}

@@ -7,7 +7,7 @@ import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
 import { type TodoItem } from '@/lib/todos/todo-types';
 
-import { useTodoItemMutations } from './use-todos';
+import { useTodoItemMutations, useTodoItems } from './use-todos';
 
 // The undo window of useTodoItemMutations.removeWithUndo: the held delete runs
 // after five seconds, and only while the account that scheduled it is current.
@@ -50,6 +50,14 @@ vi.mock('@tanstack/react-query', async importOriginal => {
     ...actual,
     useQueryClient: () => client,
     useMutation: () => ({}),
+    // The list read applies its `select` to the cached rows, as React Query does.
+    useQuery: (options: {
+      queryKey: readonly unknown[];
+      select?: (rows: TodoItem[]) => TodoItem[];
+    }) => {
+      const rows = client.getQueryData<TodoItem[]>(options.queryKey) ?? [];
+      return { data: options.select ? options.select(rows) : rows };
+    },
   };
 });
 vi.mock('@/lib/trpc', () => ({
@@ -57,7 +65,10 @@ vi.mock('@/lib/trpc', () => ({
     todos: {
       pathFilter: () => PATH_FILTER,
       items: {
-        list: { queryKey: () => ITEMS_KEY },
+        list: {
+          queryKey: () => ITEMS_KEY,
+          queryOptions: () => ({ queryKey: ITEMS_KEY }),
+        },
         create: { mutationOptions: (options: unknown) => options },
         update: { mutationOptions: (options: unknown) => options },
         get: { queryKey: ({ id }: { id: string }) => [['todos', 'items', 'get'], { id }] },
@@ -90,6 +101,11 @@ function seed(item: TodoItem) {
   client.setQueryData<TodoItem[]>(ITEMS_KEY, [item]);
 }
 
+/** The rows the list screen renders: the cached data through the held-delete select. */
+function useVisibleTodos(): TodoItem[] {
+  return useTodoItems(LIST_ID).data ?? [];
+}
+
 function isInvalidated() {
   return client.getQueryCache().find({ queryKey: ITEMS_KEY, exact: true })?.state.isInvalidated;
 }
@@ -116,7 +132,8 @@ describe('removeWithUndo commit', () => {
 
     removeWithUndo(item);
     expect(notices).toEqual(['todos.item.deleted']);
-    expect(client.getQueryData<TodoItem[]>(ITEMS_KEY)).toHaveLength(1);
+    // The row is held for the undo toast, so the list hides it meanwhile.
+    expect(useVisibleTodos()).toEqual([]);
     expect(deleteRpc).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(TODO_UNDO_WINDOW_MS);
@@ -133,14 +150,15 @@ describe('removeWithUndo commit', () => {
     const { removeWithUndo } = useTodoItemMutations(LIST_ID);
 
     removeWithUndo(item);
+    expect(useVisibleTodos()).toEqual([]);
     setSignOutActive(true);
     await vi.advanceTimersByTimeAsync(TODO_UNDO_WINDOW_MS);
 
     expect(deleteRpc).not.toHaveBeenCalled();
     expect(isInvalidated()).toBe(false);
     expect(errors).toEqual([]);
-    // The row was never deleted, so the list shows it again.
-    expect(client.getQueryData<TodoItem[]>(ITEMS_KEY)).toHaveLength(1);
+    // The delete was skipped, so the held row is released and listed again.
+    expect(useVisibleTodos()).toEqual([item]);
   });
 
   it('keeps the to-do when another account replaced this one in the window', async () => {

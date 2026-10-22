@@ -92,7 +92,7 @@ function mapGeminiThoughtToReasoningDetails(value: unknown) {
 
   if (details.length > 0) {
     value.reasoning_details = Array.isArray(value.reasoning_details)
-      ? [...value.reasoning_details, ...details]
+      ? [...(value.reasoning_details as unknown[]), ...details]
       : details;
   }
 }

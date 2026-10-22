@@ -3,10 +3,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ENV_KEYS } from '../src/lib/env-keys.js';
+import { SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS } from '../src/lib/android-notification-channels.js';
 
 // Contract values mirrored from app.config.ts (bundle id, package, scheme,
 // orientation, associated domain, app name, blocked and requested permissions,
-// and Sentry plugin). ENV_KEYS is imported live from src/lib/env-keys.js. The
+// and Sentry plugin). ENV_KEYS is imported live from src/lib/env-keys.js, and
+// the silent channel list from src/lib/android-notification-channels.js. The
 // script runs the full evaluated config, so these must match the resolved
 // build-time output, not the raw app.config.ts source.
 const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
@@ -265,17 +267,20 @@ for (const tag of localizations) {
   );
 }
 
-const pluginNames = (config.plugins ?? []).map(plugin =>
-  Array.isArray(plugin) ? plugin[0] : plugin
+const pluginEntries = (config.plugins ?? []).map(plugin =>
+  Array.isArray(plugin)
+    ? { name: plugin[0], options: plugin[1] }
+    : { name: plugin, options: undefined }
 );
+const pluginNames = pluginEntries.map(entry => entry.name);
+/** The first entry for a plugin name, with the options it was configured with. */
+const pluginEntry = name => pluginEntries.find(entry => entry.name === name);
 check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGIN}"`);
 // Without the Sentry Android Gradle Plugin a release build uploads no NDK
 // symbols or R8 mapping, and Android native crashes reach Sentry unsymbolicated.
-const sentryPlugin = (config.plugins ?? []).find(
-  plugin => Array.isArray(plugin) && plugin[0] === SENTRY_PLUGIN
-);
+const sentryPlugin = pluginEntry(SENTRY_PLUGIN);
 check(
-  sentryPlugin?.[1]?.experimental_android?.enableAndroidGradlePlugin === true,
+  sentryPlugin?.options?.experimental_android?.enableAndroidGradlePlugin === true,
   `"${SENTRY_PLUGIN}" must set experimental_android.enableAndroidGradlePlugin`
 );
 // The rotation surface plugin pins the Android window background to the theme
@@ -307,16 +312,14 @@ check(
   pluginNames.includes(ALERT_DIALOG_THEME_PLUGIN),
   `plugins must include "${ALERT_DIALOG_THEME_PLUGIN}"`
 );
-const splashEntries = (config.plugins ?? []).filter(
-  plugin => Array.isArray(plugin) && plugin[0] === BRANDED_SPLASH_PLUGIN
-);
+const splashEntries = pluginEntries.filter(entry => entry.name === BRANDED_SPLASH_PLUGIN);
 check(splashEntries.length === 1, `plugins must include exactly one "${BRANDED_SPLASH_PLUGIN}"`);
 check(
   !pluginNames.includes('expo-splash-screen') &&
     !pluginNames.includes('./plugins/withAndroidSplashWindowBackground'),
   'the shared branded splash must own native splash registration and mod ordering'
 );
-const splashOptions = splashEntries[0]?.[1];
+const splashOptions = splashEntries[0]?.options;
 check(
   splashOptions?.image === './assets/images/logo-mark.png' &&
     splashOptions.backgroundColor === '#FFDD00' &&
@@ -354,22 +357,18 @@ check(
 // never reach the plugin still evaluate to the dev-menu defaults (auto-show on,
 // onboarding on), and the menu then sits over the product screen carrying the
 // raw SF Symbol names a scene dump reads aloud.
-const devClientPlugin = (config.plugins ?? []).find(
-  plugin => Array.isArray(plugin) && plugin[0] === DEV_CLIENT_PLUGIN
-);
+const devClientPlugin = pluginEntry(DEV_CLIENT_PLUGIN);
 for (const [option, expected] of Object.entries(DEV_CLIENT_PLUGIN_OPTIONS)) {
   check(
-    devClientPlugin?.[1]?.[option] === expected,
+    devClientPlugin?.options?.[option] === expected,
     `plugins "${DEV_CLIENT_PLUGIN}" must set ${option}: ${JSON.stringify(expected)}`
   );
 }
 
 // Android release minification: the prebuild reads `extraProguardRules` from
 // this option, so a dropped entry silently reintroduces the headless crash.
-const buildPropertiesPlugin = (config.plugins ?? []).find(
-  plugin => Array.isArray(plugin) && plugin[0] === BUILD_PROPERTIES_PLUGIN
-);
-const extraProguardRules = buildPropertiesPlugin?.[1]?.android?.extraProguardRules;
+const buildPropertiesPlugin = pluginEntry(BUILD_PROPERTIES_PLUGIN);
+const extraProguardRules = buildPropertiesPlugin?.options?.android?.extraProguardRules;
 check(
   typeof extraProguardRules === 'string' &&
     extraProguardRules.includes(HEADLESS_APP_LOADER_KEEP_RULE),
@@ -379,20 +378,17 @@ check(
 // FCM falls back to this channel for a message without `channel_id`; naming a
 // channel the app creates stops FirebaseMessaging from logging "Missing Default
 // Notification Channel metadata" on every message.
-const notificationsPlugin = (config.plugins ?? []).find(
-  plugin => Array.isArray(plugin) && plugin[0] === NOTIFICATIONS_PLUGIN
-);
+const notificationsPlugin = pluginEntry(NOTIFICATIONS_PLUGIN);
 check(
-  notificationsPlugin?.[1]?.defaultChannel === ANDROID_DEFAULT_NOTIFICATION_CHANNEL,
+  notificationsPlugin?.options?.defaultChannel === ANDROID_DEFAULT_NOTIFICATION_CHANNEL,
   `plugins "${NOTIFICATIONS_PLUGIN}" must set defaultChannel: "${ANDROID_DEFAULT_NOTIFICATION_CHANNEL}"`
 );
 // The fallback carries needs-input/chat alerts for an unversioned token, so it
-// must not name a channel the app creates silent: mirrored from
-// src/lib/notifications.ts `SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS`.
-const SILENT_ANDROID_NOTIFICATION_CHANNELS = ['agent-progress'];
+// must not name a channel the app creates silent. The list is the same one
+// src/lib/notifications.ts writes its channels from.
 check(
-  !SILENT_ANDROID_NOTIFICATION_CHANNELS.includes(ANDROID_DEFAULT_NOTIFICATION_CHANNEL),
-  `the FCM default channel must not be silent (${SILENT_ANDROID_NOTIFICATION_CHANNELS.join(', ')})`
+  !SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.includes(ANDROID_DEFAULT_NOTIFICATION_CHANNEL),
+  `the FCM default channel must not be silent (${SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.join(', ')})`
 );
 
 const extra = config.extra ?? {};

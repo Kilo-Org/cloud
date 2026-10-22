@@ -37,7 +37,7 @@
     "new-cap": [
       "error",
       {
-        "capIsNewExceptions": ["Tag", "GenericTag", "TaggedError", "TaggedClass"]
+        "capIsNewExceptions": ["Service", "TaggedError", "TaggedClass"]
       }
     ],
     "sort-imports": "off",
@@ -90,6 +90,12 @@
       "rules": {
         "import/no-nodejs-modules": "off",
         "unicorn/no-null": "off"
+      }
+    },
+    {
+      "files": ["src/plugins/remote-mcp/validator.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
       }
     }
   ]

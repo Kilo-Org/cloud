@@ -21,7 +21,15 @@ export function useSetReviewMemoryEnabled(scope: string) {
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (enabled: boolean) =>
       trpcClient.reviewMemory.setEnabled.mutate({ ...ownerInput, enabled }),
-    onSuccess: () => {
+    onSuccess: data => {
+      // The stored value is authoritative, so write it into the cached summary
+      // as soon as the mutation settles: the switch and the screen's state
+      // branch read one source, and the refetch below replaces it with the
+      // server's answer instead of a value that outlives the request.
+      queryClient.setQueryData(
+        trpc.reviewMemory.getDashboardSummary.queryKey(ownerInput),
+        previous => (previous ? { ...previous, enabled: data.enabled } : previous)
+      );
       void queryClient.invalidateQueries({
         queryKey: trpc.reviewMemory.getDashboardSummary.queryKey(ownerInput),
       });

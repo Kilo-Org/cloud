@@ -1847,12 +1847,14 @@ export const cliSessionsV2Router = createTRPCRouter({
    * (`platform`/`pr_url`/`pr_number` plus `pr_head_ref`/`pr_head_sha`). The
    * fetched PR is accepted only when `verifySessionPullRequestLink` confirms
    * the link names the session's repo, the PR base and head repositories are
-   * that same repo, the PR head ref is the session's branch, and (when
-   * reported) the session head SHA is the PR head or one of its commits. On
-   * failure the link is left unverified and no live PR is returned (the read
-   * path still shows the session's own pending partial); there is no
-   * branch-name fallback. On success `pr_link_verified_at` is set and the
-   * state cache is upserted by PR identity `(git_url, pr_number, tenant)`.
+   * that same repo, the PR head ref is the branch the session reported pushing
+   * (its `pr_head_ref`, or the stored session branch when the link carries no
+   * head ref), and (when reported) the session head SHA is the PR head or one
+   * of its commits. On failure the link is left unverified and no live PR is
+   * returned (the read path still shows the session's own pending partial);
+   * there is no branch-name fallback. On success `pr_link_verified_at` is set
+   * and the state cache is upserted by PR identity `(git_url, pr_number,
+   * tenant)`.
    */
   refreshAssociatedPullRequest: baseProcedure
     .input(z.object({ sessionId: z.string().min(1) }))

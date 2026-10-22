@@ -147,7 +147,7 @@ export function BriefingContextSettings({
         <Switch
           value={preference.aiEnabled}
           disabled={offline || update.isPending}
-          accessibilityLabel={t('agentBriefing.contextSettings', { context: contextName })}
+          accessibilityLabel={t('agentBriefing.aiOptIn')}
           onValueChange={next => {
             if (next) {
               void enable();

@@ -46,7 +46,7 @@ export async function GET(
   const havingClauses = [sql`count(*) >= ${minAccounts}`];
   if (hideAllBlocked) {
     // Exclude groups where every user is blocked
-    havingClauses.push(sql`count(*) FILTER (WHERE ${kilocode_users.blocked_reason} IS NULL) > 1`);
+    havingClauses.push(sql`count(*) FILTER (WHERE ${kilocode_users.blocked_reason} IS NULL) > 0`);
   }
   const havingClause = sql.join(havingClauses, sql` AND `);
 

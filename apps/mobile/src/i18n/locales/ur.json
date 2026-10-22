@@ -669,7 +669,8 @@
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لینے کے لیے اپنا GitLab اکاؤنٹ منسلک کریں۔",
       "bitbucketDescription": "موبائل پر پل ریکویسٹس کا جائزہ لینے کے لیے Bitbucket کو اس تنظیم سے منسلک کریں۔",
       "bitbucketOrgOnlyDescription": "اس کی Bitbucket پل ریکویسٹس کا جائزہ لینے کے لیے اوپر موجود اکاؤنٹ کو ایک تنظیم پر تبدیل کریں۔",
-      "contextLine": "{{organization}} کے لیے"
+      "contextLine": "{{organization}} کے لیے",
+      "contextLinePersonal": "ذاتی اکاؤنٹ کے لیے"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "ڈالر",
       "costSpoken": "لاگت {{cost}}",
       "costSpokenWithTime": "لاگت {{cost}}، {{time}}",
+      "spokenJoiner": "، اور",
       "pullRequest": "پل ریکویسٹ {{number}}"
     },
     "githubInstall": {

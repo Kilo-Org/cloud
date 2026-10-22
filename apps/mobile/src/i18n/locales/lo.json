@@ -669,7 +669,8 @@
       "gitlabDescription": "ເຊື່ອມຕໍ່ບັນຊີ GitLab ຂອງທ່ານເພື່ອກວດທານ merge request ເທິງມືຖື",
       "bitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ກັບອົງກອນນີ້ເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດເທິງມືຖື",
       "bitbucketOrgOnlyDescription": "ປ່ຽນບັນຊີຂ້າງເທິງໄປຫາອົງກອນເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງມັນ.",
-      "contextLine": "ສຳລັບ {{organization}}"
+      "contextLine": "ສຳລັບ {{organization}}",
+      "contextLinePersonal": "ສຳລັບບັນຊີສ່ວນຕົວຂອງທ່ານ"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "ໂດລາ",
       "costSpoken": "ຄ່າໃຊ້ຈ່າຍ {{cost}}",
       "costSpokenWithTime": "ຄ່າໃຊ້ຈ່າຍ {{cost}}, {{time}}",
+      "spokenJoiner": ",",
       "pullRequest": "ຄຳຂໍລວມໂຄ້ດ {{number}}"
     },
     "githubInstall": {

@@ -669,7 +669,8 @@
       "gitlabDescription": "เชื่อมต่อบัญชี GitLab ของคุณเพื่อรีวิว merge request บนมือถือ",
       "bitbucketDescription": "เชื่อมต่อ Bitbucket กับองค์กรนี้เพื่อรีวิวพูลรีเควสต์บนมือถือ",
       "bitbucketOrgOnlyDescription": "สลับบัญชีด้านบนไปที่องค์กรเพื่อรีวิวพูลรีเควสต์บน Bitbucket ขององค์กรนั้น",
-      "contextLine": "สำหรับ {{organization}}"
+      "contextLine": "สำหรับ {{organization}}",
+      "contextLinePersonal": "สำหรับบัญชีส่วนตัวของคุณ"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "ดอลลาร์",
       "costSpoken": "ค่าใช้จ่าย {{cost}}",
       "costSpokenWithTime": "ค่าใช้จ่าย {{cost}}, {{time}}",
+      "spokenJoiner": "และ",
       "pullRequest": "PR {{number}}"
     },
     "githubInstall": {

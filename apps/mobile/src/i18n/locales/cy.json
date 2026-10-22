@@ -717,7 +717,8 @@
       "gitlabDescription": "Cysylltwch eich cyfrif GitLab i adolygu ceisiadau uno ar y dyfais symudol.",
       "bitbucketDescription": "Cysylltwch Bitbucket â'r sefydliad hwn i adolygu ceisiadau tynnu ar y dyfais symudol.",
       "bitbucketOrgOnlyDescription": "Newidiwch y cyfrif uchod i sefydliad i adolygu ei geisiadau tynnu ar Bitbucket.",
-      "contextLine": "Ar gyfer {{organization}}"
+      "contextLine": "Ar gyfer {{organization}}",
+      "contextLinePersonal": "Ar gyfer eich cyfrif personol"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2220,6 +2221,7 @@
       "dollar_many": "doler",
       "costSpoken": "cost o {{cost}}",
       "costSpokenWithTime": "y gost yw {{cost}}, {{time}}",
+      "spokenJoiner": ", a(c)",
       "pullRequest": "cais tynnu {{number}}"
     },
     "githubInstall": {

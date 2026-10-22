@@ -669,7 +669,8 @@
       "gitlabDescription": "Csatlakoztasd a GitLab-fiókodat a merge requestek kódellenőrzéséhez mobilon.",
       "bitbucketDescription": "Csatlakoztasd a Bitbucketot ehhez a szervezethez a módosítási kérelmek mobilos kódellenőrzéséhez.",
       "bitbucketOrgOnlyDescription": "Váltsd a fenti fiókot egy szervezetre a Bitbucket-módosítási kérelmek kódellenőrzéséhez.",
-      "contextLine": "{{organization}} számára"
+      "contextLine": "{{organization}} számára",
+      "contextLinePersonal": "Személyes fiókodhoz"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dollár",
       "costSpoken": "költség: {{cost}}",
       "costSpokenWithTime": "költség: {{cost}}, {{time}}",
+      "spokenJoiner": "és",
       "pullRequest": "{{number}}. módosítási kérelem"
     },
     "githubInstall": {

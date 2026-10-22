@@ -1587,14 +1587,15 @@
       "sessionDeleted": "Sitzung gelöscht",
       "needsInput": "eingabe erforderlich",
       "fromPlatform": "von {{platform}}",
-      "cent_one": "cent",
-      "cent": "cent",
-      "cent_other": "cent",
-      "dollar_one": "dollar",
-      "dollar": "dollar",
-      "dollar_other": "dollar",
-      "costSpoken": "kosten: {{cost}}",
-      "costSpokenWithTime": "kosten {{cost}}, {{time}}",
+      "cent_one": "Cent",
+      "cent": "Cent",
+      "cent_other": "Cent",
+      "dollar_one": "Dollar",
+      "dollar": "Dollar",
+      "dollar_other": "Dollar",
+      "costSpoken": "kostet {{cost}}",
+      "costSpokenWithTime": "kostet {{cost}}, {{time}}",
+      "spokenJoiner": ",",
       "pullRequest": "pull-Request {{number}}"
     },
     "githubInstall": {
@@ -2172,7 +2173,7 @@
     "contextUsage": {
       "windowUnavailable": "Größe des Kontextfensters nicht verfügbar",
       "tapToViewDetails": "Tippe, um Kontextdetails anzusehen.",
-      "costSuffix": ", kosten {{cost}}",
+      "costSuffix": ", kostet {{cost}}",
       "tokensWindowUnavailable": "Kontext: {{used}} Tokens, Größe des Kontextfensters nicht verfügbar",
       "tokensUsage": "Kontext: {{used}} von {{window}} Tokens, {{percentage}} genutzt",
       "title": "Kontextnutzung",
@@ -2554,7 +2555,8 @@
       "gitlabDescription": "Verbinde dein GitLab-Konto, um Merge-Requests in der App zu prüfen.",
       "bitbucketDescription": "Verbinde Bitbucket mit dieser Organisation, um Pull-Requests in der App zu prüfen.",
       "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
-      "contextLine": "Für {{organization}}"
+      "contextLine": "Für {{organization}}",
+      "contextLinePersonal": "Für den persönlichen Bereich"
     },
     "connectionExpired": "Die GitHub-Verbindung ist abgelaufen.",
     "couldNotLoadPullRequest": "Der Pull-Request konnte nicht geladen werden.",

@@ -1639,6 +1639,7 @@
       "dollar_many": "دولارًا",
       "costSpoken": "التكلفة {{cost}}",
       "costSpokenWithTime": "التكلفة {{cost}}، {{time}}",
+      "spokenJoiner": "و",
       "pullRequest": "طلب سحب {{number}}"
     },
     "githubInstall": {
@@ -2654,7 +2655,8 @@
       "gitlabDescription": "اربط حسابك في GitLab لمراجعة طلبات الدمج على الجوال.",
       "bitbucketDescription": "اربط Bitbucket بهذه المؤسسة لمراجعة طلبات السحب على الجوال.",
       "bitbucketOrgOnlyDescription": "بدّل الحساب أعلاه إلى مؤسسة لمراجعة طلبات السحب الخاصة بها على Bitbucket.",
-      "contextLine": "لـ{{organization}}"
+      "contextLine": "لـ{{organization}}",
+      "contextLinePersonal": "لحسابك الشخصي"
     },
     "connectionExpired": "انتهت صلاحية الربط مع GitHub.",
     "couldNotLoadPullRequest": "تعذّر تحميل طلب السحب.",

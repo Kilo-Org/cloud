@@ -669,7 +669,8 @@
       "gitlabDescription": "Haɗa asusun GitLab ɗinka don bita buƙatun haɗawa a wayar hannu.",
       "bitbucketDescription": "Haɗa Bitbucket da wannan ƙungiya don bita buƙatun haɗa canje-canje a wayar hannu.",
       "bitbucketOrgOnlyDescription": "Canja asusun da ke sama zuwa ƙungiya don bita buƙatun haɗa canje-canje na Bitbucket na ƙungiyar.",
-      "contextLine": "Don {{organization}}"
+      "contextLine": "Don {{organization}}",
+      "contextLinePersonal": "Don kashin kanka"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "daloli",
       "costSpoken": "farashi {{cost}}",
       "costSpokenWithTime": "farashi {{cost}}, {{time}}",
+      "spokenJoiner": ", da",
       "pullRequest": "buƙatar haɗawa {{number}}"
     },
     "githubInstall": {

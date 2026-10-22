@@ -1595,6 +1595,7 @@
       "dollar_other": "美元",
       "costSpoken": "費用 {{cost}}",
       "costSpokenWithTime": "費用 {{cost}}，{{time}}",
+      "spokenJoiner": "和",
       "pullRequest": "提取請求 {{number}}"
     },
     "githubInstall": {
@@ -2554,7 +2555,8 @@
       "gitlabDescription": "連結你的 GitLab 帳戶，以便在行動裝置上審查合併請求。",
       "bitbucketDescription": "將 Bitbucket 連結到此組織，以便在行動裝置上審查提取請求。",
       "bitbucketOrgOnlyDescription": "將上方的帳戶切換為某個組織，以便審查其 Bitbucket 提取請求。",
-      "contextLine": "適用於 {{organization}}"
+      "contextLine": "適用於 {{organization}}",
+      "contextLinePersonal": "適用於您的個人帳戶"
     },
     "connectionExpired": "GitHub 連線已過期。",
     "couldNotLoadPullRequest": "無法載入提取請求。",

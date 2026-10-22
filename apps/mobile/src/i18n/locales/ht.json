@@ -669,7 +669,8 @@
       "gitlabDescription": "Konekte kont GitLab ou pou w revize merge request sou mobil ou.",
       "bitbucketDescription": "Konekte Bitbucket ak òganizasyon sa a pou w revize demann fizyon sou mobil ou.",
       "bitbucketOrgOnlyDescription": "Chanje kont ki anwo a pou yon òganizasyon pou w revize demann fizyon Bitbucket li.",
-      "contextLine": "Pou {{organization}}"
+      "contextLine": "Pou {{organization}}",
+      "contextLinePersonal": "Pou kont pèsonèl ou"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dola",
       "costSpoken": "pri {{cost}}",
       "costSpokenWithTime": "pri {{cost}}, {{time}}",
+      "spokenJoiner": ", and",
       "pullRequest": "demann fizyon {{number}}"
     },
     "githubInstall": {

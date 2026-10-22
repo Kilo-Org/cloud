@@ -705,7 +705,8 @@
       "gitlabDescription": "Ceangail do chuntas GitLab chun iarratais chumaisc a athbhreithniú ar an ngléas soghluaiste.",
       "bitbucketDescription": "Ceangail Bitbucket leis an eagraíocht seo chun iarratais tharraingthe a athbhreithniú ar an ngléas soghluaiste.",
       "bitbucketOrgOnlyDescription": "Athraigh an cuntas thuas go heagraíocht chun iarratais tharraingthe Bitbucket na heagraíochta sin a athbhreithniú.",
-      "contextLine": "Do {{organization}}"
+      "contextLine": "Do {{organization}}",
+      "contextLinePersonal": "Do do chuntas pearsanta"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2193,6 +2194,7 @@
       "dollar_many": "ndollar",
       "costSpoken": "costas {{cost}}",
       "costSpokenWithTime": "costas {{cost}}, {{time}}",
+      "spokenJoiner": "agus",
       "pullRequest": "iarratas tarraingthe {{number}}"
     },
     "githubInstall": {

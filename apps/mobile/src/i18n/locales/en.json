@@ -760,7 +760,8 @@
       "gitlabDescription": "Connect your GitLab account to review merge requests on mobile.",
       "bitbucketDescription": "Connect Bitbucket to this organization to review pull requests on mobile.",
       "bitbucketOrgOnlyDescription": "Switch the account above to an organization to review its Bitbucket pull requests.",
-      "contextLine": "For {{organization}}"
+      "contextLine": "For {{organization}}",
+      "contextLinePersonal": "For your personal account"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2205,6 +2206,7 @@
       "dollar_other": "dollars",
       "costSpoken": "cost {{cost}}",
       "costSpokenWithTime": "cost {{cost}}, {{time}}",
+      "spokenJoiner": ", and",
       "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {

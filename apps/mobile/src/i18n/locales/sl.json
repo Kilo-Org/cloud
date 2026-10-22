@@ -693,7 +693,8 @@
       "gitlabDescription": "Poveži svoj račun GitLab, da lahko pregleduješ merge requeste na mobilni napravi.",
       "bitbucketDescription": "Poveži Bitbucket s to organizacijo, da lahko pregleduješ zahtevke za združitev na mobilni napravi.",
       "bitbucketOrgOnlyDescription": "Preklopi zgornji račun na organizacijo, da lahko pregleduješ njene zahtevke za združitev na Bitbucktu.",
-      "contextLine": "Za {{organization}}"
+      "contextLine": "Za {{organization}}",
+      "contextLinePersonal": "Za osebni račun"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2166,6 +2167,7 @@
       "dollar_few": "dolarji",
       "costSpoken": "strošek {{cost}}",
       "costSpokenWithTime": "stroški {{cost}}, {{time}}",
+      "spokenJoiner": "in",
       "pullRequest": "zahtevek za združitev {{number}}"
     },
     "githubInstall": {

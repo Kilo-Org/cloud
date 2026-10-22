@@ -693,7 +693,8 @@
       "gitlabDescription": "Падключыце ўліковы запіс GitLab, каб разглядаць merge-запыты з мабільнай прылады.",
       "bitbucketDescription": "Падключыце Bitbucket да гэтай арганізацыі, каб разглядаць запыты на зліццё з мабільнай прылады.",
       "bitbucketOrgOnlyDescription": "Пераключыце ўліковы запіс, указаны вышэй, на арганізацыю, каб разглядаць яе запыты на зліццё ў Bitbucket.",
-      "contextLine": "Для {{organization}}"
+      "contextLine": "Для {{organization}}",
+      "contextLinePersonal": "Для асабістага ўліковага запісу"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2166,6 +2167,7 @@
       "dollar_many": "долараў",
       "costSpoken": "кошт {{cost}}",
       "costSpokenWithTime": "кошт {{cost}}, {{time}}",
+      "spokenJoiner": "і",
       "pullRequest": "запыт на зліццё {{number}}"
     },
     "githubInstall": {

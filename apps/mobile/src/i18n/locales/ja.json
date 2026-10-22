@@ -1595,6 +1595,7 @@
       "dollar_other": "ドル",
       "costSpoken": "コスト {{cost}}",
       "costSpokenWithTime": "料金{{cost}}、{{time}}",
+      "spokenJoiner": "、",
       "pullRequest": "プルリクエスト {{number}}"
     },
     "githubInstall": {
@@ -2554,7 +2555,8 @@
       "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
       "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
       "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
-      "contextLine": "{{organization}}用"
+      "contextLine": "{{organization}}用",
+      "contextLinePersonal": "個人用"
     },
     "connectionExpired": "GitHubとの連携が期限切れになりました。",
     "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした。",

@@ -1,7 +1,8 @@
 import { type GlanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { i18n } from '@/i18n';
-import { formatList, formatNumber } from '@/lib/format';
+import { formatNumber } from '@/lib/format';
+import { listFormat } from '@/lib/intl-cache';
 import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -205,5 +206,34 @@ export function sessionRowAccessibilityLabel({
   if (platform) {
     parts.push(i18n.t('agents.sessionRow.fromPlatform', { platform: platformLabel(platform) }));
   }
-  return formatList(parts, i18n.language);
+  const format = listFormat(i18n.language, { style: 'long', type: 'conjunction' });
+  // Two fragments are plain labels ("title, badge"): the locale list
+  // formatter's own coupling is right for them. From three on, the fragments
+  // are clauses and a locale may need a separator other than its list
+  // conjunction — a verb-initial cost sentence after "and"/"und" reads as a
+  // second subject — so the coupling before the last fragment comes from the
+  // catalog and keeps this formatter's spacing around it.
+  if (parts.length < 3) {
+    return format.format(parts);
+  }
+  const tokens = format.formatToParts(parts);
+  let lastLiteral = -1;
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    if (tokens[index]?.type === 'literal') {
+      lastLiteral = index;
+      break;
+    }
+  }
+  const literalToken = lastLiteral === -1 ? undefined : tokens[lastLiteral];
+  if (!literalToken) {
+    return parts.join(' ');
+  }
+  const literal = literalToken.value;
+  const joiner = i18n.t('agents.sessionRow.spokenJoiner');
+  // A coupling that opens with punctuation binds to the word before it, so it
+  // takes the formatter's trailing spacing only.
+  const leading = /^[,،、，]/u.test(joiner) ? '' : /^\s*/u.exec(literal)?.[0];
+  const trailing = /\s*$/u.exec(literal)?.[0];
+  tokens[lastLiteral] = { type: 'literal', value: `${leading ?? ''}${joiner}${trailing ?? ''}` };
+  return tokens.map(token => token.value).join('');
 }

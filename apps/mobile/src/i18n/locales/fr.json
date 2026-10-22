@@ -2497,6 +2497,7 @@
       "dollar_many": "dollars américains",
       "costSpoken": "coût de {{cost}}",
       "costSpokenWithTime": "coût : {{cost}}, {{time}}",
+      "spokenJoiner": "et",
       "pullRequest": "demande de fusion {{number}}"
     },
     "githubInstall": {
@@ -2579,7 +2580,8 @@
       "gitlabDescription": "Connectez votre compte GitLab pour examiner des merge requests sur mobile.",
       "bitbucketDescription": "Connectez Bitbucket à cette organisation pour examiner des PR sur mobile.",
       "bitbucketOrgOnlyDescription": "Basculez le compte ci-dessus vers une organisation pour examiner ses PR Bitbucket.",
-      "contextLine": "Pour {{organization}}"
+      "contextLine": "Pour {{organization}}",
+      "contextLinePersonal": "Pour votre compte personnel"
     },
     "connectionExpired": "La connexion à GitHub a expiré.",
     "couldNotLoadPullRequest": "Impossible de charger la demande de fusion.",

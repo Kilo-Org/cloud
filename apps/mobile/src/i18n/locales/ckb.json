@@ -669,7 +669,8 @@
       "gitlabDescription": "هەژمارەی GitLabەکەت بچەلەاندن بۆ پێداچوونەوەی داواکارییەکانی تێکەڵکردن لە مۆبایلدا.",
       "bitbucketDescription": "Bitbucket بەم ڕێکخراوە بچەلەێنە بۆ پێداچوونەوەی داواکارییەکانی ڕاکێشان لە مۆبایلدا.",
       "bitbucketOrgOnlyDescription": "هەژمارەی سەرەوە بگۆڕە بۆ ڕێکخراوێک بۆ پێداچوونەوەی داواکارییەکانی ڕاکێشانی Bitbucketی.",
-      "contextLine": "بۆ {{organization}}"
+      "contextLine": "بۆ {{organization}}",
+      "contextLinePersonal": "بۆ هەژماری کەسی"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "دۆلار",
       "costSpoken": "تێچوون: {{cost}}",
       "costSpokenWithTime": "تێچووی {{cost}}، {{time}}",
+      "spokenJoiner": ", and",
       "pullRequest": "داواکاری ڕاکێشانی {{number}}"
     },
     "githubInstall": {

@@ -669,7 +669,8 @@
       "gitlabDescription": "मोबाइलमा मर्ज रिक्वेस्टहरू समीक्षा गर्न आफ्नो GitLab खाता जडान गर्नुहोस्।",
       "bitbucketDescription": "मोबाइलमा पुल रिक्वेस्टहरू समीक्षा गर्न यो संस्थालाई Bitbucket सँग जडान गर्नुहोस्।",
       "bitbucketOrgOnlyDescription": "यसको Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न माथिको खाता एउटा संस्थामा स्विच गर्नुहोस्।",
-      "contextLine": "{{organization}} का लागि"
+      "contextLine": "{{organization}} का लागि",
+      "contextLinePersonal": "तपाईंको व्यक्तिगत खाताका लागि"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "डलर",
       "costSpoken": "लागत {{cost}}",
       "costSpokenWithTime": "लागत {{cost}}, {{time}}",
+      "spokenJoiner": "र",
       "pullRequest": "पुल रिक्वेस्ट {{number}}"
     },
     "githubInstall": {

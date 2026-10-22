@@ -669,7 +669,8 @@
       "gitlabDescription": "Koppel jou GitLab-rekening om merge requests op jou foon te hersien.",
       "bitbucketDescription": "Koppel Bitbucket aan hierdie organisasie om trekversoeke op jou foon te hersien.",
       "bitbucketOrgOnlyDescription": "Skakel die rekening hierbo oor na 'n organisasie om sy Bitbucket-trekversoeke te hersien.",
-      "contextLine": "Vir {{organization}}"
+      "contextLine": "Vir {{organization}}",
+      "contextLinePersonal": "Vir jou persoonlike rekening"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dollar",
       "costSpoken": "koste {{cost}}",
       "costSpokenWithTime": "koste {{cost}}, {{time}}",
+      "spokenJoiner": "en",
       "pullRequest": "trekversoek {{number}}"
     },
     "githubInstall": {

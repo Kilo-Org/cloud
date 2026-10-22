@@ -669,7 +669,8 @@
       "gitlabDescription": "Мобильдіде біріктіру сұрауларын қарау үшін GitLab тіркелгіңізді қосыңыз.",
       "bitbucketDescription": "Мобильдіде тарту сұрауларын қарау үшін Bitbucket-ты осы ұйымға қосыңыз.",
       "bitbucketOrgOnlyDescription": "Жоғарыдағы тіркелгіні ұйымға ауыстырыңыз, оның Bitbucket тарту сұрауларын қарау үшін.",
-      "contextLine": "{{organization}} үшін"
+      "contextLine": "{{organization}} үшін",
+      "contextLinePersonal": "Жеке аккаунтыңыз үшін"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "доллар",
       "costSpoken": "құны {{cost}}",
       "costSpokenWithTime": "құны {{cost}}, {{time}}",
+      "spokenJoiner": ",",
       "pullRequest": "№{{number}} біріктіру сұрауы"
     },
     "githubInstall": {

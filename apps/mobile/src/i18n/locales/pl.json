@@ -1617,6 +1617,7 @@
       "dollar_many": "dolarów",
       "costSpoken": "koszt {{cost}}",
       "costSpokenWithTime": "koszt {{cost}}, {{time}}",
+      "spokenJoiner": "i",
       "pullRequest": "PR {{number}}"
     },
     "githubInstall": {
@@ -2604,7 +2605,8 @@
       "gitlabDescription": "Połącz konto GitLab, aby przeglądać merge requesty na telefonie.",
       "bitbucketDescription": "Połącz Bitbucket z tą organizacją, aby przeglądać PR-y na telefonie.",
       "bitbucketOrgOnlyDescription": "Przełącz konto powyżej na organizację, aby przeglądać jej PR-y na Bitbucketu.",
-      "contextLine": "Dla {{organization}}"
+      "contextLine": "Dla {{organization}}",
+      "contextLinePersonal": "Dla konta osobistego"
     },
     "connectionExpired": "Połączenie z serwisem GitHub wygasło.",
     "couldNotLoadPullRequest": "Nie udało się wczytać PR.",

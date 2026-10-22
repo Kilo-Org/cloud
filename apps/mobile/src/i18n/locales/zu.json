@@ -669,7 +669,8 @@
       "gitlabDescription": "Xhuma i-akhawunti yakho ye-GitLab ukuze ubuyekeze izicelo zokuhlanganisa kufoni.",
       "bitbucketDescription": "Xhuma i-Bitbucket kule nhlangano ukuze ubuyekeze ama-PR kufoni.",
       "bitbucketOrgOnlyDescription": "Shintsha i-akhawunti engenhla ibe yinhlangano ukuze ubuyekeze ama-PR ayo e-Bitbucket.",
-      "contextLine": "Ku-{{organization}}"
+      "contextLine": "Ku-{{organization}}",
+      "contextLinePersonal": "Kwokomuntu siqu"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "amadola",
       "costSpoken": "izindleko {{cost}}",
       "costSpokenWithTime": "izindleko {{cost}}, {{time}}",
+      "spokenJoiner": ", ne-",
       "pullRequest": "isicelo sokuhlanganisa {{number}}"
     },
     "githubInstall": {

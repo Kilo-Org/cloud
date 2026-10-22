@@ -669,7 +669,8 @@
       "gitlabDescription": "Tengdu GitLab-reikninginn þinn til að yfirfara merge requests í símanum.",
       "bitbucketDescription": "Tengdu Bitbucket við þessa stofnun til að yfirfara sameiningarbeiðnir í símanum.",
       "bitbucketOrgOnlyDescription": "Skiptu reikningnum hér að ofan yfir í stofnun til að yfirfara sameiningarbeiðnir hennar á Bitbucket.",
-      "contextLine": "Fyrir {{organization}}"
+      "contextLine": "Fyrir {{organization}}",
+      "contextLinePersonal": "Fyrir persónulegan reikning"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dalir",
       "costSpoken": "kostnaður {{cost}}",
       "costSpokenWithTime": "kostnaður {{cost}}, {{time}}",
+      "spokenJoiner": "og",
       "pullRequest": "sameiningarbeiðni {{number}}"
     },
     "githubInstall": {

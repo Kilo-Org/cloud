@@ -1595,6 +1595,7 @@
       "dollar_other": "đô la",
       "costSpoken": "chi phí {{cost}}",
       "costSpokenWithTime": "chi phí {{cost}}, {{time}}",
+      "spokenJoiner": "và",
       "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
@@ -2554,7 +2555,8 @@
       "gitlabDescription": "Kết nối tài khoản GitLab để xem merge request trên thiết bị di động.",
       "bitbucketDescription": "Kết nối Bitbucket với tổ chức này để xem PR trên thiết bị di động.",
       "bitbucketOrgOnlyDescription": "Chuyển tài khoản ở trên sang một tổ chức để xem các PR Bitbucket của tổ chức đó.",
-      "contextLine": "Cho {{organization}}"
+      "contextLine": "Cho {{organization}}",
+      "contextLinePersonal": "Cho tài khoản cá nhân"
     },
     "connectionExpired": "Kết nối GitHub đã hết hạn.",
     "couldNotLoadPullRequest": "Không thể tải PR.",

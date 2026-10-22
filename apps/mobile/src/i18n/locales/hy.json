@@ -669,7 +669,8 @@
       "gitlabDescription": "Միացրեք Ձեր GitLab հաշիվը՝ միաձուլման հարցումները բջջայինում վերանայելու համար։",
       "bitbucketDescription": "Միացրեք Bitbucket-ը այս կազմակերպությանը՝ միավորման հարցումները բջջայինում վերանայելու համար։",
       "bitbucketOrgOnlyDescription": "Վերեւի հաշիվը փոխեք կազմակերպության՝ դրա Bitbucket-ի միավորման հարցումները վերանայելու համար։",
-      "contextLine": "{{organization}}-ի համար"
+      "contextLine": "{{organization}}-ի համար",
+      "contextLinePersonal": "Անձնական հաշվի համար"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "դոլար",
       "costSpoken": "արժեքը՝ {{cost}}",
       "costSpokenWithTime": "արժեքը՝ {{cost}}, {{time}}",
+      "spokenJoiner": "և",
       "pullRequest": "միավորման հարցում {{number}}"
     },
     "githubInstall": {

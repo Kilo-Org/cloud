@@ -669,7 +669,8 @@
       "gitlabDescription": "Ampifandraiso ny kaonty GitLab-nao mba hijerena ny fangatahana fampiraisana amin'ny finday.",
       "bitbucketDescription": "Ampifandraiso amin'ity fikambanana ity ny Bitbucket mba hijerena ny fangatahana fampiraisana amin'ny finday.",
       "bitbucketOrgOnlyDescription": "Ampifandraiso amin'ny fikambanana ny kaonty etsy ambony mba hijerena ny fangatahana fampiraisana Bitbucket'ny.",
-      "contextLine": "Ho an'ny {{organization}}"
+      "contextLine": "Ho an'ny {{organization}}",
+      "contextLinePersonal": "Ho an'ny kaontinao manokana"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dolara",
       "costSpoken": "sarany {{cost}}",
       "costSpokenWithTime": "sarany {{cost}}, {{time}}",
+      "spokenJoiner": ", and",
       "pullRequest": "fangatahana fampiraisana {{number}}"
     },
     "githubInstall": {

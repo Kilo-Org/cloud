@@ -1617,6 +1617,7 @@
       "dollar_many": "долларов",
       "costSpoken": "стоимость {{cost}}",
       "costSpokenWithTime": "стоимость {{cost}}, {{time}}",
+      "spokenJoiner": "и",
       "pullRequest": "запрос на слияние {{number}}"
     },
     "githubInstall": {
@@ -2604,7 +2605,8 @@
       "gitlabDescription": "Подключите аккаунт GitLab, чтобы просматривать запросы на слияние с мобильного.",
       "bitbucketDescription": "Подключите Bitbucket к этой организации, чтобы просматривать пул-реквесты с мобильного.",
       "bitbucketOrgOnlyDescription": "Переключите аккаунт, указанный выше, на организацию, чтобы просматривать её пул-реквесты в Bitbucket.",
-      "contextLine": "Для {{organization}}"
+      "contextLine": "Для {{organization}}",
+      "contextLinePersonal": "Для личного аккаунта"
     },
     "connectionExpired": "Срок действия подключения к GitHub истёк.",
     "couldNotLoadPullRequest": "Не удалось загрузить запрос на слияние.",

@@ -1595,6 +1595,7 @@
       "dollar_other": "डॉलर",
       "costSpoken": "लागत {{cost}}",
       "costSpokenWithTime": "लागत {{cost}}, {{time}}",
+      "spokenJoiner": ", और",
       "pullRequest": "पुल रिक्वेस्ट {{number}}"
     },
     "githubInstall": {
@@ -2554,7 +2555,8 @@
       "gitlabDescription": "मोबाइल पर मर्ज रिक्वेस्ट समीक्षित करने के लिए अपना GitLab खाता कनेक्ट करें।",
       "bitbucketDescription": "मोबाइल पर पुल रिक्वेस्ट समीक्षित करने के लिए इस संगठन को Bitbucket से कनेक्ट करें।",
       "bitbucketOrgOnlyDescription": "इसके Bitbucket पुल रिक्वेस्ट समीक्षित करने के लिए ऊपर दिए गए खाते को एक संगठन में बदलें।",
-      "contextLine": "{{organization}} के लिए"
+      "contextLine": "{{organization}} के लिए",
+      "contextLinePersonal": "आपके व्यक्तिगत खाते के लिए"
     },
     "connectionExpired": "GitHub कनेक्शन की अवधि समाप्त हो गई।",
     "couldNotLoadPullRequest": "पुल रिक्वेस्ट लोड नहीं हो सकी।",

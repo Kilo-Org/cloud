@@ -669,7 +669,8 @@
       "gitlabDescription": "په موبایل کې د یوځای کولو د غوښتنو د بیاکتنې لپاره خپل GitLab حساب ونښلوئ.",
       "bitbucketDescription": "په موبایل کې د پول ریکویسټونو د بیاکتنې لپاره Bitbucket له دې بنسټ سره ونښلوئ.",
       "bitbucketOrgOnlyDescription": "د هغې د Bitbucket پول ریکویسټونو د بیاکتنې لپاره پورته حساب یو بنسټ ته وبدلئ.",
-      "contextLine": "{{organization}} لپاره"
+      "contextLine": "{{organization}} لپاره",
+      "contextLinePersonal": "د ستاسې د شخصي حساب لپاره"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "ډالره",
       "costSpoken": "لګښت {{cost}}",
       "costSpokenWithTime": "لګښت {{cost}}، {{time}}",
+      "spokenJoiner": "، او",
       "pullRequest": "پل ریکویسټ {{number}}"
     },
     "githubInstall": {

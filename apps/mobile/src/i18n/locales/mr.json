@@ -669,7 +669,8 @@
       "gitlabDescription": "मोबाइलवर मर्ज रिक्वेस्ट तपासण्यासाठी तुमचे GitLab खाते कनेक्ट करा.",
       "bitbucketDescription": "मोबाइलवर पुल रिक्वेस्ट तपासण्यासाठी हे संघटन Bitbucket शी कनेक्ट करा.",
       "bitbucketOrgOnlyDescription": "त्याच्या Bitbucket पुल रिक्वेस्ट तपासण्यासाठी वरील खाते एका संघटनेत बदला.",
-      "contextLine": "{{organization}} साठी"
+      "contextLine": "{{organization}} साठी",
+      "contextLinePersonal": "तुमच्या वैयक्तिक खात्यासाठी"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "डॉलर",
       "costSpoken": "खर्च {{cost}}",
       "costSpokenWithTime": "खर्च {{cost}}, {{time}}",
+      "spokenJoiner": "आणि",
       "pullRequest": "पुल रिक्वेस्ट {{number}}"
     },
     "githubInstall": {

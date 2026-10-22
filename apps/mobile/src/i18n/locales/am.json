@@ -669,7 +669,8 @@
       "gitlabDescription": "በሞባይል ላይ የማዋሃድ ጥያቄዎችን ለመገምገም የGitLab መለያዎን ያገናኙ።",
       "bitbucketDescription": "Bitbucketን ከዚህ ድርጅት ጋር ያገናኙ የማዋሃድ ጥያቄዎችን በሞባይል ለመገምገም።",
       "bitbucketOrgOnlyDescription": "ከላይ ያለውን መለያ ወደ ድርጅት ይቀይሩ፣ የዚህ ድርጅት የBitbucket የማዋሃድ ጥያቄዎችን ለመገምገም።",
-      "contextLine": "ለ{{organization}}"
+      "contextLine": "ለ{{organization}}",
+      "contextLinePersonal": "ለግል መለያዎ"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "ዶላር",
       "costSpoken": "ወጪ {{cost}}",
       "costSpokenWithTime": "ወጪ {{cost}}፣ {{time}}",
+      "spokenJoiner": "እና",
       "pullRequest": "የማዋሃድ ጥያቄ {{number}}"
     },
     "githubInstall": {

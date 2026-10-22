@@ -69,7 +69,9 @@ export function PrReviewContextLine({ instanceHint }: Readonly<{ instanceHint?: 
       numberOfLines={1}
       ellipsizeMode="tail"
     >
-      {t('prReview.connect.contextLine', { organization: name })}
+      {organizationId === null
+        ? t('prReview.connect.contextLinePersonal')
+        : t('prReview.connect.contextLine', { organization: name })}
     </Text>
   );
 

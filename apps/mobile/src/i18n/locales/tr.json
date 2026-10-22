@@ -1595,6 +1595,7 @@
       "dollar_other": "dolar",
       "costSpoken": "maliyet: {{cost}}",
       "costSpokenWithTime": "maliyet {{cost}}, {{time}}",
+      "spokenJoiner": "ve",
       "pullRequest": "{{number}} numaralı çekme isteği"
     },
     "githubInstall": {
@@ -2554,7 +2555,8 @@
       "gitlabDescription": "Mobilde birleştirme isteklerini gözden geçirmek için GitLab hesabını bağla.",
       "bitbucketDescription": "Mobilde çekme isteklerini gözden geçirmek için Bitbucket'ı bu kuruluşla bağla.",
       "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
-      "contextLine": "{{organization}} için"
+      "contextLine": "{{organization}} için",
+      "contextLinePersonal": "Kişisel hesabınız için"
     },
     "connectionExpired": "GitHub bağlantısının süresi doldu.",
     "couldNotLoadPullRequest": "Çekme isteği yüklenemedi.",

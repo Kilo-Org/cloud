@@ -669,7 +669,8 @@
       "gitlabDescription": "Гар утаснаас нэгтгэх хүсэлтүүдийг шалгахын тулд GitLab бүртгэлээ холбоно уу.",
       "bitbucketDescription": "Гар утаснаас татах хүсэлтүүдийг шалгахын тулд Bitbucket-ийг энэ байгууллагад холбоно уу.",
       "bitbucketOrgOnlyDescription": "Түүний Bitbucket татах хүсэлтүүдийг шалгахын тулд дээрх бүртгэлийг байгууллагад шилжүүлнэ үү.",
-      "contextLine": "{{organization}}-ийн хувьд"
+      "contextLine": "{{organization}}-ийн хувьд",
+      "contextLinePersonal": "Хувийн дансны хувьд"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "доллар",
       "costSpoken": "зардал {{cost}}",
       "costSpokenWithTime": "зардал {{cost}}, {{time}}",
+      "spokenJoiner": ",",
       "pullRequest": "{{number}} дугаартай нэгтгэх хүсэлт"
     },
     "githubInstall": {

@@ -1575,6 +1575,7 @@
       "dollar_many": "dólares",
       "costSpoken": "custo de {{cost}}",
       "costSpokenWithTime": "custo {{cost}}, {{time}}",
+      "spokenJoiner": "e",
       "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
@@ -2579,7 +2580,8 @@
       "gitlabDescription": "Conecte sua conta do GitLab para revisar merge requests no celular.",
       "bitbucketDescription": "Conecte o Bitbucket a esta organização para revisar pull requests no celular.",
       "bitbucketOrgOnlyDescription": "Mude a conta acima para uma organização para revisar as pull requests dela no Bitbucket.",
-      "contextLine": "Para {{organization}}"
+      "contextLine": "Para {{organization}}",
+      "contextLinePersonal": "Para sua conta pessoal"
     },
     "connectionExpired": "A conexão com o GitHub expirou.",
     "couldNotLoadPullRequest": "Não foi possível carregar o pull request.",

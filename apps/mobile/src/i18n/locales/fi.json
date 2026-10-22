@@ -669,7 +669,8 @@
       "gitlabDescription": "Yhdistä GitLab-tilisi, niin voit katselmoida yhdistämispyyntöjä mobiililaitteella.",
       "bitbucketDescription": "Yhdistä Bitbucket tähän organisaatioon, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
       "bitbucketOrgOnlyDescription": "Vaihda yllä oleva tili organisaatioon, niin voit katselmoida sen Bitbucket-muutospyyntöjä.",
-      "contextLine": "{{organization}}-organisaatiolle"
+      "contextLine": "{{organization}}-organisaatiolle",
+      "contextLinePersonal": "Henkilökohtaiselle tilillesi"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dollaria",
       "costSpoken": "kustannus {{cost}}",
       "costSpokenWithTime": "kustannus {{cost}}, {{time}}",
+      "spokenJoiner": "ja",
       "pullRequest": "muutospyyntö {{number}}"
     },
     "githubInstall": {

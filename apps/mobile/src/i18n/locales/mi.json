@@ -669,7 +669,8 @@
       "gitlabDescription": "Honoa tō pūkete GitLab kia arotakehia ngā tono whakakotahi i te waea pūkoro.",
       "bitbucketDescription": "Honoa a Bitbucket ki tēnei whakahaere kia arotakehia ngā tono kume i te waea pūkoro.",
       "bitbucketOrgOnlyDescription": "Whakawhiti te pūkete kei runga ake nei ki tētahi whakahaere kia arotakehia ōna tono kume Bitbucket.",
-      "contextLine": "Mō {{organization}}"
+      "contextLine": "Mō {{organization}}",
+      "contextLinePersonal": "Mō tō whaiaro"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "tāra",
       "costSpoken": "utu {{cost}}",
       "costSpokenWithTime": "utu {{cost}}, {{time}}",
+      "spokenJoiner": ",",
       "pullRequest": "tono kume {{number}}"
     },
     "githubInstall": {

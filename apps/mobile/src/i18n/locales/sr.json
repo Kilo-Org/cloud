@@ -681,7 +681,8 @@
       "gitlabDescription": "Poveži svoj GitLab nalog da pregledaš merge requeste na telefonu.",
       "bitbucketDescription": "Poveži Bitbucket sa ovom organizacijom da pregledaš zahteve za spajanje na telefonu.",
       "bitbucketOrgOnlyDescription": "Prebaci nalog gore na organizaciju da pregledaš njene zahteve za spajanje na Bitbucktu.",
-      "contextLine": "Za {{organization}}"
+      "contextLine": "Za {{organization}}",
+      "contextLinePersonal": "Za lični nalog"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2139,6 +2140,7 @@
       "dollar_few": "dolara",
       "costSpoken": "trošak {{cost}}",
       "costSpokenWithTime": "cena {{cost}}, {{time}}",
+      "spokenJoiner": "i",
       "pullRequest": "zahtev za spajanje {{number}}"
     },
     "githubInstall": {

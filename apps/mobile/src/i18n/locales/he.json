@@ -1606,6 +1606,7 @@
       "dollar_two": "דולרים",
       "costSpoken": "עלות {{cost}}",
       "costSpokenWithTime": "עלות {{cost}}, {{time}}",
+      "spokenJoiner": "ו-",
       "pullRequest": "בקשת משיכה {{number}}"
     },
     "githubInstall": {
@@ -2579,7 +2580,8 @@
       "gitlabDescription": "חברו את חשבון GitLab שלכם כדי לסקור בקשות מיזוג בנייד.",
       "bitbucketDescription": "חברו את Bitbucket לארגון הזה כדי לסקור בקשות משיכה בנייד.",
       "bitbucketOrgOnlyDescription": "החליפו את החשבון שלמעלה לארגון כדי לסקור את בקשות המשיכה שלו ב-Bitbucket.",
-      "contextLine": "עבור {{organization}}"
+      "contextLine": "עבור {{organization}}",
+      "contextLinePersonal": "עבור החשבון האישי"
     },
     "connectionExpired": "פג תוקף החיבור ל-GitHub.",
     "couldNotLoadPullRequest": "לא ניתן היה לטעון את בקשת המשיכה.",

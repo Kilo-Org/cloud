@@ -1595,6 +1595,7 @@
       "dollar_other": "dollar",
       "costSpoken": "kosten {{cost}}",
       "costSpokenWithTime": "kosten {{cost}}, {{time}}",
+      "spokenJoiner": "en",
       "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
@@ -2554,7 +2555,8 @@
       "gitlabDescription": "Koppel je GitLab-account om merge requests op je telefoon te beoordelen.",
       "bitbucketDescription": "Koppel Bitbucket aan deze organisatie om PR's op je telefoon te beoordelen.",
       "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
-      "contextLine": "Voor {{organization}}"
+      "contextLine": "Voor {{organization}}",
+      "contextLinePersonal": "Voor je persoonlijke account"
     },
     "connectionExpired": "De GitHub-koppeling is verlopen.",
     "couldNotLoadPullRequest": "De PR kon niet worden geladen.",

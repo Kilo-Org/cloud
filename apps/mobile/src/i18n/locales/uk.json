@@ -1617,6 +1617,7 @@
       "dollar_many": "доларів",
       "costSpoken": "вартість {{cost}}",
       "costSpokenWithTime": "вартість {{cost}}, {{time}}",
+      "spokenJoiner": "і",
       "pullRequest": "запит на злиття {{number}}"
     },
     "githubInstall": {
@@ -2604,7 +2605,8 @@
       "gitlabDescription": "Підключіть обліковий запис GitLab, щоб переглядати merge-запити з мобільного.",
       "bitbucketDescription": "Підключіть Bitbucket до цієї організації, щоб переглядати запити на злиття з мобільного.",
       "bitbucketOrgOnlyDescription": "Перемкніть обліковий запис, вказаний вище, на організацію, щоб переглядати її запити на злиття в Bitbucket.",
-      "contextLine": "Для {{organization}}"
+      "contextLine": "Для {{organization}}",
+      "contextLinePersonal": "Для особистого простору"
     },
     "connectionExpired": "Термін дії підключення до GitHub минув.",
     "couldNotLoadPullRequest": "Не вдалося завантажити запит на злиття.",

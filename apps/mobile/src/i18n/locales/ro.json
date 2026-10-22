@@ -681,7 +681,8 @@
       "gitlabDescription": "Conectează-ți contul GitLab pentru a revizui merge requesturi de pe mobil.",
       "bitbucketDescription": "Conectează Bitbucket la această organizație pentru a revizui PR-uri de pe mobil.",
       "bitbucketOrgOnlyDescription": "Comută contul de mai sus pe o organizație pentru a revizui PR-urile Bitbucket ale acesteia.",
-      "contextLine": "Pentru {{organization}}"
+      "contextLine": "Pentru {{organization}}",
+      "contextLinePersonal": "Pentru contul personal"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2139,6 +2140,7 @@
       "dollar_few": "dolari",
       "costSpoken": "cost de {{cost}}",
       "costSpokenWithTime": "costul este {{cost}}, {{time}}",
+      "spokenJoiner": "și",
       "pullRequest": "pR {{number}}"
     },
     "githubInstall": {

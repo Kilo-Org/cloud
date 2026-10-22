@@ -681,7 +681,8 @@
       "gitlabDescription": "Pievieno savu GitLab kontu, lai pārskatītu merge requests mobilajā ierīcē.",
       "bitbucketDescription": "Pievieno Bitbucket šai organizācijai, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē.",
       "bitbucketOrgOnlyDescription": "Pārslēdz augstāk redzamo kontu uz organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus.",
-      "contextLine": "Priekš {{organization}}"
+      "contextLine": "Priekš {{organization}}",
+      "contextLinePersonal": "Priekš personīgā konta"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2139,6 +2140,7 @@
       "dollar_zero": "dolāru",
       "costSpoken": "izmaksas {{cost}}",
       "costSpokenWithTime": "izmaksas {{cost}}, {{time}}",
+      "spokenJoiner": "un",
       "pullRequest": "izmaiņu pieprasījums {{number}}"
     },
     "githubInstall": {

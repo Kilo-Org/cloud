@@ -669,7 +669,8 @@
       "gitlabDescription": "Ikonekta ang iyong GitLab account para suriin ang mga merge request sa mobile.",
       "bitbucketDescription": "Ikonekta ang Bitbucket sa organizasyong ito para suriin ang mga pull request sa mobile.",
       "bitbucketOrgOnlyDescription": "Palitan ang account sa itaas ng isang organisasyon para suriin ang mga pull request nito sa Bitbucket.",
-      "contextLine": "Para sa {{organization}}"
+      "contextLine": "Para sa {{organization}}",
+      "contextLinePersonal": "Para sa pansariling account"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dolyar",
       "costSpoken": "gastos na {{cost}}",
       "costSpokenWithTime": "halagang {{cost}}, {{time}}",
+      "spokenJoiner": ", at",
       "pullRequest": "pull request na {{number}}"
     },
     "githubInstall": {

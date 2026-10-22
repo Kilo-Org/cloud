@@ -669,7 +669,8 @@
       "gitlabDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf herrega GitLab kee walqabsiisi.",
       "bitbucketDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf Bitbucket dhaabbata kana waliin walqabsiisi.",
       "bitbucketOrgOnlyDescription": "Herrega gubbaa jiru gara dhaabbataatti jijjiiri, dhaabbata sanaa gaaffiiwwan walitti makuu Bitbucket ilaaluuf.",
-      "contextLine": "{{organization}}iif"
+      "contextLine": "{{organization}}iif",
+      "contextLinePersonal": "Dhuunfaa'iif"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "doolaara",
       "costSpoken": "baasii {{cost}}",
       "costSpokenWithTime": "gatii {{cost}}, {{time}}",
+      "spokenJoiner": ", and",
       "pullRequest": "gaaffii walitti makuu {{number}}"
     },
     "githubInstall": {

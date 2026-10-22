@@ -28,9 +28,9 @@ catalog:
   '@tanstack/query-async-storage-persister': 5.100.10
   '@tanstack/react-query': 5.100.10
   '@tanstack/react-query-persist-client': 5.100.10
-  '@trpc/client': 11.17.0
-  '@trpc/server': 11.17.0
-  '@trpc/tanstack-react-query': 11.17.0
+  '@trpc/client': 11.19.0
+  '@trpc/server': 11.19.0
+  '@trpc/tanstack-react-query': 11.19.0
   '@types/jsonwebtoken': 9.0.10
   '@types/node': 24.12.4
   '@typescript/native-preview': 7.0.0-dev.20260514.1
@@ -51,7 +51,7 @@ catalog:
   vitest: 4.1.11
   workers-tagged-logger: 1.0.0
   wrangler: 4.135.0
-  zod: 4.4.3
+  zod: 4.6.7
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
@@ -114,6 +114,10 @@ minimumReleaseAgeExclude:
   # enough on its own.
   - react-native-reanimated@4.7.1
 overrides:
+  # One pg client in the tree: drizzle-orm's optional peers include pg, so two
+  # pg versions split drizzle-orm into two packages and their SQL types stop
+  # being assignable to each other across workspace imports.
+  pg: 8.23.1
   # Do NOT add an '@sentry/cli' override here to dedupe it against the catalog.
   # @sentry/bundler-plugin-core (used by @sentry/nextjs to upload source maps)
   # requires ^2.58.5 and calls @sentry/cli through its Node API. v3 replaced the
@@ -253,7 +257,11 @@ patchedDependencies:
   # `(tabs)` route vanishes from the generated `Href` union and typecheck
   # rejects valid navigations.
   '@expo/router-server@57.0.11': patches/@expo+router-server@57.0.11.patch
-  expo-server-sdk: patches/expo-server-sdk.patch
+  # workerd has no undici ALPN support and the bundle must not read package.json
+  # at runtime: use globalThis.fetch and inline the SDK version the push request
+  # headers report. The patch hard-codes 6.1.0, so it is pinned to that release
+  # instead of widening to every later one.
+  expo-server-sdk@6.1.0: patches/expo-server-sdk@6.1.0.patch
   # Android: keep the React host after a headless expo-task-manager run. The
   # loader destroyed the host after each background task, and a destroyed host
   # keeps its native memory, so each background push or refresh added a new
@@ -285,7 +293,7 @@ patchedDependencies:
   # A finished first entry made a cold start re-enqueue with REPLACE, which
   # cancelled the glanceable refresh run in progress.
   expo-background-task@57.0.21: patches/expo-background-task@57.0.21.patch
-  '@expo/react-native-action-sheet@4.1.1': patches/@expo__react-native-action-sheet@4.1.1.patch
+  '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'
@@ -321,3 +329,4 @@ allowBuilds:
   tree-sitter-bash: false
   geckodriver: true
   '@scarf/scarf': false
+  '@parcel/watcher': false

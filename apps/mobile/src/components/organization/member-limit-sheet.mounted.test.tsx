@@ -1,6 +1,9 @@
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
+import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { InviteMemberSheet } from './invite-member-sheet';
 import { LowBalanceAlertSheet } from './low-balance-alert-sheet';
@@ -13,7 +16,18 @@ const boundary = vi.hoisted(() => ({
   isResolving: false,
 }));
 const query = vi.hoisted(() => ({
-  data: undefined as { members: { id: string; status: string }[]; settings: object } | undefined,
+  data: undefined as
+    | {
+        members: {
+          id: string;
+          status: string;
+          name?: string | null;
+          email?: string | null;
+          dailyUsageLimitUsd?: number | null;
+        }[];
+        settings: object;
+      }
+    | undefined,
   isLoading: false,
   isPending: false,
   isError: false,
@@ -69,11 +83,22 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isActiveOrgMember: (member: { status: string }) => member.status === 'active',
   isMoneyRole: (role: string) => role === 'owner' || role === 'billing_manager',
 }));
-const mutations = vi.hoisted(() => ({
-  current: {
-    invite: { isPending: false, isError: false, mutate: vi.fn() },
-  },
-}));
+const mutations = vi.hoisted(() => {
+  const updateMember = {
+    mutate: vi.fn(),
+    isError: false,
+    isPending: false,
+    error: null as Error | null,
+  };
+  return {
+    updateMember,
+    current: {
+      invite: { isPending: false, isError: false, mutate: vi.fn() },
+      updateMember,
+    },
+  };
+});
+const updateMember = mutations.updateMember;
 vi.mock('@/lib/hooks/use-organization-mutations', () => ({
   useOrganizationMutations: () => mutations.current,
 }));
@@ -91,6 +116,10 @@ beforeEach(() => {
   query.isPending = false;
   query.isError = false;
   query.refetch.mockClear();
+  updateMember.mutate.mockClear();
+  updateMember.isError = false;
+  updateMember.isPending = false;
+  updateMember.error = null;
 });
 
 const sheets = [
@@ -158,4 +187,95 @@ describe('organization sheet surfaces', () => {
       unmount();
     }
   );
+});
+
+async function mountLimitForm(dailyUsageLimitUsd: number | null) {
+  query.data = {
+    members: [
+      {
+        id: 'member-1',
+        status: 'active',
+        name: 'Dana Member',
+        email: 'dana@example.com',
+        dailyUsageLimitUsd,
+      },
+    ],
+    settings: {},
+  };
+  const mounted = await renderWithProviders(
+    createElement(MemberLimitSheet, { memberId: 'member-1' })
+  );
+  return mounted;
+}
+
+function propsOf(instance: TestRenderer.ReactTestInstance): Record<string, unknown> {
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
+  return instance.props as Record<string, unknown>;
+  /* eslint-enable typescript-eslint/no-unsafe-member-access */
+}
+
+function formField(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
+  return propsOf(renderer.root.find(node => String(node.type) === 'FormField'));
+}
+
+function saveButton(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
+  const [save] = renderer.root.findAll(node => String(node.type) === 'Button');
+  if (!save) {
+    throw new Error('the limit form rendered no save button');
+  }
+  return propsOf(save);
+}
+
+const rangeMessage = i18n.t('organization.memberLimit.rangeError', {
+  max: formatNumber(2000, i18n.language),
+});
+const blankWithoutLimitMessage = i18n.t('organization.memberLimit.blankWithoutLimitError', {
+  max: formatNumber(2000, i18n.language),
+});
+
+describe('MemberLimitSheet validation', () => {
+  it('shows the range error on an above-maximum amount and keeps save disabled', async () => {
+    const { renderer, unmount } = await mountLimitForm(1200);
+
+    expect(formField(renderer).error).toBeUndefined();
+    expect(saveButton(renderer).disabled).toBe(false);
+
+    act(() => {
+      (formField(renderer).onChangeText as (value: string) => void)('2500');
+    });
+
+    expect(formField(renderer).error).toBe(rangeMessage);
+    expect(saveButton(renderer).disabled).toBe(true);
+    unmount();
+  });
+
+  it('clears the error and re-enables save once the amount is back in range', async () => {
+    const { renderer, unmount } = await mountLimitForm(1200);
+
+    act(() => {
+      (formField(renderer).onChangeText as (value: string) => void)('2500');
+    });
+    act(() => {
+      (formField(renderer).onChangeText as (value: string) => void)('900');
+    });
+
+    expect(formField(renderer).error).toBeUndefined();
+    expect(saveButton(renderer).disabled).toBe(false);
+    unmount();
+  });
+
+  it('explains a blank field on a member with no limit only after interaction', async () => {
+    const { renderer, unmount } = await mountLimitForm(null);
+
+    expect(formField(renderer).error).toBeUndefined();
+    expect(saveButton(renderer).disabled).toBe(true);
+
+    act(() => {
+      (formField(renderer).onBlur as () => void)();
+    });
+
+    expect(formField(renderer).error).toBe(blankWithoutLimitMessage);
+    expect(saveButton(renderer).disabled).toBe(true);
+    unmount();
+  });
 });

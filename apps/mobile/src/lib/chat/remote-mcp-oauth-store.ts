@@ -4,6 +4,8 @@ import { isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { createSecureStorePreference } from '@/lib/hooks/secure-store-preference';
 import { REMOTE_MCP_OAUTH_KEY } from '@/lib/storage-keys';
 
+import { normalizeRemoteMcpUrl } from './remote-mcp-url';
+
 /**
  * The OAuth state of each remote MCP server, on the account-scoped secure store
  * and cleared with it on sign-out.
@@ -11,6 +13,22 @@ import { REMOTE_MCP_OAUTH_KEY } from '@/lib/storage-keys';
  * An entry names the URL it was made for. A server whose URL changed reads no
  * state, so a token issued for one endpoint is never sent to another.
  */
+
+/**
+ * Whether an entry was made for this server's endpoint.
+ *
+ * Entries outlive the spellings that wrote them — the server store drops a
+ * root-path trailing slash when it loads — and one endpoint keeps one set of
+ * credentials, so both sides are compared in normalized form. An entry that
+ * cannot be normalized is compared as written, so it matches only itself.
+ */
+function sameEndpoint(saved: string, url: string): boolean {
+  try {
+    return normalizeRemoteMcpUrl(saved) === normalizeRemoteMcpUrl(url);
+  } catch {
+    return saved === url;
+  }
+}
 
 const tokensSchema = z
   .object({
@@ -79,7 +97,7 @@ export async function readRemoteMcpOAuth(
 ): Promise<RemoteMcpOAuthState | undefined> {
   await store.whenLoaded();
   const state = store.getRequested()[id];
-  return state?.url === url ? state : undefined;
+  return state != null && sameEndpoint(state.url, url) ? state : undefined;
 }
 
 /**
@@ -98,7 +116,8 @@ export async function writeRemoteMcpOAuth(
   }
   const { id, url } = owner;
   const current = store.getRequested();
-  const existing = current[id]?.url === url ? current[id] : undefined;
+  const saved = current[id];
+  const existing = saved != null && sameEndpoint(saved.url, url) ? saved : undefined;
   store.set({ ...current, [id]: { ...existing, ...patch, url } });
 }
 

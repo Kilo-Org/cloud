@@ -25,6 +25,7 @@
     "error": "خطا: {{error}}",
     "back": "بازگشت",
     "somethingWentWrong": "مشکلی پیش آمد.",
+    "actionNotRecorded": "نتوانستیم این اقدام را ثبت کنیم. لطفاً بعداً دوباره تلاش کنید.",
     "couldNotOpen": "باز کردن {{label}} ممکن نشد.",
     "link": "پیوند",
     "takingLonger": "این کار بیش از حد انتظار طول می‌کشد. می‌توانید این صفحه را ببندید و بعداً دوباره بررسی کنید.",
@@ -111,7 +112,9 @@
     "online": "آنلاین",
     "open": "باز کردن {{name}}",
     "openPullRequest": "پول ریکوئست باز",
+    "completed": "تکمیل‌شده",
     "pending": "در انتظار",
+    "running": "در حال اجرا",
     "performance": "عملکرد",
     "preferences": "تنظیمات دلخواه",
     "privacyPolicy": "خط‌مشی حریم خصوصی",
@@ -782,7 +785,6 @@
       "mergeResultDefaultError": "GitHub ادغام را تکمیل نکرد.",
       "mergeResultNotCompleted": "{{term}} ادغام نشد. وضعیت آن را بررسی کنید و دوباره تلاش کنید.",
       "ambiguous": "تأیید نتیجه ممکن نشد. پیش از تلاش مجدد، PR را بررسی کنید.",
-      "persistenceFailed": "نتوانستیم این اقدام را ثبت کنیم. لطفاً بعداً دوباره تلاش کنید.",
       "forbidden": "اجازهٔ انجام این کار را ندارید."
     },
     "capabilities": {
@@ -1454,8 +1456,9 @@
       "loading": "در حال بارگذاری حافظه بررسی",
       "couldNotLoad": "بارگذاری حافظه بررسی ممکن نشد.",
       "off": "حافظه بررسی غیرفعال است.",
+      "on": "حافظه بررسی فعال است.",
       "offDescription": "آن را فعال کنید تا Kilo از پاسخ‌های نگهدارندگان یاد بگیرد و دستورالعمل‌هایی برای REVIEW.md پیشنهاد دهد.",
-      "readOnlyDescription": "فقط مالکان سازمان و مدیران صورتحساب می‌توانند حافظه بررسی را فعال کنند.",
+      "readOnlyDescription": "فقط مالکان سازمان و مدیران صورتحساب می‌توانند حافظه بررسی را تغییر دهند.",
       "enable": "فعال‌سازی حافظه بررسی",
       "loadingProposals": "در حال بارگذاری پیشنهادها",
       "couldNotLoadProposals": "بارگذاری پیشنهادها ممکن نشد.",
@@ -1536,8 +1539,6 @@
     "updateFailed": "به‌روزرسانی بررسی‌کننده کد ممکن نشد.",
     "configSaveFailed": "ذخیره تنظیمات بررسی ممکن نشد.",
     "status": {
-      "running": "در حال اجرا",
-      "completed": "تکمیل‌شده",
       "interrupted": "قطع شد"
     },
     "reviewStyle": {
@@ -1879,6 +1880,9 @@
       "viewA11y": "مشاهده گزارش ممیزی"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "مدیر Kilo",
+      "actorMaskedUser": "کاربر ناشناس",
+      "actorSystem": "سیستم Kilo",
       "couldNotLoad": "بارگذاری گزارش ممیزی ممکن نشد.",
       "events": "رویدادها",
       "generated": "این گزارش در {{generatedAt}} تولید شده است.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "ممکن است همگام‌سازی کامل نشده باشد. برای تطبیق وضعیت آن دوباره تلاش کنید یا آن را کنار بگذارید.",
       "syncInProgress": "یک همگام‌سازی امنیتی در حال انجام است. لطفاً دوباره تلاش کنید.",
       "dismissalInProgress": "نادیده‌گرفتن این یافته در حال انجام است. لطفاً دوباره تلاش کنید.",
-      "couldNotReadPendingSyncs": "خواندن همگام‌سازی‌های در انتظار ممکن نشد. دوباره تلاش کنید."
+      "couldNotReadPendingSyncs": "خواندن همگام‌سازی‌های در انتظار ممکن نشد. دوباره تلاش کنید.",
+      "ambiguous": "تأیید نتیجه ممکن نشد. پیش از تلاش مجدد، بازبینی امنیتی را بررسی کنید.",
+      "settleFailed": "عملیات انجام شد، اما نتوانستیم نتیجه را ثبت کنیم. لطفاً دوباره تلاش کنید.",
+      "replayFailed": "این عملیات کامل نشد. لطفاً دوباره تلاش کنید.",
+      "actionFailed": "امکان انجام این عملیات وجود نداشت. لطفاً دوباره تلاش کنید.",
+      "actionBlocked": "امکان انجام این عملیات وجود نداشت. مشکل باید ابتدا برطرف شود تا بتوانید دوباره تلاش کنید."
     },
     "analysisState": {
       "queued": "تحلیل در صف",
@@ -2772,7 +2781,7 @@
     "thisDevice": "این دستگاه",
     "viewProfile": "مشاهدهٔ پروفایل",
     "signOutThisDevice": "خروج از این دستگاه",
-    "signOutThisSession": "خروج از این نشست",
+    "signOutSessionLabel": "خروج از {{device}}، ورود در {{signedIn}}",
     "sessionSignedOut": "خروج از نشست انجام شد.",
     "signOutThisDeviceTitle": "از حساب خود در این دستگاه خارج می‌شوید؟",
     "signOutThisSessionTitle": "از این نشست خارج می‌شوید؟",
@@ -3010,11 +3019,23 @@
     "boundary": {
       "backToProfile": "بازگشت به پروفایل",
       "loadErrorMessage": "اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.",
+
+      "chooseAccount": "انتخاب حساب",
       "loadErrorTitle": "بارگذاری سازمان‌های شما ممکن نشد.",
+      "membershipLostNotice": "شما دیگر به این سازمان دسترسی ندارید. به {{target}} تغییر یافت.",
+      "noOrganization": "بدون سازمان",
+
+      "noOrganizationDescription": "این حساب بخشی از هیچ سازمانی نیست. برای استفاده از ویژگی‌های سازمان مانند دعوت اعضا و هشدارهای موجودی کم، در وب یک سازمان ایجاد کنید یا به یکی بپیوندید.",
+
+      "openWebOrganizations": "باز کردن سازمان‌ها در وب",
+
       "organizationUnavailable": "سازمان در دسترس نیست.",
-      "selectDescription": "برای ادامه، در پروفایل خود یک سازمان انتخاب کنید.",
+      "selectDescriptionWithOrganizations": "شما عضو یک یا چند سازمان هستید. حسابی را انتخاب کنید که این صفحه باید استفاده کند.",
+
       "selectOrganization": "انتخاب سازمان",
       "unavailableDescription": "این سازمان دیگر در دسترس نیست. برای ادامه، در پروفایل خود سازمان دیگری انتخاب کنید.",
+
+      "unavailableSessionsDescription": "این سازمان دیگر در دسترس نیست. جلسات آن قابل بارگذاری نیست.",
       "accessDeniedDescription": "شما به این سازمان دسترسی ندارید."
     },
     "creditActivity": {
@@ -3066,7 +3087,11 @@
       "separateEmailsHint": "آدرس‌های ایمیل را با ویرگول جدا کنید.",
       "thresholdLabel": "هشدار برای موجودی کمتر از (USD)",
       "title": "هشدار موجودی کم",
-      "emailsError": "حداقل یک آدرس ایمیل معتبر وارد کنید. آدرس‌ها را با ویرگول جدا کنید.",
+      "emailsInvalid": "یک یا چند آدرس ایمیل معتبر نیست.",
+      "emailsRequired": "حداقل یک آدرس ایمیل وارد کنید.",
+      "saveEmailsError": "برخی آدرس‌های ایمیل پذیرفته نشد. آن‌ها را بررسی کنید و دوباره امتحان کنید.",
+      "saveError": "هشدار موجودی کم ذخیره نشد.",
+      "thresholdPlaceholder": "مبلغی وارد کنید",
       "thresholdError": "مبلغی بیشتر از ۰ وارد کنید."
     },
     "memberLimit": {
@@ -3077,6 +3102,7 @@
       "removeLimit": "حذف محدودیت",
       "title": "محدودیت مصرف روزانه",
       "blankError": "مبلغی وارد کنید یا روی «حذف محدودیت» در پایین بزنید.",
+      "blankWithoutLimitError": "حد روزانه‌ای بین ۰ و {{max}} وارد کنید.",
       "rangeError": "مبلغی بین ۰ و {{max}} وارد کنید."
     },
     "members": {
@@ -3544,6 +3570,7 @@
   "appActions": {
     "start": {
       "promptRequired": "برای شروع عامل، یک پیام لازم است. یک پیام اضافه کنید و دوباره اجرا کنید.",
+      "repositoryRequired": "برای شروع عامل، یک مخزن لازم است. Kilo را باز کنید و یکی را انتخاب کنید، سپس دوباره اجرا کنید.",
       "repositoryUnknown": "Kilo مخزن {{repository}} را به عنوان مخزن GitHub یا GitLab نمی‌شناسد. در Kilo مخزن دیگری انتخاب کنید.",
       "repositoryUnsupported": "{{repository}} یک مخزن Bitbucket است — شروع عامل هنوز نمی‌تواند از آن استفاده کند. در Kilo مخزن دیگری انتخاب کنید."
     }
@@ -3615,7 +3642,6 @@
     "keyTooLong": "کلید باید 256 نویسه یا کمتر باشد",
     "keyDuplicate": "این کلید از قبل در نمایه وجود دارد",
     "valueLabel": "ارزش",
-    "secretLabel": "راز",
     "secrets": {
       "markSecret": "علامت گذاری به عنوان راز",
       "masked": "ارزش پنهان",
@@ -3674,7 +3700,9 @@
       "jsonTooLarge": "حداکثر 50 ورودی، کلیدها تا 128 و مقادیر تا 4096 نویسه استفاده کنید",
       "timeoutInvalid": "تایم اوت باید چندین میلی ثانیه باشد",
       "edit": "ویرایش سرور MCP",
-      "saveFailed": "سرور MCP ذخیره نشد"
+      "saveFailed": "سرور MCP ذخیره نشد",
+      "deleteFailed": "سرور MCP حذف نشد",
+      "updateFailed": "سرور MCP به‌روزرسانی نشد"
     },
     "agents": {
       "title": "نمایندگان پروفایل",
@@ -3701,6 +3729,7 @@
       "visibilitySubagent": "Subagent - فقط از دیگران قابل تماس است",
       "visibilityAll": "همه - هر دو",
       "saveFailed": "عامل ذخیره نشد",
+      "deleteFailed": "عامل حذف نشد",
       "nameRequired": "یک نام نماینده وارد کنید",
       "slugRequired": "یک اسلاگ عامل را وارد کنید",
       "slugInvalid": "Slug باید با یک حرف شروع شود و فقط از حروف کوچک، اعداد و خط تیره استفاده کند",
@@ -3715,10 +3744,12 @@
       "description": "توضیحات فرمان",
       "template": "الگو",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS را توضیح دهید",
       "subtask": "به عنوان وظیفه فرعی اجرا شود",
       "edit": "ویرایش دستور اسلش",
       "saveFailed": "فرمان ذخیره نشد",
+      "deleteFailed": "فرمان حذف نشد",
       "nameRequired": "یک نام فرمان وارد کنید",
       "nameInvalid": "نام باید با یک حرف کوچک شروع شود و فقط از حروف کوچک، ارقام و خط تیره استفاده کند",
       "templateRequired": "یک قالب فرمان را وارد کنید",
@@ -3865,7 +3896,7 @@
     "view": "خواندن گزارش",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "نمایش وضعیت زنده",
+    "dismiss": "نادیده گرفتن گزارش",
     "offline": "آفلاین · گزارش ذخیره‌شده",
     "cached": "گزارش ذخیره‌شده · به‌روزرسانی در دسترس نیست",
     "revised": "بازبینی‌شده · {{revision}}",

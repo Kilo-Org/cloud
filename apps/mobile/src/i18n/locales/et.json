@@ -25,6 +25,7 @@
     "error": "viga: {{error}}",
     "back": "Tagasi",
     "somethingWentWrong": "Midagi läks valesti.",
+    "actionNotRecorded": "Seda toimingut ei õnnestunud salvestada. Proovi hiljem uuesti.",
     "couldNotOpen": "Avamine ebaõnnestus: {{label}}.",
     "link": "veebilink",
     "takingLonger": "See võtab oodatust kauem aega. Sa võid selle sulgeda ja hiljem uuesti vaadata.",
@@ -111,7 +112,9 @@
     "online": "Võrgus",
     "open": "Ava {{name}}",
     "openPullRequest": "Ava tõmbetaotlus",
+    "completed": "Lõpetatud",
     "pending": "Ootel",
+    "running": "Töötab",
     "performance": "Jõudlus",
     "preferences": "Eelistused",
     "privacyPolicy": "Privaatsuspoliitika",
@@ -782,7 +785,6 @@
       "mergeResultDefaultError": "GitHub ei lõpetanud ühendamist.",
       "mergeResultNotCompleted": "{{term}} ei liidetud. Kontrolli olekut ja proovi uuesti.",
       "ambiguous": "Toimingu õnnestumist ei õnnestunud kinnitada — kontrolli PR-i enne uuesti proovimist.",
-      "persistenceFailed": "Seda toimingut ei õnnestunud salvestada. Proovi hiljem uuesti.",
       "forbidden": "See toiming pole lubatud."
     },
     "capabilities": {
@@ -1454,8 +1456,9 @@
       "loading": "Ülevaatuste mälu laadimine",
       "couldNotLoad": "Ülevaatuste mälu ei õnnestunud laadida.",
       "off": "Ülevaatuste mälu on välja lülitatud.",
+      "on": "Ülevaatuste mälu on sisse lülitatud.",
       "offDescription": "Lülita see sisse, et Kilo saaks hooldajate vastustest õppida ja pakkuda juhiseid faili REVIEW.md.",
-      "readOnlyDescription": "Ülevaatuste mälu saavad sisse lülitada ainult organisatsiooni omanikud ja arveldushaldurid.",
+      "readOnlyDescription": "Ülevaatuste mälu saavad muuta ainult organisatsiooni omanikud ja arveldushaldurid.",
       "enable": "Luba ülevaatuste mälu",
       "loadingProposals": "Ettepanekute laadimine",
       "couldNotLoadProposals": "Ettepanekuid ei õnnestunud laadida.",
@@ -1536,8 +1539,6 @@
     "updateFailed": "Koodiülevaataja uuendamine ebaõnnestus.",
     "configSaveFailed": "Ülevaatuse seadete salvestamine ebaõnnestus.",
     "status": {
-      "running": "Töötab",
-      "completed": "Lõpetatud",
       "interrupted": "Katkestatud"
     },
     "reviewStyle": {
@@ -1879,6 +1880,9 @@
       "viewA11y": "Vaata auditiaruannet"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administraator",
+      "actorMaskedUser": "Varjatud kasutaja",
+      "actorSystem": "Kilo süsteem",
       "couldNotLoad": "Auditiaruannet ei õnnestunud laadida.",
       "events": "Sündmused",
       "generated": "Aruanne on loodud {{generatedAt}}.",
@@ -1957,7 +1961,12 @@
       "syncMayNotHaveCompleted": "Sünkroonimine ei pruukinud lõppeda. Oleku ühtlustamiseks proovi uuesti või loobu.",
       "syncInProgress": "Turbesünkroonimine on juba käimas. Proovi uuesti.",
       "dismissalInProgress": "See kõrvalejätmine on juba käimas. Proovi uuesti.",
-      "couldNotReadPendingSyncs": "Ootel sünkroonimisi ei õnnestunud lugeda. Proovi uuesti."
+      "couldNotReadPendingSyncs": "Ootel sünkroonimisi ei õnnestunud lugeda. Proovi uuesti.",
+      "ambiguous": "Toimingu õnnestumist ei õnnestunud kinnitada — kontrolli turvalisuse läbivaadet enne uuesti proovimist.",
+      "settleFailed": "Toiming lõppes edukalt, kuid me ei suutnud tulemust salvestada. Proovi uuesti.",
+      "replayFailed": "Toimingut ei lõpetatud. Proovi uuesti.",
+      "actionFailed": "Seda toimingut ei õnnestunud lõpule viia. Proovi uuesti.",
+      "actionBlocked": "Seda toimingut ei õnnestunud lõpule viia. Probleem tuleb kõigepealt lahendada."
     },
     "analysisState": {
       "queued": "Analüüs järjekorras",
@@ -2772,7 +2781,7 @@
     "thisDevice": "See seade",
     "viewProfile": "Vaata profiili",
     "signOutThisDevice": "Logi sellest seadmest välja",
-    "signOutThisSession": "Logi sellest seansist välja",
+    "signOutSessionLabel": "Logi seadmest {{device}} välja, sisse logitud {{signedIn}}",
     "sessionSignedOut": "Seansist on välja logitud.",
     "signOutThisDeviceTitle": "Kas logida sellest seadmest välja?",
     "signOutThisSessionTitle": "Kas logida sellest seansist välja?",
@@ -3010,11 +3019,23 @@
     "boundary": {
       "backToProfile": "Tagasi profiilile",
       "loadErrorMessage": "Kontrolli ühendust ja proovi uuesti.",
+
+      "chooseAccount": "Vali konto",
       "loadErrorTitle": "Sinu organisatsioone ei õnnestunud laadida.",
+      "membershipLostNotice": "Sul puudub enam juurdepääs sellele organisatsioonile. Vahetatud {{target}}-le.",
+      "noOrganization": "Organisatsioon puudub",
+
+      "noOrganizationDescription": "See konto ei kuulu ühtegi organisatsiooni. Organisatsiooni funktsioonide, nagu liikmekutsed ja väikese saldo hoiatused, kasutamiseks loo organisatsioon või liitu sellega veebis.",
+
+      "openWebOrganizations": "Ava organisatsioonid veebis",
+
       "organizationUnavailable": "Organisatsioon pole saadaval.",
-      "selectDescription": "Jätkamiseks vali oma profiililt organisatsioon.",
+      "selectDescriptionWithOrganizations": "Kuulud ühte või mitmesse organisatsiooni. Vali konto, mida see ekraan peaks kasutama.",
+
       "selectOrganization": "Vali organisatsioon",
       "unavailableDescription": "See organisatsioon pole enam saadaval. Jätkamiseks vali oma profiililt teine organisatsioon.",
+
+      "unavailableSessionsDescription": "See organisatsioon pole enam saadaval. Selle seansse ei saa laadida.",
       "accessDeniedDescription": "Sul puudub juurdepääs sellele organisatsioonile."
     },
     "creditActivity": {
@@ -3066,7 +3087,11 @@
       "separateEmailsHint": "Eralda e-posti aadressid komadega.",
       "thresholdLabel": "Hoiatuse saldopiir (USD)",
       "title": "Madala saldo hoiatus",
-      "emailsError": "Sisesta vähemalt üks kehtiv e-posti aadress. Eralda aadressid komadega.",
+      "emailsInvalid": "Üks või mitu e-posti aadressi ei ole kehtiv.",
+      "emailsRequired": "Sisesta vähemalt üks e-posti aadress.",
+      "saveEmailsError": "Mõned e-posti aadressid ei olnud lubatud. Kontrolli need üle ja proovi uuesti.",
+      "saveError": "Madala saldo hoiatust ei õnnestununud salvestada.",
+      "thresholdPlaceholder": "Sisesta summa",
       "thresholdError": "Sisesta nullist suurem summa."
     },
     "memberLimit": {
@@ -3077,6 +3102,7 @@
       "removeLimit": "Eemalda piirang",
       "title": "Päevane kasutuspiirang",
       "blankError": "Sisesta summa või eemalda piirang alloleva nupuga.",
+      "blankWithoutLimitError": "Sisesta päevane piirang vahemikus 0 kuni {{max}}.",
       "rangeError": "Sisesta summa vahemikus 0 kuni {{max}}."
     },
     "members": {
@@ -3544,6 +3570,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agendi käivitamiseks on vaja viipa. Lisa viip ja käivita see uuesti.",
+      "repositoryRequired": "Agendi käivitamiseks on vaja hoidlat. Ava Kilo, vali hoidla ja käivita see uuesti.",
       "repositoryUnknown": "Kilo ei tunne {{repository}} ära GitHubi ega GitLabi hoidlana. Vali Kilos teine hoidla.",
       "repositoryUnsupported": "{{repository}} on Bitbucketi hoidla — Käivita agent ei saa seda veel kasutada. Vali Kilos teine hoidla."
     }
@@ -3615,7 +3642,6 @@
     "keyTooLong": "Võti võib olla kuni 256 tähemärki",
     "keyDuplicate": "See võti on profiilis juba olemas",
     "valueLabel": "Väärtus",
-    "secretLabel": "Saladus",
     "secrets": {
       "markSecret": "Märgi salajaseks",
       "masked": "Varjatud väärtus",
@@ -3674,7 +3700,9 @@
       "jsonTooLarge": "Kasuta kõige rohkem 50 kirjet, võtmed kuni 128 ja väärtused kuni 4096 tähemärki",
       "timeoutInvalid": "Aegumine peab olema täisarv millisekundeid",
       "edit": "Redigeeri MCP-serverit",
-      "saveFailed": "MCP-serverit ei saanud salvestada"
+      "saveFailed": "MCP-serverit ei saanud salvestada",
+      "deleteFailed": "MCP-serverit ei õnnestunud kustutada",
+      "updateFailed": "MCP-serverit ei õnnestunud värskendada"
     },
     "agents": {
       "title": "Profiiliagendid",
@@ -3701,6 +3729,7 @@
       "visibilitySubagent": "Subagent — ainult teistelt helistatav",
       "visibilityAll": "Kõik - mõlemad",
       "saveFailed": "Agenti ei õnnestunud salvestada",
+      "deleteFailed": "Agenti ei õnnestunud kustutada",
       "nameRequired": "Sisestage agendi nimi",
       "slugRequired": "Sisestage agent nälkjas",
       "slugInvalid": "Slug peab algama tähega ja kasutama ainult väiketähti, numbreid ja sidekriipse",
@@ -3715,10 +3744,12 @@
       "description": "Käsu kirjeldus",
       "template": "Mall",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Selgitage $ARGUMENTS",
       "subtask": "Käivita alamülesandena",
       "edit": "Muuda kaldkriipsu käsku",
       "saveFailed": "Käsku ei saanud salvestada",
+      "deleteFailed": "Käsku ei õnnestunud kustutada",
       "nameRequired": "Sisestage käsu nimi",
       "nameInvalid": "Nimi peab algama väiketähtedega ja kasutama ainult väiketähti, numbreid ja sidekriipse",
       "templateRequired": "Sisestage käsumall",
@@ -3865,7 +3896,7 @@
     "view": "Loe ülevaadet",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Näita reaalajas olekut",
+    "dismiss": "Jäta ülevaade kõrvale",
     "offline": "Võrguühenduseta · salvestatud ülevaade",
     "cached": "Salvestatud aruanne · värskendamine pole saadaval",
     "revised": "Muudetud · {{revision}}",

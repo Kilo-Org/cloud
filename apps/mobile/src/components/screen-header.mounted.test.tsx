@@ -394,6 +394,34 @@ describe('ScreenHeader mounted', () => {
     ).toHaveLength(0);
   });
 
+  it("keeps a mark-only heading's inlineActions on the row when the caller forbids a reflow", () => {
+    // The shared-row check reserves 120dp of readable title per font-scale
+    // unit: at a 3x accessibility scale on a 390dp phone that reserve is 360dp
+    // against 334dp free, so the picker reflowed under the mark although both
+    // fit. The home header turns the check off for its picker.
+    Object.assign(layout, { width: 390, fontScale: 3 });
+
+    const reflowed = renderHeader({
+      title: 'Kilo',
+      titleContent: 'MARK',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+    });
+    expect(reflowed.root.findAll(isStackedActionsRow)).toHaveLength(1);
+
+    const pinned = renderHeader({
+      title: 'Kilo',
+      titleContent: 'MARK',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+      allowInlineActionsStacking: false,
+    });
+    expect(pinned.root.findAll(isStackedActionsRow)).toHaveLength(0);
+    const inline = findInlineActionsWrapper(pinned.root);
+    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.parent?.props.className).toContain('flex-row');
+  });
+
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 

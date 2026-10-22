@@ -140,6 +140,15 @@ type ScreenHeaderProps = {
    * wider than the title can spare.
    */
   inlineActionsWidth?: number;
+  /**
+   * Keep the `inlineActions` cluster on the title row even when the shared-row
+   * check would reflow it. That check reserves a readable title, and the home
+   * header's heading is a fixed 40dp mark with no text, so the reserve does not
+   * apply: at a 2.5x accessibility font scale the account picker would drop
+   * under the mark on a phone wide enough to hold both. Leave it on for a
+   * heading that carries text.
+   */
+  allowInlineActionsStacking?: boolean;
   /** Home, Quick Chat, and session headers supply context below the title.
    * Other callers keep their existing title-only layout when this slot is absent. */
   context?: React.ReactNode;
@@ -198,6 +207,7 @@ export function ScreenHeader({
   headerRightShrinks = false,
   inlineActions,
   inlineActionsWidth,
+  allowInlineActionsStacking = true,
   context,
   modal,
   centerTitle = modal ?? false,
@@ -230,6 +240,7 @@ export function ScreenHeader({
   // width drops it beneath the title before it squeezes the title's own
   // readable minimum, so the 30px Agents title never breaks inside a word.
   const stackInlineActions =
+    allowInlineActionsStacking &&
     inlineActions != null &&
     shouldStackHeaderActions(windowWidth, fontScale, inlineActionsWidth ?? 0);
 

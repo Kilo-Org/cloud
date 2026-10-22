@@ -8,3 +8,9 @@ packages/harness-sdk/src/plugins/remote-model/security\.test\.ts
 # embedded credentials ("user:secret@localhost") is rejected. Exclude the
 # fixture path so the synthetic credential URI does not fail the scan.
 apps/web/src/lib/cloud-agent/preview-link\.test\.ts
+
+# Git remote fixtures. git-credentials.test.ts asserts which remote forms the
+# platform rewrites to a canonical URL, so it lists synthetic credential URLs.
+# Exclude the fixture path so the scan does not read them as real credentials.
+services/cloud-agent-next/wrapper/src/control/git-credentials\.test\.ts
+

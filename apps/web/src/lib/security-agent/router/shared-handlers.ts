@@ -59,10 +59,7 @@ import {
 import { checkDependabotAlertsAvailability } from '@/lib/security-agent/github/dependabot-api';
 import { submitManualSecuritySync } from '@/lib/security-agent/services/manual-sync-client';
 import { submitManualFindingDismissal } from '@/lib/security-agent/services/manual-dismiss-client';
-import {
-  submitManualAnalysisStart,
-  WorkerTransportError,
-} from '@/lib/security-agent/services/manual-analysis-client';
+import { submitManualAnalysisStart } from '@/lib/security-agent/services/manual-analysis-client';
 import {
   submitApplyAutoRemediation,
   submitManualRemediationStart,
@@ -456,10 +453,7 @@ async function executeSecurityCommandSubmit(args: {
   try {
     accepted = await args.submit();
   } catch (error) {
-    const isAmbiguous =
-      (error instanceof TRPCError && error.code === 'BAD_GATEWAY') ||
-      error instanceof WorkerTransportError;
-    if (isAmbiguous) {
+    if (error instanceof TRPCError && error.code === 'BAD_GATEWAY') {
       // An ambiguous outcome promises same-key reconciliation, so it is
       // surfaced only once `reconcile_pending` is durable.
       await requireLedgerWrite(
@@ -931,9 +925,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           existingConfig?.config.remediation_model_slug ??
           analysisModelSlug;
 
-        // Enqueue backlog findings when include_existing becomes active — either
-        // because it was just toggled ON, or because auto-analysis was re-enabled
-        // while include_existing was already ON.
         const wasAutoAnalysisOn = existingConfig?.config.auto_analysis_enabled ?? false;
         const isAutoAnalysisOn =
           input.autoAnalysisEnabled ?? existingConfig?.config.auto_analysis_enabled ?? false;

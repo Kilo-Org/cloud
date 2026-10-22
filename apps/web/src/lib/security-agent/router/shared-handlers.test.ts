@@ -95,7 +95,6 @@ jest.mock('../services/manual-dismiss-client', () => ({
 }));
 jest.mock('../services/manual-analysis-client', () => ({
   submitManualAnalysisStart: mockSubmitManualAnalysisStart,
-  WorkerTransportError: class WorkerTransportError extends Error {},
 }));
 jest.mock('../services/manual-remediation-client', () => ({
   submitApplyAutoRemediation: mockSubmitApplyAutoRemediation,
@@ -1020,44 +1019,11 @@ describe('queue-backed handlers', () => {
     );
   });
 
-  it('keeps the reservation when the submission outcome is ambiguous', async () => {
+  it('keeps the reservation on an ambiguous submission outcome', async () => {
     mockGetSecurityFindingById.mockResolvedValue({ id: 'finding-id' });
     mockTryReserveAnalysisStartSlot.mockResolvedValue({ reserved: true });
     mockSubmitManualAnalysisStart.mockRejectedValue(
       new TRPCError({ code: 'BAD_GATEWAY', message: 'ambiguous' })
-    );
-    mockAdmitOperation.mockResolvedValue({
-      admission: 'admitted',
-      row: {
-        id: 'ledger-row-id',
-        intent: 'start_analysis',
-        resource_key:
-          'security:start_analysis:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-      },
-    });
-
-    await expect(
-      createHandlers().startAnalysis.handler({
-        ctx: context,
-        input: { findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' },
-      })
-    ).rejects.toThrow("Couldn't confirm — check the security review before retrying.");
-
-    expect(mockMarkReconcilePending).toHaveBeenCalled();
-    expect(mockReleaseAnalysisStartReservation).not.toHaveBeenCalled();
-  });
-
-  it('keeps the reservation on a worker transport failure', async () => {
-    const analysisClientMock = jest.requireMock('../services/manual-analysis-client') as {
-      WorkerTransportError: new (message: string, status?: number) => Error;
-    };
-    mockGetSecurityFindingById.mockResolvedValue({ id: 'finding-id' });
-    mockTryReserveAnalysisStartSlot.mockResolvedValue({ reserved: true });
-    mockSubmitManualAnalysisStart.mockRejectedValue(
-      new analysisClientMock.WorkerTransportError(
-        'Security analysis Worker request failed: socket hang up',
-        502
-      )
     );
     mockAdmitOperation.mockResolvedValue({
       admission: 'admitted',

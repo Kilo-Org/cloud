@@ -28,7 +28,16 @@ import { cn } from '@/lib/utils';
 
 type CenteredStateProps = {
   children: ReactNode;
+  /** Classes for the scroller itself: background, width. */
   className?: string;
+  /**
+   * Classes for the content box that holds the caller's children. A horizontal
+   * inset belongs here: the scroller's own padding does not narrow the scroll
+   * content, so an inset set through `className` leaves the end side flush in a
+   * right-to-left layout, and the scroller's content container style already
+   * carries the centering layout, so a class applied there is replaced by it.
+   */
+  contentContainerClassName?: string;
   testID?: string;
   refreshControl?: ScrollViewProps['refreshControl'];
 };
@@ -45,6 +54,7 @@ export const STATE_SURFACE_FALLBACK_MS = 400;
 export function CenteredState({
   children,
   className,
+  contentContainerClassName,
   testID = 'centered-state',
   refreshControl,
 }: CenteredStateProps) {
@@ -175,7 +185,7 @@ export function CenteredState({
         keyboardShouldPersistTaps="handled"
       >
         <View
-          className={cn('w-full', !visible && 'opacity-0')}
+          className={cn('w-full', contentContainerClassName, !visible && 'opacity-0')}
           testID={testID ? `${testID}-content` : undefined}
           onLayout={measureContent}
           accessibilityElementsHidden={!visible}

@@ -27,11 +27,14 @@ import {
   useUpsertCustomLlm,
   useDeleteCustomLlm,
 } from '@/app/admin/api/custom-llms/hooks';
-import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
+import {
+  CustomLlmCredentialsSchema,
+  CustomLlmDefinitionSchema,
+  CustomLlmPublicIdSchema,
+} from '@kilocode/db/schema-types';
 import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { toast } from 'sonner';
 import { Copy as CopyIcon, Plus, Pencil } from 'lucide-react';
 import Editor from '@monaco-editor/react';
@@ -153,15 +156,13 @@ export function CustomLlmsContent() {
       return;
     }
 
-    if (!publicId.startsWith(CUSTOM_LLM_PREFIX)) {
+    const publicIdResult = CustomLlmPublicIdSchema.safeParse(publicId);
+    if (!publicIdResult.success) {
       setCopy(prev =>
         prev
           ? {
               ...prev,
-              validationError: {
-                field: 'publicId',
-                message: `New public ID must start with "${CUSTOM_LLM_PREFIX}"`,
-              },
+              validationError: { field: 'publicId', message: formatZodError(publicIdResult.error) },
             }
           : prev
       );
@@ -208,12 +209,12 @@ export function CustomLlmsContent() {
       return;
     }
 
-    if (!trimmedPublicId.startsWith(CUSTOM_LLM_PREFIX)) {
-      setEditor(prev => ({
-        ...prev,
-        validationError: `public_id must start with "${CUSTOM_LLM_PREFIX}"`,
-      }));
-      return;
+    if (editor.mode === 'create') {
+      const publicIdResult = CustomLlmPublicIdSchema.safeParse(trimmedPublicId);
+      if (!publicIdResult.success) {
+        setEditor(prev => ({ ...prev, validationError: formatZodError(publicIdResult.error) }));
+        return;
+      }
     }
 
     let parsedCredentials: CustomLlmCredentials | undefined = undefined;
@@ -298,9 +299,9 @@ export function CustomLlmsContent() {
 
       <p className="text-muted-foreground">
         Manage custom LLM definitions stored in the <code>custom_llm2</code> table. Each entry has a{' '}
-        <code>public_id</code>, encrypted credentials (such as API keys or Google Cloud
-        service-account keys), and a JSON <code>definition</code> validated against{' '}
-        <code>CustomLlmDefinitionSchema</code>.
+        <code>public_id</code>, encrypted credentials (such as API keys, Google Cloud
+        service-account keys, or Amazon Bedrock IAM access keys), and a JSON <code>definition</code>{' '}
+        validated against <code>CustomLlmDefinitionSchema</code>.
       </p>
 
       {isLoading ? (
@@ -395,7 +396,7 @@ export function CustomLlmsContent() {
                   }))
                 }
                 disabled={editor.mode === 'edit'}
-                placeholder={`e.g. ${CUSTOM_LLM_PREFIX}my-custom-model`}
+                placeholder="e.g. acme/my-custom-model"
                 className="font-mono"
               />
             </div>
@@ -463,6 +464,26 @@ export function CustomLlmsContent() {
   }
 }`}
                   </pre>
+                  <p className="mt-2">
+                    For Amazon Bedrock with IAM access keys, set the definition&apos;s{' '}
+                    <code className="text-foreground">base_url</code> to a Bedrock endpoint such as{' '}
+                    <code className="text-foreground">
+                      https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1
+                    </code>{' '}
+                    and use the following. Requests are signed with AWS SigV4. Bedrock API keys use{' '}
+                    <code className="text-foreground">&quot;type&quot;: &quot;api_key&quot;</code>{' '}
+                    on OpenAI-compatible routes and{' '}
+                    <code className="text-foreground">&quot;type&quot;: &quot;x-api-key&quot;</code>{' '}
+                    on Anthropic Messages routes.
+                  </p>
+                  <pre className="text-foreground mt-2 overflow-x-auto font-mono whitespace-pre-wrap">
+                    {`{
+  "type": "aws_bedrock",
+  "region": "us-east-1",
+  "access_key_id": "AKIA...",
+  "secret_access_key": "YOUR_SECRET_ACCESS_KEY"
+}`}
+                  </pre>
                 </div>
               )}
             </div>
@@ -500,6 +521,12 @@ export function CustomLlmsContent() {
                 <code>&quot;internal_id&quot;: &quot;provider-model&quot;</code> to send an upstream{' '}
                 <code>model</code>; omit <code>internal_id</code> to remove <code>model</code> from
                 the outbound request body.
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Public ID may only contain lowercase letters, digits, and <code>. / -</code>. It
+                must not start with <code>kilo/</code>, <code>kilo-auto/</code>,{' '}
+                <code>kilocode/</code>, or a direct BYOK provider prefix, and must not be an
+                OpenRouter or Kilo-exclusive model.
               </p>
             </div>
 
@@ -548,7 +575,7 @@ export function CustomLlmsContent() {
                     prev ? { ...prev, publicId: event.target.value, validationError: null } : prev
                   )
                 }
-                placeholder={`e.g. ${CUSTOM_LLM_PREFIX}my-copied-model`}
+                placeholder="e.g. acme/my-copied-model"
                 className="font-mono"
                 aria-invalid={copy?.validationError?.field === 'publicId'}
                 aria-describedby={

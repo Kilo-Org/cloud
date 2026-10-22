@@ -9,7 +9,7 @@ import { createElement, type ElementType, type ReactNode } from 'react';
 import type * as ReactModule from 'react';
 import { Platform, Pressable } from 'react-native';
 import { act, type ReactTestRenderer } from '@/test/renderer';
-import { type QueryClient } from '@tanstack/react-query';
+import { onlineManager, type QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -253,6 +253,8 @@ function headerClasses(renderer: ReactTestRenderer): string[] {
 beforeEach(() => {
   Platform.OS = 'ios';
   windowDims.width = 390;
+  // A test that simulates the app reporting offline must not leak that state.
+  onlineManager.setOnline(true);
   savedMetadata.clear();
   saveCompletion = undefined;
   addCreditsRowProps.latest = undefined;
@@ -281,6 +283,71 @@ beforeEach(() => {
 });
 
 describe('CreditsCard balance state', () => {
+  it.each([
+    { name: 'expired grants', future: false },
+    { name: 'mixed grants', future: true },
+  ])('excludes elapsed expiry dates from $name', async ({ future }) => {
+    const now = Date.parse('2026-10-17T12:00:00Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [
+        { balance_mUsd: 1_900_000, expiry_date: '2026-06-17T12:00:00Z' },
+        { balance_mUsd: 3_000_000, expiry_date: '2026-10-17T12:00:00Z' },
+        { balance_mUsd: 7_000_000, expiry_date: null },
+        ...(future ? [{ balance_mUsd: 2_000_000, expiry_date: '2026-12-17T12:00:00Z' }] : []),
+      ],
+    });
+    try {
+      const { texts, unmount } = await mountCard();
+      try {
+        await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
+        const notes = texts().filter(text => text.includes('in bonus credits'));
+        expect(notes).toEqual(future ? ['$2.00 in bonus credits expiring 12/17/2026'] : []);
+      } finally {
+        unmount();
+      }
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('excludes elapsed expiry dates from organization credits', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-17T12:00:00Z'));
+    currentUser.userId = 'user-a';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+    // The personal query keeps its own future grant, so a subtitle built from
+    // it would read $5.00 expiring 1/17/2027, and one that summed both sources
+    // would read $7.00 expiring 12/17/2026.
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [{ balance_mUsd: 5_000_000, expiry_date: '2027-01-17T12:00:00Z' }],
+    });
+    orgCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [
+        { balance_mUsd: 1_900_000, expiry_date: '2026-06-17T12:00:00Z' },
+        { balance_mUsd: 2_000_000, expiry_date: '2026-12-17T12:00:00Z' },
+      ],
+    });
+    const orgs = [
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+    ] as OrgListEntry[];
+    try {
+      const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+      try {
+        await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
+        expect(texts().filter(text => text.includes('in bonus credits'))).toEqual([
+          '$2.00 in bonus credits expiring 12/17/2026',
+        ]);
+      } finally {
+        unmount();
+      }
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it.each([
     { orgs: [], options: ['Personal', 'Cancel'], choice: 0, expected: null, label: 'Personal' },
     {
@@ -522,6 +589,36 @@ describe('CreditsCard add-credits entry point', () => {
       unmount();
     }
   );
+
+  it('settles the balance read while the app reports offline', async () => {
+    // NetInfo can hold the device offline while the backend is reachable. A
+    // read that pauses there is pending without fetching, so the slot never
+    // leaves its skeleton: the card must ask Query to settle regardless.
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 12.5 });
+    onlineManager.setOnline(false);
+
+    const { texts, unmount } = await mountCard();
+    await waitFor(() => texts().includes('$12.50'));
+
+    expect(texts()).not.toContain('SKELETON');
+    unmount();
+    onlineManager.setOnline(true);
+  });
+
+  it('settles an unreachable balance read to the retry surface while offline', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(new Error('Network request failed'));
+    onlineManager.setOnline(false);
+
+    const { texts, unmount } = await mountCard();
+    await waitFor(() => texts().includes('Failed to load balance. Tap to retry.'));
+
+    expect(texts()).not.toContain('SKELETON');
+    expect(texts()).not.toContain('$0.00');
+    unmount();
+    onlineManager.setOnline(true);
+  });
 
   it('keeps personal Buy credits actionable when the balance request fails', async () => {
     currentUser.userId = 'user-1';

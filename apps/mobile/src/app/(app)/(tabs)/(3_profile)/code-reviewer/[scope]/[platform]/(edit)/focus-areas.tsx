@@ -30,6 +30,13 @@ export default function FocusAreasRoute() {
     documentation: 'codeReviewer.focusArea.documentation',
   } as const;
 
+  // A stored area outside REVIEW_FOCUS_AREAS has no enum row of its own; show
+  // each distinct one with the localized fallback label so the user can see
+  // and unselect it instead of it silently persisting.
+  const unknownAreas = [
+    ...new Set(selected.filter(area => !(REVIEW_FOCUS_AREAS as readonly string[]).includes(area))),
+  ];
+
   const toggleArea = (area: string) => {
     // Read the cache at call time, not the render-time snapshot above, so
     // two rapid taps each build the next array from the latest committed
@@ -54,6 +61,19 @@ export default function FocusAreasRoute() {
             label={t(areaLabels[area])}
             multi
             selected={selected.includes(area)}
+            disabled={disabled}
+            className="border-b-[0.5px] border-hair-soft"
+            onPress={() => {
+              toggleArea(area);
+            }}
+          />
+        ))}
+        {unknownAreas.map(area => (
+          <ChoiceRow
+            key={area}
+            label={t('codeReviewer.focusArea.unknown', { area })}
+            multi
+            selected
             disabled={disabled}
             className="border-b-[0.5px] border-hair-soft"
             onPress={() => {

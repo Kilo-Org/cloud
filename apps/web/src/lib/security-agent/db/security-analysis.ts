@@ -860,7 +860,6 @@ export async function enqueueBacklogFindings(params: {
 
   const executor = params.tx ?? db;
 
-  // Use a single INSERT ... SELECT to bulk-enqueue eligible findings.
   // severity_rank maps null severity to low (3).
   const result = await executor.execute<{ id: string }>(sql`
     INSERT INTO ${security_analysis_queue} (

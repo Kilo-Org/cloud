@@ -539,6 +539,33 @@ describe('checkOpenAiChatGptByok', () => {
     expect('top_p' in body).toBe(false);
   });
 
+  it('keeps only the reasoning fields OpenAI accepts', async () => {
+    const provider = await buildProviderForTest();
+    const body: GatewayResponsesRequest = {
+      model: 'openai/gpt-5-nano',
+      input: 'hello',
+      reasoning: {
+        effort: 'high',
+        summary: 'auto',
+        generate_summary: 'detailed',
+        ...{ enabled: true, exclude: false, max_tokens: 2000 },
+      },
+    };
+
+    await transformResponsesRequest(provider, body);
+
+    expect(body.reasoning).toEqual({ effort: 'high', summary: 'auto' });
+  });
+
+  it('leaves an absent reasoning object absent', async () => {
+    const provider = await buildProviderForTest();
+    const body: GatewayResponsesRequest = { model: 'openai/gpt-5-nano', input: 'hello' };
+
+    await transformResponsesRequest(provider, body);
+
+    expect('reasoning' in body).toBe(false);
+  });
+
   it.each([
     [1, 16],
     [15, 16],

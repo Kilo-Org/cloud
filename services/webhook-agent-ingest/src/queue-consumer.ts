@@ -3,7 +3,10 @@ import type { TriggerConfig, TriggerDO } from './dos/TriggerDO';
 import { renderPromptTemplate } from './util/prompt-template';
 import { logger } from './util/logger';
 import { withDORetry } from './util/do-retry';
-import { getTokenMintingService } from './services/token-minting-service.js';
+import {
+  CreatorExecutionAuthorizationError,
+  getTokenMintingService,
+} from './services/token-minting-service.js';
 import { classifyInitiateResponse } from './initiate-response';
 import { findActiveSandboxIdForInstance, getWorkerDb } from './db/queries';
 import { getKiloChat } from './kilo-chat-binding';
@@ -65,6 +68,15 @@ async function getOrMintToken(
   env: Env,
   triggerConfig: TriggerConfig
 ): Promise<{ token: string; cached: boolean }> {
+  if (triggerConfig.executionUserId != null) {
+    const result = await getTokenMintingService(env).mintToken({
+      userId: triggerConfig.userId,
+      orgId: triggerConfig.orgId,
+      executionUserId: triggerConfig.executionUserId,
+      triggerId: triggerConfig.triggerId,
+    });
+    return { token: result.token, cached: false };
+  }
   const cacheKey = tokenCacheKey(triggerConfig, env.SHARED_RESOURCE_TOKENS_ENABLED);
 
   // Check KV cache first
@@ -337,6 +349,11 @@ async function processWebhookMessage(
 
     // Branch based on target type
     if (triggerConfig.targetType === 'kiloclaw_chat') {
+      if (triggerConfig.executionUserId != null) {
+        throw new CreatorExecutionAuthorizationError(
+          'Creator execution is not supported for KiloClaw triggers'
+        );
+      }
       await processKiloclawChatMessage(stub, webhook, request, triggerConfig, env);
       message.ack();
       return;
@@ -633,7 +650,11 @@ async function processWebhookMessage(
       attempts: message.attempts,
     });
 
-    if ((!sessionCreated || canRetryInitiate) && message.attempts < MAX_RETRY_ATTEMPTS) {
+    if (
+      !(error instanceof CreatorExecutionAuthorizationError) &&
+      (!sessionCreated || canRetryInitiate) &&
+      message.attempts < MAX_RETRY_ATTEMPTS
+    ) {
       logger.info('Retrying message', {
         requestId: webhook.requestId,
         attempt: message.attempts,

@@ -434,6 +434,10 @@ export const githubAppsRouter = createTRPCRouter({
       );
 
       if (input.organizationId && result.success) {
+        const effortSuffix =
+          input.thinkingEffort === undefined
+            ? ''
+            : ` with thinking effort ${input.thinkingEffort ?? 'default'}`;
         await createAuditLog({
           organization_id: input.organizationId,
           action: 'organization.settings.change',
@@ -441,11 +445,8 @@ export const githubAppsRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
           message: input.integrationId
-            ? `Updated GitHub App installation ${input.integrationId} model to ${input.modelSlug}` +
-              (input.thinkingEffort === undefined
-                ? ''
-                : ` with thinking effort ${input.thinkingEffort ?? 'default'}`)
-            : `Updated GitHub App integration model to ${input.modelSlug}`,
+            ? `Updated GitHub App installation ${input.integrationId} model to ${input.modelSlug}${effortSuffix}`
+            : `Updated GitHub App integration model to ${input.modelSlug}${effortSuffix}`,
         });
       }
 

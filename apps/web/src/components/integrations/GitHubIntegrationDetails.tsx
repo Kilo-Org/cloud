@@ -342,6 +342,16 @@ function GitHubIntegrationDetailsContent({
     () => modelOptions.find(model => model.id === selectedModel)?.variants ?? [],
     [modelOptions, selectedModel]
   );
+  // A stored effort can outlive the selected model's variant list (the model
+  // changed, or the catalog dropped the variant). Keep it selectable so the
+  // setting is visible and can be cleared instead of silently persisting.
+  const effortOptions = useMemo(
+    () =>
+      selectedEffort !== null && !availableVariants.includes(selectedEffort)
+        ? [...availableVariants, selectedEffort]
+        : availableVariants,
+    [availableVariants, selectedEffort]
+  );
   const installationDetectedRef = useRef(false);
   const launchedInstallStates = useRef(new Set<string>());
 
@@ -961,7 +971,7 @@ function GitHubIntegrationDetailsContent({
                   isLoading={isLoadingModels}
                   placeholder="Select a model"
                 />
-                {availableVariants.length > 0 && (
+                {effortOptions.length > 0 && (
                   <div className="space-y-2">
                     <Label>Thinking Effort</Label>
                     <Select
@@ -1002,7 +1012,7 @@ function GitHubIntegrationDetailsContent({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__default__">Default</SelectItem>
-                        {availableVariants.map(variant => (
+                        {effortOptions.map(variant => (
                           <SelectItem key={variant} value={variant}>
                             {thinkingEffortLabel(variant)}
                           </SelectItem>

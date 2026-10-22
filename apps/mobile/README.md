@@ -25,6 +25,20 @@ Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
 
+## PR merge sheet
+
+The merge sheet composes the form and provider-specific bodies. `usePrMergeDraft`
+owns identity-scoped loading, seeding, saving, background flushing, and clearing;
+`usePrMergeSubmit` owns confirmation, mutation inputs, errors, and success effects.
+Header back retains the draft. Footer Cancel and a successful submission clear it.
+
+The mounted suites keep React, form sections, and draft persistence real, with
+native controls, encrypted storage, identity, and mutations replaced at their boundaries:
+
+```bash
+pnpm --filter kilo-app exec vitest run src/components/pr-review/merge
+```
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.

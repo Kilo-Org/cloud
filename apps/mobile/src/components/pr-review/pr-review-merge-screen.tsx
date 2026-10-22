@@ -8,7 +8,8 @@ import { CenteredState } from '@/components/centered-state';
 
 import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
 import { QueryError } from '@/components/query-error';
-import { PrMergeSheet, providerPrNounKey } from '@/components/pr-review/merge/pr-merge-sheet';
+import { PrMergeSheet } from '@/components/pr-review/merge/pr-merge-sheet';
+import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrMergeMethod } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { parseParam } from '@/lib/route-params';

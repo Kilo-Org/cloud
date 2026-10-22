@@ -1,88 +1,20 @@
-/* eslint-disable max-lines -- Merge-sheet form sub-components share the sheet's keyboard-visibility and footer contracts. */
-// Form sub-components for the S8 merge sheet. Extracted out of
-// `pr-merge-sheet.tsx` to keep that file under the repo's 300-line limit.
-
 import { type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Switch, TextInput, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { Switch, TextInput, View } from 'react-native';
 
 import {
   PrFormSheetFooter,
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
-import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
-import {
-  type AllowedMergeMethod,
-  prMergeDescription,
-} from '@/lib/pr-review/merge/merge-blocked-reasons';
+import { type AllowedMergeMethod } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { type MergeMethodOption } from '@/components/pr-review/merge/pr-merge-icons';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
-
-function MethodPicker({
-  methodOptions,
-  method,
-  isDisabled,
-  onChange,
-}: Readonly<{
-  methodOptions: MergeMethodOption[];
-  method: AllowedMergeMethod;
-  isDisabled: boolean;
-  onChange: (next: AllowedMergeMethod) => void;
-}>) {
-  const { t } = useTranslation();
-  return (
-    <View className="gap-1.5">
-      <Text className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-        {t('prReview.merge.methodLabel')}
-      </Text>
-      <RadioGroup label={t('prReview.merge.methodLabel')} className="flex-row flex-wrap gap-2">
-        {methodOptions.map(option => {
-          const active = method === option.value;
-          // Long labels stay readable via accessibilityLabel; chip shows short text.
-          return (
-            <Pressable
-              key={option.value}
-              disabled={isDisabled}
-              onPress={() => {
-                void Haptics.selectionAsync();
-                onChange(option.value);
-              }}
-              {...radioItemA11y({
-                label: option.accessibilityLabel,
-                checked: active,
-                disabled: isDisabled,
-              })}
-              accessibilityHint={prMergeDescription(option.value)}
-              className={cn(
-                'min-h-11 items-center justify-center rounded-full border px-4 py-2 active:opacity-70',
-                active && 'border-primary bg-primary',
-                !active && isDisabled && 'border-hair-soft bg-secondary',
-                !active && !isDisabled && 'border-border bg-secondary'
-              )}
-            >
-              <Text
-                className={cn(
-                  'text-sm font-medium',
-                  active && 'text-primary-foreground',
-                  !active && isDisabled && 'text-muted-foreground',
-                  !active && !isDisabled && 'text-foreground'
-                )}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </RadioGroup>
-    </View>
-  );
-}
+import { MethodPicker } from '@/components/pr-review/merge/pr-merge-method-picker';
 
 function CommitTitleField({
   titleRef,

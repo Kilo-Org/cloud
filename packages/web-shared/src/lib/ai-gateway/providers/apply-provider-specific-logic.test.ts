@@ -6,7 +6,6 @@ import {
   applyReasoningDetailsTransform,
   getIgnoredProviders,
   removeModelsFallback,
-  removePaidServerFeatures,
   removeUnsupportedRequestServiceTier,
   withIgnoredProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
@@ -605,15 +604,18 @@ describe('removeModelsFallback', () => {
   });
 });
 
-describe('removePaidServerFeatures', () => {
-  const functionTool = {
-    type: 'function',
-    function: { name: 'lookup', parameters: { type: 'object' } },
-  } as const;
+describe('applyProviderSpecificLogic paid server features', () => {
+  const fields = {
+    plugins: [{ id: 'web' }],
+    tools: [
+      { type: 'openrouter:web_search' },
+      { type: 'function', function: { name: 'lookup', parameters: { type: 'object' } } },
+    ],
+  };
 
-  async function applyTo(model: string, userId: string, fields: Record<string, unknown>) {
+  async function applyTo(model: string) {
     const request = makeRequest(model);
-    Object.assign(request.body, fields);
+    Object.assign(request.body, structuredClone(fields));
     await applyProviderSpecificLogic(
       makeProvider(null),
       model,
@@ -621,7 +623,7 @@ describe('removePaidServerFeatures', () => {
       {},
       null,
       EmptyFraudDetectionHeaders,
-      userId,
+      'user-1',
       null,
       null,
       null,
@@ -630,141 +632,22 @@ describe('removePaidServerFeatures', () => {
     return request.body;
   }
 
-  it('removes paid plugins and server tools from free model requests', async () => {
+  it('removes them from free model requests', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const paidPlugins = [{ id: 'web' }, { id: 'file-parser', pdf: { engine: 'mistral-ocr' } }];
 
-    const body = await applyTo('vendor/model:free', 'user-1', {
-      plugins: [...paidPlugins, { id: 'response-healing' }],
-      tools: [{ type: 'openrouter:web_search' }, functionTool, { type: 'openrouter:advisor' }],
-    });
+    const body = await applyTo('vendor/model:free');
 
-    expect(body.plugins).toEqual([
-      { id: 'response-healing' },
-      { id: 'file-parser', pdf: { engine: 'cloudflare-ai' } },
-    ]);
-    expect(body.tools).toEqual([functionTool]);
-    expect(warn).toHaveBeenCalledWith(
-      '[applyProviderSpecificLogic] Removed paid server features from free request',
-      {
-        userId: 'user-1',
-        model: 'vendor/model:free',
-        requestKind: 'chat_completions',
-        removedPlugins: paidPlugins,
-        removedToolTypes: ['openrouter:web_search', 'openrouter:advisor'],
-      }
-    );
+    expect(body.plugins).toEqual([{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }]);
+    expect(body.tools).toEqual([fields.tools[1]]);
     warn.mockRestore();
   });
 
-  it('keeps free plugins, including a disabled one, without logging', () => {
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const request = makeRequest('vendor/model:free');
-    const freePlugins = [{ id: 'response-healing' }, { id: 'context-compression', enabled: false }];
-    request.body.plugins = freePlugins;
-
-    removePaidServerFeatures(makeProvider(null), 'vendor/model:free', request, 'user-1');
-
-    expect(request.body.plugins).toEqual([
-      ...freePlugins,
-      { id: 'file-parser', pdf: { engine: 'cloudflare-ai' } },
-    ]);
-    expect(warn).not.toHaveBeenCalled();
-    warn.mockRestore();
-  });
-
-  it('adds no PDF parser for providers other than OpenRouter', () => {
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const request = makeRequest('vendor/model:free');
-    request.body.plugins = [{ id: 'web' }];
-
-    removePaidServerFeatures(
-      { ...makeProvider(null), id: 'vercel' },
-      'vendor/model:free',
-      request,
-      'user-1'
-    );
-
-    expect(request.body).not.toHaveProperty('plugins');
-    warn.mockRestore();
-  });
-
-  it('removes the tool list and tool choice when only server tools were requested', async () => {
+  it('keeps them for paid model requests', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-    const body = await applyTo('vendor/model:free', 'user-1', {
-      tools: [{ type: 'openrouter:web_search' }],
-      tool_choice: 'required',
-    });
-
-    expect(body).not.toHaveProperty('tools');
-    expect(body).not.toHaveProperty('tool_choice');
-    warn.mockRestore();
-  });
-
-  it('removes a tool choice that forces a removed server tool', async () => {
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const request: Extract<GatewayRequest, { kind: 'responses' }> = {
-      kind: 'responses',
-      body: {
-        model: 'vendor/model:free',
-        input: 'hello',
-        tools: [
-          { type: 'web_search_preview' },
-          { type: 'function', name: 'lookup', parameters: null, strict: false },
-        ],
-        tool_choice: { type: 'web_search_preview' },
-      },
-    };
-
-    removePaidServerFeatures(makeProvider(null), 'vendor/model:free', request, 'user-1');
-
-    expect(request.body.tools).toEqual([
-      { type: 'function', name: 'lookup', parameters: null, strict: false },
-    ]);
-    expect(request.body).not.toHaveProperty('tool_choice');
-    warn.mockRestore();
-  });
-
-  it('keeps client-executed Messages API tools', () => {
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const request = makeMessagesRequest('vendor/model:free');
-    const customTool = { name: 'lookup', input_schema: { type: 'object' as const } };
-    request.body.tools = [
-      customTool,
-      { type: 'custom', ...customTool },
-      { type: 'web_search_20250305', name: 'web_search' },
-    ];
-    request.body.tool_choice = { type: 'tool', name: 'lookup' };
-
-    removePaidServerFeatures(makeProvider(null), 'vendor/model:free', request, 'user-1');
-
-    expect(request.body.tools).toEqual([customTool, { type: 'custom', ...customTool }]);
-    expect(request.body.tool_choice).toEqual({ type: 'tool', name: 'lookup' });
-    warn.mockRestore();
-  });
-
-  it('keeps plugins and server tools for paid signed-in requests', async () => {
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const fields = {
-      plugins: [{ id: 'web' }],
-      tools: [{ type: 'openrouter:web_search' }, functionTool],
-    };
-
-    const body = await applyTo('vendor/model', 'user-1', structuredClone(fields));
+    const body = await applyTo('vendor/model');
 
     expect(body).toMatchObject(fields);
-    expect(warn).not.toHaveBeenCalled();
-    warn.mockRestore();
-  });
-
-  it('does not log when a free request has nothing to remove', async () => {
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-
-    const body = await applyTo('vendor/model:free', 'user-1', { tools: [functionTool] });
-
-    expect(body.tools).toEqual([functionTool]);
-    expect(body.plugins).toEqual([{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }]);
     expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
   });

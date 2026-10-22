@@ -2256,6 +2256,27 @@ describe('listCodeReviews narrows the list DTO', () => {
     expect(Object.keys(row).sort()).toEqual(Object.keys(listColumns).sort());
   });
 
+  it('lists reviews for the requested owner', async () => {
+    await createReviewWithHeavyFields();
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      await listCodeReviews({
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        limit: 50,
+        offset: 0,
+        repoFullName: `${REPO}-narrow-list`,
+      });
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    const listLogs = logSpy.mock.calls.filter(
+      ([first]) => typeof first === 'string' && first.includes('[listCodeReviews]')
+    );
+    expect(listLogs).toEqual([]);
+  });
+
   it('keeps council_result available to the detail getter', async () => {
     const reviewId = await createReviewWithHeavyFields();
 

@@ -1,4 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
+const mockDeleteGitHubInstallation = jest.fn();
+jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
+  ...(jest.requireActual('@/lib/integrations/platforms/github/adapter') as object),
+  deleteGitHubInstallation: (...args: unknown[]) => mockDeleteGitHubInstallation(...args),
+}));
 import { organizations, platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -7,7 +12,12 @@ import {
   getIntegrationForOwner,
   getPrimaryGitHubIntegrationForOrganization,
 } from '@/lib/integrations/db/platform-integrations';
-import { getInstallation, isInstallationGoneError, updateModel } from './github-apps-service';
+import {
+  getInstallation,
+  isInstallationGoneError,
+  uninstallApp,
+  updateModel,
+} from './github-apps-service';
 
 describe('getInstallation', () => {
   it('prefers a healthy installation when the owner has multiple GitHub rows', async () => {
@@ -249,5 +259,49 @@ describe('isInstallationGoneError', () => {
 
   it('should return false for number errors', () => {
     expect(isInstallationGoneError(404)).toBe(false);
+  });
+});
+
+describe('uninstallApp', () => {
+  it('returns a fixed message when the provider rejects the deletion', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `GitHub uninstall ${crypto.randomUUID()}` })
+      .returning();
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        github_connection_role: 'workflow',
+        integration_type: 'app',
+        platform_installation_id: crypto.randomUUID(),
+        integration_status: 'active',
+        repository_access: 'all',
+      })
+      .returning();
+    const upstreamFailure = new Error('upstream refused for installation install-8f21');
+    mockDeleteGitHubInstallation.mockRejectedValueOnce(upstreamFailure);
+
+    try {
+      await expect(
+        uninstallApp(
+          { type: 'org', id: organization.id },
+          row.id,
+          'user-for-uninstall-test',
+          'user@example.com',
+          'Test User'
+        )
+      ).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to delete GitHub installation',
+      });
+      expect(mockDeleteGitHubInstallation).toHaveBeenCalledWith(
+        row.platform_installation_id,
+        'standard'
+      );
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
   });
 });

@@ -1534,24 +1534,13 @@ export async function listCodeReviews(params: ListReviewsParams): Promise<CodeRe
   try {
     const { owner, limit = 50, offset = 0, status, repoFullName, platform } = params;
 
-    console.log('[listCodeReviews] Query params:', {
-      owner,
-      limit,
-      offset,
-      status,
-      repoFullName,
-      platform,
-    });
-
     // Build WHERE conditions
     const conditions = [];
 
     // Owner condition
     if (owner.type === 'org') {
-      console.log('[listCodeReviews] Querying for org:', owner.id);
       conditions.push(eq(cloud_agent_code_reviews.owned_by_organization_id, owner.id));
     } else {
-      console.log('[listCodeReviews] Querying for user:', owner.id);
       conditions.push(eq(cloud_agent_code_reviews.owned_by_user_id, owner.id));
     }
 
@@ -1583,13 +1572,16 @@ export async function listCodeReviews(params: ListReviewsParams): Promise<CodeRe
       .limit(limit)
       .offset(offset);
 
-    console.log('[listCodeReviews] Found reviews:', reviews.length);
-
     return reviews;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'listCodeReviews' },
-      extra: { params },
+      extra: {
+        ownerType: params.owner.type,
+        hasRepositoryFilter: Boolean(params.repoFullName),
+        limit: params.limit ?? 50,
+        offset: params.offset ?? 0,
+      },
     });
     throw error;
   }

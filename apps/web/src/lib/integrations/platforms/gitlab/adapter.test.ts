@@ -4,6 +4,10 @@ jest.mock('dns/promises', () => ({
 jest.mock('https', () => ({
   request: jest.fn(),
 }));
+const mockLogExceptInTest = jest.fn();
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  logExceptInTest: (...args: unknown[]) => mockLogExceptInTest(...args),
+}));
 
 import { lookup } from 'dns/promises';
 import { EventEmitter } from 'events';
@@ -15,6 +19,7 @@ import {
   validateGitLabInstance,
   validatePersonalAccessToken,
   createProjectWebhook,
+  createMRNote,
   deleteProjectWebhook,
   fetchGitLabProjects,
   fetchGitLabRootTextFileAtRef,
@@ -679,5 +684,64 @@ describe('validatePersonalAccessToken', () => {
       error: 'GitLab instance URL host resolves to an address that is not allowed.',
     });
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('provider failure content', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockLogExceptInTest.mockReset();
+  });
+
+  function mockFailureResponse(status: number, body: string) {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status,
+      text: async () => body,
+    });
+  }
+
+  it('writes one log line with the operation, status, and a capped message', async () => {
+    mockFailureResponse(500, 'message: branch is protected\n  details: second line');
+
+    await expect(
+      createProjectWebhook('test-token', 123, 'https://example.com/webhook', 'webhook-secret')
+    ).rejects.toThrow(/^GitLab create webhook failed: 500$/);
+
+    expect(mockLogExceptInTest).toHaveBeenCalledWith('GitLab create webhook failed:', {
+      status: 500,
+      bodyExcerpt: 'message: branch is protected details: second line',
+      projectId: 123,
+    });
+  });
+
+  it('truncates a long provider message in the log line', async () => {
+    const providerBody = `message: ${'x'.repeat(400)}`;
+    mockFailureResponse(500, providerBody);
+
+    await expect(
+      createProjectWebhook('test-token', 123, 'https://example.com/webhook', 'webhook-secret')
+    ).rejects.toThrow(/^GitLab create webhook failed: 500$/);
+
+    expect(mockLogExceptInTest).toHaveBeenCalledWith('GitLab create webhook failed:', {
+      status: 500,
+      bodyExcerpt: `${providerBody.slice(0, 199)}…`,
+      projectId: 123,
+    });
+  });
+
+  it('writes one log line when a note creation request fails', async () => {
+    mockFailureResponse(400, 'message: invalid note payload');
+
+    await expect(createMRNote('test-token', 123, 7, 'body')).rejects.toThrow(
+      /^GitLab MR note creation failed: 400$/
+    );
+
+    expect(mockLogExceptInTest).toHaveBeenCalledWith('GitLab MR note creation failed:', {
+      status: 400,
+      bodyExcerpt: 'message: invalid note payload',
+      projectId: 123,
+      mrIid: 7,
+    });
   });
 });

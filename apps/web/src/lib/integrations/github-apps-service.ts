@@ -21,6 +21,7 @@ import {
   fetchGitHubRepositories,
 } from '@/lib/integrations/platforms/github/adapter';
 import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * List all integrations for an owner
@@ -141,9 +142,10 @@ export async function uninstallApp(
         message: 'Disconnect this Kilo connection instead of uninstalling the shared GitHub App',
       });
     }
+    errorExceptInTest('Failed to delete GitHub installation', { error });
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
-      message: `Failed to delete GitHub installation: ${error instanceof Error ? error.message : String(error)}`,
+      message: 'Failed to delete GitHub installation',
     });
   }
 

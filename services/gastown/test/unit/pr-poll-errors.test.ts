@@ -7,6 +7,16 @@ import {
 } from '../../src/dos/town/town-scm';
 import type { TownConfig } from '../../src/types';
 
+vi.mock('../../src/dos/GastownUser.do', () => ({
+  getGastownUserStub: (_env: unknown, userId: string) => ({
+    getTownAsync: async (townId: string) =>
+      userId === 'user-owner' && townId === 'test-town' ? { owner_user_id: userId } : null,
+  }),
+}));
+vi.mock('../../src/dos/GastownOrg.do', () => ({
+  getGastownOrgStub: () => ({ getTownAsync: async () => null }),
+}));
+
 function mockSCMContext(overrides: Partial<SCMContext> = {}): SCMContext {
   return {
     env: {} as SCMContext['env'],

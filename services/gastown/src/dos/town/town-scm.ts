@@ -7,6 +7,8 @@ import {
   parseGitUrl,
 } from '../../util/platform-pr.util';
 import { writeEvent } from '../../util/analytics.util';
+import { getGastownUserStub } from '../GastownUser.do';
+import { getGastownOrgStub } from '../GastownOrg.do';
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
 
 const TOWN_LOG = '[town-scm]';
@@ -68,9 +70,11 @@ export async function resolveGitHubToken(ctx: SCMContext): Promise<GitHubTokenRe
   const sourceLabel = townConfig.git_auth?.platform_integration_id
     ? 'town platform integration'
     : 'rig platform integration';
-  const integrationOwner = townIntegrationOwner(townConfig);
+  const integrationOwner = integrationId
+    ? await resolveTownIntegrationOwner(ctx, townConfig)
+    : null;
   if (integrationId && !integrationOwner) {
-    tried.push(`${sourceLabel} (town has no owner)`);
+    tried.push(`${sourceLabel} (town owner not confirmed)`);
     return { ok: false, tried };
   }
   if (integrationId && integrationOwner && ctx.env.GIT_TOKEN_SERVICE) {
@@ -112,20 +116,28 @@ export async function resolveGitHubToken(ctx: SCMContext): Promise<GitHubTokenRe
 }
 
 /**
- * The identity a town's platform integration must belong to, read from the
- * ownership fields set when the town was created: the owning user for a
- * personal town, or the owning org plus its creator for an org town.
+ * The identity a town's platform integration must belong to: the owning user
+ * for a personal town, or the owning org plus its creator for an org town.
+ * The owner named in town config is confirmed against the town's creation
+ * record in the owning user or org DO, which only the create flows write,
+ * and the org creator is taken from that record.
  */
-function townIntegrationOwner(
+async function resolveTownIntegrationOwner(
+  ctx: SCMContext,
   townConfig: TownConfig
-): { userId: string } | { userId: string; orgId: string } | null {
+): Promise<{ userId: string } | { userId: string; orgId: string } | null> {
   if (townConfig.owner_type === 'org') {
     const orgId = townConfig.organization_id ?? townConfig.owner_id;
-    const userId = townConfig.owner_user_id;
-    return orgId && userId ? { userId, orgId } : null;
+    if (!orgId) return null;
+    const town = await getGastownOrgStub(ctx.env, orgId).getTownAsync(ctx.townId);
+    if (!town || town.owner_org_id !== orgId) return null;
+    return { userId: town.created_by_user_id, orgId };
   }
-  const userId = townConfig.owner_id ?? townConfig.owner_user_id;
-  return userId ? { userId } : null;
+  const userId = townConfig.owner_user_id ?? townConfig.owner_id;
+  if (!userId) return null;
+  const town = await getGastownUserStub(ctx.env, userId).getTownAsync(ctx.townId);
+  if (!town || town.owner_user_id !== userId) return null;
+  return { userId };
 }
 
 export async function resolveGitHubTokenString(ctx: SCMContext): Promise<string | null> {

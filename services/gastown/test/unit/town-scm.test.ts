@@ -1,6 +1,24 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { resolveGitHubToken } from '../../src/dos/town/town-scm';
 import { TownConfigSchema, type TownConfig } from '../../src/types';
+
+const creationRecords = vi.hoisted(() => ({
+  userTowns: new Map<string, { owner_user_id: string }>(),
+  orgTowns: new Map<string, { owner_org_id: string; created_by_user_id: string }>(),
+}));
+
+vi.mock('../../src/dos/GastownUser.do', () => ({
+  getGastownUserStub: (_env: unknown, userId: string) => ({
+    getTownAsync: async (townId: string) =>
+      creationRecords.userTowns.get(`${userId}:${townId}`) ?? null,
+  }),
+}));
+vi.mock('../../src/dos/GastownOrg.do', () => ({
+  getGastownOrgStub: (_env: unknown, orgId: string) => ({
+    getTownAsync: async (townId: string) =>
+      creationRecords.orgTowns.get(`${orgId}:${townId}`) ?? null,
+  }),
+}));
 
 const STORED_GITHUB_TOKEN = 'ghs_stored_stale_token';
 const FRESH_INSTALLATION_TOKEN = 'ghs_fresh_from_integration';
@@ -8,6 +26,9 @@ const USER_PAT = 'ghp_user_long_lived_pat';
 const INTEGRATION_ID = '119277743';
 const OWNER_USER_ID = 'user-owner';
 const OWNER_ORG_ID = '00000000-0000-4000-8000-0000000000aa';
+const ORG_CREATOR_ID = 'user-org-creator';
+const OTHER_USER_ID = 'user-other';
+const OTHER_ORG_ID = '00000000-0000-4000-8000-0000000000bb';
 
 type IntegrationTokenRequest = { integrationId: string; userId: string; orgId?: string };
 
@@ -55,6 +76,16 @@ function fakeEnv(opts: {
 }
 
 describe('resolveGitHubToken priority chain', () => {
+  beforeEach(() => {
+    creationRecords.userTowns.clear();
+    creationRecords.orgTowns.clear();
+    creationRecords.userTowns.set(`${OWNER_USER_ID}:town-1`, { owner_user_id: OWNER_USER_ID });
+    creationRecords.orgTowns.set(`${OWNER_ORG_ID}:town-1`, {
+      owner_org_id: OWNER_ORG_ID,
+      created_by_user_id: ORG_CREATOR_ID,
+    });
+  });
+
   it('prefers github_cli_pat over everything else', async () => {
     const cfg = buildConfig({
       github_cli_pat: USER_PAT,
@@ -159,7 +190,7 @@ describe('resolveGitHubToken priority chain', () => {
     expect(requests).toEqual([{ integrationId: INTEGRATION_ID, userId: OWNER_USER_ID }]);
   });
 
-  it('requests an org town integration token on behalf of the owning org', async () => {
+  it('takes the org town creator from the creation record, not town config', async () => {
     const requests: IntegrationTokenRequest[] = [];
     const cfg = buildConfig({
       platform_integration_id: INTEGRATION_ID,
@@ -176,8 +207,41 @@ describe('resolveGitHubToken priority chain', () => {
       getTownConfig: () => Promise.resolve(cfg),
     });
     expect(requests).toEqual([
-      { integrationId: INTEGRATION_ID, userId: OWNER_USER_ID, orgId: OWNER_ORG_ID },
+      { integrationId: INTEGRATION_ID, userId: ORG_CREATOR_ID, orgId: OWNER_ORG_ID },
     ]);
+  });
+
+  it.each([
+    [
+      'a personal owner whose user record does not list the town',
+      { owner_type: 'user' as const, owner_user_id: OTHER_USER_ID },
+    ],
+    [
+      'a personal owner_id whose user record does not list the town',
+      { owner_type: 'user' as const, owner_id: OTHER_USER_ID },
+    ],
+    [
+      'an org whose record does not list the town',
+      {
+        owner_type: 'org' as const,
+        owner_id: OTHER_ORG_ID,
+        organization_id: OTHER_ORG_ID,
+        owner_user_id: OWNER_USER_ID,
+      },
+    ],
+  ])('does not request an integration token for %s', async (_label, owner) => {
+    const requests: IntegrationTokenRequest[] = [];
+    const cfg = buildConfig({ platform_integration_id: INTEGRATION_ID, owner });
+    const result = await resolveGitHubToken({
+      env: fakeEnv({ requests }),
+      townId: 'town-1',
+      getTownConfig: () => Promise.resolve(cfg),
+    });
+    expect(requests).toEqual([]);
+    expect(result).toEqual({
+      ok: false,
+      tried: ['town.github_cli_pat', 'town platform integration (town owner not confirmed)'],
+    });
   });
 
   it('does not request an integration token for a town without an owner', async () => {
@@ -195,7 +259,7 @@ describe('resolveGitHubToken priority chain', () => {
     expect(requests).toEqual([]);
     expect(result).toEqual({
       ok: false,
-      tried: ['town.github_cli_pat', 'town platform integration (town has no owner)'],
+      tried: ['town.github_cli_pat', 'town platform integration (town owner not confirmed)'],
     });
   });
 

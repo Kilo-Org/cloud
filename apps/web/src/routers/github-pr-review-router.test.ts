@@ -2972,22 +2972,44 @@ describe('githubPrReviewRouter.getFileLines', () => {
     return createCaller({ user: { id: 'user-1' } as User });
   }
 
-  it('reads the blob inside the budget and returns the requested window', async () => {
+  it('serves the window from the inline body of one contents request', async () => {
     const caller = connectedCaller();
     const octokit = buildOctokit('t1');
-    octokit.repos.getContent
-      .mockResolvedValueOnce({ data: { type: 'file', size: 17, sha: 'blob-sha' } })
-      .mockResolvedValueOnce({ data: 'one\ntwo\nthree\nfour' });
+    const body = 'one\ntwo\nthree\nfour';
+    octokit.repos.getContent.mockResolvedValueOnce({
+      data: {
+        type: 'file',
+        size: Buffer.byteLength(body),
+        sha: 'blob-sha',
+        encoding: 'base64',
+        content: Buffer.from(body, 'utf8').toString('base64'),
+      },
+    });
 
     const result = await caller.getFileLines(fileLinesInput);
 
     expect(result).toEqual({ lines: ['two', 'three'], totalLines: 4 });
-    expect(octokit.repos.getContent).toHaveBeenNthCalledWith(1, {
+    expect(octokit.repos.getContent).toHaveBeenCalledTimes(1);
+    expect(octokit.repos.getContent).toHaveBeenCalledWith({
       owner: 'octocat',
       repo: 'hello',
       path: 'src/app.ts',
       ref: 'feature/x',
     });
+  });
+
+  it('reads the raw body when the metadata leaves it out', async () => {
+    const caller = connectedCaller();
+    const octokit = buildOctokit('t1');
+    octokit.repos.getContent
+      .mockResolvedValueOnce({
+        data: { type: 'file', size: 17, sha: 'blob-sha', encoding: 'none', content: '' },
+      })
+      .mockResolvedValueOnce({ data: 'one\ntwo\nthree\nfour' });
+
+    const result = await caller.getFileLines(fileLinesInput);
+
+    expect(result).toEqual({ lines: ['two', 'three'], totalLines: 4 });
     // The metadata `sha` is the blob id, not a commit-ish the contents
     // endpoint accepts as `ref`, so both reads use the caller's ref.
     expect(octokit.repos.getContent).toHaveBeenNthCalledWith(2, {
@@ -3003,7 +3025,7 @@ describe('githubPrReviewRouter.getFileLines', () => {
     const caller = connectedCaller();
     const octokit = buildOctokit('t1');
     octokit.repos.getContent.mockResolvedValueOnce({
-      data: { type: 'file', size: FILE_READ_MAX_BYTES + 1, sha: 'blob-sha' },
+      data: { type: 'file', size: FILE_READ_MAX_BYTES + 1, sha: 'blob-sha', encoding: 'none' },
     });
 
     await expect(caller.getFileLines(fileLinesInput)).rejects.toMatchObject({
@@ -3017,7 +3039,7 @@ describe('githubPrReviewRouter.getFileLines', () => {
     const caller = connectedCaller();
     const octokit = buildOctokit('t1');
     octokit.repos.getContent
-      .mockResolvedValueOnce({ data: { type: 'file', size: 4, sha: 'blob-sha' } })
+      .mockResolvedValueOnce({ data: { type: 'file', size: 4, sha: 'blob-sha', encoding: 'none' } })
       .mockResolvedValueOnce({ data: 'x'.repeat(FILE_READ_MAX_BYTES + 1) });
 
     await expect(caller.getFileLines(fileLinesInput)).rejects.toMatchObject({

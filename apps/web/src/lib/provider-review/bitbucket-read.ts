@@ -676,13 +676,20 @@ export async function getFileLines(
     }
     const encodedPath = cleanPath.split('/').map(encodeURIComponent).join('/');
     const sourcePath = `/2.0/repositories/${repositorySegment(access.repository)}/src/${encodeURIComponent(ref)}/${encodedPath}`;
-    // Metadata first: `format=meta` describes the file instead of returning
-    // it, so a file outside the budget is rejected before its body is read. An
-    // answer without a usable size falls through to the bounded body read.
-    const metadata = BitbucketFileMetadataSchema.safeParse(
-      await requestBitbucketJson<unknown>(access, sourcePath, { query: { format: 'meta' } })
-    );
-    if (metadata.success) assertFileWithinReadBudget(metadata.data.size);
+    // The `format=meta` probe is best effort: it reports the file size before
+    // the body read, and when the provider cannot answer it the body read
+    // enforces the same ceiling, so a failed probe never fails a read that
+    // would otherwise succeed.
+    let probedSize: number | null | undefined;
+    try {
+      const metadata = BitbucketFileMetadataSchema.safeParse(
+        await requestBitbucketJson<unknown>(access, sourcePath, { query: { format: 'meta' } })
+      );
+      if (metadata.success) probedSize = metadata.data.size;
+    } catch {
+      probedSize = undefined;
+    }
+    assertFileWithinReadBudget(probedSize);
     const text = await requestBitbucketText(access, sourcePath);
     assertFileWithinReadBudget(Buffer.byteLength(text));
     const allLines = text.split('\n');

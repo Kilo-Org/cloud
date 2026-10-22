@@ -1731,10 +1731,12 @@ export const githubPrReviewRouter = createTRPCRouter({
     return withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
-        // The window is capped at FILE_LINES_MAX lines. The contents metadata
-        // carries the blob size, so only a blob inside the budget is read; the
-        // raw read follows and the delivered body is measured against the same
-        // budget, which keeps the ceiling true whichever ref the two calls see.
+        // The window is capped at FILE_LINES_MAX lines and the body at
+        // FILE_READ_MAX_BYTES. The contents metadata reports the blob size and,
+        // for a blob inside GitHub's inline limit, carries the body itself, so
+        // one request answers the read; only a body the metadata leaves out is
+        // fetched from the raw endpoint, and either body is measured against
+        // the budget before any line is sliced.
         const metadata = await octokit.repos.getContent({
           owner: input.owner,
           repo: input.repo,
@@ -1748,24 +1750,32 @@ export const githubPrReviewRouter = createTRPCRouter({
             message: 'Requested path is not a file',
           });
         }
-        const { size } = (entry ?? {}) as { size?: number };
+        const { size, encoding, content } = (entry ?? {}) as {
+          size?: number;
+          encoding?: string;
+          content?: string;
+        };
         assertFileWithinReadBudget(typeof size === 'number' ? size : 0);
-        const response = await octokit.repos.getContent({
-          owner: input.owner,
-          repo: input.repo,
-          path: input.path,
-          ref: input.ref,
-          mediaType: { format: 'raw' },
-        });
-        const data = response.data as unknown;
-        if (typeof data !== 'string') {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Requested path is not a file',
+        let data: string;
+        if (encoding === 'base64' && typeof content === 'string') {
+          data = Buffer.from(content, 'base64').toString('utf8');
+        } else {
+          const response = await octokit.repos.getContent({
+            owner: input.owner,
+            repo: input.repo,
+            path: input.path,
+            ref: input.ref,
+            mediaType: { format: 'raw' },
           });
+          const raw = response.data as unknown;
+          if (typeof raw !== 'string') {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Requested path is not a file',
+            });
+          }
+          data = raw;
         }
-        // Both observations of the blob stay inside the budget: the delivered
-        // body is measured against it before any line is sliced.
         assertFileWithinReadBudget(Buffer.byteLength(data));
         const cappedEnd = Math.min(input.endLine, input.startLine + FILE_LINES_MAX - 1);
         return sliceFileLines({

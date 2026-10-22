@@ -1097,6 +1097,19 @@ describe('request transport binds to the resolved address (no DNS rebinding)', (
     });
   });
 
+  it('stops a bound file read at the shared read budget', async () => {
+    mockBoundResponse({ status: 200, body: Buffer.alloc(FILE_READ_MAX_BYTES + 1, 0x61) });
+
+    const error = await captureRejection(
+      getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 2)
+    );
+
+    expect(error.kind).toBe('too_large');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toBe(FILE_READ_TOO_LARGE_MESSAGE);
+    expect(mockHttpsRequest).toHaveBeenCalledTimes(1);
+  });
+
   it('classifies a bound 404 as not_found without leaking the instance URL', async () => {
     mockBoundResponse({ status: 404, json: { message: '404 Project Not Found' } });
 

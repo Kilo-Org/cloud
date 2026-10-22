@@ -165,15 +165,27 @@ export async function requestGitLabJson<T>(
   }
 }
 
+type GitLabFetchInit = RequestInit & {
+  /**
+   * Response byte limit for this request. A file read passes the shared read
+   * budget here, so the bound transport stops as soon as the body passes it and
+   * answers `too_large`; otherwise the transport ceiling applies.
+   */
+  maxResponseBytes?: number;
+};
+
 /**
  * Resolve the URL once (refusing unsafe hosts), then send the request bound
  * to the resolved address. Only an IP literal or gitlab.com keeps the plain
  * transport — the same split the adapter's fetchGitLabOnce makes.
  */
-async function fetchGitLabValidated(url: string, init: RequestInit): Promise<Response> {
+async function fetchGitLabValidated(url: string, init: GitLabFetchInit): Promise<Response> {
+  // The byte limit belongs to the bound transport; the plain fetch path keeps
+  // its own read limit in readBodyWithinReadBudget.
+  const { maxResponseBytes: _maxResponseBytes, ...requestInit } = init;
   const resolvedUrl = await resolveGitLabUrlSafely(url);
   if (!resolvedUrl.address) {
-    return fetch(url, { ...init, redirect: 'manual' });
+    return fetch(url, { ...requestInit, redirect: 'manual' });
   }
   return fetchGitLabBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
 }
@@ -186,7 +198,7 @@ async function fetchGitLabValidated(url: string, init: RequestInit): Promise<Res
  */
 function fetchGitLabBoundToAddress(
   { url, address, family }: GitLabResolvedUrl & { address: string },
-  init: RequestInit
+  init: GitLabFetchInit
 ): Promise<Response> {
   const request = url.protocol === 'https:' ? https.request : http.request;
   const headers = new Headers(init.headers);
@@ -211,11 +223,15 @@ function fetchGitLabBoundToAddress(
       response => {
         const chunks: Buffer[] = [];
         let responseBytes = 0;
+        const maxResponseBytes = init.maxResponseBytes ?? MAX_GITLAB_RESPONSE_BYTES;
         response.on('data', chunk => {
           const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
           responseBytes += buffer.byteLength;
-          if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
-            const error = new Error('GitLab response exceeded size limit');
+          if (responseBytes > maxResponseBytes) {
+            const error =
+              init.maxResponseBytes === undefined
+                ? new Error('GitLab response exceeded size limit')
+                : new GitLabReviewError('too_large', FILE_READ_TOO_LARGE_MESSAGE);
             response.destroy(error);
             req.destroy(error);
             reject(error);
@@ -550,6 +566,7 @@ async function readFileTextWithinReadBudget(
   );
   const response = await fetchGitLabValidated(url, {
     headers: { Authorization: `Bearer ${access.accessToken}` },
+    maxResponseBytes: FILE_READ_MAX_BYTES,
     method: 'GET',
     redirect: 'manual',
     signal: AbortSignal.timeout(GITLAB_REQUEST_TIMEOUT_MS),

@@ -1,4 +1,4 @@
-jest.mock('@/lib/auth/device-session-realtime');
+import '@/tests/setup/mock-device-session-realtime';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@/lib/auth/apple-jwks', () => ({

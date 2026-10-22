@@ -1,5 +1,5 @@
+import '@/tests/setup/mock-device-session-realtime';
 import { afterEach, describe, test, expect } from '@jest/globals';
-jest.mock('@/lib/auth/device-session-realtime');
 import { eq } from 'drizzle-orm';
 import {
   admin_action_audit_logs,

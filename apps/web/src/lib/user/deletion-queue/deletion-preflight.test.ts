@@ -1,3 +1,4 @@
+import '@/tests/setup/mock-device-session-realtime';
 import { eq } from 'drizzle-orm';
 import { user_deletion_requests } from '@kilocode/db/schema';
 import {
@@ -13,7 +14,6 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 jest.mock('@/lib/user/deletion-queue/deletion-ticket-resolve', () => ({
   resolveTicketEmail: jest.fn(),
 }));
-jest.mock('@/lib/auth/device-session-realtime');
 
 const resolveTicketEmailMock = jest.mocked(resolveTicketEmail);
 

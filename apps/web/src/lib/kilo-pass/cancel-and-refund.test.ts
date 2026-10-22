@@ -1,7 +1,6 @@
-import { describe, expect, it, beforeEach, afterEach } from '@jest/globals';
+import '@/tests/setup/mock-device-session-realtime';
+import { describe, expect, it, beforeEach, afterEach, jest } from '@jest/globals';
 import type Stripe from 'stripe';
-
-jest.mock('@/lib/auth/device-session-realtime');
 
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import {

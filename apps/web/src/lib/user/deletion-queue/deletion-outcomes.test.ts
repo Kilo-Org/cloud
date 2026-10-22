@@ -1,3 +1,4 @@
+import '@/tests/setup/mock-device-session-realtime';
 import { and, eq } from 'drizzle-orm';
 import {
   kilocode_users,
@@ -22,8 +23,6 @@ import {
 } from '@/lib/user/deletion-queue/deletion-outcomes';
 import { runDeletionPreflight } from '@/lib/user/deletion-queue/deletion-preflight';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-
-jest.mock('@/lib/auth/device-session-realtime');
 
 describe('persistHandlerOutcome progress', () => {
   beforeEach(async () => {

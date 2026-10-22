@@ -1,4 +1,5 @@
-import { describe, test, expect, beforeEach } from '@jest/globals';
+import '@/tests/setup/mock-device-session-realtime';
+import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import {
   kilocode_users,
@@ -9,7 +10,6 @@ import {
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-jest.mock('@/lib/auth/device-session-realtime');
 
 import { scheduleDeviceSessionRealtimeClose } from '@/lib/auth/device-session-realtime';
 import { blockUser } from '@/lib/user/block';

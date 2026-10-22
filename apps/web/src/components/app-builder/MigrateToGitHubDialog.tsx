@@ -80,7 +80,6 @@ export function MigrateToGitHubDialog({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  // Pre-flight check queries for personal/org context
   const personalCanMigrateQuery = useQuery({
     ...trpc.appBuilder.canMigrateToGitHub.queryOptions({ projectId }),
     enabled: isOpen && !organizationId,
@@ -97,7 +96,6 @@ export function MigrateToGitHubDialog({
   const canMigrateQuery = organizationId ? orgCanMigrateQuery : personalCanMigrateQuery;
   const canMigrateData: CanMigrateToGitHubResult | undefined = canMigrateQuery.data;
 
-  // Migration mutations for personal/org context
   const handleMigrationSuccess = useCallback(
     (
       data:
@@ -145,7 +143,6 @@ export function MigrateToGitHubDialog({
   const isPending = organizationId ? orgIsPending : personalIsPending;
   const reset = organizationId ? orgReset : personalReset;
 
-  // Map available repos to RepositoryCombobox format
   const repositoryOptions: RepositoryOption[] = useMemo(
     () =>
       (canMigrateData?.availableRepos ?? []).map(repo => ({
@@ -161,7 +158,6 @@ export function MigrateToGitHubDialog({
     (open: boolean) => {
       setIsOpen(open);
       if (!open) {
-        // Reset state when closing
         setStep('create');
         setSelectedRepo('');
         setMigrationResult(null);
@@ -199,12 +195,10 @@ export function MigrateToGitHubDialog({
     }
   }, [organizationId, orgMigrate, personalMigrate, projectId, selectedRepo]);
 
-  // Skip grant-access step if user has "all repositories" access
   const needsGrantAccess = canMigrateData?.repositorySelection === 'selected';
 
   const handleNext = useCallback(() => {
     if (step === 'create') {
-      // Skip grant-access step if user has access to all repos
       setStep(needsGrantAccess ? 'grant-access' : 'select');
     } else if (step === 'grant-access') {
       setStep('select');
@@ -215,12 +209,10 @@ export function MigrateToGitHubDialog({
     if (step === 'grant-access') {
       setStep('create');
     } else if (step === 'select') {
-      // Go back to grant-access only if needed, otherwise go to create
       setStep(needsGrantAccess ? 'grant-access' : 'create');
     }
   }, [step, needsGrantAccess]);
 
-  // Determine if migration is possible
   const canMigrate = canMigrateData?.hasGitHubIntegration && !canMigrateData?.alreadyMigrated;
 
   return (

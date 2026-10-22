@@ -5,6 +5,7 @@
   "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
+    "WORKER_URL": "https://worker.example.com",
     "NEXTAUTH_SECRET": "cloud-agent-integration-test-secret",
     // Fake-provider tests have no Postgres binding. Capacity queries run in the Postgres suite.
     "CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED": "true",
@@ -65,6 +66,9 @@
     },
   ],
   "kv_namespaces": [{ "binding": "SHARED_SANDBOX_OVERRIDES" }],
+  "r2_buckets": [
+    { "binding": "RUNTIME_RELEASE_BUCKET", "bucket_name": "cloud-agent-runtime-test" },
+  ],
   "queues": {
     "producers": [
       { "binding": "EXECUTION_QUEUE", "queue": "cloud-agent-executions" },

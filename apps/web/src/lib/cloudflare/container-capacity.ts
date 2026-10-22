@@ -4,7 +4,7 @@ const MEGABYTE_BYTES = 1_000_000;
 // Production Cloud Agent values mirror the top-level services/cloud-agent-next/wrangler.jsonc
 // entries and SANDBOX_CAPACITIES in services/cloud-agent-next/src/container-usage-context.ts.
 // Development intentionally uses different named instance types and does not query Analytics.
-// Keep container-capacity-parity.test.ts aligned when adding a container class.
+// Keep all three in sync manually when adding or resizing a container class.
 
 export type ContainerCapacity = {
   vcpu: number;
@@ -24,15 +24,19 @@ export function containerCapacityForService(service: string): ContainerCapacity 
       };
     case 'cloud-agent-next-sandbox-small':
     case 'cloud-agent-next-sandbox-dind':
-    case 'cloud-agent-next-sandbox-small-containment':
       return { vcpu: 2, memoryBytes: 6_144 * MEBIBYTE_BYTES, diskBytes: 10_000 * MEGABYTE_BYTES };
+    case 'cloud-agent-next-sandbox-small-containment':
+      return { vcpu: 2, memoryBytes: 6_144 * MEBIBYTE_BYTES, diskBytes: 20_000 * MEGABYTE_BYTES };
     case 'cloud-agent-next-sandbox-code-review':
-    case 'cloud-agent-next-sandbox-code-review-containment':
       return { vcpu: 1, memoryBytes: 4_096 * MEBIBYTE_BYTES, diskBytes: 8_000 * MEGABYTE_BYTES };
+    case 'cloud-agent-next-sandbox-code-review-containment':
+      return { vcpu: 1, memoryBytes: 4_096 * MEBIBYTE_BYTES, diskBytes: 20_000 * MEGABYTE_BYTES };
     case 'cloud-agent-next-sandbox-containers-standard3':
       return { vcpu: 2, memoryBytes: 8_192 * MEBIBYTE_BYTES, diskBytes: 16_000 * MEGABYTE_BYTES };
     case 'cloud-agent-next-sandbox-containers-standard4':
       return { vcpu: 4, memoryBytes: 12_288 * MEBIBYTE_BYTES, diskBytes: 20_000 * MEGABYTE_BYTES };
+    case 'cloud-agent-next-sandbox-containers-code-review':
+      return { vcpu: 1, memoryBytes: 4_096 * MEBIBYTE_BYTES, diskBytes: 8_000 * MEGABYTE_BYTES };
     default:
       return null;
   }

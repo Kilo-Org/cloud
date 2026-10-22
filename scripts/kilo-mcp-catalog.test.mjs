@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { load } from 'js-yaml';
+
+const repoRoot = fileURLToPath(new URL('../', import.meta.url));
 
 const workflowPath = '.github/workflows/kilo-mcp-catalog.yml';
 const testPath = 'scripts/kilo-mcp-catalog.test.mjs';
@@ -38,6 +42,12 @@ const catalogPathFragments = [
   /kilo-mcp\/SKILL|\.kilo\/skills\//,
   /kilo-mcp-catalog\\?\.yml/,
   /kilo-mcp-catalog\\?\.test\\?\.mjs/,
+  // Router sources read zod schemas by relative path from cloud-agent-next and
+  // by package name from the workspaces below, so a schema-only change there
+  // alters catalog.json (inputSchema, tags, searchBlob) without touching
+  // apps/web. The derived test below keeps this list honest.
+  /services\/cloud-agent-next\/src\/shared\//,
+  /packages\/\(app-shared\|cloud-agent-profile\|cloud-agent-sdk\|kiloclaw-instance-tiers\|kiloclaw-secret-catalog\|organization-entitlement\|session-ingest-contracts\)\/src\//,
 ];
 // A `git diff --exit-code` that covers both committed artifacts in the order
 // the workflow writes them (catalog first, then the generated skill), so
@@ -123,23 +133,135 @@ function assertCredentialConfinement(workflow, completeByJob) {
 }
 
 /**
- * Change detection must match a written name list. Piping `git diff` into
- * `grep -q` lets grep exit on its first match; git then takes SIGPIPE and
- * `pipefail` reports the pipeline as a failure, which reads as "no changes"
- * and silently skips the pipeline.
+ * Change detection must judge its pipeline by the matcher. `grep -E` stops at
+ * its first match, so the diff writer can take SIGPIPE, and `pipefail` would
+ * then report a matching pipeline as a failure that reads as "no changes".
  */
-function assertNoPipedDiff(step, jobName) {
-  assert.doesNotMatch(
+function assertMatcherVerdict(step, jobName) {
+  assert.match(
     step.run ?? '',
-    // A pipe may sit on the same line or on a `\`-continued next line.
-    /git diff --name-only[\s\S]{0,160}?\|\s*grep/,
-    `${jobName}: change detection matches a written name list, not a piped diff`
+    /if set \+o pipefail && git diff --name-only/,
+    `${jobName}: change detection reads a closed pipe as the matcher's answer`
   );
   assert.match(
     step.run ?? '',
-    />\s*"\$changed"/,
-    `${jobName}: change detection writes the name list before matching it`
+    /\n\s*set -o pipefail\n/,
+    `${jobName}: change detection restores the step's shell options`
   );
+}
+
+/** The `grep -Eq '…'` pattern a change-detection step runs. */
+function detectionPattern(step, jobName) {
+  const match = /grep -Eq '([^']+)'/.exec(step.run ?? '');
+  assert.ok(match, `${jobName}: the change-detection step must grep the changed paths with -Eq`);
+  return match[1];
+}
+
+/**
+ * Compiles a `dorny/paths-filter` entry (`**` across directories, `*` within
+ * one) into a matcher for a repo-relative path.
+ */
+function globToRegExp(glob) {
+  const escaped = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  // One pass: a `**` replaced first would leave a `*` behind for the single
+  // star rule to eat.
+  const body = escaped.replace(/\*\*\/|\*\*|\*/g, token =>
+    token === '**/' ? '(?:.*/)?' : token === '**' ? '.*' : '[^/]*'
+  );
+  return new RegExp(`^${body}$`);
+}
+
+/** Every workspace directory and its package name, per pnpm-workspace.yaml. */
+function workspaceInventory() {
+  const config = load(readFileSync(join(repoRoot, 'pnpm-workspace.yaml'), 'utf8'));
+  const dirs = new Set();
+  const expand = (prefix, tokens) => {
+    if (tokens.length === 0) {
+      if (existsSync(prefix)) dirs.add(relative(repoRoot, prefix));
+      return;
+    }
+    const [head, ...rest] = tokens;
+    if (head !== '*') {
+      expand(join(prefix, head), rest);
+      return;
+    }
+    for (const entry of readdirSync(prefix, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') {
+        continue;
+      }
+      expand(join(prefix, entry.name), rest);
+    }
+  };
+  for (const glob of config.packages ?? []) expand(repoRoot, glob.split('/'));
+
+  const byName = new Map();
+  for (const dir of dirs) {
+    const manifest = join(repoRoot, dir, 'package.json');
+    if (!existsSync(manifest)) continue;
+    const { name } = JSON.parse(readFileSync(manifest, 'utf8'));
+    if (typeof name === 'string') byName.set(name, dir);
+  }
+  return { dirs: [...dirs].sort(), byName };
+}
+
+/** The non-test sources the dump imports: the tRPC routers and the dump itself. */
+function catalogSourceFiles() {
+  const roots = ['apps/web/src/routers', 'apps/web/src/scripts/mcp-catalog'];
+  const files = [];
+  const walk = dir => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules' && !entry.name.startsWith('.')) walk(path);
+        continue;
+      }
+      if (/\.(?:ts|tsx|mts)$/.test(entry.name) && !/\.test\.(?:ts|tsx)$/.test(entry.name)) {
+        files.push(path);
+      }
+    }
+  };
+  for (const root of roots) walk(join(repoRoot, root));
+  return files;
+}
+
+/**
+ * The file a specifier reads, or null for anything outside the workspace
+ * (a third-party package). A bare `@kilocode/<pkg>[/sub]` resolves to that
+ * workspace's `src/`, which is the directory a change has to touch.
+ */
+function resolveSpecifier(specifier, fromFile, byName) {
+  if (specifier.startsWith('.')) {
+    const base = resolve(dirname(fromFile), specifier);
+    const candidates = [`${base}.ts`, `${base}.tsx`, `${base}.mts`, join(base, 'index.ts')];
+    const found = candidates.find(
+      candidate => existsSync(candidate) && statSync(candidate).isFile()
+    );
+    return found ?? (existsSync(base) ? base : null);
+  }
+  const [scope, name] = specifier.split('/');
+  if (!scope?.startsWith('@') || !name) return null;
+  const dir = byName.get(`${scope}/${name}`);
+  return dir ? join(repoRoot, dir, 'src', 'index.ts') : null;
+}
+
+/**
+ * The `kilocode_backend` filter of ci.yml. A change that matches it runs
+ * `web-test`, whose `apps/web/src/scripts/mcp-catalog/catalog.test.ts` re-dumps
+ * the catalog and fails when the committed artifact is stale — so the author
+ * regenerates it and the merge job then sees `services/kilo-mcp/`.
+ */
+function webTestFilterPaths() {
+  const ci = load(readFileSync(join(repoRoot, '.github/workflows/ci.yml'), 'utf8'));
+  const step = (ci.jobs?.changes?.steps ?? []).find(
+    candidate => typeof candidate.with?.filters === 'string'
+  );
+  assert.ok(step, 'ci.yml: the changes job must carry its filters inline');
+  const filters = load(step.with.filters);
+  assert.ok(
+    Array.isArray(filters.kilocode_backend),
+    'ci.yml: kilocode_backend must be a path list'
+  );
+  return filters.kilocode_backend;
 }
 
 function validate(workflow) {
@@ -196,7 +318,7 @@ function validate(workflow) {
   for (const fragment of catalogPathFragments) {
     assert.match(gate.run ?? '', fragment, `change-detection step must recognise ${fragment}`);
   }
-  assertNoPipedDiff(gate, prepareJobName);
+  assertMatcherVerdict(gate, prepareJobName);
   const gateIndex = prepare.steps.indexOf(gate);
   for (const step of prepare.steps.slice(gateIndex + 1)) {
     assert.match(
@@ -435,7 +557,7 @@ function validate(workflow) {
       `merge change-detection step must recognise ${fragment}`
     );
   }
-  assertNoPipedDiff(mergeDetect, mergeJobName);
+  assertMatcherVerdict(mergeDetect, mergeJobName);
   const mergeGateIndex = merge.steps.indexOf(mergeDetect);
   for (const step of merge.steps.slice(mergeGateIndex + 1)) {
     assert.match(
@@ -520,6 +642,49 @@ function validate(workflow) {
   );
 }
 
+/**
+ * Paths a catalog source reads that neither the catalog job's detection pattern
+ * nor `web-test`'s `kilocode_backend` filter covers. Empty is the invariant:
+ * a change there changes `catalog.json` on main with no regenerate and no
+ * Vectorize upsert.
+ */
+function uncoveredCatalogInputs(workflow) {
+  const pr = findStep(
+    workflow.jobs[prepareJobName],
+    step => step.id === 'catalog_changes',
+    'PR change-detection step'
+  );
+  const mergeStep = findStep(
+    workflow.jobs[mergeJobName],
+    step => step.id === 'merge_changes',
+    'merge change-detection step'
+  );
+  const prPattern = detectionPattern(pr, prepareJobName);
+  assert.equal(
+    detectionPattern(mergeStep, mergeJobName),
+    prPattern,
+    'the PR and merge change-detection patterns must stay identical'
+  );
+
+  const catalogPaths = new RegExp(prPattern);
+  const webTestPaths = webTestFilterPaths().map(globToRegExp);
+  const { byName } = workspaceInventory();
+
+  const uncovered = new Set();
+  for (const file of catalogSourceFiles()) {
+    const source = readFileSync(file, 'utf8');
+    for (const match of source.matchAll(/(?:from|import\()\s*['"]([^'"]+)['"]/g)) {
+      const target = resolveSpecifier(match[1], file, byName);
+      if (!target) continue;
+      const path = relative(repoRoot, target);
+      if (catalogPaths.test(path)) continue;
+      if (webTestPaths.some(pattern => pattern.test(path))) continue;
+      uncovered.add(`${path} (read by ${relative(repoRoot, file)})`);
+    }
+  }
+  return [...uncovered].sort();
+}
+
 test('workflow file exists', () => {
   assert.ok(
     existsSync(new URL(`../${workflowPath}`, import.meta.url)),
@@ -529,6 +694,14 @@ test('workflow file exists', () => {
 
 test('catalog workflow wiring is valid', () => {
   validate(readWorkflow());
+});
+
+test('change detection covers every workspace a catalog source reads', () => {
+  assert.deepEqual(
+    uncoveredCatalogInputs(readWorkflow()),
+    [],
+    'add the workspace to both change-detection patterns in kilo-mcp-catalog.yml: a schema change there alters catalog.json on main with no regenerate and no Vectorize upsert'
+  );
 });
 
 for (const [name, defect] of [
@@ -769,33 +942,24 @@ for (const [name, defect] of [
     workflow => dropStep(workflow, prepareJobName, step => step.id === 'catalog_changes'),
   ],
   [
-    'change detection pipes the name list into grep',
+    'change detection drops its matcher verdict',
     workflow => {
       const step = workflow.jobs[prepareJobName].steps.find(item => item.id === 'catalog_changes');
-      step.run = step.run.replace(
-        'git diff --name-only "$base" HEAD > "$changed"',
-        'git diff --name-only "$base" HEAD | grep -Ev \'^$\' > "$changed"'
-      );
+      step.run = step.run.replace('if set +o pipefail && git diff', 'if git diff');
     },
   ],
   [
-    'change detection pipes the name list into grep on a continued line',
+    'change detection leaves the step shell options changed',
     workflow => {
       const step = workflow.jobs[prepareJobName].steps.find(item => item.id === 'catalog_changes');
-      step.run = step.run.replace(
-        'git diff --name-only "$base" HEAD > "$changed"',
-        'git diff --name-only "$base" HEAD \\\n            | grep -Ev \'^$\' > "$changed"'
-      );
+      step.run = step.run.replace('\nset -o pipefail', '');
     },
   ],
   [
-    'merge change detection matches a piped diff',
+    'merge change detection drops its matcher verdict',
     workflow => {
       const step = workflow.jobs[mergeJobName].steps.find(item => item.id === 'merge_changes');
-      step.run = step.run.replace(
-        'git diff --name-only "$before" HEAD > "$changed"',
-        'git diff --name-only "$before" HEAD | grep -Ev \'^$\' > "$changed"'
-      );
+      step.run = step.run.replace('if set +o pipefail && git diff', 'if git diff');
     },
   ],
   [
@@ -907,6 +1071,23 @@ for (const [name, defect] of [
     assert.throws(() => validate(workflow), assert.AssertionError);
   });
 }
+
+test('derived coverage check rejects a schema workspace dropped from the patterns', () => {
+  const workflow = readWorkflow();
+  for (const [jobName, stepId] of [
+    [prepareJobName, 'catalog_changes'],
+    [mergeJobName, 'merge_changes'],
+  ]) {
+    const step = workflow.jobs[jobName].steps.find(item => item.id === stepId);
+    const widened = step.run.replaceAll('^packages/(app-shared|', '^packages/(not-app-shared|');
+    assert.notEqual(widened, step.run, `${jobName}: the app-shared alternative must exist`);
+    step.run = widened;
+  }
+  assert.ok(
+    uncoveredCatalogInputs(workflow).some(entry => entry.startsWith('packages/app-shared/src/')),
+    'dropping app-shared from the patterns must be reported as uncovered'
+  );
+});
 
 function dropStep(workflow, jobName, predicate) {
   const job = workflow.jobs[jobName];

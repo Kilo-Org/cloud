@@ -1,4 +1,24 @@
+import { type AuthErrorMessageKey } from '@/lib/auth/auth-error-messages';
+
 type DeviceAuthStatus = 'idle' | 'pending' | 'approved' | 'denied' | 'expired' | 'error';
+
+/**
+ * A device-auth error stored untranslated. Almost every site owns a catalog
+ * key, so the screen translates it at render and a language switch re-renders
+ * the banner in the new language; the one server-authored case (the 429 start
+ * refusal's own body text) has no key and flows through as text.
+ */
+export type DeviceAuthError =
+  | { kind: 'key'; key: AuthErrorMessageKey }
+  | { kind: 'text'; text: string };
+
+export function deviceAuthErrorKey(key: AuthErrorMessageKey): DeviceAuthError {
+  return { kind: 'key', key };
+}
+
+export function deviceAuthErrorText(text: string): DeviceAuthError {
+  return { kind: 'text', text };
+}
 
 export type DeviceAuthState = {
   status: DeviceAuthStatus;
@@ -6,14 +26,14 @@ export type DeviceAuthState = {
   token: string | undefined;
   refreshToken: string | undefined;
   expiresIn: number | undefined;
-  error: string | undefined;
+  error: DeviceAuthError | undefined;
   verificationUrl: string | undefined;
   resumed?: boolean;
 };
 
 export function errorDeviceAuthState(
   code: string | undefined,
-  error: string,
+  error: DeviceAuthError,
   previousVerificationUrl: string | undefined
 ): DeviceAuthState {
   return {
@@ -77,7 +97,7 @@ export function approvedDeviceAuthState(params: {
 export function terminalDeviceAuthState(params: {
   status: 'denied' | 'expired';
   code: string;
-  error: string;
+  error: DeviceAuthError;
   previousVerificationUrl?: string;
 }): DeviceAuthState {
   return {

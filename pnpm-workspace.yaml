@@ -286,6 +286,9 @@ patchedDependencies:
   # A finished first entry made a cold start re-enqueue with REPLACE, which
   # cancelled the glanceable refresh run in progress.
   expo-background-task@58.0.10: patches/expo-background-task@58.0.10.patch
+  # Android: defer sheet insets registration to ON_RESUME when React has no
+  # current activity during fragment ON_START; react-native-screens#4531.
+  react-native-screens@4.30.0: patches/react-native-screens@4.30.0.patch
   # React Native installs on-device JSI bindings through its TurboModule runtime hook.
   llama.rn@0.12.9: patches/llama.rn@0.12.9.patch
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch

@@ -5,6 +5,7 @@
   "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
+    "WORKER_URL": "https://worker.example.com",
     "NEXTAUTH_SECRET": "cloud-agent-integration-test-secret",
     // Fake-provider tests have no Postgres binding. Capacity queries run in the Postgres suite.
     "CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED": "true",

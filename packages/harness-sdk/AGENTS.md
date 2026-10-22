@@ -87,9 +87,10 @@ file before you change any file in this package.
     dependency's own imports, and `skipLibCheck: true` removes the rest of the
     leverage. So the rule is checked by reading the build, not by trusting the
     compiler, and `pnpm check:platform` is what reads it. It runs after
-    `pnpm build` as the last step of `pnpm check`, and it fails on an import of
-    a Node builtin anywhere, or on `globalThis`, `process` or `Buffer` under
-    `core/`. It matches code, not prose: `core/id.ts` names `node:crypto` in a
+    `pnpm build` inside `pnpm check:ci`, `pnpm check:package` follows it, and
+    `pnpm check` then runs `test:perf`. It fails on an import of a Node
+    builtin anywhere, or on `globalThis`, `process` or `Buffer` under `core/`.
+    It matches code, not prose: `core/id.ts` names `node:crypto` in a
     comment explaining why it does not import it.
 13. Measure, do not guess. A decision about performance is made from data.
     Write the benchmark, run it, and put the number in the commit message or
@@ -1790,9 +1791,9 @@ the entry even with the key.
 
 `openai` and `@anthropic-ai/sdk` are the contract the three wires are written
 against, and every import of either is a type. Nothing of either survives the
-build, so both are dev dependencies and a consumer installs neither: 33 MiB and
-21 MiB unpacked at `openai` 7.34.0 and `@anthropic-ai/sdk` 0.137.0, against 4
-runtime dependencies that are all used.
+build, so both are dev dependencies and a consumer installs neither: 21.5 MiB
+and 14.2 MiB unpacked at `openai` 7.36.0 and `@anthropic-ai/sdk` 0.137.0,
+against 4 runtime dependencies that are all used.
 
 That holds only while no published declaration names one. Exporting a type
 built out of one — `ContentBlock`, say, which two wires exported and neither

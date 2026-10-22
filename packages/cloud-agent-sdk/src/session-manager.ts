@@ -2674,7 +2674,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     getSession: () => CloudAgentSession
   ): OpenSessionCallbacks {
     const expectedGeneration = open.expectedGeneration;
-    const resolvedFailures = open.resolvedFailures;
     return {
       onSessionCreated: info => {
         if (info.parentID == null) {
@@ -3022,9 +3021,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // await disk here: an unavailable cache must never delay a healthy open.
     open.acceptCachedPage = false;
 
-    let session: CloudAgentSession;
     const callbacks = buildOpenSessionCallbacks(open, () => session);
-    session = createCloudAgentSession({
+    const session = createCloudAgentSession({
       kiloSessionId,
       resolveSession: config.resolveSession,
       transport: {

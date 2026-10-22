@@ -122,6 +122,17 @@ export const GitHubRepositorySchema = z.object({
   }),
 });
 
+// GitHub author_association values from webhook payloads
+export const GitHubAuthorAssociationSchema = z.enum([
+  'COLLABORATOR',
+  'CONTRIBUTOR',
+  'FIRST_TIMER',
+  'FIRST_TIME_CONTRIBUTOR',
+  'MANNEQUIN',
+  'MEMBER',
+  'NONE',
+  'OWNER',
+]);
 export const PullRequestPayloadSchema = z.object({
   action: z.string(),
   pull_request: z.object({
@@ -133,6 +144,7 @@ export const PullRequestPayloadSchema = z.object({
     merged: z.boolean().nullable().optional(),
     html_url: z.string().optional(),
     created_at: z.string().datetime().optional(),
+    author_association: GitHubAuthorAssociationSchema.optional(),
     user: z.object({
       id: z.number(),
       login: z.string(),
@@ -171,18 +183,6 @@ export const PullRequestPayloadSchema = z.object({
   }),
   sender: GitHubSenderSchema.optional(),
 });
-
-// GitHub author_association values from webhook payloads
-export const GitHubAuthorAssociationSchema = z.enum([
-  'COLLABORATOR',
-  'CONTRIBUTOR',
-  'FIRST_TIMER',
-  'FIRST_TIME_CONTRIBUTOR',
-  'MANNEQUIN',
-  'MEMBER',
-  'NONE',
-  'OWNER',
-]);
 
 export const PullRequestReviewCommentPayloadSchema = z.object({
   action: z.string(),

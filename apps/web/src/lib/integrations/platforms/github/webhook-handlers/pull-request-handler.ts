@@ -129,12 +129,14 @@ export async function handlePullRequestCodeReview(
 
     const config = agentConfig.config as CodeReviewAgentConfig;
 
-    // Bot PRs are skipped by default (enforced below). Compute the decision up front so the
-    // merge-commit path also defers to it: otherwise a bot PR whose head is a merge commit
-    // would be re-pointed to a new SHA with a fresh check run, keeping alive a review the guardrail
-    // is meant to skip. When true, the PR falls through to cancellation + skip instead.
     const skipBotPullRequests = config.skip_bot_pull_requests ?? true;
     const isBotPullRequestSkip = skipBotPullRequests && pull_request.user.type === 'Bot';
+    const isExternalPullRequestSkip =
+      (config.skip_external_pull_requests ?? true) &&
+      pull_request.author_association !== 'OWNER' &&
+      pull_request.author_association !== 'MEMBER' &&
+      pull_request.author_association !== 'COLLABORATOR';
+    const isAuthorPolicySkip = isBotPullRequestSkip || isExternalPullRequestSkip;
 
     if (
       config?.repository_selection_mode === 'selected' &&
@@ -172,7 +174,7 @@ export async function handlePullRequestCodeReview(
     // Runs before cancellation so that an in-flight review at an earlier SHA is preserved:
     // a merge commit introduces no new feature work and should not supersede the existing review.
     if (
-      !isBotPullRequestSkip &&
+      !isAuthorPolicySkip &&
       headOwner &&
       headRepoName &&
       (await shouldSkipSynchronizeForMergeCommit({
@@ -285,12 +287,6 @@ export async function handlePullRequestCodeReview(
       );
     }
 
-    // Feature-level guardrail: by default, skip automated reviews of bot-authored PRs
-    // (dependabot/renovate/etc.) — high-volume, low-value dependency bumps otherwise consume review
-    // compute and clutter the PR. Configurable per org via `skip_bot_pull_requests`. Applies to
-    // standard and council reviews; manual reviews never reach this handler. Runs AFTER
-    // supersession so a bot push still cancels any stale in-flight review and resolves its
-    // check run, instead of leaving it stuck.
     if (isBotPullRequestSkip) {
       logExceptInTest('Skipping bot-authored PR:', {
         pr_number: pull_request.number,
@@ -298,6 +294,12 @@ export async function handlePullRequestCodeReview(
         author: pull_request.user.login,
       });
       return NextResponse.json({ message: 'Skipped bot-authored PR' }, { status: 200 });
+    }
+    if (isExternalPullRequestSkip) {
+      return NextResponse.json(
+        { message: 'Skipped by automated review author policy' },
+        { status: 200 }
+      );
     }
 
     const existingReview = await findExistingReview(reviewScope, pull_request.head.sha);

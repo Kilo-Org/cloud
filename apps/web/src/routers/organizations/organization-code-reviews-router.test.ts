@@ -290,6 +290,7 @@ describe('organization review agent router: patchReviewConfig', () => {
         // Web-only setting the patch schema never carries; `false` proves
         // the patch passes it through instead of resetting to the default.
         skip_bot_pull_requests: false,
+        skip_external_pull_requests: false,
         review_memory_enabled: true,
         review_analytics_enabled: true,
       },
@@ -483,6 +484,7 @@ describe('organization review agent router: patchReviewConfig', () => {
         gate_threshold: 'off',
         disable_review_md: true,
         skip_bot_pull_requests: false,
+        skip_external_pull_requests: false,
       })
     );
   });
@@ -896,6 +898,49 @@ describe('organization review agent router: skip bot pull requests', () => {
       platform: 'github',
     });
     expect(cfg.skipBotPullRequests).toBe(false);
+  });
+
+  it('defaults external pull request selection to true for new and empty configs', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+    const input = { organizationId: organization.id, platform: 'github' as const };
+    expect(
+      (await caller.organizations.reviewAgent.getReviewConfig(input)).skipExternalPullRequests
+    ).toBe(true);
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {},
+      is_enabled: false,
+      created_by: owner.id,
+    });
+    expect(
+      (await caller.organizations.reviewAgent.getReviewConfig(input)).skipExternalPullRequests
+    ).toBe(true);
+    await caller.organizations.reviewAgent.patchReviewConfig({ ...input, reviewStyle: 'strict' });
+    const stored = await getAgentConfig(organization.id, 'code_review', 'github');
+    expect(stored?.config).toEqual(expect.objectContaining({ skip_external_pull_requests: true }));
+  });
+
+  it.each([true, false])('persists external pull request selection %s', async value => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'anthropic/claude-sonnet-5',
+      skipExternalPullRequests: value,
+    });
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+    });
+    expect(returned.skipExternalPullRequests).toBe(value);
+    const stored = await getAgentConfig(organization.id, 'code_review', 'github');
+    expect(stored?.config).toEqual(expect.objectContaining({ skip_external_pull_requests: value }));
   });
 });
 

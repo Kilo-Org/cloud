@@ -3281,6 +3281,54 @@ describe('personalReviewAgent.patchReviewConfig', () => {
     });
   });
 
+  it('defaults external pull request selection to true for new and empty configs', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const input = { platform: 'github' as const };
+    expect((await caller.personalReviewAgent.getReviewConfig(input)).skipExternalPullRequests).toBe(
+      true
+    );
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {},
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+    expect((await caller.personalReviewAgent.getReviewConfig(input)).skipExternalPullRequests).toBe(
+      true
+    );
+    await caller.personalReviewAgent.patchReviewConfig({ ...input, reviewStyle: 'strict' });
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(expect.objectContaining({ skip_external_pull_requests: true }));
+  });
+
+  it.each([true, false])('persists external pull request selection %s', async value => {
+    const caller = await createCallerForUser(testUser.id);
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'anthropic/claude-sonnet-5',
+      skipExternalPullRequests: value,
+      autoConfigureWebhooks: false,
+    });
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
+    expect(returned.skipExternalPullRequests).toBe(value);
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(expect.objectContaining({ skip_external_pull_requests: value }));
+  });
+
   // Seeds a GitHub personal config with values that the patch should NOT
   // touch: manuallyAddedRepositories, repositoryModelOverrides, and the
   // review_memory_enabled / review_analytics_enabled feature flags. Each
@@ -3314,6 +3362,7 @@ describe('personalReviewAgent.patchReviewConfig', () => {
         // Web-only setting the patch schema never carries; `false` proves
         // the patch passes it through instead of resetting to the default.
         skip_bot_pull_requests: false,
+        skip_external_pull_requests: false,
         review_memory_enabled: true,
         review_analytics_enabled: true,
       },
@@ -3406,6 +3455,7 @@ describe('personalReviewAgent.patchReviewConfig', () => {
         disable_review_md: true,
         // Web-only setting preserved by the patch pass-through:
         skip_bot_pull_requests: false,
+        skip_external_pull_requests: false,
         // Feature flags preserved by `preserveCodeReviewFeatureSettings`:
         review_memory_enabled: true,
         review_analytics_enabled: true,

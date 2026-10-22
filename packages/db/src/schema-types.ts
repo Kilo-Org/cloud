@@ -1750,6 +1750,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   // Bitbucket do not expose an authoritative bot flag in their webhooks, so the setting has no
   // effect there yet.
   skip_bot_pull_requests: z.boolean().optional(),
+  skip_external_pull_requests: z.boolean().optional(),
   disable_review_md: z.boolean().optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.

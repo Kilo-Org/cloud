@@ -112,6 +112,7 @@ const SaveReviewConfigInputSchema = z.object({
     .optional(),
   disableReviewMd: z.boolean().optional(),
   skipBotPullRequests: z.boolean().optional(),
+  skipExternalPullRequests: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // GitLab-specific: auto-configure webhooks
   autoConfigureWebhooks: z.boolean().optional().default(true),
@@ -269,6 +270,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
           councilEnabledRepositoryIds: [],
           disableReviewMd: true,
           skipBotPullRequests: true,
+          skipExternalPullRequests: true,
           reviewMemoryEnabled: false,
           actionRequired: null,
         };
@@ -301,6 +303,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
           })),
         disableReviewMd: cfg.disable_review_md ?? true,
         skipBotPullRequests: cfg.skip_bot_pull_requests ?? true,
+        skipExternalPullRequests: cfg.skip_external_pull_requests ?? true,
         // Council is org-only; personal configs never set it, but expose it so the query shape
         // matches the org query (the form's `configData` is a union of the two).
         council: cfg.council ?? null,
@@ -357,6 +360,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             repository_model_overrides: repositoryModelOverrides,
             disable_review_md: input.disableReviewMd ?? true,
             skip_bot_pull_requests: input.skipBotPullRequests ?? true,
+            skip_external_pull_requests: input.skipExternalPullRequests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
           },
@@ -594,6 +598,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             // through so a PATCH can't silently reset it to the default —
             // same field-merge contract as every other omitted field.
             skip_bot_pull_requests: prevCfg.skip_bot_pull_requests ?? true,
+            skip_external_pull_requests: prevCfg.skip_external_pull_requests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
           },

@@ -273,6 +273,7 @@ export function ReviewConfigForm({
   const [useReviewMd, setUseReviewMd] = useState(true);
   // Feature-level guardrail; defaults to skipping bot PRs (matches the server default).
   const [skipBotPullRequests, setSkipBotPullRequests] = useState(true);
+  const [skipExternalPullRequests, setSkipExternalPullRequests] = useState(true);
   // GitLab-specific: auto-configure webhooks
   const [autoConfigureWebhooks, setAutoConfigureWebhooks] = useState(true);
   // Webhook sync result from last save
@@ -464,6 +465,7 @@ export function ReviewConfigForm({
       );
       setUseReviewMd(!(configData.disableReviewMd ?? false));
       setSkipBotPullRequests(configData.skipBotPullRequests ?? true);
+      setSkipExternalPullRequests(configData.skipExternalPullRequests ?? true);
     }
   }, [configData, isGitLab]);
 
@@ -726,6 +728,7 @@ export function ReviewConfigForm({
         councilEnabledRepositoryIds: councilEnabledRepositoryIdsPayload,
         disableReviewMd: !useReviewMd,
         skipBotPullRequests,
+        skipExternalPullRequests,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
       });
@@ -744,6 +747,7 @@ export function ReviewConfigForm({
         repositoryModelOverrides: repositoryModelOverridesPayload,
         disableReviewMd: !useReviewMd,
         skipBotPullRequests,
+        skipExternalPullRequests,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
       });
@@ -946,6 +950,30 @@ export function ReviewConfigForm({
                   id="skip-bot-prs"
                   checked={skipBotPullRequests}
                   onCheckedChange={setSkipBotPullRequests}
+                  disabled={
+                    orgSaveMutation.isPending || personalSaveMutation.isPending || !isEnabled
+                  }
+                />
+              </div>
+            )}
+
+            {platform === 'github' && (
+              <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="skip-external-prs" className="text-base font-semibold">
+                    Skip pull requests from external contributors
+                  </Label>
+                  <p id="skip-external-prs-help" className="text-muted-foreground text-sm">
+                    Only run automated reviews on pull requests from repository owners, members, and
+                    collaborators. Turn this off to review external contributors too. Manual reviews
+                    are unchanged.
+                  </p>
+                </div>
+                <Switch
+                  id="skip-external-prs"
+                  checked={skipExternalPullRequests}
+                  onCheckedChange={setSkipExternalPullRequests}
+                  aria-describedby="skip-external-prs-help"
                   disabled={
                     orgSaveMutation.isPending || personalSaveMutation.isPending || !isEnabled
                   }

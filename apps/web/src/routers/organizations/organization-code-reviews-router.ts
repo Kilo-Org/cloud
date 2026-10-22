@@ -153,6 +153,7 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
   disableReviewMd: z.boolean().optional(),
   // Feature-level guardrail: skip automated reviews of bot-authored PRs. Defaults to true.
   skipBotPullRequests: z.boolean().optional(),
+  skipExternalPullRequests: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // Org-level council config (specialists + governance), shared by every council-enabled repo.
   // `null`/absent leaves council unset. Persisted only for entitled orgs (checked in the handler).
@@ -586,6 +587,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           councilEnabledRepositoryIds: [],
           disableReviewMd: true,
           skipBotPullRequests: true,
+          skipExternalPullRequests: true,
           reviewMemoryEnabled: false,
           actionRequired: null,
         };
@@ -627,6 +629,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           })),
         disableReviewMd: isBitbucket ? true : (cfg.disable_review_md ?? true),
         skipBotPullRequests: cfg.skip_bot_pull_requests ?? true,
+        skipExternalPullRequests: cfg.skip_external_pull_requests ?? true,
         council: cfg.council ?? null,
         councilEnabledRepositoryIds: cfg.council_enabled_repository_ids ?? [],
         reviewMemoryEnabled: isBitbucket ? false : getReviewMemoryEnabledFromConfig(config.config),
@@ -721,6 +724,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             council_enabled_repository_ids: input.councilEnabledRepositoryIds ?? [],
             disable_review_md: isBitbucket ? true : (input.disableReviewMd ?? true),
             skip_bot_pull_requests: input.skipBotPullRequests ?? true,
+            skip_external_pull_requests: input.skipExternalPullRequests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
           },
@@ -1070,6 +1074,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             // default — same field-merge contract as every other omitted
             // field.
             skip_bot_pull_requests: prevCfg.skip_bot_pull_requests ?? true,
+            skip_external_pull_requests: prevCfg.skip_external_pull_requests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
           },

@@ -64,6 +64,7 @@ import {
   shouldSkipSynchronizeForMergeCommit,
 } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-handler';
 import type { PullRequestPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
+import { PullRequestPayloadSchema } from '@/lib/integrations/platforms/github/webhook-schemas';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 
 function pullRequestPayload(overrides: Partial<PullRequestPayload> = {}): PullRequestPayload {
@@ -81,6 +82,7 @@ function pullRequestPayload(overrides: Partial<PullRequestPayload> = {}): PullRe
       title: 'Add widgets',
       state: 'open',
       draft: false,
+      author_association: 'MEMBER',
       html_url: 'https://github.com/acme/widgets/pull/42',
       user: { id: 111, login: 'alice', avatar_url: 'https://example.com/a.png', type: 'User' },
       head: { sha: 'abc123', ref: 'feature/widgets', repo: { full_name: 'acme/widgets' } },
@@ -447,6 +449,110 @@ describe('handlePullRequest', () => {
       expect(mockCreateCodeReview).toHaveBeenCalledWith(
         expect.objectContaining({ reviewType: 'standard' })
       );
+    });
+  });
+
+  describe('automated author policy', () => {
+    it.each([
+      ['OWNER', undefined, false, 202],
+      ['MEMBER', true, false, 202],
+      ['COLLABORATOR', true, true, 202],
+      ['CONTRIBUTOR', undefined, true, 200],
+      ['FIRST_TIMER', true, true, 200],
+      ['FIRST_TIME_CONTRIBUTOR', true, true, 200],
+      ['MANNEQUIN', true, false, 200],
+      ['NONE', true, true, 200],
+      [undefined, undefined, false, 200],
+      ['NONE', false, true, 202],
+      [undefined, false, true, 202],
+    ])('applies author policy case %#', async (association, skipExternal, fork, status) => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({
+        is_enabled: true,
+        config: { skip_external_pull_requests: skipExternal },
+      });
+      const raw = pullRequestPayload();
+      const payload = PullRequestPayloadSchema.parse({
+        ...raw,
+        pull_request: {
+          ...raw.pull_request,
+          author_association: association,
+          head: {
+            ...raw.pull_request.head,
+            repo: { full_name: fork ? 'contributor/widgets' : 'acme/widgets' },
+          },
+        },
+      });
+
+      const response = await handlePullRequest(payload, platformIntegration());
+
+      expect(response.status).toBe(status);
+      expect(mockCreateCodeReview).toHaveBeenCalledTimes(status === 202 ? 1 : 0);
+      expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(status === 202 ? 1 : 0);
+      expect(mockCreateCheckRun).toHaveBeenCalledTimes(status === 202 ? 1 : 0);
+      expect(mockAddReactionToPR).toHaveBeenCalledTimes(status === 202 ? 1 : 0);
+    });
+
+    it('completes supersession cleanup', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+      mockIsMergeCommit.mockResolvedValue(true);
+      mockCancelSupersededReviewsForPR.mockResolvedValue([
+        {
+          id: 'queued-review',
+          prevStatus: 'queued',
+          latestActiveAttemptId: 'queued-attempt',
+          checkRunId: 555,
+          platform: 'github',
+        },
+      ]);
+      const payload = pullRequestPayload();
+      payload.pull_request.author_association = 'NONE';
+
+      const response = await handlePullRequest(payload, platformIntegration());
+
+      expect(response.status).toBe(200);
+      expect(mockCancelReview).toHaveBeenCalledWith(
+        'queued-review',
+        'Superseded by new push',
+        'queued-attempt'
+      );
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        '98765',
+        'acme',
+        'widgets',
+        555,
+        expect.objectContaining({ status: 'completed', conclusion: 'cancelled' }),
+        'standard'
+      );
+      expect(mockFindActiveReviewsForPR).not.toHaveBeenCalled();
+      expect(mockIsMergeCommit).not.toHaveBeenCalled();
+      expect(mockCreateCodeReview).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [true, false, 200],
+      [false, true, 200],
+      [false, false, 202],
+    ])('applies combined author controls case %#', async (skipExternal, skipBot, status) => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({
+        is_enabled: true,
+        config: {
+          skip_external_pull_requests: skipExternal,
+          skip_bot_pull_requests: skipBot,
+        },
+      });
+      const payload = pullRequestPayload();
+      payload.pull_request.author_association = 'NONE';
+      payload.pull_request.user.type = 'Bot';
+
+      const response = await handlePullRequest(payload, platformIntegration());
+
+      expect(response.status).toBe(status);
+      expect(mockCreateCodeReview).toHaveBeenCalledTimes(status === 202 ? 1 : 0);
+      expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(status === 202 ? 1 : 0);
     });
   });
 

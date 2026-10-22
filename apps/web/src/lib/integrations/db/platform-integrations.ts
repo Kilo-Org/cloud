@@ -1442,32 +1442,6 @@ export async function findGitLabIntegrationByWebhookToken(webhookToken: string) 
 }
 
 /**
- * Find GitLab integration by project ID
- * Used when we know the GitLab project ID from the webhook payload
- */
-export async function findGitLabIntegrationByProjectId(projectId: number) {
-  const integrations = await db
-    .select()
-    .from(platform_integrations)
-    .where(eq(platform_integrations.platform, PLATFORM.GITLAB));
-
-  // An integration matches when its access is 'all' or its repositories list
-  // contains this project.
-  for (const integration of integrations) {
-    if (integration.repository_access === 'all') {
-      return integration;
-    }
-
-    const repos = integration.repositories;
-    if (repos?.some(repo => repo.id === projectId)) {
-      return integration;
-    }
-  }
-
-  return null;
-}
-
-/**
  * Updates the metadata for a platform integration
  * Used for storing webhook configuration, tokens, etc.
  */

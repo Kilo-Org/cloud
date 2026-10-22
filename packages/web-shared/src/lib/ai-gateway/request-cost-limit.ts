@@ -121,7 +121,7 @@ const boundedRequestProperties = z
     metadata: inertProperty,
     store: inertProperty,
     stream_options: inertProperty,
-    service_tier: inertProperty,
+    service_tier: z.enum(['auto', 'default', 'flex']).optional(),
     prompt_cache_key: inertProperty,
     safety_identifier: inertProperty,
     session_id: inertProperty,

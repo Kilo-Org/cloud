@@ -243,6 +243,13 @@ describe('request cost admission', () => {
       )
     ).resolves.toBeNull();
   });
+  it('refuses a service tier the catalog price does not cover', async () => {
+    for (const service_tier of ['priority', 'scale', 'unpriced']) {
+      await expect(
+        enforceRequestCostLimit('2000000', model.id, { ...body, service_tier }, 2_000_000)
+      ).resolves.toMatch(/text-only/);
+    }
+  });
   it('refuses a choice count outside the priced range', async () => {
     for (const n of [0, -2, 1.5, 129]) {
       await expect(

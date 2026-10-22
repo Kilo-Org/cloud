@@ -264,14 +264,14 @@ describe('updateMcpServer secret reuse', () => {
     expect(state.updateSets).toHaveLength(0);
   });
 
-  test.each([
-    { BASE_URL: 'https://mcp.example.com' },
-    { BASE_URL: storedEnvelope('https://mcp.example.com') },
-  ])('validates local environment consistency (%#)', async environment => {
+  test('requires every environment value when one value changes', async () => {
     const { db, state } = createMcpServiceDb({
       type: 'local',
       command: ['node', 'server.js'],
-      environment: { ...environment, API_KEY: storedEnvelope('secret-1') },
+      environment: {
+        BASE_URL: storedEnvelope('https://mcp.example.com'),
+        API_KEY: storedEnvelope('secret-1'),
+      },
     });
 
     await expect(
@@ -292,42 +292,6 @@ describe('updateMcpServer secret reuse', () => {
       )
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(state.updateSets).toEqual([]);
-  });
-
-  test('preserves local configuration values', async () => {
-    const stored = storedEnvelope('secret-1');
-    const { db, state } = createMcpServiceDb({
-      type: 'local',
-      environment: { BASE_URL: 'https://mcp.example.com', API_KEY: stored },
-    });
-
-    await updateMcpServer(
-      db,
-      PUBLIC_KEY,
-      PROFILE_ID,
-      SERVER_ID,
-      parseInput({
-        name: 'renamed-server',
-        type: 'local',
-        config: {
-          command: ['node', 'server.js'],
-          environment: { API_KEY: MASKED_SECRET_VALUE, BASE_URL: 'https://mcp.example.com' },
-        },
-      }),
-      OWNER
-    );
-
-    expect(state.updateSets).toEqual([
-      expect.objectContaining({
-        config: {
-          command: ['node', 'server.js'],
-          environment: {
-            API_KEY: stored,
-            BASE_URL: expect.objectContaining({ algorithm: 'rsa-aes-256-gcm', version: 1 }),
-          },
-        },
-      }),
-    ]);
   });
 
   test('rejects masked values when the server type changes', async () => {

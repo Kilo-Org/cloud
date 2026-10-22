@@ -146,8 +146,8 @@ function encryptRecord(
  * On update, `existing` carries the previously stored encrypted envelopes
  * so keys left as the masked placeholder round-trip unchanged.
  *
- * Local configuration consistency includes the full command argv and all
- * environment entries. Remote configuration consistency uses the URL.
+ * Local configuration consistency covers the full command argv and every
+ * environment entry. Remote configuration consistency covers the URL.
  * Create has no stored configuration to compare.
  */
 function buildStoredConfig(
@@ -156,25 +156,30 @@ function buildStoredConfig(
   existing?: StoredMcpConfig
 ): StoredMcpConfig {
   if (input.type === 'local') {
+    const storedEnvironment =
+      existing !== undefined && 'command' in existing ? existing.environment : undefined;
     const commandUnchanged =
       existing !== undefined &&
       'command' in existing &&
       existing.command.length === input.config.command.length &&
       existing.command.every((part, index) => part === input.config.command[index]);
-    const envUnchanged =
+    // Stored entries are envelopes once this service has written them, so a
+    // submitted entry is either the placeholder or a replacement value.
+    // Reuse therefore requires every entry to be the placeholder for a key
+    // that already exists; a replacement value means the caller supplies the
+    // whole environment, which `encryptRecord` then encrypts.
+    const environmentReusable =
       commandUnchanged &&
+      storedEnvironment !== undefined &&
       input.config.environment !== undefined &&
-      existing.environment !== undefined &&
-      Object.keys(existing.environment).length === Object.keys(input.config.environment).length &&
+      Object.keys(storedEnvironment).length === Object.keys(input.config.environment).length &&
       Object.entries(input.config.environment).every(
-        ([key, value]) =>
-          existing.environment?.[key] !== undefined &&
-          (value === MASKED_SECRET_VALUE || value === existing.environment[key])
+        ([key, value]) => value === MASKED_SECRET_VALUE && storedEnvironment[key] !== undefined
       );
     const carriesPlaceholder =
       input.config.environment !== undefined &&
       Object.values(input.config.environment).some(value => value === MASKED_SECRET_VALUE);
-    if (existing !== undefined && !(commandUnchanged && envUnchanged) && carriesPlaceholder) {
+    if (existing !== undefined && !environmentReusable && carriesPlaceholder) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
         message: 'Environment values must be re-entered when the command or environment changes',
@@ -185,7 +190,7 @@ function buildStoredConfig(
       environment: encryptRecord(
         publicKeyBase64,
         input.config.environment,
-        commandUnchanged && envUnchanged ? existing.environment : undefined
+        environmentReusable ? storedEnvironment : undefined
       ),
     };
   }

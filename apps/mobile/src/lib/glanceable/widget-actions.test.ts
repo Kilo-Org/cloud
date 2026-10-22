@@ -301,9 +301,9 @@ describe('runWidgetApprove', () => {
       kind: 'approved',
     });
 
-    expect(isAttentionAcked('waiting', '2026-09-18T21:00:00.000Z')).toBe(true);
+    expect(isAttentionAcked('waiting', { raiseId: '2026-09-18T21:00:00.000Z' })).toBe(true);
     // A permission raised after the answered one keeps its badge.
-    expect(isAttentionAcked('waiting', '2026-09-18T21:30:00.000Z')).toBe(false);
+    expect(isAttentionAcked('waiting', { raiseId: '2026-09-18T21:30:00.000Z' })).toBe(false);
     release();
   });
 
@@ -346,7 +346,7 @@ describe('runWidgetApprove', () => {
     // makes the redraw count it as answered instead of showing the pre-action
     // counts.
     expect(rpc.activeSessions.list.query).toHaveBeenCalledTimes(2);
-    expect(isAttentionAcked('waiting', 'permission')).toBe(true);
+    expect(isAttentionAcked('waiting', { raiseId: 'permission' })).toBe(true);
     expect(snapshots).toHaveLength(1);
     expect(snapshots[0]).toMatchObject({ needsInput: 0, status: 'happy' });
     // The card outlives the JS process, so the republish must start/update it,

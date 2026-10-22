@@ -306,7 +306,9 @@ export function ackSessionAttention(
   statusUpdatedAt?: string | null
 ): void {
   const entry = store.entries.get(sessionId);
-  const trackedRaise = entry?.status === status ? entry.raiseId : null;
+  // Only a cleared entry tracks the raise still waiting for an answer; an acked
+  // entry's raise was answered already and must not be reused for a new one.
+  const trackedRaise = entry?.ackedAt === null && entry.status === status ? entry.raiseId : null;
   const raiseId = statusUpdatedAt ?? trackedRaise ?? status;
   if (entry && entry.ackedAt !== null && sameRaise(entry.raiseId, raiseId)) {
     return;
@@ -445,21 +447,42 @@ export async function clearSessionAttentionForSignOut(): Promise<void> {
 }
 
 /**
+ * One raise as a reader sees it: the identity the row gives (`statusUpdatedAt ??
+ * status`) plus, when the caller knows it, the row's status.
+ */
+export type AttentionRaise = {
+  raiseId: string | null;
+  status?: string | null;
+};
+
+/**
  * True when the ack names this raise.
  *
  * Raise ids are compared as identities, so a stored row's PostgreSQL text and a
- * live row's ISO form of the same instant are the same raise. A caller that
- * only has the status (the tray badge and the launcher surfaces read a row
- * without its timestamp) asks with the status alone, and the acked status
- * answers it: a miss there would draw the badge for a raise the user already
- * answered.
+ * live row's ISO form of the same instant are the same raise. A row the surface
+ * cannot date (`raiseId === status`), or an ack written from a status-only
+ * answer, matches by status: a miss there would draw the badge for a raise the
+ * user already answered. A caller that knows the row's status time asks about
+ * exactly one raise, so a re-raise under the same status shows again.
  */
-export function isAttentionAcked(sessionId: string, raiseId: string | null): boolean {
+export function isAttentionAcked(sessionId: string, raise: AttentionRaise): boolean {
   const entry = store.entries.get(sessionId);
   if (!entry || entry.ackedAt === null) {
     return false;
   }
-  return sameRaise(entry.raiseId, raiseId) || (raiseId !== null && entry.status === raiseId);
+  if (sameRaise(entry.raiseId, raise.raiseId)) {
+    return true;
+  }
+  if (raise.raiseId === null || entry.status === null) {
+    return false;
+  }
+  // The row could not be dated, so it names the acked status rather than a raise.
+  if (raise.raiseId === entry.status) {
+    return true;
+  }
+  // The ack itself was written from a status-only answer: nothing it holds can
+  // tell two raises of that status apart.
+  return entry.raiseId === entry.status && raise.status === entry.status;
 }
 
 export function shouldShowNeedsInput({

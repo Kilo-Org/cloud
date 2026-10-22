@@ -121,17 +121,17 @@ describe('useInteractionHandlers attention ack', () => {
     await render().handleAnswerQuestion([['yes']]);
 
     expect(manager.answerQuestion).toHaveBeenCalledWith('q1', [['yes']]);
-    expect(isAttentionAcked('kilo-session-1', 'question')).toBe(true);
+    expect(isAttentionAcked('kilo-session-1', { raiseId: 'question' })).toBe(true);
     expect(
       shouldShowNeedsInput({
         status: 'question',
         raiseId: 'question',
-        isAcked: isAttentionAcked('kilo-session-1', 'question'),
+        isAcked: isAttentionAcked('kilo-session-1', { raiseId: 'question' }),
       })
     ).toBe(false);
     expect(__peekSessionAttentionForTests('kilo-session-1')).toEqual({ raiseId: 'question' });
     // Must key by kilo id, never the cloud-agent id.
-    expect(isAttentionAcked('cloud-agent-id', 'question')).toBe(false);
+    expect(isAttentionAcked('cloud-agent-id', { raiseId: 'question' })).toBe(false);
     expect(captureEvent).toHaveBeenCalledWith('question_answered', {
       surface: 'remote-session',
       skipped: false,
@@ -162,9 +162,9 @@ describe('useInteractionHandlers attention ack', () => {
     expect(__peekSessionAttentionForTests('kilo-session-1')).toEqual({
       raiseId: '2026-09-18T21:00:00.000Z',
     });
-    expect(isAttentionAcked('kilo-session-1', '2026-09-18T21:00:00.000Z')).toBe(true);
+    expect(isAttentionAcked('kilo-session-1', { raiseId: '2026-09-18T21:00:00.000Z' })).toBe(true);
     // A question raised later is a different raise and keeps its badge.
-    expect(isAttentionAcked('kilo-session-1', '2026-09-18T21:30:00.000Z')).toBe(false);
+    expect(isAttentionAcked('kilo-session-1', { raiseId: '2026-09-18T21:30:00.000Z' })).toBe(false);
   });
 
   it('ignores an observed raise of the other kind', async () => {
@@ -208,7 +208,7 @@ describe('useInteractionHandlers attention ack', () => {
     await render().handleRejectQuestion();
 
     expect(manager.rejectQuestion).toHaveBeenCalledWith('q1');
-    expect(isAttentionAcked('kilo-session-1', 'question')).toBe(true);
+    expect(isAttentionAcked('kilo-session-1', { raiseId: 'question' })).toBe(true);
     expect(captureEvent).toHaveBeenCalledWith('question_answered', {
       surface: 'cloud-agent',
       skipped: true,
@@ -232,7 +232,7 @@ describe('useInteractionHandlers attention ack', () => {
     await render().handleRespondToPermission('once');
 
     expect(manager.respondToPermission).toHaveBeenCalledWith('p1', 'once');
-    expect(isAttentionAcked('kilo-session-1', 'permission')).toBe(true);
+    expect(isAttentionAcked('kilo-session-1', { raiseId: 'permission' })).toBe(true);
     expect(captureEvent).toHaveBeenCalledWith('permission_responded', {
       surface: 'remote-session',
       response: 'once',
@@ -306,13 +306,13 @@ describe('useInteractionHandlers attention ack', () => {
 
     await render().handleAnswerQuestion([['yes']]);
 
-    expect(isAttentionAcked('kilo-session-1', 'question')).toBe(false);
+    expect(isAttentionAcked('kilo-session-1', { raiseId: 'question' })).toBe(false);
     expect(__peekSessionAttentionForTests('kilo-session-1')).toBeUndefined();
     expect(
       shouldShowNeedsInput({
         status: 'question',
         raiseId: 'question',
-        isAcked: isAttentionAcked('kilo-session-1', 'question'),
+        isAcked: isAttentionAcked('kilo-session-1', { raiseId: 'question' }),
       })
     ).toBe(true);
     expect(toastError).toHaveBeenCalledWith('Failed to submit answer. Please try again.');
@@ -335,7 +335,7 @@ describe('useInteractionHandlers attention ack', () => {
 
     await render().handleRejectQuestion();
 
-    expect(isAttentionAcked('kilo-session-1', 'question')).toBe(false);
+    expect(isAttentionAcked('kilo-session-1', { raiseId: 'question' })).toBe(false);
     expect(toastError).toHaveBeenCalledWith('Failed to skip question. Please try again.');
     expect(captureEvent).not.toHaveBeenCalled();
   });
@@ -356,7 +356,7 @@ describe('useInteractionHandlers attention ack', () => {
 
     await render().handleRespondToPermission('reject');
 
-    expect(isAttentionAcked('kilo-session-1', 'permission')).toBe(false);
+    expect(isAttentionAcked('kilo-session-1', { raiseId: 'permission' })).toBe(false);
     expect(toastError).toHaveBeenCalledWith('Failed to respond to permission. Please try again.');
     expect(captureEvent).not.toHaveBeenCalled();
   });
@@ -377,7 +377,7 @@ describe('useInteractionHandlers attention ack', () => {
 
     await render().handleAnswerQuestion([['ok']]);
 
-    expect(isAttentionAcked('session-a', 'question')).toBe(true);
-    expect(isAttentionAcked('session-b', 'question')).toBe(false);
+    expect(isAttentionAcked('session-a', { raiseId: 'question' })).toBe(true);
+    expect(isAttentionAcked('session-b', { raiseId: 'question' })).toBe(false);
   });
 });

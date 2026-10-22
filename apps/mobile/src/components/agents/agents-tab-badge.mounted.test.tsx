@@ -159,7 +159,7 @@ describe('Agents needs-input badge and shared live count', () => {
       });
       expectCounts(result.renderer, undefined, 1);
       await updateSessions(result, sessions([status]));
-      expect(isAttentionAcked('personal-0', 'question')).toBe(false);
+      expect(isAttentionAcked('personal-0', { raiseId: 'question' })).toBe(false);
       expectCounts(result.renderer, status === 'permission' ? 1 : undefined, 1);
       await updateSessions(result, sessions(['question']));
       expectCounts(result.renderer, 1, 1);
@@ -298,7 +298,7 @@ describe('Agents needs-input badge and shared live count', () => {
       queryClient.setQueryData(key('org-a'), { sessions: sessions(['busy'], 'org-a') });
     });
     expectCounts(result.renderer);
-    expect(isAttentionAcked('org-a-0', 'question')).toBe(true);
+    expect(isAttentionAcked('org-a-0', { raiseId: 'question' })).toBe(true);
     fetchSessions.mockResolvedValue({
       sessions: [
         ...sessions(['question', 'busy'], 'org-b'),
@@ -311,7 +311,7 @@ describe('Agents needs-input badge and shared live count', () => {
     });
     await waitFor(() => agentsOptions(result.renderer).tabBarBadge === 1);
     expectCounts(result.renderer, 1, 2);
-    expect(isAttentionAcked('org-a-0', 'question')).toBe(true);
+    expect(isAttentionAcked('org-a-0', { raiseId: 'question' })).toBe(true);
     expect(
       queryClient
         .getQueryCache()

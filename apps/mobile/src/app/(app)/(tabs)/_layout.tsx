@@ -166,7 +166,10 @@ export default function TabsLayout() {
   const needsInputRows = activeSessions.map(session => ({
     id: session.id,
     status: session.status,
-    isAcked: isAttentionAcked(session.id, session.status),
+    isAcked: isAttentionAcked(session.id, {
+      raiseId: session.statusUpdatedAt ?? session.status,
+      status: session.status,
+    }),
   }));
   const needsInputCount = needsInputRows.filter(session =>
     shouldShowNeedsInput({

@@ -129,8 +129,8 @@ describe('ack store state machine', () => {
   it('an ack hides only the raise it names', () => {
     ackSessionAttention('s1', 'question', 'R1');
 
-    expect(isAttentionAcked('s1', 'R1')).toBe(true);
-    expect(isAttentionAcked('s1', 'R2')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(false);
     expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: 'R1' });
   });
 
@@ -138,8 +138,8 @@ describe('ack store state machine', () => {
     ackSessionAttention('s1', 'question');
 
     // The caller named the status the user answered, nothing more.
-    expect(isAttentionAcked('s1', 'question')).toBe(true);
-    expect(isAttentionAcked('s1', 'R1')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'question' })).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
   });
 
   it('a different raise observed after an ack keeps its own badge', () => {
@@ -149,12 +149,12 @@ describe('ack store state machine', () => {
 
     reconcileSessionAttention('s1', 'permission', 'R2');
 
-    expect(isAttentionAcked('s1', 'R2')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(false);
     expect(
       shouldShowNeedsInput({
         status: 'permission',
         raiseId: 'R2',
-        isAcked: isAttentionAcked('s1', 'R2'),
+        isAcked: isAttentionAcked('s1', { raiseId: 'R2' }),
       })
     ).toBe(true);
     expect(__peekSessionAttentionEntryForTests('s1')).toEqual({
@@ -170,8 +170,8 @@ describe('ack store state machine', () => {
 
     reconcileSessionAttention('s1', 'permission', 'R2');
 
-    expect(isAttentionAcked('s1', 'R1')).toBe(false);
-    expect(isAttentionAcked('s1', 'R2')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(false);
   });
 
   it('a status-only ack learns its raise on the first observation, then a later raise shows', () => {
@@ -179,12 +179,41 @@ describe('ack store state machine', () => {
 
     // The raise the user answered, observed for the first time.
     reconcileSessionAttention('s1', 'permission', 'R1');
-    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
 
     // A new permission under the same status.
     reconcileSessionAttention('s1', 'permission', 'R2');
-    expect(isAttentionAcked('s1', 'R1')).toBe(false);
-    expect(isAttentionAcked('s1', 'R2')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(false);
+  });
+
+  it('a same-status re-raise shows on a reader that knows the row time', () => {
+    ackSessionAttention('s1', 'permission', 'R1');
+
+    // The Agents rows read the row they render: its status and its status time.
+    expect(isAttentionAcked('s1', { raiseId: 'R1', status: 'permission' })).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R2', status: 'permission' })).toBe(false);
+    // A row the surface cannot date still reads the acked status.
+    expect(isAttentionAcked('s1', { raiseId: 'permission' })).toBe(true);
+  });
+
+  it('reads a status-only ack as answered for every raise of that status', () => {
+    ackSessionAttention('s1', 'permission');
+
+    // Nothing the ack holds can tell two permissions apart, so it answers both;
+    // a raise of the other kind is a different raise.
+    expect(isAttentionAcked('s1', { raiseId: 'R2', status: 'permission' })).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R2', status: 'question' })).toBe(false);
+  });
+
+  it('does not reuse a raise that was already answered', () => {
+    ackSessionAttention('s1', 'question', 'R1');
+
+    // A question the store has not observed yet; the answer names only the
+    // status, and the acked raise is not the one the user answered.
+    ackSessionAttention('s1', 'question');
+
+    expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: 'question' });
   });
 
   it('an observation without a timestamp keeps the acked status hidden', () => {
@@ -194,7 +223,7 @@ describe('ack store state machine', () => {
     reconcileSessionAttention('s1', 'permission', null);
 
     expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: 'R1' });
-    expect(isAttentionAcked('s1', 'permission')).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'permission' })).toBe(true);
   });
 
   it('reads a stored row PostgreSQL time and a live row ISO time as one raise', () => {
@@ -202,7 +231,7 @@ describe('ack store state machine', () => {
 
     reconcileSessionAttention('s1', 'permission', '2026-10-12 09:45:12.945+00');
 
-    expect(isAttentionAcked('s1', '2026-10-12T09:45:12.945Z')).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: '2026-10-12T09:45:12.945Z' })).toBe(true);
     expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: '2026-10-12T09:45:12.945Z' });
   });
 
@@ -210,12 +239,12 @@ describe('ack store state machine', () => {
     ackSessionAttention('s1', 'question', 'R1');
     // A new raise arrives and is not acked.
     reconcileSessionAttention('s1', 'question', 'R2');
-    expect(isAttentionAcked('s1', 'R2')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(false);
 
     ackSessionAttention('s1', 'question', 'R2');
 
-    expect(isAttentionAcked('s1', 'R2')).toBe(true);
-    expect(isAttentionAcked('s1', 'R1')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
   });
 
   it('an ack with no timestamp keeps the raise the store already tracks for its status', () => {
@@ -228,30 +257,30 @@ describe('ack store state machine', () => {
 
     expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: 'R2' });
     reconcileSessionAttention('s1', 'question', 'R3');
-    expect(isAttentionAcked('s1', 'R3')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R3' })).toBe(false);
   });
 
   it('without an ack, opening alone leaves the badge visible for any raise', () => {
     // DEF-4: no on-mount ack — viewing a blocked session must not hide NEEDS INPUT
-    expect(isAttentionAcked('s1', 'R1')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
     expect(
       shouldShowNeedsInput({
         status: 'question',
         raiseId: 'R1',
-        isAcked: isAttentionAcked('s1', 'R1'),
+        isAcked: isAttentionAcked('s1', { raiseId: 'R1' }),
       })
     ).toBe(true);
   });
 
   it('acking one session never suppresses a raise on a different session', () => {
     ackSessionAttention('s1', 'question', 'R1');
-    expect(isAttentionAcked('s1', 'R1')).toBe(true);
-    expect(isAttentionAcked('s2', 'R1')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
+    expect(isAttentionAcked('s2', { raiseId: 'R1' })).toBe(false);
     expect(
       shouldShowNeedsInput({
         status: 'question',
         raiseId: 'R1',
-        isAcked: isAttentionAcked('s2', 'R1'),
+        isAcked: isAttentionAcked('s2', { raiseId: 'R1' }),
       })
     ).toBe(true);
   });
@@ -266,7 +295,7 @@ describe('ack store state machine', () => {
 
     // next question raise (no timestamp — remote active-only row)
     // is NOT acked and therefore visible
-    expect(isAttentionAcked('s1', 'question')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'question' })).toBe(false);
   });
 
   it('timestamp-less remote question → busy → question cycle re-raises visibly', () => {
@@ -280,17 +309,17 @@ describe('ack store state machine', () => {
     expect(__peekSessionAttentionForTests('s1')).toBeUndefined();
 
     // fresh question raise — not acked, visible
-    expect(isAttentionAcked('s1', 'question')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'question' })).toBe(false);
   });
 
   it('answer-then-clear sequence: the ack names its raise, so the next raise is not absorbed', () => {
     ackSessionAttention('s1', 'question', 'R1');
     // Server status still reports the same raise.
     reconcileSessionAttention('s1', 'question', 'R1');
-    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
 
     // new raise R2 — the ack names R1, so R2 is NOT acked
-    expect(isAttentionAcked('s1', 'R2')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(false);
   });
 
   it('reconcile with attention status and no entry is a no-op', () => {
@@ -302,7 +331,7 @@ describe('ack store state machine', () => {
 
     expect(getRevisionSnapshot()).toBe(before);
     expect(listener).not.toHaveBeenCalled();
-    expect(isAttentionAcked('s1', 'R1')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
 
     unsubscribe();
   });
@@ -331,7 +360,7 @@ describe('ack store state machine', () => {
     reconcileSessionAttention('s1', 'question', 'R1');
     expect(getRevisionSnapshot()).toBe(before);
     expect(listener).not.toHaveBeenCalled();
-    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
 
     unsubscribe();
   });
@@ -349,12 +378,12 @@ describe('entry shape and re-raise', () => {
 
   it('replaces the raise and clears the ack on a same-session re-raise', () => {
     ackSessionAttention('s1', 'question', 'R1');
-    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
 
     // a new status_updated_at is a new raise: the badge returns
     reconcileSessionAttention('s1', 'question', 'R2');
-    expect(isAttentionAcked('s1', 'R1')).toBe(false);
-    expect(isAttentionAcked('s1', 'R2')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(false);
     expect(__peekSessionAttentionEntryForTests('s1')).toEqual({
       raiseId: 'R2',
       status: 'question',
@@ -367,12 +396,12 @@ describe('entry shape and re-raise', () => {
     ackSessionAttention('s1', 'question', 'R1');
     // re-raise
     reconcileSessionAttention('s1', 'question', 'R2');
-    expect(isAttentionAcked('s1', 'R2')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(false);
 
     // user answers the new raise
     ackSessionAttention('s1', 'question', 'R2');
-    expect(isAttentionAcked('s1', 'R2')).toBe(true);
-    expect(isAttentionAcked('s1', 'R1')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
     expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: 'R2' });
   });
 });
@@ -386,8 +415,8 @@ describe('durable persistence', () => {
     __resetSessionAttentionForTests();
     await __hydrateSessionAttentionForTests();
 
-    expect(isAttentionAcked('s1', 'R1')).toBe(true);
-    expect(isAttentionAcked('s1', 'R2')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(false);
     expect(__peekSessionAttentionEntryForTests('s1')).toEqual({
       raiseId: 'R1',
       status: 'question',
@@ -402,14 +431,14 @@ describe('durable persistence', () => {
 
     __resetSessionAttentionForTests();
     await __hydrateSessionAttentionForTests();
-    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
 
     // A raise that arrived while the app was dead: the restored ack names R1,
     // so R2 is not suppressed.
     reconcileSessionAttention('s1', 'question', 'R2');
 
-    expect(isAttentionAcked('s1', 'R2')).toBe(false);
-    expect(isAttentionAcked('s1', 'R1')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
     expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: 'R2' });
   });
 
@@ -424,8 +453,8 @@ describe('durable persistence', () => {
 
     // An unbound ack suppresses nothing: the raise stays visible.
     expect(__peekSessionAttentionForTests('s1')).toBeUndefined();
-    expect(isAttentionAcked('s1', 'R1')).toBe(false);
-    expect(isAttentionAcked('s1', 'question')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'question' })).toBe(false);
   });
 
   it('persists a deleted entry as gone across a restart', async () => {
@@ -478,7 +507,7 @@ describe('durable persistence', () => {
     kvMock.setItem.mockRejectedValueOnce(new Error('disk full'));
     ackSessionAttention('s1', 'question');
     // In-memory store is authoritative: the badge hides immediately.
-    expect(isAttentionAcked('s1', 'question')).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'question' })).toBe(true);
     await __flushSessionAttentionWritesForTests();
     expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: 'question' });
 
@@ -506,7 +535,7 @@ describe('durable persistence', () => {
     expect(__peekSessionAttentionForTests('s1')).toBeUndefined();
 
     ackSessionAttention('s1', 'question', 'R1');
-    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
   });
 });
 
@@ -570,24 +599,24 @@ describe('hydration gating', () => {
 
     // Hydration is in flight: the store is still empty, so the badge derives
     // from server status (no stale ack suppression).
-    expect(isAttentionAcked('s1', 'R1')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
     expect(
       shouldShowNeedsInput({
         status: 'question',
         raiseId: 'R1',
-        isAcked: isAttentionAcked('s1', 'R1'),
+        isAcked: isAttentionAcked('s1', { raiseId: 'R1' }),
       })
     ).toBe(true);
 
     await hydration;
 
     // After hydration the restored ack suppresses its raise.
-    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
     expect(
       shouldShowNeedsInput({
         status: 'question',
         raiseId: 'R1',
-        isAcked: isAttentionAcked('s1', 'R1'),
+        isAcked: isAttentionAcked('s1', { raiseId: 'R1' }),
       })
     ).toBe(false);
   });
@@ -621,7 +650,7 @@ describe('hydration gating', () => {
 
     // The fresh ack survives: still its own raise, not the persisted entry.
     expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: 'question' });
-    expect(isAttentionAcked('s1', 'question')).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'question' })).toBe(true);
   });
 });
 
@@ -652,7 +681,7 @@ describe('revision snapshot and listener notification', () => {
 
     expect(getRevisionSnapshot()).toBe(after);
     expect(listener).not.toHaveBeenCalled();
-    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
 
     unsubscribe();
   });
@@ -669,8 +698,8 @@ describe('revision snapshot and listener notification', () => {
     expect(getRevisionSnapshot()).toBe(after + 1);
     expect(listener).toHaveBeenCalledTimes(1);
     // The ack moved to R2; R1 is no longer suppressed.
-    expect(isAttentionAcked('s1', 'R2')).toBe(true);
-    expect(isAttentionAcked('s1', 'R1')).toBe(false);
+    expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(true);
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
 
     unsubscribe();
   });
@@ -777,7 +806,7 @@ describe('sign-out cleanup', () => {
   it('drops the previous account acks so a reused session id is not suppressed', async () => {
     ackSessionAttention('session-shared', 'question', '2026-08-24T10:00:00Z');
     await __flushSessionAttentionWritesForTests();
-    expect(isAttentionAcked('session-shared', '2026-08-24T10:00:00Z')).toBe(true);
+    expect(isAttentionAcked('session-shared', { raiseId: '2026-08-24T10:00:00Z' })).toBe(true);
 
     await clearSessionAttentionForSignOut();
 
@@ -785,7 +814,7 @@ describe('sign-out cleanup', () => {
     // prior ack cannot suppress the badge for the same session id.
     await __hydrateSessionAttentionForTests();
     expect(__peekSessionAttentionForTests('session-shared')).toBeUndefined();
-    expect(isAttentionAcked('session-shared', '2026-08-24T10:00:00Z')).toBe(false);
+    expect(isAttentionAcked('session-shared', { raiseId: '2026-08-24T10:00:00Z' })).toBe(false);
     expect(
       shouldShowNeedsInput({ status: 'question', raiseId: '2026-08-24T10:00:00Z', isAcked: false })
     ).toBe(true);

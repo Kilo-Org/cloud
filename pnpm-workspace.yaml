@@ -5,8 +5,6 @@ packages:
   - services/gastown/container
   - services/kiloclaw/controller
   - services/kiloclaw/plugins/*
-  - services/deploy-infra/builder
-  - services/deploy-infra/dispatcher
   - packages/*
 
 catalog:
@@ -48,9 +46,9 @@ catalog:
   tsx: 4.21.0
   # TypeScript 7 is the native compiler and ships no compiler JS API. The
   # workspace typechecks with the @typescript/native-preview `tsgo` binary, so
-  # this entry is what `tsc`, `next build` and the bundlers load. The tools that
-  # still read the API (rollup-plugin-dts, ts-jest) get a compatibility package
-  # of their own instead of a second pin here.
+  # this entry is what `tsc`, `next build` and the bundlers load. The one tool
+  # that still reads the API (rollup-plugin-dts) gets a compatibility package of
+  # its own instead of a second pin here.
   typescript: 7.0.2
   ulid: 3.0.2
   vitest: 4.1.11
@@ -216,12 +214,6 @@ overrides:
   # otherwise resolve to two native-module copies. Force one version.
   '@expo/ui': 57.0.21
 packageExtensions:
-  # ts-jest reads the TypeScript compiler API, which the catalog's native 7 no
-  # longer ships. Its patch falls back to this alias of the last JS release, and
-  # keeps its own peer when that peer has the API.
-  'ts-jest@29.4.9':
-    dependencies:
-      ts-compiler-js: npm:typescript@5.9.3
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
   # under pnpm's isolated linker (autoInstallPeers is false).
   '@sentry/react-native':
@@ -299,10 +291,6 @@ patchedDependencies:
   # cancelled the glanceable refresh run in progress.
   expo-background-task@57.0.21: patches/expo-background-task@57.0.21.patch
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
-  # TypeScript 7 is the native compiler and ships no compiler API, which ts-jest
-  # loads. Keep its peer when that peer still has the API, and otherwise load the
-  # compatibility alias above.
-  ts-jest@29.4.9: patches/ts-jest@29.4.9.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

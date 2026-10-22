@@ -36,7 +36,7 @@
     "drizzle-kit": "catalog:",
     "jsonc-parser": "3.3.1",
     "typescript": "catalog:",
-    "vitest": "catalog:",
+    "vitest": "catalog:vitest5",
     "wrangler": "catalog:"
   }
 }

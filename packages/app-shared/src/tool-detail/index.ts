@@ -24,18 +24,6 @@ export type ToolDetail = {
   error?: string;
 };
 
-/**
- * Friendly names for the image MCP tools. The slash keys cover the MCP
- * envelope (`server_name/tool_name`); the underscore keys cover a session that
- * reports the tool id directly.
- */
-const knownTools = new Map([
-  ['app-builder-images/transfer_image', 'Publish Image'],
-  ['app-builder-images/get_image', 'Analyze Image'],
-  ['app-builder-images_transfer_image', 'Publish Image'],
-  ['app-builder-images_get_image', 'Analyze Image'],
-]);
-
 const labelKeys = ['description', 'query', 'url', 'filePath', 'path', 'pattern', 'name'];
 
 const DEFAULT_VALUE_MAX_LENGTH = 4000;
@@ -71,16 +59,11 @@ function resolveName(
   name: string;
   isLabel: boolean;
 } {
-  const byTool = knownTools.get(tool);
-  if (byTool !== undefined) return { name: byTool, isLabel: true };
-
   if (tool === 'mcp') {
     const serverName = typeof input.server_name === 'string' ? input.server_name : undefined;
     const toolName = typeof input.tool_name === 'string' ? input.tool_name : undefined;
     if (serverName?.trim() && toolName?.trim()) {
-      const key = `${serverName}/${toolName}`;
-      const known = knownTools.get(key);
-      return known !== undefined ? { name: known, isLabel: true } : { name: key, isLabel: false };
+      return { name: `${serverName}/${toolName}`, isLabel: false };
     }
   }
 

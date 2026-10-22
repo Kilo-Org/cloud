@@ -1,8 +1,7 @@
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
+
 import { type AccessRequiredSubcase } from '@/lib/analytics/onboarding-events';
 import { WEB_BASE_URL } from '@/lib/config';
-
-/** Support inbox, the same address the feedback flow writes to (see lib/feedback). */
-export const SUPPORT_EMAIL = 'hi@kilo.ai';
 
 const SUBSCRIBE_SUBCASES: ReadonlySet<AccessRequiredSubcase> = new Set([
   'trial_expired',

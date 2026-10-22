@@ -103,6 +103,12 @@ export type InstancePickerInstance =
 export type InstancePickerBridge = {
   instances: InstancePickerInstance[];
   currentValue: InstancePickerInstance | null;
+  /**
+   * The computer target is selected with no computer bound yet (the tour's
+   * computer path with zero connected computers): the picker shows neither
+   * row checked, since the Cloud Agent default is not the current target.
+   */
+  pendingComputer?: boolean;
   onSelect: (instance: InstancePickerInstance | null) => void;
 };
 

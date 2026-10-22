@@ -9,6 +9,7 @@ import type {
   WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
+import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { gitAuthorSchema, sessionAttachMcpServersSchema } from './sandbox-control-protocol.js';
 import {
   sessionTerminalClosePayloadSchema,
@@ -102,11 +103,16 @@ export type ControlPlaneSetupEvent = z.infer<typeof controlPlaneSetupEventSchema
 export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'preparation_timeout',
   'workspace_setup_failed',
+  'credential_upgrade_required',
   'agent_unavailable',
   'billing_blocked',
   'billing_unavailable',
   'container_limit_reached',
   'invalid_configuration',
+  'runtime_artifact_unauthorized',
+  'runtime_artifact_invalid',
+  'runtime_cli_probe_failed',
+  'runtime_supervisor_missing',
   'connection_lost',
   'sandbox_lost',
   'agent_restarted',
@@ -198,6 +204,40 @@ export const controlPlaneWorkspaceFailureSubtypeSchema = z.enum(
   CONTROL_PLANE_WORKSPACE_FAILURE_SUBTYPES
 );
 
+// Bounded run-container facts are duplicated locally (type-only import above)
+// so the standalone wrapper bundle never contains worker-utils. The drift
+// guards below and control-plane-run-container.test.ts contain the drift risk.
+export const CONTROL_PLANE_RUN_CONTAINER_PROVIDERS = [
+  'cloudflare',
+  'vercel',
+  'cloudflare-containers',
+] as const satisfies readonly CloudAgentRunContainer['provider'][];
+
+const controlPlaneRunContainerIdentifierSchema = z.string().min(1).max(128);
+
+export const controlPlaneRunContainerSchema = z
+  .object({
+    provider: z.enum(CONTROL_PLANE_RUN_CONTAINER_PROVIDERS),
+    sandboxId: controlPlaneRunContainerIdentifierSchema,
+    allocationId: controlPlaneRunContainerIdentifierSchema.optional(),
+    instanceId: controlPlaneRunContainerIdentifierSchema.optional(),
+    instanceType: controlPlaneRunContainerIdentifierSchema.optional(),
+    region: controlPlaneRunContainerIdentifierSchema.optional(),
+    imageRef: z.string().min(1).max(1024).optional(),
+    snapshotId: controlPlaneRunContainerIdentifierSchema.optional(),
+    runtimeBuildId: controlPlaneRunContainerIdentifierSchema.optional(),
+    startSource: z.enum(['image', 'snapshot']).optional(),
+  })
+  .strict();
+export type ControlPlaneRunContainer = z.infer<typeof controlPlaneRunContainerSchema>;
+
+type _RunContainerMissingFactDriftGuard = AssertNever<
+  Exclude<CloudAgentRunContainer, ControlPlaneRunContainer>
+>;
+type _RunContainerExtraFactDriftGuard = AssertNever<
+  Exclude<ControlPlaneRunContainer, CloudAgentRunContainer>
+>;
+
 // Kilo final-error reasons are free text from the wrapper; the closed set above
 // covers only control-plane reasons.
 export const controlPlaneOutcomeReasonSchema = z.string().min(1).max(4096);
@@ -281,6 +321,10 @@ export const controlPlaneRouteSpecSchema = z
     runtimeSkills: RuntimeSkillsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
+    /**
+     * Preserves the runtime key and HOME of existing allocations. The Sandbox
+     * omits it only after negotiating worktree sharing for a new allocation.
+     */
     runtimeIsolation: z.enum(['per-session']).optional(),
     attemptId: z.string().min(1).max(128),
     /**
@@ -297,23 +341,7 @@ export const controlPlaneRouteSpecSchema = z
      */
     secretEnvKeys: z.array(z.string().min(1).max(128)).max(50).optional(),
   })
-  .strict()
-  .superRefine((spec, context) => {
-    if (
-      (spec.permission ||
-        spec.githubReviewTarget ||
-        spec.runtimeSkills?.length ||
-        spec.runtimeAgents?.length ||
-        spec.kiloCommands?.length) &&
-      spec.runtimeIsolation !== 'per-session'
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['runtimeIsolation'],
-        message: 'Runtime permissions and profiles require per-session isolation',
-      });
-    }
-  });
+  .strict();
 
 /**
  * Route spec accepted at the registration boundary. `secretEnvKeys` is
@@ -336,7 +364,7 @@ export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSche
  * DO-only credential source (plan "Clarification (2026-09-27, B3 credentials)").
  * The Session DO has the session metadata; the Sandbox DO does not. `prepare`
  * carries this minimal issue-time snapshot privately so the Sandbox DO can mint
- * and re-issue the per-session Git and Kilo credential grant. It must never be
+ * and re-issue the route's Git and Kilo credential grant. It must never be
  * serialized into a wrapper frame.
  */
 export const controlPlaneCredentialRepositorySchema = z.discriminatedUnion('type', [
@@ -550,13 +578,22 @@ const controlPlaneRoutePreparingSchema = z
     attemptId: z.string().min(1).max(128),
     step: controlPlanePreparationStepSchema.optional(),
     detail: controlPlanePreparationDetailSchema.optional(),
+    container: controlPlaneRunContainerSchema.optional(),
   })
   .strict();
 const controlPlaneRouteReadySchema = z
-  .object({ state: z.literal('ready'), attemptId: z.string().min(1).max(128) })
+  .object({
+    state: z.literal('ready'),
+    attemptId: z.string().min(1).max(128),
+    container: controlPlaneRunContainerSchema.optional(),
+  })
   .strict();
 const controlPlaneRouteReconnectingSchema = z
-  .object({ state: z.literal('reconnecting'), attemptId: z.string().min(1).max(128) })
+  .object({
+    state: z.literal('reconnecting'),
+    attemptId: z.string().min(1).max(128),
+    container: controlPlaneRunContainerSchema.optional(),
+  })
   .strict();
 const controlPlaneRouteFailedSchema = z
   .object({
@@ -564,6 +601,7 @@ const controlPlaneRouteFailedSchema = z
     attemptId: z.string().min(1).max(128),
     reason: controlPlaneFailureReasonSchema,
     subtype: controlPlaneWorkspaceFailureSubtypeSchema.optional().catch(undefined),
+    container: controlPlaneRunContainerSchema.optional(),
   })
   .strict();
 const controlPlaneRouteLostSchema = z
@@ -571,6 +609,7 @@ const controlPlaneRouteLostSchema = z
     state: z.literal('lost'),
     attemptId: z.string().min(1).max(128),
     reason: controlPlaneFailureReasonSchema,
+    container: controlPlaneRunContainerSchema.optional(),
   })
   .strict();
 
@@ -627,6 +666,7 @@ export const controlPlaneDeliverPayloadSchema = z
   .object({
     sessionId: z.string().min(1),
     messages: z.array(controlPlanePromptPayloadSchema).min(1),
+    allocationId: z.string().min(1).max(128).optional(),
   })
   .strict();
 
@@ -687,6 +727,21 @@ export const controlPlaneSessionCredentialsPayloadSchema = z
       .strict()
       .optional(),
     kilo: z.object({ token: z.string().min(1).max(4096) }).strict(),
+    cloudAgentMcp: z
+      .object({
+        url: z.union([
+          z.literal('https://mcp.kiloapps.io/mcp'),
+          z
+            .string()
+            .regex(
+              /^http:\/\/(?:localhost|127\.0\.0\.1|host\.docker\.internal)(?::\d{1,5})?\/mcp$/
+            ),
+        ]),
+        token: z.string().min(1).max(65536),
+        expiresAt: z.number().int().positive(),
+      })
+      .strict()
+      .optional(),
     // Spec §6: when the route runs behind the runtime credential proxy, the
     // Worker-facade handle and facade targets travel here, not in the route
     // spec. The wrapper prefers these over the spec's alias and targets.
@@ -965,8 +1020,6 @@ const controlPlaneWorktreeDeleteFrameSchema = z
   })
   .strict();
 
-// --- terminals (B10) --------------------------------------------------------
-
 /**
  * Session DO -> Sandbox DO terminal request (spec §10). The Sandbox DO forwards
  * exactly one request frame and returns the wrapper's `terminal.result`. The
@@ -1059,6 +1112,77 @@ const controlPlaneTerminalResultFrameSchema = z.discriminatedUnion('ok', [
     .strict(),
 ]);
 
+/**
+ * Upper bound on one native Kilo response crossing the wrapper socket. The
+ * facade applies the same budget to the public JSON it returns, so a large
+ * transcript or diff is reported as `too_large` instead of being truncated.
+ */
+export const CONTROL_PLANE_KILO_RESULT_MAX_BYTES = 8 * 1024 * 1024;
+
+/** Bound on one message window read for a live native session. */
+export const CONTROL_PLANE_KILO_MESSAGE_LIMIT = 32;
+
+/**
+ * Allowlisted native Kilo read a control request may perform inside the live
+ * wrapper. This is a named-operation list, never a URL, shell or generic HTTP
+ * envelope, so hosted live routing cannot become a sandbox tunnel.
+ */
+export const controlPlaneNativeOperationSchema = z.discriminatedUnion('name', [
+  z.object({ name: z.literal('session.get') }).strict(),
+  z
+    .object({
+      name: z.literal('session.messages'),
+      limit: z.number().int().positive().max(100).optional(),
+    })
+    .strict(),
+  z.object({ name: z.literal('session.status') }).strict(),
+  z.object({ name: z.literal('session.todo') }).strict(),
+  z
+    .object({
+      name: z.literal('session.diff'),
+      baseRef: sessionGitSummaryPayloadSchema.shape.baseRef,
+    })
+    .strict(),
+  z.object({ name: z.literal('question.list') }).strict(),
+  z.object({ name: z.literal('permission.list') }).strict(),
+]);
+
+/** Session DO -> Sandbox DO native read request (spec §10). */
+export const controlPlaneKiloRequestInputSchema = z
+  .object({
+    session: controlPlaneControlSessionSchema,
+    operation: controlPlaneNativeOperationSchema,
+  })
+  .strict();
+
+const controlPlaneKiloRequestFrameSchema = z
+  .object({
+    type: z.literal('kilo.request'),
+    requestId: z.string().min(1).max(128),
+    session: controlPlaneControlSessionSchema,
+    operation: controlPlaneNativeOperationSchema,
+  })
+  .strict();
+
+const controlPlaneKiloResultFrameSchema = z.discriminatedUnion('ok', [
+  z
+    .object({
+      type: z.literal('kilo.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(true),
+      result: z.unknown(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('kilo.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(false),
+      error: controlPlaneRequestErrorSchema,
+    })
+    .strict(),
+]);
+
 export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneHelloFrameSchema,
   controlPlaneWelcomeFrameSchema,
@@ -1089,6 +1213,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneTerminalCloseFrameSchema,
   controlPlaneTerminalConnectFrameSchema,
   controlPlaneTerminalResultFrameSchema,
+  controlPlaneKiloRequestFrameSchema,
+  controlPlaneKiloResultFrameSchema,
 ]);
 
 export type ControlPlaneRouteGit = z.infer<typeof controlPlaneRouteGitSchema>;
@@ -1176,4 +1302,8 @@ export type ControlPlaneTerminalRequestFrame =
   | ControlPlaneTerminalResizeFrame
   | ControlPlaneTerminalCloseFrame
   | ControlPlaneTerminalConnectFrame;
+export type ControlPlaneNativeOperation = z.infer<typeof controlPlaneNativeOperationSchema>;
+export type ControlPlaneKiloRequestInput = z.infer<typeof controlPlaneKiloRequestInputSchema>;
+export type ControlPlaneKiloRequestFrame = z.infer<typeof controlPlaneKiloRequestFrameSchema>;
+export type ControlPlaneKiloResultFrame = z.infer<typeof controlPlaneKiloResultFrameSchema>;
 export type ControlPlaneWrapperFrame = z.infer<typeof controlPlaneWrapperFrameSchema>;

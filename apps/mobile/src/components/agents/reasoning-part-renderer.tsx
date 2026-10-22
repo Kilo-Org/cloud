@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/text';
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
 import { FixedPartRow } from './fixed-part-row';
 import { useOpenPartDetail } from './open-part-detail-context';
-import { hasNonWhitespaceText } from './part-types';
+import { hasDisplayableReasoningText } from './part-types';
 
 type ReasoningPartRendererProps = {
   partId: string;
@@ -26,7 +26,7 @@ export function ReasoningPartRenderer({
   const textSelectable = useTranscriptTextSelectable();
   const { t } = useTranslation();
 
-  if (!hasNonWhitespaceText(text)) {
+  if (!hasDisplayableReasoningText(text)) {
     return null;
   }
 
@@ -58,7 +58,6 @@ export function ReasoningPartRenderer({
   return (
     <FixedPartRow
       variant="dashed"
-      labelKind="eyebrow"
       label={label}
       accessibilityLabel={label}
       onPress={

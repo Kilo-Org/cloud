@@ -2,12 +2,13 @@ import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/clie
 import { unfilteredKiloEvents } from '../control/feed.js';
 import type { KiloFeedEvent } from '../control/worktree-feed.js';
 import { logToFile } from '../utils.js';
+import { kiloClientConfig, type KiloServer } from '../kilo-server-auth.js';
 
 export type { KiloFeedEvent };
 
 export type KiloEventFeedSource = Readonly<{
   directory: string;
-  serverUrl: string;
+  server: KiloServer;
   nativeRuntimeId: string;
 }>;
 
@@ -33,7 +34,7 @@ export type KiloEventFeedOptions = {
  * closing this feed and opening a new one against the same Kilo.
  */
 export function createKiloEventFeed(options: KiloEventFeedOptions): KiloEventFeed {
-  const { directory, serverUrl, nativeRuntimeId } = options.source;
+  const { directory, server, nativeRuntimeId } = options.source;
   const log = options.log ?? logToFile;
   const lifetime = new AbortController();
   const signal = AbortSignal.any([lifetime.signal, options.signal]);
@@ -65,7 +66,7 @@ export function createKiloEventFeed(options: KiloEventFeedOptions): KiloEventFee
     async open(): Promise<void> {
       if (opened) throw new Error('Kilo event feed is already open');
       log(`control feed directory=${directory} phase=opening`);
-      const client = createKiloEventClient({ baseUrl: serverUrl, directory });
+      const client = createKiloEventClient(kiloClientConfig(server, directory));
       const result = await client.global.event({ signal, sseMaxRetryAttempts: 1 });
       if (!result.stream) throw new Error('Kilo global event feed is unavailable');
       const events = unfilteredKiloEvents(result.stream);

@@ -87,9 +87,10 @@ file before you change any file in this package.
     dependency's own imports, and `skipLibCheck: true` removes the rest of the
     leverage. So the rule is checked by reading the build, not by trusting the
     compiler, and `pnpm check:platform` is what reads it. It runs after
-    `pnpm build` as the last step of `pnpm check`, and it fails on an import of
-    a Node builtin anywhere, or on `globalThis`, `process` or `Buffer` under
-    `core/`. It matches code, not prose: `core/id.ts` names `node:crypto` in a
+    `pnpm build` inside `pnpm check:ci`, `pnpm check:package` follows it, and
+    `pnpm check` then runs `test:perf`. It fails on an import of a Node
+    builtin anywhere, or on `globalThis`, `process` or `Buffer` under `core/`.
+    It matches code, not prose: `core/id.ts` names `node:crypto` in a
     comment explaining why it does not import it.
 13. Measure, do not guess. A decision about performance is made from data.
     Write the benchmark, run it, and put the number in the commit message or
@@ -417,11 +418,16 @@ A call is tried again on a transport failure and on 408, 409, 425, 429, 500,
 body is read, so a second try never repeats text the caller has already seen.
 The older `/api/openrouter` prefix also works; the package does not use it.
 
-A `chat_completions` reply on this gateway reports what the call cost, in US
-dollars, as `usage.cost`. The wire reads it into `ModelUsage.cost`, and
-`session.usage` adds it up. The gateway removes it for a free model and for a
-model with a custom price, so an absent cost is not a zero. The `messages` and
-`responses` wires do not read a cost.
+All three gateway shapes read what the call cost, in US dollars, into
+`ModelUsage.cost`, and `session.usage` adds it up. The cost is `usage.cost`,
+except on a call OpenRouter served on a provider key (`is_byok`): there `cost`
+is only OpenRouter's fee, and the gateway bills
+`cost_details.upstream_inference_cost`, so that is what is read. The gateway
+removes the cost fields for a free model and for a model with a custom price,
+so an absent cost is not a zero. `done.model` preserves the provider's served model.
+`session.usageByModel` groups all completed calls, including summaries, by that
+model and falls back to the requested model when none was reported. Routing
+metadata never replaces the requested model for the next call.
 
 ### The gateway wants the session id in a header
 

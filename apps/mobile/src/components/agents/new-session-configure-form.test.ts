@@ -432,6 +432,37 @@ describe('NewSessionConfigureForm', () => {
     });
   });
 
+  it('renders the organization section above the run-target block', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+      organizationSection: 'Organization section',
+    }) as Node;
+
+    // The labeled section renders inside the same scroll body as the other
+    // form sections (the run-target block itself is a string-host mock here).
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(scrollBody).not.toBeNull();
+    expect(findTextContent(scrollBody as Node, text => text === 'Organization section')).toBe(true);
+  });
+
+  it('hides the organization section when the caller omits it', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+    }) as Node;
+
+    expect(findTextContent(element, text => text === 'Organization section')).toBe(false);
+  });
+
   // ── Case 1b: ordered repository array passes through unchanged ──
   it('passes the ordered repository array unchanged into NewSessionRepositorySection', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
@@ -492,6 +523,12 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'NewSessionRepositorySection')).not.toBeNull();
     expect(findTextContent(element, t => t === 'Run on')).toBe(false);
     expect(findTextContent(element, t => t === 'Run on: ')).toBe(false);
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(false);
   });
 
   // ── Case 3: Remote, selector shown ──
@@ -511,6 +548,12 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: true,
       runOnInstance: INSTANCE,
     });
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(true);
   });
 
   // ── Case 4: Remote, selector hidden ──
@@ -897,8 +940,8 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Changes')).toBe(false);
   });
 
-  // ── Case 12: the Run on helper sentence stays in plain language ──
-  it('renders the plain help sentence, without CLI jargon, for cloud and remote targets', async () => {
+  // ── Case 12: the Run on helper sentence stays in plain language, on a remote target only ──
+  it('renders the plain help sentence for a remote target and never for the cloud target', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     const helpSentence = 'To run on your computer, start Kilo there and leave it running.';
@@ -910,15 +953,13 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: null,
       showRunOnSelector: true,
     }) as Node;
-    expect(findTextContent(cloud, t => t === helpSentence)).toBe(true);
+    expect(findTextContent(cloud, t => t === helpSentence)).toBe(false);
     for (const term of cliTerms) {
       expect(
         findTextContent(cloud, t => t.includes(term)),
         term
       ).toBe(false);
     }
-    // The help draws the sentence as prose: the authoring markers must not
-    // reach the screen.
     expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention

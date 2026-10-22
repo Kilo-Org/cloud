@@ -110,7 +110,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         good: '#5FCB8E',
         info: '#60A5FA',
         idle: '#56544F',
-        primary: '#E8F27A',
+        primary: '#FFDD00',
         primaryFg: '#1A1A10',
         secondary: '#26262B',
         track: '#3A3A40',
@@ -182,7 +182,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     warn: '#F2B05F',
     // The same green the dark palette uses for the added-lines line.
     good: '#5FCB8E',
-    primary: '#E8F27A',
+    primary: '#FFDD00',
     primaryFg: '#1A1A10',
     secondary: '#26262B',
     track: '#3A3A40',
@@ -972,17 +972,55 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         {lockScreenCard(card)}
       </VStack>
     ),
-    // The Apple Watch and CarPlay small family: the status line and Approve.
+    // The Apple Watch and CarPlay small family. The CarPlay Dashboard slot is
+    // narrow and short and adds no margins, so the card is two compact rows:
+    // the mark, the title and a compact Approve (the title truncates to make
+    // room), then the status line or a failed press's line. Tapping the card
+    // opens the session, so Open is not drawn. CarPlay shows Approve but
+    // disables it; Apple Watch lets it act.
     bannerSmall: (
-      <VStack alignment="leading" spacing={6}>
-        <HStack alignment="center" spacing={10}>
-          {statusLine(island, true)}
-          {canApprove && !approving ? <Button label={COPY.approve} target="approve" /> : null}
-          <Spacer />
+      <VStack
+        alignment="leading"
+        spacing={6}
+        modifiers={[
+          padding({ horizontal: 12, vertical: 10 }),
+          frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'leading' }),
+          environment({ key: 'locale', value: locale }),
+          opacity(dimmed ? 0.72 : 1),
+        ]}
+      >
+        <HStack alignment="center" spacing={6}>
+          <HStack
+            alignment="center"
+            spacing={6}
+            modifiers={[accessibilityElement('combine'), accessibilityLabel(spoken)]}
+          >
+            {mark(16)}
+            {text(title, 13, island.fg, 'semibold')}
+          </HStack>
+          <Spacer minLength={4} />
+          {canApprove && !approving ? (
+            <Button
+              target="approve"
+              modifiers={[buttonStyle('plain'), accessibilityLabel(COPY.approve ?? 'Approve')]}
+            >
+              <Text
+                modifiers={[
+                  font({ size: 12, weight: 'semibold' }),
+                  lineLimit(1),
+                  fixedSize({ horizontal: true, vertical: false }),
+                  foregroundStyle(island.primaryFg),
+                  padding({ horizontal: 10 }),
+                  frame({ height: 24 }),
+                  background(island.primary, shapes.capsule()),
+                ]}
+              >
+                {COPY.approve ?? 'Approve'}
+              </Text>
+            </Button>
+          ) : null}
         </HStack>
-        <VStack modifiers={[frame({ height: 18 })]}>
-          {notice === null ? null : text(notice, 13, island.warn, 'semibold')}
-        </VStack>
+        {notice === null ? statusLine(island, true) : text(notice, 12, island.warn, 'semibold')}
       </VStack>
     ),
     compactLeading: mark(18),

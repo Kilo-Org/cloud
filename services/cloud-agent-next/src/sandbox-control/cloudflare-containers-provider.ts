@@ -1,5 +1,5 @@
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
-import { isContainerConcurrencyLimitError } from '../container-concurrency.js';
+import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 import {
   containersBillingIdentity,
   parseSandboxBillingInput,
@@ -96,7 +96,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       try {
         admission = await container.ensureBillingAdmission(input, instance);
       } catch (error) {
-        if (isContainerConcurrencyLimitError(error)) throw error;
+        if (getContainerCapacityFailureReason(error)) throw error;
         admission = {
           success: false,
           code: 'meter_unavailable',
@@ -117,12 +117,22 @@ export function createCloudflareContainersProviderAdapter(deps: {
 
   return {
     ensureBillingAdmission,
+    describeRuntime(ref) {
+      const parsed = decodeOwnedProviderRef(ref);
+      if (parsed === null) return undefined;
+      return {
+        provider: 'cloudflare-containers',
+        sandboxId: deps.logicalSandboxId,
+        instanceId: parsed.instanceId,
+        instanceType: instance,
+      };
+    },
     async create(intent: ProviderCreateIntent) {
       const providerRef = encodeIntentProviderRef(intent);
       await ensureBillingAdmission(providerRef, intent.billing);
       return { providerRef };
     },
-    async launch(ref, env, options) {
+    async launch(ref, { command, env }, options) {
       const owned = decodeOwnedProviderRef(ref);
       if (owned === null) {
         throw new ProviderCreationError('invalid_configuration');
@@ -133,6 +143,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
         String(containersBillingIdentity(instance).capacity.memoryMiB);
       const { startSource, snapshotFailed } = await container.launchWrapper({
         allocationRef: ref,
+        command,
         instance,
         containment: owned.containment,
         ...(deps.egressAllowlist === undefined ? {} : { egressAllowlist: deps.egressAllowlist }),

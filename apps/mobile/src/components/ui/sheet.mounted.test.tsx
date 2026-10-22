@@ -22,6 +22,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 const theme = vi.hoisted(() => ({ colors: { card: '#1F1F24' } }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => theme.colors }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, View: 'View' }));
 
 // Models the parts of `@expo/ui/community/bottom-sheet` this suite depends on:
 // `index` drives a native presentation, a dismissal reports through a guard that
@@ -164,6 +165,34 @@ describe('Sheet', () => {
     expect(node.props.enablePanDownToClose).toBe(true);
     // The default drag indicator is shown; null hides it.
     expect(node.props.handleComponent).toBeUndefined();
+    expect(renderer.root.findAllByProps({ testID: 'sheet-content' })).toHaveLength(1);
+  });
+
+  it('turns only the drag gesture off when the content scrolls', async () => {
+    const { renderer } = await mount({ dismissGestures: false });
+    const node = sheet(renderer);
+    if (!node) {
+      throw new Error('sheet not rendered');
+    }
+
+    expect(node.props.dismissGestures).toBe(false);
+    // Back and the Android scrim still ask to dismiss; the form answers them.
+    expect(node.props.enablePanDownToClose).toBe(true);
+  });
+
+  it('asks the caller before a requested dismissal and honours a refusal', async () => {
+    const onRequestDismiss = vi.fn(() => false);
+    const onClose = vi.fn<() => void>();
+    const { renderer } = await mount({ onRequestDismiss, onClose });
+    const node = sheet(renderer);
+    if (!node) {
+      throw new Error('sheet not rendered');
+    }
+
+    // The native sheet asks the JS handler; refusing keeps it presented.
+    expect((node.props.onRequestDismiss as () => boolean)()).toBe(false);
+    expect(onRequestDismiss).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
     expect(renderer.root.findAllByProps({ testID: 'sheet-content' })).toHaveLength(1);
   });
 

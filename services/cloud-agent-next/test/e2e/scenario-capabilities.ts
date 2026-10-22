@@ -147,10 +147,26 @@ export type GatesObservation = { parkedStreamsSupported: true };
 export type ControlPlaneV2Observation = { ready: true };
 
 /**
+ * A running owned-container HTTP fixture, started by
+ * `ControlPlaneRuntimeObservation.startPreviewFixture`. `port` is the
+ * loopback port the fixture bound inside the container; `stop` is idempotent
+ * and best-effort (a container already gone is not an error), but callers must
+ * still invoke it in a `finally`.
+ */
+export type PreviewFixtureHandle = {
+  port: number;
+  stop(): Promise<void>;
+};
+
+/**
  * Local-Docker proof that the session's owned container runs the new plane.
  * `proveNewPlane` captures the new-plane control wrapper uniquely in the owned
  * container; a legacy container has no such process and the call throws. The
  * returned identity is the same physical handle the fault operations use.
+ *
+ * `controlPlaneRuntime` itself is provided only by the local Docker profile; the
+ * deployed/local-HTTP profiles omit the observation entirely, so a scenario that
+ * needs its members is only ever dispatched where the profile provides them.
  */
 export type ControlPlaneRuntimeObservation = {
   proveNewPlane(allocation: SandboxFaultAllocation): Promise<{ instanceId: string; pid: number }>;
@@ -170,6 +186,19 @@ export type ControlPlaneRuntimeObservation = {
   gitRemoteUrl(allocation: SandboxFaultAllocation): Promise<string | null>;
   /** Count of summary (compaction) messages in the live Kilo history. */
   summaryCount(allocation: SandboxFaultAllocation): Promise<number>;
+  /**
+   * Start the preview HTTP fixture inside the owned container and wait until it
+   * answers on `127.0.0.1`. Optional so profiles that do not implement
+   * owned-container fixtures remain assignable; the local Docker profile
+   * provides it and `preview-http` refuses to run without it.
+   */
+  startPreviewFixture?(
+    this: void,
+    allocation: SandboxFaultAllocation,
+    options?: { port?: number }
+  ): Promise<PreviewFixtureHandle>;
+  /** The loopback port of the session's `kilo serve` in the owned container. */
+  kiloServerPort?(this: void, allocation: SandboxFaultAllocation): Promise<number>;
 };
 
 /**

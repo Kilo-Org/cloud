@@ -30,9 +30,8 @@ export async function publishTrayOnce(ctx: GlanceablePublisherContext): Promise<
   );
   publisher.handleSessions(resolveAnsweredRaises(sessions), ctx);
   await Promise.all(
-    getGlanceableSinks().flatMap(sink => [
-      sink.waitForNativeStart?.(),
-      sink.waitForNativeTerminal?.(),
-    ])
+    getGlanceableSinks()
+      .flatMap(sink => [sink.waitForNativeStart?.(), sink.waitForNativeTerminal?.()])
+      .filter((pending): pending is Promise<void> => pending !== undefined)
   );
 }

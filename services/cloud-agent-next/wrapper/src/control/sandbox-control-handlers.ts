@@ -584,7 +584,7 @@ export async function handleControlRequest(
       // already gone away. Live runtimes each retain their own Kilo state.
       const clients =
         runtimes.length > 0
-          ? runtimes.map(runtime => createWorktreeKiloCleanupClient(runtime.kiloClient.serverUrl))
+          ? runtimes.map(runtime => createWorktreeKiloCleanupClient(runtime.kiloClient.server))
           : deps.worktreeCleanupClient
             ? [deps.worktreeCleanupClient]
             : [];

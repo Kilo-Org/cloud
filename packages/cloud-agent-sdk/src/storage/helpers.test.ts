@@ -1,4 +1,5 @@
 import type { Part } from '@kilocode/app-shared/opencode';
+import type { MessageInfo } from '../types';
 import {
   EMPTY_PARTS,
   applyTextDelta,
@@ -10,8 +11,77 @@ import {
   insertSorted,
   isSupportedDeltaField,
   notify,
+  orderMessageIds,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
+
+describe('orderMessageIds', () => {
+  function message(id: string, parentID?: string, sessionID = 'root'): MessageInfo {
+    return {
+      id,
+      sessionID,
+      role: parentID === undefined ? 'user' : 'assistant',
+      ...(parentID === undefined ? {} : { parentID }),
+    } as MessageInfo;
+  }
+
+  test('keeps already causal IDs and their array identity', () => {
+    const ids = ['a', 'b', 'c'];
+    const messages = new Map([
+      ['a', message('a')],
+      ['b', message('b', 'a')],
+      ['c', message('c')],
+    ]);
+    expect(orderMessageIds(ids, messages)).toBe(ids);
+  });
+
+  test('uses a stable topological order rather than a pairwise parent comparator', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e'];
+    const messages = new Map([
+      ['a', message('a', 'd')],
+      ['b', message('b', 'd')],
+      ['c', message('c')],
+      ['d', message('d')],
+      ['e', message('e', 'd')],
+    ]);
+    const ordered = orderMessageIds(ids, messages);
+    expect(ordered).toEqual(['c', 'd', 'a', 'b', 'e']);
+    expect(orderMessageIds(ordered, messages)).toBe(ordered);
+    expect(ids).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  test('keeps the earliest ready row first when parent chains release several rows', () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    const messages = new Map([
+      ['a', message('a', 'd')],
+      ['b', message('b', 'd')],
+      ['c', message('c', 'a')],
+      ['d', message('d')],
+    ]);
+    expect(orderMessageIds(ids, messages)).toEqual(['d', 'a', 'b', 'c']);
+  });
+
+  test('ignores missing parents, self references and cross-session parents', () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    const messages = new Map([
+      ['a', message('a', 'missing')],
+      ['b', message('b', 'b')],
+      ['c', message('c', 'd', 'child')],
+      ['d', message('d')],
+    ]);
+    expect(orderMessageIds(ids, messages)).toBe(ids);
+  });
+
+  test('never drops rows from invalid parent cycles', () => {
+    const ids = ['a', 'b', 'c'];
+    const messages = new Map([
+      ['a', message('a', 'b')],
+      ['b', message('b', 'a')],
+      ['c', message('c')],
+    ]);
+    expect(orderMessageIds(ids, messages)).toEqual(['c', 'a', 'b']);
+  });
+});
 
 function makePart(id: string, text = '', messageID = 'm'): Part {
   return { id, sessionID: 's', messageID, type: 'text', text } as Part;

@@ -101,6 +101,16 @@ export type RuntimeKiloCommand = {
   subtask?: boolean;
 };
 
+/**
+ * Instruction file injected from the web app's merged profile stack. Each entry
+ * is materialized to `${SESSION_HOME}/.kilocode/rules/<name>.md` at session
+ * preparation time, alongside the Cloud-Agent-owned `cloud-agent.md`.
+ */
+export type RuntimeInstruction = {
+  name: string;
+  content: string;
+};
+
 export type CloudAgentSessionState = SessionMetadata;
 
 /**

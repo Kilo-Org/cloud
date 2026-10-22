@@ -4,7 +4,7 @@
 import { createElement } from 'react';
 import { type AppState } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
 import type * as TokenOwnerModule from './token-owner';
@@ -334,6 +334,14 @@ vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
   clearLiveActivityPreference: vi.fn(),
 }));
 
+// The tracking prompt module pulls expo-tracking-transparency -> expo, which
+// needs `__DEV__` and cannot load in the node test environment. Mock it like
+// the sibling SecureStore preference modules: this suite only asserts the
+// teardown ordering.
+vi.mock('@/lib/hooks/use-tracking-permission-prompt', () => ({
+  clearTrackingPromptDismissed: vi.fn(),
+}));
+
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference }));
 
 // Like use-trusted-hosts below: the real module pulls secure-store-preference
@@ -457,6 +465,7 @@ vi.mock('@/lib/storage-keys', () => ({
   ORGANIZATION_PERSONAL_STORAGE_KEY: 'selected-organization-personal',
   PENDING_DEEP_LINK_KEY: 'pending-deep-link',
   PICKER_LAUNCH_CONTEXT_KEY: 'picker-launch-context',
+  PICKER_RESTORE_RECORD_KEY: 'picker-restore-record',
   REFRESH_TOKEN_KEY: 'refresh-token',
   LIVE_SESSION_FILTERS_KEY: 'live-session-filters',
   SESSION_FILTERS_KEY: 'session-filters',
@@ -560,28 +569,65 @@ async function mountAndGetContext(): Promise<{
   };
 }
 
-/** Flush act passes on real timers until bootstrap stops loading, bounded so a
- *  stuck provider fails as a timeout rather than hanging the suite.
+/** Let `ms` of timer time pass inside one act scope. The tests that drive the
+ *  SecureStore retry backoff (250/500/1000 ms) run on fake timers, so there
+ *  the clock jumps instead of waiting; every other test waits for real. */
+async function elapse(ms: number): Promise<void> {
+  await act(async () => {
+    if (vi.isFakeTimers()) {
+      await vi.advanceTimersByTimeAsync(ms);
+      return;
+    }
+    await new Promise<void>(resolve => {
+      void setTimeout(resolve, ms);
+    });
+  });
+}
+
+/** Install fake timers for the current test so the SecureStore retry backoff
+ *  elapses without a real wait. */
+function useFakeBackoffClock(): void {
+  vi.useFakeTimers();
+  onTestFinished(() => {
+    vi.useRealTimers();
+  });
+}
+
+/** Await `work` inside the caller's act scope while the fake clock moves in
+ *  20 ms passes, so a retry backoff inside it elapses without a real wait.
+ *  Bounded like `settleBootstrap` so a stuck `work` fails instead of hanging. */
+async function awaitOnFakeClock(work: () => Promise<void> | void): Promise<void> {
+  const progress = { settled: false };
+  const tracked = (async () => {
+    try {
+      await work();
+    } finally {
+      progress.settled = true;
+    }
+  })();
+  for (let pass = 0; pass < 1250 && !progress.settled; pass += 1) {
+    // eslint-disable-next-line no-await-in-loop -- each pass must flush before the next advance
+    await vi.advanceTimersByTimeAsync(20);
+  }
+  if (!progress.settled) {
+    throw new Error('work never settled on the fake clock');
+  }
+  await tracked;
+}
+
+/** Flush act passes until bootstrap stops loading, bounded so a stuck provider
+ *  fails as an error rather than hanging the suite.
  *
- *  The budget is a count of act passes, not wall-clock milliseconds: the gate
- *  runs this file beside ~170 others and the device stack, so each 20 ms pass
- *  can stretch several-fold while the bootstrap's own backoff timers stretch
- *  with it. Counting passes keeps the two in step — a wall-clock deadline
- *  would expire early on exactly the loaded machine this guards against.
- *  1250 passes is far more than the ~90 the 1.75 s backoff needs, so a
- *  healthy bootstrap still returns on its first pass. The whole file carries a
- *  30 s per-test timeout (see the `vi.setConfig` at the top), above this. */
+ *  Each pass lets 20 ms elapse (see `elapse`). 1250 passes is far more than
+ *  the ~90 the 1.75 s backoff needs, so a healthy bootstrap still returns on
+ *  its first pass. */
 async function settleBootstrap(
   read: () => AuthContextValue | undefined,
   budgetPasses = 1250
 ): Promise<void> {
   for (let pass = 0; pass < budgetPasses; pass += 1) {
     // eslint-disable-next-line no-await-in-loop -- polling must flush and re-check sequentially between act cycles
-    await act(async () => {
-      await new Promise<void>(resolve => {
-        void setTimeout(resolve, 20);
-      });
-    });
+    await elapse(20);
     if (read()?.isLoading === false) {
       return;
     }
@@ -1291,11 +1337,7 @@ describe('bootstrap and foreground race fencing', () => {
       );
       await Promise.resolve();
     });
-    await act(async () => {
-      await new Promise<void>(resolve => {
-        void setTimeout(resolve, 0);
-      });
-    });
+    await elapse(0);
 
     return {
       getCtx: () => {
@@ -1776,6 +1818,7 @@ describe('bootstrap and foreground race fencing', () => {
   });
 
   it('a restore-failure bootstrap never wipes the search index', async () => {
+    useFakeBackoffClock();
     // Every credential read rejects: the session is not known to be gone, so
     // the account may still own the index and only a positively signed-out
     // launch may clear it.
@@ -1792,6 +1835,7 @@ describe('bootstrap and foreground race fencing', () => {
   }, 60_000);
 
   it('repro: an unreadable refresh-token read shows the restore error instead of signing out', async () => {
+    useFakeBackoffClock();
     const storedToken = makeToken({ kiloUserId: 'user-1' });
     // Bootstrap consumes: preloadedToken, preloadedRefreshToken, the expiry
     // read, then the credential re-read — all healthy, so the session restores.
@@ -1814,7 +1858,7 @@ describe('bootstrap and foreground race fencing', () => {
       throw new Error('unauthorized handler was not registered');
     }
     await act(async () => {
-      await handler();
+      await awaitOnFakeClock(handler);
     });
 
     // The credential set is one unit: an unreadable refresh token is not a
@@ -1836,6 +1880,7 @@ describe('bootstrap and foreground race fencing', () => {
   }, 30_000);
 
   it('regression: an unreadable read with an empty credential set raises no restore error and no sign-out', async () => {
+    useFakeBackoffClock();
     // The launch positively restored no session: every read answers null, so
     // bootstrap left the person on the login route with no error surface.
     const { getCtx, unmount } = await mountProvider();
@@ -1853,7 +1898,7 @@ describe('bootstrap and foreground race fencing', () => {
       throw new Error('unauthorized handler was not registered');
     }
     await act(async () => {
-      await handler();
+      await awaitOnFakeClock(handler);
     });
 
     // No false restore error over the correct login destination, and no
@@ -2545,9 +2590,15 @@ describe('auth-transition queue and sign-out failure matrix', () => {
 });
 
 describe('startup credential read failure', () => {
+  // Every case here waits on the 250/500/1000 ms SecureStore retry backoff or
+  // a lock-hold window; the fake clock elapses them without a real wait.
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.callOrder.length = 0;
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   /** The environmental keychain failure: reads of `auth-token` reject for the
@@ -2725,19 +2776,11 @@ describe('startup credential read failure', () => {
       return { gate, getCtx, unmount: () => renderer?.unmount() };
     }
 
-    async function flushFor(ms: number): Promise<void> {
-      await act(async () => {
-        await new Promise<void>(resolve => {
-          void setTimeout(resolve, ms);
-        });
-      });
-    }
-
     it('waits for unlock, without a keychain call or the restore error, then restores', async () => {
       failTokenReads(0);
 
       const { gate, getCtx, unmount } = await mountWithGate(true);
-      await flushFor(2000);
+      await elapse(2000);
 
       expect(hoisted.secureStore.getItemAsync).not.toHaveBeenCalled();
       expect(getCtx().isLoading).toBe(true);
@@ -2767,7 +2810,7 @@ describe('startup credential read failure', () => {
           return (await healthyRead?.(key)) ?? null;
         });
       });
-      await flushFor(2000);
+      await elapse(2000);
 
       expect(lockedOnce).toBe(true);
       expect(getCtx().isLoading).toBe(true);
@@ -2804,21 +2847,15 @@ describe('startup credential read failure', () => {
     expect(getCtx().restoreFailed).toBe(false);
     expect(getCtx().token).toBeUndefined();
 
-    // Let the abandoned retry's remaining reads exhaust (~1.75 s of backoff)
-    // and flush its catch. Resurrecting the flag here would repaint the error
-    // screen over the login route, where the sign-out dedupe makes a second
-    // tap a no-op — the escape hatch would be permanently dead. The budget is a
-    // real wall-clock wait so a loaded machine's stretched cycles do not cut the
-    // retry's backoff short.
-    const abandonedSettleStartedAt = Date.now();
-    while (Date.now() - abandonedSettleStartedAt <= 30_000 && readCount() < 8) {
+    // Let the abandoned retry's remaining reads exhaust (1.75 s of backoff on
+    // the fake clock) and flush its catch. Resurrecting the flag here would
+    // repaint the error screen over the login route, where the sign-out dedupe
+    // makes a second tap a no-op — the escape hatch would be permanently dead.
+    for (let pass = 0; pass < 1250 && readCount() < 8; pass += 1) {
       // eslint-disable-next-line no-await-in-loop -- polling must flush and re-check sequentially between act cycles
-      await act(async () => {
-        await new Promise<void>(resolve => {
-          setTimeout(resolve, 20);
-        });
-      });
+      await elapse(20);
     }
+    expect(readCount()).toBe(8);
     await act(async () => {
       await Promise.resolve();
     });

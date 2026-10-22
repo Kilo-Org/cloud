@@ -1,10 +1,31 @@
-import { describe, expect, test } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
+import {
+  customLlmDefinition,
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import {
   createAllowPredicateFromProviderAllowList,
   createAllowPredicateFromRestrictions,
   type ProviderLookup,
 } from '@kilocode/web-shared/lib/model-allow.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
+import type * as ExclusiveModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+
+// The live catalog's restricted Kilo-exclusive models come and go, so the restriction
+// cases use a synthetic alias restricted to StepFun and keep the real lookup otherwise.
+jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof ExclusiveModels>(
+    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
+  );
+  return {
+    ...actual,
+    getKiloExclusiveInferenceProviders: (modelId: string) =>
+      modelId === 'test/restricted-exclusive'
+        ? new Set(['stepfun'])
+        : actual.getKiloExclusiveInferenceProviders(modelId),
+  };
+});
 
 function lookup(map: Record<string, string[]>): ProviderLookup {
   return async modelId => new Set(map[modelId] ?? []);
@@ -112,7 +133,73 @@ describe('model access predicates', () => {
     await expect(missingFromSnapshot(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
   });
 
-  test.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
+  describe('custom LLMs', () => {
+    const ORG_ID = '00000000-0000-4000-8000-0000000000a1';
+    const GROUP_ID = '00000000-0000-4000-8000-0000000000b1';
+    const restrictions = {
+      requireModelInCurrentSnapshot: true,
+      providerAllowList: [],
+      modelDenyList: ['acme/org-model', 'acme/group-model'],
+    };
+
+    beforeAll(async () => {
+      await insertCustomLlmForTest(
+        'acme/org-model',
+        customLlmDefinition({ organization_ids: [ORG_ID] })
+      );
+      await insertCustomLlmForTest(
+        'acme/group-model',
+        customLlmDefinition({ organization_ids: [], group_ids: [GROUP_ID] })
+      );
+    });
+
+    afterAll(async () => {
+      await deleteCustomLlmForTest('acme/org-model');
+      await deleteCustomLlmForTest('acme/group-model');
+    });
+
+    test.each([
+      ['an allowlisted organization', 'acme/org-model', { organizationId: ORG_ID, groupIds: [] }],
+      [
+        'an allowlisted group',
+        'acme/group-model',
+        { organizationId: '00000000-0000-4000-8000-0000000000a2', groupIds: [GROUP_ID] },
+      ],
+    ])('exempts a custom LLM granted to %s', async (_grant, modelId, customLlmGrantee) => {
+      const isAllowed = createAllowPredicateFromRestrictions(
+        { ...restrictions, customLlmGrantee },
+        lookup({})
+      );
+
+      await expect(isAllowed(modelId)).resolves.toBe(true);
+    });
+
+    test.each([
+      [
+        'another organization',
+        { organizationId: '00000000-0000-4000-8000-0000000000a2', groupIds: [] },
+      ],
+      ['no grantee', undefined],
+    ])('applies restrictions to a custom LLM for %s', async (_grant, customLlmGrantee) => {
+      const isAllowed = createAllowPredicateFromRestrictions(
+        { ...restrictions, customLlmGrantee },
+        lookup({})
+      );
+
+      await expect(isAllowed('acme/org-model')).resolves.toBe(false);
+    });
+
+    test('does not exempt a kilo-internal/ id without a custom LLM', async () => {
+      const isAllowed = createAllowPredicateFromRestrictions(
+        { requireModelInCurrentSnapshot: true, providerAllowList: [], modelDenyList: [] },
+        lookup({})
+      );
+
+      await expect(isAllowed('kilo-internal/missing-model')).resolves.toBe(false);
+    });
+  });
+
+  test.each(['kilo-auto/balanced', 'kimi-coding/kimi-for-coding'])(
     'keeps %s exempt from Enterprise model restrictions',
     async modelId => {
       const isAllowed = createAllowPredicateFromRestrictions(
@@ -159,7 +246,7 @@ describe('model access predicates', () => {
       lookup({ 'stepfun/step-5-preview': ['fireworks', 'stepfun'] })
     );
 
-    await expect(isAllowed('stepfun/step-5-preview-free')).resolves.toBe(false);
+    await expect(isAllowed('test/restricted-exclusive')).resolves.toBe(false);
     await expect(isAllowed('stepfun/step-5-preview')).resolves.toBe(true);
   });
 
@@ -170,13 +257,13 @@ describe('model access predicates', () => {
       lookup({ 'stepfun/step-5-preview': ['fireworks'] })
     );
 
-    await expect(isAllowed('stepfun/step-5-preview-free')).resolves.toBe(true);
+    await expect(isAllowed('test/restricted-exclusive')).resolves.toBe(true);
   });
 
   test('provider allow list still evaluates restricted exclusive models missing from the snapshot', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(undefined, ['stepfun'], lookup({}));
 
-    await expect(isAllowed('stepfun/step-5-preview-free')).resolves.toBe(true);
+    await expect(isAllowed('test/restricted-exclusive')).resolves.toBe(true);
     await expect(isAllowed('unknown/model')).resolves.toBe(false);
   });
 });

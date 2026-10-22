@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildChallengeEntry,
+  buildDeviceAuthPollRequest,
   parseAuthError,
   parseDeviceAuthCodeResponse,
   parseDeviceAuthTokenResponse,
   parseEmailCodeResponse,
   parseTokenPair,
   parseTokenResponse,
+  selectChallengeId,
   shouldRefreshBeforeRequest,
 } from '@/lib/auth/native-auth-contract';
 
@@ -146,16 +149,8 @@ describe('parseDeviceAuthTokenResponse', () => {
     });
   });
 
-  it('parses a pending response', () => {
-    expect(parseDeviceAuthTokenResponse({ status: 'pending' })).toEqual({ status: 'pending' });
-  });
-
-  it('parses a denied response', () => {
-    expect(parseDeviceAuthTokenResponse({ status: 'denied' })).toEqual({ status: 'denied' });
-  });
-
-  it('parses an expired response', () => {
-    expect(parseDeviceAuthTokenResponse({ status: 'expired' })).toEqual({ status: 'expired' });
+  it.each(['pending', 'denied', 'expired'] as const)('parses a %s response', status => {
+    expect(parseDeviceAuthTokenResponse({ status })).toEqual({ status });
   });
 
   it('returns null for approved without token', () => {
@@ -182,16 +177,48 @@ describe('parseDeviceAuthTokenResponse', () => {
     ).toEqual({ status: 'approved', token: 'tok' });
   });
 
-  it('returns null for an unknown status', () => {
-    expect(parseDeviceAuthTokenResponse({ status: 'unknown' })).toBeNull();
+  it.each([null, {}, { status: 'unknown' }])('returns null for %s', input => {
+    expect(parseDeviceAuthTokenResponse(input)).toBeNull();
+  });
+});
+
+// --- Challenge selection and device polling helpers ---
+
+describe('buildChallengeEntry', () => {
+  it('returns null for a legacy success without challengeId', () => {
+    expect(buildChallengeEntry({ success: true, challengeId: undefined }, 'a@b.co')).toBeNull();
   });
 
-  it('returns null for non-object', () => {
-    expect(parseDeviceAuthTokenResponse(null)).toBeNull();
+  it('stores the email with the challenge id', () => {
+    expect(buildChallengeEntry({ success: true, challengeId: 'c-1' }, 'a@b.co')).toEqual({
+      email: 'a@b.co',
+      challengeId: 'c-1',
+    });
+  });
+});
+
+describe('selectChallengeId', () => {
+  const entry = { email: 'a@b.co', challengeId: 'c-1' };
+
+  it('returns the challenge id for the matching email', () => {
+    expect(selectChallengeId(entry, 'a@b.co')).toBe('c-1');
   });
 
-  it('returns null for empty object', () => {
-    expect(parseDeviceAuthTokenResponse({})).toBeNull();
+  it('returns undefined for a different email so a stale challenge is not reused', () => {
+    expect(selectChallengeId(entry, 'other@b.co')).toBeUndefined();
+  });
+
+  it('returns undefined without a stored challenge', () => {
+    expect(selectChallengeId(null, 'a@b.co')).toBeUndefined();
+  });
+});
+
+describe('buildDeviceAuthPollRequest', () => {
+  it('builds a refresh-capable poll request', () => {
+    expect(buildDeviceAuthPollRequest('device-code')).toEqual({
+      deviceCode: 'device-code',
+      supportsRefresh: true,
+    });
   });
 });
 
@@ -238,6 +265,16 @@ describe('parseAuthError', () => {
 
   it('tolerates the absence of ssoOrganizationId', () => {
     expect(parseAuthError({ error: 'BLOCKED' })).toEqual({ code: 'BLOCKED' });
+  });
+
+  it('returns the step-up methods and keeps the code when they are malformed', () => {
+    expect(parseAuthError({ error: 'SIGNUP-STEP-UP', methods: ['google', 'apple'] })).toEqual({
+      code: 'SIGNUP-STEP-UP',
+      signupMethods: ['google', 'apple'],
+    });
+    expect(parseAuthError({ error: 'SIGNUP-STEP-UP', methods: 'apple' })).toEqual({
+      code: 'SIGNUP-STEP-UP',
+    });
   });
 
   it('returns undefined for null, undefined, and non-error objects', () => {

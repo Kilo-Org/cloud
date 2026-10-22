@@ -763,7 +763,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
           reply.permissionId,
           reply.response,
           reply.message,
-          undefined,
+          true,
           route.directory
         );
       } else if (reply.action === 'reject') {
@@ -904,6 +904,14 @@ export function createTurnManager(deps: TurnManagerDeps) {
     if (key === undefined) return undefined;
     const direct = routes.get(key);
     if (direct !== undefined) return direct;
+    const knownRoot =
+      resolveRootKiloSession(eventKiloSessionId(event.properties)) ??
+      (event.type === 'session.created'
+        ? resolveRootKiloSession(childFromSessionCreated(event.properties)?.parentId)
+        : undefined);
+    const knownSessionId = knownRoot === undefined ? undefined : turnByKiloSession.get(knownRoot);
+    const knownRoute = knownSessionId === undefined ? undefined : routes.get(knownSessionId);
+    if (knownRoute?.runtimeKey === key) return knownRoute;
     let matched: TurnRoute | undefined;
     for (const turn of turns.values()) {
       const route = routes.get(turn.route.sessionId);

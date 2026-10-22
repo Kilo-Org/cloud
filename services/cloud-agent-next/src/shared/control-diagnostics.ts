@@ -396,6 +396,7 @@ export const controlDiagnosticFieldsSchema = z
         'controller_unavailable',
         'readback_mismatch',
         'write_failed',
+        'oom_score_write_failed',
         'unavailable',
         'pid_changed',
         'membership_unconfirmed',

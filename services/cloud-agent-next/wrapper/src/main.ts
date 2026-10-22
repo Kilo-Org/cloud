@@ -350,7 +350,12 @@ async function main() {
   runtime = createKiloRuntimeLifecycle({
     createKilo,
     bindClient: (result, workspacePath) =>
-      createWrapperKiloClient(result.client as SDKClient, result.server.url, workspacePath),
+      createWrapperKiloClient(
+        result.client as SDKClient,
+        // The legacy wrapper starts Kilo without a password; see kilo-server-auth.ts.
+        { url: result.server.url },
+        workspacePath
+      ),
     captureEnv: () => process.env,
     resolveGitHubReviewPublishBinary: () => Bun.which(GITHUB_REVIEW_MCP_BINARY) ?? undefined,
     getPlatform: () => serverConfig.platform,

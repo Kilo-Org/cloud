@@ -25,6 +25,7 @@
     "error": "خرابی: {{error}}",
     "back": "واپس",
     "somethingWentWrong": "کوئی خرابی پیش آ گئی۔",
+    "actionNotRecorded": "ہم اس کارروائی کو ریکارڈ نہیں کر سکے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
     "couldNotOpen": "{{label}} کھولا نہیں جا سکا۔",
     "link": "لنک",
     "takingLonger": "اس میں توقع سے زیادہ وقت لگ رہا ہے۔ آپ اسے بند کر کے دوبارہ چیک کر سکتے ہیں۔",
@@ -35,6 +36,8 @@
     "connectGithub": "GitHub کو منسلک کریں",
     "cost": "لاگت",
     "discard": "ضائع کریں",
+    "discardChangesMessage": "آپ کی تبدیلیاں ضائع ہو جائیں گی۔",
+    "discardChangesTitle": "تبدیلیاں ضائع کریں؟",
     "findings": "شناخت شدہ مسائل",
     "mergeRequest": "مرج ریکویسٹ",
     "notConnected": "منسلک نہیں",
@@ -109,7 +112,9 @@
     "online": "آن لائن",
     "open": "{{name}} کھولیں",
     "openPullRequest": "پل ریکویسٹ کھولیں",
+    "completed": "مکمل",
     "pending": "زیر التوا",
+    "running": "چل رہا ہے",
     "performance": "کارکردگی",
     "preferences": "ترجیحات",
     "privacyPolicy": "رازداری کی پالیسی",
@@ -133,6 +138,7 @@
     "status": "حالت",
     "truncated": "نامکمل",
     "updated": "اپ ڈیٹ کیا گیا",
+    "generating": "بنایا جا رہا ہے…",
     "working": "کام جاری ہے",
     "yourOwnRepositories": "آپ کی اپنی ریپوزٹریز",
     "dismissed": "نظر انداز کردہ",
@@ -585,6 +591,8 @@
     "installKiloGitHubApp": "Kilo GitHub ایپ انسٹال کریں",
     "checkConnection": "کنکشن چیک کریں",
     "couldNotLoadPullRequest": "پل ریکویسٹ لوڈ نہیں ہو سکی۔",
+    "reviewServiceUnavailable": "سروس دستیاب نہیں ہے",
+    "reviewServiceUnavailableDescription": "سروس عارضی طور پر دستیاب نہیں ہے۔ جلد دوبارہ کوشش کریں۔",
     "description": "تفصیل",
     "noDescriptionProvided": "کوئی تفصیل فراہم نہیں کی گئی۔",
     "review": "جائزہ",
@@ -660,7 +668,8 @@
       "description": "موبائل پر پل ریکویسٹ کا جائزہ لینے کے لیے اپنا GitHub اکاؤنٹ منسلک کریں۔",
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لینے کے لیے اپنا GitLab اکاؤنٹ منسلک کریں۔",
       "bitbucketDescription": "موبائل پر پل ریکویسٹس کا جائزہ لینے کے لیے Bitbucket کو اس تنظیم سے منسلک کریں۔",
-      "bitbucketOrgOnlyDescription": "اپنے پروفائل میں ایک تنظیم منتخب کریں تاکہ اس کی Bitbucket پل ریکویسٹس کا جائزہ لیا جا سکے۔"
+      "bitbucketOrgOnlyDescription": "اس کی Bitbucket پل ریکویسٹس کا جائزہ لینے کے لیے اوپر موجود اکاؤنٹ کو ایک تنظیم پر تبدیل کریں۔",
+      "contextLine": "{{organization}} کے لیے"
     },
     "screen": {
       "title": "#{{number}}",
@@ -755,6 +764,7 @@
       "truncationBanner_other": "GitHub API کی حد کے باعث کل {{total}} تبدیل شدہ فائلوں میں سے پہلی {{limit}} دکھائی جا رہی ہیں۔"
     },
     "linkPasteClipboardEmpty": "کلپ بورڈ خالی ہے۔",
+    "linkPasteDenied": "پیسٹ کرنے کی اجازت نہیں دی گئی۔ پیسٹ کی اجازت دیں اور دوبارہ کوشش کریں۔",
     "linkPasteNotAPullRequest": "یہ پل ریکویسٹ یا مرج ریکویسٹ کا لنک نہیں ہے۔",
     "announce": {
       "commentPosted": "تبصرہ پوسٹ ہو گیا",
@@ -768,7 +778,9 @@
       "reviewNotSubmitted": "یہ جائزہ اپنی موجودہ صورت میں جمع نہیں ہو سکتا۔ ممکن ہے PR بدل گئی ہو یا یہ آپ کی اپنی پل ریکویسٹ ہو، جس کا آپ جائزہ نہیں لے سکتے۔",
       "reviewNotSubmittedTerm": "اس جائزے کو یونہی جمع نہیں کیا جا سکتا۔ ہو سکتا ہے {{term}} بدل گیا ہو، یا آپ اپنا خود {{term}} کا جائزہ نہیں لے سکتے۔",
       "couldNotPostComment": "تبصرہ پوسٹ نہیں ہو سکا۔",
-      "couldNotSubmitReview": "جائزہ جمع نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔"
+      "couldNotSubmitReview": "جائزہ جمع نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+      "rateLimited": "بہت زیادہ درخواستیں۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
+      "conflict": "آپ اس پر کام کر رہے تھے اس دوران یہ تبدیل ہو گیا۔ براہ کرم اسے دوبارہ لوڈ کریں اور دوبارہ کوشش کریں۔"
     },
     "operation": {
       "couldNotReply": "جواب نہیں بھیجا جا سکا۔",
@@ -776,7 +788,6 @@
       "mergeResultDefaultError": "GitHub نے مرج مکمل نہیں کیا۔",
       "mergeResultNotCompleted": "{{term}} مرج نہیں ہوا۔ اس کی حالت چیک کریں اور دوبارہ کوشش کریں۔",
       "ambiguous": "تصدیق نہیں ہو سکی — دوبارہ کوشش کرنے سے پہلے PR چیک کریں۔",
-      "persistenceFailed": "ہم اس کارروائی کو ریکارڈ نہیں کر سکے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
       "forbidden": "اس کارروائی کی اجازت نہیں ہے۔"
     },
     "capabilities": {
@@ -1259,7 +1270,7 @@
         "stoppedTitle": "سیٹ اپ رک گیا",
         "stoppedBody": "سیٹ اپ کے دوران {{name}} کی انسٹنس غیر متوقع طور پر رک گئی۔",
         "stalledTitle": "پیش رفت رک گئی",
-        "stalledBody": "ہم {{name}} کا سیٹ اپ مکمل نہیں کر سکے۔ دوبارہ کوشش کریں، یا اگر ایسا بار بار ہو تو hi@kilo.ai پر ای میل کریں۔",
+        "stalledBody": "ہم {{name}} کا سیٹ اپ مکمل نہیں کر سکے۔ دوبارہ کوشش کریں، یا اگر ایسا بار بار ہو تو {{supportEmail}} پر ای میل کریں۔",
         "timeoutTitle": "توقع سے زیادہ وقت لگ رہا ہے",
         "timeoutBody": "{{name}} کا سیٹ اپ معمول سے زیادہ وقت لے رہا ہے ({{displayMinutes}} منٹ سے زیادہ)۔",
         "continueInBackground": "پس منظر میں جاری رکھیں",
@@ -1317,7 +1328,7 @@
       "nonCanonicalEarlybirdBody": "موبائل پر استعمال سے پہلے آپ کے ابتدائی رسائی والے پلان کا انسانی جائزہ ضروری ہے۔",
       "iosTitle": "IOS پر KiloClaw دستیاب نہیں",
       "iosBody": "اس اکاؤنٹ کے لیے KiloClaw تک رسائی کا انتظام iOS ایپ سے باہر ہوتا ہے۔",
-      "iosContact": "کوئی سوال ہے؟ hi@kilo.ai پر رابطہ کریں۔",
+      "iosContact": "کوئی سوال ہے؟ {{supportEmail}} پر رابطہ کریں۔",
       "quarantinedCta": "ہماری ٹیم کو ای میل بھیجیں",
       "nonCanonicalEarlybirdCta": "اپنا پلان Kilo.ai پر دیکھیں"
     },
@@ -1412,6 +1423,9 @@
       "couldNotGetLatest": "تازہ ترین معلومات حاصل نہیں ہو سکیں۔",
       "byline": "{{repo}} #{{number}}، مصنف: {{author}}",
       "noFindings": "کوئی مسئلہ نہیں ملا۔",
+      "findingsUnavailable": "اس جائزے کی ناکامی کی وجہ سے نتائج دستیاب نہیں ہیں۔",
+      "serviceUnavailable": "کوڈ کے جائزے کی سروس سے رابطہ نہیں ہو سکا۔ سروس دستیاب ہونے پر جائزے کی دوبارہ کوشش کریں۔",
+      "reviewFailed": "جائزہ ناکام ہو گیا۔ براہ کرم دوبارہ کوشش کریں۔",
       "showMore": "مزید دکھائیں",
       "created": "تخلیق شدہ",
       "started": "شروع ہوا",
@@ -1445,8 +1459,9 @@
       "loading": "جائزے کی یادداشت لوڈ ہو رہی ہے",
       "couldNotLoad": "جائزے کی یادداشت لوڈ نہیں ہو سکی۔",
       "off": "جائزے کی یادداشت بند ہے۔",
+      "on": "جائزے کی یادداشت فعال ہے۔",
       "offDescription": "اسے فعال کریں تاکہ Kilo دیکھ بھال کرنے والوں کے جوابات سے سیکھ سکے اور REVIEW.md کے لیے ہدایات تجویز کر سکے۔",
-      "readOnlyDescription": "صرف تنظیم کے مالکان اور بلنگ مینیجر جائزے کی یادداشت فعال کر سکتے ہیں۔",
+      "readOnlyDescription": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر جائزے کی یادداشت بدل سکتے ہیں۔",
       "enable": "جائزے کی یادداشت فعال کریں",
       "loadingProposals": "تجاویز لوڈ ہو رہی ہیں",
       "couldNotLoadProposals": "تجاویز لوڈ نہیں ہو سکیں۔",
@@ -1466,7 +1481,10 @@
       "starting": "جائزہ شروع ہو رہا ہے…",
       "start": "جائزہ شروع کریں"
     },
-    "notConnectedReadOnly": "{{platform}} منسلک نہیں ہے۔ صرف تنظیم کے مالکان اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
+    "notConnectedReadOnly": "{{platform}} منسلک نہیں ہے۔ صرف تنظیم کے مالک اور منتظم اسے منسلک کر سکتے ہیں۔",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} منسلک نہیں ہے۔ ادارے کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے منسلک کرنے کی درخواست کریں۔"
+    },
     "webhookSetup": "ویب ہک کا سیٹ اپ نامکمل ہے۔",
     "webhookSetupDescription": "ممکن ہے کچھ ریپوزٹریز کے خودکار جائزے نہ ہوں۔",
     "autoReviews": "خودکار جائزے",
@@ -1474,7 +1492,7 @@
     "followReviewMd": "REVIEW.md کی پیروی کریں",
     "followReviewMdSubtitle": "ہر ریپوزٹری کی REVIEW.md فائل میں دی گئی ہدایات پر عمل کریں",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالکان اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
+      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
       "setupIncomplete": "سیٹ اپ نامکمل ہے — kilo.ai پر ترتیبات مکمل کریں۔",
       "setup": "Bitbucket کا سیٹ اپ"
     },
@@ -1527,8 +1545,6 @@
     "updateFailed": "ریویور کو اپ ڈیٹ نہیں کیا جا سکا۔",
     "configSaveFailed": "جائزے کی ترتیبات محفوظ نہیں ہو سکیں۔",
     "status": {
-      "running": "چل رہا ہے",
-      "completed": "مکمل",
       "interrupted": "رک گیا"
     },
     "reviewStyle": {
@@ -1541,7 +1557,8 @@
       "bugs": "خرابیاں",
       "style": "انداز",
       "testing": "جانچ",
-      "documentation": "دستاویزات"
+      "documentation": "دستاویزات",
+      "unknown": "دیگر ({{area}})"
     },
     "gateThreshold": {
       "warning": "انتباہ"
@@ -1552,7 +1569,7 @@
         "recoveryLabel": "GitHub ایپ اپ ڈیٹ کریں"
       },
       "githubIpAllowList": {
-        "description": "کوڈ ریویور غیر فعال کر دیا گیا کیونکہ اس GitHub تنظیم کی اجازت یافتہ IP پتوں کی فہرست Kilo کی رسائی روکتی ہے۔ مدد کے لیے hi@kilo.ai پر رابطہ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔"
+        "description": "کوڈ ریویور غیر فعال کر دیا گیا کیونکہ اس GitHub تنظیم کی اجازت یافتہ IP پتوں کی فہرست Kilo کی رسائی روکتی ہے۔ مدد کے لیے {{supportEmail}} پر رابطہ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔"
       },
       "gitlabProjectAccessRequired": {
         "description": "کوڈ ریویور غیر فعال کر دیا گیا کیونکہ Kilo اس پروجیکٹ کے لیے GitLab پر رسائی کا ٹوکن نہیں بنا سکتا۔ دیکھ بھال کرنے والے کی سطح کی رسائی دیں یا پروجیکٹ تک رسائی کے ٹوکن فعال کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔",
@@ -1567,7 +1584,7 @@
         "recoveryLabel": "کوڈ ریویور کی ترتیبات اپ ڈیٹ کریں"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "آج ریپوزٹری کلون کرنے کی تین کوششیں مقررہ وقت میں مکمل نہ ہونے پر کوڈ ریویور غیر فعال کر دیا گیا۔ مدد کے لیے hi@kilo.ai پر رابطہ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔"
+        "description": "آج ریپوزٹری کلون کرنے کی تین کوششیں مقررہ وقت میں مکمل نہ ہونے پر کوڈ ریویور غیر فعال کر دیا گیا۔ مدد کے لیے {{supportEmail}} پر رابطہ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔"
       },
       "title": "کوڈ کے جائزہ کار کو آپ کی توجہ درکار ہے۔",
       "recoveryLabel": "معاونت کی ٹیم سے رابطہ کریں"
@@ -1653,7 +1670,14 @@
       "whereFound": "مسئلہ ملنے کے مقامات ({{displayCount}})",
       "fullReport": "تیار کردہ مکمل رپورٹ",
       "yes": "ہاں",
-      "no": "نہیں"
+      "no": "نہیں",
+      "action": {
+        "analyzeCodebase": "کوڈ بیس کا تجزیہ کریں",
+        "dismiss": "مسترد کریں",
+        "manualReview": "دستی جائزہ",
+        "monitor": "نگرانی کریں",
+        "openPr": "پل ریکوئسٹ کھولیں"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} مسائل",
@@ -1728,7 +1752,7 @@
       "couldNotLoad": "یہ شناخت شدہ مسئلہ لوڈ نہیں ہو سکا۔",
       "couldNotCheckPermissions": "اخراج کی اجازتوں کی جانچ نہیں ہو سکی۔",
       "cannotDismissTitle": "یہ مسئلہ خارج نہیں کیا جا سکتا",
-      "cannotDismissDescription": "صرف تنظیم کے مالکان اور بلنگ مینیجر مسائل خارج کر سکتے ہیں۔",
+      "cannotDismissDescription": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر مسائل خارج کر سکتے ہیں۔",
       "alreadyResolvedDescription": "یہ مسئلہ پہلے ہی حل ہو چکا ہے اور اب اسے خارج نہیں کیا جا سکتا۔"
     },
     "findingDetails": {
@@ -1770,7 +1794,7 @@
       "automationAllOff": "سب بند",
       "automationCount": "3 میں سے {{displayCount}} فعال",
       "notificationsCount": "2 میں سے {{displayCount}} فعال",
-      "disabledNoManage": "سکیورٹی ایجنٹ غیر فعال ہے۔ صرف تنظیم کے مالکان اور بلنگ مینیجر اسے فعال کر سکتے ہیں۔",
+      "disabledNoManage": "سکیورٹی ایجنٹ غیر فعال ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے فعال کر سکتے ہیں۔",
       "disabledNoRepo": "سکیورٹی ایجنٹ فعال کرنے سے پہلے کم از کم ایک ریپوزٹری منتخب کریں۔",
       "disabledPrompt": "Dependabot کی اطلاعات ہم آہنگ کرنے، ریپوزٹریز منتخب کرنے اور خودکار کارروائیوں کی ترتیبات طے کرنے کے لیے سکیورٹی ایجنٹ فعال کریں۔"
     },
@@ -1819,7 +1843,7 @@
       "invalidDayCount": "دنوں کی تعداد 1 سے 365 تک صحیح عدد میں درج کریں۔",
       "remediationDeadlineA11y": "{{label}} کی اصلاح کی مہلت، دنوں میں",
       "enterWholeNumber": "1 سے 365 تک کوئی صحیح عدد درج کریں",
-      "permissionNote": "صرف تنظیم کے مالکان اور بلنگ مینیجر یہ ترتیبات تبدیل کر سکتے ہیں۔",
+      "permissionNote": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر یہ ترتیبات تبدیل کر سکتے ہیں۔",
       "enableTracking": "SLA کی نگرانی فعال کریں",
       "enableTrackingSubtitle": "مسئلے کی شدت کے لحاظ سے اصلاح کی آخری تاریخ مقرر کریں۔",
       "deadlinesHeading": "اصلاح کی مہلت (دن)"
@@ -1855,12 +1879,16 @@
     "settingsSave": {
       "saveChanges": "تبدیلیاں محفوظ کریں",
       "unsavedTitle": "محفوظ نہ کی گئی تبدیلیاں",
-      "unsavedMessage": "اس اسکرین سے جانے سے پہلے اپنی تبدیلیاں محفوظ کریں؟"
+      "unsavedMessage": "اس اسکرین سے جانے سے پہلے اپنی تبدیلیاں محفوظ کریں؟",
+      "unsavedInvalidMessage": "یہ تبدیلیاں ابھی محفوظ نہیں کی جا سکتیں۔ محفوظ کرنے کے لیے انہیں ٹھیک کریں، یا جانے کے لیے انہیں ضائع کریں۔"
     },
     "auditReportButton": {
       "viewA11y": "آڈٹ رپورٹ دیکھیں"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo ایڈمن",
+      "actorMaskedUser": "چھپا ہوا صارف",
+      "actorSystem": "Kilo سسٹم",
       "couldNotLoad": "آڈٹ رپورٹ لوڈ نہیں ہو سکی۔",
       "events": "واقعات",
       "generated": "رپورٹ {{generatedAt}} کو تیار کی گئی۔",
@@ -1871,8 +1899,25 @@
       "summary": "رپورٹ کا خلاصہ",
       "title": "آڈٹ رپورٹ",
       "unavailable": "آڈٹ رپورٹ دستیاب نہیں",
-      "unavailableDescription": "صرف تنظیم کے مالکان اور بلنگ مینیجر آڈٹ رپورٹس دیکھ سکتے ہیں۔ رسائی دینے کے لیے کسی مالک یا بلنگ مینیجر سے کہیں۔",
-      "queryFailed": "رپورٹ کے لیے ڈیٹا حاصل نہیں ہو سکا۔ دوبارہ کوشش کریں۔"
+      "unavailableDescription": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر آڈٹ رپورٹس دیکھ سکتے ہیں۔ رسائی دینے کے لیے کسی مالک، منتظم یا بلنگ مینیجر سے کہیں۔",
+      "queryFailed": "رپورٹ کے لیے ڈیٹا حاصل نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+      "eventActions": {
+        "findingAnalysisCompleted": "تجزیہ مکمل ہوا",
+        "findingAnalysisFailed": "تجزیہ ناکام ہو گیا",
+        "findingAutoDismissed": "خودکار طور پر مسترد کیا گیا",
+        "findingCreated": "درآمد کیا گیا",
+        "findingDeleted": "حذف کر دیا گیا",
+        "findingDismissed": "مسترد کیا گیا",
+        "findingSeverityChanged": "شدت تبدیل ہو گئی",
+        "findingStatusChange": "اسٹیٹس تبدیل ہو گیا",
+        "findingSuperseded": "جگہ لی گئی",
+        "remediationBlocked": "اصلاح روک دی گئی",
+        "remediationCancelled": "منسوخ کر دیا گیا",
+        "remediationFailed": "اصلاح ناکام ہو گئی",
+        "remediationNoChangesNeeded": "کوئی تبدیلی کی ضرورت نہیں",
+        "remediationPrOpened": "پل ریکوئسٹ کھول دیا گیا",
+        "remediationQueued": "اصلاح کی درخواست کی گئی"
+      }
     },
     "notifications": {
       "couldNotLoad": "اطلاعات کی ترتیبات لوڈ نہیں ہو سکیں۔",
@@ -1904,7 +1949,6 @@
       "installApp": "GitHub ایپ انسٹال کریں",
       "reauthorizeButton": "GitHub ایپ کو دوبارہ اجازت دیں",
       "reauthorizeDescription": "سکیورٹی ایجنٹ کو Dependabot کی اطلاعات تک رسائی کے لیے vulnerability_alerts کی اجازت درکار ہے۔ یہ اجازت دینے کے لیے GitHub ایپ کو دوبارہ مجاز بنائیں۔",
-      "reauthorizeFailed": "دوبارہ اجازت دینے کا عمل شروع نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
       "reauthorizeTitle": "اضافی اجازتیں درکار ہیں",
       "setupFailed": "GitHub سیٹ اپ شروع نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔"
     },
@@ -1923,7 +1967,12 @@
       "syncMayNotHaveCompleted": "ممکن ہے ہم آہنگی مکمل نہ ہوئی ہو۔ حالت درست کرنے کے لیے دوبارہ کوشش کریں یا درخواست مسترد کر دیں۔",
       "syncInProgress": "سکیورٹی ڈیٹا کی ہم آہنگی پہلے سے جاری ہے۔ براہ کرم دوبارہ کوشش کریں۔",
       "dismissalInProgress": "اخراج کی یہ کارروائی پہلے سے جاری ہے۔ براہ کرم دوبارہ کوشش کریں۔",
-      "couldNotReadPendingSyncs": "ہم آہنگی کی زیر التوا درخواستیں پڑھی نہیں جا سکیں۔ دوبارہ کوشش کریں۔"
+      "couldNotReadPendingSyncs": "ہم آہنگی کی زیر التوا درخواستیں پڑھی نہیں جا سکیں۔ دوبارہ کوشش کریں۔",
+      "ambiguous": "تصدیق نہیں ہو سکی — دوبارہ کوشش کرنے سے پہلے سکیورٹی جائزہ چیک کریں۔",
+      "settleFailed": "کارروائی مکمل ہو گئی، لیکن ہم نتیجہ ریکارڈ نہیں کر سکے۔ براہ کرم دوبارہ کوشش کریں۔",
+      "replayFailed": "یہ کارروائی مکمل نہیں ہوئی۔ براہ کرم دوبارہ کوشش کریں۔",
+      "actionFailed": "یہ کارروائی مکمل نہیں ہو سکی۔ براہ کرم دوبارہ کوشش کریں۔",
+      "actionBlocked": "یہ کارروائی مکمل نہیں ہو سکی۔ دوبارہ کوشش کرنے سے پہلے اس مسئلے کو حل کرنا ضروری ہے۔"
     },
     "analysisState": {
       "queued": "تجزیہ قطار میں ہے",
@@ -2200,6 +2249,8 @@
       "commitAndPush": "کمٹ اور پش کریں",
       "startSession": "سیشن شروع کریں",
       "selectRepositoryToStart": "شروع کرنے کے لیے ایک ریپوزٹری منتخب کریں۔",
+      "enterPromptToStart": "شروع کرنے کے لیے ایک پرومپٹ شامل کریں۔",
+      "enterPromptOrFileToStart": "شروع کرنے کے لیے ایک پرومپٹ یا فائل شامل کریں۔",
       "connectProviderToStart": "شروع کرنے کے لیے ایک فراہم کنندہ منسلک کریں۔",
       "promptPlaceholder": "آپ کس چیز پر کام کرنا چاہیں گے؟",
       "couldNotLoadModels": "ماڈلز لوڈ نہیں ہو سکے۔",
@@ -2208,6 +2259,7 @@
       "prefillModelUnavailable": "{{model}} اب دستیاب نہیں ہے۔ آپ کا پہلے سے طے شدہ ماڈل استعمال ہو رہا ہے۔",
       "couldNotReadPendingSessions": "زیر التواء سیشنز نہیں پڑھے جا سکے۔ دوبارہ کوشش کریں۔",
       "failedToCreate": "سیشن نہیں بن سکا۔",
+      "checkOrganizationAccess": "اس تنظیم تک اپنی رسائی چیک کریں، پھر دوبارہ کوشش کریں۔",
       "couldNotRefreshRepositories": "ریپوزٹریوں کی فہرست تازہ نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
       "discardDraftTitle": "مسودہ حذف کریں؟",
       "discardDraftMessage": "آپ کا پرامپٹ ضائع ہو جائے گا۔",
@@ -2277,7 +2329,8 @@
       "linesBadge_other": "{{displayCount}} سطریں",
       "matchesBadge_one": "{{displayCount}} مماثلت",
       "matchesBadge_other": "{{displayCount}} مماثلتیں",
-      "noOutput": "کوئی آؤٹ پٹ نہیں ہے۔"
+      "noOutput": "کوئی آؤٹ پٹ نہیں ہے۔",
+      "translationFailed": "ترجمہ ناکام رہا"
     },
     "readToolMarkdown": {
       "linesTruncated": "سطریں {{start}}–{{end}} (نامکمل متن)",
@@ -2428,6 +2481,7 @@
       "title": "ایجنٹ کو جواب درکار ہے",
       "skipQuestionsTitle": "سوالات چھوڑیں؟",
       "skipQuestionsMessage": "ایجنٹ یہ مرحلہ چھوڑ دے گا۔",
+      "answerProgress": "{{total}} میں سے {{answered}} کے جواب دیے گئے",
       "selectAllThatApply": "تمام متعلقہ اختیارات منتخب کریں۔",
       "option": "{{label}}",
       "optionSelected": "{{label}}، منتخب شدہ",
@@ -2496,6 +2550,7 @@
       "title": "سیشن فلٹر کریں",
       "platformCloud": "کلاؤڈ",
       "platformExtension": "ایکسٹینشن",
+      "platformDesktop": "ڈیسک ٹاپ",
       "platformCli": "CLI",
       "platformSlack": "Slack",
       "platformLinear": "Linear",
@@ -2726,6 +2781,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "آپ کے فعال سیشن اس وقت تک دستیاب نہیں ہیں جب تک یہ لوڈ نہ ہو۔",
     "currentDeviceUnidentified": "موجودہ ڈیوائس کی شناخت نہیں ہو سکی۔",
+    "kiloApp": "Kilo ایپ",
     "noSessions": "کوئی فعال سیشن نہیں",
     "noSessionsDescription": "کسی دوسری ڈیوائس پر Kilo ایپ سے سائن ان کریں۔ اس کا سیشن یہاں نظر آئے گا۔",
     "onlyKiloAppSignIns": "صرف Kilo ایپ کے سائن ان یہاں ظاہر ہوتے ہیں۔ ایڈیٹر اور CLI سائن ان درج نہیں ہیں۔",
@@ -2734,7 +2790,7 @@
     "webBrowser": "ویب براؤزر",
     "viewProfile": "پروفائل دیکھیں",
     "signOutThisDevice": "اس ڈیوائس سے سائن آؤٹ کریں",
-    "signOutThisSession": "اس سیشن سے سائن آؤٹ کریں",
+    "signOutSessionLabel": "{{device}} سے سائن آؤٹ کریں، سائن ان: {{signedIn}}",
     "sessionSignedOut": "سیشن سائن آؤٹ ہو گیا۔",
     "signOutThisDeviceTitle": "اس ڈیوائس سے سائن آؤٹ کریں؟",
     "signOutThisSessionTitle": "اس سیشن سے سائن آؤٹ کریں؟",
@@ -2878,6 +2934,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "شروع کرنے سے پہلے",
+    "summaryTitle": "ڈیٹا شیئرنگ کی ترجیحات",
     "introDescription": "Kilo جوابات تیار کرنے کے لیے آپ کے پیغامات AI فراہم کنندگان کو بھیجتا ہے۔ یہاں بتایا گیا ہے کہ کون سا ڈیٹا کس کے ساتھ شیئر ہوتا ہے۔",
     "required": "Kilo استعمال کرنے کے لیے ضروری",
     "promptsTitle": "آپ کے پرامپٹس اور گفتگو",
@@ -2886,7 +2943,6 @@
     "accountDescription": "آپ کے Kilo اکاؤنٹ کی ID اور درخواست کا میٹاڈیٹا آپ کی شناخت کی تصدیق اور استعمال کی پیمائش کے لیے استعمال ہوتے ہیں۔",
     "diagnosticsTitle": "ایپ کی تشخیصی معلومات",
     "diagnosticsDescription": "ایپ کو مستحکم رکھنے کے لیے کریش اور خرابی کی رپورٹس استعمال ہوتی ہیں۔ ان سے ایپ کا مواد ہٹا دیا جاتا ہے۔",
-    "optional": "اختیاری",
     "helpImprove": "Kilo کو بہتر بنانے میں مدد کریں",
     "helpImproveDescription": "ایپ کے استعمال کے گمنام اعداد و شمار اور انسٹالیشن کا ذریعہ شیئر کریں۔ آپ یہ انتخاب کسی بھی وقت ترتیبات میں تبدیل کر سکتے ہیں۔",
     "seeFullDetails": "مکمل تفصیلات دیکھیں",
@@ -2971,11 +3027,23 @@
     "boundary": {
       "backToProfile": "پروفائل پر واپس جائیں",
       "loadErrorMessage": "اپنا انٹرنیٹ کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+
+      "chooseAccount": "ایک اکاؤنٹ منتخب کریں",
       "loadErrorTitle": "آپ کی تنظیمیں لوڈ نہیں ہو سکیں۔",
+      "membershipLostNotice": "آپ کو اب اس تنظیم تک رسائی حاصل نہیں ہے۔ {{target}} پر منتقل کر دیا گیا۔",
+      "noOrganization": "کوئی تنظیم نہیں",
+
+      "noOrganizationDescription": "یہ اکاؤنٹ کسی تنظیم کا حصہ نہیں ہے۔ ممبر دعوتیں اور کم بیلنس انتباہات جیسی تنظیمی خصوصیات استعمال کرنے کے لیے ویب پر ایک تنظیم بنائیں یا اس میں شامل ہوں۔",
+
+      "openWebOrganizations": "ویب پر تنظیمیں کھولیں",
+
       "organizationUnavailable": "تنظیم دستیاب نہیں ہے۔",
-      "selectDescription": "جاری رکھنے کے لیے اپنے پروفائل سے ایک تنظیم منتخب کریں۔",
+      "selectDescriptionWithOrganizations": "آپ ایک یا زیادہ تنظیموں سے تعلق رکھتے ہیں۔ وہ اکاؤنٹ منتخب کریں جو یہ اسکرین استعمال کرے۔",
+
       "selectOrganization": "ایک تنظیم منتخب کریں",
       "unavailableDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ جاری رکھنے کے لیے اپنے پروفائل سے کوئی اور تنظیم منتخب کریں۔",
+
+      "unavailableSessionsDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ اس کے سیشنز لوڈ نہیں ہو سکتے۔",
       "accessDeniedDescription": "آپ کو اس تنظیم تک رسائی حاصل نہیں ہے۔"
     },
     "creditActivity": {
@@ -3027,7 +3095,11 @@
       "separateEmailsHint": "ایک سے زیادہ ای میل پتے ہوں تو انہیں کوما سے الگ کریں۔",
       "thresholdLabel": "اس رقم سے کم ہونے پر اطلاع دیں (USD)",
       "title": "بیلنس کم ہونے کی اطلاع",
-      "emailsError": "کم از کم ایک درست ای میل پتہ درج کریں۔ ایک سے زیادہ پتے ہوں تو انہیں کوما سے الگ کریں۔",
+      "emailsInvalid": "ایک یا زیادہ ای میل پتے درست نہیں ہیں۔",
+      "emailsRequired": "کم از کم ایک ای میل پتہ درج کریں۔",
+      "saveEmailsError": "کچھ ای میل پتے قبول نہیں ہوئے۔ انہیں چیک کر کے دوبارہ کوشش کریں۔",
+      "saveError": "بیلنس کم ہونے کی اطلاع محفوظ نہیں ہو سکی۔",
+      "thresholdPlaceholder": "رقم درج کریں",
       "thresholdError": "0 سے زیادہ رقم درج کریں۔"
     },
     "memberLimit": {
@@ -3038,12 +3110,13 @@
       "removeLimit": "حد ہٹائیں",
       "title": "روزانہ استعمال کی حد",
       "blankError": "رقم درج کریں یا نیچے «حد ہٹائیں» پر ٹیپ کریں۔",
+      "blankWithoutLimitError": "0 اور {{max}} کے درمیان روزانہ حد درج کریں۔",
       "rangeError": "0 اور {{max}} کے درمیان رقم درج کریں۔"
     },
     "members": {
       "changeRole": "کردار تبدیل کریں",
       "emptyDescriptionCanInvite": "اس تنظیم میں مل کر کام کرنے کے لیے اپنے ساتھیوں کو دعوت دیں۔",
-      "emptyDescriptionCannotInvite": "ٹیم کے ساتھیوں کو دعوت دینے کے لیے مالک یا بلنگ مینیجر سے کہیں۔",
+      "emptyDescriptionCannotInvite": "ٹیم کے ساتھیوں کو دعوت دینے کے لیے کسی مالک، منتظم یا بلنگ مینیجر سے کہیں۔",
       "emptyTitle": "ابھی کوئی رکن نہیں",
       "invitedDate": "{{date}} کو دعوت دی گئی",
       "limitPerDay": "{{amount}}/دن",
@@ -3105,6 +3178,9 @@
     "ssoError": "آپ کی تنظیم میں SSO کے ذریعے سائن ان کرنا ضروری ہے۔ '$t(login.moreSignInOptions)' استعمال کریں۔",
     "blocked": "یہ اکاؤنٹ بلاک کر دیا گیا ہے۔ براہ کرم سپورٹ سے رابطہ کریں۔",
     "signupRateLimited": "بہت زیادہ کوششیں ہو چکی ہیں۔ براہ کرم کچھ دیر بعد دوبارہ کوشش کریں۔",
+    "signupStepUp": "اپنا اکاؤنٹ بنانا مکمل کرنے کے لیے '$t(login.moreSignInOptions)' استعمال کریں۔",
+    "signupStepUpApple": "اپنا اکاؤنٹ بنانا مکمل کرنے کے لیے '$t(login.signInWithApple)' استعمال کریں۔",
+    "signupStepUpGoogle": "اپنا اکاؤنٹ بنانا مکمل کرنے کے لیے '$t(login.signInWithGoogle)' استعمال کریں۔",
     "invalidCode": "یہ کوڈ غلط ہے۔ براہ کرم دوبارہ کوشش کریں۔",
     "codeInProgress": "آپ کے کوڈ پر کارروائی ہو رہی ہے۔ ذرا انتظار کریں اور دوبارہ کوشش کریں۔",
     "tooManyAttempts": "بہت زیادہ کوششیں ہو چکی ہیں۔ براہ کرم نئے کوڈ کی درخواست کریں۔",
@@ -3304,7 +3380,8 @@
       "settingsToolsOn": "آن — سیٹنگز ٹولز ماڈل کو بھیجے جاتے ہیں",
       "settingsToolsOff": "آف — ماڈل کو کوئی سیٹنگز ٹول نہیں بھیجا جاتا",
       "serverChecking": "اس سرور کی جانچ ہو رہی ہے…",
-      "serverToolCount": "{{count}} ٹولز",
+      "serverToolCount_one": "{{count}} ٹول",
+      "serverToolCount_other": "{{count}} ٹولز",
       "serverUnreachable": "اس سرور تک نہیں پہنچ سکا",
       "serverOff": "یہ سرور بند ہے"
     },
@@ -3322,6 +3399,10 @@
     },
     "backends": {
       "title": "چیٹ بیک اینڈز",
+      "providersTitle": "چیٹ فراہم کنندگان",
+      "cloud": "کلاؤڈ میں",
+      "cloudModel": "ماڈل: {{model}}",
+      "cloudUnavailable": "Kilo ماڈلز ابھی دستیاب نہیں ہیں۔ اپنا کنکشن چیک کریں.",
       "manage": "بیک اینڈز کا نظم کریں",
       "defaultKilo": "$t(consent.kilo) (ڈیفالٹ)",
       "kiloHelp": "بلٹ اِن بیک اینڈ آپ کا Kilo اکاؤنٹ استعمال کرتا ہے اور اس میں ترمیم یا اسے حذف نہیں کیا جا سکتا۔",
@@ -3381,7 +3462,6 @@
     "gguf": {
       "title": "ڈاؤن لوڈ کے قابل ماڈلز",
       "help": "ایک اوپن ماڈل ڈاؤن لوڈ کریں اور llama.cpp کے ساتھ اسی فون پر چلائیں۔ آپ کے پرامپٹس اور جوابات ڈیوائس پر ہی رہتے ہیں۔ ماڈلز بڑے ہوتے ہیں، اس لیے Wi-Fi استعمال کریں۔",
-      "details": "{{size}} · لائسنس: {{license}}",
       "download": "ماڈل ڈاؤن لوڈ کریں",
       "pause": "ڈاؤن لوڈ روکیں",
       "resume": "ڈاؤن لوڈ دوبارہ شروع کریں",
@@ -3393,6 +3473,8 @@
       "url": "براہ راست ڈاؤن لوڈ لنک",
       "urlHelp": ".gguf فائل کا HTTPS لنک پیسٹ کریں، جیسے Hugging Face کا resolve لنک۔ صرف قابل اعتماد ذرائع سے ماڈلز ڈاؤن لوڈ کریں۔",
       "downloadUrl": "لنک سے ڈاؤن لوڈ کریں",
+      "advanced": "جدید",
+      "localPurpose": "یہ اس ڈیوائس پر llama.cpp کے ساتھ چلتا ہے۔ پرامپٹ اور جوابات ڈیوائس پر ہی رہتے ہیں.",
       "deleteTitle": "یہ ماڈل حذف کریں؟",
       "deleteMessage": "{{name}} کو اس ڈیوائس سے حذف کریں؟ جو چیٹس اسے استعمال کرتی ہیں انہیں جاری رکھنے کے لیے کسی دوسرے ماڈل کی ضرورت ہوگی۔",
       "errors": {
@@ -3421,8 +3503,17 @@
         "fits": "موافق",
         "tight": "بمشکل موافق",
         "tooLarge": "بہت بڑا",
-        "noStorage": "اسٹوریج ناکافی"
+        "noStorage": "اسٹوریج ناکافی",
+        "unknown": "موزونیت نامعلوم"
       },
+      "recommendationsHelp": "یہ ایپ جس مختصر فہرست کو نمایاں کرتی ہے: فی ماڈل ایک فائل، ایسے ناشر سے جو لائسنس بتاتا ہو۔ اس کے علاوہ کچھ درجہ بند نہیں.",
+      "compatibilityHelp": "موزونیت ماڈل فائل کا اس ڈیوائس کی میموری اور خالی اسٹوریج سے موازنہ کرتی ہے۔ میموری کا عدد ایک تخمینہ ہے، پیمائش نہیں.",
+      "text": "متن",
+      "listTextPurpose": "صرف متنی پرامپٹ.",
+      "listImagePurpose": "متن کے ساتھ تصاویر بھی پڑھتا ہے.",
+      "smallestDownload": "سب سے چھوٹا ڈاؤن لوڈ: {{size}} · تقریباً {{memory}} میموری",
+      "fullFileName": "فائل: {{name}}",
+      "memoryEstimateNote": "میموری کے اعداد تخمینے ہیں، پیمائش نہیں.",
       "parameters": "پیرامیٹرز: {{value}}",
       "downloads": "ڈاؤن لوڈز: {{value}}",
       "likes": "پسندیدگیاں: {{value}}",
@@ -3437,6 +3528,8 @@
       "quantizationsHelp": "چھوٹی فائلیں کم میموری اور اسٹوریج استعمال کرتی ہیں۔ بڑی فائلیں عموماً بہتر جوابات دیتی ہیں۔",
       "quantDetail": "{{size}} ڈاؤن لوڈ · تقریباً {{memory}} میموری",
       "downloadQuant": "{{quant}} ڈاؤن لوڈ کریں",
+      "downloadModelA11y": "{{name}} ڈاؤن لوڈ کریں",
+      "detailsA11y": "تفصیلات: {{name}}",
       "loadingModel": "ماڈل کی تفصیلات لوڈ ہو رہی ہیں",
       "couldNotLoadModel": "یہ ماڈل لوڈ نہیں ہو سکا",
       "noFiles": "ایسی کوئی فائل نہیں جو یہ ایپ چلا سکے",
@@ -3447,7 +3540,11 @@
     },
     "localModels": {
       "title": "ڈیوائس پر چلنے والے ماڈلز",
-      "help": "ڈیوائس پر چلنے والے ماڈلز اسی فون پر چلتے ہیں۔ آپ کے پرامپٹس اور جوابات ڈیوائس پر ہی رہتے ہیں، اور یہ ماڈلز ٹولز استعمال نہیں کر سکتے۔",
+      "help": "ڈیوائس پر چلنے والے ماڈلز اسی فون پر چلتے ہیں۔ آپ کے پرامپٹس اور جوابات ڈیوائس پر ہی رہتے ہیں۔",
+      "switchTitle": "ڈیوائس پر چلنے والے ماڈل پر منتقل ہوں؟",
+      "switchMessage": "{{name}} پر منتقل ہونے سے اس گفتگو کے پرامپٹس اور سیاق کسی ریموٹ سرور کے بجائے اسی فون پر پروسیس ہوں گے۔",
+      "switchConfirm": "ماڈل تبدیل کریں",
+      "systemPurpose": "اس ڈیوائس کے سسٹم میں شامل ماڈل۔ یہ ڈیوائس پر ہی چلتا ہے۔",
       "apple": "Apple Intelligence (ڈیوائس پر)",
       "checking": "دستیابی چیک کی جا رہی ہے…",
       "ready": "استعمال کے لیے تیار",
@@ -3484,6 +3581,7 @@
   "appActions": {
     "start": {
       "promptRequired": "ایجنٹ شروع کرنے کے لیے پرامپٹ درکار ہے۔ ایک پرامپٹ شامل کریں اور اسے دوبارہ چلائیں۔",
+      "repositoryRequired": "ایجنٹ شروع کرنے کے لیے ریپوزٹری درکار ہے۔ Kilo کھولیں، کوئی ریپوزٹری منتخب کریں، پھر اسے دوبارہ چلائیں۔",
       "repositoryUnknown": "Kilo، {{repository}} کو GitHub یا GitLab ریپوزٹری کے طور پر نہیں پہچانتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔",
       "repositoryUnsupported": "{{repository}} ایک Bitbucket ریپوزٹری ہے — ایجنٹ شروع کریں ابھی اسے استعمال نہیں کر سکتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔"
     }
@@ -3521,10 +3619,13 @@
     "emptyDescription": "سیشنوں میں ماحولیاتی متغیرات، سیٹ اپ کمانڈز، اور مہارتوں کو دوبارہ استعمال کرنے کے لیے ایک پروفائل بنائیں۔",
     "loadFailed": "پروفائلز لوڈ نہیں ہو سکے۔",
     "counts": {
-      "vars": "{{count}} متغیرات",
+      "vars_one": "{{count}} متغیر",
+      "vars_other": "{{count}} متغیرات",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ہنر",
-      "commands": "{{count}} کمانڈز",
+      "skills_one": "{{count}} ہنر",
+      "skills_other": "{{count}} ہنر",
+      "commands_one": "{{count}} کمانڈ",
+      "commands_other": "{{count}} کمانڈز",
       "varsShort": "{{count}}م",
       "skillsShort": "{{count}}ہ",
       "commandsShort": "{{count}}ک"
@@ -3543,7 +3644,6 @@
     "personalDefaultDescription": "جب کسی ریپوزٹری میں پن شدہ پروفائل نہ ہو تو خودکار طور پر لوڈ ہوتا ہے۔",
     "organizationDefaultDescription": "ان اراکین کے لیے خودکار طور پر لوڈ کیا گیا جن کا کوئی ذاتی ڈیفالٹ نہیں ہے۔",
     "setAsDefault": "بطور ڈیفالٹ سیٹ کریں۔",
-    "removeDefault": "بطور ڈیفالٹ ہٹا دیں۔",
     "saveFailed": "پروفائل محفوظ نہیں ہو سکا",
     "deleteTitle": "پروفائل حذف کریں۔",
     "deleteMessage": "یہ پروفائل اور اس کی ترتیبات کو مستقل طور پر ہٹا دیتا ہے۔ اسے کالعدم نہیں کیا جا سکتا۔",
@@ -3556,7 +3656,6 @@
     "keyTooLong": "چابی 256 حروف یا اس سے کم ہونی چاہیے",
     "keyDuplicate": "یہ چابی پہلے سے پروفائل میں موجود ہے",
     "valueLabel": "قدر",
-    "secretLabel": "خفیہ",
     "secrets": {
       "markSecret": "خفیہ کے طور پر نشان زد کریں۔",
       "masked": "پوشیدہ قدر",
@@ -3569,11 +3668,13 @@
     "commandsTitle": "سیٹ اپ کمانڈز",
     "addCommand": "کمانڈ شامل کریں۔",
     "commandLabel": "حکم",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "مثلاً pnpm install",
     "commandsEmpty": "ابھی تک کوئی سیٹ اپ کمانڈ نہیں ہے۔",
     "commandsSaveFailed": "سیٹ اپ کمانڈز کو محفوظ نہیں کیا جا سکا",
     "moveUp": "اوپر بڑھیں۔",
     "moveDown": "نیچے کی طرف بڑھیں۔",
+    "moveCommandUp": "کمانڈ {{position}} کو اوپر منتقل کریں",
+    "moveCommandDown": "کمانڈ {{position}} کو نیچے منتقل کریں",
     "skillsTitle": "ہنر",
     "addSkill": "مہارت شامل کریں۔",
     "skillNameLabel": "ہنر کا نام",
@@ -3598,7 +3699,7 @@
       "environment": "ماحولیات (JSON)",
       "headers": "ہیڈرز (JSON)",
       "timeout": "ٹائم آؤٹ",
-      "secretCount": "خفیہ گنتی",
+      "secretCount": "خفیہ گنتی: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3613,7 +3714,9 @@
       "jsonTooLarge": "زیادہ سے زیادہ 50 اندراجات استعمال کریں، چابیاں 128 تک اور اقدار 4096 حروف تک",
       "timeoutInvalid": "ٹائم آؤٹ ملی سیکنڈز کی پوری تعداد میں ہونا چاہیے۔",
       "edit": "MCP سرور میں ترمیم کریں۔",
-      "saveFailed": "MCP سرور محفوظ نہیں ہو سکا"
+      "saveFailed": "MCP سرور محفوظ نہیں ہو سکا",
+      "deleteFailed": "MCP سرور حذف نہیں ہو سکا",
+      "updateFailed": "MCP سرور اپ ڈیٹ نہیں ہو سکا"
     },
     "agents": {
       "title": "پروفائل ایجنٹس",
@@ -3639,11 +3742,15 @@
       "visibilityPrimary": "پرائمری - چننے والے میں دکھایا گیا ہے۔",
       "visibilitySubagent": "Subagent — صرف دوسروں سے کال کی جا سکتی ہے۔",
       "visibilityAll": "سبھی — دونوں",
+      "modePrimary": "صرف پرائمری",
+      "modeSubagent": "صرف سب ایجنٹ",
+      "modeAll": "سبھی موڈز",
       "saveFailed": "ایجنٹ کو محفوظ نہیں کیا جا سکا",
+      "deleteFailed": "ایجنٹ حذف نہیں کیا جا سکا",
       "nameRequired": "ایجنٹ کا نام درج کریں۔",
       "slugRequired": "ایک ایجنٹ سلگ درج کریں۔",
       "slugInvalid": "سلگ کا آغاز ایک حرف سے ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کرنا چاہیے۔",
-      "slugConflict": "وہ سلگ ایک بلٹ ان ایجنٹ کے ذریعہ محفوظ ہے۔",
+      "slugConflict": "وہ سلگ پہلے ہی کسی بلٹ ان ایجنٹ یا اس پروفائل میں کسی دوسرے ایجنٹ کے زیر استعمال ہے",
       "edit": "ایجنٹ میں ترمیم کریں۔"
     },
     "slashCommands": {
@@ -3654,10 +3761,12 @@
       "description": "کمانڈ کی تفصیل",
       "template": "سانچہ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS کی وضاحت کریں۔",
       "subtask": "ذیلی کام کے طور پر چلائیں۔",
       "edit": "سلیش کمانڈ میں ترمیم کریں۔",
       "saveFailed": "کمانڈ کو محفوظ نہیں کیا جا سکا",
+      "deleteFailed": "کمانڈ حذف نہیں کی جا سکی",
       "nameRequired": "کمانڈ کا نام درج کریں۔",
       "nameInvalid": "نام کا آغاز چھوٹے حروف سے ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کرنا چاہیے۔",
       "templateRequired": "کمانڈ ٹیمپلیٹ درج کریں۔",
@@ -3696,6 +3805,8 @@
     "empty": "کریڈٹ پیک اس وقت دستیاب نہیں ہیں۔",
     "noMatchingProducts": "App Store نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
     "noMatchingProductsPlay": "Google Play نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
+    "storeTimedOut": "App Store نے وقت پر جواب نہیں دیا۔ دوبارہ کوشش کریں۔",
+    "storeTimedOutPlay": "Google Play نے وقت پر جواب نہیں دیا۔ دوبارہ کوشش کریں۔",
     "purchaseOwnedByAnotherAccount": "اس Apple Account کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اسی Kilo اکاؤنٹ میں سائن ان کریں۔",
     "purchaseOwnedByAnotherAccountPlay": "اس Google Play اکاؤنٹ کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اس Kilo اکاؤنٹ میں سائن ان کریں۔"
   },
@@ -3748,12 +3859,26 @@
       "startNow": "بغیر جائزے کے شروع کریں",
       "startNowHint": "بغیر جائزے کے شروع کرنے کے لیے دیر تک دبائیں",
       "titleLabel": "کام کا عنوان",
+      "renameTitle": "ٹاسک کا نام بدلیں",
       "notes": "نوٹس",
-      "notesPlaceholder": "Markdown میں نوٹس شامل کریں",
+      "addNotes": "نوٹس شامل کریں",
+      "notesPrompt": "سیاق، تقاضے یا قبولیت کے معیار شامل کریں.",
+      "markdownSupported": "Markdown سپورٹڈ",
       "sessions": "منسلک سیشن",
       "noSessions": "ابھی تک کوئی سیشن نہیں",
+      "untitledLinkedSession": "منسلک سیشن",
+      "sessionNeedsInput": "سیشن کو ان پٹ درکار ہے",
+      "sessionRunning": "سیشن چل رہا ہے",
+      "sessionFinished": "سیشن مکمل ہو گیا",
+      "sessionPullRequest": "سیشن PR",
+      "sessionPullRequestNumber": "سیشن PR #{{number}}",
+      "openSessionHint": "سیشن کھولتا ہے.",
+      "unlinkSessionAction": "سیشن کا لنک ہٹائیں",
+      "unlinkConfirmTitle": "{{title}} کا لنک ہٹائیں؟",
+      "unlinkConfirmMessage": "سیشن خود حذف نہیں ہوتا۔ صرف اس کا اس ٹو-ڈو سے لنک ہٹایا جاتا ہے.",
+      "startNewSession": "نیا سیشن شروع کریں",
+      "startNewSessionHint": "نیا سیشن شروع کرنے کے لیے دیر تک دبائیں.",
       "linkSession": "سیشن لنک کریں",
-      "unlinkSession": "{{title}} کا لنک ہٹائیں",
       "linkFailed": "سیشن کو کام سے لنک نہیں کیا جا سکا"
     },
     "linkSession": {
@@ -3771,5 +3896,69 @@
       "title": "فہرست میں محفوظ کریں",
       "saved": "{{list}} میں محفوظ ہو گیا"
     }
+  },
+  "agentBriefing": {
+    "title": "صبح کی بریفنگ",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "کچھ پرانی سرگرمی غائب ہو سکتی ہے۔ ≥ کا مطلب ہے کم از کم اتنا؛ نامعلوم کا مطلب صفر نہیں۔",
+    "available": "دستیاب بریفنگز",
+    "history": "بریفنگ کی تاریخ",
+    "historyHint": "رپورٹس 30 دن تک رکھی جاتی ہیں، بشمول مسترد شدہ رپورٹس۔",
+    "settings": "بریفنگ کی ترتیبات",
+    "empty": "رات بھر کوئی سرگرمی نہیں",
+    "emptyHint": "فعال رات کے بعد آپ کے کلاؤڈ اور CLI کوڈنگ سیشن یہاں نظر آئیں گے۔",
+    "loadError": "بریفنگز لوڈ نہیں ہو سکیں",
+    "sessions": "رات بھر فعال",
+    "pullRequests": "کھولے گئے PRs",
+    "blockers": "نئی رکاوٹیں",
+    "spend": "رات بھر کا خرچ",
+    "view": "بریفنگ پڑھیں",
+    "viewWithPreview": "$t(agentBriefing.view)۔ {{preview}}",
+    "scheduleTimeLabel": "{{label}}، {{time}}",
+    "dismiss": "بریفنگ نظر انداز کریں",
+    "offline": "آف لائن · محفوظ شدہ بریفنگ",
+    "cached": "محفوظ شدہ رپورٹ · ریفریش دستیاب نہیں",
+    "revised": "نظرثانی شدہ · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "AI خلاصہ",
+    "summaryDisabled": "منظم رپورٹ · اس سیاق کے لیے AI بند ہے",
+    "summaryPending": "AI خلاصہ تیار ہو رہا ہے۔ تیار ہونے پر یہاں منسلک ہو جائے گا۔",
+    "summaryFailed": "AI خلاصہ ناکام ہو گیا۔ دوبارہ کوشش پر مزید چارج لگ سکتا ہے۔",
+    "summaryUnavailable": "AI خلاصہ دستیاب نہیں۔ آپ کی منظم رپورٹ اب بھی دستیاب ہے۔",
+    "summaryOutdated": "یہ خلاصہ رپورٹ کی تازہ ترین نظرثانی سے پہلے کا ہے۔",
+    "summaryCharge": "AI چارج {{cost}}",
+    "summaryChargePending": "AI چارج کی تصدیق زیر التوا ہے",
+    "generate": "خلاصہ بنائیں",
+    "retrySummary": "ادا شدہ خلاصہ دوبارہ آزمائیں",
+    "sources": "شواہد اور آرٹیفیکٹس",
+    "timezone": "بریفنگ کا ٹائم زون",
+    "deviceTimezone": "ڈیوائس کا ٹائم زون استعمال کریں",
+    "timezoneHint": "IANA ٹائم زون، مثلاً Europe/Berlin۔ شیڈول کی تبدیلیاں آئندہ راتوں پر لاگو ہوں گی۔",
+    "nightStart": "رات کا آغاز",
+    "morningStart": "رات کا اختتام / صبح کا آغاز",
+    "morningEnd": "صبح کا اختتام",
+    "timeHint": "صبح ختم ہونے پر ہوم کارڈ لائیو اسٹیٹس بحال کر دیتا ہے، آف لائن بھی۔",
+    "invalidSchedule": "درست ٹائم زون اور غیر خالی، غیر متداخل رات اور صبح کے اوقات منتخب کریں۔",
+    "notificationsHint": "پہلی رپورٹ تیار ہونے پر ہر صبح ایک عمومی اطلاع۔ ادا شدہ AI خلاصوں سے آزاد۔",
+    "notificationPermission": "اپنی بریفنگ وصول کرنے کے لیے $t(common.notifications) میں ڈیوائس اطلاعات فعال کریں۔",
+    "aiOptIn": "ادا شدہ AI خلاصے",
+    "aiHint": "صرف اس سیاق کے لیے اختیاری۔ منتخب، ترمیم شدہ اقتباسات اور منظم حقائق آپ کی ایپ کی زبان میں آپ کے ماڈل کو بھیجے جاتے ہیں۔ چارجز اس سیاق کے بیلنس سے کٹتے ہیں۔",
+    "defaultModel": "Kilo کا ڈیفالٹ ماڈل استعمال کریں",
+    "duration": "وقت کی حد (منٹ)",
+    "spendLimit": "خرچ کی حد (USD)",
+    "safeguardHint": "فی خلاصہ محدود حفاظتی حدیں، روزانہ بجٹ نہیں۔ ڈیفالٹ: 10 منٹ اور $2۔ رپورٹ زیادہ سے زیادہ پانچ منٹ میں شائع ہو جاتی ہے جبکہ ان حدود میں تیاری جاری رہتی ہے۔",
+    "invalidSafeguards": "مثبت اور محدود وقت اور خرچ کی حدیں درج کریں۔",
+    "estimate": "تخمینہ {{estimate}} · زیادہ سے زیادہ {{maximum}}",
+    "estimateUnavailable": "ان ترتیبات کے لیے ادائیگی والا خلاصہ دستیاب نہیں ہے۔",
+    "confirmPaid": "{{context}} کے لیے ادا شدہ خلاصے فعال کریں؟",
+    "confirmGeneration": "ادا شدہ خلاصہ بنائیں؟",
+    "paidDisclosure": "تخمینہ {{estimate}}، زیادہ سے زیادہ {{maximum}}، {{minutes}} منٹ کی حد کے ساتھ۔ تیاری ناکام ہونے پر بھی چارجز لاگو ہوں گے۔",
+    "enable": "ادا شدہ خلاصے فعال کریں",
+    "contextSettings": "AI ترتیبات · {{context}}",
+    "allContexts": "ذاتی اور تنظیمی بریفنگز الگ الگ رہتی ہیں۔",
+    "estimatePricingUnavailable": "اس ماڈل کی قیمت دستیاب نہیں ہے۔",
+    "estimateBalanceUnavailable": "ادائیگی والے خلاصے کے لیے بیلنس کافی نہیں ہے۔",
+    "estimateModelNotAllowed": "یہ ماڈل یہاں کی اجازت نہیں رکھتا۔",
+    "estimateSpendLimitTooLow": "اس خلاصے کی اجازت کے لیے خرچ کی حفاظتی حد بڑھائیں۔"
   }
 }

@@ -90,11 +90,17 @@ export function classifyControlPlaneFailure(
   switch (reason) {
     case 'missing_metadata':
       return { stage: 'pre_dispatch', code: 'session_metadata_missing' };
+    case 'runtime_artifact_unauthorized':
+    case 'runtime_artifact_invalid':
+    case 'runtime_cli_probe_failed':
+    case 'runtime_supervisor_missing':
     case 'preparation_timeout':
     case 'attach_exhausted':
       return PRE_DISPATCH;
     // Spec §10 reasons for the new plane (the mapping's one owner).
     case 'workspace_setup_failed':
+      return { stage: 'pre_dispatch', code: 'workspace_setup_failed' };
+    case 'credential_upgrade_required':
       return { stage: 'pre_dispatch', code: 'workspace_setup_failed' };
     case 'billing_blocked':
       return { stage: 'pre_dispatch', code: 'payment_required' };

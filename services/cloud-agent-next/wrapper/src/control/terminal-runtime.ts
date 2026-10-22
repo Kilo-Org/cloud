@@ -14,6 +14,7 @@ import {
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../../src/shared/runtime-environment.js';
 import { isKiloServerUnreachableError } from '../kilo-api.js';
+import { kiloServerHeaders } from '../kilo-server-auth.js';
 import { directoryForSession, forgetAttachedRoot, rootForSession } from './session-directories.js';
 import type { WorktreeKiloRuntime } from './worktree-runtime.js';
 
@@ -154,11 +155,6 @@ export function createControlTerminalRuntime(options: {
   wrapperInstanceId: string;
   getKiloRuntime: (identity: SessionRequestIdentity) => WorktreeKiloRuntime | undefined;
   getRetainedKiloRuntime?: (identity: SessionRequestIdentity) => WorktreeKiloRuntime | undefined;
-  /**
-   * Called for each browser→PTY input frame. The control-plane wrapper uses it
-   * to keep heartbeat `active` true only while a terminal has real input
-   * (spec §6), not merely because a PTY exists.
-   */
   onInput?: (identity: SessionRequestIdentity) => void;
 }): ControlTerminalRuntime {
   const { wrapperInstanceId } = options;
@@ -352,16 +348,20 @@ export function createControlTerminalRuntime(options: {
         );
       }
 
+      const kiloServer = currentKiloRuntime(bridge.terminal).kiloClient.server;
       const localUrl = new URL(
         `/pty/${encodeURIComponent(bridge.terminal.ptyId)}/connect`,
-        currentKiloRuntime(bridge.terminal).kiloClient.serverUrl
+        kiloServer.url
       );
       localUrl.protocol = localUrl.protocol === 'https:' ? 'wss:' : 'ws:';
       localUrl.search = '';
       localUrl.hash = '';
       localUrl.searchParams.set('directory', bridge.terminal.directory);
 
-      const local = new WebSocket(localUrl.toString());
+      const LocalWebSocket = WebSocket as AuthenticatedWebSocketConstructor;
+      const local = new LocalWebSocket(localUrl.toString(), {
+        headers: kiloServerHeaders(kiloServer),
+      });
       local.binaryType = 'arraybuffer';
       bridge.local = local;
       local.onmessage = event => forwardMessage(bridge, bridge.reverse, event.data);

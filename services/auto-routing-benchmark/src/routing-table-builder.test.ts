@@ -2,10 +2,19 @@ import { describe, expect, it } from 'vitest';
 import type {
   BenchmarkDeciderModel,
   BenchmarkModelSummary,
+  ComplexityLabels,
+  RoutingTable,
   TaxonomyRouteKey,
 } from '@kilocode/auto-routing-contracts';
 import { RoutingTableSchema, TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
-import { buildRoutingTable } from './routing-table-builder';
+import {
+  buildCustomRoutingTable,
+  buildEffortByComplexity,
+  buildRoutingTable,
+  computeRegistryRoutingTableVersion,
+  MIN_COMPLEXITY_CASES,
+} from './routing-table-builder';
+import type { OfflineSweep } from './scoreboard/schema';
 
 const DECIDER_MODELS: BenchmarkDeciderModel[] = [
   { id: 'model/cheap', variant: null, reasoningEffort: null },
@@ -48,7 +57,395 @@ function summariesForEveryRoute(
   );
 }
 
+describe('buildEffortByComplexity', () => {
+  const route = 'implementation/code_generation';
+  const routes: RoutingTable['routes'] = {
+    [route]: ['low', 'high'].map(variant => ({
+      model: 'model/shared',
+      variant,
+      accuracy: 1,
+      avgCostUsd: 0.1,
+      meetsThreshold: true,
+    })),
+  };
+  const labels: ComplexityLabels = Object.fromEntries(
+    ['low', 'high'].flatMap(bucket =>
+      Array.from({ length: MIN_COMPLEXITY_CASES }, (_, i) => [`${bucket}-${i}`, bucket])
+    )
+  ) as ComplexityLabels;
+  function pairs(highCases = MIN_COMPLEXITY_CASES): OfflineSweep['pairs'] {
+    return ['low', 'high'].map(variant => ({
+      model: 'model/shared',
+      variant,
+      results: ['low', 'high'].flatMap(bucket =>
+        Array.from({ length: bucket === 'high' ? highCases : MIN_COMPLEXITY_CASES }, (_, i) => ({
+          caseId: `${bucket}-${i}`,
+          rep: 0,
+          routeKey: route,
+          split: 'train' as const,
+          score: 1,
+          costUsd: variant === bucket ? 0.01 : 1,
+          graderCostUsd: 0,
+          latencyMs: 100,
+          error: null,
+        }))
+      ),
+    }));
+  }
+
+  it('ranks variants independently for each measured complexity bucket', () => {
+    expect(buildEffortByComplexity(routes, pairs(), labels, 0.9)).toEqual({
+      [route]: { 'model/shared': { low: 'low', medium: 'low', high: 'high' } },
+    });
+  });
+
+  it.each([
+    { accuracyNoiseBand: undefined, expectedVariant: 'low' },
+    { accuracyNoiseBand: 0.05, expectedVariant: 'low' },
+    { accuracyNoiseBand: 0.01, expectedVariant: 'high' },
+  ])(
+    'uses noise band $accuracyNoiseBand consistently for route and complexity rankings',
+    ({ accuracyNoiseBand, expectedVariant }) => {
+      const minAccuracy = 0.99;
+      const measured = pairs().map(pair => ({
+        ...pair,
+        results: pair.results.map(result => ({
+          ...result,
+          score: pair.variant === 'low' ? 0.97 : 1,
+          costUsd: pair.variant === 'low' ? 0.01 : 1,
+        })),
+      }));
+      const summaries = TAXONOMY_ROUTE_KEYS.flatMap(routeKey =>
+        ['low', 'high'].map(variant => ({
+          ...summary(
+            'model/shared',
+            routeKey,
+            variant === 'low' ? 0.97 : 1,
+            variant === 'low' ? 0.01 : 1
+          ),
+          variant,
+        }))
+      );
+      const params = {
+        generatedAt: '2026-01-01T00:00:00.000Z',
+        minAccuracy,
+        accuracyNoiseBand,
+        switchCostFactor: 3,
+        bestAccuracySwitchThreshold: 0.05,
+        summaries,
+        perCaseResults: measured,
+        complexityLabels: labels,
+      };
+      const platform = buildRoutingTable({
+        ...params,
+        version: 'noise-band',
+        deciderModels: ['low', 'high'].map(variant => ({
+          id: 'model/shared',
+          variant,
+          reasoningEffort: null,
+        })),
+      });
+      const custom = buildCustomRoutingTable({
+        ...params,
+        readyEntries: ['low', 'high'].map(variant => ({
+          entry: { model: 'model/shared', variant },
+          runId: 'noise-band',
+        })),
+        summaries: summaries.map(value => ({ ...value, runId: 'noise-band' })),
+      });
+      for (const table of [platform, custom]) {
+        expect(table?.routes[route]?.[0]?.variant).toBe(expectedVariant);
+        expect(table?.effortByComplexity?.[route]?.['model/shared']?.low).toBe(expectedVariant);
+        expect(table?.effortByComplexity?.[route]?.['model/shared']?.high).toBe(expectedVariant);
+      }
+      expect(
+        buildEffortByComplexity(
+          platform.routes,
+          measured,
+          labels,
+          minAccuracy,
+          null,
+          accuracyNoiseBand
+        )[route]
+      ).toEqual(platform.effortByComplexity?.[route]);
+    }
+  );
+
+  it('uses the route-level variant for sparse and absent buckets', () => {
+    const mapping = buildEffortByComplexity(routes, pairs(MIN_COMPLEXITY_CASES - 1), labels, 0.9);
+    expect(mapping[route]?.['model/shared']).toEqual({ low: 'low', medium: 'low', high: 'low' });
+  });
+
+  it('ignores unlabeled and infrastructure-error cases when deciding bucket coverage', () => {
+    expect(buildEffortByComplexity(routes, pairs(), {}, 0.9)[route]?.['model/shared']?.high).toBe(
+      'low'
+    );
+    const failed = pairs().map(pair => ({
+      ...pair,
+      results: pair.results.map(result =>
+        result.caseId.startsWith('high-')
+          ? { ...result, error: 'OpenRouter returned HTTP 503' }
+          : result
+      ),
+    }));
+    expect(
+      buildEffortByComplexity(routes, failed, labels, 0.9)[route]?.['model/shared']?.high
+    ).toBe('low');
+  });
+
+  it('does not count repetitions as independent cases or train on held-out scores', () => {
+    const repeated = pairs(1).map(pair => ({
+      ...pair,
+      results: pair.results.flatMap(result =>
+        Array.from({ length: MIN_COMPLEXITY_CASES }, (_, rep) => ({ ...result, rep }))
+      ),
+    }));
+    expect(
+      buildEffortByComplexity(routes, repeated, labels, 0.9)[route]?.['model/shared']?.high
+    ).toBe('low');
+    const heldOut = pairs().map(pair => ({
+      ...pair,
+      results: pair.results.map(result => ({ ...result, split: 'heldOut' as const })),
+    }));
+    expect(
+      buildEffortByComplexity(routes, heldOut, labels, 0.9)[route]?.['model/shared']?.high
+    ).toBe('low');
+  });
+
+  it('does not choose pairs missing from the published model candidates', () => {
+    const measured = [
+      ...pairs(),
+      {
+        ...pairs()[0],
+        variant: 'unpublished',
+        results: pairs()[0].results.map(r => ({ ...r, costUsd: 0 })),
+      },
+    ];
+    expect(
+      buildEffortByComplexity(routes, measured, labels, 0.9)[route]?.['model/shared']?.high
+    ).toBe('high');
+  });
+
+  it('preserves null as the selected variant instead of falling back to a named effort', () => {
+    const nullRoutes: RoutingTable['routes'] = {
+      [route]: [
+        {
+          model: 'model/shared',
+          variant: 'high',
+          accuracy: 1,
+          avgCostUsd: 1,
+          meetsThreshold: true,
+        },
+        {
+          model: 'model/shared',
+          variant: null,
+          accuracy: 1,
+          avgCostUsd: 0.01,
+          meetsThreshold: true,
+        },
+      ],
+    };
+    const measured = pairs().map(pair => ({
+      ...pair,
+      variant: pair.variant === 'low' ? null : 'high',
+    }));
+    expect(
+      buildEffortByComplexity(nullRoutes, measured, labels, 0.9)[route]?.['model/shared']?.low
+    ).toBeNull();
+  });
+
+  it('includes complexity choices in registry table identity', () => {
+    const contributors = [{ runId: 'fixture', model: 'model/shared', variant: 'low' }];
+    const knobs = { minAccuracy: 0.9, switchCostFactor: 3, bestAccuracySwitchThreshold: 0.05 };
+    const base = computeRegistryRoutingTableVersion(contributors, knobs);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        effortByComplexity: buildEffortByComplexity(routes, pairs(), labels, 0.9),
+      })
+    ).not.toBe(base);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        effortByComplexity: { [route]: { 'model/shared': { low: null } } },
+      })
+    ).not.toBe(
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        effortByComplexity: { [route]: { 'model/shared': {} } },
+      })
+    );
+  });
+
+  it('attaches learned efforts when building the full routing table', () => {
+    const built = buildRoutingTable({
+      version: 'fixture-complexity',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      minAccuracy: 0.9,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      deciderModels: [
+        { id: 'model/shared', variant: 'low', reasoningEffort: null },
+        { id: 'model/shared', variant: 'high', reasoningEffort: null },
+      ],
+      summaries: TAXONOMY_ROUTE_KEYS.flatMap(routeKey =>
+        ['low', 'high'].map(variant => ({
+          ...summary('model/shared', routeKey, 1, variant === 'low' ? 0.1 : 1),
+          variant,
+        }))
+      ),
+      perCaseResults: pairs(),
+      complexityLabels: labels,
+    });
+    expect(built.effortByComplexity?.[route]?.['model/shared']?.high).toBe('high');
+  });
+});
+describe('production-cost table version', () => {
+  it('isolates router, dataset identity and ranking configuration in the version hash', () => {
+    const contributors = [{ runId: 'run', model: 'model', variant: 'high' }];
+    const knobs = { minAccuracy: 0.9, switchCostFactor: 3, bestAccuracySwitchThreshold: 0.05 };
+    const efficient = computeRegistryRoutingTableVersion(contributors, knobs);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        router: 'efficient',
+        accuracyNoiseBand: 0.05,
+        frontierMinAccuracyDelta: 0,
+      })
+    ).toBe(efficient);
+    for (const changed of [
+      { router: 'frontier' as const },
+      { engineIdentity: 'frontier:v1:dataset' },
+      { accuracyNoiseBand: 0.01 },
+      { frontierMinAccuracyDelta: 0.1 },
+    ]) {
+      expect(computeRegistryRoutingTableVersion(contributors, { ...knobs, ...changed })).not.toBe(
+        efficient
+      );
+    }
+  });
+
+  it('includes first-token measurements in the version independent of summary order', () => {
+    const contributors = [{ runId: 'synthetic-run', model: 'model/cheap', variant: null }];
+    const knobs = { minAccuracy: 0.9, switchCostFactor: 3, bestAccuracySwitchThreshold: 0.05 };
+    const summaries = [
+      { ...summary('model/cheap', TAXONOMY_ROUTE_KEYS[0], 1), p50TtftMs: 100 },
+      { ...summary('model/cheap', TAXONOMY_ROUTE_KEYS[1], 1), p50TtftMs: null },
+    ];
+    const base = computeRegistryRoutingTableVersion(contributors, { ...knobs, summaries });
+    expect(
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        summaries: [...summaries].reverse(),
+      })
+    ).toBe(base);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        summaries: summaries.map(s => ({ ...s, p50TtftMs: 200 })),
+      })
+    ).not.toBe(base);
+  });
+  it('republishes when the profile, horizon or model prices change', () => {
+    const contributors = [{ runId: 'synthetic-run', model: 'synthetic/model', variant: null }];
+    const knobs = { minAccuracy: 0.9, switchCostFactor: 3, bestAccuracySwitchThreshold: 0.05 };
+    const base = computeRegistryRoutingTableVersion(contributors, knobs);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, { ...knobs, productionTokenProfile: null })
+    ).toBe(base);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        productionTokenProfile: { uncachedInputTokens: 20, cachedInputTokens: 80 },
+      })
+    ).not.toBe(base);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, { ...knobs, switchHorizonTurns: 4 })
+    ).not.toBe(base);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, { ...knobs, lowConfidenceThreshold: 0.8 })
+    ).not.toBe(base);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, { ...knobs, lowConfidenceThreshold: null })
+    ).toBe(base);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        prices: new Map([
+          [
+            'synthetic/model',
+            { promptUsdPerToken: 0.002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: null },
+          ],
+        ]),
+      })
+    ).not.toBe(base);
+  });
+});
+
 describe('buildRoutingTable', () => {
+  it('publishes prompt-cost ranking and the production switching settings', () => {
+    const params = {
+      version: 'synthetic-production-cost',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      minAccuracy: 0.9,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      deciderModels: DECIDER_MODELS,
+      summaries: TAXONOMY_ROUTE_KEYS.flatMap(routeKey => [
+        summary('model/cheap', routeKey, 1, 0.01),
+        summary('model/value', routeKey, 1, 0.02),
+      ]),
+      prices: new Map([
+        [
+          'model/cheap',
+          { promptUsdPerToken: 0.002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: 0.001 },
+        ],
+        [
+          'model/value',
+          { promptUsdPerToken: 0.0002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: 0.0001 },
+        ],
+      ]),
+    };
+    const route = 'implementation/code_generation';
+    expect(buildRoutingTable(params).routes[route]?.[0]?.model).toBe('model/cheap');
+    const productionTokenProfile = { uncachedInputTokens: 20, cachedInputTokens: 80 };
+    const table = buildRoutingTable({
+      ...params,
+      productionTokenProfile,
+      switchHorizonTurns: 4,
+      lowConfidenceThreshold: 0.8,
+    });
+    expect(table.routes[route]?.[0]?.model).toBe('model/value');
+    expect(table.routes[route]?.[0]?.estimatedRequestCostUsd).toBeCloseTo(0.032);
+    expect(table.routes[route]?.[0]?.pricing).toEqual(params.prices.get('model/value'));
+    expect(table.productionTokenProfile).toEqual(productionTokenProfile);
+    expect(table.switchHorizonTurns).toBe(4);
+    expect(table.lowConfidenceThreshold).toBe(0.8);
+    expect(table.routes[route]?.[0]?.cases).toBe(10);
+  });
+
+  it('ranks equally accurate candidates by their measured sample size', () => {
+    const routeKey = 'implementation/code_generation';
+    const table = buildRoutingTable({
+      version: 'synthetic-wilson',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      minAccuracy: 0.95,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      deciderModels: DECIDER_MODELS,
+      summaries: summariesForEveryRoute({
+        [routeKey]: [
+          { ...summary('model/cheap', routeKey, 1), cases: 10 },
+          { ...summary('model/value', routeKey, 1), cases: 100 },
+        ],
+      }),
+    });
+    expect(table.routes[routeKey]?.map(c => [c.model, c.cases])).toEqual([
+      ['model/value', 100],
+      ['model/cheap', 10],
+    ]);
+  });
+
   it('ranks candidates by lowest cost per accuracy for each taxonomy route', () => {
     const table = buildRoutingTable({
       version: 'test-run-1',

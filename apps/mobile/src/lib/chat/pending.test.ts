@@ -22,6 +22,7 @@ const row = (sessionId: string, title: string) => ({
   sessionId,
   model: 'kilo/one',
   title,
+  preview: '',
   updatedAt: 1,
 });
 

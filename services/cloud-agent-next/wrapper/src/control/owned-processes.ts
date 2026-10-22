@@ -94,7 +94,6 @@ type OwnedChild = {
   process: ChildProcessWithoutNullStreams;
   identity?: string;
   exited: boolean;
-  gate?: Writable;
 };
 type Cgroup = {
   directory: string;
@@ -265,13 +264,6 @@ function releaseChildStreams(child: OwnedChild): void {
   for (const stream of [child.process.stdin, child.process.stdout, child.process.stderr]) {
     try {
       stream.destroy();
-    } catch {
-      console.warn('Owned process child stream release failed; continuing stream cleanup');
-    }
-  }
-  if (child.gate) {
-    try {
-      child.gate.destroy();
     } catch {
       console.warn('Owned process child stream release failed; continuing stream cleanup');
     }
@@ -700,11 +692,23 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
       ): Promise<number> => {
         let moved = 0;
         for (const pid of pids) {
-          if (members.has(pid)) continue;
           deadline.check();
+          const entry = table.get(pid);
+          if (!entry || !(await pidStillMatches('/proc', entry))) continue;
+          // Children inherit Kilo's OOM immunity. Remove it even when cgroup migration
+          // fails, and retry for existing members after an earlier adjustment failure.
+          // Otherwise no tool can be killed to release the shared parent's memory.
+          if (!writeOomScoreAdj(pid, oomScoreAdj)) {
+            workloadReporter?.emit(scopeId, {
+              phase: 'failed',
+              workloadPhase: 'protection',
+              workloadFailure: 'oom_score_write_failed',
+            });
+          }
+          if (members.has(pid)) continue;
           const outcome = await migrateWorkloadProcess({
             pid,
-            entry: table.get(pid),
+            entry,
             procRoot: '/proc',
             write: value => writeSync(procs, String(value), 0, 'utf8'),
             confirmMembership: async () => {
@@ -716,12 +720,12 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
           });
           if (outcome === 'migrated') {
             moved += 1;
-            if (writeOomScoreAdj(pid, oomScoreAdj)) continue;
+            continue;
           }
           workloadReporter?.emit(scopeId, {
             phase: 'failed',
             workloadPhase: 'migration',
-            workloadFailure: outcome === 'migrated' ? 'write_failed' : outcome,
+            workloadFailure: outcome,
           });
         }
         return moved;
@@ -942,11 +946,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
 
       const spawnChild = (gatedChild: boolean): OwnedChild => {
         const child = gatedChild
-          ? spawnGated(command, args, {
-              ...options,
-              detached: true,
-              stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
-            })
+          ? spawnGated(command, args, { ...options, detached: true, stdio: 'pipe' })
           : spawn(command, args, { ...options, detached: true, stdio: 'pipe' });
         const record: OwnedChild = { process: child, exited: false };
         children.add(record);
@@ -977,8 +977,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         startSweep();
         return record.process;
       }
-      const gate = record.process.stdio[3];
-      if (gate instanceof Writable) record.gate = gate;
+      const gate = record.process.stdin;
       try {
         const pid = record.process.pid;
         if (

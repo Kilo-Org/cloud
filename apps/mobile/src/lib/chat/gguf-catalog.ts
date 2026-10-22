@@ -30,12 +30,12 @@ export const GGUF_CATALOG: readonly CatalogModel[] = [
     license: 'Apache 2.0',
   },
   {
-    fileId: 'llama-3.2-1b-instruct-q4_k_m',
-    name: 'Llama 3.2 1B Instruct (Q4_K_M)',
-    url: 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/067b946cf014b7c697f3654f621d577a3e3afd1c/Llama-3.2-1B-Instruct-Q4_K_M.gguf',
-    sizeBytes: 807_694_464,
-    sha256: '6f85a640a97cf2bf5b8e764087b1e83da0fdb51d7c9fab7d0fece9385611df83',
-    license: 'Llama 3.2 Community License',
+    fileId: 'qwen3-0.6b-q8_0',
+    name: 'Qwen3 0.6B (Q8_0)',
+    url: 'https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/23749fefcc72300e3a2ad315e1317431b06b590a/Qwen3-0.6B-Q8_0.gguf',
+    sizeBytes: 639_446_688,
+    sha256: '9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031',
+    license: 'Apache 2.0',
   },
   {
     fileId: 'qwen2.5-1.5b-instruct-q4_k_m',

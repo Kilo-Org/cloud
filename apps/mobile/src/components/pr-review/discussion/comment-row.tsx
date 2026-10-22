@@ -47,7 +47,8 @@ import {
   type ReviewReactionContent,
   selectCommentAuthorName,
 } from '@/lib/pr-review/discussion/review-discussion-types';
-import { parseTimestamp, timeAgo } from '@/lib/utils';
+import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { Pressable, View } from 'react-native';
 
 type CommentRowProps = {
@@ -221,8 +222,9 @@ export function CommentRow({
             // The author row holds the whole frame (no negative margin: RN
             // stops delivering touches outside the parent, so a shrunk layout
             // box would leave part of the target dead). The visible circle
-            // stays compact at 28pt.
-            className="h-11 w-11 items-center justify-center rounded-full active:bg-muted"
+            // stays compact at 28pt. The 48dp box alone meets Android's
+            // minimum; the slop only extends the reach.
+            className={cn(ICON_TARGET_BOX_CLASS, 'rounded-full active:bg-muted')}
           >
             <View className="h-[28px] w-[28px] items-center justify-center">
               <MoreHorizontal size={16} color={colors.mutedForeground} />

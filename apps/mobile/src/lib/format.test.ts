@@ -65,6 +65,14 @@ describe('localized format helpers', () => {
     expect(parseLocalizedNumber('٢5', 'ar')).toBe(25);
   });
 
+  it('folds digits whose sets are adjacent in the code chart', () => {
+    // Mathematical double-struck digits (U+1D7D8) follow the bold set with no
+    // gap, and the Myanmar Pao set (U+116D0) touches the Eastern Pwo Karen one.
+    expect(parseLocalizedNumber('𝟚𝟝', 'en')).toBe(25);
+    expect(parseLocalizedNumber('𝟘', 'en')).toBe(0);
+    expect(parseLocalizedNumber('𑛚𑛟', 'en')).toBe(5);
+  });
+
   it('still rejects a value with a non-digit left in it', () => {
     expect(parseLocalizedNumber('٢٥x', 'ar')).toBeNull();
     expect(parseLocalizedNumber('٢٥٫٥٫٥', 'ar-EG')).toBeNull();

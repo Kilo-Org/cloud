@@ -128,8 +128,9 @@ const DECIMAL_DIGIT = /\p{Nd}/u;
  * Fold every Unicode decimal digit to ASCII. A keypad's digits follow its own
  * script, not the active app language: an Arabic keyboard types `٢٥` while the
  * `ar` locale formats with Latin digits. Unicode encodes each decimal digit set
- * as ten consecutive code points in ascending order, so a digit's value is its
- * offset from the start of its run.
+ * as ten consecutive code points in ascending order, but adjacent sets share no
+ * separator (the mathematical alphabets form one 50-code-point run), so a
+ * digit's value is its offset from the start of its run modulo ten.
  */
 function foldDecimalDigits(value: string): string {
   return value.replaceAll(/\p{Nd}/gu, digit => {
@@ -138,7 +139,7 @@ function foldDecimalDigits(value: string): string {
     while (DECIMAL_DIGIT.test(String.fromCodePoint(start - 1))) {
       start -= 1;
     }
-    return String(codePoint - start);
+    return String((codePoint - start) % 10);
   });
 }
 

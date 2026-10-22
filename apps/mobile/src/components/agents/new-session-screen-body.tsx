@@ -79,6 +79,7 @@ import {
   resolveContinueStartDisabled,
   resolveNewSessionStartBlockedReason,
   resolveNewSessionStartDisabled,
+  resolveRemoteStartMissingContent,
 } from '@/lib/new-session-submit';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { getRepoBindingsPath } from '@/lib/profile-agent-navigation';
@@ -981,7 +982,15 @@ export function NewSessionScreenBody() {
       if (runOnInstance === null) {
         return true;
       }
+      // An empty composer hands the spawn nothing: `buildComposerSharePayload`
+      // returns null, the spawn carries no prompt and no file, and Start would
+      // stay busy until the SDK timeout with nothing to show for it. A file
+      // alone is content (the destination keeps it for the user to send).
       return (
+        resolveRemoteStartMissingContent({
+          hasPrompt,
+          hasAttachments: attachments.attachments.length > 0,
+        }) ||
         remoteSpawn.isSpawningRemote ||
         isSubmitting ||
         attachments.hasFailedAttachments ||
@@ -1021,6 +1030,8 @@ export function NewSessionScreenBody() {
           isLoadingRepositories,
           isRemoteTargetSelected,
           selectedRepo,
+          hasAttachments: attachments.attachments.length > 0,
+          selectedRepositoryResolved: selectedRepository !== null,
           gate: {
             isCreating,
             isSubmitting,
@@ -1040,6 +1051,8 @@ export function NewSessionScreenBody() {
           isLoadingRepositories,
           isRemoteTargetSelected,
           selectedRepo,
+          hasAttachments: attachments.attachments.length > 0,
+          selectedRepositoryResolved: selectedRepository !== null,
           gate: {
             attachmentsHasFailed: attachments.hasFailedAttachments,
             attachmentsIsUploading: attachments.isUploading,
@@ -1064,6 +1077,10 @@ export function NewSessionScreenBody() {
     startBlockedReason = t('agentChat.newSession.refreshRepositories');
   } else if (startBlockedReasonKey === 'select-repository') {
     startBlockedReason = t('agentChat.newSession.selectRepositoryToStart');
+  } else if (startBlockedReasonKey === 'enter-prompt') {
+    startBlockedReason = t('agentChat.newSession.enterPromptToStart');
+  } else if (startBlockedReasonKey === 'enter-prompt-or-file') {
+    startBlockedReason = t('agentChat.newSession.enterPromptOrFileToStart');
   }
 
   const handleStartSession = useCallback(() => {

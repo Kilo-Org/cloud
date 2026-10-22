@@ -25,6 +25,7 @@
     "error": "eroare: {{error}}",
     "back": "Înapoi",
     "somethingWentWrong": "A apărut o eroare.",
+    "actionNotRecorded": "Nu am putut înregistra această acțiune. Încearcă din nou mai târziu.",
     "couldNotOpen": "Nu s-a putut deschide {{label}}.",
     "link": "legătură",
     "takingLonger": "Operația durează mai mult decât era de așteptat. Poți închide acest ecran și verifica din nou mai târziu.",
@@ -601,6 +602,8 @@
     "installKiloGitHubApp": "Instalează aplicația Kilo pentru GitHub",
     "checkConnection": "Verifică conexiunea",
     "couldNotLoadPullRequest": "Nu s-a putut încărca PR-ul.",
+    "reviewServiceUnavailable": "Serviciul nu este disponibil",
+    "reviewServiceUnavailableDescription": "Serviciul este temporar indisponibil. Încearcă din nou în scurt timp.",
     "description": "Descriere",
     "noDescriptionProvided": "Nu există nicio descriere.",
     "review": "Revizuire",
@@ -777,6 +780,7 @@
       "truncationBanner_few": "Se afișează primele {{limit}} din {{total}} fișiere modificate, din cauza limitei API-ului GitHub."
     },
     "linkPasteClipboardEmpty": "Clipboardul este gol.",
+    "linkPasteDenied": "Accesul pentru lipire a fost refuzat. Permite lipirea și încearcă din nou.",
     "linkPasteNotAPullRequest": "Aceasta nu este o legătură către un PR sau un merge request",
     "announce": {
       "commentPosted": "Comentariu publicat",
@@ -800,7 +804,6 @@
       "mergeResultDefaultError": "GitHub nu a finalizat îmbinarea.",
       "mergeResultNotCompleted": "{{term}} nu a fost îmbinat. Verifică starea lui și încearcă din nou.",
       "ambiguous": "Nu s-a putut confirma rezultatul — verifică PR-ul înainte de a încerca din nou.",
-      "persistenceFailed": "Nu am putut înregistra această acțiune. Încearcă din nou mai târziu.",
       "forbidden": "Accesul este interzis."
     },
     "capabilities": {
@@ -1475,8 +1478,9 @@
       "loading": "Se încarcă memoria de revizuire",
       "couldNotLoad": "Nu s-a putut încărca memoria de revizuire.",
       "off": "Memoria de revizuire este dezactivată.",
+      "on": "Memoria de revizuire este activată.",
       "offDescription": "Activeaz-o pentru ca Kilo să învețe din răspunsurile responsabililor de proiect și să propună instrucțiuni pentru REVIEW.md.",
-      "readOnlyDescription": "Doar proprietarii organizației și responsabilii cu facturarea pot activa memoria de revizuire.",
+      "readOnlyDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației pot modifica memoria de revizuire.",
       "enable": "Activează memoria de revizuire",
       "loadingProposals": "Se încarcă propunerile",
       "couldNotLoadProposals": "Nu s-au putut încărca propunerile.",
@@ -1496,7 +1500,10 @@
       "starting": "Se începe revizuirea…",
       "start": "Începe revizuirea"
     },
-    "notConnectedReadOnly": "{{platform}} nu este conectat. Doar proprietarii organizației și responsabilii cu facturarea îl pot conecta.",
+    "notConnectedReadOnly": "{{platform}} nu este conectat. Doar proprietarii și administratorii organizației îl pot conecta.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} nu este conectat. Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să îl conecteze."
+    },
     "webhookSetup": "Configurarea webhook-ului este incompletă.",
     "webhookSetupDescription": "Este posibil ca unele depozite să nu primească revizuiri automate.",
     "autoReviews": "Revizuiri automate",
@@ -1504,7 +1511,7 @@
     "followReviewMd": "Respectă REVIEW.md",
     "followReviewMdSubtitle": "Respectă instrucțiunile din fișierul REVIEW.md al fiecărui depozit",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nu este conectat. Doar proprietarii organizației și responsabilii cu facturarea îl pot conecta.",
+      "notConnectedReadOnly": "Bitbucket nu este conectat. Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
       "setupIncomplete": "Configurarea este incompletă. Finalizeaz-o pe kilo.ai.",
       "setup": "Configurare Bitbucket"
     },
@@ -1767,7 +1774,7 @@
       "couldNotLoad": "Nu s-a putut încărca această problemă.",
       "couldNotCheckPermissions": "Nu s-au putut verifica permisiunile de respingere.",
       "cannotDismissTitle": "Nu se poate respinge această constatare",
-      "cannotDismissDescription": "Doar proprietarii organizației și responsabilii cu facturarea pot respinge constatări.",
+      "cannotDismissDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației pot respinge constatări.",
       "alreadyResolvedDescription": "Această constatare a fost deja rezolvată și nu mai poate fi respinsă."
     },
     "findingDetails": {
@@ -1809,7 +1816,7 @@
       "automationAllOff": "Toate dezactivate",
       "automationCount": "{{displayCount}} din {{total}} activate",
       "notificationsCount": "{{displayCount}} din {{total}} activate",
-      "disabledNoManage": "Agentul de securitate este dezactivat. Doar proprietarii organizației și responsabilii cu facturarea îl pot activa.",
+      "disabledNoManage": "Agentul de securitate este dezactivat. Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot activa.",
       "disabledNoRepo": "Selectează cel puțin un depozit înainte de a activa agentul de securitate.",
       "disabledPrompt": "Activează agentul de securitate pentru a sincroniza alertele Dependabot, a alege depozitele și a configura automatizarea.",
       "repositoriesCount_few": "{{displayCount}} depozite selectate"
@@ -1859,7 +1866,7 @@
       "invalidDayCount": "introdu un număr întreg de zile între {{min}} și {{max}}.",
       "remediationDeadlineA11y": "Termen limită de remediere în zile pentru {{label}}",
       "enterWholeNumber": "Introdu un număr întreg între {{min}} și {{max}}",
-      "permissionNote": "Doar proprietarii organizației și responsabilii cu facturarea pot modifica aceste setări.",
+      "permissionNote": "Doar proprietarii, administratorii și managerii de facturare ai organizației pot modifica aceste setări.",
       "enableTracking": "Activează urmărirea SLA",
       "enableTrackingSubtitle": "Stabilește termene limită de remediere în funcție de gravitatea constatării.",
       "deadlinesHeading": "Termene limită de remediere (zile)"
@@ -1902,6 +1909,9 @@
       "viewA11y": "Vezi raportul de audit"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrator Kilo",
+      "actorMaskedUser": "Utilizator mascat",
+      "actorSystem": "Sistemul Kilo",
       "couldNotLoad": "Nu s-a putut încărca raportul de audit.",
       "events": "Evenimente",
       "generated": "Raport generat la {{generatedAt}}.",
@@ -1912,7 +1922,7 @@
       "summary": "Rezumatul raportului",
       "title": "Raport de audit",
       "unavailable": "Raport de audit indisponibil",
-      "unavailableDescription": "Doar proprietarii organizației și responsabilii cu facturarea pot vedea rapoartele de audit. Cere unui proprietar sau unui responsabil cu facturarea să îți acorde acces.",
+      "unavailableDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației pot vedea rapoartele de audit. Cere unui proprietar, unui administrator sau unui manager de facturare să îți acorde acces.",
       "queryFailed": "Interogarea pentru raport nu s-a finalizat. Încearcă din nou.",
       "eventActions": {
         "findingAnalysisCompleted": "Analiză finalizată",
@@ -1980,7 +1990,12 @@
       "syncMayNotHaveCompleted": "Este posibil ca o sincronizare să nu se fi finalizat. Reîncearcă pentru a-i actualiza starea sau renunță.",
       "syncInProgress": "O sincronizare de securitate este deja în curs. Încearcă din nou.",
       "dismissalInProgress": "Această respingere este deja în curs. Încearcă din nou.",
-      "couldNotReadPendingSyncs": "Nu s-au putut citi sincronizările în așteptare. Încearcă din nou."
+      "couldNotReadPendingSyncs": "Nu s-au putut citi sincronizările în așteptare. Încearcă din nou.",
+      "ambiguous": "Nu s-a putut confirma rezultatul — verifică revizuirea de securitate înainte de a încerca din nou.",
+      "settleFailed": "Acțiunea s-a finalizat, dar nu am putut înregistra rezultatul. Încearcă din nou.",
+      "replayFailed": "Această acțiune nu s-a finalizat. Încearcă din nou.",
+      "actionFailed": "Această acțiune nu a putut fi finalizată. Încearcă din nou.",
+      "actionBlocked": "Această acțiune nu a putut fi finalizată. Problema trebuie rezolvată înainte de a încerca din nou."
     },
     "analysisState": {
       "queued": "Analiză în coadă",
@@ -2262,6 +2277,8 @@
       "commitAndPush": "Fă commit și trimite",
       "startSession": "Începe sesiunea",
       "selectRepositoryToStart": "Selectează un depozit pentru a începe.",
+      "enterPromptToStart": "Adaugă un prompt pentru a începe.",
+      "enterPromptOrFileToStart": "Adaugă un prompt sau un fișier pentru a începe.",
       "connectProviderToStart": "Conectează un furnizor pentru a începe.",
       "promptPlaceholder": "La ce vrei să lucrezi?",
       "couldNotLoadModels": "Nu s-au putut încărca modelele.",
@@ -2811,7 +2828,7 @@
     "thisDevice": "Acest dispozitiv",
     "viewProfile": "Vezi profilul",
     "signOutThisDevice": "Deconectează acest dispozitiv",
-    "signOutThisSession": "Deconectează această sesiune",
+    "signOutSessionLabel": "Deconectează {{device}}, autentificare: {{signedIn}}",
     "sessionSignedOut": "Sesiune deconectată.",
     "signOutThisDeviceTitle": "Deconectezi acest dispozitiv?",
     "signOutThisSessionTitle": "Deconectezi această sesiune?",
@@ -3050,21 +3067,16 @@
     "boundary": {
       "backToProfile": "Înapoi la profil",
       "loadErrorMessage": "Verifică conexiunea și încearcă din nou.",
-
       "chooseAccount": "Selectează un cont",
       "loadErrorTitle": "Nu s-au putut încărca organizațiile tale.",
+      "membershipLostNotice": "Nu mai ai acces la această organizație. S-a comutat la {{target}}.",
       "noOrganization": "Nicio organizație",
-
       "noOrganizationDescription": "Acest cont nu face parte dintr-o organizație. Creează sau alătură-te unei organizații pe site pentru a folosi funcții de organizație precum invitațiile pentru membri și alertele de sold scăzut.",
-
       "openWebOrganizations": "Deschide organizațiile pe site",
-
       "organizationUnavailable": "Organizația nu este disponibilă.",
       "selectDescriptionWithOrganizations": "Aparții unei sau mai multor organizații. Alege contul pe care ar trebui să îl folosească acest ecran.",
-
       "selectOrganization": "Selectează o organizație",
       "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua.",
-
       "unavailableSessionsDescription": "Această organizație nu mai este disponibilă. Sesiunile ei nu pot fi încărcate.",
       "accessDeniedDescription": "Nu ai acces la această organizație."
     },
@@ -3117,7 +3129,11 @@
       "separateEmailsHint": "Separă adresele de e-mail prin virgule.",
       "thresholdLabel": "Prag de alertă (USD)",
       "title": "Alertă de sold scăzut",
-      "emailsError": "Introdu cel puțin o adresă de e-mail validă. Separă adresele prin virgule.",
+      "emailsInvalid": "Una sau mai multe adrese de e-mail nu sunt valide.",
+      "emailsRequired": "Introdu cel puțin o adresă de e-mail.",
+      "saveEmailsError": "Unele adrese de e-mail nu au fost acceptate. Verifică-le și încearcă din nou.",
+      "saveError": "Nu am putut salva alerta de sold scăzut.",
+      "thresholdPlaceholder": "Introdu o sumă",
       "thresholdError": "Introdu o sumă mai mare decât {{min}}."
     },
     "memberLimit": {
@@ -3128,12 +3144,13 @@
       "removeLimit": "Elimină limita",
       "title": "Limită zilnică de utilizare",
       "blankError": "Introdu o sumă sau atinge „Elimină limita” mai jos.",
+      "blankWithoutLimitError": "Introdu o limită zilnică între 0 și {{max}}.",
       "rangeError": "Introdu o sumă între {{min}} și {{max}}."
     },
     "members": {
       "changeRole": "Schimbă rolul",
       "emptyDescriptionCanInvite": "Invită colegi pentru a începe colaborarea în această organizație.",
-      "emptyDescriptionCannotInvite": "Roagă un proprietar sau un manager de facturare să invite colegi.",
+      "emptyDescriptionCannotInvite": "Roagă un proprietar, un administrator sau un manager de facturare să invite colegi.",
       "emptyTitle": "Încă niciun membru",
       "invitedDate": "Invitat la {{date}}",
       "limitPerDay": "{{amount}}/zi",
@@ -3398,7 +3415,9 @@
       "settingsToolsOn": "Activat — instrumentele de setări sunt trimise modelului",
       "settingsToolsOff": "Dezactivat — niciun instrument de setări nu este trimis modelului",
       "serverChecking": "Se verifică acest server…",
-      "serverToolCount": "{{count}} instrumente",
+      "serverToolCount_few": "{{count}} instrumente",
+      "serverToolCount_one": "{{count}} instrument",
+      "serverToolCount_other": "{{count}} instrumente",
       "serverUnreachable": "Nu s-a putut contacta acest server",
       "serverOff": "Acest server este oprit"
     },
@@ -3545,6 +3564,8 @@
       "quantizationsHelp": "Fișierele mai mici folosesc mai puțină memorie și spațiu de stocare. Fișierele mai mari oferă de obicei răspunsuri mai bune.",
       "quantDetail": "Descărcare de {{size}} · aproximativ {{memory}} de memorie",
       "downloadQuant": "Descarcă {{quant}}",
+      "downloadModelA11y": "Descarcă {{name}}",
+      "detailsA11y": "Detalii: {{name}}",
       "loadingModel": "Se încarcă detaliile modelului",
       "couldNotLoadModel": "Acest model nu a putut fi încărcat",
       "noFiles": "Niciun fișier pe care aplicația îl poate rula",
@@ -3596,6 +3617,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Pornește un agent necesită o instrucțiune. Adaugă o instrucțiune și rulează-l din nou.",
+      "repositoryRequired": "Pornește un agent necesită un depozit. Deschide Kilo și alege unul, apoi rulează-l din nou.",
       "repositoryUnknown": "Kilo nu recunoaște {{repository}} ca depozit GitHub sau GitLab. Alege alt depozit în Kilo.",
       "repositoryUnsupported": "{{repository}} este un depozit Bitbucket — Pornește un agent nu îl poate folosi încă. Alege alt depozit în Kilo."
     }
@@ -3633,10 +3655,16 @@
     "emptyDescription": "Creați un profil pentru a reutiliza variabilele de mediu, comenzile de configurare și abilitățile în sesiuni.",
     "loadFailed": "Profilurile nu au putut fi încărcate",
     "counts": {
-      "vars": "{{count}} variabile",
+      "vars_few": "{{count}} variabile",
+      "vars_one": "{{count}} variabilă",
+      "vars_other": "{{count}} variabile",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} abilități",
-      "commands": "{{count}} comenzi",
+      "skills_few": "{{count}} abilități",
+      "skills_one": "{{count}} abilitate",
+      "skills_other": "{{count}} abilități",
+      "commands_few": "{{count}} comenzi",
+      "commands_one": "{{count}} comandă",
+      "commands_other": "{{count}} comenzi",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}a",
       "commandsShort": "{{count}}c"
@@ -3667,7 +3695,6 @@
     "keyTooLong": "Cheia trebuie să aibă 256 de caractere sau mai puțin",
     "keyDuplicate": "Această cheie există deja în profil",
     "valueLabel": "Valoare",
-    "secretLabel": "Secret",
     "secrets": {
       "markSecret": "Marcați ca secret",
       "masked": "Valoare ascunsă",
@@ -3711,7 +3738,7 @@
       "environment": "Mediu (JSON)",
       "headers": "Anteturi (JSON)",
       "timeout": "Pauză",
-      "secretCount": "Numărarea secretă",
+      "secretCount": "Numărarea secretă: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3754,6 +3781,9 @@
       "visibilityPrimary": "Primar — afișat în selector",
       "visibilitySubagent": "Subagent - apelabil numai de la alții",
       "visibilityAll": "Toate — ambele",
+      "modePrimary": "Doar primar",
+      "modeSubagent": "Doar subagent",
+      "modeAll": "Toate modurile",
       "saveFailed": "Agentul nu a putut fi salvat",
       "deleteFailed": "Agentul nu a putut fi șters",
       "nameRequired": "Introduceți un nume de agent",
@@ -3814,6 +3844,8 @@
     "empty": "Pachetele de credite nu sunt disponibile momentan.",
     "noMatchingProducts": "App Store nu a returnat pachete de credite corespunzătoare.",
     "noMatchingProductsPlay": "Google Play nu a returnat pachete de credite corespunzătoare.",
+    "storeTimedOut": "App Store nu a răspuns la timp. Încearcă din nou.",
+    "storeTimedOutPlay": "Google Play nu a răspuns la timp. Încearcă din nou.",
     "purchaseOwnedByAnotherAccount": "Creditele asociate acestui Apple Account aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi.",
     "purchaseOwnedByAnotherAccountPlay": "Creditele de pe acest cont Google Play aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi."
   },

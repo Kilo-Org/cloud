@@ -204,12 +204,10 @@ export const organizationsRouter = createTRPCRouter({
       childrenByParentId.set(child.parentOrganizationId, children);
     }
 
-    return directOrganizations.map(
-      (organization): UserOrganizationWithInheritedChildren => ({
-        ...organization,
-        inheritedChildren: childrenByParentId.get(organization.organizationId) ?? [],
-      })
-    );
+    return directOrganizations.map((organization): UserOrganizationWithInheritedChildren => ({
+      ...organization,
+      inheritedChildren: childrenByParentId.get(organization.organizationId) ?? [],
+    }));
   }),
 
   create: baseProcedure.input(OrganizationCreateRequestSchema).mutation(async opts => {

@@ -168,8 +168,9 @@ async function createCloudAgentControlToken(user: User, headersList?: Headers): 
  * - New message format (Message + Part[])
  * - New modes ('plan' | 'build')
  *
- * All mutations return immediately with execution info; streaming is handled
- * separately via WebSocket connection.
+ * Mutations return immediately. `initiateFromPreparedSession` and
+ * `sendMessage` include execution info; streaming is handled separately via
+ * the WebSocket connection.
  */
 export const cloudAgentNextRouter = createTRPCRouter({
   getSandboxSelectionOptions: baseProcedure
@@ -210,7 +211,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
 
       const { gitlabProject, githubRepo, publicRepoUrl, attachments, images, ...restInput } = input;
 
-      // Determine git source: GitLab uses gitUrl, GitHub uses githubRepo.
       // Tokens are resolved inside cloud-agent-next via GIT_TOKEN_SERVICE.
       // Profile resolution (repo binding + default + explicit override) also
       // happens in cloud-agent-next; we just forward profileId and any inline
@@ -711,15 +711,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       const client = createCloudAgentNextClient(authToken);
       return await client.getPendingInteractions(input.cloudAgentSessionId);
-    }),
-
-  getComputeBillingStatus: baseProcedure
-    .input(baseGetSessionNextSchema)
-    .query(async ({ ctx, input }) => {
-      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
-      return await createCloudAgentNextClient(
-        await createCloudAgentControlToken(ctx.user, ctx.headersList)
-      ).getComputeBillingStatus(input.cloudAgentSessionId);
     }),
 
   checkEligibility: baseProcedure.query(async ({ ctx }) => {

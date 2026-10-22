@@ -78,8 +78,12 @@ jobs:
           fetch-depth: 0
 
       # The job always reports (required check); only the catalog's own paths
-      # justify the expensive dump. Keep the patterns in sync with the merge
-      # job's detection step and with scripts/kilo-mcp-catalog.test.mjs.
+      # justify the expensive dump. The pattern must cover two kinds of input:
+      # the artifacts themselves, and every workspace the router sources read
+      # schemas from — a schema-only change there changes catalog.json without
+      # touching apps/web. scripts/kilo-mcp-catalog.test.mjs derives that second
+      # set from the routers' imports and fails when a workspace is missing, and
+      # also asserts this pattern equals the merge job's.
       - name: Detect catalog-relevant changes
         id: catalog_changes
         run: |
@@ -93,7 +97,7 @@ jobs:
             exit 0
           fi
           if git diff --name-only "$base" HEAD \
-            | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
+            | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^services/cloud-agent-next/src/shared/|^packages/(app-shared|cloud-agent-profile|cloud-agent-sdk|kiloclaw-instance-tiers|kiloclaw-secret-catalog|organization-entitlement|session-ingest-contracts)/src/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
             echo "catalog=true" >> "$GITHUB_OUTPUT"
           else
             echo "catalog=false" >> "$GITHUB_OUTPUT"
@@ -123,9 +127,15 @@ jobs:
         if: steps.catalog_changes.outputs.catalog == 'true'
         run: node --test scripts/kilo-mcp-catalog.test.mjs
 
+      # `cloud-agent-next` is not in web's dependency closure, but
+      # `apps/web/src/routers/cloud-agent-next-schemas.ts` imports schemas from
+      # it by relative path. Without that project installed, its bare `zod`
+      # import falls back to pnpm's hoisted copy, which can be a different
+      # version from the one the tests use, and the dump then rewrites the
+      # catalog with that version's JSON Schema output.
       - name: Install web dependencies
         if: steps.catalog_changes.outputs.catalog == 'true'
-        run: pnpm install --frozen-lockfile --filter web...
+        run: pnpm install --frozen-lockfile --filter web... --filter cloud-agent-next
 
       # Same dummies the jest suite already tolerates (ci.yml does the same for
       # the production build). The dump itself layers apps/web/.env.test under
@@ -333,8 +343,9 @@ jobs:
           fetch-depth: 0
 
       # The job always reports (required on main); only the catalog's own paths
-      # justify the expensive dump and the Vectorize upsert. Keep the patterns
-      # in sync with scripts/kilo-mcp-catalog.test.mjs.
+      # justify the expensive dump and the Vectorize upsert. The pattern is the
+      # PR job's, byte for byte — scripts/kilo-mcp-catalog.test.mjs asserts the
+      # equality and derives the workspace set the router sources read.
       - name: Detect catalog-relevant changes
         id: merge_changes
         run: |
@@ -349,7 +360,7 @@ jobs:
             exit 0
           fi
           if git diff --name-only "$before" HEAD \
-            | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
+            | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^services/cloud-agent-next/src/shared/|^packages/(app-shared|cloud-agent-profile|cloud-agent-sdk|kiloclaw-instance-tiers|kiloclaw-secret-catalog|organization-entitlement|session-ingest-contracts)/src/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
             echo "catalog=true" >> "$GITHUB_OUTPUT"
           else
             echo "catalog=false" >> "$GITHUB_OUTPUT"
@@ -371,9 +382,12 @@ jobs:
         if: steps.merge_changes.outputs.catalog == 'true'
         run: npm install -g @kilocode/cli
 
+      # Same install scope as the PR job: the dump statically imports schemas
+      # from `cloud-agent-next`, so that project must be installed for its
+      # `zod` to resolve to the workspace version rather than the hoisted one.
       - name: Install web dependencies
         if: steps.merge_changes.outputs.catalog == 'true'
-        run: pnpm install --frozen-lockfile --filter web...
+        run: pnpm install --frozen-lockfile --filter web... --filter cloud-agent-next
 
       - name: Setup dummy env
         if: steps.merge_changes.outputs.catalog == 'true'
@@ -442,8 +456,10 @@ jobs:
 
       # Vectorize upsert (requirement 9). The index name and account id match
       # the production bindings in services/kilo-mcp/wrangler.jsonc; the
-      # account id is not a secret (it is committed there).
-      - name: Upsert Vectorize index
+      # account id is not a secret (it is committed there). The script then
+      # prunes every vector whose procedure path left the catalog, so a removed
+      # or renamed procedure stops competing for kNN slots.
+      - name: Upsert Vectorize index and prune stale vectors
         if: steps.merge_changes.outputs.catalog == 'true'
         run: node services/kilo-mcp/scripts/embed-catalog.ts upsert
         env:

@@ -26,7 +26,7 @@ import {
   type ScopeHandleResolution,
 } from '../../src/control-plane/sandbox/accepted-handles.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import type { AgentSandboxProvider } from '../../src/types.js';
 import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/provider.js';
 import {
@@ -140,7 +140,6 @@ type FakeProvider = { adapter: ProviderAdapter; launchEnvs: Record<string, strin
 function createProvider(): FakeProvider {
   const provider: FakeProvider = { adapter: null as unknown as ProviderAdapter, launchEnvs: [] };
   provider.adapter = {
-    resumable: false,
     persistentWorkspace: false,
     destroysOnStop: true,
     async ensureBillingAdmission() {},

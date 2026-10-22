@@ -89,6 +89,7 @@
     "error": "error: {{error}}",
     "back": "Back",
     "somethingWentWrong": "Something went wrong",
+    "actionNotRecorded": "We could not record this action. Please try again later.",
     "couldNotOpen": "Could not open {{label}}",
     "link": "link",
     "takingLonger": "This is taking longer than expected. You can close this and check again.",
@@ -654,6 +655,8 @@
     "installKiloGitHubApp": "Install the Kilo GitHub App",
     "checkConnection": "Check connection",
     "couldNotLoadPullRequest": "Could not load pull request",
+    "reviewServiceUnavailable": "Review service unavailable",
+    "reviewServiceUnavailableDescription": "The review service is temporarily unavailable. Try again shortly.",
     "description": "Description",
     "noDescriptionProvided": "No description provided.",
     "review": "Review",
@@ -825,6 +828,7 @@
       "emptyLine": "(empty)"
     },
     "linkPasteClipboardEmpty": "Clipboard is empty",
+    "linkPasteDenied": "Paste access was denied. Allow paste and try again.",
     "linkPasteNotAPullRequest": "Not a pull request or merge request link",
     "announce": {
       "commentPosted": "Comment posted",
@@ -848,7 +852,6 @@
       "mergeResultDefaultError": "GitHub did not complete the merge.",
       "mergeResultNotCompleted": "The {{term}} was not merged. Check its state and try again.",
       "ambiguous": "Couldn't confirm — check the PR before retrying.",
-      "persistenceFailed": "We could not record this action. Please try again later.",
       "forbidden": "Forbidden"
     },
     "capabilities": {
@@ -1520,8 +1523,9 @@
       "loading": "Loading review memory",
       "couldNotLoad": "Could not load review memory",
       "off": "Review memory is off",
+      "on": "Review memory is on",
       "offDescription": "Turn it on to let Kilo learn from maintainer replies and propose REVIEW.md guidance.",
-      "readOnlyDescription": "Only organization owners and billing managers can enable review memory.",
+      "readOnlyDescription": "Only organization owners, admins, and billing managers can change review memory.",
       "enable": "Enable review memory",
       "loadingProposals": "Loading proposals",
       "couldNotLoadProposals": "Could not load proposals",
@@ -1541,7 +1545,10 @@
       "starting": "Starting review…",
       "start": "Start review"
     },
-    "notConnectedReadOnly": "{{platform}} isn't connected. Only organization owners and billing managers can connect it.",
+    "notConnectedReadOnly": "{{platform}} isn't connected. Only organization owners and admins can connect it.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} isn't connected. Ask an organization owner, admin, or billing manager to connect it."
+    },
     "webhookSetup": "Webhook setup incomplete",
     "webhookSetupDescription": "Some repositories may not receive automatic reviews.",
     "autoReviews": "Automatic reviews",
@@ -1549,7 +1556,7 @@
     "followReviewMd": "Follow REVIEW.md",
     "followReviewMdSubtitle": "Honor per-repo REVIEW.md instruction files",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners and billing managers can connect it.",
+      "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it.",
       "setupIncomplete": "Setup incomplete — finish configuration on kilo.ai",
       "setup": "Bitbucket setup"
     },
@@ -1809,7 +1816,7 @@
       "couldNotLoad": "Could not load this finding",
       "couldNotCheckPermissions": "Could not check dismiss permissions",
       "cannotDismissTitle": "Can't dismiss this finding",
-      "cannotDismissDescription": "Only organization owners and billing managers can dismiss findings.",
+      "cannotDismissDescription": "Only organization owners, admins, and billing managers can dismiss findings.",
       "alreadyResolvedDescription": "This finding has already been resolved and no longer accepts a dismissal."
     },
     "findingDetails": {
@@ -1851,7 +1858,7 @@
       "automationAllOff": "All off",
       "automationCount": "{{displayCount}} of {{total}} automations enabled",
       "notificationsCount": "{{displayCount}} of {{total}} notifications enabled",
-      "disabledNoManage": "Security Agent is disabled. Only organization owners and billing managers can turn it on.",
+      "disabledNoManage": "Security Agent is disabled. Only organization owners, admins, and billing managers can turn it on.",
       "disabledNoRepo": "Select at least one repository before enabling Security Agent.",
       "disabledPrompt": "Turn on Security Agent to sync Dependabot alerts, choose repositories, and configure automation."
     },
@@ -1900,7 +1907,7 @@
       "invalidDayCount": "{{min}}-{{max}} days, whole numbers only.",
       "remediationDeadlineA11y": "{{label}} remediation deadline in days",
       "enterWholeNumber": "Enter a whole number between {{min}} and {{max}}",
-      "permissionNote": "Only organization owners and billing managers can change these settings.",
+      "permissionNote": "Only organization owners, admins, and billing managers can change these settings.",
       "enableTracking": "Enable SLA tracking",
       "enableTrackingSubtitle": "Set remediation deadlines based on finding severity.",
       "deadlinesHeading": "Remediation deadlines (days)"
@@ -1943,6 +1950,9 @@
       "viewA11y": "View audit report"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo Admin",
+      "actorMaskedUser": "Masked user",
+      "actorSystem": "Kilo system",
       "couldNotLoad": "Could not load the audit report",
       "events": "Events",
       "eventActions": {
@@ -1970,7 +1980,7 @@
       "summary": "Report summary",
       "title": "Audit report",
       "unavailable": "Audit report unavailable",
-      "unavailableDescription": "Only organization owners and billing managers can view audit reports. Ask an owner or billing manager to grant you access.",
+      "unavailableDescription": "Only organization owners, admins, and billing managers can view audit reports. Ask an owner, admin, or billing manager to grant you access.",
       "queryFailed": "Report query did not finish. Try again."
     },
     "notifications": {
@@ -2021,7 +2031,12 @@
       "syncMayNotHaveCompleted": "A sync may not have completed. Retry to reconcile it, or discard.",
       "syncInProgress": "A security sync is already in progress. Please try again.",
       "dismissalInProgress": "This dismissal is already in progress. Please try again.",
-      "couldNotReadPendingSyncs": "Could not read pending syncs. Try again."
+      "couldNotReadPendingSyncs": "Could not read pending syncs. Try again.",
+      "ambiguous": "Couldn't confirm — check the security review before retrying.",
+      "settleFailed": "The action completed, but we could not record the result. Please try again.",
+      "replayFailed": "This action did not complete. Please try again.",
+      "actionFailed": "Could not complete this action. Please try again.",
+      "actionBlocked": "Could not complete this action. The problem needs fixing before you can retry."
     },
     "analysisState": {
       "queued": "Analysis queued",
@@ -2298,6 +2313,8 @@
       "commitAndPush": "Commit and push",
       "startSession": "Start session",
       "selectRepositoryToStart": "Select a repository to start.",
+      "enterPromptToStart": "Add a prompt to start.",
+      "enterPromptOrFileToStart": "Add a prompt or a file to start.",
       "connectProviderToStart": "Connect a provider to start.",
       "promptPlaceholder": "What would you like to work on?",
       "couldNotLoadModels": "Couldn't load models",
@@ -2740,7 +2757,7 @@
       "exitSession": "Exit the session",
       "clearSession": "End this session and start a new one",
       "compactDescription": "compact the current session context",
-      "goalDescription": "Keep working toward a session goal. /goal <objective> or pause, resume, clear. A goal may wait on a scheduled wakeup, a cron task, or a background process: the wait suspends the goal until it fires and the goal resumes itself; /goal pause and /goal clear cancel its armed timers. If the objective is to wait for a deploy, build, or CI job, schedule that wait immediately; do not explore the repository first.",
+      "goalDescription": "Keep working toward a session goal. /goal <objective> or pause, resume, clear",
       "initDescription": "guided AGENTS.md setup",
       "resumeClaudeDescription": "import a Claude Code session transcript",
       "resumeCodexDescription": "import an OpenAI Codex session transcript",
@@ -2836,7 +2853,7 @@
     "thisDevice": "This device",
     "viewProfile": "View profile",
     "signOutThisDevice": "Sign out this device",
-    "signOutThisSession": "Sign out this session",
+    "signOutSessionLabel": "Sign out {{device}}, signed in {{signedIn}}",
     "sessionSignedOut": "Session signed out.",
     "signOutThisDeviceTitle": "Sign out this device?",
     "signOutThisSessionTitle": "Sign out this session?",
@@ -3090,6 +3107,7 @@
       "chooseAccount": "Choose an account",
       "loadErrorMessage": "Check your connection and try again.",
       "loadErrorTitle": "Couldn't load your organizations",
+      "membershipLostNotice": "You no longer have access to this organization. Switched to {{target}}.",
       "noOrganization": "No organization",
       "noOrganizationDescription": "This account is not part of an organization. Create or join one on the web to use organization features like member invites and low-balance alerts.",
       "openWebOrganizations": "Open organizations on web",
@@ -3142,13 +3160,17 @@
       }
     },
     "lowBalanceAlert": {
+      "emailsInvalid": "One or more email addresses are not valid.",
+      "emailsRequired": "Enter at least one email address.",
       "enableA11y": "Enable low balance alert",
       "notifyEmailsLabel": "Notify emails",
       "permissionDenied": "You don't have permission to manage billing alerts.",
+      "saveEmailsError": "Some email addresses were not accepted. Check them and try again.",
+      "saveError": "Couldn't save the low balance alert.",
       "separateEmailsHint": "Separate multiple emails with commas.",
       "thresholdLabel": "Alert below (USD)",
+      "thresholdPlaceholder": "Enter an amount",
       "title": "Low balance alert",
-      "emailsError": "Enter at least one valid email, separated by commas",
       "thresholdError": "Enter an amount greater than {{min}}"
     },
     "memberLimit": {
@@ -3159,12 +3181,13 @@
       "removeLimit": "Remove limit",
       "title": "Daily usage limit",
       "blankError": "Enter an amount, or use Remove limit below",
+      "blankWithoutLimitError": "Enter a daily limit between 0 and {{max}}",
       "rangeError": "Enter an amount between {{min}} and {{max}}"
     },
     "members": {
       "changeRole": "Change role",
       "emptyDescriptionCanInvite": "Invite teammates to start collaborating in this organization.",
-      "emptyDescriptionCannotInvite": "Ask an owner or billing manager to invite teammates.",
+      "emptyDescriptionCannotInvite": "Ask an owner, admin, or billing manager to invite teammates.",
       "emptyTitle": "No members yet",
       "invitedDate": "Invited {{date}}",
       "limitPerDay": "{{amount}}/day",
@@ -3503,6 +3526,8 @@
       "quantizationsHelp": "Smaller files use less memory and storage. Larger files usually give better answers.",
       "quantDetail": "{{size}} download · about {{memory}} of memory",
       "downloadQuant": "Download {{quant}}",
+      "downloadModelA11y": "Download {{name}}",
+      "detailsA11y": "Details: {{name}}",
       "loadingModel": "Loading model details",
       "couldNotLoadModel": "Couldn't load this model",
       "noFiles": "No files this app can run",
@@ -3587,7 +3612,8 @@
       "settingsToolsOn": "On — the settings tools are sent to the model",
       "settingsToolsOff": "Off — no settings tool is sent to the model",
       "serverChecking": "Checking this server…",
-      "serverToolCount": "{{count}} tools",
+      "serverToolCount_one": "{{count}} tool",
+      "serverToolCount_other": "{{count}} tools",
       "serverUnreachable": "Couldn't reach this server",
       "serverOff": "This server is off"
     },
@@ -3613,6 +3639,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Start agent needs a prompt. Add a prompt and run it again.",
+      "repositoryRequired": "Start agent needs a repository. Open Kilo and choose one, then run it again.",
       "repositoryUnknown": "Kilo doesn't recognize {{repository}} as a GitHub or GitLab repository. Choose another repository in Kilo.",
       "repositoryUnsupported": "{{repository}} is a Bitbucket repository — Start agent can't use it yet. Choose another repository in Kilo."
     }
@@ -3650,14 +3677,11 @@
     "emptyDescription": "Create a profile to reuse environment variables, setup commands, and skills across sessions.",
     "loadFailed": "Couldn't load profiles",
     "counts": {
-      "vars": "{{count}} vars",
       "vars_one": "{{count}} var",
       "vars_other": "{{count}} vars",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} skills",
       "skills_one": "{{count}} skill",
       "skills_other": "{{count}} skills",
-      "commands": "{{count}} cmds",
       "commands_one": "{{count}} cmd",
       "commands_other": "{{count}} cmds",
       "varsShort": "{{count}}v",
@@ -3690,7 +3714,6 @@
     "keyTooLong": "Key must be 256 characters or fewer",
     "keyDuplicate": "This key already exists in the profile",
     "valueLabel": "Value",
-    "secretLabel": "Secret",
     "secrets": {
       "markSecret": "Mark as secret",
       "masked": "Hidden value",
@@ -3734,7 +3757,7 @@
       "environment": "Environment (JSON)",
       "headers": "Headers (JSON)",
       "timeout": "Timeout",
-      "secretCount": "Secret count",
+      "secretCount": "Secret count: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3777,6 +3800,9 @@
       "visibilityPrimary": "Primary — shown in the picker",
       "visibilitySubagent": "Subagent — only callable from others",
       "visibilityAll": "All — both",
+      "modePrimary": "Primary only",
+      "modeSubagent": "Subagent only",
+      "modeAll": "All modes",
       "saveFailed": "Couldn't save agent",
       "deleteFailed": "Couldn't delete agent",
       "nameRequired": "Enter an agent name",
@@ -3837,6 +3863,8 @@
     "empty": "Credit packs are unavailable right now.",
     "noMatchingProducts": "No matching credit packs were returned by App Store.",
     "noMatchingProductsPlay": "No matching credit packs were returned by Google Play.",
+    "storeTimedOut": "App Store didn't respond in time. Try again.",
+    "storeTimedOutPlay": "Google Play didn't respond in time. Try again.",
     "purchaseOwnedByAnotherAccount": "The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.",
     "purchaseOwnedByAnotherAccountPlay": "The credits on this Google Play account belong to a different Kilo account. Sign in to that Kilo account to use them."
   },

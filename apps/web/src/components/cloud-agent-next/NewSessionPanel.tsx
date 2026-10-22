@@ -111,6 +111,7 @@ import {
 import {
   getBitbucketRepositoryRefreshFailureMessage,
   refreshSessionRepositories,
+  resolveRepositoryStatus,
   shouldCacheBitbucketRepositoryRefreshResult,
   shouldIncludeBitbucketRepositoryRefresh,
 } from '@/components/cloud-agent-next/repository-refresh';
@@ -230,7 +231,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       ? 'Enter an https git URL'
       : null;
   const hasPublicRepo = trimmedPublicRepoUrl.length > 0 && publicRepoUrlError === null;
-  const [attachmentMessageUuid, setAttachmentMessageUuid] = useState(() => uuidv4());
+  const [attachmentMessageUuid] = useState(() => uuidv4());
   // Repo profile bindings are only keyed by GitHub/GitLab today.
   const profileBindingPlatform: Exclude<RepositoryPlatform, 'bitbucket'> | undefined =
     selectedPlatform === 'bitbucket' ? undefined : selectedPlatform;
@@ -726,14 +727,16 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     async (statusOverride?: typeof bitbucketStatusData) => {
       if (!organizationId) return;
 
-      const bitbucketStatus =
-        statusOverride ??
-        bitbucketStatusData ??
-        (await queryClient.fetchQuery(
-          trpc.organizations.bitbucket.getStatus.queryOptions({
-            organizationId,
-          })
-        ));
+      const bitbucketStatus = await resolveRepositoryStatus({
+        override: statusOverride,
+        cached: bitbucketStatusData,
+        // The tRPC option type widens the result to include undefined; `query`
+        // resolves with the fetched data or rejects.
+        load: () =>
+          queryClient.query(
+            trpc.organizations.bitbucket.getStatus.queryOptions({ organizationId })
+          ) as Promise<NonNullable<typeof bitbucketStatusData>>,
+      });
 
       if (bitbucketStatus.integrationId && bitbucketStatus.canManage) {
         const result = await refreshBitbucketRepositoriesFromProvider({
@@ -746,7 +749,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         return;
       }
 
-      const result = await queryClient.fetchQuery({
+      const result = await queryClient.query({
         ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
           organizationId,
           forceRefresh: true,
@@ -1139,8 +1142,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         attachmentNames: attachmentUpload.attachments.map(a => a.file.name),
       },
     });
-    attachmentUpload.clearAttachments();
-    setAttachmentMessageUuid(uuidv4());
+    // The local session owns these uploads now; clearing would delete them before prepare links them.
     // The lock stays held: the panel unmounts with this navigation, and a second
     // submit before then would create a second session.
     router.push(`${basePath}/chat?sessionId=${kiloSessionId}`);

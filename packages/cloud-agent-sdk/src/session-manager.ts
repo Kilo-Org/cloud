@@ -278,7 +278,6 @@ type FetchedSessionData = {
   variant: string | null;
   repository: string | null;
   isInitiated: boolean;
-  needsLegacyPrepare: boolean;
   isPreparingAsync: boolean;
   /**
    * Whether the session currently has a ready route that can own a terminal.
@@ -1317,7 +1316,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // Pagination state for `loadOlderMessages`. Reset on every switchSession.
   let olderMessagesCursor: string | null = null;
   // Monotonically increasing per-session generation; older-page results
-  // whose `expectedLoadOlderGeneration` doesn't match are dropped.
+  // whose captured `expectedGeneration` no longer matches are dropped.
   let loadOlderGeneration = 0;
   // In-flight older-page load, used to dedupe concurrent calls and to let
   // late callers await the same result.
@@ -2063,7 +2062,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (olderMessagesTerminal) return;
     // `/clear` keeps the local view empty for this visit — do not page history back in.
     if (store.get(transcriptClearedAtom)) return;
-    // No cursor means nothing left to load.
     if (olderMessagesCursor === null) return;
     // Dedupe: if a load is already in flight, every caller awaits the
     // same result instead of starting a parallel backend request.

@@ -54,7 +54,6 @@ import {
   EMPTY_SESSION_LIVE_SUMMARY_STATE,
   foldSessionLiveSummary,
   sessionLiveSummaryChanged,
-  type SessionLiveBatchItem,
   type SessionLiveSummaryState,
 } from './session-live-summary';
 import {
@@ -864,11 +863,7 @@ export class SessionIngestDO extends DurableObject<Env> {
     // Session card summary: fold this batch into the running value and apply
     // the status transition. Only the derived summary leaves the DO.
     const priorLiveSummary = readLiveSummaryState(this.db);
-    const foldedLiveSummary = foldSessionLiveSummary(
-      priorLiveSummary,
-      storedItems as unknown as SessionLiveBatchItem[],
-      statusValue
-    );
+    const foldedLiveSummary = foldSessionLiveSummary(priorLiveSummary, storedItems, statusValue);
     const currentLiveSummaryState =
       statusChangeForLive === undefined
         ? foldedLiveSummary

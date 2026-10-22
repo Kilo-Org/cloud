@@ -30,14 +30,14 @@ import {
 } from '../../persistence/session-metadata.js';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
-import { generateSessionId } from '../../session-plane.js';
+import { generateSessionId } from '../../session-identity.js';
 import { buildControlPlaneSandboxSelection } from '../../session/control-plane-session-input.js';
 import {
   assertSessionOperationIdentity,
   assertRuntimeIsolationAdmission,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
 } from '../../session/session-registration.js';
-import type { SandboxId, TRPCContext } from '../../types.js';
+import type { TRPCContext } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
@@ -429,11 +429,7 @@ function buildRegistrationInput(
 
   return {
     metadata,
-    sandboxSelection: buildControlPlaneSandboxSelection(
-      metadata,
-      ctx.env,
-      workspace.sandboxId as SandboxId
-    ),
+    sandboxSelection: buildControlPlaneSandboxSelection(metadata, ctx.env, workspace.sandboxId),
     ...(runtimeAuthorization ? { runtimeAuthorizationSeal: runtimeAuthorization.seal } : {}),
   };
 }
@@ -849,7 +845,7 @@ async function executeWorktreeCreate(
   const startedAt = Date.now();
   await assertNewDestinationRuntimeIsolation(ctx);
   const progress = operationProgressSchema.parse({
-    cloudAgentSessionId: generateSessionId('control'),
+    cloudAgentSessionId: generateSessionId(),
     kiloSessionId: requestedKiloSessionId ?? generateKiloSessionId(),
     worktreeId: source.worktreeId,
     [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: fingerprint,

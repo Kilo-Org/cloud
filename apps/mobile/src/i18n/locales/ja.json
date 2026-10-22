@@ -25,6 +25,7 @@
     "error": "エラー: {{error}}",
     "back": "戻る",
     "somethingWentWrong": "問題が発生しました。",
+    "actionNotRecorded": "この操作を記録できませんでした。しばらくしてからもう一度お試しください。",
     "couldNotOpen": "{{label}}を開けませんでした。",
     "link": "リンク",
     "takingLonger": "通常より時間がかかっています。この画面を閉じて、後で確認できます。",
@@ -893,7 +894,7 @@
     },
     "autoReviews": "自動レビュー",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketが接続されていません。接続できるのは組織のオーナーと請求管理者のみです。",
+      "notConnectedReadOnly": "Bitbucketが接続されていません。接続できるのは組織のオーナー、管理者、請求管理者のみです。",
       "setupIncomplete": "セットアップが完了していません。kilo.aiで設定を完了してください。",
       "setup": "Bitbucketのセットアップ"
     },
@@ -917,7 +918,10 @@
       "starting": "レビューを開始中…",
       "title": "手動レビュー"
     },
-    "notConnectedReadOnly": "{{platform}}が接続されていません。接続できるのは組織のオーナーと請求管理者のみです。",
+    "notConnectedReadOnly": "{{platform}}が接続されていません。接続できるのは組織のオーナーと管理者のみです。",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}}が接続されていません。組織のオーナー、管理者、または請求管理者に接続を依頼してください。"
+    },
     "platformList": {
       "activity": "アクティビティ",
       "checking": "確認中…",
@@ -994,8 +998,9 @@
       "noProposals": "提案はありません",
       "noProposalsDescription": "Kiloがメンテナーの返信を分析すると、レビューメモリの提案がここに表示されます。",
       "off": "レビューメモリはオフです。",
+      "on": "レビューメモリはオンです。",
       "offDescription": "有効にすると、Kiloがメンテナーの返信から学習し、REVIEW.mdに記載する指針を提案します。",
-      "readOnlyDescription": "レビューメモリを有効にできるのは組織のオーナーと請求管理者のみです。",
+      "readOnlyDescription": "レビューメモリを変更できるのは組織のオーナー、管理者、請求管理者のみです。",
       "title": "レビューメモリ"
     },
     "scopeList": {
@@ -1133,6 +1138,9 @@
       "triageModel": "トリアージモデル"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo管理者",
+      "actorMaskedUser": "マスク済みユーザー",
+      "actorSystem": "Kiloシステム",
       "couldNotLoad": "監査レポートを読み込めませんでした。",
       "events": "イベント",
       "generated": "{{generatedAt}}に生成しました。",
@@ -1144,7 +1152,7 @@
       "summary": "レポートの概要",
       "title": "監査レポート",
       "unavailable": "監査レポートを利用できません",
-      "unavailableDescription": "監査レポートを表示できるのは、組織のオーナーと請求管理者のみです。アクセス権の付与をオーナーまたは請求管理者に依頼してください。",
+      "unavailableDescription": "監査レポートを表示できるのは、組織のオーナー、管理者、請求管理者のみです。アクセス権の付与をオーナー、管理者、または請求管理者に依頼してください。",
       "eventActions": {
         "findingAnalysisCompleted": "分析が完了しました",
         "findingAnalysisFailed": "分析に失敗しました",
@@ -1258,7 +1266,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "この検出結果はすでに解決済みのため、却下できません。",
-      "cannotDismissDescription": "検出結果を却下できるのは、組織のオーナーと請求管理者のみです。",
+      "cannotDismissDescription": "検出結果を却下できるのは、組織のオーナー、管理者、請求管理者のみです。",
       "cannotDismissTitle": "この検出結果は却下できません",
       "commentAccessibility": "却下時のコメント",
       "commentLabel": "コメント（任意）",
@@ -1390,7 +1398,7 @@
       "automationCount": "{{total}}件中{{displayCount}}件が有効",
       "couldNotLoadPermissions": "権限情報を読み込めませんでした。",
       "couldNotLoadSettings": "セキュリティエージェントの設定を読み込めませんでした。",
-      "disabledNoManage": "セキュリティエージェントは無効です。有効にできるのは、組織のオーナーと請求管理者のみです。",
+      "disabledNoManage": "セキュリティエージェントは無効です。有効にできるのは、組織のオーナー、管理者、請求管理者のみです。",
       "disabledNoRepo": "セキュリティエージェントを有効にする前に、リポジトリを1つ以上選択してください。",
       "disabledPrompt": "セキュリティエージェントを有効にして、Dependabotアラートの同期、リポジトリの選択、自動化の設定を行ってください。",
       "notificationsCount": "{{total}}件中{{displayCount}}件が有効",
@@ -1423,7 +1431,7 @@
       "lowDescription": "セキュリティへの影響はごくわずかです。",
       "medium": "中",
       "mediumDescription": "影響が限定的、または特定の条件下でのみ発生します。",
-      "permissionNote": "これらの設定を変更できるのは、組織のオーナーと請求管理者のみです。",
+      "permissionNote": "これらの設定を変更できるのは、組織のオーナー、管理者、請求管理者のみです。",
       "remediationDeadlineA11y": "{{label}}の修復期限（日数）",
       "title": "SLAポリシー"
     },
@@ -1442,7 +1450,12 @@
       "syncMayNotHaveCompleted": "同期が完了していない可能性があります。再試行して状態の整合性を確認するか、破棄してください。",
       "syncInProgress": "セキュリティの同期はすでに実行中です。もう一度お試しください。",
       "dismissalInProgress": "この検出結果の却下はすでに処理中です。もう一度お試しください。",
-      "couldNotReadPendingSyncs": "保留中の同期情報を読み込めませんでした。もう一度お試しください。"
+      "couldNotReadPendingSyncs": "保留中の同期情報を読み込めませんでした。もう一度お試しください。",
+      "ambiguous": "操作の結果を確認できませんでした。再試行する前にセキュリティレビューをご確認ください。",
+      "settleFailed": "操作は完了しましたが、結果を記録できませんでした。もう一度お試しください。",
+      "replayFailed": "この操作は完了しませんでした。もう一度お試しください。",
+      "actionFailed": "この操作を完了できませんでした。もう一度お試しください。",
+      "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。"
     },
     "analysisState": {
       "queued": "分析の順番待ち",
@@ -1719,6 +1732,8 @@
       "commitAndPush": "コミットしてプッシュ",
       "startSession": "セッションを開始",
       "selectRepositoryToStart": "開始するにはリポジトリを選択してください。",
+      "enterPromptToStart": "開始するにはプロンプトを追加してください。",
+      "enterPromptOrFileToStart": "開始するにはプロンプトまたはファイルを追加してください。",
       "connectProviderToStart": "開始するにはプロバイダーを接続してください。",
       "promptPlaceholder": "何に取り組みますか？",
       "couldNotLoadModels": "モデルを読み込めませんでした。",
@@ -1744,29 +1759,29 @@
       "forkFilesUnchangedOnComputer": "このコンピューター上のファイルは変更されません。",
       "pickProfile": "プロフィールを選択してください",
       "noProfile": "プロフィールなし",
-      "manageProfiles": "プロファイルの管理",
+      "manageProfiles": "プロフィールの管理",
       "noProfiles": "まだプロフィールはありません。環境変数、MCP サーバー、スキルを追加するために作成します。",
       "advancedConfig": "高度な構成",
-      "advancedConfigDescription": "プロファイルを選択して保存された構成をロードし、追加の環境変数とセットアップ コマンドを手動で構成します",
+      "advancedConfigDescription": "プロフィールを選択して保存された構成をロードし、追加の環境変数とセットアップ コマンドを手動で構成します",
       "saveAsProfile": "プロフィールとして保存",
-      "saveProfileDescription": "現在の環境変数とセットアップ コマンドを再利用可能なプロファイルとして保存します。",
+      "saveProfileDescription": "現在の環境変数とセットアップ コマンドを再利用可能なプロフィールとして保存します。",
       "profileSummary": "{{vars}} 環境変数 · {{commands}} セットアップ コマンド",
-      "profileSaved": "プロファイル「{{name}}」が保存されました",
+      "profileSaved": "プロフィール「{{name}}」が保存されました",
       "organizationProfiles": "組織プロフィール",
       "personalProfiles": "個人プロフィール",
       "yourProfiles": "あなたのプロフィール",
       "nameTooLong": "プロフィール名が長すぎます",
       "descriptionTooLong": "説明が長すぎます",
       "secretsEncrypted": "シークレットは保存前に暗号化されます。",
-      "profileActive": "プロファイルがアクティブです",
-      "profilesActive": "プロファイルがアクティブです",
+      "profileActive": "プロフィールがアクティブです",
+      "profilesActive": "プロフィールがアクティブです",
       "customConfigActive": "カスタム構成がアクティブです",
       "configNeedsAttention": "設定には注意が必要です",
-      "repoProfile": "リポジトリプロファイル",
-      "selectedProfile": "選択したプロファイル",
+      "repoProfile": "リポジトリプロフィール",
+      "selectedProfile": "選択したプロフィール",
       "manualOverrides": "手動オーバーライド",
       "openSettingsToReview": "設定を開いて確認してください",
-      "profileSelection": "プロファイルの選択"
+      "profileSelection": "プロフィールの選択"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました。",
@@ -2257,7 +2272,7 @@
     "thisDevice": "このデバイス",
     "viewProfile": "プロフィールを表示",
     "signOutThisDevice": "このデバイスからサインアウト",
-    "signOutThisSession": "このセッションからサインアウト",
+    "signOutSessionLabel": "{{device}}からサインアウト、サインイン：{{signedIn}}",
     "sessionSignedOut": "セッションからサインアウトしました。",
     "signOutThisDeviceTitle": "このデバイスからサインアウトしますか？",
     "signOutThisSessionTitle": "このセッションからサインアウトしますか？",
@@ -2540,6 +2555,8 @@
     },
     "connectionExpired": "GitHubとの連携が期限切れになりました。",
     "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした。",
+    "reviewServiceUnavailable": "レビューサービスを利用できません",
+    "reviewServiceUnavailableDescription": "レビューサービスは一時的に利用できません。しばらくしてからもう一度お試しください。",
     "couldNotOpenGitHubAppSettings": "GitHub Appの設定を開けませんでした。",
     "description": "説明",
     "discussion": {
@@ -2950,6 +2967,7 @@
       "truncationBanner_other": "GitHub APIの制限により、変更された{{total}}件のファイルのうち、最初の{{limit}}件を表示しています。"
     },
     "linkPasteClipboardEmpty": "クリップボードが空です。",
+    "linkPasteDenied": "ペーストが許可されませんでした。ペーストを許可して、もう一度お試しください。",
     "linkPasteNotAPullRequest": "プルリクエストまたはマージリクエストのリンクではありません",
     "announce": {
       "commentPosted": "コメントを投稿しました",
@@ -2973,7 +2991,6 @@
       "mergeResultDefaultError": "GitHubでマージが完了しませんでした。",
       "mergeResultNotCompleted": "{{term}}はマージされませんでした。状態を確認して再試行してください。",
       "ambiguous": "操作の結果を確認できませんでした。再試行する前にPRを確認してください。",
-      "persistenceFailed": "この操作を記録できませんでした。しばらくしてからもう一度お試しください。",
       "forbidden": "この操作を行う権限がありません。"
     },
     "capabilities": {
@@ -3002,21 +3019,16 @@
     "boundary": {
       "backToProfile": "プロフィールに戻る",
       "loadErrorMessage": "接続を確認して、もう一度お試しください。",
-
       "chooseAccount": "アカウントを選択",
       "loadErrorTitle": "組織を読み込めませんでした。",
+      "membershipLostNotice": "この組織にアクセスできなくなりました。{{target}}に切り替えました。",
       "noOrganization": "組織なし",
-
       "noOrganizationDescription": "このアカウントは組織に属していません。メンバーの招待や残高不足のアラートなどの組織機能を使用するには、ウェブで組織を作成するか参加してください。",
-
       "openWebOrganizations": "ウェブで組織を開く",
-
       "organizationUnavailable": "組織を利用できません。",
       "selectDescriptionWithOrganizations": "あなたは1つ以上の組織に所属しています。この画面で使用するアカウントを選択してください。",
-
       "selectOrganization": "組織を選択",
       "unavailableDescription": "この組織は利用できなくなりました。続行するには、プロフィールから組織を選択してください。",
-
       "unavailableSessionsDescription": "この組織は利用できなくなりました。セッションを読み込めません。",
       "accessDeniedDescription": "この組織にアクセスする権限がありません。"
     },
@@ -3076,7 +3088,11 @@
       "separateEmailsHint": "複数のメールアドレスはカンマで区切ってください。",
       "thresholdLabel": "通知する残高の下限（USD）",
       "title": "残高アラート",
-      "emailsError": "有効なメールアドレスを1つ以上入力してください。複数ある場合はカンマで区切ってください。",
+      "emailsInvalid": "無効なメールアドレスがあります。",
+      "emailsRequired": "メールアドレスを1つ以上入力してください。",
+      "saveEmailsError": "一部のメールアドレスが受け付けられませんでした。確認して、もう一度お試しください。",
+      "saveError": "残高アラートを保存できませんでした。",
+      "thresholdPlaceholder": "金額を入力",
       "thresholdError": "{{min}}より大きい金額を入力してください。"
     },
     "memberLimit": {
@@ -3087,12 +3103,13 @@
       "removeLimit": "上限を解除",
       "title": "1日の利用上限額",
       "blankError": "金額を入力するか、下の「上限を解除」をタップしてください。",
+      "blankWithoutLimitError": "0から{{max}}までの1日の上限額を入力してください。",
       "rangeError": "{{min}}から{{max}}までの金額を入力してください。"
     },
     "members": {
       "changeRole": "役割を変更",
       "emptyDescriptionCanInvite": "この組織で共同作業を始めるには、チームメイトを招待してください。",
-      "emptyDescriptionCannotInvite": "チームメイトを招待するよう、オーナーまたは請求管理者に依頼してください。",
+      "emptyDescriptionCannotInvite": "チームメイトを招待するよう、オーナー、管理者、または請求管理者に依頼してください。",
       "emptyTitle": "まだメンバーがいません",
       "invitedDate": "{{date}}に招待",
       "limitPerDay": "{{amount}}/日",
@@ -3357,7 +3374,8 @@
       "settingsToolsOn": "オン — 設定ツールがモデルに送信されます",
       "settingsToolsOff": "オフ — 設定ツールはモデルに送信されません",
       "serverChecking": "このサーバーを確認しています…",
-      "serverToolCount": "{{count}} 個のツール",
+      "serverToolCount_one": "{{count}} 個のツール",
+      "serverToolCount_other": "{{count}} 個のツール",
       "serverUnreachable": "このサーバーに接続できませんでした",
       "serverOff": "このサーバーはオフです"
     },
@@ -3504,6 +3522,8 @@
       "quantizationsHelp": "小さいファイルほどメモリとストレージの使用量が少なくなります。大きいファイルのほうが通常は回答の質が高くなります。",
       "quantDetail": "ダウンロード {{size}} · メモリ約 {{memory}}",
       "downloadQuant": "{{quant}} をダウンロード",
+      "downloadModelA11y": "{{name}} をダウンロード",
+      "detailsA11y": "詳細：{{name}}",
       "loadingModel": "モデルの詳細を読み込み中",
       "couldNotLoadModel": "このモデルを読み込めませんでした",
       "noFiles": "このアプリで実行できるファイルがありません",
@@ -3555,6 +3575,7 @@
   "appActions": {
     "start": {
       "promptRequired": "エージェントを開始するにはプロンプトが必要です。プロンプトを追加して、もう一度実行してください。",
+      "repositoryRequired": "エージェントを開始するにはリポジトリが必要です。Kilo を開き、リポジトリを選択して、もう一度実行してください。",
       "repositoryUnknown": "Kilo は {{repository}} を GitHub または GitLab のリポジトリとして認識しません。Kilo で別のリポジトリを選択してください。",
       "repositoryUnsupported": "{{repository}} は Bitbucket のリポジトリです — エージェントを開始はまだこれを使用できません。Kilo で別のリポジトリを選択してください。"
     }
@@ -3589,44 +3610,46 @@
     "entrySubtitle": "セッション間で環境設定を再利用する",
     "newProfile": "新しいプロフィール",
     "emptyTitle": "まだプロフィールがありません",
-    "emptyDescription": "プロファイルを作成して、セッション間で環境変数、セットアップ コマンド、スキルを再利用します。",
-    "loadFailed": "プロファイルを読み込めませんでした",
+    "emptyDescription": "プロフィールを作成して、セッション間で環境変数、セットアップ コマンド、スキルを再利用します。",
+    "loadFailed": "プロフィールを読み込めませんでした",
     "counts": {
-      "vars": "{{count}} 変数",
+      "vars_one": "{{count}} 変数",
+      "vars_other": "{{count}} 変数",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} スキル",
-      "commands": "{{count}} コマンド",
+      "skills_one": "{{count}} スキル",
+      "skills_other": "{{count}} スキル",
+      "commands_one": "{{count}} コマンド",
+      "commands_other": "{{count}} コマンド",
       "varsShort": "{{count}}変",
       "skillsShort": "{{count}}ス",
       "commandsShort": "{{count}}コ"
     },
-    "nameLabel": "プロファイル名",
+    "nameLabel": "プロフィール名",
     "namePlaceholder": "例えばバックエンドのデバッグ",
     "descriptionLabel": "プロフィールの説明",
     "descriptionPlaceholder": "オプションの説明",
     "ownerLabel": "プロフィール所有者",
-    "nameRequired": "プロファイル名を入力してください",
+    "nameRequired": "プロフィール名を入力してください",
     "createAction": "プロフィールの作成",
     "createFailed": "プロフィールを作成できませんでした",
-    "createdToast": "プロファイル「{{name}}」が作成されました",
+    "createdToast": "プロフィール「{{name}}」が作成されました",
     "settingsSectionTitle": "構成",
-    "defaultSectionTitle": "デフォルトのプロファイル",
-    "personalDefaultDescription": "リポジトリに固定プロファイルがない場合に自動ロードされます。",
+    "defaultSectionTitle": "デフォルトのプロフィール",
+    "personalDefaultDescription": "リポジトリに固定プロフィールがない場合に自動ロードされます。",
     "organizationDefaultDescription": "個人のデフォルトがないメンバーの場合は自動ロードされます。",
     "setAsDefault": "デフォルトとして設定",
     "saveFailed": "プロフィールを保存できませんでした",
     "deleteTitle": "プロフィールの削除",
-    "deleteMessage": "これにより、プロファイルとその設定が完全に削除されます。これを元に戻すことはできません。",
+    "deleteMessage": "これにより、プロフィールとその設定が完全に削除されます。これを元に戻すことはできません。",
     "deleteFailed": "プロフィールを削除できませんでした",
-    "deleteBlocked": "このプロファイルは Webhook トリガーによって使用されます。まずそれらのトリガーから削除してください。",
-    "deletedToast": "プロファイル「{{name}}」が削除されました",
+    "deleteBlocked": "このプロフィールは Webhook トリガーによって使用されます。まずそれらのトリガーから削除してください。",
+    "deletedToast": "プロフィール「{{name}}」が削除されました",
     "variablesTitle": "環境変数",
     "addVariable": "変数の追加",
     "keyLabel": "鍵",
     "keyTooLong": "キーは256文字以内で入力してください",
-    "keyDuplicate": "このキーはすでにプロファイルに存在します",
+    "keyDuplicate": "このキーはすでにプロフィールに存在します",
     "valueLabel": "価値",
-    "secretLabel": "秘密",
     "secrets": {
       "markSecret": "シークレットとしてマークする",
       "masked": "隠された値",
@@ -3670,7 +3693,7 @@
       "environment": "環境(JSON)",
       "headers": "ヘッダー (JSON)",
       "timeout": "タイムアウト",
-      "secretCount": "シークレット数",
+      "secretCount": "シークレット数：{{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3690,7 +3713,7 @@
       "updateFailed": "MCP サーバーを更新できませんでした"
     },
     "agents": {
-      "title": "プロファイルエージェント",
+      "title": "プロフィールエージェント",
       "add": "エージェントの追加",
       "empty": "まだエージェントがいません",
       "name": "エージェント名",
@@ -3713,12 +3736,15 @@
       "visibilityPrimary": "プライマリ — ピッカーに表示されます",
       "visibilitySubagent": "サブエージェント — 他からのみ呼び出し可能",
       "visibilityAll": "すべて — 両方",
+      "modePrimary": "プライマリのみ",
+      "modeSubagent": "サブエージェントのみ",
+      "modeAll": "すべてのモード",
       "saveFailed": "エージェントを保存できませんでした",
       "deleteFailed": "エージェントを削除できませんでした",
       "nameRequired": "エージェント名を入力してください",
       "slugRequired": "エージェントスラッグを入力してください",
       "slugInvalid": "スラグは文字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
-      "slugConflict": "そのスラッグは組み込みエージェントまたはこのプロファイルの別のエージェントが既に使用しています",
+      "slugConflict": "そのスラッグは組み込みエージェントまたはこのプロフィールの別のエージェントが既に使用しています",
       "edit": "エージェントの編集"
     },
     "slashCommands": {
@@ -3741,19 +3767,19 @@
       "nameConflict": "その名前は組み込みコマンドによって予約されています"
     },
     "repoBindings": {
-      "title": "リポジトリのデフォルトプロファイル",
+      "title": "リポジトリのデフォルトプロフィール",
       "add": "デフォルトを追加",
       "empty": "デフォルトは設定されていません",
-      "emptyDescription": "リポジトリのセッションを開始するときにプロファイルを自動的に適用するデフォルトを追加します。",
+      "emptyDescription": "リポジトリのセッションを開始するときにプロフィールを自動的に適用するデフォルトを追加します。",
       "repo": "リポジトリを選択してください…",
-      "profile": "プロファイルの選択",
+      "profile": "プロフィールの選択",
       "remove": "バインドを解除する",
       "private": "プライベート",
       "search": "リポジトリを検索…",
-      "addedToast": "「{{repo}}」に設定されたデフォルトのプロファイル",
-      "addFailed": "デフォルトのプロファイルを設定できませんでした",
-      "removedToast": "「{{repo}}」のデフォルトプロファイルが削除されました",
-      "removeFailed": "デフォルトのプロファイルを削除できませんでした",
+      "addedToast": "「{{repo}}」に設定されたデフォルトのプロフィール",
+      "addFailed": "デフォルトのプロフィールを設定できませんでした",
+      "removedToast": "「{{repo}}」のデフォルトプロフィールが削除されました",
+      "removeFailed": "デフォルトのプロフィールを削除できませんでした",
       "pinnedTitle": "リポジトリに固定",
       "pinRepo": "リポジトリを固定する",
       "pinnedEmpty": "どのリポジトリにも固定されていません。",
@@ -3773,6 +3799,8 @@
     "empty": "現在、クレジットパックを利用できません。",
     "noMatchingProducts": "App Storeから一致するクレジットパックが返されませんでした。",
     "noMatchingProductsPlay": "Google Playから一致するクレジットパックが返されませんでした。",
+    "storeTimedOut": "App Storeが時間内に応答しませんでした。再試行",
+    "storeTimedOutPlay": "Google Playが時間内に応答しませんでした。再試行",
     "purchaseOwnedByAnotherAccount": "このApple Accountのクレジットは、別のKiloアカウントに紐付いています。使用するには、そのKiloアカウントにサインインしてください。",
     "purchaseOwnedByAnotherAccountPlay": "このGoogle Playアカウントのクレジットは別のKiloアカウントに属しています。使用するにはそのKiloアカウントにサインインしてください。"
   },

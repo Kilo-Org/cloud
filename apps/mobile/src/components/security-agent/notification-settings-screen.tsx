@@ -19,7 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { formatNumber, parseLocalizedNumber } from '@/lib/format';
+import { formatList, formatNumber, parseLocalizedNumber } from '@/lib/format';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -220,6 +220,17 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                 ? t('securityAgent.notifications.newFindingPersonalTitle')
                 : t('securityAgent.notifications.emailOwners')
             }
+            accessibilityLabel={
+              personal
+                ? undefined
+                : formatList(
+                    [
+                      t('securityAgent.notifications.newFindingSection'),
+                      t('securityAgent.notifications.emailOwners'),
+                    ],
+                    i18n.language
+                  )
+            }
             subtitle={t('securityAgent.notifications.newFindingSubtitle')}
             value={newFindingNotificationsEnabled}
             disabled={!canManage}
@@ -245,6 +256,17 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
               personal
                 ? t('securityAgent.notifications.slaPersonalTitle')
                 : t('securityAgent.notifications.emailOwners')
+            }
+            accessibilityLabel={
+              personal
+                ? undefined
+                : formatList(
+                    [
+                      t('securityAgent.notifications.slaSection'),
+                      t('securityAgent.notifications.emailOwners'),
+                    ],
+                    i18n.language
+                  )
             }
             subtitle={t('securityAgent.notifications.slaSubtitle')}
             value={slaNotificationsEnabled}

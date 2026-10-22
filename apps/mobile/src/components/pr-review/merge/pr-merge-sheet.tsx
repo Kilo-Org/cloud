@@ -418,9 +418,6 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       return 'REBASE';
     })();
     return {
-      owner,
-      repo: repoName,
-      number,
       prNodeId,
       method: autoMethod,
       commitTitle: titleRef.current.trim().length > 0 ? titleRef.current.trim() : undefined,

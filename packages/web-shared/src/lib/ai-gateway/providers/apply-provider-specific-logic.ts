@@ -33,7 +33,6 @@ import {
 import { isStepModel } from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
-import { isAnonymousUserId } from '@kilocode/web-shared/lib/anonymous';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import {
@@ -286,8 +285,9 @@ function isFreePlugin(plugin: unknown) {
 /**
  * OpenRouter bills plugins (web search, PDF parsing with OCR) and server tools
  * (`openrouter:*` and their aliases such as `web_search_20250305`) to the
- * gateway's account, even when the model itself is free. Free and anonymous
- * requests keep only free plugins and tools the client executes itself.
+ * gateway's account, even when the model itself is free. Free requests,
+ * which include every anonymous request, keep only free plugins and tools the
+ * client executes itself.
  */
 export function removePaidServerFeatures(
   provider: Provider,
@@ -407,7 +407,7 @@ export async function applyProviderSpecificLogic(
   isNonTrialEnterprise: boolean
 ) {
   removeModelsFallback(requestedModel, requestToMutate, userId);
-  if (isFreeModelExcludingCustomLlms(requestedModel) || isAnonymousUserId(userId)) {
+  if (isFreeModelExcludingCustomLlms(requestedModel)) {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
   }
   applyTrackingIds(requestToMutate, provider, userId, taskId);

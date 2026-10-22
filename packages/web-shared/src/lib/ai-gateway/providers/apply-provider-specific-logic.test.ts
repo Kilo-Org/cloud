@@ -657,19 +657,6 @@ describe('removePaidServerFeatures', () => {
     warn.mockRestore();
   });
 
-  it('removes paid plugins and server tools from anonymous requests', async () => {
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-
-    const body = await applyTo('vendor/model', 'anon:203.0.113.7', {
-      plugins: [{ id: 'web' }],
-      tools: [{ type: 'web_search_preview' }, functionTool],
-    });
-
-    expect(body.plugins).toEqual([{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }]);
-    expect(body.tools).toEqual([functionTool]);
-    warn.mockRestore();
-  });
-
   it('keeps free plugins, including a disabled one, without logging', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const request = makeRequest('vendor/model:free');

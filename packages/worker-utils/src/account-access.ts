@@ -213,14 +213,16 @@ export function isEmailBlacklistedByDomain(
   const index = blacklistIndex(blacklistedDomains);
   const normalizedEmail = email.toLowerCase();
   const at = normalizedEmail.lastIndexOf('@');
-  // An address without '@' is matched as if it were the host itself, which is
-  // what the previous endsWith checks did.
   const host = at === -1 ? normalizedEmail : normalizedEmail.slice(at + 1);
   const labels = host.split('.');
 
+  // An address without '@' can only match on a dotted suffix, because the
+  // previous implementation needed '@' for an exact-domain match.
+  const firstLabel = at === -1 ? 1 : 0;
+
   // Every label-boundary suffix of the host. '@' cannot appear inside a label,
-  // so this matches exactly the strings the endsWith checks matched.
-  for (let i = 0; i < labels.length; i++) {
+  // so these are exactly the strings the previous endsWith checks matched.
+  for (let i = firstLabel; i < labels.length; i++) {
     if (index.has(labels.slice(i).join('.'))) return true;
   }
   return false;

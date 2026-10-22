@@ -93,6 +93,11 @@ describe('account access rules', () => {
     expect(isEmailBlacklistedByDomain('user@spam.com', ['spam.com'])).toBe(true);
   });
 
+  it('matches a bare host only through a dotted suffix', () => {
+    expect(isEmailBlacklistedByDomain('spam.com', ['spam.com'])).toBe(false);
+    expect(isEmailBlacklistedByDomain('a.spam.com', ['spam.com'])).toBe(true);
+  });
+
   it('reads blocked domains from the admin config and falls back when it is empty', () => {
     const config = (domains: string[]) =>
       JSON.stringify({ domains, updated_at: null, updated_by: null, updated_by_email: null });

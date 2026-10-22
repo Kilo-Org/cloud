@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type RefObject } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useRef, useState, type MouseEvent, type RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -18,20 +17,14 @@ import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
 import { WorktreeChangesButton } from './WorktreeChanges';
 import { buildRepoBrowseUrl, detectGitPlatform } from './utils/git-utils';
-import { useTRPC } from '@/lib/trpc/utils';
 import { SandboxStatusIndicator } from './SandboxStatusIndicator';
-
-export function computeBillingRefetchInterval(
-  sessionActive: boolean,
-  phase: 'idle' | 'active' | 'stopping' | 'settling' | 'unavailable' | undefined
-): number | false {
-  return sessionActive || phase === 'active' || phase === 'stopping' || phase === 'settling'
-    ? 5_000
-    : false;
-}
 
 type ChatHeaderProps = {
   cloudAgentSessionId: string;
+  changesCloudAgentSessionId?: string;
+  worktreeId?: string;
+  /** The worktree, or the session when it has none: chats of one worktree share its sandbox. */
+  sandboxScopeId: string;
   kiloSessionId?: string;
   organizationId?: string;
   repository: string;
@@ -56,6 +49,8 @@ type ChatHeaderProps = {
 
 export function ChatHeader({
   cloudAgentSessionId,
+  changesCloudAgentSessionId = cloudAgentSessionId,
+  worktreeId,
   repository,
   branch,
   gitUrl,
@@ -75,6 +70,7 @@ export function ChatHeader({
   sessionActive,
   sandboxStatusEligible = false,
   canForkToCloud = false,
+  sandboxScopeId,
 }: ChatHeaderProps) {
   const [showActionsDialog, setShowActionsDialog] = useState(false);
   const moreOptionsTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -82,25 +78,6 @@ export function ChatHeader({
     () => (sessionInfoOpen ? getSessionCostBreakdown?.() : undefined),
     [getSessionCostBreakdown, sessionInfoOpen]
   );
-  const trpc = useTRPC();
-  const computeQuery = useQuery({
-    ...(organizationId
-      ? trpc.organizations.cloudAgentNext.getComputeBillingStatus.queryOptions({
-          organizationId,
-          cloudAgentSessionId,
-        })
-      : trpc.cloudAgentNext.getComputeBillingStatus.queryOptions({ cloudAgentSessionId })),
-    enabled: cloudAgentSessionId.startsWith('agent_'),
-    refetchInterval: query => {
-      return computeBillingRefetchInterval(sessionActive, query.state.data?.phase);
-    },
-  });
-  const wasSessionActive = useRef(sessionActive);
-  useEffect(() => {
-    if (sessionActive && !wasSessionActive.current) void computeQuery.refetch();
-    wasSessionActive.current = sessionActive;
-  }, [computeQuery.refetch, sessionActive]);
-  const computeStatus = computeQuery.data;
 
   const browseUrl = buildRepoBrowseUrl(gitUrl);
   const repoUrl =
@@ -125,7 +102,6 @@ export function ChatHeader({
         model={model}
         modelDisplayName={modelDisplayName}
         sessionCostBreakdown={sessionCostBreakdown}
-        computeStatus={computeStatus}
       />
       <SessionActionsDialog
         open={showActionsDialog}
@@ -137,21 +113,25 @@ export function ChatHeader({
         canForkToCloud={canForkToCloud}
       />
       <div className="flex min-w-0 items-center gap-1">
+        {/* First, so its late-loading counts grow into the reserved space on the left
+            instead of moving the other controls. */}
+        {onToggleChanges && (
+          <WorktreeChangesButton
+            key={`worktree-changes:${organizationId ?? 'personal'}:${worktreeId ?? changesCloudAgentSessionId}`}
+            cloudAgentSessionId={changesCloudAgentSessionId}
+            organizationId={organizationId}
+            worktreeId={worktreeId}
+            open={changesOpen}
+            onToggle={onToggleChanges}
+          />
+        )}
         {sandboxStatusEligible && (
           <SandboxStatusIndicator
-            key={`sandbox-status:${organizationId ?? 'personal'}:${cloudAgentSessionId}`}
+            key={`sandbox-status:${organizationId ?? 'personal'}:${sandboxScopeId}`}
+            scopeId={sandboxScopeId}
             cloudAgentSessionId={cloudAgentSessionId}
             organizationId={organizationId}
             sessionActive={sessionActive}
-          />
-        )}
-        {onToggleChanges && (
-          <WorktreeChangesButton
-            key={`worktree-changes:${organizationId ?? 'personal'}:${cloudAgentSessionId}`}
-            cloudAgentSessionId={cloudAgentSessionId}
-            organizationId={organizationId}
-            open={changesOpen}
-            onToggle={onToggleChanges}
           />
         )}
         {onToggleSound && (

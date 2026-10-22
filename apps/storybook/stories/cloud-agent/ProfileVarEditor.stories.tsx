@@ -874,6 +874,7 @@ export const ManyVariables: Story = {
       skills: [],
       agents: [],
       kiloCommands: [],
+      instructions: [],
     };
     return <ProfileVarEditorWrapper profile={manyVarsProfile} initialTab="vars" />;
   },
@@ -900,6 +901,7 @@ export const ManyCommands: Story = {
       skills: [],
       agents: [],
       kiloCommands: [],
+      instructions: [],
     };
     return <ProfileVarEditorWrapper profile={manyCommandsProfile} initialTab="commands" />;
   },

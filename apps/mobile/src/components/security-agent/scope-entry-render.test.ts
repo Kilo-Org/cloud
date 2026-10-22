@@ -9,6 +9,7 @@ import {
 const base: SelectScopeEntryViewInput = {
   isLoading: false,
   isError: false,
+  isDenied: false,
   hasIntegration: true,
   hasPermissions: true,
   isEnabled: true,
@@ -29,6 +30,22 @@ describe('selectScopeEntryView', () => {
 
   it('returns loading before error when both flags are true', () => {
     expect(selectScopeEntryView({ ...base, isLoading: true, isError: true })).toBe('loading');
+  });
+
+  it('returns denied when access is lost', () => {
+    expect(viewFor({ isDenied: true })).toBe('denied');
+  });
+
+  it('returns denied before error, the setup gates and the dashboard', () => {
+    expect(viewFor({ isDenied: true, isError: true })).toBe('denied');
+    expect(viewFor({ isDenied: true, hasIntegration: false, hasPermissions: false })).toBe(
+      'denied'
+    );
+    expect(viewFor({ isDenied: true })).not.toBe('dashboard');
+  });
+
+  it('returns loading before denied', () => {
+    expect(selectScopeEntryView({ ...base, isLoading: true, isDenied: true })).toBe('loading');
   });
 
   it('returns connect-github when integrated is missing', () => {

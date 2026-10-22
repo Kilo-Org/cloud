@@ -1,9 +1,11 @@
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+import { ParentSessionCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
+  clientKiloSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
@@ -21,6 +23,10 @@ import {
   CLOUD_AGENT_IMAGE_MAX_COUNT,
   CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
 } from '@/lib/cloud-agent/constants';
+import {
+  PREVIEW_PORT_MAX,
+  PREVIEW_PORT_MIN,
+} from '../../../../services/cloud-agent-next/src/shared/preview-port';
 
 export {
   SandboxStatusSnapshotSchema as baseGetSandboxStatusNextOutputSchema,
@@ -140,7 +146,6 @@ export const cloudAgentGetAttachmentUploadUrlSchema = z
   })
   .superRefine((data, ctx) => {
     if (data.extension) {
-      // Relaxed surface: contentType only needs the type/subtype shape.
       if (!CLOUD_AGENT_ATTACHMENT_RELAXED_CONTENT_TYPE_REGEX.test(data.contentType)) {
         ctx.addIssue({
           code: 'custom',
@@ -385,6 +390,8 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
  * initial turn fields.
  */
 const PrepareSessionSharedFields = {
+  allowSubagentSessions: z.boolean().optional(),
+  callbackTarget: ParentSessionCallbackTargetSchema.optional(),
   // Repository source (mutually exclusive - must provide exactly one)
   githubRepo: z
     .string()
@@ -408,6 +415,17 @@ const PrepareSessionSharedFields = {
       repositoryUuid: z.uuid(),
     })
     .strict()
+    .optional(),
+  /**
+   * Local-development only: clone a public repository by URL when no
+   * source-control integration is configured. Mirrors the E2E harness's
+   * `E2E_GIT_URL` path, which clones anonymously as `type: 'git'`. The
+   * prepareSession handlers reject it outside development.
+   */
+  publicRepoUrl: z
+    .string()
+    .url('Enter a valid repository URL')
+    .refine(value => /^https:\/\//i.test(value), 'Must be an https git URL')
     .optional(),
 
   // Execution params (required)
@@ -448,6 +466,8 @@ const PrepareSessionNonCloneVariant = z.object({
   autoInitiate: z.boolean().optional(),
   /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
   operationKey: z.string().uuid().optional(),
+  /** Client-proposed Kilo session ID, so the client can show the session before prepare returns. */
+  kiloSessionId: clientKiloSessionIdSchema.optional(),
   /**
    * Optional source Kilo session to clone into this Cloud Agent session.
    * Old callers omit the field and create an empty destination session.
@@ -478,7 +498,7 @@ export const basePrepareSessionNextSchema = z
   .and(egressPolicySchema)
   .refine(
     data =>
-      [data.githubRepo, data.gitlabProject, data.bitbucketRepo].filter(
+      [data.githubRepo, data.gitlabProject, data.bitbucketRepo, data.publicRepoUrl].filter(
         repository => repository !== undefined
       ).length === 1,
     {
@@ -534,6 +554,8 @@ export const baseCreateWorktreeChatNextSchema = z
   .object({
     sourceKiloSessionId: kiloSessionIdSchema,
     operationKey: z.uuid(),
+    /** Client-proposed id for the new chat, so the client can show it before this returns. */
+    kiloSessionId: clientKiloSessionIdSchema.optional(),
   })
   .strict();
 
@@ -722,6 +744,38 @@ export const baseResizeTerminalNextOutputSchema = z.object({
 export const baseCloseTerminalNextOutputSchema = z.object({
   success: z.boolean(),
 });
+
+const previewSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
+
+export const baseCreatePreviewNextSchema = z.object({
+  cloudAgentSessionId: previewSessionIdSchema,
+  port: z.number().int().min(PREVIEW_PORT_MIN).max(PREVIEW_PORT_MAX),
+  /** Where the preview opens; the Worker validates it where it redirects. */
+  path: z.string().startsWith('/').max(2048).optional(),
+});
+
+export const baseCreatePreviewNextOutputSchema = z.object({
+  url: z.url(),
+  expiresAt: z.number().int().positive(),
+});
+
+export const basePreviewOptionsNextSchema = z.object({
+  cloudAgentSessionId: previewSessionIdSchema,
+  /** The route's organization; the Worker uses it only to decide whether to show preview. */
+  organizationId: z.uuid().optional(),
+});
+
+/** The Worker's answer: its preview hostname with a `{port}` placeholder. */
+export const workerPreviewOptionsSchema = z.discriminatedUnion('enabled', [
+  z.object({ enabled: z.literal(false) }),
+  z.object({ enabled: z.literal(true), hostTemplate: z.string().min(1) }),
+]);
+
+/** The browser's answer: the full preview URL with a `{port}` placeholder. */
+export const basePreviewOptionsNextOutputSchema = z.discriminatedUnion('enabled', [
+  z.object({ enabled: z.literal(false) }),
+  z.object({ enabled: z.literal(true), urlTemplate: z.string().min(1) }),
+]);
 
 // Execution status schema for getSession response
 export const executionStatusNextSchema = z

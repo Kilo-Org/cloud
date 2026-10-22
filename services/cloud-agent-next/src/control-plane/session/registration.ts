@@ -11,7 +11,10 @@ import {
   controlPlaneSandboxSelectionSchema,
   type ControlPlaneSandboxSelection,
 } from './sandbox-selection.js';
-import { credentialSourceFromMetadata } from '../../sandbox-control/session-credentials.js';
+import {
+  credentialSourceFromMetadata,
+  SessionCredentialUpgradeRequiredError,
+} from '../../sandbox-control/session-credentials.js';
 import {
   buildSessionAttachPayload,
   isReadOnlyBitbucketReview,
@@ -31,7 +34,7 @@ import { hasModernRuntimeAuthorization } from '../../session/runtime-authorizati
 import { getWorktreeCredentialContainment } from '../../sandbox-control/credential-containment.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../../runtime-credential-proxy.js';
 import { getControlPlaneSessionDirectory } from '../../workspace.js';
-import { getCommandGuardPolicy, getCommandGuardPermissions } from '../../session-service.js';
+import { getCommandGuardPolicy, getCommandGuardPermissions } from '../../session/command-guard.js';
 import { codeReviewIdFromCallbackTarget } from '../../router/schemas.js';
 import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import type { ControlPlaneSessionRegistration } from './session-do.js';
@@ -92,8 +95,8 @@ function withoutRawKiloToken(
  * Sandbox DO's grant issuance supplies the `git`/`kilo` aliases in the projected
  * spec (B3 N3).
  *
- * `payload.mcp` is materialized only to prove it decrypts and to force
- * per-session isolation; the plaintext is deliberately not copied into the
+ * `payload.mcp` is materialized to prove it decrypts and preserve compatibility
+ * isolation. The plaintext is deliberately not copied into the
  * persisted spec. The Sandbox DO materializes the encrypted credential-source
  * `mcpServers` immediately before the authenticated `session.prepare` frame.
  */
@@ -112,9 +115,7 @@ export function controlPlaneRouteSpecFromAttachPayload(
           ...(payload.git.platform ? { platform: payload.git.platform } : {}),
         };
   const env = withoutRawKiloToken(payload.env);
-  // Materialized MCP servers are per-session user config: sharing a runtime
-  // would let one session's servers leak into another, so they force isolation
-  // (legacy `adaptSessionAttachPayloadForWrapper`).
+  // Preserve the original MCP runtime layout until the Sandbox negotiates sharing.
   const runtimeIsolation = payload.mcp ? 'per-session' : options?.runtimeIsolation;
   return {
     sessionId: ids.sessionId,
@@ -162,8 +163,8 @@ function materializeAttachPayload(
 /**
  * Builds the DO registration from grouped metadata and the Worker's selection.
  * One owner: the DO records the given selection rather than re-deriving it (H2).
- * `runtimeIsolation` follows modern runtime authorization (M1) or materialized
- * MCP servers. `mcpPrivateKey` decrypts `profile.mcpServers` transiently to fail
+ * `runtimeIsolation` retains the original layout for existing allocations.
+ * The Sandbox omits it on frames for negotiated worktree runtimes. `mcpPrivateKey` decrypts `profile.mcpServers` transiently to fail
  * closed before any route is prepared; the encrypted snapshot rides the
  * DO-private credential source and only the Sandbox DO decrypts it before a
  * frame.
@@ -229,8 +230,10 @@ export function buildControlPlaneSessionRegistration(
   if (sandboxProvider === 'vercel' && !containment.kilocode && !containment.github) {
     throw new Error('Vercel requires credential containment');
   }
+  if (!hasModernRuntimeAuthorization(metadata)) {
+    throw new SessionCredentialUpgradeRequiredError();
+  }
   if (
-    hasModernRuntimeAuthorization(metadata) &&
     runtimeConfiguration &&
     (!runtimeConfiguration.workerUrl ||
       !runtimeCredentialProxyFacadeBaseUrl(runtimeConfiguration.workerUrl))
@@ -243,8 +246,8 @@ export function buildControlPlaneSessionRegistration(
     if (!validated.success) throw new McpAttachValidationError(validated.reason);
   }
   // A read-only Bitbucket review runs with worker-owned env only, so its
-  // encrypted profile secrets, agents and commands are withheld, mirroring the
-  // legacy plane and the withheld MCP snapshot. Its runtime skills stay: they
+  // encrypted profile secrets, agents, commands and MCP are withheld.
+  // Its runtime skills stay: they
   // carry the trusted review skill that the Code Reviewer attaches.
   const readOnlyBitbucketReview = isReadOnlyBitbucketReview(metadata);
   const encryptedSecrets = readOnlyBitbucketReview ? undefined : metadata.profile?.encryptedSecrets;

@@ -32,7 +32,7 @@ const GLYPH_PLACEHOLDER = '__KILO_WIDGET_GLYPH_URI__';
 const LOGO_FILES = [
   {
     token: LOGO_PLACEHOLDER,
-    fileName: 'kilo-logo.png',
+    fileName: 'kilo-logo-ffdd00.png',
     // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- the Metro asset registry needs a static require
     asset: () => require('../../assets/images/logo-widget.png') as number,
   },
@@ -102,7 +102,7 @@ async function copyLogos(): Promise<void> {
       if (source?.uri.startsWith('file://') === true) {
         // Release build: the asset is a file inside the app bundle.
         new File(source.uri).copySync(target, { overwrite: true });
-      } else if (source !== null) {
+      } else if (source !== null && source !== undefined) {
         // Dev build: the asset is served by Metro over HTTP.
         // eslint-disable-next-line no-await-in-loop -- two small files, copied one after the other
         await File.downloadFileAsync(source.uri, target, { idempotent: true });

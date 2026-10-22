@@ -6,7 +6,7 @@ import {
   type UsageContext,
 } from '@kilocode/container-usage';
 import { z } from 'zod';
-import { isContainerConcurrencyLimitError } from './container-concurrency.js';
+import { getContainerCapacityFailureReason } from './container-concurrency.js';
 import {
   getSandboxAllocationResources,
   type CloudflareContainersInstance,
@@ -16,6 +16,10 @@ import {
 import { logger } from './logger.js';
 import { isIsolatedSandboxId, isValidSandboxId, type SandboxIdClass } from './sandbox-id.js';
 import { resolveSandboxIdClass, sandboxKindSchema, type SandboxKind } from './sandbox-placement.js';
+import {
+  CODE_REVIEW_CONTAINERS_INSTANCE,
+  CODE_REVIEW_CONTAINERS_RESOURCES,
+} from './sandbox-containers/instance-size.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import type { SandboxId, SandboxInstance } from './types.js';
 import type { BillingContext } from '@kilocode/container-usage';
@@ -30,6 +34,7 @@ export const SANDBOX_USAGE_SKUS = {
   SandboxCodeReviewContainment: 'cloud-agent-code-review-2026-07',
   SandboxContainersStandard3: 'cloud-agent-containers-standard-3-2026-09',
   SandboxContainersStandard4: 'cloud-agent-containers-standard-4-2026-09',
+  SandboxContainersCodeReview: 'cloud-agent-code-review-2026-07',
   SandboxVercelSmall: 'cloud-agent-vercel-small-2026-09',
   SandboxVercelLarge: 'cloud-agent-vercel-large-2026-09',
 } as const;
@@ -40,7 +45,8 @@ export type SandboxCapacity = { vcpu: number; memoryMiB: number; diskMB: number 
 
 export type ContainersBillingClassName =
   | 'SandboxContainersStandard3'
-  | 'SandboxContainersStandard4';
+  | 'SandboxContainersStandard4'
+  | 'SandboxContainersCodeReview';
 
 export type VercelBillingClassName = 'SandboxVercelSmall' | 'SandboxVercelLarge';
 
@@ -50,16 +56,16 @@ export type LegacySandboxClassName = Exclude<
 >;
 
 // Production values mirror this service's top-level wrangler.jsonc entries and
-// apps/web/src/lib/cloudflare/container-capacity.ts. The parity test reads all three sources.
+// apps/web/src/lib/cloudflare/container-capacity.ts. Keep all three in sync manually.
 // Development intentionally uses different named instance types and does not query Analytics.
 export const SANDBOX_CAPACITIES: Record<LegacySandboxClassName, SandboxCapacity> = {
   Sandbox: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
   SandboxContainment: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
   SandboxSmall: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
-  SandboxSmallContainment: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
+  SandboxSmallContainment: { vcpu: 2, memoryMiB: 6_144, diskMB: 20_000 },
   SandboxDIND: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
   SandboxCodeReview: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
-  SandboxCodeReviewContainment: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
+  SandboxCodeReviewContainment: { vcpu: 1, memoryMiB: 4_096, diskMB: 20_000 },
 };
 
 // One `SandboxContainers` Durable Object serves every instance size, so there is no per-size
@@ -67,6 +73,11 @@ export const SANDBOX_CAPACITIES: Record<LegacySandboxClassName, SandboxCapacity>
 export const CONTAINERS_BILLING_CAPACITIES: Record<ContainersBillingClassName, SandboxCapacity> = {
   SandboxContainersStandard3: { vcpu: 2, memoryMiB: 8_192, diskMB: 16_000 },
   SandboxContainersStandard4: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
+  SandboxContainersCodeReview: {
+    vcpu: CODE_REVIEW_CONTAINERS_RESOURCES.vcpu,
+    memoryMiB: CODE_REVIEW_CONTAINERS_RESOURCES.memoryMib,
+    diskMB: CODE_REVIEW_CONTAINERS_RESOURCES.diskMb,
+  },
 };
 
 /** Vercel presets have no disk; the session schema carries `vcpus` and `memory` only. */
@@ -130,7 +141,11 @@ export type ContainersBillingIdentity = {
 const CONTAINERS_CLASS_BY_INSTANCE: Record<string, ContainersBillingClassName | undefined> = {
   'standard-3': 'SandboxContainersStandard3',
   'standard-4': 'SandboxContainersStandard4',
-} satisfies Record<CloudflareContainersInstance, ContainersBillingClassName>;
+  [CODE_REVIEW_CONTAINERS_INSTANCE]: 'SandboxContainersCodeReview',
+} satisfies Record<
+  CloudflareContainersInstance | typeof CODE_REVIEW_CONTAINERS_INSTANCE,
+  ContainersBillingClassName
+>;
 
 export function containersBillingIdentity(instance: string): ContainersBillingIdentity {
   const className = Object.hasOwn(CONTAINERS_CLASS_BY_INSTANCE, instance)
@@ -214,7 +229,7 @@ export const sandboxBillingInputEnvelopeSchema = z
       .min(1)
       .max(63)
       .refine(isValidSandboxId, 'Invalid sandboxId format')
-      .transform(value => value as SandboxId),
+      .transform(value => value),
     subject: billingSubjectSchema,
     actor: billingActorSchema,
     onBehalfOf: billingSubjectSchema.optional(),
@@ -231,9 +246,6 @@ export const sandboxBillingInputEnvelopeSchema = z
   .strict();
 
 const KNOWN_ORIGINS = new Set([
-  'app-builder',
-  'auto-triage',
-  'autofix',
   'cloud-agent',
   'cloud-agent-web',
   'code-review',
@@ -308,6 +320,7 @@ function expectedIsolatedSandboxIdClasses(
 ): readonly SandboxIdClass[] {
   if (sandboxClassName === 'Sandbox') return ['isolated-standard', 'isolated-small', 'code-review'];
   if (sandboxClassName === 'SandboxContainment') return ['isolated-standard'];
+  if (sandboxClassName === 'SandboxContainersCodeReview') return ['code-review'];
   if (
     isContainersBillingClassName(sandboxClassName) ||
     isVercelBillingClassName(sandboxClassName) ||
@@ -388,7 +401,7 @@ export async function ensureSandboxBillingAdmissionInput(
   try {
     return await (sandbox as MeteredSandboxInstance).ensureBillingAdmission(input);
   } catch (error) {
-    if (isContainerConcurrencyLimitError(error)) throw error;
+    if (getContainerCapacityFailureReason(error)) throw error;
     return {
       success: false,
       code: 'meter_unavailable',

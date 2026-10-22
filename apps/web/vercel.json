@@ -3,6 +3,14 @@
   "skipMiddlewareRequestBody": true,
   "crons": [
     {
+      "path": "/api/cron/agent-briefing",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/agent-briefing-summaries",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/sync-model-stats",
       "schedule": "0 */6 * * *"
     },
@@ -12,6 +20,10 @@
     },
     {
       "path": "/api/cron/sync-providers",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-direct-byok-providers",
       "schedule": "*/5 * * * *"
     },
     {
@@ -29,6 +41,10 @@
     {
       "path": "/api/cron/cleanup-webhook-events",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-admin-action-audit-logs",
+      "schedule": "30 3 * * *"
     },
     {
       "path": "/api/cron/kilo-pass-yearly-monthly-base",
@@ -49,10 +65,6 @@
     {
       "path": "/api/cron/kilo-pass-expire-referral-rewards",
       "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/deployment-threat-scan",
-      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/oss-monthly-reset",
@@ -133,10 +145,6 @@
     {
       "path": "/api/cron/usage-partition-maintenance",
       "schedule": "0 0 1 * *"
-    },
-    {
-      "path": "/api/cron/cleanup-free-model-usage",
-      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/cleanup-review-memory",

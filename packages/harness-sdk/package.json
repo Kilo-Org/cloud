@@ -57,20 +57,21 @@
     "typecheck:e2e": "ttsc --noEmit -p e2e/tsconfig.json"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/ext-apps": "1.7.5",
+    "@modelcontextprotocol/sdk": "1.32.1",
     "drizzle-orm": "catalog:",
-    "effect": "3.22.1",
-    "eventsource-parser": "3.0.8",
-    "typia": "14.0.4"
+    "effect": "4.0.5",
+    "eventsource-parser": "4.1.2",
+    "typia": "15.1.0"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "0.104.1",
-    "@ttsc/unplugin": "0.28.3",
+    "@anthropic-ai/sdk": "0.137.0",
+    "@ttsc/unplugin": "0.33.0",
     "@types/node": "catalog:",
     "drizzle-kit": "catalog:",
-    "openai": "6.49.0",
-    "ttsc": "0.28.3",
-    "typescript": "7.0.2",
+    "openai": "7.36.0",
+    "ttsc": "0.33.0",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "files": [

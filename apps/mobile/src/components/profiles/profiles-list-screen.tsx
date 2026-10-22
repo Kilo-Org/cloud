@@ -27,6 +27,7 @@ import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { formatProfileCountItemsShort } from '@/lib/profile-count-labels';
 import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganization } from '@/lib/organization-context';
@@ -41,29 +42,6 @@ const NEW_PROFILE_PATH = '/(app)/(tabs)/(3_profile)/profiles/new' as Href;
  */
 function ownerIcon(profile: AgentProfileListItem): LucideIcon {
   return profileOwnerType(profile) === 'organization' ? Building2 : User;
-}
-
-/** Profile name plus the default marker, for the star's accessibility label. */
-function defaultStarLabel(name: string, defaultLabel: string): string {
-  return [name, defaultLabel].join(', ');
-}
-
-/**
- * The effective-default marker. Returns `undefined` when the profile is not
- * the default, so `ConfigureRow` falls back to its chevron.
- */
-function renderDefaultStar({
-  isDefault,
-  name,
-  label,
-  color,
-}: Readonly<{ isDefault: boolean; name: string; label: string; color: string }>) {
-  if (!isDefault) {
-    return undefined;
-  }
-  return (
-    <Star size={16} color={color} fill={color} accessibilityLabel={defaultStarLabel(name, label)} />
-  );
 }
 
 /**
@@ -102,6 +80,8 @@ export function ProfilesListScreen() {
     isRefetching,
     refetch,
   } = useAgentProfileList(organizationId ?? undefined);
+  // Reactive: a connectivity commit re-renders the error variant selection.
+  const committedConnectivity = useCommittedConnectivityStatus();
 
   const sections = buildProfileSections({ orgProfiles, personalProfiles, isOrgContext });
   // Wait for the stored organization before choosing the list context, so a
@@ -132,9 +112,13 @@ export function ProfilesListScreen() {
           />
         }
       >
+        {/* A failed refetch keeps the cached rows usable: the error banner sits
+            above the content and only replaces it when there is nothing to
+            show. A confirmed-offline device is a connectivity failure, not a
+            server one; `unknown` connectivity keeps the server variant. */}
         {isError && (
           <QueryError
-            variant="server"
+            variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
             placement="top"
             title={t('profiles.loadFailed')}
             onRetry={() => void refetch()}
@@ -155,7 +139,7 @@ export function ProfilesListScreen() {
             }
           />
         )}
-        {!isError && !isListLoading && sections.length > 0 && (
+        {!isListLoading && sections.length > 0 && (
           <>
             {sections.map(section => (
               <View key={section.key} className="gap-3">
@@ -183,12 +167,18 @@ export function ProfilesListScreen() {
                       subtitle={subtitle || undefined}
                       className="rounded-lg bg-secondary px-3"
                       last={index === section.profiles.length - 1}
-                      trailing={renderDefaultStar({
-                        isDefault: isEffectiveDefault(profile, effectiveDefaultId),
-                        name: profile.name,
-                        label: t('profiles.defaultSectionTitle'),
-                        color: colors.primary,
-                      })}
+                      trailing={
+                        isEffectiveDefault(profile, effectiveDefaultId) ? (
+                          // The row already announces the profile name; the
+                          // star adds only the state it marks.
+                          <Star
+                            size={16}
+                            color={colors.primary}
+                            fill={colors.primary}
+                            accessibilityLabel={t('profiles.defaultSectionTitle')}
+                          />
+                        ) : undefined
+                      }
                       onPress={() => {
                         openProfile(profile);
                       }}

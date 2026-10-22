@@ -3,12 +3,12 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { ChatScreen } from '@/components/chat/chat-screen';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { type StoredChatBackend } from '@/lib/chat/backend-store';
-import { backendTargetId } from '@/lib/chat/backend-target';
+import { backendTargetId, localTargetId } from '@/lib/chat/backend-target';
 
 /**
  * What the chat screen draws while it is opening.
@@ -94,7 +94,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
       model: state.model,
       effort: state.effort,
       turns: [],
-      answering: '',
+      answering: [],
       status: state.status,
       asked: state.asked,
       waiting: [],
@@ -163,6 +163,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
+vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
@@ -177,13 +178,30 @@ vi.mock('@/components/chat/chat-details-sheet', () => ({ ChatDetailsSheet: 'Chat
 vi.mock('@/components/agents/session-context-metrics', () => ({
   SessionContextMetrics: 'SessionContextMetrics',
 }));
+vi.mock('@/components/agents/working-indicator', () => ({
+  WorkingIndicator: 'WorkingIndicator',
+}));
+const announce = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: announce }));
 vi.mock('@/components/chat/web-search-row', () => ({
   useWebSearchSetting: () => ({ enabled: true, setEnabled: () => undefined }),
 }));
-const keyboard = vi.hoisted(() => ({ isVisible: false }));
+const keyboard = vi.hoisted(() => ({ progress: 0 }));
 vi.mock('react-native-keyboard-controller', () => ({
   KeyboardAvoidingView: 'KeyboardAvoidingView',
-  useKeyboardState: (selector: (snapshot: { isVisible: boolean }) => boolean) => selector(keyboard),
+  useReanimatedKeyboardAnimation: () => ({ progress: { value: keyboard.progress } }),
+}));
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  Extrapolation: { CLAMP: 'clamp' },
+  // Two-point interpolation, which is all the composer's safe-area inset asks
+  // for: closed (0) takes the first output, open (1) the second.
+  interpolate: (
+    value: number,
+    _input: readonly [number, number],
+    output: readonly [number, number]
+  ) => (value <= 0 ? output[0] : output[1]),
+  useAnimatedStyle: (style: () => unknown) => style(),
 }));
 vi.mock('react-native', () => ({
   Alert: { alert: backendUi.alert },
@@ -211,7 +229,7 @@ beforeEach(() => {
   state.model = 'm1';
   state.effort = null;
   state.images = false;
-  keyboard.isVisible = false;
+  keyboard.progress = 0;
   state.send.mockClear();
 });
 afterEach(() => {
@@ -248,14 +266,43 @@ describe('the chat transcript while it opens', () => {
     expect(count(tree, 'SessionSkeletonMessages')).toBe(0);
   });
 
-  it.each([false, true])(
-    'keeps the composer gap correct when keyboard visibility is %s',
-    async visible => {
-      keyboard.isVisible = visible;
+  it.each([
+    { progress: 0, height: 24 },
+    { progress: 1, height: 0 },
+  ])(
+    'keeps the composer inset in step with the keyboard at progress $progress',
+    async ({ progress, height }) => {
+      keyboard.progress = progress;
       const tree = await mount();
-      const composer = tree.root.find(node => (node.type as string) === 'ChatComposer');
+      const inset = tree.root.find(node => node.props.testID === 'chat-composer-inset');
 
-      expect(composer.parent?.props.style).toEqual({ paddingBottom: visible ? 0 : 24 });
+      // The inset below the composer tracks the keyboard's own progress, rather
+      // than flipping after the keyboard has landed, and draws on the composer's
+      // bar surface instead of the screen background.
+      expect(inset.props.style).toEqual({ height });
+      expect(inset.parent?.type).toBe('BlurBar');
+    }
+  );
+
+  it.each([
+    { status: 'idle' as const, rows: 0, announced: [] },
+    { status: 'working' as const, rows: 1, announced: [['Generating…']] },
+  ])(
+    'draws the working row above the composer only while working ($status)',
+    async ({ status, rows, announced }) => {
+      announce.mockClear();
+      state.status = status;
+      state.messages = [{ info: { id: 'm1', role: 'assistant' } }];
+      const tree = await mount();
+      const working = tree.root.findAll(node => (node.type as string) === 'WorkingIndicator');
+
+      // An idle chat reserves no status space: the transcript ends at the composer.
+      expect(working).toHaveLength(rows);
+      if (rows === 1) {
+        expect(working[0]?.props).toMatchObject({ isStreaming: true, messages: state.messages });
+      }
+      // The row is not a live region, so the reply start is announced once.
+      expect(announce.mock.calls).toEqual(announced);
     }
   );
 
@@ -327,6 +374,43 @@ describe('the chat details', () => {
 });
 
 describe('backend context-transfer approval', () => {
+  it.each([
+    localTargetId('apple'),
+    localTargetId('android'),
+    localTargetId('gguf', 'qwen-test.gguf'),
+  ])('describes local processing and waits for approval before selecting %s', async target => {
+    state.status = 'idle';
+    const tree = await mount();
+    const composer = () =>
+      tree.root.find(node => (node.type as string) === 'ChatComposer').props as {
+        model: string;
+        onModelSelect: (model: string, variant: string) => void;
+      };
+
+    act(() => {
+      composer().onModelSelect(target, '');
+    });
+    expect(composer().model).toBe('m1');
+    const [title, message, actions] = backendUi.alert.mock.calls.at(-1) ?? [];
+    expect(title).toBe(i18n.t('modelChat.localModels.switchTitle'));
+    expect(message).toBe(i18n.t('modelChat.localModels.switchMessage', { name: target }));
+    expect(actions?.find(action => action.onPress)).toMatchObject({
+      text: i18n.t('modelChat.localModels.switchConfirm'),
+    });
+    act(() => {
+      actions?.find(action => action.onPress)?.onPress?.();
+    });
+    expect(composer().model).toBe(target);
+    act(() => {
+      composer().onModelSelect('m1', '');
+    });
+    expect(backendUi.alert.mock.calls.at(-1)?.slice(0, 2)).toEqual([
+      i18n.t('modelChat.backends.switchTitle'),
+      i18n.t('modelChat.backends.switchMessage', { name: 'm1' }),
+    ]);
+    expect(composer().model).toBe(target);
+  });
+
   it('requires approval when returning from a picked custom backend before its queued move finishes', async () => {
     state.status = 'working';
     const backend: StoredChatBackend = {

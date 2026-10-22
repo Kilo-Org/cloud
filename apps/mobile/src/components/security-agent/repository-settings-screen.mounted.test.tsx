@@ -30,11 +30,20 @@ const repositories = vi.hoisted(() => ({
 const capability = vi.hoisted(() => ({ canManage: true }));
 const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 const saveButton = vi.hoisted(() => ({ onSave: null as (() => Promise<void>) | null }));
+const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   View: 'View',
   Pressable: 'Pressable',
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: 0,
+    left: sideInsets.left,
+    right: sideInsets.right,
+  }),
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn(), push: vi.fn() }),
@@ -161,6 +170,8 @@ function textContents(renderer: TestRenderer.ReactTestRenderer): unknown[] {
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  sideInsets.left = 0;
+  sideInsets.right = 0;
   config.data = configData('selected');
   config.isLoading = false;
   config.isError = false;
@@ -200,9 +211,26 @@ describe('RepositorySettingsScreen repository picker', () => {
     // The old ScrollView content inset (`px-6 pt-4` plus the tab-bar band) is
     // now the list's content container, so the last row still clears the bar.
     expect(list.props as { contentContainerStyle: unknown }).toMatchObject({
-      contentContainerStyle: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12 },
+      contentContainerStyle: {
+        paddingTop: 16,
+        paddingBottom: 12,
+        paddingLeft: 24,
+        paddingRight: 24,
+      },
     });
     expect((list.props as { style: unknown }).style).toEqual({ flex: 1 });
+  });
+
+  it('keeps the picker rows inside the landscape side insets', async () => {
+    sideInsets.left = 47;
+    sideInsets.right = 59;
+    const { renderer } = await mount();
+    expect(listOf(renderer).props.contentContainerStyle).toEqual({
+      paddingTop: 16,
+      paddingLeft: 71,
+      paddingRight: 83,
+      paddingBottom: 12,
+    });
   });
 
   it('adds the pressed repository to the selection and saves that id', async () => {

@@ -1,3 +1,7 @@
+import {
+  WORKTREE_RUNTIME_HEADER,
+  WORKTREE_RUNTIME_VERSION,
+} from '../../../src/shared/control-plane-runtime-contract.js';
 import { SELF } from 'cloudflare:test';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -9,6 +13,7 @@ export type FakeWrapperConnectInput = {
   sandboxId: string;
   credential: string;
   path?: string;
+  runtimeContract?: 'legacy' | 'worktree';
 };
 
 export type FakeWrapperHelloInput = {
@@ -16,6 +21,12 @@ export type FakeWrapperHelloInput = {
   allocationId: string;
   protocolVersion?: number;
   redactsNamedSecrets?: boolean;
+};
+
+export type FakeNativeEvent = {
+  type: string;
+  properties: Record<string, unknown>;
+  timestamp?: string;
 };
 
 /**
@@ -27,6 +38,8 @@ export class FakeWrapper {
   private readonly messages: ControlPlaneWrapperFrame[] = [];
   private readonly frameWaiters: Array<(frame: ControlPlaneWrapperFrame | null) => void> = [];
   private readonly closeWaiters: Array<(code: number) => void> = [];
+  private readonly listeners = new Set<(frame: ControlPlaneWrapperFrame) => void>();
+  private readonly unparsed: string[] = [];
   private closeCode: number | null = null;
   private received = 0;
 
@@ -37,9 +50,13 @@ export class FakeWrapper {
       try {
         frame = controlPlaneWrapperFrameSchema.parse(JSON.parse(text));
       } catch {
+        // A frame the Worker produced outside the protocol would otherwise
+        // vanish. Keep it so a test can assert the Worker never did that.
+        this.unparsed.push(text);
         return;
       }
       this.received += 1;
+      for (const listener of this.listeners) listener(frame);
       const waiter = this.frameWaiters.shift();
       if (waiter) waiter(frame);
       else this.messages.push(frame);
@@ -56,7 +73,13 @@ export class FakeWrapper {
   static async connect(input: FakeWrapperConnectInput): Promise<FakeWrapper> {
     const path = input.path ?? `/sandbox-control-v2/${encodeURIComponent(input.sandboxId)}`;
     const response = await SELF.fetch(`http://worker.test${path}`, {
-      headers: { Upgrade: 'websocket', Authorization: `Bearer ${input.credential}` },
+      headers: {
+        Upgrade: 'websocket',
+        Authorization: `Bearer ${input.credential}`,
+        ...(input.runtimeContract === 'legacy'
+          ? {}
+          : { [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION }),
+      },
     });
     if (response.status !== 101 || !response.webSocket) {
       throw new Error(`Unexpected sandbox control v2 upgrade: ${response.status}`);
@@ -72,6 +95,24 @@ export class FakeWrapper {
   /** How many frames this wrapper has received, consumed or queued. */
   receivedFrames(): number {
     return this.received;
+  }
+
+  /** Raw frames the Worker sent that did not match the protocol schema. */
+  unparsedFrames(): readonly string[] {
+    return [...this.unparsed];
+  }
+
+  /** Observe every parsed inbound frame without consuming the queue. */
+  onFrame(listener: (frame: ControlPlaneWrapperFrame) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  /** Pushes one native event batch for a session, as the real wrapper does. */
+  sendSessionEvents(sessionId: string, events: readonly FakeNativeEvent[]): void {
+    this.send({ type: 'session.events', sessionId, events });
   }
 
   sendRaw(data: string): void {

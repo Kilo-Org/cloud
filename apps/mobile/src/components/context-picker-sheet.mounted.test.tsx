@@ -10,12 +10,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContextPickerSheet } from '@/components/context-picker-sheet';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-const theme = vi.hoisted(() => ({ colors: { primary: '#E8F27A', foreground: '#F2F0EB' } }));
+const theme = vi.hoisted(() => ({ colors: { primary: '#FFDD00', foreground: '#F2F0EB' } }));
 const onSelect = vi.hoisted(() => vi.fn());
 const onClose = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', () => ({
   Modal: 'Modal',
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',

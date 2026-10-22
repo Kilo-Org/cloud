@@ -16,10 +16,7 @@ import { ChatComposer } from './chat-composer';
 // gate, optimistic clear) runs exactly as a device tap reaches it.
 
 // ── native bridges ───────────────────────────────────────────────────────────
-const keyboardListeners = vi.hoisted(() => ({
-  show: null as ((event: { endCoordinates: { height: number } }) => void) | null,
-  hide: null as (() => void) | null,
-}));
+const keyboardState = vi.hoisted(() => ({ height: 0 }));
 const keyboardDismiss = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', () => ({
@@ -31,18 +28,7 @@ vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   I18nManager: { isRTL: false },
-  Keyboard: {
-    addListener: vi.fn((event: string, handler: never) => {
-      if (event === 'keyboardWillShow' || event === 'keyboardDidShow') {
-        keyboardListeners.show = handler;
-      }
-      if (event === 'keyboardWillHide' || event === 'keyboardDidHide') {
-        keyboardListeners.hide = handler;
-      }
-      return { remove: vi.fn() };
-    }),
-    dismiss: keyboardDismiss,
-  },
+  Keyboard: { dismiss: keyboardDismiss },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   Text: 'Text',
@@ -53,6 +39,12 @@ vi.mock('react-native', () => ({
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
+}));
+
+// The composer reads the keyboard from the provider, not from a listener of its own.
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: <T,>(selector: (state: { height: number }) => T) => selector(keyboardState),
+  useReanimatedKeyboardAnimation: () => ({ progress: { value: 0 }, height: { value: 0 } }),
 }));
 
 vi.mock('react-native-gesture-handler', () => ({
@@ -77,6 +69,8 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
+  useSharedValue: <T,>(value: T) => ({ value }),
+  useAnimatedStyle: (style: () => unknown) => style(),
 }));
 
 vi.mock('@/lib/a11y/motion', () => ({
@@ -99,10 +93,6 @@ vi.mock('sonner-native', () => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useNavigation: () => ({ dispatch: vi.fn() }),
-}));
-
-vi.mock('@/lib/navigation/prevent-remove', () => ({
   usePreventRemove: vi.fn(),
 }));
 
@@ -303,8 +293,7 @@ async function flushSubmitChain(): Promise<void> {
 
 describe('ChatComposer send — one tap sends exactly once', () => {
   beforeEach(() => {
-    keyboardListeners.show = null;
-    keyboardListeners.hide = null;
+    keyboardState.height = 0;
     keyboardDismiss.mockClear();
     uploadMock.uploadPending.mockClear();
     uploadMock.uploadPending.mockImplementation(async () => ({ ok: true as const }));
@@ -332,12 +321,11 @@ describe('ChatComposer send — one tap sends exactly once', () => {
 
   it('sends the typed message on the first send press, keyboard open', async () => {
     const onSend = vi.fn(async () => undefined);
+
+    // Keyboard open: the provider's reported height caps the remaining space.
+    keyboardState.height = 336;
     const renderer = await mountComposer(baseProps({ onSend }));
 
-    // Keyboard open: the composer's listener tracks the reported height.
-    await act(async () => {
-      keyboardListeners.show?.({ endCoordinates: { height: 336 } });
-    });
     await typeIntoComposer(renderer, 'typed with the keyboard up');
 
     const send = sendControl(renderer.root);

@@ -29,6 +29,8 @@ jest.mock('@kilocode/web-shared/lib/email-neverbounce', () => ({
 import Mailgun from 'mailgun.js';
 import { sendAccountDeletionCompletedEmail } from '@kilocode/web-shared/lib/email';
 import { sendStoreCreditWebTipEmail } from '@kilocode/web-shared/lib/store-credit-web-tip-email';
+import { sendAutoRoutingPoolNoticeEmail } from '@kilocode/web-shared/lib/auto-routing-pool-notice-email';
+import { verifyEmail } from '@kilocode/web-shared/lib/email-neverbounce';
 import {
   getEmailVerificationRecipient,
   sendViaMailgun,
@@ -84,6 +86,21 @@ const message = {
 };
 
 describe('Mailgun email boundary', () => {
+  it('defaults production Reply-To to support without changing the sender', async () => {
+    restoreEnvironmentVariable('NODE_ENV', 'production');
+    process.env.VERCEL_TARGET_ENV = 'production';
+
+    await expect(sendViaMailgun({ ...message, replyTo: undefined })).resolves.toBe(true);
+
+    expect(latestMessagesCreateMock()).toHaveBeenCalledWith(
+      'mail.example.test',
+      expect.objectContaining({
+        from: 'Kilo Code <hi@app.kilocode.ai>',
+        'h:Reply-To': 'hi@kilo.ai',
+      })
+    );
+  });
+
   it('delivers the original message in the production target', async () => {
     restoreEnvironmentVariable('NODE_ENV', 'production');
     process.env.VERCEL_TARGET_ENV = 'production';
@@ -113,6 +130,67 @@ describe('Mailgun email boundary', () => {
     await sendAccountDeletionCompletedEmail(message.to);
     const transactionalMessage = latestMessagesCreateMock().mock.calls[0][1];
     expect(transactionalMessage).not.toHaveProperty('o:tag');
+  });
+
+  it('renders the pool notice through the real mail boundary without bypassing provider suppressions', async () => {
+    restoreEnvironmentVariable('NODE_ENV', 'production');
+    process.env.VERCEL_TARGET_ENV = 'production';
+    jest.mocked(verifyEmail).mockClear();
+
+    await expect(
+      sendAutoRoutingPoolNoticeEmail({
+        to: message.to,
+        cutoverAt: '2099-11-01T12:00:00.000Z',
+        routers: [
+          { id: 'personal', modelId: 'kilo-auto/custom/efficient', organization: null },
+          {
+            id: 'organization',
+            modelId: 'kilo-auto/custom/org/efficient',
+            organization: { id: 'org-id', name: '<img src=x onerror=alert(1)>' },
+          },
+        ],
+      })
+    ).resolves.toEqual({ sent: true });
+
+    expect(verifyEmail).toHaveBeenCalledWith(message.to, { suppressDiagnostics: true });
+    const payload = latestMessagesCreateMock().mock.calls[0][1] as {
+      html: string;
+      subject: string;
+    };
+    expect(payload.html).toContain('kilo-auto/custom/efficient');
+    expect(payload.html).toContain('kilo-auto/custom/org/efficient');
+    expect(payload.html).toContain('Sunday, November 1, 2099 at 12:00 UTC');
+    expect(payload.subject).toBe(
+      'Change Required: Your Auto model pool has a new model ID on November 1st, 2099'
+    );
+    expect(payload.html).toContain('href="https://app.example.test/profile"');
+    expect(payload.html).toContain(
+      'href="https://app.example.test/organizations/org-id/providers-and-models"'
+    );
+    expect(payload.html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(payload.html).not.toContain('<img src=x');
+    expect(payload.html).not.toMatch(/\\{\\{/);
+    expect(latestMessagesCreateMock()).toHaveBeenCalledWith('mail.example.test', {
+      from: 'Kilo Code <hi@app.kilocode.ai>',
+      'h:Reply-To': 'hi@kilo.ai',
+      to: message.to,
+      subject: payload.subject,
+      html: payload.html,
+    });
+  });
+
+  it('does not hand a NeverBounce-rejected pool notice to Mailgun', async () => {
+    restoreEnvironmentVariable('NODE_ENV', 'production');
+    process.env.VERCEL_TARGET_ENV = 'production';
+    jest.mocked(verifyEmail).mockResolvedValueOnce(false);
+    await expect(
+      sendAutoRoutingPoolNoticeEmail({
+        to: message.to,
+        cutoverAt: '2099-11-01T12:00:00.000Z',
+        routers: [{ id: 'personal', modelId: 'kilo-auto/custom/efficient', organization: null }],
+      })
+    ).resolves.toEqual({ sent: false, reason: 'neverbounce_rejected' });
+    expect(mailgunClientMock).not.toHaveBeenCalled();
   });
 
   it('never gives Mailgun the external staging recipient or Reply-To', async () => {

@@ -110,7 +110,6 @@ export async function fetchExpiringTransactions(userId: string, fromDb: typeof d
 
   // Fetch ALL transactions with expiry dates (including future ones) for baseline adjustment
   // Use LEFT JOIN to exclude transactions that have already been processed (have a credits_expired entry)
-  // Match on original_transaction_id (preferred) OR orb_credit_block_id (legacy)
   return await fromDb
     .select({
       id: creditTransactionsTable.id,

@@ -1,8 +1,9 @@
 /* eslint-disable max-lines -- the registry suite pins one question at a time, the moves onto another model or tool set, and the MCP discovery around an open on one fake SDK harness. */
-import { type ModelEvent, type ModelUsage, type PartDraft } from '@kilocode/harness-sdk';
-import { Effect, Layer, Stream } from 'effect';
+import { type ModelEvent, type ModelUsage, type PartDraft, type Turn } from '@kilocode/harness-sdk';
+import { Effect, Layer, Queue, Stream } from 'effect';
 import { type StoredChatBackend } from './backend-store';
 import { backendTargetId } from './backend-target';
+import { asMessages } from './turns';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -43,6 +44,8 @@ let storedEffort: string | null = null;
 let storedTools: readonly string[] | null = null;
 /** Ends the answer that is arriving, so a test decides when a turn finishes. */
 let finish: (() => void) | undefined = undefined;
+let emitEvent: ((event: ModelEvent) => void) | undefined = undefined;
+let storedHistory: readonly Turn[] | undefined = undefined;
 /** A session id whose reopen fails, so the failed-open path can be exercised. */
 let failOpenFor: string | undefined = undefined;
 /** A session id whose stored tool names no longer resolve, so the mover can be. */
@@ -64,6 +67,7 @@ const CALL: ModelUsage = {
 };
 /** Each fake session's own total, which starts at zero when the session opens, as the SDK's does. */
 const totals = new Map<string, ModelUsage>();
+const routedTotals = new Map<string, ReadonlyMap<string, ModelUsage>>();
 /** The usage column of the chats table, by session. */
 const recorded = vi.hoisted(() => new Map<string, unknown>());
 /** Makes the next usage write throw, the way a closed database does. */
@@ -109,6 +113,7 @@ const TURN = {
 
 const handleFor = (id: string) => {
   totals.set(id, { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 });
+  routedTotals.delete(id);
   return {
     id,
     ask: (input: string | readonly PartDraft[]) => {
@@ -124,10 +129,13 @@ const handleFor = (id: string) => {
         asked.push(said);
         return Stream.fail(new Error('custom answer failed'));
       }
-      return Stream.asyncPush<ModelEvent>(emit =>
+      return Stream.callback<ModelEvent>(queue =>
         Effect.sync(() => {
           asked.push(said);
-          emit.single({ kind: 'delta', text: 'ok' });
+          emitEvent = event => {
+            Queue.offerUnsafe(queue, event);
+          };
+          Queue.offerUnsafe(queue, { kind: 'delta', text: 'ok' });
           finish = () => {
             const held = totals.get(id);
             totals.set(id, {
@@ -137,16 +145,26 @@ const handleFor = (id: string) => {
               cacheWriteTokens: 0,
               cost: (held?.cost ?? 0) + (CALL.cost ?? 0),
             });
-            emit.single({ kind: 'done', usage: CALL, stop: 'end' });
-            emit.end();
+            Queue.offerUnsafe(queue, { kind: 'done', usage: CALL, stop: 'end' });
+            Queue.endUnsafe(queue);
           };
           return Effect.void;
         })
       );
     },
-    history:
-      failHistoryFor === id ? Effect.fail(new Error('history unreadable')) : Effect.succeed([TURN]),
+    history: Effect.suspend(() =>
+      failHistoryFor === id
+        ? Effect.fail(new Error('history unreadable'))
+        : Effect.succeed(storedHistory ?? [TURN])
+    ),
     usage: Effect.sync(() => totals.get(id)),
+    usageByModel: Effect.sync(() => {
+      const routed = routedTotals.get(id);
+      const total = totals.get(id);
+      return (
+        routed ?? (total?.cost === undefined ? new Map() : new Map([[snapshotOf(id).model, total]]))
+      );
+    }),
   };
 };
 
@@ -377,6 +395,8 @@ beforeEach(async () => {
   asked.length = 0;
   released.length = 0;
   finish = undefined;
+  emitEvent = undefined;
+  storedHistory = undefined;
   failOpenFor = undefined;
   missingToolsFor = undefined;
   missingCloneFor = undefined;
@@ -1469,7 +1489,7 @@ describe('what a chat has used', () => {
     const twice = { ...CALL, inputTokens: 20, outputTokens: 4, cacheReadTokens: 180, cost: 0.02 };
     expect(snapshotOf(opened).record).toMatchObject({
       usage: { 'kilo/one': twice },
-      prompted: 100,
+      prompted: 102,
     });
     expect(recorded.get('s1')).toEqual({ 'kilo/one': twice });
   });
@@ -1506,6 +1526,55 @@ describe('what a chat has used', () => {
     await answer('two', 'kilo/one');
     expect(recorded.get('s1')).toMatchObject({ 'kilo/one': { inputTokens: 20 } });
   });
+
+  it('records routed tool rounds and summaries without replacing Auto, and retains them on reopen', async () => {
+    await releaseChat(opened);
+    const auto = 'kilo-auto/balanced';
+    opened = await startChat(place, { model: auto, effort: null });
+    await say(opened, { text: 'use a tool', images: [] }, { model: auto, effort: null });
+    await settled();
+    const current = snapshotOf(opened).sessionId;
+    routedTotals.set(current, new Map([['vendor/first', CALL]]));
+    emitEvent?.({ kind: 'done', model: 'vendor/first', usage: CALL, stop: 'tools' });
+    await settled();
+    expect(snapshotOf(opened).record.usage).toEqual({ 'vendor/first': CALL });
+    expect(snapshotOf(opened).model).toBe(auto);
+
+    const second = { ...CALL, inputTokens: 20, cost: 0.02 };
+    const summary = { ...CALL, inputTokens: 30, cost: 0.003 };
+    const expected = { 'vendor/first': CALL, 'vendor/second': second, 'vendor/summary': summary };
+    routedTotals.set(current, new Map(Object.entries(expected)));
+    emitEvent?.({ kind: 'done', model: 'vendor/second', usage: second, stop: 'end' });
+    await settled();
+    finish?.();
+    await settled();
+
+    expect(snapshotOf(opened).model).toBe(auto);
+    expect(snapshotOf(opened).record.usage).toEqual(expected);
+    expect(recorded.get(current)).toEqual(expected);
+    await releaseChat(opened);
+    await enterChat(place, current);
+    expect(snapshotOf(current).record.usage).toEqual(expected);
+    await answer('next model', 'kilo/one');
+    expect(snapshotOf(current).record.usage).toEqual({ ...expected, 'kilo/one': CALL });
+  });
+
+  it('persists a completed summary even when no answer done event follows it', async () => {
+    routedTotals.set(opened, new Map([['vendor/summary', CALL]]));
+    failAnswerFor = opened;
+
+    await say(
+      opened,
+      { text: 'after compaction', images: [] },
+      { model: 'kilo/one', effort: null }
+    );
+    await settled();
+
+    expect(snapshotOf(opened)).toMatchObject({ status: 'idle' });
+    expect(snapshotOf(opened).failed).not.toBeNull();
+    expect(snapshotOf(opened).record.usage).toEqual({ 'vendor/summary': CALL });
+    expect(recorded.get(opened)).toEqual({ 'vendor/summary': CALL });
+  });
 });
 
 describe('remote servers after a restart', () => {
@@ -1539,5 +1608,112 @@ describe('remote servers after a restart', () => {
     // The stored names resolved, so the chat continued rather than being moved.
     expect(clonedWith).toBeUndefined();
     await fresh.releaseChat('s9');
+  });
+});
+
+describe('tool visibility while reading', () => {
+  it('publishes pending, running and resolved tools in order, then restores them after reopening', async () => {
+    await say(opened, { text: 'check today', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    emitEvent?.({
+      kind: 'toolCall',
+      call: { id: 'c1', name: 'web_search', arguments: '{"query":"today"}' },
+    });
+    await settled();
+    expect(asMessages(snapshotOf(opened)).at(-1)?.parts).toEqual([
+      expect.objectContaining({ type: 'text', text: 'ok' }),
+      expect.objectContaining({
+        type: 'tool',
+        tool: 'web_search',
+        state: expect.objectContaining({ status: 'pending', input: { query: 'today' } }),
+      }),
+    ]);
+    emitEvent?.({
+      kind: 'done',
+      usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      stop: 'tools',
+    });
+    await settled();
+    expect(snapshotOf(opened).answering[1]).toMatchObject({ state: { status: 'running' } });
+    emitEvent?.({
+      kind: 'toolResult',
+      result: { callId: 'c1', body: 'today’s news', failed: false },
+    });
+    emitEvent?.({ kind: 'delta', text: 'Here is the news.' });
+    await settled();
+    const live = asMessages(snapshotOf(opened)).at(-1);
+    expect(live?.parts.map(part => part.type)).toEqual(['text', 'tool', 'text']);
+    expect(live?.parts[1]).toMatchObject({
+      state: { status: 'completed', input: { query: 'today' }, output: 'today’s news' },
+    });
+    storedHistory = [
+      {
+        id: 't1',
+        sessionId: opened,
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: 'check today' }],
+      },
+      {
+        id: 't2',
+        sessionId: opened,
+        role: 'assistant',
+        parts: [
+          { id: 'p2', kind: 'text', body: 'ok' },
+          {
+            id: 'p3',
+            kind: 'toolCall',
+            callId: 'c1',
+            name: 'web_search',
+            body: '{"query":"today"}',
+          },
+        ],
+      },
+      {
+        id: 't3',
+        sessionId: opened,
+        role: 'user',
+        parts: [
+          { id: 'p4', kind: 'toolResult', callId: 'c1', body: 'today’s news', failed: false },
+        ],
+      },
+      {
+        id: 't4',
+        sessionId: opened,
+        role: 'assistant',
+        parts: [{ id: 'p5', kind: 'text', body: 'Here is the news.' }],
+      },
+    ];
+    finish?.();
+    await settled();
+    expect(snapshotOf(opened)).toMatchObject({ status: 'idle', answering: [], asked: null });
+    const stored = asMessages(snapshotOf(opened));
+    expect(stored.map(message => message.parts.map(part => part.type))).toEqual([
+      ['text'],
+      ['text', 'tool'],
+      ['text'],
+    ]);
+    await releaseChat(opened);
+    await enterChat(place, opened);
+    expect(asMessages(snapshotOf(opened))).toEqual(stored);
+  });
+
+  it('shows a failed tool without failing the answer or adding a result bubble', async () => {
+    await say(opened, { text: 'what time is it', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    emitEvent?.({ kind: 'toolCall', call: { id: 'c1', name: 'time', arguments: '{}' } });
+    emitEvent?.({
+      kind: 'toolResult',
+      result: { callId: 'c1', body: 'clock unavailable', failed: true },
+    });
+    await settled();
+    expect(snapshotOf(opened)).toMatchObject({ status: 'working', failureKey: null });
+    const live = asMessages(snapshotOf(opened));
+    expect(live).toHaveLength(2);
+    expect(live.at(-1)?.parts[1]).toMatchObject({
+      type: 'tool',
+      state: { status: 'error', input: {}, error: 'clock unavailable' },
+    });
+    finish?.();
+    await settled();
   });
 });

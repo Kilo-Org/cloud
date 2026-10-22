@@ -1,0 +1,191 @@
+{
+  "contractVersion": 1,
+  "description": "Wire fixtures for the Cloud-hosted Kilo /kilo surface consumed by the kilo-cloud adapter. Cloud-observed behavior only: this file defines no Kilo route, no provider capability, and no M2 (checkpoint, handoff, environment) shape.",
+  "basePath": "/kilo",
+  "publicDirectory": "/cloud-agent/sessions/{sessionID}",
+  "auth": {
+    "header": "Authorization",
+    "scheme": "Bearer",
+    "note": "The bearer is a Kilo token. Cloud resolves the user and derives every session selector from it; a client-supplied userId is never trusted."
+  },
+  "headers": {
+    "nextCursor": "X-Next-Cursor",
+    "linkNext": "Link",
+    "omittedItemCount": "X-Kilo-Omitted-Item-Count"
+  },
+  "sse": {
+    "contentType": "text/event-stream",
+    "frames": [
+      "server.connected",
+      "kilo.native.fence",
+      "kilo.native.resnapshot",
+      "message.updated",
+      "message.part.updated",
+      "question.asked",
+      "permission.asked"
+    ],
+    "fence": {
+      "requiredProperties": ["sessionID", "directory", "snapshotComplete"],
+      "optionalProperties": ["fence"],
+      "meaning": "Every frame before the fence is the durable snapshot through it. Frames after it are live pushes with a position above it."
+    },
+    "resnapshot": {
+      "requiredProperties": ["sessionID"],
+      "optionalProperties": ["directory", "reason"],
+      "reasons": ["continuity_unproven", "snapshot_too_large", "snapshot_unavailable"],
+      "meaning": "The client must discard its transcript and rebuild from a fresh attach. Cloud closes the stream after this frame."
+    }
+  },
+  "routes": [
+    { "method": "GET", "path": "/session", "response": "KiloSession[]" },
+    { "method": "GET", "path": "/session/{sessionID}", "response": "KiloSession" },
+    { "method": "GET", "path": "/session/{sessionID}/message", "response": "MessageEntry[]" },
+    {
+      "method": "GET",
+      "path": "/session/status",
+      "query": { "directory": "/cloud-agent/sessions/{sessionID}" },
+      "response": "Record<sessionID, SessionStatus>"
+    },
+    { "method": "GET", "path": "/session/{sessionID}/todo", "response": "Todo[]" },
+    { "method": "GET", "path": "/session/{sessionID}/diff", "response": "FileDiff[]" },
+    {
+      "method": "GET",
+      "path": "/question",
+      "query": { "directory": "/cloud-agent/sessions/{sessionID}" },
+      "response": "Question[]"
+    },
+    {
+      "method": "GET",
+      "path": "/permission",
+      "query": { "directory": "/cloud-agent/sessions/{sessionID}" },
+      "response": "Permission[]"
+    },
+    {
+      "method": "GET",
+      "path": "/event",
+      "query": { "directory": "/cloud-agent/sessions/{sessionID}" },
+      "response": "text/event-stream"
+    },
+    { "method": "GET", "path": "/global/event", "response": "text/event-stream" },
+    { "method": "POST", "path": "/session/{sessionID}/prompt_async", "response": "204" },
+    { "method": "POST", "path": "/session/{sessionID}/abort", "response": "true" },
+    { "method": "POST", "path": "/session/{sessionID}/command", "response": "204" },
+    {
+      "method": "POST",
+      "path": "/question/{requestID}/reply",
+      "query": { "directory": "/cloud-agent/sessions/{sessionID}" },
+      "response": "true"
+    },
+    {
+      "method": "POST",
+      "path": "/question/{requestID}/reject",
+      "query": { "directory": "/cloud-agent/sessions/{sessionID}" },
+      "response": "true"
+    },
+    {
+      "method": "POST",
+      "path": "/permission/{requestID}/reply",
+      "query": { "directory": "/cloud-agent/sessions/{sessionID}" },
+      "response": "true"
+    }
+  ],
+  "errors": [
+    { "code": "KILO_SESSION_NOT_FOUND", "status": 404 },
+    { "code": "KILO_SESSION_SNAPSHOT_PENDING", "status": 503 },
+    { "code": "KILO_LIVE_RUNTIME_UNAVAILABLE", "status": 503 },
+    { "code": "KILO_INTERACTION_UNAVAILABLE", "status": 409 },
+    { "code": "KILO_PROMPT_PAYMENT_REQUIRED", "status": 402 },
+    { "code": "KILO_BILLING_BLOCKED", "status": 409 },
+    { "code": "KILO_BILLING_UNAVAILABLE", "status": 503 }
+  ],
+  "limits": {
+    "nativeDelivery": {
+      "count": 512,
+      "bytes": 65536,
+      "eventBytes": 262144,
+      "retainedBytes": 327680,
+      "batchBytes": 331776,
+      "ageMs": 2000,
+      "coalesceMs": 10
+    }
+  },
+  "fixtures": {
+    "sessionListPage": {
+      "request": "GET /kilo/session?limit=2&start=200",
+      "response": [
+        {
+          "id": "ses_12345678901234567890123456",
+          "slug": "ses_12345678901234567890123456",
+          "projectID": "cloud-agent",
+          "title": "Example",
+          "directory": "/cloud-agent/sessions/ses_12345678901234567890123456",
+          "version": "cloud-agent",
+          "time": { "created": 100, "updated": 200 }
+        }
+      ],
+      "headers": {}
+    },
+    "messagePage": {
+      "request": "GET /kilo/session/ses_12345678901234567890123456/message?limit=1",
+      "response": [
+        {
+          "info": {
+            "id": "msg_user_1",
+            "sessionID": "ses_12345678901234567890123456",
+            "role": "user",
+            "time": { "created": 110 },
+            "agent": "build",
+            "model": { "providerID": "test", "modelID": "fake" }
+          },
+          "parts": []
+        }
+      ],
+      "headers": {
+        "X-Next-Cursor": "eyJpZCI6Im1zZ191c2VyXzEiLCJ0aW1lIjoxMTB9",
+        "Link": "<http://worker.test/kilo/session/ses_12345678901234567890123456/message?limit=1&before=eyJpZCI6Im1zZ191c2VyXzEiLCJ0aW1lIjoxMTB9>; rel=\"next\"",
+        "X-Kilo-Omitted-Item-Count": "0"
+      }
+    },
+    "fence": {
+      "request": "GET /kilo/event?directory=%2Fcloud-agent%2Fsessions%2Fses_12345678901234567890123456",
+      "frames": [
+        { "type": "server.connected", "properties": {} },
+        {
+          "type": "message.updated",
+          "properties": {
+            "sessionID": "ses_12345678901234567890123456",
+            "directory": "/cloud-agent/sessions/ses_12345678901234567890123456"
+          }
+        },
+        {
+          "type": "kilo.native.fence",
+          "properties": {
+            "sessionID": "ses_12345678901234567890123456",
+            "directory": "/cloud-agent/sessions/ses_12345678901234567890123456",
+            "fence": 12,
+            "snapshotComplete": true
+          }
+        }
+      ]
+    },
+    "resnapshot": {
+      "frames": [
+        {
+          "type": "kilo.native.resnapshot",
+          "properties": {
+            "sessionID": "ses_12345678901234567890123456",
+            "directory": "/cloud-agent/sessions/ses_12345678901234567890123456",
+            "reason": "continuity_unproven"
+          }
+        }
+      ]
+    },
+    "liveRuntimeUnavailable": {
+      "status": 503,
+      "body": {
+        "error": "KILO_LIVE_RUNTIME_UNAVAILABLE",
+        "message": "Cloud Agent Kilo runtime is not live"
+      }
+    }
+  }
+}

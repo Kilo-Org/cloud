@@ -183,10 +183,13 @@ export async function trpcCall<T>(
     Authorization: `Bearer ${config.bearerToken ?? mintApiToken(config.user, config.nextAuthSecret)}`,
   };
   if (config.skipBalanceCheck !== false) {
-    // cloud-agent-client.ts sends this for App Builder callers; it cleanly
+    // cloud-agent-client.ts sends this for skipped-balance callers; it cleanly
     // skips dev billing checks. Both e2e profiles send it, because the fake
     // LLM performs no billable inference.
     headers['x-skip-balance-check'] = 'true';
+    if (config.internalApiSecret) {
+      headers['x-internal-api-key'] = config.internalApiSecret;
+    }
   }
   if (opts?.internalApiSecret) {
     headers['x-internal-api-key'] = opts.internalApiSecret;

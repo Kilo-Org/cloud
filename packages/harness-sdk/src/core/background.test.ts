@@ -15,7 +15,7 @@ import { type Tool, ToolFailure, ToolRegistry } from './tool.js';
  * and a harness that could only wait would be useless for every one of them.
  */
 
-const tool = (name: string, run: Tool['run'], inlineFor?: Duration.DurationInput): Tool => ({
+const tool = (name: string, run: Tool['run'], inlineFor?: Duration.Input): Tool => ({
   definition: { name, description: name, parameters: { type: 'object', properties: {} } },
   ...(inlineFor === undefined ? {} : { inlineFor }),
   run,
@@ -76,7 +76,9 @@ it('starts a round of its own when the call finally answers', async () => {
       Effect.gen(function* () {
         /* Watch before asking, so the round the session starts on its own has
            somewhere to go the moment it happens. */
-        const watching = yield* Effect.fork(Stream.runCollect(Stream.take(session.continued, 2)));
+        const watching = yield* Effect.forkChild(
+          Stream.runCollect(Stream.take(session.continued, 2))
+        );
         yield* Stream.runDrain(session.ask('start the build'));
         return [...(yield* Fiber.join(watching))];
       }),
@@ -107,9 +109,11 @@ it('writes the round it started on its own, like any other exchange', async () =
     tools: registry(tool('slow', () => Effect.succeed('exit 0'))),
     use: session =>
       Effect.gen(function* () {
-        const watching = yield* Effect.fork(Stream.runDrain(Stream.take(session.continued, 2)));
+        const watching = yield* Effect.forkChild(
+          Stream.runDrain(Stream.take(session.continued, 2))
+        );
         yield* Stream.runDrain(session.ask('start the build'));
-        yield* watching.await;
+        yield* Fiber.await(watching);
       }),
   });
 
@@ -137,9 +141,11 @@ it('tells the model a backgrounded call failed, in the round it starts', async (
     tools: registry(tool('slow', () => Effect.fail(new ToolFailure({ cause: 'exit 1' })))),
     use: session =>
       Effect.gen(function* () {
-        const watching = yield* Effect.fork(Stream.runDrain(Stream.take(session.continued, 2)));
+        const watching = yield* Effect.forkChild(
+          Stream.runDrain(Stream.take(session.continued, 2))
+        );
         yield* Stream.runDrain(session.ask('start the build'));
-        yield* watching.await;
+        yield* Fiber.await(watching);
       }),
   });
 
@@ -162,10 +168,12 @@ it('waits for the question in flight rather than asking over it', async () => {
     tools: registry(tool('slow', () => Effect.as(Deferred.await(gate), 'exit 0'))),
     use: session =>
       Effect.gen(function* () {
-        const watching = yield* Effect.fork(Stream.runDrain(Stream.take(session.continued, 2)));
+        const watching = yield* Effect.forkChild(
+          Stream.runDrain(Stream.take(session.continued, 2))
+        );
         yield* Deferred.succeed(gate, true);
         yield* Stream.runDrain(session.ask('start the build'));
-        yield* watching.await;
+        yield* Fiber.await(watching);
       }),
   });
 
@@ -179,7 +187,7 @@ it('continues nothing on its own when nothing is waiting', async () => {
   const { calls } = await runWith({
     replies: [{ deltas: ['hello'] }],
     use: session =>
-      Effect.zipRight(
+      Effect.andThen(
         Stream.runDrain(session.ask('hi')),
         /* Nothing joined the line, so this ends on the timeout rather than on
            an event, and the session is none the worse for it. */

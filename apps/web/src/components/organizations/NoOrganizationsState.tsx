@@ -1,4 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { Building2, Users, PiggyBank } from 'lucide-react';
 import { NewOrganizationButton } from '@/components/organizations/new/NewOrganizationButton';
 import { OrganizationsList } from './OrganizationsList';
@@ -89,7 +90,7 @@ export function NoOrganizationsState() {
             ) : (
               <p className="text-muted-foreground mb-4">
                 <a
-                  href="mailto:hi@kilo.ai"
+                  href={`mailto:${SUPPORT_EMAIL}`}
                   className="text-primary hover:text-primary/80 font-medium underline"
                 >
                   Contact our support team

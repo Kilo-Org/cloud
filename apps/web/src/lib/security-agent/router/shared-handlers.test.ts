@@ -2039,6 +2039,40 @@ describe('findings list DTO narrowing', () => {
     expect(row.remediationSummary?.latestAttempt).toBeDefined();
   });
 
+  it('fails closed when the list query returns a finding owned by another organization', async () => {
+    const ownFinding = makeFullDecoratedFinding();
+    const foreignFinding = {
+      ...makeFullDecoratedFinding(),
+      id: 'foreign-finding-id',
+      owned_by_organization_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    };
+    mockListSecurityFindings.mockResolvedValue({
+      findings: [ownFinding, foreignFinding],
+      totalCount: 2,
+    });
+    mockDecorateFindingsWithRemediation.mockResolvedValue([ownFinding, foreignFinding]);
+    mockCanStartAnalysis.mockResolvedValue({ allowed: true, currentCount: 0, limit: 3 });
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(
+      createOrganizationTrackingHandlers().listFindings.handler({
+        ctx: context,
+        input: {
+          organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          sortBy: 'severity_desc',
+          limit: 10,
+          offset: 0,
+        },
+      })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+    expect(mockDecorateFindingsWithRemediation).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('outside the requested owner scope'),
+      expect.objectContaining({ foreignFindingIds: ['foreign-finding-id'] })
+    );
+    consoleError.mockRestore();
+  });
+
   it('keeps the heavy fields on the detail getFinding response', async () => {
     const decoratedFinding = makeFullDecoratedFinding();
     mockGetSecurityFindingById.mockResolvedValue(decoratedFinding);

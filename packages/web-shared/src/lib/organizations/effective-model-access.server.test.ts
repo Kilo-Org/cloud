@@ -1,4 +1,9 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import {
+  customLlmDefinition,
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type { OrganizationGroupPolicyContext } from './organization-group-policy-context.server';
 import {
   evaluateEffectiveModelAccessPolicy,
@@ -6,6 +11,22 @@ import {
 } from './effective-model-access.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 import { VIRTUAL_PROVIDER } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
+import type * as ExclusiveModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+
+// The live catalog's restricted Kilo-exclusive models come and go, so the restriction
+// cases use a synthetic alias restricted to StepFun and keep the real lookup otherwise.
+jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof ExclusiveModels>(
+    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
+  );
+  return {
+    ...actual,
+    getKiloExclusiveInferenceProviders: (modelId: string) =>
+      modelId === 'test/restricted-exclusive'
+        ? new Set(['stepfun'])
+        : actual.getKiloExclusiveInferenceProviders(modelId),
+  };
+});
 
 function context(
   overrides: Partial<OrganizationGroupPolicyContext> = {}
@@ -135,7 +156,63 @@ describe('effective organization model access', () => {
     ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
   });
 
-  it.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
+  describe('custom LLMs', () => {
+    const ORG_ID = '00000000-0000-4000-8000-0000000000a1';
+    const GROUP_ID = '00000000-0000-4000-8000-0000000000b1';
+    const organization = { ...context().organization, id: ORG_ID };
+
+    beforeAll(async () => {
+      await insertCustomLlmForTest(
+        'acme/org-model',
+        customLlmDefinition({ organization_ids: [ORG_ID] })
+      );
+      await insertCustomLlmForTest(
+        'acme/group-model',
+        customLlmDefinition({ organization_ids: [], group_ids: [GROUP_ID] })
+      );
+      await insertCustomLlmForTest(
+        'acme/other-org-model',
+        customLlmDefinition({ organization_ids: ['00000000-0000-4000-8000-0000000000a2'] })
+      );
+    });
+
+    afterAll(async () => {
+      await deleteCustomLlmForTest('acme/org-model');
+      await deleteCustomLlmForTest('acme/group-model');
+      await deleteCustomLlmForTest('acme/other-org-model');
+    });
+
+    it('exempts a custom LLM granted to the organization', async () => {
+      const policy = evaluateEffectiveModelAccessPolicy(context({ organization }));
+
+      await expect(
+        getEffectiveModelDecision(policy, 'acme/org-model', async () => new Set())
+      ).resolves.toEqual({ allowed: true });
+    });
+
+    it('exempts a custom LLM granted to one of the member groups', async () => {
+      const policy = evaluateEffectiveModelAccessPolicy(
+        context({ organization, groupIds: [GROUP_ID] })
+      );
+
+      await expect(
+        getEffectiveModelDecision(policy, 'acme/group-model', async () => new Set())
+      ).resolves.toEqual({ allowed: true });
+    });
+
+    it.each(['acme/other-org-model', 'acme/group-model'])(
+      'applies organization policy to %s when it is not granted',
+      async modelId => {
+        const policy = evaluateEffectiveModelAccessPolicy(context({ organization }));
+
+        await expect(
+          getEffectiveModelDecision(policy, modelId, async () => new Set())
+        ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
+      }
+    );
+  });
+
+  it.each(['kilo-auto/balanced', 'kimi-coding/kimi-for-coding'])(
     'keeps %s exempt from effective Enterprise restrictions',
     async modelId => {
       const policy = evaluateEffectiveModelAccessPolicy(context());
@@ -380,7 +457,7 @@ describe('effective organization model access', () => {
     const catalogLookup = async () => new Set(['fireworks', 'stepfun']);
 
     expect(
-      await getEffectiveModelDecision(policy, 'stepfun/step-5-preview-free', catalogLookup)
+      await getEffectiveModelDecision(policy, 'test/restricted-exclusive', catalogLookup)
     ).toEqual({ allowed: false, denialSource: 'organization_provider' });
   });
 
@@ -396,7 +473,7 @@ describe('effective organization model access', () => {
     );
     const decision = await getEffectiveModelDecision(
       policy,
-      'stepfun/step-5-preview-free',
+      'test/restricted-exclusive',
       async () => new Set(['fireworks'])
     );
 
@@ -418,7 +495,7 @@ describe('effective organization model access', () => {
 
     const exclusive = await getEffectiveModelDecision(
       policy,
-      'stepfun/step-5-preview-free',
+      'test/restricted-exclusive',
       catalogLookup
     );
     const catalogModel = await getEffectiveModelDecision(
@@ -446,7 +523,7 @@ describe('effective organization model access', () => {
 
     const restricted = await getEffectiveModelDecision(
       policy,
-      'stepfun/step-5-preview-free',
+      'test/restricted-exclusive',
       emptySnapshot
     );
     const unrestricted = await getEffectiveModelDecision(policy, 'unknown/model', emptySnapshot);

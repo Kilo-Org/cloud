@@ -16,6 +16,8 @@ import { McpServersTab } from './McpServersTab';
 import { SkillsTab } from './SkillsTab';
 import { ProfileAgentsTab } from './ProfileAgentsTab';
 import { KiloCommandsTab } from './KiloCommandsTab';
+import { InstructionsTab } from './InstructionsTab';
+import { ImportConfigTab } from './ImportConfigTab';
 
 type ProfileDetailPaneProps = {
   profileId: string;
@@ -93,6 +95,8 @@ export function ProfileDetailPane({
               { id: 'mcps', label: 'MCP', count: profile.mcpServers.length, title: 'MCP servers' },
               { id: 'skills', label: 'Skills', count: profile.skills.length },
               { id: 'agents', label: 'Agents', count: profile.agents.length },
+              { id: 'instructions', label: 'Instructions', count: profile.instructions.length },
+              { id: 'import', label: 'Import', count: null },
             ] as const
           ).map(tab => (
             <TabsTrigger
@@ -168,6 +172,12 @@ export function ProfileDetailPane({
             organizationId={organizationId}
             kiloCommands={profile.kiloCommands}
           />
+        </TabsContent>
+        <TabsContent value="instructions" className="mt-0">
+          <InstructionsTab instructions={profile.instructions} />
+        </TabsContent>
+        <TabsContent value="import" className="mt-0">
+          <ImportConfigTab key={profileId} profileId={profileId} organizationId={organizationId} />
         </TabsContent>
       </div>
     </Tabs>

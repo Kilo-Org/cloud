@@ -413,6 +413,24 @@ describe('createServiceState', () => {
 
       expect(state.getStatus()).toEqual({ type: 'error', message: 'previous error' });
     });
+
+    it.each(['question', 'permission', 'offline'])(
+      'leaves activity and status untouched for a %s status',
+      type => {
+        const state = createServiceState(makeConfig());
+        state.setActivity({ type: 'busy' });
+        state.setStatus({ type: 'error', message: 'previous error' });
+
+        state.process({
+          type: 'session.status',
+          sessionId: 'root-1',
+          status: { type },
+        });
+
+        expect(state.getActivity()).toEqual({ type: 'busy' });
+        expect(state.getStatus()).toEqual({ type: 'error', message: 'previous error' });
+      }
+    );
   });
 
   describe('stopped', () => {

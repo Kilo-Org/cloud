@@ -7,7 +7,11 @@
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
-import { PREPARATION_OUTPUT_TAIL_MAX_BYTES, sessionCommitDataSchema } from './schemas';
+import {
+  knownSessionStatus,
+  PREPARATION_OUTPUT_TAIL_MAX_BYTES,
+  sessionCommitDataSchema,
+} from './schemas';
 import type {
   SessionInfo,
   SessionActivity,
@@ -235,7 +239,15 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       terminated = false;
     }
 
-    if (sessionStatus.type === 'busy') {
+    const known = knownSessionStatus(sessionStatus);
+    if (known === null) {
+      // A status this SDK does not know yet keeps its event, but it has no
+      // meaning here; the previous activity and status stand, never idle.
+      notify();
+      return;
+    }
+
+    if (known.type === 'busy') {
       replay?.childErrors.delete(sessionId);
       if (isRootSession(sessionId)) {
         activity = { type: 'busy' };
@@ -244,17 +256,17 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         completed = false;
         terminated = false;
       }
-    } else if (sessionStatus.type === 'retry' && isRootSession(sessionId)) {
+    } else if (known.type === 'retry' && isRootSession(sessionId)) {
       activity = {
         type: 'retrying',
-        attempt: sessionStatus.attempt,
-        message: sessionStatus.message,
+        attempt: known.attempt,
+        message: known.message,
       };
-    } else if (sessionStatus.type === 'idle') {
+    } else if (known.type === 'idle') {
       if (isRootSession(sessionId) && activity.type !== 'idle') {
         activity = { type: 'idle' };
       }
-    } else if (sessionStatus.type === 'scheduled') {
+    } else if (known.type === 'scheduled') {
       // A scheduled session does nothing now, so the activity reads idle while
       // the lifecycle status carries the wake time. Like `busy`, a child
       // session's status must not repaint the root's status.
@@ -262,13 +274,13 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         if (activity.type !== 'idle') activity = { type: 'idle' };
         status = {
           type: 'scheduled',
-          ...(sessionStatus.scheduledAt ? { scheduledAt: sessionStatus.scheduledAt } : {}),
+          ...(known.scheduledAt ? { scheduledAt: known.scheduledAt } : {}),
         };
       }
     }
-    // Any other (unknown) status string leaves the previous status untouched —
-    // it is never coerced to idle.
-
+    // `question` and `permission` name a pending interaction that the
+    // question.asked / permission.asked events already carry, so the status
+    // alone changes nothing here.
     notify();
   }
 
@@ -906,16 +918,19 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       if (activity.type === 'connecting') {
         activity = { type: 'idle' };
       }
-    } else if (sessionStatus.type === 'busy') {
-      activity = { type: 'busy' };
-    } else if (sessionStatus.type === 'idle') {
-      activity = { type: 'idle' };
-    } else if (sessionStatus.type === 'retry') {
-      activity = {
-        type: 'retrying',
-        attempt: sessionStatus.attempt,
-        message: sessionStatus.message,
-      };
+    } else {
+      const known = knownSessionStatus(sessionStatus);
+      if (known?.type === 'busy') {
+        activity = { type: 'busy' };
+      } else if (known?.type === 'idle') {
+        activity = { type: 'idle' };
+      } else if (known?.type === 'retry') {
+        activity = {
+          type: 'retrying',
+          attempt: known.attempt,
+          message: known.message,
+        };
+      }
     }
 
     // Set cloudStatus (undefined means not provided — leave as null)

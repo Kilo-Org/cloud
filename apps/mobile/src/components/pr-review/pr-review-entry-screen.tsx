@@ -20,7 +20,6 @@ import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
-import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
@@ -284,8 +283,10 @@ export function PrReviewEntryScreen() {
           />
           {!hasInput ? <PrLinkPlaceholder label={urlPlaceholder} /> : null}
           {showClearButton ? (
-            // h-13 w-13 measures 45×45pt on device; h-12 is 42pt and h-11 is
-            // 38pt in this app — do not "simplify" back to h-11/w-11.
+            // The clear control is icon-only like the paste control beside it,
+            // so it carries the same shared 48dp target; the 45pt box it used
+            // to render (`h-13`, which is 45pt at this app's 14pt rem) sits
+            // under Android's minimum.
             <Pressable
               onPress={() => {
                 // clear() is the iOS-safe native empty after real typing.
@@ -301,7 +302,7 @@ export function PrReviewEntryScreen() {
               }}
               accessibilityRole="button"
               accessibilityLabel={t('prReview.entry.clearLink')}
-              className="h-13 w-13 items-center justify-center active:opacity-70"
+              className={`${ICON_TARGET_BOX_CLASS} active:opacity-70`}
             >
               <X size={16} color={colors.mutedForeground} />
             </Pressable>
@@ -313,10 +314,7 @@ export function PrReviewEntryScreen() {
           }}
           accessibilityRole="button"
           accessibilityLabel={t('prReview.entry.pasteLink')}
-          className={cn(
-            ICON_TARGET_BOX_CLASS,
-            'rounded-md border border-border bg-card active:opacity-70'
-          )}
+          className={`${ICON_TARGET_BOX_CLASS} rounded-md border border-border bg-card active:opacity-70`}
         >
           <ClipboardIcon size={18} color={colors.mutedForeground} />
         </Pressable>

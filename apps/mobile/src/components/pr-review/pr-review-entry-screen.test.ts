@@ -224,7 +224,14 @@ describe('provider-neutral URL field', () => {
     const input = find(before, 'Input', () => true);
     (propsOf(input).onChangeText as (value: string) => void)('anything');
     const after = render();
-    expect(find(after, 'Pressable', p => p.accessibilityLabel === 'Clear link')).toBeTruthy();
+    const clear = find(after, 'Pressable', p => p.accessibilityLabel === 'Clear link');
+    expect(clear).toBeTruthy();
+    // Icon-only like the paste control, so its own box carries Android's 48dp
+    // minimum instead of a smaller frame plus hit slop.
+    expect(String(clear.props?.className)).toContain(
+      'h-[48px] w-[48px] items-center justify-center'
+    );
+    expect(clear.props?.hitSlop).toBeUndefined();
   });
 
   it('gives the paste control the shared 48dp icon target with no hit slop', async () => {

@@ -47,6 +47,7 @@ const mockGetRemediationAttemptHistory = jest.fn<() => Promise<unknown>>();
 const mockDeleteFindingsByRepository =
   jest.fn<(params: unknown) => Promise<{ deletedCount: number }>>();
 const mockTrackSecurityAgentSync = jest.fn();
+const mockTrackSecurityAgentEnabled = jest.fn();
 const mockTrackSecurityAgentUiInteraction = jest.fn();
 const mockTrackSecurityAgentRemediationAction = jest.fn();
 const mockLogSecurityAudit = jest.fn();
@@ -113,7 +114,7 @@ jest.mock('../github/dependabot-api', () => ({
   checkDependabotAlertsAvailability: mockCheckDependabotAlertsAvailability,
 }));
 jest.mock('../posthog-tracking', () => ({
-  trackSecurityAgentEnabled: jest.fn(),
+  trackSecurityAgentEnabled: mockTrackSecurityAgentEnabled,
   trackSecurityAgentConfigSaved: jest.fn(),
   trackSecurityAgentSync: mockTrackSecurityAgentSync,
   trackSecurityAgentFindingDismissed: jest.fn(),
@@ -592,6 +593,7 @@ describe('setEnabled', () => {
     expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
     expect(mockAdmitOperation).not.toHaveBeenCalled();
     expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+    expect(mockTrackSecurityAgentEnabled).not.toHaveBeenCalled();
     expect(mockLogSecurityAudit).not.toHaveBeenCalled();
   });
 

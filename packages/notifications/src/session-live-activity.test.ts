@@ -26,6 +26,12 @@ describe('sessionLiveActivityTitle', () => {
     const capped = sessionLiveActivityTitle(`${'x'.repeat(119)}😀`);
     expect(capped).toBe('x'.repeat(119));
   });
+
+  it('keeps the title to the characters it draws', () => {
+    expect(sessionLiveActivityTitle('report\u202Efdp.exe')).toBe('reportfdp.exe');
+    expect(sessionLiveActivityTitle('\u2066Deploy\u2069\u200B fix')).toBe('Deploy fix');
+    expect(sessionLiveActivityTitle('Fix\u2028the login bug')).toBe('Fix the login bug');
+  });
 });
 
 describe('buildSessionLiveActivityContentState', () => {
@@ -63,6 +69,27 @@ describe('buildSessionLiveActivityContentState', () => {
       approvalKey: null,
       statusSince: options.statusSinceFallback,
     });
+  });
+
+  it('keeps the card text to the characters it draws', () => {
+    const content = buildSessionLiveActivityContentState(
+      {
+        id: 'ses_text',
+        title: '\u202EFix the \u2066login bug',
+        status: 'permission',
+        permissionCommand: 'pnpm\u200B install \u202E--frozen-lockfile',
+        currentStep: { verb: 'editing', target: 'src/report\u202Efdp.exe' },
+        plan: { done: 1, total: 3, current: '\u2066review\u2069 tests' },
+      },
+      options
+    );
+    expect(content).toMatchObject({
+      title: 'Fix the login bug',
+      permissionCommand: 'pnpm install --frozen-lockfile',
+      currentStep: { verb: 'editing', target: 'src/reportfdp.exe' },
+      plan: { done: 1, total: 3, current: 'review tests' },
+    });
+    expect(sessionLiveActivityContentStateSchema.parse(content)).toEqual(content);
   });
 
   it('carries the derived facts and keeps the server-only ones on a local update', () => {

@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} araç",
       "serverToolCount_other": "{{count}} araç",
       "serverUnreachable": "Bu sunucuya ulaşılamadı",
-      "serverOff": "Bu sunucu kapalı"
+      "serverOff": "Bu sunucu kapalı",
+      "app": {
+        "label": "Araç arayüzü",
+        "failed": "Bu aracın arayüzü yüklenemedi.",
+        "empty": "Bu aracın arayüzünde gösterilecek bir şey yok."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Kimlik doğrulama",

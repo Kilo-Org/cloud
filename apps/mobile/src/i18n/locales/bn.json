@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} টুল",
       "serverToolCount_other": "{{count}} টুল",
       "serverUnreachable": "এই সার্ভারে পৌঁছানো যায়নি",
-      "serverOff": "এই সার্ভার বন্ধ আছে"
+      "serverOff": "এই সার্ভার বন্ধ আছে",
+      "app": {
+        "label": "টুল ইন্টারফেস",
+        "failed": "এই টুলের ইন্টারফেস লোড করা যায়নি।",
+        "empty": "এই টুলের ইন্টারফেসে দেখানোর কিছু নেই।"
+      }
     },
     "mcpOAuth": {
       "authMethod": "প্রমাণীকরণ",

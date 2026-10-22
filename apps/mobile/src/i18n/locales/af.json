@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} gereedskapstuk",
       "serverToolCount_other": "{{count}} gereedskap",
       "serverUnreachable": "Kon nie hierdie bediener bereik nie",
-      "serverOff": "Hierdie bediener is af"
+      "serverOff": "Hierdie bediener is af",
+      "app": {
+        "label": "Gereedskapkoppelvlak",
+        "failed": "Hierdie gereedskap se koppelvlak kon nie laai nie.",
+        "empty": "Hierdie gereedskap se koppelvlak het niks om te wys nie."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Verifikasie",

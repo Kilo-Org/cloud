@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} taputapu",
       "serverToolCount_other": "{{count}} taputapu",
       "serverUnreachable": "Kāore i taea te toro atu ki tēnei tūmau",
-      "serverOff": "Kua weto tēnei tūmau"
+      "serverOff": "Kua weto tēnei tūmau",
+      "app": {
+        "label": "Atanga utauta",
+        "failed": "Kāore i taea te uta i te atanga o tēnei utauta.",
+        "empty": "Kāore he mea hei whakaatu i te atanga o tēnei utauta."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Motuhēhēnga",

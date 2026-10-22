@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} ابزار",
       "serverToolCount_other": "{{count}} ابزار",
       "serverUnreachable": "دسترسی به این سرور ممکن نشد",
-      "serverOff": "این سرور خاموش است"
+      "serverOff": "این سرور خاموش است",
+      "app": {
+        "label": "رابط ابزار",
+        "failed": "رابط این ابزار بارگذاری نشد.",
+        "empty": "رابط این ابزار چیزی برای نمایش ندارد."
+      }
     },
     "mcpOAuth": {
       "authMethod": "احراز هویت",

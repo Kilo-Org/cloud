@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} tööriist",
       "serverToolCount_other": "{{count}} tööriista",
       "serverUnreachable": "Selle serverini ei õnnestunud jõuda",
-      "serverOff": "See server on välja lülitatud"
+      "serverOff": "See server on välja lülitatud",
+      "app": {
+        "label": "Tööriista liides",
+        "failed": "Selle tööriista liidest ei õnnestunud laadida.",
+        "empty": "Selle tööriista liidesel pole midagi näidata."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentimine",

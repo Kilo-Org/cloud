@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} qalab",
       "serverToolCount_other": "{{count}} qalab",
       "serverUnreachable": "Lama gaari karin serverkan",
-      "serverOff": "Serverkan waa dammaan"
+      "serverOff": "Serverkan waa dammaan",
+      "app": {
+        "label": "Isdhexgalka qalabka",
+        "failed": "Isdhexgalka qalabkan lama soo dejin karin.",
+        "empty": "Isdhexgalka qalabkan wax la muujiyo ma jiro."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Xaqiijinta",

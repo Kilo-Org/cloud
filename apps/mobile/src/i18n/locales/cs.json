@@ -3470,7 +3470,12 @@
       "serverToolCount_one": "{{count}} nástroj",
       "serverToolCount_other": "{{count}} nástrojů",
       "serverUnreachable": "Nepodařilo se připojit k tomuto serveru",
-      "serverOff": "Tento server je vypnutý"
+      "serverOff": "Tento server je vypnutý",
+      "app": {
+        "label": "Rozhraní nástroje",
+        "failed": "Rozhraní tohoto nástroje se nepodařilo načíst.",
+        "empty": "Rozhraní tohoto nástroje nemá co zobrazit."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Ověření",

@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} ഉപകരണം",
       "serverToolCount_other": "{{count}} ഉപകരണങ്ങൾ",
       "serverUnreachable": "ഈ സെർവറിൽ എത്തിച്ചേരാനായില്ല",
-      "serverOff": "ഈ സെർവർ ഓഫാണ്"
+      "serverOff": "ഈ സെർവർ ഓഫാണ്",
+      "app": {
+        "label": "ടൂൾ ഇന്റർഫേസ്",
+        "failed": "ഈ ടൂളിന്റെ ഇന്റർഫേസ് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
+        "empty": "ഈ ടൂളിന്റെ ഇന്റർഫേസിൽ കാണിക്കാൻ ഒന്നുമില്ല."
+      }
     },
     "mcpOAuth": {
       "authMethod": "ആധികാരികത",

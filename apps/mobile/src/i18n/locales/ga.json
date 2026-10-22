@@ -3512,7 +3512,12 @@
       "serverToolCount_other": "{{count}} uirlis",
       "serverToolCount_two": "{{count}} uirlis",
       "serverUnreachable": "Níorbh fhéidir an freastalaí seo a shroicheadh",
-      "serverOff": "Tá an freastalaí seo múchta"
+      "serverOff": "Tá an freastalaí seo múchta",
+      "app": {
+        "label": "Comhéadan na huirlise",
+        "failed": "Níorbh fhéidir comhéadan na huirlise seo a lódáil.",
+        "empty": "Níl aon rud le taispeáint ar chomhéadan na huirlise seo."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Fíordheimhniú",

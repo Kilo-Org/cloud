@@ -3467,6 +3467,11 @@
       "serverChecking": "Tikrinamas šis serveris…",
       "serverUnreachable": "Nepavyko pasiekti šio serverio",
       "serverOff": "Šis serveris išjungtas",
+      "app": {
+        "label": "Įrankio sąsaja",
+        "failed": "Nepavyko įkelti šio įrankio sąsajos.",
+        "empty": "Šio įrankio sąsajoje nėra ką rodyti."
+      },
       "serverToolCount_one": "{{count}} įrankis",
       "serverToolCount_few": "{{count}} įrankiai",
       "serverToolCount_many": "{{count}} įrankių",

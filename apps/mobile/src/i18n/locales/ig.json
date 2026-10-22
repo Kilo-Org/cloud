@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "ngwá ọrụ {{count}}",
       "serverToolCount_other": "ngwá ọrụ {{count}}",
       "serverUnreachable": "Enweghị ike iru sava a",
-      "serverOff": "Sava a agbanyụrụ"
+      "serverOff": "Sava a agbanyụrụ",
+      "app": {
+        "label": "Interface ngwá ọrụ",
+        "failed": "Enweghị ike ibu interface ngwá ọrụ a.",
+        "empty": "Interface ngwá ọrụ a enweghị ihe ọ ga-egosi."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Nkwenye njirimara",

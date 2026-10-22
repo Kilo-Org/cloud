@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "fitaovana {{count}}",
       "serverToolCount_other": "fitaovana {{count}}",
       "serverUnreachable": "Tsy tratra ity server ity",
-      "serverOff": "Mihidy ity server ity"
+      "serverOff": "Mihidy ity server ity",
+      "app": {
+        "label": "Interfasan'ny fitaovana",
+        "failed": "Tsy tafiditra ny interfasan'ity fitaovana ity.",
+        "empty": "Tsy misy zavatra haseho ao amin'ny interfasan'ity fitaovana ity."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Fanamarinana",

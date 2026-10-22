@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "irinṣẹ́ {{count}}",
       "serverToolCount_other": "irinṣẹ́ {{count}}",
       "serverUnreachable": "A kò lè dé sáfà yìí",
-      "serverOff": "Sáfà yìí ti pa"
+      "serverOff": "Sáfà yìí ti pa",
+      "app": {
+        "label": "Ẹ̀rọ ìjápọ̀",
+        "failed": "A kò le gbé ẹ̀rọ ìjápọ̀ yìí sókè.",
+        "empty": "Ẹ̀rọ ìjápọ̀ yìí kò ní nnkan láti fihàn."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Ìjẹ́rìísí",

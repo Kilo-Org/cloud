@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} ਟੂਲ",
       "serverToolCount_other": "{{count}} ਟੂਲ",
       "serverUnreachable": "ਇਸ ਸਰਵਰ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਿਆ",
-      "serverOff": "ਇਹ ਸਰਵਰ ਬੰਦ ਹੈ"
+      "serverOff": "ਇਹ ਸਰਵਰ ਬੰਦ ਹੈ",
+      "app": {
+        "label": "ਸਾਧਨ ਇੰਟਰਫੇਸ",
+        "failed": "ਇਸ ਸਾਧਨ ਦਾ ਇੰਟਰਫੇਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ.",
+        "empty": "ਇਸ ਸਾਧਨ ਦੇ ਇੰਟਰਫੇਸ ਵਿੱਚ ਵੇਖਾਉਣ ਲਈ ਕੁਝ ਵੀ ਨਹੀਂ ਹੈ."
+      }
     },
     "mcpOAuth": {
       "authMethod": "ਪ੍ਰਮਾਣੀਕਰਨ",

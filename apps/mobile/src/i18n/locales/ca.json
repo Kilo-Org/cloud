@@ -3428,7 +3428,12 @@
       "serverToolCount_one": "{{count}} eina",
       "serverToolCount_other": "{{count}} eines",
       "serverUnreachable": "No s'ha pogut contactar amb aquest servidor",
-      "serverOff": "Aquest servidor està desactivat"
+      "serverOff": "Aquest servidor està desactivat",
+      "app": {
+        "label": "Interfície de l'eina",
+        "failed": "No s'ha pogut carregar la interfície d'aquesta eina.",
+        "empty": "La interfície d'aquesta eina no té res a mostrar."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autenticació",

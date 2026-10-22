@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} alat",
       "serverToolCount_other": "{{count}} alat",
       "serverUnreachable": "Tidak dapat menjangkau server ini",
-      "serverOff": "Server ini nonaktif"
+      "serverOff": "Server ini nonaktif",
+      "app": {
+        "label": "Antarmuka alat",
+        "failed": "Antarmuka alat ini tidak dapat dimuat.",
+        "empty": "Antarmuka alat ini tidak memiliki apa pun untuk ditampilkan."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentikasi",

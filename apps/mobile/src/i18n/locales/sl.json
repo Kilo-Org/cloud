@@ -3470,7 +3470,12 @@
       "serverToolCount_other": "{{count}} orodij",
       "serverToolCount_two": "{{count}} orodji",
       "serverUnreachable": "Ni bilo mogoče doseči tega strežnika",
-      "serverOff": "Ta strežnik je izklopljen"
+      "serverOff": "Ta strežnik je izklopljen",
+      "app": {
+        "label": "Vmesnik orodja",
+        "failed": "Vmesnika tega orodja ni bilo mogoče naložiti.",
+        "empty": "Vmesnik tega orodja nima ničesar za prikaz."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Preverjanje pristnosti",

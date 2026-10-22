@@ -3428,7 +3428,12 @@
       "serverToolCount_one": "{{count}} strumento",
       "serverToolCount_other": "{{count}} strumenti",
       "serverUnreachable": "Impossibile raggiungere questo server",
-      "serverOff": "Questo server è disattivato"
+      "serverOff": "Questo server è disattivato",
+      "app": {
+        "label": "Interfaccia dello strumento",
+        "failed": "Impossibile caricare l'interfaccia di questo strumento.",
+        "empty": "L'interfaccia di questo strumento non ha nulla da mostrare."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autenticazione",

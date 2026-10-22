@@ -3385,6 +3385,11 @@
       "serverChecking": "આ સર્વર તપાસી રહ્યું છે…",
       "serverUnreachable": "આ સર્વર સુધી પહોંચી શકાયું નથી",
       "serverOff": "આ સર્વર બંધ છે",
+      "app": {
+        "label": "ટૂલ ઇન્ટરફેસ",
+        "failed": "આ ટૂલનું ઇન્ટરફેસ લોડ થઈ શક્યું નથી.",
+        "empty": "આ ટૂલના ઇન્ટરફેસમાં બતાવવા માટે કંઈ નથી."
+      },
       "serverToolCount_one": "{{count}} સાધન",
       "serverToolCount_other": "{{count}} સાધનો"
     },

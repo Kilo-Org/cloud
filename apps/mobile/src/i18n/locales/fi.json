@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} työkalu",
       "serverToolCount_other": "{{count}} työkalua",
       "serverUnreachable": "Tähän palvelimeen ei saatu yhteyttä",
-      "serverOff": "Tämä palvelin on pois päältä"
+      "serverOff": "Tämä palvelin on pois päältä",
+      "app": {
+        "label": "Työkalun käyttöliittymä",
+        "failed": "Tämän työkalun käyttöliittymää ei voitu ladata.",
+        "empty": "Tämän työkalun käyttöliittymässä ei ole näytettävää."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Todennus",

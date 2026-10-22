@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} værktøj",
       "serverToolCount_other": "{{count}} værktøjer",
       "serverUnreachable": "Kunne ikke nå denne server",
-      "serverOff": "Denne server er slået fra"
+      "serverOff": "Denne server er slået fra",
+      "app": {
+        "label": "Værktøjsgrænseflade",
+        "failed": "Grænsefladen til dette værktøj kunne ikke indlæses.",
+        "empty": "Grænsefladen til dette værktøj har intet at vise."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Godkendelse",

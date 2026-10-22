@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "zana {{count}}",
       "serverToolCount_other": "zana {{count}}",
       "serverUnreachable": "Haikuweza kufikia seva hii",
-      "serverOff": "Seva hii imezimwa"
+      "serverOff": "Seva hii imezimwa",
+      "app": {
+        "label": "Kiolesura cha zana",
+        "failed": "Kiolesura cha zana hii hakukuweza kupakiwa.",
+        "empty": "Kiolesura cha zana hii hakina kitu cha kuonyesha."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Uthibitishaji",

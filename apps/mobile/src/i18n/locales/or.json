@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} ସାଧନ",
       "serverToolCount_other": "{{count}} ସାଧନ",
       "serverUnreachable": "ଏହି ସର୍ଭର ପର୍ଯ୍ୟନ୍ତ ପହଞ୍ଚି ପାରିଲା ନାହିଁ",
-      "serverOff": "ଏହି ସର୍ଭର ବନ୍ଦ ଅଛି"
+      "serverOff": "ଏହି ସର୍ଭର ବନ୍ଦ ଅଛି",
+      "app": {
+        "label": "ସାଧନ ଇଣ୍ଟରଫେସ୍",
+        "failed": "ଏହି ସାଧନର ଇଣ୍ଟରଫେସ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ.",
+        "empty": "ଏହି ସାଧନର ଇଣ୍ଟରଫେସ୍ରେ ଦେଖାଇବାକୁ କିଛି ନାହିଁ."
+      }
     },
     "mcpOAuth": {
       "authMethod": "ପ୍ରମାଣୀକରଣ",

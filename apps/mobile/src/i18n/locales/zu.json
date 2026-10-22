@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "ithuluzi elingu-{{count}}",
       "serverToolCount_other": "amathuluzi angu-{{count}}",
       "serverUnreachable": "Ayikwazanga ukufinyelela le seve",
-      "serverOff": "Le seve ivaliwe"
+      "serverOff": "Le seve ivaliwe",
+      "app": {
+        "label": "Isixhumi esibonakalayo sethuluzi",
+        "failed": "Ayikwazanga ukulayisha isixhumi esibonakalayo salesi thuluzi.",
+        "empty": "Isixhumi esibonakalayo salesi thuluzi asinakho okufanele kuboniswe."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Ukuqinisekisa",

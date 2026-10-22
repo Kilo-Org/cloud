@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} verkfæri",
       "serverToolCount_other": "{{count}} verkfæri",
       "serverUnreachable": "Náði ekki sambandi við þennan þjón",
-      "serverOff": "Þessi þjónn er óvirkur"
+      "serverOff": "Þessi þjónn er óvirkur",
+      "app": {
+        "label": "Viðmót tóls",
+        "failed": "Ekki tókst að hlaða viðmóti tólsins.",
+        "empty": "Viðmót tólsins hefur ekkert til að sýna."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Auðkenning",

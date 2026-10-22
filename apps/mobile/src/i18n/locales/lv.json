@@ -3426,6 +3426,11 @@
       "serverChecking": "Pārbauda šo serveri…",
       "serverUnreachable": "Neizdevās sasniegt šo serveri",
       "serverOff": "Šis serveris ir izslēgts",
+      "app": {
+        "label": "Rīka saskarne",
+        "failed": "Neizdevās ielādēt šī rīka saskarni.",
+        "empty": "Šī rīka saskarnē nav ko parādīt."
+      },
       "serverToolCount_zero": "{{count}} rīku",
       "serverToolCount_one": "{{count}} rīks",
       "serverToolCount_other": "{{count}} rīki"

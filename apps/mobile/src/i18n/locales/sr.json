@@ -3428,7 +3428,12 @@
       "serverToolCount_one": "{{count}} alat",
       "serverToolCount_other": "{{count}} alata",
       "serverUnreachable": "Nije bilo moguće doći do ovog servera",
-      "serverOff": "Ovaj server je isključen"
+      "serverOff": "Ovaj server je isključen",
+      "app": {
+        "label": "Interfejs alata",
+        "failed": "Interfejs ovog alata nije mogao da se učita.",
+        "empty": "Interfejs ovog alata nema šta da prikaže."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentifikacija",

@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} उपकरण",
       "serverToolCount_other": "{{count}} उपकरण",
       "serverUnreachable": "यो सर्भरसम्म पुग्न सकिएन",
-      "serverOff": "यो सर्भर बन्द छ"
+      "serverOff": "यो सर्भर बन्द छ",
+      "app": {
+        "label": "उपकरण इन्टरफेस",
+        "failed": "यो उपकरणको इन्टरफेस लोड गर्न सकिएन.",
+        "empty": "यो उपकरणको इन्टरफेसमा देखाउनका लागि केही पनि छैन."
+      }
     },
     "mcpOAuth": {
       "authMethod": "प्रमाणीकरण",

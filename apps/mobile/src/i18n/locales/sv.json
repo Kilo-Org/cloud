@@ -3385,7 +3385,12 @@
       "serverToolCount_one": "{{count}} verktyg",
       "serverToolCount_other": "{{count}} verktyg",
       "serverUnreachable": "Kunde inte nå denna server",
-      "serverOff": "Denna server är avstängd"
+      "serverOff": "Denna server är avstängd",
+      "app": {
+        "label": "Verktygsgränssnitt",
+        "failed": "Det här verktygets gränssnitt kunde inte läsas in.",
+        "empty": "Det här verktygets gränssnitt har inget att visa."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentisering",

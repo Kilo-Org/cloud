@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} መሳሪያ",
       "serverToolCount_other": "{{count}} መሳሪያዎች",
       "serverUnreachable": "ይህን ሰርቨር ማግኘት አልተቻለም",
-      "serverOff": "ይህ ሰርቨር ተዘግቷል"
+      "serverOff": "ይህ ሰርቨር ተዘግቷል",
+      "app": {
+        "label": "የመሣሪያ በይነገጽ",
+        "failed": "የዚህ መሣሪያ በይነገጽ መጫን አልተቻለም።",
+        "empty": "የዚህ መሣሪያ በይነገጽ የሚያሳየ ነገር የለውም።"
+      }
     },
     "mcpOAuth": {
       "authMethod": "ማረጋገጫ",

@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} vosita",
       "serverToolCount_other": "{{count}} vosita",
       "serverUnreachable": "Bu serverga yetib boʻlmadi",
-      "serverOff": "Bu server oʻchirilgan"
+      "serverOff": "Bu server oʻchirilgan",
+      "app": {
+        "label": "Vosita interfeysi",
+        "failed": "Ushbu vositanning interfeysini yuklab bo‘lmadi.",
+        "empty": "Ushbu vositanning interfeysida ko‘rsatish uchun hech narsa yo‘q."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentifikatsiya",

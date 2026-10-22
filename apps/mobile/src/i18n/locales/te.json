@@ -3386,7 +3386,12 @@
       "serverToolCount_one": "{{count}} సాధనం",
       "serverToolCount_other": "{{count}} సాధనాలు",
       "serverUnreachable": "ఈ సర్వర్‌ను చేరుకోలేకపోయింది",
-      "serverOff": "ఈ సర్వర్ ఆఫ్‌లో ఉంది"
+      "serverOff": "ఈ సర్వర్ ఆఫ్‌లో ఉంది",
+      "app": {
+        "label": "టూల్ ఇంటర్‌ఫేస్",
+        "failed": "ఈ టూల్ ఇంటర్‌ఫేస్‌ను లోడ్ చేయడం సాధ్యం కాలేదు.",
+        "empty": "ఈ టూల్ ఇంటర్‌ఫేస్‌లో చూపడానికి ఏమీ లేదు."
+      }
     },
     "mcpOAuth": {
       "authMethod": "ప్రామాణీకరణ",

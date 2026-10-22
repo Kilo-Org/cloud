@@ -3549,6 +3549,11 @@
       "serverChecking": "جارٍ التحقق من هذا الخادم…",
       "serverUnreachable": "تعذّر الوصول إلى هذا الخادم",
       "serverOff": "هذا الخادم متوقف",
+      "app": {
+        "label": "واجهة الأداة",
+        "failed": "تعذّر تحميل واجهة هذه الأداة.",
+        "empty": "لا تحتوي واجهة هذه الأداة على أي شيء للعرض."
+      },
       "serverToolCount_zero": "{{count}} أدوات",
       "serverToolCount_one": "{{count}} أداة",
       "serverToolCount_two": "{{count}} أداتان",

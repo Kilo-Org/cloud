@@ -3554,7 +3554,12 @@
       "serverToolCount_two": "{{count}} offeryn",
       "serverToolCount_zero": "{{count}} offeryn",
       "serverUnreachable": "Ni ellid cyrraedd y gweinydd hwn",
-      "serverOff": "Mae'r gweinydd hwn i ffwrdd"
+      "serverOff": "Mae'r gweinydd hwn i ffwrdd",
+      "app": {
+        "label": "Rhyngwyneb yr offeryn",
+        "failed": "Methwyd llwytho rhyngwyneb yr offeryn hwn.",
+        "empty": "Does dim byd i'w ddangos yng rhyngwyneb yr offeryn hwn."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Dilysu",

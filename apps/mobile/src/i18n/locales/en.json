@@ -3645,7 +3645,12 @@
       "serverToolCount_one": "{{count}} tool",
       "serverToolCount_other": "{{count}} tools",
       "serverUnreachable": "Couldn't reach this server",
-      "serverOff": "This server is off"
+      "serverOff": "This server is off",
+      "app": {
+        "label": "Tool interface",
+        "failed": "This tool's interface couldn't load.",
+        "empty": "This tool's interface has nothing to show."
+      }
     },
     "reasoningEffort": {
       "modelFlag": "This model supports thinking effort"

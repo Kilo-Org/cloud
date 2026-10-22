@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "dit seneste kodelager",
+      "confirmMessage": "Kodelager: {{repository}}. Forespørgsel: {{prompt}}",
+      "confirmTitle": "Start denne agent?",
       "promptRequired": "Start agenten kræver en forespørgsel. Tilføj en forespørgsel, og kør den igen.",
       "repositoryRequired": "Start agenten kræver et kodelager. Åbn Kilo, vælg et, og kør den igen.",
       "repositoryUnknown": "Kilo genkender ikke {{repository}} som et GitHub- eller GitLab-kodelager. Vælg et andet kodelager i Kilo.",

@@ -3748,6 +3748,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "أحدث مستودع لديك",
+      "confirmMessage": "المستودع: {{repository}}. التعليمات: {{prompt}}",
+      "confirmTitle": "هل تريد تشغيل هذا الوكيل؟",
       "promptRequired": "يتطلب تشغيل وكيل تعليمات. أضف تعليمات ثم شغّله مرة أخرى.",
       "repositoryRequired": "يتطلب تشغيل وكيل مستودعًا. افتح Kilo واختر مستودعًا، ثم شغّله مرة أخرى.",
       "repositoryUnknown": "لا يتعرّف Kilo على {{repository}} كمستودع GitHub أو GitLab. اختر مستودعًا آخر في Kilo.",

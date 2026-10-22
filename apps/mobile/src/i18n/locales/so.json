@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "kaydkaagii ugu dambeeyay",
+      "confirmMessage": "Kayd: {{repository}}. Tilmaan: {{prompt}}",
+      "confirmTitle": "Ma bilaabaa wakiilkan?",
       "promptRequired": "Bilow wakiilka wuxuu u baahan yahay tilmaan. Ku dar tilmaan kadibna mar kale orod.",
       "repositoryRequired": "Bilow wakiilka wuxuu u baahan yahay kayd. Fur Kilo oo ku dooro mid, kadibna mar kale orod.",
       "repositoryUnknown": "Kilo kama aqoonsado {{repository}} kayd GitHub ama GitLab ah. Dooro kayd kale gudaha Kilo.",

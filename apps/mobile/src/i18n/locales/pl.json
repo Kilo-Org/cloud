@@ -3664,6 +3664,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "twoje najnowsze repozytorium",
+      "confirmMessage": "Repozytorium: {{repository}}. Polecenie: {{prompt}}",
+      "confirmTitle": "Uruchomić tego agenta?",
       "promptRequired": "Uruchomienie agenta wymaga polecenia. Dodaj polecenie i uruchom go ponownie.",
       "repositoryRequired": "Uruchomienie agenta wymaga repozytorium. Otwórz Kilo i wybierz je, a następnie uruchom go ponownie.",
       "repositoryUnknown": "Kilo nie rozpoznaje {{repository}} jako repozytorium GitHub lub GitLab. Wybierz inne repozytorium w Kilo.",

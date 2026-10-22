@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "таны хамгийн сүүлийн кодын сан",
+      "confirmMessage": "Кодын сан: {{repository}}. Хүсэлт: {{prompt}}",
+      "confirmTitle": "Энэ агентийг эхлүүлэх үү?",
       "promptRequired": "Агент эхлүүлэхэд заавар шаардлагатай. Заавар нэмээд дахин ажиллуулна уу.",
       "repositoryRequired": "Агент эхлүүлэхэд кодын сан шаардлагатай. Kilo-г нээгээд нэгийг сонгоод дахин ажиллуулна уу.",
       "repositoryUnknown": "Kilo {{repository}}-г GitHub эсвэл GitLab кодын сан гэж хүлээн зөвшөөрөхгүй. Kilo дотор өөр кодын сан сонгоно уу.",

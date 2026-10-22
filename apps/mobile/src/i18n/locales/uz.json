@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "eng so'nggi repozitoriyangiz",
+      "confirmMessage": "Repozitoriya: {{repository}}. So'rov: {{prompt}}",
+      "confirmTitle": "Bu agent ishga tushirilsinmi?",
       "promptRequired": "Agentni ishga tushirish uchun so'rov kerak. So'rov qo'shing va qayta ishga tushiring.",
       "repositoryRequired": "Agentni ishga tushirish uchun repozitoriya kerak. Kilo'ni oching, bir repozitoriy tanlang va qayta ishga tushiring.",
       "repositoryUnknown": "Kilo {{repository}} ni GitHub yoki GitLab repozitoriyasi deb tanimaydi. Kilo'da boshqa repozitoriy tanlang.",

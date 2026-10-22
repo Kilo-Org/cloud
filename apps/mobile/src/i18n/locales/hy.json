@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "քո ամենավերջին պահոցը",
+      "confirmMessage": "Պահոց՝ {{repository}}։ Հարցում՝ {{prompt}}։",
+      "confirmTitle": "Մեկնարկե՞լ այս գործակալը։",
       "promptRequired": "Գործակալը մեկնարկելու համար հուշում է պետք։ Ավելացրու հուշում և նորից գործարկիր այն։",
       "repositoryRequired": "Գործակալը մեկնարկելու համար պահոց է պետք։ Բացիր Kilo-ն, ընտրիր մեկը, ապա նորից գործարկիր այն։",
       "repositoryUnknown": "Kilo-ն {{repository}}-ը չի ճանաչում որպես GitHub կամ GitLab պահոց։ Ընտրիր մեկ այլ պահոց Kilo-ում։",

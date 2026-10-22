@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "نوێترین کۆگای تۆ",
+      "confirmMessage": "کۆگا: {{repository}}. داواکاری: {{prompt}}",
+      "confirmTitle": "ئەم بریکارە دەستپێبکەیت؟",
       "promptRequired": "بۆ دەستپێکردنی بریکار داواکاری پێویستە. داواکارییەک زیاد بکە و دووبارە بیخە کار.",
       "repositoryRequired": "بۆ دەستپێکردنی بریکار کۆگایەک پێویستە. Kilo بکەرەوە و کۆگایەک هەڵبژێرە، پاشان دووبارە بیخە کار.",
       "repositoryUnknown": "Kilo {{repository}} وەک کۆگای GitHub یان GitLab ناناسێت. لە Kilo کۆگایەکی تر هەڵبژێرە.",

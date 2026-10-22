@@ -3664,6 +3664,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "tvůj nejnovější repozitář",
+      "confirmMessage": "Repozitář: {{repository}}. Požadavek: {{prompt}}",
+      "confirmTitle": "Spustit tohoto agenta?",
       "promptRequired": "Ke spuštění agenta je potřeba zadání. Přidej zadání a spusť ho znovu.",
       "repositoryRequired": "Ke spuštění agenta je potřeba repozitář. Otevři Kilo a vyber jeden, a pak ho spusť znovu.",
       "repositoryUnknown": "Kilo nerozpoznává {{repository}} jako repozitář na GitHubu nebo GitLabu. Vyber jiný repozitář v Kilu.",

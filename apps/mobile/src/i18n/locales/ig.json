@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ebe nchekwa koodu kachasị ọhụrụ gị",
+      "confirmMessage": "Ebe nchekwa koodu: {{repository}}. Arịrịọ: {{prompt}}.",
+      "confirmTitle": "Malite onye enyemaka a?",
       "promptRequired": "Malite onye enyemaka chọrọ ntụziaka. Tinye ntụziaka wee mee ya ọzọ.",
       "repositoryRequired": "Malite onye enyemaka chọrọ ebe nchekwa koodu. Mepee Kilo ma họrọ otu, ka emesịa mee ya ọzọ.",
       "repositoryUnknown": "Kilo anaghị amata {{repository}} dị ka ebe nchekwa koodu GitHub ma ọ bụ GitLab. Họrọ ebe nchekwa koodu ọzọ na Kilo.",

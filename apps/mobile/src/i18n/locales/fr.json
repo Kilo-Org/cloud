@@ -3622,6 +3622,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "votre dépôt le plus récent",
+      "confirmMessage": "Dépôt : {{repository}}. Demande : {{prompt}}.",
+      "confirmTitle": "Démarrer cet agent ?",
       "promptRequired": "Démarrer un agent nécessite une consigne. Ajoutez une consigne et relancez-le.",
       "repositoryRequired": "Démarrer un agent nécessite un dépôt. Ouvrez Kilo et choisissez-en un, puis relancez-le.",
       "repositoryUnknown": "Kilo ne reconnaît pas {{repository}} comme un dépôt GitHub ou GitLab. Choisissez un autre dépôt dans Kilo.",

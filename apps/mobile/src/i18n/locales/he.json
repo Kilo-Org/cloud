@@ -3622,6 +3622,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "המאגר האחרון שלך",
+      "confirmMessage": "מאגר: {{repository}}. בקשה: {{prompt}}",
+      "confirmTitle": "להפעיל את הסוכן הזה?",
       "promptRequired": "כדי להפעיל סוכן נדרשת הנחיה. הוסף הנחיה והפעל שוב.",
       "repositoryRequired": "כדי להפעיל סוכן נדרש מאגר. פתח את Kilo ובחר מאגר, ואז הפעל שוב.",
       "repositoryUnknown": "Kilo לא מזהה את {{repository}} כמאגר GitHub או GitLab. בחר מאגר אחר ב-Kilo.",

@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "የቅርብ ጊዜ ማከማቻዎ",
+      "confirmMessage": "ማከማቻ፦ {{repository}}። ጥያቄ፦ {{prompt}}",
+      "confirmTitle": "ይህን ወኪል ይጀምሩ?",
       "promptRequired": "ወኪል ለመጀመር ጥያቄ ያስፈልጋል። ጥያቄ ያክሉ እና እንደገና ያሂዱ።",
       "repositoryRequired": "ወኪል ለመጀመር ማከማቻ ያስፈልጋል። Kilo ይክፈቱ እና አንዱን ይምረጡ፣ ከዚያ እንደገና ያሂዱ።",
       "repositoryUnknown": "Kilo {{repository}}ን እንደ GitHub ወይም GitLab ማከማቻ አያውቅም። በKilo ውስጥ ሌላ ማከማቻ ይምረጡ።",

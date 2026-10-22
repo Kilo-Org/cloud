@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "kuusaa koodii kee kan dhiyeenyaa",
+      "confirmMessage": "Kuusaa koodii: {{repository}}. Gaaffii: {{prompt}}",
+      "confirmTitle": "Eejensa kana jalqabnaa?",
       "promptRequired": "Eejensa jalqabuuf gaaffii barbaachisa. Gaaffii itti dabaliitii irra deebi'ii hojjedhu.",
       "repositoryRequired": "Eejensa jalqabuuf kuusaa koodii barbaachisa. Kilo banaa'iitii tokko filadhu, sana booda irra deebi'ii hojjedhu.",
       "repositoryUnknown": "Kilo {{repository}} kuusaa koodii GitHub yookaan GitLab jedhee hin beeku. Kilo keessatti kuusaa koodii bira filadhu.",

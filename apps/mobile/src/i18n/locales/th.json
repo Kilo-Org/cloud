@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "คลังโค้ดล่าสุดของคุณ",
+      "confirmMessage": "คลังโค้ด: {{repository}} คำขอ: {{prompt}}",
+      "confirmTitle": "เริ่มเอเจนต์นี้หรือไม่?",
       "promptRequired": "การเริ่มเอเจนต์ต้องมีพรอมต์ เพิ่มพรอมต์แล้วลองอีกครั้ง",
       "repositoryRequired": "การเริ่มเอเจนต์ต้องมีคลังโค้ด เปิด Kilo แล้วเลือกคลังโค้ด จากนั้นลองอีกครั้ง",
       "repositoryUnknown": "Kilo ไม่รู้จัก {{repository}} ว่าเป็นคลังโค้ด GitHub หรือ GitLab เลือกคลังโค้ดอื่นใน Kilo",

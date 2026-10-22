@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ny tahirin-kaody farany anao",
+      "confirmMessage": "Tahirin-kaody: {{repository}}. Toromarika: {{prompt}}",
+      "confirmTitle": "Atombohy ity mpanampy ity?",
       "promptRequired": "Ny Atombohy ny mpanampy dia mila toromarika. Manampia toromarika ary avereno indray izy.",
       "repositoryRequired": "Ny Atombohy ny mpanampy dia mila tahirin-kaody. Sokafy ny Kilo ary mifidiana iray, avy eo avereno indray izy.",
       "repositoryUnknown": "Tsy fantatr'i Kilo ny {{repository}} ho tahirin-kaody GitHub na GitLab. Mifidiana tahirin-kaody hafa ao amin'ny Kilo.",

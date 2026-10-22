@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "nýjasta kóðasafnið þitt",
+      "confirmMessage": "Kóðasafn: {{repository}}. Beiðni: {{prompt}}.",
+      "confirmTitle": "Ræsa þennan fulltrúa?",
       "promptRequired": "Ræsa fulltrúa krefst skilaboða. Bættu við skilaboðum og keyrðu aftur.",
       "repositoryRequired": "Ræsa fulltrúa krefst kóðasafns. Opnaðu Kilo og veldu eitt, keyrðu síðan aftur.",
       "repositoryUnknown": "Kilo þekkir ekki {{repository}} sem GitHub- eða GitLab-kóðasafn. Veldu annað kóðasafn í Kilo.",

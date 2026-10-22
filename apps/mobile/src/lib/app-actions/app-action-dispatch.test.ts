@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one harness covers the dispatcher's action branches, the StartAgent confirmation order, and the native replay */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -17,6 +18,7 @@ import {
 const mocks = vi.hoisted(() => ({
   registerNativeAppActionDispatcher: vi.fn(),
   captureException: vi.fn(),
+  confirmStart: vi.fn(),
   startAgent: vi.fn(),
 }));
 
@@ -25,14 +27,21 @@ vi.mock('./native-bridge', () => ({
 }));
 
 // The registered handler dispatches with the default deps, which import the
-// real action path lazily. This suite stubs that one entry so a run does not
-// load the create graph; the real classification is `start-agent.test.ts`'s.
+// real action path and the confirmation lazily. This suite stubs both so a run
+// loads neither the create graph nor the native alert; the real classification
+// is `start-agent.test.ts`'s.
 vi.mock('./start-agent', () => ({ startAgent: mocks.startAgent }));
+
+vi.mock('./confirm-app-action-start', () => ({ confirmAppActionStart: mocks.confirmStart }));
 
 vi.mock('@sentry/react-native', () => ({ captureException: mocks.captureException }));
 
+/** A confirmed request: the default answer every run in this suite expects. */
+const CONFIRMED = Promise.resolve(true);
+
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.confirmStart.mockReturnValue(CONFIRMED);
   takePendingAppAction();
 });
 
@@ -49,7 +58,7 @@ describe('dispatchAppActionRequest', () => {
     await expect(
       dispatchAppActionRequest(
         { action: 'StartAgent', prompt: 'fix the build', repository: 'o/r' },
-        { startAgent }
+        { confirmStart: () => CONFIRMED, startAgent }
       )
     ).resolves.toEqual(result);
     expect(startAgent).toHaveBeenCalledExactlyOnceWith({
@@ -57,6 +66,74 @@ describe('dispatchAppActionRequest', () => {
       repository: 'o/r',
     });
     expect(takePendingAppAction()).toEqual({ action: 'OpenSession', sessionId: 'ses_7' });
+  });
+
+  it('asks for confirmation of the StartAgent it is about to run', async () => {
+    const confirmStart = vi.fn().mockReturnValue(CONFIRMED);
+    const startAgent = vi.fn().mockResolvedValue({
+      ok: true,
+      action: 'StartAgent',
+      sessionId: 'ses_8',
+      message: '',
+    });
+    await dispatchAppActionRequest(
+      { action: 'StartAgent', prompt: 'fix the build' },
+      { confirmStart, startAgent }
+    );
+    expect(confirmStart).toHaveBeenCalledExactlyOnceWith({ prompt: 'fix the build' });
+    expect(startAgent).toHaveBeenCalledOnce();
+  });
+
+  it('does not run StartAgent before the confirmation answers', async () => {
+    const answer = Promise.withResolvers<boolean>();
+    const startAgent = vi.fn().mockResolvedValue({
+      ok: true,
+      action: 'StartAgent',
+      sessionId: 'ses_9',
+      message: '',
+    });
+    const pending = dispatchAppActionRequest(
+      { action: 'StartAgent', prompt: 'fix the build' },
+      { confirmStart: () => answer.promise, startAgent }
+    );
+    await Promise.resolve();
+    expect(startAgent).not.toHaveBeenCalled();
+    answer.resolve(true);
+    await expect(pending).resolves.toMatchObject({ ok: true, sessionId: 'ses_9' });
+    expect(startAgent).toHaveBeenCalledOnce();
+  });
+
+  it('reports a cancelled confirmation without running StartAgent', async () => {
+    const startAgent = vi.fn().mockResolvedValue({
+      ok: true,
+      action: 'StartAgent',
+      sessionId: 'ses_10',
+      message: '',
+    });
+    const result = await dispatchAppActionRequest(
+      { action: 'StartAgent', prompt: 'fix the build', repository: 'o/r' },
+      { confirmStart: () => Promise.resolve(false), startAgent }
+    );
+    expect(result).toEqual({
+      ok: false,
+      action: 'StartAgent',
+      retryable: false,
+      code: 'start-cancelled',
+      message: i18n.t('common.cancelled'),
+    });
+    expect(startAgent).not.toHaveBeenCalled();
+    expect(getPendingAppAction()).toBeNull();
+  });
+
+  it('reports a cancelled confirmation when the prompt cannot be shown', async () => {
+    const startAgent = vi.fn();
+    const result = await dispatchAppActionRequest(
+      { action: 'StartAgent', prompt: 'fix the build' },
+      { confirmStart: () => Promise.reject(new Error('no alert surface')), startAgent }
+    );
+    expect(result).toMatchObject({ ok: false, code: 'start-cancelled', retryable: false });
+    expect(startAgent).not.toHaveBeenCalled();
+    expect(mocks.captureException).not.toHaveBeenCalled();
   });
 
   it('reports a StartAgent failure without parking a session', async () => {
@@ -69,7 +146,10 @@ describe('dispatchAppActionRequest', () => {
     };
     const startAgent = vi.fn().mockResolvedValue(failure);
     await expect(
-      dispatchAppActionRequest({ action: 'StartAgent', prompt: 'go' }, { startAgent })
+      dispatchAppActionRequest(
+        { action: 'StartAgent', prompt: 'go' },
+        { confirmStart: () => CONFIRMED, startAgent }
+      )
     ).resolves.toEqual(failure);
     expect(getPendingAppAction()).toBeNull();
   });
@@ -78,7 +158,7 @@ describe('dispatchAppActionRequest', () => {
     const startAgent = vi.fn().mockRejectedValue(new Error('boom'));
     const result = await dispatchAppActionRequest(
       { action: 'StartAgent', prompt: 'go' },
-      { startAgent }
+      { confirmStart: () => CONFIRMED, startAgent }
     );
     expect(result).toEqual({
       ok: false,

@@ -3622,6 +3622,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "o teu repositório mais recente",
+      "confirmMessage": "Repositório: {{repository}}. Pedido: {{prompt}}",
+      "confirmTitle": "Iniciar este agente?",
       "promptRequired": "Iniciar agente precisa de um pedido. Adiciona um pedido e executa-o novamente.",
       "repositoryRequired": "Iniciar agente precisa de um repositório. Abre o Kilo e escolhe um, depois executa-o novamente.",
       "repositoryUnknown": "O Kilo não reconhece {{repository}} como um repositório GitHub ou GitLab. Escolhe outro repositório no Kilo.",

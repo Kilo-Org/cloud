@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "మీ ఇటీవలి రిపోజిటరీ",
+      "confirmMessage": "రిపోజిటరీ: {{repository}}. అభ్యర్థన: {{prompt}}",
+      "confirmTitle": "ఈ ఏజెంట్‌ను ప్రారంభించాలా?",
       "promptRequired": "ఏజెంట్‌ను ప్రారంభించడానికి ప్రాంప్ట్ అవసరం. ప్రాంప్ట్‌ను జోడించి మళ్లీ అమలు చేయండి.",
       "repositoryRequired": "ఏజెంట్‌ను ప్రారంభించడానికి రిపోజిటరీ అవసరం. Kiloను తెరిచి ఒకటి ఎంచుకుని, మళ్లీ అమలు చేయండి.",
       "repositoryUnknown": "Kilo, {{repository}}ను GitHub లేదా GitLab రిపోజిటరీగా గుర్తించదు. Kiloలో మరో రిపోజిటరీని ఎంచుకోండి.",

@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "kho mã nguồn gần đây nhất của bạn",
+      "confirmMessage": "Kho mã nguồn: {{repository}}. Yêu cầu: {{prompt}}",
+      "confirmTitle": "Bắt đầu trợ lý này?",
       "promptRequired": "Bắt đầu trợ lý cần một lời nhắc. Thêm lời nhắc và chạy lại.",
       "repositoryRequired": "Bắt đầu trợ lý cần một kho mã nguồn. Mở Kilo, chọn một kho mã nguồn, rồi chạy lại.",
       "repositoryUnknown": "Kilo không nhận diện {{repository}} là kho mã nguồn GitHub hoặc GitLab. Chọn kho mã nguồn khác trong Kilo.",

@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "آخرین مخزن شما",
+      "confirmMessage": "مخزن: {{repository}}. درخواست: {{prompt}}.",
+      "confirmTitle": "این عامل شروع شود؟",
       "promptRequired": "برای شروع عامل، یک پیام لازم است. یک پیام اضافه کنید و دوباره اجرا کنید.",
       "repositoryRequired": "برای شروع عامل، یک مخزن لازم است. Kilo را باز کنید و یکی را انتخاب کنید، سپس دوباره اجرا کنید.",
       "repositoryUnknown": "Kilo مخزن {{repository}} را به عنوان مخزن GitHub یا GitLab نمی‌شناسد. در Kilo مخزن دیگری انتخاب کنید.",

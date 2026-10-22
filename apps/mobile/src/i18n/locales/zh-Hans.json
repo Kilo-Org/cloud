@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "您最近的仓库",
+      "confirmMessage": "仓库：{{repository}}。请求：{{prompt}}。",
+      "confirmTitle": "启动此智能体？",
       "promptRequired": "启动智能体需要提示词。请添加提示词后重新运行。",
       "repositoryRequired": "启动智能体需要一个仓库。请打开 Kilo，选择一个仓库，然后重新运行。",
       "repositoryUnknown": "Kilo 无法将 {{repository}} 识别为 GitHub 或 GitLab 仓库。请在 Kilo 中选择其他仓库。",

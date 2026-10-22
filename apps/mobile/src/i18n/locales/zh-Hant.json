@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "您最近的存放庫",
+      "confirmMessage": "存放庫：{{repository}}。請求：{{prompt}}",
+      "confirmTitle": "要啟動此代理程式嗎？",
       "promptRequired": "啟動代理程式需要提示詞。請新增提示詞後重新執行。",
       "repositoryRequired": "啟動代理程式需要存放庫。請開啟 Kilo 並選擇一個存放庫，然後重新執行。",
       "repositoryUnknown": "Kilo 無法將 {{repository}} 辨識為 GitHub 或 GitLab 存放庫。請在 Kilo 中選擇其他存放庫。",

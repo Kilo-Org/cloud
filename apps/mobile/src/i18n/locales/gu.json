@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "તમારી સૌથી તાજેતરની રિપોઝિટરી",
+      "confirmMessage": "રિપોઝિટરી: {{repository}}. વિનંતી: {{prompt}}",
+      "confirmTitle": "આ એજન્ટ શરૂ કરીએ?",
       "promptRequired": "એજન્ટ શરૂ કરવા માટે પ્રોમ્પ્ટ જરૂરી છે. પ્રોમ્પ્ટ ઉમેરો અને ફરી ચલાવો.",
       "repositoryRequired": "એજન્ટ શરૂ કરવા માટે રિપોઝિટરી જરૂરી છે. Kilo ખોલો અને એક પસંદ કરો, પછી તેને ફરી ચલાવો.",
       "repositoryUnknown": "Kilo {{repository}} ને GitHub કે GitLab રિપોઝિટરી તરીકે ઓળખતું નથી. Kilo માં બીજી રિપોઝિટરી પસંદ કરો.",

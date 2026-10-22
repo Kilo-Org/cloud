@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "আপনার সবচেয়ে সাম্প্রতিক রিপোজিটরি",
+      "confirmMessage": "রিপোজিটরি: {{repository}}। অনুরোধ: {{prompt}}",
+      "confirmTitle": "এই এজেন্টটি চালু করবেন?",
       "promptRequired": "এজেন্ট চালু করতে একটি প্রম্পট প্রয়োজন। একটি প্রম্পট যোগ করুন এবং আবার চালান।",
       "repositoryRequired": "এজেন্ট চালু করতে একটি রিপোজিটরি প্রয়োজন। Kilo খুলুন এবং একটি রিপোজিটরি বেছে নিন, তারপর আবার চালান।",
       "repositoryUnknown": "Kilo {{repository}}-কে GitHub বা GitLab রিপোজিটরি হিসেবে চেনে না। Kilo-তে অন্য একটি রিপোজিটরি বেছে নিন।",

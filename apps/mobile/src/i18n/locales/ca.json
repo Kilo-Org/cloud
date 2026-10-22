@@ -3622,6 +3622,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "el teu repositori més recent",
+      "confirmMessage": "Repositori: {{repository}}. Sol·licitud: {{prompt}}",
+      "confirmTitle": "Iniciar aquest agent?",
       "promptRequired": "Per iniciar un agent cal un missatge. Afegeix un missatge i torna-ho a executar.",
       "repositoryRequired": "Per iniciar un agent cal un repositori. Obre Kilo i tria'n-neu un, i torna-ho a executar.",
       "repositoryUnknown": "Kilo no reconeix {{repository}} com a repositori de GitHub o GitLab. Tria un altre repositori a Kilo.",

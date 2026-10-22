@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "твојот најнов репозиториум",
+      "confirmMessage": "Репозиториум: {{repository}}. Упатство: {{prompt}}",
+      "confirmTitle": "Да го стартираш овој агент?",
       "promptRequired": "За да стартираш агент, потребно е упатство. Додај упатство и стартувај го повторно.",
       "repositoryRequired": "За да стартираш агент, потребен е репозиториум. Отвори Kilo и избери еден, па стартувај повторно.",
       "repositoryUnknown": "Kilo не го препознава {{repository}} како GitHub или GitLab репозиториум. Избери друг репозиториум во Kilo.",

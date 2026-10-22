@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "depo ki pi resan ou",
+      "confirmMessage": "Depo: {{repository}}. Demann: {{prompt}}",
+      "confirmTitle": "Kòmanse ajan sa a?",
       "promptRequired": "Kòmanse ajan bezwen yon enstriksyon. Ajoute yon enstriksyon epi kouri li ankò.",
       "repositoryRequired": "Kòmanse ajan bezwen yon depo. Ouvri Kilo epi chwazi youn, apre sa kouri li ankò.",
       "repositoryUnknown": "Kilo pa rekonèt {{repository}} kòm yon depo GitHub oswa GitLab. Chwazi yon lòt depo nan Kilo.",

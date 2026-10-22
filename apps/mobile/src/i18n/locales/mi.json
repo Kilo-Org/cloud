@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "tō pūranga waehere hou",
+      "confirmMessage": "Pūranga waehere: {{repository}}. Tohutohu: {{prompt}}",
+      "confirmTitle": "Tīmata i tēnei kaiāwhina?",
       "promptRequired": "Me whai tohutohu te Tīmata i te kaiāwhina. Tāpirihia he tohutohu ka whakahaere anō.",
       "repositoryRequired": "Me pūranga waehere te Tīmata i te kaiāwhina. Whakatuwheratia a Kilo ka kōwhiria tētahi, ka whakahaere anō.",
       "repositoryUnknown": "Kāore a Kilo e āhukahuka i a {{repository}} hei pūranga waehere GitHub, GitLab rānei. Kōwhiria tētahi atu pūranga waehere i roto i a Kilo.",

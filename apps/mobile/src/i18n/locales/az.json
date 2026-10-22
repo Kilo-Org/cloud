@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ən son repozitoriyan",
+      "confirmMessage": "Repozitoriya: {{repository}}. Sorğu: {{prompt}}",
+      "confirmTitle": "Bu agenti başlat?",
       "promptRequired": "Agenti başlatmaq üçün sorğu lazımdır. Sorğu əlavə et və yenidən işə sal.",
       "repositoryRequired": "Agenti başlatmaq üçün repozitoriya lazımdır. Kilo-nu aç və bir repozitoriya seç, sonra yenidən işə sal.",
       "repositoryUnknown": "Kilo {{repository}} adını GitHub və ya GitLab repozitoriyası kimi tanımır. Kilo-da başqa repozitoriya seç.",

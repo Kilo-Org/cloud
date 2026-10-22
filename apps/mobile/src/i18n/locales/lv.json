@@ -3622,6 +3622,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "tava jaunākā repozitorija",
+      "confirmMessage": "Repozitorija: {{repository}}. Uzvedne: {{prompt}}",
+      "confirmTitle": "Sākt šo aģentu?",
       "promptRequired": "Lai sāktu aģentu, nepieciešama uzvedne. Pievieno uzvedni un palaid to vēlreiz.",
       "repositoryRequired": "Lai sāktu aģentu, nepieciešama repozitorija. Atver Kilo un izvēlies vienu, pēc tam palaid to vēlreiz.",
       "repositoryUnknown": "Kilo neatpazīst {{repository}} kā GitHub vai GitLab repozitoriju. Izvēlies citu repozitoriju Kilo.",

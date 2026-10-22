@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "viimeisin koodivarastosi",
+      "confirmMessage": "Koodivarasto: {{repository}}. Pyyntö: {{prompt}}.",
+      "confirmTitle": "Käynnistetäänkö tämä agentti?",
       "promptRequired": "Agentin käynnistys vaatii kehotteen. Lisää kehote ja suorita se uudelleen.",
       "repositoryRequired": "Agentin käynnistys vaatii koodivaraston. Avaa Kilo ja valitse koodivarasto, sitten suorita se uudelleen.",
       "repositoryUnknown": "Kilo ei tunnista {{repository}}-kohdetta GitHub- tai GitLab-koodivarastoksi. Valitse toinen koodivarasto Kilossa.",

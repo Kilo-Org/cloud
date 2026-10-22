@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ibi ìpamọ́ kóòdù tí o ṣẹ̀ṣẹ̀ lò",
+      "confirmMessage": "Ibi ìpamọ́ kóòdù: {{repository}}. Ìtọ́rọ̀: {{prompt}}",
+      "confirmTitle": "Ṣé kí a bẹ̀rẹ̀ aṣojú yìí?",
       "promptRequired": "Bẹ̀rẹ̀ aṣojú nílò ìtọ́ni. Fi ìtọ́ni kún un kí o sì tún gbìyànjú.",
       "repositoryRequired": "Bẹ̀rẹ̀ aṣojú nílò ibi ìpamọ́ kóòdù. Ṣí Kilo, yan ibi ìpamọ́ kóòdù kan, kí o sì tún gbìyànjú.",
       "repositoryUnknown": "Kilo kò dá {{repository}} mọ̀ gẹ́gẹ́ bí ibi ìpamọ́ kóòdù GitHub tàbí GitLab. Yan ibi ìpamọ́ kóòdù mìíràn nínú Kilo.",

@@ -3622,6 +3622,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "cel mai recent depozit al tău",
+      "confirmMessage": "Depozit: {{repository}}. Instrucțiune: {{prompt}}",
+      "confirmTitle": "Pornești acest agent?",
       "promptRequired": "Pornește un agent necesită o instrucțiune. Adaugă o instrucțiune și rulează-l din nou.",
       "repositoryRequired": "Pornește un agent necesită un depozit. Deschide Kilo și alege unul, apoi rulează-l din nou.",
       "repositoryUnknown": "Kilo nu recunoaște {{repository}} ca depozit GitHub sau GitLab. Alege alt depozit în Kilo.",

@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "repositori terbaharu anda",
+      "confirmMessage": "Repositori: {{repository}}. Permintaan: {{prompt}}",
+      "confirmTitle": "Mulakan ejen ini?",
       "promptRequired": "Mulakan ejen memerlukan gesaan. Tambah gesaan dan jalankannya semula.",
       "repositoryRequired": "Mulakan ejen memerlukan repositori. Buka Kilo dan pilih satu, kemudian jalankannya semula.",
       "repositoryUnknown": "Kilo tidak mengenali {{repository}} sebagai repositori GitHub atau GitLab. Pilih repositori lain dalam Kilo.",

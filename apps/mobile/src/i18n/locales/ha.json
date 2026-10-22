@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ma'ajiyarka ta baya-bayan nan",
+      "confirmMessage": "Ma'ajiya: {{repository}}. Buƙata: {{prompt}}",
+      "confirmTitle": "Fara wannan wakili?",
       "promptRequired": "Fara wakili na buƙatar umarni. Ƙara umarni sannan ka sake gudanar da shi.",
       "repositoryRequired": "Fara wakili na buƙatar ma'ajiya. Buɗe Kilo ka zaɓi ɗaya, sannan ka sake gudanar da shi.",
       "repositoryUnknown": "Kilo ba ya gane {{repository}} a matsayin ma'ajiyar GitHub ko GitLab. Zaɓi wata ma'ajiya a cikin Kilo.",

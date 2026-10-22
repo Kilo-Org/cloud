@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "inqolobane yekhodi yakho yamuva",
+      "confirmMessage": "Inqolobane yekhodi: {{repository}}. Isicelo: {{prompt}}",
+      "confirmTitle": "Qala leli ejenti?",
       "promptRequired": "Qala i-ejenti kudinga isicelo. Engeza isicelo bese uyiphinda.",
       "repositoryRequired": "Qala i-ejenti kudinga inqolobane yekhodi. Vula i-Kilo bese ukhetha eyodwa, buse uyiphinde.",
       "repositoryUnknown": "I-Kilo ayiyiboni i-{{repository}} njengenqolobane yekhodi ye-GitHub noma ye-GitLab. Khetha enye inqolobane yekhodi ku-Kilo.",

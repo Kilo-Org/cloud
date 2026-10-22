@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ଆପଣଙ୍କ ସର୍ବଶେଷ ରିପୋଜିଟୋରୀ",
+      "confirmMessage": "ରିପୋଜିଟୋରୀ: {{repository}}। ଅନୁରୋଧ: {{prompt}}",
+      "confirmTitle": "ଏହି ଏଜେଣ୍ଟ ଆରମ୍ଭ କରିବେ?",
       "promptRequired": "ଏଜେଣ୍ଟ ଆରମ୍ଭ କରିବାକୁ ଏକ ପ୍ରମ୍ପ୍ଟ ଆବଶ୍ୟକ। ଏକ ପ୍ରମ୍ପ୍ଟ ଯୋଡ଼ନ୍ତୁ ଏବଂ ଏହାକୁ ପୁଣି ଚଲାନ୍ତୁ।",
       "repositoryRequired": "ଏଜେଣ୍ଟ ଆରମ୍ଭ କରିବାକୁ ଏକ ରିପୋଜିଟୋରୀ ଆବଶ୍ୟକ। Kilo ଖୋଲନ୍ତୁ ଏବଂ ଗୋଟିଏ ବାଛନ୍ତୁ, ତାପରେ ଏହାକୁ ପୁଣି ଚଲାନ୍ତୁ।",
       "repositoryUnknown": "Kilo, {{repository}} କୁ GitHub କିମ୍ବା GitLab ରିପୋଜିଟୋରୀ ଭାବରେ ଚିହ୍ନଟ କରେ ନାହିଁ। Kilo ରେ ଅନ୍ୟ ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ।",

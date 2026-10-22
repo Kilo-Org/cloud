@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "repositori terbaru Anda",
+      "confirmMessage": "Repositori: {{repository}}. Permintaan: {{prompt}}.",
+      "confirmTitle": "Mulai agen ini?",
       "promptRequired": "Mulai agen memerlukan instruksi. Tambahkan instruksi lalu jalankan lagi.",
       "repositoryRequired": "Mulai agen memerlukan repositori. Buka Kilo dan pilih satu, lalu jalankan lagi.",
       "repositoryUnknown": "Kilo tidak mengenali {{repository}} sebagai repositori GitHub atau GitLab. Pilih repositori lain di Kilo.",

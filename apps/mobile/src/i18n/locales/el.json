@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "το πιο πρόσφατο αποθετήριό σου",
+      "confirmMessage": "Αποθετήριο: {{repository}}. Μήνυμα: {{prompt}}",
+      "confirmTitle": "Έναρξη αυτού του πράκτορα;",
       "promptRequired": "Η έναρξη πράκτορα απαιτεί μήνυμα. Πρόσθεσε ένα μήνυμα και εκτέλεσέ το ξανά.",
       "repositoryRequired": "Η έναρξη πράκτορα απαιτεί αποθετήριο. Άνοιξε το Kilo, επίλεξε ένα και εκτέλεσέ το ξανά.",
       "repositoryUnknown": "Το Kilo δεν αναγνωρίζει το {{repository}} ως αποθετήριο GitHub ή GitLab. Επίλεξε άλλο αποθετήριο στο Kilo.",

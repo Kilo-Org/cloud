@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "en son deponuz",
+      "confirmMessage": "Depo: {{repository}}. İstek: {{prompt}}",
+      "confirmTitle": "Bu ajanı başlatayım mı?",
       "promptRequired": "Ajanı başlat için bir istem gerekir. Bir istem ekleyip yeniden çalıştır.",
       "repositoryRequired": "Ajanı başlat için bir depo gerekir. Kilo'yu aç, bir depo seç, ardından yeniden çalıştır.",
       "repositoryUnknown": "Kilo, {{repository}} adresini GitHub veya GitLab deposu olarak tanımıyor. Kilo'da başka bir depo seç.",

@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "je meest recente repository",
+      "confirmMessage": "Repository: {{repository}}. Verzoek: {{prompt}}",
+      "confirmTitle": "Deze agent starten?",
       "promptRequired": "Agent starten vereist een prompt. Voeg een prompt toe en voer de actie opnieuw uit.",
       "repositoryRequired": "Agent starten vereist een repository. Open Kilo en kies er een, voer de actie daarna opnieuw uit.",
       "repositoryUnknown": "Kilo herkent {{repository}} niet als GitHub- of GitLab-repository. Kies een andere repository in Kilo.",

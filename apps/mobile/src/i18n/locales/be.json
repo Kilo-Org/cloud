@@ -3664,6 +3664,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ваш апошні рэпазіторый",
+      "confirmMessage": "Рэпазіторый: {{repository}}. Запыт: {{prompt}}",
+      "confirmTitle": "Запусціць гэтага агента?",
       "promptRequired": "Каб запусціць агента, патрэбен запыт. Дадайце запыт і запусціце зноў.",
       "repositoryRequired": "Каб запусціць агента, патрэбны рэпазіторый. Адкрыйце Kilo і выберыце рэпазіторый, затым запусціце зноў.",
       "repositoryUnknown": "Kilo не распазнае {{repository}} як рэпазіторый GitHub або GitLab. Выберыце іншы рэпазіторый у Kilo.",

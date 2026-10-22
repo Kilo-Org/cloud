@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "உங்கள் சமீபத்திய களஞ்சியம்",
+      "confirmMessage": "களஞ்சியம்: {{repository}}. கோரிக்கை: {{prompt}}",
+      "confirmTitle": "இந்த முகவரியைத் தொடங்கவா?",
       "promptRequired": "முகவரியைத் தொடங்க வினவல் தேவை. ஒரு வினவலைச் சேர்த்து மீண்டும் இயக்கவும்.",
       "repositoryRequired": "முகவரியைத் தொடங்க ஒரு களஞ்சியம் தேவை. Kilo-ஐத் திறந்து ஒன்றைத் தேர்ந்தெடுத்து, மீண்டும் இயக்கவும்.",
       "repositoryUnknown": "Kilo, {{repository}}-ஐ GitHub அல்லது GitLab களஞ்சியமாக அடையாளம் காணவில்லை. Kilo-வில் வேறு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்.",

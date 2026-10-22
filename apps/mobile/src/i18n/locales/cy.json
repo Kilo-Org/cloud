@@ -3748,6 +3748,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "eich ystorfa ddiweddaraf",
+      "confirmMessage": "Ystorfa: {{repository}}. Cais: {{prompt}}",
+      "confirmTitle": "Dechrau'r asiant hwn?",
       "promptRequired": "Mae angen anogiad i ddechrau asiant. Ychwanega anogiad a'i redeg eto.",
       "repositoryRequired": "Mae angen ystorfa i ddechrau asiant. Agora Kilo a dewis un, yna ei redeg eto.",
       "repositoryUnknown": "Nid yw Kilo'n adnabod {{repository}} fel ystorfa GitHub neu GitLab. Dewiswch ystorfa arall yn Kilo.",

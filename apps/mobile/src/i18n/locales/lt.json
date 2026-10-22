@@ -3664,6 +3664,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "tavo naujausia saugykla",
+      "confirmMessage": "Saugykla: {{repository}}. Užklausa: {{prompt}}",
+      "confirmTitle": "Paleisti šį agentą?",
       "promptRequired": "Norint paleisti agentą, reikia užklausos. Pridėk užklausą ir paleisk iš naujo.",
       "repositoryRequired": "Norint paleisti agentą, reikia saugyklos. Atsidaryk Kilo ir pasirink saugyklą, tada paleisk iš naujo.",
       "repositoryUnknown": "Kilo neatpažįsta {{repository}} kaip GitHub ar GitLab saugyklos. Pasirink kitą saugyklą Kilo programoje.",

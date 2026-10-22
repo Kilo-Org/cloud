@@ -3580,6 +3580,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "a legutóbbi adattárad",
+      "confirmMessage": "Adattár: {{repository}}. Kérés: {{prompt}}.",
+      "confirmTitle": "Indítsd el ezt az ügynököt?",
       "promptRequired": "Az ügynök indításához utasítás szükséges. Adj hozzá utasítást, és futtasd újra.",
       "repositoryRequired": "Az ügynök indításához adattár szükséges. Nyisd meg a Kilo alkalmazást, válassz egyet, majd futtasd újra.",
       "repositoryUnknown": "A Kilo nem ismeri fel a {{repository}} nevet GitHub- vagy GitLab-adattárként. Válassz másik adattárat a Kiloban.",

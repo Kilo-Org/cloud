@@ -3664,6 +3664,9 @@
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ваш останній репозиторій",
+      "confirmMessage": "Репозиторій: {{repository}}. Запит: {{prompt}}",
+      "confirmTitle": "Запустити цього агента?",
       "promptRequired": "Для запуску агента потрібен запит. Додайте запит і запустіть знову.",
       "repositoryRequired": "Для запуску агента потрібен репозиторій. Відкрийте Kilo, виберіть репозиторій та запустіть знову.",
       "repositoryUnknown": "Kilo не розпізнає {{repository}} як репозиторій GitHub або GitLab. Виберіть інший репозиторій у Kilo.",

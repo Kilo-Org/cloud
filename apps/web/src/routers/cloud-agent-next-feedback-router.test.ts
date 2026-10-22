@@ -106,3 +106,4 @@ describe('Cloud Agent feedback Slack notification', () => {
       ).resolves.toEqual({ id: 'feedback-id' });
     }
   );
+});

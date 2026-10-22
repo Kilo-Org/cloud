@@ -202,13 +202,22 @@ describe('getAuthHeaders', () => {
       expect(vi.mocked(secureStoreMock.getItemAsync)).toHaveBeenCalledWith('token-expires-at');
     });
     // Publish a newer owner while the cold expiry read is still in flight.
-    const { setActiveToken } = await import('@/lib/auth/token-owner');
-    setActiveToken('newer-token', Date.now() + 3_600_000);
+    const newerExpiresAt = Date.now() + 3_600_000;
+    // `afterEach` resets the module registry, so the owner must be loaded from
+    // the same graph as `./trpc` inside the case rather than imported statically.
+    const { getActiveTokenSnapshot, setActiveToken } = await import('@/lib/auth/token-owner');
+    setActiveToken('newer-token', newerExpiresAt);
     secureStoreMock.releaseHeldExpiryRead();
 
     // The request uses the newest owner token, not the cold-read token, and
     // the newer owner's expiry is not overwritten by the stale read.
     await expect(pending).resolves.toMatchObject({ Authorization: 'Bearer newer-token' });
+    // The stale read resolved to an expired value; the owner must still hold
+    // the newer expiry instead of having been overwritten by it.
+    expect(getActiveTokenSnapshot()).toMatchObject({
+      token: 'newer-token',
+      expiresAtMs: newerExpiresAt,
+    });
   });
 });
 

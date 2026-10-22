@@ -56,8 +56,6 @@ exist as an org-scoped mirror under `organizations`, for example
 - `activeSessions`
 - `agentBriefing`
 - `agentProfiles`
-- `appBuilder`
-- `appBuilderFeedback`
 - `appReportedMessages`
 - `byok`
 - `cliSessions`
@@ -70,7 +68,6 @@ exist as an org-scoped mirror under `organizations`, for example
 - `codingPlans`
 - `credits`
 - `debug`
-- `deployments`
 - `discord`
 - `dolthub`
 - `feedback`

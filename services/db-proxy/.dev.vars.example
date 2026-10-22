@@ -1,3 +1,0 @@
-# Admin authentication token for the DB proxy API
-# @from APP_BUILDER_DB_PROXY_AUTH_TOKEN
-DB_PROXY_ADMIN_TOKEN=example-token

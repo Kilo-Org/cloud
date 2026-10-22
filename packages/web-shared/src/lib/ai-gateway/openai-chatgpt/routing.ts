@@ -52,6 +52,16 @@ const METADATA_ENTRY_LIMIT = 16;
 const METADATA_VALUE_LIMIT = 512;
 
 /**
+ * Subscription sharing rejects every other tier with
+ * `subscription_sharing_unsupported_capability`; without one the plan's
+ * default tier applies.
+ */
+const SUPPORTED_SERVICE_TIERS: ReadonlySet<unknown> = new Set(['auto', 'default']);
+
+/** OpenAI rejects a smaller `max_output_tokens` with `integer_below_min_value`. */
+const MIN_MAX_OUTPUT_TOKENS = 16;
+
+/**
  * Adds the required traceability keys to the request metadata, keeping any
  * caller-supplied entries. `session_id` is the gateway's identifier for one
  * run, which is what `subscription_sharing_activity_id` expects; it is optional
@@ -281,6 +291,15 @@ export function buildOpenAiChatGptProvider(
       // api.openai.com rejects unknown request arguments, exactly like the
       // other raw upstream providers strip it.
       delete body.provider;
+      if (body.service_tier !== undefined && !SUPPORTED_SERVICE_TIERS.has(body.service_tier)) {
+        delete body.service_tier;
+      }
+      if (
+        typeof body.max_output_tokens === 'number' &&
+        body.max_output_tokens < MIN_MAX_OUTPUT_TOKENS
+      ) {
+        body.max_output_tokens = MIN_MAX_OUTPUT_TOKENS;
+      }
       // OpenAI requires this traceability metadata on every delegated Responses
       // request, including later turns. Without it the request is rejected once
       // the integration is enabled for it.

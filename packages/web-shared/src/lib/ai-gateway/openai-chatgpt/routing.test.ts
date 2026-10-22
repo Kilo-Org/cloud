@@ -508,6 +508,62 @@ describe('checkOpenAiChatGptByok', () => {
     expect(result.subscription_sharing_activity_id).toBe('sess_limit');
   });
 
+  it.each(['flex', 'priority', 'scale', null] as const)(
+    'drops service_tier %s, which subscription sharing rejects',
+    async serviceTier => {
+      const provider = await buildProviderForTest();
+      const body: GatewayResponsesRequest = {
+        model: 'openai/gpt-5-nano',
+        input: 'hello',
+        service_tier: serviceTier,
+      };
+
+      await transformResponsesRequest(provider, body);
+
+      expect('service_tier' in body).toBe(false);
+    }
+  );
+
+  it.each(['auto', 'default'] as const)('keeps service_tier %s', async serviceTier => {
+    const provider = await buildProviderForTest();
+    const body: GatewayResponsesRequest = {
+      model: 'openai/gpt-5-nano',
+      input: 'hello',
+      service_tier: serviceTier,
+    };
+
+    await transformResponsesRequest(provider, body);
+
+    expect(body.service_tier).toBe(serviceTier);
+  });
+
+  it.each([
+    [1, 16],
+    [15, 16],
+    [16, 16],
+    [4096, 4096],
+  ])('sends max_output_tokens %d as %d', async (requested, sent) => {
+    const provider = await buildProviderForTest();
+    const body: GatewayResponsesRequest = {
+      model: 'openai/gpt-5-nano',
+      input: 'hello',
+      max_output_tokens: requested,
+    };
+
+    await transformResponsesRequest(provider, body);
+
+    expect(body.max_output_tokens).toBe(sent);
+  });
+
+  it('leaves an absent max_output_tokens absent', async () => {
+    const provider = await buildProviderForTest();
+    const body: GatewayResponsesRequest = { model: 'openai/gpt-5-nano', input: 'hello' };
+
+    await transformResponsesRequest(provider, body);
+
+    expect('max_output_tokens' in body).toBe(false);
+  });
+
   it('sends the partner key as Authorization and the delegated token upstream', async () => {
     const provider = await buildProviderForTest();
     const body: GatewayResponsesRequest = {

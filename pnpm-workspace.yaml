@@ -48,9 +48,9 @@ catalog:
   tsx: 4.21.0
   # TypeScript 7 is the native compiler and ships no compiler JS API. The
   # workspace typechecks with the @typescript/native-preview `tsgo` binary, so
-  # this entry is what `tsc`, `next build` and the bundlers load. Tools that
-  # still read the API (rollup-plugin-dts, ts-jest, madge) get a compatibility
-  # package of their own instead of a second pin here.
+  # this entry is what `tsc`, `next build` and the bundlers load. The tools that
+  # still read the API (rollup-plugin-dts, ts-jest) get a compatibility package
+  # of their own instead of a second pin here.
   typescript: 7.0.2
   ulid: 3.0.2
   vitest: 4.1.11

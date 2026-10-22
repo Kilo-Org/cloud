@@ -10,7 +10,7 @@ import {
 
 import { t } from '../auth.js';
 import { parseSessionMetadata, type SessionMetadata } from '../../persistence/session-metadata.js';
-import type * as SessionPlane from '../../session-plane.js';
+import type * as SessionPlane from '../../session-identity.js';
 import type { TRPCContext } from '../../types.js';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
@@ -61,11 +61,11 @@ vi.mock('./organization-membership.js', () => ({
   assertOrganizationMembership: assertOrganizationMembershipMock,
 }));
 
-vi.mock('../../session-plane.js', async importOriginal => {
+vi.mock('../../session-identity.js', async importOriginal => {
   const original = await importOriginal<typeof SessionPlane>();
   return {
     ...original,
-    generateSessionId: (plane: string) => generateSessionIdMock(plane),
+    generateSessionId: () => generateSessionIdMock(),
   };
 });
 
@@ -610,7 +610,7 @@ describe('createWorktreeChat request validation and authorization', () => {
       kiloSessionId: DESTINATION_KILO_SESSION_ID,
       worktreeId: WORKTREE_ID,
     });
-    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+    expect(generateSessionIdMock).toHaveBeenCalledWith();
   });
 });
 
@@ -1055,7 +1055,7 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     expect(legacySessionNamespace.get).not.toHaveBeenCalled();
     expect(sandboxControlNamespace.get).not.toHaveBeenCalled();
     expect(destinationStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+    expect(generateSessionIdMock).toHaveBeenCalledWith();
   });
 
   it('does not create ownership when canonical operation progress cannot be recorded', async () => {

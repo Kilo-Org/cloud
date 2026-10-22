@@ -321,6 +321,16 @@ function validate(workflow) {
 
   // The prepare job enumerates the PR checkout and writes the prompt
   // artifact; the PR checkout code in this job never sees a credential.
+  const prepareCheckout = findStep(
+    prepare,
+    step => (step.uses ?? '').includes('checkout@'),
+    'prepare checkout'
+  );
+  assert.equal(
+    prepareCheckout.with?.['persist-credentials'],
+    false,
+    `${prepareJobName}: the job that runs pull request scripts keeps no repository credential`
+  );
   const gate = findStep(prepare, step => step.id === 'catalog_changes', 'change-detection step');
   for (const fragment of catalogPathFragments) {
     assert.match(gate.run ?? '', fragment, `change-detection step must recognise ${fragment}`);
@@ -1002,6 +1012,15 @@ for (const [name, defect] of [
   [
     'change-detection gate removed',
     workflow => dropStep(workflow, prepareJobName, step => step.id === 'catalog_changes'),
+  ],
+  [
+    'prepare checkout keeps repository credentials',
+    workflow => {
+      const step = workflow.jobs[prepareJobName].steps.find(item =>
+        (item.uses ?? '').includes('checkout@')
+      );
+      step.with['persist-credentials'] = true;
+    },
   ],
   [
     'change detection drops its matcher verdict',

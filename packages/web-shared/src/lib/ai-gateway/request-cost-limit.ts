@@ -16,17 +16,15 @@ export type TextRequestPriceCeiling = {
   requestCost: number;
 };
 
-/** The stored catalog cannot produce usable prices for this model. */
-export class ModelPricingError extends Error {}
-
-export function textRequestPriceCeiling(metadata: StoredModel): TextRequestPriceCeiling {
-  if (metadata.endpoints.length === 0) throw new ModelPricingError('Model pricing is unavailable');
+/** Catalog-pricing failures are returned as messages; unexpected failures propagate. */
+export function textRequestPriceCeiling(metadata: StoredModel): TextRequestPriceCeiling | string {
+  if (metadata.endpoints.length === 0) return 'Model pricing is unavailable';
   let inputRate = 0;
   let outputRate = 0;
   let requestCost = 0;
   for (const endpoint of metadata.endpoints) {
     const price = getModelDisplayPricing(endpoint.pricing);
-    if (!price) throw new ModelPricingError('Model has an unpriced route');
+    if (!price) return 'Model has an unpriced route';
     const values = [
       price.prompt,
       price.completion,
@@ -36,7 +34,7 @@ export function textRequestPriceCeiling(metadata: StoredModel): TextRequestPrice
       price.internal_reasoning ?? '0',
     ].map(Number);
     if (values.some(value => !Number.isFinite(value) || value < 0))
-      throw new ModelPricingError('Model has invalid pricing');
+      return 'Model has invalid pricing';
     inputRate = Math.max(inputRate, values[0] + Math.max(values[3], values[4]));
     outputRate = Math.max(outputRate, values[1] + values[5]);
     requestCost = Math.max(requestCost, values[2]);
@@ -54,7 +52,7 @@ export function textRequestPriceCeiling(metadata: StoredModel): TextRequestPrice
       ) / 1_000_000;
     const output = pricing.completion_per_million / 1_000_000;
     if (![input, output].every(value => Number.isFinite(value) && value >= 0))
-      throw new ModelPricingError('Model has invalid billed pricing');
+      return 'Model has invalid billed pricing';
     inputRate = Math.max(inputRate, input);
     outputRate = Math.max(outputRate, output);
   }
@@ -82,13 +80,8 @@ export function systemOneRequestCostBound(
   metadata: StoredModel,
   request: { state: unknown; questions: Record<string, unknown> }
 ): number | null {
-  let price: TextRequestPriceCeiling;
-  try {
-    price = textRequestPriceCeiling(metadata);
-  } catch (error) {
-    if (error instanceof ModelPricingError) return null;
-    throw error;
-  }
+  const price = textRequestPriceCeiling(metadata);
+  if (typeof price === 'string') return null;
   const questionBytes = Buffer.byteLength(JSON.stringify(request.questions) ?? '', 'utf8');
   const inputTokenCeiling =
     Buffer.byteLength(JSON.stringify(request.state) ?? '', 'utf8') + questionBytes + 1024;
@@ -163,6 +156,7 @@ export async function enforceRequestCostLimit(
     )
       return 'Model alias target changed before bounded spending admission';
     const price = textRequestPriceCeiling(metadata.data);
+    if (typeof price === 'string') return price;
     const inputTokenCeiling = requestTextBytes(body) + 2048;
     const bound = Math.ceil(
       (inputTokenCeiling * price.inputRate +

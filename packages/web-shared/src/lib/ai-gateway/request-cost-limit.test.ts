@@ -48,15 +48,43 @@ beforeEach(() => {
 describe('request cost admission', () => {
   it('bounds every route including cache, reasoning and per-request fees', () => {
     const price = textRequestPriceCeiling(model);
-    expect(price.inputRate).toBeCloseTo(0.000004, 12);
-    expect(price.outputRate).toBeCloseTo(0.000006, 12);
-    expect(price.requestCost).toBe(0.02);
+    expect(price).toEqual({
+      inputRate: expect.closeTo(0.000004, 12),
+      outputRate: expect.closeTo(0.000006, 12),
+      requestCost: 0.02,
+    });
   });
   it('fails closed for unknown or incompletely priced routes', async () => {
     await expect(
       enforceRequestCostLimit('2000000', 'missing/model', body, 2_000_000)
     ).resolves.toMatch(/pricing/);
-    expect(() => textRequestPriceCeiling({ ...model, endpoints: [{}] })).toThrow();
+    expect(textRequestPriceCeiling({ ...model, endpoints: [{}] })).toBe(
+      'Model has an unpriced route'
+    );
+  });
+  it.each([
+    { endpoints: [], error: 'Model pricing is unavailable' },
+    { endpoints: [{}], error: 'Model has an unpriced route' },
+    {
+      endpoints: [{ pricing: { prompt: '-1', completion: '0' } }],
+      error: 'Model has invalid pricing',
+    },
+    {
+      endpoints: [{ pricing: { prompt: '0', completion: 'Infinity' } }],
+      error: 'Model has invalid pricing',
+    },
+    {
+      endpoints: [{ pricing: { prompt: 'NaN', completion: '0' } }],
+      error: 'Model has invalid pricing',
+    },
+  ])('returns catalog pricing results', async ({ endpoints, error }) => {
+    const metadata = { ...model, endpoints };
+    mockCatalogLimit.mockResolvedValue([{ models: { [model.id]: metadata } }]);
+    expect(textRequestPriceCeiling(metadata)).toBe(error);
+    expect(systemOneRequestCostBound(metadata, { state: null, questions: {} })).toBeNull();
+    await expect(enforceRequestCostLimit('2000000', model.id, body, 2_000_000)).resolves.toBe(
+      error
+    );
   });
   it('rejects before upstream spend for an insufficient ceiling or balance', async () => {
     await expect(enforceRequestCostLimit('1', model.id, body, 2_000_000)).resolves.toMatch(

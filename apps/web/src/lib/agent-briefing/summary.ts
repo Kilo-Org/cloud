@@ -107,12 +107,8 @@ export async function briefingPriceBound(
   const metadata = models[pricingModel];
   if (!metadata || metadata.endpoints.length === 0) throw new Error('model_pricing_unavailable');
   if (Buffer.byteLength(prompt, 'utf8') > MAX_INPUT_BYTES) throw new Error('input_too_large');
-  let price;
-  try {
-    price = textRequestPriceCeiling(metadata);
-  } catch {
-    throw new Error('invalid_model_pricing');
-  }
+  const price = textRequestPriceCeiling(metadata);
+  if (typeof price === 'string') throw new Error('invalid_model_pricing');
   const { inputRate, outputRate, requestCost } = price;
   const inputTokensBound = Buffer.byteLength(prompt, 'utf8') + 4096;
   const inputCost = Math.ceil((inputTokensBound * inputRate + requestCost) * 1_000_000);

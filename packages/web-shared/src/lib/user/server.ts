@@ -227,7 +227,7 @@ export async function getUserFromBearerForCredentialExchange(
     return authError(401, 'Unauthorized', auth.userId);
   }
 
-  const user = await findUserById(auth.userId);
+  const user = await findUserById(auth.userId, db);
   if (
     auth.claims.apiTokenPepper === undefined ||
     auth.claims.apiTokenPepper !== user?.api_token_pepper
@@ -306,7 +306,7 @@ async function resolveUserFromAuth(
         credentialsRejected: true,
       });
     }
-    const user = await findUserById(authorizationValidationResult.kiloUserId);
+    const user = await findUserById(authorizationValidationResult.kiloUserId, db);
 
     if (
       user &&
@@ -363,7 +363,7 @@ async function resolveUserFromSession(opts: RequiredPermissions): Promise<GetAut
 
   if (!maybeKiloUserId) return authError(401, 'Unauthorized', '?');
 
-  const user = await findUserById(maybeKiloUserId);
+  const user = await findUserById(maybeKiloUserId, db);
   if (!user) return authError(401, 'Unauthorized (D)', maybeKiloUserId);
 
   if (!isWebSessionCurrent(session.webSessionPepper, user))

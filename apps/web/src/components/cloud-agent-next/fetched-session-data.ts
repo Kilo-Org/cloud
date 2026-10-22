@@ -40,7 +40,6 @@ export function toFetchedSessionData(
     variant: rs?.variant ?? null,
     repository: rs?.githubRepo ?? null,
     isInitiated: Boolean(rs?.initiatedAt),
-    needsLegacyPrepare: Boolean(session.cloud_agent_session_id && !rs),
     isPreparingAsync: Boolean(rs && !rs.preparedAt),
     routeReady: rs?.routeReady,
     prompt: rs?.prompt ?? null,

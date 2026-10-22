@@ -1,5 +1,5 @@
+import type { SessionId } from './types/ids.js';
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
-import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
@@ -149,7 +149,7 @@ export const agentSandboxProviderSchema = z.enum(AGENT_SANDBOX_PROVIDERS);
 export type { AgentSandboxProvider };
 
 /** Unique identifier for a session within a sandbox */
-export type SessionId = `agent_${string}` | `workspace_${string}`;
+export type { SessionId } from './types/ids.js';
 
 export type SessionContext = {
   sandboxId: SandboxId;
@@ -536,8 +536,6 @@ export type Env = {
   SandboxCodeReview: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for ephemeral Code Reviewer sandbox containers with SCM credential containment */
   SandboxCodeReviewContainment: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
-  CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
   /** Durable Object namespace for control-plane sessions */
@@ -586,6 +584,8 @@ export type Env = {
   WS_ALLOWED_ORIGINS?: string;
   /** Backend base URL (used for balance checks before session spin-up) */
   KILOCODE_BACKEND_BASE_URL?: string;
+  /** Optional organization context for model catalog validation. */
+  KILOCODE_ORG_ID_OVERRIDE?: string;
   /** Base URL override for OpenRouter-compatible Kilo API */
   KILO_OPENROUTER_BASE?: string;
   /** Local-dev override for the scoped subagent-launch MCP endpoint; never set in deployed config */
@@ -617,8 +617,6 @@ export type Env = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
   /** 'true' disables the per-account concurrent-container cap. Set only on the disposable e2e Worker. */
   CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
-  /** Comma-separated user or org IDs whose Code Reviewer sessions run on the call-home control plane. `*` includes personal. */
-  CODE_REVIEW_CONTROL_PLANE_IDS?: string;
   /** Comma-separated user or org IDs whose Code Reviewer sessions use the Cloudflare Containers runtime. `*` includes personal. */
   CODE_REVIEW_CONTAINERS_ORG_IDS?: string;
   RUNTIME_ISOLATION_ENABLED?: string;

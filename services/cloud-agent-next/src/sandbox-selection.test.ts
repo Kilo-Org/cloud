@@ -10,7 +10,6 @@ import {
   isSandboxAllocationAvailable,
 } from './sandbox-selection.js';
 import { classifySandboxId, selectSandboxForNewSession } from './sandbox-id.js';
-import { sessionPlaneForNewOwner } from './session-plane.js';
 import type { Env } from './types.js';
 
 const configured = {
@@ -108,11 +107,10 @@ describe('sandbox selection policy', () => {
     const env = { ...configured, ...overrides } as Env;
     const capabilities = getSandboxSelectionCapabilities(env, owner);
     expect(capabilities.defaultDestination).toEqual(expected);
-    const plane = sessionPlaneForNewOwner(env, owner, { createdOnPlatform: 'cloud-agent-web' });
     const actual = await selectSandboxForNewSession({
       env,
       ...owner,
-      sessionId: `${plane === 'control' ? 'workspace' : 'agent'}_12345678-1234-1234-1234-123456789012`,
+      sessionId: 'workspace_12345678-1234-1234-1234-123456789012',
     });
     expect(actual.provider).toBe(expected.provider.id);
     if (actual.provider === 'cloudflare') {

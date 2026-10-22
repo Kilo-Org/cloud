@@ -5,9 +5,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import { deleteRoute, readRoute } from '../../src/control-plane/sandbox/routes.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
-import { events } from '../../src/db/sqlite-schema.js';
+import { events } from '../../src/control-plane/session/sqlite-schema.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,

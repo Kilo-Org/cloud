@@ -109,6 +109,11 @@ export type JustTheCostsUsageStats = {
   cacheDiscount_mUsd?: number;
   /** The real cost before any free/BYOK/promo zeroing. Set by processTokenData. */
   market_cost?: number;
+  /**
+   * The part of `cost_mUsd` the gateway charged on top of BYOK inference, such as
+   * server tools, plugins and PDF parsing. Absent when not reported separately.
+   */
+  addonCost_mUsd?: number;
   inputTokens: number;
   outputTokens: number;
   cacheWriteTokens: number;
@@ -281,6 +286,7 @@ export type UsageMetaData = {
   auto_model: string | null;
   reasoning_setting: string | null;
   market_cost: number | null;
+  addon_cost: number | null;
   is_free: boolean | null;
   abuse_delay: number | null;
   abuse_downgraded_from: string | null;

@@ -51,7 +51,7 @@ describe('processMessagesApiUsage', () => {
       cost_details: { upstream_inference_cost: 0.7 },
     };
 
-    const result = processMessagesApiUsage(usage, null, coreProps);
+    const result = processMessagesApiUsage(usage, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(1000);
     expect(result.is_byok).toBe(false);
@@ -74,7 +74,7 @@ describe('processMessagesApiUsage', () => {
       cost_details: { upstream_inference_cost: 0.02 },
     };
 
-    const result = processMessagesApiUsage(usage, null, coreProps);
+    const result = processMessagesApiUsage(usage, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(20000);
     expect(result.is_byok).toBe(true);
@@ -93,7 +93,7 @@ describe('processMessagesApiUsage', () => {
       gateway: { routing: { finalProvider: 'anthropic' }, cost: '0', marketCost: '0.000375' },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
 
     expect(result.cost_mUsd).toBe(375); // toMicrodollars(0.000375)
     expect(result.is_byok).toBeNull();
@@ -128,7 +128,7 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
 
     expect(result.is_byok).toBe(true);
     expect(result.cost_mUsd).toBe(402);
@@ -159,7 +159,7 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
 
     expect(result.is_byok).toBe(false);
   });
@@ -192,13 +192,52 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
 
     expect(result.is_byok).toBe(false);
   });
 
+  test.each([
+    // Real Vercel responses: Perplexity searches billed to gateway credits, and a
+    // native Anthropic web search billed to the BYOK key within marketCost.
+    { cost: '0.025', marketCost: '0.041388', addon: 25000 },
+    { cost: '0', marketCost: '0.020541', addon: 0 },
+  ])('charges Vercel BYOK add-ons from gateway cost $cost', input => {
+    const usage = {
+      input_tokens: 10,
+      output_tokens: 5,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      server_tool_use: { input_tokens: 0, web_fetch_requests: 0, web_search_requests: 0 },
+      output_tokens_details: null,
+    };
+    const providerMetadata = {
+      gateway: {
+        routing: {
+          finalProvider: 'xai',
+          modelAttempts: [
+            {
+              success: true,
+              providerAttempts: [{ provider: 'xai', credentialType: 'byok', success: true }],
+            },
+          ],
+        },
+        cost: input.cost,
+        marketCost: input.marketCost,
+      },
+    };
+
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
+
+    expect(result.is_byok).toBe(true);
+    expect(result.addonCost_mUsd).toBe(input.addon);
+    expect(result.cost_mUsd).toBe(
+      Math.round(parseFloat(input.marketCost) * 1_000_000) + input.addon
+    );
+  });
+
   test('returns zero cost when no usage or metadata is provided', () => {
-    const result = processMessagesApiUsage(null, null, coreProps);
+    const result = processMessagesApiUsage(null, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(0);
     expect(result.is_byok).toBeNull();
@@ -398,7 +437,7 @@ describe('parseMessagesMicrodollarUsageFromString approval tests', () => {
   test(vercelMessagesJson, async () => {
     const inputFile = join(sampleDir, vercelMessagesJson);
     const jsonString = await readFile(inputFile, 'utf-8');
-    const result = parseMessagesMicrodollarUsageFromString(jsonString, 200);
+    const result = parseMessagesMicrodollarUsageFromString(jsonString, 200, 'openrouter');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);

@@ -207,6 +207,7 @@ function generateRandomRecord(
     ),
     reasoning_setting: null,
     market_cost: core.cost,
+    addon_cost: null,
     is_free: Math.random() < 0.1,
     abuse_delay: null,
     abuse_downgraded_from: null,

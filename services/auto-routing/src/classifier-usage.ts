@@ -101,6 +101,7 @@ export async function buildClassifierUsage(
       auto_model: clean(identity.requestedModel.toLowerCase()),
       reasoning_setting: null,
       market_cost: Math.round(costUsd * 1_000_000),
+      addon_cost: null,
       is_free: false,
       abuse_delay: null,
       abuse_downgraded_from: null,

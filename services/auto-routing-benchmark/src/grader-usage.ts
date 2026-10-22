@@ -75,6 +75,7 @@ export async function buildGraderUsage(
       auto_model: null,
       reasoning_setting: null,
       market_cost: microdollars,
+      addon_cost: null,
       is_free: false,
       abuse_delay: null,
       abuse_downgraded_from: null,

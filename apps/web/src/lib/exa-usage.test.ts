@@ -336,6 +336,46 @@ describe('Exa Usage Tracking', () => {
       });
     });
 
+    test('charges the requesting organization only for the excess across contexts', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Exa boundary organization',
+        user.id,
+        50_000
+      );
+      // Personal usage already consumed the month's allowance up to 1000 short of it.
+      await seedMonthlyUsage(user.id, 9_999_000);
+
+      await recordExaUsage({
+        userId: user.id,
+        organizationId: organization.id,
+        path: '/search',
+        costMicrodollars: 2000,
+        freeAllowanceMicrodollars: 10_000_000,
+      });
+
+      const [chargedOrganization] = await db
+        .select({ microdollars_used: organizations.microdollars_used })
+        .from(organizations)
+        .where(eq(organizations.id, organization.id));
+      expect(chargedOrganization.microdollars_used).toBe(1000);
+
+      const [memberUsage] = await db
+        .select()
+        .from(organization_user_usage)
+        .where(eq(organization_user_usage.organization_id, organization.id));
+      expect(memberUsage).toMatchObject({
+        kilo_user_id: user.id,
+        microdollar_usage: 1000,
+      });
+
+      const [personal] = await db
+        .select({ microdollars_used: kilocode_users.microdollars_used })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, user.id));
+      expect(personal.microdollars_used).toBe(0);
+    });
+
     test('rolls back charged Exa source and monthly rows when the user row is missing', async () => {
       const missingUserId = `missing-exa-user-${crypto.randomUUID()}`;
       await seedMonthlyUsage(missingUserId, 10_000_000);

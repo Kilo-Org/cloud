@@ -3569,6 +3569,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agentin käynnistys vaatii kehotteen. Lisää kehote ja suorita se uudelleen.",
+      "repositoryRequired": "Agentin käynnistys vaatii koodivaraston. Avaa Kilo ja valitse koodivarasto, sitten suorita se uudelleen.",
       "repositoryUnknown": "Kilo ei tunnista {{repository}}-kohdetta GitHub- tai GitLab-koodivarastoksi. Valitse toinen koodivarasto Kilossa.",
       "repositoryUnsupported": "{{repository}} on Bitbucket-koodivarasto — Agentin käynnistys ei voi vielä käyttää sitä. Valitse toinen koodivarasto Kilossa."
     }

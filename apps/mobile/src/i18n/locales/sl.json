@@ -3651,6 +3651,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Za zagon agenta je potreben poziv. Dodaj poziv in ga znova zaženi.",
+      "repositoryRequired": "Zagon agenta zahteva repozitorij. Odpri Kilo in izberi repozitorij, nato ga znova zaženi.",
       "repositoryUnknown": "Kilo ne prepozna {{repository}} kot repozitorij GitHub ali GitLab. Izberi drug repozitorij v Kilu.",
       "repositoryUnsupported": "{{repository}} je repozitorij Bitbucket — Zaženi agenta ga še ne more uporabiti. Izberi drug repozitorij v Kilu."
     }

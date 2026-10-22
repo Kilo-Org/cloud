@@ -3569,6 +3569,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Fillo agjentin kërkon një kërkesë. Shto një kërkesë dhe ekzekutoje përsëri.",
+      "repositoryRequired": "Fillo agjentin kërkon një depo. Hap Kilo dhe zgjidh një depo, pastaj ekzekutoje përsëri.",
       "repositoryUnknown": "Kilo nuk e njeh {{repository}} si depo GitHub ose GitLab. Zgjidh një depo tjetër në Kilo.",
       "repositoryUnsupported": "{{repository}} është një depo Bitbucket — Fillo agjentin nuk mund ta përdorë ende. Zgjidh një depo tjetër në Kilo."
     }

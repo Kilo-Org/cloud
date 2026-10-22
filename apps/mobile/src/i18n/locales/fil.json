@@ -3569,6 +3569,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Nangangailangan ng prompt ang Simulan ang agent. Magdagdag ng prompt at patakbuhin itong muli.",
+      "repositoryRequired": "Nangangailangan ng repositoryo ang Simulan ang agent. Buksan ang Kilo at pumili ng isa, pagkatapos ay patakbuhin itong muli.",
       "repositoryUnknown": "Hindi kinikilala ng Kilo ang {{repository}} bilang GitHub o GitLab na repositoryo. Pumili ng ibang repositoryo sa Kilo.",
       "repositoryUnsupported": "Ang {{repository}} ay isang Bitbucket na repositoryo — Hindi pa ito magagamit ng Simulan ang agent. Pumili ng ibang repositoryo sa Kilo."
     }

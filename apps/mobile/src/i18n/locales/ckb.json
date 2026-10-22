@@ -3569,6 +3569,7 @@
   "appActions": {
     "start": {
       "promptRequired": "بۆ دەستپێکردنی بریکار داواکاری پێویستە. داواکارییەک زیاد بکە و دووبارە بیخە کار.",
+      "repositoryRequired": "بۆ دەستپێکردنی بریکار کۆگایەک پێویستە. Kilo بکەرەوە و کۆگایەک هەڵبژێرە، پاشان دووبارە بیخە کار.",
       "repositoryUnknown": "Kilo {{repository}} وەک کۆگای GitHub یان GitLab ناناسێت. لە Kilo کۆگایەکی تر هەڵبژێرە.",
       "repositoryUnsupported": "{{repository}} کۆگای Bitbucket ە — بریکار دەستپێبکە هێشتا ناتوانێت بەکاری بهێنێت. لە Kilo کۆگایەکی تر هەڵبژێرە."
     }

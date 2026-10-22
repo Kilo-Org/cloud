@@ -3569,6 +3569,7 @@
   "appActions": {
     "start": {
       "promptRequired": "ການເລີ່ມເອເຈນຕ້ອງການຂໍ້ຄວາມ. ເພີ່ມຂໍ້ຄວາມແລ້ວລອງອີກຄັ້ງ.",
+      "repositoryRequired": "ການເລີ່ມເອເຈນຕ້ອງການຄັງໂຄ້ດ. ເປີດ Kilo ແລະເລືອກຄັງໂຄ້ດໜຶ່ງ, ແລ້ວລອງອີກຄັ້ງ.",
       "repositoryUnknown": "Kilo ບໍ່ຮູ້ຈັກ {{repository}} ວ່າເປັນຄັງໂຄ້ດ GitHub ຫຼື GitLab. ເລືອກຄັງໂຄ້ດອື່ນໃນ Kilo.",
       "repositoryUnsupported": "{{repository}} ເປັນຄັງໂຄ້ດ Bitbucket — ເລີ່ມເອເຈນຍັງໃຊ້ມັນບໍ່ໄດ້. ເລືອກຄັງໂຄ້ດອື່ນໃນ Kilo."
     }

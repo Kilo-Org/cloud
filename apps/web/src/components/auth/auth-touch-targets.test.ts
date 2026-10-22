@@ -356,6 +356,7 @@ describe('sign-in touch targets', () => {
         code: 'ABCD-1234',
         viewerToken: 'viewer-token',
         isAppMode: true,
+        requestingClient: null,
         user: { name: 'Ada Lovelace', email: 'ada@kilo.ai', imageUrl: '' },
       })
     );

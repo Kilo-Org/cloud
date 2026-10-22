@@ -34,6 +34,7 @@ describe('POST /api/device-auth/codes', () => {
       userCode: 'ABCD-EFGH',
       deviceCode: 'base64url-device-secret',
       expiresAt,
+      requestingClient: null,
     });
 
     const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
@@ -62,6 +63,7 @@ describe('POST /api/device-auth/codes', () => {
       userCode: 'WXYZ-1234',
       deviceCode: 'super-long-secret-that-should-not-leak',
       expiresAt,
+      requestingClient: null,
     });
 
     const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
@@ -102,5 +104,89 @@ describe('POST /api/device-auth/codes', () => {
     });
 
     await expect(POST(req)).rejects.toThrow('unexpected');
+  });
+
+  test('stores the requesting client named by the body and echoes it', async () => {
+    const requestingClient = {
+      clientId: 'client-abc',
+      clientName: 'Claude Desktop',
+      redirectOrigin: 'https://client.test',
+    };
+    mockCreate.mockResolvedValue({
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient,
+    });
+
+    const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
+      method: 'POST',
+      body: JSON.stringify({
+        requesting_client: {
+          client_id: 'client-abc',
+          client_name: 'Claude Desktop',
+          redirect_origin: 'https://client.test',
+        },
+      }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(req);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ requestingClient }));
+    expect(data.requestingClient).toEqual(requestingClient);
+  });
+
+  test('opens a plain pairing for a body that names no client', async () => {
+    mockCreate.mockResolvedValue({
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
+    });
+
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/device-auth/codes', { method: 'POST' })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ requestingClient: expect.anything() })
+    );
+    expect((await response.json()).requestingClient).toBeNull();
+  });
+
+  test.each([
+    [
+      'an empty client id',
+      { client_id: '', client_name: 'Acme', redirect_origin: 'https://a.test' },
+    ],
+    [
+      'a control character in the name',
+      { client_id: 'client-abc', client_name: 'Acme\u0007', redirect_origin: 'https://a.test' },
+    ],
+    [
+      'an oversized redirect origin',
+      {
+        client_id: 'client-abc',
+        client_name: 'Acme',
+        redirect_origin: `https://${'a'.repeat(300)}`,
+      },
+    ],
+  ])('refuses a client description with %s', async (_label, requesting_client) => {
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/device-auth/codes', {
+        method: 'POST',
+        body: JSON.stringify({ requesting_client }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 });

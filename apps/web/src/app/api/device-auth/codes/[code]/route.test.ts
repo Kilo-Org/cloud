@@ -57,6 +57,37 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
       token: 'jwt',
       userId: 'user-1',
       userEmail: 'user@example.com',
+      requestingClient: null,
+      clientConfirmed: false,
+    });
+  });
+
+  test('returns the confirmed client with an approved pairing', async () => {
+    mockPoll.mockResolvedValue({
+      status: 'approved',
+      token: 'jwt',
+      userId: 'user-1',
+      userEmail: 'user@example.com',
+      requestingClient: {
+        clientId: 'client-abc',
+        clientName: 'Claude Desktop',
+        redirectOrigin: 'https://client.test',
+      },
+      clientConfirmed: true,
+    });
+
+    const response = await GET(new NextRequest('http://localhost:3000'), {
+      params: Promise.resolve({ code: 'ABCD-EFGH' }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'approved',
+      requestingClient: {
+        clientId: 'client-abc',
+        clientName: 'Claude Desktop',
+        redirectOrigin: 'https://client.test',
+      },
+      clientConfirmed: true,
     });
   });
 

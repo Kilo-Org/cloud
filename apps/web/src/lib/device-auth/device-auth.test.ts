@@ -17,6 +17,7 @@ import {
   cleanupExpiredDeviceAuthRequests,
   DeviceAuthPendingLimitError,
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
+  DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE,
 } from './device-auth';
 import { issueSessionCredentials } from '@/lib/auth/device-sessions';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
@@ -204,6 +205,63 @@ describe('Device Auth', () => {
       await expect(createDeviceAuthRequest({ ipAddress })).rejects.toThrow(
         DEVICE_AUTH_PENDING_LIMIT_MESSAGE
       );
+    });
+  });
+
+  describe('requesting client', () => {
+    const requestingClient = {
+      clientId: 'client-abc',
+      clientName: 'Claude Desktop',
+      redirectOrigin: 'https://client.test',
+    };
+
+    test('stores the named client and gives it back on the approved poll', async () => {
+      const { code } = await createDeviceAuthRequest({ requestingClient });
+      expect(await getDeviceAuthRequest(code)).toMatchObject({
+        requesting_client_id: 'client-abc',
+        requesting_client_name: 'Claude Desktop',
+        requesting_redirect_origin: 'https://client.test',
+      });
+
+      await approveDeviceAuthRequest(code, testUserId, { confirmedClientId: 'client-abc' });
+
+      await expect(pollDeviceAuthRequest(code)).resolves.toMatchObject({
+        status: 'approved',
+        userId: testUserId,
+        requestingClient,
+        clientConfirmed: true,
+      });
+    });
+
+    test.each([
+      ['no confirmation', undefined],
+      ['a different client', 'client-other'],
+    ])('refuses %s and leaves the request pending', async (_label, confirmedClientId) => {
+      const { code } = await createDeviceAuthRequest({ requestingClient });
+
+      await expect(
+        approveDeviceAuthRequest(code, testUserId, {
+          ...(confirmedClientId ? { confirmedClientId } : {}),
+        })
+      ).rejects.toThrow(DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE);
+
+      expect(await getDeviceAuthRequest(code)).toMatchObject({
+        status: 'pending',
+        kilo_user_id: null,
+        client_confirmed_at: null,
+      });
+    });
+
+    test('approves a request that names no client without a confirmation', async () => {
+      const { code } = await createDeviceAuthRequest({});
+
+      await approveDeviceAuthRequest(code, testUserId);
+
+      await expect(pollDeviceAuthRequest(code)).resolves.toMatchObject({
+        status: 'approved',
+        requestingClient: null,
+        clientConfirmed: false,
+      });
     });
   });
 

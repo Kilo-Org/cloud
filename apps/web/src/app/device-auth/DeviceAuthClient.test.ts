@@ -92,6 +92,7 @@ describe('DeviceAuthClient layout', () => {
         code: 'ABC-123',
         viewerToken: 'v',
         isAppMode: true,
+        requestingClient: null,
         user,
       })
     );
@@ -128,6 +129,58 @@ describe('DeviceAuthClient layout', () => {
     const html = renderClient({ name: 'Test User', email: 'test@example.com', imageUrl: '' });
 
     expect(html).toContain('class="text-2xl font-bold tracking-wider break-all"');
+  });
+});
+
+describe('DeviceAuthClient requesting app', () => {
+  const requestingClient = {
+    clientId: 'client-abc',
+    clientName: 'Claude Desktop',
+    redirectOrigin: 'https://client.test',
+  };
+
+  const renderClient = (client: typeof requestingClient | null) =>
+    renderToStaticMarkup(
+      React.createElement(DeviceAuthClient, {
+        code: 'ABC-123',
+        viewerToken: 'v',
+        isAppMode: false,
+        requestingClient: client,
+        user: { name: 'Test User', email: 'test@example.com', imageUrl: '' },
+      })
+    );
+
+  /** The Authorize button is the primary action on the card. */
+  const authorizeButton = (html: string): string =>
+    html.slice(html.lastIndexOf('<button'), html.indexOf('</button>', html.lastIndexOf('<button')));
+
+  test('names the app, its redirect origin, and its client id', () => {
+    const html = renderClient(requestingClient);
+
+    expect(html).toContain('Requesting app');
+    expect(html).toContain('Claude Desktop');
+    expect(html).toContain('Redirects to');
+    expect(html).toContain('https://client.test');
+    expect(html).toContain('Client ID');
+    expect(html).toContain('client-abc');
+  });
+
+  test('keeps the approval disabled until the app is confirmed', () => {
+    const html = renderClient(requestingClient);
+
+    expect(authorizeButton(html)).toContain('disabled=""');
+    expect(html).toContain('Confirm the requesting app above to authorize it.');
+    expect(html).toContain('for="confirm-requesting-client"');
+    expect(html).toMatch(/type="checkbox"[^>]*id="confirm-requesting-client"/);
+    expect(html).not.toContain('checked=""');
+  });
+
+  test('renders the plain approval when the request names no app', () => {
+    const html = renderClient(null);
+
+    expect(html).not.toContain('Requesting app');
+    expect(html).not.toContain('Confirm the requesting app');
+    expect(authorizeButton(html)).not.toContain('disabled=""');
   });
 });
 

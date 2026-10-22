@@ -5,6 +5,17 @@ import { eq, and, lt, lte, gt, isNull, isNotNull, sql } from 'drizzle-orm';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { randomInt, createHash, randomBytes } from 'node:crypto';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
+import { requestingClientOfRow, type RequestingClient } from './requesting-client';
+
+export type { RequestingClient } from './requesting-client';
+
+/**
+ * Refusal when the approval does not confirm the client the request names. The
+ * approval page shows the client, the approver confirms that exact client, and
+ * a request that names one is never approved without it.
+ */
+export const DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE =
+  'Device authorization client confirmation does not match';
 
 const CODE_LENGTH = 8;
 const CODE_EXPIRATION_MINUTES = 10;
@@ -61,8 +72,15 @@ export function hashDeviceSecret(secret: string): string {
 export async function createDeviceAuthRequest(params: {
   userAgent?: string;
   ipAddress?: string;
-}): Promise<{ code: string; userCode: string; deviceCode: string; expiresAt: Date }> {
-  const { userAgent, ipAddress } = params;
+  requestingClient?: RequestingClient;
+}): Promise<{
+  code: string;
+  userCode: string;
+  deviceCode: string;
+  expiresAt: Date;
+  requestingClient: RequestingClient | null;
+}> {
+  const { userAgent, ipAddress, requestingClient = null } = params;
 
   // Validate IP address on Production
   if (process.env['NODE_ENV'] === 'production' && !ipAddress) {
@@ -100,9 +118,23 @@ export async function createDeviceAuthRequest(params: {
     expires_at: expiresAt.toISOString(),
     user_agent: userAgent,
     ip_address: ipAddress,
+    ...requestingClientColumns(requestingClient),
   });
 
-  return { code: userCode, userCode, deviceCode: deviceSecret, expiresAt };
+  return { code: userCode, userCode, deviceCode: deviceSecret, expiresAt, requestingClient };
+}
+
+/** The stored columns of a named requesting client; absent for an unnamed caller. */
+function requestingClientColumns(client: RequestingClient | null): {
+  requesting_client_id: string | null;
+  requesting_client_name: string | null;
+  requesting_redirect_origin: string | null;
+} {
+  return {
+    requesting_client_id: client?.clientId ?? null,
+    requesting_client_name: client?.clientName ?? null,
+    requesting_redirect_origin: client?.redirectOrigin ?? null,
+  };
 }
 
 /**
@@ -130,15 +162,37 @@ export function isDeviceAuthRequestExpired(request: {
 
 /**
  * Approve a device authorization request.
+ *
+ * A request that names a requesting client is approved only together with a
+ * confirmation of that exact client: the approval page shows the client and
+ * its redirect origin, and the approver confirms them. The confirmation is
+ * recorded on the row so the requester can verify that the approval it
+ * receives is for the client it asked about.
  */
-export async function approveDeviceAuthRequest(code: string, userId: string): Promise<void> {
+export async function approveDeviceAuthRequest(
+  code: string,
+  userId: string,
+  options: { confirmedClientId?: string } = {}
+): Promise<void> {
   const now = new Date().toISOString();
+  const existing = await getDeviceAuthRequest(code);
+  const requestingClientId = existing?.requesting_client_id ?? null;
+  // An actionable row that names a client requires its confirmation before any
+  // other outcome is considered; an expired row reports its expiry below.
+  const confirmed =
+    requestingClientId !== null &&
+    existing?.status === 'pending' &&
+    new Date(existing.expires_at).getTime() > Date.parse(now)
+      ? confirmRequestingClient(requestingClientId, options.confirmedClientId)
+      : false;
+
   const [approved] = await db
     .update(device_auth_requests)
     .set({
       status: 'approved',
       kilo_user_id: userId,
       approved_at: now,
+      ...(confirmed ? { client_confirmed_at: now } : {}),
     })
     .where(
       and(
@@ -179,6 +233,18 @@ export async function approveDeviceAuthRequest(code: string, userId: string): Pr
     throw new Error('Device authorization request is not pending');
   }
   throw new Error('Device authorization request has expired');
+}
+
+/**
+ * Accept a matching client confirmation, refuse a missing or different one.
+ * The client id of a row never changes after insert, so this decision holds
+ * for the transition that follows.
+ */
+function confirmRequestingClient(requestingClientId: string, confirmedClientId?: string): true {
+  if (confirmedClientId !== requestingClientId) {
+    throw new Error(DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE);
+  }
+  return true;
 }
 
 /**
@@ -341,6 +407,10 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
   token?: string;
   userId?: string;
   userEmail?: string;
+  /** The client the request named, when it named one. */
+  requestingClient?: RequestingClient | null;
+  /** Whether the approval confirmed that exact client. */
+  clientConfirmed?: boolean;
 }> {
   const now = new Date().toISOString();
 
@@ -394,6 +464,8 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
         token,
         userId: user.id,
         userEmail: user.google_user_email,
+        requestingClient: requestingClientOfRow(consumed),
+        clientConfirmed: consumed.client_confirmed_at !== null,
       };
     } catch (err) {
       // Restore the row so the request remains redeemable.

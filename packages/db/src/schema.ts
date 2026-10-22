@@ -6935,6 +6935,14 @@ export const device_auth_requests = pgTable(
     device_code_hash: text(),
     user_agent: text(),
     ip_address: text(),
+    /** The OAuth client the request asks to connect, when the requester names one. */
+    requesting_client_id: text(),
+    /** Display name of that client, as it is shown on the approval page. */
+    requesting_client_name: text(),
+    /** Origin (or app scheme) the approved code is delivered to, as shown to the approver. */
+    requesting_redirect_origin: text(),
+    /** When the approver confirmed that exact client; null until then. */
+    client_confirmed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

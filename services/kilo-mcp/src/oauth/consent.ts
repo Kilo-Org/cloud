@@ -40,6 +40,9 @@ import {
   fetchOrgOptions,
   fetchUserIsAdmin,
   pollKiloPairing,
+  redirectOriginOf,
+  type KiloPollOutcome,
+  type RequestingClient,
 } from './kilo-pairing';
 import {
   PERSONAL_ORG_ID,
@@ -139,6 +142,22 @@ function isPaired(record: PendingAuthorization): record is PendingAuthorization 
   );
 }
 
+/**
+ * Whether an approved pairing answers exactly the client this authorization was
+ * started for: the approver confirmed that client, and the client id and
+ * redirect origin come back unchanged. A missing description never matches.
+ */
+function approvalConfirmsRequestingClient(
+  record: PendingAuthorization,
+  approval: Extract<KiloPollOutcome, { status: 'approved' }>
+): boolean {
+  if (!approval.clientConfirmed) return false;
+  const requesting = approval.requestingClient;
+  if (requesting === null) return false;
+  if (requesting.clientId !== record.authRequest.clientId) return false;
+  return requesting.redirectOrigin === redirectOriginOf(record.authRequest.redirectUri);
+}
+
 /** Rebuild the client's original /authorize request from the stored library request. */
 function restartAuthorizeUrl(authRequest: AuthRequest, origin: string): string {
   const url = new URL(AUTH_PATHS.authorize, origin);
@@ -211,7 +230,29 @@ async function handleAuthorize(request: Request, env: Env, deps: ConsentDeps): P
     return errorPage('invalid_request', 'Unknown OAuth client.');
   }
 
-  const pairing = await createKiloPairing(deps, request);
+  // The client the approval page presents and the approver confirms. A
+  // redirect URI without an absolute origin cannot be presented, so it is
+  // refused here rather than approved blind.
+  const redirectOrigin = redirectOriginOf(authRequest.redirectUri);
+  if (redirectOrigin === null) {
+    deps.analytics?.oauthSignIn({
+      phase: 'failed',
+      identity: null,
+      clientId: authRequest.clientId,
+      reason: 'invalid_request',
+    });
+    return errorPage(
+      'invalid_request',
+      'This client registered a redirect URI that cannot be shown to the person approving it. Correct the client registration, then retry.'
+    );
+  }
+
+  const requestingClient: RequestingClient = {
+    clientId: authRequest.clientId,
+    clientName: client.clientName ?? '',
+    redirectOrigin,
+  };
+  const pairing = await createKiloPairing(deps, request, requestingClient);
   if (!pairing.ok) {
     // Retryable unhappy path: nothing was created; tell the user exactly what
     // to do (wait vs check connection) and send them back to the client.
@@ -224,7 +265,9 @@ async function handleAuthorize(request: Request, env: Env, deps: ConsentDeps): P
     const description =
       pairing.kind === 'rate_limited'
         ? 'Too many pending Kilo sign-in requests from your network right now. Wait a few minutes, then retry from your MCP client.'
-        : 'Kilo sign-in could not be reached. Check your connection, then retry from your MCP client.';
+        : pairing.kind === 'client_unconfirmed'
+          ? 'Kilo sign-in could not confirm this app right now. Wait a few minutes, then retry from your MCP client.'
+          : 'Kilo sign-in could not be reached. Check your connection, then retry from your MCP client.';
     return errorPage('temporarily_unavailable', description, 503);
   }
 
@@ -325,6 +368,26 @@ async function handlePairingStatus(request: Request, deps: ConsentDeps): Promise
       return authJsonResponse({ status: 'expired' } satisfies PairingStatus);
     }
     case 'approved': {
+      // The approval only applies to the client this authorization was started
+      // for: the approver saw and confirmed it, and the same client and
+      // redirect origin come back. Anything else is refused here, before the
+      // paired identity is stored, and the record is closed so no poll can
+      // complete it later.
+      if (!approvalConfirmsRequestingClient(record, upstream)) {
+        const transitioned = await deps.store.denyPendingAuthorization(
+          record.deviceAuthCode,
+          nowIso
+        );
+        if (transitioned) {
+          deps.analytics?.oauthSignIn({
+            phase: 'failed',
+            identity: null,
+            clientId,
+            reason: 'client_not_confirmed',
+          });
+        }
+        return authJsonResponse({ status: 'denied' } satisfies PairingStatus);
+      }
       // Persist BEFORE any further poll: the upstream answer is single-use.
       await deps.store.recordPairingApproval(
         record.deviceAuthCode,

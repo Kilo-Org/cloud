@@ -38,6 +38,8 @@ export const GET = withRestTiming(
             token: result.token,
             userId: result.userId,
             userEmail: result.userEmail,
+            requestingClient: result.requestingClient ?? null,
+            clientConfirmed: result.clientConfirmed === true,
           },
           { status: 200 }
         );

@@ -46,18 +46,111 @@ function forwardedHeader(request: Request, name: ForwardedHeaderName): string | 
   return parsed.success ? parsed.data[name] : undefined;
 }
 
-export type KiloPairingFailure = 'rate_limited' | 'unreachable';
+export type KiloPairingFailure = 'rate_limited' | 'unreachable' | 'client_unconfirmed';
+
+/**
+ * The OAuth client a pairing asks about, as the approval page presents it and
+ * the approved pairing echoes it back. The worker accepts an approval only for
+ * this exact client and redirect origin.
+ */
+export type RequestingClient = {
+  clientId: string;
+  /** Display name; an absent or unusable name becomes a neutral label. */
+  clientName?: string;
+  /** Origin (or app scheme) the approved code is delivered to. */
+  redirectOrigin: string;
+};
+
+/** Longest client name the approval page renders (`REQUESTING_CLIENT_FIELD_MAX`). */
+const CLIENT_NAME_MAX = 200;
+
+/** The label a client without a usable name shows as. */
+const UNNAMED_CLIENT = 'Unnamed application';
+
+/**
+ * The origin the approved code is delivered to. http(s) URIs yield their
+ * origin; any other scheme yields `scheme://host` (or the bare scheme), because
+ * `URL.origin` is `null` for a non-special scheme. `null` means the redirect
+ * URI is not an absolute URL, so no client identity can be presented for it.
+ * The path and query never appear: the approver only needs to know where the
+ * code goes, and a path is not a trust boundary.
+ */
+export function redirectOriginOf(redirectUri: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(redirectUri);
+  } catch {
+    return null;
+  }
+  if (url.protocol === 'http:' || url.protocol === 'https:') return url.origin;
+  return url.host.length > 0 ? `${url.protocol}//${url.host}` : url.protocol;
+}
+
+/** One displayable line from a client-supplied name: no control characters, bounded. */
+function displayClientName(name: string | undefined): string {
+  const collapsed = (name ?? '')
+    .replace(/\p{Cc}/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const bounded = collapsed.slice(0, CLIENT_NAME_MAX).trim();
+  return bounded.length > 0 ? bounded : UNNAMED_CLIENT;
+}
+
+/** The `requesting_client` member apps/web stores and echoes for a pairing. */
+function requestingClientPayload(client: RequestingClient): {
+  client_id: string;
+  client_name: string;
+  redirect_origin: string;
+} {
+  return {
+    client_id: client.clientId,
+    client_name: displayClientName(client.clientName),
+    redirect_origin: client.redirectOrigin,
+  };
+}
+
+/**
+ * Read the requesting client an apps/web answer carries. A shape this worker
+ * cannot act on is `null`, never a guess: every approval is compared field by
+ * field before a grant is minted.
+ */
+function readRequestingClient(value: unknown): RequestingClient | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const clientId = 'clientId' in value ? value.clientId : undefined;
+  const clientName = 'clientName' in value ? value.clientName : undefined;
+  const redirectOrigin = 'redirectOrigin' in value ? value.redirectOrigin : undefined;
+  if (
+    typeof clientId !== 'string' ||
+    clientId.length === 0 ||
+    typeof clientName !== 'string' ||
+    clientName.length === 0 ||
+    typeof redirectOrigin !== 'string' ||
+    redirectOrigin.length === 0
+  ) {
+    return null;
+  }
+  return { clientId, clientName, redirectOrigin };
+}
 
 /**
  * Create the Kilo device-auth pairing on apps/web
  * (`POST /api/device-auth/codes`, apps/web/src/app/api/device-auth/codes/route.ts).
  * apps/web rate-limits pending pairings per IP and requires the client IP in
  * production, so the incoming request's IP and user-agent are forwarded.
+ *
+ * The request names the OAuth client it is asking about, and the answer echoes
+ * the client apps/web stored. An answer that does not echo this client cannot
+ * be approved against it later, so it is a retryable failure now instead of a
+ * sign-in that can never finish.
  */
 export async function createKiloPairing(
   deps: KiloPairingDeps,
-  request: Request
-): Promise<{ ok: true; pairingCode: string } | { ok: false; kind: KiloPairingFailure }> {
+  request: Request,
+  client: RequestingClient
+): Promise<
+  | { ok: true; pairingCode: string; requestingClient: RequestingClient }
+  | { ok: false; kind: KiloPairingFailure }
+> {
   const fetchImpl = deps.fetchImpl ?? fetch;
   const url = `${deps.webBaseUrl.replace(/\/$/, '')}/api/device-auth/codes`;
   const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -67,27 +160,45 @@ export async function createKiloPairing(
   const userAgent = forwardedHeader(request, 'user-agent');
   if (userAgent) headers['user-agent'] = userAgent;
 
+  const body = JSON.stringify({ requesting_client: requestingClientPayload(client) });
+
   let response: Response;
   try {
-    response = await fetchImpl(url, { method: 'POST', headers, body: '{}' });
+    response = await fetchImpl(url, { method: 'POST', headers, body });
   } catch {
     return { ok: false, kind: 'unreachable' };
   }
   if (response.status === 429) return { ok: false, kind: 'rate_limited' };
   if (!response.ok) return { ok: false, kind: 'unreachable' };
 
-  const body: unknown = await response.json().catch(() => null);
-  const code =
-    typeof body === 'object' && body !== null ? (body as { code?: unknown }).code : undefined;
+  const answer: unknown = await response.json().catch(() => null);
+  if (typeof answer !== 'object' || answer === null) {
+    return { ok: false, kind: 'unreachable' };
+  }
+  const code = 'code' in answer ? answer.code : undefined;
   if (typeof code !== 'string' || code.length === 0) {
     return { ok: false, kind: 'unreachable' };
   }
-  return { ok: true, pairingCode: code };
+  const echoed = readRequestingClient(
+    'requestingClient' in answer ? answer.requestingClient : null
+  );
+  if (echoed === null || echoed.clientId !== client.clientId) {
+    return { ok: false, kind: 'client_unconfirmed' };
+  }
+  return { ok: true, pairingCode: code, requestingClient: echoed };
 }
 
 export type KiloPollOutcome =
   | { status: 'pending' }
-  | { status: 'approved'; token: string; userId: string }
+  | {
+      status: 'approved';
+      token: string;
+      userId: string;
+      /** The client the approved pairing names, when apps/web reports one. */
+      requestingClient: RequestingClient | null;
+      /** Whether the approver confirmed that exact client. */
+      clientConfirmed: boolean;
+    }
   | { status: 'denied' }
   | { status: 'expired' }
   | { status: 'unreachable' };
@@ -97,7 +208,9 @@ export type KiloPollOutcome =
  * (`GET /api/device-auth/codes/{code}` — statuses pending/approved/denied/
  * expired, apps/web/src/app/api/device-auth/codes/[code]/route.ts). Any
  * transport-level or shape surprise is `unreachable`: the caller keeps the
- * user waiting and lets the next poll retry rather than failing the flow.
+ * user waiting and lets the next poll retry rather than failing the flow. An
+ * approval is never `unreachable` for a missing client description: it is an
+ * approval this worker will refuse to complete.
  */
 export async function pollKiloPairing(
   deps: Pick<KiloPairingDeps, 'webBaseUrl' | 'fetchImpl'>,
@@ -117,13 +230,21 @@ export async function pollKiloPairing(
   if (!response.ok) return { status: 'unreachable' };
   const body: unknown = await response.json().catch(() => null);
   if (typeof body !== 'object' || body === null) return { status: 'unreachable' };
-  const record = body as { status?: unknown; token?: unknown; userId?: unknown };
-  if (record.status !== 'approved') return { status: 'unreachable' };
-  if (typeof record.token !== 'string' || record.token.length === 0)
-    return { status: 'unreachable' };
-  if (typeof record.userId !== 'string' || record.userId.length === 0)
-    return { status: 'unreachable' };
-  return { status: 'approved', token: record.token, userId: record.userId };
+  const status = 'status' in body ? body.status : undefined;
+  const token = 'token' in body ? body.token : undefined;
+  const userId = 'userId' in body ? body.userId : undefined;
+  if (status !== 'approved') return { status: 'unreachable' };
+  if (typeof token !== 'string' || token.length === 0) return { status: 'unreachable' };
+  if (typeof userId !== 'string' || userId.length === 0) return { status: 'unreachable' };
+  return {
+    status: 'approved',
+    token,
+    userId,
+    requestingClient: readRequestingClient(
+      'requestingClient' in body ? body.requestingClient : null
+    ),
+    clientConfirmed: ('clientConfirmed' in body ? body.clientConfirmed : undefined) === true,
+  };
 }
 
 /** The catalog query used to list the caller's orgs (read-only, in the dump). */

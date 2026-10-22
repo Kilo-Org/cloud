@@ -1,5 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
-import { isActiveDeviceSession, type DeviceSessionDb } from './device-session-auth';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getWorkerDb } from '@kilocode/db/client';
+import {
+  findActiveDeviceSession,
+  isActiveDeviceSession,
+  type DeviceSessionDb,
+} from './device-session-auth';
+
+vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
 
 function fakeDb(rows: unknown[] | Error) {
   const limit = vi.fn(async () => {
@@ -40,6 +47,38 @@ describe('isActiveDeviceSession', () => {
 
     await expect(isActiveDeviceSession(db, deviceSessionId, 'user-1')).rejects.toThrow(
       'connection refused'
+    );
+  });
+});
+
+describe('findActiveDeviceSession', () => {
+  const connectionString = 'postgres://localhost/test';
+  const deviceSessionId = '11111111-1111-4111-8111-111111111111';
+
+  beforeEach(() => {
+    vi.mocked(getWorkerDb).mockReset();
+  });
+
+  it('bounds connections and queries without startup parameters', async () => {
+    const { db } = fakeDb([{ id: deviceSessionId }]);
+    vi.mocked(getWorkerDb).mockReturnValue(db as ReturnType<typeof getWorkerDb>);
+
+    await expect(
+      findActiveDeviceSession(connectionString, deviceSessionId, 'user-1')
+    ).resolves.toBe(true);
+    expect(getWorkerDb).toHaveBeenCalledExactlyOnceWith(connectionString, {
+      connectionTimeoutMillis: 2_000,
+      query_timeout: 2_000,
+    });
+  });
+
+  it('propagates query timeouts as dependency failures', async () => {
+    const timeout = new Error('Query read timeout');
+    const { db } = fakeDb(timeout);
+    vi.mocked(getWorkerDb).mockReturnValue(db as ReturnType<typeof getWorkerDb>);
+
+    await expect(findActiveDeviceSession(connectionString, deviceSessionId, 'user-1')).rejects.toBe(
+      timeout
     );
   });
 });

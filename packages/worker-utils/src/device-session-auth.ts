@@ -44,7 +44,7 @@ export async function findActiveDeviceSession(
   userId: string
 ): Promise<boolean> {
   return isActiveDeviceSession(
-    getWorkerDb(connectionString, { statement_timeout: 2_000 }),
+    getWorkerDb(connectionString, { connectionTimeoutMillis: 2_000, query_timeout: 2_000 }),
     deviceSessionId,
     userId
   );

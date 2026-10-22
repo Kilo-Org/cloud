@@ -19,6 +19,8 @@ import { Plus, X, Link as LinkIcon, ExternalLink } from 'lucide-react';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { SortableButton } from '@/app/admin/components/SortableButton';
+import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
+import { CreditManagementAccessOverlay } from '@/app/admin/components/CreditManagementAccessOverlay';
 import { useTRPC } from '@/lib/trpc/utils';
 import CampaignForm, { type CampaignFormValues } from './CampaignForm';
 
@@ -56,6 +58,13 @@ export default function CreditCampaignsPage() {
   const queryClient = useQueryClient();
   const listOptions = trpc.admin.creditCampaigns.list.queryOptions();
   const { data: campaigns, isLoading } = useQuery(listOptions);
+
+  // Campaign rows configure signup credit grants, so changing one needs the
+  // same credit-management capability the bulk and per-account grant paths
+  // require. Until the permission query resolves, treat the operator as
+  // unprivileged so no write control flashes as enabled.
+  const { canManageCredits, isPermissionResolved } = useAdminCreditManagementPermission();
+  const canManageCampaigns = isPermissionResolved && canManageCredits;
 
   const [mode, setMode] = useState<
     { kind: 'list' } | { kind: 'create' } | { kind: 'edit'; id: number }
@@ -172,9 +181,14 @@ export default function CreditCampaignsPage() {
             </p>
           </div>
           {mode.kind === 'list' && (
-            <Button onClick={() => setMode({ kind: 'create' })}>
-              <Plus className="mr-1 h-4 w-4" /> New Campaign
-            </Button>
+            <div className="relative">
+              <Button onClick={() => setMode({ kind: 'create' })} disabled={!canManageCampaigns}>
+                <Plus className="mr-1 h-4 w-4" /> New Campaign
+              </Button>
+              {!canManageCampaigns && (
+                <CreditManagementAccessOverlay message="You don't have access to manage credit campaigns. File an access request before changing a campaign." />
+              )}
+            </div>
           )}
           {mode.kind !== 'list' && (
             <Button variant="outline" onClick={() => setMode({ kind: 'list' })}>
@@ -248,6 +262,11 @@ export default function CreditCampaignsPage() {
               </CardTitle>
               <CardDescription>
                 {campaigns?.length ?? 0} campaign{campaigns?.length === 1 ? '' : 's'}
+                {!canManageCampaigns && (
+                  <span className="mt-1 block">
+                    Read-only: credit management access is required to change a campaign.
+                  </span>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -373,7 +392,7 @@ export default function CreditCampaignsPage() {
                             <TableCell>
                               <Switch
                                 checked={c.active}
-                                disabled={togglingId === c.id}
+                                disabled={!canManageCampaigns || togglingId === c.id}
                                 onCheckedChange={checked => {
                                   setTogglingId(c.id);
                                   setActiveMutation.mutate({ id: c.id, active: checked });
@@ -385,6 +404,7 @@ export default function CreditCampaignsPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
+                                disabled={!canManageCampaigns}
                                 onClick={() => setMode({ kind: 'edit', id: c.id })}
                               >
                                 Edit

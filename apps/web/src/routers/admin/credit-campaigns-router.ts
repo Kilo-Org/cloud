@@ -1,6 +1,8 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isUniqueViolation } from '@/lib/db-errors';
+import { creditManagerProcedure } from '@/lib/trpc/admin-procedures';
+import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import {
   credit_campaigns,
   credit_transactions,
@@ -95,6 +97,25 @@ function toMicrodollars(amount_usd: number): number {
   return Math.round(amount_usd * 1_000_000);
 }
 
+/**
+ * Audit metadata for a campaign write. Campaigns are not users or
+ * organizations, so the audit entry carries no typed target and keeps the
+ * identifying fields here instead — the same shape create, update and
+ * setActive record, so the audit log reads consistently regardless of which
+ * mutation changed the row.
+ */
+function campaignAuditMetadata(campaign: CreditCampaign): Record<string, unknown> {
+  return {
+    campaignId: campaign.id,
+    slug: campaign.slug,
+    amountUsd: Number(campaign.amount_microdollars) / 1_000_000,
+    totalRedemptionsAllowed: campaign.total_redemptions_allowed,
+    creditExpiryHours: campaign.credit_expiry_hours,
+    campaignEndsAt: campaign.campaign_ends_at,
+    active: campaign.active,
+  };
+}
+
 export const creditCampaignsRouter = createTRPCRouter({
   /**
    * List all campaigns alongside per-campaign stats. Stats query is
@@ -141,7 +162,7 @@ export const creditCampaignsRouter = createTRPCRouter({
       return row;
     }),
 
-  create: adminProcedure
+  create: creditManagerProcedure
     .input(createCampaignInputSchema)
     .mutation(async ({ input, ctx }): Promise<CreditCampaign> => {
       const credit_category = credit_categoryForSlug(input.slug);
@@ -173,6 +194,12 @@ export const creditCampaignsRouter = createTRPCRouter({
             created_by_kilo_user_id: ctx.user.id,
           })
           .returning();
+        await recordAdminAction(ctx, {
+          action: 'credit_campaign.create',
+          target: null,
+          message: `Created credit campaign ${row.slug}`,
+          metadata: campaignAuditMetadata(row),
+        });
         return row;
       } catch (error) {
         // Drizzle wraps the pg error in a `DrizzleQueryError`; the
@@ -189,9 +216,9 @@ export const creditCampaignsRouter = createTRPCRouter({
       }
     }),
 
-  update: adminProcedure
+  update: creditManagerProcedure
     .input(updateCampaignInputSchema)
-    .mutation(async ({ input }): Promise<CreditCampaign> => {
+    .mutation(async ({ input, ctx }): Promise<CreditCampaign> => {
       // slug + credit_category are deliberately excluded from the SET —
       // they're immutable after create to keep historical credit_transactions
       // rows tied to a stable category. See updateCampaignInputSchema.
@@ -216,12 +243,18 @@ export const creditCampaignsRouter = createTRPCRouter({
       if (!row) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Campaign not found' });
       }
+      await recordAdminAction(ctx, {
+        action: 'credit_campaign.update',
+        target: null,
+        message: `Updated credit campaign ${row.slug}`,
+        metadata: campaignAuditMetadata(row),
+      });
       return row;
     }),
 
-  setActive: adminProcedure
+  setActive: creditManagerProcedure
     .input(z.object({ id: z.number().int().positive(), active: z.boolean() }))
-    .mutation(async ({ input }): Promise<CreditCampaign> => {
+    .mutation(async ({ input, ctx }): Promise<CreditCampaign> => {
       const [row] = await db
         .update(credit_campaigns)
         .set({ active: input.active, updated_at: new Date().toISOString() })
@@ -230,6 +263,14 @@ export const creditCampaignsRouter = createTRPCRouter({
       if (!row) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Campaign not found' });
       }
+      await recordAdminAction(ctx, {
+        action: 'credit_campaign.set_active',
+        target: null,
+        message: row.active
+          ? `Activated credit campaign ${row.slug}`
+          : `Deactivated credit campaign ${row.slug}`,
+        metadata: campaignAuditMetadata(row),
+      });
       return row;
     }),
 

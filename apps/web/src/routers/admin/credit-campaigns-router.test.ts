@@ -1,18 +1,28 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
-import { credit_campaigns, credit_transactions } from '@kilocode/db/schema';
+import {
+  admin_action_audit_logs,
+  credit_campaigns,
+  credit_transactions,
+} from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import type { User } from '@kilocode/db/schema';
 
-let admin: User;
+let creditManager: User;
+let plainAdmin: User;
 let nonAdmin: User;
 
 beforeEach(async () => {
   await cleanupDbForTest();
-  admin = await insertTestUser({
+  creditManager = await insertTestUser({
     google_user_email: `cc-admin-${Math.random()}@admin.example.com`,
+    is_admin: true,
+    can_manage_credits: true,
+  });
+  plainAdmin = await insertTestUser({
+    google_user_email: `cc-plain-admin-${Math.random()}@admin.example.com`,
     is_admin: true,
   });
   nonAdmin = await insertTestUser({
@@ -35,14 +45,14 @@ function makeValidInput(overrides: Partial<Record<string, unknown>> = {}) {
 
 describe('creditCampaigns.create', () => {
   it('creates a campaign with derived credit_category and microdollar amount', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     const row = await caller.admin.creditCampaigns.create(makeValidInput());
 
     expect(row.slug).toBe('summit');
     expect(row.credit_category).toBe('c-summit');
     expect(row.amount_microdollars).toBe(5_000_000);
     expect(row.active).toBe(true);
-    expect(row.created_by_kilo_user_id).toBe(admin.id);
+    expect(row.created_by_kilo_user_id).toBe(creditManager.id);
   });
 
   it('rejects a non-admin caller', async () => {
@@ -64,7 +74,7 @@ describe('creditCampaigns.create', () => {
     // resolve to credit_category="c-ustom" — NOT a collision. Safer
     // is to create a duplicate via the router itself and verify the
     // second attempt fails.
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     await caller.admin.creditCampaigns.create(makeValidInput({ slug: 'dupeslug' }));
     await expect(
       caller.admin.creditCampaigns.create(makeValidInput({ slug: 'dupeslug' }))
@@ -72,7 +82,7 @@ describe('creditCampaigns.create', () => {
   });
 
   it('rejects a slug outside the 5-40 lowercase-alphanumeric format', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     await expect(
       caller.admin.creditCampaigns.create(makeValidInput({ slug: 'abc' })) // too short
     ).rejects.toBeDefined();
@@ -85,7 +95,7 @@ describe('creditCampaigns.create', () => {
   });
 
   it('rejects an amount over the $1000 safety cap', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     await expect(
       caller.admin.creditCampaigns.create(makeValidInput({ amount_usd: 10_000 }))
     ).rejects.toBeDefined();
@@ -93,7 +103,7 @@ describe('creditCampaigns.create', () => {
 
   it('rejects credit_expiry_hours that would overflow int32', async () => {
     // int32 max ~2.1B; the Zod cap of 87,600 (~10 years) kicks in first.
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     await expect(
       caller.admin.creditCampaigns.create(
         makeValidInput({ slug: 'bigexpiry', credit_expiry_hours: 20_000_000_000_000 })
@@ -103,7 +113,7 @@ describe('creditCampaigns.create', () => {
 
   it('rejects total_redemptions_allowed that would overflow int32', async () => {
     // int32 max ~2.1B; the Zod cap of 1,000,000 kicks in first.
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     await expect(
       caller.admin.creditCampaigns.create(
         makeValidInput({ slug: 'bigcap', total_redemptions_allowed: 10_000_000_000 })
@@ -112,7 +122,7 @@ describe('creditCampaigns.create', () => {
   });
 
   it('rejects a campaign_ends_at in the past', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     await expect(
       caller.admin.creditCampaigns.create(
@@ -122,7 +132,7 @@ describe('creditCampaigns.create', () => {
   });
 
   it('accepts a campaign_ends_at in the future', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const row = await caller.admin.creditCampaigns.create(
       makeValidInput({ slug: 'futureends', campaign_ends_at: tomorrow })
@@ -133,7 +143,7 @@ describe('creditCampaigns.create', () => {
 
 describe('creditCampaigns.update', () => {
   it('updates mutable fields and bumps updated_at', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     const created = await caller.admin.creditCampaigns.create(makeValidInput());
 
     const updated = await caller.admin.creditCampaigns.update({
@@ -160,7 +170,7 @@ describe('creditCampaigns.update', () => {
     // credit_transactions from the new category, resetting the cap counter
     // and hiding real spend. The update schema omits slug entirely, so
     // Zod silently strips it and the persisted row keeps the original.
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     const created = await caller.admin.creditCampaigns.create(
       makeValidInput({ slug: 'immutable' })
     );
@@ -184,7 +194,7 @@ describe('creditCampaigns.update', () => {
     // admin wants to edit the description or toggle active. The future-only
     // refine on create would block this; update schema intentionally drops
     // the refine so the stale value can pass through unchanged.
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const created = await caller.admin.creditCampaigns.create(
       makeValidInput({ slug: 'editexpired', campaign_ends_at: tomorrow })
@@ -203,7 +213,7 @@ describe('creditCampaigns.update', () => {
   });
 
   it('returns NOT_FOUND when the id does not exist', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     await expect(
       caller.admin.creditCampaigns.update({
         id: 9_999_999,
@@ -215,7 +225,7 @@ describe('creditCampaigns.update', () => {
 
 describe('creditCampaigns.setActive', () => {
   it('flips the active flag atomically', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     const created = await caller.admin.creditCampaigns.create(makeValidInput());
 
     const deactivated = await caller.admin.creditCampaigns.setActive({
@@ -234,7 +244,7 @@ describe('creditCampaigns.setActive', () => {
 
 describe('creditCampaigns.list', () => {
   it('returns campaigns with stats populated from credit_transactions', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     const a = await caller.admin.creditCampaigns.create(makeValidInput({ slug: 'alpha' }));
     await caller.admin.creditCampaigns.create(makeValidInput({ slug: 'bravo' }));
 
@@ -260,7 +270,7 @@ describe('creditCampaigns.list', () => {
 
 describe('creditCampaigns.getRedemptions', () => {
   it('returns only is_free transactions joined with user email', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     const created = await caller.admin.creditCampaigns.create(makeValidInput({ slug: 'redeemcc' }));
 
     const redeemer = await insertTestUser({
@@ -285,7 +295,7 @@ describe('creditCampaigns.getRedemptions', () => {
     // `total` should reflect all matching rows even when the limit
     // returns fewer — otherwise pagination UI ("page X of Y") can't be
     // built on top of this response.
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     const created = await caller.admin.creditCampaigns.create(
       makeValidInput({ slug: 'pagecount' })
     );
@@ -311,7 +321,7 @@ describe('creditCampaigns.getRedemptions', () => {
   });
 
   it('returns NOT_FOUND when the campaign does not exist', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     await expect(
       caller.admin.creditCampaigns.getRedemptions({ id: 9_999_999 })
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
@@ -320,7 +330,7 @@ describe('creditCampaigns.getRedemptions', () => {
 
 describe('creditCampaigns.get', () => {
   it('returns a single campaign by id', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     const created = await caller.admin.creditCampaigns.create(makeValidInput({ slug: 'onebyid' }));
 
     const fetched = await caller.admin.creditCampaigns.get({ id: created.id });
@@ -329,7 +339,7 @@ describe('creditCampaigns.get', () => {
   });
 
   it('returns NOT_FOUND for an unknown id', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     await expect(caller.admin.creditCampaigns.get({ id: 9_999_999 })).rejects.toMatchObject({
       code: 'NOT_FOUND',
     });
@@ -338,7 +348,7 @@ describe('creditCampaigns.get', () => {
 
 describe('cross-cutting', () => {
   it('inserted rows land with the expected schema defaults', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     const created = await caller.admin.creditCampaigns.create(
       makeValidInput({
         slug: 'defaultscheck',
@@ -360,7 +370,7 @@ describe('cross-cutting', () => {
   });
 
   it('rejects a create with missing total_redemptions_allowed', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     const { total_redemptions_allowed: _, ...rest } = makeValidInput({
       slug: 'noredemptioncap',
     });
@@ -369,7 +379,7 @@ describe('cross-cutting', () => {
   });
 
   it('rejects a create with empty description', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     await expect(
       caller.admin.creditCampaigns.create(
         makeValidInput({ slug: 'nodescription', description: '' })
@@ -378,7 +388,7 @@ describe('cross-cutting', () => {
   });
 
   it('rejects a create with whitespace-only description', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     await expect(
       caller.admin.creditCampaigns.create(
         makeValidInput({ slug: 'wsonlydesc', description: '   \t\n   ' })
@@ -387,11 +397,104 @@ describe('cross-cutting', () => {
   });
 
   it('rejects an amount below $0.01', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(creditManager.id);
     await expect(
       caller.admin.creditCampaigns.create(
         makeValidInput({ slug: 'tinyamount', amount_usd: 0.0001 })
       )
     ).rejects.toBeDefined();
+  });
+});
+
+describe('credit management access', () => {
+  it('rejects a plain admin on create', async () => {
+    const caller = await createCallerForUser(plainAdmin.id);
+    await expect(caller.admin.creditCampaigns.create(makeValidInput())).rejects.toThrow(
+      'Credit management access required'
+    );
+    expect(await db.select().from(credit_campaigns)).toHaveLength(0);
+  });
+
+  it('rejects a plain admin on update', async () => {
+    const managerCaller = await createCallerForUser(creditManager.id);
+    const created = await managerCaller.admin.creditCampaigns.create(makeValidInput());
+    const caller = await createCallerForUser(plainAdmin.id);
+
+    const { slug: _slug, ...mutable } = makeValidInput({ amount_usd: 900 });
+    void _slug;
+    await expect(
+      caller.admin.creditCampaigns.update({ id: created.id, ...mutable })
+    ).rejects.toThrow('Credit management access required');
+
+    const refetched = await managerCaller.admin.creditCampaigns.get({ id: created.id });
+    expect(refetched.amount_microdollars).toBe(5_000_000);
+  });
+
+  it('rejects a plain admin on setActive', async () => {
+    const managerCaller = await createCallerForUser(creditManager.id);
+    const created = await managerCaller.admin.creditCampaigns.create(makeValidInput());
+    const caller = await createCallerForUser(plainAdmin.id);
+
+    await expect(
+      caller.admin.creditCampaigns.setActive({ id: created.id, active: false })
+    ).rejects.toThrow('Credit management access required');
+
+    const refetched = await managerCaller.admin.creditCampaigns.get({ id: created.id });
+    expect(refetched.active).toBe(true);
+  });
+
+  it('keeps the read-only views available to a plain admin', async () => {
+    const managerCaller = await createCallerForUser(creditManager.id);
+    const created = await managerCaller.admin.creditCampaigns.create(makeValidInput());
+    const caller = await createCallerForUser(plainAdmin.id);
+
+    expect(await caller.admin.creditCampaigns.list()).toHaveLength(1);
+    expect((await caller.admin.creditCampaigns.get({ id: created.id })).slug).toBe('summit');
+    expect((await caller.admin.creditCampaigns.getRedemptions({ id: created.id })).total).toBe(0);
+  });
+});
+
+describe('admin action audit', () => {
+  it('records each campaign write with its identity and changed fields', async () => {
+    const caller = await createCallerForUser(creditManager.id);
+    const created = await caller.admin.creditCampaigns.create(makeValidInput());
+
+    const { slug: _slug, ...mutable } = makeValidInput({ amount_usd: 7 });
+    void _slug;
+    await caller.admin.creditCampaigns.update({ id: created.id, ...mutable });
+    await caller.admin.creditCampaigns.setActive({ id: created.id, active: false });
+
+    const rows = await db.select().from(admin_action_audit_logs);
+    expect(rows).toHaveLength(3);
+    const byAction = new Map(rows.map(row => [row.action, row]));
+
+    expect([...byAction.keys()].sort()).toEqual([
+      'credit_campaign.create',
+      'credit_campaign.set_active',
+      'credit_campaign.update',
+    ]);
+    for (const row of rows) {
+      expect(row.actor_id).toBe(creditManager.id);
+      // Campaigns have no typed audit target; identity lives in metadata.
+      expect(row.target_type).toBeNull();
+      expect(row.target_id).toBeNull();
+      expect(row.metadata).toMatchObject({ campaignId: created.id, slug: 'summit' });
+    }
+
+    expect(byAction.get('credit_campaign.create')?.metadata).toMatchObject({ amountUsd: 5 });
+    expect(byAction.get('credit_campaign.update')?.metadata).toMatchObject({
+      amountUsd: 7,
+      totalRedemptionsAllowed: 100,
+    });
+    expect(byAction.get('credit_campaign.set_active')?.metadata).toMatchObject({ active: false });
+  });
+
+  it('records nothing when the write is refused', async () => {
+    const caller = await createCallerForUser(plainAdmin.id);
+    await expect(caller.admin.creditCampaigns.create(makeValidInput())).rejects.toThrow(
+      'Credit management access required'
+    );
+
+    expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
   });
 });

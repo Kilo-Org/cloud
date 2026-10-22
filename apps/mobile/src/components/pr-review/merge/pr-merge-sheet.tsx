@@ -223,12 +223,16 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       })
     : null;
   const methodOptions = providerMethodOptions ?? mergeMethodOptionsFor(repoSettings);
-  const safeInitial: AllowedMergeMethod =
-    methodOptions.find(o => o.value === initialMethod)?.value ??
-    (providerMethodOptions
-      ? (providerMethodOptions[0]?.value ?? defaultMergeMethodOptionFor(repoSettings))
-      : defaultMergeMethodOptionFor(repoSettings));
-  const [method, setMethod] = useState<AllowedMergeMethod>(safeInitial);
+  // The sheet's selection is seeded once: the route's method when the repo
+  // offers it, else the arm's first allowed method. A lazy initializer keeps
+  // the option scan off every render now that the list is rebuilt each time.
+  const [method, setMethod] = useState<AllowedMergeMethod>(
+    () =>
+      methodOptions.find(o => o.value === initialMethod)?.value ??
+      (providerMethodOptions
+        ? (providerMethodOptions[0]?.value ?? defaultMergeMethodOptionFor(repoSettings))
+        : defaultMergeMethodOptionFor(repoSettings))
+  );
 
   const showDeleteBranchToggle = prRef ? true : !isCrossRepo;
   const [deleteBranch, setDeleteBranch] = useState<boolean>(repoSettings.deleteBranchOnMerge);

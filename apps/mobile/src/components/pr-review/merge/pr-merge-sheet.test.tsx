@@ -58,10 +58,13 @@ vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
   return {
     ...actual,
-    useState: vi.fn(<T,>(initial: T) => {
+    useState: vi.fn(<T,>(initial: T | (() => T)) => {
       const setter = vi.fn();
       stateSetters.push(setter);
-      return [initial, setter as () => void] as [T, (value: T) => void];
+      // React runs a function initializer once, on the first render; the sheet
+      // seeds its method that way, so the harness must too.
+      const value = typeof initial === 'function' ? (initial as () => T)() : initial;
+      return [value, setter as () => void] as [T, (value: T) => void];
     }),
     useMemo: vi.fn(<T,>(factory: () => T) => factory()),
     useRef: vi.fn(<T,>(initial: T) => {

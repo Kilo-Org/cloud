@@ -60,10 +60,14 @@ async function resolveCatalogServiceAccount(): Promise<
     return { ok: false, error: `the benchmark worker returned ${detail}` };
   }
   const config = 'config' in result.body ? result.body.config : null;
-  const identity = resolveBenchmarkIdentity(
-    config ?? { benchmarkUserId: null, benchmarkOrgId: null }
-  );
-  return { ok: true, userId: identity.benchmarkUserId, organizationId: identity.benchmarkOrgId };
+  try {
+    const identity = resolveBenchmarkIdentity(
+      config ?? { benchmarkUserId: null, benchmarkOrgId: null }
+    );
+    return { ok: true, userId: identity.benchmarkUserId, organizationId: identity.benchmarkOrgId };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export async function POST(req: NextRequest) {

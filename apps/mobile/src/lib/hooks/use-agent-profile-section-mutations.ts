@@ -84,7 +84,11 @@ export function useAgentProfileSectionMutations(organizationId?: string) {
   const toastError = (error: { message: string }) => {
     toast.error(error.message);
   };
+  // `networkMode: 'always'` keeps a section save settling while the online
+  // manager is offline (NetInfo can misreport while the backend is reachable):
+  // the request either succeeds or fails fast, so `isPending` can never stick.
   const callbacks = {
+    networkMode: 'always' as const,
     onSuccess: invalidateProfiles,
     onError: (error: { message: string }) => {
       toastError(error);

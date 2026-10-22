@@ -1,4 +1,4 @@
-import { Layer, Schedule } from 'effect';
+import { type Duration, Layer, Schedule } from 'effect';
 import { RetryPolicy } from '../../core/retry.js';
 import type { ModelError } from '../../core/model.js';
 
@@ -14,19 +14,22 @@ const isRetryable = (error: ModelError): boolean =>
  * attempts. Jitter matters because a gateway outage makes every session retry
  * on the same beat, and an unjittered fleet retries as one.
  */
-const backoff = (retries: number): Schedule.Schedule<unknown, ModelError> =>
-  Schedule.exponential('200 millis').pipe(
+const backoff = (retries: number): Schedule.Schedule<unknown, ModelError> => {
+  const waiting = Schedule.exponential('200 millis').pipe(
     Schedule.jittered,
-    Schedule.whileInput(isRetryable),
-    Schedule.intersect(Schedule.recurs(retries))
+    Schedule.while((metadata: Schedule.Metadata<Duration.Duration, ModelError>) =>
+      isRetryable(metadata.input)
+    )
   );
+  return Schedule.max([waiting, Schedule.recurs(retries)]);
+};
 
 const layerBackoff = (retries = 3): Layer.Layer<RetryPolicy> =>
   Layer.succeed(RetryPolicy, { schedule: backoff(retries) });
 
 /** Tries once and gives up. Useful when the caller owns its own retry loop. */
 const layerNoRetry: Layer.Layer<RetryPolicy> = Layer.succeed(RetryPolicy, {
-  schedule: Schedule.stop,
+  schedule: Schedule.recurs(0),
 });
 
 export { backoff, layerBackoff, layerNoRetry };

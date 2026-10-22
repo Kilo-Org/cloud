@@ -12,7 +12,7 @@ type RemoteMcpToken = () => Effect.Effect<string, RemoteMcpError>;
  * requests after it.
  */
 const ended = (server: RemoteMcpServer, deadline: Deadline): Effect.Effect<never, RemoteMcpError> =>
-  Effect.async<never, RemoteMcpError>(resume => {
+  Effect.callback<never, RemoteMcpError>(resume => {
     const end = (): void => {
       resume(
         Effect.fail(

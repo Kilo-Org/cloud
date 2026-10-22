@@ -15,8 +15,8 @@ const HEADER_HISTORY_LABEL_FONT_SIZE = 11;
  * direction and resets it for the scripts it cannot hold (see
  * {@link headerLabelTracking}), so it is applied per label. */
 const HEADER_LABEL_TRACKING = 1.5;
-/** `SessionFilterButton`'s `h-[36px] w-[36px] shrink-0`. */
-const HEADER_FILTER_BUTTON_WIDTH = 36;
+/** `SessionFilterButton`'s shared 48dp icon-target box (`shrink-0`). */
+const HEADER_FILTER_BUTTON_WIDTH = 48;
 /** The controls row's `gap-4`: NativeWind's rem is 14pt, not 16. */
 const HEADER_ACTIONS_GAP = 14;
 
@@ -61,7 +61,7 @@ function headerLabelWidth(params: {
  * "Age" / "nti" beside the history link and the filter button on a narrow
  * phone.
  *
- * The row holds the history link and (when the list can be filtered) the 36dp
+ * The row holds the history link and (when the list can be filtered) the 48dp
  * filter button, `gap-4` apart. The label width is an upper bound, so the row
  * reflows a hair early rather than leaving the title squeezed; the estimate
  * scales with the system font because the label does.

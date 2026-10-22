@@ -174,6 +174,15 @@ const FAILED_PROMPT_MEMORY_MAX_SESSIONS = 20;
 const RETAINED_MESSAGE_WINDOW = 200;
 
 /**
+ * How long a matching `Aborted` error stays suppressed after an interrupt RPC
+ * settles. The service can deliver the abort before the HTTP acknowledgement or
+ * later, for example replayed after a reconnect (the transport backs off up to
+ * 30s per attempt). Past this window the error belongs to something else and
+ * must reach `errorAtom` again.
+ */
+export const INTERRUPT_ABORT_SUPPRESSION_MS = 30_000;
+
+/**
  * Shared empty-parts sentinel. `memoizedStoredMessage` compares `cached.parts
  * === parts`; `partsMap.get(id) ?? []` would allocate a fresh array on every
  * `partsRevision` bump, defeating the memo for rows that have no parts entry.
@@ -845,6 +854,50 @@ function modelSelectionsEqual(a: ModelSelection | null, b: ModelSelection | null
   return modelRefsEqual(a.model, b.model) && a.variant === b.variant;
 }
 
+function deliveryStatesEqual(a: MessageDeliveryState, b: MessageDeliveryState): boolean {
+  if (a === b) return true;
+  if (a.status !== b.status) return false;
+  if (a.status === 'queued' || b.status === 'queued') return true;
+  return (
+    a.error === b.error && a.reason === b.reason && (a.attempts ?? null) === (b.attempts ?? null)
+  );
+}
+
+/**
+ * Schedule a timer that must not keep a Node process alive on its own. The
+ * interrupt guard's expiry only withholds a possible error, so a host that is
+ * otherwise done must be able to shut down while it is pending. Browsers and
+ * React Native expose no `unref`, and there the choice is moot.
+ */
+function scheduleUnrefdTimer(callback: () => void, delayMs: number): ReturnType<typeof setTimeout> {
+  const timer = setTimeout(callback, delayMs);
+  if (typeof timer === 'object' && timer !== null && 'unref' in timer) {
+    const unref = timer.unref;
+    if (typeof unref === 'function') unref.call(timer);
+  }
+  return timer;
+}
+
+/**
+ * True when two delivery maps describe the same queue. The service state mutates
+ * one shared map in place, so its identity says nothing about change; only the
+ * entries do. Comparing them keeps unrelated notifications (a streamed step
+ * output, a stale preparation event) from replacing `pendingMessagesAtom` with
+ * an equivalent new map and invalidating every dependent atom.
+ */
+function pendingDeliveryStatesEqual(
+  a: ReadonlyMap<string, MessageDeliveryState>,
+  b: ReadonlyMap<string, MessageDeliveryState>
+): boolean {
+  if (a === b) return true;
+  if (a.size !== b.size) return false;
+  for (const [messageId, state] of a) {
+    const other = b.get(messageId);
+    if (other === undefined || !deliveryStatesEqual(state, other)) return false;
+  }
+  return true;
+}
+
 function upsertPendingRequest<T extends { requestId: string }>(
   list: readonly T[],
   next: T
@@ -1284,9 +1337,43 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * Session captured at the start of an interrupt call. While non-null, an
    * `onError("Aborted")` from this session is suppressed — it was produced by
    * the manager's own `interrupt()`. A real transport error or an Aborted from
-   * a different/late session still sets errorAtom normally.
+   * a different/late session still sets errorAtom normally. The guard lives
+   * until that Aborted arrives, the interrupt rejects, the session resets, or
+   * `INTERRUPT_ABORT_SUPPRESSION_MS` passes after the interrupt settled.
    */
   let pendingInterruptSession: CloudAgentSession | null = null;
+  let pendingInterruptClearTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Drop the one-shot abort guard, including a scheduled expiry of it. Every
+   * path that ends the guard's relevance (the expected `Aborted`, a rejected
+   * interrupt, a session reset/destroy) goes through here so no timer outlives
+   * the state it would clear.
+   */
+  function clearPendingInterrupt(): void {
+    pendingInterruptSession = null;
+    if (pendingInterruptClearTimer !== null) {
+      clearTimeout(pendingInterruptClearTimer);
+      pendingInterruptClearTimer = null;
+    }
+  }
+
+  /**
+   * Start the suppression window for the guard currently armed. Overlapping
+   * interrupt calls re-arm the same guard, so the previous expiry is dropped
+   * here rather than left running: its callback would otherwise end a newer
+   * call's window early.
+   */
+  function armPendingInterruptExpiry(): void {
+    if (pendingInterruptClearTimer !== null) {
+      clearTimeout(pendingInterruptClearTimer);
+      pendingInterruptClearTimer = null;
+    }
+    pendingInterruptClearTimer = scheduleUnrefdTimer(
+      clearPendingInterrupt,
+      INTERRUPT_ABORT_SUPPRESSION_MS
+    );
+  }
   /**
    * Message ids already in local storage when a reconnect replay starts while
    * `/clear` is active. Those are live post-clear turns for this visit and
@@ -1439,7 +1526,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     lastPromptMode = null;
     olderMessagesTerminal = false;
     currentCapabilities = undefined;
-    pendingInterruptSession = null;
+    clearPendingInterrupt();
   }
 
   function setChildSessionHydrationState(
@@ -1903,7 +1990,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(permissionAtom, session.state.getPermission());
       store.set(suggestionAtom, session.state.getSuggestion());
       store.set(sessionInfoAtom, session.state.getSessionInfo());
-      store.set(pendingMessagesAtom, new Map(session.state.getPendingMessages()));
+      const nextPendingMessages = session.state.getPendingMessages();
+      if (!pendingDeliveryStatesEqual(store.get(pendingMessagesAtom), nextPendingMessages)) {
+        store.set(pendingMessagesAtom, new Map(nextPendingMessages));
+      }
 
       // Disconnect clears the interrupt unlock latch so normal
       // (!session.canSend) semantics take over for unresolved/null sessions.
@@ -2751,7 +2841,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // restoreAfterInterrupt. The guard is consumed on match (one-shot) so
         // unrelated or subsequent Aborted events still surface.
         if (message === 'Aborted' && pendingInterruptSession === session) {
-          pendingInterruptSession = null;
+          clearPendingInterrupt();
           return;
         }
         // An open that fails before the stream connects (for example, a refused
@@ -3217,8 +3307,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (session.canInterrupt) {
         // Mark this session as the expected source of any "Aborted" error
         // so onError can suppress it without hiding real transport failures.
+        // The guard expires on its own once this call settles: a service that
+        // acknowledges the stop without ever reporting the abort must not
+        // swallow a later genuine one.
+        clearPendingInterrupt();
         pendingInterruptSession = session;
         await session.interrupt();
+        if (pendingInterruptSession === session) {
+          armPendingInterruptExpiry();
+        }
       }
       if (currentSession === session) {
         const activityType = session.state.getActivity().type;
@@ -3234,6 +3331,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       }
     } catch {
+      // A rejected interrupt never aborts the turn, so nothing will report it.
+      if (pendingInterruptSession === session) {
+        clearPendingInterrupt();
+      }
       if (currentSession === session) {
         // Prefer unlock over a stuck composer when the session is still writable.
         restoreAfterInterrupt(session);

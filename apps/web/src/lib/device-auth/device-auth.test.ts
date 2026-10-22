@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import crypto from 'node:crypto';
 import {
   generateUserCode,
   generateDeviceCode,
@@ -140,6 +141,64 @@ describe('Device Auth', () => {
   });
 
   describe('createDeviceAuthRequest', () => {
+    test('enforces unique displayed user codes in the database', async () => {
+      const created = await createDeviceAuthRequest({});
+      await approveDeviceAuthRequest(created.userCode, testUserId);
+
+      await expect(
+        db.insert(device_auth_requests).values({
+          code: generateDeviceSecret(),
+          user_code: created.userCode,
+          expires_at: created.expiresAt.toISOString(),
+        })
+      ).rejects.toMatchObject({
+        cause: { code: '23505', constraint: 'UQ_device_auth_requests_user_code' },
+      });
+    });
+
+    test('retries a displayed user code collision with a fresh code', async () => {
+      await db.insert(device_auth_requests).values({
+        code: generateDeviceSecret(),
+        user_code: 'AAAA-AAAA',
+        kilo_user_id: testUserId,
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+      const randomIntSpy = jest.spyOn(crypto, 'randomInt').mockImplementation(() => 1);
+      for (let i = 0; i < 8; i++) {
+        randomIntSpy.mockImplementationOnce(() => 0);
+      }
+
+      try {
+        const created = await createDeviceAuthRequest({});
+        await approveDeviceAuthRequest(created.userCode, testUserId);
+
+        expect(created.userCode).toBe('BBBB-BBBB');
+        expect((await getDeviceAuthRequest(created.userCode))?.code).toBe(created.code);
+        expect(randomIntSpy).toHaveBeenCalledTimes(16);
+      } finally {
+        randomIntSpy.mockRestore();
+      }
+    });
+
+    test('bounds displayed user code allocation attempts', async () => {
+      await db.insert(device_auth_requests).values({
+        code: generateDeviceSecret(),
+        user_code: 'AAAA-AAAA',
+        kilo_user_id: testUserId,
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+      const randomIntSpy = jest.spyOn(crypto, 'randomInt').mockImplementation(() => 0);
+
+      try {
+        await expect(createDeviceAuthRequest({})).rejects.toThrow(
+          'Unable to allocate a device authorization user code'
+        );
+        expect(randomIntSpy).toHaveBeenCalledTimes(40);
+      } finally {
+        randomIntSpy.mockRestore();
+      }
+    });
+
     test('stores a poll secret in code and the displayed user code separately', async () => {
       const result = await createDeviceAuthRequest({
         userAgent: 'test-agent',

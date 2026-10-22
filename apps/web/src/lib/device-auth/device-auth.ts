@@ -9,6 +9,7 @@ import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-
 const CODE_LENGTH = 8;
 const CODE_EXPIRATION_MINUTES = 10;
 const MAX_PENDING_REQUESTS_PER_IP = 5;
+const MAX_USER_CODE_ATTEMPTS = 5;
 
 export const DEVICE_AUTH_PENDING_LIMIT_MESSAGE =
   'Too many sign-in attempts from this network. Wait a few minutes and try again.';
@@ -91,23 +92,36 @@ export async function createDeviceAuthRequest(params: {
     }
   }
 
-  const userCode = generateUserCode();
   const pollSecret = generateDeviceSecret();
   const deviceSecret = generateDeviceSecret();
   const deviceCodeHash = hashDeviceSecret(deviceSecret);
   const expiresAt = new Date(Date.now() + CODE_EXPIRATION_MINUTES * 60 * 1000);
 
-  await db.insert(device_auth_requests).values({
-    code: pollSecret,
-    user_code: userCode,
-    device_code_hash: deviceCodeHash,
-    status: 'pending',
-    expires_at: expiresAt.toISOString(),
-    user_agent: userAgent,
-    ip_address: ipAddress,
-  });
+  for (let attempt = 0; attempt < MAX_USER_CODE_ATTEMPTS; attempt++) {
+    const userCode = generateUserCode();
+    const [inserted] = await db
+      .insert(device_auth_requests)
+      .values({
+        code: pollSecret,
+        user_code: userCode,
+        device_code_hash: deviceCodeHash,
+        status: 'pending',
+        expires_at: expiresAt.toISOString(),
+        user_agent: userAgent,
+        ip_address: ipAddress,
+      })
+      .onConflictDoNothing({
+        target: device_auth_requests.user_code,
+        where: sql`${device_auth_requests.user_code} IS NOT NULL`,
+      })
+      .returning({ id: device_auth_requests.id });
 
-  return { code: pollSecret, userCode, deviceCode: deviceSecret, expiresAt };
+    if (inserted) {
+      return { code: pollSecret, userCode, deviceCode: deviceSecret, expiresAt };
+    }
+  }
+
+  throw new Error('Unable to allocate a device authorization user code');
 }
 
 /**

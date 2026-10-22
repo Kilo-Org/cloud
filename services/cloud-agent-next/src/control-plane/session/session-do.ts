@@ -10,6 +10,15 @@ import {
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
+  authorizeCloudAgentChild,
+  issueCloudAgentMcpGrant,
+  assertCloudAgentParentAuthority,
+} from '../../cloud-agent-authority.js';
+import {
+  CloudAgentAuthoritySchema,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
+import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
   type CloudAgentChildSessionLineage,
@@ -922,6 +931,59 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return this.metadata;
   }
 
+  async getCloudAgentSpawnRuntimeToken(authority: CloudAgentAuthority): Promise<string> {
+    await this.initialized;
+    const scope = CloudAgentAuthoritySchema.parse(authority);
+    const authorization = RuntimeAuthorizationSchema.parse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    assertCloudAgentParentAuthority(this.metadata, authorization, scope);
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    const issued = await renewRuntimeAuthorization({
+      authorization,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+    });
+    const current = RuntimeAuthorizationSchema.parse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    assertCloudAgentParentAuthority(this.metadata, current, scope);
+    return issued.token;
+  }
+
+  async authorizeCloudAgentChild(input: {
+    authority: CloudAgentAuthority;
+    childSessionId: string;
+  }): Promise<{ token: string; seal: string }> {
+    await this.initialized;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    return authorizeCloudAgentChild({
+      ...input,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+      metadata: () => this.getMetadata(),
+      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+  }
+
+  async issueCloudAgentMcpGrant(): Promise<
+    { url: string; token: string; expiresAt: number } | undefined
+  > {
+    await this.initialized;
+    if (this.metadata?.allowSubagentSessions !== true) return undefined;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    return issueCloudAgentMcpGrant({
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+      metadata: () => this.getMetadata(),
+      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      mcpUrl: this.env.CLOUD_AGENT_MCP_URL_OVERRIDE,
+    });
+  }
+
   /**
    * H4/R1: mints and persists the runtime credential proxy handle for a connected
    * route. The Sandbox DO reads its own allocation fence and passes it in, so this
@@ -1236,6 +1298,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return (
       existing.identity.userId === metadata.identity.userId &&
       (existing.identity.orgId ?? null) === (metadata.identity.orgId ?? null) &&
+      (existing.allowSubagentSessions ?? false) === (metadata.allowSubagentSessions ?? false) &&
+      existing.parentCloudAgentSessionId === metadata.parentCloudAgentSessionId &&
       sameRepository(existing.repository, metadata.repository) &&
       this.registration.sandboxId === metadata.workspace?.sandboxId &&
       (existing.workspace?.egressMode ?? 'unrestricted') ===

@@ -4,7 +4,7 @@ import { activityFixture } from './kilo-activity-fixture.js';
 const binary = process.env.KILO_781_BINARY;
 const suite = binary ? describe : describe.skip;
 
-suite('human-required permissions with pinned Kilo 7.8.1', () => {
+suite('human-required permissions with pinned Kilo', () => {
   for (const response of ['once', 'reject'] as const) {
     it(`${response} settles the real skill shell permission`, async () => {
       if (!binary) throw new Error('KILO_781_BINARY is required');

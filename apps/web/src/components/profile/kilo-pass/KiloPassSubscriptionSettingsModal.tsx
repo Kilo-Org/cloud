@@ -55,14 +55,12 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   const scheduleChange = useMutation(trpc.kiloPass.scheduleChange.mutationOptions());
   const cancelScheduledChange = useMutation(trpc.kiloPass.cancelScheduledChange.mutationOptions());
 
-  const [panel, setPanel] = useState<'main' | 'update'>('update');
   const [isCancelingPendingChangeUntilRefetch, setIsCancelingPendingChangeUntilRefetch] =
     useState(false);
 
   const scheduledChange = scheduledChangeQuery.data?.scheduledChange ?? null;
 
   const closeModal = () => {
-    setPanel('update');
     onClose();
   };
 
@@ -255,17 +253,14 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   const resumeAction = view.actions.resume;
   const resumePausedAction = view.actions.resumePaused;
 
-  const isUpdateSubscriptionDisabled = view.status.isPendingCancellation;
-
   const pendingChange = Boolean(scheduledChange);
-  const showUpdatePanel = panel === 'update' && !pendingChange;
+  const showUpdatePanel = !pendingChange;
 
   return (
     <Dialog
       open={isOpen}
       onOpenChange={open => {
         if (!open) {
-          setPanel('update');
           onClose();
         }
       }}
@@ -301,11 +296,8 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
           />
         ) : (
           <MainPanel
-            hasScheduledChange={Boolean(scheduledChange)}
             onCancelPendingChange={handleCancelScheduledChange}
             isCancelingPendingChange={isCancelingPendingChange}
-            onUpdateSubscription={() => setPanel('update')}
-            isUpdateSubscriptionDisabled={isUpdateSubscriptionDisabled}
             onManagePaymentMethod={actions.openCustomerPortal}
             isOpeningCustomerPortal={actions.isOpeningCustomerPortal}
             resumeAction={resumeAction}

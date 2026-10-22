@@ -20,6 +20,18 @@ const body = JSON.stringify({
   data: { object: { id: 'cs_local_fixture' } },
 });
 
+function signatureError(): Stripe.errors.StripeSignatureVerificationError {
+  try {
+    client.webhooks.constructEvent(body, 'fixture', secret);
+  } catch (error) {
+    if (error instanceof Stripe.errors.StripeSignatureVerificationError) {
+      return error;
+    }
+    throw error;
+  }
+  throw new Error('Expected SDK verification error');
+}
+
 async function deliver(
   payload = body,
   signature: string | null = client.webhooks.generateTestHeaderString({ payload, secret })
@@ -62,19 +74,17 @@ describe('Stripe webhook responses', () => {
     expect(captureException).not.toHaveBeenCalled();
   });
 
-  test.each([
-    new Error('local processing failure'),
-    new Stripe.errors.StripeSignatureVerificationError('fixture', body, {
-      message: 'local processing failure',
-    }),
-  ])('retains processing diagnostics %#', async error => {
-    jest.mocked(processStripePaymentEventHook).mockRejectedValueOnce(error);
-    const response = await deliver();
-    expect(response.status).toBe(400);
-    expect(await response.text()).toBe('Webhook Error: local processing failure');
-    expect(captureException).toHaveBeenCalledTimes(1);
-    expect(captureException).toHaveBeenCalledWith(error);
-  });
+  test.each([new Error('local processing failure'), signatureError()])(
+    'retains processing diagnostics %#',
+    async error => {
+      jest.mocked(processStripePaymentEventHook).mockRejectedValueOnce(error);
+      const response = await deliver();
+      expect(response.status).toBe(400);
+      expect(await response.text()).toBe(`Webhook Error: ${error.message}`);
+      expect(captureException).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(error);
+    }
+  );
 
   test('retains unexpected diagnostics', async () => {
     const error = new Error('local verification failure');

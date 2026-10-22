@@ -9,7 +9,9 @@ import { openAiChatGptOwnerKey, type OpenAiChatGptOwner } from './store';
  * the partner project's OpenAI rate limits, so one connection driven by a relay
  * can exhaust them for every other person. Requests count per connection,
  * which is one ChatGPT plan, so rotating source addresses does not raise the
- * allowance. The window and limit live in the project's firewall configuration.
+ * allowance. The window and limit live in the project's firewall configuration;
+ * keep the window at ten minutes or longer, because the refusal tells clients
+ * not to retry.
  */
 const OPENAI_CHATGPT_RATE_LIMIT_RULE = {
   id: 'openai-chatgpt-inference',

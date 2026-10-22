@@ -568,9 +568,10 @@ export function paidModelAuthRequiredResponse() {
   );
 }
 
-// The free-model limits use hour-long windows, so an immediate client retry
-// only spends more of the caller's allowance. Kilo CLI v2 and the OpenAI SDKs
-// honor this header.
+// The free-model and ChatGPT connection limits use windows of ten minutes to an
+// hour, far longer than any SDK retry backoff, so an immediate client retry only
+// spends more of the caller's allowance. Kilo CLI v2 and the OpenAI SDKs honor
+// this header.
 const DO_NOT_RETRY_HEADERS = { 'x-should-retry': 'false' };
 
 export function anonymousFreeModelLimitResponse() {

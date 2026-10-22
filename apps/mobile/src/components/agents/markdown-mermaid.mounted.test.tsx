@@ -189,4 +189,27 @@ describe('MarkdownMermaid source changes', () => {
       renderer.unmount();
     });
   });
+
+  it('ignores a page failure the superseded diagram reports late', async () => {
+    const renderer = await mount('flowchart TD\n  a --> b');
+    const { onMessage } = webViewProps(renderer.root);
+    if (!onMessage) {
+      throw new Error('WebView has no onMessage');
+    }
+
+    await rerender(renderer, 'flowchart TD\n  c --> d');
+    // The unmounted page can still deliver a message it sent before the new
+    // source replaced it; it must not hide the diagram that is now mounted.
+    await act(async () => {
+      onMessage({ nativeEvent: { data: JSON.stringify({ kind: 'error' }) } });
+      await Promise.resolve();
+    });
+
+    expect(countOf(renderer.root, WebViewType)).toBe(1);
+    expect(countOf(renderer.root, CodeBlockType)).toBe(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
 });

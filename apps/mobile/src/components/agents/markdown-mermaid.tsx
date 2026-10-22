@@ -121,16 +121,18 @@ function parseDiagramMessage(data: string) {
 export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidProps>) {
   const dark = useColorScheme() === 'dark';
   const [height, setHeight] = useState(MIN_HEIGHT);
-  const [failed, setFailed] = useState(false);
+  // A failure belongs to the source that produced it: a recycled row hands a
+  // new diagram to a mounted instance, and a late host rejection or page
+  // message from the superseded diagram must not mask the new one.
+  const [failure, setFailure] = useState<{ source: string } | null>(null);
+  const failed = failure?.source === source;
   const [host, setHost] = useState<MermaidHost | null>(null);
-  // A recycled row hands a new diagram to a mounted instance, so the previous
-  // source's failure and measured height must not outlive it. Reset
-  // synchronously during render (React's "adjust state when a prop changes"
-  // pattern) so no frame shows the fallback or the height of the old diagram.
+  // Clear the measured height of the previous diagram synchronously during
+  // render (React's "adjust state when a prop changes" pattern), so no frame
+  // shows the new diagram in the old one's box.
   const [prevSource, setPrevSource] = useState(source);
   if (prevSource !== source) {
     setPrevSource(source);
-    setFailed(false);
     setHeight(MIN_HEIGHT);
   }
   // The host is prepared once per process, so a source change only re-runs this
@@ -146,7 +148,7 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
         }
       } catch {
         if (active) {
-          setFailed(true);
+          setFailure({ source });
         }
       }
     };
@@ -202,11 +204,11 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
               setHeight(Math.max(MIN_HEIGHT, message.height));
             } else {
               // An error or a malformed message keeps the source as a code block.
-              setFailed(true);
+              setFailure({ source });
             }
           }}
           onError={() => {
-            setFailed(true);
+            setFailure({ source });
           }}
           // The page paints the card color itself, so the native view must not
           // flash its own white background before the diagram loads.

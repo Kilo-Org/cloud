@@ -53,7 +53,7 @@
     "@rn-primitives/dialog": "1.5.2",
     "@rn-primitives/portal": "1.5.3",
     "@rn-primitives/slot": "1.5.2",
-    "@sentry/react-native": "~8.29.0",
+    "@sentry/react-native": "~8.31.0",
     "@shopify/flash-list": "2.3.3",
     "@tailwindcss/postcss": "4.3.3",
     "@tanstack/query-async-storage-persister": "catalog:",

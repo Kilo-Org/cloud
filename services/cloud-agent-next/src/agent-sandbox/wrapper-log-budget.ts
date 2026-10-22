@@ -4,8 +4,8 @@ import type { WrapperLogSkipReason, WrapperLogTruncation } from './protocol.js';
  * Fixed budget for one wrapper-log readout.
  *
  * The readout serves debugging, so it returns the newest content and names what
- * it left out. Every number is a hard bound on what the control plane holds for
- * one request, independent of what the sandbox filesystem contains.
+ * it left out. Every number is a hard bound on what the control plane holds and
+ * how long it waits, independent of what the sandbox filesystem contains.
  */
 export const WRAPPER_LOG_LIMITS = {
   /** Files whose content the readout returns. */
@@ -20,11 +20,16 @@ export const WRAPPER_LOG_LIMITS = {
   maxDepth: 2,
   /** Directories listed for one readout, across every root. */
   maxDirectories: 8,
-  /** Entries examined per listed directory. */
+  /** Matching entries kept per listed directory. */
   maxDirectoryEntries: 64,
   /** Timeout for reading the tail of one oversized file. */
-  tailTimeoutMs: 15_000,
+  tailTimeoutMs: 10_000,
+  /** Wall-clock budget for every read of one readout. */
+  readDeadlineMs: 30_000,
 } as const;
+
+/** Numeric bounds of the readout, overridable for tests. */
+export type WrapperLogLimits = { [Key in keyof typeof WRAPPER_LOG_LIMITS]: number };
 
 export type WrapperLogCandidate = {
   path: string;
@@ -40,6 +45,8 @@ export type WrapperLogReadRequest = {
   bytesToRead: number;
   /** Size reported by the directory listing. */
   sizeBytes: number;
+  /** Time this read may take; already bounded by the readout deadline. */
+  timeoutMs: number;
 };
 
 /** Returns the requested bytes of one candidate, or `undefined` when unreadable. */
@@ -52,17 +59,37 @@ export type WrapperLogReadout = {
   omittedFileCount: number;
 };
 
+/** Read one candidate, giving up when the readout deadline arrives first. */
+async function readBeforeDeadline(
+  read: WrapperLogReader,
+  request: WrapperLogReadRequest
+): Promise<{ status: 'read'; content: string | undefined } | { status: 'timeout' }> {
+  const { promise, resolve } = Promise.withResolvers<{ status: 'timeout' }>();
+  const timer = setTimeout(() => resolve({ status: 'timeout' }), request.timeoutMs);
+  try {
+    return await Promise.race([
+      read(request)
+        .catch(() => undefined)
+        .then(content => ({ status: 'read' as const, content })),
+      promise,
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Read log candidates newest first within {@link WRAPPER_LOG_LIMITS}.
  *
- * Cancelled reads do not consume the byte allowance, so an unreadable file never
- * hides a readable one. A candidate over the per-file cap is requested as its
- * newest bytes; `truncated` records the byte split.
+ * The readout stops at the read deadline and at the byte allowance, reports the
+ * files it could not return, and keeps going after a failed read so an
+ * unreadable file never hides a readable one. A candidate over the per-file cap
+ * is requested as its newest bytes; `truncated` records the byte split.
  */
 export async function readWrapperLogsWithinBudget(input: {
   candidates: readonly WrapperLogCandidate[];
   read: WrapperLogReader;
-  limits?: typeof WRAPPER_LOG_LIMITS;
+  limits?: WrapperLogLimits;
 }): Promise<WrapperLogReadout> {
   const limits = input.limits ?? WRAPPER_LOG_LIMITS;
   const ordered = [...input.candidates].sort(
@@ -73,6 +100,7 @@ export async function readWrapperLogsWithinBudget(input: {
   const files: Record<string, string> = {};
   const truncated: Record<string, WrapperLogTruncation> = {};
   const skipped: Record<string, WrapperLogSkipReason> = {};
+  const deadlineAt = Date.now() + limits.readDeadlineMs;
   let remainingBytes = limits.maxTotalBytes;
   let readCount = 0;
 
@@ -85,25 +113,36 @@ export async function readWrapperLogsWithinBudget(input: {
       skipped[candidate.path] = 'byte-limit';
       continue;
     }
+    const remainingMs = deadlineAt - Date.now();
+    if (remainingMs <= 0) {
+      skipped[candidate.path] = 'timeout';
+      continue;
+    }
 
     const bytesToRead = Math.min(candidate.size, limits.maxFileBytes, remainingBytes);
-    const content = await input.read({
+    const outcome = await readBeforeDeadline(input.read, {
       path: candidate.path,
       bytesToRead,
       sizeBytes: candidate.size,
+      timeoutMs: Math.min(remainingMs, limits.tailTimeoutMs),
     });
-    if (content === undefined) {
+    if (outcome.status === 'timeout') {
+      skipped[candidate.path] = 'timeout';
+      continue;
+    }
+    if (outcome.content === undefined) {
       skipped[candidate.path] = 'read-failed';
       continue;
     }
 
-    files[candidate.path] = content;
-    remainingBytes -= bytesToRead;
+    const returnedBytes = new TextEncoder().encode(outcome.content).byteLength;
+    files[candidate.path] = outcome.content;
+    remainingBytes -= Math.min(returnedBytes, remainingBytes);
     readCount += 1;
-    if (bytesToRead < candidate.size) {
+    if (returnedBytes < candidate.size) {
       truncated[candidate.path] = {
-        returnedBytes: bytesToRead,
-        omittedBytes: candidate.size - bytesToRead,
+        returnedBytes,
+        omittedBytes: candidate.size - returnedBytes,
       };
     }
   }

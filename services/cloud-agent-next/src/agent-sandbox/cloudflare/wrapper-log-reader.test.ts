@@ -8,6 +8,7 @@ import {
   rm,
   stat,
   symlink,
+  utimes,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -139,14 +140,65 @@ describe('readWrapperLogsForRoots', () => {
       { path: root, include: isWrapperLogFileName },
     ]);
 
-    const expectedTail = (await readFile(path, 'utf8')).slice(-WRAPPER_LOG_LIMITS.maxFileBytes);
-    expect(readout.files[path]).toBe(expectedTail);
+    expect(
+      readout.files[path].endsWith(
+        'line ' + (Math.ceil((4 * WRAPPER_LOG_LIMITS.maxFileBytes) / 12) - 1) + '\n'
+      )
+    ).toBe(true);
+    const returnedBytes = Buffer.byteLength(readout.files[path]);
+    expect(returnedBytes).toBeGreaterThan(WRAPPER_LOG_LIMITS.maxFileBytes - 16);
+    expect(returnedBytes).toBeLessThanOrEqual(WRAPPER_LOG_LIMITS.maxFileBytes);
     expect(readout.truncated[path]).toEqual({
-      returnedBytes: WRAPPER_LOG_LIMITS.maxFileBytes,
-      omittedBytes: (await stat(path)).size - WRAPPER_LOG_LIMITS.maxFileBytes,
+      returnedBytes,
+      omittedBytes: (await stat(path)).size - returnedBytes,
     });
     expect(counts.exec).toBe(1);
     expect(counts.readFile).toBe(0);
+  });
+
+  it('keeps multi-byte text intact at the tail boundary', async () => {
+    const root = await sessionRoot();
+    const path = join(root, 'kilocode-wrapper-agent_a-1.log');
+    const line = 'žluťoučký kůň — průvodce\n';
+    await writeFile(
+      path,
+      line.repeat(Math.ceil((4 * WRAPPER_LOG_LIMITS.maxFileBytes) / line.length))
+    );
+
+    const readout = await readWrapperLogsForRoots(fileSystemSession({ readFile: 0, exec: 0 }), [
+      { path: root, include: isWrapperLogFileName },
+    ]);
+
+    const bytes = await readFile(path);
+    const slice = bytes.subarray(bytes.length - WRAPPER_LOG_LIMITS.maxFileBytes);
+    const expected = new TextDecoder('utf-8').decode(slice).replace(/^\uFFFD+/, '');
+    const content = readout.files[path];
+    expect(content).toBe(expected);
+    expect(content.includes('\uFFFD')).toBe(false);
+    expect(content.endsWith(line)).toBe(true);
+  });
+
+  it('selects by name before applying the per-directory entry budget', async () => {
+    const root = await sessionRoot();
+    await mkdir(join(root, 'bulk'));
+    for (let index = 0; index < WRAPPER_LOG_LIMITS.maxDirectoryEntries + 20; index += 1) {
+      const path = join(root, `unrelated-${String(index).padStart(3, '0')}.txt`);
+      await writeFile(path, 'noise\n');
+      await utimes(path, new Date(), new Date());
+    }
+    for (let index = 0; index < 3; index += 1) {
+      const path = join(root, `kilocode-wrapper-agent_a-${index}.log`);
+      await writeFile(path, 'wrapper\n');
+      await utimes(path, new Date(1_000), new Date(1_000));
+    }
+
+    const discovery = await discoverWrapperLogCandidates(
+      fileSystemSession({ readFile: 0, exec: 0 }),
+      [{ path: root, include: isWrapperLogFileName }]
+    );
+
+    expect(discovery.candidates).toHaveLength(3);
+    expect(discovery.omittedFileCount).toBe(0);
   });
 
   it('reads only the newest files when a directory holds many logs', async () => {

@@ -43,6 +43,8 @@ export type WrapperLogRoot = {
 export type WrapperLogDiscovery = {
   candidates: WrapperLogCandidate[];
   skipped: Record<string, WrapperLogSkipReason>;
+  /** Matching entries a directory held beyond its entry budget. */
+  omittedFileCount: number;
 };
 
 export function isWrapperLogFileName(name: string): boolean {
@@ -62,6 +64,7 @@ export async function discoverWrapperLogCandidates(
   const skipped: Record<string, WrapperLogSkipReason> = {};
   const pending = roots.map(root => ({ ...root, depth: 0 }));
   let listedDirectories = 0;
+  let omittedFileCount = 0;
 
   while (pending.length > 0 && listedDirectories < WRAPPER_LOG_LIMITS.maxDirectories) {
     const directory = pending.shift();
@@ -70,15 +73,10 @@ export async function discoverWrapperLogCandidates(
     const listed = await session.listFiles(directory.path).catch(() => undefined);
     if (!listed?.success) continue;
 
-    const ordered =
-      listed.files.length > WRAPPER_LOG_LIMITS.maxDirectoryEntries
-        ? [...listed.files].sort(
-            (left, right) =>
-              (Date.parse(right.modifiedAt) || 0) - (Date.parse(left.modifiedAt) || 0)
-          )
-        : listed.files;
-
-    for (const entry of ordered.slice(0, WRAPPER_LOG_LIMITS.maxDirectoryEntries)) {
+    // Select by name first, then bound by the newest matches, so unrelated
+    // entries in a shared directory never displace this readout's logs.
+    const matched: WrapperLogCandidate[] = [];
+    for (const entry of listed.files) {
       const path = entry.absolutePath || `${directory.path}/${entry.name}`;
       if (entry.type === 'directory') {
         if (directory.descend !== false && directory.depth < WRAPPER_LOG_LIMITS.maxDepth) {
@@ -91,15 +89,27 @@ export async function discoverWrapperLogCandidates(
         skipped[path] = 'not-regular-file';
         continue;
       }
-      candidates.push({
+      matched.push({
         path,
         size: entry.size,
         modifiedAtMs: Date.parse(entry.modifiedAt) || 0,
       });
     }
+
+    const overflow = matched.length - WRAPPER_LOG_LIMITS.maxDirectoryEntries;
+    if (overflow <= 0) {
+      candidates.push(...matched);
+      continue;
+    }
+    omittedFileCount += overflow;
+    candidates.push(
+      ...matched
+        .sort((left, right) => right.modifiedAtMs - left.modifiedAtMs)
+        .slice(0, WRAPPER_LOG_LIMITS.maxDirectoryEntries)
+    );
   }
 
-  return { candidates, skipped };
+  return { candidates, skipped, omittedFileCount };
 }
 
 /** Quote one path as a single shell word for the in-sandbox tail command. */
@@ -111,7 +121,9 @@ export function quoteShellArgument(value: string): string {
  * Return the requested bytes of one candidate, newest content last.
  *
  * A file that fits the cap is read whole. A larger file is read as its newest
- * bytes by `tail`, so the control plane never receives the full file.
+ * bytes by `tail`, so the control plane never receives the full file. A byte
+ * offset can land inside a multi-byte character, so the tail drops the partial
+ * leading character instead of returning a replacement character.
  */
 export async function readWrapperLogContent(
   session: WrapperLogSession,
@@ -130,9 +142,9 @@ export async function readWrapperLogContent(
       session,
       `tail -c ${request.bytesToRead} -- ${quoteShellArgument(request.path)}`,
       'wrapper-logs.tail',
-      { timeoutMs: WRAPPER_LOG_LIMITS.tailTimeoutMs }
+      { timeoutMs: Math.min(request.timeoutMs, WRAPPER_LOG_LIMITS.tailTimeoutMs) }
     );
-    return tail.success ? tail.stdout : undefined;
+    return tail.success ? tail.stdout.replace(/^\uFFFD+/, '') : undefined;
   } catch {
     return undefined;
   }
@@ -148,5 +160,9 @@ export async function readWrapperLogsForRoots(
     candidates: discovery.candidates,
     read: request => readWrapperLogContent(session, request),
   });
-  return { ...readout, skipped: { ...discovery.skipped, ...readout.skipped } };
+  return {
+    ...readout,
+    skipped: { ...discovery.skipped, ...readout.skipped },
+    omittedFileCount: readout.omittedFileCount + discovery.omittedFileCount,
+  };
 }

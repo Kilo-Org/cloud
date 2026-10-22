@@ -1173,13 +1173,18 @@ describe('readWrapperLogs', () => {
 
     expect(exec).toHaveBeenCalledWith(
       `tail -c ${256 * 1024} -- '${path}'`,
-      expect.objectContaining({ timeout: 15_000 })
+      expect.objectContaining({ timeout: 10_000 })
     );
     expect(readFile).not.toHaveBeenCalled();
     expect(logs).toEqual({
       files: { [path]: 'tail content' },
       processes: undefined,
-      truncated: { [path]: { returnedBytes: 256 * 1024, omittedBytes: size - 256 * 1024 } },
+      truncated: {
+        [path]: {
+          returnedBytes: 'tail content'.length,
+          omittedBytes: size - 'tail content'.length,
+        },
+      },
       skipped: {},
       omittedFileCount: 0,
     });

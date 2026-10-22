@@ -114,8 +114,14 @@ export type TerminalClientResult =
  * - `file-limit` — the readout already returned its file allowance.
  * - `byte-limit` — the readout already returned its total byte allowance.
  * - `read-failed` — the sandbox could not return the file.
+ * - `timeout` — the readout's read deadline arrived before the file was read.
  */
-export type WrapperLogSkipReason = 'not-regular-file' | 'file-limit' | 'byte-limit' | 'read-failed';
+export type WrapperLogSkipReason =
+  | 'not-regular-file'
+  | 'file-limit'
+  | 'byte-limit'
+  | 'read-failed'
+  | 'timeout';
 
 /** Byte accounting for one log file returned as the end of its content. */
 export type WrapperLogTruncation = {

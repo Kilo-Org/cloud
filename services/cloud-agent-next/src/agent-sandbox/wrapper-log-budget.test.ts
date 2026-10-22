@@ -13,15 +13,11 @@ function candidate(path: string, size: number, ageMinutes: number): WrapperLogCa
   return { path, size, modifiedAtMs: 1_000_000 - ageMinutes * 60_000 };
 }
 
-/** Content that names the request it answered, so ordering is observable. */
-async function recordReads(
-  requests: WrapperLogReadRequest[],
-  options?: { fail?: (request: WrapperLogReadRequest) => boolean }
-) {
+/** Answer every request with exactly as many bytes as it asked for. */
+async function recordReads(requests: WrapperLogReadRequest[]) {
   return async (request: WrapperLogReadRequest): Promise<string | undefined> => {
     requests.push(request);
-    if (options?.fail?.(request)) return undefined;
-    return `<${request.path}:${request.bytesToRead}>`;
+    return 'x'.repeat(request.bytesToRead);
   };
 }
 
@@ -61,6 +57,7 @@ describe('readWrapperLogsWithinBudget', () => {
         path: '/tmp/kilocode-wrapper-a-1.log',
         bytesToRead: WRAPPER_LOG_LIMITS.maxFileBytes,
         sizeBytes: oversized,
+        timeoutMs: WRAPPER_LOG_LIMITS.tailTimeoutMs,
       },
     ]);
     expect(readout.truncated).toEqual({
@@ -68,6 +65,19 @@ describe('readWrapperLogsWithinBudget', () => {
         returnedBytes: WRAPPER_LOG_LIMITS.maxFileBytes,
         omittedBytes: oversized - WRAPPER_LOG_LIMITS.maxFileBytes,
       },
+    });
+  });
+
+  it('counts a shorter result against the file size', async () => {
+    const size = 4 * KIB;
+    const readout = await readWrapperLogsWithinBudget({
+      candidates: [candidate('/tmp/kilocode-wrapper-a-1.log', size, 1)],
+      read: async () => 'x'.repeat(KIB),
+    });
+
+    expect(readout.truncated['/tmp/kilocode-wrapper-a-1.log']).toEqual({
+      returnedBytes: KIB,
+      omittedBytes: size - KIB,
     });
   });
 
@@ -129,15 +139,16 @@ describe('readWrapperLogsWithinBudget', () => {
         candidate('/tmp/kilocode-wrapper-a-0.log', KIB, 1),
         candidate('/tmp/kilocode-wrapper-a-1.log', KIB, 2),
       ],
-      read: await recordReads(requests, {
-        fail: request => request.path === '/tmp/kilocode-wrapper-a-0.log',
-      }),
+      read: async request => {
+        requests.push(request);
+        return request.path === '/tmp/kilocode-wrapper-a-0.log'
+          ? undefined
+          : 'x'.repeat(request.bytesToRead);
+      },
     });
 
     expect(requests).toHaveLength(2);
-    expect(readout.files).toEqual({
-      '/tmp/kilocode-wrapper-a-1.log': '</tmp/kilocode-wrapper-a-1.log:1024>',
-    });
+    expect(readout.files).toEqual({ '/tmp/kilocode-wrapper-a-1.log': 'x'.repeat(KIB) });
     expect(readout.skipped).toEqual({ '/tmp/kilocode-wrapper-a-0.log': 'read-failed' });
   });
 
@@ -149,5 +160,25 @@ describe('readWrapperLogsWithinBudget', () => {
 
     expect(readout.files).toEqual({ '/tmp/kilocode-wrapper-a-0.log': '' });
     expect(readout.truncated).toEqual({});
+  });
+
+  it('names candidates as timeout once the read deadline has passed', async () => {
+    const requests: WrapperLogReadRequest[] = [];
+    const read = await recordReads(requests);
+    const readout = await readWrapperLogsWithinBudget({
+      candidates: [
+        candidate('/tmp/kilocode-wrapper-a-0.log', KIB, 1),
+        candidate('/tmp/kilocode-wrapper-a-1.log', KIB, 2),
+      ],
+      read,
+      limits: { ...WRAPPER_LOG_LIMITS, readDeadlineMs: 0 },
+    });
+
+    expect(readout.files).toEqual({});
+    expect(readout.skipped).toEqual({
+      '/tmp/kilocode-wrapper-a-0.log': 'timeout',
+      '/tmp/kilocode-wrapper-a-1.log': 'timeout',
+    });
+    expect(requests).toHaveLength(0);
   });
 });

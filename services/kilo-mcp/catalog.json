@@ -6344,6 +6344,7 @@
       "properties": {
         "cloudAgentSessionId": {
           "type": "string",
+          "format": "starts_with",
           "allOf": [
             {
               "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
@@ -17840,6 +17841,7 @@
       "properties": {
         "cloudAgentSessionId": {
           "type": "string",
+          "format": "starts_with",
           "allOf": [
             {
               "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"

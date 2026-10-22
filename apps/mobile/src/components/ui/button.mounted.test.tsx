@@ -102,6 +102,11 @@ describe('Button native target contract', () => {
     }
   );
 
+  it('keeps transcript actions at least 48 points tall while allowing labels to grow', async () => {
+    const button = renderButton({ size: 'action', variant: 'outline' });
+    expect(await nativeDimensions(button)).toEqual([{ minHeight: 48 }]);
+  });
+
   it('keeps a 36-point compact minimum plus four-point hitSlop on every edge', async () => {
     const button = renderButton({ size: 'sm' });
     expect(await nativeDimensions(button)).toEqual([{ minHeight: 36 }]);

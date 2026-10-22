@@ -2568,7 +2568,7 @@ export function SessionDetailContent({
             </Text>
             <Button
               variant="outline"
-              size="sm"
+              size="action"
               accessibilityLabel={t('agentChat.session.continueInNewSession')}
               onPress={handleContinueInNewSession}
             >
@@ -2712,6 +2712,7 @@ export function SessionDetailContent({
             </Text>
             <Button
               variant="outline"
+              size="action"
               accessibilityLabel={t('common.retry')}
               loading={slowRetryPending}
               onPress={() => {
@@ -2758,6 +2759,7 @@ export function SessionDetailContent({
             action={
               <Button
                 variant="outline"
+                size="action"
                 onPress={() => {
                   void manager.loadOlderMessages();
                 }}

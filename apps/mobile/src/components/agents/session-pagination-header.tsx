@@ -39,10 +39,8 @@ export function SessionPaginationHeader({
         <AccessibleStatus message={model.text} tone="status" className="flex-1 text-sm" />
         <Button
           variant="outline"
-          size="sm"
+          size="action"
           onPress={onRetry}
-          // h-11 is 44pt on iOS, exceeding the >=44pt touch target.
-          className="min-h-11"
           accessibilityLabel={model.retry.label}
           accessibilityHint={model.retry.accessibilityHint}
         >

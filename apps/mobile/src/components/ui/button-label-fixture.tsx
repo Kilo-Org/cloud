@@ -25,7 +25,7 @@ export function ButtonLabelFixture() {
           <Plus size={16} color={colors.primaryForeground} />
           <Text>{hi.profiles.newProfile}</Text>
         </Button>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="action">
           <Text>{hi.agentChat.session.continueInNewSession}</Text>
         </Button>
         <Text>English · full width</Text>
@@ -44,7 +44,7 @@ export function ButtonLabelFixture() {
         </View>
         <Text>Narrow · complete multiline label</Text>
         <View className="w-[100px] self-center">
-          <Button variant="outline">
+          <Button variant="outline" size="action">
             <Text>{hi.agentChat.session.continueInNewSession}</Text>
           </Button>
         </View>

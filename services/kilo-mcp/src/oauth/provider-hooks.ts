@@ -103,7 +103,7 @@ const OAUTH_ERROR_DETAILS: Record<string, string> = {
 };
 
 /** The slug for one library error, or `other` for a description outside the table. */
-export function oauthErrorDetail(description: string): string {
+function oauthErrorDetail(description: string): string {
   return OAUTH_ERROR_DETAILS[description] ?? 'other';
 }
 

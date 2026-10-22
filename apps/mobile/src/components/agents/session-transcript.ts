@@ -117,6 +117,20 @@ export function getSessionTranscriptItemMessageId(item: SessionTranscriptItem): 
   return item.messageId;
 }
 
+export type SessionTranscriptOptions = {
+  /**
+   * Delivery state per message id, for a client that tracks its own sends.
+   * Read once per build; the transcript rules below depend on it.
+   */
+  deliveryStates?: ReadonlyMap<string, MessageDeliveryState>;
+  /**
+   * Drop a user message that renders no content, even if it is confirmed.
+   * Set only while a stored session resolves read-only; a later live resolution
+   * rebuilds with the default streaming behavior.
+   */
+  dropUnrenderableUserRows?: boolean;
+};
+
 /**
  * Whether `mergeSessionTranscript` emits a row for this message: it renders
  * content, or its delivery failed and its typed footer is the row's own
@@ -124,31 +138,41 @@ export function getSessionTranscriptItemMessageId(item: SessionTranscriptItem): 
  *
  * An unconfirmed row with no parts at all stays invisible: unlike a confirmed
  * user row (whose parts may still stream in, so a zero-part row stays
- * transient), a client materialised row that never received its parts will not
- * gain content on its own — it would otherwise leave the reported empty yellow
- * stub above the submitted text. A synthetic row whose parts exist but render
- * nothing is already dropped by `messageRendersContent`, so this rule only has
- * to name the zero-part case. The row is keyed by the id the client sent (the
- * server honors `messageId`), so the run that failed it attaches here and a
- * failed submission keeps its one row with the typed footer. Two rows with the
- * same prompt are two submissions and stay two rows. If the server later
- * confirms the id, the authoritative record replaces the info and the row
- * re-renders through the normal path.
+ * transient), a client-materialised row that never received its parts will not
+ * gain content on its own. A synthetic row whose parts exist but render nothing
+ * is already dropped by `messageRendersContent`, so this rule only has to name
+ * the zero-part case. The row is keyed by the id the client sent (the server
+ * honors `messageId`), so the run that failed it attaches here and a failed
+ * submission keeps its one row with the typed footer. Two rows with the same
+ * prompt are two submissions and stay two rows. If the server later confirms
+ * the id, the authoritative record replaces the info and the row re-renders
+ * through the normal path.
+ *
+ * For a read-only stored session, no live writer is currently supplying parts.
+ * A user row that renders nothing would stay an empty bubble under a time marker
+ * that never gains content, so the row is omitted. If the session later resolves
+ * to a live transport, the default streaming behavior applies on the next build.
  */
 export function transcriptRendersMessage(
   message: StoredMessage,
-  deliveryStates?: ReadonlyMap<string, MessageDeliveryState>
+  deliveryStates?: ReadonlyMap<string, MessageDeliveryState>,
+  dropUnrenderableUserRows?: boolean
 ): boolean {
   const failed = deliveryStates?.get(message.info.id)?.status === 'failed';
-  const unconfirmedWithoutParts =
-    isUnconfirmedSubmission(message) && !failed && message.parts.length === 0;
-  return !unconfirmedWithoutParts && (messageRendersContent(message) || failed);
+  if (failed) {
+    return true;
+  }
+  if (dropUnrenderableUserRows === true && message.info.role === 'user') {
+    return message.parts.some(partRendersContent);
+  }
+  const unconfirmedWithoutParts = isUnconfirmedSubmission(message) && message.parts.length === 0;
+  return !unconfirmedWithoutParts && messageRendersContent(message);
 }
 
 export function mergeSessionTranscript(
   messages: readonly StoredMessage[],
   preparationAttempts: readonly PreparationAttempt[],
-  deliveryStates?: ReadonlyMap<string, MessageDeliveryState>
+  options?: SessionTranscriptOptions
 ): SessionTranscriptItem[] {
   // `ensureWrapper` records a completed attempt for every message delivery,
   // even warm reuse. Drop no-op completed attempts so "Environment prepared"
@@ -166,10 +190,11 @@ export function mergeSessionTranscript(
 
   const items: SessionTranscriptItem[] = [];
   const messageIds = new Set<string>();
+  const deliveryStates = options?.deliveryStates;
   let previousCreated: number | undefined = undefined;
   for (const message of messages) {
     messageIds.add(message.info.id);
-    if (transcriptRendersMessage(message, deliveryStates)) {
+    if (transcriptRendersMessage(message, deliveryStates, options?.dropUnrenderableUserRows)) {
       const created = message.info.time.created;
       // One validity rule, shared with the marker component: a timestamp the label
       // cannot format must never produce a marker.

@@ -110,29 +110,43 @@ Resolution steps:
 2. If the canonical ID is itself a catalog ID, return it.
 3. Otherwise return `index.canonicalToCatalog.get(canonical) ?? null`.
 
-**Several upstream models from one provider can map to the same catalog ID.** For example, neuralwatt's `kimi-k3`, `kimi-k3-fast` and `kimi-k3-flex` all map to `moonshotai/kimi-k3`, and zai-coding's `glm-5.3` and `glm-5.3-highspeed` both map to `z-ai/glm-5.3`. The sync marks exactly one of them as the **primary** model for that catalog ID, choosing in this order:
-1. the model whose upstream ID, lowercased and without an `hf:` prefix, ends with the catalog ID's last path segment;
-2. then the model flagged `recommended`;
-3. then the shortest upstream ID.
-
-Only the primary model is served under the catalog ID. The other variants remain reachable through their bespoke IDs.
+**Prerequisite: parse `canonical_model_id`.** Zod's default object parsing drops undeclared keys, and today's `ModelsDevModelSchema` (`apps/web/src/lib/providers/direct-byok/sync-direct-byok.ts:33`) does not declare `canonical_model_id`. Without a change, every model parsed through `ModelsDevProviderSchema` loses the field and the resolver returns `null` for all of them. Add `canonical_model_id: z.string().optional().catch(undefined)` to that schema. Parse the models.dev `openrouter` entry with the same schema when building the index. That entry is otherwise untouched, because `ModelsDevCatalogSchema` keeps provider entries as `unknown`.
 
 ### Storage (no migration for model data)
 
-Extend `DirectByokModelSchema` (`packages/db/src/schema-types.ts`) with two fields:
-- `catalog_model_id: z.string().optional()`;
-- `catalog_primary: z.boolean().optional()`.
+Extend `DirectByokModelSchema` (`packages/db/src/schema-types.ts`) with `catalog_model_id: z.string().optional()`. It is stored in the existing `direct_byok_model_lists.models` jsonb.
 
-They are stored in the existing `direct_byok_model_lists.models` jsonb.
+The sync builds the index from the models.dev catalog it already fetches once per run, plus the OpenRouter snapshot that `syncAndStoreProviders` has just fetched (pass it through `SyncContext`). It annotates every synced model and logs the mapped count per provider.
 
-The sync builds the index from the models.dev catalog it already fetches once per run, plus the OpenRouter snapshot that `syncAndStoreProviders` has just fetched (pass it through `SyncContext`). It annotates every model and logs the mapped count per provider.
+### Read-time merge and primary selection
 
-At read time, only treat a mapping as live if the catalog ID is still valid (`isValidOpenRouterModelId`), because the catalog can drift between syncs.
+**The merge with static recommended models.** `cachedEnhancedDirectByokModelList` (`packages/web-shared/src/lib/ai-gateway/providers/direct-byok/model-list.ts:46-61`) works like this today:
+- it puts each provider's static `recommendedModels` ahead of the synced rows;
+- for a model in both lists, it keeps the static entry;
+- it copies only `reasoning_options` over from the synced entry;
+- the `recommended` flag exists only at this point; the sync never sees it.
+
+Two changes follow from that:
+
+1. **Copy the catalog ID.** `enhanceDirectByokModelList` copies `catalog_model_id` from the synced entry with the same upstream ID, exactly as it does for `reasoning_options`. A static recommended model that is missing from the synced list stays unmapped. Such a model is not on the provider's live list, so serving it under a catalog ID would be a guess.
+2. **Select the primary here.** Primary selection happens in this read step, not in the sync, so the `recommended` flag can take part. Several upstream models from one provider can map to the same catalog ID. For example:
+   - neuralwatt's `kimi-k3`, `kimi-k3-fast` and `kimi-k3-flex` all map to `moonshotai/kimi-k3`;
+   - zai-coding's `glm-5.3` and `glm-5.3-highspeed` both map to `z-ai/glm-5.3`.
+
+   Exactly one is chosen as the **primary** for each catalog ID, in this order:
+   1. the model whose upstream ID, lowercased and without an `hf:` prefix, ends with the catalog ID's last path segment;
+   2. then the model flagged `recommended`;
+   3. then the shortest upstream ID.
+
+   The result can be a derived `Map<catalogId, upstreamId>` cached next to the list. It is not stored. Only the primary is served under the catalog ID; the other variants remain reachable through their bespoke IDs.
+
+A mapping only counts as live if the catalog ID is still valid (`isValidOpenRouterModelId`), because the catalog can drift between syncs.
 
 ### Opt-in: per key
 
 Add `byok_api_keys.serve_catalog_models boolean not null default false`. This needs a migration; follow the `database-migrations` skill.
 - **Web UI.** Add a switch per direct BYOK key in `BYOKKeysManager.tsx`, labelled "Use this key for matching Kilo catalog models". Show it only for providers with a `models_dev_id`.
+- **Who may change the flag on organization keys.** Owners and admins only (`ORGANIZATION_MANAGE_ROLES`), the same roles that can edit model and provider policies (`organizationAdminMutationProcedure`). Org BYOK keys themselves can also be managed by billing managers (`ORGANIZATION_BILLING_ROLES` in `byok-router.ts`). If billing managers could set this flag too, they could send catalog traffic to an upstream that policy admins never approved. See [Model policy enforcement](#model-policy-enforcement).
 - **Key data.** Expose the flag in `byok-router.ts` list and update procedures. Return it from `getBYOKforUser` / `getBYOKforOrganization` and from `getUserByokProviderIds` / `getOrganizationByokProviderIds`, or from a sibling helper.
 
 With the flag off, behavior is exactly as today.
@@ -160,10 +174,15 @@ The easiest place is the existing `checkDirectBYOK`, which already runs before t
 #### Model policy enforcement
 
 When a request is served by an opted-in key, organization model policies apply:
-- **Return value.** `checkDirectBYOK` returns `bypassAccessCheck: false` for these requests, with `userByok` set. A set `userByok` already skips the zero-balance block (`llm-proxy.ts:901-905`); ChatGPT BYOK uses the same shape.
+- **Return value.** `checkDirectBYOK` returns `bypassAccessCheck: false` for these requests, with `userByok` set. A set `userByok` already skips the zero-balance block (`llm-proxy.ts:901-905`). Vercel BYOK already returns this shape (`get-provider.ts`, `checkVercelBYOK` branch). ChatGPT BYOK does not: it returns `userByok: null` with `skipBalanceCheck: true`, so it is not the model to copy.
 - **Which ID is checked.** The access check uses the catalog ID. For a catalog ID request that is the requested ID. For a bespoke ID with a live mapping on an opted-in key, it is that model's `catalog_model_id`, so the bespoke ID cannot be used to get around a deny rule. `createAccessCheckResolver` (`llm-proxy.ts:808`) needs to receive this policy model ID instead of the raw requested ID.
 - **Unmapped bespoke IDs** keep today's exemption, because no catalog entry exists that an admin could allow or deny.
-- **Provider routing.** Organization provider-routing output (`effectiveProviderConfig.only`) has no meaning for a direct BYOK upstream. It is already dropped, because direct BYOK `transformRequest` deletes `body.provider`. The model allow/deny decision is the part that is enforced.
+- **Provider allowlists do not cover direct BYOK upstreams.** Organization provider allowlists list OpenRouter and Vercel provider slugs. Direct BYOK providers are deliberately kept out of the provider policy UI (`handlers/providers.ts`, `withDirectByokProviders`), so an admin can neither allow nor exclude them there.
+  - **What is checked instead.** For catalog-ID routing, the allowlist still decides whether the catalog **model** is allowed (`groupModelAllowed` / `groupProvidersAllowed`, evaluated as for a Kilo-routed request). Which upstream serves the request is authorized by the opt-in on the key, and only owners and admins can set that opt-in on organization keys (see [Opt-in: per key](#opt-in-per-key)).
+  - **Routing output is ignored.** The resulting `effectiveProviderConfig.only` has no meaning for a direct BYOK upstream and is already dropped, because direct BYOK `transformRequest` deletes `body.provider`.
+  - **Rejected alternative.** "Only route if the direct BYOK provider is on the allowlist" would turn the feature off for every organization that has a provider allowlist, because no allowlist can contain a direct BYOK provider today.
+  - **Later option.** If admins need per-provider control, add direct BYOK providers to the provider policy UI as its own change, then gate on them.
+  - **Personal requests** have no organization policy, so none of this applies to them.
 - **Model list.** `isModelRestrictionExempt` (`model-allow.server.ts:51`) stays as it is, because hidden bespoke entries are no longer in the list.
 
 #### Usage and leaderboards (easiest path)
@@ -184,11 +203,12 @@ No changes:
 ## Implementation steps
 
 1. Add `models_dev_id` to the provider definitions and drive the models.dev fetchers from it.
-2. Add the resolver and the primary-model selection, with fixture-based unit tests.
-3. Annotate models during the sync, extend the schema with `catalog_model_id` and `catalog_primary`, and log coverage. Extend `sync-direct-byok.test.ts`.
-4. Migrate `byok_api_keys.serve_catalog_models`, then update the BYOK router and the web UI switch.
-5. Model list: set the badge, hide mapped bespoke entries, and accept hidden IDs in validation and model preferences. Extend `handlers/models.test.ts`, `organization-models.test.ts`, `model-validation.test.ts` and the model preferences tests.
-6. Routing and policy: resolve catalog IDs in `checkDirectBYOK`, set `bypassAccessCheck: false` for opted-in keys, and run the access check against the catalog ID. Extend the `get-provider` tests and the llm-proxy access-check tests for both allow and deny, for catalog and bespoke IDs.
+2. Add `canonical_model_id` to `ModelsDevModelSchema`, then add the resolver with fixture-based unit tests. The fixtures must include the raw models.dev shape, so a schema that strips the field fails the test.
+3. Annotate models during the sync, extend `DirectByokModelSchema` with `catalog_model_id`, and log coverage. Extend `sync-direct-byok.test.ts`.
+4. Copy `catalog_model_id` in `enhanceDirectByokModelList` and select the primary there. Extend `model-list.test.ts` with recommended models (catalog ID copied, recommended model wins the tie-break).
+5. Migrate `byok_api_keys.serve_catalog_models`, then update the BYOK router (owner/admin-only for organization keys) and the web UI switch.
+6. Model list: set the badge, hide mapped bespoke entries, and accept hidden IDs in validation and model preferences. Extend `handlers/models.test.ts`, `organization-models.test.ts`, `model-validation.test.ts` and the model preferences tests.
+7. Routing and policy: resolve catalog IDs in `checkDirectBYOK`, set `bypassAccessCheck: false` for opted-in keys, and run the access check against the catalog ID. Extend the `get-provider` tests and the llm-proxy access-check tests for both allow and deny, for catalog and bespoke IDs.
 
 ## Open questions
 

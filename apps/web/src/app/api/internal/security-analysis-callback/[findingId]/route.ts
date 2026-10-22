@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { SECURITY_AUTO_ANALYSIS_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
+import { ServiceFetchTimeoutError, fetchWithinBudget } from '@/lib/bounded-service-fetch';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { z } from 'zod';
 
@@ -52,7 +53,9 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid callback payload' }, { status: 400 });
     }
 
-    const workerResponse = await fetch(
+    // Bounded: a Worker that never answers aborts inside the budget instead of
+    // holding the callback ingress open until the platform timeout.
+    const workerResponse = await fetchWithinBudget(
       `${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/security-analysis-callback/${findingId}?attempt=${encodeURIComponent(attemptToken)}`,
       {
         method: 'POST',
@@ -66,6 +69,14 @@ export async function POST(
     const workerBody: unknown = await workerResponse.json();
     return NextResponse.json(workerBody, { status: workerResponse.status });
   } catch (error) {
+    if (error instanceof ServiceFetchTimeoutError) {
+      // The callback was never admitted, so the caller must retry; a 504 says
+      // so without echoing an upstream body.
+      return NextResponse.json(
+        { error: 'Security analysis Worker did not respond in time' },
+        { status: 504 }
+      );
+    }
     return NextResponse.json(
       {
         error: 'Failed to admit callback',

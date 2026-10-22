@@ -61,8 +61,6 @@ export type KiloAdminElevationReason =
   | 'cli_session_cross_org_query'
   /** Code-index read/write redirected to another org or user via `overrideUser`. */
   | 'code_index_user_override'
-  /** MCP gateway org-manager check bypassed for a global admin. */
-  | 'mcp_gateway_organization_manage'
   /** Security Agent audit report assembled with Kilo-admin visibility. */
   | 'security_agent_audit_report'
   /** A token carrying `isAdmin` was minted for a downstream service. */

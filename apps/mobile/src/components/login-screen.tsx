@@ -19,6 +19,8 @@ import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -52,7 +54,7 @@ export function LoginScreen() {
   const colors = useThemeColors();
   const insets = useScreenInsets();
   const { t } = useTranslation();
-  const [persistError, setPersistError] = useState<string | undefined>(undefined);
+  const [persistFailed, setPersistFailed] = useState(false);
   const [authFormBusy, setAuthFormBusy] = useState(false);
   const [draft, setDraft] = useState<{
     email: string;
@@ -61,15 +63,17 @@ export function LoginScreen() {
 
   const persistToken = useCallback(
     async (tokenValue: string, refreshTokenValue?: string, expiresInValue?: number) => {
-      setPersistError(undefined);
+      setPersistFailed(false);
       try {
         await signIn(tokenValue, refreshTokenValue, expiresInValue);
         clearLoginDrafts();
       } catch {
-        setPersistError(t('login.couldNotCompleteSignIn'));
+        // The message renders from the catalog at draw time, so a language
+        // switch re-renders it in the new language.
+        setPersistFailed(true);
       }
     },
-    [signIn, t]
+    [signIn]
   );
 
   useEffect(() => {
@@ -114,11 +118,13 @@ export function LoginScreen() {
   const keyboardHeight = useKeyboardState(state => state.height);
 
   if (status === 'approved') {
-    if (persistError) {
+    if (persistFailed) {
       return (
         <CenteredState className="bg-background">
           <View className="items-center gap-3 px-6">
-            <Text className="text-center text-sm text-destructive">{persistError}</Text>
+            <Text className="text-center text-sm text-destructive">
+              {t('login.couldNotCompleteSignIn')}
+            </Text>
             <Button
               onPress={() => {
                 if (token) {
@@ -300,11 +306,13 @@ export function LoginScreen() {
           router.push('/(auth)/language-picker' as Href);
         }}
         disabled={globeDisabled}
-        hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={t('common.language')}
         accessibilityState={{ disabled: globeDisabled }}
-        className="absolute h-11 w-11 items-center justify-center rounded-full active:opacity-70 disabled:opacity-50"
+        className={cn(
+          ICON_TARGET_BOX_CLASS,
+          'absolute rounded-full active:opacity-70 disabled:opacity-50'
+        )}
         // eslint-disable-next-line react-native/no-inline-styles -- safe-area + RTL-aware trailing edge
         style={{ top: insets.top + 8, ...globeTrailing }}
       >

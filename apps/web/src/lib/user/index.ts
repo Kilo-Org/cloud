@@ -143,6 +143,7 @@ import {
   type SignupStepUpMethod,
 } from '@kilocode/web-shared/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
+import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult, successResult, trpcFailure } from '@kilocode/web-shared/lib/maybe-result';
@@ -182,7 +183,6 @@ import {
   type ParsedImpactReferralTouch,
 } from '@/lib/impact/referral-utils';
 import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
-import { revokeGatewayStateForUser } from '@/lib/mcp-gateway/lifecycle-service';
 import {
   USER_DELETION_USAGE_PREFIX_BATCH_SIZE,
   USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS,
@@ -458,7 +458,8 @@ export async function createOrUpdateUser(
   requestHeaders?: Headers,
   affiliateTrackingId?: string | null,
   trackingContext?: CreateOrUpdateUserTrackingContext,
-  deferSignInAnalytics?: boolean
+  deferSignInAnalytics?: boolean,
+  verifyNewAccountAdmission?: () => Promise<boolean>
 ): Promise<CreateOrUpdateUserResult> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
@@ -606,12 +607,33 @@ export async function createOrUpdateUser(
     }
   }
 
+  const normalizedEmail = normalizeEmail(args.google_user_email);
+  const operationId = signupOperationId(normalizedEmail);
+
+  // Never fall through to the insert: its dedup misses legacy rows with a NULL
+  // normalized_email that findUserByNormalizedEmail matches case-insensitively.
+  if (args.provider === 'email' && isEmailSignupDisabled()) {
+    const matchingUser = await findUserByNormalizedEmail(args.google_user_email);
+    console.info('[auth] Signup creation outcome', {
+      operationId,
+      outcome: 'rejected',
+      reason: matchingUser ? 'email_already_used' : 'email_signup_disabled',
+    });
+    return failureResult(matchingUser ? 'EMAIL-ALREADY-USED' : 'EMAIL-SIGNUP-DISABLED');
+  }
+
   if (turnstile_guid && (await findUserById(turnstile_guid)))
     throw new Error('Abuser warning: turnstile guid reuse detected ' + turnstile_guid);
 
   const signupIp = getSignupIp(requestHeaders);
-  const normalizedEmail = normalizeEmail(args.google_user_email);
-  const operationId = signupOperationId(normalizedEmail);
+  if (verifyNewAccountAdmission && !(await verifyNewAccountAdmission())) {
+    console.info('[auth] Signup creation outcome', {
+      operationId,
+      outcome: 'rejected',
+      reason: 'native_admission',
+    });
+    return failureResult('ADMISSION_REQUIRED');
+  }
   const bouncerIp = bareIpLiteral(signupIp ?? undefined);
   if (!IS_DEVELOPMENT) {
     // Subdomains of one registrable domain share Bouncer's domain counter.
@@ -1075,9 +1097,6 @@ export async function anonymizeCloudUserData(
       normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
     });
   }
-
-  // ── Gateway cleanup ───────────────────────────────────────────────────
-  await revokeGatewayStateForUser(tx, userId);
 
   // Remove recipient-addressed Security Agent notifications before user
   // anonymization and org membership removal. Org-owned findings can remain.

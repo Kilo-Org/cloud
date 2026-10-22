@@ -99,7 +99,6 @@ describe('permission-denied query removal', () => {
       })
     ).rejects.toBe(error);
 
-    // The forbidden org's query is dropped; the sibling org's query survives.
     expect(queryClient.getQueryData(org1Key)).toBeUndefined();
     expect(queryClient.getQueryData(org2Key)).toEqual({ members: ['b'] });
     // Permission loss never signs the user out.
@@ -201,6 +200,91 @@ describe('permission-denied query removal', () => {
     expect(queryClient.getQueryData(key)).toEqual({ members: ['a'] });
     expect(signOut).not.toHaveBeenCalled();
     clear();
+  });
+});
+
+const LIST_KEY: readonly unknown[] = [['organizations', 'list'], { type: 'query' }];
+const makeOrgKey = (id: string): readonly unknown[] => [
+  ['organizations', 'withMembers'],
+  { type: 'query', input: { organizationId: id } },
+];
+const forbidden = () =>
+  Object.assign(new Error('forbidden'), {
+    data: { code: 'FORBIDDEN', httpStatus: 403 },
+  });
+
+describe('organizations.list refresh on permission loss', () => {
+  it('refetches the shared list once an org-scoped FORBIDDEN lands', async () => {
+    const queryClient = createKiloAppQueryClient();
+    const listFn = vi.fn<() => Promise<{ organizationId: string }[]>>();
+    queryClient.setQueryData(LIST_KEY, [{ organizationId: 'org-1' }]);
+
+    const observer = new QueryObserver(queryClient, {
+      queryKey: makeOrgKey('org-1'),
+      queryFn: () => {
+        throw forbidden();
+      },
+      retry: false,
+      staleTime: Infinity,
+    });
+    const unsubscribe = observer.subscribe(() => undefined);
+    await observer.refetch().catch(() => undefined);
+    unsubscribe();
+
+    // The denial scheduled the shared list's refresh: the fresh payload is now
+    // marked stale, so the next observer mount refetches it.
+    expect(queryClient.getQueryState(LIST_KEY)?.isInvalidated).toBe(true);
+
+    const pending = Promise.withResolvers<{ organizationId: string }[]>();
+    let gated = false;
+    listFn.mockImplementation(async () => {
+      // The initial mount fires one refetch (the invalidation marked the query
+      // stale); gate it so the resolution order is observable. Any further
+      // call answers immediately.
+      if (gated) {
+        await Promise.resolve();
+        return [];
+      }
+      gated = true;
+      const settled = await pending.promise;
+      return settled;
+    });
+    const listObserver = new QueryObserver(queryClient, {
+      queryKey: LIST_KEY,
+      queryFn: listFn,
+      retry: false,
+      staleTime: Infinity,
+    });
+    const unsubList = listObserver.subscribe(() => undefined);
+    await flushQueryUpdates();
+    // The mount's refetch arrived at the gated queryFn.
+    expect(listFn).toHaveBeenCalledTimes(1);
+    pending.resolve([{ organizationId: 'org-2' }]);
+    await flushQueryUpdates();
+    expect(listObserver.getCurrentResult().data).toEqual([{ organizationId: 'org-2' }]);
+    unsubList();
+  });
+
+  it('does not refresh the list for a non-org FORBIDDEN', async () => {
+    const queryClient = createKiloAppQueryClient();
+    queryClient.setQueryData(LIST_KEY, [{ organizationId: 'org-1' }]);
+
+    const error = forbidden();
+    await expect(
+      queryClient.fetchQuery({
+        queryKey: [['user', 'getMe'], { type: 'query' }],
+        staleTime: 0,
+        queryFn: () => {
+          throw error;
+        },
+      })
+    ).rejects.toBe(error);
+
+    // No observer was attached to the list, no invalidation was scheduled: the
+    // cached payload stays fresh and unmarked, so a later mount refetches
+    // nothing.
+    expect(queryClient.getQueryState(LIST_KEY)?.dataUpdatedAt).toBeGreaterThan(0);
+    expect(queryClient.getQueryState(LIST_KEY)?.isInvalidated).toBe(false);
   });
 });
 

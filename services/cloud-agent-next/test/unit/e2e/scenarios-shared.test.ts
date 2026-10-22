@@ -266,14 +266,14 @@ function installPacedHold(
 }
 
 type FakeStream = StreamConnection & {
-  close: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn<() => void>>;
   waitForTerminal: ReturnType<typeof vi.fn>;
 };
 
 function fakeStream(events: StreamEvent[], terminal: StreamEvent): FakeStream {
   return {
     events,
-    close: vi.fn(),
+    close: vi.fn<() => void>(),
     waitFor: predicate => Promise.resolve(events.find(predicate) ?? null),
     waitForTerminal: vi.fn().mockResolvedValue(terminal),
     get receivedCount() {
@@ -1780,7 +1780,7 @@ describe('callback scenario behaviour under both profiles', () => {
     // its task fails; the scenario must reach that id for its failure-path
     // interrupt even though `startSession` never returns.
     mocks.startSession.mockImplementation(async (startConfig: DriverConfig) => {
-      startConfig.onSessionCreated?.(preparedId);
+      startConfig.onSessionCreated?.(preparedId, KILO_SESSION_ID);
       throw new Error('initiateFromKilocodeSessionV2 failed');
     });
 
@@ -2212,6 +2212,71 @@ describe('moved queue scenario run isolation', () => {
 });
 
 describe('queue-while-busy settlement contract', () => {
+  it.each(['queue-while-busy', 'queue-interrupt-clears'])(
+    'retains queued-only hot follow-up expectations for legacy sessions in %s',
+    async scenario => {
+      installPacedHold('message_boot', 'message_held');
+      mocks.startSession.mockResolvedValue({
+        cloudAgentSessionId: 'agent_legacy',
+        kiloSessionId: KILO_SESSION_ID,
+        messageId: 'message_boot',
+        delivery: 'sent',
+      });
+      mocks.sendMessage
+        .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'sent' })
+        .mockResolvedValueOnce({ messageId: 'message_third', delivery: 'sent' });
+      const result = await runSharedScenario(SHARED_SCENARIOS[scenario], {
+        config,
+        conversation: '_',
+        timeoutMs: 5_000,
+        env: { ...queueHttpEnvironment(), requireControlPlaneSession: false },
+      });
+      expect(result.ok).toBe(false);
+      expect(result.message).toContain('expected delivery=queued');
+    }
+  );
+
+  it('accepts sent hot control-plane follow-ups while requiring FIFO sent evidence', async () => {
+    installPacedHold('message_boot', 'message_held', [
+      sentEvent('message_held'),
+      sentEvent('message_second'),
+      sentEvent('message_third'),
+      completedEvent('message_held'),
+      completedEvent('message_second'),
+      completedEvent('message_third'),
+    ]);
+    mocks.sendMessage
+      .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'sent' })
+      .mockResolvedValueOnce({ messageId: 'message_third', delivery: 'sent' });
+    const result = await runSharedScenario(SHARED_SCENARIOS['queue-while-busy'], {
+      config,
+      conversation: '_',
+      timeoutMs: 5_000,
+      env: queueHttpEnvironment(),
+    });
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('successful FIFO');
+  });
+
+  it('rejects completed control-plane follow-ups whose sent evidence is missing', async () => {
+    installPacedHold('message_boot', 'message_held', [
+      completedEvent('message_held'),
+      completedEvent('message_second'),
+      completedEvent('message_third'),
+    ]);
+    mocks.sendMessage
+      .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'sent' })
+      .mockResolvedValueOnce({ messageId: 'message_third', delivery: 'sent' });
+    const result = await runSharedScenario(SHARED_SCENARIOS['queue-while-busy'], {
+      config,
+      conversation: '_',
+      timeoutMs: 5_000,
+      env: queueHttpEnvironment(),
+    });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('delivery order');
+  });
+
   /**
    * #6660 settles each batched follow-up through its own delivery, so completion
    * frames can reach the client out of order. The scenario waits for every
@@ -2271,6 +2336,36 @@ describe('queue-while-busy settlement contract', () => {
 });
 
 describe('queue-interrupt-clears settlement contract', () => {
+  it('accepts sent control-plane acknowledgements with ordered sent interruption evidence', async () => {
+    installPacedHold('message_boot', 'message_held', [
+      sentEvent('message_second'),
+      sentEvent('message_third'),
+      interruptedDeliveryEvent('message_second', 'sent'),
+      interruptedDeliveryEvent('message_third', 'sent'),
+    ]);
+    mocks.sendMessage
+      .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'sent' })
+      .mockResolvedValueOnce({ messageId: 'message_third', delivery: 'sent' });
+    const result = await runSharedScenario(SHARED_SCENARIOS['queue-interrupt-clears'], {
+      config,
+      conversation: '_',
+      timeoutMs: 5_000,
+      env: queueHttpEnvironment(),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects out-of-order follow-up sent frames even when interruption deliveries agree', async () => {
+    const result = await runInterruptClearsWith([
+      sentEvent('message_third'),
+      sentEvent('message_second'),
+      interruptedDeliveryEvent('message_second', 'sent'),
+      interruptedDeliveryEvent('message_third', 'sent'),
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('delivery order');
+  });
+
   it('accepts an observed sent frame whose failure reports sent', async () => {
     const result = await runInterruptClearsWith([
       sentEvent('message_second'),

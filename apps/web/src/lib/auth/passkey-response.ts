@@ -22,18 +22,21 @@ const base64UrlStringSchema = z.string().min(1);
 /**
  * Client extension outputs are opaque to this relying party: the verifier never
  * reads them, and their wire form differs from the browser's object type, so
- * only presence as an object is checked. A native security-key assertion omits
- * them, which carries the same meaning as no output at all, so absence
- * defaults to `{}`.
+ * only presence as an object is checked. Native bridges emit null for absent
+ * optional fields; absent extension outputs normalize to an empty object.
  */
 const clientExtensionResultsSchema = z
   .custom<AuthenticationExtensionsClientOutputs>(
     value => typeof value === 'object' && value !== null && !Array.isArray(value)
   )
-  .optional()
-  .default({});
+  .nullish()
+  .transform(value => value ?? {});
 
-const authenticatorAttachmentSchema = z.enum(['platform', 'cross-platform']);
+function optionalNativeField<T extends z.ZodType>(schema: T) {
+  return schema.nullish().transform(value => value ?? undefined);
+}
+
+const authenticatorAttachmentSchema = optionalNativeField(z.enum(['platform', 'cross-platform']));
 
 /** The `navigator.credentials.create()` result, JSON-encoded. */
 export const registrationResponseSchema: z.ZodType<RegistrationResponseJSON> = z.object({
@@ -43,12 +46,12 @@ export const registrationResponseSchema: z.ZodType<RegistrationResponseJSON> = z
   response: z.object({
     clientDataJSON: base64UrlStringSchema,
     attestationObject: base64UrlStringSchema,
-    authenticatorData: base64UrlStringSchema.optional(),
-    transports: z.array(z.string()).optional(),
-    publicKeyAlgorithm: z.number().int().optional(),
-    publicKey: base64UrlStringSchema.optional(),
+    authenticatorData: optionalNativeField(base64UrlStringSchema),
+    transports: optionalNativeField(z.array(z.string())),
+    publicKeyAlgorithm: optionalNativeField(z.number().int()),
+    publicKey: optionalNativeField(base64UrlStringSchema),
   }),
-  authenticatorAttachment: authenticatorAttachmentSchema.optional(),
+  authenticatorAttachment: authenticatorAttachmentSchema,
   clientExtensionResults: clientExtensionResultsSchema,
 });
 
@@ -63,8 +66,8 @@ export const authenticationResponseSchema: z.ZodType<AuthenticationResponseJSON>
     signature: base64UrlStringSchema,
     // The verifier ignores a user handle it cannot use, and a native
     // authenticator may report an empty one, so any string is accepted here.
-    userHandle: z.string().optional(),
+    userHandle: optionalNativeField(z.string()),
   }),
-  authenticatorAttachment: authenticatorAttachmentSchema.optional(),
+  authenticatorAttachment: authenticatorAttachmentSchema,
   clientExtensionResults: clientExtensionResultsSchema,
 });

@@ -10,6 +10,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: mockReadDb }));
 jest.mock('@sentry/nextjs', () => ({ captureException: mockCaptureException }));
 
 import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
+import { FAILURE_BACKOFF_MS } from '../cached-fetch';
 import {
   appUpdateRequiredError,
   enforceMinimumVersion,
@@ -122,31 +123,85 @@ describe('enforceMinimumVersion', () => {
 });
 
 describe('getMinimumVersions', () => {
+  const row = { ios: '1.0.4', android: '1.0.5' };
+
   test('returns the configured minimums on a successful read', async () => {
-    limitMock.mockResolvedValueOnce([{ ios: '1.0.4', android: '1.0.5' }]);
-    await expect(getMinimumVersions()).resolves.toEqual({ ios: '1.0.4', android: '1.0.5' });
+    limitMock.mockResolvedValueOnce([row]);
+    await expect(getMinimumVersions()).resolves.toEqual(row);
   });
 
-  test('returns null when no row is configured', async () => {
-    limitMock.mockResolvedValueOnce([]);
+  test('caches the read for the TTL, including a "no row" result', async () => {
+    limitMock.mockResolvedValue([]);
+
     await expect(getMinimumVersions()).resolves.toBeNull();
-  });
-
-  test('returns null when the read fails with no cache', async () => {
-    limitMock.mockRejectedValueOnce(new Error('db down'));
     await expect(getMinimumVersions()).resolves.toBeNull();
-    expect(mockCaptureException).toHaveBeenCalled();
+
+    expect(limitMock).toHaveBeenCalledTimes(1);
   });
 
-  test('uses the stale cache when a read fails after the TTL expires', async () => {
-    limitMock.mockResolvedValueOnce([{ ios: '1.0.4', android: '1.0.5' }]);
-    await expect(getMinimumVersions()).resolves.toEqual({ ios: '1.0.4', android: '1.0.5' });
+  test('shares one read between concurrent cold callers', async () => {
+    limitMock.mockResolvedValue([row]);
+
+    await expect(
+      Promise.all([getMinimumVersions(), getMinimumVersions(), getMinimumVersions()])
+    ).resolves.toEqual([row, row, row]);
+
+    expect(limitMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('rejects with a retryable error when the read fails with nothing cached', async () => {
+    limitMock.mockRejectedValue(new Error('db down'));
+
+    const error = await getMinimumVersions().catch((caught: unknown) => caught);
+
+    // The module under test is re-required after `resetModules`, so its
+    // `TRPCError` class is a different instance than this file's import; read
+    // the code the client would receive instead of comparing classes.
+    if (!error || typeof error !== 'object' || !('code' in error)) {
+      throw new Error('expected getMinimumVersions to reject with a TRPCError');
+    }
+    expect(error.code).toBe('SERVICE_UNAVAILABLE');
+    // No `app_update_required` cause: the client must not read this as a verdict.
+    expect('cause' in error ? error.cause : undefined).toBeUndefined();
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+  });
+
+  test('backs off a failing read, reporting it once per window', async () => {
+    const start = Date.now();
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(start);
+    try {
+      limitMock.mockRejectedValue(new Error('db down'));
+      await expect(getMinimumVersions()).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+
+      nowSpy.mockReturnValue(start + FAILURE_BACKOFF_MS - 1);
+      await expect(getMinimumVersions()).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+
+      expect(limitMock).toHaveBeenCalledTimes(1);
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+
+      limitMock.mockResolvedValueOnce([row]);
+      nowSpy.mockReturnValue(start + FAILURE_BACKOFF_MS + 1);
+      await expect(getMinimumVersions()).resolves.toEqual(row);
+
+      expect(limitMock).toHaveBeenCalledTimes(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  test('serves the last-known value without awaiting a failing read', async () => {
+    limitMock.mockResolvedValueOnce([row]);
+    await expect(getMinimumVersions()).resolves.toEqual(row);
 
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 10 * 60 * 1000);
     try {
       limitMock.mockRejectedValueOnce(new Error('db down'));
-      await expect(getMinimumVersions()).resolves.toEqual({ ios: '1.0.4', android: '1.0.5' });
-      expect(mockCaptureException).toHaveBeenCalled();
+      await expect(getMinimumVersions()).resolves.toEqual(row);
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+
+      await expect(getMinimumVersions()).resolves.toEqual(row);
+      expect(limitMock).toHaveBeenCalledTimes(2);
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
     } finally {
       nowSpy.mockRestore();
     }

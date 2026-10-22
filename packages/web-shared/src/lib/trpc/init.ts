@@ -209,6 +209,9 @@ const auditContextMiddleware = t.middleware(({ path, type, next }) =>
 // Refuses a mobile client whose app version is below the configured minimum.
 // Web/CLI callers (and any caller without a `headersList`) short-circuit on
 // `isMobileClient` and pass without a DB read.
+// `getMinimumVersions` rejects with a retryable SERVICE_UNAVAILABLE when the
+// read failed and nothing is cached, and that rejection passes through here
+// unchanged, so only a version verdict becomes a FORBIDDEN app update here.
 const minimumVersionMiddleware = t.middleware(async ({ ctx, next }) => {
   if (!isMobileClient(ctx.headersList)) return next();
   const minimums = await getMinimumVersions();

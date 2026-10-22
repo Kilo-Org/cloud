@@ -149,10 +149,12 @@
     "balanced",
     "critical",
     "no changes needed",
+    "none",
     "open",
     "open pull request",
     "pr opened",
-    "remediation blocked"
+    "remediation blocked",
+    "tokens"
   ],
   "es": [
     "analysis failed",

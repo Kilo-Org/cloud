@@ -1035,6 +1035,44 @@ describe('GitLab encrypted credential persistence', () => {
     );
   });
 
+  it('discards the previous instance cache when the repository list cannot be loaded', async () => {
+    const user = await insertTestUser();
+    mockFetchGitLabProjects.mockResolvedValueOnce([
+      { id: 123, name: 'repo', full_name: 'group/sub/repo', private: true },
+    ]);
+    const initial = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-initial-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [before] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, initial.integration.id));
+    mockFetchGitLabProjects.mockRejectedValueOnce(new Error('GitLab projects fetch failed: 500'));
+
+    const result = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-replacement-token',
+      'https://gitlab.example.com',
+      user.id
+    );
+
+    const [after] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, initial.integration.id));
+
+    expect(before.repositories).toHaveLength(1);
+    expect(result.success).toBe(true);
+    expect(result.warnings).toEqual([
+      'Connected, but the repository list could not be loaded. Refresh the project list from the GitLab integration page.',
+    ]);
+    expect(after.repositories).toBeNull();
+    expect(after.repositories_synced_at).toBeNull();
+  });
+
   it('reports a rejected project token creation as a reconnect error', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(

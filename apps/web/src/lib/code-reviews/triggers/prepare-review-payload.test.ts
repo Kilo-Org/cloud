@@ -765,6 +765,34 @@ describe('prepareReviewPayload', () => {
     expect((failure as Error).message).not.toContain('Maintainer');
   });
 
+  it('reports a broker reconnect refusal as a reconnect problem', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, gitlabIntegration.id, {
+          platform: 'gitlab',
+          platform_project_id: 456,
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
+        })
+      )
+      .returning();
+    mockGetOrCreateProjectAccessToken.mockRejectedValueOnce(
+      new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'GitLab integration must be reconnected',
+      })
+    );
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'gitlab',
+      })
+    ).rejects.toThrow('Reconnect the GitLab integration, then retry.');
+  });
+
   it('keeps Maintainer-role guidance when GitLab refuses the role', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)

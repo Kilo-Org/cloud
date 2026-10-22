@@ -39,7 +39,6 @@ import {
   fetchMRInlineComments,
   getMRHeadCommit,
   getMRDiffRefs,
-  GitLabAuthenticationError,
   GitLabProjectAccessTokenPermissionError,
   fetchGitLabRootTextFileAtRef,
   fetchGitLabRepositorySize,
@@ -48,6 +47,7 @@ import {
   getOrCreateProjectAccessToken,
   type GitLabIntegrationMetadata,
 } from '@/lib/integrations/gitlab-service';
+import { isGitLabReconnectRequiredError } from '@/lib/integrations/platforms/gitlab/credential-errors';
 import type {
   ExistingReviewState,
   PreviousReviewStatus,
@@ -173,16 +173,6 @@ export type CodeReviewPayload = {
    */
   reviewAgents: ReviewAgentsConfig;
 };
-
-/**
- * A GitLab credential rejection (HTTP 401), either from the adapter directly or
- * wrapped by `getOrCreateProjectAccessToken`. It is not a project-permission
- * problem: the integration must be reconnected.
- */
-function isGitLabAuthenticationFailure(error: unknown): boolean {
-  if (error instanceof GitLabAuthenticationError) return true;
-  return error instanceof Error && error.cause instanceof GitLabAuthenticationError;
-}
 
 /**
  * Prepare complete payload for code review
@@ -568,7 +558,7 @@ export async function prepareReviewPayload(
             projectId,
           });
         } catch (pratError) {
-          if (isGitLabAuthenticationFailure(pratError)) {
+          if (isGitLabReconnectRequiredError(pratError)) {
             throw new Error(
               `GitLab rejected the connected credential while preparing this review of ` +
                 `${review.repo_full_name}. Reconnect the GitLab integration, then retry.`

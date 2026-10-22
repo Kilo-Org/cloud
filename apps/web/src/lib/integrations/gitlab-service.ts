@@ -35,6 +35,7 @@ import {
   GitLabInstanceUrlError,
   normalizeGitLabInstanceUrl,
 } from '@/lib/integrations/platforms/gitlab/instance-url';
+import { GITLAB_RECONNECT_REQUIRED_MESSAGE } from '@/lib/integrations/platforms/gitlab/credential-errors';
 import {
   mutateGitLabMetadataInTransaction,
   readGitLabMetadataInTransaction,
@@ -231,7 +232,7 @@ function requireAvailableGitLabCredential(
     case 'reconnect_required':
       throw new TRPCError({
         code: 'UNAUTHORIZED',
-        message: 'GitLab integration must be reconnected',
+        message: GITLAB_RECONNECT_REQUIRED_MESSAGE,
       });
     case 'temporarily_unavailable':
       throw new TRPCError({
@@ -1003,13 +1004,19 @@ const GITLAB_REPOSITORY_SYNC_WARNING =
  *
  * A provider refusal here says nothing about the connection itself, so it is
  * reported as a warning on the successful result instead of failing the
- * connect. `repositories_synced_at` stays null, so opening the repository list
- * refetches it (see `listGitLabRepositories`).
+ * connect. The cache then keeps its last successful sync, or stays empty for a
+ * new connection, so opening the repository list refetches it (see
+ * `listGitLabRepositories`).
+ *
+ * `discardOnFailure` is for an instance change: the cached rows belong to the
+ * previous GitLab instance, so they are dropped rather than shown against a
+ * credential that cannot reach them.
  */
 async function cacheConnectedGitLabRepositories(
   integrationId: string,
   token: string,
-  instanceUrl: string
+  instanceUrl: string,
+  discardOnFailure: boolean
 ): Promise<string | undefined> {
   try {
     const repos = await fetchGitLabProjects(token, instanceUrl);
@@ -1023,7 +1030,21 @@ async function cacheConnectedGitLabRepositories(
     logExceptInTest('[connectWithPAT] Repository sync failed after commit', {
       integrationId,
       error: error instanceof Error ? error.message : String(error),
+      discardOnFailure,
     });
+    if (discardOnFailure) {
+      try {
+        await db
+          .update(platform_integrations)
+          .set({ repositories: null, repositories_synced_at: null })
+          .where(eq(platform_integrations.id, integrationId));
+      } catch (clearError) {
+        logExceptInTest('[connectWithPAT] Failed to discard stale repositories', {
+          integrationId,
+          error: clearError instanceof Error ? clearError.message : String(clearError),
+        });
+      }
+    }
     return GITLAB_REPOSITORY_SYNC_WARNING;
   }
 }
@@ -1252,7 +1273,8 @@ export async function connectWithPAT(
     const syncWarning = await cacheConnectedGitLabRepositories(
       existingIntegration.id,
       token,
-      normalizedInstanceUrl
+      normalizedInstanceUrl,
+      isInstanceChange
     );
 
     return {
@@ -1348,7 +1370,8 @@ export async function connectWithPAT(
   const syncWarning = await cacheConnectedGitLabRepositories(
     integration.id,
     token,
-    normalizedInstanceUrl
+    normalizedInstanceUrl,
+    false
   );
 
   return {

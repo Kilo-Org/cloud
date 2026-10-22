@@ -34,8 +34,8 @@ catalog:
   '@types/jsonwebtoken': 9.0.10
   '@types/node': 24.12.4
   '@typescript/native-preview': 7.0.0-dev.20260514.1
-  '@vitest/coverage-v8': 4.1.11
-  '@vitest/ui': 4.1.11
+  '@vitest/coverage-v8': 4.1.12
+  '@vitest/ui': 4.1.12
   '@workos-inc/node': 8.13.0
   aws4fetch: 1.0.20
   drizzle-kit: 0.31.10
@@ -48,7 +48,7 @@ catalog:
   tsx: 4.21.0
   typescript: 5.9.3
   ulid: 3.0.2
-  vitest: 4.1.11
+  vitest: 4.1.12
   workers-tagged-logger: 1.0.0
   wrangler: 4.135.0
   zod: 4.6.7

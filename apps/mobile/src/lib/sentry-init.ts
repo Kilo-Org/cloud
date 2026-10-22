@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import { isRunningInExpoGo } from 'expo';
+import { Platform } from 'react-native';
 
 import { SENTRY_ENVIRONMENT } from '@/lib/config';
 import { SENTRY_DSN } from '@/lib/sentry-dsn';
@@ -60,6 +61,15 @@ let profilerRegistrations = 0;
 //   integration). The authoritative per-launch timing metric is the PostHog
 //   `app_startup` event in src/lib/startup-timing.ts.
 //
+// Android API level of the running build. An unreadable `Platform.Version`
+// keeps the NDK handler (level 0), so an unknown platform never loses native
+// crash capture.
+function androidApiLevel(): number {
+  const version = Platform.Version;
+  const level = typeof version === 'number' ? version : Number(version);
+  return Number.isFinite(level) ? level : 0;
+}
+
 export function initSentry(optionalConsented: boolean, extras?: SentryInitExtras) {
   const userIntegrations: SentryIntegration[] = optionalConsented
     ? [
@@ -97,6 +107,13 @@ export function initSentry(optionalConsented: boolean, extras?: SentryInitExtras
     sendDefaultPii: false,
 
     enableTombstone: true,
+    // The tombstone integration covers native crashes on Android 12+ and the
+    // NDK in-process handler duplicates it there. The handler's unwinder aborts
+    // with std::bad_alloc on some devices while parsing /proc/self/maps
+    // (Play: sentry__unwind_stack_libunwindstack), which replaces the real
+    // crash with the abort. Keep the NDK handler only where no tombstone
+    // exists, so pre-Android-12 builds still report native crashes.
+    ...(Platform.OS === 'android' ? { enableNdk: androidApiLevel() < 31 } : {}),
     enableMetricKit: true,
     enableAppHangTracking: false,
 

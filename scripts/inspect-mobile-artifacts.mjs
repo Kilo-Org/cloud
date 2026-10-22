@@ -18,6 +18,7 @@
  * Exits 1 with a clear message on any contract violation.
  */
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -37,6 +38,7 @@ const SKADNETWORK_ENDPOINT = 'https://appsflyer-skadnetwork.com/';
 const INTENT_FILTER_HOST = 'app.kilo.ai';
 const BUNDLETOOL_URL =
   'https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar';
+const BUNDLETOOL_SHA256 = 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29';
 const DEBUGSYMBOLS_PREFIX = 'BUNDLE-METADATA/com.android.tools.build.debugsymbols/';
 const SHRINK_SENTINEL = 'zz_unused_shrink_sentinel';
 const REQUIRED_USAGE_DESCRIPTIONS = [
@@ -258,6 +260,13 @@ function listZipEntries(zipPath) {
   }
 }
 
+export function assertFileSha256(filePath, expectedSha256) {
+  const actualSha256 = createHash('sha256').update(readFileSync(filePath)).digest('hex');
+  if (actualSha256 !== expectedSha256) {
+    throw new Error(`SHA-256 must be ${expectedSha256}, got ${actualSha256}`);
+  }
+}
+
 function inspectAndroid(aabPath) {
   const work = mkdtempSync(join(tmpdir(), 'kilo-inspect-android-'));
   try {
@@ -266,6 +275,12 @@ function inspectAndroid(aabPath) {
       run('curl', ['-fsSL', BUNDLETOOL_URL, '-o', jarPath]);
     } catch (error) {
       failures.push(`cannot download bundletool: ${error.message}`);
+      return;
+    }
+    try {
+      assertFileSha256(jarPath, BUNDLETOOL_SHA256);
+    } catch (error) {
+      failures.push(`cannot verify bundletool: ${error.message}`);
       return;
     }
 

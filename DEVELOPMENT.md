@@ -160,9 +160,9 @@ pnpm web:env set EXAMPLE_API_TOKEN
 
 Prerequisites:
 
-- Sign in with `vercel login` and have access to the projects in the `kilocode` scope.
+- Sign in with `pnpm exec vercel login` and have access to the projects in the `kilocode` scope.
 - Install the 1Password CLI and have write access to the `Kilo Web ENV Production` vault. If needed, the CLI prompts you to sign in with Touch ID.
-- Have `pnpm` available; the command runs the pinned Vercel CLI with `pnpm dlx`.
+- Run `pnpm install --frozen-lockfile` in the checkout first. The command uses the workspace Vercel CLI via `pnpm exec vercel`; verify access with `pnpm exec vercel whoami --scope kilocode --format=json`.
 
 The command asks whether the variable is sensitive, defaulting to yes. Sensitive Production and Staging values use Vercel's sensitive type, while Development remains encrypted but exportable through `vercel env pull`. The Production and Staging values are also stored in one concealed, exact-name item in `Kilo Web ENV Production`: Production uses the built-in `password` field and Staging uses `password (staging)`. Either field can be created before the other. The item's notes identify the local user and computer that last updated it.
 

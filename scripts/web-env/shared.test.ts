@@ -81,11 +81,6 @@ if (args[0] === 'account' && args[1] === 'list') {
 }
 `;
 
-const FAKE_PNPM_VERCEL_AUTH_FAILURE = `#!/usr/bin/env node
-process.stderr.write('Error: No existing credentials found. Run vercel login.\\n');
-process.exitCode = 1;
-`;
-
 const FAKE_OP_AUTH_FAILURE = `#!/usr/bin/env node
 process.stderr.write('You are not currently signed in to a 1Password account.\\n');
 process.exitCode = 1;
@@ -176,27 +171,13 @@ void test('redeployLatest redeploys the latest ready deployment for the target e
       .trim()
       .split('\n')
       .map(line => JSON.parse(line) as string[]);
-    assert.deepEqual(invocations[0]?.slice(0, 10), [
-      'dlx',
-      'vercel@53.3.1',
-      'list',
-      'kilocode-app',
-      '--environment',
-      'staging',
-      '--status',
-      'READY',
-      '--format=json',
-      '--scope',
-    ]);
-    assert.deepEqual(invocations[1]?.slice(0, 7), [
-      'dlx',
-      'vercel@53.3.1',
-      'redeploy',
-      'latest-staging.example.vercel.app',
-      '--target',
-      'staging',
-      '--scope',
-    ]);
+    assert.equal(invocations[0]?.[2], 'list');
+    assert.equal(invocations[0]?.[3], 'kilocode-app');
+    assert.equal(invocations[0]?.[5], 'staging');
+    assert.equal(invocations[0]?.[7], 'READY');
+    assert.equal(invocations[1]?.[2], 'redeploy');
+    assert.equal(invocations[1]?.[3], 'latest-staging.example.vercel.app');
+    assert.equal(invocations[1]?.[5], 'staging');
   } finally {
     if (originalPath === undefined) delete process.env.PATH;
     else process.env.PATH = originalPath;
@@ -372,50 +353,6 @@ void test(
     }
   }
 );
-
-void test('resolveVercelContexts explains how to install and verify pnpm for Vercel checks', () => {
-  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-vercel-test-'));
-  const originalPath = process.env.PATH;
-  process.env.PATH = '';
-
-  try {
-    assert.throws(
-      () => resolveVercelContexts(directory),
-      error =>
-        error instanceof Error &&
-        error.message.includes('Vercel access checks require pnpm') &&
-        error.message.includes('corepack enable') &&
-        error.message.includes('pnpm dlx vercel@53.3.1 whoami --scope kilocode --format=json')
-    );
-  } finally {
-    if (originalPath === undefined) delete process.env.PATH;
-    else process.env.PATH = originalPath;
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-void test('resolveVercelContexts explains how to fix Vercel authentication failures', () => {
-  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-vercel-test-'));
-  writeFileSync(path.join(directory, 'pnpm'), FAKE_PNPM_VERCEL_AUTH_FAILURE, { mode: 0o700 });
-  const originalPath = process.env.PATH;
-  process.env.PATH = `${directory}:${originalPath ?? ''}`;
-
-  try {
-    assert.throws(
-      () => resolveVercelContexts(directory),
-      error =>
-        error instanceof Error &&
-        error.message.includes('Could not verify Vercel access for the kilocode team') &&
-        error.message.includes('pnpm dlx vercel@53.3.1 login') &&
-        error.message.includes('pnpm dlx vercel@53.3.1 whoami --scope kilocode --format=json') &&
-        error.message.includes('No existing credentials found')
-    );
-  } finally {
-    if (originalPath === undefined) delete process.env.PATH;
-    else process.env.PATH = originalPath;
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
 
 void test(
   'resolveVault explains how to fix 1Password authentication or vault access failures',

@@ -9,8 +9,7 @@ export const PROJECTS = ['kilocode-app', 'kilocode-ai-gateway'] as const;
 export const ENVIRONMENTS = ['development', 'staging', 'production'] as const;
 export const VAULT = 'Kilo Web ENV Production';
 const ONE_PASSWORD_ACCOUNT_URL = 'kilocode.1password.com';
-const VERCEL_PACKAGE = 'vercel@53.3.1';
-const VERCEL_COMMAND = `pnpm dlx ${VERCEL_PACKAGE}`;
+const VERCEL_COMMAND = 'pnpm exec vercel';
 const ONE_PASSWORD_CLI_DOCS = 'https://www.1password.dev/cli/get-started';
 
 export type Project = (typeof PROJECTS)[number];
@@ -71,11 +70,11 @@ function missingCommandMessage(command: string, args: string[]): string | undefi
     ].join('\n');
   }
 
-  if (command === 'pnpm' && args[0] === 'dlx' && args[1]?.startsWith('vercel@')) {
+  if (command === 'pnpm' && args[0] === 'exec' && args[1] === 'vercel') {
     return [
       'Vercel access checks require pnpm, but `pnpm` is not installed or is not on PATH.',
       'Install pnpm with Corepack (`corepack enable`) or enter the repo dev shell.',
-      'Then verify access with `pnpm dlx vercel@53.3.1 whoami --scope kilocode --format=json`.',
+      'Run `pnpm install --frozen-lockfile` in the checkout, then verify access with `pnpm exec vercel whoami --scope kilocode --format=json`.',
     ].join('\n');
   }
 
@@ -132,8 +131,8 @@ function vercel(
   return run(
     'pnpm',
     [
-      'dlx',
-      VERCEL_PACKAGE,
+      'exec',
+      'vercel',
       ...args,
       '--scope',
       'kilocode',
@@ -142,7 +141,7 @@ function vercel(
       ...(context ? ['--cwd', context.cwd] : []),
     ],
     {
-      cwd: context?.cwd,
+      cwd: findRepoRoot(),
       env: context
         ? {
             ...process.env,
@@ -159,8 +158,8 @@ function vercel(
 function vercelAsync(context: VercelContext, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     const commandArgs = [
-      'dlx',
-      VERCEL_PACKAGE,
+      'exec',
+      'vercel',
       ...args,
       '--scope',
       'kilocode',
@@ -170,7 +169,7 @@ function vercelAsync(context: VercelContext, args: string[]): Promise<string> {
       context.cwd,
     ];
     const child = spawn('pnpm', commandArgs, {
-      cwd: context.cwd,
+      cwd: findRepoRoot(),
       env: {
         ...process.env,
         VERCEL_ORG_ID: context.orgId,

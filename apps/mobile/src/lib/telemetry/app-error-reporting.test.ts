@@ -156,6 +156,22 @@ describe('reportAppError', () => {
     expect(events[0]).toMatchObject({ level: 'warning', fingerprint: ['expected-outage'] });
   });
 
+  it('stays silent for a declared none, which the network layer already owns', () => {
+    reportAppError(
+      Object.assign(new Error('stale token'), {
+        [TELEMETRY_DESCRIPTION_KEY]: {
+          fingerprint: ['transcription-models-fetch', 'http.401'],
+          level: 'warning',
+          report: 'none',
+          tags: { 'error.subsystem': 'transcription-models', 'http.status': 401 },
+        },
+      }),
+      { source: 'query' }
+    );
+
+    expect(events).toEqual([]);
+  });
+
   it('ignores a malformed declared telemetry and keeps the generic fingerprint', () => {
     reportAppError(
       Object.assign(new Error('boom'), { [TELEMETRY_DESCRIPTION_KEY]: { fingerprint: [] } }),

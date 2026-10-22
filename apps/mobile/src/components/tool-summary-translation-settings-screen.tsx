@@ -32,7 +32,8 @@ const NO_MODEL_VALUE = '—';
  */
 export function ToolSummaryTranslationSettingsScreen() {
   const { organizationId } = useOrganization();
-  const { enabled, model, hasLoaded, setEnabled, setModel } = useToolSummaryTranslationPreference();
+  const { enabled, model, hasLoaded, setEnabled, setModel, getRequestedEnabled } =
+    useToolSummaryTranslationPreference();
   const { models, isLoading, isError, isFetching, isFetched, refetch } = useAvailableModels(
     organizationId ?? undefined
   );
@@ -106,6 +107,7 @@ export function ToolSummaryTranslationSettingsScreen() {
           value={enabled}
           disabled={!hasLoaded}
           onValueChange={setEnabled}
+          resolveValue={getRequestedEnabled}
         />
         <ConfigureRow
           icon={Cpu}

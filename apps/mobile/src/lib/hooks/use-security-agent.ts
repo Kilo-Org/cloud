@@ -150,8 +150,8 @@ export function useSecurityAgentLastSyncTime(scope: string, repoFullName?: strin
   return isPersonalSecurityScope(scope) ? personal : organization;
 }
 
-// Personal scope always has full access; for an organization, only owner and
-// billing_manager can manage config. `organizations.list` is already fetched
+// Personal scope always has full access; `canManageSecurityAgent` owns the
+// organization role policy. `organizations.list` is already fetched
 // app-wide for the org switcher, so this reuses that cache rather than adding
 // a new procedure (mirrors useCanEditReviewer in use-code-reviewer.ts:234).
 //

@@ -165,3 +165,20 @@ export function deriveKiloSandboxTargets(
     targets: { backendBaseUrl, providerBaseUrl, sessionIngestBaseUrl },
   };
 }
+
+const LOOPBACK_FACADE_TARGET =
+  /^http:\/\/(?:localhost|127\.0\.0\.1|host\.docker\.internal)(?::\d+)?(?:\/|$)/;
+
+export function deriveLoopbackFacadeTargets(env: KiloTargetEnv): KiloSandboxTargets | null {
+  const derived = deriveKiloSandboxTargets(env, '', { requireHttps: false });
+  if (!derived.success) return null;
+  const targets = Object.values(derived.targets);
+  if (!targets.every(target => LOOPBACK_FACADE_TARGET.test(target))) return null;
+  const hostFetchable = (target: string) =>
+    target.replace(`://${LOCAL_SANDBOX_HOSTNAME}`, '://127.0.0.1');
+  return {
+    backendBaseUrl: hostFetchable(derived.targets.backendBaseUrl),
+    providerBaseUrl: hostFetchable(derived.targets.providerBaseUrl),
+    sessionIngestBaseUrl: hostFetchable(derived.targets.sessionIngestBaseUrl),
+  };
+}

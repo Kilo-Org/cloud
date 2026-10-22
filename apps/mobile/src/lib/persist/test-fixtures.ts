@@ -24,6 +24,7 @@ export function makePersistedClient(data: unknown, buster = ''): PersistedClient
         {
           queryHash: hashKey(GET_ME_QUERY_KEY),
           queryKey: GET_ME_QUERY_KEY,
+          dehydratedAt: Date.now(),
           state: {
             data,
             dataUpdateCount: 0,

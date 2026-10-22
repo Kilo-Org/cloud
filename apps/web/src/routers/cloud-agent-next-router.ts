@@ -7,6 +7,7 @@ import {
   rethrowCloudAgentError,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
+import { isPublicRepoUrlEnabled } from '@/lib/cloud-agent-next/public-repo-url';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
@@ -167,8 +168,9 @@ async function createCloudAgentControlToken(user: User, headersList?: Headers): 
  * - New message format (Message + Part[])
  * - New modes ('plan' | 'build')
  *
- * All mutations return immediately with execution info; streaming is handled
- * separately via WebSocket connection.
+ * Mutations return immediately. `initiateFromPreparedSession` and
+ * `sendMessage` include execution info; streaming is handled separately via
+ * the WebSocket connection.
  */
 export const cloudAgentNextRouter = createTRPCRouter({
   getSandboxSelectionOptions: baseProcedure
@@ -207,9 +209,8 @@ export const cloudAgentNextRouter = createTRPCRouter({
       });
       const client = createCloudAgentNextClientForModel(authToken, eligibility);
 
-      const { gitlabProject, githubRepo, attachments, images, ...restInput } = input;
+      const { gitlabProject, githubRepo, publicRepoUrl, attachments, images, ...restInput } = input;
 
-      // Determine git source: GitLab uses gitUrl, GitHub uses githubRepo.
       // Tokens are resolved inside cloud-agent-next via GIT_TOKEN_SERVICE.
       // Profile resolution (repo binding + default + explicit override) also
       // happens in cloud-agent-next; we just forward profileId and any inline
@@ -224,6 +225,14 @@ export const cloudAgentNextRouter = createTRPCRouter({
         const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
         const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
         gitParams = { gitUrl, platform: PLATFORM.GITLAB };
+      } else if (publicRepoUrl) {
+        if (!isPublicRepoUrlEnabled()) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Public repository URLs are only available in local development',
+          });
+        }
+        gitParams = { gitUrl: publicRepoUrl };
       } else {
         gitParams = { githubRepo, platform: PLATFORM.GITHUB };
       }
@@ -266,6 +275,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         headersList: ctx.headersList,
         sourceKiloSessionId: input.sourceKiloSessionId,
         operationKey: input.operationKey,
+        kiloSessionId: input.kiloSessionId,
       })
     ),
 
@@ -527,7 +537,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(cloudAgentGetImageUploadUrlSchema)
     .mutation(async ({ ctx, input }) => {
       return generateImageUploadUrl({
-        service: 'cloud-agent',
         userId: ctx.user.id,
         messageUuid: input.messageUuid,
         imageId: input.imageId,
@@ -701,15 +710,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       const client = createCloudAgentNextClient(authToken);
       return await client.getPendingInteractions(input.cloudAgentSessionId);
-    }),
-
-  getComputeBillingStatus: baseProcedure
-    .input(baseGetSessionNextSchema)
-    .query(async ({ ctx, input }) => {
-      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
-      return await createCloudAgentNextClient(
-        await createCloudAgentControlToken(ctx.user, ctx.headersList)
-      ).getComputeBillingStatus(input.cloudAgentSessionId);
     }),
 
   checkEligibility: baseProcedure.query(async ({ ctx }) => {

@@ -32,6 +32,7 @@ export default function RequestLoggingOptInsContent() {
   const { data: optIns, isLoading } = useQuery(listOptions);
   const [targetType, setTargetType] = useState<'account' | 'organization'>('account');
   const [targetId, setTargetId] = useState('');
+  const [scope, setScope] = useState<'all' | 'errors_only'>('all');
   const [reason, setReason] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -61,12 +62,23 @@ export default function RequestLoggingOptInsContent() {
 
   function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    createMutation.mutate({ target_type: targetType, target_id: targetId, reason });
+    createMutation.mutate({
+      target_type: targetType,
+      target_id: targetId,
+      reason,
+      errors_only: scope === 'errors_only',
+    });
   }
 
   function handleTargetTypeChange(value: string) {
     if (value === 'account' || value === 'organization') {
       setTargetType(value);
+    }
+  }
+
+  function handleScopeChange(value: string) {
+    if (value === 'all' || value === 'errors_only') {
+      setScope(value);
     }
   }
 
@@ -89,7 +101,7 @@ export default function RequestLoggingOptInsContent() {
         </CardHeader>
         <CardContent>
           <form
-            className="grid gap-4 md:grid-cols-[180px_minmax(240px,1fr)_minmax(280px,2fr)_auto] md:items-end"
+            className="grid gap-4 md:grid-cols-[180px_minmax(240px,1fr)_180px_minmax(280px,2fr)_auto] md:items-end"
             onSubmit={handleCreate}
           >
             <div className="grid gap-2">
@@ -116,6 +128,18 @@ export default function RequestLoggingOptInsContent() {
               />
             </div>
             <div className="grid gap-2">
+              <Label htmlFor="scope">Log</Label>
+              <Select value={scope} onValueChange={handleScopeChange}>
+                <SelectTrigger id="scope">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All requests</SelectItem>
+                  <SelectItem value="errors_only">Errors only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="reason">Reason</Label>
               <Textarea
                 id="reason"
@@ -140,15 +164,19 @@ export default function RequestLoggingOptInsContent() {
         <CardHeader>
           <CardTitle>Active opt-ins</CardTitle>
           <CardDescription>
-            Requests are logged only when the account or organization is opted in.
+            Requests are logged only when the account or organization is opted in. Errors-only
+            opt-ins log responses with an upstream status of 400 or higher, a response read error,
+            or invalid tool call arguments. When both an account and its organization match, the
+            broader opt-in wins.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Type</TableHead>
                 <TableHead>ID</TableHead>
+                <TableHead>Log</TableHead>
                 <TableHead>Reason</TableHead>
                 <TableHead>Added by</TableHead>
                 <TableHead>Added</TableHead>
@@ -158,14 +186,14 @@ export default function RequestLoggingOptInsContent() {
             <TableBody>
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground">
+                  <TableCell colSpan={7} className="text-muted-foreground">
                     Loading opt-ins…
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && optIns?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground">
+                  <TableCell colSpan={7} className="text-muted-foreground">
                     No request logging opt-ins.
                   </TableCell>
                 </TableRow>
@@ -173,8 +201,15 @@ export default function RequestLoggingOptInsContent() {
               {optIns?.map(entry => (
                 <TableRow key={entry.id}>
                   <TableCell className="capitalize">{entry.target_type}</TableCell>
-                  <TableCell className="font-mono text-xs break-all">{entry.target_id}</TableCell>
-                  <TableCell className="max-w-md whitespace-pre-wrap">{entry.reason}</TableCell>
+                  <TableCell className="min-w-[calc(36ch+1.5rem)] font-mono text-xs break-all">
+                    {entry.target_id}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {entry.errors_only ? 'Errors only' : 'All requests'}
+                  </TableCell>
+                  <TableCell className="max-w-md min-w-48 break-words whitespace-pre-wrap">
+                    {entry.reason}
+                  </TableCell>
                   <TableCell>{entry.added_by_email}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     {new Date(entry.added_at).toLocaleString()}

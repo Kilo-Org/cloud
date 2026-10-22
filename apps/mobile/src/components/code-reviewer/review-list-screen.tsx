@@ -39,8 +39,8 @@ const STATUS_CLASSNAME = {
 const STATUS_KEY = {
   pending: 'common.pending',
   queued: 'common.queued',
-  running: 'codeReviewer.status.running',
-  completed: 'codeReviewer.status.completed',
+  running: 'common.running',
+  completed: 'common.completed',
   failed: 'common.failed',
   cancelled: 'common.cancelled',
   interrupted: 'codeReviewer.status.interrupted',

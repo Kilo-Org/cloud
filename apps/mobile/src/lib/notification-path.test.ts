@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { SECURITY_LIFECYCLE_EVENTS } from '@kilocode/notifications';
+
 import { notificationPathForData, prPathForData } from './notification-path';
 
 describe('prPathForData', () => {
@@ -51,6 +53,15 @@ describe('prPathForData', () => {
 });
 
 describe('notificationPathForData', () => {
+  it('opens the available-context briefing list without leaking a report into the lock screen', () => {
+    expect(
+      notificationPathForData({
+        type: 'agent_briefing',
+        url: '/agent-briefing',
+      })
+    ).toBe('/(app)/agent-briefing?via=push');
+  });
+
   it('routes chat message notifications to the conversation screen', () => {
     expect(
       notificationPathForData({
@@ -113,6 +124,7 @@ describe('notificationPathForData', () => {
         status: 'happy',
         running: 1,
         needsInput: 0,
+        needsApproval: 0,
         idle: 0,
         scheduled: 0,
         updatedAt: '2026-01-01T00:00:00.000Z',
@@ -174,18 +186,7 @@ describe('notificationPathForData', () => {
   });
 
   it('routes every security_lifecycle event value to the finding detail path', () => {
-    const events = [
-      'analysis_completed',
-      'analysis_failed',
-      'remediation_queued',
-      'remediation_pr_opened',
-      'remediation_failed',
-      'remediation_blocked',
-      'remediation_no_changes_needed',
-      'remediation_cancelled',
-    ] as const;
-
-    for (const event of events) {
+    for (const event of SECURITY_LIFECYCLE_EVENTS) {
       expect(
         notificationPathForData({
           type: 'security_lifecycle',

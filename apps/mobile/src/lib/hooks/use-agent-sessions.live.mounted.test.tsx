@@ -200,6 +200,27 @@ describe('live query presentation and refresh contracts', () => {
     expect(live().hasAcceptedSuccess).toBe(false);
   });
 
+  it('resumes a paused first load when the manager returns online', async () => {
+    // The offline→online edge the committed-connectivity bridge produces.
+    onlineManager.setOnline(false);
+    await render();
+    expect(live().isPaused).toBe(true);
+    const network = deferred<CachedActiveSessionsData>();
+    state.request.mockReturnValue(network.promise);
+    await act(async () => {
+      onlineManager.setOnline(true);
+      await flush();
+    });
+    expect(live().isFetching).toBe(true);
+    await act(async () => {
+      network.resolve({ sessions: [makeCached({ id: 'live-1', organizationId: null })] });
+      await flush();
+    });
+    expect(live().isPaused).toBe(false);
+    expect(live().hasAcceptedSuccess).toBe(true);
+    expect(live().activeSessions.map(row => row.id)).toEqual(['live-1']);
+  });
+
   it.each([
     ['retryable', new Error('offline')],
     ['non-retryable', Object.assign(new Error('denied'), { data: { code: 'FORBIDDEN' } })],
@@ -250,7 +271,7 @@ describe('live query presentation and refresh contracts', () => {
   it.each(['cancel', 'sign-out'])(
     'rejects a fallback result after %s without publishing late data',
     async boundary => {
-      await client.fetchQuery({ queryKey: QUERY_KEY, queryFn: () => cached });
+      await client.query({ queryKey: QUERY_KEY, queryFn: () => cached });
       await render();
       const network = deferred<CachedActiveSessionsData>();
       state.request.mockReturnValue(network.promise);

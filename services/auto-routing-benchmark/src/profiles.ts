@@ -13,11 +13,12 @@ import {
   benchmarkPairKey,
 } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, eq, gte, inArray, sql } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
+import { and, asc, eq, gte, inArray, or, sql } from 'drizzle-orm';
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { benchmarkProfiles, profileRequestEvents } from './db-schema';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import { computeEngineIdentity } from './run';
+import { noLiveBenchmarkChunks } from './profile-entry-claims';
 
 /** Rolling 24h owner admission limit per base router (charged new/retry only). */
 export const PROFILE_ADMISSION_LIMIT = 20;
@@ -308,8 +309,16 @@ export function pendingRegisterUpsertStatement(
         updated_at: values.updated_at,
         completed_at: null,
       },
-      // SQLite ON CONFLICT DO UPDATE WHERE — only rewrite failed rows.
-      where: eq(benchmarkProfiles.status, 'failed'),
+      where: and(
+        eq(benchmarkProfiles.status, 'failed'),
+        noLiveBenchmarkChunks({
+          router: values.router ?? 'efficient',
+          model: values.model,
+          variant: values.variant ?? '',
+          engineIdentity: values.engine_identity,
+          repetitions: values.repetitions,
+        })
+      ),
     });
 }
 
@@ -341,14 +350,9 @@ export type ChargedEventInsertValues = {
 };
 
 /**
- * Charged ledger insert guarded inside the batch: only write an event when no
- * active (pending/running/ready) current profile row exists yet. Statement
- * order places these BEFORE profile upserts so the guard sees pre-batch state
- * within the transaction; SQLite writer serialization makes a concurrent
- * batch's guard observe the first batch's committed row.
- *
- * SQL shape: INSERT ... SELECT NULL AS id, <literals...> WHERE NOT EXISTS (
- *   SELECT 1 FROM benchmark_profiles WHERE pk AND status IN (...))
+ * Charged ledger insert guarded inside the batch: write once per model when any
+ * requested charged pair can transition to pending. Events precede upserts so
+ * SQLite writer serialization makes concurrent admissions observe committed rows.
  *
  * Drizzle's insert().select always emits the full table column list including
  * autoincrement `id`, so the SELECT must provide 9 expressions (NULL AS id)
@@ -356,8 +360,34 @@ export type ChargedEventInsertValues = {
  */
 export function chargedEventInsertStatement(
   orm: ReturnType<typeof drizzle>,
-  values: ChargedEventInsertValues
+  values: ChargedEventInsertValues,
+  eligiblePairs: readonly BenchmarkPair[] = [
+    { model: values.model, variant: variantFromStorage(values.variant) },
+  ]
 ) {
+  const eligible = eligiblePairs
+    .filter(pair => pair.model === values.model)
+    .map(pair => {
+      const variant = variantToStorage(pair.variant);
+      return sql`(
+        NOT EXISTS (
+          SELECT 1 FROM ${benchmarkProfiles}
+          WHERE ${benchmarkProfiles.model} = ${values.model}
+            AND ${benchmarkProfiles.router} = ${values.router}
+            AND ${benchmarkProfiles.variant} = ${variant}
+            AND ${benchmarkProfiles.engine_identity} = ${values.engine_identity}
+            AND ${benchmarkProfiles.repetitions} = ${values.repetitions}
+            AND ${benchmarkProfiles.status} IN ('pending', 'running', 'ready')
+        )
+        AND ${noLiveBenchmarkChunks({
+          router: values.router,
+          model: values.model,
+          variant,
+          engineIdentity: values.engine_identity,
+          repetitions: values.repetitions,
+        })}
+      )`;
+    });
   // __stmt tags the batch item for the in-memory test stand-in; real D1
   // executes the SELECT...WHERE NOT EXISTS guard. Literal SELECT (no FROM)
   // is expressed as SQL because drizzle's typed select builder requires .from().
@@ -373,15 +403,7 @@ export function chargedEventInsertStatement(
         ${values.engine_identity} AS engine_identity,
         ${values.repetitions} AS repetitions,
         ${values.admitted_at} AS admitted_at
-      WHERE NOT EXISTS (
-        SELECT 1 FROM ${benchmarkProfiles}
-        WHERE ${benchmarkProfiles.model} = ${values.model}
-          AND ${benchmarkProfiles.router} = ${values.router}
-          AND ${benchmarkProfiles.variant} = ${values.variant}
-          AND ${benchmarkProfiles.engine_identity} = ${values.engine_identity}
-          AND ${benchmarkProfiles.repetitions} = ${values.repetitions}
-          AND ${benchmarkProfiles.status} IN ('pending', 'running', 'ready')
-      )
+      WHERE ${or(...eligible) ?? sql`0`}
     `),
     {
       __stmt: {
@@ -400,6 +422,69 @@ export function chargedEventInsertStatement(
       },
     }
   );
+}
+
+type ProfileRequestEventRow = typeof profileRequestEvents.$inferSelect;
+
+type AdmissionQuotaScope = {
+  ownerType: ProfileOwnerType;
+  ownerId: string;
+  router: AutoRouter;
+  windowStartIso: string;
+};
+
+/**
+ * Last statement of a charged admission batch. SQLite has no RAISE outside triggers, so
+ * it fails the batch with a NOT NULL violation when the batch's own events pushed the
+ * rolling count over the limit; D1 then rolls back every write of that batch. Writer
+ * serialization makes concurrent admissions count each other's committed events.
+ */
+function admissionQuotaGuardStatement(orm: DrizzleD1Database, scope: AdmissionQuotaScope) {
+  return Object.assign(
+    orm.insert(profileRequestEvents).select(sql`
+      SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+      WHERE (
+        SELECT COUNT(*) FROM ${profileRequestEvents}
+        WHERE ${profileRequestEvents.owner_type} = ${scope.ownerType}
+          AND ${profileRequestEvents.owner_id} = ${scope.ownerId}
+          AND ${profileRequestEvents.router} = ${scope.router}
+          AND ${profileRequestEvents.admitted_at} >= ${scope.windowStartIso}
+      ) > ${PROFILE_ADMISSION_LIMIT}
+    `),
+    { __stmt: { kind: 'quota_guard' as const } }
+  );
+}
+
+function recentAdmissionEvents(
+  orm: DrizzleD1Database,
+  scope: AdmissionQuotaScope
+): Promise<ProfileRequestEventRow[]> {
+  return orm
+    .select()
+    .from(profileRequestEvents)
+    .where(
+      and(
+        eq(profileRequestEvents.owner_type, scope.ownerType),
+        eq(profileRequestEvents.owner_id, scope.ownerId),
+        eq(profileRequestEvents.router, scope.router),
+        gte(profileRequestEvents.admitted_at, scope.windowStartIso)
+      )
+    )
+    .orderBy(asc(profileRequestEvents.admitted_at));
+}
+
+function profileQuotaExceeded(
+  recentEvents: ReadonlyArray<{ admitted_at: string }>,
+  now: Date
+): ProfileQuotaExceededError {
+  const retryAt = computeQuotaRetryAt(
+    recentEvents[0]?.admitted_at ?? now.toISOString(),
+    now.getTime()
+  );
+  return new ProfileQuotaExceededError({
+    error: `Profile benchmark request limit reached. New benchmarks can be requested after ${retryAt}.`,
+    retryAt,
+  });
 }
 
 export type RegisterProfilesInput = {
@@ -461,71 +546,73 @@ export async function registerProfiles(
   const freeAdmissions = plan.filter(
     p => p.classification.kind === 'admit' && !p.classification.charged
   );
-  const chargedModels = new Map<string, PlanItem>();
+  const chargedModels = new Map<string, BenchmarkPair[]>();
   for (const item of chargedAdmissions) {
-    if (!chargedModels.has(item.entry.model)) chargedModels.set(item.entry.model, item);
+    const pairs = chargedModels.get(item.entry.model);
+    if (pairs) pairs.push(item.entry);
+    else chargedModels.set(item.entry.model, [item.entry]);
   }
 
   const orm = drizzle(db);
-  const recentEvents = await orm
-    .select()
-    .from(profileRequestEvents)
-    .where(
-      and(
-        eq(profileRequestEvents.owner_type, input.ownerType),
-        eq(profileRequestEvents.owner_id, input.ownerId),
-        eq(profileRequestEvents.router, router),
-        gte(profileRequestEvents.admitted_at, windowStartIso)
-      )
-    )
-    .orderBy(asc(profileRequestEvents.admitted_at));
-
+  const quotaScope: AdmissionQuotaScope = {
+    ownerType: input.ownerType,
+    ownerId: input.ownerId,
+    router,
+    windowStartIso,
+  };
+  const recentEvents = await recentAdmissionEvents(orm, quotaScope);
   if (recentEvents.length + chargedModels.size > PROFILE_ADMISSION_LIMIT) {
-    const oldest = recentEvents[0]?.admitted_at ?? nowIso;
-    const retryAt = computeQuotaRetryAt(oldest, now.getTime());
-    throw new ProfileQuotaExceededError({
-      error: `Profile benchmark request limit reached. New benchmarks can be requested after ${retryAt}.`,
-      retryAt,
-    });
+    throw profileQuotaExceeded(recentEvents, now);
   }
 
   const admissions = [...chargedAdmissions, ...freeAdmissions];
   {
     const stmts: BatchItem<'sqlite'>[] = [];
 
-    // Events first so the NOT EXISTS guard sees pre-batch profile state. The
-    // quota counts models, so one event records the first charged pair of each.
-    for (const item of chargedModels.values()) {
+    // Events precede upserts so eligibility is checked against pre-batch state.
+    for (const [model, pairs] of chargedModels) {
       stmts.push(
-        chargedEventInsertStatement(orm, {
-          owner_type: input.ownerType,
-          owner_id: input.ownerId,
-          router,
-          model: item.entry.model,
-          variant: variantToStorage(item.entry.variant),
-          engine_identity: current.engineIdentity,
-          repetitions: current.repetitions,
-          admitted_at: nowIso,
-        }) as BatchItem<'sqlite'>
+        chargedEventInsertStatement(
+          orm,
+          {
+            owner_type: input.ownerType,
+            owner_id: input.ownerId,
+            router,
+            model,
+            variant: variantToStorage(pairs[0]?.variant),
+            engine_identity: current.engineIdentity,
+            repetitions: current.repetitions,
+            admitted_at: nowIso,
+          },
+          pairs
+        )
       );
     }
 
     for (const item of admissions) {
       stmts.push(
-        pendingRegisterUpsertStatement(
-          orm,
-          buildPendingUpsertValues(item.entry, current, nowIso)
-        ) as BatchItem<'sqlite'>
+        pendingRegisterUpsertStatement(orm, buildPendingUpsertValues(item.entry, current, nowIso))
       );
     }
 
     // Runs for reported pairs too, so an existing platform row records that
     // an owner wants it.
-    stmts.push(
-      claimUserRequestedStatement(orm, input.pairs, current, nowIso) as BatchItem<'sqlite'>
-    );
+    stmts.push(claimUserRequestedStatement(orm, input.pairs, current, nowIso));
 
-    await orm.batch(stmts as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+    if (chargedModels.size > 0) {
+      stmts.push(admissionQuotaGuardStatement(orm, quotaScope));
+    }
+
+    try {
+      await orm.batch(stmts as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+    } catch (error) {
+      if (chargedModels.size === 0) throw error;
+      const committedEvents = await recentAdmissionEvents(orm, quotaScope);
+      if (committedEvents.length + chargedModels.size > PROFILE_ADMISSION_LIMIT) {
+        throw profileQuotaExceeded(committedEvents, now);
+      }
+      throw error;
+    }
   }
 
   // Derive reported statuses for admitted entries from post-batch rows so a

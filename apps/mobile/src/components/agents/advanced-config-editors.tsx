@@ -24,6 +24,7 @@ import { Text } from '@/components/ui/text';
 import { MAX_SESSION_ENV_VAR_VALUE_LENGTH } from '@/lib/agent-profile-forms';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 
 type ManualEnvVarsEditorProps = Readonly<{
   vars: readonly VariableEdit[];
@@ -142,7 +143,7 @@ export function ManualSetupCommandsEditor({
   const [generation, setGeneration] = useState(0);
 
   const controlClass = (controlDisabled: boolean) =>
-    cn('h-11 w-11 items-center justify-center active:opacity-70', controlDisabled && 'opacity-40');
+    cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70', controlDisabled && 'opacity-40');
 
   return (
     <View className="gap-2">
@@ -195,7 +196,7 @@ export function ManualSetupCommandsEditor({
                 <ChevronDown size={20} color={colors.mutedForeground} />
               </Pressable>
               <Pressable
-                className="h-11 w-11 items-center justify-center active:opacity-70"
+                className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
                 accessibilityRole="button"
                 accessibilityLabel={t('common.delete')}
                 onPress={() => {

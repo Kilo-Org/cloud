@@ -730,6 +730,18 @@ describe('provider failure content', () => {
     });
   });
 
+  it('returns a fixed message when a token check fails', async () => {
+    mockFailureResponse(500, 'message: token check unavailable');
+
+    const result = await validatePersonalAccessToken('pat-token');
+
+    expect(result).toEqual({ valid: false, error: 'Failed to validate token: 500' });
+    expect(mockLogExceptInTest).toHaveBeenCalledWith(
+      '[validatePersonalAccessToken] Token info fetch failed',
+      { status: 500, bodyExcerpt: 'message: token check unavailable' }
+    );
+  });
+
   it('writes one log line when a note creation request fails', async () => {
     mockFailureResponse(400, 'message: invalid note payload');
 

@@ -91,7 +91,11 @@ type FixtureReadData =
   | RouterOutputs['user']['getMe'];
 
 function fixtureResponse(data: FixtureReadData): Response {
-  return Response.json({ result: { data } });
+  // eslint-disable-next-line unicorn/prefer-response-static-json -- React Native's fetch polyfill has no static Response.json.
+  return new Response(JSON.stringify({ result: { data } }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
 }
 
 const FilePageInput = z.object({ cursor: z.literal(100).nullish() });

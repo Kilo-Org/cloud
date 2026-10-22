@@ -284,10 +284,11 @@ function createUserWebConnection(
 
   function requestPreSocketRecovery(): void {
     if (destroyed || !hasLifetime() || baseConnection || started || connectPromise) return;
-    if (initialAuthRetryTimeout !== null) {
-      clearTimeout(initialAuthRetryTimeout);
-      initialAuthRetryTimeout = null;
-    }
+    // Mirrors the base connection's resume paths: a fresh network or visibility
+    // signal restarts the attempt series and clears exhaustion before the probe,
+    // so the surface reads "reconnecting" rather than terminal while it tries.
+    clearInitialAuthRetry();
+    setExhausted(false);
     startConnection(false);
   }
 

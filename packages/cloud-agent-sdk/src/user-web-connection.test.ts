@@ -757,6 +757,77 @@ describe('createUserWebConnection', () => {
     }
   });
 
+  it('restarts the token attempt series on online after exhaustion', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const onlineHandler: { current: (() => void) | null } = { current: null };
+      const listener = jest.fn();
+      const getAuthToken = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('token unavailable'))
+        .mockRejectedValueOnce(new Error('token unavailable'))
+        .mockRejectedValueOnce(new Error('token unavailable'))
+        .mockRejectedValueOnce(new Error('token unavailable'))
+        .mockResolvedValueOnce('online-token');
+      const client = createUserWebConnection({
+        websocketUrl: WS_URL,
+        getAuthToken,
+        maxReconnectAttempts: 2,
+        lifecycleHooks: {
+          onOnline: handler => {
+            onlineHandler.current = handler;
+            return () => {};
+          },
+        },
+      });
+      client.onReconnectExhaustionChange(listener);
+      const release = client.retain();
+
+      await Promise.resolve();
+      await Promise.resolve();
+      jest.advanceTimersByTime(60_000);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(client.isReconnectExhausted()).toBe(true);
+
+      const handleOnline = onlineHandler.current;
+      if (!handleOnline)
+        throw new Error('Expected online lifecycle handler before socket creation');
+      handleOnline();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(client.isReconnectExhausted()).toBe(false);
+      expect(listener).toHaveBeenLastCalledWith(false);
+
+      // The resume restarts the series, so the failed probe schedules a retry
+      // instead of stopping at the spent budget.
+      expect(getAuthToken).toHaveBeenCalledTimes(3);
+      jest.advanceTimersByTime(60_000);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(getAuthToken).toHaveBeenCalledTimes(4);
+      expect(client.isReconnectExhausted()).toBe(true);
+
+      handleOnline();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(getAuthToken).toHaveBeenCalledTimes(5);
+      expect(client.isReconnectExhausted()).toBe(false);
+      expect(listener).toHaveBeenLastCalledWith(false);
+      expect(webSocketConstructor).toHaveBeenCalledWith(
+        `${WS_URL}?ticket=online-token&connectionId=uuid-1`
+      );
+
+      release();
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('recovers immediately on online while retained in initial auth backoff', async () => {
     jest.useFakeTimers();
     jest.spyOn(Math, 'random').mockReturnValue(0);

@@ -1037,4 +1037,28 @@ describe('deleteFindingsByRepository', () => {
       })
     );
   });
+
+  it('reports zero and writes no audit event when the repository has no findings', async () => {
+    const user = await insertTestUser();
+    const repo = `test-org/bulk-delete-empty-${randomUUID()}`;
+
+    const result = await deleteFindingsByRepository({
+      owner: { userId: user.id },
+      repoFullName: repo,
+      actor,
+    });
+
+    expect(result.deletedCount).toBe(0);
+
+    const auditRows = await db
+      .select({ id: security_audit_log.id })
+      .from(security_audit_log)
+      .where(
+        and(
+          eq(security_audit_log.owned_by_user_id, user.id),
+          eq(security_audit_log.action, SecurityAuditLogAction.FindingDeleted)
+        )
+      );
+    expect(auditRows).toEqual([]);
+  });
 });

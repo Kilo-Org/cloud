@@ -9,7 +9,6 @@ import { useStatusAnnouncement } from './status-announcement';
 
 const accessibilityMock = vi.hoisted(() => ({
   announceForAccessibility: vi.fn(),
-  setAccessibilityFocus: vi.fn(),
 }));
 
 const reactNativeMock = vi.hoisted(() => ({
@@ -18,7 +17,6 @@ const reactNativeMock = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({
   AccessibilityInfo: accessibilityMock,
-  findNodeHandle: vi.fn(),
   Platform: reactNativeMock.Platform,
 }));
 
@@ -50,15 +48,15 @@ function announcements(): string[] {
 
 beforeEach(() => {
   accessibilityMock.announceForAccessibility.mockClear();
-  accessibilityMock.setAccessibilityFocus.mockClear();
   reactNativeMock.Platform.OS = 'ios';
 });
 
 describe('useStatusAnnouncement on iOS', () => {
   it('announces a status that first appears', () => {
-    mount('Failed to load');
+    const renderer = mount('Failed to load');
 
     expect(announcements()).toEqual(['Failed to load']);
+    renderer.unmount();
   });
 
   it('does not announce again when the same status re-renders', () => {
@@ -94,6 +92,8 @@ describe('useStatusAnnouncement on iOS', () => {
     const renderer = mount(null);
 
     expect(announcements()).toEqual([]);
+    rerender(renderer, null);
+    expect(announcements()).toEqual([]);
     renderer.unmount();
   });
 
@@ -123,7 +123,12 @@ describe('useStatusAnnouncement on Android', () => {
   });
 
   it('leaves every announcement to the live region', () => {
-    const renderer = mount('Failed to load');
+    const renderer = mount(null);
+
+    rerender(renderer, null);
+    rerender(renderer, 'Failed to load');
+    rerender(renderer, 'Failed to load');
+    rerender(renderer, '  Failed to load  ');
 
     rerender(renderer, 'Reconnected');
     rerender(renderer, null);

@@ -120,10 +120,7 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-// The overlay moves VoiceOver focus on open; the real helper reaches
-// `AccessibilityInfo`/`findNodeHandle`, which the `react-native` stub above
-// does not carry. `status-announcement` (inside `QueryError`) still needs the
-// announce half of the module.
+// Mock the native adapter; QueryError still uses its announcement export.
 vi.mock('@/lib/a11y/announce', () => ({
   announceForA11y: holder.announceForA11y,
   requestA11yFocus: holder.requestA11yFocus,

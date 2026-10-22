@@ -362,6 +362,60 @@ describe('SessionIngestDO integration', () => {
       }
     );
 
+    it.each([
+      ['missing', 'retryable_failure'],
+      ['oversized', 'too_large'],
+      ['invalid', 'invalid_data'],
+    ])('keeps live share messages readable with %s session info', async (kind, expectedKind) => {
+      const sessionId = `ses_live_share_unavailable_${crypto.randomUUID()}`;
+      const key = `items/${kiloUserId}/${sessionId}/session/current`;
+      const stub = getStub(kiloUserId, sessionId);
+      try {
+        if (kind === 'oversized') {
+          await env.SESSION_INGEST_R2.put(
+            key,
+            JSON.stringify({ title: 'x'.repeat(MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES + 1) })
+          );
+        } else if (kind === 'invalid') {
+          await env.SESSION_INGEST_R2.put(key, 'invalid JSON');
+        }
+        await stub.ingest(
+          [
+            { type: 'session', data: {} },
+            { type: 'message', data: { id: 'msg_1', role: 'user' } },
+            {
+              type: 'part',
+              data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: 'Readable' },
+            },
+            { type: 'session_diff', data: [{ file: 'cumulative-private.ts', patch: 'private' }] },
+          ],
+          kiloUserId,
+          sessionId,
+          1,
+          1000,
+          { session: key }
+        );
+        expect(await stub.readKiloSdkSessionSnapshot()).toMatchObject({ kind: expectedKind });
+
+        const shared = JSON.parse(
+          await stub.getLiveSharedSessionStream().then(stream => new Response(stream).text())
+        );
+        expect(shared.info).toEqual({});
+        expect(shared.messages).toMatchObject([
+          { info: { id: 'msg_1' }, parts: [{ id: 'part_1', text: 'Readable' }] },
+        ]);
+        expect(shared.sessionDiff).toEqual([]);
+        await runInDurableObject(stub, async instance => {
+          await expect(instance.captureShareInfo(crypto.randomUUID())).rejects.toThrow(
+            kind === 'oversized' ? 'Share snapshot is too large' : 'Share snapshot is unavailable'
+          );
+        });
+      } finally {
+        await stub.clear();
+        await env.SESSION_INGEST_R2.delete(key);
+      }
+    });
+
     it('does not expose later updates to an item that existed at the boundary', async () => {
       const sessionId = 'ses_roundtrip_shared_update_000007';
       const publicId = '22222222-2222-4222-8222-222222222222';

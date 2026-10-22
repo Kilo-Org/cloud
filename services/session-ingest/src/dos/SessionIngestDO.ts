@@ -1229,7 +1229,9 @@ export class SessionIngestDO extends DurableObject<Env> {
 
   /** Include later messages using the same session-info projection as snapshot shares. */
   async getLiveSharedSessionStream(): Promise<ReadableStream<Uint8Array>> {
-    const shareInfo = await this.readShareableSessionInfo();
+    const snapshot = await readKiloSdkSessionSnapshot(this.db, this.env.SESSION_INGEST_R2);
+    // Session details are optional for reading an existing transcript.
+    const shareInfo = snapshot.kind === 'value' ? projectSharedSessionInfo(snapshot.info) : '{}';
     return this.buildSessionExportStream({ includeSessionDiff: false, shareInfo });
   }
 
@@ -1241,8 +1243,13 @@ export class SessionIngestDO extends DurableObject<Env> {
   async captureShareInfo(publicId: string, duration: SessionShareDuration = '7d'): Promise<number> {
     const shareDuration = sessionShareDurationSchema.parse(duration);
     if (this.isDeleted()) throw new Error('Session deleted');
-    const info = await this.readShareableSessionInfo();
+    const snapshot = await readKiloSdkSessionSnapshot(this.db, this.env.SESSION_INGEST_R2);
+    if (snapshot.kind === 'too_large') throw new Error(SHARE_INFO_TOO_LARGE_ERROR);
+    if (snapshot.kind !== 'value' && snapshot.kind !== 'pending') {
+      throw new Error('Share snapshot is unavailable');
+    }
     if (this.isDeleted()) throw new Error('Session deleted');
+    const info = snapshot.kind === 'value' ? projectSharedSessionInfo(snapshot.info) : '{}';
     const now = Date.now();
     const expiresAtSeconds = getSessionShareExpiresAt(shareDuration, Math.floor(now / 1000));
     const expiresAt = expiresAtSeconds === null ? null : expiresAtSeconds * 1000;
@@ -1305,15 +1312,6 @@ export class SessionIngestDO extends DurableObject<Env> {
       .where(eq(ingestMeta.key, shareInfoKey(publicId)))
       .get();
     return readShareInfo(row?.value ?? null, Date.now());
-  }
-
-  private async readShareableSessionInfo(): Promise<string> {
-    const snapshot = await readKiloSdkSessionSnapshot(this.db, this.env.SESSION_INGEST_R2);
-    if (snapshot.kind === 'too_large') throw new Error(SHARE_INFO_TOO_LARGE_ERROR);
-    if (snapshot.kind !== 'value' && snapshot.kind !== 'pending') {
-      throw new Error('Share snapshot is unavailable');
-    }
-    return snapshot.kind === 'value' ? projectSharedSessionInfo(snapshot.info) : '{}';
   }
 
   private buildSessionExportStream(options: {

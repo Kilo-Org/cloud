@@ -113,6 +113,7 @@ import { beginAuthenticatedOwner, markRestoredAuthenticatedOwner } from '@/lib/c
 // warning level with the stable read fingerprint).
 export const preloadedAuthToken = readStoredValue(AUTH_TOKEN_KEY);
 const preloadedRefreshToken = readStoredValue(REFRESH_TOKEN_KEY);
+let credentialPreloadsAvailable = true;
 // A keychain failure at process start rejects these before any consumer can
 // await them, and the runtime would report that as an unhandled rejection
 // before AuthProvider even mounts. Observe it here; the bootstrap read below
@@ -361,7 +362,13 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   );
 
   useEffect(() => {
-    void load({ token: preloadedAuthToken, refresh: preloadedRefreshToken });
+    // Android can recreate the activity without restarting JavaScript. A later
+    // provider mount must read storage, not the snapshot from before sign-in.
+    const preload = credentialPreloadsAvailable
+      ? { token: preloadedAuthToken, refresh: preloadedRefreshToken }
+      : undefined;
+    credentialPreloadsAvailable = false;
+    void load(preload);
   }, [load]);
 
   const retryRestore = useCallback(() => {

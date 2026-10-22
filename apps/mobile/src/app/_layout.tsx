@@ -68,7 +68,7 @@ import { subscribeToConsentChanges } from '@/lib/consent';
 import { shouldStartAnalytics } from '@/lib/analytics-consent';
 import { isPostHogReady, subscribeToPostHogReady } from '@/lib/analytics/posthog';
 import { drainStartupTimings } from '@/lib/startup-drain';
-import { markStartup, markStartupComplete } from '@/lib/startup-timing';
+import { isStartupComplete, markStartup, markStartupComplete } from '@/lib/startup-timing';
 import { prefetchCurrentUser } from '@/lib/startup-prefetch';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
@@ -283,9 +283,8 @@ function RootLayoutNav({
   const [optionalConsent, setOptionalConsentState] = useState(false);
   const [consentCheckError, setConsentCheckError] = useState<unknown>(null);
   const [consentCheckRetryKey, setConsentCheckRetryKey] = useState(0);
-  // Flipped by every splash-hide site below, so the app_startup drain can
-  // depend on "startup finished" as an ordinary dependency.
-  const [startupFinished, setStartupFinished] = useState(false);
+  // A recreated activity has no splash once this runtime completed startup.
+  const [startupFinished, setStartupFinished] = useState(isStartupComplete);
   // Reactive snapshot so the drain effect re-triggers when the PostHog
   // client becomes ready after async init.
   const postHogReady = useSyncExternalStore(subscribeToPostHogReady, isPostHogReady);

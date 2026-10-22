@@ -522,12 +522,12 @@ async function loadAuthModule() {
 /** Mount the AuthProvider and extract the auth context value via a
  *  consumer child. The context is captured synchronously once the
  *  component mounts inside act. */
-async function mountAndGetContext(): Promise<{
+async function mountAndGetContext(authModule?: typeof AuthContextModule): Promise<{
   ctx: AuthContextValue;
   getCtx: () => AuthContextValue;
   unmount: () => void;
 }> {
-  const mod = await loadAuthModule();
+  const mod = authModule ?? (await loadAuthModule());
 
   let capturedCtx: AuthContextValue | undefined = undefined;
   // The consumer captures ctx before any act flush.
@@ -2886,4 +2886,77 @@ describe('startup credential read failure', () => {
 
     unmount();
   }, 30_000);
+});
+
+describe('session restoration after provider remount', () => {
+  const store = new Map<string, string>();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store.clear();
+    hoisted.secureStore.getItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(store.get(key) ?? null)
+    );
+    hoisted.secureStore.setItemAsync.mockImplementation((key: string, value: string) => {
+      store.set(key, value);
+      return Promise.resolve();
+    });
+    hoisted.secureStore.deleteItemAsync.mockImplementation((key: string) => {
+      store.delete(key);
+      return Promise.resolve();
+    });
+  });
+
+  afterEach(() => {
+    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+    hoisted.secureStore.setItemAsync.mockResolvedValue(undefined);
+    hoisted.secureStore.deleteItemAsync.mockImplementation(() => {
+      hoisted.callOrder.push('SecureStore.deleteItemAsync');
+      return Promise.resolve();
+    });
+  });
+
+  it('restores a session signed in after the initial signed-out bootstrap', async () => {
+    const mod = await loadAuthModule();
+    const first = await mountAndGetContext(mod);
+    expect(first.getCtx().token).toBeUndefined();
+
+    await act(async () => {
+      await first.getCtx().signIn('signed-in-token', 'signed-in-refresh', 3600);
+    });
+    expect(first.getCtx().token).toBe('signed-in-token');
+    await act(() => {
+      first.unmount();
+    });
+
+    const restored = await mountAndGetContext(mod);
+    onTestFinished(() => {
+      restored.unmount();
+    });
+    expect(restored.getCtx().token).toBe('signed-in-token');
+    expect(restored.getCtx().restoreFailed).toBe(false);
+  });
+
+  it('does not restore an initial session after explicit sign-out', async () => {
+    store.set('auth-token', 'initial-token');
+    store.set('refresh-token', 'initial-refresh');
+    const mod = await loadAuthModule();
+    const first = await mountAndGetContext(mod);
+    expect(first.getCtx().token).toBe('initial-token');
+
+    await act(async () => {
+      await first.getCtx().signOut();
+    });
+    expect(first.getCtx().token).toBeUndefined();
+    await act(() => {
+      first.unmount();
+    });
+
+    const restored = await mountAndGetContext(mod);
+    onTestFinished(() => {
+      restored.unmount();
+    });
+    expect(restored.getCtx().token).toBeUndefined();
+    expect(restored.getCtx().restoreFailed).toBe(false);
+  });
 });

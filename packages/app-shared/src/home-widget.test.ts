@@ -83,6 +83,28 @@ describe('Home-only widget policy', () => {
     ).toBe(joined);
   });
 
+  it('keeps the details payload printable across every row', () => {
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [
+        {
+          status: 'permission',
+          title: '\u202eApprove\u2066 the\u2069 \u200bplan',
+          statusUpdatedAt: '2026-10-09T09:00:00Z',
+        },
+        {
+          status: 'scheduled',
+          title: '\ufeffNightly\u2060 run',
+          scheduledAt: '2026-10-09T11:00:00Z',
+        },
+        { status: 'busy', title: '\u200bBuild' },
+      ],
+    });
+    expect(data.details.primaryTitle).toBe('Approve the plan');
+    expect(data.details.scheduledAgents[0]?.title).toBe('Nightly run');
+    expect(JSON.stringify(data.details)).toMatch(/^[\x20-\x7e]*$/);
+  });
+
   it('bounds the title by printed characters', () => {
     const details = buildHomeWidgetDetails([
       {

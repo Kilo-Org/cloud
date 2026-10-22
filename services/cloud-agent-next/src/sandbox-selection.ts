@@ -5,6 +5,7 @@ import {
   getKiloSandboxAllocation,
   getSandboxAllocationProvider,
   getSandboxAllocationRequest,
+  isSandboxAllocationAvailable,
   type SandboxAllocation,
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
@@ -17,6 +18,8 @@ import {
   isOrgInList,
 } from './sandbox-id.js';
 import type { Env } from './types.js';
+
+export { isSandboxAllocationAvailable } from '@kilocode/worker-utils/sandbox-allocation';
 
 type SelectionOwner = { userId: string; orgId?: string };
 
@@ -165,23 +168,6 @@ export function getSandboxSelectionCapabilities(
       ? nativeSmallInPlaceOfSingle(candidates)
       : candidates,
   };
-}
-
-export function isSandboxAllocationAvailable(
-  capabilities: SandboxSelectionCapabilities,
-  allocation: SandboxAllocation
-): boolean {
-  return (
-    capabilities.enabled &&
-    (allocation === 'isolated-standard' ||
-      allocation === 'cloudflare-single' ||
-      capabilities.options.some(
-        option =>
-          getKiloSandboxAllocation(option.allocation) === allocation &&
-          option.unavailableReason === undefined &&
-          option.repositoryUnavailableReason === undefined
-      ))
-  );
 }
 
 export function assertSandboxAllocationAvailable(

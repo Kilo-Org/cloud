@@ -27,6 +27,9 @@ export const proxyErrorTypeSchema = z.enum([
   'upstream_error',
   'no_free_models_available',
   'organization_auto_configuration',
+  'custom_router',
+  'auto_routing_unavailable',
+  'invalid_auto_decision',
   'upstream_disconnect',
   'client_disconnect',
 ]);

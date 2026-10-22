@@ -295,6 +295,19 @@ test('starts the session-ingest worker whenever the web app starts', () => {
   assert.equal(worker.port, 8800 + portOffset);
 });
 
+test('runs kilo-mcp with the cloud-agent group on its wrangler port', () => {
+  const targets = resolveTargets(['cloud-agent']);
+  assert.ok(
+    targets.includes('kilo-mcp'),
+    `expected kilo-mcp in cloud-agent start targets, got: ${targets.join(', ')}`
+  );
+
+  const worker = getService('kilo-mcp');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/kilo-mcp');
+  assert.equal(worker.port, 8815 + portOffset);
+});
+
 test('points both user data export Hyperdrive bindings at the offset database', () => {
   const initialOffset = portOffset;
   try {
@@ -428,7 +441,6 @@ test('injects deletion-mock host overrides only when the service is selected', (
     PYLON_HOST: 'http://127.0.0.1:5210',
     SUBSTACK_PUBLICATION_URL: 'http://127.0.0.1:5210',
     CUSTOMERIO_TRACK_BASE: 'http://127.0.0.1:5210',
-    CSA_APP_BASE_URL: 'http://127.0.0.1:5210',
     PYLON_API_KEY: 'deletion-mock',
     POSTHOG_PERSONAL_API_KEY: 'deletion-mock',
     POSTHOG_ENVIRONMENT_ID: 'deletion-mock',

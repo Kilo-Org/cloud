@@ -337,6 +337,7 @@ describe('MeteredBillingLifecycle placed sandbox admission', () => {
     await lifecycle.configureBilling(identity, input);
     const expected = {
       subject: input.subject,
+      actor: input.actor,
       instanceId: PLACED_ID,
       billingOrigin: 'code-review',
     };

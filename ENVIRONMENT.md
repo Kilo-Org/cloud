@@ -332,6 +332,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `QDRANT_API_KEY` - Qdrant API key. `[SECRET]`
 - `MILVUS_ADDRESS` - Milvus vector DB address. [SERVER]
 - `MILVUS_TOKEN` - Milvus auth token. `[SECRET]`
+- `CODE_INDEXING_ENABLED` - Set to `true` to enable cloud managed code indexing. Disabled by default; unset, empty, or any other value keeps the feature off. [SERVER]
 
 ### Email & Notifications
 

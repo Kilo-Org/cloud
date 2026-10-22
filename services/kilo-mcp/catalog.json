@@ -26036,38 +26036,6 @@
     ],
     "searchBlob": "organizations.settings.updateAllowLists Set which model providers are allowed and which models are blocked for an organization. Use to restrict model access for enterprise plans. organizations settings updateallowlists organizationid provider_allow_list model_deny_list organizationId provider_allow_list model_deny_list"
   },
-  "organizations.settings.updateCodeIndexingFeatureFlag": {
-    "path": "organizations.settings.updateCodeIndexingFeatureFlag",
-    "kind": "mutation",
-    "summary": "Enable or disable code indexing for an organization. Use as an admin to toggle the code indexing feature.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "code_indexing_enabled": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "organizationId",
-        "code_indexing_enabled"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "settings",
-      "updatecodeindexingfeatureflag",
-      "organizationid",
-      "code_indexing_enabled"
-    ],
-    "searchBlob": "organizations.settings.updateCodeIndexingFeatureFlag Enable or disable code indexing for an organization. Use as an admin to toggle the code indexing feature. organizations settings updatecodeindexingfeatureflag organizationid code_indexing_enabled organizationId code_indexing_enabled",
-    "admin": true
-  },
   "organizations.settings.updateDataCollection": {
     "path": "organizations.settings.updateDataCollection",
     "kind": "mutation",

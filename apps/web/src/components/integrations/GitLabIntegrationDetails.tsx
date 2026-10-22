@@ -164,8 +164,11 @@ export function GitLabIntegrationDetails({
         setPatToken('');
         setPATValidation({ status: 'idle' });
         setConnectionMethod('oauth');
-        // Reload the page to refresh the installation data
-        window.location.reload();
+        // Refresh the installation in place. A reload here would replace the
+        // document and discard the toast before it can be read.
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gitlab.getInstallation.queryKey(input),
+        });
       },
       onError: err => {
         toast.error('Failed to connect', { description: err.message });

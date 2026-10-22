@@ -928,7 +928,13 @@ export type AutocommitStartedData = z.infer<typeof autocommitStartedDataSchema>;
 const commitPushStatusSchema = z.enum(['pushed', 'failed', 'not_attempted', 'unknown']);
 const maxCommitMessageBytes = 16 * 1024;
 
-export const sessionCommitDataSchema = z.object({
+/**
+ * The commit record, declared once. `sessionCommitDataSchema` is the strict
+ * record the SDK stores; `autocommitCompletedDataSchema` carries the same
+ * fields on the wire, so a new field reaches both paths instead of needing two
+ * synchronized declarations.
+ */
+const commitRecordShape = {
   commitHash: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/),
   commitMessage: z
     .string()
@@ -939,19 +945,27 @@ export const sessionCommitDataSchema = z.object({
   committedAt: z.iso.datetime({ offset: true }),
   pushStatus: commitPushStatusSchema,
   commitMessageTruncated: z.literal(true).optional(),
-});
+};
+
+export const sessionCommitDataSchema = z.object(commitRecordShape);
 
 export const autocommitCompletedDataSchema = z.object({
-  messageId: z.string(),
+  messageId: commitRecordShape.messageId,
   success: z.boolean().catch(false),
   message: z.string().optional(),
   skipped: z.boolean().optional(),
-  commitHash: z.string().optional(),
-  commitMessage: z.string().optional(),
-  userMessageId: z.string().optional().catch(undefined),
-  committedAt: sessionCommitDataSchema.shape.committedAt.optional().catch(undefined),
-  pushStatus: commitPushStatusSchema.optional().catch(undefined),
-  commitMessageTruncated: z.boolean().optional().catch(undefined),
+  // The commit half of the event: every field in `commitRecordShape` is
+  // required on a stored record, so a completion that has no commit (skipped,
+  // failed, metadata unavailable) omits them. A value that could not be stored
+  // is dropped by `.catch` instead of failing the event — the completion notice
+  // and the commit count must not depend on metadata quality, and storage still
+  // decides with `sessionCommitDataSchema` from the same definitions.
+  commitHash: commitRecordShape.commitHash.optional().catch(undefined),
+  commitMessage: commitRecordShape.commitMessage.optional().catch(undefined),
+  userMessageId: commitRecordShape.userMessageId.optional().catch(undefined),
+  committedAt: commitRecordShape.committedAt.optional().catch(undefined),
+  pushStatus: commitRecordShape.pushStatus.optional().catch(undefined),
+  commitMessageTruncated: commitRecordShape.commitMessageTruncated.optional().catch(undefined),
 });
 export type AutocommitCompletedData = z.infer<typeof autocommitCompletedDataSchema>;
 

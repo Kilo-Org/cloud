@@ -1,5 +1,6 @@
 import {
   activeSessionSchema,
+  autocommitCompletedDataSchema,
   cloudAgentEventSchema,
   cloudWorktreeChangesReadyDataSchema,
   parseCustomerBillingFailure,
@@ -313,6 +314,49 @@ describe('activeSessionSchema scheduledAt', () => {
 
     expect(parsed.scheduledAt).toBeUndefined();
   });
+});
+
+describe('autocommitCompletedDataSchema commit fields', () => {
+  const record = {
+    messageId: 'msg-1',
+    success: true,
+    commitHash: 'a'.repeat(40),
+    commitMessage: 'feat: add feature',
+    userMessageId: 'user-msg-1',
+    committedAt: '2026-09-01T12:00:00+02:00',
+    pushStatus: 'pushed',
+    commitMessageTruncated: true,
+  };
+
+  it('keeps every field of a storable commit record', () => {
+    expect(autocommitCompletedDataSchema.parse(record)).toEqual(record);
+  });
+
+  it.each([
+    ['commitHash', 'abc123'],
+    ['commitHash', 'A'.repeat(40)],
+    ['commitMessage', 'x'.repeat(16 * 1024 + 1)],
+    ['userMessageId', ''],
+    ['userMessageId', 'x'.repeat(257)],
+    ['committedAt', '2026-09-01'],
+    ['pushStatus', 'pushing'],
+    ['commitMessageTruncated', false],
+  ])('drops an unstorable %s instead of failing the completion', (field, value) => {
+    const parsed = autocommitCompletedDataSchema.parse({ ...record, [field]: value });
+
+    expect((parsed as unknown as Record<string, unknown>)[field]).toBeUndefined();
+    expect(parsed.success).toBe(true);
+    expect(parsed.messageId).toBe('msg-1');
+  });
+
+  it.each([{ messageId: '' }, { messageId: 'x'.repeat(257) }, { messageId: undefined }])(
+    'rejects a completion whose message id cannot name a message: %p',
+    overrides => {
+      expect(autocommitCompletedDataSchema.safeParse({ ...record, ...overrides }).success).toBe(
+        false
+      );
+    }
+  );
 });
 
 describe('live session status values', () => {

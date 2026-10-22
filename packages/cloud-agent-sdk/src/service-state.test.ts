@@ -1722,6 +1722,68 @@ describe('createServiceState', () => {
       expect(state.getActivity()).toEqual({ type: 'idle' });
     });
 
+    it.each([
+      { type: 'busy' as const },
+      { type: 'idle' as const },
+      { type: 'retry' as const, attempt: 2, message: 'Overloaded', next: 5_000 },
+      { type: 'scheduled' as const, scheduledAt: '2026-09-24T09:00:00.000Z' },
+      { type: 'scheduled' as const },
+    ])('reads $type on connect exactly as a live status event does', status => {
+      const live = createServiceState(makeConfig());
+      const connected = createServiceState(makeConfig());
+
+      live.process({ type: 'session.status', sessionId: 'root-1', status });
+      connected.process({ type: 'connected', sessionStatus: status });
+
+      expect(connected.getActivity()).toEqual(live.getActivity());
+      expect(connected.getStatus()).toEqual(live.getStatus());
+    });
+
+    it('sets idle activity and carries the wake time from a scheduled sessionStatus', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'connected',
+        sessionStatus: { type: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+      });
+
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+      expect(state.getStatus()).toEqual({
+        type: 'scheduled',
+        scheduledAt: '2026-09-24T09:00:00.000Z',
+      });
+    });
+
+    it('leaves a scheduled status bare when the server reports no wake time', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'connected', sessionStatus: { type: 'scheduled' } });
+
+      expect(state.getStatus()).toEqual({ type: 'scheduled' });
+      expect(state.getStatus()).not.toHaveProperty('scheduledAt');
+    });
+
+    it('reports the retry attempt and leaves the lifecycle status to the turn', () => {
+      const state = createServiceState(makeConfig());
+      state.setStatus({ type: 'error', message: 'Assistant request failed' });
+
+      state.process({
+        type: 'connected',
+        sessionStatus: { type: 'retry', attempt: 2, message: 'Retrying', next: 5_000 },
+      });
+
+      expect(state.getActivity()).toEqual({ type: 'retrying', attempt: 2, message: 'Retrying' });
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'Assistant request failed' });
+    });
+
+    it('leaves activity and status alone for a status this SDK does not know', () => {
+      const state = createServiceState(makeConfig());
+      state.setActivity({ type: 'busy' });
+
+      state.process({ type: 'connected', sessionStatus: { type: 'offline' } });
+
+      expect(state.getActivity()).toEqual({ type: 'busy' });
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
     it('defaults activity to idle when sessionStatus is absent', () => {
       const state = createServiceState(makeConfig());
       expect(state.getActivity()).toEqual({ type: 'connecting' });
@@ -1985,6 +2047,31 @@ describe('createServiceState', () => {
           committedAt: '2026-09-01T12:00:00+02:00',
           commitMessage: data.commitMessage,
           commitMessageTruncated: true,
+        }),
+      ]);
+    });
+
+    it('stores the commit when the wire event carries an explicit false truncation flag', () => {
+      const state = createServiceState(makeConfig());
+      const data = autocommitCompletedDataSchema.parse({
+        messageId: 'msg-1',
+        success: true,
+        commitHash: 'b'.repeat(40),
+        commitMessage: 'feat: add feature',
+        userMessageId: 'user-msg-1',
+        committedAt: '2026-09-01T12:00:00+02:00',
+        pushStatus: 'pushed',
+        commitMessageTruncated: false,
+      });
+
+      state.process({ type: 'autocommit_completed', ...data });
+
+      expect(state.getCommits()).toEqual([
+        expect.objectContaining({
+          commitHash: 'b'.repeat(40),
+          commitMessage: 'feat: add feature',
+          commitMessageTruncated: undefined,
+          pushStatus: 'pushed',
         }),
       ]);
     });
@@ -2889,6 +2976,28 @@ describe('createServiceState', () => {
         state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
 
         expect(failed(state, 'm1')).toEqual({
+          status: 'failed',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+      });
+
+      it('connected keeps the failed entry and drops the queued one', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'cloud.message.queued', messageId: 'queued-1' });
+        state.process({
+          type: 'cloud.message.failed',
+          messageId: 'failed-1',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+        state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+
+        expect(state.getPendingMessages().has('queued-1')).toBe(false);
+        expect(failed(state, 'failed-1')).toEqual({
           status: 'failed',
           error: 'flush failed',
           reason: 'exhausted',

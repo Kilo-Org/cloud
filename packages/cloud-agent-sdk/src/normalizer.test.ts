@@ -1459,8 +1459,12 @@ describe('normalize', () => {
         success: true,
         message: 'Done',
         skipped: false,
-        commitHash: 'abc123',
+        commitHash: 'a'.repeat(40),
         commitMessage: 'feat: add feature',
+        userMessageId: 'user-msg-1',
+        committedAt: '2026-09-01T12:00:00+02:00',
+        pushStatus: 'pushed',
+        commitMessageTruncated: true,
       };
       const result = normalize(createRaw('autocommit_completed', data));
       expect(result).toEqual({
@@ -1469,8 +1473,13 @@ describe('normalize', () => {
         success: true,
         message: 'Done',
         skipped: false,
-        commitHash: 'abc123',
+        commitHash: 'a'.repeat(40),
         commitMessage: 'feat: add feature',
+        userMessageId: 'user-msg-1',
+        committedAt: '2026-09-01T12:00:00+02:00',
+        pushStatus: 'pushed',
+        commitMessageTruncated: true,
+        timestamp: expect.any(String),
       });
     });
 
@@ -1511,6 +1520,47 @@ describe('normalize', () => {
         commitHash: undefined,
         commitMessage: undefined,
       });
+    });
+
+    it('drops a commit field that cannot be stored and keeps the completion', () => {
+      const data = {
+        messageId: 'msg-1',
+        success: true,
+        message: 'Done',
+        commitHash: 'abc123',
+        commitMessage: 'feat: add feature',
+      };
+      const result = normalize(createRaw('autocommit_completed', data));
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          type: 'autocommit_completed',
+          messageId: 'msg-1',
+          success: true,
+          message: 'Done',
+          commitHash: undefined,
+          commitMessage: 'feat: add feature',
+        })
+      );
+    });
+
+    it('reads an explicit false truncation flag as absent', () => {
+      const data = {
+        messageId: 'msg-1',
+        success: true,
+        commitHash: 'a'.repeat(40),
+        commitMessage: 'feat: add feature',
+        commitMessageTruncated: false,
+      };
+      const result = normalize(createRaw('autocommit_completed', data));
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          type: 'autocommit_completed',
+          commitHash: 'a'.repeat(40),
+          commitMessageTruncated: undefined,
+        })
+      );
     });
 
     it('returns null when messageId is missing', () => {

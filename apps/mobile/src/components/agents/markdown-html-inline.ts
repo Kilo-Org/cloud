@@ -49,6 +49,17 @@ const ENTITY = /&(#\d{1,7}|#[xX][\da-fA-F]{1,6}|[a-zA-Z][a-zA-Z\d]*);/g;
 const SPACE = /\s/u;
 const PUNCTUATION = /[\p{P}\p{S}]/u;
 const EDGE_WHITESPACE = /^(\s*)([\s\S]*?)(\s*)$/;
+// The inline syntax markdown reads in ordinary text: an escape, a code span,
+// emphasis, strikethrough, a link or image label, and an HTML tag or autolink.
+const MARKDOWN_SYNTAX = /[\\`*_[\]~<]/g;
+
+/**
+ * Escapes the markdown syntax inside text copied out of HTML, so the characters
+ * render as the source element held them (`a*b*c` stays three asterisks). The
+ * delimiters the converter generates for real emphasis, code, links and images
+ * are added after this and stay unescaped.
+ */
+const escapeText = (source: string) => source.replaceAll(MARKDOWN_SYNTAX, String.raw`\$&`);
 
 /**
  * A run of inline markdown. Emphasis keeps its delimiter apart until it is
@@ -59,7 +70,12 @@ type InlinePiece = { delimiter: string; lead: string; core: string; trail: strin
 
 const text = (core: string): InlinePiece => ({ delimiter: '', lead: '', core, trail: '' });
 
-/** Collapses whitespace as HTML does, except inside code spans, whose spaces markdown keeps. */
+/**
+ * Collapses whitespace as HTML does, except inside code spans, whose spaces
+ * markdown keeps. Every other run is escaped, so the markdown syntax a copied
+ * text node holds renders as the characters the source had; a code span the
+ * source already wrote in markdown keeps its backticks.
+ */
 function renderText(context: ConvertContext, start: number, end: number): string {
   const { value, masks } = context;
   let low = 0;
@@ -80,11 +96,11 @@ function renderText(context: ConvertContext, start: number, end: number): string
     }
     const maskStart = Math.max(mask.start, cursor);
     const maskEnd = Math.min(mask.end, end);
-    rendered += value.slice(cursor, maskStart).replace(WHITESPACE_RUN, ' ');
+    rendered += escapeText(value.slice(cursor, maskStart).replace(WHITESPACE_RUN, ' '));
     rendered += value.slice(maskStart, maskEnd).replaceAll('\n', ' ');
     cursor = maskEnd;
   }
-  return rendered + value.slice(cursor, end).replace(WHITESPACE_RUN, ' ');
+  return rendered + escapeText(value.slice(cursor, end).replace(WHITESPACE_RUN, ' '));
 }
 
 /** Decodes the entities code text needs as characters; null for a name the HTML set does not define. */

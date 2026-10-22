@@ -339,27 +339,6 @@ async function byokErrorMessage(
     : '[BYOK] Your provider rejected the request. Check your provider account and settings.';
 }
 
-function vertexByokModelNotFoundResponse(
-  response: Response,
-  userByokProviderIds: UserByokProviderId[] | null
-) {
-  if (
-    userByokProviderIds === null ||
-    !userByokProviderIds.includes('vertex') ||
-    response.status !== 404
-  ) {
-    return undefined;
-  }
-
-  const error =
-    '[BYOK] Google Vertex AI could not find the requested model. The model might not be enabled for your Google Cloud project or selected Vertex location.';
-  warnExceptInTest(`Responding with ${response.status} ${error}`);
-  return NextResponse.json(
-    { error, error_type: ProxyErrorType.byok_error, message: error },
-    { status: response.status }
-  );
-}
-
 const noAllowedProvidersErrorSchema = z.object({
   message: z.literal('No allowed providers are available for the selected model.'),
   code: z.literal(404),
@@ -419,9 +398,6 @@ export async function makeErrorReadable({
   if (response.status < 400) {
     return undefined;
   }
-
-  const vertexByokResponse = vertexByokModelNotFoundResponse(response, userByokProviderIds);
-  if (vertexByokResponse) return vertexByokResponse;
 
   const specificByokMessage =
     userByokProviderIds === null

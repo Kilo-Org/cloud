@@ -923,28 +923,7 @@ describe('makeErrorReadable', () => {
     expect(result).toBeUndefined();
   });
 
-  it('explains a missing model for a Vertex user BYOK request', async () => {
-    const response = Response.json({ error: { message: 'AI_APICallError' } }, { status: 404 });
-
-    const result = await makeErrorReadable({
-      providerId: 'vercel',
-      requestedModel: 'anthropic/claude-sonnet-5',
-      request,
-      response,
-      userByokProviderIds: ['vertex'],
-    });
-
-    expect(result?.status).toBe(404);
-    await expect(result?.json()).resolves.toEqual({
-      error:
-        '[BYOK] Google Vertex AI could not find the requested model. The model might not be enabled for your Google Cloud project or selected Vertex location.',
-      error_type: 'byok_error',
-      message:
-        '[BYOK] Google Vertex AI could not find the requested model. The model might not be enabled for your Google Cloud project or selected Vertex location.',
-    });
-  });
-
-  it('does not label other user BYOK 404 responses as Vertex errors', async () => {
+  it('forwards the provider message for a user BYOK 404', async () => {
     const response = Response.json({ error: { message: 'Model not found' } }, { status: 404 });
 
     const result = await makeErrorReadable({
@@ -1057,7 +1036,6 @@ describe('makeErrorReadable', () => {
     [403, ['anthropic']],
     [403, ['opencode-go']],
     [429, []],
-    [404, ['vertex']],
   ] as const)(
     'keeps the specific BYOK %i mapping ahead of an upstream overflow body for %j',
     async (status, providerIds) => {

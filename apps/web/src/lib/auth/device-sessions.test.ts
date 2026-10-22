@@ -694,6 +694,35 @@ describe('device-sessions', () => {
       }
     });
 
+    test('preserves session credentials for a retryable policy lookup error', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+      const lookupError = new Error('Policy lookup unavailable');
+      mockIsEmailBlacklistedByDomainAsync.mockRejectedValueOnce(lookupError);
+
+      await expect(rotateRefreshToken(refreshToken)).rejects.toBe(lookupError);
+
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(session!.revoked_at).toBeNull();
+      expect(session!.revoked_reason).toBeNull();
+
+      const tokens = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, sessionId));
+      expect(tokens).toHaveLength(1);
+      expect(tokens[0]!.consumed_at).toBeNull();
+
+      const retry = await rotateRefreshToken(refreshToken);
+      expect(retry.ok).toBe(true);
+      if (retry.ok) {
+        expect(retry.refreshToken).not.toBe(refreshToken);
+      }
+    });
+
     test('refresh with an eligible domain rotates and keeps the session', async () => {
       const sessionId = await createDeviceSession({ userId: testUserId });
       const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);

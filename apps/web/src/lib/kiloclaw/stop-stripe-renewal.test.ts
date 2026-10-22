@@ -11,6 +11,7 @@ import { eq } from 'drizzle-orm';
 import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 import {
   KiloClawStripeRenewalReconciliationConflictError,
+  KiloClawStripeRenewalMissingLocalSubscriptionError,
   stopKiloClawStripeRenewal,
 } from './stop-stripe-renewal';
 
@@ -268,7 +269,7 @@ describe('stopKiloClawStripeRenewal', () => {
     { cancelAt: 1_600_000_000, label: 'before the current term boundary' },
     { cancelAt: 1_700_000_000, label: 'at the current term boundary' },
   ])('does not extend an explicit cancellation $label', async ({ cancelAt }) => {
-    await createSubscription();
+    const subscription = await createSubscription({ cancel_at_period_end: true });
     const update = mockStripe({
       id: 'sub_stop_renewal',
       status: 'active',
@@ -287,6 +288,31 @@ describe('stopKiloClawStripeRenewal', () => {
     ).resolves.toEqual({ outcome: 'already_canceling' });
 
     expect(update).not.toHaveBeenCalled();
+    const [updated] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    expect(updated).toEqual(expect.objectContaining({ cancel_at_period_end: false }));
+  });
+
+  it('does not call Stripe when no local subscription matches', async () => {
+    const retrieve = jest.spyOn(stripeClient.subscriptions, 'retrieve');
+    const update = jest.spyOn(stripeClient.subscriptions, 'update');
+    const scheduleRetrieve = jest.spyOn(stripeClient.subscriptionSchedules, 'retrieve');
+    const scheduleRelease = jest.spyOn(stripeClient.subscriptionSchedules, 'release');
+
+    await expect(
+      stopKiloClawStripeRenewal({
+        stripeSubscriptionId: 'sub_missing_local_row',
+        actor,
+        runId: 'run-missing-local-row',
+      })
+    ).rejects.toEqual(new KiloClawStripeRenewalMissingLocalSubscriptionError());
+
+    expect(retrieve).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(scheduleRetrieve).not.toHaveBeenCalled();
+    expect(scheduleRelease).not.toHaveBeenCalled();
   });
 
   it('caps a later explicit cancellation at the current term after schedule release', async () => {

@@ -4,6 +4,7 @@ import {
   getStripeRenewalBatchStatus,
   retryStripeRenewalBatch,
   startStripeRenewalBatch,
+  StripeRenewalBatchInputError,
 } from '@/lib/kiloclaw/admin-stripe-renewal-batch';
 import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
@@ -22,7 +23,6 @@ export const adminKiloclawStripeRenewalsRouter = createTRPCRouter({
       z.object({
         previewId: z.string().uuid(),
         confirmation: z.literal('STOP STRIPE RENEWALS'),
-        reason: z.string().min(1).max(500),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -30,12 +30,16 @@ export const adminKiloclawStripeRenewalsRouter = createTRPCRouter({
         return await startStripeRenewalBatch({
           previewId: input.previewId,
           actor: actor(ctx.user),
-          reason: input.reason,
         });
       } catch (error) {
         throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: error instanceof Error ? error.message : 'Unable to start renewal batch',
+          code:
+            error instanceof StripeRenewalBatchInputError ? error.code : 'INTERNAL_SERVER_ERROR',
+          message:
+            error instanceof StripeRenewalBatchInputError
+              ? error.message
+              : 'Unable to start Stripe renewal batch',
+          cause: error,
         });
       }
     }),
@@ -47,8 +51,13 @@ export const adminKiloclawStripeRenewalsRouter = createTRPCRouter({
         return await retryStripeRenewalBatch(input.runId, actor(ctx.user));
       } catch (error) {
         throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: error instanceof Error ? error.message : 'Unable to retry renewal batch',
+          code:
+            error instanceof StripeRenewalBatchInputError ? error.code : 'INTERNAL_SERVER_ERROR',
+          message:
+            error instanceof StripeRenewalBatchInputError
+              ? error.message
+              : 'Unable to retry Stripe renewal batch',
+          cause: error,
         });
       }
     }),

@@ -27,6 +27,15 @@ export class KiloClawStripeRenewalReconciliationConflictError extends Error {
   }
 }
 
+export class KiloClawStripeRenewalMissingLocalSubscriptionError extends Error {
+  constructor() {
+    super(
+      'No local KiloClaw subscription matches this Stripe subscription. Stripe renewal was not changed.'
+    );
+    this.name = 'KiloClawStripeRenewalMissingLocalSubscriptionError';
+  }
+}
+
 function scheduleId(schedule: string | { id: string } | null): string | null {
   if (!schedule) return null;
   return typeof schedule === 'string' ? schedule : schedule.id;
@@ -80,7 +89,7 @@ export async function stopKiloClawStripeRenewal({
     .limit(1);
 
   if (!initialSubscription) {
-    throw new KiloClawStripeRenewalReconciliationConflictError();
+    throw new KiloClawStripeRenewalMissingLocalSubscriptionError();
   }
 
   const liveSubscription = await stripeClient.subscriptions.retrieve(
@@ -93,6 +102,7 @@ export async function stopKiloClawStripeRenewal({
   const originallyCanceling =
     liveSubscription.cancel_at_period_end || liveSubscription.cancel_at !== null;
   const originalCancelAt = liveSubscription.cancel_at;
+  let providerCancelAtPeriodEnd = liveSubscription.cancel_at_period_end;
   const cancelAtToPreserve =
     !alreadyCanceled && originalCancelAt !== null
       ? Math.min(originalCancelAt, earliestRenewableBoundary(liveSubscription))
@@ -134,6 +144,7 @@ export async function stopKiloClawStripeRenewal({
     const currentSubscription = releasedScheduleId
       ? await stripeClient.subscriptions.retrieve(stripeSubscriptionId, {}, stripeRequestOptions())
       : liveSubscription;
+    providerCancelAtPeriodEnd = currentSubscription.cancel_at_period_end;
     const hasEarlierCancellation = currentSubscription.cancel_at !== null;
     if (cancelAtToPreserve !== null && currentSubscription.cancel_at !== cancelAtToPreserve) {
       await stripeClient.subscriptions.update(
@@ -153,6 +164,7 @@ export async function stopKiloClawStripeRenewal({
         { cancel_at_period_end: true },
         stripeRequestOptions()
       );
+      providerCancelAtPeriodEnd = true;
     }
   }
 
@@ -207,7 +219,9 @@ export async function stopKiloClawStripeRenewal({
     const [updated] = await tx
       .update(kiloclaw_subscriptions)
       .set({
-        cancel_at_period_end: alreadyCanceled ? subscription.cancel_at_period_end : true,
+        cancel_at_period_end: alreadyCanceled
+          ? subscription.cancel_at_period_end
+          : providerCancelAtPeriodEnd,
         ...scheduleUpdate,
       })
       .where(

@@ -31,7 +31,7 @@ function StripeRenewalControls() {
   const [confirmation, setConfirmation] = useState('');
   const status = useQuery({
     ...trpc.admin.kiloclawStripeRenewals.status.queryOptions(),
-    refetchInterval: query => (query.state.data?.run?.status === 'running' ? 5_000 : 15_000),
+    refetchInterval: query => (query.state.data?.run?.status === 'running' ? 5_000 : false),
   });
   const refreshStatus = () =>
     queryClient.invalidateQueries({
@@ -196,7 +196,6 @@ function StripeRenewalControls() {
                 start.mutate({
                   previewId: preview.data.id,
                   confirmation,
-                  reason: 'KiloClaw end of life',
                 });
               }}
             >

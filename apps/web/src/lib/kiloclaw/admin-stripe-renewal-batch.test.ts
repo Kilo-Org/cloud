@@ -8,6 +8,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import {
   createStripeRenewalBatchPreview,
   getStripeRenewalBatchStatus,
+  purgeExpiredStripeRenewalBatches,
   retryStripeRenewalBatch,
   runStripeRenewalBatches,
   startStripeRenewalBatch,
@@ -37,7 +38,7 @@ async function subscription(
 describe('admin Stripe renewal batch', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
-    jest.clearAllMocks();
+    jest.resetAllMocks();
   });
 
   it('freezes all non-null Stripe subscription IDs, including stale hybrid rows, but excludes credit-only rows', async () => {
@@ -47,17 +48,24 @@ describe('admin Stripe renewal batch', () => {
 
     expect(preview.total).toBe(1);
     await subscription('sub_late', 'stripe');
-    await startStripeRenewalBatch({ previewId: preview.id, actor, reason: 'incident response' });
-    jest.mocked(stopKiloClawStripeRenewal).mockImplementation(async input => {
-      expect(input.deadlineAtMs).toBeGreaterThan(Date.now());
-      expect(input.deadlineAtMs).toBeLessThanOrEqual(Date.now() + 20_000);
+    await startStripeRenewalBatch({ previewId: preview.id, actor });
+    let calledAt = 0;
+    jest.mocked(stopKiloClawStripeRenewal).mockImplementation(async () => {
+      calledAt = Date.now();
       return { outcome: 'updated' };
     });
+    const before = Date.now();
     await runStripeRenewalBatches();
 
     expect(stopKiloClawStripeRenewal).toHaveBeenCalledTimes(1);
     expect(stopKiloClawStripeRenewal).toHaveBeenCalledWith(
       expect.objectContaining({ stripeSubscriptionId: 'sub_hybrid', actor })
+    );
+    const [input] = jest.mocked(stopKiloClawStripeRenewal).mock.calls[0];
+    expect(input.deadlineAtMs).toBeGreaterThan(before);
+    expect(input.deadlineAtMs).toBeLessThanOrEqual(calledAt + 20_000);
+    await expect(getStripeRenewalBatchStatus()).resolves.toEqual(
+      expect.objectContaining({ run: expect.objectContaining({ updated: 1, failed: 0 }) })
     );
   });
 
@@ -69,9 +77,41 @@ describe('admin Stripe renewal batch', () => {
       startStripeRenewalBatch({
         previewId: preview.id,
         actor: { id: 'another-admin', email: 'other@example.com', name: null },
-        reason: 'incident response',
       })
     ).rejects.toThrow('Preview not found');
+  });
+
+  it('persists every page of a preview without dropping historical Stripe subscriptions', async () => {
+    const user = await insertTestUser();
+    await db.insert(kiloclaw_subscriptions).values(
+      Array.from(
+        { length: 501 },
+        (_, index) =>
+          ({
+            user_id: user.id,
+            stripe_subscription_id: `sub_page_${index}`,
+            payment_source: 'stripe',
+            kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+            plan: 'standard',
+            status: 'canceled',
+          }) satisfies typeof kiloclaw_subscriptions.$inferInsert
+      )
+    );
+
+    const preview = await createStripeRenewalBatchPreview(actor);
+
+    expect(preview.total).toBe(501);
+    const [items] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.resource_key, preview.id),
+          eq(operation_ledgers.intent, 'batch_item')
+        )
+      );
+    expect(items.count).toBe(501);
+    expect(stopKiloClawStripeRenewal).not.toHaveBeenCalled();
   });
 
   it('rejects an expired preview without starting any work', async () => {
@@ -88,9 +128,9 @@ describe('admin Stripe renewal batch', () => {
         )
       );
 
-    await expect(
-      startStripeRenewalBatch({ previewId: preview.id, actor, reason: 'KiloClaw end of life' })
-    ).rejects.toThrow('Preview has expired');
+    await expect(startStripeRenewalBatch({ previewId: preview.id, actor })).rejects.toThrow(
+      'Preview has expired'
+    );
     await runStripeRenewalBatches();
     expect(stopKiloClawStripeRenewal).not.toHaveBeenCalled();
   });
@@ -98,7 +138,7 @@ describe('admin Stripe renewal batch', () => {
   it('starts the same preview idempotently and does not reattribute an active run on retry', async () => {
     await subscription('sub_idempotent', 'stripe');
     const preview = await createStripeRenewalBatchPreview(actor);
-    const input = { previewId: preview.id, actor, reason: 'KiloClaw end of life' };
+    const input = { previewId: preview.id, actor };
     await startStripeRenewalBatch(input);
     await startStripeRenewalBatch(input);
     await retryStripeRenewalBatch(preview.id, {
@@ -134,19 +174,40 @@ describe('admin Stripe renewal batch', () => {
 
     const admin = await insertTestUser({ is_admin: true, is_super_admin: true });
     const adminCaller = await createCallerForUser(admin.id);
+    await subscription('sub_confirmation', 'stripe');
+    const preview = await adminCaller.admin.kiloclawStripeRenewals.preview();
     await expect(
       adminCaller.admin.kiloclawStripeRenewals.start({
-        previewId: crypto.randomUUID(),
+        previewId: preview.id,
         confirmation: 'stop' as never,
-        reason: 'incident response',
       })
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(getStripeRenewalBatchStatus()).resolves.toEqual({ run: null });
+    await adminCaller.admin.kiloclawStripeRenewals.start({
+      previewId: preview.id,
+      confirmation: 'STOP STRIPE RENEWALS',
+    });
+    await expect(getStripeRenewalBatchStatus()).resolves.toEqual(
+      expect.objectContaining({
+        run: expect.objectContaining({ id: preview.id, status: 'running' }),
+      })
+    );
+    const [header] = await db
+      .select()
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.resource_key, preview.id),
+          eq(operation_ledgers.intent, 'batch_header')
+        )
+      );
+    expect(header.canonical_result).toMatchObject({ reason: 'KiloClaw end of life' });
   });
 
   it('counts stale claims as attempts and exposes terminal failures for manual retry', async () => {
     await subscription('sub_retry', 'stripe');
     const preview = await createStripeRenewalBatchPreview(actor);
-    await startStripeRenewalBatch({ previewId: preview.id, actor, reason: 'incident response' });
+    await startStripeRenewalBatch({ previewId: preview.id, actor });
     (stopKiloClawStripeRenewal as jest.Mock).mockRejectedValue(new Error('Stripe unavailable'));
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -210,10 +271,137 @@ describe('admin Stripe renewal batch', () => {
     );
   });
 
+  it('retries empty-message exceptions and records a terminal failure instead of success', async () => {
+    await subscription('sub_empty_error', 'stripe');
+    const preview = await createStripeRenewalBatchPreview(actor);
+    await startStripeRenewalBatch({ previewId: preview.id, actor });
+    jest.mocked(stopKiloClawStripeRenewal).mockRejectedValue(new Error(''));
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await db
+        .update(operation_ledgers)
+        .set({
+          lease_expires_at: sql`now() - interval '1 second'`,
+          canonical_result: sql`jsonb_set(canonical_result, '{nextAttemptAt}', 'null'::jsonb)`,
+        })
+        .where(
+          and(
+            eq(operation_ledgers.resource_key, preview.id),
+            eq(operation_ledgers.intent, 'batch_item')
+          )
+        );
+      await runStripeRenewalBatches();
+    }
+    expect(stopKiloClawStripeRenewal).toHaveBeenCalledTimes(3);
+    await expect(getStripeRenewalBatchStatus()).resolves.toMatchObject({
+      run: {
+        status: 'failed',
+        updated: 0,
+        skipped: 0,
+        failed: 1,
+        processed: 1,
+        failures: [
+          {
+            stripeSubscriptionId: 'sub_empty_error',
+            error: 'Stripe renewal stop failed without an error message',
+          },
+        ],
+      },
+    });
+  });
+
+  it('purges expired preview manifests and retained terminal batches, never active or unrelated records', async () => {
+    await subscription('sub_retention', 'stripe');
+    const expired = await createStripeRenewalBatchPreview(actor);
+    const terminal = await createStripeRenewalBatchPreview(actor);
+    const active = await createStripeRenewalBatchPreview(actor);
+    const fresh = await createStripeRenewalBatchPreview(actor);
+    await startStripeRenewalBatch({ previewId: active.id, actor });
+    await db
+      .update(operation_ledgers)
+      .set({
+        canonical_result: sql`jsonb_set(canonical_result, '{previewExpiresAt}', '"2000-01-01T00:00:00.000Z"'::jsonb)`,
+      })
+      .where(
+        and(
+          eq(operation_ledgers.resource_key, expired.id),
+          eq(operation_ledgers.intent, 'batch_header')
+        )
+      );
+    await db
+      .update(operation_ledgers)
+      .set({
+        status: 'completed',
+        expires_at: '2000-01-01T00:00:00.000Z',
+        canonical_result: sql`jsonb_set(canonical_result, '{state}', '"completed"'::jsonb)`,
+      })
+      .where(eq(operation_ledgers.resource_key, terminal.id));
+    await db
+      .update(operation_ledgers)
+      .set({ expires_at: '2000-01-01T00:00:00.000Z' })
+      .where(eq(operation_ledgers.resource_key, active.id));
+    await db.insert(operation_ledgers).values({
+      kilo_user_id: actor.id,
+      domain: 'session',
+      operation_key: 'unrelated-retention',
+      intent: 'batch_header',
+      resource_key: expired.id,
+      taxonomy: 'safe-retry',
+      status: 'completed',
+      canonical_result: { state: 'completed' },
+      admitted_at: new Date().toISOString(),
+      lease_expires_at: '2000-01-01T00:00:00.000Z',
+      expires_at: '2000-01-01T00:00:00.000Z',
+    });
+
+    await expect(purgeExpiredStripeRenewalBatches()).resolves.toBe(2);
+
+    const rows = await db.select().from(operation_ledgers);
+    expect(rows.filter(row => row.resource_key === expired.id)).toHaveLength(1);
+    expect(rows.find(row => row.operation_key === 'unrelated-retention')).toBeDefined();
+    expect(rows.filter(row => row.resource_key === terminal.id)).toHaveLength(0);
+    expect(rows.filter(row => row.resource_key === active.id)).toHaveLength(2);
+    expect(rows.filter(row => row.resource_key === fresh.id)).toHaveLength(2);
+  });
+
+  it('distinguishes expected input errors from private infrastructure failures', async () => {
+    const admin = await insertTestUser({ is_admin: true, is_super_admin: true });
+    const caller = await createCallerForUser(admin.id);
+    await expect(
+      caller.admin.kiloclawStripeRenewals.start({
+        previewId: crypto.randomUUID(),
+        confirmation: 'STOP STRIPE RENEWALS',
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Preview not found' });
+    const preview = await caller.admin.kiloclawStripeRenewals.preview();
+    const transaction = jest
+      .spyOn(db, 'transaction')
+      .mockRejectedValueOnce(new Error('private database connection details'));
+    try {
+      await expect(
+        caller.admin.kiloclawStripeRenewals.start({
+          previewId: preview.id,
+          confirmation: 'STOP STRIPE RENEWALS',
+        })
+      ).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Unable to start Stripe renewal batch',
+      });
+      transaction.mockRejectedValueOnce(new Error('private database connection details'));
+      await expect(
+        caller.admin.kiloclawStripeRenewals.retry({ runId: preview.id })
+      ).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Unable to retry Stripe renewal batch',
+      });
+    } finally {
+      transaction.mockRestore();
+    }
+  });
+
   it('does not call Stripe again when a stale claim has already exhausted its attempts', async () => {
     await subscription('sub_stale', 'stripe');
     const preview = await createStripeRenewalBatchPreview(actor);
-    await startStripeRenewalBatch({ previewId: preview.id, actor, reason: 'incident response' });
+    await startStripeRenewalBatch({ previewId: preview.id, actor });
     await db
       .update(operation_ledgers)
       .set({
@@ -247,7 +435,7 @@ describe('admin Stripe renewal batch', () => {
   it('prevents a second admin preview from starting while a batch is running', async () => {
     await subscription('sub_running', 'stripe');
     const first = await createStripeRenewalBatchPreview(actor);
-    await startStripeRenewalBatch({ previewId: first.id, actor, reason: 'incident response' });
+    await startStripeRenewalBatch({ previewId: first.id, actor });
     const secondActor = { id: 'admin-second', email: 'second@example.com', name: null };
     const second = await createStripeRenewalBatchPreview(secondActor);
 
@@ -255,7 +443,6 @@ describe('admin Stripe renewal batch', () => {
       startStripeRenewalBatch({
         previewId: second.id,
         actor: secondActor,
-        reason: 'incident response',
       })
     ).rejects.toThrow('Another Stripe renewal batch is already running');
   });
@@ -263,14 +450,14 @@ describe('admin Stripe renewal batch', () => {
   it('prioritizes an active retry over a newer completed run in status', async () => {
     await subscription('sub_first', 'stripe');
     const first = await createStripeRenewalBatchPreview(actor);
-    await startStripeRenewalBatch({ previewId: first.id, actor, reason: 'incident response' });
+    await startStripeRenewalBatch({ previewId: first.id, actor });
     (stopKiloClawStripeRenewal as jest.Mock).mockResolvedValue({ outcome: 'updated' });
     await runStripeRenewalBatches();
     await runStripeRenewalBatches();
 
     await subscription('sub_second', 'stripe');
     const second = await createStripeRenewalBatchPreview(actor);
-    await startStripeRenewalBatch({ previewId: second.id, actor, reason: 'incident response' });
+    await startStripeRenewalBatch({ previewId: second.id, actor });
     await runStripeRenewalBatches();
     await runStripeRenewalBatches();
 

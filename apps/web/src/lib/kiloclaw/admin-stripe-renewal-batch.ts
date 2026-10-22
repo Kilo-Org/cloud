@@ -20,6 +20,15 @@ const FAILURE_LIMIT = 100;
 
 export type StripeRenewalBatchActor = { id: string; email: string; name: string | null };
 
+export class StripeRenewalBatchInputError extends Error {
+  constructor(
+    readonly code: 'NOT_FOUND' | 'CONFLICT' | 'BAD_REQUEST',
+    message: string
+  ) {
+    super(message);
+  }
+}
+
 type HeaderResult = {
   type: 'header';
   state: 'preview' | 'running' | 'completed' | 'failed';
@@ -101,7 +110,7 @@ function parseItem(row: typeof operation_ledgers.$inferSelect): BatchItem | null
 
 function errorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return message.slice(0, 1_000);
+  return message.slice(0, 1_000) || 'Stripe renewal stop failed without an error message';
 }
 
 function retryAt(attempt: number) {
@@ -118,40 +127,7 @@ export async function createStripeRenewalBatchPreview(actor: StripeRenewalBatchA
   const id = crypto.randomUUID();
   const now = new Date();
   const expiresAt = new Date(now.getTime() + PREVIEW_LIFETIME_MS).toISOString();
-  const subscriptions: Array<{ userId: string; stripeSubscriptionId: string }> = [];
-  let cursor: string | null = null;
-
-  while (true) {
-    const page = await db
-      .select({
-        id: kiloclaw_subscriptions.id,
-        userId: kiloclaw_subscriptions.user_id,
-        stripeSubscriptionId: kiloclaw_subscriptions.stripe_subscription_id,
-      })
-      .from(kiloclaw_subscriptions)
-      .where(
-        cursor
-          ? and(
-              isNotNull(kiloclaw_subscriptions.stripe_subscription_id),
-              gt(kiloclaw_subscriptions.id, cursor)
-            )
-          : isNotNull(kiloclaw_subscriptions.stripe_subscription_id)
-      )
-      .orderBy(asc(kiloclaw_subscriptions.id))
-      .limit(PAGE_SIZE);
-    subscriptions.push(
-      ...page.flatMap(row =>
-        row.stripeSubscriptionId
-          ? [{ userId: row.userId, stripeSubscriptionId: row.stripeSubscriptionId }]
-          : []
-      )
-    );
-    if (page.length < PAGE_SIZE) break;
-    cursor = page.at(-1)?.id ?? null;
-  }
-
-  await db.transaction(async tx => {
-    await lockBatch(tx);
+  const total = await db.transaction(async tx => {
     await tx.insert(operation_ledgers).values({
       operation_key: headerKey(id),
       domain: DOMAIN,
@@ -171,39 +147,97 @@ export async function createStripeRenewalBatchPreview(actor: StripeRenewalBatchA
       lease_expires_at: expiresAt,
       expires_at: new Date(now.getTime() + RETENTION_MS).toISOString(),
     });
-    for (let offset = 0; offset < subscriptions.length; offset += PAGE_SIZE) {
-      const rows = subscriptions.slice(offset, offset + PAGE_SIZE);
-      await tx.insert(operation_ledgers).values(
-        rows.map(subscription => ({
-          operation_key: itemKey(id, subscription.stripeSubscriptionId),
-          domain: DOMAIN,
-          intent: ITEM_INTENT,
-          kilo_user_id: subscription.userId,
-          resource_key: id,
-          provider_ref: subscription.stripeSubscriptionId,
-          taxonomy: 'safe-retry' as const,
-          status: 'admitted',
-          canonical_result: {
-            type: 'item',
-            stripeSubscriptionId: subscription.stripeSubscriptionId,
-            state: 'pending',
-            attempts: 0,
-          } satisfies ItemResult,
-          admitted_at: now.toISOString(),
-          lease_expires_at: now.toISOString(),
-          expires_at: new Date(now.getTime() + RETENTION_MS).toISOString(),
-        }))
+    let count = 0;
+    let cursor: string | null = null;
+    while (true) {
+      const page = await tx
+        .select({
+          id: kiloclaw_subscriptions.id,
+          userId: kiloclaw_subscriptions.user_id,
+          stripeSubscriptionId: kiloclaw_subscriptions.stripe_subscription_id,
+        })
+        .from(kiloclaw_subscriptions)
+        .where(
+          cursor
+            ? and(
+                isNotNull(kiloclaw_subscriptions.stripe_subscription_id),
+                gt(kiloclaw_subscriptions.id, cursor)
+              )
+            : isNotNull(kiloclaw_subscriptions.stripe_subscription_id)
+        )
+        .orderBy(asc(kiloclaw_subscriptions.id))
+        .limit(PAGE_SIZE);
+      const rows = page.flatMap(row =>
+        row.stripeSubscriptionId
+          ? [{ userId: row.userId, stripeSubscriptionId: row.stripeSubscriptionId }]
+          : []
       );
+      if (rows.length > 0)
+        await tx.insert(operation_ledgers).values(
+          rows.map(subscription => ({
+            operation_key: itemKey(id, subscription.stripeSubscriptionId),
+            domain: DOMAIN,
+            intent: ITEM_INTENT,
+            kilo_user_id: subscription.userId,
+            resource_key: id,
+            provider_ref: subscription.stripeSubscriptionId,
+            taxonomy: 'safe-retry' as const,
+            status: 'admitted',
+            canonical_result: {
+              type: 'item',
+              stripeSubscriptionId: subscription.stripeSubscriptionId,
+              state: 'pending',
+              attempts: 0,
+            } satisfies ItemResult,
+            admitted_at: now.toISOString(),
+            lease_expires_at: now.toISOString(),
+            expires_at: new Date(now.getTime() + RETENTION_MS).toISOString(),
+          }))
+        );
+      count += rows.length;
+      if (page.length < PAGE_SIZE) break;
+      cursor = page.at(-1)?.id ?? null;
     }
+    return count;
   });
 
-  return { id, total: subscriptions.length };
+  return { id, total };
+}
+
+export async function purgeExpiredStripeRenewalBatches() {
+  return db.transaction(async tx => {
+    await lockBatch(tx);
+    const expired = await tx
+      .select({ resourceKey: operation_ledgers.resource_key })
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.domain, DOMAIN),
+          eq(operation_ledgers.intent, HEADER_INTENT),
+          sql`((${operation_ledgers.canonical_result}->>'state' = 'preview' and (${operation_ledgers.canonical_result}->>'previewExpiresAt')::timestamptz <= now()) or (${operation_ledgers.canonical_result}->>'state' in ('completed', 'failed') and ${operation_ledgers.expires_at} <= now()))`
+        )
+      )
+      .orderBy(asc(operation_ledgers.admitted_at))
+      .limit(10)
+      .for('update', { skipLocked: true });
+    for (const header of expired) {
+      if (header.resourceKey === null) continue;
+      await tx
+        .delete(operation_ledgers)
+        .where(
+          and(
+            eq(operation_ledgers.domain, DOMAIN),
+            eq(operation_ledgers.resource_key, header.resourceKey)
+          )
+        );
+    }
+    return expired.length;
+  });
 }
 
 export async function startStripeRenewalBatch(params: {
   previewId: string;
   actor: StripeRenewalBatchActor;
-  reason: string;
 }) {
   return db.transaction(async tx => {
     await lockBatch(tx);
@@ -221,12 +255,12 @@ export async function startStripeRenewalBatch(params: {
       .for('update')
       .limit(1);
     const header = stored ? parseHeader(stored) : null;
-    if (!header) throw new Error('Preview not found');
+    if (!header) throw new StripeRenewalBatchInputError('NOT_FOUND', 'Preview not found');
     if (
       header.canonical_result.state === 'preview' &&
       Date.parse(header.canonical_result.previewExpiresAt) < Date.now()
     ) {
-      throw new Error('Preview has expired');
+      throw new StripeRenewalBatchInputError('BAD_REQUEST', 'Preview has expired');
     }
     if (
       header.canonical_result.state === 'running' ||
@@ -247,14 +281,18 @@ export async function startStripeRenewalBatch(params: {
         )
       )
       .limit(1);
-    if (running[0]) throw new Error('Another Stripe renewal batch is already running');
+    if (running[0])
+      throw new StripeRenewalBatchInputError(
+        'CONFLICT',
+        'Another Stripe renewal batch is already running'
+      );
     await tx
       .update(operation_ledgers)
       .set({
         canonical_result: {
           ...header.canonical_result,
           state: 'running',
-          reason: params.reason,
+          reason: 'KiloClaw end of life',
           startedAt: new Date().toISOString(),
         },
         lease_expires_at: new Date(Date.now() + CLAIM_LEASE_MS).toISOString(),
@@ -280,9 +318,9 @@ export async function retryStripeRenewalBatch(runId: string, actor: StripeRenewa
       .for('update')
       .limit(1);
     const header = stored ? parseHeader(stored) : null;
-    if (!header) throw new Error('Run not found');
+    if (!header) throw new StripeRenewalBatchInputError('NOT_FOUND', 'Run not found');
     if (header.canonical_result.state === 'preview') {
-      throw new Error('Preview has not been started');
+      throw new StripeRenewalBatchInputError('BAD_REQUEST', 'Preview has not been started');
     }
     if (header.canonical_result.state === 'running') return { id: runId };
     const active = await tx
@@ -297,7 +335,10 @@ export async function retryStripeRenewalBatch(runId: string, actor: StripeRenewa
       )
       .limit(1);
     if (active[0] && active[0].id !== runId)
-      throw new Error('Another Stripe renewal batch is already running');
+      throw new StripeRenewalBatchInputError(
+        'CONFLICT',
+        'Another Stripe renewal batch is already running'
+      );
     const failed = await tx
       .select()
       .from(operation_ledgers)
@@ -438,8 +479,9 @@ async function settleClaim(params: {
   error?: string;
 }) {
   const current = params.item.canonical_result;
-  const terminal = params.error && current.attempts >= MAX_ATTEMPTS;
-  const result: ItemResult = params.error
+  const failed = params.error !== undefined;
+  const terminal = failed && current.attempts >= MAX_ATTEMPTS;
+  const result: ItemResult = failed
     ? terminal
       ? { ...current, state: 'failed', error: params.error, claimToken: undefined }
       : {
@@ -453,12 +495,12 @@ async function settleClaim(params: {
   await db
     .update(operation_ledgers)
     .set({
-      status: terminal || !params.error ? (terminal ? 'failed' : 'completed') : 'admitted',
+      status: terminal || !failed ? (terminal ? 'failed' : 'completed') : 'admitted',
       outcome_code: params.outcome ?? (terminal ? 'failed' : null),
-      settled_at: terminal || !params.error ? new Date().toISOString() : null,
+      settled_at: terminal || !failed ? new Date().toISOString() : null,
       canonical_result: result,
       lease_expires_at:
-        params.error && !terminal
+        failed && !terminal
           ? new Date().toISOString()
           : new Date(Date.now() + CLAIM_LEASE_MS).toISOString(),
     })
@@ -525,6 +567,7 @@ export async function runStripeRenewalBatches() {
   const startedAt = Date.now();
   const deadlineAtMs = startedAt + WORK_BUDGET_MS;
   const effectDeadlineAtMs = deadlineAtMs - SETTLEMENT_RESERVE_MS;
+  await purgeExpiredStripeRenewalBatches();
   let processed = 0;
   while (Date.now() < effectDeadlineAtMs) {
     const headers = await db

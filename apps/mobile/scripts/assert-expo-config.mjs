@@ -422,6 +422,17 @@ for (const key of Object.keys(ENV_KEYS)) {
   }
 }
 
+// Admission contract: the server issues native credentials only to an attested
+// device, and Play Integrity is the Android proof. An optional key would
+// otherwise bake an empty value into a release that then cannot sign in.
+if (process.env.EAS_BUILD_PROFILE === 'production') {
+  check(
+    typeof extra.playIntegrityProjectNumber === 'string' &&
+      extra.playIntegrityProjectNumber.length > 0,
+    'a production build must carry extra.playIntegrityProjectNumber (Android cannot attest without it)'
+  );
+}
+
 if (failures.length > 0) {
   console.error('Expo config contract violations:');
   for (const failure of failures) {

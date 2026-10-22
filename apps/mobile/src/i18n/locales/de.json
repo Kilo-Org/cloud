@@ -1658,7 +1658,7 @@
       "failedToCreate": "Die Remote-Sitzung konnte nicht erstellt werden.",
       "failedToExit": "Die Sitzung konnte nicht beendet werden.",
       "exitTitle": "Sitzung beenden?",
-      "exitMessage": "Die laufende Sitzung wird beendet. Dein Verlauf bleibt erhalten.",
+      "exitMessage": "Die laufende Sitzung wird beendet. Der Verlauf bleibt erhalten.",
       "keepSessionRunning": "Sitzung weiterlaufen lassen",
       "exitSession": "Sitzung beenden",
       "restartExitFailed": "Eine neue Sitzung wurde gestartet. Die vorherige Sitzung ist noch geöffnet.",

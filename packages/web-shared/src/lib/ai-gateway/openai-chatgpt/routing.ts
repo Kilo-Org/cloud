@@ -287,6 +287,10 @@ export function buildOpenAiChatGptProvider(
       // Subscription sharing accepts only `auto` and `default`, which match the
       // behavior without a tier, and rejects every other tier.
       delete body.service_tier;
+      // The reasoning models served on this route reject sampling parameters
+      // with `unsupported_parameter`.
+      delete body.temperature;
+      delete body.top_p;
       if (
         typeof body.max_output_tokens === 'number' &&
         body.max_output_tokens < MIN_MAX_OUTPUT_TOKENS

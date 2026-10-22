@@ -524,6 +524,21 @@ describe('checkOpenAiChatGptByok', () => {
     }
   );
 
+  it('drops the sampling parameters', async () => {
+    const provider = await buildProviderForTest();
+    const body: GatewayResponsesRequest = {
+      model: 'openai/gpt-5-nano',
+      input: 'hello',
+      temperature: 0.2,
+      top_p: 0.9,
+    };
+
+    await transformResponsesRequest(provider, body);
+
+    expect('temperature' in body).toBe(false);
+    expect('top_p' in body).toBe(false);
+  });
+
   it.each([
     [1, 16],
     [15, 16],

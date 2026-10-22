@@ -273,6 +273,83 @@ describe('active-sessions-router.list cloud merge', () => {
     expect(result.sessions).toEqual([]);
   });
 
+  it('flag on + busy turn with no run row + fresh activity → included', async () => {
+    // A session between message turns — or one whose current turn wrote no run
+    // row — keeps a non-idle status with no open run, so neither the open-run
+    // nor the warm-idle proof applies while the agent is demonstrably working.
+    // Recorded session activity is the only proof of life; without it the tray
+    // dropped the row until the session went idle, which made it appear only
+    // "temporarily when finished".
+    const sessionId = nextId('busy-activity');
+    const casId = nextId('cas');
+    await seedCloudSession({
+      sessionId,
+      cloudAgentSessionId: casId,
+      kiloUserId: regularUser.id,
+      status: 'busy',
+      statusUpdatedAt: minutesAgoIso(30),
+      lastActivityAt: minutesAgoIso(1),
+      title: 'Working without a run row',
+      run: null,
+    });
+
+    fetchSpy = mockWorkerSessions([]);
+    const caller = await createCallerForUser(regularUser.id);
+    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
+
+    expect(result.sessions.map(s => s.id)).toEqual([sessionId]);
+    expect(result.sessions[0]).toMatchObject({
+      status: 'busy',
+      connectionId: CLOUD_AGENT_CONNECTION_ID,
+      title: 'Working without a run row',
+    });
+  });
+
+  it('flag on + attention status with no run row + fresh activity → included as attention', async () => {
+    // A session waiting on the user is the one case the tray must never hide:
+    // the fleet badge and the needs-input notification read this set.
+    const sessionId = nextId('question-activity');
+    const casId = nextId('cas');
+    await seedCloudSession({
+      sessionId,
+      cloudAgentSessionId: casId,
+      kiloUserId: regularUser.id,
+      status: 'question',
+      statusUpdatedAt: minutesAgoIso(20),
+      lastActivityAt: minutesAgoIso(2),
+      run: null,
+    });
+
+    fetchSpy = mockWorkerSessions([]);
+    const caller = await createCallerForUser(regularUser.id);
+    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
+
+    expect(result.sessions.map(s => s.id)).toEqual([sessionId]);
+    expect(result.sessions[0]?.status).toBe('question');
+  });
+
+  it('flag on + busy status with no run row + stale activity → excluded', async () => {
+    // The recency window keeps abandoned `busy` rows (a runner that died
+    // without writing a terminal run) out of the tray.
+    const sessionId = nextId('stale-busy');
+    const casId = nextId('cas');
+    await seedCloudSession({
+      sessionId,
+      cloudAgentSessionId: casId,
+      kiloUserId: regularUser.id,
+      status: 'busy',
+      statusUpdatedAt: minutesAgoIso(40),
+      lastActivityAt: minutesAgoIso(30),
+      run: null,
+    });
+
+    fetchSpy = mockWorkerSessions([]);
+    const caller = await createCallerForUser(regularUser.id);
+    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
+
+    expect(result.sessions).toEqual([]);
+  });
+
   it('excludes child cloud rows (parent_session_id set)', async () => {
     const parentId = nextId('parent');
     const parentCas = nextId('cas-p');

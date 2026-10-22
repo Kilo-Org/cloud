@@ -44,7 +44,7 @@ describe('payerSharingIp', () => {
   });
 
   it('stays undefined when no address resolved', () => {
-    expect(payerSharingIp(undefined, 'app-builder')).toBeUndefined();
+    expect(payerSharingIp(undefined, 'cloud-agent')).toBeUndefined();
   });
 });
 

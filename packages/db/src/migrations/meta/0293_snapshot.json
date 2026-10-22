@@ -1,5 +1,5 @@
 {
-  "id": "e494532c-95fc-4e8f-8c74-f5398ed405ab",
+  "id": "496f66ad-4ac2-42fc-bf29-3081b7c66a06",
   "prevId": "48da44e5-b482-4eae-a823-83defe1a305a",
   "version": "7",
   "dialect": "postgresql",
@@ -2181,6 +2181,12 @@
         },
         "vercel_model_id_overrides": {
           "name": "vercel_model_id_overrides",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preferred_provider_order": {
+          "name": "preferred_provider_order",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -12983,12 +12989,6 @@
           "type": "bigint",
           "primaryKey": false,
           "notNull": true
-        },
-        "charged_microdollars": {
-          "name": "charged_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
         },
         "charged_to_balance": {
           "name": "charged_to_balance",

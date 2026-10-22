@@ -11,7 +11,7 @@ import {
   type SandboxAllocationCapability,
   type SessionRepositoryType,
 } from '../sandbox-selection.js';
-import { requiredProviderCapability } from '../session-plane.js';
+import { requiredProviderCapability } from '../session-identity.js';
 import type { Env } from '../types.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
 

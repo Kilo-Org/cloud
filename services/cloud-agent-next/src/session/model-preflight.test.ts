@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
-import { resolveSessionStub } from '../sandbox-session/session-stub.js';
+import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchSessionMetadata } from '../session-service.js';
+import { fetchSessionMetadata } from './metadata.js';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import type { PersistenceEnv, CloudAgentSessionState } from '../persistence/types.js';
 import {
@@ -11,10 +11,9 @@ import {
 } from './model-preflight.js';
 
 vi.mock('../sandbox-session/session-stub.js', () => ({
-  resolveSessionStub: vi.fn(),
   getSandboxSessionStub: vi.fn(),
 }));
-vi.mock('../session-service.js', () => ({ fetchSessionMetadata: vi.fn() }));
+vi.mock('./metadata.js', () => ({ fetchSessionMetadata: vi.fn() }));
 vi.mock('../model-validation.js', () => ({ assertKiloModelAvailable: vi.fn() }));
 
 const metadata: CloudAgentSessionState = {
@@ -71,7 +70,7 @@ describe('model preflight for stored sessions', () => {
         message: expect.stringContaining('Devcontainer support has been retired'),
       });
     }
-    expect(resolveSessionStub).not.toHaveBeenCalled();
+    expect(getSandboxSessionStub).not.toHaveBeenCalled();
     expect(assertKiloModelAvailable).not.toHaveBeenCalled();
   });
 
@@ -84,7 +83,7 @@ describe('model preflight for stored sessions', () => {
       procedure: 'send',
     });
 
-    expect(resolveSessionStub).not.toHaveBeenCalled();
+    expect(getSandboxSessionStub).not.toHaveBeenCalled();
     expect(assertKiloModelAvailable).toHaveBeenCalledWith({
       env,
       submittedModel: 'override/model',
@@ -182,8 +181,8 @@ describe('modern preflight token renewal', () => {
       ...metadata,
       auth: { kilocodeToken: expiredToken },
     });
-    vi.mocked(resolveSessionStub).mockReturnValue({ getRuntimeToken } as unknown as ReturnType<
-      typeof resolveSessionStub
+    vi.mocked(getSandboxSessionStub).mockReturnValue({ getRuntimeToken } as unknown as ReturnType<
+      typeof getSandboxSessionStub
     >);
   });
 
@@ -197,7 +196,11 @@ describe('modern preflight token renewal', () => {
         cloudAgentSessionId: metadata.identity.sessionId,
         procedure: 'send',
       });
-      expect(resolveSessionStub).toHaveBeenCalledWith(env, 'user-1', metadata.identity.sessionId);
+      expect(getSandboxSessionStub).toHaveBeenCalledWith(
+        env,
+        'user-1',
+        metadata.identity.sessionId
+      );
       expect(getRuntimeToken).toHaveBeenCalledTimes(1);
       expect(assertKiloModelAvailable).toHaveBeenCalledWith(
         expect.objectContaining({ originalToken: 'renewed-token' })

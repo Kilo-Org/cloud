@@ -29,7 +29,8 @@ function formatCodeDestination(message: string, email: string): string {
   const [before = '', after = ''] = message.split(ADDRESS_SLOT);
   const lead = before ? `${before}\n` : '';
   const trail = after.startsWith(' ') ? `\n${after}` : after;
-  return `${lead}${email}${trail}`;
+  const destination = email.length > 48 ? `${email.slice(0, 24)}…${email.slice(-23)}` : email;
+  return `${lead}${destination}${trail}`;
 }
 
 export function EmailOtpForm({

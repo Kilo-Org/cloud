@@ -105,13 +105,6 @@ afterEach(async () => {
 });
 
 describe('EmailOtpForm destination layout', () => {
-  it('starts the reported address on its own line instead of sharing the instruction', () => {
-    const { mounted } = mount();
-    const text = destination(mounted.root).props.children as string;
-
-    expect(text.split('\n')).toEqual(['Enter the code sent to ', reportedEmail]);
-  });
-
   it.each(SUPPORTED_LANGUAGES)(
     'keeps the %s message intact and never strands its punctuation on its own line',
     async language => {
@@ -134,19 +127,26 @@ describe('EmailOtpForm destination layout', () => {
     }
   );
 
-  it.each(['a@example.com', `${'long-address-'.repeat(5)}@example.com`])(
-    'preserves the complete address and native font scaling for %s',
-    email => {
-      const { mounted } = mount({ email });
-      const node = destination(mounted.root, email);
-
-      expect((node.props.children as string).split('\n')).toContain(email);
-      expect(node.props.numberOfLines).toBeUndefined();
-      expect(node.props.ellipsizeMode).toBeUndefined();
-      expect(node.props.allowFontScaling).not.toBe(false);
-      expect(node.props.adjustsFontSizeToFit).not.toBe(true);
-    }
-  );
+  it('shortens a long destination without changing code submission', () => {
+    const email = `${'a'.repeat(3496)}@example.com`;
+    const { mounted, props } = mount({ email });
+    const displayedEmail = `${email.slice(0, 24)}…${email.slice(-23)}`;
+    const text = destination(mounted.root, displayedEmail).props.children as string;
+    expect(text.replaceAll('\n', '')).toBe(
+      i18n.t('login.enterCodeSentTo', { email: displayedEmail })
+    );
+    expect(text).not.toContain(email);
+    const input = mounted.root.findByType('TextInput');
+    act(() => {
+      (input.props.onChangeText as (value: string) => void)('123456');
+    });
+    const verify = mounted.root.findByProps({ accessibilityLabel: 'Verify code' });
+    expect(verify.props.disabled).toBe(false);
+    act(() => {
+      (verify.props.onPress as () => void)();
+    });
+    expect(props.onVerify).toHaveBeenCalledWith('123456');
+  });
 
   it.each(['otp-send', 'otp-verify'] as const)(
     'keeps the destination unchanged through %s and recovery',

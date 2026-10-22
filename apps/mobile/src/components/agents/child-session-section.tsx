@@ -296,9 +296,7 @@ function StatusBadge({ status, label }: Readonly<{ status: ChildSessionStatus; l
 
   return (
     <View className={`rounded px-1.5 py-0.5 ${bgClass}`}>
-      <Text className={`text-xs ${textClass}`} numberOfLines={1}>
-        {label}
-      </Text>
+      <Text className={`text-xs ${textClass}`}>{label}</Text>
     </View>
   );
 }

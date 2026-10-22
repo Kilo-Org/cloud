@@ -9,7 +9,7 @@ import {
 import { getPgDb } from '../db/pg.js';
 import type { Env } from '../types.js';
 import { logger } from '../logger.js';
-import { CONTROL_PLANE_SESSION_PREFIX } from '../session-plane.js';
+import { CONTROL_PLANE_SESSION_PREFIX } from '../session-identity.js';
 import { retentionCutoff } from './report-store.js';
 
 // Provisional: not yet measured against production reporting lag.

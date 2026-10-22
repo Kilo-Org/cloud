@@ -14,6 +14,12 @@ type NewSessionRunTargetProps = {
   instanceList: InstancePickerInstance[];
   isLoadingInstances: boolean;
   isFetchingInstances: boolean;
+  /**
+   * The computer target is selected with no computer bound yet (the tour's
+   * computer path with zero connected computers): the selector shows the
+   * no-computer copy instead of the Cloud Agent label.
+   */
+  pendingComputer?: boolean;
   onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
   onRefreshInstances: () => void;
   disabled: boolean;
@@ -30,6 +36,7 @@ export function NewSessionRunTarget({
   instanceList,
   isLoadingInstances,
   isFetchingInstances,
+  pendingComputer,
   onChangeRunOnInstance,
   onRefreshInstances,
   disabled,
@@ -50,6 +57,7 @@ export function NewSessionRunTarget({
               value={runOnInstance}
               instances={instanceList}
               isLoading={isLoadingInstances}
+              pendingComputer={pendingComputer}
               onChange={onChangeRunOnInstance}
               disabled={disabled}
             />

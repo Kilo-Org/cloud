@@ -1,9 +1,9 @@
 export const RUNTIME_DISTRIBUTION = {
   nodeMajor: '24',
   bun: '1.3.14',
-  pnpm: '11.1.2',
-  glab: '1.93.0',
-  gh: '2.82.1',
+  pnpm: '12.14.0',
+  glab: '1.124.0',
+  gh: '2.102.0',
 } as const;
 
 export type WrapperBundle = {
@@ -14,12 +14,6 @@ export type WrapperBundle = {
 };
 
 export const WRAPPER_BUNDLES: readonly WrapperBundle[] = [
-  {
-    entry: 'src/main.ts',
-    distName: 'wrapper.js',
-    installName: 'kilocode-wrapper.js',
-    executable: false,
-  },
   {
     entry: 'src/restore-session.ts',
     distName: 'restore-session.js',

@@ -45,6 +45,9 @@ const BILLING_INPUT = {
   enforcementRequested: true,
 };
 
+const LEGACY_NON_BILLABLE_INSTANCE = 'standard-2' as ContainerInstanceSize;
+const LEGACY_NON_BILLABLE_INSTANCE_ALT = 'lite' as ContainerInstanceSize;
+
 type MeterRecordStartInput = Parameters<ContainerUsageRpcMethods['recordStart']>[0];
 type MeterRecordHeartbeatInput = Parameters<ContainerUsageRpcMethods['recordHeartbeat']>[0];
 type MeterRecordStopInput = Parameters<ContainerUsageRpcMethods['recordStop']>[0];
@@ -736,8 +739,11 @@ describe('ContainersBilling force destroy', () => {
 });
 
 describe('ContainersBilling inert without persisted attribution', () => {
-  it('keeps launch, same-ref reuse, stop, and pre-change records unchanged for standard-2 and lite', async () => {
-    for (const instanceSize of ['standard-2', 'lite'] as const) {
+  it('keeps launch, same-ref reuse, stop, and pre-change records unchanged for legacy non-billable instances', async () => {
+    for (const instanceSize of [
+      LEGACY_NON_BILLABLE_INSTANCE,
+      LEGACY_NON_BILLABLE_INSTANCE_ALT,
+    ] as const) {
       const { instance, container, storage, meter } = setup();
 
       await expect(
@@ -1028,7 +1034,7 @@ describe('ContainersBilling resumed launch activation', () => {
       return execProcess(0);
     };
 
-    await expect(launch(reconstructed.instance, REF_A, 'standard-2')).resolves.toEqual({
+    await expect(launch(reconstructed.instance, REF_A, 'standard-3')).resolves.toEqual({
       started: true,
       startSource: 'image',
     });
@@ -1138,9 +1144,9 @@ describe('ContainersBilling launch instance persistence', () => {
       },
     });
 
-    await launch(instance, REF_A, 'standard-2');
+    await launch(instance, REF_A, LEGACY_NON_BILLABLE_INSTANCE);
 
-    expect(readRecord(storage)).toMatchObject({ instance: 'standard-2' });
+    expect(readRecord(storage)).toMatchObject({ instance: LEGACY_NON_BILLABLE_INSTANCE });
     expect(readRecord(storage).billingConfigured).toBeUndefined();
   });
 
@@ -1149,7 +1155,7 @@ describe('ContainersBilling launch instance persistence', () => {
       record: {
         state: 'idle',
         allocationRef: null,
-        instance: 'standard-2',
+        instance: LEGACY_NON_BILLABLE_INSTANCE,
       },
     });
 
@@ -1426,14 +1432,14 @@ describe('ContainersBilling identity replacement', () => {
     await admit(instance, 'standard-4');
 
     // The switch is refused until the old generation settles, so retry after it lands.
-    await expect(instance.configureBilling(BILLING_INPUT, 'standard-2')).rejects.toThrow(
-      'Container billing identity change refused'
-    );
+    await expect(
+      instance.configureBilling(BILLING_INPUT, LEGACY_NON_BILLABLE_INSTANCE)
+    ).rejects.toThrow('Container billing identity change refused');
     await flushPending(pendingTasks);
 
-    await instance.configureBilling(BILLING_INPUT, 'standard-2');
+    await instance.configureBilling(BILLING_INPUT, LEGACY_NON_BILLABLE_INSTANCE);
 
-    expect(readRecord(storage).instance).toBe('standard-2');
+    expect(readRecord(storage).instance).toBe(LEGACY_NON_BILLABLE_INSTANCE);
     expect(readRecord(storage).billingConfigured).toBeUndefined();
   });
 });
@@ -1535,7 +1541,7 @@ describe('ContainersBilling inert pre-change records', () => {
       record: { state: 'running', allocationRef: REF_A },
     });
     reuse.container.running = true;
-    await expect(launch(reuse.instance, REF_A, 'standard-2')).resolves.toEqual({
+    await expect(launch(reuse.instance, REF_A, 'standard-3')).resolves.toEqual({
       started: false,
       startSource: 'image',
     });
@@ -1549,7 +1555,7 @@ describe('ContainersBilling inert pre-change records', () => {
     });
     resumed.container.running = true;
     resumed.container.execHandler = () => execProcess(0);
-    await expect(launch(resumed.instance, REF_A, 'standard-2')).resolves.toEqual({
+    await expect(launch(resumed.instance, REF_A, 'standard-3')).resolves.toEqual({
       started: true,
       startSource: 'image',
     });

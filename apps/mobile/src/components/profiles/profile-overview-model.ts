@@ -7,18 +7,6 @@
  * classification, and the three section rows the Overview lists.
  */
 
-/** The `profiles.*` keys the default row's switch reads its label from. */
-const SET_DEFAULT_LABEL_KEY = 'profiles.setAsDefault';
-const REMOVE_DEFAULT_LABEL_KEY = 'profiles.removeDefault';
-
-/**
- * Label for the default toggle. The label names the action a press performs,
- * so it flips with the profile's current default state.
- */
-export function defaultControlLabel(isDefault: boolean): string {
-  return isDefault ? REMOVE_DEFAULT_LABEL_KEY : SET_DEFAULT_LABEL_KEY;
-}
-
 /**
  * Copy for the default row's subtitle. An org-owned profile explains the
  * organization rule; a personal profile explains the personal rule.

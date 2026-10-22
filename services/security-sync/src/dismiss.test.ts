@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseConfigFileTextToJson } from 'typescript';
+import { parse as parseJsonc, type ParseError } from 'jsonc-parser';
 import { z } from 'zod';
 import { processSecurityFindingDismissal } from './dismiss.js';
 import type { SecurityDismissMessage } from './index.js';
@@ -144,14 +144,16 @@ describe('processSecurityFindingDismissal', () => {
   it.each(['../wrangler.jsonc', '../../git-token-service/wrangler.jsonc'])(
     'preserves custom RPC error names with the compatibility flags in %s',
     path => {
-      const parsed = parseConfigFileTextToJson(
-        path,
-        readFileSync(new URL(path, import.meta.url), 'utf8')
+      const errors: ParseError[] = [];
+      const config: unknown = parseJsonc(
+        readFileSync(new URL(path, import.meta.url), 'utf8'),
+        errors,
+        { allowTrailingComma: true }
       );
-      expect(parsed.error).toBeUndefined();
-      const config = z.object({ compatibility_flags: z.array(z.string()) }).parse(parsed.config);
-      expect(config.compatibility_flags).toContain('enhanced_error_serialization');
-      expect(config.compatibility_flags).not.toContain('legacy_error_serialization');
+      expect(errors).toEqual([]);
+      const flags = z.object({ compatibility_flags: z.array(z.string()) }).parse(config);
+      expect(flags.compatibility_flags).toContain('enhanced_error_serialization');
+      expect(flags.compatibility_flags).not.toContain('legacy_error_serialization');
     }
   );
 

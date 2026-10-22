@@ -5,6 +5,7 @@ import { normalizeImageAsset } from '@/components/agents/attachment-picker';
 import {
   type AttachmentSurface,
   clearPickerLaunchContext,
+  PICKER_LAUNCH_CONTEXT_TTL_MS,
   readPickerLaunchContext,
 } from '@/lib/agent-attachments/picker-launch-context';
 import {
@@ -13,8 +14,6 @@ import {
 } from '@/lib/agent-attachments/pending-picker-result';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-
-const PICKER_LAUNCH_CONTEXT_TTL_MS = 10 * 60 * 1000;
 
 type UseAndroidPendingPickerRecoveryOptions = {
   surface: AttachmentSurface;

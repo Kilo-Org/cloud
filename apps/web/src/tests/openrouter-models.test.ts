@@ -149,6 +149,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
   getCustomLlmsById: jest.fn(async () => new Map()),
   requireCustomLlmsById: jest.fn(async () => new Map()),
+  isCustomLlm: jest.fn(async () => false),
 }));
 
 jest.mock('@kilocode/web-shared/lib/redis', () => ({

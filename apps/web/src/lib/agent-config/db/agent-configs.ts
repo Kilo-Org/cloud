@@ -51,19 +51,7 @@ function configForAtomicUpdate(
  * Gets agent configuration for an organization
  */
 export async function getAgentConfig(organizationId: string, agentType: string, platform: string) {
-  const [config] = await db
-    .select()
-    .from(agent_configs)
-    .where(
-      and(
-        eq(agent_configs.owned_by_organization_id, organizationId),
-        eq(agent_configs.agent_type, agentType),
-        eq(agent_configs.platform, platform)
-      )
-    )
-    .limit(1);
-
-  return config || null;
+  return getAgentConfigForOwner({ type: 'org', id: organizationId }, agentType, platform);
 }
 
 /**
@@ -79,49 +67,11 @@ export async function upsertAgentConfig(
     createdBy: string;
   } & AgentConfigUpsertOptions
 ) {
-  const updateSet = {
-    config: configForAtomicUpdate(data.config, data),
-    updated_at: new Date().toISOString(),
-    ...(data.isEnabled !== undefined ? { is_enabled: data.isEnabled } : {}),
-  };
-
-  await db.transaction(async tx => {
-    if (data.platform === 'github' && data.isEnabled === true) {
-      await assertGitHubAutomationCanBeEnabled({ type: 'org', id: data.organizationId }, tx);
-    }
-    await tx
-      .insert(agent_configs)
-      .values({
-        owned_by_organization_id: data.organizationId,
-        agent_type: data.agentType,
-        platform: data.platform,
-        config: data.config,
-        is_enabled: data.isEnabled ?? false,
-        created_by: data.createdBy,
-      })
-      .onConflictDoUpdate({
-        target: [
-          agent_configs.owned_by_organization_id,
-          agent_configs.agent_type,
-          agent_configs.platform,
-        ],
-        set: updateSet,
-      });
+  const { organizationId, ...rest } = data;
+  return upsertAgentConfigForOwner({
+    owner: { type: 'org', id: organizationId },
+    ...rest,
   });
-
-  // Create bot user for code review agents
-  if (data.agentType === 'code_review') {
-    try {
-      await ensureBotUserForOrg(data.organizationId, 'code-review');
-    } catch (error) {
-      // Log warning but don't fail the config save
-      warnExceptInTest('[upsertAgentConfig] Failed to create bot user:', error);
-      captureException(error, {
-        tags: { operation: 'upsert-agent-config', step: 'ensure-bot-user' },
-        extra: { organizationId: data.organizationId, agentType: data.agentType },
-      });
-    }
-  }
 }
 
 /**
@@ -133,24 +83,12 @@ export async function setAgentEnabled(
   platform: string,
   isEnabled: boolean
 ) {
-  await db.transaction(async tx => {
-    if (platform === 'github' && isEnabled) {
-      await assertGitHubAutomationCanBeEnabled({ type: 'org', id: organizationId }, tx);
-    }
-    await tx
-      .update(agent_configs)
-      .set({
-        is_enabled: isEnabled,
-        updated_at: new Date().toISOString(),
-      })
-      .where(
-        and(
-          eq(agent_configs.owned_by_organization_id, organizationId),
-          eq(agent_configs.agent_type, agentType),
-          eq(agent_configs.platform, platform)
-        )
-      );
-  });
+  return setAgentEnabledForOwner(
+    { type: 'org', id: organizationId },
+    agentType,
+    platform,
+    isEnabled
+  );
 }
 
 /**
@@ -186,7 +124,6 @@ export async function getAgentConfigForOwner(
     eq(agent_configs.platform, platform),
   ];
 
-  // Add owner-specific condition
   if (owner.type === 'org') {
     conditions.push(eq(agent_configs.owned_by_organization_id, owner.id));
   } else {
@@ -264,10 +201,14 @@ export async function upsertAgentConfigForOwner(
       await ensureBotUserForOrg(data.owner.id, 'code-review');
     } catch (error) {
       // Log warning but don't fail the config save
-      warnExceptInTest('[upsertAgentConfigForOwner] Failed to create bot user:', error);
+      warnExceptInTest('[upsertAgentConfig] Failed to create bot user:', error);
       captureException(error, {
-        tags: { operation: 'upsert-agent-config-owner', step: 'ensure-bot-user' },
-        extra: { ownerId: data.owner.id, agentType: data.agentType },
+        tags: { operation: 'upsert-agent-config', step: 'ensure-bot-user' },
+        extra: {
+          ownerType: data.owner.type,
+          ownerId: data.owner.id,
+          agentType: data.agentType,
+        },
       });
     }
   }
@@ -288,7 +229,6 @@ export async function setAgentEnabledForOwner(
     eq(agent_configs.platform, platform),
   ];
 
-  // Add owner-specific condition
   if (owner.type === 'org') {
     conditions.push(eq(agent_configs.owned_by_organization_id, owner.id));
   } else {

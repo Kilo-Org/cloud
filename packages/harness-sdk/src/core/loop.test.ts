@@ -1,4 +1,4 @@
-import { Duration, Effect, Layer, Stream } from 'effect';
+import { Duration, Effect, Layer, Semaphore, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import type { ModelEvent, ModelRequest } from './model.js';
 import { recordingStore, runWith, texts } from './session-fixture.js';
@@ -125,15 +125,15 @@ it('runs the calls of one turn at once, and leaves a tool to serialise itself', 
   const order: string[] = [];
   const marking = (name: string) =>
     Effect.sync(() => order.push(`${name} in`)).pipe(
-      Effect.zipRight(Effect.sleep(Duration.millis(20))),
-      Effect.zipRight(Effect.sync(() => order.push(`${name} out`))),
+      Effect.andThen(Effect.sleep(Duration.millis(20))),
+      Effect.andThen(Effect.sync(() => order.push(`${name} out`))),
       Effect.as('done')
     );
   const slow = (name: string) => tool(name, () => marking(name));
   /* The session serialises nothing, so a tool that must not overlap says so in
      its own body. This is the four lines a caller writes. */
   const serialised = (name: string) => {
-    const permit = Effect.unsafeMakeSemaphore(1);
+    const permit = Semaphore.makeUnsafe(1);
     return tool(name, () => permit.withPermits(1)(marking(name)));
   };
 
@@ -188,7 +188,7 @@ it('keeps every turn of the exchange in the history, in the order they happened'
       { deltas: ['it rains outside'] },
     ],
     use: session =>
-      Effect.zipRight(Stream.runDrain(session.ask('what is it like out')), session.history),
+      Effect.andThen(Stream.runDrain(session.ask('what is it like out')), session.history),
   });
 
   expect(texts(value)).toEqual([
@@ -221,7 +221,7 @@ it('counts what every round cost, not only the last', async () => {
       },
       { deltas: ['it rains'], usage: { inputTokens: 20, outputTokens: 5 } },
     ],
-    use: session => Effect.zipRight(Stream.runDrain(session.ask('out?')), session.usage),
+    use: session => Effect.andThen(Stream.runDrain(session.ask('out?')), session.usage),
   });
 
   /* A caller reading `usage` to know what a question cost must see every round

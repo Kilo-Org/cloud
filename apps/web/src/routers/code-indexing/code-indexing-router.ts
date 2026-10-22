@@ -21,6 +21,10 @@ import { getUserUUID } from '@kilocode/web-shared/lib/user/server';
 import { findUserByEmail } from '@/lib/user';
 import { chunkCountToSizeKbSql } from '@/lib/code-indexing/util';
 import {
+  CODE_INDEXING_GONE_MESSAGE,
+  isCodeIndexingEnabled,
+} from '@/lib/code-indexing/availability.server';
+import {
   trackCodeIndexingSearch,
   trackCodeIndexingDelete,
   trackCodeIndexingManifest,
@@ -30,7 +34,27 @@ import {
 } from '@/lib/code-indexing/posthog-tracking';
 
 const errorLogger = sentryLogger('code-indexing', 'error');
-const storage = getIndexStorage();
+
+let storage: ReturnType<typeof getIndexStorage> | undefined;
+
+function getStorage() {
+  return (storage ??= getIndexStorage());
+}
+
+function codeIndexingNotAvailable() {
+  return new TRPCError({
+    code: 'NOT_FOUND',
+    message: CODE_INDEXING_GONE_MESSAGE,
+  });
+}
+
+const codeIndexingProcedure = baseProcedure.use(async ({ next }) => {
+  if (!isCodeIndexingEnabled()) {
+    throw codeIndexingNotAvailable();
+  }
+
+  return next();
+});
 
 const CodebaseIndexingSearchRequestSchema = z.object({
   organizationId: z.uuid().nullable().optional(),
@@ -122,6 +146,10 @@ const CodebaseIndexingProjectFilesResponseSchema = z.object({
 
 type Input = { organizationId?: string | null | undefined };
 export async function getCodeIndexOrganizationId(ctx: TRPCContext, input: Input) {
+  if (!isCodeIndexingEnabled()) {
+    throw codeIndexingNotAvailable();
+  }
+
   if (input.organizationId) {
     const org = await ensureOrganizationAccessAndFetchOrg(ctx, input.organizationId);
     if (org.settings.code_indexing_enabled === false) {
@@ -175,13 +203,13 @@ async function resolveOrganizationIdWithOverride(
 }
 
 export const codeIndexingRouter = createTRPCRouter({
-  search: baseProcedure
+  search: codeIndexingProcedure
     .input(CodebaseIndexingSearchRequestSchema)
     .output(CodebaseIndexingSearchResponseSchema)
     .query(async ({ ctx, input }) => {
       const organizationId = await getCodeIndexOrganizationId(ctx, input);
 
-      const finalResults = await storage.search({
+      const finalResults = await getStorage().search({
         query: input.query,
         organizationId: organizationId,
         projectId: input.projectId,
@@ -221,13 +249,13 @@ export const codeIndexingRouter = createTRPCRouter({
 
       return finalResults;
     }),
-  delete: baseProcedure
+  delete: codeIndexingProcedure
     .input(CodebaseIndexingDeleteRequestSchema)
     .mutation(async ({ ctx, input }) => {
       try {
         const organizationId = await getCodeIndexOrganizationId(ctx, input);
 
-        const deletedFiles = await storage.delete({
+        const deletedFiles = await getStorage().delete({
           organizationId,
           projectId: input.projectId,
           gitBranch: input.gitBranch,
@@ -272,13 +300,13 @@ export const codeIndexingRouter = createTRPCRouter({
         return { success: false, deletedFiles: 0 };
       }
     }),
-  getManifest: baseProcedure
+  getManifest: codeIndexingProcedure
     .input(CodebaseIndexingManifestRequestSchema)
     .output(CodebaseIndexingManifestResponseSchema)
     .query(async ({ ctx, input }) => {
       const organizationId = await getCodeIndexOrganizationId(ctx, input);
 
-      const manifest = await storage.getManifest({
+      const manifest = await getStorage().getManifest({
         organizationId: organizationId,
         projectId: input.projectId,
         gitBranch: input.gitBranch,
@@ -296,7 +324,7 @@ export const codeIndexingRouter = createTRPCRouter({
       return manifest;
     }),
   // Non-admin procedures for organization members to view their own org's stats
-  getOrganizationStats: baseProcedure
+  getOrganizationStats: codeIndexingProcedure
     .input(CodebaseIndexingStatsSchema)
     .output(
       z.array(
@@ -415,7 +443,7 @@ export const codeIndexingRouter = createTRPCRouter({
 
       return result;
     }),
-  getProjectFiles: baseProcedure
+  getProjectFiles: codeIndexingProcedure
     .input(CodebaseIndexingProjectFilesRequestSchema)
     .output(CodebaseIndexingProjectFilesResponseSchema)
     .query(async ({ ctx, input }) => {
@@ -516,12 +544,12 @@ export const codeIndexingRouter = createTRPCRouter({
 
       return response;
     }),
-  deleteBeforeDate: baseProcedure
+  deleteBeforeDate: codeIndexingProcedure
     .input(CodebaseIndexingDeleteBeforeDateRequestSchema)
     .mutation(async ({ ctx, input }) => {
       const organizationId = await getCodeIndexOrganizationId(ctx, input);
 
-      await storage.deleteByOrganizationBeforeDate({
+      await getStorage().deleteByOrganizationBeforeDate({
         organizationId,
         beforeDate: input.beforeDate,
       });

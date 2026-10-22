@@ -630,16 +630,19 @@ describe('removePaidServerFeatures', () => {
     return request.body;
   }
 
-  it('removes plugins and server tools from free model requests', async () => {
+  it('removes paid plugins and server tools from free model requests', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const plugins = [{ id: 'web' }, { id: 'file-parser', pdf: { engine: 'mistral-ocr' } }];
+    const paidPlugins = [{ id: 'web' }, { id: 'file-parser', pdf: { engine: 'mistral-ocr' } }];
 
     const body = await applyTo('vendor/model:free', 'user-1', {
-      plugins,
+      plugins: [...paidPlugins, { id: 'response-healing' }],
       tools: [{ type: 'openrouter:web_search' }, functionTool, { type: 'openrouter:advisor' }],
     });
 
-    expect(body).not.toHaveProperty('plugins');
+    expect(body.plugins).toEqual([
+      { id: 'response-healing' },
+      { id: 'file-parser', pdf: { engine: 'cloudflare-ai' } },
+    ]);
     expect(body.tools).toEqual([functionTool]);
     expect(warn).toHaveBeenCalledWith(
       '[applyProviderSpecificLogic] Removed paid server features from free request',
@@ -647,14 +650,14 @@ describe('removePaidServerFeatures', () => {
         userId: 'user-1',
         model: 'vendor/model:free',
         requestKind: 'chat_completions',
-        plugins,
+        removedPlugins: paidPlugins,
         removedToolTypes: ['openrouter:web_search', 'openrouter:advisor'],
       }
     );
     warn.mockRestore();
   });
 
-  it('removes plugins and server tools from anonymous requests', async () => {
+  it('removes paid plugins and server tools from anonymous requests', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     const body = await applyTo('vendor/model', 'anon:203.0.113.7', {
@@ -662,8 +665,40 @@ describe('removePaidServerFeatures', () => {
       tools: [{ type: 'web_search_preview' }, functionTool],
     });
 
-    expect(body).not.toHaveProperty('plugins');
+    expect(body.plugins).toEqual([{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }]);
     expect(body.tools).toEqual([functionTool]);
+    warn.mockRestore();
+  });
+
+  it('keeps free plugins, including a disabled one, without logging', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const request = makeRequest('vendor/model:free');
+    const freePlugins = [{ id: 'response-healing' }, { id: 'context-compression', enabled: false }];
+    request.body.plugins = freePlugins;
+
+    removePaidServerFeatures(makeProvider(null), 'vendor/model:free', request, 'user-1');
+
+    expect(request.body.plugins).toEqual([
+      ...freePlugins,
+      { id: 'file-parser', pdf: { engine: 'cloudflare-ai' } },
+    ]);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('adds no PDF parser for providers other than OpenRouter', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const request = makeRequest('vendor/model:free');
+    request.body.plugins = [{ id: 'web' }];
+
+    removePaidServerFeatures(
+      { ...makeProvider(null), id: 'vercel' },
+      'vendor/model:free',
+      request,
+      'user-1'
+    );
+
+    expect(request.body).not.toHaveProperty('plugins');
     warn.mockRestore();
   });
 
@@ -695,7 +730,7 @@ describe('removePaidServerFeatures', () => {
       },
     };
 
-    removePaidServerFeatures('vendor/model:free', request, 'user-1');
+    removePaidServerFeatures(makeProvider(null), 'vendor/model:free', request, 'user-1');
 
     expect(request.body.tools).toEqual([
       { type: 'function', name: 'lookup', parameters: null, strict: false },
@@ -715,7 +750,7 @@ describe('removePaidServerFeatures', () => {
     ];
     request.body.tool_choice = { type: 'tool', name: 'lookup' };
 
-    removePaidServerFeatures('vendor/model:free', request, 'user-1');
+    removePaidServerFeatures(makeProvider(null), 'vendor/model:free', request, 'user-1');
 
     expect(request.body.tools).toEqual([customTool, { type: 'custom', ...customTool }]);
     expect(request.body.tool_choice).toEqual({ type: 'tool', name: 'lookup' });
@@ -742,6 +777,7 @@ describe('removePaidServerFeatures', () => {
     const body = await applyTo('vendor/model:free', 'user-1', { tools: [functionTool] });
 
     expect(body.tools).toEqual([functionTool]);
+    expect(body.plugins).toEqual([{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }]);
     expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
   });

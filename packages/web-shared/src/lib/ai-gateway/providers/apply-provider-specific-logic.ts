@@ -271,20 +271,45 @@ function getServerToolType(tool: unknown): string | null {
   return tool.type === 'function' || tool.type === 'custom' ? null : tool.type;
 }
 
+// Plugins OpenRouter does not bill separately. Every other plugin id, including
+// ids added later, is removed from free requests.
+const FREE_PLUGIN_IDS: ReadonlySet<string> = new Set(['response-healing', 'context-compression']);
+
+// Without a configured engine, OpenRouter parses PDFs with Mistral OCR, billed
+// per page, for models that do not accept files natively.
+const FREE_PDF_PARSER_PLUGIN = { id: 'file-parser', pdf: { engine: 'cloudflare-ai' } };
+
+function isFreePlugin(plugin: unknown) {
+  return isRecord(plugin) && typeof plugin.id === 'string' && FREE_PLUGIN_IDS.has(plugin.id);
+}
+
 /**
  * OpenRouter bills plugins (web search, PDF parsing with OCR) and server tools
  * (`openrouter:*` and their aliases such as `web_search_20250305`) to the
  * gateway's account, even when the model itself is free. Free and anonymous
- * requests keep only tools the client executes itself.
+ * requests keep only free plugins and tools the client executes itself.
  */
 export function removePaidServerFeatures(
+  provider: Provider,
   requestedModel: string,
   requestToMutate: GatewayRequest,
   userId: string
 ) {
   const body: { plugins?: unknown; tools?: unknown; tool_choice?: unknown } = requestToMutate.body;
   const { plugins, tools, tool_choice } = body;
-  delete body.plugins;
+
+  const requestedPlugins: unknown[] =
+    plugins === undefined || plugins === null ? [] : Array.isArray(plugins) ? plugins : [plugins];
+  const removedPlugins = requestedPlugins.filter(plugin => !isFreePlugin(plugin));
+  const keptPlugins = [
+    ...requestedPlugins.filter(isFreePlugin),
+    ...(provider.id === 'openrouter' ? [FREE_PDF_PARSER_PLUGIN] : []),
+  ];
+  if (keptPlugins.length > 0) {
+    body.plugins = keptPlugins;
+  } else {
+    delete body.plugins;
+  }
 
   const removedToolTypes = Array.isArray(tools)
     ? tools.map(getServerToolType).filter(type => type !== null)
@@ -305,14 +330,14 @@ export function removePaidServerFeatures(
     }
   }
 
-  if (plugins === undefined && removedToolTypes.length === 0) {
+  if (removedPlugins.length === 0 && removedToolTypes.length === 0) {
     return;
   }
   console.warn('[applyProviderSpecificLogic] Removed paid server features from free request', {
     userId,
     model: requestedModel,
     requestKind: requestToMutate.kind,
-    plugins,
+    removedPlugins,
     removedToolTypes,
   });
 }
@@ -383,7 +408,7 @@ export async function applyProviderSpecificLogic(
 ) {
   removeModelsFallback(requestedModel, requestToMutate, userId);
   if (isFreeModelExcludingCustomLlms(requestedModel) || isAnonymousUserId(userId)) {
-    removePaidServerFeatures(requestedModel, requestToMutate, userId);
+    removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
   }
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 

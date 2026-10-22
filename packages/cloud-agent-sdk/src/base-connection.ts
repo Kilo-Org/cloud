@@ -65,7 +65,7 @@ export type Connection = {
   destroy: () => void;
 };
 
-const MAX_RECONNECT_ATTEMPTS = 8;
+export const MAX_RECONNECT_ATTEMPTS = 8;
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30000;
 export const DEFAULT_STALENESS_TIMEOUT_MS = 30_000;

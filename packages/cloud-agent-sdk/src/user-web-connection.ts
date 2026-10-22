@@ -1,5 +1,6 @@
 import {
   createBaseConnection,
+  MAX_RECONNECT_ATTEMPTS,
   type Connection,
   type ConnectionLifecycleHooks,
 } from './base-connection';
@@ -171,6 +172,12 @@ function createUserWebConnection(
   let pingInterval: ReturnType<typeof setInterval> | null = null;
   let pongTimeout: ReturnType<typeof setTimeout> | null = null;
   let initialAuthRetryTimeout: ReturnType<typeof setTimeout> | null = null;
+  // Consecutive pre-socket token fetches allowed before the wrapper publishes
+  // exhaustion. Shares the socket reconnect cap so both transport retry series
+  // stop at the same point and exhaustion means one thing to recovery UI.
+  const maxInitialAuthAttempts = config.maxReconnectAttempts ?? MAX_RECONNECT_ATTEMPTS;
+  // Retries scheduled since the last successful token; `+ 1` is the failure
+  // that just happened, so this equals the current consecutive failure count - 1.
   let initialAuthRetryAttempt = 0;
   let outstandingPingNonce: string | null = null;
   const preSocketLifecycleCleanupFns: Array<() => void> = [];
@@ -527,6 +534,11 @@ function createUserWebConnection(
     const openWithToken = (value: string): void => {
       if (!started || destroyed || !hasLifetime() || expectedGeneration !== generation) return;
       clearInitialAuthRetry();
+      // Before the first base connection exists, exhaustion is wrapper-owned and
+      // only a token that finally resolves (manual retry, or lifecycle recovery
+      // after signing in again) can clear it. Afterwards the base connection
+      // emits its own edges, so the flag is left alone.
+      if (!baseConnection) setExhausted(false);
       token = value;
       ensureBaseConnection();
       baseConnection?.connect();
@@ -536,6 +548,15 @@ function createUserWebConnection(
       started = false;
       rejectPending('Failed to get auth token');
       config.onError?.('Failed to get auth token');
+      // Bound the series the same way the base connection bounds socket
+      // reconnects: once the cap is reached, publish the exhaustion edge so the
+      // recovery surface renders instead of retrying silently forever. The
+      // counter is deliberately left at the cap: lifecycle recovery still gets
+      // one attempt per event, and only `retryConnection()` restarts the budget.
+      if (initialAuthRetryAttempt + 1 >= maxInitialAuthAttempts) {
+        setExhausted(true);
+        return;
+      }
       scheduleInitialAuthRetry(expectedGeneration);
     };
 
@@ -694,7 +715,17 @@ function createUserWebConnection(
       };
     },
     retryConnection() {
-      baseConnection?.retryReconnect();
+      if (baseConnection) {
+        baseConnection.retryReconnect();
+        return;
+      }
+      if (destroyed || !hasLifetime()) return;
+      // No base connection yet means the failure was token acquisition, which
+      // the wrapper owns: clear that state, restart the attempt budget, and ask
+      // for a token again so the user can recover after signing in again.
+      clearInitialAuthRetry();
+      setExhausted(false);
+      if (!started && !connectPromise) startConnection(false);
     },
     subscribeToCliSession(sessionId) {
       if (destroyed) return () => {};

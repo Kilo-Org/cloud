@@ -618,7 +618,7 @@ describe('createUserWebConnection', () => {
     }
   });
 
-  it('recovers after retained initial auth failures exceed the prior retry window', async () => {
+  it('recovers on the last allowed initial auth attempt', async () => {
     jest.useFakeTimers();
     jest.spyOn(Math, 'random').mockReturnValue(0);
     try {
@@ -631,13 +631,11 @@ describe('createUserWebConnection', () => {
         .mockRejectedValueOnce(new Error('token unavailable'))
         .mockRejectedValueOnce(new Error('token unavailable'))
         .mockRejectedValueOnce(new Error('token unavailable'))
-        .mockRejectedValueOnce(new Error('token unavailable'))
-        .mockRejectedValueOnce(new Error('token unavailable'))
         .mockResolvedValueOnce('eventual-token');
       const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken });
       const release = client.retain();
 
-      for (let attempt = 0; attempt < 10; attempt += 1) {
+      for (let attempt = 0; attempt < 7; attempt += 1) {
         await Promise.resolve();
         await Promise.resolve();
         jest.advanceTimersByTime(60_000);
@@ -645,10 +643,113 @@ describe('createUserWebConnection', () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(getAuthToken).toHaveBeenCalledTimes(10);
+      expect(getAuthToken).toHaveBeenCalledTimes(8);
+      expect(client.isReconnectExhausted()).toBe(false);
       expect(webSocketConstructor).toHaveBeenCalledWith(
         `${WS_URL}?ticket=eventual-token&connectionId=uuid-1`
       );
+      release();
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('publishes exhaustion once token acquisition uses up its bounded retries', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const onError = jest.fn();
+      const listener = jest.fn();
+      const getAuthToken = jest.fn(() => Promise.reject(new Error('token unavailable')));
+      const client = createUserWebConnection({
+        websocketUrl: WS_URL,
+        getAuthToken,
+        maxReconnectAttempts: 2,
+        onError,
+      });
+      client.onReconnectExhaustionChange(listener);
+      const release = client.retain();
+
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(client.isReconnectExhausted()).toBe(false);
+      expect(onError).toHaveBeenCalledWith('Failed to get auth token');
+
+      jest.advanceTimersByTime(60_000);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(getAuthToken).toHaveBeenCalledTimes(2);
+      expect(onError).toHaveBeenCalledTimes(2);
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(true);
+      expect(client.isReconnectExhausted()).toBe(true);
+      expect(webSocketConstructor).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(600_000);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(getAuthToken).toHaveBeenCalledTimes(2);
+      expect(listener).toHaveBeenCalledTimes(1);
+
+      release();
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('grants a manual retry a fresh token attempt budget before any socket exists', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const listener = jest.fn();
+      const getAuthToken = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('token unavailable'))
+        .mockRejectedValueOnce(new Error('token unavailable'))
+        .mockRejectedValueOnce(new Error('token unavailable'))
+        .mockResolvedValueOnce('recovered-token');
+      const client = createUserWebConnection({
+        websocketUrl: WS_URL,
+        getAuthToken,
+        maxReconnectAttempts: 2,
+      });
+      client.onReconnectExhaustionChange(listener);
+      const release = client.retain();
+
+      await Promise.resolve();
+      await Promise.resolve();
+      jest.advanceTimersByTime(60_000);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(client.isReconnectExhausted()).toBe(true);
+
+      client.retryConnection();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(client.isReconnectExhausted()).toBe(false);
+      expect(listener).toHaveBeenLastCalledWith(false);
+
+      // The fresh budget schedules one more retry before giving up again, so a
+      // single failure after a manual retry does not re-enter exhaustion.
+      expect(getAuthToken).toHaveBeenCalledTimes(3);
+      expect(client.isReconnectExhausted()).toBe(false);
+
+      jest.advanceTimersByTime(60_000);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(getAuthToken).toHaveBeenCalledTimes(4);
+      expect(client.isReconnectExhausted()).toBe(false);
+      expect(listener).toHaveBeenLastCalledWith(false);
+      expect(webSocketConstructor).toHaveBeenCalledWith(
+        `${WS_URL}?ticket=recovered-token&connectionId=uuid-1`
+      );
+
       release();
       client.destroy();
     } finally {

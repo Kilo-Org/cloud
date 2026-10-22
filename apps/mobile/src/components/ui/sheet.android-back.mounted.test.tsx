@@ -46,7 +46,9 @@ vi.mock('@expo/ui/community/bottom-sheet', () => ({
 
 const mounted: { unmount: () => void }[] = [];
 
-function sheetIndex(renderer: { root: { findAllByType: (type: never) => { props: { index?: number } }[] } }) {
+function sheetIndex(renderer: {
+  root: { findAllByType: (type: never) => { props: { index?: number } }[] };
+}) {
   const node = renderer.root.findAllByType('BottomSheet' as never).at(0);
   if (!node) {
     throw new Error('sheet not rendered');

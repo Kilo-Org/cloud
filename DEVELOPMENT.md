@@ -602,6 +602,14 @@ Apply database migrations before deploying the session-ingest, notification, gat
 The CLI status producer must send occurrence timestamps and transition identities for reliable historical blocker counts.
 Legacy activity remains readable with partial coverage; unknown values must not appear as confirmed zeroes.
 
+Report display contracts allow 64 sessions, 256 sources, and 32 sources per session.
+Titles use 160 characters, URLs 2048, and excerpts 600. Scheduled collection reads
+2048 activity events and 2048 usage records, with up to 256 session ancestry lookups.
+Sampled evidence carries partial coverage; scorecards describe the collected evidence.
+One-off period sampling and the summary model's 16-source/24-session selection remain independent.
+History pages allow up to 100 reports within a 3 MB JSON response budget.
+Stored reports must satisfy the shared contract; unreadable records are skipped during pagination.
+
 The protected cron routes are `/api/cron/agent-briefing` and `/api/cron/agent-briefing-summaries`.
 They use the existing cron authorization, database, gateway, and notification configuration.
 Local verification must use an isolated database and fake accounts.

@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+export const BRIEFING_MAX_SESSIONS = 64;
+export const BRIEFING_MAX_SOURCES = 256;
+export const BRIEFING_MAX_SOURCES_PER_SESSION = 32;
+export const BRIEFING_MAX_TITLE_LENGTH = 160;
+export const BRIEFING_MAX_URL_LENGTH = 2048;
+export const BRIEFING_MAX_EXCERPT_LENGTH = 600;
+
 export const briefingContextSchema = z.object({
   id: z.string(),
   organizationId: z.string().nullable(),
@@ -9,10 +16,10 @@ export const briefingSourceSchema = z.object({
   id: z.string(),
   sessionId: z.string(),
   kind: z.enum(['activity', 'pull_request', 'blocker', 'cost', 'artifact']),
-  title: z.string(),
-  url: z.string(),
+  title: z.string().max(BRIEFING_MAX_TITLE_LENGTH),
+  url: z.string().max(BRIEFING_MAX_URL_LENGTH),
   occurredAt: z.string().datetime(),
-  excerpt: z.string().max(600).optional(),
+  excerpt: z.string().max(BRIEFING_MAX_EXCERPT_LENGTH).optional(),
 });
 export const briefingSummaryErrorSchema = z.enum([
   'model_pricing_unavailable',
@@ -67,17 +74,19 @@ export const briefingReportSchema = z.object({
     blockers: z.enum(['complete', 'partial']),
     pullRequests: z.enum(['complete', 'partial']),
   }),
-  sessions: z.array(
-    z.object({
-      sessionId: z.string(),
-      title: z.string(),
-      url: z.string(),
-      status: z.string().nullable(),
-      spendMicrodollars: z.number(),
-      sources: z.array(briefingSourceSchema),
-    })
-  ),
-  sources: z.array(briefingSourceSchema),
+  sessions: z
+    .array(
+      z.object({
+        sessionId: z.string(),
+        title: z.string().max(BRIEFING_MAX_TITLE_LENGTH),
+        url: z.string().max(BRIEFING_MAX_URL_LENGTH),
+        status: z.string().nullable(),
+        spendMicrodollars: z.number(),
+        sources: z.array(briefingSourceSchema).max(BRIEFING_MAX_SOURCES_PER_SESSION),
+      })
+    )
+    .max(BRIEFING_MAX_SESSIONS),
+  sources: z.array(briefingSourceSchema).max(BRIEFING_MAX_SOURCES),
   summary: briefingSummarySchema,
   expiresAt: z.string().datetime(),
 });
@@ -130,7 +139,10 @@ export function isBriefingVisible(report: BriefingReport, now = Date.now()): boo
     report.scorecard.sessions > 0
   );
 }
-export function redactBriefingExcerpt(value: string, maxLength = 600): string {
+export function redactBriefingExcerpt(
+  value: string,
+  maxLength = BRIEFING_MAX_EXCERPT_LENGTH
+): string {
   return value
     .replace(
       /-----BEGIN[^-]*PRIVATE KEY-----[\s\S]*?-----END[^-]*PRIVATE KEY-----/g,

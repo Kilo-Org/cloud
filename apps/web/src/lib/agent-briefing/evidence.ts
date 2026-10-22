@@ -22,7 +22,16 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
 } from '@kilocode/db/schema';
-import { redactBriefingExcerpt, type BriefingSource } from '@kilocode/app-shared/agent-briefing';
+import {
+  BRIEFING_MAX_SESSIONS,
+  BRIEFING_MAX_SOURCES,
+  BRIEFING_MAX_SOURCES_PER_SESSION,
+  BRIEFING_MAX_TITLE_LENGTH,
+  BRIEFING_MAX_URL_LENGTH,
+  BRIEFING_MAX_EXCERPT_LENGTH,
+  redactBriefingExcerpt,
+  type BriefingSource,
+} from '@kilocode/app-shared/agent-briefing';
 import {
   boundBriefingSlices,
   freezeBriefingEvidence,
@@ -32,6 +41,11 @@ import {
   ONE_OFF_SESSION_LIMIT,
   sampleBriefingItems,
 } from './one-off-evidence';
+
+export const BRIEFING_MAX_EVENT_ROWS = 2048;
+export const BRIEFING_MAX_USAGE_ROWS = 2048;
+const BRIEFING_MAX_ACTIVE_SESSIONS = 256;
+const BRIEFING_MAX_ANCESTRY_ROWS = 256;
 
 type Session = Pick<
   typeof cli_sessions_v2.$inferSelect,
@@ -57,6 +71,7 @@ export type BriefingEvidenceCoverage = {
 export type BriefingCoverageContext = {
   collectionStartedAt?: string | null;
   legacyStatusInWindow?: boolean;
+  truncated?: boolean;
 };
 
 const transitionIdOf = (event: Event) =>
@@ -82,6 +97,11 @@ export function aggregateBriefingEvidence(
   const collectionCovered =
     collectionStartedAt !== null && Date.parse(collectionStartedAt) <= start;
   let untimestampedStatus = coverageContext.legacyStatusInWindow === true;
+  let truncated = coverageContext.truncated === true;
+  const boundedText = (value: string, limit: number) => {
+    truncated ||= value.length > limit;
+    return value.slice(0, limit);
+  };
   const activityRoots = new Set<string>();
   const spendRoots = new Set<string>();
   const byId = new Map(rows.map(row => [row.session_id, row]));
@@ -115,8 +135,11 @@ export function aggregateBriefingEvidence(
     if (!group) {
       group = {
         sessionId: root.session_id,
-        title: root.title ?? 'Coding session',
-        url: `/cloud/sessions/${encodeURIComponent(root.session_id)}`,
+        title: boundedText(root.title ?? 'Coding session', BRIEFING_MAX_TITLE_LENGTH),
+        url: boundedText(
+          `/cloud/sessions/${encodeURIComponent(root.session_id)}`,
+          BRIEFING_MAX_URL_LENGTH
+        ),
         status: null,
         spendMicrodollars: 0,
         sources: [],
@@ -124,6 +147,11 @@ export function aggregateBriefingEvidence(
       groups.set(root.session_id, group);
     }
     return group;
+  };
+  const addSource = (group: { sources: BriefingSource[] }, source: BriefingSource) => {
+    source.title = boundedText(source.title, BRIEFING_MAX_TITLE_LENGTH);
+    source.url = boundedText(source.url, BRIEFING_MAX_URL_LENGTH);
+    group.sources.push(source);
   };
   const statuses = new Map<string, { latest: Event; blockedSince: Event | null }>();
   const uniqueEvents = new Map(events.map(event => [event.id, event]));
@@ -173,7 +201,7 @@ export function aggregateBriefingEvidence(
         const group = groupFor(event.session_id);
         if (group) {
           activeRoots.add(group.sessionId);
-          group.sources.push({
+          addSource(group, {
             id: `status:${event.id}`,
             sessionId: event.session_id,
             kind: 'activity',
@@ -197,6 +225,7 @@ export function aggregateBriefingEvidence(
       occurredAt: new Date(at).toISOString(),
     };
     if (event.kind === 'activity' && typeof event.payload?.excerpt === 'string') {
+      truncated ||= event.payload.excerpt.length > BRIEFING_MAX_EXCERPT_LENGTH;
       source.excerpt = redactBriefingExcerpt(event.payload.excerpt);
     }
     if (event.kind === 'pull_request') {
@@ -211,7 +240,7 @@ export function aggregateBriefingEvidence(
       source.title = event.title;
       source.url = event.url;
     } else if (event.kind !== 'activity') continue;
-    group.sources.push(source);
+    addSource(group, source);
     activeRoots.add(group.sessionId);
     if (event.kind === 'activity') activityRoots.add(group.sessionId);
   }
@@ -224,7 +253,7 @@ export function aggregateBriefingEvidence(
     if (!group) continue;
     blockers += 1;
     activeRoots.add(group.sessionId);
-    group.sources.push({
+    addSource(group, {
       id: since.id,
       sessionId,
       kind: 'blocker',
@@ -245,7 +274,7 @@ export function aggregateBriefingEvidence(
     spendMicrodollars += item.cost;
     activeRoots.add(group.sessionId);
     spendRoots.add(group.sessionId);
-    group.sources.push({
+    addSource(group, {
       id: `usage:${item.id}`,
       sessionId: item.sessionId,
       kind: 'cost',
@@ -272,28 +301,47 @@ export function aggregateBriefingEvidence(
     group.sources.sort(
       (a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.id.localeCompare(b.id)
     );
+    truncated ||= group.sources.length > BRIEFING_MAX_SOURCES_PER_SESSION;
+    group.sources = sampleBriefingItems(group.sources, BRIEFING_MAX_SOURCES_PER_SESSION);
   }
-  const sessions = [...groups.values()].filter(group => activeRoots.has(group.sessionId));
-  sessions.sort((a, b) => a.sessionId.localeCompare(b.sessionId));
-  const sources = sessions.flatMap(session => session.sources);
-  sources.sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.id.localeCompare(b.id));
+  const activeSessions = [...groups.values()].filter(group => activeRoots.has(group.sessionId));
+  activeSessions.sort((a, b) => a.sessionId.localeCompare(b.sessionId));
+  const sessions = activeSessions.slice(0, BRIEFING_MAX_SESSIONS);
+  truncated ||= sessions.length !== activeSessions.length;
+  const allSources = sessions.flatMap(session => session.sources);
+  allSources.sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.id.localeCompare(b.id));
+  const sources = sampleBriefingItems(allSources, BRIEFING_MAX_SOURCES);
+  truncated ||= sources.length !== allSources.length;
+  const selectedSources = new Set(sources);
+  for (const session of sessions) {
+    session.sources = session.sources.filter(source => selectedSources.has(source));
+    if (
+      coverageContext.truncated &&
+      session.status !== 'question' &&
+      session.status !== 'permission'
+    ) {
+      session.status = null;
+    }
+  }
   const everyActiveSessionCharged = [...activityRoots].every(root => spendRoots.has(root));
   const coverage: BriefingEvidenceCoverage = {
-    activity: collectionCovered ? 'complete' : 'partial',
+    activity: collectionCovered && !truncated ? 'complete' : 'partial',
     spend:
       used.size === 0
         ? collectionCovered && activityRoots.size === 0
-          ? 'complete'
+          ? truncated
+            ? 'partial'
+            : 'complete'
           : 'unavailable'
-        : collectionCovered && everyActiveSessionCharged
+        : collectionCovered && everyActiveSessionCharged && !truncated
           ? 'complete'
           : 'partial',
-    blockers: collectionCovered && !untimestampedStatus ? 'complete' : 'partial',
-    pullRequests: collectionCovered ? 'complete' : 'partial',
+    blockers: collectionCovered && !untimestampedStatus && !truncated ? 'complete' : 'partial',
+    pullRequests: collectionCovered && !truncated ? 'complete' : 'partial',
   };
   return {
     scorecard: {
-      sessions: sessions.length,
+      sessions: activeSessions.length,
       pullRequests: pullRequests.size,
       blockers,
       spendMicrodollars,
@@ -374,7 +422,7 @@ export async function collectBriefingEvidence(
               query(false).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
               query(true).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
             ]
-          : [query(false)];
+          : [query(false).limit(BRIEFING_MAX_EVENT_ROWS + 1)];
       });
       const [firstEvents, secondEvents, ...remainingEvents] = eventQueries;
       if (firstEvents === undefined) throw new Error('Missing briefing event range');
@@ -384,7 +432,10 @@ export async function collectBriefingEvidence(
           : await firstEvents;
       const eventSample = freeze
         ? boundBriefingSlices(eventRows, compareEvents)
-        : { records: eventRows, truncated: false };
+        : {
+            records: eventRows.slice(0, BRIEFING_MAX_EVENT_ROWS),
+            truncated: eventRows.length > BRIEFING_MAX_EVENT_ROWS,
+          };
       const events = eventSample.records;
       const usageQueries = ranges.flatMap(range => {
         const query = (reverse: boolean) => {
@@ -430,7 +481,7 @@ export async function collectBriefingEvidence(
               query(false).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
               query(true).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
             ]
-          : [query(false)];
+          : [query(false).limit(BRIEFING_MAX_USAGE_ROWS + 1)];
       });
       const [firstUsage, secondUsage, ...remainingUsage] = usageQueries;
       if (firstUsage === undefined) throw new Error('Missing briefing usage range');
@@ -444,7 +495,10 @@ export async function collectBriefingEvidence(
             (a, b) =>
               Date.parse(a.occurredAt) - Date.parse(b.occurredAt) || a.id.localeCompare(b.id)
           )
-        : { records: usageRows, truncated: false };
+        : {
+            records: usageRows.slice(0, BRIEFING_MAX_USAGE_ROWS),
+            truncated: usageRows.length > BRIEFING_MAX_USAGE_ROWS,
+          };
       const usage = usageSample.records;
       const activity = [
         ...events.map(event => ({ sessionId: event.session_id, occurredAt: event.occurred_at })),
@@ -453,7 +507,7 @@ export async function collectBriefingEvidence(
       const allActiveSessionIds = [...new Set(activity.map(item => item.sessionId))];
       const activeSessionIds = freeze
         ? sampleBriefingItems(allActiveSessionIds, ONE_OFF_SESSION_LIMIT)
-        : allActiveSessionIds;
+        : allActiveSessionIds.slice(0, BRIEFING_MAX_ACTIVE_SESSIONS);
       let truncated =
         eventSample.truncated ||
         usageSample.truncated ||
@@ -486,16 +540,13 @@ export async function collectBriefingEvidence(
       const queried = new Set<string>();
       let pending = activeSessionIds;
       while (pending.length > 0) {
-        const queryIds = freeze
-          ? pending.slice(0, Math.max(0, ONE_OFF_ANCESTRY_LIMIT - rows.size))
-          : pending;
+        const ancestryLimit = freeze ? ONE_OFF_ANCESTRY_LIMIT : BRIEFING_MAX_ANCESTRY_ROWS;
+        const queryIds = pending.slice(0, Math.max(0, ancestryLimit - queried.size));
         if (queryIds.length === 0) {
           truncated = true;
           break;
         }
-        if (freeze) {
-          for (const id of queryIds) queried.add(id);
-        }
+        for (const id of queryIds) queried.add(id);
         const found = await tx
           .select({
             session_id: cli_sessions_v2.session_id,
@@ -506,7 +557,7 @@ export async function collectBriefingEvidence(
           .where(
             and(scope, sql`${cli_sessions_v2.session_id} = ANY(${sql.param(queryIds)}::text[])`)
           );
-        pending = freeze ? pending.slice(queryIds.length) : [];
+        pending = pending.slice(queryIds.length);
         for (const row of found) {
           rows.set(row.session_id, row);
           if (row.parent_session_id !== null && !requested.has(row.parent_session_id)) {
@@ -529,20 +580,18 @@ export async function collectBriefingEvidence(
           )
         )
         .limit(1);
-      const completeRows = freeze
-        ? [...rows.values()].filter(row => {
-            let current = row;
-            const seen = new Set([row.session_id]);
-            while (current.parent_session_id) {
-              const parent = rows.get(current.parent_session_id);
-              if (!parent) return queried.has(current.parent_session_id);
-              if (seen.has(parent.session_id)) return false;
-              seen.add(parent.session_id);
-              current = parent;
-            }
-            return true;
-          })
-        : [...rows.values()];
+      const completeRows = [...rows.values()].filter(row => {
+        let current = row;
+        const seen = new Set([row.session_id]);
+        while (current.parent_session_id) {
+          const parent = rows.get(current.parent_session_id);
+          if (!parent) return queried.has(current.parent_session_id);
+          if (seen.has(parent.session_id)) return false;
+          seen.add(parent.session_id);
+          current = parent;
+        }
+        return true;
+      });
       truncated ||= completeRows.length !== rows.size;
       const latest =
         freeze && completeRows.length > 0
@@ -574,6 +623,7 @@ export async function collectBriefingEvidence(
         {
           collectionStartedAt: preferences?.createdAt ?? null,
           legacyStatusInWindow: legacyStatus !== undefined,
+          truncated,
         }
       );
       if (!freeze) return facts;
@@ -585,6 +635,12 @@ export async function collectBriefingEvidence(
           ),
         ],
         sessionIds: [...readableSessions],
+        usage: usage
+          .filter(item => readableSessions.has(item.sessionId))
+          .map(item => ({
+            id: item.id,
+            sessionId: item.sessionId,
+          })),
         partial: truncated,
       });
     },

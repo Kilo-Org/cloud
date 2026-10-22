@@ -11,6 +11,7 @@ import {
   getLastRouteSnapshot,
   isLastRouteHydrated,
   type LastRouteRecord,
+  prepareLastRouteRepair,
   recordLastRoute,
   subscribeLastRoute,
 } from './last-route';
@@ -136,6 +137,20 @@ describe('hydration state', () => {
 });
 
 describe('consumeLastRouteForRepair', () => {
+  it('keeps the focused profile route while root Retry remounts at Home', () => {
+    const profileRoute = '/(app)/(tabs)/(3_profile)/profiles/new';
+    consumeLastRouteForRepair('u1');
+    recordLastRoute(profileRoute, 'u1');
+
+    prepareLastRouteRepair();
+    expect(recordLastRoute('/(app)/(tabs)/(0_home)', 'u1')).toBe(false);
+    expect(consumeLastRouteForRepair('other-account')).toBeNull();
+    expect(consumeLastRouteForRepair('u1')).toBe(profileRoute);
+
+    expect(recordLastRoute('/(app)/(tabs)/(0_home)', 'u1')).toBe(true);
+    expect(getLastRoute('u1')).toBe('/(app)/(tabs)/(0_home)');
+  });
+
   it('returns the record once, then null', async () => {
     store.set(KEY, recordFor('/(app)/variables', 'u1'));
     await _hydrateLastRouteForTests();

@@ -130,6 +130,7 @@ import {
   consumeLastRouteForRepair,
   getLastRouteHydrationVersion,
   isLastRouteHydrated,
+  prepareLastRouteRepair,
   subscribeLastRoute,
 } from '@/lib/last-route';
 import { shouldRepairRestoredRoute } from '@/lib/last-route-repair';
@@ -1385,7 +1386,14 @@ function RootLayout() {
 }
 
 function RootErrorBoundary({ retry }: ErrorBoundaryProps) {
-  return <RuntimeErrorScreen onRetry={() => void retry()} />;
+  return (
+    <RuntimeErrorScreen
+      onRetry={() => {
+        prepareLastRouteRepair();
+        void retry();
+      }}
+    />
+  );
 }
 
 export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(RootErrorBoundary);

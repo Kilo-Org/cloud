@@ -270,6 +270,11 @@ export function clearLastRoute(): void {
 // record was absent and nothing could be repaired).
 let repairEvaluated = false;
 
+/** Hold the focused route until the root layout remounts and restores it on Retry. */
+export function prepareLastRouteRepair(): void {
+  repairEvaluated = false;
+}
+
 /**
  * Read-and-latch for the relaunch repair: opens recording from then on (see
  * `recordLastRoute`) and returns the persisted record for the account, or

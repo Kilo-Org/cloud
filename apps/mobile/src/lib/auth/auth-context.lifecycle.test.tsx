@@ -1316,13 +1316,15 @@ describe('bootstrap and foreground race fencing', () => {
    *  runs against the caller-installed SecureStore mock queue. The queue is
    *  consumed in this order: preloadedToken, preloadedRefreshToken, the
    *  bootstrap expiry read, then the bootstrap credential re-read. */
-  async function mountProvider(): Promise<{
+  async function mountProvider(existingModule?: typeof AuthContextModule): Promise<{
     getCtx: () => AuthContextValue;
     unmount: () => void;
     mod: typeof AuthContextModule;
   }> {
-    vi.resetModules();
-    const mod = await import('./auth-context');
+    if (existingModule === undefined) {
+      vi.resetModules();
+    }
+    const mod = existingModule ?? (await import('./auth-context'));
 
     let capturedCtx: AuthContextValue | undefined = undefined;
     function Consumer(): null {
@@ -1353,6 +1355,50 @@ describe('bootstrap and foreground race fencing', () => {
       mod,
     };
   }
+
+  it('restores the signed-in session when the provider remounts after a signed-out launch', async () => {
+    const first = await mountProvider();
+    await settleBootstrap(first.getCtx);
+    expect(first.getCtx().token).toBeUndefined();
+    const token = makeToken({ kiloUserId: 'user-1' });
+    await act(async () => {
+      await first.getCtx().signIn(token, 'current-refresh', 3600);
+    });
+    hoisted.secureStore.getItemAsync.mockImplementation((key: string) => {
+      if (key === 'auth-token') {
+        return Promise.resolve(token);
+      }
+      if (key === 'refresh-token') {
+        return Promise.resolve('current-refresh');
+      }
+      return Promise.resolve(null);
+    });
+    act(first.unmount);
+
+    const recovered = await mountProvider(first.mod);
+    onTestFinished(() => act(recovered.unmount));
+    await settleBootstrap(recovered.getCtx);
+
+    expect(recovered.getCtx().token).toBe(token);
+    expect(recovered.getCtx().restoreFailed).toBe(false);
+    expect(recovered.getCtx().sessionEnded).toBe(false);
+    expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenLastCalledWith('user-1');
+  });
+
+  it('surfaces unreadable current credentials on remount instead of replaying an empty launch', async () => {
+    useFakeBackoffClock();
+    const first = await mountProvider();
+    await settleBootstrap(first.getCtx);
+    act(first.unmount);
+    hoisted.secureStore.getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+
+    const recovered = await mountProvider(first.mod);
+    onTestFinished(() => act(recovered.unmount));
+    await settleBootstrap(recovered.getCtx);
+
+    expect(recovered.getCtx().restoreFailed).toBe(true);
+    expect(recovered.getCtx().sessionEnded).toBe(false);
+  });
 
   it('regression: sign-out during bootstrap does not restore the preloaded token into React state or the owner', async () => {
     const { promise: readGate, resolve: releaseRead } = Promise.withResolvers<undefined>();

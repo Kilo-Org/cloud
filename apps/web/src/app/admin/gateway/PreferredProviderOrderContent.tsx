@@ -14,6 +14,7 @@ import {
   type PreferredProviderOrderConfig,
 } from '@kilocode/db/schema-types';
 import {
+  EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG,
   findPreferredProviderOrderRuleIndex,
   resolvePreferredProviderOrder,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
@@ -52,13 +53,7 @@ function PreviewResult({ providers }: { providers: string[] }) {
   );
 }
 
-function RoutingCard({
-  json,
-  source,
-}: {
-  json: string;
-  source: 'stored' | 'built-in' | 'unsaved';
-}) {
+function RoutingCard({ json, source }: { json: string; source: 'stored' | 'none' | 'unsaved' }) {
   const [model, setModel] = useState('');
   const trimmed = model.trim();
   const parsed = useMemo(() => parseConfig(json), [json]);
@@ -70,7 +65,7 @@ function RoutingCard({
           <CardTitle>Current routing</CardTitle>
           <Badge variant={source === 'unsaved' ? 'beta' : 'secondary'}>
             {source === 'stored' && 'Stored configuration'}
-            {source === 'built-in' && 'Built-in rules'}
+            {source === 'none' && 'No configuration'}
             {source === 'unsaved' && 'Unsaved changes'}
           </Badge>
         </div>
@@ -123,7 +118,7 @@ export function PreferredProviderOrderContent() {
 
   useEffect(() => {
     if (data) {
-      setJson(toJson(data.config ?? data.fallback));
+      setJson(toJson(data.config ?? EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG));
       setValidationError(null);
       setHasChanges(false);
     }
@@ -156,13 +151,6 @@ export function PreferredProviderOrderContent() {
     mutation.mutate({ config: parsed.config });
   }
 
-  function handleLoadFallback() {
-    if (!data) return;
-    setJson(toJson(data.fallback));
-    setValidationError(null);
-    setHasChanges(true);
-  }
-
   function handleClear() {
     mutation.mutate({ config: null });
   }
@@ -187,17 +175,16 @@ export function PreferredProviderOrderContent() {
             <code>provider.order</code> to its <code>providers</code>; when no rule matches, there
             is no preference. The order is only applied when the caller did not send one, and the
             first provider also picks the price shown in the model catalog. Provider slugs are
-            OpenRouter slugs, optionally with an endpoint variant such as <code>minimax/fp8</code>.{' '}
-            <strong>
-              The gateway does not read this configuration yet; it still uses the built-in rules.
-            </strong>
+            OpenRouter slugs, optionally with an endpoint variant such as <code>minimax/fp8</code>.
+            Without a stored configuration, no model has a preference. Changes take up to a minute
+            to reach every gateway instance.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <p className="text-muted-foreground text-sm">
             {hasStoredConfig
               ? 'Showing the stored configuration.'
-              : 'No configuration stored. Showing the built-in rules.'}
+              : 'No configuration stored. The gateway sets no provider order.'}
           </p>
           <div className="border-input overflow-hidden rounded-md border">
             <Editor
@@ -240,14 +227,6 @@ export function PreferredProviderOrderContent() {
             >
               {mutation.isPending ? 'Saving...' : 'Save'}
             </Button>
-            <Button
-              onClick={handleLoadFallback}
-              disabled={mutation.isPending}
-              variant="outline"
-              size="sm"
-            >
-              Load built-in rules
-            </Button>
             {hasStoredConfig && (
               <Button
                 onClick={handleClear}
@@ -264,7 +243,7 @@ export function PreferredProviderOrderContent() {
 
       <RoutingCard
         json={json}
-        source={hasChanges ? 'unsaved' : hasStoredConfig ? 'stored' : 'built-in'}
+        source={hasChanges ? 'unsaved' : hasStoredConfig ? 'stored' : 'none'}
       />
     </div>
   );

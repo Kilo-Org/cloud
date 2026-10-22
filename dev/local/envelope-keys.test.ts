@@ -75,7 +75,7 @@ test('keeps a configured envelope so stored credentials still decrypt', () => {
   );
 });
 
-test('reports a half-configured envelope instead of guessing', () => {
+test('keeps the values of a half-configured envelope instead of dropping them', () => {
   const spec = requireGitHubSpec();
 
   for (const partial of [
@@ -87,9 +87,19 @@ test('reports a half-configured envelope instead of guessing', () => {
       [spec.publicKeyEnv, 'existing-public-key'],
     ]),
   ]) {
+    // The write path rebuilds .env.local from the example, so a pair that is not
+    // carried into the result is erased rather than left alone.
     assert.deepEqual(
       planEnvelopeProvisioning(spec, key => partial.get(key)),
-      { status: 'incomplete', configured: partial.size }
+      {
+        status: 'incomplete',
+        configured: partial.size,
+        keypair: {
+          keyId: partial.get(spec.keyIdEnv) ?? '',
+          publicKey: partial.get(spec.publicKeyEnv) ?? '',
+          privateKey: partial.get(spec.privateKeyEnv) ?? '',
+        },
+      }
     );
   }
 });

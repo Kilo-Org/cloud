@@ -66,16 +66,20 @@ export type EnvelopeProvisioning =
   | { readonly status: 'generate'; readonly keypair: EnvelopeKeypair }
   /** All three values configured: reuse them so the stored envelopes still decrypt. */
   | { readonly status: 'keep'; readonly keypair: EnvelopeKeypair }
-  /** Some of the three configured: leave the file alone and report the gap. */
-  | { readonly status: 'incomplete'; readonly configured: number };
+  /** Some of the three configured: keep exactly those and report the gap. */
+  | {
+      readonly status: 'incomplete';
+      readonly configured: number;
+      readonly keypair: EnvelopeKeypair;
+    };
 
 /**
  * Decide what a setup run should do with one envelope.
  *
  * Reuse matters as much as generation: a fresh keypair cannot decrypt a
  * credential that git-token-service stored under the previous one, so a
- * configured pair is always kept, and a half-configured pair is reported
- * instead of being replaced by guesses.
+ * configured pair is always kept, and a half-configured pair keeps its own
+ * values instead of being replaced by guesses or dropped.
  */
 export function planEnvelopeProvisioning(
   spec: EnvelopeKeySpec,
@@ -89,7 +93,7 @@ export function planEnvelopeProvisioning(
     return { status: 'keep', keypair: { keyId, publicKey, privateKey } };
   }
   if (configured !== 0) {
-    return { status: 'incomplete', configured };
+    return { status: 'incomplete', configured, keypair: { keyId, publicKey, privateKey } };
   }
   return { status: 'generate', keypair: { keyId: spec.keyId, ...generateEnvelopeKeypair() } };
 }

@@ -448,9 +448,7 @@ async function readAuthorizedRepositoryCache(
   // guard here keeps that invariant local to the projection.
   return cache.repositories.flatMap(repository => {
     const [workspace, slug] = repository.fullName.split('/');
-    return workspace && slug
-      ? [{ uuid: repository.id, slug, fullName: repository.fullName }]
-      : [];
+    return workspace && slug ? [{ uuid: repository.id, slug, fullName: repository.fullName }] : [];
   });
 }
 

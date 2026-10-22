@@ -43,21 +43,6 @@ several. Before the upstream inference request is sent:
 - `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so
   that variable must stay set on the `kilocode-ai-gateway` Vercel project.
 
-## Vercel user BYOK has no system-credential fallback
-
-Vercel's public BYOK docs say request-scoped BYOK may fall back to system
-credentials when the provided ones fail. Vercel special-cases Kilo's account to
-disable that fallback: a request sent with `providerOptions.gateway.byok` is
-served with the user's credentials or fails with the upstream error (invalid
-key, 429, 5xx). This was verified with live requests on the chat completions,
-responses, and messages APIs. It is not configured anywhere in this repo.
-
-The gateway relies on it: a user BYOK request skips the zero-balance check in
-`handlers/llm-proxy.ts` and is recorded at zero cost in `processUsage.ts` based on
-`user_byok` alone, not on the serving attempt's `credentialType`. If Vercel ever
-re-enables the fallback, bill from the serving attempt's `credentialType`
-(`extractVercelIsByok`) before relying on BYOK for free inference.
-
 ## Runtime files
 
 - `src/lib/email.ts` reads `src/emails/*.html` from disk, relative to the app's

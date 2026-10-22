@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, Lock, Plus, Unlock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,10 @@ import {
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useTRPC } from '@/lib/trpc/utils';
+import {
+  getGitHubRepositoryNotices,
+  githubIntegrationSettingsHref,
+} from '../github-repository-status';
 import { excludeListedRepositories } from './settings-options';
 
 export type RepositoryOption = {
@@ -76,6 +81,11 @@ export function RepositoryPicker({
   const hasBothPlatforms =
     (github.data?.repositories.length ?? 0) > 0 && (gitlab.data?.repositories.length ?? 0) > 0;
 
+  const githubNotices = getGitHubRepositoryNotices(
+    github.data,
+    githubIntegrationSettingsHref(organizationId)
+  );
+
   const choose = (repository: RepositoryOption) => {
     setOpen(false);
     onSelect(repository);
@@ -92,6 +102,32 @@ export function RepositoryPicker({
       <PopoverContent className="w-80 p-0" align="end">
         <Command>
           <CommandInput placeholder="Search repositories..." />
+          {githubNotices.length > 0 && (
+            <div className="space-y-1 border-b px-3 py-2 text-xs">
+              {githubNotices.map(notice => (
+                <p key={notice.kind} className="text-amber-400">
+                  {notice.message}{' '}
+                  {notice.kind === 'reconnect' ? (
+                    <Link
+                      href={notice.settingsHref}
+                      className="text-link hover:text-link-hover underline underline-offset-4"
+                    >
+                      Review the GitHub connection
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void github.refetch()}
+                      disabled={github.isFetching}
+                      className="underline underline-offset-4 disabled:opacity-50"
+                    >
+                      {github.isFetching ? 'Refreshing...' : 'Refresh'}
+                    </button>
+                  )}
+                </p>
+              ))}
+            </div>
+          )}
           <CommandList className="max-h-64 overflow-auto">
             {github.isLoading || gitlab.isLoading ? (
               <div className="text-muted-foreground flex items-center justify-center gap-2 py-6 text-sm">

@@ -8,6 +8,7 @@ import {
   detectRepositoryPlatform,
   type NewSessionRepository,
   type RepositoryGroup,
+  type RepositoryGroupNotice,
   type RepositoryGroups,
   repositoryIdentityKey,
   type RepositoryPlatform,
@@ -199,7 +200,11 @@ export function useNewSessionRepos({
     isError: githubQuery.isError,
     integrationInstalled: githubQuery.data?.integrationInstalled,
     repositoryCount: githubRepositories.length,
+    unavailableReason: githubQuery.data?.unavailableReason,
   });
+  const githubNotice: RepositoryGroupNotice | undefined = githubQuery.data?.partial
+    ? 'partial'
+    : undefined;
   const gitlabStatus = resolveProviderStatus({
     isLoading: gitlabQuery.isLoading,
     isError: gitlabQuery.isError,
@@ -217,7 +222,12 @@ export function useNewSessionRepos({
     () =>
       resolveRepositoryGroups({
         organizationId,
-        github: { key: 'github', status: githubStatus, repositories: githubRepositories },
+        github: {
+          key: 'github',
+          status: githubStatus,
+          repositories: githubRepositories,
+          notice: githubNotice,
+        },
         gitlab: { key: 'gitlab', status: gitlabStatus, repositories: gitlabRepositories },
         bitbucket: {
           key: 'bitbucket',
@@ -230,6 +240,7 @@ export function useNewSessionRepos({
       organizationId,
       githubStatus,
       githubRepositories,
+      githubNotice,
       gitlabStatus,
       gitlabRepositories,
       bitbucketStatus,

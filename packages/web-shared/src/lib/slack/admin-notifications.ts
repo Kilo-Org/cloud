@@ -41,14 +41,17 @@ export async function sendAdminSlackNotification(
   notification: AdminSlackNotification,
   options: { requireConfigured?: boolean; destination?: 'admin' | 'gateway' } = {}
 ): Promise<void> {
-  const webhookVariable =
-    options.destination === 'gateway'
-      ? 'SLACK_GATEWAY_NOTIFICATIONS_WEBHOOK_URL'
-      : 'SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL';
-  const webhookUrl =
-    options.destination === 'gateway'
-      ? SLACK_GATEWAY_NOTIFICATIONS_WEBHOOK_URL
-      : SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL;
+  const webhooks = {
+    admin: {
+      variable: 'SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL',
+      url: SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL,
+    },
+    gateway: {
+      variable: 'SLACK_GATEWAY_NOTIFICATIONS_WEBHOOK_URL',
+      url: SLACK_GATEWAY_NOTIFICATIONS_WEBHOOK_URL,
+    },
+  };
+  const { variable: webhookVariable, url: webhookUrl } = webhooks[options.destination ?? 'admin'];
   if (!webhookUrl) {
     if (options.requireConfigured) {
       throw new AdminSlackNotificationError('configuration');

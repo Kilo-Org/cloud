@@ -12,14 +12,12 @@ type Boundary = {
   isResolving: boolean;
 };
 
-const boundary = vi.hoisted(
-  (): Boundary => ({
-    organizationId: 'org-1',
-    role: 'owner',
-    org: { organizationId: 'org-1' },
-    isResolving: false,
-  })
-);
+const boundary = vi.hoisted((): Boundary => ({
+  organizationId: 'org-1',
+  role: 'owner',
+  org: { organizationId: 'org-1' },
+  isResolving: false,
+}));
 const invite = vi.hoisted(() => ({
   mutate: vi.fn(),
   reset: vi.fn(),

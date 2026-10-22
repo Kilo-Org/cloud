@@ -1,8 +1,8 @@
 # Direct BYOK: optional unified catalog model IDs
 
-**Date**: 2026-10-21
+**Date**: 2026-10-21 (updated 2026-10-22 after review)
 **Status**: Plan, not implemented
-**Scope**: Map direct BYOK models to main catalog (OpenRouter-style) model IDs. First expose the mapping as metadata. Then let users opt in to sending catalog IDs through their own direct BYOK keys. Bespoke IDs keep working.
+**Scope**: Use models.dev to map direct BYOK models to main catalog (OpenRouter-style) model IDs. Users can opt in per BYOK key to serving catalog IDs with that key. Bespoke IDs keep working. Providers not in models.dev are out of scope.
 
 ## Problem
 
@@ -11,159 +11,186 @@
 | Catalog ID | Direct BYOK IDs for the same model |
 |---|---|
 | `moonshotai/kimi-k2.6` | `synthetic/hf:moonshotai/kimi-k2.6`, `chutes-byok/moonshotai/kimi-k2.6-tee`, `ollama-cloud/kimi-k2.6:cloud`, `orcarouter/kimi/kimi-k2.6`, `inceptron-byok/moonshotai/kimi-k2.6`, `opencode-go/kimi-k2.6`, … |
-| `z-ai/glm-5.2` | `zai-coding/glm-5.2`, `byteplus-coding/glm-5.2`, `synthetic/hf:zai-org/glm-5.2`, … |
+| `z-ai/glm-5.2` | `zai-coding/glm-5.2`, `synthetic/hf:zai-org/glm-5.2`, … |
 
 Consequences:
 
-- **Model pickers** show several near-duplicate entries per model. They also have no link to the catalog entry, so catalog benchmarks, descriptions and display pricing are missing.
-- **Auto routing and custom routers** give direct BYOK models placeholder capabilities because they have no `model_stats` row (`services/auto-routing/src/custom-router-decision.ts:119-155`).
-- **Model-family logic** (`isKimiModel`, `getFallbackReasoningOptions`, `getAiSdkProvider`, …) relies on substring checks over the bespoke ID. It only works because upstream names usually contain the family name.
-- **Users must choose a different model to switch billing paths.** They cannot keep selecting `moonshotai/kimi-k2.6` and have it billed to their own key. Vercel BYOK already works this way for first-party providers (same catalog ID, the user's key is used).
-- **`canonical_slug` carries no information.** It is emitted on direct BYOK models but is set to the bespoke ID itself (`direct-byok/index.ts:45`).
+- **Model pickers** show several near-duplicate entries per model.
+- **Switching to your own key means switching models.** A user cannot keep selecting `moonshotai/kimi-k2.6` and have it billed to their own key. Vercel BYOK already works that way for first-party providers.
+- **No access to catalog data.** Catalog metadata (`model_stats`, benchmarks, display data) is out of reach. For example, auto routing gives these models placeholder capabilities (`services/auto-routing/src/custom-router-decision.ts:119-155`).
+- **Organization model policies do not apply.** Direct BYOK models are exempt (`isModelRestrictionExempt`, `packages/web-shared/src/lib/model-allow.server.ts:51`).
 
-## Data sources investigated
+## Data source: models.dev only
 
-| Source | What it offers | Verdict |
+The data comes from two parts of models.dev's `https://models.dev/api.json`, which the direct BYOK sync already fetches (`apps/web/src/lib/providers/direct-byok/sync-direct-byok.ts`):
+
+1. **`canonical_model_id` on provider models.** It is present on about 85% of models.dev entries, e.g. `synthetic` `hf:moonshotai/Kimi-K2.6` → `moonshotai/kimi-k2.6`, `ollama-cloud` `gemma4:31b` → `google/gemma-4-31b-it`.
+   - The values use models.dev's own vendor namespace (`zhipuai/`, `alibaba/`, `xai/`, `mistral/`, dashed Anthropic versions), not OpenRouter's.
+2. **The models.dev `openrouter` provider.** Its entries are keyed by OpenRouter IDs and also carry `canonical_model_id`. Reversing them gives a `canonical → OpenRouter ID` index.
+   - This replaces any hand-maintained vendor rename table (`zhipuai`→`z-ai`, `alibaba`→`qwen`, …).
+
+Explicitly **not** used for now:
+- OpenRouter `hugging_face_id`;
+- exact or partial name matching;
+- per-model mapping functions;
+- admin override tables.
+
+These can be revisited if coverage turns out to be insufficient.
+
+### Provider scope
+
+Each `DirectByokProvider` gets an optional `models_dev_id` (`direct-byok/types.ts`). Only providers that set it take part.
+
+| Provider | `models_dev_id` |
+|---|---|
+| alibaba-token-plan | `alibaba-token-plan` |
+| chutes-byok | `chutes` |
+| edenai | `edenai` |
+| inceptron-byok | `inceptron` |
+| morph-byok | `morph` |
+| neuralwatt | `neuralwatt` |
+| nvidia-byok | `nvidia` |
+| ollama-cloud | `ollama-cloud` |
+| opencode-go | `opencode-go` |
+| orcarouter | `orcarouter` |
+| synthetic | `synthetic` |
+| xiaomi-token-plan-ams / -sgp | `xiaomi-token-plan-ams` / `-sgp` |
+| zai-coding | `zai-coding-plan` |
+| martian, byteplus-coding | not in models.dev; excluded |
+| kimi-coding | unset. Its single static model `kimi-for-coding` is a moving alias for whatever model the plan currently serves. |
+
+The `models_dev_id` replaces the catalog key that is hard-coded in `FETCHERS` today, so the sync and the mapping share one source. Providers whose model list comes from their own OpenAI-compatible `/models` endpoint still list models that way. They only use models.dev to look up `canonical_model_id`. Upstream models missing from models.dev stay unmapped.
+
+### Coverage snapshot (2026-10-21)
+
+These numbers came from live models.dev, live OpenRouter `/models` and each provider's live model list. Lists were filtered to the models.dev subset where the sync does the same.
+
+| Provider | Mapped / total | Not in models.dev |
 |---|---|---|
-| **models.dev `canonical_model_id`** | Present on about 85% of all models.dev entries, e.g. `synthetic` `hf:moonshotai/Kimi-K2.6` → `moonshotai/kimi-k2.6`, `ollama-cloud` `gemma4:31b` → `google/gemma-4-31b-it`. It uses models.dev's own vendor namespace (`zhipuai/`, `alibaba/`, `xai/`, `mistral/`, and dashes for Anthropic), not OpenRouter's. | **Primary signal.** |
-| **models.dev `openrouter` provider** | Its entries are keyed by OpenRouter IDs and also carry `canonical_model_id`. Reversing them gives a `canonical → OpenRouter id` index. This removes the need for a hand-maintained vendor rename table (`zhipuai`→`z-ai`, `alibaba`→`qwen`, …). | **Primary signal**, used to join the step above. |
-| OpenRouter `/models` `hugging_face_id` | Present for open-weight models; joins HF-style upstream IDs (Chutes, Inceptron, Synthetic). Our schema currently strips it (`OpenRouterModelsResponseSchema`). | Cheap fallback for providers that are not in models.dev. |
-| OpenRouter `canonical_slug` | A dated permaslug (`deepseek/deepseek-v4.1-flash-20261017`), not a cross-provider key. | Not useful. |
-| models.dev `family` | Coarse (`kimi-k2`, `glm-flash`). | Not precise enough for IDs; could replace some substring family heuristics later. |
-| Per-provider mapping functions | Needed only for systematic spelling differences, e.g. the `hf:` prefix, the `-TEE` suffix or Ollama `name:tag`. | Small optional per-provider hook; no long lists. |
+| zai-coding | 7/7 | 0 |
+| inceptron-byok | 6/6 | 0 |
+| ollama-cloud | 21/22 | 0 |
+| chutes-byok | 13/14 | 0 |
+| opencode-go | 27/29 | 0 |
+| edenai | 308/359 | 0 |
+| neuralwatt | 20/27 | 7 |
+| alibaba-token-plan | 19/29 | 0 |
+| nvidia-byok | 16/26 | 0 |
+| synthetic | 8/14 | 6 |
+| orcarouter | 97/209 | 95 |
+| xiaomi-token-plan-ams / -sgp | 4/9 each | 0 |
+| morph-byok | 0/11 | 9 |
+| **Total** | **550/771 (71%)** | 117 |
 
-Every provider we sync is in models.dev, even the ones whose list we take from their OpenAI-compatible `/models` endpoint (`chutes`, `inceptron`, `neuralwatt`, `synthetic`, `orcarouter`, `morph`). The exceptions are `martian`, `byteplus-coding` (static list) and `kimi-coding` (static, one model). Martian already uses OpenRouter IDs verbatim.
-
-## Feasibility snapshot (2026-10-21)
-
-The resolver below was run against live models.dev, live OpenRouter `/models` and each provider's live model list. For models.dev-backed providers the list was cut down to the models.dev subset, as the sync does.
-
-| Provider | Mapped / total | Main method |
-|---|---|---|
-| zai-coding | 7/7 | models.dev |
-| inceptron-byok | 6/6 | models.dev |
-| ollama-cloud | 21/22 | models.dev |
-| chutes-byok | 13/14 | models.dev |
-| opencode-go | 27/30 | models.dev |
-| edenai | 306/357 | models.dev |
-| martian | 256/316 | exact ID |
-| neuralwatt | 20/27 | models.dev |
-| alibaba-token-plan | 20/29 | models.dev |
-| nvidia-byok | 16/26 | models.dev |
-| orcarouter | 119/209 | models.dev and exact ID |
-| synthetic | 9/14 | models.dev |
-| xiaomi-token-plan-ams/sgp | 4/9 each | models.dev |
-| kimi-coding (models.dev `kimi-code-plan-global`) | 2/4 | models.dev; the 2 misses are moving aliases |
-| morph-byok | 2/11 | tail match |
-| **Total** (one Xiaomi region counted) | **828/1081 (77%)** | |
-
-`byteplus-coding` is not in the snapshot because its list is static and it has no models.dev entry. It would depend on the `exact` and `heuristic` steps or on overrides.
-
-The unmapped models are almost all models with **no catalog counterpart**:
-- provider routers (`orcarouter/fusion`, `nw-large`, `syn:large:text`);
-- fine-tunes (`morph-glm53-744b`);
-- TTS, image and video models (`mimo-v2.5-tts`, `wan2.7-image`);
-- models OpenRouter does not list (`qwen3.8-max`, older NVIDIA NIM models).
-
-The models that matter for coding (Kimi, GLM, Qwen, DeepSeek, MiniMax, MiMo, gpt-oss, Gemma) map on every provider that serves them.
-
-Precision issues found in the snapshot. The resolver design below handles all of them:
-
-1. **Free variants in the reverse index.** It contained `:free` variants (`minimax-m3.1-flash` → `minimax/minimax-m3.1-flash:free`). Variant IDs must be excluded from the index.
-2. **Router namespaces in tail matching.** A bare tail match gave `orcarouter/free` → `openrouter/free`. A tail match must also require the vendor to match.
-3. **Serving-tier variants collapse onto one catalog ID.** For example, `neuralwatt` `kimi-k3`, `kimi-k3-fast` and `kimi-k3-flex` all map to `moonshotai/kimi-k3`, and Chutes `gemma-4-31B-turbo-TEE` maps to `google/gemma-4-31b-it`. That is correct for metadata, but routing needs one deterministic winner per provider.
-4. **Moving aliases.** models.dev maps `kimi-for-coding` to whatever model the plan currently serves. Such entries must never be used for routing.
-5. **Dated snapshots.** `deepseek-v4.1-flash` resolved to `deepseek-v4.1-flash` on one provider and `deepseek-v4.1-flash-1017` on another. The tie-break should prefer exact canonical equality, then the shorter ID.
+**What maps and what doesn't:**
+- The coding models (Kimi, GLM, Qwen, DeepSeek, MiniMax, MiMo, gpt-oss, Gemma) map on every provider that serves them.
+- Most other misses are models OpenRouter does not list: provider routers, fine-tunes, TTS, image and video models.
+- OrcaRouter's 95 models missing from models.dev mostly already use OpenRouter-style IDs. A later exact-ID step could pick them up.
 
 ## Design
 
-### Resolver (pure function, unit-tested with fixture slices)
+### Resolver
+
+A pure function, unit-tested with small fixture slices of the models.dev catalog:
 
 ```ts
-type CatalogMatch = 'override' | 'exact' | 'models-dev' | 'heuristic';
-
-resolveCatalogModelId(input: {
-  upstreamId: string;
-  modelsDevEntry?: ModelsDevModel;        // provider's models.dev entry, if any
-  normalize?: (upstreamId: string) => string; // optional per-provider hook
-}, index: CatalogIndex): { id: string; match: CatalogMatch } | null
+resolveCatalogModelId(
+  upstreamId: string,
+  modelsDevProvider: ModelsDevProvider,
+  index: CatalogIndex
+): string | null
 ```
 
-`CatalogIndex` is built once per sync. It holds:
-- the set of catalog IDs, with no `:variant` IDs;
-- a lowercase-ID lookup;
-- `canonical → catalog id`, built from the models.dev `openrouter` provider;
-- `hugging_face_id → catalog id`;
-- a unique `tail → catalog id` map.
+`CatalogIndex` is built once per sync from two inputs:
+- the set of current catalog IDs, excluding `:variant` IDs such as `:free`;
+- `canonical → catalog ID` from the models.dev `openrouter` provider. When several catalog IDs share a canonical ID, prefer the one equal to the canonical ID, then the shortest. This avoids dated snapshots.
 
-The resolver tries these steps in order:
+Resolution steps:
+1. Look up `modelsDevProvider.models[upstreamId].canonical_model_id`. If it is missing, return `null`.
+2. If the canonical ID is itself a catalog ID, return it.
+3. Otherwise return `index.canonicalToCatalog.get(canonical) ?? null`.
 
-1. **Admin override**, `null` included, to suppress a bad match.
-2. **`exact`.** The normalized upstream ID equals a catalog ID (Martian, OrcaRouter, EdenAI pass-through).
-3. **`models-dev`.** `canonical_model_id` resolves through the reverse index, or equals a catalog ID directly.
-4. **`exact` via `hugging_face_id`.** The normalized upstream ID equals a catalog `hugging_face_id`.
-5. **`heuristic`.** A unique tail match, with the vendor required to match when the upstream ID has one.
+**Several upstream models from one provider can map to the same catalog ID.** For example, neuralwatt's `kimi-k3`, `kimi-k3-fast` and `kimi-k3-flex` all map to `moonshotai/kimi-k3`, and zai-coding's `glm-5.3` and `glm-5.3-highspeed` both map to `z-ai/glm-5.3`. The sync marks exactly one of them as the **primary** model for that catalog ID, choosing in this order:
+1. the model whose upstream ID, lowercased and without an `hf:` prefix, ends with the catalog ID's last path segment;
+2. then the model flagged `recommended`;
+3. then the shortest upstream ID.
 
-The default normalizer strips `hf:` and lowercases. Per-provider hooks stay one-liners, such as Chutes `-TEE` or Ollama `name:tag` → `name-tag`.
+Only the primary model is served under the catalog ID. The other variants remain reachable through their bespoke IDs.
 
-A match is marked **routable** when its method is `override`, `exact` or `models-dev`, and the provider is not flagged as serving moving aliases. A flag on the provider definition is enough, e.g. `catalog_aliases: false` for `kimi-coding`. `heuristic` matches are metadata only.
+### Storage (no migration for model data)
 
-### Phase 1: compute, store and expose the mapping (no routing change)
+Extend `DirectByokModelSchema` (`packages/db/src/schema-types.ts`) with two fields:
+- `catalog_model_id: z.string().optional()`;
+- `catalog_primary: z.boolean().optional()`.
 
-1. **Model schema.** Add two optional fields to `DirectByokModelSchema` (`packages/db/src/schema-types.ts`): `catalog_model_id: z.string().optional()` and `catalog_match: CatalogMatchSchema.optional()`. The data lives in the `direct_byok_model_lists.models` jsonb, so no migration is needed.
-2. **Provider definitions.** Add an optional `models_dev_key` and an optional `normalizeCatalogId` hook to `DirectByokProvider` (`direct-byok/types.ts`). Move the models.dev key out of the `FETCHERS` table so providers listed via OpenAI-compatible endpoints can also use models.dev metadata.
-3. **Sync.** In `apps/web/src/lib/providers/direct-byok/sync-direct-byok.ts`, build `CatalogIndex` from the OpenRouter snapshot that `syncAndStoreProviders` has already fetched (pass it through `SyncContext`) and from the models.dev catalog that is already fetched once per run. Annotate every model, then log per-provider coverage counts to Axiom so drift is visible.
-4. **Overrides.** Add `ai_gateway_config.direct_byok_catalog_overrides: Record<bespokeId, catalogId | null>` and copy the pattern of `vercel_model_id_overrides` and its admin router. This is the only hand-maintained data, expected to hold a handful of entries.
-5. **Read path.** In `convertModel` (`direct-byok/index.ts:36`), emit `catalog_model_id` on direct BYOK `/models` entries, but only if the ID is still in the current catalog (`isValidOpenRouterModelId`), because the catalog drifts between syncs. Keep `canonical_slug` unchanged until the Kilo CLI's use of it is checked (see open questions).
-6. **Use the link internally:**
-   - Fall back to the catalog entry's `opencode` settings (family, reasoning options) when models.dev gave none.
-   - Run model-family checks against `catalog_model_id ?? id`.
-   - Let auto routing and custom routers look up `model_stats` and benchmarks through `catalog_model_id`, instead of using placeholder capabilities.
-7. **Clients (optional, additive).** The web, extension and mobile pickers can group direct BYOK entries under their catalog model.
+They are stored in the existing `direct_byok_model_lists.models` jsonb.
 
-Phase 1 is additive and safe to ship without a flag.
+The sync builds the index from the models.dev catalog it already fetches once per run, plus the OpenRouter snapshot that `syncAndStoreProviders` has just fetched (pass it through `SyncContext`). It annotates every model and logs the mapped count per provider.
 
-### Phase 2: opt-in unified IDs (catalog ID routed via direct BYOK)
+At read time, only treat a mapping as live if the catalog ID is still valid (`isValidOpenRouterModelId`), because the catalog can drift between syncs.
 
-1. **Opt-in per key.** Add `byok_api_keys.serve_catalog_models boolean not null default false` (migration). In the web UI (`BYOKKeysManager.tsx`) add a switch: "Use this key for matching Kilo catalog models". For organization keys, the switch is set by organization admins.
-2. **Model list** (`handlers/models.ts`, `organization-models.ts`). For each catalog model with a routable mapping on an enabled, opted-in provider:
-   - set the existing `hasUserByokAvailable: true` badge;
-   - add a `byok_provider_id` hint;
-   - drop the duplicate bespoke entries from the list. Unmapped bespoke models stay listed.
-3. **Routing.** Add `checkUnifiedDirectBYOK` to `getProvider` (`providers/get-provider.ts`). Proposed precedence:
-   - custom LLM;
-   - explicit bespoke direct BYOK ID;
-   - ChatGPT subscription;
-   - Vercel BYOK (first-party key);
-   - **unified direct BYOK**;
-   - Kilo-paid routing.
-4. **Choosing the upstream model.** Within one provider, prefer:
-   - a normalized upstream tail equal to the catalog tail;
-   - then the `recommended` flag;
-   - then the shortest ID. This keeps `-flex`/`-fast` tiers reachable only by their bespoke IDs.
+### Opt-in: per key
 
-   Across providers, use the definition order for now. A user-defined order can come later if anyone asks.
-5. **Request handling.** Use the same `transformRequest` as `checkDirectBYOK`, with `body.model` set to the chosen upstream ID. Return `userByok` set (which skips the balance check) and `bypassAccessCheck: false`, so organization allow/deny rules evaluate the **catalog** ID. This is the same model as ChatGPT BYOK. Before shipping, verify that provider-route policies (`groupProvidersAllowed`) do not reject the `direct-byok` provider.
-6. **Usage.** Set `requested_model` to the catalog ID and keep `provider = 'direct-byok'`. Record the direct BYOK provider ID next to it. Decide whether `leaderboard-model-usage` should exclude `direct-byok`, as the provider-usage leaderboard already does.
-7. **Failure behavior.** Do not silently fall back to Kilo credits after an upstream BYOK error, matching existing BYOK behavior. If a mapping disappears, the catalog ID routes as a normal Kilo-paid request, and the badge disappears from the list at the same time.
-8. **Backward compatibility.** Bespoke IDs stay routable indefinitely. Favorites, `last_selected`, organization Auto targets and custom-router entries that store bespoke IDs are not rewritten. `model-preferences-router` filters favorites against available IDs, so it must also accept bespoke IDs that are hidden from the list. The alternative is to migrate favorites when the toggle is switched on.
-9. **Rollout.** Ship behind the per-key toggle, which defaults off. Add a PostHog flag gating the UI switch for staged rollout.
+Add `byok_api_keys.serve_catalog_models boolean not null default false`. This needs a migration; follow the `database-migrations` skill.
+- **Web UI.** Add a switch per direct BYOK key in `BYOKKeysManager.tsx`, labelled "Use this key for matching Kilo catalog models". Show it only for providers with a `models_dev_id`.
+- **Key data.** Expose the flag in `byok-router.ts` list and update procedures. Return it from `getBYOKforUser` / `getBYOKforOrganization` and from `getUserByokProviderIds` / `getOrganizationByokProviderIds`, or from a sibling helper.
 
-### Phase 3 (explicitly deferred)
+With the flag off, behavior is exactly as today.
 
-Renaming the bespoke IDs themselves (e.g. `synthetic/moonshotai/kimi-k2.6`) adds little once Phase 2 exists. It would also need a legacy alias layer for every stored ID and would still collide on serving-tier variants. Not planned.
+### Behavior when a key is opted in
 
-## Testing
+#### Model list (`handlers/models.ts`, `organizations/organization-models.ts`)
 
-- **Resolver unit tests.** Use small fixture slices of models.dev and OpenRouter JSON covering each match method and each precision issue listed above.
-- **Sync tests** (`sync-direct-byok.test.ts`): annotation, override handling and the coverage log.
-- **Read path.** `convertModel` and handler tests check that `catalog_model_id` is emitted only for IDs present in the catalog.
-- **Phase 2.** Add `get-provider` tests for the precedence and tie-break rules, organization policy evaluated on the catalog ID, and no access-check bypass. Add `handlers/models.test.ts` tests for badge and de-duplication, and model-preferences tests for hidden bespoke favorites.
+- **Badge on catalog models.** A catalog model with a live, primary mapping on an opted-in, enabled key gets `hasUserByokAvailable: true`. Extend `addUserByokAvailability` (`packages/web-shared/src/lib/ai-gateway/byok/index.ts:80`) to check direct mappings as well as Vercel endpoints.
+- **Hidden bespoke entries.** For opted-in providers, every bespoke entry with a live `catalog_model_id` is left out of the list: primary models and their variants alike. Bespoke entries without a mapping stay listed, unchanged.
+- **Hidden IDs keep working.** `/models/validate` (`handlers/model-validation.ts`) and the favorites and last-selected filters (`apps/web/src/routers/model-preferences-router.ts`) check against the list of available IDs. They must also accept hidden bespoke IDs so that stored references keep working. Favorites are not rewritten.
+
+#### Routing (`providers/get-provider.ts`)
+
+The easiest place is the existing `checkDirectBYOK`, which already runs before the ChatGPT subscription and Vercel BYOK checks. **Direct BYOK therefore wins over both**; that is acceptable for now.
+
+1. **Bespoke ID.** Behaves as today: `getDirectByokModel` matches the prefix and the exact ID.
+2. **Catalog ID (new).** If no bespoke ID matched:
+   - find the primary direct BYOK model whose `catalog_model_id` equals the requested ID, among the user's or organization's enabled keys that have `serve_catalog_models`;
+   - if several providers qualify, take the first one in `DIRECT_BYOK_PROVIDERS` order;
+   - set `body.model` to that model's upstream ID and run the provider's `transformRequest`, the same path bespoke IDs use.
+3. **No match.** Fall through to the existing routes, so the request goes to the Kilo-paid path as today.
+4. **Failures.** An upstream BYOK error is returned to the caller and does not silently fall back to Kilo credits, the same as existing BYOK.
+
+#### Model policy enforcement
+
+When a request is served by an opted-in key, organization model policies apply:
+- **Return value.** `checkDirectBYOK` returns `bypassAccessCheck: false` for these requests, with `userByok` set. A set `userByok` already skips the zero-balance block (`llm-proxy.ts:901-905`); ChatGPT BYOK uses the same shape.
+- **Which ID is checked.** The access check uses the catalog ID. For a catalog ID request that is the requested ID. For a bespoke ID with a live mapping on an opted-in key, it is that model's `catalog_model_id`, so the bespoke ID cannot be used to get around a deny rule. `createAccessCheckResolver` (`llm-proxy.ts:808`) needs to receive this policy model ID instead of the raw requested ID.
+- **Unmapped bespoke IDs** keep today's exemption, because no catalog entry exists that an admin could allow or deny.
+- **Provider routing.** Organization provider-routing output (`effectiveProviderConfig.only`) has no meaning for a direct BYOK upstream. It is already dropped, because direct BYOK `transformRequest` deletes `body.provider`. The model allow/deny decision is the part that is enforced.
+- **Model list.** `isModelRestrictionExempt` (`model-allow.server.ts:51`) stays as it is, because hidden bespoke entries are no longer in the list.
+
+#### Usage and leaderboards (easiest path)
+
+No changes:
+- `requested_model` is the catalog ID for catalog requests and stays the bespoke ID for bespoke requests;
+- `provider` stays `'direct-byok'`;
+- `leaderboard-model-provider-usage` already excludes `direct-byok`;
+- `leaderboard-model-usage` groups by requested model, so traffic routed by catalog ID counts toward that catalog model.
+
+### Deferred
+
+- Showing `catalog_model_id` on bespoke `/models` entries, and using it for model-family heuristics, `model_stats` and benchmarks.
+- Exact-ID and `hugging_face_id` fallbacks for models that are not in models.dev, and admin overrides.
+- A user-defined order of preference between providers, and a precedence choice between Vercel and direct BYOK.
+- Renaming bespoke IDs.
+
+## Implementation steps
+
+1. Add `models_dev_id` to the provider definitions and drive the models.dev fetchers from it.
+2. Add the resolver and the primary-model selection, with fixture-based unit tests.
+3. Annotate models during the sync, extend the schema with `catalog_model_id` and `catalog_primary`, and log coverage. Extend `sync-direct-byok.test.ts`.
+4. Migrate `byok_api_keys.serve_catalog_models`, then update the BYOK router and the web UI switch.
+5. Model list: set the badge, hide mapped bespoke entries, and accept hidden IDs in validation and model preferences. Extend `handlers/models.test.ts`, `organization-models.test.ts`, `model-validation.test.ts` and the model preferences tests.
+6. Routing and policy: resolve catalog IDs in `checkDirectBYOK`, set `bypassAccessCheck: false` for opted-in keys, and run the access check against the catalog ID. Extend the `get-provider` tests and the llm-proxy access-check tests for both allow and deny, for catalog and bespoke IDs.
 
 ## Open questions
 
-1. **Kilo CLI and `canonical_slug`.** Does the Kilo CLI read `canonical_slug`? If not, should Phase 1 set `canonical_slug = catalog_model_id` instead of adding a new field?
-2. **Precedence.** Should unified direct BYOK win over Vercel BYOK when a user has keys for both, e.g. OrcaRouter and Anthropic?
-3. **Leaderboards.** Should unified BYOK traffic count toward catalog-model leaderboards and model usage stats?
-4. **Personal toggles.** Should personal users get one global toggle instead of one per key? A per-key toggle mirrors the organization case and avoids surprising users who have several keys.
-5. **Spec.** Should this become a `.specs/` business-rule document once Phase 2 is approved?
+1. **Kilo CLI and hidden IDs.** Does the Kilo CLI cache or validate model IDs against `/models` in a way that breaks when bespoke IDs disappear from the list?
+2. **Spec.** Should this become a `.specs/` business-rule document once implementation starts?

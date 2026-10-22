@@ -224,7 +224,7 @@
     "hideBalance": "ಉಳಿಕೆ ಮರೆಮಾಡಿ",
     "showBalance": "ಉಳಿಕೆ ತೋರಿಸಿ",
     "balanceHidden": "ಉಳಿಕೆ ಮರೆಮಾಡಲಾಗಿದೆ",
-    "bonusCreditsExpiring": "{{amount}} ಮೊತ್ತದ ಬೋನಸ್ ಕ್ರೆಡಿಟ್‌ಗಳ ಅವಧಿ {{date}} ರಂದು ಮುಗಿಯುತ್ತದೆ.",
+    "bonusCreditsExpiring": "{{amount}} ಮೊತ್ತದ ಕ್ರೆಡಿಟ್‌ಗಳ ಅವಧಿ {{date}} ರಂದು ಮುಗಿಯುತ್ತದೆ.",
     "signOutTitle": "ಸೈನ್ ಔಟ್ ಮಾಡಬೇಕೆ?",
     "signOutMessage": "ನಿಮ್ಮ ಕಾರ್ಯಸ್ಥಳವನ್ನು ಪ್ರವೇಶಿಸಲು ಮತ್ತೆ ಸೈನ್ ಇನ್ ಮಾಡಬೇಕು.",
     "deleteAccountTitle": "ಖಾತೆಯನ್ನು ಅಳಿಸಬೇಕೆ?",

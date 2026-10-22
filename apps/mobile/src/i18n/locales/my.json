@@ -224,7 +224,7 @@
     "hideBalance": "လက်ကျန် ဖျောက်ရန်",
     "showBalance": "လက်ကျန် ပြရန်",
     "balanceHidden": "လက်ကျန် ဖျောက်ထားသည်",
-    "bonusCreditsExpiring": "အပိုဆုခရက်ဒစ် {{amount}} သည် {{date}} တွင် သက်တမ်းကုန်ပါမည်။",
+    "bonusCreditsExpiring": "ခရက်ဒစ် {{amount}} သည် {{date}} တွင် သက်တမ်းကုန်ပါမည်။",
     "signOutTitle": "အကောင့်မှထွက်မလား။",
     "signOutMessage": "သင့်လုပ်ငန်းခွင်ကို အသုံးပြုရန် အကောင့်သို့ ပြန်ဝင်ရပါမည်။",
     "deleteAccountTitle": "အကောင့်ကို ဖျက်မလား။",

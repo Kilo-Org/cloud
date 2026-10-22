@@ -224,7 +224,7 @@
     "hideBalance": "پنهان کردن موجودی",
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",
-    "bonusCreditsExpiring": "{{amount}} اعتبار هدیه در {{date}} منقضی می‌شود.",
+    "bonusCreditsExpiring": "{{amount}} اعتبار در {{date}} منقضی می‌شود.",
     "signOutTitle": "از حساب خود خارج می‌شوید؟",
     "signOutMessage": "برای دسترسی به فضای کاری خود باید دوباره وارد شوید.",
     "deleteAccountTitle": "حساب حذف شود؟",

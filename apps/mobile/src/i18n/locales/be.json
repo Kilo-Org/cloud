@@ -224,7 +224,7 @@
     "hideBalance": "Схаваць баланс",
     "showBalance": "Паказаць баланс",
     "balanceHidden": "Баланс схаваны",
-    "bonusCreditsExpiring": "Тэрмін дзеяння бонусных крэдытаў на суму {{amount}} скончыцца {{date}}.",
+    "bonusCreditsExpiring": "Тэрмін дзеяння крэдытаў на суму {{amount}} скончыцца {{date}}.",
     "signOutTitle": "Выйсці?",
     "signOutMessage": "Каб вярнуцца ў сваю працоўную прастору, трэба будзе ўвайсці зноў.",
     "deleteAccountTitle": "Выдаліць уліковы запіс?",

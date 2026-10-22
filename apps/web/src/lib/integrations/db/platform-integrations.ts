@@ -823,27 +823,13 @@ export async function findPendingInstallations() {
 }
 
 /**
- * Find a pending installation by GitHub requester ID
- */
-export async function findPendingInstallationByRequesterId(githubRequesterId: string) {
-  const [result] = await db
-    .select()
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.GITHUB),
-        eq(platform_integrations.platform_requester_account_id, githubRequesterId),
-        eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
-        isNull(platform_integrations.platform_installation_id)
-      )
-    )
-    .limit(1);
-
-  return result || null;
-}
-
-/**
- * Find a pending installation by Kilo user ID
+ * Find the pending installation a Kilo user most recently requested.
+ *
+ * Several pending rows can exist for one user (the pending-target unique
+ * indexes are per owner, app type, and GitHub target account), so the lookup
+ * orders explicitly: newest request first, ties broken by id. Without the
+ * order Postgres may return any matching row, and a resumed view or a cancel
+ * could address a different request than the one the user saw.
  */
 export async function findPendingInstallationByKiloUserId(kiloUserId: string) {
   const [result] = await db
@@ -857,6 +843,7 @@ export async function findPendingInstallationByKiloUserId(kiloUserId: string) {
         isNull(platform_integrations.platform_installation_id)
       )
     )
+    .orderBy(desc(platform_integrations.created_at), desc(platform_integrations.id))
     .limit(1);
 
   return result || null;

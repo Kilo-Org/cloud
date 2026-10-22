@@ -224,7 +224,7 @@
     "hideBalance": "मौज्दात लुकाउनुहोस्",
     "showBalance": "मौज्दात देखाउनुहोस्",
     "balanceHidden": "मौज्दात लुकाइएको छ",
-    "bonusCreditsExpiring": "{{amount}} बराबरको बोनस क्रेडिटको म्याद {{date}} मा सकिन्छ।",
+    "bonusCreditsExpiring": "{{amount}} बराबरको क्रेडिटको म्याद {{date}} मा सकिन्छ।",
     "signOutTitle": "साइन आउट गर्ने?",
     "signOutMessage": "आफ्नो कार्यक्षेत्र प्रयोग गर्न फेरि साइन इन गर्नुपर्नेछ।",
     "deleteAccountTitle": "खाता मेट्ने?",

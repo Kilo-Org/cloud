@@ -224,7 +224,7 @@
     "hideBalance": "إخفاء الرصيد",
     "showBalance": "إظهار الرصيد",
     "balanceHidden": "الرصيد مخفي",
-    "bonusCreditsExpiring": "تنتهي صلاحية رصيد إضافي بقيمة {{amount}} في {{date}}.",
+    "bonusCreditsExpiring": "تنتهي صلاحية رصيد بقيمة {{amount}} في {{date}}.",
     "signOutTitle": "تسجيل الخروج؟",
     "signOutMessage": "ستحتاج إلى تسجيل الدخول مرة أخرى للوصول إلى مساحة عملك.",
     "deleteAccountTitle": "حذف الحساب؟",

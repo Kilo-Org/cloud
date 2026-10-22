@@ -224,7 +224,7 @@
     "hideBalance": "బ్యాలెన్స్ దాచు",
     "showBalance": "బ్యాలెన్స్ చూపించు",
     "balanceHidden": "బ్యాలెన్స్ దాచబడింది",
-    "bonusCreditsExpiring": "{{amount}} బోనస్ క్రెడిట్ల గడువు {{date}}న ముగుస్తుంది.",
+    "bonusCreditsExpiring": "{{amount}} క్రెడిట్ల గడువు {{date}}న ముగుస్తుంది.",
     "signOutTitle": "సైన్ అవుట్ చేయాలా?",
     "signOutMessage": "మీ వర్క్‌స్పేస్‌ను ఉపయోగించడానికి మళ్లీ సైన్ ఇన్ చేయాలి.",
     "deleteAccountTitle": "ఖాతాను తొలగించాలా?",

@@ -1192,6 +1192,24 @@ describe('listInbox', () => {
     const result = await listInbox(ORG_OWNER, foreign);
     expect(result.items).toHaveLength(1);
   });
+
+  it('reports a provider permission refusal as a reconnect, never as the caller permission', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      // The workspace repository listing is refused for the released token.
+      return jsonResponse({ error: { message: 'Forbidden' } }, 403);
+    });
+
+    const error = await captureRejection(listInbox(ORG_OWNER));
+
+    expect(error).toBeInstanceOf(BitbucketReviewError);
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toMatch(/reconnect/i);
+  });
 });
 
 describe('getMergeRestrictions', () => {

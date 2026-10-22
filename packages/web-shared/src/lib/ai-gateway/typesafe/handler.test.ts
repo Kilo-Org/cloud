@@ -528,17 +528,17 @@ describe('handleSystemOneRequest', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
-  it('returns the admission backoff response before authentication', async () => {
+  it('returns the admission server error before authentication', async () => {
     jest.mocked(checkGatewayAccountRateLimit).mockResolvedValue('unavailable');
     const request = makeRequest();
 
     const response = await handleSystemOneRequest(request);
 
-    expect(response.status).toBe(429);
-    expect(response.headers.get('retry-after')).toBe('60');
+    expect(response.status).toBe(500);
+    expect(response.headers.get('retry-after')).toBeNull();
     expect(await response.json()).toEqual({
-      message: 'Rate limit exceeded',
-      error_type: 'rate_limit_exceeded',
+      error: 'Internal Server Error',
+      message: 'An internal server error occurred.',
     });
     expect(getUserFromAuth).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();

@@ -43,8 +43,7 @@ export function gatewayRateLimitKey(headers: Headers, ipAddress: string | undefi
 }
 
 /**
- * Account admission verdict. Both non-admitted outcomes use HTTP 429;
- * `unavailable` additionally requests a 60-second client backoff via Retry-After.
+ * Account admission verdict. Callers distinguish server errors from throttling.
  */
 export type GatewayRateLimitOutcome = 'admitted' | 'rate-limited' | 'unavailable';
 

@@ -705,20 +705,28 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   });
 
   it.each([
-    { verdict: { rateLimited: false, error: 'not-found' as const }, retryAfter: '60' },
-    { verdict: { rateLimited: true }, retryAfter: null },
-  ])('returns the admission response with backoff $retryAfter', async ({ verdict, retryAfter }) => {
+    {
+      verdict: { rateLimited: false, error: 'not-found' as const },
+      status: 500,
+      body: { error: 'Internal Server Error', message: 'An internal server error occurred.' },
+    },
+    {
+      verdict: { rateLimited: true },
+      status: 429,
+      body: {
+        error: 'Rate limit exceeded',
+        error_type: 'rate_limit_exceeded',
+        message: 'Too many requests. Please try again later.',
+      },
+    },
+  ])('returns the admission response with status $status', async ({ verdict, status, body }) => {
     jest.mocked(checkRateLimit).mockResolvedValueOnce(verdict);
 
     const response = await handleLlmProxyRequest(makeRequest(makeBody()));
 
-    expect(response.status).toBe(429);
-    expect(response.headers.get('retry-after')).toBe(retryAfter);
-    expect(await response.json()).toEqual({
-      error: 'Rate limit exceeded',
-      error_type: 'rate_limit_exceeded',
-      message: 'Too many requests. Please try again later.',
-    });
+    expect(response.status).toBe(status);
+    expect(response.headers.get('retry-after')).toBeNull();
+    expect(await response.json()).toEqual(body);
     expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
     expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();

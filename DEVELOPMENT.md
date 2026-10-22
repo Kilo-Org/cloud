@@ -265,6 +265,13 @@ should pass against the local PostgreSQL database.
 | `pnpm --filter web stripe` | Start Stripe webhook forwarding to localhost |
 | `pnpm test:e2e` | Run Playwright end-to-end tests |
 
+### Gateway response checks
+
+Use a production-mode gateway build with a local firewall fixture to verify
+`/api/v1/chat/completions` and `/api/v1/systemone`. Admission server errors use
+HTTP 500 with a generic JSON error and no `Retry-After` header. Ordinary
+throttling uses HTTP 429 and the endpoint's `rate_limit_exceeded` body.
+
 ## Git Workflow
 
 - Direct commits to `main` are blocked by a git hook. Always work on a feature branch.

@@ -187,10 +187,13 @@ jobs:
     needs: [gate, promote_ios]
     # Build when nothing is published, or when the promote of the short-lived
     # artifact failed: a failed promote must not leave the hash without a
-    # durable build.
+    # durable build. `always()` keeps this job alive when the promote job was
+    # skipped, which is the normal case.
     if: |
-      needs.gate.outputs.need_ios == 'true' ||
-      (needs.gate.outputs.promote_ios == 'true' && needs.promote_ios.result != 'success')
+      always() &&
+      needs.gate.result == 'success' &&
+      (needs.gate.outputs.need_ios == 'true' ||
+       (needs.gate.outputs.promote_ios == 'true' && needs.promote_ios.result != 'success'))
     runs-on: macos-26
     timeout-minutes: 90
     concurrency:
@@ -293,8 +296,10 @@ jobs:
   android:
     needs: [gate, promote_android]
     if: |
-      needs.gate.outputs.need_android == 'true' ||
-      (needs.gate.outputs.promote_android == 'true' && needs.promote_android.result != 'success')
+      always() &&
+      needs.gate.result == 'success' &&
+      (needs.gate.outputs.need_android == 'true' ||
+       (needs.gate.outputs.promote_android == 'true' && needs.promote_android.result != 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     concurrency:

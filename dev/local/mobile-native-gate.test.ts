@@ -194,11 +194,17 @@ test('a promote job copies the short-lived artifact under the durable name', () 
   }
 });
 
-test('a failed promote still builds the platform', () => {
+test('a failed promote still builds the platform, and a skipped one does not disable it', () => {
   const workflow = readWorkflow();
   for (const platform of ['ios', 'android'] as const) {
     const job = workflow.jobs[platform];
     assert.deepEqual(job.needs, ['gate', `promote_${platform}`]);
+    // GitHub skips a job whose `needs` dependency was skipped unless the `if`
+    // calls a status function. promote_* is skipped on every run that does not
+    // promote, so without `always()` the workflow builds nothing at all.
+    assert.match(job.if ?? '', /^always\(\)/, `${platform}: the if needs a status function`);
+    assert.match(job.if ?? '', /needs\.gate\.result == 'success'/);
+    assert.match(job.if ?? '', new RegExp(`needs\\.gate\\.outputs\\.need_${platform} == 'true'`));
     assert.match(job.if ?? '', new RegExp(`needs\\.promote_${platform}\\.result != 'success'`));
   }
 });

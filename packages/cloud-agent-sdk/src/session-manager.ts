@@ -278,7 +278,6 @@ type FetchedSessionData = {
   variant: string | null;
   repository: string | null;
   isInitiated: boolean;
-  needsLegacyPrepare: boolean;
   isPreparingAsync: boolean;
   /**
    * Whether the session currently has a ready route that can own a terminal.

@@ -698,24 +698,22 @@ function toolRunMessage(
 ): StoredMessage {
   const message = assistantMessage(messageId);
   message.info = { ...message.info, sessionID: sessionId };
-  message.parts = partIds.map(
-    (partId, index): ToolPart => ({
-      id: partId,
-      sessionID: sessionId,
-      messageID: messageId,
-      type: 'tool',
-      callID: `call-${partId}`,
-      tool: 'read',
-      state: {
-        status: 'completed',
-        input: { filePath: `/repo/${partId}.ts` },
-        output: '',
-        title: 'read',
-        metadata: {},
-        time: { start: index, end: index + 1 },
-      },
-    })
-  );
+  message.parts = partIds.map((partId, index): ToolPart => ({
+    id: partId,
+    sessionID: sessionId,
+    messageID: messageId,
+    type: 'tool',
+    callID: `call-${partId}`,
+    tool: 'read',
+    state: {
+      status: 'completed',
+      input: { filePath: `/repo/${partId}.ts` },
+      output: '',
+      title: 'read',
+      metadata: {},
+      time: { start: index, end: index + 1 },
+    },
+  }));
   return message;
 }
 
@@ -918,7 +916,6 @@ async function mountDetails(
         variant: null,
         repository: null,
         isInitiated: true,
-        needsLegacyPrepare: false,
         isPreparingAsync: false,
         prompt: null,
         initialMessageId: null,
@@ -1119,7 +1116,6 @@ describe('SessionDetailContent display scope', () => {
     expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
       'min-h-21'
     );
-    expect(header.props.context).toBeUndefined();
     expect(header.findAllByType(ContextControl)).toHaveLength(0);
     // The PR link shares the goal row now, so the header row holds no badge.
     expect(header.findAllByType('SessionPrBadge')).toHaveLength(0);
@@ -2508,6 +2504,7 @@ describe('child transcript requests', () => {
       expect(button.accessibilityLabel).toContain('Researcher');
       expect(button.accessibilityLabel).toContain(`Task ${sessionId}`);
       expect(button.accessibilityLabel).toContain(statusLabel);
+      expect(button.accessibilityLabel).not.toContain(status);
       expect(button.accessibilityLabel?.includes('Waiting for activity')).toBe(false);
       if (activity) {
         expect(button.accessibilityLabel).toContain(activity);

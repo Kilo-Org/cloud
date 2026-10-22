@@ -65,6 +65,9 @@ const deniedListKey = [
 function report(id: string, organizationId: string | null): BriefingReport {
   return {
     id,
+    kind: 'scheduled',
+    createdAt: '2026-10-15T08:00:00Z',
+    timezone: 'UTC',
     context: {
       id: organizationId ?? 'personal',
       organizationId,

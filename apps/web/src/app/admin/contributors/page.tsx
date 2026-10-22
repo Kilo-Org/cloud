@@ -449,11 +449,11 @@ export default function ContributorChampionsAdminPage() {
     trpc.admin.contributorChampions.upgradeTier.mutationOptions({
       onSuccess: result => {
         const creditMsg =
-          result.creditDifferentialUsd > 0
-            ? result.creditGranted
-              ? ` — $${result.creditDifferentialUsd} top-up credit granted`
-              : ` — credit pending (no linked account)`
-            : '';
+          result.creditGrantedUsd > 0
+            ? ` — $${result.creditGrantedUsd} top-up credit granted`
+            : result.creditPendingUsd > 0
+              ? ` — credit pending (no linked account)`
+              : '';
         toast.success(`Upgraded to ${result.upgradedTier}${creditMsg}`);
         setUpgradeState(null);
         setUpgradeSelections({});

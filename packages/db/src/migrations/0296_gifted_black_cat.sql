@@ -1,0 +1,1 @@
+ALTER TABLE "contributor_champion_memberships" ADD COLUMN "credits_window_granted_microdollars" bigint DEFAULT 0 NOT NULL;

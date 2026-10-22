@@ -5496,6 +5496,7 @@ export const contributor_champion_memberships = pgTable(
     enrolled_at: timestamp({ withTimezone: true, mode: 'string' }),
     credit_amount_microdollars: bigint({ mode: 'number' }).default(0).notNull(),
     credits_last_granted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    credits_window_granted_microdollars: bigint({ mode: 'number' }).default(0).notNull(),
     linked_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })

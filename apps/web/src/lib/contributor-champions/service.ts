@@ -16,7 +16,7 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, gte, isNotNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
-import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
+import { grantCreditForCategory, type DbOrTx } from '@kilocode/web-shared/lib/promotionalCredits';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { captureException } from '@sentry/nextjs';
@@ -68,6 +68,119 @@ type ContributorTier = (typeof CONTRIBUTOR_TIERS)[keyof typeof CONTRIBUTOR_TIERS
 import { TIER_CREDIT_USD } from './constants';
 
 const CREDIT_EXPIRY_HOURS = 30 * 24; // 30 days
+
+/**
+ * Contributor champion credit renews every 30 days. Enrollment, manual enrollment and
+ * tier changes use the same window as refreshContributorChampionCredits: while a window
+ * is open they complete the target tier amount for that window, and the refresh job
+ * opens the next one.
+ */
+type ContributorCreditWindow = {
+  /** Credit the membership received inside the current 30-day window. */
+  active: boolean;
+  grantedMicrodollars: number;
+};
+
+type ContributorMembershipCreditState = {
+  enrolledTier: string | null;
+  window: ContributorCreditWindow;
+};
+
+type ContributorCreditGrant = {
+  grantedMicrodollars: number;
+  /** The credit provider rejected the grant; callers that require the top-up roll back. */
+  failed: boolean;
+};
+
+function computeWindowGrant(input: {
+  window: ContributorCreditWindow;
+  targetMicrodollars: number;
+}): number {
+  if (input.targetMicrodollars <= 0) return 0;
+  if (!input.window.active) return input.targetMicrodollars;
+  return Math.max(0, input.targetMicrodollars - Math.max(0, input.window.grantedMicrodollars));
+}
+
+async function readContributorMembershipCreditState(
+  tx: DbOrTx,
+  contributorId: string
+): Promise<ContributorMembershipCreditState | null> {
+  // Lock the membership row, not just the contributor row: refreshContributorChampionCredits
+  // claims the same row with FOR UPDATE SKIP LOCKED, so this serializes the manual paths
+  // with a refresh grant on the same membership.
+  const [row] = await tx
+    .select({
+      enrolledTier: contributor_champion_memberships.enrolled_tier,
+      windowActive: sql<
+        boolean | null
+      >`${contributor_champion_memberships.credits_last_granted_at} > now() - interval '30 days'`,
+      grantedMicrodollars: contributor_champion_memberships.credits_window_granted_microdollars,
+    })
+    .from(contributor_champion_memberships)
+    .where(eq(contributor_champion_memberships.contributor_id, contributorId))
+    .limit(1)
+    .for('update');
+
+  if (!row) return null;
+  return {
+    enrolledTier: row.enrolledTier,
+    window: {
+      active: row.windowActive === true,
+      grantedMicrodollars: Math.max(0, row.grantedMicrodollars),
+    },
+  };
+}
+
+async function grantContributorChampionCredit(
+  tx: DbOrTx,
+  input: {
+    contributorId: string;
+    linkedKiloUserId: string | null;
+    targetMicrodollars: number;
+    window: ContributorCreditWindow;
+    now: string;
+  }
+): Promise<ContributorCreditGrant> {
+  if (!input.linkedKiloUserId) return { grantedMicrodollars: 0, failed: false };
+
+  const grantedMicrodollars = computeWindowGrant({
+    window: input.window,
+    targetMicrodollars: input.targetMicrodollars,
+  });
+  if (grantedMicrodollars <= 0) return { grantedMicrodollars: 0, failed: false };
+
+  const [linkedUser] = await tx
+    .select()
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, input.linkedKiloUserId))
+    .limit(1);
+  if (!linkedUser) return { grantedMicrodollars: 0, failed: false };
+
+  const result = await grantCreditForCategory(linkedUser, {
+    credit_category: 'contributor-champion-credits',
+    amount_usd: fromMicrodollars(grantedMicrodollars),
+    expiry_hours: CREDIT_EXPIRY_HOURS,
+    counts_as_selfservice: false,
+    dbOrTx: tx,
+  });
+  if (!result.success) return { grantedMicrodollars: 0, failed: true };
+
+  const windowColumns = input.window.active
+    ? {
+        credits_window_granted_microdollars: input.window.grantedMicrodollars + grantedMicrodollars,
+      }
+    : {
+        credits_last_granted_at: input.now,
+        credits_window_granted_microdollars: grantedMicrodollars,
+      };
+
+  await tx
+    .update(contributor_champion_memberships)
+    .set({ ...windowColumns, updated_at: sql`now()` })
+    .where(eq(contributor_champion_memberships.contributor_id, input.contributorId));
+
+  return { grantedMicrodollars, failed: false };
+}
 
 const SEARCH_PULL_REQUEST_LIST_ITEM_SCHEMA = z.object({
   number: z.number().int().nonnegative(),
@@ -721,14 +834,17 @@ export async function enrollContributorChampion(input: {
 
   const now = new Date().toISOString();
 
-  // Use a transaction with FOR UPDATE on the contributor row to prevent concurrent
-  // enrollments from double-granting credits.
+  // Use a transaction with FOR UPDATE on the contributor row to serialize concurrent
+  // enrollments; the credit window is read after the lock.
   const creditGranted = await db.transaction(async tx => {
     // Lock the contributor row for the duration of this transaction so concurrent
     // enroll requests are serialized rather than racing.
     await tx.execute(
       sql`SELECT id FROM contributor_champion_contributors WHERE id = ${input.contributorId} FOR UPDATE`
     );
+
+    const existing = await readContributorMembershipCreditState(tx, input.contributorId);
+    const window = existing?.window ?? { active: false, grantedMicrodollars: 0 };
 
     await tx
       .insert(contributor_champion_memberships)
@@ -748,41 +864,23 @@ export async function enrollContributorChampion(input: {
           enrolled_at: now,
           credit_amount_microdollars: creditAmountMicrodollars,
           linked_kilo_user_id: linkedKiloUserId,
-          // Preserve existing timestamp — overwriting with null would reset the
-          // 30-day credit cycle, potentially triggering a premature re-grant.
+          // Preserve the credit window columns across a re-enrollment.
           credits_last_granted_at: sql`contributor_champion_memberships.credits_last_granted_at`,
+          credits_window_granted_microdollars: sql`contributor_champion_memberships.credits_window_granted_microdollars`,
           updated_at: sql`now()`,
         },
       });
 
-    let granted = false;
-    if (creditAmountUsd > 0 && linkedKiloUserId) {
-      const [linkedUser] = await tx
-        .select()
-        .from(kilocode_users)
-        .where(eq(kilocode_users.id, linkedKiloUserId))
-        .limit(1);
+    // Grants the part of the target amount the current window has not granted yet.
+    const grant = await grantContributorChampionCredit(tx, {
+      contributorId: input.contributorId,
+      linkedKiloUserId,
+      targetMicrodollars: creditAmountMicrodollars,
+      window,
+      now,
+    });
 
-      if (linkedUser) {
-        const result = await grantCreditForCategory(linkedUser, {
-          credit_category: 'contributor-champion-credits',
-          amount_usd: creditAmountUsd,
-          expiry_hours: CREDIT_EXPIRY_HOURS,
-          counts_as_selfservice: false,
-          dbOrTx: tx,
-        });
-        granted = result.success;
-      }
-    }
-
-    if (granted) {
-      await tx
-        .update(contributor_champion_memberships)
-        .set({ credits_last_granted_at: now })
-        .where(eq(contributor_champion_memberships.contributor_id, input.contributorId));
-    }
-
-    return granted;
+    return grant.grantedMicrodollars > 0;
   });
 
   return {
@@ -794,8 +892,9 @@ export async function enrollContributorChampion(input: {
 
 type UpgradeResult = {
   upgradedTier: ContributorTier;
-  creditDifferentialUsd: number;
-  creditGranted: boolean;
+  creditGrantedUsd: number;
+  /** Amount still due inside the current window, with no Kilo account linked. */
+  creditPendingUsd: number;
 };
 
 export async function upgradeContributorChampionTier(input: {
@@ -820,35 +919,26 @@ export async function upgradeContributorChampionTier(input: {
   // Prefer the explicit membership link over the email-derived match, same as enrollContributorChampion.
   const linkedKiloUserId = row.linkedKiloUserId ?? row.linkedUserId;
 
-  const { creditGranted, creditDifferentialUsd } = await db.transaction(async tx => {
+  const result = await db.transaction(async tx => {
     // Lock the contributor row to serialize concurrent upgrade requests.
     await tx.execute(
       sql`SELECT id FROM contributor_champion_contributors WHERE id = ${input.contributorId} FOR UPDATE`
     );
 
-    // Re-read the membership inside the transaction after acquiring the lock so the
-    // differential is computed from the authoritative current tier, not the
-    // leaderboard snapshot taken before the lock. Without this, two concurrent
-    // upgrade calls could both read the pre-upgrade tier, both compute the same
-    // differential, and both grant — double-granting the top-up.
-    const [membership] = await tx
-      .select({ enrolled_tier: contributor_champion_memberships.enrolled_tier })
-      .from(contributor_champion_memberships)
-      .where(eq(contributor_champion_memberships.contributor_id, input.contributorId))
-      .limit(1);
-
+    // Re-read the membership and its credit window inside the transaction after
+    // acquiring the lock so the top-up is computed from the authoritative tier.
+    const membership = await readContributorMembershipCreditState(tx, input.contributorId);
     if (!membership) throw new Error('Contributor membership not found');
-    if (!membership.enrolled_tier) throw new Error('Contributor is not currently enrolled');
+    if (!membership.enrolledTier) throw new Error('Contributor is not currently enrolled');
 
-    const lockedCurrentTier = parseContributorTier(membership.enrolled_tier);
+    const lockedCurrentTier = parseContributorTier(membership.enrolledTier);
     if (!lockedCurrentTier)
-      throw new Error(`Invalid enrolled_tier "${membership.enrolled_tier}" in DB`);
+      throw new Error(`Invalid enrolled_tier "${membership.enrolledTier}" in DB`);
     const lockedCurrentCreditUsd = TIER_CREDIT_USD[lockedCurrentTier];
-    const lockedDifferentialUsd = newCreditUsd - lockedCurrentCreditUsd;
 
-    if (lockedDifferentialUsd <= 0) {
+    if (newCreditUsd <= lockedCurrentCreditUsd) {
       throw new Error(
-        `Tier is already at or above "${input.newTier}" (current: "${membership.enrolled_tier}")`
+        `Tier is already at or above "${input.newTier}" (current: "${membership.enrolledTier}")`
       );
     }
 
@@ -863,47 +953,36 @@ export async function upgradeContributorChampionTier(input: {
       })
       .where(eq(contributor_champion_memberships.contributor_id, input.contributorId));
 
-    // Grant the credit differential immediately (the top-up for the current period).
-    let granted = false;
-    if (lockedDifferentialUsd > 0 && linkedKiloUserId) {
-      const [linkedUser] = await tx
-        .select()
-        .from(kilocode_users)
-        .where(eq(kilocode_users.id, linkedKiloUserId))
-        .limit(1);
+    // Top up to the new tier for the current period, completing the window's target
+    // amount.
+    const grant = await grantContributorChampionCredit(tx, {
+      contributorId: input.contributorId,
+      linkedKiloUserId,
+      targetMicrodollars: newCreditAmountMicrodollars,
+      window: membership.window,
+      now,
+    });
+    if (grant.failed) {
+      throw new Error('Failed to grant top-up credit; rolling back tier upgrade');
+    }
 
-      if (linkedUser) {
-        const result = await grantCreditForCategory(linkedUser, {
-          credit_category: 'contributor-champion-credits',
-          amount_usd: lockedDifferentialUsd,
-          expiry_hours: CREDIT_EXPIRY_HOURS,
-          counts_as_selfservice: false,
-          dbOrTx: tx,
+    const pendingMicrodollars = linkedKiloUserId
+      ? 0
+      : computeWindowGrant({
+          window: membership.window,
+          targetMicrodollars: newCreditAmountMicrodollars,
         });
-        if (!result.success) {
-          throw new Error('Failed to grant top-up credit; rolling back tier upgrade');
-        }
-        granted = true;
-      }
-    }
 
-    // Reset the renewal clock after a successful top-up grant. Without this,
-    // refreshContributorChampionCredits could see a stale credits_last_granted_at
-    // and immediately grant the full new monthly amount on top of the top-up.
-    if (granted) {
-      await tx
-        .update(contributor_champion_memberships)
-        .set({ credits_last_granted_at: now })
-        .where(eq(contributor_champion_memberships.contributor_id, input.contributorId));
-    }
-
-    return { creditGranted: granted, creditDifferentialUsd: lockedDifferentialUsd };
+    return {
+      creditGrantedUsd: fromMicrodollars(grant.grantedMicrodollars),
+      creditPendingUsd: fromMicrodollars(pendingMicrodollars),
+    };
   });
 
   return {
     upgradedTier: input.newTier,
-    creditDifferentialUsd,
-    creditGranted,
+    creditGrantedUsd: result.creditGrantedUsd,
+    creditPendingUsd: result.creditPendingUsd,
   };
 }
 
@@ -993,6 +1072,8 @@ export async function refreshContributorChampionCredits(): Promise<CreditRefresh
             .update(contributor_champion_memberships)
             .set({
               credits_last_granted_at: new Date().toISOString(),
+              // The refresh opens a new window with the full monthly amount.
+              credits_window_granted_microdollars: Number(row.credit_amount_microdollars),
               updated_at: sql`now()`,
             })
             .where(eq(contributor_champion_memberships.id, row.id));
@@ -1156,6 +1237,25 @@ export async function manualEnrollContributor(input: {
   const creditAmountUsd = TIER_CREDIT_USD[resolvedTier];
   const creditAmountMicrodollars = toMicrodollars(creditAmountUsd);
 
+  // A linked Kilo account has to match the enrollment email; the account is resolved
+  // before any write so a mismatched link is rejected up front.
+  const linkedKiloUser = input.kiloUserId
+    ? await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, input.kiloUserId),
+      })
+    : undefined;
+  if (input.kiloUserId) {
+    if (!linkedKiloUser) {
+      throw new Error('Kilo account not found for manual enrollment');
+    }
+    if (
+      linkedKiloUser.google_user_email.trim().toLowerCase() !== input.email.trim().toLowerCase()
+    ) {
+      throw new Error('Enrollment email does not match the linked Kilo account');
+    }
+  }
+  const linkedKiloUserId = linkedKiloUser?.id ?? null;
+
   // Create or find contributor record
   const githubLogin =
     input.githubLogin ?? `manual-${input.email.replace('@', '-at-').replace(/\./g, '-')}`;
@@ -1184,12 +1284,15 @@ export async function manualEnrollContributor(input: {
 
   const now = new Date().toISOString();
 
-  // Use a transaction with FOR UPDATE on the contributor row to prevent concurrent
-  // manual enrollments from double-granting credits.
+  // Serialize concurrent manual enrollments on the contributor row, then read the
+  // credit window under that lock.
   const creditGranted = await db.transaction(async tx => {
     await tx.execute(
       sql`SELECT id FROM contributor_champion_contributors WHERE id = ${contributorId} FOR UPDATE`
     );
+
+    const existing = await readContributorMembershipCreditState(tx, contributorId);
+    const window = existing?.window ?? { active: false, grantedMicrodollars: 0 };
 
     await tx
       .insert(contributor_champion_memberships)
@@ -1199,7 +1302,7 @@ export async function manualEnrollContributor(input: {
         enrolled_tier: resolvedTier,
         enrolled_at: now,
         credit_amount_microdollars: creditAmountMicrodollars,
-        linked_kilo_user_id: input.kiloUserId,
+        linked_kilo_user_id: linkedKiloUserId,
       })
       .onConflictDoUpdate({
         target: contributor_champion_memberships.contributor_id,
@@ -1208,40 +1311,23 @@ export async function manualEnrollContributor(input: {
           enrolled_tier: resolvedTier,
           enrolled_at: now,
           credit_amount_microdollars: creditAmountMicrodollars,
-          linked_kilo_user_id: input.kiloUserId,
+          linked_kilo_user_id: linkedKiloUserId,
+          // Preserve the credit window — clearing it would restart the 30-day cycle.
           credits_last_granted_at: sql`contributor_champion_memberships.credits_last_granted_at`,
+          credits_window_granted_microdollars: sql`contributor_champion_memberships.credits_window_granted_microdollars`,
           updated_at: sql`now()`,
         },
       });
 
-    let granted = false;
-    if (creditAmountUsd > 0 && input.kiloUserId) {
-      const kiloUserRow = await tx
-        .select()
-        .from(kilocode_users)
-        .where(eq(kilocode_users.id, input.kiloUserId))
-        .limit(1)
-        .then(rows => rows[0]);
-      if (kiloUserRow) {
-        const result = await grantCreditForCategory(kiloUserRow, {
-          credit_category: 'contributor-champion-credits',
-          amount_usd: creditAmountUsd,
-          expiry_hours: CREDIT_EXPIRY_HOURS,
-          counts_as_selfservice: false,
-          dbOrTx: tx,
-        });
-        granted = result.success;
-      }
-    }
+    const grant = await grantContributorChampionCredit(tx, {
+      contributorId,
+      linkedKiloUserId,
+      targetMicrodollars: creditAmountMicrodollars,
+      window,
+      now,
+    });
 
-    if (granted) {
-      await tx
-        .update(contributor_champion_memberships)
-        .set({ credits_last_granted_at: now })
-        .where(eq(contributor_champion_memberships.contributor_id, contributorId));
-    }
-
-    return granted;
+    return grant.grantedMicrodollars > 0;
   });
 
   return { enrolledTier: resolvedTier, creditAmountUsd, creditGranted };

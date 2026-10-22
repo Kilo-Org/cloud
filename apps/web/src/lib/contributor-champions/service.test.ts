@@ -42,6 +42,7 @@ let processAutoTierUpgrades: typeof serviceModule.processAutoTierUpgrades;
 let refreshContributorChampionCredits: typeof serviceModule.refreshContributorChampionCredits;
 let searchKiloUsersByEmail: typeof serviceModule.searchKiloUsersByEmail;
 let syncContributorChampionData: typeof serviceModule.syncContributorChampionData;
+let upgradeContributorChampionTier: typeof serviceModule.upgradeContributorChampionTier;
 let upsertContributorSelectedTier: typeof serviceModule.upsertContributorSelectedTier;
 
 beforeAll(async () => {
@@ -56,6 +57,7 @@ beforeAll(async () => {
     refreshContributorChampionCredits,
     searchKiloUsersByEmail,
     syncContributorChampionData,
+    upgradeContributorChampionTier,
     upsertContributorSelectedTier,
   } = await import('./service'));
 });
@@ -112,6 +114,27 @@ async function insertEvent(input: {
     github_author_login: input.login,
     github_author_email: input.email ?? null,
     merged_at: input.mergedAt,
+  });
+}
+
+let nextEventPrNumber = 12_000;
+
+async function insertLinkedContributor(input: { login: string; email: string }) {
+  const contributorId = await insertContributor({ login: input.login, allTimeContributions: 20 });
+  nextEventPrNumber += 1;
+  await insertEvent({
+    contributorId,
+    prNumber: nextEventPrNumber,
+    mergedAt: daysAgo(5),
+    login: input.login,
+    email: input.email,
+  });
+  return contributorId;
+}
+
+async function readMembership(contributorId: string) {
+  return db.query.contributor_champion_memberships.findFirst({
+    where: eq(contributor_champion_memberships.contributor_id, contributorId),
   });
 }
 
@@ -681,6 +704,196 @@ describe('contributor champions service', () => {
     expect(membership?.enrolled_tier).toBe('contributor');
     // Verify credits_last_granted_at was preserved (not reset to null) after re-enrollment.
     expect(membership?.credits_last_granted_at).not.toBeNull();
+  });
+
+  it('applies the 30-day credit window to enrollment', async () => {
+    const user = await insertTestUser({ google_user_email: 'window-user@example.com' });
+    const contributorId = await insertLinkedContributor({
+      login: 'window-user',
+      email: 'window-user@example.com',
+    });
+    expect(user.id).toBeTruthy();
+
+    mockedGrantCredit.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      amount_usd: 50,
+      credit_transaction_id: 'test-tx',
+    });
+
+    const first = await enrollContributorChampion({ contributorId, tier: 'ambassador' });
+    const repeat = await enrollContributorChampion({ contributorId, tier: 'ambassador' });
+
+    expect(first.creditGranted).toBe(true);
+    expect(repeat.creditGranted).toBe(false);
+    expect(mockedGrantCredit).toHaveBeenCalledTimes(1);
+    expect(mockedGrantCredit).toHaveBeenCalledWith(
+      expect.objectContaining({ id: user.id }),
+      expect.objectContaining({ amount_usd: 50 })
+    );
+
+    const afterEnroll = await readMembership(contributorId);
+    expect(afterEnroll?.credits_last_granted_at).not.toBeNull();
+    expect(afterEnroll?.credits_window_granted_microdollars).toBe(50_000_000);
+
+    await db
+      .update(contributor_champion_memberships)
+      .set({ credits_last_granted_at: daysAgo(31) })
+      .where(eq(contributor_champion_memberships.contributor_id, contributorId));
+
+    const afterWindow = await enrollContributorChampion({ contributorId, tier: 'ambassador' });
+
+    expect(afterWindow.creditGranted).toBe(true);
+    expect(mockedGrantCredit).toHaveBeenCalledTimes(2);
+
+    const afterRenewal = await readMembership(contributorId);
+    expect(afterRenewal?.credits_window_granted_microdollars).toBe(50_000_000);
+  });
+
+  it('tops up a mid-window tier change to the target tier amount', async () => {
+    const user = await insertTestUser({ google_user_email: 'top-up-user@example.com' });
+    const contributorId = await insertLinkedContributor({
+      login: 'top-up-user',
+      email: 'top-up-user@example.com',
+    });
+    expect(user.id).toBeTruthy();
+
+    mockedGrantCredit.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      amount_usd: 50,
+      credit_transaction_id: 'test-tx',
+    });
+
+    await enrollContributorChampion({ contributorId, tier: 'ambassador' });
+    const raised = await enrollContributorChampion({ contributorId, tier: 'champion' });
+
+    expect(raised.creditGranted).toBe(true);
+    expect(mockedGrantCredit).toHaveBeenCalledTimes(2);
+    const grantedAmounts = mockedGrantCredit.mock.calls.map(call => call[1].amount_usd);
+    expect(grantedAmounts).toEqual([50, 100]);
+
+    const membership = await readMembership(contributorId);
+    expect(membership?.credits_window_granted_microdollars).toBe(150_000_000);
+  });
+
+  it('keeps one credit window across a downgrade and upgrade cycle', async () => {
+    await insertTestUser({ google_user_email: 'cycle-user@example.com' });
+    const contributorId = await insertLinkedContributor({
+      login: 'cycle-user',
+      email: 'cycle-user@example.com',
+    });
+
+    mockedGrantCredit.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      amount_usd: 150,
+      credit_transaction_id: 'test-tx',
+    });
+
+    const champion = await enrollContributorChampion({ contributorId, tier: 'champion' });
+    const downgraded = await enrollContributorChampion({ contributorId, tier: 'contributor' });
+    const upgraded = await upgradeContributorChampionTier({
+      contributorId,
+      newTier: 'champion',
+    });
+
+    expect(champion.creditGranted).toBe(true);
+    expect(downgraded.creditGranted).toBe(false);
+    expect(upgraded.creditGrantedUsd).toBe(0);
+    expect(upgraded.creditPendingUsd).toBe(0);
+    expect(mockedGrantCredit).toHaveBeenCalledTimes(1);
+    expect(mockedGrantCredit).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ amount_usd: 150 })
+    );
+
+    const membership = await readMembership(contributorId);
+    expect(membership?.enrolled_tier).toBe('champion');
+    expect(membership?.credits_window_granted_microdollars).toBe(150_000_000);
+  });
+
+  it('manual enrollment applies the credit window and the same-email rule', async () => {
+    const user = await insertTestUser({ google_user_email: 'manual-window@example.com' });
+
+    mockedGrantCredit.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      amount_usd: 50,
+      credit_transaction_id: 'test-tx',
+    });
+
+    const first = await manualEnrollContributor({
+      email: 'manual-window@example.com',
+      githubLogin: 'manual-window-user',
+      tier: 'ambassador',
+      kiloUserId: user.id,
+    });
+    const repeat = await manualEnrollContributor({
+      email: 'manual-window@example.com',
+      githubLogin: 'manual-window-user',
+      tier: 'ambassador',
+      kiloUserId: user.id,
+    });
+
+    expect(first.creditGranted).toBe(true);
+    expect(repeat.creditGranted).toBe(false);
+    expect(mockedGrantCredit).toHaveBeenCalledTimes(1);
+
+    const contributor = await db.query.contributor_champion_contributors.findFirst({
+      where: eq(contributor_champion_contributors.github_login, 'manual-window-user'),
+    });
+    await expect(
+      manualEnrollContributor({
+        email: 'different-address@example.com',
+        githubLogin: 'manual-mismatch-user',
+        tier: 'ambassador',
+        kiloUserId: user.id,
+      })
+    ).rejects.toThrow('Enrollment email does not match the linked Kilo account');
+
+    expect(mockedGrantCredit).toHaveBeenCalledTimes(1);
+    const rejectedContributor = await db.query.contributor_champion_contributors.findFirst({
+      where: eq(contributor_champion_contributors.github_login, 'manual-mismatch-user'),
+    });
+    expect(rejectedContributor).toBeUndefined();
+    expect(contributor).toBeTruthy();
+  });
+
+  it('refreshContributorChampionCredits opens the next credit window', async () => {
+    const user = await insertTestUser({ google_user_email: 'refresh-window@example.com' });
+    const contributorId = await insertLinkedContributor({
+      login: 'refresh-window',
+      email: 'refresh-window@example.com',
+    });
+
+    await db.insert(contributor_champion_memberships).values({
+      contributor_id: contributorId,
+      enrolled_tier: 'ambassador',
+      enrolled_at: daysAgo(60),
+      credit_amount_microdollars: 50_000_000,
+      linked_kilo_user_id: user.id,
+      credits_last_granted_at: daysAgo(31),
+    });
+
+    mockedGrantCredit.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      amount_usd: 50,
+      credit_transaction_id: 'test-tx',
+    });
+
+    const refresh = await refreshContributorChampionCredits();
+    expect(refresh.granted).toBe(1);
+
+    const afterRefresh = await readMembership(contributorId);
+    expect(afterRefresh?.credits_window_granted_microdollars).toBe(50_000_000);
+    expect(afterRefresh?.credits_last_granted_at).not.toBeNull();
+
+    const enroll = await enrollContributorChampion({ contributorId, tier: 'ambassador' });
+
+    expect(enroll.creditGranted).toBe(false);
+    expect(mockedGrantCredit).toHaveBeenCalledTimes(1);
   });
 
   it('searchKiloUsersByEmail returns matching users', async () => {

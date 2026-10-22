@@ -46,7 +46,13 @@ catalog:
   p-limit: 7.3.0
   stripe: 19.3.1
   tsx: 4.21.0
-  typescript: 5.9.3
+  # TypeScript 7 is the native compiler and ships no compiler JS API. The
+  # workspace typechecks with the @typescript/native-preview `tsgo` binary, so
+  # this entry is what `tsc`, `next build` and the bundlers load. apps/web keeps
+  # typescript 5.9.3 for the tools that read the API (madge, knip, ts-jest), and
+  # ts-jest itself is patched to load a compatible compiler when its peer has
+  # none.
+  typescript: 7.0.2
   ulid: 3.0.2
   vitest: 4.1.11
   workers-tagged-logger: 1.0.0
@@ -217,6 +223,12 @@ overrides:
   # otherwise resolve to two native-module copies. Force one version.
   '@expo/ui': 57.0.21
 packageExtensions:
+  # ts-jest reads the TypeScript compiler API, which the catalog's native 7 no
+  # longer ships. The patch below falls back to this alias of the last JS
+  # release; ts-jest stays on its peer when that peer has the API.
+  'ts-jest@29.4.9':
+    dependencies:
+      ts-compiler-js: npm:typescript@5.9.3
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
   # under pnpm's isolated linker (autoInstallPeers is false).
   '@sentry/react-native':
@@ -294,6 +306,10 @@ patchedDependencies:
   # cancelled the glanceable refresh run in progress.
   expo-background-task@57.0.21: patches/expo-background-task@57.0.21.patch
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
+  # TypeScript 7 is the native compiler and ships no compiler API, which ts-jest
+  # loads. Keep its peer when that peer still has the API, and otherwise load
+  # the compatibility alias above.
+  ts-jest@29.4.9: patches/ts-jest@29.4.9.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

@@ -1,0 +1,46 @@
+diff --git a/dist/utils/importer.js b/dist/utils/importer.js
+--- a/dist/utils/importer.js
++++ b/dist/utils/importer.js
+@@ -27,7 +27,8 @@
+         return this._import(why, '@babel/core');
+     }
+     typescript(why, which) {
+-        return this._import(why, which);
++        const compiler = this._import(why, which);
++        return typeof compiler.createProgram === 'function' ? compiler : this._import(why, 'ts-compiler-js');
+     }
+     esBuild(why) {
+         return this._import(why, 'esbuild');
+diff --git a/dist/legacy/ts-jest-transformer.js b/dist/legacy/ts-jest-transformer.js
+--- a/dist/legacy/ts-jest-transformer.js
++++ b/dist/legacy/ts-jest-transformer.js
+@@ -7,6 +7,6 @@
+ const fs_1 = require("fs");
+ const path_1 = __importDefault(require("path"));
+-const typescript_1 = __importDefault(require("typescript"));
++const typescript_1 = __importDefault(require("typescript").createProgram ? require("typescript") : require("ts-compiler-js"));
+ const constants_1 = require("../constants");
+ const utils_1 = require("../utils");
+ const importer_1 = require("../utils/importer");
+diff --git a/dist/legacy/compiler/ts-compiler.js b/dist/legacy/compiler/ts-compiler.js
+--- a/dist/legacy/compiler/ts-compiler.js
++++ b/dist/legacy/compiler/ts-compiler.js
+@@ -8,6 +8,6 @@
+ const bs_logger_1 = require("bs-logger");
+ const lodash_memoize_1 = __importDefault(require("lodash.memoize"));
+-const typescript_1 = __importDefault(require("typescript"));
++const typescript_1 = __importDefault(require("typescript").createProgram ? require("typescript") : require("ts-compiler-js"));
+ const constants_1 = require("../../constants");
+ const transpile_module_1 = require("../../transpilers/typescript/transpile-module");
+ const utils_1 = require("../../utils");
+diff --git a/dist/transpilers/typescript/transpile-module.js b/dist/transpilers/typescript/transpile-module.js
+--- a/dist/transpilers/typescript/transpile-module.js
++++ b/dist/transpilers/typescript/transpile-module.js
+@@ -6,6 +6,6 @@
+ exports.tsTranspileModule = exports.isModernNodeModuleKind = void 0;
+ const node_path_1 = __importDefault(require("node:path"));
+-const typescript_1 = __importDefault(require("typescript"));
++const typescript_1 = __importDefault(require("typescript").createProgram ? require("typescript") : require("ts-compiler-js"));
+ const utils_1 = require("../../utils");
+ const barebonesLibContent = `/// <reference no-default-lib="true"/>
+ interface Boolean {}

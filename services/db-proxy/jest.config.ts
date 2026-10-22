@@ -1,7 +1,9 @@
 import type { Config } from 'jest';
 
+// ts-jest compiles through the TypeScript compiler API, which typescript@7 no
+// longer ships. @swc/jest transpiles the tests without it; `tsgo --noEmit`
+// remains the type check.
 const config: Config = {
-  preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: ['**/*.test.ts'],
   collectCoverageFrom: ['src/**/*.ts'],
@@ -10,13 +12,17 @@ const config: Config = {
   extensionsToTreatAsEsm: ['.ts'],
   transform: {
     '^.+\\.ts$': [
-      'ts-jest',
+      '@swc/jest',
       {
-        tsconfig: {
-          esModuleInterop: true,
-          allowSyntheticDefaultImports: true,
+        jsc: {
+          parser: {
+            syntax: 'typescript',
+          },
+          target: 'es2022',
         },
-        useESM: true,
+        module: {
+          type: 'es6',
+        },
       },
     ],
   },

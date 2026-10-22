@@ -5,6 +5,7 @@
 
 import type { Event } from '@sentry/nextjs';
 import { consoleLoggingIntegration, httpIntegration, init } from '@sentry/nextjs';
+import { RESTRICTED_DATA_COLLECTION } from '@kilocode/web-shared/lib/observability/sentry-data-collection';
 import {
   SENSITIVE_PATHS,
   SENSITIVE_QUERY_PARAMS,
@@ -83,11 +84,6 @@ function isTRPC4xxError(error: unknown): boolean {
   );
 }
 
-// Sentry's automatic request-data integration can capture credentials from the
-// request URL or query string. Request metadata is filtered with the shared
-// sensitive-URL policy plus `installState`, which only the server app-flow
-// handoff carries. Share tokens in the path are redacted by
-// `sanitizeAnalyticsPathname`.
 const EXTRA_REDACTED_QUERY_KEYS = new Set(['installstate']);
 
 // Decode a raw query key the way URLSearchParams would, so percent-encoded
@@ -119,9 +115,6 @@ function sanitizeStringQuery(queryString: string): string {
     .join('&');
 }
 
-// Relative URLs cannot be parsed with `new URL`; split off the query string
-// manually, reuse the same sanitizers, and preserve any fragment. A sensitive
-// path keeps no query string, matching the shared policy.
 function sanitizeRelativeRequestUrl(url: string): string {
   const hashIndex = url.indexOf('#');
   const fragment = hashIndex === -1 ? '' : url.slice(hashIndex);
@@ -202,8 +195,6 @@ export function sanitizeSentryRequestData(event: Event): Event {
     request.url = sanitizeRequestUrl(request.url);
   }
   if (request.query_string !== undefined) {
-    // A request on a shared policy path keeps no query string, in the URL or
-    // in this field.
     const sensitivePath =
       typeof request.url === 'string' && SENSITIVE_PATHS.has(requestPathname(request.url));
     request.query_string = sensitivePath
@@ -228,12 +219,15 @@ export function initServerSentry(): void {
     debug: false,
     normalizeDepth: 5,
 
-    // Skip Sentry's OTEL setup because we are using Vercel's OTEL with SentrySpanProcessor
-    skipOpenTelemetrySetup: true,
+    // The Vercel OTel setup in node-instrumentation.ts owns the tracer provider, so Sentry
+    // must not install one of its own.
+    enableOpenTelemetrySetup: false,
+
+    dataCollection: RESTRICTED_DATA_COLLECTION,
 
     integrations: [
-      // Keep Sentry's httpIntegration for correct request isolation, but do not
-      // emit spans here because tracing spans are produced by Vercel's OTel.
+      // Keep Sentry's httpIntegration for correct request isolation. It emits no spans
+      // because Sentry tracing is disabled.
       httpIntegration({ spans: false }),
       // send console.log, console.error, and console.warn calls as logs to Sentry
       consoleLoggingIntegration({ levels: ['log', 'error', 'warn'] }),
@@ -289,9 +283,6 @@ export function initServerSentry(): void {
         }
       }
 
-      // Automatic request data can retain credentials in the request URL or
-      // query string; sanitize it with the shared sensitive-URL policy while
-      // keeping the rest.
       sanitizeSentryRequestData(event);
 
       return event;

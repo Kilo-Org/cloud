@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { databaseTypeParsers } from '@kilocode/db/client';
 import { createReplicaDatabase } from './databases';
 
 describe('replica database lifecycle', () => {
@@ -24,6 +25,7 @@ describe('replica database lifecycle', () => {
       connectionString: 'postgres://hyperdrive.example/database',
       max: 1,
       statement_timeout: 30_000,
+      types: databaseTypeParsers,
     });
     expect(query).toHaveBeenNthCalledWith(1, 'SELECT $1', ['first']);
     expect(query).toHaveBeenNthCalledWith(2, 'SELECT $1', ['second']);

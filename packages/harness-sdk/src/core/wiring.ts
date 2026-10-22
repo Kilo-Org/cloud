@@ -62,7 +62,7 @@ interface SessionOptions {
    * How long the model waits for a tool before the call goes to the background.
    * 30 seconds by default. A tool may name its own, and its own wins.
    */
-  readonly inlineFor?: Duration.DurationInput;
+  readonly inlineFor?: Duration.Input;
   /**
    * How many times one question may go back to the model before the loop stops
    * offering tools and asks for an answer in words. 24 by default.

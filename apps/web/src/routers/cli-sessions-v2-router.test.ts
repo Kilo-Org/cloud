@@ -1559,6 +1559,25 @@ describe('cli-sessions-v2-router', () => {
         expect.objectContaining({ method: 'DELETE' })
       );
     });
+
+    it('deletes a legacy agent session through ingest without a runtime call', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_session_id: 'agent_12345678-1234-4234-9234-123456789abc' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
+        success: true,
+        session_id: sessionId,
+      });
+
+      expect(mockDeleteCloudAgentSession).not.toHaveBeenCalled();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `https://test-ingest.example.com/api/session/${encodeURIComponent(sessionId)}`,
+        expect.objectContaining({ method: 'DELETE' })
+      );
+    });
   });
 
   describe('session authorization', () => {
@@ -1622,6 +1641,27 @@ describe('cli-sessions-v2-router', () => {
         );
       } finally {
         await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, personalSessionId));
+      }
+    });
+
+    it('list omits organization sessions after the organization is soft-deleted', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      try {
+        await db
+          .update(organizations)
+          .set({ deleted_at: new Date().toISOString() })
+          .where(eq(organizations.id, testOrganization.id));
+
+        const result = await caller.cliSessionsV2.list({});
+        expect(result.cliSessions.map(session => session.session_id)).not.toContain(
+          organizationSessionId
+        );
+      } finally {
+        await db
+          .update(organizations)
+          .set({ deleted_at: null })
+          .where(eq(organizations.id, testOrganization.id));
       }
     });
 
@@ -1975,6 +2015,61 @@ describe('cli-sessions-v2-router', () => {
       expect(parseGitHubPrUrl('https://github.com/kilo/repo/pull/abc')).toBeNull();
       expect(parseGitHubPrUrl('not-a-url')).toBeNull();
     });
+  });
+
+  describe('getWithRuntimeState stored runtime identifiers', () => {
+    const sessionId = 'ses_stored_runtime_identifier';
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+      mockGetSession.mockReset();
+      mockGetSession.mockRejectedValue(new Error('not mocked'));
+    });
+
+    it.each([
+      '11111111-1111-4111-8111-111111111111',
+      'agent_legacy',
+      'agent_11111111-1111-4111-8111-111111111111',
+    ])(
+      'returns historical metadata for unsupported runtime identifier %s',
+      async cloudAgentSessionId => {
+        await db.insert(cli_sessions_v2).values({
+          session_id: sessionId,
+          kilo_user_id: regularUser.id,
+          title: 'Stored conversation',
+          created_on_platform: 'cloud-agent',
+          cloud_agent_session_id: cloudAgentSessionId,
+        });
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId });
+        expect(result).toMatchObject({
+          session_id: sessionId,
+          title: 'Stored conversation',
+          cloud_agent_session_id: cloudAgentSessionId,
+          runtimeState: null,
+        });
+      }
+    );
+
+    it.each(['workspace'])(
+      'preserves runtime failures for current %s identifiers',
+      async prefix => {
+        await db.insert(cli_sessions_v2).values({
+          session_id: sessionId,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          cloud_agent_session_id: `${prefix}_11111111-1111-4111-8111-111111111111`,
+        });
+        mockGetSession.mockRejectedValue(new Error('Runtime unavailable'));
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId })
+        ).rejects.toMatchObject({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch session runtime state',
+        });
+      }
+    );
   });
 
   describe('getWithRuntimeState associatedPr', () => {
@@ -3124,6 +3219,30 @@ describe('cli-sessions-v2-router', () => {
       expect(await readCacheRows()).toHaveLength(1);
     });
 
+    it('verifies the PR when its head ref is the branch the session reported pushing', async () => {
+      // The session recorded `feature/z` as its branch but pushed the PR from
+      // `feature/pushed`, which is the branch the CLI reported with the link.
+      const pushedBranch = 'feature/pushed';
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_head_ref: pushedBranch, pr_head_sha: 'abc123' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      mockedFetchPullRequestByNumber.mockResolvedValue(
+        ownPrFacts({ headRef: pushedBranch, headSha: 'abc123' })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr).toMatchObject({ number: 7, state: 'open' });
+      expect(await readCacheRows()).toHaveLength(1);
+      const [sessionRow] = await db
+        .select({ verifiedAt: cli_sessions_v2.pr_link_verified_at })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      expect(sessionRow.verifiedAt).not.toBeNull();
+    });
+
     it('returns null for a non-GitHub session without calling GitHub', async () => {
       await db
         .update(cli_sessions_v2)
@@ -3738,6 +3857,39 @@ describe('cli-sessions-v2-router', () => {
       expect(result.results.find(session => session.session_id === sharedId)).not.toHaveProperty(
         'public_id'
       );
+    });
+  });
+
+  describe('share size result', () => {
+    const sessionId = 'ses_share_oversized_info_0001';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        title: 'Large session',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('returns PAYLOAD_TOO_LARGE with the size message from an HTTP 413', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ success: false, error: 'share_snapshot_too_large' }), {
+          status: 413,
+        })
+      );
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(caller.cliSessionsV2.share({ session_id: sessionId })).rejects.toMatchObject({
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'Session details are too large to share. Existing links are unchanged.',
+        });
+      } finally {
+        fetchSpy.mockRestore();
+      }
     });
   });
 

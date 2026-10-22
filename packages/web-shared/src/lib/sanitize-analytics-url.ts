@@ -1,6 +1,3 @@
-// The sensitive-URL policy is shared by analytics and server error reporting.
-// Query keys are compared case-insensitively; sensitive paths drop the query
-// string entirely.
 export const SENSITIVE_QUERY_PARAMS = new Set(['callbackurl', 'code', 'email', 'state', 'token']);
 export const SENSITIVE_PATHS = new Set(['/auth/verify-magic-link']);
 const SESSION_SHARE_SEGMENT = 's/:share_token';

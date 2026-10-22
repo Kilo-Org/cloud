@@ -13,7 +13,7 @@ const CALLBACK_URL = 'https://app.kilo.sh/api/integrations/github/callback?insta
 
 describe('sanitizeSentryRequestData', () => {
   test.each(SHARED_QUERY_KEYS)(
-    'removes the %s key from an absolute request URL and string query',
+    'applies the %s policy to absolute URL and string query metadata',
     key => {
       const event: Event = {
         request: {
@@ -30,7 +30,7 @@ describe('sanitizeSentryRequestData', () => {
     }
   );
 
-  test.each(SHARED_QUERY_KEYS)('removes the %s key from a relative request URL', key => {
+  test.each(SHARED_QUERY_KEYS)('applies the %s policy to relative URL metadata', key => {
     const event: Event = {
       request: {
         url: `/api/integrations/github/callback?${key}=sensitive&installation_id=12345`,
@@ -43,27 +43,24 @@ describe('sanitizeSentryRequestData', () => {
     expect(result.request?.url).toBe('/api/integrations/github/callback?installation_id=12345');
   });
 
-  test.each(SHARED_QUERY_KEYS)(
-    'removes mixed-case and percent-encoded %s keys from request metadata',
-    key => {
-      const upperCase = key.toUpperCase();
-      const percentEncoded = `%${key.charCodeAt(0).toString(16)}${key.slice(1)}`;
-      const event: Event = {
-        request: {
-          url: `${CALLBACK_URL}&${upperCase}=sensitive&${percentEncoded}=sensitive`,
-          query_string: `installation_id=12345&${upperCase}=sensitive&${percentEncoded}=sensitive`,
-          method: 'GET',
-        },
-      };
+  test.each(SHARED_QUERY_KEYS)('applies the %s policy with normalized key matching', key => {
+    const upperCase = key.toUpperCase();
+    const percentEncoded = `%${key.charCodeAt(0).toString(16)}${key.slice(1)}`;
+    const event: Event = {
+      request: {
+        url: `${CALLBACK_URL}&${upperCase}=sensitive&${percentEncoded}=sensitive`,
+        query_string: `installation_id=12345&${upperCase}=sensitive&${percentEncoded}=sensitive`,
+        method: 'GET',
+      },
+    };
 
-      const result = sanitizeSentryRequestData(event);
+    const result = sanitizeSentryRequestData(event);
 
-      expect(result.request?.url).toBe(CALLBACK_URL);
-      expect(result.request?.query_string).toBe('installation_id=12345');
-    }
-  );
+    expect(result.request?.url).toBe(CALLBACK_URL);
+    expect(result.request?.query_string).toBe('installation_id=12345');
+  });
 
-  test('removes every shared policy key from object-form and array-form query strings', () => {
+  test('applies the shared policy to object and array query representations', () => {
     for (const key of SHARED_QUERY_KEYS) {
       const objectForm: Event = {
         request: {
@@ -90,7 +87,7 @@ describe('sanitizeSentryRequestData', () => {
     }
   });
 
-  test.each(SHARED_PATHS)('drops the whole URL query string on the %s path', path => {
+  test.each(SHARED_PATHS)('applies the %s path policy to absolute URL metadata', path => {
     const event: Event = {
       request: {
         url: `https://app.kilo.sh${path}?email=user%40example.com&tab=usage`,
@@ -105,39 +102,33 @@ describe('sanitizeSentryRequestData', () => {
     expect(result.request?.query_string).toBe('');
   });
 
-  test.each(SHARED_PATHS)(
-    'drops the whole query string on the %s path for every query form',
-    path => {
-      const relativeUrl = `${path}?email=user%40example.com&tab=usage`;
-      const stringForm: Event = { request: { url: relativeUrl, query_string: 'tab=usage' } };
-      const arrayForm: Event = {
-        request: { url: relativeUrl, query_string: [['tab', 'usage']] },
-      };
-      const objectForm: Event = {
-        request: { url: relativeUrl, query_string: { tab: 'usage' } },
-      };
+  test.each(SHARED_PATHS)('applies the %s path policy to each query representation', path => {
+    const relativeUrl = `${path}?email=user%40example.com&tab=usage`;
+    const stringForm: Event = { request: { url: relativeUrl, query_string: 'tab=usage' } };
+    const arrayForm: Event = {
+      request: { url: relativeUrl, query_string: [['tab', 'usage']] },
+    };
+    const objectForm: Event = {
+      request: { url: relativeUrl, query_string: { tab: 'usage' } },
+    };
 
-      expect(sanitizeSentryRequestData(stringForm).request?.query_string).toBe('');
-      expect(sanitizeSentryRequestData(arrayForm).request?.query_string).toEqual([]);
-      expect(sanitizeSentryRequestData(objectForm).request?.query_string).toEqual({});
-    }
-  );
+    expect(sanitizeSentryRequestData(stringForm).request?.query_string).toBe('');
+    expect(sanitizeSentryRequestData(arrayForm).request?.query_string).toEqual([]);
+    expect(sanitizeSentryRequestData(objectForm).request?.query_string).toEqual({});
+  });
 
-  test.each(SHARED_PATHS)(
-    'drops the query string on a relative %s path while keeping the fragment',
-    path => {
-      const event: Event = {
-        request: {
-          url: `${path}?email=user%40example.com&tab=usage#done`,
-          method: 'GET',
-        },
-      };
+  test.each(SHARED_PATHS)('preserves fragments with the %s path policy', path => {
+    const event: Event = {
+      request: {
+        url: `${path}?email=user%40example.com&tab=usage#done`,
+        method: 'GET',
+      },
+    };
 
-      const result = sanitizeSentryRequestData(event);
+    const result = sanitizeSentryRequestData(event);
 
-      expect(result.request?.url).toBe(`${path}#done`);
-    }
-  );
+    expect(result.request?.url).toBe(`${path}#done`);
+  });
 
   test('keeps unrelated parameters', () => {
     const event: Event = {
@@ -181,7 +172,7 @@ describe('sanitizeSentryRequestData', () => {
     expect(result.request?.url).toBe('/api/integrations/github/callback');
   });
 
-  test('removes the app flow installState value from the request URL and query string', () => {
+  test('applies the app-flow policy to URL and query metadata', () => {
     const event: Event = {
       request: {
         url: 'https://app.kilo.sh/github-app?organizationId=org_123&installState=hidden-value&fromApp=1',
@@ -242,7 +233,7 @@ describe('sanitizeSentryRequestData', () => {
     expect(result.request?.query_string).toEqual([['organizationId', 'org_123']]);
   });
 
-  test('removes both a shared policy key and installState while keeping unrelated parameters', () => {
+  test('composes shared and app-flow metadata policies', () => {
     const event: Event = {
       request: {
         url: 'https://app.kilo.sh/github-app?organizationId=org_123&installState=hidden-value&state=hidden-state&fromApp=1',
@@ -260,7 +251,7 @@ describe('sanitizeSentryRequestData', () => {
     expect(result.request?.query_string).toBe('organizationId=org_123&fromApp=1');
   });
 
-  test('sanitizes a relative request URL with an installState value', () => {
+  test('applies the app-flow policy to relative URL metadata', () => {
     const event: Event = {
       request: {
         url: '/github-app?organizationId=org_123&installState=hidden-value&fromApp=1',
@@ -279,7 +270,7 @@ describe('sanitizeSentryRequestData', () => {
     expect(sanitizeSentryRequestData(event)).toBe(event);
   });
 
-  test('redacts a session share token from an absolute request URL', () => {
+  test('applies the share-path policy to absolute URL metadata', () => {
     const event: Event = {
       request: {
         url: 'https://app.kilo.sh/s/eyJhbGciOiJIUzI1NiJ9.share.token?utm_source=copy',
@@ -292,7 +283,7 @@ describe('sanitizeSentryRequestData', () => {
     expect(result.request?.url).toBe('https://app.kilo.sh/s/:share_token?utm_source=copy');
   });
 
-  test('redacts a session share token from a relative request URL while keeping the fragment', () => {
+  test('preserves fragments with the relative share-path policy', () => {
     const event: Event = {
       request: {
         url: '/s/eyJhbGciOiJIUzI1NiJ9.share.token#open',

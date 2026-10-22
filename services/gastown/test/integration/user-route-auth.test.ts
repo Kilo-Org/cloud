@@ -4,10 +4,12 @@ import { signKiloToken, type SignKiloTokenExtra } from '@kilocode/worker-utils/k
 import { GASTOWN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getGastownUserStub } from '../../src/dos/GastownUser.do';
 import { getTownDOStub } from '../../src/dos/Town.do';
+import { getTownContainerStub } from '../../src/dos/TownContainer.do';
 import type { UserTownRecord } from '../../src/db/tables/user-towns.table';
 import type { UserRigRecord } from '../../src/db/tables/user-rigs.table';
 
 const JWT_SECRET = 'test-nextauth-secret-must-be-at-least-32-chars-long';
+const ACCESS = { gastownAccess: true } as const;
 const routes = [
   ['POST', 'towns', 201],
   ['GET', 'towns', 200],
@@ -81,7 +83,7 @@ describe('Personal user route authorization', () => {
   it.each(routes)('rejects another user for %s %s', async (method, path) => {
     const response = await SELF.fetch(url(ownerId, path), {
       method,
-      headers: await headersFor(callerId),
+      headers: await headersFor(callerId, ACCESS),
       body: requestBody(method),
     });
 
@@ -90,12 +92,27 @@ describe('Personal user route authorization', () => {
     await expectPrivateState();
   });
 
+  it.each(routes)('rejects the owner without Gastown access for %s %s', async (method, path) => {
+    const response = await SELF.fetch(url(ownerId, path), {
+      method,
+      headers: await headersFor(ownerId),
+      body: requestBody(method),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Gastown access required',
+    });
+    await expectPrivateState();
+  });
+
   it.each(routes.filter(([method, path]) => method !== 'POST' || path !== 'towns'))(
     'allows the owner for %s %s',
     async (method, path, status) => {
       const response = await SELF.fetch(url(ownerId, path), {
         method,
-        headers: await headersFor(ownerId),
+        headers: await headersFor(ownerId, ACCESS),
         body: requestBody(method),
       });
 
@@ -211,7 +228,7 @@ describe('Personal user route authorization', () => {
     const fakeUserId = crypto.randomUUID();
     const response = await SELF.fetch(url(fakeUserId, 'towns'), {
       method: 'POST',
-      headers: await headersFor(callerId),
+      headers: await headersFor(callerId, ACCESS),
       body: requestBody('POST'),
     });
 
@@ -222,10 +239,95 @@ describe('Personal user route authorization', () => {
   it('does not destroy an unowned town through the caller user path', async () => {
     const response = await SELF.fetch(url(callerId, 'towns/:townId'), {
       method: 'DELETE',
-      headers: await headersFor(callerId),
+      headers: await headersFor(callerId, ACCESS),
     });
 
     expect(response.status).toBe(404);
     await expectPrivateState();
+  });
+});
+
+describe('Town and org route Gastown access', () => {
+  let ownerId: string;
+  let townId: string;
+
+  beforeEach(async () => {
+    ownerId = crypto.randomUUID();
+    const town = await getGastownUserStub(env, ownerId).createTown({
+      name: 'Town routes',
+      owner_user_id: ownerId,
+    });
+    townId = town.id;
+    const townStub = getTownDOStub(env, townId);
+    await townStub.setTownId(townId);
+    await townStub.updateTownConfig({
+      owner_user_id: ownerId,
+      owner_type: 'user',
+      owner_id: ownerId,
+    });
+  });
+
+  function townUrl(path: string) {
+    return `http://localhost/api/towns/${townId}/${path}`;
+  }
+
+  it('rejects the owner without Gastown access', async () => {
+    const response = await SELF.fetch(townUrl('config'), { headers: await headersFor(ownerId) });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Gastown access required',
+    });
+  });
+
+  it('rejects a mayor message without Gastown access', async () => {
+    const response = await SELF.fetch(townUrl('mayor/message'), {
+      method: 'POST',
+      headers: await headersFor(ownerId),
+      body: JSON.stringify({ message: 'run something' }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await getTownContainerStub(env, townId).getState()).toEqual({ status: 'stopped' });
+  });
+
+  it('allows the owner with Gastown access', async () => {
+    const response = await SELF.fetch(townUrl('config'), {
+      headers: await headersFor(ownerId, ACCESS),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true });
+  });
+
+  it('preserves admin support access', async () => {
+    const response = await SELF.fetch(townUrl('config'), {
+      headers: await headersFor(crypto.randomUUID(), { isAdmin: true }),
+    });
+
+    expect(response.status).toBe(200);
+  });
+
+  it('returns the ownership rejection to another user', async () => {
+    const response = await SELF.fetch(townUrl('config'), {
+      headers: await headersFor(crypto.randomUUID(), ACCESS),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ success: false, error: 'Forbidden' });
+  });
+
+  it('rejects org routes without Gastown access', async () => {
+    const orgId = crypto.randomUUID();
+    const response = await SELF.fetch(`http://localhost/api/orgs/${orgId}/towns`, {
+      headers: await headersFor(ownerId, { orgMemberships: [{ orgId, role: 'owner' }] }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Gastown access required',
+    });
   });
 });

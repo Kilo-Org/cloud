@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "wrangler deploy",
-    "predeploy": "wrangler d1 migrations apply auto-routing-benchmark --remote",
+    "deploy": "node scripts/deploy.mjs",
     "predev": "CI=1 wrangler d1 migrations apply auto-routing-benchmark --local",
     "dev": "wrangler dev",
     "types": "wrangler types --include-runtime=false --strict-vars=false",
@@ -18,7 +17,8 @@
     "sweep:offline": "tsx scripts/offline-sweep.ts",
     "screen:candidates": "tsx scripts/screen-candidates.ts",
     "smoke:scheduler": "tsx scripts/scheduler-smoke.ts",
-    "test": "vitest run"
+    "test": "vitest run && pnpm run test:deploy",
+    "test:deploy": "tsx --test scripts/deploy.test.mjs"
   },
   "dependencies": {
     "@cloudflare/containers": "0.1.1",
@@ -34,6 +34,7 @@
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
+    "jsonc-parser": "3.3.1",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"

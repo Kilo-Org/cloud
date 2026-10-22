@@ -25,13 +25,18 @@ import {
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
   ArrowLeft,
   Shell,
   Clock,
   Check,
   X,
-  ChevronDown,
-  ChevronRight,
   Copy,
   Loader2,
   AlertCircle,
@@ -125,8 +130,7 @@ export function WebhookRequestsContent({
   const { triggerId } = use(params);
   const trpc = useTRPC();
 
-  // State for expanded rows
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
 
   // Build URLs based on context
@@ -206,19 +210,6 @@ export function WebhookRequestsContent({
     refetchOnMount: 'always', // Always fetch fresh data on navigation
     refetchInterval: 10000, // Auto-refresh every 10 seconds
   });
-
-  // Toggle row expansion
-  const toggleRow = useCallback((requestId: string) => {
-    setExpandedRows(prev => {
-      const next = new Set(prev);
-      if (next.has(requestId)) {
-        next.delete(requestId);
-      } else {
-        next.add(requestId);
-      }
-      return next;
-    });
-  }, []);
 
   // Copy webhook URL to clipboard
   const handleCopyUrl = useCallback(async () => {
@@ -304,15 +295,15 @@ export function WebhookRequestsContent({
           <h1 className="text-3xl font-bold">Requests for {triggerId}</h1>
         </div>
         <p className="text-muted-foreground mt-2">
-          View captured requests, processing status, and cloud agent execution logs. Expand a
-          request to inspect its run.
+          View captured requests, processing status, and cloud agent execution logs. Open logs to
+          inspect a run without leaving this page.
         </p>
 
         {/* Webhook URL with copy button (webhook triggers only) */}
         {triggerData?.activationMode !== 'scheduled' && triggerData?.inboundUrl && (
           <div className="bg-muted/50 mt-4 flex items-center gap-2 rounded-md border p-3">
             <code className="flex-1 truncate font-mono text-sm">{triggerData.inboundUrl}</code>
-            <Button variant="ghost" size="sm" onClick={handleCopyUrl}>
+            <Button variant="ghost" size="sm" onClick={handleCopyUrl} aria-label="Copy webhook URL">
               {copiedUrl ? (
                 <Check className="h-4 w-4 text-green-500" />
               ) : (
@@ -330,21 +321,18 @@ export function WebhookRequestsContent({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-8"></TableHead>
                   <TableHead>Request ID</TableHead>
                   <TableHead>Timestamp</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead>Method</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Session</TableHead>
+                  <TableHead>Logs</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...Array(5)].map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell>
-                      <Skeleton className="h-4 w-4" />
-                    </TableCell>
                     <TableCell>
                       <Skeleton className="h-4 w-24" />
                     </TableCell>
@@ -353,6 +341,9 @@ export function WebhookRequestsContent({
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-4 w-16" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-20" />
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-4 w-12" />
@@ -400,237 +391,242 @@ export function WebhookRequestsContent({
 
       {/* Requests Table */}
       {!isLoading && !isRequestsError && requests && requests.length > 0 && (
-        <div className="rounded-md border">
+        <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-8"></TableHead>
                 <TableHead>Request ID</TableHead>
                 <TableHead>Timestamp</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Method</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Session</TableHead>
+                <TableHead>Logs</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {requests.map(request => {
-                const isExpanded = expandedRows.has(request.id);
                 const timestamp = formatTimestamp(request.timestamp);
 
                 return (
-                  <React.Fragment key={request.id}>
-                    <TableRow
-                      className="hover:bg-muted/50 cursor-pointer"
-                      onClick={() => toggleRow(request.id)}
-                    >
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`${isExpanded ? 'Collapse' : 'Expand'} request ${shortId(request.id)}`}
-                          aria-expanded={isExpanded}
-                          onClick={event => {
-                            event.stopPropagation();
-                            toggleRow(request.id);
-                          }}
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">{shortId(request.id)}</TableCell>
-                      <TableCell>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="text-sm">
-                                {timestamp.absolute}
-                                <span className="text-muted-foreground">
-                                  {' '}
-                                  • {timestamp.relative}
-                                </span>
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{timestamp.relative}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-                      <TableCell>
-                        {request.triggerSource === 'scheduled' ? (
-                          <Badge variant="outline" className="gap-1">
-                            <Clock className="h-3 w-3" />
-                            Scheduled
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="gap-1">
-                            <Webhook className="h-3 w-3" />
-                            Webhook
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono">
-                          {request.method}
+                  <TableRow key={request.id}>
+                    <TableCell className="font-mono text-sm">{shortId(request.id)}</TableCell>
+                    <TableCell>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-sm">
+                              {timestamp.absolute}
+                              <span className="text-muted-foreground"> • {timestamp.relative}</span>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{timestamp.relative}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableCell>
+                    <TableCell>
+                      {request.triggerSource === 'scheduled' ? (
+                        <Badge variant="outline" className="gap-1">
+                          <Clock className="h-3 w-3" />
+                          Scheduled
                         </Badge>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(request.processStatus)}</TableCell>
-                      <TableCell>
-                        {request.kiloSessionId ? (
-                          (() => {
-                            const sessionId = request.kiloSessionId;
-                            if (isAdminView) {
-                              return canViewSessions ? (
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="h-auto p-0"
-                                    asChild
-                                    onClick={e => e.stopPropagation()}
-                                  >
-                                    <Link href={`/admin/session-traces?sessionId=${sessionId}`}>
-                                      <ExternalLink className="mr-1 h-3 w-3" />
-                                      {shortId(sessionId)}
-                                    </Link>
-                                  </Button>
-                                  <span onClick={e => e.stopPropagation()}>
-                                    <CopyTextButton text={sessionId} />
-                                  </span>
+                      ) : (
+                        <Badge variant="outline" className="gap-1">
+                          <Webhook className="h-3 w-3" />
+                          Webhook
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-mono">
+                        {request.method}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(request.processStatus)}</TableCell>
+                    <TableCell>
+                      {request.kiloSessionId ? (
+                        (() => {
+                          const sessionId = request.kiloSessionId;
+                          if (isAdminView) {
+                            return canViewSessions ? (
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="h-auto p-0"
+                                  asChild
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  <Link href={`/admin/session-traces?sessionId=${sessionId}`}>
+                                    <ExternalLink className="mr-1 h-3 w-3" />
+                                    {shortId(sessionId)}
+                                  </Link>
+                                </Button>
+                                <span onClick={e => e.stopPropagation()}>
+                                  <CopyTextButton text={sessionId} />
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">
+                                Session viewer access required
+                              </span>
+                            );
+                          }
+
+                          return organizationId ? (
+                            <span className="text-muted-foreground font-mono text-xs">
+                              {shortId(sessionId)}
+                            </span>
+                          ) : (
+                            // Personal context: direct link to session
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0"
+                              asChild
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <Link href={getSessionUrl(sessionId)}>
+                                <ExternalLink className="mr-1 h-3 w-3" />
+                                {shortId(sessionId)}
+                              </Link>
+                            </Button>
+                          );
+                        })()
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Dialog
+                        open={selectedRequestId === request.id}
+                        onOpenChange={open => setSelectedRequestId(open ? request.id : null)}
+                      >
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="min-h-11 gap-2 sm:min-h-8">
+                            <ScrollText className="h-4 w-4" />
+                            View logs
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent
+                          showCloseButton={false}
+                          className="flex h-[min(85dvh,800px)] w-[calc(100vw-2rem)] max-w-4xl flex-col gap-3 overflow-hidden p-4"
+                        >
+                          <div className="flex shrink-0 items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <DialogTitle className="text-base font-semibold">
+                                Execution logs
+                              </DialogTitle>
+                              <DialogDescription className="sr-only">
+                                Read-only conversation for request {shortId(request.id)}
+                              </DialogDescription>
+                              <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
+                                <span className="font-mono">{shortId(request.id)}</span>
+                                <span>{timestamp.absolute}</span>
+                                {getStatusBadge(request.processStatus)}
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Close execution logs"
+                              onClick={() => setSelectedRequestId(null)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          {request.errorMessage && (
+                            <p role="alert" className="text-destructive shrink-0 text-sm">
+                              {request.errorMessage}
+                            </p>
+                          )}
+                          {!isAdminView || canViewSessions ? (
+                            <WebhookRequestLogs
+                              triggerId={triggerId}
+                              requestId={request.id}
+                              organizationId={organizationId}
+                              adminScope={adminScope ?? undefined}
+                            />
+                          ) : (
+                            <p className="text-muted-foreground text-sm">
+                              Session viewer access is required to view execution logs.
+                            </p>
+                          )}
+                          <details className="shrink-0 overflow-auto rounded-md border p-3 open:max-h-[35%]">
+                            <summary className="cursor-pointer text-sm font-medium">
+                              Request details
+                            </summary>
+                            <div className="mt-3 space-y-4">
+                              {request.triggerSource === 'scheduled' ? (
+                                /* Scheduled trigger — no meaningful headers/body */
+                                <div className="text-muted-foreground text-sm">
+                                  <p>
+                                    Scheduled trigger fired at{' '}
+                                    <span className="font-mono">
+                                      {format(new Date(request.timestamp), 'MMM d, yyyy h:mm:ss a')}
+                                    </span>
+                                  </p>
+                                  <p className="mt-1 text-xs">
+                                    The rendered prompt sent to the bot is not currently stored.
+                                  </p>
                                 </div>
                               ) : (
-                                <span className="text-muted-foreground text-xs">
-                                  Session viewer access required
-                                </span>
-                              );
-                            }
-
-                            return organizationId ? (
-                              <Button
-                                variant="link"
-                                size="sm"
-                                className="h-auto p-0"
-                                onClick={event => {
-                                  event.stopPropagation();
-                                  toggleRow(request.id);
-                                }}
-                              >
-                                <ScrollText className="mr-1 h-3 w-3" />
-                                View logs
-                              </Button>
-                            ) : (
-                              // Personal context: direct link to session
-                              <Button
-                                variant="link"
-                                size="sm"
-                                className="h-auto p-0"
-                                asChild
-                                onClick={e => e.stopPropagation()}
-                              >
-                                <Link href={getSessionUrl(sessionId)}>
-                                  <ExternalLink className="mr-1 h-3 w-3" />
-                                  {shortId(sessionId)}
-                                </Link>
-                              </Button>
-                            );
-                          })()
-                        ) : (
-                          <span className="text-muted-foreground text-sm">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-
-                    {/* Expanded Details */}
-                    {isExpanded && (
-                      <TableRow key={`${request.id}-expanded`}>
-                        <TableCell colSpan={7} className="bg-muted/30 p-0">
-                          <div className="space-y-4 p-4">
-                            {!isAdminView || canViewSessions ? (
-                              <WebhookRequestLogs
-                                triggerId={triggerId}
-                                requestId={request.id}
-                                organizationId={organizationId}
-                                adminScope={adminScope ?? undefined}
-                              />
-                            ) : (
-                              <p className="text-muted-foreground text-sm">
-                                Session viewer access is required to view execution logs.
-                              </p>
-                            )}
-                            {/* Error Message (if failed) */}
-                            {request.errorMessage && (
-                              <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3">
-                                <p className="text-sm font-medium text-red-400">Error</p>
-                                <p className="mt-1 text-sm">{request.errorMessage}</p>
-                              </div>
-                            )}
-
-                            {request.triggerSource === 'scheduled' ? (
-                              /* Scheduled trigger — no meaningful headers/body */
-                              <div className="text-muted-foreground text-sm">
-                                <p>
-                                  Scheduled trigger fired at{' '}
-                                  <span className="font-mono">
-                                    {format(new Date(request.timestamp), 'MMM d, yyyy h:mm:ss a')}
-                                  </span>
-                                </p>
-                                <p className="mt-1 text-xs">
-                                  The rendered prompt sent to the bot is not currently stored.
-                                </p>
-                              </div>
-                            ) : (
-                              <>
-                                {/* Headers */}
-                                <div>
-                                  <p className="mb-2 text-sm font-medium">Headers</p>
-                                  <pre className="bg-muted max-h-48 overflow-auto rounded-md p-3 text-xs">
-                                    <code>
-                                      {JSON.stringify(
-                                        isAdminView
-                                          ? maskHeaders(request.headers)
-                                          : request.headers,
-                                        null,
-                                        2
-                                      )}
-                                    </code>
-                                  </pre>
-                                </div>
-
-                                {/* Body */}
-                                <div>
-                                  <p className="mb-2 text-sm font-medium">Body</p>
-                                  {isAdminView ? (
-                                    <p className="text-muted-foreground text-xs">
-                                      Payload body length:{' '}
-                                      {new TextEncoder().encode(request.body).byteLength} bytes
-                                    </p>
-                                  ) : (
-                                    <pre className="bg-muted max-h-64 overflow-auto rounded-md p-3 text-xs">
+                                <>
+                                  {/* Headers */}
+                                  <div>
+                                    <p className="mb-2 text-sm font-medium">Headers</p>
+                                    <pre
+                                      tabIndex={0}
+                                      className="bg-muted max-h-48 overflow-auto rounded-md p-3 text-xs"
+                                    >
                                       <code>
-                                        {(() => {
-                                          try {
-                                            const parsed = JSON.parse(request.body);
-                                            return JSON.stringify(parsed, null, 2);
-                                          } catch {
-                                            return request.body || '(empty)';
-                                          }
-                                        })()}
+                                        {JSON.stringify(
+                                          isAdminView
+                                            ? maskHeaders(request.headers)
+                                            : request.headers,
+                                          null,
+                                          2
+                                        )}
                                       </code>
                                     </pre>
-                                  )}
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </React.Fragment>
+                                  </div>
+
+                                  {/* Body */}
+                                  <div>
+                                    <p className="mb-2 text-sm font-medium">Body</p>
+                                    {isAdminView ? (
+                                      <p className="text-muted-foreground text-xs">
+                                        Payload body length:{' '}
+                                        {new TextEncoder().encode(request.body).byteLength} bytes
+                                      </p>
+                                    ) : (
+                                      <pre
+                                        tabIndex={0}
+                                        className="bg-muted max-h-64 overflow-auto rounded-md p-3 text-xs"
+                                      >
+                                        <code>
+                                          {(() => {
+                                            try {
+                                              const parsed = JSON.parse(request.body);
+                                              return JSON.stringify(parsed, null, 2);
+                                            } catch {
+                                              return request.body || '(empty)';
+                                            }
+                                          })()}
+                                        </code>
+                                      </pre>
+                                    )}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </details>
+                        </DialogContent>
+                      </Dialog>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
             </TableBody>

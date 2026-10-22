@@ -451,6 +451,10 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     // unresolved rather than as a settled page, so they can offer a retry
     // instead of a skeleton that never settles.
     storedIsPaused: stored.isPaused,
+    // The stored query's failure code, when it has one. Callers that act on a
+    // denial (the Share Gate resolving a new-session organization) must not
+    // read any stored failure — a network blip is not a membership answer.
+    storedErrorCode: stored.error?.data?.code,
     storedFetchedSinceMount,
     // React Query v5's `isLoading` is `isPending && isFetching`, so it is false
     // on the first render (the observer has not started the fetch yet) and

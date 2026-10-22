@@ -68,10 +68,7 @@ export const NO_AGREEMENT = new Map([
     'bare count after a label: "{{emoji}} reaction, {{displayCount}}"',
   ],
   ['codeReviewer.overview.nSelected', 'participle: "{{displayCount}} selected" has no count form'],
-  ['prReview.checks.passed', 'participle: "{{displayCount}} passed" has no count form'],
-  ['prReview.checks.failed', 'participle: "{{displayCount}} failed" has no count form'],
   ['prReview.checks.pending', 'participle: "{{displayCount}} pending" has no count form'],
-  ['prReview.checks.skipped', 'participle: "{{displayCount}} skipped" has no count form'],
   [
     'prReview.discussion.reactionPill',
     'the noun is already a family: "{{emoji}} reaction, {{displayCount}} {{countLabel}}"',
@@ -467,7 +464,7 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
         'prReview.checks.skipped',
       ],
       reason:
-        'STATUS_LABEL_KEY map in pr-review-checks-status-row.tsx; participles, no inflected word',
+        'STATUS_LABEL_KEY map in pr-review-checks-status-row.tsx; passed, failed and skipped use plural families; pending remains invariant',
     },
   ],
   [

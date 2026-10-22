@@ -91,7 +91,7 @@ describe('counted expand rows', () => {
     annotated: readonly string[],
   ])[] = [
     ['en af am fi gu he hi kn ml mr pa sq ta te ur'.split(' ') as SupportedLanguage[], []],
-    ['bg bs ca el es gl hr is mk pt pt-BR ro'.split(' ') as SupportedLanguage[], [ALL_LINES]],
+    ['bg bs ca es gl hr is mk pt pt-BR ro'.split(' ') as SupportedLanguage[], [ALL_LINES]],
     ['de nl'.split(' ') as SupportedLanguage[], [ALL_LINES, MORE_ABOVE]],
     [
       'sv'.split(' ') as SupportedLanguage[],

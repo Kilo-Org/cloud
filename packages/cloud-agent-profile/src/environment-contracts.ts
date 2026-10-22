@@ -4,6 +4,8 @@ import { TRPCError } from '@trpc/server';
 import type { EncryptedEnvelope } from '@kilocode/encryption';
 import { MASKED_SECRET_VALUE, type ProfileOwner } from './types';
 
+export const ENVIRONMENT_SECRET_PLACEHOLDER = '<unchanged>';
+
 /** Owner of a repository environment - exactly one of organization or user. */
 export type EnvironmentOwner = ProfileOwner;
 
@@ -202,7 +204,7 @@ export function validateEnvironmentPlainVars(
 }
 
 export function validateEnvironmentSecretValue(value: string): string {
-  if (value === MASKED_SECRET_VALUE) {
+  if (value === MASKED_SECRET_VALUE || value === ENVIRONMENT_SECRET_PLACEHOLDER) {
     throw badRequest('A masked placeholder is not a secret value');
   }
   if (value.length > ENVIRONMENT_LIMITS.MAX_SECRET_VALUE_LENGTH) {

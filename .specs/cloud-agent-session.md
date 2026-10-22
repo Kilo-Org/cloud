@@ -66,8 +66,8 @@ repository.
 4. A first prompt that is exactly a known slash command MUST run as that
    command, not as free text.
 5. An over-long prompt, or an attachment still uploading, MUST block submission.
-6. A session started from Cloud Agent web, Slack, GitHub, Linear, Discord, App
-   Builder, a webhook, or a schedule MUST use the owner's repository environment
+6. A session started from Cloud Agent web, Slack, GitHub, Linear, Discord,
+   a webhook, or a schedule MUST use the owner's repository environment
    for the chosen repository when one exists. The user does not select it. Code
    review and security sessions MUST NOT use it. A repository without one
    launches unchanged. Its setup commands MUST run as preparation steps and

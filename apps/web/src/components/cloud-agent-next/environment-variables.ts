@@ -1,11 +1,12 @@
 import {
+  ENVIRONMENT_SECRET_PLACEHOLDER,
   assertValidEnvironmentKey,
   validateEnvironmentSecretValue,
   validateEnvironmentVarCount,
   type EnvironmentSecretChange,
 } from '@kilocode/cloud-agent-profile';
 
-export const ENVIRONMENT_SECRET_PLACEHOLDER = '<unchanged>';
+export { ENVIRONMENT_SECRET_PLACEHOLDER };
 
 type Variable = { key: string; value: string; unchanged?: true };
 
@@ -64,14 +65,9 @@ export function parseEnvironmentVariables(text: string): Variable[] {
     } else {
       value = source.split('#', 1)[0].trim();
     }
-    validateEnvironmentSecretValue(value);
-    variables.push({
-      key,
-      value,
-      ...(quote !== '"' && quote !== "'" && value === ENVIRONMENT_SECRET_PLACEHOLDER
-        ? { unchanged: true as const }
-        : {}),
-    });
+    const unchanged = quote !== '"' && quote !== "'" && value === ENVIRONMENT_SECRET_PLACEHOLDER;
+    if (!unchanged) validateEnvironmentSecretValue(value);
+    variables.push({ key, value, ...(unchanged ? { unchanged: true as const } : {}) });
   }
   return variables;
 }

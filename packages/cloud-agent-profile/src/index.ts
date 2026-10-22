@@ -224,6 +224,7 @@ export {
 } from './profile-import-service';
 // Repository environments
 export {
+  ENVIRONMENT_SECRET_PLACEHOLDER,
   ENVIRONMENT_LIMITS,
   ENVIRONMENT_KEY_PATTERN,
   isReservedEnvironmentKey,

@@ -449,7 +449,7 @@ export const cliSessionsRouter = createTRPCRouter({
 
     const [[countResult], results] = await Promise.all([
       db
-        .select({ count: sql<bigint>`count(*)` })
+        .select({ count: sql<string>`count(*)` })
         .from(cliSessions)
         .where(whereCondition),
       db

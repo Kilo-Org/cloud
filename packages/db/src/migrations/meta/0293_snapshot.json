@@ -1,5 +1,5 @@
 {
-  "id": "16a80f5d-cd80-4a39-a1cf-46d95746ed42",
+  "id": "496f66ad-4ac2-42fc-bf29-3081b7c66a06",
   "prevId": "48da44e5-b482-4eae-a823-83defe1a305a",
   "version": "7",
   "dialect": "postgresql",
@@ -2181,6 +2181,12 @@
         },
         "vercel_model_id_overrides": {
           "name": "vercel_model_id_overrides",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preferred_provider_order": {
+          "name": "preferred_provider_order",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -4581,13 +4587,6 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
-        },
-        "is_fork": {
-          "name": "is_fork",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "parent_session_id": {
           "name": "parent_session_id",
@@ -32606,21 +32605,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_shared_cli_sessions_kilo_user_id": {
-          "name": "IDX_shared_cli_sessions_kilo_user_id",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

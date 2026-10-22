@@ -234,7 +234,7 @@ describe('useRouteForegroundRefresh key matching with a real QueryClient', () =>
   it('invalidates a tRPC-shaped query key with the nested prefix form', async () => {
     const queryClient = new QueryClient();
     const queryFn = vi.fn().mockResolvedValue('sentinel');
-    await queryClient.prefetchQuery({ queryKey: [['user', 'getMe']], queryFn });
+    await queryClient.query({ queryKey: [['user', 'getMe']], queryFn });
 
     await renderProbeWithProvider(queryClient, [[['user']]]);
 
@@ -246,7 +246,7 @@ describe('useRouteForegroundRefresh key matching with a real QueryClient', () =>
   it('does not invalidate a tRPC-shaped query key with the flat prefix form', async () => {
     const queryClient = new QueryClient();
     const queryFn = vi.fn().mockResolvedValue('sentinel');
-    await queryClient.prefetchQuery({ queryKey: [['user', 'getMe']], queryFn });
+    await queryClient.query({ queryKey: [['user', 'getMe']], queryFn });
 
     await renderProbeWithProvider(queryClient, [['user']]);
 

@@ -222,12 +222,14 @@ describe('drizzle', () => {
           'SELECT pg_backend_pid() AS pid'
         );
         await writer.query(`SELECT nextval('http_ip_http_ip_id_seq') FROM generate_series(1, 2)`);
-        const { rows: observerRows } = await db.execute<{ pid: number; last_value: bigint }>(sql`
+        const { rows: observerRows } = await db.execute<{ pid: number; last_value: string }>(sql`
           SELECT pg_backend_pid() AS pid,
             pg_sequence_last_value('http_ip_http_ip_id_seq'::regclass) AS last_value
         `);
         expect(observerRows[0].pid).not.toBe(writerRows[0].pid);
-        expect(observerRows[0].last_value).toBe(BigInt(2));
+        // Raw SQL through Drizzle keeps pg's text decoding for int8; the pool hands its
+        // own clients a BigInt parser, which the assertion below covers.
+        expect(observerRows[0].last_value).toBe('2');
 
         await cleanupDbForTest();
 

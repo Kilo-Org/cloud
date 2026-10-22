@@ -2056,8 +2056,29 @@
     {
       "idx": 293,
       "version": "7",
-      "when": 1792661716305,
-      "tag": "0293_illegal_hedge_knight",
+      "when": 1792667291991,
+      "tag": "0293_preferred_provider_order",
+      "breakpoints": true
+    },
+    {
+      "idx": 294,
+      "version": "7",
+      "when": 1792681536086,
+      "tag": "0294_heavy_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 295,
+      "version": "7",
+      "when": 1792684800197,
+      "tag": "0295_tiresome_champions",
+      "breakpoints": true
+    },
+    {
+      "idx": 296,
+      "version": "7",
+      "when": 1792694535711,
+      "tag": "0296_cli_session_copy_metadata",
       "breakpoints": true
     }
   ]

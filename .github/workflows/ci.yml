@@ -98,7 +98,6 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
-              - 'services/deploy-infra/builder/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent_next:
@@ -142,7 +141,6 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
-              - 'services/deploy-infra/builder/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent_next:
@@ -646,9 +644,6 @@ jobs:
 
       - name: Run script tests
         run: pnpm run test:scripts
-
-      - name: Run builder Postgres repository tests
-        run: pnpm --filter kilo-deploy-builder test:postgres
 
       - name: Run container usage Postgres tests
         # The meter suite connects to POSTGRES_URL directly. Avoid the Jest worker

@@ -755,10 +755,10 @@ function createUserWebConnection(
     },
     onSessionEvent(event, listener) {
       const listeners = sessionListeners.get(event) ?? new Set<(data: never) => void>();
-      listeners.add(listener as (data: never) => void);
+      listeners.add(listener);
       sessionListeners.set(event, listeners);
       return () => {
-        listeners.delete(listener as (data: never) => void);
+        listeners.delete(listener);
         if (listeners.size === 0) sessionListeners.delete(event);
       };
     },

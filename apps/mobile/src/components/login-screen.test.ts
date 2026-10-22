@@ -2,6 +2,7 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // login-screen.test.ts — narrow contract tests plus mounted globe tests.
 // The refresh boundary contract is verified through the useDeviceAuth hook's
@@ -333,6 +334,59 @@ describe('login-screen language globe', () => {
     deviceAuth.resumed = false;
     push.mockClear();
     setLanguagePickerBridge.mockClear();
+  });
+
+  it('reanchors growing sign-in content below the safe area and recenters when it fits again', async () => {
+    vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 24, bottom: 0, left: 0, right: 0 });
+    const renderer = await mountLoginScreen();
+    const scroll = renderer.root.findByType('ScrollView');
+    const content = renderer.root.find(
+      node => node.type === 'View' && typeof node.props.onLayout === 'function'
+    );
+    const measureContent = content.props.onLayout as (event: {
+      nativeEvent: { layout: { height: number } };
+    }) => void;
+    const attachScroll = scroll.props.ref as (node: {
+      getNativeScrollRef: () => {
+        measureInWindow: (onMeasure: (...bounds: [number, number, number, number]) => void) => void;
+      };
+    }) => void;
+
+    try {
+      act(() => {
+        attachScroll({
+          getNativeScrollRef: () => ({
+            measureInWindow: onMeasure => {
+              onMeasure(0, 0, 844, 400);
+            },
+          }),
+        });
+        measureContent({ nativeEvent: { layout: { height: 200 } } });
+      });
+      expect(scroll.props.contentContainerStyle).toMatchObject({
+        paddingTop: 100,
+        paddingBottom: 100,
+      });
+
+      act(() => {
+        measureContent({ nativeEvent: { layout: { height: 600 } } });
+      });
+      expect(scroll.props.contentContainerStyle).toMatchObject({
+        paddingTop: 40,
+        paddingBottom: 16,
+      });
+
+      act(() => {
+        measureContent({ nativeEvent: { layout: { height: 200 } } });
+      });
+      expect(scroll.props.contentContainerStyle).toMatchObject({
+        paddingTop: 100,
+        paddingBottom: 100,
+      });
+    } finally {
+      renderer.unmount();
+      vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 0, bottom: 0, left: 0, right: 0 });
+    }
   });
 
   it('renders the globe and names it Language', async () => {

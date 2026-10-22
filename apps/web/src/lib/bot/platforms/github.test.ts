@@ -409,6 +409,53 @@ describe('createGitHubBotPlatform.getConversationContext', () => {
     expect(mockPullsListReviewCommentsFn).toHaveBeenCalledTimes(5);
   });
 
+  it.each([
+    [4, 303, [300, 301, 302]],
+    [4, 300, [301, 302, 303]],
+    [13, 312, [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311]],
+    [13, 300, [301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312]],
+    [18, 305, [300, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317]],
+    [18, 300, [301, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317]],
+  ])('selects chronological review history (%i, %i)', async (count, triggerId, expectedIds) => {
+    mockIssuesGetFn.mockResolvedValue({
+      data: {
+        body: 'Pull request description.',
+        html_url: 'https://github.com/acme/widgets/pull/37',
+        number: 37,
+        pull_request: {},
+        state: 'open',
+        title: 'Update widgets',
+        user: { login: 'alice' },
+      },
+    });
+    mockIssuesListCommentsFn.mockResolvedValue({ data: [], headers: {} });
+    mockPullsListReviewCommentsFn.mockResolvedValue({
+      data: Array.from({ length: count }, (_, index) => ({
+        id: 300 + index,
+        body: `Review entry ${index}`,
+        created_at: new Date(Date.UTC(2026, 4, 5, 7, index)).toISOString(),
+        ...(index === 0 ? {} : { in_reply_to_id: 300 }),
+        path: 'src/widgets.ts',
+        line: 12,
+        user: { login: 'alice' },
+      })).reverse(),
+      headers: {},
+    });
+
+    const context = await githubPlatform.getConversationContext({
+      thread: createThread({ id: `github:acme/widgets:37:rc:${triggerId}` }),
+      triggerMessage: createMessage({ id: String(triggerId), text: 'Please update this' }),
+      platformIntegration: createIntegration(),
+    });
+
+    const renderedIds = [...context.matchAll(/<github_review_comment id="(\d+)"/g)].map(match =>
+      Number(match[1])
+    );
+    expect(renderedIds).toEqual(expectedIds);
+    expect(context).toContain('Please update this');
+    expect(context).toContain('- File: src/widgets.ts');
+  });
+
   it('includes GitHub pull request review thread context', async () => {
     mockIssuesGetFn.mockResolvedValue({
       data: {

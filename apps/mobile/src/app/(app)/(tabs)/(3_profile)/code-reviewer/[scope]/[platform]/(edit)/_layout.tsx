@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { appSceneLayout } from '@/components/app-screen-layout';
 
 import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { useReviewerEditGuard } from '@/lib/hooks/use-code-reviewer';
@@ -11,5 +12,5 @@ export default function CodeReviewerEditLayout() {
   const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
   useReviewerEditGuard(scope, platform);
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return <Stack screenLayout={appSceneLayout} screenOptions={{ headerShown: false }} />;
 }

@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { appSceneLayout } from '@/components/app-screen-layout';
 
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 
@@ -15,5 +16,5 @@ export default function ProfileLayout() {
     [['kiloPass']],
     [['agentProfiles']],
   ]);
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return <Stack screenLayout={appSceneLayout} screenOptions={{ headerShown: false }} />;
 }

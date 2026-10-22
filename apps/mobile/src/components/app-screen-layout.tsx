@@ -61,6 +61,17 @@ function CoveredScreenA11yGate({
   );
 }
 
+/**
+ * The gate on its own, for a nested Stack whose scene already sits inside the
+ * root `(app)` scene: the tab and section stacks push sibling routes over each
+ * other in exactly the same way, and their scenes must leave the accessibility
+ * tree when covered. The unlock surface belongs to the root scene only, so
+ * these stacks must not wrap a second `NativeStateSurface` around theirs.
+ */
+export function appSceneLayout({ navigation, children }: ScreenLayoutProps): ReactElement {
+  return <CoveredScreenA11yGate navigation={navigation}>{children}</CoveredScreenA11yGate>;
+}
+
 // The unlock surface stays the scene's layout (its NativeStateSurface hosts
 // the unlock overlay above the scene content); the a11y gate wraps both.
 export function appScreenLayout({ navigation, ...props }: ScreenLayoutProps): ReactElement {

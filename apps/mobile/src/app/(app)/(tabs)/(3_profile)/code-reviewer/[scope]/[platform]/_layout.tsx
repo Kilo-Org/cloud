@@ -1,4 +1,5 @@
 import { type Href, Stack } from 'expo-router';
+import { appSceneLayout } from '@/components/app-screen-layout';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { useValidatedReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
@@ -14,5 +15,5 @@ export default function CodeReviewerPlatformLayout() {
     return <InvalidRouteState backTo={'/(app)/(tabs)/(3_profile)/code-reviewer' as Href} />;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return <Stack screenLayout={appSceneLayout} screenOptions={{ headerShown: false }} />;
 }

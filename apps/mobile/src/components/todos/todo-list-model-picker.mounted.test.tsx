@@ -35,7 +35,9 @@ vi.mock('expo-router', async () => {
 vi.mock('react-native', async () => {
   const { NativeTextInput } = await import('./todo-list-model-picker.mounted.test-helpers');
   return {
-    BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
+    // The settings sheet asks Android Back to run the same dismiss guard as a
+    // swipe; the mocked subscription keeps that effect inert here.
+    BackHandler: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
     I18nManager: { isRTL: false },
     Keyboard: { dismiss: vi.fn() },
     Pressable: 'Pressable',

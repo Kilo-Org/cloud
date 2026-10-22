@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { parseTimestamp } from './utils';
+
 /**
  * One durable, privacy-minimal, versioned snapshot for every glanceable
  * surface (Live Activity, Dynamic Island, Home Screen widget, Android
@@ -77,9 +79,9 @@ export const glanceableAgentsSnapshotSchema = z.object({
   needsInput: z.number().int().min(0),
   /**
    * Sessions waiting on a permission prompt: the needs-input rows that can be
-   * approved without choosing an option. Optional on the wire — an older
-   * producer omits it and the parse fills 0, the same convention as
-   * `scheduled` — and every reader treats absent as 0.
+   * approved without choosing an option. Optional on input with a zero
+   * default — an older producer omits it — so the parsed snapshot carries a
+   * total count like the push schema.
    */
   needsApproval: z.number().int().min(0).default(0),
   /** Sessions connected but doing nothing. */
@@ -138,10 +140,10 @@ export type GlanceableCounts = {
 /** One session row, as both producers read it from the active-sessions list. */
 export type GlanceableSessionRow = {
   status: string;
-  /** ISO 8601; when this session's status last changed. Absent on old rows. */
+  /** Backend timestamp; when this session's status last changed. Absent on old rows. */
   statusUpdatedAt?: string;
   /**
-   * ISO 8601 wake time. Only a `scheduled` row carries one, and even then the
+   * Backend wake time. Only a `scheduled` row carries one, and even then the
    * CLI may omit it — `scheduled` with no time is representable.
    */
   scheduledAt?: string;
@@ -232,8 +234,21 @@ export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow
 }
 
 /**
- * The earliest `statusUpdatedAt` among the needs-input sessions, or null when
- * none waits or none carried a usable timestamp.
+ * Epoch milliseconds of one session time, or null when it does not parse.
+ *
+ * A producer hands these rows a JSON timestamp that may arrive in the
+ * PostgreSQL form rather than ISO 8601. Hermes cannot parse that form with
+ * `Date.parse`, and a silently skipped row drops a real wait, wake, or result
+ * fact, so every comparison reads the instant through the shared parser.
+ */
+function sessionTimeMs(value: string): number | null {
+  const at = parseTimestamp(value).getTime();
+  return Number.isFinite(at) ? at : null;
+}
+
+/**
+ * The earliest `statusUpdatedAt` among the needs-input sessions as an ISO 8601
+ * timestamp, or null when none waits or none carried a usable timestamp.
  *
  * The counts are aggregates, so a single duration can only honestly describe
  * the oldest wait: it is a floor on how long the user has kept an agent
@@ -242,7 +257,6 @@ export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow
  */
 export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[]): string | null {
   let oldest: number | null = null;
-  let oldestIso: string | null = null;
   for (const session of sessions) {
     if (
       glanceableNeedsInputKind(session.status) === null ||
@@ -250,19 +264,18 @@ export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[])
     ) {
       continue;
     }
-    const at = Date.parse(session.statusUpdatedAt);
-    if (Number.isNaN(at) || (oldest !== null && at >= oldest)) {
+    const at = sessionTimeMs(session.statusUpdatedAt);
+    if (at === null || (oldest !== null && at >= oldest)) {
       continue;
     }
     oldest = at;
-    oldestIso = session.statusUpdatedAt;
   }
-  return oldestIso;
+  return oldest === null ? null : new Date(oldest).toISOString();
 }
 
 /**
- * The earliest parseable `scheduledAt` among scheduled sessions, or null when
- * none is scheduled or none carried a usable wake time.
+ * The earliest parseable `scheduledAt` among scheduled sessions as an ISO 8601
+ * timestamp, or null when none is scheduled or none carried a usable wake time.
  *
  * A row with a missing or unparseable timestamp is skipped rather than treated
  * as waking now, which would understate how soon the soonest wake is. A
@@ -271,24 +284,22 @@ export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[])
  */
 export function soonestScheduledAt(sessions: readonly GlanceableSessionRow[]): string | null {
   let soonest: number | null = null;
-  let soonestIso: string | null = null;
   for (const session of sessions) {
     if (session.status !== 'scheduled' || session.scheduledAt === undefined) {
       continue;
     }
-    const at = Date.parse(session.scheduledAt);
-    if (Number.isNaN(at) || (soonest !== null && at >= soonest)) {
+    const at = sessionTimeMs(session.scheduledAt);
+    if (at === null || (soonest !== null && at >= soonest)) {
       continue;
     }
     soonest = at;
-    soonestIso = session.scheduledAt;
   }
-  return soonestIso;
+  return soonest === null ? null : new Date(soonest).toISOString();
 }
 
 /**
- * The most recent status change across the rows, or null when no row carried a
- * usable timestamp.
+ * The most recent status change across the rows as an ISO 8601 timestamp, or
+ * null when no row carried a usable timestamp.
  *
  * The counts and the newest-result line must agree, so the kind maps through
  * `glanceableStatusKind`: a completed or unknown status reads as `running`
@@ -300,21 +311,21 @@ export function newestGlanceableResult(
   sessions: readonly GlanceableSessionRow[]
 ): { kind: GlanceableStatusKind; at: string } | null {
   let newest: number | null = null;
-  let newestIso: string | null = null;
   let newestKind: GlanceableStatusKind | null = null;
   for (const session of sessions) {
     if (session.statusUpdatedAt === undefined) {
       continue;
     }
-    const at = Date.parse(session.statusUpdatedAt);
-    if (Number.isNaN(at) || (newest !== null && at <= newest)) {
+    const at = sessionTimeMs(session.statusUpdatedAt);
+    if (at === null || (newest !== null && at <= newest)) {
       continue;
     }
     newest = at;
-    newestIso = session.statusUpdatedAt;
     newestKind = glanceableStatusKind(session.status);
   }
-  return newestIso === null || newestKind === null ? null : { kind: newestKind, at: newestIso };
+  return newest === null || newestKind === null
+    ? null
+    : { kind: newestKind, at: new Date(newest).toISOString() };
 }
 
 // FNV-1a 32-bit over UTF-16 code units (two bytes each). Deterministic across

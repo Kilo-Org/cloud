@@ -302,7 +302,7 @@ export async function grantCreditForCategoryConfig(
     } else if (typeof error === 'object' && error !== null) {
       errorMessage = JSON.stringify(error);
     } else if (error !== undefined && error !== null) {
-      errorMessage = String(error);
+      errorMessage = String(error as string | number | boolean | bigint | symbol);
     }
     return { success: false, message: errorMessage };
   }

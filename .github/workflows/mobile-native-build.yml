@@ -9,6 +9,19 @@
 # workflow_dispatch. The gate job skips platforms whose artifact already
 # exists, so a PR whose nativeHash is already published costs one ubuntu gate
 # job and no macOS runner.
+#
+# A finished artifact is the only thing the gate can see, and one native build
+# takes longer than the gap between two pushes of the same native inputs.
+# Two mechanisms keep that from multiplying the work:
+# - Both heavy jobs and both promote jobs take a job-level concurrency slot
+#   keyed on the nativeHash, and each heavy job re-checks its artifact
+#   (`mobile-native-gate.ts --published`) before it builds. A run that arrives
+#   while the first build of that hash is running waits for the slot, then
+#   exits in seconds instead of spending a second runner.
+# - A run that must publish the durable artifact (push, workflow_dispatch) but
+#   finds only the one-day pull_request artifact promotes it: the promote job
+#   copies the artifact under the same name with the durable retention, which
+#   costs a minute on ubuntu instead of a second full build.
 name: mobile-native-build
 
 on:
@@ -65,6 +78,12 @@ jobs:
       android_hash: ${{ steps.decide.outputs.android_hash }}
       need_ios: ${{ steps.decide.outputs.need_ios }}
       need_android: ${{ steps.decide.outputs.need_android }}
+      promote_ios: ${{ steps.decide.outputs.promote_ios }}
+      promote_android: ${{ steps.decide.outputs.promote_android }}
+      promote_ios_artifact_id: ${{ steps.decide.outputs.promote_ios_artifact_id }}
+      promote_android_artifact_id: ${{ steps.decide.outputs.promote_android_artifact_id }}
+      promote_ios_name: ${{ steps.decide.outputs.promote_ios_name }}
+      promote_android_name: ${{ steps.decide.outputs.promote_android_name }}
       prefix: ${{ steps.decide.outputs.prefix }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -95,20 +114,88 @@ jobs:
           android_hash=$(pnpm exec tsx dev/local/mobile-native-hash.ts android)
           echo "ios_hash=$ios_hash" >> "$GITHUB_OUTPUT"
           echo "android_hash=$android_hash" >> "$GITHUB_OUTPUT"
-          # dev/local/mobile-native-gate.ts decides the prefix and which
-          # platforms still need building. A pull_request run that edits this
+          # dev/local/mobile-native-gate.ts decides the prefix, which platforms
+          # still need building, and which are copied from the one-day
+          # pull_request artifact instead. A pull_request run that edits this
           # workflow is validating that edit, so it publishes under
           # pr<N>-<workflow hash>- and hosts never install it; a pull_request
           # run whose native input changed publishes the plain
-          # mobile-native-<platform>-<nativeHash> name a host installs, and
-          # skips a platform whose artifact already exists.
+          # mobile-native-<platform>-<nativeHash> name a host installs.
           pnpm exec tsx dev/local/mobile-native-gate.ts "$ios_hash" "$android_hash"
 
-  ios:
+  # A run that must publish the durable artifact, but finds only the one-day
+  # pull_request one, copies it instead of rebuilding. The copy carries the
+  # same name, so hosts and the gate look it up exactly as they look up a
+  # build.
+  promote_ios:
     needs: gate
-    if: needs.gate.outputs.need_ios == 'true'
+    if: needs.gate.outputs.promote_ios == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: ${{ github.workflow }}-ios-${{ needs.gate.outputs.ios_hash }}
+      cancel-in-progress: false
+    steps:
+      - name: Download the short-lived artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ needs.gate.outputs.promote_ios_artifact_id }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" \
+            > "$RUNNER_TEMP/artifact.zip"
+          mkdir -p "$RUNNER_TEMP/unpacked"
+          unzip -q "$RUNNER_TEMP/artifact.zip" -d "$RUNNER_TEMP/unpacked"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ needs.gate.outputs.promote_ios_name }}
+          path: ${{ runner.temp }}/unpacked
+          compression-level: 0
+          retention-days: 90
+          if-no-files-found: error
+
+  promote_android:
+    needs: gate
+    if: needs.gate.outputs.promote_android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: ${{ github.workflow }}-android-${{ needs.gate.outputs.android_hash }}
+      cancel-in-progress: false
+    steps:
+      - name: Download the short-lived artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ needs.gate.outputs.promote_android_artifact_id }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" \
+            > "$RUNNER_TEMP/artifact.zip"
+          mkdir -p "$RUNNER_TEMP/unpacked"
+          unzip -q "$RUNNER_TEMP/artifact.zip" -d "$RUNNER_TEMP/unpacked"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ needs.gate.outputs.promote_android_name }}
+          path: ${{ runner.temp }}/unpacked
+          compression-level: 0
+          retention-days: 90
+          if-no-files-found: error
+
+  ios:
+    needs: [gate, promote_ios]
+    # Build when nothing is published, or when the promote of the short-lived
+    # artifact failed: a failed promote must not leave the hash without a
+    # durable build.
+    if: |
+      needs.gate.outputs.need_ios == 'true' ||
+      (needs.gate.outputs.promote_ios == 'true' && needs.promote_ios.result != 'success')
     runs-on: macos-26
     timeout-minutes: 90
+    concurrency:
+      group: ${{ github.workflow }}-ios-${{ needs.gate.outputs.ios_hash }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -126,10 +213,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The concurrency group above serializes this hash, so the build that
+      # held the slot may have published the artifact while this job queued.
+      - name: Check whether another run published this artifact
+        id: published
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT: ${{ needs.gate.outputs.prefix }}mobile-native-ios-${{ needs.gate.outputs.ios_hash }}
+        run: pnpm exec tsx dev/local/mobile-native-gate.ts --published "$ARTIFACT"
+
       - name: Build trpc types
+        if: steps.published.outputs.published != 'true'
         run: pnpm --filter @kilocode/trpc run build
 
       - name: Build harness SDK
+        if: steps.published.outputs.published != 'true'
         run: pnpm --filter @kilocode/harness-sdk run build
 
       # A consumer computes the hash on macOS; the gate computed it on
@@ -137,6 +235,7 @@ jobs:
       # so fail loudly instead. Android is checked here too: it builds on
       # Linux but is consumed on macOS, and nothing else compares the two.
       - name: Verify the hashes are platform-independent
+        if: steps.published.outputs.published != 'true'
         run: |
           set -euo pipefail
           check() {
@@ -150,9 +249,11 @@ jobs:
           check android "${{ needs.gate.outputs.android_hash }}"
 
       - name: Expo prebuild
+        if: steps.published.outputs.published != 'true'
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform ios
 
       - name: Build
+        if: steps.published.outputs.published != 'true'
         run: |
           set -euo pipefail
           xcodebuild \
@@ -169,6 +270,7 @@ jobs:
       # simulator SDK so a consumer refuses a binary its target simulator
       # runtime cannot launch (see dev/local/mobile-remote-native.ts).
       - name: Package
+        if: steps.published.outputs.published != 'true'
         run: |
           set -euo pipefail
           products="$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator"
@@ -180,6 +282,7 @@ jobs:
             -czf "ios-${{ needs.gate.outputs.ios_hash }}.tar.gz" Kilo.app toolchain.json
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.published.outputs.published != 'true'
         with:
           name: ${{ needs.gate.outputs.prefix }}mobile-native-ios-${{ needs.gate.outputs.ios_hash }}
           path: ios-${{ needs.gate.outputs.ios_hash }}.tar.gz
@@ -188,10 +291,15 @@ jobs:
           if-no-files-found: error
 
   android:
-    needs: gate
-    if: needs.gate.outputs.need_android == 'true'
+    needs: [gate, promote_android]
+    if: |
+      needs.gate.outputs.need_android == 'true' ||
+      (needs.gate.outputs.promote_android == 'true' && needs.promote_android.result != 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    concurrency:
+      group: ${{ github.workflow }}-android-${{ needs.gate.outputs.android_hash }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -215,16 +323,29 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The concurrency group above serializes this hash, so the build that
+      # held the slot may have published the artifact while this job queued.
+      - name: Check whether another run published this artifact
+        id: published
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT: ${{ needs.gate.outputs.prefix }}mobile-native-android-${{ needs.gate.outputs.android_hash }}
+        run: pnpm exec tsx dev/local/mobile-native-gate.ts --published "$ARTIFACT"
+
       - name: Build trpc types
+        if: steps.published.outputs.published != 'true'
         run: pnpm --filter @kilocode/trpc run build
 
       - name: Build harness SDK
+        if: steps.published.outputs.published != 'true'
         run: pnpm --filter @kilocode/harness-sdk run build
 
       - name: Expo prebuild
+        if: steps.published.outputs.published != 'true'
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform android
 
       - name: Build
+        if: steps.published.outputs.published != 'true'
         run: |
           set -euo pipefail
           cd apps/mobile/android
@@ -232,6 +353,7 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/Kilo.apk"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.published.outputs.published != 'true'
         with:
           name: ${{ needs.gate.outputs.prefix }}mobile-native-android-${{ needs.gate.outputs.android_hash }}
           path: ${{ runner.temp }}/Kilo.apk

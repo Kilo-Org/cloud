@@ -47,9 +47,12 @@ function applePost() {
   });
 }
 
-function rawPost(init: { body?: string; contentType?: string }) {
+function rawPost(init: { body?: string; contentType?: string; contentLength?: string }) {
   const headers = new Headers();
   if (init.contentType !== undefined) headers.set('content-type', init.contentType);
+  // A string body does not populate content-length, so a request that must carry
+  // one sets it here.
+  if (init.contentLength !== undefined) headers.set('content-length', init.contentLength);
   return new NextRequest(ROUTE_URL, { method: 'POST', headers, body: init.body });
 }
 
@@ -262,6 +265,37 @@ describe('POST /api/auth/apple-notifications', () => {
         rawPost({
           contentType: 'application/x-www-form-urlencoded',
           body: OVER_LIMIT_FORM_BODY,
+          contentLength: String(Buffer.byteLength(OVER_LIMIT_FORM_BODY)),
+        })
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'Payload too large' });
+      expect(mockVerifyAppleJwtWithJwks).not.toHaveBeenCalled();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rejects a declared length over the size limit before reading a short body', async () => {
+      const response = await POST(
+        rawPost({
+          contentType: 'application/x-www-form-urlencoded',
+          body: 'payload=fake-apple-jwt',
+          contentLength: String(8 * 1024 * 1024),
+        })
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'Payload too large' });
+      expect(mockVerifyAppleJwtWithJwks).not.toHaveBeenCalled();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rejects a content-length that is not a byte count', async () => {
+      const response = await POST(
+        rawPost({
+          contentType: 'application/x-www-form-urlencoded',
+          body: 'payload=fake-apple-jwt',
+          contentLength: '1e4',
         })
       );
 

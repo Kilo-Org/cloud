@@ -1,5 +1,7 @@
 'use client';
 
+import { cn } from '@/lib/utils';
+
 import React, { useCallback } from 'react';
 import { Scissors, Image, FileText, AlertCircle, Clock, LoaderCircle } from 'lucide-react';
 import { TimeAgo } from '@/components/shared/TimeAgo';
@@ -348,8 +350,13 @@ export function MessageBubble({
             {interrupted ? 'Interrupted' : 'Failed'}
           </span>
         )}
-        {!isStreaming && hasText && (
-          <div className="mt-1 flex items-center gap-2 opacity-0 transition-opacity group-focus-within/msg:opacity-100 group-hover/msg:opacity-100">
+        {hasText && (
+          <div
+            className={cn(
+              'mt-1 flex items-center gap-2 opacity-0 transition-opacity motion-reduce:transition-none group-focus-within/msg:opacity-100 group-hover/msg:opacity-100',
+              isStreaming && 'invisible'
+            )}
+          >
             <CopyMessageButton getText={getTextForCopy} />
             <TimeAgo timestamp={timestamp} className="text-muted-foreground/70 text-xs" />
           </div>

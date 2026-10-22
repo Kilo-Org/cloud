@@ -21,6 +21,8 @@ import {
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /** The mutation hook toasts `error.message`; the section supplies a fallback otherwise. */
 function hasUsableMessage(error: unknown): boolean {
@@ -152,7 +154,7 @@ export function ProfileRepoPinsSection({
                 {repoPlatformBadge(binding.platform)}
               </Text>
               <Pressable
-                className="h-11 w-11 items-center justify-center active:opacity-70"
+                className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
                 accessibilityRole="button"
                 accessibilityLabel={t('profiles.repoBindings.remove')}
                 disabled={unbind.isPending}

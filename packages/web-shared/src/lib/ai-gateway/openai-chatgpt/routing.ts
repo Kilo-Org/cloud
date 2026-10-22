@@ -1,10 +1,7 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
-import type {
-  GatewayRequest,
-  GatewayResponsesRequest,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
 import {
@@ -53,6 +50,9 @@ const OPENAI_CHATGPT_PURPOSE = "Run the user's coding task in Kilo Code.";
 /** OpenAI's metadata limits: 16 entries and 512 characters per value. */
 const METADATA_ENTRY_LIMIT = 16;
 const METADATA_VALUE_LIMIT = 512;
+
+/** OpenAI rejects a smaller `max_output_tokens` with `integer_below_min_value`. */
+const MIN_MAX_OUTPUT_TOKENS = 16;
 
 /**
  * Adds the required traceability keys to the request metadata, keeping any
@@ -271,7 +271,7 @@ export function buildOpenAiChatGptProvider(
       // captured token is still the fresh one.
       context.extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = accessToken;
 
-      const body = context.request.body as GatewayResponsesRequest;
+      const body = context.request.body;
       if (typeof body.model === 'string') {
         body.model = body.model.trim().replace(OPENAI_MODEL_PREFIX, '');
       }
@@ -284,6 +284,19 @@ export function buildOpenAiChatGptProvider(
       // api.openai.com rejects unknown request arguments, exactly like the
       // other raw upstream providers strip it.
       delete body.provider;
+      // Subscription sharing accepts only `auto` and `default`, which match the
+      // behavior without a tier, and rejects every other tier.
+      delete body.service_tier;
+      // The reasoning models served on this route reject sampling parameters
+      // with `unsupported_parameter`.
+      delete body.temperature;
+      delete body.top_p;
+      if (
+        typeof body.max_output_tokens === 'number' &&
+        body.max_output_tokens < MIN_MAX_OUTPUT_TOKENS
+      ) {
+        body.max_output_tokens = MIN_MAX_OUTPUT_TOKENS;
+      }
       // OpenAI requires this traceability metadata on every delegated Responses
       // request, including later turns. Without it the request is rejected once
       // the integration is enabled for it.

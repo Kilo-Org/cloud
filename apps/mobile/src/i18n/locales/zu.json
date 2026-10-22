@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Khetha i-akhawunti",
       "loadErrorTitle": "Asikwazanga ukulayisha izinhlangano zakho.",
+      "membershipLostNotice": "Awusenayo imvume yokufinyelela kule nhlangano. Ushintshelwe ku-{{target}}.",
       "noOrganization": "Ayikho inhlangano",
 
       "noOrganizationDescription": "Le akhawunti ayiyona ingxenye yenhlangano. Dala noma ujoyine inhlangano kuwebhu ukuze usebenzise izici zenhlangano njengezimemo zamalungu nezexwayiso zebhalansi ephansi.",

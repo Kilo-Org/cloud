@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Valitse tili",
       "loadErrorTitle": "Organisaatioitasi ei voitu ladata.",
+      "membershipLostNotice": "Sinulla ei ole enää pääsyä tähän organisaatioon. Vaihdettu {{target}}.",
       "noOrganization": "Ei organisaatiota",
 
       "noOrganizationDescription": "Tämä tili ei kuulu mihinkään organisaatioon. Luo organisaatio tai liity sellaiseen verkossa käyttääksesi organisaatio-ominaisuuksia, kuten jäsenkutsuja ja alhaisen saldon hälytyksiä.",

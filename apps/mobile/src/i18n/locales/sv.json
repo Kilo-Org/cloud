@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Välj ett konto",
       "loadErrorTitle": "Det gick inte att läsa in dina organisationer.",
+      "membershipLostNotice": "Du har inte längre åtkomst till den här organisationen. Växlade till {{target}}.",
       "noOrganization": "Ingen organisation",
 
       "noOrganizationDescription": "Det här kontot tillhör ingen organisation. Skapa eller gå med i en organisation på webben för att använda organisationsfunktioner som medlemsinbjudningar och varningar om lågt saldo.",

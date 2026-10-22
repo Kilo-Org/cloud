@@ -3054,6 +3054,7 @@
 
       "chooseAccount": "Choisir un compte",
       "loadErrorTitle": "Impossible de charger vos organisations.",
+      "membershipLostNotice": "Vous n'avez plus accès à cette organisation. Basculé vers {{target}}.",
       "noOrganization": "Aucune organisation",
 
       "noOrganizationDescription": "Ce compte ne fait partie d'aucune organisation. Créez une organisation ou rejoignez-en une sur le site web pour utiliser les fonctionnalités d'organisation telles que les invitations de membres et les alertes de solde faible.",

@@ -3054,6 +3054,7 @@
 
       "chooseAccount": "Selecione uma conta",
       "loadErrorTitle": "Não foi possível carregar suas organizações.",
+      "membershipLostNotice": "Você não tem mais acesso a esta organização. Mudou para {{target}}.",
       "noOrganization": "Sem organização",
 
       "noOrganizationDescription": "Esta conta não faz parte de uma organização. Crie ou entre em uma organização no site para usar recursos de organização como convites de membros e alertas de saldo baixo.",

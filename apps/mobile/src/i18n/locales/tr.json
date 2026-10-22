@@ -3014,6 +3014,7 @@
 
       "chooseAccount": "Bir hesap seç",
       "loadErrorTitle": "Kuruluşların yüklenemedi.",
+      "membershipLostNotice": "Bu kuruluşa artık erişimin yok. {{target}}'e geçildi.",
       "noOrganization": "Kuruluş yok",
 
       "noOrganizationDescription": "Bu hesap bir kuruluşun parçası değil. Üye davetleri ve düşük bakiye uyarıları gibi kuruluş özelliklerini kullanmak için web sitesinde bir kuruluş oluştur veya birine katıl.",

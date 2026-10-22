@@ -3062,6 +3062,7 @@
 
       "chooseAccount": "Izaberi nalog",
       "loadErrorTitle": "Učitavanje tvojih organizacija nije uspelo.",
+      "membershipLostNotice": "Više nemaš pristup ovoj organizaciji. Prebačeno na {{target}}.",
       "noOrganization": "Nema organizacije",
 
       "noOrganizationDescription": "Ovaj nalog nije deo organizacije. Napravi ili se pridruži organizaciji na vebu da bi koristio funkcije organizacije kao što su pozivnice za članove i upozorenja o niskom saldu.",

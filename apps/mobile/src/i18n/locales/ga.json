@@ -3142,6 +3142,7 @@
 
       "chooseAccount": "Roghnaigh cuntas",
       "loadErrorTitle": "Níorbh fhéidir d'eagraíochtaí a lódáil.",
+      "membershipLostNotice": "Níl rochtain agat ar an eagraíocht seo a thuilleadh. Athraithe go {{target}}.",
       "noOrganization": "Gan eagraíocht",
 
       "noOrganizationDescription": "Níl an cuntas seo mar chuid d'eagraíocht. Cruthaigh eagraíocht nó bí páirteach i gceann ar an ngréasán chun gnéithe eagraíochta a úsáid ar nós cuirí do bhaill agus foláirimh maidir le hiarmhéid íseal.",

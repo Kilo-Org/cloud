@@ -3102,6 +3102,7 @@
 
       "chooseAccount": "Izberi račun",
       "loadErrorTitle": "Tvojih organizacij ni bilo mogoče naložiti.",
+      "membershipLostNotice": "Nimaš več dostopa do te organizacije. Preklopljeno na {{target}}.",
       "noOrganization": "Ni organizacije",
 
       "noOrganizationDescription": "Ta račun ni del organizacije. Ustvari ali se pridruži organizaciji na spletu, da boš lahko uporabljal funkcije organizacije, kot so povabila za člane in opozorila o nizkem stanju.",

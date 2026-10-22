@@ -3102,6 +3102,7 @@
 
       "chooseAccount": "Vyberte účet",
       "loadErrorTitle": "Vaše organizace se nepodařilo načíst.",
+      "membershipLostNotice": "Už nemáte přístup do této organizace. Přepnuto na {{target}}.",
       "noOrganization": "Žádná organizace",
 
       "noOrganizationDescription": "Tento účet není součástí organizace. Vytvořte organizaci nebo se k některé připojte na webu, abyste mohli využívat funkce organizace, jako jsou pozvánky pro členy a upozornění na nízký zůstatek.",

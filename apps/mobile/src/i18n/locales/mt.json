@@ -3142,6 +3142,7 @@
 
       "chooseAccount": "Agħżel kont",
       "loadErrorTitle": "Ma setgħux jitgħabbew l-organizzazzjonijiet tiegħek.",
+      "membershipLostNotice": "M'għandekx iktar aċċess għal din l-organizzazzjoni. Inbidel għal {{target}}.",
       "noOrganization": "L-ebda organizzazzjoni",
 
       "noOrganizationDescription": "Dan il-kont mhuwiex parti minn organizzazzjoni. Oħloq jew ingħaqad ma' organizzazzjoni fuq il-web biex tuża karatteristiċi tal-organizzazzjoni bħal stedini għall-membri u twissijiet dwar bilanċ baxx.",

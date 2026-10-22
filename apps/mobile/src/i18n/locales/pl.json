@@ -3094,6 +3094,7 @@
 
       "chooseAccount": "Wybierz konto",
       "loadErrorTitle": "Nie udało się wczytać twoich organizacji.",
+      "membershipLostNotice": "Nie masz już dostępu do tej organizacji. Przełączono na {{target}}.",
       "noOrganization": "Brak organizacji",
 
       "noOrganizationDescription": "To konto nie należy do organizacji. Utwórz organizację lub dołącz do niej w przeglądarce, aby korzystać z funkcji organizacji, takich jak zaproszenia dla członków i alerty o niskim saldzie.",

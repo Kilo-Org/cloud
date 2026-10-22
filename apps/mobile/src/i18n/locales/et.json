@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Vali konto",
       "loadErrorTitle": "Sinu organisatsioone ei õnnestunud laadida.",
+      "membershipLostNotice": "Sul puudub enam juurdepääs sellele organisatsioonile. Vahetatud {{target}}-le.",
       "noOrganization": "Organisatsioon puudub",
 
       "noOrganizationDescription": "See konto ei kuulu ühtegi organisatsiooni. Organisatsiooni funktsioonide, nagu liikmekutsed ja väikese saldo hoiatused, kasutamiseks loo organisatsioon või liitu sellega veebis.",

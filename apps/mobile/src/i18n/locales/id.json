@@ -3014,6 +3014,7 @@
 
       "chooseAccount": "Pilih akun",
       "loadErrorTitle": "Tidak dapat memuat daftar organisasimu.",
+      "membershipLostNotice": "Kamu tidak lagi memiliki akses ke organisasi ini. Beralih ke {{target}}.",
       "noOrganization": "Tidak ada organisasi",
 
       "noOrganizationDescription": "Akun ini bukan bagian dari organisasi. Buat atau gabung ke organisasi di web untuk menggunakan fitur organisasi seperti undangan anggota dan peringatan saldo rendah.",

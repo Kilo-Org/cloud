@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Hesab seç",
       "loadErrorTitle": "Təşkilatlarını yükləmək mümkün olmadı.",
+      "membershipLostNotice": "Bu təşkilata artıq giriş icazən yoxdur. Keçid edildi: {{target}}.",
       "noOrganization": "Təşkilat yoxdur",
 
       "noOrganizationDescription": "Bu hesab heç bir təşkilatın üzvü deyil. Üzv dəvətləri və aşağı balans xəbərdarlıqları kimi təşkilat funksiyalarından istifadə etmək üçün saytda təşkilat yarat və ya ona qoşul.",

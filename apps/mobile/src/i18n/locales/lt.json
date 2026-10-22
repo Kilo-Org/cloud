@@ -3102,6 +3102,7 @@
 
       "chooseAccount": "Pasirinkite paskyrą",
       "loadErrorTitle": "Nepavyko įkelti jūsų organizacijų.",
+      "membershipLostNotice": "Jūs nebeturite prieigos prie šios organizacijos. Perjungta į {{target}}.",
       "noOrganization": "Nėra organizacijos",
 
       "noOrganizationDescription": "Ši paskyra nepriklauso jokiai organizacijai. Kad galėtumėte naudoti organizacijos funkcijas, tokias kaip narių kvietimai ir įspėjimai apie mažą likutį, sukurkite organizaciją arba prisijunkite prie jos naršyklėje.",

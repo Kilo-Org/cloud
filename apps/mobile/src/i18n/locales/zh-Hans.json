@@ -3014,6 +3014,7 @@
 
       "chooseAccount": "选择账户",
       "loadErrorTitle": "无法加载你的组织列表。",
+      "membershipLostNotice": "你已无法访问此组织。已切换至 {{target}}。",
       "noOrganization": "无组织",
 
       "noOrganizationDescription": "此账户不属于任何组织。请在网页版创建或加入组织，以使用成员邀请和低余额提醒等组织功能。",

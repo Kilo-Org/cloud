@@ -3182,6 +3182,7 @@
 
       "chooseAccount": "Dewiswch gyfrif",
       "loadErrorTitle": "Methu llwytho'ch sefydliadau.",
+      "membershipLostNotice": "Nid oes gennych fynediad i'r sefydliad hwn mwyach. Wedi newid i {{target}}.",
       "noOrganization": "Dim sefydliad",
 
       "noOrganizationDescription": "Nid yw'r cyfrif hwn yn rhan o sefydliad. Crëwch un neu ymunwch ag un ar y we i ddefnyddio nodweddion sefydliad fel gwahoddiadau i aelodau a rhybuddion balans isel.",

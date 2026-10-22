@@ -3062,6 +3062,7 @@
 
       "chooseAccount": "Izvēlies kontu",
       "loadErrorTitle": "Neizdevās ielādēt tavas organizācijas.",
+      "membershipLostNotice": "Tev vairs nav piekļuves šai organizācijai. Pārslēgts uz {{target}}.",
       "noOrganization": "Nav organizācijas",
 
       "noOrganizationDescription": "Šis konts nav daļa no organizācijas. Lai izmantotu organizācijas funkcijas, piemēram, dalībnieku uzaicinājumus un brīdinājumus par zemu atlikumu, izveido vai pievienojies organizācijai tīmeklī.",

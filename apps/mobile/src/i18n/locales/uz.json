@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Hisobni tanlang",
       "loadErrorTitle": "Tashkilotlaringizni yuklab bo'lmadi.",
+      "membershipLostNotice": "Sizda ushbu tashkilotga kirish huquqi endi yo'q. {{target}} ga o'tkazildi.",
       "noOrganization": "Tashkilot yo'q",
 
       "noOrganizationDescription": "Bu hisob hech qanday tashkilotga tegishli emas. A'zolarni taklif qilish va kam balans haqidagi ogohlantirishlar kabi tashkilot funksiyalaridan foydalanish uchun saytda tashkilot yarating yoki unga qo'shiling.",

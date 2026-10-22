@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Herrega filadhu",
       "loadErrorTitle": "Dhaabbilee kee fe'uu hin danda'amne.",
+      "membershipLostNotice": "Dhaabbata kana bira ga'uuf kana booda hayyama hin qabdu. Gara {{target}} tti jijjiirame.",
       "noOrganization": "Dhaabbanni hin jiru",
 
       "noOrganizationDescription": "Herregni kun dhaabbata tokko keessaa hin qoodu. Faayidaalee dhaabbataa akka affeerraa miseensotaa fi akeekkachiisa haala maallaqaa gadii fayyadamuf marsariitii irratti dhaabbata uumi yookaan tokkotti makami.",

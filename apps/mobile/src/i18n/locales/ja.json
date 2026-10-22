@@ -3014,6 +3014,7 @@
 
       "chooseAccount": "アカウントを選択",
       "loadErrorTitle": "組織を読み込めませんでした。",
+      "membershipLostNotice": "この組織にアクセスできなくなりました。{{target}}に切り替えました。",
       "noOrganization": "組織なし",
 
       "noOrganizationDescription": "このアカウントは組織に属していません。メンバーの招待や残高不足のアラートなどの組織機能を使用するには、ウェブで組織を作成するか参加してください。",

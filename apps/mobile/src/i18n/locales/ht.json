@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Chwazi yon kont",
       "loadErrorTitle": "Nou pa t ka chaje òganizasyon ou yo.",
+      "membershipLostNotice": "Ou pa gen aksè nan òganizasyon sa a ankò. Chanje pou {{target}}.",
       "noOrganization": "Pa gen òganizasyon",
 
       "noOrganizationDescription": "Kont sa a pa fè pati yon òganizasyon. Kreye oswa rantre nan yon òganizasyon sou sit entènèt la pou itilize fonksyon òganizasyon tankou envitasyon manm ak alèt sou balans ki ba.",

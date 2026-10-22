@@ -3014,6 +3014,7 @@
 
       "chooseAccount": "Konto auswählen",
       "loadErrorTitle": "Deine Organisationen konnten nicht geladen werden.",
+      "membershipLostNotice": "Du hast keinen Zugriff mehr auf diese Organisation. Gewechselt zu {{target}}.",
       "noOrganization": "Keine Organisation",
 
       "noOrganizationDescription": "Dieses Konto gehört keiner Organisation an. Erstelle eine Organisation oder tritt einer auf der Website bei, um Organisationsfunktionen wie Mitgliedseinladungen und Warnungen bei niedrigem Guthaben zu nutzen.",

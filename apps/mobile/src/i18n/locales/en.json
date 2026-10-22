@@ -3099,6 +3099,7 @@
       "chooseAccount": "Choose an account",
       "loadErrorMessage": "Check your connection and try again.",
       "loadErrorTitle": "Couldn't load your organizations",
+      "membershipLostNotice": "You no longer have access to this organization. Switched to {{target}}.",
       "noOrganization": "No organization",
       "noOrganizationDescription": "This account is not part of an organization. Create or join one on the web to use organization features like member invites and low-balance alerts.",
       "openWebOrganizations": "Open organizations on web",

@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Hautatu kontu bat",
       "loadErrorTitle": "Ezin izan dira zure erakundeak kargatu.",
+      "membershipLostNotice": "Ez duzu jada erakunde honetarako sarbiderik. Aldatu da {{target}}-ra.",
       "noOrganization": "Erakunderik ez",
 
       "noOrganizationDescription": "Kontu hau ez da erakunde baten parte. Sortu edo batu erakunde bat webgunean, kideen gonbidapenak eta saldo baxuaren abisuak bezalako erakunde-funtzioak erabiltzeko.",

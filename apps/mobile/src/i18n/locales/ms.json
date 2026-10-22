@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Pilih akaun",
       "loadErrorTitle": "Tidak dapat memuatkan organisasi anda.",
+      "membershipLostNotice": "Anda tidak lagi mempunyai akses kepada organisasi ini. Ditukar kepada {{target}}.",
       "noOrganization": "Tiada organisasi",
 
       "noOrganizationDescription": "Akaun ini bukan sebahagian daripada organisasi. Cipta atau sertai organisasi di laman web untuk menggunakan ciri organisasi seperti jemputan ahli dan amaran baki rendah.",

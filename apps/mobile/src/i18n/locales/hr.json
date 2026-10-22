@@ -3062,6 +3062,7 @@
 
       "chooseAccount": "Odaberi račun",
       "loadErrorTitle": "Nije moguće učitati tvoje organizacije.",
+      "membershipLostNotice": "Više nemaš pristup ovoj organizaciji. Prebačeno na {{target}}.",
       "noOrganization": "Nema organizacije",
 
       "noOrganizationDescription": "Ovaj račun nije dio organizacije. Stvori ili se pridruži organizaciji na webu da bi koristio značajke organizacije kao što su pozivnice za članove i upozorenja o niskom saldu.",

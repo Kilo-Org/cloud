@@ -3014,6 +3014,7 @@
 
       "chooseAccount": "選取帳戶",
       "loadErrorTitle": "無法載入你的組織清單。",
+      "membershipLostNotice": "你已無法存取此組織。已切換至 {{target}}。",
       "noOrganization": "沒有組織",
 
       "noOrganizationDescription": "此帳戶不屬於任何組織。請在網頁版建立或加入組織，以使用成員邀請和低餘額提醒等組織功能。",

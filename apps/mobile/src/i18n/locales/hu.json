@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Fiók kiválasztása",
       "loadErrorTitle": "Nem sikerült betölteni a szervezeteidet.",
+      "membershipLostNotice": "Már nincs hozzáférésed ehhez a szervezethez. Átváltva a következőre: {{target}}.",
       "noOrganization": "Nincs szervezet",
 
       "noOrganizationDescription": "Ez a fiók nem tagja egyetlen szervezetnek sem. Hozz létre vagy csatlakozz egy szervezethez a weboldalon, hogy használhasd a szervezetfunkciókat, például a tagmeghívókat és az alacsony egyenlegre vonatkozó figyelmeztetéseket.",

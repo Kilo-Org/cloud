@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Veldu reikning",
       "loadErrorTitle": "Ekki tókst að hlaða félögunum þínum.",
+      "membershipLostNotice": "Þú hefur ekki lengur aðgang að þessu félagi. Skipt yfir í {{target}}.",
       "noOrganization": "Ekkert félag",
 
       "noOrganizationDescription": "Þessi reikningur er ekki hluti af félagi. Búðu til eða gakktu til liðs við félag á vefnum til að nota eiginleika félagsins eins og boð til meðlima og viðvaranir um lága stöðu.",

@@ -3014,6 +3014,7 @@
 
       "chooseAccount": "Chọn tài khoản",
       "loadErrorTitle": "Không thể tải danh sách tổ chức của bạn.",
+      "membershipLostNotice": "Bạn không còn quyền truy cập vào tổ chức này. Đã chuyển sang {{target}}.",
       "noOrganization": "Không có tổ chức",
 
       "noOrganizationDescription": "Tài khoản này không thuộc tổ chức nào. Hãy tạo hoặc tham gia một tổ chức trên web để sử dụng các tính năng của tổ chức như lời mời thành viên và cảnh báo số dư thấp.",

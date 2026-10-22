@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Zgjidh një llogari",
       "loadErrorTitle": "Nuk u ngarkuan organizatat e tua.",
+      "membershipLostNotice": "Nuk ke më qasje në këtë organizatë. U kalua te {{target}}.",
       "noOrganization": "Asnjë organizatë",
 
       "noOrganizationDescription": "Kjo llogari nuk është pjesë e një organizate. Krijo ose bashkohu me një organizatë në ueb për të përdorur veçoritë e organizatës si ftesat për anëtarët dhe alarmet për balancë të ulët.",

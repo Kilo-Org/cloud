@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Misafidiana kaonty",
       "loadErrorTitle": "Tsy voaray ny fikambananao.",
+      "membershipLostNotice": "Tsy manana alalana hiditra amin'ity fikambanana ity intsony ianao. Nafindra tany amin'ny {{target}}.",
       "noOrganization": "Tsy misy fikambanana",
 
       "noOrganizationDescription": "Ity kaonty ity dia tsy anisan'ny fikambanana. Mamorona na midira ao amin'ny fikambanana ao amin'ny tranonkala mba hampiasa ny endriky ny fikambanana toy ny fanasana mpikambana sy ny fampitandremana momba ny fifandanjana ambany.",

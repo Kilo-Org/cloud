@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "መለያ ይምረጡ",
       "loadErrorTitle": "ድርጅቶችዎን መጫን አልተቻለም።",
+      "membershipLostNotice": "ይህን ድርጅት ከእንግዲህ የመድረስ ፈቃድ የለዎትም። ወደ {{target}} ተቀይሯል።",
       "noOrganization": "ድርጅት የለም",
 
       "noOrganizationDescription": "ይህ መለያ የድርጅት አካል አይደለም። እንደ አባል ግብዣዎች እና ዝቅተኛ ቀሪ ሂሳብ ማንቂያዎች ያሉ የድርጅት ባህሪያትን ለመጠቀም በድር ላይ አንዱን ይፍጠሩ ወይም ይቀላቀሉ።",

@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Kies 'n rekening",
       "loadErrorTitle": "Jou organisasies kon nie gelaai word nie.",
+      "membershipLostNotice": "Jy het nie meer toegang tot hierdie organisasie nie. Oorgeskakel na {{target}}.",
       "noOrganization": "Geen organisasie",
 
       "noOrganizationDescription": "Hierdie rekening is nie deel van 'n organisasie nie. Skep of sluit by een aan op die web om organisasiefunksies soos lede-uitnodigings en waarskuwings oor lae saldo te gebruik.",

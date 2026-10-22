@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Pumili ng account",
       "loadErrorTitle": "Hindi ma-load ang iyong mga organisasyon.",
+      "membershipLostNotice": "Wala ka nang access sa organisasyong ito. Lumipat sa {{target}}.",
       "noOrganization": "Walang organisasyon",
 
       "noOrganizationDescription": "Ang account na ito ay hindi bahagi ng isang organisasyon. Gumawa o sumali sa isang organisasyon sa web upang magamit ang mga feature ng organisasyon tulad ng mga imbitasyon ng miyembro at mga alerto sa mababang balanse.",

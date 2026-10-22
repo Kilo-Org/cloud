@@ -3062,6 +3062,7 @@
 
       "chooseAccount": "Selectează un cont",
       "loadErrorTitle": "Nu s-au putut încărca organizațiile tale.",
+      "membershipLostNotice": "Nu mai ai acces la această organizație. S-a comutat la {{target}}.",
       "noOrganization": "Nicio organizație",
 
       "noOrganizationDescription": "Acest cont nu face parte dintr-o organizație. Creează sau alătură-te unei organizații pe site pentru a folosi funcții de organizație precum invitațiile pentru membri și alertele de sold scăzut.",

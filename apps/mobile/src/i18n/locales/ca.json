@@ -3062,6 +3062,7 @@
 
       "chooseAccount": "Selecciona un compte",
       "loadErrorTitle": "No s'han pogut carregar les teves organitzacions.",
+      "membershipLostNotice": "Ja no tens accés a aquesta organització. Canviat a {{target}}.",
       "noOrganization": "Sense organització",
 
       "noOrganizationDescription": "Aquest compte no forma part de cap organització. Crea'n una o uneix-te'n a una al web per utilitzar funcions d'organització com les invitacions de membres i les alertes de saldo baix.",

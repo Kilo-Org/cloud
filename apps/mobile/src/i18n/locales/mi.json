@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Kōwhiria tētahi pūkete",
       "loadErrorTitle": "Kāore i taea te uta i ō rōpū.",
+      "membershipLostNotice": "Kāore ō whakaaetanga uru ki tēnei rōpū anō. I whakawhiti ki {{target}}.",
       "noOrganization": "Kāore he rōpū",
 
       "noOrganizationDescription": "Kāore tēnei pūkete i roto i tētahi rōpū. Waihangatia, uru atu rānei ki tētahi rōpū i runga i te paetukutuku kia whakamahi ai i ngā āhuatanga rōpū pēnei i ngā pōwhiri mema me ngā whakatūpato mō te toenga iti.",

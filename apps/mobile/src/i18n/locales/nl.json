@@ -3014,6 +3014,7 @@
 
       "chooseAccount": "Een account kiezen",
       "loadErrorTitle": "Je organisaties konden niet worden geladen.",
+      "membershipLostNotice": "Je hebt geen toegang meer tot deze organisatie. Overgeschakeld naar {{target}}.",
       "noOrganization": "Geen organisatie",
 
       "noOrganizationDescription": "Dit account maakt geen deel uit van een organisatie. Maak er een aan of word lid van een organisatie op de website om organisatiefuncties zoals liduitnodigingen en waarschuwingen bij een laag saldo te gebruiken.",

@@ -3022,6 +3022,7 @@
 
       "chooseAccount": "Chagua akaunti",
       "loadErrorTitle": "Imeshindikana kupakia mashirika yako.",
+      "membershipLostNotice": "Huna tena ruhusa ya kufikia shirika hili. Imebadilishwa kwenda {{target}}.",
       "noOrganization": "Hakuna shirika",
 
       "noOrganizationDescription": "Akaunti hii si sehemu ya shirika. Unda au jiunge na shirika kwenye wavuti ili kutumia vipengele vya shirika kama vile mialiko ya wanachama na arifa za salio la chini.",

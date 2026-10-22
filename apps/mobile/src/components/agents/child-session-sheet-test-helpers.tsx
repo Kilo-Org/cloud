@@ -244,7 +244,6 @@ export async function createRecoverySource(
       variant: null,
       repository: null,
       isInitiated: true,
-      needsLegacyPrepare: false,
       isPreparingAsync: false,
       prompt: null,
       initialMessageId: null,

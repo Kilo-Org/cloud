@@ -18,7 +18,8 @@ import {
   allocation as allocationTable,
   scopeGrants,
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
-import { readScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js';
+import { readScopeGrant, listScopeGrants } from '../../src/control-plane/sandbox/scope-grants.js';
+import { deleteRoute } from '../../src/control-plane/sandbox/routes.js';
 import { createControlPlaneCredential } from '../../src/sandbox-control/managed-credential.js';
 import { buildControlNetworkPolicy } from '../../src/sandbox-control/session-credentials.js';
 import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider.js';
@@ -152,10 +153,10 @@ function b64url(value: string): string {
 }
 
 /** A Kilo token that decodes to `runtimeAuthorization`, enabling the Vercel runtime proxy. */
-function runtimeAuthorizedKiloToken(): string {
+function runtimeAuthorizedKiloToken(signature = 'sig'): string {
   const header = b64url(JSON.stringify({ alg: 'none', typ: 'JWT' }));
   const payload = b64url(JSON.stringify({ runtimeAuthorization: { id: 'ra_1' } }));
-  return `${header}.${payload}.sig`;
+  return `${header}.${payload}.${signature}`;
 }
 
 function credentialsSource(
@@ -169,7 +170,7 @@ function credentialsSource(
   return {
     userId: options.userId ?? 'user_123',
     kiloSessionId: kiloSessionIdFor(sessionId),
-    kiloToken: options.kiloToken ?? NATIVE_KILO_TOKEN,
+    kiloToken: options.kiloToken ?? runtimeAuthorizedKiloToken(),
     orgId: 'org_123',
     repository: options.repository ?? { type: 'github', repo: 'acme/widgets' },
     scopeId: sessionId,
@@ -184,6 +185,46 @@ function routeSpec(sessionId: string): ControlPlaneRouteSpec {
     kiloSessionId: kiloSessionIdFor(sessionId),
     directory: `/workspace/${sessionId}`,
     attemptId: `${sessionId}-requested`,
+  };
+}
+
+const LEGACY_SCOPE = 'legacy_scope';
+const LEGACY_SESSION = 'workspace_33333333-3333-3333-3333-333333333333';
+const LEGACY_KILO_SESSION = 'ses_cccccccccccccccccccccccccc';
+const LOCAL_KILO_TARGETS = {
+  backendBaseUrl: 'https://api.kilo.ai',
+  providerBaseUrl: 'https://api.kilo.ai',
+  sessionIngestBaseUrl: 'https://ingest.kilosessions.ai',
+};
+
+/** The grant shape written before the direct containment-off fallback was removed. */
+function legacyGrant(input: {
+  sessionId: string;
+  kiloSessionId: string;
+  scopeId: string;
+  directory: string;
+  targets: {
+    backendBaseUrl: string;
+    providerBaseUrl: string;
+    sessionIngestBaseUrl: string;
+  };
+  provider?: 'cloudflare' | 'vercel';
+}) {
+  const now = Date.now();
+  return {
+    version: 1,
+    containmentEnabled: false,
+    scopeId: input.scopeId,
+    sandboxId: SANDBOX_ID,
+    directory: input.directory,
+    userId: 'user_123',
+    orgId: 'org_123',
+    provider: input.provider ?? 'cloudflare',
+    members: [{ sessionId: input.sessionId, kiloSessionId: input.kiloSessionId }],
+    repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
+    kilo: { token: NATIVE_KILO_TOKEN, targets: input.targets, capabilities: {} },
+    preparedAt: now,
+    expiresAt: now + 60 * 60 * 1000,
   };
 }
 
@@ -261,6 +302,7 @@ async function setup(
     // local `.dev.vars` value cannot change what each test means.
     installFakeCredentialEnv(instance.env, broker, {
       CREDENTIAL_CONTAINMENT_ENABLED: 'true',
+      WORKER_URL: VERCEL_TARGET,
       KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
       KILO_OPENROUTER_BASE: 'https://api.kilo.ai',
       KILO_SESSION_INGEST_URL: 'https://ingest.kilosessions.ai',
@@ -423,198 +465,155 @@ afterEach(async () => {
 });
 
 describe('SandboxControlV2 credentials (B3)', () => {
-  it.each([false, true])(
-    'retires pre-B generation-2 JSON grants and recovers warm shared sends with modern=%s',
-    async modern => {
-      const provider = createFakeProvider();
-      let stopCalls = 0;
-      provider.adapter.stop = async () => {
-        stopCalls += 1;
-        return 'terminal';
-      };
-      const stub = await setup(provider, createFakeCredentialBroker(), {
-        WORKER_URL: VERCEL_TARGET,
-      });
-      const input = (sessionId: string) =>
-        prepareInput(
-          sessionId,
-          {
-            ...credentialsSource(
-              sessionId,
-              modern ? { kiloToken: runtimeAuthorizedKiloToken() } : {}
-            ),
-            scopeId: 'upgrade_shared',
-          },
-          {
-            ...routeSpec(sessionId),
-            directory: '/workspace/upgrade_shared',
-            ...(modern ? { runtimeIsolation: 'per-session' as const } : {}),
-          }
-        );
-      const { wrapper, prepareFrame } = await prepareWarmRoute(stub, provider, input(SESSION));
-      if (prepareFrame?.type !== 'session.prepare') throw new Error('missing old preparation');
-      await stub.prepare(input(SESSION_NEXT));
-      expect((await wrapper.next())?.type).toBe('session.prepare');
-      await reconstructPreB(stub, provider, async (reconstructed, updates) => {
-        expect(
-          await reconstructed.deliver({
-            sessionId: SESSION,
-            messages: [promptPayload('msg_upgrade')],
-          })
-        ).toBe('not_ready');
-        expect((await reconstructed.status({ sessionId: SESSION })).view.state).toBe('failed');
-        expect((await reconstructed.status({ sessionId: SESSION_NEXT })).view.state).toBe('failed');
-        expect((await reconstructed.getAllocationState()).kind).toBe('stopping');
-        expect(stopCalls).toBe(0);
-        const retiredState = await reconstructed.getAllocationState();
-        expect(retiredState).toMatchObject({ stopAttempt: 1, stopPending: true });
-        const db = drizzle(reconstructed.ctx.storage);
-        expect(db.select().from(scopeGrants).all()).toEqual([]);
-        expect(
-          db
-            .select()
-            .from(routesTable)
-            .all()
-            .every(route => route.grant === null && route.state === 'failed')
-        ).toBe(true);
-        const resumed = new SandboxControlV2(reconstructed.ctx, reconstructed.env);
-        Object.assign(resumed, {
-          createProviderAdapter: () => provider.adapter,
-          provider: provider.adapter,
-        });
-        expect(await resumed.getAllocationState()).toEqual(retiredState);
-        await waitFor(() =>
-          expect(updates.map(entry => [entry.sessionId, entry.update.state])).toEqual([
-            [SESSION, 'lost'],
-            [SESSION_NEXT, 'failed'],
-          ])
-        );
-        expect(
-          updates.every(
-            entry => 'reason' in entry.update && entry.update.reason === 'agent_restarted'
-          )
-        ).toBe(true);
-        expect(
-          await reconstructed.resolveCredential({
-            credential: prepareFrame.credentials.kilo.token,
-            outboundContainerId: OUTBOUND_CONTAINER_ID,
-            url: 'https://api.kilo.ai/api/openrouter/chat/completions',
-            method: 'POST',
-          })
-        ).toBeNull();
-        if (modern)
-          expect(
-            await reconstructed.getRuntimeCredentialProxyFence({
-              ownerId: 'user_123',
-              sessionId: SESSION,
-              kiloSessionId: kiloSessionIdFor(SESSION),
-              directory: '/workspace/upgrade_shared',
-            })
-          ).toBeNull();
-        const view = await reconstructed.prepare(input(SESSION));
-        expect(view.state).toBe('preparing');
-        await reconstructed.alarm();
-        await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
-        expect(stopCalls).toBe(1);
-        expect((await reconstructed.getAllocationState()).kind).toBe('starting');
-      });
-      const launch = provider.launchEnvs[1];
-      if (launch === undefined) throw new Error('missing upgraded launch');
-      const replacement = await FakeWrapper.connect({
-        sandboxId: SANDBOX_ID,
-        credential: launch.SANDBOX_CONTROL_CREDENTIAL,
-      });
-      await replacement.hello({
-        wrapperId: 'wr_upgrade',
-        allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
-      });
-      const first = await replacement.next();
-      if (first?.type !== 'session.prepare') throw new Error('missing upgraded preparation');
-      expect(first.credentials.kilo.token === prepareFrame.credentials.kilo.token).toBe(false);
-      if (modern) expect(Boolean(first.credentials.proxy?.handle)).toBe(true);
-      replacement.send({ type: 'session.ready', sessionId: SESSION });
-      await waitFor(async () =>
-        expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready')
+  it('retires pre-B generation-2 JSON grants and recovers modern shared sends', async () => {
+    const provider = createFakeProvider();
+    let stopCalls = 0;
+    provider.adapter.stop = async () => {
+      stopCalls += 1;
+      return 'terminal';
+    };
+    const stub = await setup(provider, createFakeCredentialBroker(), {
+      WORKER_URL: VERCEL_TARGET,
+    });
+    const input = (sessionId: string) =>
+      prepareInput(
+        sessionId,
+        {
+          ...credentialsSource(sessionId),
+          scopeId: 'upgrade_shared',
+        },
+        {
+          ...routeSpec(sessionId),
+          directory: '/workspace/upgrade_shared',
+          runtimeIsolation: 'per-session' as const,
+        }
       );
+    const { wrapper, prepareFrame } = await prepareWarmRoute(stub, provider, input(SESSION));
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing old preparation');
+    await stub.prepare(input(SESSION_NEXT));
+    expect((await wrapper.next())?.type).toBe('session.prepare');
+    await reconstructPreB(stub, provider, async (reconstructed, updates) => {
       expect(
-        await stub.deliver({
+        await reconstructed.deliver({
           sessionId: SESSION,
-          messages: [promptPayload('msg_upgrade_recovered')],
+          messages: [promptPayload('msg_upgrade')],
         })
-      ).toBe('sent');
-      expect((await replacement.next())?.type).toBe('session.prompt');
-      expect((await stub.prepare(input(SESSION_NEXT))).state).toBe('preparing');
-      const second = await replacement.next();
-      if (second?.type !== 'session.prepare')
-        throw new Error('missing upgraded sibling preparation');
-      expect(second.credentials.kilo.token === first.credentials.kilo.token).toBe(true);
-      replacement.send({ type: 'session.ready', sessionId: SESSION_NEXT });
-      await waitFor(async () =>
-        expect((await stub.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready')
-      );
-      const resolve = (url: string, credential = first.credentials.kilo.token, method = 'POST') =>
-        stub.resolveCredential({
-          credential,
-          outboundContainerId: OUTBOUND_CONTAINER_ID,
-          url,
-          method,
-        });
-      if (modern) {
-        expect(first.credentials.proxy?.handle === second.credentials.proxy?.handle).toBe(false);
-        const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}');
-        expect(Object.keys(grant.kilo.capabilities)).toEqual([]);
-        expect(await resolve('https://api.kilo.ai/api/openrouter/chat/completions')).toBeNull();
-      } else {
-        for (const sessionId of [SESSION, SESSION_NEXT]) {
-          expect(
-            await resolve('https://api.kilo.ai/api/openrouter/chat/completions')
-          ).not.toBeNull();
-          for (const operation of ['ingest', 'export'])
-            expect(
-              await resolve(
-                `https://ingest.kilosessions.ai/api/session/${kiloSessionIdFor(sessionId)}/${operation}`,
-                first.credentials.kilo.token,
-                operation === 'export' ? 'GET' : 'POST'
-              )
-            ).not.toBeNull();
-        }
-      }
-      await stub.release({ sessionId: SESSION });
-      expect((await stub.getAllocationState()).kind).toBe('connected');
+      ).toBe('not_ready');
+      expect((await reconstructed.status({ sessionId: SESSION })).view.state).toBe('failed');
+      expect((await reconstructed.status({ sessionId: SESSION_NEXT })).view.state).toBe('failed');
+      expect((await reconstructed.getAllocationState()).kind).toBe('stopping');
+      expect(stopCalls).toBe(0);
+      const retiredState = await reconstructed.getAllocationState();
+      expect(retiredState).toMatchObject({ stopAttempt: 1, stopPending: true });
+      const db = drizzle(reconstructed.ctx.storage);
+      expect(db.select().from(scopeGrants).all()).toEqual([]);
       expect(
-        await resolve(
-          'https://github.com/acme/widgets.git/info/refs',
-          first.credentials.git?.token,
-          'GET'
-        )
-      ).not.toBeNull();
-      if (!modern) {
-        expect(await resolve('https://api.kilo.ai/api/openrouter/chat/completions')).not.toBeNull();
-        for (const operation of ['ingest', 'export']) {
-          expect(
-            await resolve(
-              `https://ingest.kilosessions.ai/api/session/${kiloSessionIdFor(SESSION)}/${operation}`,
-              first.credentials.kilo.token,
-              operation === 'export' ? 'GET' : 'POST'
-            )
-          ).toBeNull();
-          expect(
-            await resolve(
-              `https://ingest.kilosessions.ai/api/session/${kiloSessionIdFor(SESSION_NEXT)}/${operation}`,
-              first.credentials.kilo.token,
-              operation === 'export' ? 'GET' : 'POST'
-            )
-          ).not.toBeNull();
-        }
-      }
-      await runInDurableObject(stub, async (instance, state) => {
-        const again = new SandboxControlV2(state, instance.env);
-        expect((await again.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready');
-        expect(await state.storage.get('control_plane_generation')).toBe(2);
-        expect(drizzle(state.storage).select().from(scopeGrants).all()).toHaveLength(1);
+        db
+          .select()
+          .from(routesTable)
+          .all()
+          .every(route => route.grant === null && route.state === 'failed')
+      ).toBe(true);
+      const resumed = new SandboxControlV2(reconstructed.ctx, reconstructed.env);
+      Object.assign(resumed, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
       });
-    }
-  );
+      expect(await resumed.getAllocationState()).toEqual(retiredState);
+      await waitFor(() =>
+        expect(updates.map(entry => [entry.sessionId, entry.update.state])).toEqual([
+          [SESSION, 'lost'],
+          [SESSION_NEXT, 'failed'],
+        ])
+      );
+      expect(
+        updates.every(
+          entry => 'reason' in entry.update && entry.update.reason === 'agent_restarted'
+        )
+      ).toBe(true);
+      expect(
+        await reconstructed.resolveCredential({
+          credential: prepareFrame.credentials.kilo.token,
+          outboundContainerId: OUTBOUND_CONTAINER_ID,
+          url: 'https://api.kilo.ai/api/openrouter/chat/completions',
+          method: 'POST',
+        })
+      ).toBeNull();
+      expect(
+        await reconstructed.getRuntimeCredentialProxyFence({
+          ownerId: 'user_123',
+          sessionId: SESSION,
+          kiloSessionId: kiloSessionIdFor(SESSION),
+          directory: '/workspace/upgrade_shared',
+        })
+      ).toBeNull();
+      const view = await reconstructed.prepare(input(SESSION));
+      expect(view.state).toBe('preparing');
+      await reconstructed.alarm();
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
+      expect(stopCalls).toBe(1);
+      expect((await reconstructed.getAllocationState()).kind).toBe('starting');
+    });
+    const launch = provider.launchEnvs[1];
+    if (launch === undefined) throw new Error('missing upgraded launch');
+    const replacement = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential: launch.SANDBOX_CONTROL_CREDENTIAL,
+    });
+    await replacement.hello({
+      wrapperId: 'wr_upgrade',
+      allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
+    });
+    const first = await replacement.next();
+    if (first?.type !== 'session.prepare') throw new Error('missing upgraded preparation');
+    expect(first.credentials.kilo.token === prepareFrame.credentials.kilo.token).toBe(false);
+    expect(Boolean(first.credentials.proxy?.handle)).toBe(true);
+    replacement.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready')
+    );
+    expect(
+      await stub.deliver({
+        sessionId: SESSION,
+        messages: [promptPayload('msg_upgrade_recovered')],
+      })
+    ).toBe('sent');
+    expect((await replacement.next())?.type).toBe('session.prompt');
+    expect((await stub.prepare(input(SESSION_NEXT))).state).toBe('preparing');
+    const second = await replacement.next();
+    if (second?.type !== 'session.prepare') throw new Error('missing upgraded sibling preparation');
+    expect(second.credentials.kilo.token === first.credentials.kilo.token).toBe(true);
+    replacement.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready')
+    );
+    const resolve = (url: string, credential = first.credentials.kilo.token, method = 'POST') =>
+      stub.resolveCredential({
+        credential,
+        outboundContainerId: OUTBOUND_CONTAINER_ID,
+        url,
+        method,
+      });
+    expect(first.credentials.proxy?.handle === second.credentials.proxy?.handle).toBe(false);
+    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}');
+    expect(Object.keys(grant.kilo.capabilities)).toEqual([]);
+    expect(await resolve('https://api.kilo.ai/api/openrouter/chat/completions')).toBeNull();
+    await stub.release({ sessionId: SESSION });
+    expect((await stub.getAllocationState()).kind).toBe('connected');
+    expect(
+      await resolve(
+        'https://github.com/acme/widgets.git/info/refs',
+        first.credentials.git?.token,
+        'GET'
+      )
+    ).not.toBeNull();
+    await runInDurableObject(stub, async (instance, state) => {
+      const again = new SandboxControlV2(state, instance.env);
+      expect((await again.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready');
+      expect(await state.storage.get('control_plane_generation')).toBe(2);
+      expect(drizzle(state.storage).select().from(scopeGrants).all()).toHaveLength(1);
+    });
+  });
 
   it('retires a credential-bearing ready route with a missing canonical owner', async () => {
     const provider = createFakeProvider();
@@ -669,136 +668,6 @@ describe('SandboxControlV2 credentials (B3)', () => {
       expect(db.select().from(scopeGrants).all()).toHaveLength(1);
     });
   });
-
-  it.each([false, true])(
-    'keeps mixed managed-SCM admission fail-closed when modern-first=%s',
-    async modernFirst => {
-      const provider = createFakeProvider();
-      const stub = await setup(provider, createFakeCredentialBroker(), {
-        WORKER_URL: VERCEL_TARGET,
-      });
-      const input = (sessionId: string, modern: boolean) =>
-        prepareInput(
-          sessionId,
-          {
-            ...credentialsSource(sessionId),
-            scopeId: 'managed_mixed',
-            ...(modern ? { kiloToken: runtimeAuthorizedKiloToken() } : {}),
-          },
-          {
-            ...routeSpec(sessionId),
-            directory: '/workspace/managed_mixed',
-            ...(modern ? { runtimeIsolation: 'per-session' as const } : {}),
-          }
-        );
-      await prepareWarmRoute(stub, provider, input(SESSION, modernFirst));
-      const before = (await readRouteRow(stub, SESSION))?.grant;
-      expect((await stub.prepare(input(SESSION_NEXT, !modernFirst))).state).toBe('failed');
-      expect((await readRouteRow(stub, SESSION))?.grant === before).toBe(true);
-      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
-    }
-  );
-
-  it.each([false, true])(
-    'preserves mixed repository credentials on an older allocation (modern-first=%s)',
-    async modernFirst => {
-      const provider = createFakeProvider();
-      const stub = await setupVercel(provider, createFakeCredentialBroker());
-      const input = (sessionId: string, modern: boolean) =>
-        prepareInput(
-          sessionId,
-          {
-            ...credentialsSource(sessionId, {
-              repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
-              ...(modern ? { kiloToken: runtimeAuthorizedKiloToken() } : {}),
-            }),
-            scopeId: 'mixed_class',
-          },
-          {
-            ...routeSpec(sessionId),
-            directory: '/workspace/mixed_class',
-            ...(modern ? { runtimeIsolation: 'per-session' as const } : {}),
-          }
-        );
-      const { wrapper, prepareFrame } = await prepareWarmRoute(
-        stub,
-        provider,
-        input(SESSION, modernFirst),
-        'legacy'
-      );
-      if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare');
-      expect(prepareFrame.spec.runtimeIsolation).toBe(modernFirst ? 'per-session' : undefined);
-      expect((await stub.prepare(input(SESSION_NEXT, !modernFirst))).state).toBe('preparing');
-      const sibling = await wrapper.next();
-      if (sibling?.type !== 'session.prepare') throw new Error('missing sibling prepare');
-      expect(sibling.spec.runtimeIsolation).toBe(modernFirst ? undefined : 'per-session');
-      wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
-      await waitFor(async () =>
-        expect((await stub.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready')
-      );
-      await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
-      expect(
-        await stub.deliver({ sessionId: SESSION, messages: [promptPayload('refresh_legacy')] })
-      ).toBe('sent');
-      expect((await wrapper.next())?.type).toBe('session.credentials');
-      expect((await wrapper.next())?.type).toBe('session.prompt');
-      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
-      expect((await stub.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready');
-      expect(provider.launchEnvs).toHaveLength(1);
-    }
-  );
-
-  it.each([false, true])(
-    'rejects the other credential class for a directory sharing one checkout (modern-first=%s)',
-    async modernFirst => {
-      const provider = createFakeProvider();
-      const broker = createFakeCredentialBroker();
-      const stub = await setupVercel(provider, broker);
-      const directory = '/workspace/mixed_class';
-      const input = (sessionId: string, modern: boolean) =>
-        prepareInput(
-          sessionId,
-          {
-            ...credentialsSource(sessionId, {
-              repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
-              ...(modern ? { kiloToken: runtimeAuthorizedKiloToken() } : {}),
-            }),
-            scopeId: 'mixed_class',
-          },
-          {
-            ...routeSpec(sessionId),
-            directory,
-            // Negotiated sharing removes compatibility isolation at the wire boundary.
-            ...(modern ? { runtimeIsolation: 'per-session' as const } : {}),
-          }
-        );
-      const { wrapper } = await prepareWarmRoute(stub, provider, input(SESSION, modernFirst));
-      const before = (await readRouteRow(stub, SESSION))?.grant;
-      const diagnostics: Record<string, unknown>[] = [];
-      const spy = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
-        const bounded = fields as unknown as Record<string, unknown>;
-        if (bounded.diagnosticEvent === 'route_failed') diagnostics.push(bounded);
-        return logger;
-      });
-      expect((await stub.prepare(input(SESSION_NEXT, !modernFirst))).state).toBe('failed');
-      spy.mockRestore();
-      expect(diagnostics.some(diagnostic => diagnostic.stage === 'mixed_credential_class')).toBe(
-        true
-      );
-      expect(
-        diagnostics.some(
-          diagnostic =>
-            diagnostic.stage === 'mixed_credential_class' &&
-            diagnostic.grantPhase === 'compatibility' &&
-            diagnostic.grantFailureReason === 'mixed_credential_class'
-        )
-      ).toBe(true);
-      expect((await readRouteRow(stub, SESSION))?.grant === before).toBe(true);
-      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
-      // The joiner fails at admission, before any prepare frame reaches the wrapper.
-      expect(await wrapper.next(100)).toBeNull();
-    }
-  );
 
   it('does not publish a runtime handle whose Vercel policy update failed', async () => {
     const provider = createFakeProvider();
@@ -883,18 +752,18 @@ describe('SandboxControlV2 credentials (B3)', () => {
       const db = drizzle(state.storage, { logger: false });
       expect(db.select().from(scopeGrants).all()).toHaveLength(1);
       expect(db.select({ grant: routesTable.grant }).from(routesTable).all()).toEqual([
-        { grant: 'shared_worktree:legacy' },
-        { grant: 'shared_worktree:legacy' },
+        { grant: 'shared_worktree:runtime' },
+        { grant: 'shared_worktree:runtime' },
       ]);
-      const grant = readScopeGrant(db, 'shared_worktree:legacy');
-      if (!grant?.kilo.alias) throw new Error('missing canonical grant');
+      const grant = readScopeGrant(db, 'shared_worktree:runtime');
+      if (!grant?.scm?.alias) throw new Error('missing canonical grant');
       const reconstructed = new SandboxControlV2(state, instance.env);
       expect((await reconstructed.status({ sessionId: SESSION })).view.state).toBe('ready');
       expect(
         await reconstructed.resolveCredential({
-          credential: grant.kilo.alias,
+          credential: grant.scm.alias,
           outboundContainerId: OUTBOUND_CONTAINER_ID,
-          url: 'https://ingest.kilosessions.ai/api/session/ses_bbbbbbbbbbbbbbbbbbbbbbbbbb/ingest',
+          url: 'https://github.com/acme/widgets.git/info/refs',
           method: 'POST',
         })
       ).not.toBeNull();
@@ -955,34 +824,32 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect((await stub.getAllocationState()).kind).toBe('connected');
   });
 
-  it.each([
-    'organization',
-    'repository',
-    'legacy backing authorization',
-    'modern backing authorization',
-  ])('fails incompatible same-scope %s closed without changing the live owner', async kind => {
-    const provider = createFakeProvider();
-    const stub = await setup(provider, createFakeCredentialBroker(), { WORKER_URL: VERCEL_TARGET });
-    const input = (sessionId: string) =>
-      prepareInput(
-        sessionId,
-        { ...credentialsSource(sessionId), scopeId: 'shared_worktree' },
-        { ...routeSpec(sessionId), directory: '/workspace/shared_worktree' }
-      );
-    await prepareWarmRoute(stub, provider, input(SESSION));
-    const before = (await readRouteRow(stub, SESSION))?.grant;
-    const next = input(SESSION_NEXT);
-    if (kind === 'organization') next.credentials.orgId = 'org_other';
-    if (kind === 'repository')
-      next.credentials.repository = { type: 'github', repo: 'acme/private' };
-    if (kind === 'legacy backing authorization')
-      next.credentials.kiloToken = 'different-user-authority';
-    if (kind === 'modern backing authorization')
-      next.credentials.kiloToken = runtimeAuthorizedKiloToken();
-    expect((await stub.prepare(next)).state).toBe('failed');
-    expect((await readRouteRow(stub, SESSION))?.grant === before).toBe(true);
-    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
-  });
+  it.each(['organization', 'repository', 'legacy backing authorization'])(
+    'fails incompatible same-scope %s closed without changing the live owner',
+    async kind => {
+      const provider = createFakeProvider();
+      const stub = await setup(provider, createFakeCredentialBroker(), {
+        WORKER_URL: VERCEL_TARGET,
+      });
+      const input = (sessionId: string) =>
+        prepareInput(
+          sessionId,
+          { ...credentialsSource(sessionId), scopeId: 'shared_worktree' },
+          { ...routeSpec(sessionId), directory: '/workspace/shared_worktree' }
+        );
+      await prepareWarmRoute(stub, provider, input(SESSION));
+      const before = (await readRouteRow(stub, SESSION))?.grant;
+      const next = input(SESSION_NEXT);
+      if (kind === 'organization') next.credentials.orgId = 'org_other';
+      if (kind === 'repository')
+        next.credentials.repository = { type: 'github', repo: 'acme/private' };
+      if (kind === 'legacy backing authorization')
+        next.credentials.kiloToken = 'different-user-authority';
+      expect((await stub.prepare(next)).state).toBe('failed');
+      expect((await readRouteRow(stub, SESSION))?.grant === before).toBe(true);
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
+    }
+  );
 
   it('retires physical aliases and rebinds a preparing route without resetting its attempt', async () => {
     const provider = createFakeProvider();
@@ -1001,9 +868,9 @@ describe('SandboxControlV2 credentials (B3)', () => {
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
     expect(
       await stub.resolveCredential({
-        credential: first.prepareFrame.credentials.kilo.token,
+        credential: first.prepareFrame.credentials.git?.token ?? 'missing-alias',
         outboundContainerId: OUTBOUND_CONTAINER_ID,
-        url: 'https://api.kilo.ai/api/user',
+        url: 'https://github.com/acme/widgets.git/info/refs',
         method: 'GET',
       })
     ).toBeNull();
@@ -1031,116 +898,12 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(after?.attempt_deadline_at).toBe(before?.attempt_deadline_at);
     expect(
       await stub.resolveCredential({
-        credential: prepared.credentials.kilo.token,
+        credential: prepared.credentials.git?.token ?? 'missing-alias',
         outboundContainerId: OUTBOUND_CONTAINER_ID,
-        url: 'https://api.kilo.ai/api/user',
+        url: 'https://github.com/acme/widgets.git/info/refs',
         method: 'GET',
       })
     ).not.toBeNull();
-  });
-
-  it('shares legacy scope aliases and resolves both native histories after creator release', async () => {
-    const provider = createFakeProvider();
-    const stub = await setup(provider);
-    const sharedInput = (sessionId: string) =>
-      prepareInput(
-        sessionId,
-        { ...credentialsSource(sessionId), scopeId: 'shared_worktree' },
-        { ...routeSpec(sessionId), directory: '/workspace/shared_worktree' }
-      );
-    const { wrapper, prepareFrame } = await prepareWarmRoute(stub, provider, sharedInput(SESSION));
-    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
-    const alias = prepareFrame.credentials.kilo.token;
-    await stub.prepare(sharedInput(SESSION_NEXT));
-    const sibling = await wrapper.next();
-    expect(sibling?.type).toBe('session.prepare');
-    if (sibling?.type !== 'session.prepare') throw new Error('missing sibling prepare');
-    expect(sibling.credentials.kilo.token === alias).toBe(true);
-    wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
-    await waitFor(async () =>
-      expect((await stub.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready')
-    );
-    const resolve = (url: string, credential = alias, method = 'POST') =>
-      stub.resolveCredential({
-        credential,
-        outboundContainerId: OUTBOUND_CONTAINER_ID,
-        url,
-        method,
-      });
-    for (const sessionId of [SESSION, SESSION_NEXT]) {
-      expect(await resolve('https://api.kilo.ai/api/openrouter/chat/completions')).not.toBeNull();
-      for (const operation of ['ingest', 'export']) {
-        expect(
-          await resolve(
-            `https://ingest.kilosessions.ai/api/session/${kiloSessionIdFor(sessionId)}/${operation}`,
-            alias,
-            operation === 'export' ? 'GET' : 'POST'
-          )
-        ).not.toBeNull();
-      }
-    }
-    await stub.release({ sessionId: SESSION });
-    expect((await stub.getAllocationState()).kind).toBe('connected');
-    expect(await resolve('https://api.kilo.ai/api/user', alias, 'GET')).not.toBeNull();
-    expect(
-      await resolve(
-        `https://ingest.kilosessions.ai/api/session/${kiloSessionIdFor(SESSION_NEXT)}/ingest`
-      )
-    ).not.toBeNull();
-    expect(
-      await resolve(
-        `https://ingest.kilosessions.ai/api/session/${kiloSessionIdFor(SESSION)}/ingest`
-      )
-    ).toBeNull();
-    expect(
-      await resolve(
-        `https://ingest.kilosessions.ai/api/session/${kiloSessionIdFor(SESSION)}/export`,
-        alias,
-        'GET'
-      )
-    ).toBeNull();
-    expect(
-      await resolve(
-        'https://github.com/acme/widgets.git/info/refs',
-        prepareFrame.credentials.git?.token,
-        'GET'
-      )
-    ).not.toBeNull();
-    await stub.release({ sessionId: SESSION_NEXT });
-    expect(await resolve('https://api.kilo.ai/api/user', alias, 'GET')).toBeNull();
-    await runInDurableObject(stub, (_instance, state) => {
-      expect(drizzle(state.storage).select().from(scopeGrants).all()).toEqual([]);
-    });
-  });
-
-  it('keeps installed aliases usable during warm renewal with fresh backing capabilities', async () => {
-    const provider = createFakeProvider();
-    const broker = createFakeCredentialBroker();
-    const stub = await setup(provider, broker);
-    const { wrapper, prepareFrame } = await prepareWarmRoute(stub, provider);
-    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
-    const alias = prepareFrame.credentials.kilo.token;
-    const resolve = () =>
-      stub.resolveCredential({
-        credential: alias,
-        outboundContainerId: OUTBOUND_CONTAINER_ID,
-        url: 'https://api.kilo.ai/api/user',
-        method: 'GET',
-      });
-    const before = await resolve();
-    await patchGrant(stub, SESSION, grant => ({
-      ...grant,
-      expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
-      kilo: { ...(grant.kilo as Record<string, unknown>), capabilities: {} },
-    }));
-    expect(
-      await stub.deliver({ sessionId: SESSION, messages: [promptPayload('busy_followup')] })
-    ).toBe('sent');
-    expect((await wrapper.next())?.type).toBe('session.credentials');
-    const after = await resolve();
-    expect(after).not.toBeNull();
-    expect(after?.credential === before?.credential).toBe(false);
-    expect(broker.kiloIssued()).toBe(2);
   });
 
   it('keeps old preparation aliases when an expired attempt retries before the old wrapper finishes', async () => {
@@ -1173,9 +936,9 @@ describe('SandboxControlV2 credentials (B3)', () => {
     );
     expect(
       await stub.resolveCredential({
-        credential: prepareFrame.credentials.kilo.token,
+        credential: prepareFrame.credentials.git?.token ?? 'missing-alias',
         outboundContainerId: OUTBOUND_CONTAINER_ID,
-        url: 'https://api.kilo.ai/api/user',
+        url: 'https://github.com/acme/widgets.git/info/refs',
         method: 'GET',
       })
     ).not.toBeNull();
@@ -1202,11 +965,12 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(state.kind).not.toBe('stopped');
   });
 
-  it('honours CREDENTIAL_CONTAINMENT_ENABLED=false with a containment-off selection', async () => {
+  it('denies a containment-off selection with a legacy user token', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker, { CREDENTIAL_CONTAINMENT_ENABLED: 'false' });
     const source = credentialsSource(SESSION, {
+      kiloToken: NATIVE_KILO_TOKEN,
       repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
     });
 
@@ -1214,42 +978,62 @@ describe('SandboxControlV2 credentials (B3)', () => {
       ...prepareInput(SESSION, source),
       sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
     });
-    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
+    expect(view).toMatchObject({ state: 'failed', reason: 'credential_upgrade_required' });
 
-    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
-      containmentEnabled?: boolean;
-      outboundContainerId?: string;
-      kilo?: { alias?: string };
-    };
-    // Uncontained: no alias is minted and the grant opts out of containment.
-    expect(grant.containmentEnabled).toBe(false);
-    expect(grant.kilo?.alias).toBeUndefined();
-    expect(grant.outboundContainerId).toBeUndefined();
-    await waitFor(() => expect(provider.intents).toHaveLength(1));
-    expect(provider.intents[0]?.containment).toEqual({ kilocode: false, github: false });
+    const row = await readRouteRow(stub, SESSION);
+    expect(row?.state).toBe('failed');
+    expect(provider.intents).toHaveLength(0);
+    expect(JSON.stringify(row)).not.toContain(NATIVE_KILO_TOKEN);
   });
 
-  it('prepares with a containment-off selection when no containment namespaces are bound', async () => {
+  it('prepares a containment-off selection with a session runtime proxy when no containment namespaces are bound', async () => {
     // Reproduces the deployed e2e Worker: containment is off and the containment
-    // container classes are stripped from the config, so resolving a containment
-    // proxy container would throw during prepare.
+    // container classes are stripped from the config. A session-bound runtime
+    // proxy is the only safe Kilo credential path here.
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
-    const stub = await setup(provider, broker, { CREDENTIAL_CONTAINMENT_ENABLED: 'false' });
+    const stub = await setup(provider, broker, {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+      WORKER_URL: 'https://api.kilo.ai',
+    });
     await runInDurableObject(stub, instance => {
       const mutableEnv = instance.env as Record<string, unknown>;
       delete mutableEnv.SandboxContainment;
       delete mutableEnv.SandboxSmallContainment;
     });
     const source = credentialsSource(SESSION, {
+      kiloToken: runtimeAuthorizedKiloToken(),
       repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
     });
 
-    const view = await stub.prepare({
+    const input = {
       ...prepareInput(SESSION, source),
-      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
-    });
-    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
+      sandboxSelection: {
+        provider: 'cloudflare' as const,
+        containment: { kilocode: false, github: false },
+      },
+    };
+    const { prepareFrame } = await prepareWarmRoute(stub, provider, input);
+    expect(prepareFrame?.type).toBe('session.prepare');
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.credentials.kilo.token).toMatch(/^kcp1\./);
+    expect(prepareFrame.credentials.proxy?.handle).toBeDefined();
+    expect(prepareFrame.spec.env?.KILOCODE_TOKEN).toBe(prepareFrame.credentials.kilo.token);
+    expect(JSON.stringify(prepareFrame)).not.toContain(NATIVE_KILO_TOKEN);
+    expect(JSON.stringify(prepareFrame)).not.toContain('runtimeAuthorization');
+
+    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      containmentEnabled?: boolean;
+      outboundContainerId?: string;
+      kilo?: { alias?: string; runtimeProxy?: unknown; token?: string };
+    };
+    expect(grant.containmentEnabled).toBe(false);
+    expect(grant.kilo?.alias).toBe(prepareFrame.credentials.kilo.token);
+    expect(grant.kilo?.runtimeProxy).toBeDefined();
+    expect(grant.kilo?.token).toBe(runtimeAuthorizedKiloToken());
+    expect(grant.outboundContainerId).toBeUndefined();
+    await waitFor(() => expect(provider.intents).toHaveLength(1));
+    expect(provider.intents[0]?.containment).toEqual({ kilocode: false, github: false });
   });
 
   it('stays contained when the selection carries containment on', async () => {
@@ -1275,29 +1059,196 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(provider.intents[0]?.containment).toEqual({ kilocode: true, github: true });
   });
 
-  it('falls back to CREDENTIAL_CONTAINMENT_ENABLED when the selection omits containment', async () => {
+  it('denies the containment default with a legacy user token instead of issuing direct credentials', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker, { CREDENTIAL_CONTAINMENT_ENABLED: 'false' });
     const source = credentialsSource(SESSION, {
+      kiloToken: NATIVE_KILO_TOKEN,
       repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
     });
 
-    await stub.prepare(prepareInput(SESSION, source));
+    const view = await stub.prepare(prepareInput(SESSION, source));
 
-    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
-      containmentEnabled?: boolean;
-      outboundContainerId?: string;
-    };
-    expect(grant.containmentEnabled).toBe(false);
+    expect(view).toMatchObject({ state: 'failed', reason: 'credential_upgrade_required' });
+    const row = await readRouteRow(stub, SESSION);
+    expect(row?.state).toBe('failed');
     // Containment off must not resolve a containment proxy container, which the
-    // e2e Worker does not bind and which would otherwise throw during prepare.
-    expect(grant.outboundContainerId).toBeUndefined();
-    await waitFor(() => expect(provider.intents).toHaveLength(1));
-    expect(provider.intents[0]?.containment).toEqual({
-      kilocode: false,
-      github: false,
-      worktreeScoped: true,
+    // e2e Worker does not bind, and must not fall back to a native user token.
+    expect(row?.grant?.containmentEnabled).toBeUndefined();
+    expect(provider.intents).toHaveLength(0);
+    expect(JSON.stringify(row)).not.toContain(NATIVE_KILO_TOKEN);
+  });
+
+  it('rejects legacy authorization even when containment is enabled', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const input = prepareInput(
+      SESSION,
+      credentialsSource(SESSION, { kiloToken: NATIVE_KILO_TOKEN })
+    );
+    expect(await stub.prepare(input)).toMatchObject({
+      state: 'failed',
+      reason: 'credential_upgrade_required',
+    });
+    expect(provider.intents).toHaveLength(0);
+    expect(broker.kiloIssued()).toBe(0);
+    expect(broker.githubIssued()).toBe(0);
+  });
+
+  it('rejects a persisted ready legacy grant and keeps reads and cleanup available', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider);
+    const { wrapper } = await prepareWarmRoute(stub, provider);
+    await patchGrant(stub, SESSION, grant => {
+      const kilo = grant.kilo as Record<string, unknown>;
+      const { runtimeProxy: _runtimeProxy, ...oldKilo } = kilo;
+      return { ...grant, kilo: { ...oldKilo, token: NATIVE_KILO_TOKEN } };
+    });
+    // Legacy grants use the legacy scope key, including contained grants.
+    await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage);
+      db.update(scopeGrants)
+        .set({ id: SESSION + ':legacy' })
+        .where(eq(scopeGrants.id, SESSION + ':runtime'))
+        .run();
+      db.update(routesTable)
+        .set({ grant: SESSION + ':legacy' })
+        .where(eq(routesTable.session_id, SESSION))
+        .run();
+    });
+    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('old_ready')] })).toBe(
+      'not_ready'
+    );
+    expect((await stub.status({ sessionId: SESSION })).view).toMatchObject({
+      state: 'failed',
+      reason: 'credential_upgrade_required',
+    });
+    expect(await wrapper.next(50)).toBeNull();
+    await stub.abort({ sessionId: SESSION });
+    await stub.release({ sessionId: SESSION });
+    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('unknown');
+    await runInDurableObject(stub, (_instance, state) => {
+      expect(drizzle(state.storage).select().from(scopeGrants).all()).toEqual([]);
+    });
+  });
+
+  it('reads, lists, and cleans up a persisted legacy containment-off grant', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider);
+    await prepareWarmRoute(stub, provider);
+    const legacy = legacyGrant({
+      sessionId: LEGACY_SESSION,
+      kiloSessionId: LEGACY_KILO_SESSION,
+      scopeId: LEGACY_SCOPE,
+      directory: '/workspace/legacy',
+      targets: LOCAL_KILO_TARGETS,
+    });
+
+    await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      db.insert(scopeGrants)
+        .values({ id: `${LEGACY_SCOPE}:legacy`, grant: JSON.stringify(legacy) })
+        .run();
+
+      expect(readScopeGrant(db, `${LEGACY_SCOPE}:legacy`)).toMatchObject({
+        containmentEnabled: false,
+        scopeId: LEGACY_SCOPE,
+      });
+      expect(listScopeGrants(db).map(grant => grant.scopeId)).toEqual(
+        expect.arrayContaining([LEGACY_SCOPE])
+      );
+
+      await deleteRoute(db, state.storage.kv, LEGACY_SESSION);
+
+      expect(readScopeGrant(db, `${LEGACY_SCOPE}:legacy`)).toBeNull();
+      expect(listScopeGrants(db).map(grant => grant.scopeId)).not.toContain(LEGACY_SCOPE);
+    });
+  });
+
+  it('fails a persisted legacy containment-off grant with the upgrade stage', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider, createFakeCredentialBroker(), {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+    });
+    const spec = { ...routeSpec(SESSION), directory: '/workspace/legacy' };
+    const legacy = legacyGrant({
+      sessionId: SESSION,
+      kiloSessionId: kiloSessionIdFor(SESSION),
+      scopeId: LEGACY_SCOPE,
+      directory: spec.directory,
+      targets: LOCAL_KILO_TARGETS,
+    });
+    await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      db.insert(scopeGrants)
+        .values({ id: `${LEGACY_SCOPE}:legacy`, grant: JSON.stringify(legacy) })
+        .run();
+    });
+    const source = {
+      ...credentialsSource(SESSION, {
+        kiloToken: NATIVE_KILO_TOKEN,
+        repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
+      }),
+      scopeId: LEGACY_SCOPE,
+    };
+    const diagnostics: Record<string, unknown>[] = [];
+    const spy = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+      const bounded = fields as unknown as Record<string, unknown>;
+      if (bounded.diagnosticEvent === 'route_failed') diagnostics.push(bounded);
+      return logger;
+    });
+    const view = await stub.prepare({
+      ...prepareInput(SESSION, source, spec),
+      sandboxSelection: {
+        provider: 'cloudflare',
+        containment: { kilocode: false, github: false },
+      },
+    });
+    spy.mockRestore();
+
+    expect(view).toMatchObject({ state: 'failed', reason: 'credential_upgrade_required' });
+    expect(diagnostics).toContainEqual(
+      expect.objectContaining({ stage: 'credential_upgrade_required' })
+    );
+    expect(provider.intents).toHaveLength(0);
+    expect(JSON.stringify(await readRouteRow(stub, SESSION))).not.toContain(NATIVE_KILO_TOKEN);
+  });
+
+  it('excludes a persisted legacy grant from the Vercel policy for unrelated routes', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupVercel(provider, createFakeCredentialBroker());
+    await prepareWarmRoute(stub, provider, prepareInput(SESSION, vercelSource(SESSION)));
+    const policyCalls = provider.policyCalls.length;
+    const legacy = legacyGrant({
+      sessionId: LEGACY_SESSION,
+      kiloSessionId: LEGACY_KILO_SESSION,
+      scopeId: LEGACY_SCOPE,
+      directory: '/workspace/legacy',
+      targets: {
+        backendBaseUrl: VERCEL_TARGET,
+        providerBaseUrl: VERCEL_TARGET,
+        sessionIngestBaseUrl: VERCEL_TARGET,
+      },
+      provider: 'vercel',
+    });
+    await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      db.insert(scopeGrants)
+        .values({ id: `${LEGACY_SCOPE}:legacy`, grant: JSON.stringify(legacy) })
+        .run();
+    });
+
+    expect((await stub.prepare(prepareInput(SESSION_NEXT, vercelSource(SESSION_NEXT)))).state).toBe(
+      'preparing'
+    );
+    expect(provider.policyCalls.length).toBeGreaterThan(policyCalls);
+    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
+    await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      expect(readScopeGrant(db, `${LEGACY_SCOPE}:legacy`)).not.toBeNull();
     });
   });
 
@@ -1360,9 +1311,9 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const grant = JSON.parse(row?.grant ?? '{}') as {
       kilo: { alias: string; token: string };
     };
-    expect(grant.kilo.token).toBe(NATIVE_KILO_TOKEN);
+    expect(grant.kilo.token).toBe(runtimeAuthorizedKiloToken());
     expect(grant.kilo.alias).toBe(prepareFrame.credentials?.kilo.token);
-    expect(broker.kiloIssued()).toBe(1);
+    expect(broker.kiloIssued()).toBe(0);
     expect(broker.githubIssued()).toBe(1);
   });
 
@@ -1413,7 +1364,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
       expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
         'sent'
       );
-      expect(broker.kiloIssued()).toBe(2);
+      expect(broker.kiloIssued()).toBe(0);
       expect(broker.githubIssued()).toBe(2);
       expect((await wrapper.next())?.type).toBe('session.credentials');
       expect((await wrapper.next())?.type).toBe('session.prompt');
@@ -1433,7 +1384,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
       kilo: { alias: string };
     };
     const firstAlias = first.kilo.alias;
-    expect(broker.kiloIssued()).toBe(1);
+    expect(broker.kiloIssued()).toBe(0);
 
     await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
 
@@ -1450,7 +1401,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
       expiresAt: number;
     };
     expect(refreshed.kilo.alias === firstAlias).toBe(true);
-    expect(broker.kiloIssued()).toBe(2);
+    expect(broker.kiloIssued()).toBe(0);
     expect(broker.githubIssued()).toBe(2);
     expect(refreshed.expiresAt - Date.now()).toBeGreaterThan(TIMERS.credentialGrantReissueBelowMs);
     if (credentialsFrame?.type !== 'session.credentials') throw new Error('missing frame');
@@ -1526,7 +1477,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
         expect(renewed.expiresAt - Date.now()).toBeGreaterThan(
           TIMERS.credentialGrantReissueBelowMs
         );
-        expect(broker.kiloIssued()).toBe(2);
+        expect(broker.kiloIssued()).toBe(0);
         expect(broker.githubIssued()).toBe(2);
         expect(await stub.status({ sessionId: SESSION })).toMatchObject({
           view: { state: 'ready' },
@@ -1623,64 +1574,51 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(prepareFrame.spec.permission).toEqual(input.spec.permission);
   });
 
-  it('resolves contained outbound credentials for a routed session and rejects unknown/expired/mutated', async () => {
+  it('resolves Git credentials and rejects unknown, expired, and mutated aliases', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker);
     await prepareWarmRoute(stub, provider);
-
-    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
-      kilo: { alias: string; targets: { backendBaseUrl: string } };
-    };
-    const alias = grant.kilo.alias;
-    const url = `${grant.kilo.targets.backendBaseUrl}/api/user`;
-
-    const resolved = await stub.resolveCredential({
-      credential: alias,
-      outboundContainerId: OUTBOUND_CONTAINER_ID,
-      url,
-      method: 'GET',
-    });
-    expect(resolved).not.toBeNull();
-    expect(resolved?.credential).toMatch(/^kka1\./);
-    expect(resolved?.organizationId).toBe('org_123');
-
-    // Unknown, mutated (same purpose and scope, different suffix) and wrong
-    // container all fail closed.
-    expect(
-      await stub.resolveCredential({
-        credential: 'kcp1.unknown.scope.kilo.xyz',
-        outboundContainerId: OUTBOUND_CONTAINER_ID,
-        url,
+    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}');
+    const alias = grant.scm.alias;
+    const resolve = (credential: string, outboundContainerId = OUTBOUND_CONTAINER_ID) =>
+      stub.resolveCredential({
+        credential,
+        outboundContainerId,
+        url: 'https://github.com/acme/widgets.git/info/refs',
         method: 'GET',
-      })
-    ).toBeNull();
-    expect(
-      await stub.resolveCredential({
-        credential: `${alias.slice(0, -1)}${alias.endsWith('a') ? 'b' : 'a'}`,
-        outboundContainerId: OUTBOUND_CONTAINER_ID,
-        url,
-        method: 'GET',
-      })
-    ).toBeNull();
-    expect(
-      await stub.resolveCredential({
-        credential: alias,
-        outboundContainerId: 'oc_other',
-        url,
-        method: 'GET',
-      })
-    ).toBeNull();
+      });
+    expect((await resolve(alias))?.credential).toMatch(/^kgh2\./);
+    expect(await resolve('kcp1.unknown.scope.github.xyz')).toBeNull();
+    expect(await resolve(alias + 'mutated')).toBeNull();
+    expect(await resolve(alias, 'other-container')).toBeNull();
+    await setGrantExpiry(stub, SESSION, Date.now() - 1000);
+    expect(await resolve(alias)).toBeNull();
+    expect(broker.kiloIssued()).toBe(0);
+  });
 
-    await setGrantExpiry(stub, SESSION, Date.now() - 1_000);
-    expect(
-      await stub.resolveCredential({
-        credential: alias,
-        outboundContainerId: OUTBOUND_CONTAINER_ID,
-        url,
-        method: 'GET',
-      })
-    ).toBeNull();
+  it('never redeems Kilo aliases through the credential broker', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const { prepareFrame } = await prepareWarmRoute(stub, provider);
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('Missing prepare frame');
+    expect(prepareFrame.credentials.proxy?.handle).toBeDefined();
+    for (const url of [
+      'https://api.kilo.ai/api/user',
+      'https://api.kilo.ai/api/openrouter/chat/completions',
+      'https://ingest.kilosessions.ai/api/session/' + kiloSessionIdFor(SESSION) + '/ingest',
+    ]) {
+      expect(
+        await stub.resolveCredential({
+          credential: prepareFrame.credentials.kilo.token,
+          outboundContainerId: OUTBOUND_CONTAINER_ID,
+          url,
+          method: 'POST',
+        })
+      ).toBeNull();
+    }
+    expect(broker.kiloIssued()).toBe(0);
   });
 
   it('revokes the grant on release and rejects the stale alias afterwards', async () => {
@@ -1690,10 +1628,10 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const { wrapper } = await prepareWarmRoute(stub, provider);
 
     const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
-      kilo: { alias: string; targets: { backendBaseUrl: string } };
+      scm: { alias: string };
     };
-    const alias = grant.kilo.alias;
-    const url = `${grant.kilo.targets.backendBaseUrl}/api/user`;
+    const alias = grant.scm.alias;
+    const url = 'https://github.com/acme/widgets.git/info/refs';
     expect(
       await stub.resolveCredential({
         credential: alias,
@@ -2422,7 +2360,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     // (the session directory).
     const source = credentialsSource(SESSION, {
       userId: USER_SECRET,
-      kiloToken: SUPER_SECRET_TOKEN,
+      kiloToken: runtimeAuthorizedKiloToken(SUPER_SECRET_TOKEN),
       repository: { type: 'github', repo: `acme/widgets_${REPO_SECRET}` },
     });
     const view = await stub.prepare(
@@ -2444,9 +2382,9 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       provider: 'cloudflare',
       containment: 'enabled',
       repositoryKind: 'github',
-      tokenClass: 'legacy',
+      tokenClass: 'runtime_authorized',
     });
-    expect(broker.calls).toEqual({ kilo: 1, github: 1, gitlab: 0, authorize: 0 });
+    expect(broker.calls).toEqual({ kilo: 0, github: 1, gitlab: 0, authorize: 0 });
     const serialized = JSON.stringify(events[0]);
     expect(serialized.length).toBeLessThanOrEqual(2048);
     for (const marker of [SUPER_SECRET_TOKEN, USER_SECRET, REPO_SECRET, CONTENT_SECRET]) {
@@ -2488,30 +2426,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       grantPhase: 'broker_authorization',
       grantFailureReason: 'integration_mismatch',
     });
-    expect(broker.calls).toEqual({ kilo: 1, github: 0, gitlab: 0, authorize: 1 });
-  });
-
-  it('labels Kilo issuance with the client reason', async () => {
-    const provider = createFakeProvider();
-    const broker = createGrantBroker();
-    broker.service.issueKiloSessionCapability = async () => {
-      broker.calls.kilo += 1;
-      return { success: false, reason: 'invalid_targets' };
-    };
-    const stub = await setup(provider);
-    await installGrantBroker(stub, broker.service);
-
-    const capture = captureRouteFailed();
-    const view = await stub.prepare(prepareInput(SESSION));
-    const events = capture.forAttempt(failedAttemptId(view));
-    capture.restore();
-
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      grantPhase: 'broker_issuance',
-      grantFailureReason: 'invalid_targets',
-    });
-    expect(broker.calls).toEqual({ kilo: 1, github: 0, gitlab: 0, authorize: 0 });
+    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 1 });
   });
 
   it('labels a missing whole service binding as configuration', async () => {
@@ -2619,15 +2534,16 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     });
 
     let hanging = true;
-    let rejectKilo: (error: Error) => void = () => {};
-    broker.service.issueKiloSessionCapability = () => {
-      broker.calls.kilo += 1;
+    let rejectGitHub: (error: Error) => void = () => {};
+    const issueGitHub = broker.service.issueGitHubSessionCapability;
+    broker.service.issueGitHubSessionCapability = () => {
       if (hanging) {
+        broker.calls.github += 1;
         return new Promise<never>((_resolve, reject) => {
-          rejectKilo = reject;
+          rejectGitHub = reject;
         });
       }
-      return Promise.resolve({ success: true, capability: `kka1.${broker.calls.kilo}` });
+      return issueGitHub();
     };
 
     const capture = captureRouteFailed();
@@ -2657,7 +2573,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     expect((await stub.prepare(prepareInput(SESSION_NEXT))).state).toBe('preparing');
 
     // The late rejection lands on the sealed attempt and cannot rewrite it.
-    rejectKilo(new Error(SUPER_SECRET_TOKEN));
+    rejectGitHub(new Error(SUPER_SECRET_TOKEN));
     await new Promise(resolve => setTimeout(resolve, 50));
     capture.restore();
 
@@ -2831,7 +2747,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       provider: 'cloudflare',
       containment: 'disabled',
       repositoryKind: 'github',
-      tokenClass: 'legacy',
+      tokenClass: 'runtime_authorized',
     });
     // The route failure is unchanged: failed state with no armed deadline.
     const brokerRow = await readRouteRow(stub, SESSION);
@@ -2919,7 +2835,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     expect(ceilingFor(oversizedEvent)).toBe(1209);
     // Measured UTF-8 bytes of the captured payloads. `attemptId` is a fixed-length
     // UUID and every other value is pinned above, so these are deterministic.
-    expect(actualBytes(brokerEvent)).toBe(400);
+    expect(actualBytes(brokerEvent)).toBe(412);
     expect(actualBytes(oversizedEvent)).toBe(316);
     expect(actualBytes(brokerEvent)).toBeLessThan(ceilingFor(brokerEvent));
     expect(actualBytes(brokerEvent)).toBeLessThanOrEqual(2048);

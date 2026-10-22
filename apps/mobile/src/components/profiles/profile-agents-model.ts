@@ -82,6 +82,18 @@ export type AgentRow = Readonly<{
   model: string;
 }>;
 
+/**
+ * Catalog key for the short mode badge on an agent row. The picker in the add
+ * sheet names the key that carries the explanatory suffix; the row has room for
+ * the label alone. `satisfies` fails the build when a mode is added, so no row
+ * can fall back to the raw English config value.
+ */
+export const AGENT_VISIBILITY_LABEL_KEYS = {
+  primary: 'profiles.agents.modePrimary',
+  subagent: 'profiles.agents.modeSubagent',
+  all: 'profiles.agents.modeAll',
+} satisfies Record<AgentVisibility, string>;
+
 /** Project the profile's agents into the rows the list renders. */
 export function agentRows(agents: readonly AgentSource[]): AgentRow[] {
   return agents.map(agent => ({

@@ -43,6 +43,14 @@ const LIGHT_COLORS = {
   border: 'rgba(20, 15, 10, 0.09)',
   primary: '#4F5A10',
 };
+// The provider now announces the lost-membership recovery through the
+// toast adapter, whose module graph reaches react-native's Flow source
+// the mounted transform cannot parse. Suites mock the adapter (not the
+// sonner package) so the mock sits at the edge that imports it.
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
+
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
@@ -261,7 +269,10 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
   it.each([
     { choice: 'Personal', expected: null },
     { choice: name, expected: 'org-a' },
-    { choice: 'Cancel', expected: 'org-missing' },
+    // The stored organization is missing from the list, so the provider
+    // recovers to the first listed membership before the sheet opens; a
+    // Cancel is then a plain dismissal of that recovered scope.
+    { choice: 'Cancel', expected: 'org-a' },
   ])(
     'applies the picked account $choice without an implicit reset',
     async ({ choice, expected }) => {
@@ -280,13 +291,18 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     storage.read.mockResolvedValue('org-missing');
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
+    // The stored organization is missing from the list, so the provider has
+    // already recovered to the first listed membership before the sheet opens.
+    await waitFor(
+      () => ui.renderer.root.findByType('GlobalScope' as ElementType).props.id === 'org-a'
+    );
     await openSheet(ui);
     // The native sheet's dismiss path, not a row: the scope stays as it was.
     await act(() => {
       (backdrop(ui).props.onClose as () => void)();
     });
     expect(rows(ui)).toHaveLength(0);
-    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-missing');
+    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-a');
   });
 
   it('separates the rows and exposes the current account through the radio state', async () => {
@@ -334,9 +350,10 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
   it.each([
     // An absent stored choice is 'not chosen yet': the provider's login default
     // resolves to the first organization, so the picker must mark that row. A
-    // stored organization missing from the list marks no row at all.
+    // stored organization missing from the list recovers to that first
+    // membership before the sheet opens, so its row is marked too.
     { stored: null, checked: name },
-    { stored: 'org-missing', checked: undefined },
+    { stored: 'org-missing', checked: name },
   ])(
     'marks the account the user is actually on when the stored one is missing (stored=$stored)',
     async ({ stored, checked }) => {
@@ -349,7 +366,7 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
         rows(ui)
           .filter(row => row.checked)
           .map(row => row.label)
-      ).toEqual(checked === undefined ? [] : [checked]);
+      ).toEqual([checked]);
     }
   );
 
@@ -397,18 +414,19 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     });
   });
 
-  it('recovers an unavailable organization through Personal after an empty membership result', async () => {
+  it('recovers a stored organization missing from an empty membership list to Personal', async () => {
     storage.read.mockResolvedValue('org-missing');
     list.mockResolvedValue([]);
     const ui = await mount();
-    await waitFor(() => texts(ui).includes('Organization unavailable'));
-    expect(texts(ui)).not.toContain('Retry');
-    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-missing');
+    // The stored organization is missing from the fetched list, so the
+    // provider switches to Personal (no membership remains) on the first
+    // snapshot instead of rendering the dead selection's error surface.
+    await waitFor(
+      () => ui.renderer.root.findByType('GlobalScope' as ElementType).props.id === null
+    );
+    expect(texts(ui)).not.toContain('Organization unavailable');
     await openSheet(ui);
     expect(rows(ui).map(row => row.label)).toEqual(['Personal']);
-    await chooseRow(ui, 'Personal');
-    expect(texts(ui)).toContain('Personal');
-    expect(texts(ui)).not.toContain('Organization unavailable');
   });
 
   it.each([false, true])('retries only the failed name query, read-only=%s', async readOnly => {
@@ -509,6 +527,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
   it.each([
     { organizationId: null, expected: 'Personal' },
     { organizationId: 'org-a', expected: name },
+    // The stored global scope ('global-org') is missing from the fetched
+    // list, so the provider recovers to the first listed membership; the
+    // explicit per-session scope stays read-only and independent of that.
     { organizationId: 'org-missing', expected: 'Organization unavailable' },
   ])(
     'keeps the resolved session scope $organizationId read-only and independent',
@@ -517,17 +538,22 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
       const ui = await mount({ scope: { organizationId, isResolved: true } });
       await waitFor(() => texts(ui).includes(expected));
       expect(ui.renderer.root.findAll(node => node.type === Pressable)).toHaveLength(0);
-      expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('global-org');
+      expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-a');
     }
   );
 
   it('does not infer Personal or offer a picker for unresolved session scope', async () => {
     storage.read.mockResolvedValue('global-org');
     const ui = await mount({ scope: { organizationId: null, isResolved: false } });
+    // The stored global scope is missing from the list, so the provider
+    // recovers to the first listed membership; the unresolved session scope
+    // still infers nothing and offers no picker.
+    await waitFor(
+      () => ui.renderer.root.findByType('GlobalScope' as ElementType).props.id === 'org-a'
+    );
     expect(texts(ui)).not.toContain('Personal');
     expect(ui.renderer.root.findAll(node => node.type === Skeleton)).toHaveLength(1);
     expect(ui.renderer.root.findAll(node => node.type === Pressable)).toHaveLength(0);
-    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('global-org');
   });
 
   it.each(['pending', 'failed'])(

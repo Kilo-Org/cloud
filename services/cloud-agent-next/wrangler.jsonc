@@ -86,7 +86,6 @@
     "VERCEL_SANDBOX_RUNTIME": "node24",
     "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "",
     "VERCEL_SANDBOX_EXTEND_DURATION_MS": "",
-    "CODE_REVIEW_CONTROL_PLANE_IDS": "*",
     "CODE_REVIEW_CONTAINERS_ORG_IDS": "*",
   },
   "placement": { "mode": "smart" },
@@ -327,10 +326,6 @@
         "name": "SandboxCodeReviewContainment",
       },
       {
-        "class_name": "CloudAgentSession",
-        "name": "CLOUD_AGENT_SESSION",
-      },
-      {
         "class_name": "StreamTicketNonceDO",
         "name": "STREAM_TICKET_NONCE_DO",
       },
@@ -499,7 +494,6 @@
         "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "false",
         "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "",
         "CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS": "",
-        "CODE_REVIEW_CONTROL_PLANE_IDS": "*",
         "CODE_REVIEW_CONTAINERS_ORG_IDS": "",
         "RUNTIME_ISOLATION_ENABLED": "true",
         "SANDBOX_SELECTION_IDS": "*",
@@ -676,10 +670,6 @@
           {
             "class_name": "SandboxCodeReviewContainment",
             "name": "SandboxCodeReviewContainment",
-          },
-          {
-            "class_name": "CloudAgentSession",
-            "name": "CLOUD_AGENT_SESSION",
           },
           {
             "class_name": "StreamTicketNonceDO",

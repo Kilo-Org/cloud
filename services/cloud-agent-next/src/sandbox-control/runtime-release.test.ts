@@ -14,7 +14,7 @@ const CLI_EXPANDED_BYTES = 237_895_845;
 const CLI_FILE_COUNT = 419;
 const CONTROL_SHA = 'b'.repeat(64);
 const CONTROL_BYTES = 1_048_576;
-const CONTROL_FILE_COUNT = 6;
+const CONTROL_FILE_COUNT = 5;
 
 function shaFor(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -45,7 +45,6 @@ function cliInventory(): RuntimeInventoryEntry[] {
 function controlInventory(): RuntimeInventoryEntry[] {
   const names = [
     'usr/local/bin/kilocode-control-plane-wrapper.js',
-    'usr/local/bin/kilocode-wrapper.js',
     'usr/local/bin/kilo-restore-session.js',
     'usr/local/bin/bb',
     'usr/local/bin/github-review-publish-mcp',

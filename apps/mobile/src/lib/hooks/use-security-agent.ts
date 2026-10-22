@@ -99,7 +99,7 @@ export function useRetrySecurityAgentSettings(scope: string) {
         // Cancel first, then bypass NetInfo for this deliberate attempt only.
         await queryClient.cancelQueries({ queryKey, exact: true });
         try {
-          await queryClient.fetchQuery({
+          await queryClient.query({
             ...options,
             queryKey,
             networkMode: 'always',

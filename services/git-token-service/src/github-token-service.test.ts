@@ -37,6 +37,40 @@ describe('GitHubTokenService', () => {
     });
   });
 
+  it('mints sibling-read credentials using stable repository IDs in the same installation', async () => {
+    const tokenCache = createTokenCache();
+    const generate = vi.fn().mockResolvedValue({
+      token: 'scoped-installation-token',
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    });
+    vi.mocked(createAppAuth).mockReturnValue(
+      generate as unknown as ReturnType<typeof createAppAuth>
+    );
+    const service = new GitHubTokenService({
+      GITHUB_APP_ID: 'app-id',
+      GITHUB_APP_PRIVATE_KEY: 'private-key',
+      TOKEN_CACHE: tokenCache,
+    } as unknown as CloudflareEnv);
+    expect(await service.getTokenForRepositoryIds('123', [202, 101, 202])).toBe(
+      'scoped-installation-token'
+    );
+    expect(createAppAuth).toHaveBeenCalledWith({
+      appId: 'app-id',
+      privateKey: 'private-key',
+      installationId: 123,
+    });
+    expect(generate).toHaveBeenCalledWith({
+      type: 'installation',
+      repositoryNames: undefined,
+      repositoryIds: [101, 202],
+    });
+    expect(tokenCache.put).toHaveBeenCalledWith(
+      'gh-token:123:standard:repository-ids:101,202',
+      expect.any(String),
+      expect.anything()
+    );
+  });
+
   it('refreshes installation account login and stores a fifteen minute cooldown marker', async () => {
     const tokenCache = createTokenCache();
     vi.mocked(createAppAuth).mockReturnValue(

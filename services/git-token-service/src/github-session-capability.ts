@@ -1,14 +1,19 @@
 import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@kilocode/encryption';
 import { Buffer } from 'node:buffer';
 import { z } from 'zod';
+import {
+  githubTaskGrantSchema,
+  type GitHubTaskGrant,
+} from '@kilocode/worker-utils/github-task-grant';
 
 const LEGACY_CAPABILITY_PREFIX = 'kgh1.';
 const BOUND_CAPABILITY_PREFIX = 'kgh2.';
+const TASK_CAPABILITY_PREFIX = 'kgh3.';
 const CAPABILITY_PURPOSE = 'github_scm_session';
 const MAX_LEGACY_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 2 * 60 * 60 * 1000;
 const MAX_BOUND_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 4 * 60 * 60 * 1000;
 
-function getGitHubSessionCapabilityLifetimeMs(version: 1 | 2): number {
+function getGitHubSessionCapabilityLifetimeMs(version: 1 | 2 | 3): number {
   return version === 1
     ? MAX_LEGACY_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS
     : MAX_BOUND_GITHUB_SCM_SESSION_CAPABILITY_LIFETIME_MS;
@@ -57,11 +62,23 @@ const GitHubBoundSessionCapabilityClaimsSchema = GitHubSessionCapabilityClaimsBa
   version: z.literal(2),
   outboundContainerId: z.string().min(1),
 }).strict();
+const GitHubTaskSessionCapabilityClaimsSchema = GitHubSessionCapabilityClaimsBaseSchema.extend({
+  version: z.literal(3),
+  outboundContainerId: z.string().min(1),
+  taskGrant: githubTaskGrantSchema,
+}).strict();
 const GitHubSessionCapabilityClaimsSchema = z
   .discriminatedUnion('version', [
     GitHubLegacySessionCapabilityClaimsSchema,
     GitHubBoundSessionCapabilityClaimsSchema,
+    GitHubTaskSessionCapabilityClaimsSchema,
   ])
+  .refine(
+    claims =>
+      claims.version !== 3 ||
+      (claims.taskGrant.repository.owner === claims.owner &&
+        claims.taskGrant.repository.name === claims.repo)
+  )
   .refine(claims => claims.expiresAt > claims.issuedAt)
   .refine(
     claims =>
@@ -73,6 +90,7 @@ export type GitHubSessionIdentity = z.infer<typeof GitHubSessionIdentitySchema>;
 export type GitHubSessionCapabilitySubject = {
   userId: string;
   outboundContainerId?: string;
+  taskGrant?: GitHubTaskGrant;
   orgId?: string;
   integrationId?: string;
   accessPurpose?: 'workflow' | 'agent';
@@ -131,7 +149,7 @@ export class GitHubSessionCapabilityCodec {
   issue(subject: GitHubSessionCapabilitySubject): string {
     const issuedAt = Date.now();
     const bound = subject.outboundContainerId !== undefined;
-    const version = bound ? 2 : 1;
+    const version = subject.taskGrant ? 3 : bound ? 2 : 1;
     const parsed = GitHubSessionCapabilityClaimsSchema.safeParse({
       purpose: CAPABILITY_PURPOSE,
       version,
@@ -142,7 +160,12 @@ export class GitHubSessionCapabilityCodec {
     if (!parsed.success) throw new GitHubSessionCapabilityError('invalid_capability');
 
     try {
-      const prefix = bound ? BOUND_CAPABILITY_PREFIX : LEGACY_CAPABILITY_PREFIX;
+      const prefix =
+        version === 3
+          ? TASK_CAPABILITY_PREFIX
+          : bound
+            ? BOUND_CAPABILITY_PREFIX
+            : LEGACY_CAPABILITY_PREFIX;
       return `${prefix}${encryptWithSymmetricKey(JSON.stringify(parsed.data), this.encryptionKey)}`;
     } catch {
       throw new GitHubSessionCapabilityError('capability_configuration_error');
@@ -152,9 +175,11 @@ export class GitHubSessionCapabilityCodec {
   decode(capability: string): GitHubSessionCapabilityClaims {
     const format = capability.startsWith(LEGACY_CAPABILITY_PREFIX)
       ? { prefix: LEGACY_CAPABILITY_PREFIX, version: 1 as const }
-      : capability.startsWith(BOUND_CAPABILITY_PREFIX)
-        ? { prefix: BOUND_CAPABILITY_PREFIX, version: 2 as const }
-        : null;
+      : capability.startsWith(TASK_CAPABILITY_PREFIX)
+        ? { prefix: TASK_CAPABILITY_PREFIX, version: 3 as const }
+        : capability.startsWith(BOUND_CAPABILITY_PREFIX)
+          ? { prefix: BOUND_CAPABILITY_PREFIX, version: 2 as const }
+          : null;
     if (!format) throw new GitHubSessionCapabilityError('invalid_capability');
 
     const encrypted = capability.slice(format.prefix.length);

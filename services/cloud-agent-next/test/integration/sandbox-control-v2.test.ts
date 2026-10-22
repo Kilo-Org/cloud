@@ -732,11 +732,11 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     wrapper.close();
   });
 
-  it('retains at most two unbound candidates without replacing a healthy socket', async () => {
+  it('bounds unbound candidates and prevents healthy socket replacement', async () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider);
     await awaitStarting(provider, stub);
-    const { wrapper, credential, allocationId } = await connectAndHello(provider, stub);
+    const { credential, allocationId } = launchIdentity(provider);
     const before = await readState(stub);
     const first = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const second = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
@@ -748,11 +748,8 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       type: 'welcome',
       protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
-    await expect(wrapper.waitForClose()).resolves.toBe(1000);
-    expect(await second.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
-      type: 'welcome',
-      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
-    });
+    expect(await second.hello({ wrapperId: 'wr_1', allocationId })).toBeNull();
+    expect(await second.waitForClose()).toBe(1013);
     expect((await readState(stub)).kind).toBe('connected');
     expect(provider.stopCalls).toEqual([]);
   });
@@ -1132,6 +1129,8 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     wrapper.heartbeat(true);
     expect(await wrapper.next()).toEqual({ type: 'heartbeat_ack' });
     expect(provider.leaseCalls).toHaveLength(1);
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
     const legacy = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     expect(await legacy.hello({ wrapperId: 'wr_legacy', allocationId })).toEqual({
       type: 'welcome',
@@ -1398,10 +1397,12 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider);
     await awaitLaunch(provider);
-    const { credential, allocationId } = await connectAndHello(provider, stub, 'wr_first');
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, stub, 'wr_first');
     const firstConnectionId = (await readState(stub)).connectionId;
     expect(firstConnectionId).not.toBeNull();
 
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
     const replacement = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await replacement.hello({ wrapperId: 'wr_second', allocationId });
     expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
@@ -1787,9 +1788,11 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider, { allocationName: CUSTOM_ALLOCATION_NAME });
     await awaitLaunch(provider);
-    const { credential, allocationId } = await connectAndHello(provider, stub);
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, stub);
     const before = await readState(stub);
 
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
     await evictAllDurableObjects();
     await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();

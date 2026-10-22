@@ -1,4 +1,5 @@
 import type { SessionId } from './types/ids.js';
+import type { GitHubTaskScope, GitHubTaskGrant } from '@kilocode/worker-utils/github-task-grant';
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
@@ -244,12 +245,17 @@ type GetCloudAgentAuthForRepoResult =
     }
   | {
       success: false;
-      reason: GitHubRepositoryAuthorizationFailureReason;
+      reason:
+        | GitHubRepositoryAuthorizationFailureReason
+        | 'user_authorization_required'
+        | 'user_authorization_revoked'
+        | 'user_authorization_unavailable';
     };
 
 type IssueGitHubSessionCapabilityResult =
   | {
       success: true;
+      taskGrant?: GitHubTaskGrant;
       capability: string;
       installationId: string;
       accountLogin: string;
@@ -261,13 +267,23 @@ type IssueGitHubSessionCapabilityResult =
     }
   | {
       success: false;
-      reason: GitHubRepositoryAuthorizationFailureReason | 'capability_configuration_error';
+      reason:
+        | GitHubRepositoryAuthorizationFailureReason
+        | 'capability_configuration_error'
+        | 'user_authorization_required'
+        | 'user_authorization_revoked'
+        | 'user_authorization_unavailable'
+        | 'invalid_task_scope'
+        | 'repository_mismatch'
+        | 'ref_not_allowed'
+        | 'operation_not_allowed'
+        | 'source_unavailable';
     };
 
 type RedeemGitHubSessionCapabilityResult =
   | {
       success: true;
-      authorization: string;
+      authorization: string | null;
       installationId?: string;
       source?: 'user' | 'installation';
       appType?: 'standard' | 'lite';
@@ -285,6 +301,9 @@ type RedeemGitHubSessionCapabilityResult =
         | 'invalid_upstream_request'
         | 'source_unavailable'
         | 'identity_mismatch'
+        | 'invalid_task_scope'
+        | 'operation_not_allowed'
+        | 'ref_not_allowed'
         | 'integration_mismatch';
     };
 
@@ -450,9 +469,11 @@ export type GitTokenService = {
     params: ManagedGitHubAuthParams
   ): Promise<GetCloudAgentAuthForRepoResult>;
   issueGitHubSessionCapability(
-    params: ManagedGitHubAuthParams & { outboundContainerId: string }
+    params: ManagedGitHubAuthParams & { outboundContainerId: string; taskScope?: GitHubTaskScope }
   ): Promise<IssueGitHubSessionCapabilityResult>;
   redeemGitHubSessionCapability(params: {
+    requestContentType?: string;
+    requestBody?: Uint8Array;
     capability: string;
     outboundContainerId: string;
     requestMethod: string;

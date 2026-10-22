@@ -148,6 +148,8 @@ export class GitHubUserAuthorizationService {
       let response: Response;
       try {
         response = await fetch(endpoint, {
+          redirect: 'manual',
+          signal: AbortSignal.timeout(10_000),
           headers: {
             Accept: 'application/vnd.github+json',
             Authorization: `Bearer ${token}`,

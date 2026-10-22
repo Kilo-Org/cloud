@@ -1,3 +1,4 @@
+import type { GitHubTaskGrant, GitHubTaskScope } from '@kilocode/worker-utils/github-task-grant';
 /** Decoded-only fixture; authorization verification is covered by the runtime-proxy suite. */
 export const FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN =
   'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
@@ -15,13 +16,18 @@ export type FakeCredentialBroker = {
   kiloIssued: () => number;
   githubIssued: () => number;
   issueKiloSessionCapability: () => Promise<{ success: true; capability: string }>;
-  issueGitHubSessionCapability: () => Promise<{
+  issueGitHubSessionCapability: (params: {
+    githubRepo: string;
+    taskScope?: GitHubTaskScope;
+    allowUserAuthorization?: boolean;
+  }) => Promise<{
+    taskGrant: GitHubTaskGrant;
     success: true;
     capability: string;
     installationId: number;
     accountLogin: string;
     appType: 'standard' | 'lite';
-    source: 'managed';
+    source: 'user' | 'installation';
   }>;
 };
 
@@ -37,15 +43,28 @@ export function createFakeCredentialBroker(
       kiloIssued += 1;
       return { success: true as const, capability: `kka1.${kiloIssued}` };
     },
-    async issueGitHubSessionCapability() {
+    async issueGitHubSessionCapability(params) {
       githubIssued += 1;
+      if (!params.taskScope) throw new Error('Missing task scope');
+      const [owner, name] = params.githubRepo.toLowerCase().split('/');
       return {
+        taskGrant: {
+          revision: 1,
+          scopeId: params.taskScope.scopeId,
+          taskRef: params.taskScope.taskRef,
+          repository: {
+            id: params.taskScope.repositoryId ?? 101,
+            nodeId: 'R_fixture',
+            owner,
+            name,
+          },
+        },
         success: true as const,
-        capability: `kgh2.${githubIssued}`,
+        capability: `kgh3.${githubIssued}`,
         installationId: 1,
         accountLogin: 'acme',
         appType,
-        source: 'managed' as const,
+        source: params.allowUserAuthorization ? ('user' as const) : ('installation' as const),
       };
     },
   };

@@ -54,6 +54,7 @@ type SandboxTerminalBridgeOptions = {
   ) => Promise<ControlPlaneControlResult>;
   reportActivity: (record: SandboxTerminalRecord) => Promise<void>;
   markEnded: (record: SandboxTerminalRecord) => Promise<void>;
+  authorize: () => Promise<boolean>;
   /**
    * Resolves the route directory for a metadata snapshot. Defaults to the legacy
    * workspace path; the V2 Session DO passes its registered spec directory.
@@ -312,6 +313,8 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
     }
     const ptyId = parseInternalPtyId(request, '/terminal/browser');
     if (!ptyId) return new Response('Invalid PTY ID', { status: 400 });
+    if (!(await options.authorize()))
+      return new Response('Terminal access unavailable', { status: 403 });
 
     const [metadata, record] = await Promise.all([getMetadata(), getTerminal(ptyId)]);
     if (!record || !metadata) return new Response('PTY not found', { status: 404 });
@@ -447,6 +450,10 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
   async function handleMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const attachment = readAttachment(socket);
     if (!attachment) return;
+    if (!(await options.authorize())) {
+      closeGeneration(attachment, 1008, 'Terminal access revoked');
+      return;
+    }
 
     const current = currentSocket(attachment.role, attachment.ptyId);
     if (current?.socket !== socket) {

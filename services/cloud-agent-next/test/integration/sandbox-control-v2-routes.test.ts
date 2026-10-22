@@ -438,10 +438,8 @@ describe('SandboxControlV2 routes and forwarding', () => {
       { timeout: 500 }
     );
     const reconnect = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
-    expect(await reconnect.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
-      type: 'welcome',
-      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
-    });
+    expect(await reconnect.hello({ wrapperId: 'wr_1', allocationId })).toBeNull();
+    expect(await reconnect.waitForClose()).toBe(1013);
     expect((await readState(stub)).kind).toBe('connected');
     await setAllocationField(stub, { last_activity_at: Date.now() - TIMERS.idleMs - 1 });
     await runAlarm(stub);
@@ -1132,6 +1130,8 @@ describe('SandboxControlV2 routes and forwarding', () => {
     await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
 
     const before = await readRouteRow(stub, SESSION);
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
     const wrapper2 = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await wrapper2.hello({ wrapperId: 'wr_2', allocationId });
     expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });

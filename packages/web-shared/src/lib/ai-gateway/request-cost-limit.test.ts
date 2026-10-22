@@ -208,7 +208,7 @@ describe('request cost admission', () => {
     ]) {
       await expect(
         enforceRequestCostLimit('2000000', model.id, { ...body, ...extra }, 2_000_000)
-      ).resolves.toMatch(/text-only/);
+      ).resolves.toMatch(/does not price the \w+ request property/);
     }
   });
   it('prices every choice and the full output ceiling the request can use', async () => {
@@ -247,14 +247,14 @@ describe('request cost admission', () => {
     for (const service_tier of ['priority', 'scale', 'unpriced']) {
       await expect(
         enforceRequestCostLimit('2000000', model.id, { ...body, service_tier }, 2_000_000)
-      ).resolves.toMatch(/text-only/);
+      ).resolves.toMatch(/auto, default and flex/);
     }
   });
   it('refuses a choice count outside the priced range', async () => {
     for (const n of [0, -2, 1.5, 129]) {
       await expect(
         enforceRequestCostLimit('2000000', model.id, { ...body, n }, 2_000_000)
-      ).resolves.toMatch(/text-only/);
+      ).resolves.toMatch(/between 1 and 128 choices/);
     }
   });
   it('admits the cost-neutral properties the gateway adds before admission', async () => {
@@ -307,12 +307,16 @@ describe('request cost admission', () => {
   it('requires finite positive integer safeguards, bounded text and explicit output tokens', async () => {
     for (const value of ['NaN', 'Infinity', '0', '-1', '1.5'])
       expect(await enforceRequestCostLimit(value, model.id, body, 2_000_000)).not.toBeNull();
+    await expect(
+      enforceRequestCostLimit('2000000', model.id, { ...body, max_tokens: undefined }, 2_000_000)
+    ).resolves.toMatch(/explicit output token limit/);
     for (const invalid of [
-      { ...body, max_tokens: undefined },
       { ...body, tools: [{}] },
       { ...body, stream: true },
     ])
-      expect(await enforceRequestCostLimit('2000000', model.id, invalid, 2_000_000)).not.toBeNull();
+      await expect(
+        enforceRequestCostLimit('2000000', model.id, invalid, 2_000_000)
+      ).resolves.toMatch(/text-only/);
   });
   it('does not alter ordinary gateway requests without a spending safeguard', async () => {
     await expect(enforceRequestCostLimit(null, model.id, {}, 0)).resolves.toBeNull();

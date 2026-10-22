@@ -141,6 +141,29 @@ const boundedRequestSchema = boundedRequestProperties.refine(
   request => request.max_tokens !== undefined || request.max_completion_tokens !== undefined
 );
 
+const BOUNDED_SHAPE_REFUSAL =
+  'Bounded spending requires a text-only request with an explicit output token limit and no tools';
+
+/** Names the first failing part of the request so a refusal can be fixed without reproducing it. */
+function boundedRefusal(error: z.ZodError): string {
+  const [issue] = error.issues;
+  if (!issue) return BOUNDED_SHAPE_REFUSAL;
+  if (issue.code === 'unrecognized_keys') {
+    const [property] = issue.keys;
+    return property && /^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(property)
+      ? `Bounded spending does not price the ${property} request property`
+      : BOUNDED_SHAPE_REFUSAL;
+  }
+  if (issue.code === 'custom') return 'Bounded spending requires an explicit output token limit';
+  const [field] = issue.path;
+  if (field === 'max_tokens' || field === 'max_completion_tokens')
+    return 'Bounded spending requires an explicit output token limit';
+  if (field === 'n') return `Bounded spending accepts between 1 and ${MAX_BOUNDED_CHOICES} choices`;
+  if (field === 'service_tier')
+    return 'Bounded spending accepts the auto, default and flex service tiers';
+  return BOUNDED_SHAPE_REFUSAL;
+}
+
 export async function enforceRequestCostLimit(
   header: string | null,
   model: string,
@@ -151,8 +174,7 @@ export async function enforceRequestCostLimit(
   const maximum = Number(header);
   if (!Number.isSafeInteger(maximum) || maximum <= 0) return 'Invalid request spend safeguard';
   const parsed = boundedRequestSchema.safeParse(body);
-  if (!parsed.success)
-    return 'Bounded spending requires a text-only request with an explicit output token limit and no tools';
+  if (!parsed.success) return boundedRefusal(parsed.error);
   const [catalog] = await db
     .select({ models: modelsByProvider.openrouter })
     .from(modelsByProvider)

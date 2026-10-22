@@ -13,8 +13,6 @@ import {
   Ban,
   DatabaseBackup,
   BarChart,
-  Rocket,
-  Blocks,
   Bot,
   Sparkles,
   MailCheck,
@@ -201,16 +199,6 @@ const productEngineeringItems: MenuItem[] = [
     title: () => 'Kilo Bot',
     url: '/admin/bots',
     icon: () => <Bot />,
-  },
-  {
-    title: () => 'Deployments',
-    url: '/admin/deployments',
-    icon: () => <Rocket />,
-  },
-  {
-    title: () => 'App Builder',
-    url: '/admin/app-builder',
-    icon: () => <Blocks />,
   },
   {
     title: () => 'Email Testing',

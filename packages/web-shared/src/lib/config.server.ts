@@ -169,24 +169,6 @@ export const STRIPE_ENTERPRISE_ANNUAL_PRICE_ID = getEnvVariable(
   'STRIPE_ENTERPRISE_ANNUAL_PRICE_ID'
 );
 
-export const USER_DEPLOYMENTS_API_BASE_URL =
-  getEnvVariable('USER_DEPLOYMENTS_API_BASE_URL') ||
-  'https://kilo-test-builder-do.engineering-e11.workers.dev';
-export const USER_DEPLOYMENTS_API_AUTH_KEY = getEnvVariable('USER_DEPLOYMENTS_API_AUTH_KEY') || '';
-
-// Dispatcher API for password protection
-export const USER_DEPLOYMENTS_DISPATCHER_URL =
-  getEnvVariable('USER_DEPLOYMENTS_DISPATCHER_URL') || '';
-export const USER_DEPLOYMENTS_DISPATCHER_AUTH_KEY =
-  getEnvVariable('USER_DEPLOYMENTS_DISPATCHER_AUTH_KEY') || '';
-
-/**
- * RSA public key used for encrypting deployment environment variables.
- * Must be in PEM format, one line base64 encoded
- */
-export const USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY =
-  getEnvVariable('USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY') || '';
-
 /**
  * AES-256 encryption key for BYOK API keys.
  * Must be a base64-encoded 32-byte (256-bit) key.
@@ -219,14 +201,6 @@ export const MILVUS_TOKEN = getEnvVariable('MILVUS_TOKEN');
 
 // Cloud managed code indexing. Disabled unless explicitly enabled.
 export const CODE_INDEXING_ENABLED = getEnvVariable('CODE_INDEXING_ENABLED') === 'true';
-
-// App Builder
-export const APP_BUILDER_URL = getEnvVariable('APP_BUILDER_URL');
-export const APP_BUILDER_AUTH_TOKEN = getEnvVariable('APP_BUILDER_AUTH_TOKEN');
-
-// App Builder DB Proxy
-export const APP_BUILDER_DB_PROXY_URL = getEnvVariable('APP_BUILDER_DB_PROXY_URL');
-export const APP_BUILDER_DB_PROXY_AUTH_TOKEN = getEnvVariable('APP_BUILDER_DB_PROXY_AUTH_TOKEN');
 
 // Slack
 export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
@@ -303,9 +277,6 @@ export const GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = getEnvVariable(
 // Posts user feedback into a fixed Slack channel in the Kilo workspace.
 // Expected to be a Slack Incoming Webhook URL.
 export const SLACK_USER_FEEDBACK_WEBHOOK_URL = getEnvVariable('SLACK_USER_FEEDBACK_WEBHOOK_URL');
-// Posts deploy threat alerts to a dedicated Slack channel.
-// Expected to be a Slack Incoming Webhook URL.
-export const SLACK_DEPLOY_THREAT_WEBHOOK_URL = getEnvVariable('SLACK_DEPLOY_THREAT_WEBHOOK_URL');
 
 // AI Attribution Service
 export const AI_ATTRIBUTION_ADMIN_SECRET = getEnvVariable('AI_ATTRIBUTION_ADMIN_SECRET');

@@ -489,12 +489,12 @@ If `CF_AE_TOKEN` is missing, Grafana will still boot — only dashboard queries 
 
 - **Service bindings** resolve locally for Workers launched together by `pnpm dev:start` when the bound target is running. Bindings to optional services remain unavailable unless their owning group is started (for example, session-ingest -> o11y requires the `observability` group).
 - **Webhook → KiloClaw Chat** triggers require the KiloClaw worker running on port 8795. The webhook worker calls it via `KILOCLAW_API_URL` (HTTP, not a service binding) to deliver messages to Stream Chat. Stream Chat credentials (`STREAM_CHAT_API_KEY`, `STREAM_CHAT_API_SECRET`) must be in `kiloclaw/.dev.vars`.
-- **Cloudflare Containers** (used by Cloud Agent Next and App Builder) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
+- **Cloudflare Containers** (used by Cloud Agent Next) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
 - **Analytics Engine writes** are no-ops in `wrangler dev` — there is no local AE simulator. Reads against the real prod datasets still work via the local Grafana above. **Pipelines** and **dispatch namespaces** don't work locally.
 
 ### What works without running any workers
 
-The core Next.js app handles profiles, organizations, usage tracking, billing, and the OpenRouter inference proxy without any workers. Features that require a specific worker (e.g., Cloud Agent sessions, code reviews, app builder) will fail gracefully or show connection errors if that worker isn't running.
+The core Next.js app handles profiles, organizations, usage tracking, billing, and the OpenRouter inference proxy without any workers. Features that require a specific worker (e.g., Cloud Agent sessions, code reviews) will fail gracefully or show connection errors if that worker isn't running.
 
 ### Multi-worktree support
 

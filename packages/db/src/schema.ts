@@ -125,6 +125,7 @@ import type {
   AutoFreeConfig,
   GatewayModelListConfig,
   VercelModelIdOverridesConfig,
+  PreferredProviderOrderConfig,
   KiloClawAdminAuditAction,
   AdminActionAuditAction,
   AdminActionAuditTargetType,
@@ -5737,6 +5738,7 @@ export const ai_gateway_config = pgTable(
     preferred_models: jsonb().$type<GatewayModelListConfig>(),
     unavailable_models: jsonb().$type<GatewayModelListConfig>(),
     vercel_model_id_overrides: jsonb().$type<VercelModelIdOverridesConfig>(),
+    preferred_provider_order: jsonb().$type<PreferredProviderOrderConfig>(),
   },
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );
@@ -5747,6 +5749,8 @@ export const ai_gateway_sync_providers_state = pgTable(
     id: integer().primaryKey().default(1),
     last_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
     stale_alert_last_posted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    direct_byok_last_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    direct_byok_stale_alert_last_posted_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [check('ai_gateway_sync_providers_state_singleton', sql`${table.id} = 1`)]
 );
@@ -11363,7 +11367,13 @@ export const agent_briefing_reports = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     context_key: text().notNull(),
     organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    local_date: text().notNull(),
+    kind: text().$type<'scheduled' | 'one_off'>().notNull().default('scheduled'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+    timezone: text(),
+    language: text(),
+    evidence_recorded_before: timestamp({ withTimezone: true, mode: 'string' }),
+    // NULL leaves one-off reports outside the scheduled uniqueness key.
+    local_date: text(),
     night_start_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     cutoff_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     morning_end_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),

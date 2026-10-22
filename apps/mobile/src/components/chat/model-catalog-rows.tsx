@@ -71,6 +71,7 @@ export function RecommendedRow({
         fileId={model.fileId}
         name={model.name}
         snapshot={snapshot}
+        downloadLabel={t('modelChat.catalog.downloadModelA11y', { name: displayName })}
         onDownload={
           fit === 'noStorage'
             ? undefined
@@ -82,6 +83,7 @@ export function RecommendedRow({
       {owner !== undefined && repo !== undefined && (
         <Button
           variant="ghost"
+          accessibilityLabel={t('modelChat.catalog.detailsA11y', { name: displayName })}
           onPress={() => {
             router.push({
               pathname: '/model-catalog/[owner]/[repo]',

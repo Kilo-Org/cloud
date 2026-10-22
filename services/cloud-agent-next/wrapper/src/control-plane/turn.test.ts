@@ -7,7 +7,7 @@ import type {
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
-import type { KiloFeedEvent } from '../control/worktree-feed.js';
+import type { KiloFeedEvent } from './kilo-event-feed.js';
 import { runtimeKey } from './prepare.js';
 import {
   createTurnManager,

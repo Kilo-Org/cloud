@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useTRPC } from '@/lib/trpc/utils';
+import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import {
   getGitHubRepositoryNotices,
   githubIntegrationSettingsHref,
@@ -86,6 +87,26 @@ export function RepositoryPicker({
     githubIntegrationSettingsHref(organizationId)
   );
 
+  // A partial list needs a provider read, not a cache read: the retry control
+  // forces the same refresh the new-session picker runs.
+  const { refresh: refreshGitHubRepositories, isRefreshing: isRefreshingGitHubRepositories } =
+    useRefreshRepositories({
+      getRefreshQueryOptions: () =>
+        organizationId
+          ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
+              organizationId,
+              forceRefresh: true,
+            })
+          : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({ forceRefresh: true }),
+      getCacheQueryKey: () =>
+        organizationId
+          ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryKey({
+              organizationId,
+              forceRefresh: false,
+            })
+          : trpc.cloudAgentNext.listGitHubRepositories.queryKey({ forceRefresh: false }),
+    });
+
   const choose = (repository: RepositoryOption) => {
     setOpen(false);
     onSelect(repository);
@@ -117,11 +138,11 @@ export function RepositoryPicker({
                   ) : (
                     <button
                       type="button"
-                      onClick={() => void github.refetch()}
-                      disabled={github.isFetching}
+                      onClick={() => void refreshGitHubRepositories()}
+                      disabled={isRefreshingGitHubRepositories}
                       className="underline underline-offset-4 disabled:opacity-50"
                     >
-                      {github.isFetching ? 'Refreshing...' : 'Refresh'}
+                      {isRefreshingGitHubRepositories ? 'Refreshing...' : 'Refresh'}
                     </button>
                   )}
                 </p>

@@ -1004,9 +1004,10 @@ const GITLAB_REPOSITORY_SYNC_WARNING =
  *
  * A provider refusal here says nothing about the connection itself, so it is
  * reported as a warning on the successful result instead of failing the
- * connect. The cache then keeps its last successful sync, or stays empty for a
- * new connection, so opening the repository list refetches it (see
- * `listGitLabRepositories`).
+ * connect. A new connection, or one whose previous list was dropped, then has
+ * an empty cache, so the next repository-list read refetches it (see
+ * `listGitLabRepositories`); a same-instance reconnect keeps its last
+ * successful list until the user refreshes it.
  *
  * `discardOnFailure` is for an instance change: the cached rows belong to the
  * previous GitLab instance, so they are dropped rather than shown against a

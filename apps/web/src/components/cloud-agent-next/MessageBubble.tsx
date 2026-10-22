@@ -280,7 +280,9 @@ function selectMessageFailure(input: {
       kind: 'assistant',
       title: interrupted ? 'Interrupted' : 'Failed',
       detail: null,
-      canRetry: !interrupted,
+      canRetry:
+        !interrupted &&
+        !NON_RETRYABLE_ASSISTANT_ERRORS.some(name => name === errorName),
       canCopy: false,
     };
   }
@@ -290,11 +292,13 @@ function selectMessageFailure(input: {
 function RetryFailureFooter({
   failure,
   message,
+  retryTargetMessage,
   onRetryMessage,
   onCopyToComposer,
 }: {
   failure: MessageFailure;
   message: StoredMessage;
+  retryTargetMessage?: StoredMessage;
   onRetryMessage?: (message: StoredMessage) => void;
   onCopyToComposer?: (text: string) => void;
 }) {
@@ -327,7 +331,11 @@ function RetryFailureFooter({
             disabled={retried}
             onClick={() => {
               setRetried(true);
-              onRetryMessage(message);
+              void Promise.resolve(onRetryMessage(retryTargetMessage ?? message))
+                .catch(() => {})
+                .finally(() => {
+                  setRetried(false);
+                });
             }}
             aria-label="Retry"
             className="text-muted-foreground hover:text-foreground focus-visible:ring-ring cursor-pointer rounded p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
@@ -369,6 +377,11 @@ type MessageBubbleProps = {
    */
   onRetryMessage?: (message: StoredMessage) => void;
   /**
+   * The user row an assistant failure retries: the newest preceding user
+   * message. A user failure retries its own row.
+   */
+  retryTargetMessage?: StoredMessage;
+  /**
    * Copy a failed user row's text into the composer. Wired only for delivery
    * failures (an assistant failure has no preceding user row to copy from).
    */
@@ -390,6 +403,7 @@ export function MessageBubble({
   getChildMessages,
   onOpenChildSession,
   onRetryMessage,
+  retryTargetMessage,
   onCopyToComposer,
 }: MessageBubbleProps) {
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
@@ -459,6 +473,7 @@ export function MessageBubble({
           <RetryFailureFooter
             failure={failure}
             message={message}
+            retryTargetMessage={retryTargetMessage}
             onRetryMessage={onRetryMessage}
             onCopyToComposer={onCopyToComposer}
           />
@@ -511,6 +526,7 @@ export function MessageBubble({
           <RetryFailureFooter
             failure={failure}
             message={message}
+            retryTargetMessage={retryTargetMessage}
             onRetryMessage={onRetryMessage}
             onCopyToComposer={onCopyToComposer}
           />

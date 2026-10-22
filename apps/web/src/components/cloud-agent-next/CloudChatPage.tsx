@@ -301,6 +301,23 @@ export default function CloudChatPage({
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
   const sendingMessageIds = useAtomValue(manager.atoms.sendingMessageIds);
+  // A failed row the user retried stays out of the transcript: while the
+  // re-send is in flight it is superseded, and after acceptance it is a
+  // resolved delivery failure. Both records are session-scoped projections.
+  const resolvedDeliveryFailures = useAtomValue(manager.atoms.resolvedDeliveryFailures);
+  const supersededInFlightMessageIds = useAtomValue(manager.atoms.supersededInFlightMessageIds);
+  const hiddenMessageIds = useMemo(
+    () => new Set([...resolvedDeliveryFailures, ...supersededInFlightMessageIds]),
+    [resolvedDeliveryFailures, supersededInFlightMessageIds]
+  );
+  const visibleStaticMessages = useMemo(
+    () => staticMessages.filter(message => !hiddenMessageIds.has(message.info.id)),
+    [staticMessages, hiddenMessageIds]
+  );
+  const visibleDynamicMessages = useMemo(
+    () => dynamicMessages.filter(message => !hiddenMessageIds.has(message.info.id)),
+    [dynamicMessages, hiddenMessageIds]
+  );
   const liveTotalCostUsd = useAtomValue(manager.atoms.totalCost);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
@@ -1737,8 +1754,8 @@ export default function CloudChatPage({
     localSession,
     transcriptPhase,
     live: {
-      staticMessages,
-      dynamicMessages,
+      staticMessages: visibleStaticMessages,
+      dynamicMessages: visibleDynamicMessages,
       pendingMessages,
       sendingMessageIds,
       statusIndicator: visibleStatusIndicator,

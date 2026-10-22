@@ -1080,6 +1080,14 @@ describe('ChatInput finalize failure', () => {
         changeFileInput(dom.container, [new File(['b'], 'b.txt', { type: 'text/plain' })]);
       });
       expect(upload.addFiles).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => {
+        root.unmount();
+      });
+      dom.cleanup();
+    }
+  });
+
   it('replaces a draft when a copy action requests composer text', () => {
     mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
     const dom = installLinkedomDom();

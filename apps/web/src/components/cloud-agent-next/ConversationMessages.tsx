@@ -12,7 +12,7 @@ import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { PreparationRow } from './PreparationRow';
 import { groupConversationMessages } from './message-presentation';
 import { CommitCard } from './CommitCard';
-import { isMessageStreaming, type StoredMessage } from './types';
+import { isMessageStreaming, isUserMessage, type StoredMessage } from './types';
 
 const emptyCommitAnchors: ReadonlyMap<string, readonly SessionCommit[]> = new Map();
 const emptySendingMessageIds: ReadonlySet<string> = new Set();
@@ -27,6 +27,7 @@ type ConversationMessageGroupProps = {
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
   onRetryMessage?: (message: StoredMessage) => void;
+  retryTargetMessage?: StoredMessage;
   onCopyToComposer?: (text: string) => void;
   onOpenPreparationDetails: (attemptId: string) => void;
 };
@@ -42,6 +43,7 @@ const ConversationMessageGroup = memo(
     getChildMessages,
     onOpenChildSession,
     onRetryMessage,
+    retryTargetMessage,
     onCopyToComposer,
     onOpenPreparationDetails,
   }: ConversationMessageGroupProps) {
@@ -65,6 +67,7 @@ const ConversationMessageGroup = memo(
           getChildMessages={getChildMessages}
           onOpenChildSession={onOpenChildSession}
           onRetryMessage={onRetryMessage}
+          retryTargetMessage={retryTargetMessage}
           onCopyToComposer={onCopyToComposer}
         />
         {preparations?.map(attempt => (
@@ -88,6 +91,7 @@ const ConversationMessageGroup = memo(
     previous.commits === next.commits &&
     previous.onOpenChildSession === next.onOpenChildSession &&
     previous.onRetryMessage === next.onRetryMessage &&
+    previous.retryTargetMessage === next.retryTargetMessage &&
     previous.onCopyToComposer === next.onCopyToComposer &&
     previous.onOpenPreparationDetails === next.onOpenPreparationDetails &&
     previous.messages.length === next.messages.length &&
@@ -128,10 +132,15 @@ export const ConversationMessages = memo(
     const messages = [...staticMessages, ...dynamicMessages];
     const groups = groupConversationMessages(messages, preparationByMessageId, commitsAfterMessage);
 
+    let lastUserMessage: StoredMessage | undefined;
     return groups.map(messages => {
       const first = messages[0];
       const last = messages.at(-1);
       if (!first || !last) return null;
+      const retryTargetMessage = isUserMessage(first.info) ? first : lastUserMessage;
+      if (isUserMessage(last.info)) {
+        lastUserMessage = last;
+      }
 
       return (
         <ConversationMessageGroup
@@ -145,6 +154,7 @@ export const ConversationMessages = memo(
           getChildMessages={getChildMessages}
           onOpenChildSession={onOpenChildSession}
           onRetryMessage={onRetryMessage}
+          retryTargetMessage={retryTargetMessage}
           onCopyToComposer={onCopyToComposer}
           onOpenPreparationDetails={onOpenPreparationDetails}
         />
@@ -163,6 +173,8 @@ export const ConversationMessages = memo(
       previous.preparationByMessageId === next.preparationByMessageId &&
       previous.commitsAfterMessage === next.commitsAfterMessage &&
       previous.onOpenChildSession === next.onOpenChildSession &&
+      previous.onRetryMessage === next.onRetryMessage &&
+      previous.onCopyToComposer === next.onCopyToComposer &&
       previous.onOpenPreparationDetails === next.onOpenPreparationDetails
     );
   }

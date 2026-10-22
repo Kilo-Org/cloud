@@ -59,8 +59,13 @@ vi.mock('@/components/organization/invited-member-row-state', () => ({
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
-vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+// The sheet's own dirty check: what Cancel and Back would ask about.
+const guard = vi.hoisted(() => ({ isDirty: () => false }));
+vi.mock('@/components/ui/use-sheet-dismiss-guard', () => ({
+  useSheetDismissGuard: (options: { isDirty: () => boolean }) => {
+    guard.isDirty = options.isDirty;
+    return { requestClose: vi.fn(), requestDismiss: () => true, dialog: null };
+  },
 }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: 'RadioGroup',
@@ -100,6 +105,7 @@ type FieldProps = {
   onChangeText: (value: string) => void;
 };
 type HeaderProps = { doneDisabled?: boolean; disabled?: boolean; onDone: () => void };
+type RoleProps = { onPress: () => void };
 
 /** The props of the one host element of `type`: a second one means the screen changed shape. */
 function hostProps(rendered: RenderWithProvidersResult, type: string): Record<string, unknown> {
@@ -118,6 +124,16 @@ function fieldProps(rendered: RenderWithProvidersResult): FieldProps {
 
 function headerProps(rendered: RenderWithProvidersResult): HeaderProps {
   return hostProps(rendered, 'SheetHeader') as HeaderProps;
+}
+
+/** The row at `index` of the sheet's role list, in the order the screen draws it. */
+function roleRowProps(rendered: RenderWithProvidersResult, index: number): RoleProps {
+  const rows = rendered.renderer.root.findAll(node => String(node.type) === 'Pressable');
+  const row = rows[index];
+  if (!row) {
+    throw new Error(`missing role row ${index}`);
+  }
+  return row.props as RoleProps;
 }
 
 /** The field's inline error: the first AccessibleStatus is the one FormField renders. */
@@ -185,6 +201,21 @@ describe('InviteMemberSheet reopen', () => {
     });
 
     expect(errorMessage(rendered)).toBeTruthy();
+    rendered.unmount();
+  });
+
+  it('returns the role to the default on the next open, so the form is not dirty', async () => {
+    const rendered = await openSheet();
+    expect(guard.isDirty()).toBe(false);
+
+    act(() => {
+      roleRowProps(rendered, 2).onPress();
+    });
+    expect(guard.isDirty()).toBe(true);
+
+    refocus();
+
+    expect(guard.isDirty()).toBe(false);
     rendered.unmount();
   });
 

@@ -275,7 +275,7 @@ describe('SessionListHeaderActions new-session control', () => {
       expect(facingDp).toBeLessThanOrEqual(gapDp);
       // Capping the facing sides must not drop either control below the design
       // target: the compact new-session box plus its symmetric slop, and the
-      // filter's own 36pt box plus the capped slop.
+      // filter's own 48dp box plus the capped slop.
       const box = boxDp(newSession.props.className as string);
       expect(
         box.width + slopSideDp(newSessionSlop, 'left') + slopSideDp(newSessionSlop, 'right')

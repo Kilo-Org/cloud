@@ -72,7 +72,7 @@ export function SessionFilterButton({
       testID={testID}
       className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 active:opacity-70')}
     >
-      {/* Anchored to the icon, not the 36pt box, so enlarging the target never
+      {/* Anchored to the icon, not the 48dp box, so enlarging the target never
           drifts the badge off the glyph's top-right corner. */}
       <View className="relative">
         <SlidersHorizontal

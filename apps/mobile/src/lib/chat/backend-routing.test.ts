@@ -1,5 +1,5 @@
 import { type FetchLike, type ModelClientService, type ModelRequest } from '@kilocode/harness-sdk';
-import { Effect, Either, Schedule, Stream } from 'effect';
+import { Effect, Result, Schedule, Stream } from 'effect';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { rememberKiloImageModels, targetSupportsTools } from './backend-capabilities';
@@ -139,9 +139,9 @@ it.each([
   });
   const { client, kilo, fetch } = localRouter();
   const result = await Effect.runPromise(
-    Effect.either(Stream.runCollect(client.stream(question(model))))
+    Effect.result(Stream.runCollect(client.stream(question(model))))
   );
-  expect(Either.isLeft(result) && backendFailureKey(result.left)).toBe(
+  expect(Result.isFailure(result) && backendFailureKey(result.failure)).toBe(
     'modelChat.localModels.unavailable'
   );
   expect(apple.generate).not.toHaveBeenCalled();

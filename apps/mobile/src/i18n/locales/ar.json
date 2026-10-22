@@ -25,6 +25,7 @@
     "error": "خطأ: {{error}}",
     "back": "رجوع",
     "somethingWentWrong": "حدث خطأ ما.",
+    "actionNotRecorded": "تعذّر تسجيل هذا الإجراء. حاول مرة أخرى لاحقًا.",
     "couldNotOpen": "تعذّر فتح {{label}}.",
     "link": "رابط",
     "takingLonger": "يستغرق هذا وقتًا أطول من المتوقع. يمكنك إغلاق هذه النافذة والتحقق مرة أخرى.",
@@ -35,6 +36,8 @@
     "connectGithub": "ربط GitHub",
     "cost": "التكلفة",
     "discard": "تجاهل",
+    "discardChangesMessage": "ستفقد تغييراتك.",
+    "discardChangesTitle": "تجاهل التغييرات؟",
     "findings": "الملاحظات",
     "mergeRequest": "طلب دمج",
     "notConnected": "غير مرتبط",
@@ -109,7 +112,9 @@
     "online": "متصل",
     "open": "فتح {{name}}",
     "openPullRequest": "فتح طلب السحب",
+    "completed": "تم الاكتمال",
     "pending": "قيد الانتظار",
+    "running": "قيد التشغيل",
     "performance": "الأداء",
     "preferences": "التفضيلات",
     "privacyPolicy": "سياسة الخصوصية",
@@ -1002,8 +1007,9 @@
       "noProposals": "لا توجد مقترحات",
       "noProposalsDescription": "تظهر مقترحات ذاكرة المراجعة هنا بعد أن يحلل Kilo ردود المشرفين.",
       "off": "ذاكرة المراجعة معطّلة.",
+      "on": "ذاكرة المراجعة مفعّلة.",
       "offDescription": "فعّلها ليتعلم Kilo من ردود المشرفين ويقترح إرشادات لملف REVIEW.md.",
-      "readOnlyDescription": "يمكن لمالكي المؤسسة ومديري الفوترة فقط تفعيل ذاكرة المراجعة.",
+      "readOnlyDescription": "يمكن لمالكي المؤسسة ومديري الفوترة فقط تغيير ذاكرة المراجعة.",
       "title": "ذاكرة المراجعة"
     },
     "scopeList": {
@@ -1031,8 +1037,6 @@
     "updateFailed": "تعذّر تحديث المراجع.",
     "configSaveFailed": "تعذّر حفظ إعدادات المراجعة.",
     "status": {
-      "running": "قيد التشغيل",
-      "completed": "تم الاكتمال",
       "interrupted": "متوقفة"
     },
     "reviewStyle": {
@@ -1125,7 +1129,14 @@
       "triageReasoning": "مبررات الفرز الأولي",
       "watchInCloudAgent": "المتابعة في وكيل السحابة",
       "whereFound": "مواضع الاكتشاف ({{displayCount}})",
-      "yes": "نعم"
+      "yes": "نعم",
+      "action": {
+        "analyzeCodebase": "تحليل قاعدة الكود",
+        "dismiss": "تجاهل",
+        "manualReview": "مراجعة يدوية",
+        "monitor": "مراقبة",
+        "openPr": "فتح طلب السحب"
+      }
     },
     "analysisSettings": {
       "analysisModel": "نموذج التحليل",
@@ -1136,6 +1147,9 @@
       "triageModel": "نموذج الفرز الأولي"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "مسؤول Kilo",
+      "actorMaskedUser": "مستخدم مقنّع",
+      "actorSystem": "نظام Kilo",
       "couldNotLoad": "تعذّر تحميل تقرير التدقيق.",
       "events": "الأحداث",
       "generated": "أُنشئ التقرير في {{generatedAt}}.",
@@ -1147,7 +1161,24 @@
       "summary": "ملخص التقرير",
       "title": "تقرير التدقيق",
       "unavailable": "تقرير التدقيق غير متاح",
-      "unavailableDescription": "يمكن لمالكي المؤسسة ومديري الفوترة فقط عرض تقارير التدقيق. اطلب من أحدهم منحك صلاحية الوصول."
+      "unavailableDescription": "يمكن لمالكي المؤسسة ومديري الفوترة فقط عرض تقارير التدقيق. اطلب من أحدهم منحك صلاحية الوصول.",
+      "eventActions": {
+        "findingAnalysisCompleted": "اكتمل التحليل",
+        "findingAnalysisFailed": "فشل التحليل",
+        "findingAutoDismissed": "تم التجاهل تلقائيًا",
+        "findingCreated": "تم الاستيراد",
+        "findingDeleted": "محذوف",
+        "findingDismissed": "مستبعدة",
+        "findingSeverityChanged": "تم تغيير درجة الخطورة",
+        "findingStatusChange": "تم تغيير الحالة",
+        "findingSuperseded": "مستبدلة",
+        "remediationBlocked": "المعالجة متوقفة بسبب عائق",
+        "remediationCancelled": "تم الإلغاء",
+        "remediationFailed": "فشلت المعالجة",
+        "remediationNoChangesNeeded": "لا حاجة إلى تغييرات",
+        "remediationPrOpened": "تم فتح PR",
+        "remediationQueued": "تم طلب المعالجة"
+      }
     },
     "auditReportButton": {
       "viewA11y": "عرض تقرير التدقيق"
@@ -1379,7 +1410,6 @@
       "installApp": "تثبيت تطبيق GitHub",
       "reauthorizeButton": "إعادة تفويض تطبيق GitHub",
       "reauthorizeDescription": "يتطلب وكيل الأمان صلاحية vulnerability_alerts للوصول إلى تنبيهات Dependabot. أعد تفويض تطبيق GitHub لمنح هذه الصلاحية.",
-      "reauthorizeFailed": "تعذّر بدء إعادة التفويض. حاول مرة أخرى.",
       "reauthorizeTitle": "يلزم الحصول على صلاحيات إضافية",
       "setupFailed": "تعذّر بدء إعداد GitHub. حاول مرة أخرى."
     },
@@ -1406,6 +1436,7 @@
     "settingsSave": {
       "saveChanges": "حفظ التغييرات",
       "unsavedMessage": "هل تريد حفظ تغييراتك قبل مغادرة هذه الشاشة؟",
+      "unsavedInvalidMessage": "لا يمكن حفظ هذه التغييرات بعد. أصلحها للحفظ، أو تجاهلها للمغادرة.",
       "unsavedTitle": "تغييرات غير محفوظة"
     },
     "setup": {
@@ -1444,7 +1475,12 @@
       "syncMayNotHaveCompleted": "ربما لم تكتمل المزامنة. أعد المحاولة للتحقق من حالتها وتسويتها، أو تجاهلها.",
       "syncInProgress": "مزامنة الأمان جارية بالفعل. حاول مرة أخرى.",
       "dismissalInProgress": "عملية الاستبعاد هذه جارية بالفعل. حاول مرة أخرى.",
-      "couldNotReadPendingSyncs": "تعذّرت قراءة عمليات المزامنة المعلّقة. حاول مرة أخرى."
+      "couldNotReadPendingSyncs": "تعذّرت قراءة عمليات المزامنة المعلّقة. حاول مرة أخرى.",
+      "ambiguous": "تعذّر التأكيد — تحقق من مراجعة الأمان قبل إعادة المحاولة.",
+      "settleFailed": "اكتمل الإجراء، لكن لم نتمكن من تسجيل النتيجة. حاول مرة أخرى.",
+      "replayFailed": "لم يكتمل هذا الإجراء. حاول مرة أخرى.",
+      "actionFailed": "تعذّر إكمال هذا الإجراء. حاول مرة أخرى.",
+      "actionBlocked": "تعذّر إكمال هذا الإجراء. يجب إصلاح المشكلة أولاً قبل إعادة المحاولة."
     },
     "analysisState": {
       "queued": "التحليل في قائمة الانتظار",
@@ -1835,7 +1871,8 @@
       "matchesBadge_two": "تطابقان: {{displayCount}}",
       "matchesBadge_few": "تطابقات: {{displayCount}}",
       "matchesBadge_many": "تطابقًا: {{displayCount}}",
-      "noOutput": "لا توجد مخرجات."
+      "noOutput": "لا توجد مخرجات.",
+      "translationFailed": "فشلت الترجمة"
     },
     "readToolMarkdown": {
       "linesTruncated": "الأسطر {{start}}–{{end}} (مقتطعة)",
@@ -2323,7 +2360,7 @@
     "webBrowser": "متصفح الويب",
     "viewProfile": "عرض الملف الشخصي",
     "signOutThisDevice": "تسجيل الخروج من هذا الجهاز",
-    "signOutThisSession": "تسجيل الخروج من هذه الجلسة",
+    "signOutSessionLabel": "تسجيل الخروج من {{device}}، تسجيل الدخول: {{signedIn}}",
     "sessionSignedOut": "تم تسجيل الخروج من الجلسة.",
     "signOutThisDeviceTitle": "تسجيل الخروج من هذا الجهاز؟",
     "signOutThisSessionTitle": "تسجيل الخروج من هذه الجلسة؟",
@@ -3106,7 +3143,6 @@
       "mergeResultDefaultError": "لم يكمل GitHub الدمج.",
       "mergeResultNotCompleted": "لم يتم دمج {{term}}. تحقق من حالته وأعد المحاولة.",
       "ambiguous": "تعذّر التأكيد — تحقق من PR قبل إعادة المحاولة.",
-      "persistenceFailed": "تعذّر تسجيل هذا الإجراء. حاول مرة أخرى لاحقًا.",
       "forbidden": "هذا الإجراء غير مسموح."
     },
     "capabilities": {
@@ -3135,11 +3171,23 @@
     "boundary": {
       "backToProfile": "العودة إلى الملف الشخصي",
       "loadErrorMessage": "تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
+
+      "chooseAccount": "اختيار حساب",
       "loadErrorTitle": "تعذّر تحميل مؤسساتك.",
+      "membershipLostNotice": "لم يعد لديك حق الوصول إلى هذه المؤسسة. تم التبديل إلى {{target}}.",
+      "noOrganization": "لا توجد مؤسسة",
+
+      "noOrganizationDescription": "هذا الحساب ليس جزءًا من مؤسسة. أنشئ مؤسسة أو انضم إلى واحدة على الموقع لاستخدام ميزات المؤسسة مثل دعوات الأعضاء وتنبيهات الرصيد المنخفض.",
+
+      "openWebOrganizations": "فتح المؤسسات على الموقع",
+
       "organizationUnavailable": "المؤسسة غير متاحة.",
-      "selectDescription": "اختر مؤسسة من ملفك الشخصي للمتابعة.",
+      "selectDescriptionWithOrganizations": "أنت عضو في مؤسسة واحدة أو أكثر. اختر الحساب الذي يجب أن تستخدمه هذه الشاشة.",
+
       "selectOrganization": "اختيار مؤسسة",
       "unavailableDescription": "لم تعد هذه المؤسسة متاحة. اختر واحدة من ملفك الشخصي للمتابعة.",
+
+      "unavailableSessionsDescription": "لم تعد هذه المؤسسة متاحة. لا يمكن تحميل جلساتها.",
       "accessDeniedDescription": "ليس لديك حق الوصول إلى هذه المؤسسة."
     },
     "creditActivity": {
@@ -3198,7 +3246,11 @@
       "separateEmailsHint": "افصل بين عناوين البريد الإلكتروني بفواصل.",
       "thresholdLabel": "التنبيه عند انخفاض الرصيد عن (USD)",
       "title": "تنبيه انخفاض الرصيد",
-      "emailsError": "أدخل عنوان بريد إلكتروني صالحًا واحدًا على الأقل. افصل بين العناوين بفواصل.",
+      "emailsInvalid": "عنوان بريد إلكتروني واحد أو أكثر غير صالح.",
+      "emailsRequired": "أدخل عنوان بريد إلكتروني واحدًا على الأقل.",
+      "saveEmailsError": "لم يتم قبول بعض عناوين البريد الإلكتروني. تحقق منها وحاول مرة أخرى.",
+      "saveError": "تعذّر حفظ تنبيه انخفاض الرصيد.",
+      "thresholdPlaceholder": "أدخل مبلغًا",
       "thresholdError": "أدخل مبلغًا أكبر من 0."
     },
     "memberLimit": {
@@ -3209,6 +3261,7 @@
       "removeLimit": "إزالة الحد",
       "title": "حد الاستخدام اليومي",
       "blankError": "أدخل مبلغًا، أو اضغط على «إزالة الحد» أدناه.",
+      "blankWithoutLimitError": "أدخل حدًّا يوميًّا بين 0 و{{max}}.",
       "rangeError": "أدخل مبلغًا بين 0 و{{max}}."
     },
     "members": {
@@ -3681,6 +3734,7 @@
   "appActions": {
     "start": {
       "promptRequired": "يتطلب تشغيل وكيل تعليمات. أضف تعليمات ثم شغّله مرة أخرى.",
+      "repositoryRequired": "يتطلب تشغيل وكيل مستودعًا. افتح Kilo واختر مستودعًا، ثم شغّله مرة أخرى.",
       "repositoryUnknown": "لا يتعرّف Kilo على {{repository}} كمستودع GitHub أو GitLab. اختر مستودعًا آخر في Kilo.",
       "repositoryUnsupported": "{{repository}} مستودع Bitbucket — لا يستطيع تشغيل وكيل استخدامه بعد. اختر مستودعًا آخر في Kilo."
     }
@@ -3752,7 +3806,6 @@
     "keyTooLong": "يجب ألا يزيد المفتاح عن 256 حرفًا",
     "keyDuplicate": "هذا المفتاح موجود بالفعل في الملف الشخصي",
     "valueLabel": "قيمة",
-    "secretLabel": "سر",
     "secrets": {
       "markSecret": "ضع علامة على أنها سرية",
       "masked": "القيمة المخفية",
@@ -3811,7 +3864,9 @@
       "jsonTooLarge": "استخدم 50 إدخالًا كحد أقصى، بمفاتيح حتى 128 وقيم حتى 4096 حرفًا",
       "timeoutInvalid": "يجب أن تكون المهلة عددًا صحيحًا من المللي ثانية",
       "edit": "تحرير خادم MCP",
-      "saveFailed": "تعذر حفظ خادم MCP"
+      "saveFailed": "تعذر حفظ خادم MCP",
+      "deleteFailed": "تعذر حذف خادم MCP",
+      "updateFailed": "تعذر تحديث خادم MCP"
     },
     "agents": {
       "title": "وكلاء الملف الشخصي",
@@ -3838,6 +3893,7 @@
       "visibilitySubagent": "وكيل فرعي - يمكن الاتصال به فقط من الآخرين",
       "visibilityAll": "الكل - كلاهما",
       "saveFailed": "تعذر حفظ الوكيل",
+      "deleteFailed": "تعذر حذف الوكيل",
       "nameRequired": "أدخل اسم الوكيل",
       "slugRequired": "أدخل سبيكة وكيل",
       "slugInvalid": "يجب أن يبدأ الرمز بحرف ويستخدم فقط الأحرف الصغيرة والأرقام والشرطات",
@@ -3852,10 +3908,12 @@
       "description": "وصف الأمر",
       "template": "نموذج",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "شرح $ARGUMENTS",
       "subtask": "تشغيل كمهمة فرعية",
       "edit": "تحرير أمر الشرطة المائلة",
       "saveFailed": "تعذر حفظ الأمر",
+      "deleteFailed": "تعذر حذف الأمر",
       "nameRequired": "أدخل اسم الأمر",
       "nameInvalid": "يجب أن يبدأ الاسم بحرف صغير ويستخدم فقط الأحرف الصغيرة والأرقام والشرطات",
       "templateRequired": "أدخل قالب الأمر",
@@ -4018,7 +4076,7 @@
     "view": "قراءة الملخص",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
-    "dismiss": "عرض الحالة المباشرة",
+    "dismiss": "استبعاد الملخص",
     "offline": "غير متصل · ملخص محفوظ",
     "cached": "تقرير محفوظ · التحديث غير متاح",
     "revised": "منقّح · {{revision}}",

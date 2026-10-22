@@ -60,7 +60,7 @@ const headersFrom = (config: RemoteModelConfig) =>
     catch: () => new ModelError({ reason: 'transport', cause: 'Remote header source failed' }),
   }).pipe(
     Effect.flatten,
-    Effect.catchAllDefect(() =>
+    Effect.catchDefect(() =>
       Effect.fail(new ModelError({ reason: 'transport', cause: 'Remote header source failed' }))
     )
   );

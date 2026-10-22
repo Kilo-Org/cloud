@@ -52,7 +52,7 @@ const windowed = <A, E>(
 const say = (session: SessionHandle, text: string) =>
   Stream.runFold(
     session.ask(text, { maxTokens: room }),
-    { said: '', prompted: 0 },
+    () => ({ said: '', prompted: 0 }),
     (held, event) => {
       if (event.kind === 'delta') {
         return { ...held, said: held.said + event.text };

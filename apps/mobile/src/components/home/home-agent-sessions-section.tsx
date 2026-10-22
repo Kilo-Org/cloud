@@ -22,9 +22,7 @@ import {
 import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { SectionHeader } from '@/components/home/section-header';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
-
-// The trailing slash pins the index route.
-const AGENTS_INDEX_HREF = '/(app)/(tabs)/(2_agents)/' as const;
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 
 /**
  * The briefing that replaces the live card inside the shared adaptive frame.
@@ -63,8 +61,8 @@ export function AgentSessionsSection({
             return;
           }
           // Switch tabs, then pop a previously pushed history screen to the live index.
-          router.navigate(AGENTS_INDEX_HREF as Href);
-          router.dismissTo(AGENTS_INDEX_HREF as Href);
+          router.navigate(AGENTS_SESSIONS_HREF);
+          router.dismissTo(AGENTS_SESSIONS_HREF);
         }}
         notice={notice && <LiveSessionHeaderNotice notice={notice} />}
       />

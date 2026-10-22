@@ -240,6 +240,34 @@
     ],
     "searchBlob": "agentBriefing.list List existing agent briefing reports for the user, optionally filtered by personal or organization scope with pagination. agentbriefing list scope organizationid cursor limit currentonly scope organizationId cursor limit currentOnly"
   },
+  "agentBriefing.oneOffPreferences": {
+    "path": "agentBriefing.oneOffPreferences",
+    "kind": "query",
+    "summary": "Get the saved timezone and language preferences used when generating a one-off agent activity briefing for a custom date range.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 35
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "oneoffpreferences",
+      "timezone",
+      "language"
+    ],
+    "searchBlob": "agentBriefing.oneOffPreferences Get the saved timezone and language preferences used when generating a one-off agent activity briefing for a custom date range. agentbriefing oneoffpreferences timezone language timezone language"
+  },
   "agentBriefing.preferences": {
     "path": "agentBriefing.preferences",
     "kind": "query",
@@ -267,6 +295,65 @@
       "language"
     ],
     "searchBlob": "agentBriefing.preferences Get the current user's agent briefing preferences, such as timezone, language, and notification schedule. agentbriefing preferences timezone language timezone language"
+  },
+  "agentBriefing.prepareOneOff": {
+    "path": "agentBriefing.prepareOneOff",
+    "kind": "mutation",
+    "summary": "Prepare a one-off agent briefing report for a specific date and time range, returning the draft report with session stats and a cost estimate for AI summary generation.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "startAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "endAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 35
+        }
+      },
+      "required": [
+        "requestId",
+        "startAt",
+        "endAt",
+        "timezone",
+        "language"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "prepareoneoff",
+      "requestid",
+      "organizationid",
+      "startat",
+      "endat",
+      "timezone",
+      "language"
+    ],
+    "searchBlob": "agentBriefing.prepareOneOff Prepare a one-off agent briefing report for a specific date and time range, returning the draft report with session stats and a cost estimate for AI summary generation. agentbriefing prepareoneoff requestid organizationid startat endat timezone language requestId organizationId startAt endAt timezone language"
   },
   "agentBriefing.read": {
     "path": "agentBriefing.read",

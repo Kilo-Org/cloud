@@ -24,6 +24,7 @@ const callbackAuthErrors = new Set([
   'SIGNUP-STEP-UP',
   'SIGNUP-UNAVAILABLE',
   'EMAIL-ALREADY-USED',
+  'EMAIL-SIGNUP-DISABLED',
   'EMAIL-INVALID-FORMAT',
   'EMAIL-MUST-BE-LOWERCASE',
   'EMAIL-CANNOT-CONTAIN-PLUS',
@@ -306,7 +307,16 @@ export function useSignInFlow({
         }
         setIsVerifying(false);
         setShowTurnstile(false);
-        setError('MAGIC_LINK_DELIVERY_FAILED');
+        if (result.error === 'EMAIL-SIGNUP-DISABLED') {
+          setError('EMAIL-SIGNUP-DISABLED');
+          // On sign-up, return to the provider buttons the notice points at.
+          if (isSignUp) {
+            setPendingSignIn(null);
+            setShowEmailInput(false);
+          }
+        } else {
+          setError('MAGIC_LINK_DELIVERY_FAILED');
+        }
         setFlowState('landing');
         return false;
       } catch (error) {
@@ -323,7 +333,7 @@ export function useSignInFlow({
         }
       }
     },
-    [email, isCurrentDiscoveryRequest, params, saveHint]
+    [email, isCurrentDiscoveryRequest, isSignUp, params, saveHint]
   );
 
   useEffect(
@@ -486,6 +496,7 @@ export function useSignInFlow({
         }
 
         if (checkResult.kind === 'new') {
+          if (checkResult.emailSignupDisabled) setError('EMAIL-SIGNUP-DISABLED');
           setIsNewUser(true);
           setIsVerifying(false);
           setAvailableProviders(orderNewAccountProviders(checkResult.providers));

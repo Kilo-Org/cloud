@@ -178,6 +178,7 @@ describe('pushDataSchema active_agents_glanceable', () => {
   it('round-trips a payload carrying the newest-result keys unchanged', () => {
     const withNewest = {
       ...payload,
+      needsApproval: 0,
       newestResultKind: 'needsInput',
       newestResultAt: '2025-12-31T23:59:00.000Z',
     } as const;
@@ -200,6 +201,7 @@ describe('pushDataSchema active_agents_glanceable', () => {
   it('round-trips a payload carrying scheduled count, wake time, and kind', () => {
     const withScheduled = {
       ...payload,
+      needsApproval: 0,
       scheduled: 2,
       scheduledAt: '2026-09-24T09:00:00.000Z',
       newestResultKind: 'scheduled',
@@ -321,21 +323,19 @@ const glanceablePayload = {
 } as const;
 
 describe('pushDataSchema active_agents_glanceable', () => {
-  it('parses a payload whose server omits needsApproval without inventing a value', () => {
+  it('parses a payload whose server omits needsApproval, defaulting it to 0', () => {
     const parsed = pushDataSchema.parse(glanceablePayload);
-    // The newest-result pair is the one defaulted field group: a server that
-    // predates the fact omits it, and the parsed shape fills null so mobile can
-    // spread it straight into a snapshot. Every other key round-trips exactly.
+    // The approval count and the newest-result pair are the defaulted fields:
+    // a server that predates them omits them, and the parsed shape fills 0 or
+    // null so mobile can spread it straight into a snapshot.
     expect(parsed).toEqual({
       ...glanceablePayload,
+      needsApproval: 0,
       scheduled: 0,
       scheduledAt: null,
       newestResultKind: null,
       newestResultAt: null,
     });
-    // Optional on the wire so a push from an older server still parses; the
-    // mobile readers treat absent as zero.
-    expect('needsApproval' in parsed).toBe(false);
   });
 
   it('parses a payload carrying needsApproval', () => {

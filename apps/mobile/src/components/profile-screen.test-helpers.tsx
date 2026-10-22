@@ -29,6 +29,11 @@ const captureInteraction = vi.hoisted(() => (cb: () => void) => {
 });
 const getProfileAgentScopeMock = vi.hoisted(() => vi.fn());
 const openExternalUrlFn = vi.hoisted(() => vi.fn());
+const organizationState = vi.hoisted(() => ({
+  organizationId: 'org-1' as string | null,
+  isLoaded: true,
+}));
+const setOrganizationIdFn = vi.hoisted(() => vi.fn());
 const connectivityState = vi.hoisted(() => ({
   value: 'online' as 'online' | 'offline' | 'unknown',
 }));
@@ -39,18 +44,27 @@ export {
   getProfileAgentScopeMock,
   interactionState,
   keys,
+  organizationState,
   organizationsQueryFn,
   providersQueryFn,
   routerPush,
+  setOrganizationIdFn,
   signOutFn,
 };
 
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
+  Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
   View: 'View',
   InteractionManager: {
     runAfterInteractions: vi.fn(captureInteraction),
   },
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0 }),
 }));
 
 vi.mock('react-native-reanimated', () => ({
@@ -89,7 +103,11 @@ vi.mock('@/lib/auth/auth-context', () => ({
 }));
 
 vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: 'org-1', isLoaded: true }),
+  useOrganization: () => ({
+    organizationId: organizationState.organizationId,
+    isLoaded: organizationState.isLoaded,
+    setOrganizationId: setOrganizationIdFn,
+  }),
 }));
 
 vi.mock('@/components/use-delete-account', () => ({
@@ -115,7 +133,7 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#000000' }),
+  useThemeColors: () => ({ mutedForeground: '#000000', primary: '#000000', card: '#ffffff' }),
 }));
 
 vi.mock('@/lib/hooks/use-language-preference', () => ({
@@ -156,6 +174,8 @@ vi.mock('@/components/ui/dialog', () => ({
 vi.mock('@/components/ui/icons', () => ({
   BookOpenCheck: 'BookOpenCheck',
   Building2: 'Building2',
+  Check: 'Check',
+  ChevronDown: 'ChevronDown',
   GitMerge: 'GitMerge',
   GitPullRequest: 'GitPullRequest',
   Globe: 'Globe',
@@ -171,6 +191,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 
 vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/profile-credits-card', () => ({ CreditsCard: 'CreditsCard' }));
 vi.mock('@/components/language-picker-sheet', () => ({
   LanguagePickerSheet: 'LanguagePickerSheet',

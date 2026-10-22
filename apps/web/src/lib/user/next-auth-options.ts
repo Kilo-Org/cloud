@@ -1204,6 +1204,7 @@ export const authOptions: NextAuthOptions = {
             'SIGNUP-RATE-LIMITED',
             'SIGNUP-STEP-UP',
             'EMAIL-ALREADY-USED',
+            'EMAIL-SIGNUP-DISABLED',
           ];
 
           // Only log unexpected errors to Sentry

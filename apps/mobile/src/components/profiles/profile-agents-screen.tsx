@@ -1,13 +1,19 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
-import { agentRows, type AgentSource } from '@/components/profiles/profile-agents-model';
+import {
+  AGENT_VISIBILITY_LABEL_KEYS,
+  agentRows,
+  type AgentSource,
+  type AgentVisibility,
+} from '@/components/profiles/profile-agents-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Bot, Pencil, Trash2 } from '@/components/ui/icons';
@@ -19,6 +25,8 @@ import {
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_AGENTS: AgentProfileDetail['agents'] = [];
@@ -37,7 +45,7 @@ function isSlugConflict(error: unknown): boolean {
 type AgentRowViewProps = Readonly<{
   name: string;
   slug: string;
-  visibility: string;
+  visibility: AgentVisibility;
   description: string;
   model: string;
   onEdit: () => void;
@@ -68,7 +76,7 @@ function AgentRowView({
             {slug}
           </Text>
           <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-            {visibility}
+            {t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}
           </Text>
         </View>
         {model.length > 0 ? (
@@ -83,7 +91,7 @@ function AgentRowView({
         ) : null}
       </View>
       <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('profiles.agents.edit')}
         onPress={onEdit}
@@ -91,7 +99,7 @@ function AgentRowView({
         <Pencil size={18} color={colors.mutedForeground} />
       </Pressable>
       <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('common.delete')}
         onPress={onDelete}
@@ -245,7 +253,7 @@ export function ProfileAgentsScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profiles.agents.title')} />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -253,7 +261,7 @@ export function ProfileAgentsScreen({
         showsVerticalScrollIndicator={false}
       >
         {content}
-      </ScrollView>
+      </TabScreenScrollView>
 
       {form !== null ? (
         <AgentFormSheet

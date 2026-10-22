@@ -953,6 +953,138 @@ describe('User', () => {
       expect(verifyAdmission).not.toHaveBeenCalled();
     });
 
+    describe('while email signups are disabled', () => {
+      const emailArgs = (email: string) => ({
+        google_user_email: email,
+        google_user_name: 'Email User',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'email' as const,
+        provider_account_id: email,
+      });
+      const headers = () => new Headers({ 'x-forwarded-for': '203.0.113.90' });
+
+      afterEach(() => {
+        process.env.EMAIL_SIGNUPS_ENABLED = 'true';
+      });
+
+      it('refuses a new email account before Bouncer, Stripe, or user creation', async () => {
+        const email = 'email-signup-disabled-new@example.com';
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-SIGNUP-DISABLED' });
+        expect(mockSignupDecide).not.toHaveBeenCalled();
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, email),
+          })
+        ).toBeUndefined();
+      });
+
+      it('signs in an existing email user', async () => {
+        const email = 'email-signup-disabled-existing@example.com';
+        const created = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+        expect(created.success).toBe(true);
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const signedIn = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(signedIn.success).toBe(true);
+        if (!signedIn.success) return;
+        expect(signedIn.isNew).toBe(false);
+      });
+
+      it('links email to an existing OAuth user on their first magic link', async () => {
+        const email = 'email-signup-disabled-oauth@example.com';
+        const created = await createOrUpdateUser(
+          {
+            ...emailArgs(email),
+            provider: 'google',
+            provider_account_id: 'google-email-signup-disabled',
+          },
+          undefined,
+          false,
+          headers()
+        );
+        expect(created.success).toBe(true);
+        if (!created.success) return;
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const signedIn = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(signedIn.success).toBe(true);
+        if (!signedIn.success) return;
+        expect(signedIn.user.id).toBe(created.user.id);
+        expect(signedIn.isNew).toBe(false);
+      });
+
+      it('keeps EMAIL-ALREADY-USED for a normalized match of an existing account', async () => {
+        const created = await createOrUpdateUser(
+          emailArgs('emailsignupdisabledalias@gmail.com'),
+          undefined,
+          true,
+          headers()
+        );
+        expect(created.success).toBe(true);
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          emailArgs('email.signup.disabled.alias@gmail.com'),
+          undefined,
+          true,
+          headers()
+        );
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-ALREADY-USED' });
+      });
+
+      it('refuses a case variant of a legacy account without a normalized email', async () => {
+        await insertTestUser({
+          id: 'email-signup-disabled-legacy',
+          google_user_email: 'Legacy.Case@Example.com',
+          normalized_email: null,
+        });
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          emailArgs('legacy.case@example.com'),
+          undefined,
+          true,
+          headers()
+        );
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-ALREADY-USED' });
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, 'legacy.case@example.com'),
+          })
+        ).toBeUndefined();
+      });
+
+      it('still creates a new OAuth account', async () => {
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          {
+            ...emailArgs('email-signup-disabled-google-new@example.com'),
+            provider: 'google',
+            provider_account_id: 'google-email-signup-disabled-new',
+          },
+          undefined,
+          false,
+          headers()
+        );
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.isNew).toBe(true);
+      });
+    });
+
     it.each([
       { name: 'IP rejection', flags: [{ name: 'signup:burst', source: 'ip' }] },
       { name: 'JA4 rejection', flags: [{ name: 'signup:ja4', source: 'ja4' }] },

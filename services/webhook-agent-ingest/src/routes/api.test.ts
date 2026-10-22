@@ -148,9 +148,9 @@ function createRouteHarness(initialConfig: StoredConfig | null) {
   const getConfig = vi.fn(async () => config);
   const exists = vi.fn(async () => config !== null);
   const isActive = vi.fn(async () => config?.isActive ?? false);
-  const listRequests = vi.fn(
-    async (_limit: number): Promise<{ requests: CapturedRequest[] }> => ({ requests: [] })
-  );
+  const listRequests = vi.fn(async (_limit: number): Promise<{ requests: CapturedRequest[] }> => ({
+    requests: [],
+  }));
   const getRequest = vi.fn(async (_requestId: string): Promise<CapturedRequest | null> => null);
   const deleteTrigger = vi.fn(async () => ({ success: true }));
   const updateConfig = vi.fn(
@@ -167,9 +167,10 @@ function createRouteHarness(initialConfig: StoredConfig | null) {
   );
   const getConfigForResponse = vi.fn(async () => config);
   const idFromName = vi.fn((name: string) => name);
-  const invokeScheduled = vi.fn(
-    async (): Promise<ScheduledInvocation> => ({ success: true, requestId: crypto.randomUUID() })
-  );
+  const invokeScheduled = vi.fn(async (): Promise<ScheduledInvocation> => ({
+    success: true,
+    requestId: crypto.randomUUID(),
+  }));
   const stub = {
     configure,
     getConfig,

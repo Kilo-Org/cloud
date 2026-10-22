@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one gate harness runs the provider × platform matrix; the header Back test shares its mount and router mocks. */
 import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as ReactI18next from 'react-i18next';
@@ -59,7 +60,14 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://web.example' }));
-vi.mock('expo-router', () => ({ usePathname: () => '/pr-review/github/owner/repo/1' }));
+const router = vi.hoisted(() => ({ dismissTo: vi.fn() }));
+vi.mock('expo-router', () => ({
+  usePathname: () => '/pr-review/github/owner/repo/1',
+  useRouter: () => router,
+  useFocusEffect: (effect: () => undefined | (() => void)) => {
+    React.useEffect(effect, [effect]);
+  },
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61', primaryForeground: '#FFFFFF' }),
 }));
@@ -92,6 +100,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: appState.addEventListener },
+  BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
   Platform: platform,
   View: 'View',
 }));
@@ -320,6 +329,12 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
     const renderer = mount('github');
     expect(renderer.root.findAllByType('GitHubIcon')).toHaveLength(1);
     expect(renderer.root.findAllByType('RefreshCcw')).toHaveLength(0);
+  });
+
+  it.each(providers)('%s Back dismisses to the PR Review inbox, not the app root', provider => {
+    const onBack = mount(provider).root.findByType('ScreenHeader').props.onBack as () => void;
+    onBack();
+    expect(router.dismissTo).toHaveBeenCalledExactlyOnceWith('/(app)/pr-review');
   });
 
   it.each(providers)('%s names the active context on the connect view', provider => {

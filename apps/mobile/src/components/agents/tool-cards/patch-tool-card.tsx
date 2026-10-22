@@ -9,6 +9,7 @@ import { SelectableText } from '@/components/ui/selectable-text';
 import { FixedPartRow } from '../fixed-part-row';
 import { useOpenPartDetail } from '../open-part-detail-context';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolStatusLabel } from '../tool-status-label';
 import { buildToolPatchModel } from '../tool-patch-model';
 import { ToolPatchPreview } from '../tool-patch-preview';
 import { GenericToolCardBody } from './generic-tool-card';
@@ -60,7 +61,7 @@ export function PatchToolCard({ part }: Readonly<{ part: ToolPart }>) {
       status={part.state.status}
       accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
         name: display.subtitle ?? display.title,
-        status: part.state.status,
+        status: toolStatusLabel(t, part.state.status),
       })}
       onPress={
         hasDetails && openPartDetail

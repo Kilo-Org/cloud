@@ -817,7 +817,6 @@ export async function findSecurityFindingBySource(
   }
 }
 
-/** Read owner-level last_synced_at from agent_configs.runtime_state. */
 async function getOwnerLastSyncedAt(ownerConverted: Owner): Promise<string | null> {
   const ownerCondition =
     ownerConverted.type === 'org'

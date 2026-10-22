@@ -93,7 +93,7 @@ describe.each(['personal', 'org-example'])('security notification routes (%s)', 
 
     mountScope(scope);
     expect(unstable_settings.anchor).toBe('index');
-    expect(declaredScopeRoutes()).toContain('index');
+    expect(declaredScopeRoutes()).toEqual(['index', 'dismiss/[id]', 'filter']);
 
     const url = new URL(path, 'https://example.test');
     expect(url.pathname.split('/').filter(Boolean)).toEqual([

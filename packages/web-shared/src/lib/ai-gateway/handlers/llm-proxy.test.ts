@@ -718,6 +718,47 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).toHaveBeenCalled();
   });
 
+  it('aborts the upstream on client disconnect when the generation lookup can cost the request', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const request = makeRequest(makeBody());
+
+    await handleLlmProxyRequest(request as never);
+
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].signal).toBe(request.signal);
+  });
+
+  it('keeps reading the upstream after a client disconnect when only the stream reports usage', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: { ...provider, id: 'martian' },
+      userByok: null,
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].signal).toBeUndefined();
+  });
+
+  it("aborts the upstream on client disconnect when the user's own key pays for the request", async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: { ...provider, id: 'martian' },
+      userByok: [{ decryptedAPIKey: 'user-key', providerId: 'anthropic' }],
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const request = makeRequest(makeBody());
+
+    await handleLlmProxyRequest(request as never);
+
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].signal).toBe(request.signal);
+  });
+
   it('rejects unknown paths under /api/v1', async () => {
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 

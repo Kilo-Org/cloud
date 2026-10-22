@@ -1530,16 +1530,26 @@ function bouncerUsageEvent(
   };
 }
 
+function generationLookupProviderFor(
+  providerId: ProviderId
+): typeof OPENROUTER | typeof VERCEL_AI_GATEWAY | undefined {
+  return providerId === 'openrouter'
+    ? OPENROUTER
+    : providerId === 'vercel'
+      ? VERCEL_AI_GATEWAY
+      : undefined;
+}
+
+/** Whether a stream that ends without usage can still be costed from the provider's generation record. */
+export function hasGenerationLookup(providerId: ProviderId): boolean {
+  return generationLookupProviderFor(providerId) !== undefined;
+}
+
 function getGenerationLookupProvider(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
 ): typeof OPENROUTER | typeof VERCEL_AI_GATEWAY | undefined {
-  const provider =
-    usageContext.provider === 'openrouter'
-      ? OPENROUTER
-      : usageContext.provider === 'vercel'
-        ? VERCEL_AI_GATEWAY
-        : undefined;
+  const provider = generationLookupProviderFor(usageContext.provider);
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
   if (!provider || !isSuccessStatusCode) {
     return undefined;

@@ -130,7 +130,10 @@ import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import {
+  hasGenerationLookup,
+  logMicrodollarUsage,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import {
   getMaxTokens,
   hasMiddleOutTransform,
@@ -355,21 +358,17 @@ export async function handleLlmProxyRequest(
   const vercelRequestId = extractHeaderAndLimitLength(request, 'x-vercel-id');
 
   const logClientDisconnect = () => {
-    // The request signal is forwarded to the upstream fetch and to the response
-    // stream reader, so this disconnect also aborts them. Any abort/cancellation
-    // logged for this request after this line is a consequence of the client
-    // going away, not an upstream provider failure.
-    console.log(
-      'AI gateway client disconnected (aborting in-flight upstream work for this request), requested model: %s',
-      requestedModelLowerCased,
-      {
-        path,
-        elapsed_ms: Math.round(performance.now() - requestStartedAt),
-        client_request_id: clientRequestId,
-        session_id: taskId ?? sessionHeader,
-        vercel_request_id: vercelRequestId,
-      }
-    );
+    // The request signal also aborts the upstream fetch, unless the upstream must
+    // keep streaming for usage accounting (see abortUpstreamOnClientDisconnect).
+    // Any abort/cancellation logged for this request after this line is a
+    // consequence of the client going away, not an upstream provider failure.
+    console.log('AI gateway client disconnected, requested model: %s', requestedModelLowerCased, {
+      path,
+      elapsed_ms: Math.round(performance.now() - requestStartedAt),
+      client_request_id: clientRequestId,
+      session_id: taskId ?? sessionHeader,
+      vercel_request_id: vercelRequestId,
+    });
   };
   if (request.signal.aborted) {
     logClientDisconnect();
@@ -990,6 +989,13 @@ export async function handleLlmProxyRequest(
     op: 'http.client',
   });
 
+  // Aborting the upstream when the client disconnects also drops the usage
+  // chunk at the end of the stream. Only do that when the provider's generation
+  // record can still cost the request, or when the user's own key pays for it.
+  const abortUpstreamOnClientDisconnect =
+    hasGenerationLookup(effectiveProviderContext.provider.id) ||
+    effectiveProviderContext.userByok !== null;
+
   const upstreamAttemptOptions = {
     requestedModel: effectiveModelIdLowerCased,
     fraudHeaders,
@@ -1000,7 +1006,7 @@ export async function handleLlmProxyRequest(
     isNonTrialEnterprise,
     search: url.search,
     method: request.method,
-    signal: request.signal,
+    signal: abortUpstreamOnClientDisconnect ? request.signal : undefined,
     vercelRequestId,
   };
 

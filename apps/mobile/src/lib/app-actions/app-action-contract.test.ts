@@ -240,6 +240,24 @@ describe('parseActionRepository', () => {
     });
   });
 
+  it('keeps a dotted project name', () => {
+    expect(parseActionRepository('o/.github')).toEqual({ kind: 'github', fullName: 'o/.github' });
+    expect(parseActionRepository('https://gitlab.com/g/.config.schema')).toEqual({
+      kind: 'gitlab',
+      fullName: 'g/.config.schema',
+    });
+  });
+
+  it('returns null for a path segment the providers never name a project with', () => {
+    expect(parseActionRepository('../r')).toBeNull();
+    expect(parseActionRepository('./r')).toBeNull();
+    expect(parseActionRepository('o/..')).toBeNull();
+    expect(parseActionRepository('https://github.com/o/..')).toBeNull();
+    expect(parseActionRepository('https://gitlab.com/g/../r')).toBeNull();
+    expect(parseActionRepository('git@gitlab.com:g/./r.git')).toBeNull();
+    expect(parseActionRepository('https://bitbucket.org/w/../r')).toBeNull();
+  });
+
   it('returns null for an unknown host, a blank value and an unusable path', () => {
     expect(parseActionRepository('https://example.com/o/r')).toBeNull();
     expect(parseActionRepository('   ')).toBeNull();

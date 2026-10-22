@@ -52,12 +52,7 @@ import {
   type LeaseQueries,
   type LeaseAcquireError,
 } from '../session/queries/index.js';
-import {
-  type ExecutionId,
-  type EventSourceId,
-  type EventId,
-  type SessionId,
-} from '../types/ids.js';
+import { type ExecutionId, type EventSourceId, type SessionId } from '../types/ids.js';
 import type {
   ExecutionMetadata,
   AddExecutionParams,
@@ -76,6 +71,7 @@ import {
 } from '../websocket/stream.js';
 import {
   getPreparationSnapshots,
+  listPreparationAttempts,
   reconcileStalePreparationAttempts,
 } from '../session/preparation-history.js';
 import { createPreparationProgressRecorder } from '../session/preparation-progress.js';
@@ -87,7 +83,12 @@ import {
 import type { AttentionEvent } from '../websocket/ingest-attention-classifier.js';
 import { dispatchCloudAgentAttentionPush } from '../websocket/ingest-attention-classifier.js';
 import type { StoredEvent } from '../websocket/types.js';
-import type { WrapperCommand, CloudStatusData, CommandsAvailableData } from '../shared/protocol.js';
+import type {
+  WrapperCommand,
+  CloudStatusData,
+  CommandsAvailableData,
+  PreparationAttempt,
+} from '../shared/protocol.js';
 import {
   isPublicCloudAgentExtensionSourceType,
   projectPublicCloudAgentExtensionEvent,
@@ -1156,11 +1157,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         deriveCloudStatus: () => this.deriveCloudStatus(),
         deriveQueuedMessages: () => this.deriveQueuedMessages(),
         getPreparationSnapshots: async () => {
-          const metadata = await this.getMetadata();
-          reconcileStalePreparationAttempts(this.eventQueries, {
-            now: Date.now(),
-            sessionPrepared: Boolean(metadata?.lifecycle.preparedAt),
-          });
+          await this.reconcilePreparationAttempts();
           return getPreparationSnapshots(this.eventQueries);
         },
         getAvailableCommands: () => this.getAvailableCommands(),
@@ -1482,7 +1479,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     timestamp: number;
   }): void {
     this.broadcastEvent({
-      id: 0 as EventId,
+      id: 0,
       execution_id: params.executionId,
       session_id: params.sessionId,
       stream_event_type: params.streamEventType,
@@ -1963,6 +1960,21 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.eventQueries.getLatestEventId();
   }
 
+  /** The preparation attempts the stream replays, for the first transcript page. */
+  async getPreparationAttempts(): Promise<PreparationAttempt[]> {
+    if (await this.hasDeletionIntent()) return [];
+    await this.reconcilePreparationAttempts();
+    return listPreparationAttempts(this.eventQueries);
+  }
+
+  private async reconcilePreparationAttempts(): Promise<void> {
+    const metadata = await this.getMetadata();
+    reconcileStalePreparationAttempts(this.eventQueries, {
+      now: Date.now(),
+      sessionPrepared: Boolean(metadata?.lifecycle.preparedAt),
+    });
+  }
+
   async getMessageResult(messageId: string): Promise<MessageResultRPCResponse> {
     const metadata = await this.getMetadata();
     if (!metadata) return { type: 'session-not-found' };
@@ -2382,7 +2394,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const sessionId = await this.requireSessionId();
     const payload = JSON.stringify({ messageId });
     const eventId = this.eventQueries.insertUnique({
-      executionId: '' as EventSourceId,
+      executionId: '',
       entityId: `canceled-message/${messageId}`,
       sessionId,
       streamEventType: 'cloud.message.canceled',
@@ -2392,7 +2404,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (eventId !== null) {
       this.broadcastEvent({
         id: eventId,
-        execution_id: '' as EventSourceId,
+        execution_id: '',
         session_id: sessionId,
         stream_event_type: 'cloud.message.canceled',
         payload,
@@ -3397,7 +3409,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   ): Promise<void> {
     const sessionId = await this.requireSessionId();
     const eventId = this.eventQueries.insertUnique({
-      executionId: '' as EventSourceId,
+      executionId: '',
       entityId: `sent-message/${messageId}`,
       sessionId,
       streamEventType: 'cloud.message.sent',
@@ -3407,7 +3419,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (eventId !== null) {
       this.broadcastEvent({
         id: eventId,
-        execution_id: '' as EventSourceId,
+        execution_id: '',
         session_id: sessionId,
         stream_event_type: 'cloud.message.sent',
         payload: JSON.stringify({ messageId, delivery: 'sent' }),

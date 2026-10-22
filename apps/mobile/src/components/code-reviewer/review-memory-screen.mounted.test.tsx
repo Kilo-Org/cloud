@@ -35,6 +35,7 @@ const proposals = vi.hoisted(() => ({
 
 const setEnabled = vi.hoisted(() => ({
   isPending: false,
+  data: undefined as unknown,
   mutate: vi.fn(),
 }));
 
@@ -51,8 +52,33 @@ const buttons = vi.hoisted(() => ({
   rendered: [] as { children?: unknown; onPress?: () => void; accessibilityLabel?: string }[],
 }));
 
+const switches = vi.hoisted(() => ({
+  rendered: [] as {
+    value?: boolean;
+    disabled?: boolean;
+    accessible?: boolean;
+    onValueChange?: (value: boolean) => void;
+  }[],
+}));
+
+const pressables = vi.hoisted(() => ({
+  rendered: [] as {
+    accessibilityRole?: string;
+    accessibilityLabel?: string;
+    accessibilityState?: { disabled?: boolean; busy?: boolean; checked?: boolean };
+    disabled?: boolean;
+    onPress?: () => void;
+  }[],
+}));
+
 const flashList = vi.hoisted(() => ({
   onEndReached: null as (() => void) | null,
+}));
+
+const tabScreen = vi.hoisted(() => ({ bottomPadding: 0 }));
+
+const views = vi.hoisted(() => ({
+  rendered: [] as { pointerEvents?: string; style?: { height?: number } }[],
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -98,8 +124,33 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
-  View: 'View',
+  View: (props: { children?: unknown; pointerEvents?: string; style?: { height?: number } }) => {
+    views.rendered.push(props);
+    return createElement('View', props);
+  },
   ActivityIndicator: 'ActivityIndicator',
+  Platform: { OS: 'ios' },
+  useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
+  Pressable: (props: {
+    children?: unknown;
+    disabled?: boolean;
+    accessibilityRole?: string;
+    accessibilityLabel?: string;
+    accessibilityState?: { disabled?: boolean; busy?: boolean; checked?: boolean };
+    onPress?: () => void;
+  }) => {
+    pressables.rendered.push(props);
+    return props.children;
+  },
+  Switch: (props: {
+    value?: boolean;
+    disabled?: boolean;
+    accessible?: boolean;
+    onValueChange?: (value: boolean) => void;
+  }) => {
+    switches.rendered.push(props);
+    return 'Switch';
+  },
 }));
 
 vi.mock('@shopify/flash-list', () => ({
@@ -141,6 +192,10 @@ vi.mock('@/components/query-error', () => ({
 
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 
+vi.mock('@/components/tab-screen', () => ({
+  useTabBarBottomPadding: () => tabScreen.bottomPadding,
+}));
+
 vi.mock('@/components/ui/button', () => ({
   Button: (props: { children?: unknown; onPress?: () => void; accessibilityLabel?: string }) => {
     buttons.rendered.push(props);
@@ -181,11 +236,16 @@ beforeEach(() => {
   proposals.refetch.mockClear();
   proposals.fetchNextPage.mockClear();
   setEnabled.isPending = false;
+  setEnabled.data = undefined;
   setEnabled.mutate.mockClear();
   permission.status = 'ready';
   permission.canEdit = false;
   queryErrors.errors = [];
   buttons.rendered = [];
+  switches.rendered = [];
+  pressables.rendered = [];
+  views.rendered = [];
+  tabScreen.bottomPadding = 0;
   flashList.onEndReached = null;
 });
 
@@ -251,7 +311,7 @@ describe('ReviewMemoryScreen feature disabled', () => {
     const renderer = renderScreen();
 
     expect(collectText(renderer.toJSON())).toContain(
-      'Only organization owners and billing managers can enable review memory.'
+      'Only organization owners, admins, and billing managers can change review memory.'
     );
     expect(
       buttons.rendered.find(button => button.accessibilityLabel === 'Enable review memory')
@@ -271,10 +331,93 @@ describe('ReviewMemoryScreen feature disabled', () => {
         buttons.rendered.find(button => button.accessibilityLabel === 'Enable review memory')
       ).toBeDefined();
       expect(collectText(renderer.toJSON())).not.toContain(
-        'Only organization owners and billing managers can enable review memory.'
+        'Only organization owners, admins, and billing managers can change review memory.'
       );
     }
   );
+});
+
+describe('ReviewMemoryScreen enabled state', () => {
+  it('renders the on-state row above the empty proposals state', () => {
+    summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
+    permission.canEdit = true;
+    proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
+
+    const renderer = renderScreen();
+
+    const texts = collectText(renderer.toJSON());
+    const rowIndex = texts.indexOf('Review memory is on');
+    expect(rowIndex).toBeGreaterThanOrEqual(0);
+    expect(rowIndex).toBeLessThan(texts.indexOf('EMPTY:No proposals'));
+    expect(switches.rendered).toHaveLength(1);
+    expect(switches.rendered[0]?.value).toBe(true);
+    expect(switches.rendered[0]?.disabled).toBe(false);
+  });
+
+  it('turns review memory off from the on-state row', () => {
+    summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
+    permission.canEdit = true;
+    proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
+
+    renderScreen();
+
+    const row = pressables.rendered.find(pressable => pressable.accessibilityRole === 'switch');
+    expect(row?.accessibilityLabel).toBe('Review memory');
+    expect(row?.accessibilityState).toMatchObject({ checked: true, disabled: false });
+    act(() => {
+      row?.onPress?.();
+    });
+    expect(setEnabled.mutate).toHaveBeenCalledWith(false);
+  });
+
+  it('reserves the tab bar clearance after the last proposal row', () => {
+    summary.data = { enabled: true, repositories: [], openProposalCount: 1 };
+    permission.canEdit = true;
+    tabScreen.bottomPadding = 83;
+    proposals.data = {
+      pages: [
+        {
+          proposals: [{ id: 'p1', title: 'Add auth guidance', repo_full_name: 'acme/repo' }],
+          nextCursor: null,
+        },
+      ],
+    };
+
+    renderScreen();
+
+    expect(views.rendered.at(-1)).toMatchObject({ pointerEvents: 'none', style: { height: 83 } });
+  });
+
+  it('disables the row while the mutation settles', () => {
+    summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
+    permission.canEdit = true;
+    proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
+    setEnabled.isPending = true;
+
+    renderScreen();
+
+    expect(switches.rendered[0]?.disabled).toBe(true);
+    expect(
+      pressables.rendered.find(pressable => pressable.accessibilityRole === 'switch')
+        ?.accessibilityState
+    ).toMatchObject({ disabled: true, busy: true });
+  });
+
+  it('keeps the row visible and inert for a reader who cannot edit', () => {
+    summary.data = { enabled: true, repositories: [], openProposalCount: 0 };
+    permission.canEdit = false;
+    proposals.data = { pages: [{ proposals: [], nextCursor: null }] };
+
+    const renderer = renderScreen();
+
+    expect(switches.rendered).toHaveLength(1);
+    expect(switches.rendered[0]?.disabled).toBe(true);
+    const row = pressables.rendered.find(pressable => pressable.accessibilityRole === 'switch');
+    expect(row?.accessibilityState).toMatchObject({ checked: true, disabled: true });
+    expect(collectText(renderer.toJSON())).toContain(
+      'Only organization owners, admins, and billing managers can change review memory.'
+    );
+  });
 });
 
 describe('ReviewMemoryScreen proposals', () => {

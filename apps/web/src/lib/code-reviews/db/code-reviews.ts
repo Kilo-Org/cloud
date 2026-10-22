@@ -1110,10 +1110,6 @@ export async function recordCodeReviewAttemptPublicationStatus(
 }
 
 /**
- * Updates code review status
- * Can optionally update session_id, cli_session_id, error_message, started_at, completed_at
- */
-/**
  * Persists the captured council outcome (decision + per-specialist votes/findings) on the
  * review so the cloud UI job-runs screen can render it. Council runs only.
  */

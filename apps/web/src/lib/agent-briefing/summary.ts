@@ -102,7 +102,9 @@ export async function briefingPriceBound(
   prompt: string,
   maxSpendMicrodollars: number
 ) {
-  const metadata = (await getOpenRouterModelsMetadataFromDatabase())[model];
+  const models = await getOpenRouterModelsMetadataFromDatabase();
+  const pricingModel = model.startsWith('~') ? (models[model]?.alias_target?.slug ?? model) : model;
+  const metadata = models[pricingModel];
   if (!metadata || metadata.endpoints.length === 0) throw new Error('model_pricing_unavailable');
   if (Buffer.byteLength(prompt, 'utf8') > MAX_INPUT_BYTES) throw new Error('input_too_large');
   let price;

@@ -18,6 +18,7 @@ import {
 } from '../util/constants';
 import { enqueueWebhookDelivery, type WebhookDeliveryMessage } from '../util/queue';
 import {
+  assertCreatorWebhookSecretStrength,
   compareWebhookSecret,
   hashWebhookSecret,
   normalizeAuthHeader,
@@ -37,6 +38,7 @@ export const TriggerConfig = z.object({
   namespace: z.string(),
   userId: z.string().nullable(),
   orgId: z.string().nullable(),
+  executionUserId: z.string().min(1).nullable().optional(),
   createdAt: z.string(),
   isActive: z.boolean(),
   targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
@@ -91,6 +93,7 @@ export type ScheduledInvocationResult =
     };
 
 type ConfigureInput = {
+  executionUserId?: string;
   targetType?: 'cloud_agent' | 'kiloclaw_chat';
   kiloclawInstanceId?: string;
   githubRepo?: string;
@@ -157,12 +160,32 @@ export class TriggerDO extends DurableObject<Env> {
     }
 
     const webhookAuth = await this.resolveWebhookAuthOnCreate(configOverrides.webhookAuth);
+    const executionUserId =
+      z.string().min(1).optional().parse(configOverrides.executionUserId) ?? null;
+    if (executionUserId !== null && (!orgId || targetType !== 'cloud_agent')) {
+      throw new Error('Execution user is only supported for organization Cloud Agent triggers');
+    }
+    if (
+      executionUserId !== null &&
+      configOverrides.activationMode !== 'scheduled' &&
+      !webhookAuth
+    ) {
+      throw new Error('Webhook auth is required for creator execution');
+    }
+    if (executionUserId !== null) {
+      assertCreatorWebhookSecretStrength(configOverrides.webhookAuth?.secret);
+    }
+    const existing = this.db.select().from(triggerConfigTable).limit(1).get();
+    if (existing && existing.execution_user_id !== executionUserId) {
+      throw new Error('Execution user is immutable after creation');
+    }
 
     const config: TriggerConfig = {
       triggerId,
       namespace,
       userId,
       orgId,
+      executionUserId,
       createdAt: new Date().toISOString(),
       isActive: true,
       targetType,
@@ -188,6 +211,7 @@ export class TriggerDO extends DurableObject<Env> {
       namespace: config.namespace,
       user_id: config.userId,
       org_id: config.orgId,
+      execution_user_id: config.executionUserId,
       created_at: config.createdAt,
       is_active: config.isActive ? 1 : 0,
       target_type: config.targetType,
@@ -245,6 +269,10 @@ export class TriggerDO extends DurableObject<Env> {
     return config?.isActive ?? false;
   }
 
+  async exists(): Promise<boolean> {
+    return (await this.getConfig()) !== null;
+  }
+
   async getConfig(): Promise<TriggerConfig | null> {
     const rows = this.db.select().from(triggerConfigTable).limit(1).all();
 
@@ -258,6 +286,7 @@ export class TriggerDO extends DurableObject<Env> {
       namespace: record.namespace,
       userId: record.user_id,
       orgId: record.org_id,
+      executionUserId: record.execution_user_id,
       createdAt: record.created_at,
       isActive: record.is_active === 1,
       targetType: record.target_type === 'kiloclaw_chat' ? 'kiloclaw_chat' : 'cloud_agent',
@@ -297,6 +326,9 @@ export class TriggerDO extends DurableObject<Env> {
    * - value = set to new value
    */
   async updateConfig(updates: UpdateConfigInput): Promise<{ success: boolean }> {
+    if ('executionUserId' in updates) {
+      throw new Error('Execution user is immutable after creation');
+    }
     const existingConfig = await this.getConfig();
     if (!existingConfig) {
       return { success: false };
@@ -317,6 +349,12 @@ export class TriggerDO extends DurableObject<Env> {
     };
 
     const webhookAuth = await this.resolveWebhookAuthOnUpdate(existingConfig, updates.webhookAuth);
+    if (existingConfig.executionUserId) {
+      if (existingConfig.activationMode !== 'scheduled' && !webhookAuth) {
+        throw new Error('Webhook auth is required for creator execution');
+      }
+      assertCreatorWebhookSecretStrength(updates.webhookAuth?.secret);
+    }
 
     const updatedConfig: TriggerConfig = {
       ...existingConfig,
@@ -502,7 +540,9 @@ export class TriggerDO extends DurableObject<Env> {
     sourceIp: string | null;
   }): Promise<{ success: true; requestId: string } | { success: false; error: string }> {
     const config = await this.getConfig();
-    if (!config?.isActive) {
+    // Scheduled triggers only run from alarms or authenticated invokes; they have no
+    // webhook auth, so public capture would let anyone run them as their principal.
+    if (!config?.isActive || config.activationMode === 'scheduled') {
       return { success: false, error: 'Trigger not configured or inactive' };
     }
 

@@ -11,6 +11,7 @@ const fixture = vi.hoisted(() => {
     stored,
     hasLoaded: true,
     save: (_input: { model: string; variant?: string }) => Promise.resolve(),
+  read: () => Promise.resolve({ favorites: ['first'], lastSelected: { model: 'first' } }),
   };
 });
 const queryKey = [['modelPreferences', 'get'], { type: 'query' }] as const;
@@ -34,8 +35,7 @@ vi.mock('@/lib/trpc', () => ({
       get: {
         queryOptions: () => ({
           queryKey,
-          queryFn: () =>
-            Promise.resolve({ favorites: ['first'], lastSelected: { model: 'first' } }),
+          queryFn: () => fixture.read(),
           staleTime: Infinity,
         }),
         queryKey: () => queryKey,
@@ -153,6 +153,30 @@ describe('new-session preference resolution', () => {
     });
     expect(selected).toEqual({ model: 'chosen', variant: 'high' });
     await act(() => {
+      pendingSave.resolve(undefined);
+      return pendingSave.promise;
+    });
+  });
+
+  it('publishes the explicit pick before the first preference read settles', async () => {
+    const pendingRead = Promise.withResolvers<{
+      favorites: string[];
+      lastSelected: { model: string };
+    }>();
+    fixture.read = () => pendingRead.promise;
+    const pendingSave = Promise.withResolvers<undefined>();
+    fixture.save = () => pendingSave.promise;
+    act(() => renderForm('cold'));
+    expect(selected).toEqual({ model: '', variant: '' });
+
+    await act(() => {
+      choose();
+      return Promise.resolve();
+    });
+    act(() => renderForm('cold-reopened'));
+    expect(selected).toEqual({ model: 'chosen', variant: 'high' });
+    await act(() => {
+      pendingRead.resolve({ favorites: [], lastSelected: { model: 'chosen', variant: 'high' } });
       pendingSave.resolve(undefined);
       return pendingSave.promise;
     });

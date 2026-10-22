@@ -99,13 +99,14 @@ export function useModelPreferences(organizationId: string | undefined) {
       const hash = hashKey(queryKey);
       const generation = nextMutationGeneration(hash);
       await queryClient.cancelQueries({ queryKey });
-      // Update only an already-loaded entry: fabricating one would invent an
-      // empty favorites list before the first read settles. Without an entry
-      // the pick still resolves from the local preference once the server
-      // answer arrives.
-      queryClient.setQueryData(queryKey, previous =>
-        previous ? { ...previous, lastSelected: selection } : undefined
-      );
+      // Publish even before the first read settles. A scope with no entry has
+      // shown no favorites yet, so seeding the list empty invents nothing the
+      // user could see disappear; a successful save refetches, and the failure
+      // path deliberately keeps the pick (see onError).
+      queryClient.setQueryData(queryKey, previous => ({
+        favorites: previous?.favorites ?? [],
+        lastSelected: selection,
+      }));
       return { generation, hash };
     },
     onSuccess: async (_data, _selection, context) => {

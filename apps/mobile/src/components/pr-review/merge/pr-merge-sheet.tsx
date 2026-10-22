@@ -79,12 +79,10 @@ type PrMergeSheetProps = Readonly<{
   repoName: string;
   number: number;
   headSha: string;
-  headRef: string;
   isCrossRepo: boolean;
   prNodeId: string;
   title: string;
   bodyMarkdown: string | null;
-  baseRef: string;
   repo: PrOverviewRepoSettings;
   initialMethod: PrMergeMethod;
   mode: PrMergeSheetMode;

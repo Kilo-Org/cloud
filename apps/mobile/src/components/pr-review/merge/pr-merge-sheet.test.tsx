@@ -150,9 +150,9 @@ vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
 vi.mock('@/components/pr-review/merge/pr-merge-icons', () => ({
   defaultMergeMethodOptionFor: () => 'squash',
   mergeMethodOptionsFor: () => [
-    { value: 'merge', label: 'Merge', icon: 'merge' },
-    { value: 'squash', label: 'Squash', icon: 'squash' },
-    { value: 'rebase', label: 'Rebase', icon: 'rebase' },
+    { value: 'merge', label: 'Merge', accessibilityLabel: 'Create a merge commit' },
+    { value: 'squash', label: 'Squash', accessibilityLabel: 'Squash and merge' },
+    { value: 'rebase', label: 'Rebase', accessibilityLabel: 'Rebase and merge' },
   ],
 }));
 vi.mock('@/components/pr-review/merge/pr-merge-sheet-parts', () => ({
@@ -213,12 +213,10 @@ const baseProps = {
   repoName: 'hello',
   number: 1,
   headSha: 'a'.repeat(40),
-  headRef: 'feature/x',
   isCrossRepo: false,
   prNodeId: 'pr-node-1',
   title: 'Feature',
   bodyMarkdown: null,
-  baseRef: 'main',
   repo: repoSettings,
   initialMethod: 'squash' as const,
   mode: 'merge' as const,

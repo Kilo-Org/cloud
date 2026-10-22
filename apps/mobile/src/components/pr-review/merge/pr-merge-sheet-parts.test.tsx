@@ -57,7 +57,13 @@ function formBodyProps(showTitle: boolean) {
   const messageRef = { current: '' };
   return {
     noMethodsAllowed: false,
-    methodOptions: [{ value: 'merge' as AllowedMergeMethod, label: 'Merge', icon: 'merge' }],
+    methodOptions: [
+      {
+        value: 'merge' as AllowedMergeMethod,
+        label: 'Merge',
+        accessibilityLabel: 'Create a merge commit',
+      },
+    ],
     method: 'merge' as AllowedMergeMethod,
     isMutating: false,
     onMethodChange: vi.fn(),

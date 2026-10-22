@@ -116,14 +116,18 @@ function campaignAuditMetadata(campaign: CreditCampaign): Record<string, unknown
   };
 }
 
-/** Fields an update can change, in the order the audit log lists them. */
+/**
+ * Billing-relevant fields an update can change, in the order the audit log
+ * lists them. `description` is an operator note rather than a credit-amount
+ * field, and the audit table stores metadata verbatim, so note text stays out
+ * of the delta; the entry itself still records that the campaign was updated.
+ */
 const mutableCampaignFields = [
   'amount_microdollars',
   'credit_expiry_hours',
   'campaign_ends_at',
   'total_redemptions_allowed',
   'active',
-  'description',
 ] as const;
 
 function changedCampaignFields(previous: CreditCampaign, next: CreditCampaign): string[] {

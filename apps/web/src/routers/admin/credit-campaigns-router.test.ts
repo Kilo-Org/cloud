@@ -491,6 +491,21 @@ describe('admin action audit', () => {
     expect(byAction.get('credit_campaign.set_active')?.metadata).toMatchObject({ active: false });
   });
 
+  it('records a note-only update without a billing field change', async () => {
+    const caller = await createCallerForUser(creditManager.id);
+    const created = await caller.admin.creditCampaigns.create(makeValidInput());
+
+    const { slug: _slug, ...mutable } = makeValidInput({ description: 'Renamed promotion' });
+    void _slug;
+    await caller.admin.creditCampaigns.update({ id: created.id, ...mutable });
+
+    const [updateRow] = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.action, 'credit_campaign.update'));
+    expect(updateRow?.metadata).toMatchObject({ changedFields: [], amountUsd: 5 });
+  });
+
   it('records nothing when the write is refused', async () => {
     const caller = await createCallerForUser(plainAdmin.id);
     await expect(caller.admin.creditCampaigns.create(makeValidInput())).rejects.toThrow(

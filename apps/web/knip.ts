@@ -11,9 +11,6 @@ const config: KnipConfig = {
     // Used via plugins or extends (detected by custom compiler now)
     'eslint-config-prettier',
 
-    // Alternative test runner
-    'ts-jest',
-
     // Used in client-side code
     'client-only',
 

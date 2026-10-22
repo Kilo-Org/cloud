@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- the load/back-state and dismiss-retry-card suites share one screen harness */
+
 // Finding-detail load/back states and dismiss retry cards. The screen stays
 // mounted while the dismiss sheet is open, so it re-reads the draft on focus.
 
@@ -95,6 +97,7 @@ vi.mock('@/lib/hooks/use-security-findings', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissDraft: () => dismissDraft,
+  securityDismissFailureCopy: (draft: { lastError: string }) => draft.lastError,
 }));
 vi.mock('./security-command-retry-card', () => ({ SecurityCommandRetryCard: 'RetryCard' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -224,19 +227,25 @@ describe('FindingDetailScreen pane containers', () => {
 });
 
 describe('FindingDetailScreen dismiss retry card states', () => {
-  it.each([null, { reason: 'not_used', comment: '', lastError: null, retryable: null }])(
-    'renders no retry card without a recorded failure: %j',
-    draft => {
-      dismissDraft.draft = draft;
-      expect(renderScreen().root.findAllByType(SecurityCommandRetryCard)).toHaveLength(0);
-    }
-  );
+  it.each([
+    null,
+    { reason: 'not_used', comment: '', lastError: null, lastErrorKey: null, retryable: null },
+  ])('renders no retry card without a recorded failure: %j', draft => {
+    dismissDraft.draft = draft;
+    expect(renderScreen().root.findAllByType(SecurityCommandRetryCard)).toHaveLength(0);
+  });
 
   it.each([
     ['Network error', true],
     ['Security service is not configured', false],
   ] as const)('renders the %s failure with retryable=%s', (lastError, retryable) => {
-    dismissDraft.draft = { reason: 'not_used', comment: '', lastError, retryable };
+    dismissDraft.draft = {
+      reason: 'not_used',
+      comment: '',
+      lastError,
+      lastErrorKey: null,
+      retryable,
+    };
     const card = renderScreen().root.findByType(SecurityCommandRetryCard);
     expect(card.props).toMatchObject({ lastError, retryable });
   });
@@ -246,6 +255,7 @@ describe('FindingDetailScreen dismiss retry card states', () => {
       reason: 'not_used',
       comment: '',
       lastError: 'boom',
+      lastErrorKey: null,
       retryable: true,
     };
     const card = renderScreen().root.findByType(SecurityCommandRetryCard);

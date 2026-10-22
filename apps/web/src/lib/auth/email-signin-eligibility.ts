@@ -3,6 +3,7 @@ import { checkRateLimit } from '@vercel/firewall';
 import { createHmac } from 'node:crypto';
 import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
+import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import {
   isEmailBlacklistedByDomainAsync,
   isBlockedTLD,
@@ -86,7 +87,12 @@ export type EmailSignInEligibility =
   | {
       ok: false;
       status: number;
-      errorCode: 'BLOCKED' | 'INVALID_EMAIL' | 'SIGNUP-RATE-LIMITED' | 'SSO_ERROR';
+      errorCode:
+        | 'BLOCKED'
+        | 'EMAIL-SIGNUP-DISABLED'
+        | 'INVALID_EMAIL'
+        | 'SIGNUP-RATE-LIMITED'
+        | 'SSO_ERROR';
       body: Record<string, unknown>;
     };
 
@@ -95,7 +101,7 @@ export type EmailSignInEligibility =
  * creating a token, sending mail, or consuming a rate-limit allowance.
  */
 export async function isNewAccountEligibleForMagicLink(email: string): Promise<boolean> {
-  if (!validateMagicLinkSignupEmail(email).valid) {
+  if (isEmailSignupDisabled() || !validateMagicLinkSignupEmail(email).valid) {
     return false;
   }
 
@@ -112,6 +118,7 @@ export async function isNewAccountEligibleForMagicLink(email: string): Promise<b
  * blocked by TLD or signup email rules.
  *
  * For NEW users (signup), enforces:
+ * - Email signup is enabled (EMAIL_SIGNUPS_ENABLED)
  * - Email must be lowercase
  * - Email cannot contain a + character
  *
@@ -166,8 +173,17 @@ export async function checkEmailSignInEligibility(
     };
   }
 
-  // For new users, enforce stricter email validation
   if (!domainEligibility.existingUser) {
+    if (isEmailSignupDisabled()) {
+      return {
+        ok: false,
+        status: 403,
+        errorCode: 'EMAIL-SIGNUP-DISABLED',
+        body: { success: false, error: 'EMAIL-SIGNUP-DISABLED' },
+      };
+    }
+
+    // For new users, enforce stricter email validation
     const signupValidation = validateMagicLinkSignupEmail(email);
     if (!signupValidation.valid) {
       return {

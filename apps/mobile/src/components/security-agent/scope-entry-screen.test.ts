@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted harness covers the setup states: mount mint failure, press-time re-mint, and reauthorization */
 import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { securityConfigFixture } from './security-config.test-fixture';
 import { onlineManager, QueryClient } from '@tanstack/react-query';
@@ -167,16 +168,60 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
   });
 
   it.each([false, true])(
-    'keeps one header when setup mint fails with integration=%s',
+    'keeps the setup screen usable when setup mint fails with integration=%s',
     async hasIntegration => {
       permissionData = { hasIntegration, hasPermissions: false, reauthorizeUrl: null };
       mintFailed = true;
       const root = await mount(scope);
       expect(host(root, 'ScreenHeader')).toHaveLength(1);
       expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
-      expect(host(root, 'QueryError')).toHaveLength(1);
-      expect(host(root, 'QueryError')[0]?.props.placement).not.toBe('top');
-      expect(host(root, 'SecurityAgentSetup')).toHaveLength(0);
+      expect(host(root, 'QueryError')).toHaveLength(0);
+      const setup = host(root, 'SecurityAgentSetup')[0];
+      expect(setup).toBeDefined();
+      expect(setup?.props.url).toBeUndefined();
+      // A press resolves (re-mints) the URL; still failing, it reports none.
+      const resolve = setup?.props.resolveUrl as (() => Promise<unknown>) | undefined;
+      await expect(resolve?.()).resolves.toBeUndefined();
+      expect(
+        transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintInstallState')
+      ).toHaveLength(2);
+    }
+  );
+
+  it.each([false, true])(
+    'resolves a fresh URL on press after a mount-time mint failure with integration=%s',
+    async hasIntegration => {
+      permissionData = { hasIntegration, hasPermissions: false, reauthorizeUrl: null };
+      mintFailed = true;
+      const root = await mount(scope);
+      const setup = host(root, 'SecurityAgentSetup')[0];
+      expect(setup?.props.url).toBeUndefined();
+      mintFailed = false;
+      const resolve = setup?.props.resolveUrl as (() => Promise<unknown>) | undefined;
+      const resolved = new URL((await resolve?.()) as string);
+      expect(resolved.origin + resolved.pathname).toBe('https://settings.test/github-app');
+      expect(resolved.searchParams.get('installState')).toBe('install-state');
+      expect(resolved.searchParams.get('fromApp')).toBe('1');
+      expect(resolved.searchParams.get('organizationId')).toBe(scope === 'personal' ? null : scope);
+    }
+  );
+
+  it.each([false, true])(
+    'keeps the setup mounted during a press-time re-mint with integration=%s',
+    async hasIntegration => {
+      permissionData = { hasIntegration, hasPermissions: false, reauthorizeUrl: null };
+      const root = await mount(scope);
+      const setup = host(root, 'SecurityAgentSetup')[0];
+      if (!setup) {
+        throw new Error('expected the setup screen');
+      }
+      act(() => {
+        void (setup.props.resolveUrl as () => Promise<unknown>)();
+      });
+      expect(host(root, 'SecurityAgentSetup')).toHaveLength(1);
+      expect(host(root, 'Skeleton')).toHaveLength(0);
+      await advanceBy();
+      expect(host(root, 'SecurityAgentSetup')[0]?.props.url).toBeDefined();
     }
   );
 

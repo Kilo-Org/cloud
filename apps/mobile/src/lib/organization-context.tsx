@@ -129,9 +129,6 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     setState(current => ({ ...current, isSaving: true }));
     let error: 'save' | null = null;
     try {
-      // An organization writes the organization key and clears the Personal
-      // marker; Personal deletes the organization key every other reader relies
-      // on and writes the marker in its place.
       await (id
         ? setAccountMetadata(ORGANIZATION_STORAGE_KEY, id)
         : deleteAccountMetadata(ORGANIZATION_STORAGE_KEY));

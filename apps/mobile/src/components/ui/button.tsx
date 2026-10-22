@@ -1,4 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority';
+import * as React from 'react';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
@@ -53,6 +54,39 @@ const SM_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 };
 // stayed put (the 2026-09-29 device proof: identical label ink, near-zero busy
 // ink in flight). The slot never gives up its box, in either motion branch.
 export const BUTTON_BUSY_SLOT_CLASS = 'h-[20px] w-[20px] shrink-0 items-center justify-center';
+
+/**
+ * The visible text of the button's children, for a label a loading button can
+ * hand to the accessibility layer when the caller gave none. Text children
+ * carry their caption in `props.children`; glyphs contribute nothing, so a
+ * caller with an icon-only button must label it itself.
+ */
+function flattenChildrenText(children: React.ReactNode): string | undefined {
+  const parts: string[] = [];
+  const visit = (node: React.ReactNode): void => {
+    if (node === null || node === undefined || node === true || node === false) {
+      return;
+    }
+    if (Array.isArray(node)) {
+      const items: React.ReactNode[] = node;
+      for (const child of items) {
+        visit(child);
+      }
+      return;
+    }
+    if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+      visit(node.props.children);
+      return;
+    }
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
+    if (typeof node === 'string' || typeof node === 'number') {
+      parts.push(String(node));
+    }
+  };
+  visit(children);
+  const text = parts.join(' ').replaceAll(/\s+/g, ' ').trim();
+  return text === '' ? undefined : text;
+}
 
 // Spinner color per variant, matching that variant's text color (see
 // buttonTextVariants below). accent-soft's foreground isn't in useThemeColors
@@ -110,6 +144,7 @@ function Button({
   loading,
   disabled,
   accessibilityState,
+  accessibilityLabel,
   hitSlop,
   children,
   ...props
@@ -126,6 +161,15 @@ function Button({
   // keeps the brand fill and its spinner so it still reads as working.
   const isMutedDisabled = isDisabled && !loading && isPrimary;
   const isDimmed = isDisabled && !isPrimary;
+  // On Android, a node's accessible name is only rewritten while the incoming
+  // state still carries `busy`. A loading button therefore keeps announcing its
+  // busy state after the request settles unless its label prop holds a real
+  // name for the `busy: true → false` transition to write. Pass the caller's
+  // label when given; when a call site opted into `loading` without one,
+  // derive it from the visible child text, so the announced name always
+  // matches what is on screen.
+  const resolvedLabel =
+    accessibilityLabel ?? (loading !== undefined ? flattenChildrenText(children) : undefined);
   // Reserve the busy slot whenever the caller opted into `loading` (even when
   // it is false), so the row has the same geometry before and during a request.
   // A button that never loads keeps its original layout. The fixed `icon` size
@@ -146,6 +190,7 @@ function Button({
         )}
         role="button"
         disabled={isDisabled}
+        accessibilityLabel={resolvedLabel}
         accessibilityState={{ ...accessibilityState, disabled: isDisabled, busy: loading }}
         hitSlop={hitSlop ?? (size === 'sm' ? SM_HIT_SLOP : undefined)}
         {...props}

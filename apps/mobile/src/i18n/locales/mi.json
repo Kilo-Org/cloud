@@ -25,6 +25,7 @@
     "error": "hapa: {{error}}",
     "back": "Hoki",
     "somethingWentWrong": "Kua puta he hapa.",
+    "actionNotRecorded": "Kāore i taea e mātou te tuhi i tēnei mahi. Whakamātau anō ā muri ake.",
     "couldNotOpen": "Kāore i taea te whakatuwhera i {{label}}.",
     "link": "hono",
     "takingLonger": "Kei te roa ake tēnei i te wā i whakaarotia. Ka taea e koe te kati i tēnei, ka tiro anō ā muri ake.",
@@ -35,6 +36,8 @@
     "connectGithub": "Hono ki GitHub",
     "cost": "Utu",
     "discard": "Whakarere",
+    "discardChangesMessage": "Ka ngaro ō huringa.",
+    "discardChangesTitle": "Whakarere ngā huringa?",
     "findings": "Ngā kitenga",
     "mergeRequest": "tono whakakotahi",
     "notConnected": "Kāore anō kia hono",
@@ -109,7 +112,9 @@
     "online": "Tuihono",
     "open": "Whakatuwheratia a {{name}}",
     "openPullRequest": "Tuwhera te tono kume",
+    "completed": "Kua oti",
     "pending": "E tatari ana",
+    "running": "Kei te whakahaere",
     "performance": "Mahinga",
     "preferences": "Ngā manakohanga",
     "privacyPolicy": "Kaupapahere tūmataiti",
@@ -661,7 +666,8 @@
       "description": "Honoa tō pūkete GitHub hei arotake i ngā tono kume i tō waea pūkoro.",
       "gitlabDescription": "Honoa tō pūkete GitLab kia arotakehia ngā tono whakakotahi i te waea pūkoro.",
       "bitbucketDescription": "Honoa a Bitbucket ki tēnei whakahaere kia arotakehia ngā tono kume i te waea pūkoro.",
-      "bitbucketOrgOnlyDescription": "Kōwhiria he whakahaere i tō pūkoro kia arotakehia ōna tono kume Bitbucket."
+      "bitbucketOrgOnlyDescription": "Whakawhiti te pūkete kei runga ake nei ki tētahi whakahaere kia arotakehia ōna tono kume Bitbucket.",
+      "contextLine": "Mō {{organization}}"
     },
     "screen": {
       "title": "#{{number}}",
@@ -769,7 +775,9 @@
       "reviewNotSubmitted": "Kāore e taea te tuku i tēnei arotake i tōna āhua o nāianei. Kua rerekē pea te PR, kāore rānei koe e whakaaetia kia arotake i tō ake tono kume.",
       "reviewNotSubmittedTerm": "Kāore e taea te tuku i tēnei arotake kia pēnei tonu. Tērā pea kua huri te {{term}}, kāore rānei e taea e koe te arotake i tō ake {{term}}.",
       "couldNotPostComment": "Kāore i taea te tuku i te kōrero.",
-      "couldNotSubmitReview": "Kāore i taea te tuku i te arotake. Tirohia tō hononga, ka whakamātau anō."
+      "couldNotSubmitReview": "Kāore i taea te tuku i te arotake. Tirohia tō hononga, ka whakamātau anō.",
+      "rateLimited": "Nui rawa ngā tono. Whakamātau anō ā muri atu.",
+      "conflict": "Kua hēngauna tēnei i a koe e mahi ana. Tāutia anō ka whakamātau anō."
     },
     "operation": {
       "couldNotReply": "Kāore i taea te whakautu.",
@@ -777,7 +785,6 @@
       "mergeResultDefaultError": "Kāore a GitHub i whakaoti i te whakakotahitanga.",
       "mergeResultNotCompleted": "Kāore i whakakotahitia te {{term}}. Tirohia tōna tūnga, ka ngana anō.",
       "ambiguous": "Kāore i taea te whakaū — tirohia te PR i mua i te whakamātau anō.",
-      "persistenceFailed": "Kāore i taea e mātou te tuhi i tēnei mahi. Whakamātau anō ā muri ake.",
       "forbidden": "Kāore e whakaaetia."
     },
     "capabilities": {
@@ -1449,8 +1456,9 @@
       "loading": "Kei te uta i te mahara arotake",
       "couldNotLoad": "Kāore i taea te uta i te mahara arotake.",
       "off": "Kua monoa te mahara arotake.",
+      "on": "Kua whakahohea te mahara arotake.",
       "offDescription": "Whakahohea kia ako a Kilo i ngā whakautu a ngā kaitiaki, kia tūtohu hoki i ngā aratohu mō REVIEW.md.",
-      "readOnlyDescription": "Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te whakahohe i te mahara arotake.",
+      "readOnlyDescription": "Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te huri i te mahara arotake.",
       "enable": "Whakahohea te mahara arotake",
       "loadingProposals": "Kei te uta i ngā tono",
       "couldNotLoadProposals": "Kāore i taea te uta i ngā tono.",
@@ -1534,8 +1542,6 @@
     "updateFailed": "I rahua te whakahou i te kaiarotake.",
     "configSaveFailed": "I rahua te tiaki i te whirihoranga arotake.",
     "status": {
-      "running": "Kei te whakahaere",
-      "completed": "Kua oti",
       "interrupted": "I haukotia"
     },
     "reviewStyle": {
@@ -1548,7 +1554,8 @@
       "bugs": "Ngā hapa",
       "style": "Te āhua",
       "testing": "Whakamātautau",
-      "documentation": "Tuhinga"
+      "documentation": "Tuhinga",
+      "unknown": "Ētahi ({{area}})"
     },
     "gateThreshold": {
       "warning": "Whakatūpato"
@@ -1660,7 +1667,14 @@
       "whereFound": "Te wāhi i kitea ai ({{displayCount}})",
       "fullReport": "Te pūrongo katoa i hangaia",
       "yes": "Āe",
-      "no": "Kāo"
+      "no": "Kāo",
+      "action": {
+        "analyzeCodebase": "Tātaritia te kōnae kōwae",
+        "dismiss": "Whakakore",
+        "manualReview": "Arotake a te tangata",
+        "monitor": "Aroturuki",
+        "openPr": "Whakahuakia te PR"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} kitenga",
@@ -1862,12 +1876,16 @@
     "settingsSave": {
       "saveChanges": "Tiakina ngā huringa",
       "unsavedTitle": "Ngā huringa kāore i tiakina",
-      "unsavedMessage": "Me tiaki ō huringa i mua i te wehe atu i tēnei mata?"
+      "unsavedMessage": "Me tiaki ō huringa i mua i te wehe atu i tēnei mata?",
+      "unsavedInvalidMessage": "Kāore anō ēnei huringa e taea te tiaki. Whakatikahia kia tiakina ai, whakarere rānei kia wehe atu ai."
     },
     "auditReportButton": {
       "viewA11y": "Tirohia te pūrongo arotake"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kaiwhakahaere Kilo",
+      "actorMaskedUser": "Kaiwhakamahi huna",
+      "actorSystem": "Pūnaha Kilo",
       "couldNotLoad": "Kāore i taea te uta i te pūrongo arotake.",
       "events": "Ngā takahanga",
       "generated": "I hangaia i te {{generatedAt}}.",
@@ -1879,7 +1897,24 @@
       "title": "Te pūrongo arotake",
       "unavailable": "Kāore e wātea ana te pūrongo arotake",
       "unavailableDescription": "Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te tiro i ngā pūrongo arotake. Tonohia tētahi rangatira, kaiwhakahaere, kaiwhakahaere utu rānei kia tuku whakaaetanga uru ki a koe.",
-      "queryFailed": "Kāore i oti te uiuinga pūrongo. Whakamātau anō."
+      "queryFailed": "Kāore i oti te uiuinga pūrongo. Whakamātau anō.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Kua oti te tātari",
+        "findingAnalysisFailed": "I raru te tātari",
+        "findingAutoDismissed": "Kua whakakorehia aunoa",
+        "findingCreated": "Kua whakaurua",
+        "findingDeleted": "Kua mukua",
+        "findingDismissed": "Kua whakakorehia",
+        "findingSeverityChanged": "Kua huri te taumata",
+        "findingStatusChange": "Kua huri te tūnga",
+        "findingSuperseded": "Kua whakakapia",
+        "remediationBlocked": "Kua herea te whakatika",
+        "remediationCancelled": "Kua whakakorea",
+        "remediationFailed": "I raru te whakatika",
+        "remediationNoChangesNeeded": "Kāore he panonitanga e hiahiatia",
+        "remediationPrOpened": "Kua huakina te PR",
+        "remediationQueued": "Kua tonoa te whakatika"
+      }
     },
     "notifications": {
       "couldNotLoad": "Kāore i taea te uta i ngā tautuhinga whakamōhiotanga.",
@@ -1911,7 +1946,6 @@
       "installApp": "Tāutahia te taupānga GitHub",
       "reauthorizeButton": "Whakamanahia anō te taupānga GitHub",
       "reauthorizeDescription": "Me whai te Kaiāwhina haumarutanga i te whakaaetanga vulnerability_alerts kia uru ki ngā matohi Dependabot. Whakamanahia anō te taupānga GitHub hei tuku i tēnei whakaaetanga.",
-      "reauthorizeFailed": "Kāore i taea te tīmata i te whakamana anō. Whakamātau anō.",
       "reauthorizeTitle": "E hiahiatia ana ētahi atu whakaaetanga",
       "setupFailed": "Kāore i taea te tīmata i te whakarite i GitHub. Whakamātau anō."
     },
@@ -1930,7 +1964,12 @@
       "syncMayNotHaveCompleted": "Kāore pea i oti tētahi tukutahi. Whakamātau anō kia whakaōritea ngā raraunga, whakakorea rānei.",
       "syncInProgress": "Kei te haere kē tētahi tukutahi haumarutanga. Whakamātau anō.",
       "dismissalInProgress": "Kei te haere tonu tēnei whakakorenga. Whakamātau anō.",
-      "couldNotReadPendingSyncs": "Kāore i taea te pānui i ngā tukutahi e tatari ana. Whakamātau anō."
+      "couldNotReadPendingSyncs": "Kāore i taea te pānui i ngā tukutahi e tatari ana. Whakamātau anō.",
+      "ambiguous": "Kāore i taea te whakaū — tirohia te arotake haumarutanga i mua i te whakamātau anō.",
+      "settleFailed": "Oti te mahi, engari kāore i taea te tuhi i te hua. Whakamātau anō.",
+      "replayFailed": "Kāore i oti tēnei mahi. Whakamātau anō.",
+      "actionFailed": "Kāore i taea te oti i tēnei mahi. Whakamātau anō.",
+      "actionBlocked": "Kāore i taea te oti i tēnei mahi. Me whakatika te raru i te tuatahi."
     },
     "analysisState": {
       "queued": "Kei te rārangi tatari te tātari",
@@ -2215,6 +2254,7 @@
       "prefillModelUnavailable": "Kāore a {{model}} e wātea ana ināianei. Kei te whakamahia tō tauira taunoa.",
       "couldNotReadPendingSessions": "Kāore i taea te pānui i ngā wātū e tatari ana. Whakamātau anō.",
       "failedToCreate": "Kāore i taea te hanga i te wātū.",
+      "checkOrganizationAccess": "Tirohia tō urunga ki tēnei rōpū, kātahi ka whakamātau anō.",
       "couldNotRefreshRepositories": "Kāore i taea te whakahou i ngā putunga waehere. Whakamātau anō.",
       "discardDraftTitle": "Mukua te hukihuki?",
       "discardDraftMessage": "Ka ngaro ō tohutohu.",
@@ -2284,7 +2324,8 @@
       "linesBadge_other": "{{displayCount}} rārangi",
       "matchesBadge_one": "{{displayCount}} kitenga",
       "matchesBadge_other": "{{displayCount}} kitenga",
-      "noOutput": "Kāore he putanga."
+      "noOutput": "Kāore he putanga.",
+      "translationFailed": "I rahua te whakamāoritanga"
     },
     "readToolMarkdown": {
       "linesTruncated": "ngā rārangi {{start}}–{{end}} (kua poroa)",
@@ -2744,7 +2785,7 @@
     "viewProfile": "Tirohia te kōtaha",
     "webBrowser": "Pūtirotiro tukutuku",
     "signOutThisDevice": "Takiputa i tēnei pūrere",
-    "signOutThisSession": "Takiputa i tēnei wātū",
+    "signOutSessionLabel": "Takiputa i a {{device}}, i takiuru i te {{signedIn}}",
     "sessionSignedOut": "Kua takiputaina te wātū.",
     "signOutThisDeviceTitle": "Takiputa i tēnei pūrere?",
     "signOutThisSessionTitle": "Takiputa i tēnei wātū?",
@@ -2981,11 +3022,22 @@
     "boundary": {
       "backToProfile": "Hoki ki te kōtaha",
       "loadErrorMessage": "Tirohia tō hononga, ā, whakamātau anō.",
+
+      "chooseAccount": "Kōwhiria tētahi pūkete",
       "loadErrorTitle": "Kāore i taea te uta i ō rōpū.",
+      "noOrganization": "Kāore he rōpū",
+
+      "noOrganizationDescription": "Kāore tēnei pūkete i roto i tētahi rōpū. Waihangatia, uru atu rānei ki tētahi rōpū i runga i te paetukutuku kia whakamahi ai i ngā āhuatanga rōpū pēnei i ngā pōwhiri mema me ngā whakatūpato mō te toenga iti.",
+
+      "openWebOrganizations": "Whakatuwheratia ngā rōpū i runga i te paetukutuku",
+
       "organizationUnavailable": "Kāore e wātea ana te rōpū.",
-      "selectDescription": "Kōwhiria tētahi rōpū mai i tō kōtaha kia haere tonu.",
+      "selectDescriptionWithOrganizations": "Kei roto koe i tētahi rōpū, neke atu rānei. Kōwhiria te pūkete e tika ana mā tēnei mata.",
+
       "selectOrganization": "Kōwhiria tētahi rōpū",
       "unavailableDescription": "Kāore tēnei rōpū e wātea ana ināianei. Kōwhiria tētahi mai i tō kōtaha kia haere tonu.",
+
+      "unavailableSessionsDescription": "Kāore tēnei rōpū e wātea ana ināianei. Kāore e taea ana te uta i ngā sesiona a tēnei rōpū.",
       "accessDeniedDescription": "Kāore ō whakaaetanga uru ki tēnei rōpū."
     },
     "creditActivity": {
@@ -3037,7 +3089,11 @@
       "separateEmailsHint": "Wehewehea ngā wāhitau īmēra ki ngā piko.",
       "thresholdLabel": "Whakatūpato ina iti iho i te (USD)",
       "title": "Te whakatūpato toenga iti",
-      "emailsError": "Whakaurua kia kotahi neke atu rānei ngā wāhitau īmēra tika. Wehewehea ki ngā piko.",
+      "emailsInvalid": "Kāore e tika ana tētahi, ētahi rānei o ngā wāhitau īmēra.",
+      "emailsRequired": "Whakaurua kia kotahi neke atu rānei ngā wāhitau īmēra.",
+      "saveEmailsError": "Kāore ētahi o ngā wāhitau īmēra i whakaaetia. Tirohia, kātahi ka whakamātau anō.",
+      "saveError": "Kāore i taea te tiaki i te whakatūpato toenga iti.",
+      "thresholdPlaceholder": "Whakaurua he moni",
       "thresholdError": "Whakaurua he moni nui ake i te 0."
     },
     "memberLimit": {
@@ -3048,6 +3104,7 @@
       "removeLimit": "Tangohia te tepe",
       "title": "Te tepe whakamahinga ā-rā",
       "blankError": "Whakaurua he moni, tangohia rānei te tepe mā te pātene i raro nei.",
+      "blankWithoutLimitError": "Whakaurua he tepe ā-rā i waenga i te 0 me te {{max}}.",
       "rangeError": "Whakaurua he moni i waenga i te 0 me te {{max}}."
     },
     "members": {
@@ -3586,7 +3643,6 @@
     "keyTooLong": "Kia 256 pūāhua iti iho rānei te kī",
     "keyDuplicate": "Kua noho kē tēnei kī i te kōtaha",
     "valueLabel": "Uara",
-    "secretLabel": "Mea ngaro",
     "secrets": {
       "markSecret": "Tohua hei mea ngaro",
       "masked": "Uara huna",
@@ -3645,7 +3701,9 @@
       "jsonTooLarge": "Whakamahia kia 50 ngā tāurunga, kī tae atu ki 128 me ngā uara tae atu ki 4096 pūāhua",
       "timeoutInvalid": "Ko te wa poto me he maha katoa o nga manomano",
       "edit": "Whakatika tūmau MCP",
-      "saveFailed": "Kāore i taea te tiaki i te tūmau MCP"
+      "saveFailed": "Kāore i taea te tiaki i te tūmau MCP",
+      "deleteFailed": "Kāore i taea te muku i te tūmau MCP",
+      "updateFailed": "Kāore i taea te whakahou i te tūmau MCP"
     },
     "agents": {
       "title": "Ngā māngai",
@@ -3672,6 +3730,7 @@
       "visibilitySubagent": "Subagent — ka taea anake te waea mai i etahi atu",
       "visibilityAll": "Katoa — e rua",
       "saveFailed": "Kāore i taea te tiaki māngai",
+      "deleteFailed": "Kāore i taea te muku māngai",
       "nameRequired": "Whakauruhia he ingoa māngai",
       "slugRequired": "Whakauruhia he slug māngai",
       "slugInvalid": "Me timata te Slug ki te reta me te whakamahi i nga reta iti, nga mati me nga tohu",
@@ -3686,10 +3745,12 @@
       "description": "Whakaahuatanga whakahau",
       "template": "tauira",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Whakamaramahia $ARGUMENTS",
       "subtask": "Whakahaerehia hei mahi iti",
       "edit": "Whakatika whakahau rītaha",
       "saveFailed": "Kāore i taea te tiaki tono",
+      "deleteFailed": "Kāore i taea te muku tono",
       "nameRequired": "Whakauruhia he ingoa whakahau",
       "nameInvalid": "Me timata te ingoa ki te reta iti me te whakamahi i nga reta iti, nga mati me nga tohu",
       "templateRequired": "Whakauruhia he tauira whakahau",
@@ -3836,7 +3897,7 @@
     "view": "Pānui whakamōhiotanga",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Whakaatu tūnga ora",
+    "dismiss": "Whakakorea te whakamōhiotanga",
     "offline": "Tuimotu · whakamōhiotanga kua tiakina",
     "cached": "Pūrongo kua tiakina · kāore e taea te whakahou",
     "revised": "Kua arotakea · {{revision}}",

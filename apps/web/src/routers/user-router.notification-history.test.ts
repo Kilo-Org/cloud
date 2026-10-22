@@ -89,6 +89,25 @@ describe('user.getNotificationHistory', () => {
     expect(page2.items.map(item => item.id)).toEqual([expected[1]]);
   });
 
+  it('paginates rows separated by less than a millisecond without skipping either', async () => {
+    const user = await insertTestUser();
+    const second = iso(5 * 60 * 1000).slice(0, 19);
+    const newer = await insertHistory(user.id, { created_at: `${second}.123900Z` });
+    const older = await insertHistory(user.id, { created_at: `${second}.123100Z` });
+    const caller = await createCallerForUser(user.id);
+
+    const first = await caller.user.getNotificationHistory({ limit: 1 });
+    expect(first.items.map(item => item.id)).toEqual([newer.id]);
+    expect(first.nextCursor).not.toBeNull();
+
+    const next = await caller.user.getNotificationHistory({
+      limit: 1,
+      cursor: first.nextCursor ?? undefined,
+    });
+    expect(next.items.map(item => item.id)).toEqual([older.id]);
+    expect(next.nextCursor).toBeNull();
+  });
+
   it('still resolves a cursor whose row was deleted by the prune', async () => {
     const user = await insertTestUser();
     const newer = await insertHistory(user.id, {

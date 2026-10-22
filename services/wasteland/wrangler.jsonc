@@ -74,6 +74,14 @@
     "WASTELAND_API_URL": "https://wasteland.kiloapps.io",
   },
 
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+
   "analytics_engine_datasets": [{ "binding": "WASTELAND_AE", "dataset": "wasteland_events" }],
 
   // PRODUCTION Secrets Store (shared Kilo secrets store)
@@ -118,6 +126,14 @@
           { "name": "WASTELAND_REGISTRY", "class_name": "WastelandRegistryDO" },
         ],
       },
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "624ec80650dd414199349f4e217ddb10",
+          "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+        },
+      ],
+
       "analytics_engine_datasets": [{ "binding": "WASTELAND_AE", "dataset": "wasteland_events" }],
       "secrets_store_secrets": [
         {

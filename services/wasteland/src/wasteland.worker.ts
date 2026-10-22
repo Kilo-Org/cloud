@@ -11,9 +11,7 @@ import { logger } from './util/log.util';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
 import type { AuthVariables } from './middleware/auth.middleware';
-import { createKiloAuthMiddleware } from '@kilocode/worker-utils/kilo-auth-middleware';
-import { WASTELAND_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { resolveSecret } from './util/secret.util';
+import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
 import { validateCfAccessRequest } from '@kilocode/worker-utils/cf-access';
 import { timingMiddleware } from './middleware/analytics.middleware';
 import { wrappedWastelandRouter } from './trpc/router';
@@ -36,12 +34,6 @@ export type WastelandEnv = {
 };
 
 const app = new Hono<WastelandEnv>();
-
-const kiloAuthMiddleware = createKiloAuthMiddleware<WastelandEnv>({
-  resolveSecret,
-  audiencePolicy: { audience: WASTELAND_AUDIENCE, mode: 'allow-legacy' },
-  onAuthenticated: payload => logger.setTags({ userId: payload.kiloUserId }),
-});
 
 async function cfAccessDebugMiddleware(c: Context<WastelandEnv>, next: () => Promise<void>) {
   // Bypass CF Access in dev. We can't trust the request hostname for

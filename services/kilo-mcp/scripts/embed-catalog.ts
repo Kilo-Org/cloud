@@ -250,8 +250,8 @@ export async function embedAndUpsert(options: EmbedOptions): Promise<{ vectors: 
  * meant to delete, because the next run no longer sees them in its base.
  * Deleting an id the index never had is a no-op.
  *
- * The previous artifact is the source of stale ids, never the index itself:
- * listing the whole production index through the REST API times out.
+ * The ids come from git history, never from the index itself: listing the whole
+ * production index through the REST API times out.
  *
  * An empty current catalog prunes nothing: the dump refuses to write one, so an
  * empty artifact means something went wrong, and emptying the production index

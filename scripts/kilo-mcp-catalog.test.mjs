@@ -457,6 +457,12 @@ function validate(workflow) {
   );
   assert.match(ids.run ?? '', /keys\[\]/, 'each version contributes its procedure paths');
   assert.match(ids.run ?? '', /sort -u/, 'the union is deduped');
+  // `git log` and `git show` walk every commit, so the walk's prerequisite is a
+  // full clone: without it the union silently covers only the pushed range.
+  const mergeCheckout = merge.steps.find(step =>
+    (step.uses ?? '').startsWith('useblacksmith/checkout@')
+  );
+  assert.equal(mergeCheckout?.with?.['fetch-depth'], 0, 'the history walk needs the full clone');
   assert.match(
     ids.run ?? '',
     /out="\$RUNNER_TEMP\/catalog-ever-ids\.txt"/,

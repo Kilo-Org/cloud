@@ -604,6 +604,55 @@ describe('removeModelsFallback', () => {
   });
 });
 
+describe('applyProviderSpecificLogic paid server features', () => {
+  const fields = {
+    plugins: [{ id: 'web' }],
+    tools: [
+      { type: 'openrouter:web_search' },
+      { type: 'function', function: { name: 'lookup', parameters: { type: 'object' } } },
+    ],
+  };
+
+  async function applyTo(model: string) {
+    const request = makeRequest(model);
+    Object.assign(request.body, structuredClone(fields));
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+    return request.body;
+  }
+
+  it('removes them from free model requests', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const body = await applyTo('vendor/model:free');
+
+    expect(body.plugins).toEqual([{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }]);
+    expect(body.tools).toEqual([fields.tools[1]]);
+    warn.mockRestore();
+  });
+
+  it('keeps them for paid model requests', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const body = await applyTo('vendor/model');
+
+    expect(body).toMatchObject(fields);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
 describe('applyPreferredProvider', () => {
   it.each(['openai/gpt-5.6-terra', 'openai/o3', 'gpt-5.5'])(
     'prefers OpenAI for OpenAI model %s',

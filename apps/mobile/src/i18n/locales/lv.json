@@ -1491,6 +1491,8 @@
       "saveFirst": "Saglabā labojumus pirms PR atvēršanas.",
       "proposalSaved": "Priekšlikums saglabāts",
       "proposalDismissed": "Priekšlikums noraidīts",
+      "dismissProposalTitle": "Noraidīt priekšlikumu?",
+      "dismissProposalMessage": "Šis priekšlikums tiks noņemts no aktīvo priekšlikumu saraksta, un to nevarēs atjaunot.",
       "prOpened": "Atvērts PR failam REVIEW.md",
       "alreadyPresent": "Norādījumi jau ir REVIEW.md failā",
       "status": {

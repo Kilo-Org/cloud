@@ -1472,6 +1472,8 @@
       "saveFirst": "Pull request မဖွင့်မီ သင်၏ ပြင်ဆင်ချက်များကို သိမ်းဆည်းပါ။",
       "proposalSaved": "အဆိုပြုချက်ကို သိမ်းဆည်းပြီးပါပြီ",
       "proposalDismissed": "အဆိုပြုချက်ကို ပယ်ချပြီးပါပြီ",
+      "dismissProposalTitle": "အဆိုပြုချက်ကို ပယ်ချမလား?",
+      "dismissProposalMessage": "ဤအဆိုပြုချက်ကို လက်ရှိအသုံးပြုနေသော စာရင်းမှ ဖယ်ရှားမည်ဖြစ်ပြီး ပြန်လည်ရယူနိုင်မည်မဟုတ်ပါ။",
       "prOpened": "REVIEW.md အတွက် pull request ဖွင့်ပြီးပါပြီ",
       "alreadyPresent": "လမ်းညွှန်ချက်များ REVIEW.md တွင် ရှိပြီးသားဖြစ်သည်",
       "status": {

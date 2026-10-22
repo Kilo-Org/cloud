@@ -1472,6 +1472,8 @@
       "saveFirst": "Pull request banuu kee dura gulaallii kee olkaa'i.",
       "proposalSaved": "Yaadni dhihaate olkaa'ameera",
       "proposalDismissed": "Yaadni dhihaate dhiifameera",
+      "dismissProposalTitle": "Yaada dhihaate dhiisuu?",
+      "dismissProposalMessage": "Yaadni dhihaate kun tarree hojii irra jiru keessaa ni haqama, deebisuunis hin danda’amu.",
       "prOpened": "Pull request REVIEW.md banameera",
       "alreadyPresent": "Qajeelfamni duraanuu REVIEW.md keessa jira",
       "status": {

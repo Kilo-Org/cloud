@@ -19,7 +19,7 @@ export function isProposalActionable(status: ReviewMemoryProposal['status']) {
 export function proposalStatusLabel(status: ReviewMemoryProposal['status'], t: TFunction) {
   switch (status) {
     case 'open': {
-      return t('prReview.entry.open');
+      return t('organization.invoices.status.open');
     }
     case 'edited': {
       return t('codeReviewer.reviewMemory.status.edited');

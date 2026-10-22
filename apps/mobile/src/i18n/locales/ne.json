@@ -1472,6 +1472,8 @@
       "saveFirst": "पुल रिक्वेस्ट खोल्नुअघि आफ्ना सम्पादनहरू सुरक्षित गर्नुहोस्।",
       "proposalSaved": "प्रस्ताव सुरक्षित गरियो",
       "proposalDismissed": "प्रस्ताव खारेज गरियो",
+      "dismissProposalTitle": "प्रस्ताव खारेज गर्ने?",
+      "dismissProposalMessage": "यो प्रस्ताव सक्रिय सूचीबाट हटाइनेछ र यसलाई पुनर्स्थापना गर्न सकिने छैन।",
       "prOpened": "REVIEW.md को पुल रिक्वेस्ट खोलियो",
       "alreadyPresent": "निर्देशनहरू REVIEW.md मा पहिले नै छन्",
       "status": {

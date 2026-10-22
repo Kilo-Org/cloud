@@ -1472,6 +1472,8 @@
       "saveFirst": "Tallenna muutoksesi ennen pull requestin avaamista.",
       "proposalSaved": "Ehdotus tallennettu",
       "proposalDismissed": "Ehdotus hylätty",
+      "dismissProposalTitle": "Hylätäänkö ehdotus?",
+      "dismissProposalMessage": "Tämä ehdotus poistetaan aktiivisten ehdotusten luettelosta, eikä sitä voi palauttaa.",
       "prOpened": "REVIEW.md-tiedoston pull request avattu",
       "alreadyPresent": "Ohjeet ovat jo REVIEW.md-tiedostossa",
       "status": {

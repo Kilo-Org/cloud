@@ -1491,6 +1491,8 @@
       "saveFirst": "Sačuvaj izmjene prije otvaranja pull requesta.",
       "proposalSaved": "Prijedlog sačuvan",
       "proposalDismissed": "Prijedlog odbačen",
+      "dismissProposalTitle": "Odbaciti prijedlog?",
+      "dismissProposalMessage": "Ovaj prijedlog će biti uklonjen s liste aktivnih prijedloga i neće se moći vratiti.",
       "prOpened": "Pull request za REVIEW.md otvoren",
       "alreadyPresent": "Smjernice već postoje u REVIEW.md",
       "status": {

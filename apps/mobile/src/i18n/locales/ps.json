@@ -1472,6 +1472,8 @@
       "saveFirst": "د پل ریکوېسټ له پرانیستلو مخکې خپل بدلونونه خوندي کړئ.",
       "proposalSaved": "وړاندیز خوندي شو",
       "proposalDismissed": "وړاندیز رد شو",
+      "dismissProposalTitle": "وړاندیز رد کړئ؟",
+      "dismissProposalMessage": "دا وړاندیز به د فعالو وړاندیزونو له لېست څخه لرې شي او بېرته راګرځول به یې ممکن نه وي.",
       "prOpened": "د REVIEW.md پل ریکوېسټ پرانیستل شو",
       "alreadyPresent": "لارښوونې لا دمخه په REVIEW.md کې شته",
       "status": {

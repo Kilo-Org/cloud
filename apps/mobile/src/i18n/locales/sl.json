@@ -1510,6 +1510,8 @@
       "saveFirst": "Pred odpiranjem zahtevka za združitev shrani spremembe.",
       "proposalSaved": "Predlog shranjen",
       "proposalDismissed": "Predlog zavrnjen",
+      "dismissProposalTitle": "Želite zavrniti predlog?",
+      "dismissProposalMessage": "Ta predlog bo odstranjen s seznama aktivnih predlogov in ga ne bo mogoče obnoviti.",
       "prOpened": "Zahtevek za združitev za REVIEW.md je odprt",
       "alreadyPresent": "Smernice so že v datoteki REVIEW.md",
       "status": {

@@ -1491,6 +1491,8 @@
       "saveFirst": "Guarda as tuas alterações antes de abrir um pull request.",
       "proposalSaved": "Proposta guardada",
       "proposalDismissed": "Proposta rejeitada",
+      "dismissProposalTitle": "Rejeitar proposta?",
+      "dismissProposalMessage": "Esta proposta será removida da lista de propostas ativas e não poderá ser restaurada.",
       "prOpened": "Pull request para o REVIEW.md aberto",
       "alreadyPresent": "As orientações já constam do REVIEW.md",
       "status": {

@@ -1472,6 +1472,8 @@
       "saveFirst": "Anrejistre chanjman ou yo anvan ou ouvri yon pull request.",
       "proposalSaved": "Pwopozisyon an anrejistre",
       "proposalDismissed": "Pwopozisyon an rejte",
+      "dismissProposalTitle": "Rejte pwopozisyon an?",
+      "dismissProposalMessage": "Pwopozisyon sa a p ap nan lis aktif la ankò, epi ou p ap kapab retabli li.",
       "prOpened": "Pull request pou REVIEW.md ouvri",
       "alreadyPresent": "Direktiv yo deja nan REVIEW.md",
       "status": {

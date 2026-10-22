@@ -1472,6 +1472,8 @@
       "saveFirst": "Pull request එකක් විවෘත කිරීමට පෙර ඔබේ සංස්කරණ සුරකින්න.",
       "proposalSaved": "යෝජනාව සුරකින ලදී",
       "proposalDismissed": "යෝජනාව ඉවත දමන ලදී",
+      "dismissProposalTitle": "යෝජනාව ඉවත දමන්නද?",
+      "dismissProposalMessage": "මෙම යෝජනාව සක්‍රිය ලැයිස්තුවෙන් ඉවත් කෙරෙන අතර එය නැවත ප්‍රතිසාධනය කළ නොහැක.",
       "prOpened": "REVIEW.md සඳහා pull request එකක් විවෘත කරන ලදී",
       "alreadyPresent": "මාර්ගෝපදේශ දැනටමත් REVIEW.md තුළ ඇත",
       "status": {

@@ -1472,6 +1472,8 @@
       "saveFirst": "پێش کردنەوەی داواکاری ڕاکێشان، دەستکارییەکانت پاشەکەوت بکە.",
       "proposalSaved": "پێشنیارەکە پاشەکەوت کرا",
       "proposalDismissed": "پێشنیارەکە ڕەت کرایەوە",
+      "dismissProposalTitle": "پێشنیارەکە ڕەت بکرێتەوە؟",
+      "dismissProposalMessage": "ئەم پێشنیارە لە لیستی چالاک لادەبرێت و ناتوانرێت بگەڕێنرێتەوە.",
       "prOpened": "داواکاری ڕاکێشان بۆ REVIEW.md کرایەوە",
       "alreadyPresent": "ڕێنماییەکە پێشتر لە REVIEW.md هەیە",
       "status": {

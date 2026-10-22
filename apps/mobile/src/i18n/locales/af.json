@@ -1472,6 +1472,8 @@
       "saveFirst": "Stoor jou wysigings voordat jy 'n pull request oopmaak.",
       "proposalSaved": "Voorstel gestoor",
       "proposalDismissed": "Voorstel verwerp",
+      "dismissProposalTitle": "Voorstel verwerp?",
+      "dismissProposalMessage": "Hierdie voorstel sal uit die aktiewe lys verwyder word en kan nie herstel word nie.",
       "prOpened": "Pull request vir REVIEW.md oopgemaak",
       "alreadyPresent": "Riglyne is reeds in REVIEW.md",
       "status": {

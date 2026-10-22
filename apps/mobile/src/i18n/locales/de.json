@@ -1002,6 +1002,8 @@
       "saveFirst": "Speichere deine Änderungen, bevor du einen Pull Request öffnest.",
       "proposalSaved": "Vorschlag gespeichert",
       "proposalDismissed": "Vorschlag verworfen",
+      "dismissProposalTitle": "Vorschlag verwerfen?",
+      "dismissProposalMessage": "Dieser Vorschlag wird aus der Liste der aktiven Vorschläge entfernt und kann nicht wiederhergestellt werden.",
       "prOpened": "Pull Request für REVIEW.md geöffnet",
       "alreadyPresent": "Die Richtlinien sind bereits in REVIEW.md vorhanden",
       "status": {

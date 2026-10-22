@@ -974,6 +974,8 @@
       "saveFirst": "Salva le modifiche prima di aprire una pull request.",
       "proposalSaved": "Proposta salvata",
       "proposalDismissed": "Proposta scartata",
+      "dismissProposalTitle": "Scartare la proposta?",
+      "dismissProposalMessage": "Questa proposta verrà rimossa dall'elenco attivo e non potrà essere ripristinata.",
       "prOpened": "Pull request per REVIEW.md aperta",
       "alreadyPresent": "Le indicazioni sono già presenti in REVIEW.md",
       "status": {

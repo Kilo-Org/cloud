@@ -1491,6 +1491,8 @@
       "saveFirst": "Spremi izmjene prije otvaranja zahtjeva za povlačenje.",
       "proposalSaved": "Prijedlog spremljen",
       "proposalDismissed": "Prijedlog odbačen",
+      "dismissProposalTitle": "Odbaciti prijedlog?",
+      "dismissProposalMessage": "Ovaj će prijedlog biti uklonjen s popisa aktivnih prijedloga i neće se moći vratiti.",
       "prOpened": "Zahtjev za povlačenje za REVIEW.md otvoren",
       "alreadyPresent": "Smjernice već postoje u datoteci REVIEW.md",
       "status": {

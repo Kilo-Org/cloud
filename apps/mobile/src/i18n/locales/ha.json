@@ -1472,6 +1472,8 @@
       "saveFirst": "Ajiye gyare-gyarenka kafin buɗe pull request.",
       "proposalSaved": "An ajiye shawara",
       "proposalDismissed": "An yi watsi da shawara",
+      "dismissProposalTitle": "A yi watsi da shawarar?",
+      "dismissProposalMessage": "Za a cire wannan shawara daga jerin shawarwari masu aiki, kuma ba za a iya dawo da ita ba.",
       "prOpened": "An buɗe pull request na REVIEW.md",
       "alreadyPresent": "Ƙa'idodin sun riga sun kasance a cikin REVIEW.md",
       "status": {

@@ -1002,6 +1002,8 @@
       "saveFirst": "पुल रिक्वेस्ट खोलने से पहले अपने बदलाव सहेजें।",
       "proposalSaved": "प्रस्ताव सहेजा गया",
       "proposalDismissed": "प्रस्ताव खारिज किया गया",
+      "dismissProposalTitle": "प्रस्ताव खारिज करें?",
+      "dismissProposalMessage": "यह प्रस्ताव सक्रिय सूची से हटा दिया जाएगा और इसे बहाल नहीं किया जा सकेगा।",
       "prOpened": "REVIEW.md के लिए पुल रिक्वेस्ट खोली गई",
       "alreadyPresent": "दिशानिर्देश REVIEW.md में पहले से मौजूद हैं",
       "status": {

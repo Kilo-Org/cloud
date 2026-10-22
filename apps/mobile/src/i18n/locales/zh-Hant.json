@@ -1002,6 +1002,8 @@
       "saveFirst": "建立 PR 前，請先儲存變更。",
       "proposalSaved": "提案已儲存",
       "proposalDismissed": "提案已忽略",
+      "dismissProposalTitle": "忽略提案？",
+      "dismissProposalMessage": "此提案將從使用中的清單移除，且無法還原。",
       "prOpened": "已建立 REVIEW.md PR",
       "alreadyPresent": "REVIEW.md 中已有此指引",
       "status": {

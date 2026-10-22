@@ -1472,6 +1472,8 @@
       "saveFirst": "Pull request-ის გახსნამდე შეინახე ცვლილებები.",
       "proposalSaved": "წინადადება შენახულია",
       "proposalDismissed": "წინადადება უარყოფილია",
+      "dismissProposalTitle": "გსურთ წინადადების უარყოფა?",
+      "dismissProposalMessage": "ეს წინადადება წაიშლება აქტიური სიიდან და მისი აღდგენა შეუძლებელი იქნება.",
       "prOpened": "REVIEW.md-ის pull request გახსნილია",
       "alreadyPresent": "მითითებები უკვე არის REVIEW.md-ში",
       "status": {

@@ -1491,6 +1491,8 @@
       "saveFirst": "Salvează modificările înainte de a deschide un pull request.",
       "proposalSaved": "Propunere salvată",
       "proposalDismissed": "Propunere respinsă",
+      "dismissProposalTitle": "Respingeți propunerea?",
+      "dismissProposalMessage": "Această propunere va fi eliminată din lista de propuneri active și nu va mai putea fi recuperată.",
       "prOpened": "Pull request pentru REVIEW.md deschis",
       "alreadyPresent": "Instrucțiunile există deja în REVIEW.md",
       "status": {

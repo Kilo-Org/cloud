@@ -1472,6 +1472,8 @@
       "saveFirst": "Gem dine ændringer, før du åbner en pull request.",
       "proposalSaved": "Forslag gemt",
       "proposalDismissed": "Forslag afvist",
+      "dismissProposalTitle": "Afvis forslag?",
+      "dismissProposalMessage": "Dette forslag fjernes fra den aktive liste og kan ikke gendannes.",
       "prOpened": "Pull request til REVIEW.md åbnet",
       "alreadyPresent": "Retningslinjerne findes allerede i REVIEW.md",
       "status": {

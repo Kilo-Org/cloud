@@ -1472,6 +1472,8 @@
       "saveFirst": "Зачувај ги измените пред да отвориш PR.",
       "proposalSaved": "Предлогот е зачуван",
       "proposalDismissed": "Предлогот е отфрлен",
+      "dismissProposalTitle": "Да се отфрли предлогот?",
+      "dismissProposalMessage": "Овој предлог ќе биде отстранет од списокот со активни предлози и нема да може да се врати.",
       "prOpened": "Отворен е PR за REVIEW.md",
       "alreadyPresent": "Насоките веќе се во REVIEW.md",
       "status": {

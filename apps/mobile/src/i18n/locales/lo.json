@@ -1472,6 +1472,8 @@
       "saveFirst": "ບັນທຶກການແກ້ໄຂຂອງເຈົ້າກ່ອນເປີດ PR.",
       "proposalSaved": "ບັນທຶກຂໍ້ສະເໜີແລ້ວ",
       "proposalDismissed": "ປັດຂໍ້ສະເໜີແລ້ວ",
+      "dismissProposalTitle": "ປັດຂໍ້ສະເໜີບໍ?",
+      "dismissProposalMessage": "ຂໍ້ສະເໜີນີ້ຈະຖືກລຶບອອກຈາກລາຍການທີ່ໃຊ້ງານຢູ່ ແລະຈະບໍ່ສາມາດກູ້ຄືນໄດ້.",
       "prOpened": "ເປີດ PR ສຳລັບ REVIEW.md ແລ້ວ",
       "alreadyPresent": "ມີຄຳແນະນຳຢູ່ໃນ REVIEW.md ແລ້ວ",
       "status": {

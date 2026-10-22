@@ -1472,6 +1472,8 @@
       "saveFirst": "پل ریکویسٹ کھولنے سے پہلے اپنی تبدیلیاں محفوظ کریں۔",
       "proposalSaved": "تجویز محفوظ ہو گئی",
       "proposalDismissed": "تجویز مسترد کر دی گئی",
+      "dismissProposalTitle": "تجویز مسترد کریں؟",
+      "dismissProposalMessage": "یہ تجویز فعال فہرست سے ہٹا دی جائے گی اور اسے بحال نہیں کیا جا سکے گا۔",
       "prOpened": "REVIEW.md کے لیے پل ریکویسٹ کھول دی گئی",
       "alreadyPresent": "ہدایات REVIEW.md میں پہلے سے موجود ہیں",
       "status": {

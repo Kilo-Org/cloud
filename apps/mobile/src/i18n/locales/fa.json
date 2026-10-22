@@ -1472,6 +1472,8 @@
       "saveFirst": "پیش از باز کردن پول ریکوئست، ویرایش‌های خود را ذخیره کنید.",
       "proposalSaved": "پیشنهاد ذخیره شد",
       "proposalDismissed": "پیشنهاد رد شد",
+      "dismissProposalTitle": "پیشنهاد رد شود؟",
+      "dismissProposalMessage": "این پیشنهاد از فهرست پیشنهادهای فعال حذف می‌شود و قابل بازیابی نخواهد بود.",
       "prOpened": "پول ریکوئست برای REVIEW.md باز شد",
       "alreadyPresent": "دستورالعمل‌ها از قبل در REVIEW.md موجود است",
       "status": {

@@ -1472,6 +1472,8 @@
       "saveFirst": "Pull request ከመክፈትዎ በፊት ለውጦችዎን ያስቀምጡ።",
       "proposalSaved": "የቀረበው ሐሳብ ተቀምጧል",
       "proposalDismissed": "የቀረበው ሐሳብ ተሰርዟል",
+      "dismissProposalTitle": "የቀረበው ሐሳብ ይሰረዝ?",
+      "dismissProposalMessage": "ይህ የቀረበው ሐሳብ ከንቁ ዝርዝሩ ይወገዳል፣ እንደገናም መመለስ አይቻልም።",
       "prOpened": "የREVIEW.md pull request ተከፍቷል",
       "alreadyPresent": "መመሪያዎቹ አስቀድመው በREVIEW.md ውስጥ አሉ",
       "status": {

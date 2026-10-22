@@ -1008,6 +1008,8 @@
       "saveFirst": "Збережіть зміни, перш ніж відкривати пулреквест.",
       "proposalSaved": "Пропозицію збережено",
       "proposalDismissed": "Пропозицію відхилено",
+      "dismissProposalTitle": "Відхилити пропозицію?",
+      "dismissProposalMessage": "Цю пропозицію буде вилучено зі списку активних пропозицій, і її неможливо буде відновити.",
       "prOpened": "Пулреквест для REVIEW.md відкрито",
       "alreadyPresent": "Настанови вже є в REVIEW.md",
       "status": {

@@ -1002,6 +1002,8 @@
       "saveFirst": "请先保存修改，再创建拉取请求。",
       "proposalSaved": "建议已保存",
       "proposalDismissed": "建议已忽略",
+      "dismissProposalTitle": "忽略建议？",
+      "dismissProposalMessage": "这条建议将从活跃列表中移除，且无法恢复。",
       "prOpened": "已创建 REVIEW.md 拉取请求",
       "alreadyPresent": "REVIEW.md 中已包含这些审查准则",
       "status": {

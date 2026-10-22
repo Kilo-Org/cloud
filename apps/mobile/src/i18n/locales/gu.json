@@ -1472,6 +1472,8 @@
       "saveFirst": "પુલ રિક્વેસ્ટ ખોલતાં પહેલાં તમારા ફેરફારો સાચવો.",
       "proposalSaved": "દરખાસ્ત સાચવાઈ",
       "proposalDismissed": "દરખાસ્ત ફગાવાઈ",
+      "dismissProposalTitle": "દરખાસ્ત ફગાવવી છે?",
+      "dismissProposalMessage": "આ દરખાસ્ત સક્રિય સૂચિમાંથી દૂર થઈ જશે અને તેને પુનઃસ્થાપિત કરી શકાશે નહીં.",
       "prOpened": "REVIEW.md માટે પુલ રિક્વેસ્ટ ખોલાઈ",
       "alreadyPresent": "માર્ગદર્શિકા REVIEW.md માં પહેલેથી જ છે",
       "status": {

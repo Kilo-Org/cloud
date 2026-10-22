@@ -1002,6 +1002,8 @@
       "saveFirst": "Simpan perubahan sebelum membuka pull request.",
       "proposalSaved": "Usulan disimpan",
       "proposalDismissed": "Usulan diabaikan",
+      "dismissProposalTitle": "Abaikan usulan?",
+      "dismissProposalMessage": "Usulan ini akan dihapus dari daftar aktif dan tidak dapat dipulihkan.",
       "prOpened": "Pull request REVIEW.md dibuka",
       "alreadyPresent": "Panduan sudah ada di REVIEW.md",
       "status": {

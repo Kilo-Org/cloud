@@ -1005,6 +1005,8 @@
       "saveFirst": "יש לשמור את השינויים לפני פתיחת בקשת משיכה.",
       "proposalSaved": "ההצעה נשמרה",
       "proposalDismissed": "ההצעה נדחתה",
+      "dismissProposalTitle": "לדחות את ההצעה?",
+      "dismissProposalMessage": "ההצעה תוסר מהרשימה הפעילה ולא יהיה ניתן לשחזר אותה.",
       "prOpened": "נפתחה בקשת משיכה עבור REVIEW.md",
       "alreadyPresent": "ההנחיות כבר קיימות בקובץ REVIEW.md",
       "status": {

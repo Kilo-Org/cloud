@@ -1002,6 +1002,8 @@
       "saveFirst": "풀 리퀘스트를 만들기 전에 변경 사항을 저장하세요.",
       "proposalSaved": "제안이 저장되었습니다",
       "proposalDismissed": "제안이 기각되었습니다",
+      "dismissProposalTitle": "제안을 기각할까요?",
+      "dismissProposalMessage": "이 제안은 활성 목록에서 제거되며 복원할 수 없습니다.",
       "prOpened": "REVIEW.md 풀 리퀘스트가 생성되었습니다",
       "alreadyPresent": "지침이 이미 REVIEW.md에 있습니다",
       "status": {

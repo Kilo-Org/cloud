@@ -1472,6 +1472,8 @@
       "saveFirst": "Chekwaa mgbanwe gị tupu imepe pull request.",
       "proposalSaved": "Echekwara aro",
       "proposalDismissed": "Ewepụla aro",
+      "dismissProposalTitle": "Wepụ aro a?",
+      "dismissProposalMessage": "A ga-ewepụ aro a na ndepụta na-arụ ọrụ, a gaghịkwa enwe ike iweghachi ya.",
       "prOpened": "Emeghela pull request maka REVIEW.md",
       "alreadyPresent": "Nduzi adịlarị na REVIEW.md",
       "status": {

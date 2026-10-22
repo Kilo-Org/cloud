@@ -1529,6 +1529,8 @@
       "saveFirst": "Issejvja l-bidliet tiegħek qabel tiftaħ pull request.",
       "proposalSaved": "Il-proposta ġiet issejvjata",
       "proposalDismissed": "Il-proposta twarrbet",
+      "dismissProposalTitle": "Twarrab il-proposta?",
+      "dismissProposalMessage": "Din il-proposta se titneħħa mil-lista attiva u ma tkunx tista’ tiġi rrestawrata.",
       "prOpened": "Infetħet pull request għal REVIEW.md",
       "alreadyPresent": "Il-linji gwida diġà jinsabu f'REVIEW.md",
       "status": {

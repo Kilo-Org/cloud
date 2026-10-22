@@ -1491,6 +1491,8 @@
       "saveFirst": "Desa els canvis abans d'obrir una pull request.",
       "proposalSaved": "Proposta desada",
       "proposalDismissed": "Proposta descartada",
+      "dismissProposalTitle": "Descartar la proposta?",
+      "dismissProposalMessage": "Aquesta proposta s'eliminarà de la llista de propostes actives i no es podrà restaurar.",
       "prOpened": "Pull request de REVIEW.md oberta",
       "alreadyPresent": "Les pautes ja són a REVIEW.md",
       "status": {

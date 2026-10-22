@@ -1510,6 +1510,8 @@
       "saveFirst": "Захавайце змены перад адкрыццём пул-рэквеста.",
       "proposalSaved": "Прапанова захавана",
       "proposalDismissed": "Прапанова адхілена",
+      "dismissProposalTitle": "Адхіліць прапанову?",
+      "dismissProposalMessage": "Гэта прапанова будзе выдалена са спіса актыўных прапаноў, і яе нельга будзе аднавіць.",
       "prOpened": "Пул-рэквест для REVIEW.md адкрыты",
       "alreadyPresent": "Рэкамендацыі ўжо ёсць у REVIEW.md",
       "status": {

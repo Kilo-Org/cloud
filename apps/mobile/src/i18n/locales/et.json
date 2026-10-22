@@ -1472,6 +1472,8 @@
       "saveFirst": "Salvesta muudatused enne tõmbetaotluse avamist.",
       "proposalSaved": "Ettepanek salvestatud",
       "proposalDismissed": "Ettepanek tagasi lükatud",
+      "dismissProposalTitle": "Kas lükata ettepanek tagasi?",
+      "dismissProposalMessage": "See ettepanek eemaldatakse aktiivsete ettepanekute loendist ja seda ei saa taastada.",
       "prOpened": "Faili REVIEW.md tõmbetaotlus avatud",
       "alreadyPresent": "Juhised on failis REVIEW.md juba olemas",
       "status": {

@@ -1002,6 +1002,8 @@
       "saveFirst": "Lưu các chỉnh sửa trước khi mở pull request.",
       "proposalSaved": "Đã lưu đề xuất",
       "proposalDismissed": "Đã bỏ qua đề xuất",
+      "dismissProposalTitle": "Bỏ qua đề xuất?",
+      "dismissProposalMessage": "Đề xuất này sẽ bị xóa khỏi danh sách đang hoạt động và không thể khôi phục.",
       "prOpened": "Đã mở pull request cho REVIEW.md",
       "alreadyPresent": "Hướng dẫn đã có trong REVIEW.md",
       "status": {

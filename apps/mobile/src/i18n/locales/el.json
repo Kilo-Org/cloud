@@ -1472,6 +1472,8 @@
       "saveFirst": "Αποθήκευσε τις αλλαγές σου πριν ανοίξεις ένα pull request.",
       "proposalSaved": "Η πρόταση αποθηκεύτηκε",
       "proposalDismissed": "Η πρόταση απορρίφθηκε",
+      "dismissProposalTitle": "Απόρριψη πρότασης;",
+      "dismissProposalMessage": "Αυτή η πρόταση θα αφαιρεθεί από τη λίστα ενεργών προτάσεων και δεν θα μπορεί να επαναφερθεί.",
       "prOpened": "Το pull request για το REVIEW.md άνοιξε",
       "alreadyPresent": "Οι οδηγίες υπάρχουν ήδη στο REVIEW.md",
       "status": {

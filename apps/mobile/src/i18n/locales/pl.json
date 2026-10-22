@@ -1008,6 +1008,8 @@
       "saveFirst": "Zapisz zmiany przed otwarciem pull requesta.",
       "proposalSaved": "Propozycja zapisana",
       "proposalDismissed": "Propozycja odrzucona",
+      "dismissProposalTitle": "Odrzucić propozycję?",
+      "dismissProposalMessage": "Ta propozycja zostanie usunięta z listy aktywnych propozycji i nie będzie można jej przywrócić.",
       "prOpened": "Otwarto pull request do pliku REVIEW.md",
       "alreadyPresent": "Wytyczne są już w pliku REVIEW.md",
       "status": {

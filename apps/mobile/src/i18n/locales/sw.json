@@ -1472,6 +1472,8 @@
       "saveFirst": "Hifadhi mabadiliko yako kabla ya kufungua ombi la kuunganisha mabadiliko.",
       "proposalSaved": "Pendekezo limehifadhiwa",
       "proposalDismissed": "Pendekezo limeondolewa",
+      "dismissProposalTitle": "Ondoa pendekezo?",
+      "dismissProposalMessage": "Pendekezo hili litaondolewa kwenye orodha inayotumika na haliwezi kurejeshwa.",
       "prOpened": "Ombi la kuunganisha mabadiliko ya REVIEW.md limefunguliwa",
       "alreadyPresent": "Mwongozo tayari upo kwenye REVIEW.md",
       "status": {

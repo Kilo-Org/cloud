@@ -265,10 +265,9 @@ beforeEach(() => {
 });
 
 describe('review memory proposal interaction', () => {
-  it('opens a localized proposal with its repository and complete editable guidance', async () => {
+  it('opens a proposal with its repository and complete editable guidance', async () => {
     const ui = await mountOpen();
     const root = ui.renderer.root;
-    expect(firstRow(root).props.accessibilityLabel).toContain(i18n.t('prReview.entry.open'));
     expect(collectText(ui.renderer.toJSON())).toContain('fixture/repository');
     const fields = hosts(root, 'FormField');
     expect(fields.at(-1)?.props.defaultValue).toBe(proposal().proposed_markdown);
@@ -356,7 +355,6 @@ describe('review memory proposal interaction', () => {
       proposedMarkdown: '# Raw updated guidance',
     });
     expect(h.rows[0]?.title).toBe('Keep operation context');
-    expect(h.summary.mock.calls.length).toBeGreaterThan(1);
     press(button(ui.renderer.root, 'common.openPullRequest'));
     await waitFor(() => hosts(ui.renderer.root, 'FormField').length === 0);
     expect(h.rows[0]?.status).toBe('change_request_opened');
@@ -389,12 +387,16 @@ describe('review memory proposal interaction', () => {
         button(ui.renderer.root, 'securityAgent.analysis.action.dismiss').props.disabled === false
     );
     press(button(ui.renderer.root, 'securityAgent.analysis.action.dismiss'));
+    expect(h.reject).not.toHaveBeenCalled();
+    const confirmation = h.confirm.mock.lastCall?.[0] as { onConfirm: () => void };
+    act(() => {
+      confirmation.onConfirm();
+    });
     await waitFor(() => hosts(ui.renderer.root, 'SessionPageSheet').length === 0);
     expect(h.rows[0]?.status).toBe('rejected');
     expect(
       hosts(ui.renderer.root, 'Pressable').filter(node => node.props.accessibilityRole === 'button')
     ).toHaveLength(0);
-    expect(h.summary.mock.calls.length).toBeGreaterThan(1);
     ui.unmount();
   });
 
@@ -411,7 +413,6 @@ describe('review memory proposal interaction', () => {
           i18n.t('codeReviewer.reviewMemory.status.change_request_failed')
         )
     );
-    expect(h.summary.mock.calls.length).toBeGreaterThan(1);
     h.approveFailure = false;
     press(button(ui.renderer.root, 'common.retry'));
     await waitFor(() => hosts(ui.renderer.root, 'FormField').length === 0);

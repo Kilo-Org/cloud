@@ -1472,6 +1472,8 @@
       "saveFirst": "Запази промените си, преди да отвориш pull request.",
       "proposalSaved": "Предложението е запазено",
       "proposalDismissed": "Предложението е отхвърлено",
+      "dismissProposalTitle": "Отхвърляне на предложението?",
+      "dismissProposalMessage": "Това предложение ще бъде премахнато от списъка с активни предложения и няма да може да бъде възстановено.",
       "prOpened": "Отворен е pull request за REVIEW.md",
       "alreadyPresent": "Насоките вече са в REVIEW.md",
       "status": {

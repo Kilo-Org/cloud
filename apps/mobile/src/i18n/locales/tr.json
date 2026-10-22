@@ -1002,6 +1002,8 @@
       "saveFirst": "Pull request açmadan önce düzenlemelerini kaydet.",
       "proposalSaved": "Öneri kaydedildi",
       "proposalDismissed": "Öneri göz ardı edildi",
+      "dismissProposalTitle": "Öneri göz ardı edilsin mi?",
+      "dismissProposalMessage": "Bu öneri etkin listeden kaldırılacak ve geri yüklenemeyecek.",
       "prOpened": "REVIEW.md için pull request açıldı",
       "alreadyPresent": "Yönergeler REVIEW.md dosyasında zaten mevcut",
       "status": {

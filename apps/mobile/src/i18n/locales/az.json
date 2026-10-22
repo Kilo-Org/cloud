@@ -1472,6 +1472,8 @@
       "saveFirst": "Pull sorğusu açmazdan əvvəl dəyişikliklərini yadda saxla.",
       "proposalSaved": "Təklif yadda saxlanıldı",
       "proposalDismissed": "Təklif rədd edildi",
+      "dismissProposalTitle": "Təklif rədd edilsin?",
+      "dismissProposalMessage": "Bu təklif aktiv siyahıdan silinəcək və onu bərpa etmək mümkün olmayacaq.",
       "prOpened": "REVIEW.md üçün pull sorğusu açıldı",
       "alreadyPresent": "Təlimatlar artıq REVIEW.md faylında mövcuddur",
       "status": {

@@ -1002,6 +1002,8 @@
       "saveFirst": "Sla je wijzigingen op voordat je een pull request opent.",
       "proposalSaved": "Voorstel opgeslagen",
       "proposalDismissed": "Voorstel afgewezen",
+      "dismissProposalTitle": "Voorstel afwijzen?",
+      "dismissProposalMessage": "Dit voorstel wordt uit de actieve lijst verwijderd en kan niet worden hersteld.",
       "prOpened": "Pull request voor REVIEW.md geopend",
       "alreadyPresent": "De richtlijnen staan al in REVIEW.md",
       "status": {

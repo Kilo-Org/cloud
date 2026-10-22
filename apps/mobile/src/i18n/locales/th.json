@@ -1472,6 +1472,8 @@
       "saveFirst": "บันทึกการแก้ไขก่อนเปิด Pull Request",
       "proposalSaved": "บันทึกข้อเสนอแล้ว",
       "proposalDismissed": "ปิดข้อเสนอแล้ว",
+      "dismissProposalTitle": "ปิดข้อเสนอหรือไม่?",
+      "dismissProposalMessage": "ข้อเสนอนี้จะถูกนำออกจากรายการที่ใช้งานอยู่และจะไม่สามารถกู้คืนได้",
       "prOpened": "เปิด Pull Request สำหรับไฟล์ REVIEW.md แล้ว",
       "alreadyPresent": "มีคำแนะนำนี้ในไฟล์ REVIEW.md อยู่แล้ว",
       "status": {

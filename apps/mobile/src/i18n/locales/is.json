@@ -1472,6 +1472,8 @@
       "saveFirst": "Vistaðu breytingarnar áður en þú opnar samrunabeiðni.",
       "proposalSaved": "Tillaga vistuð",
       "proposalDismissed": "Tillögu vísað frá",
+      "dismissProposalTitle": "Vísa tillögunni frá?",
+      "dismissProposalMessage": "Þessi tillaga verður fjarlægð af virka listanum og ekki verður hægt að endurheimta hana.",
       "prOpened": "Samrunabeiðni fyrir REVIEW.md opnuð",
       "alreadyPresent": "Leiðbeiningarnar eru þegar í REVIEW.md",
       "status": {

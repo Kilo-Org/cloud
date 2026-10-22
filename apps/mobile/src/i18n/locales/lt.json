@@ -1510,6 +1510,8 @@
       "saveFirst": "Prieš atidarant PR, išsaugok pakeitimus.",
       "proposalSaved": "Pasiūlymas išsaugotas",
       "proposalDismissed": "Pasiūlymas atmestas",
+      "dismissProposalTitle": "Atmesti pasiūlymą?",
+      "dismissProposalMessage": "Šis pasiūlymas bus pašalintas iš aktyvių pasiūlymų sąrašo ir jo nebus galima atkurti.",
       "prOpened": "Atidaryta REVIEW.md PR",
       "alreadyPresent": "Gairės jau yra REVIEW.md faile",
       "status": {

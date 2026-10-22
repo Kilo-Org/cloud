@@ -1472,6 +1472,8 @@
       "saveFirst": "Pull request нээхээсээ өмнө өөрчлөлтөө хадгална уу.",
       "proposalSaved": "Саналыг хадгаллаа",
       "proposalDismissed": "Саналыг хэрэгсэхгүй болголоо",
+      "dismissProposalTitle": "Саналыг хэрэгсэхгүй болгох уу?",
+      "dismissProposalMessage": "Энэ санал идэвхтэй жагсаалтаас хасагдах бөгөөд сэргээх боломжгүй болно.",
       "prOpened": "REVIEW.md файлын pull request нээгдлээ",
       "alreadyPresent": "Заавар REVIEW.md файлд аль хэдийн байна",
       "status": {

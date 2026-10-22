@@ -1529,6 +1529,8 @@
       "saveFirst": "Sábháil do chuid athruithe sula n-osclaíonn tú iarratas tarraingthe.",
       "proposalSaved": "Moladh sábháilte",
       "proposalDismissed": "Moladh diúltaithe",
+      "dismissProposalTitle": "An moladh a dhiúltú?",
+      "dismissProposalMessage": "Bainfear an moladh seo den liosta gníomhach agus ní bheifear in ann é a chur ar ais.",
       "prOpened": "Osclaíodh iarratas tarraingthe do REVIEW.md",
       "alreadyPresent": "Tá an treoir in REVIEW.md cheana féin",
       "status": {

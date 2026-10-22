@@ -1472,6 +1472,8 @@
       "saveFirst": "Pull request ашпас бұрын өзгерістеріңізді сақтаңыз.",
       "proposalSaved": "Ұсыныс сақталды",
       "proposalDismissed": "Ұсыныс қабылданбады",
+      "dismissProposalTitle": "Ұсынысты қабылдамау керек пе?",
+      "dismissProposalMessage": "Бұл ұсыныс белсенді тізімнен жойылады және оны қалпына келтіру мүмкін болмайды.",
       "prOpened": "REVIEW.md үшін pull request ашылды",
       "alreadyPresent": "Нұсқаулар REVIEW.md файлында бұрыннан бар",
       "status": {

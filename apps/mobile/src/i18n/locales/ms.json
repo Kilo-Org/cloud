@@ -1472,6 +1472,8 @@
       "saveFirst": "Simpan suntingan anda sebelum membuka pull request.",
       "proposalSaved": "Cadangan disimpan",
       "proposalDismissed": "Cadangan ditolak",
+      "dismissProposalTitle": "Tolak cadangan?",
+      "dismissProposalMessage": "Cadangan ini akan dikeluarkan daripada senarai aktif dan tidak boleh dipulihkan.",
       "prOpened": "Pull request REVIEW.md dibuka",
       "alreadyPresent": "Panduan sudah ada dalam REVIEW.md",
       "status": {

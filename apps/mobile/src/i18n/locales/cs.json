@@ -1510,6 +1510,8 @@
       "saveFirst": "Před otevřením pull requestu uložte změny.",
       "proposalSaved": "Návrh uložen",
       "proposalDismissed": "Návrh zamítnut",
+      "dismissProposalTitle": "Zamítnout návrh?",
+      "dismissProposalMessage": "Tento návrh bude odstraněn ze seznamu aktivních návrhů a nebude možné ho obnovit.",
       "prOpened": "Pull request pro REVIEW.md otevřen",
       "alreadyPresent": "Pokyny již existují v souboru REVIEW.md",
       "status": {

@@ -1548,6 +1548,8 @@
       "saveFirst": "Cadwch eich newidiadau cyn agor cais tynnu.",
       "proposalSaved": "Cynnig wedi'i gadw",
       "proposalDismissed": "Cynnig wedi'i ddiystyru",
+      "dismissProposalTitle": "Diystyru'r cynnig?",
+      "dismissProposalMessage": "Bydd y cynnig hwn yn cael ei dynnu o'r rhestr weithredol ac ni fydd modd ei adfer.",
       "prOpened": "Cais tynnu REVIEW.md wedi'i agor",
       "alreadyPresent": "Mae'r canllawiau eisoes yn REVIEW.md",
       "status": {

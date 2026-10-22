@@ -974,6 +974,8 @@
       "saveFirst": "Enregistrez vos modifications avant d’ouvrir une pull request.",
       "proposalSaved": "Proposition enregistrée",
       "proposalDismissed": "Proposition rejetée",
+      "dismissProposalTitle": "Rejeter la proposition ?",
+      "dismissProposalMessage": "Cette proposition sera retirée de la liste active et ne pourra pas être restaurée.",
       "prOpened": "Pull request pour REVIEW.md ouverte",
       "alreadyPresent": "Les consignes figurent déjà dans REVIEW.md",
       "status": {

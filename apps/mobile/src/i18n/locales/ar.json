@@ -1014,6 +1014,8 @@
       "saveFirst": "احفظ تعديلاتك قبل فتح طلب سحب.",
       "proposalSaved": "تم حفظ المقترح",
       "proposalDismissed": "تم تجاهل المقترح",
+      "dismissProposalTitle": "تجاهل المقترح؟",
+      "dismissProposalMessage": "سيُزال هذا المقترح من القائمة النشطة ولن يمكن استعادته.",
       "prOpened": "تم فتح طلب سحب لملف REVIEW.md",
       "alreadyPresent": "الإرشادات موجودة بالفعل في REVIEW.md",
       "status": {

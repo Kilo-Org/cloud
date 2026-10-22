@@ -1472,6 +1472,8 @@
       "saveFirst": "Mentsd a módosításaidat a pull request megnyitása előtt.",
       "proposalSaved": "Javaslat mentve",
       "proposalDismissed": "Javaslat elvetve",
+      "dismissProposalTitle": "Elveti a javaslatot?",
+      "dismissProposalMessage": "Ez a javaslat eltűnik az aktív listáról, és nem állítható vissza.",
       "prOpened": "Pull request megnyitva a REVIEW.md fájlhoz",
       "alreadyPresent": "Az útmutatás már szerepel a REVIEW.md fájlban",
       "status": {

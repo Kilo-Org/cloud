@@ -1472,6 +1472,8 @@
       "saveFirst": "Kaydi wax-ka-beddelladaada ka hor intaadan furin pull request.",
       "proposalSaved": "Soo-jeedinta waa la kaydiyay",
       "proposalDismissed": "Soo-jeedinta waa la iska dhaafay",
+      "dismissProposalTitle": "Iska dhaaf soo-jeedinta?",
+      "dismissProposalMessage": "Soo-jeedintan waxaa laga saari doonaa liiska firfircoon, dibna looma soo celin karo.",
       "prOpened": "Pull request-ka REVIEW.md waa la furay",
       "alreadyPresent": "Tilmaamuhu hore ayay ugu jiraan REVIEW.md",
       "status": {

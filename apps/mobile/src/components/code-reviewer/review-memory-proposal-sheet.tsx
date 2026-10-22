@@ -5,6 +5,7 @@ import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { openExternalUrl } from '@/lib/external-link';
@@ -17,6 +18,7 @@ import { proposalStatusLabel } from '@/lib/review-memory-proposals';
 export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
   const { permission } = props;
   const { t } = useTranslation();
+  const dismissal = useConfirmDialog();
   const {
     record,
     draft,
@@ -179,7 +181,16 @@ export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
               variant="destructive"
               disabled={busy}
               loading={pending === 'reject'}
-              onPress={() => void perform('reject')}
+              onPress={() => {
+                dismissal.confirm({
+                  title: t('codeReviewer.reviewMemory.dismissProposalTitle'),
+                  message: t('codeReviewer.reviewMemory.dismissProposalMessage'),
+                  confirmLabel: t('securityAgent.analysis.action.dismiss'),
+                  onConfirm: () => {
+                    void perform('reject');
+                  },
+                });
+              }}
             >
               <Text>{t('securityAgent.analysis.action.dismiss')}</Text>
             </Button>
@@ -187,6 +198,7 @@ export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
         ) : null}
       </ScrollView>
       {dialog}
+      {dismissal.dialog}
     </SessionPageSheet>
   );
 }

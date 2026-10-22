@@ -1472,6 +1472,8 @@
       "saveFirst": "Londoloza izinguquko zakho ngaphambi kokuvula i-PR.",
       "proposalSaved": "Isiphakamiso silondoloziwe",
       "proposalDismissed": "Isiphakamiso sichithiwe",
+      "dismissProposalTitle": "Chitha isiphakamiso?",
+      "dismissProposalMessage": "Lesi siphakamiso sizosuswa ohlwini olusebenzayo futhi ngeke sikwazi ukubuyiselwa.",
       "prOpened": "I-PR ye-REVIEW.md ivuliwe",
       "alreadyPresent": "Imihlahlandlela isivele ikhona ku-REVIEW.md",
       "status": {

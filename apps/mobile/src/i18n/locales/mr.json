@@ -1472,6 +1472,8 @@
       "saveFirst": "पुल रिक्वेस्ट उघडण्यापूर्वी तुमचे बदल जतन करा.",
       "proposalSaved": "प्रस्ताव जतन केला",
       "proposalDismissed": "प्रस्ताव फेटाळला",
+      "dismissProposalTitle": "प्रस्ताव फेटाळायचा?",
+      "dismissProposalMessage": "हा प्रस्ताव सक्रिय यादीतून काढला जाईल आणि तो पुन्हा आणता येणार नाही.",
       "prOpened": "REVIEW.md साठी पुल रिक्वेस्ट उघडली",
       "alreadyPresent": "मार्गदर्शक सूचना REVIEW.md मध्ये आधीच आहेत",
       "status": {

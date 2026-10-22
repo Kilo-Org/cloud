@@ -1002,6 +1002,8 @@
       "saveFirst": "プルリクエストを作成する前に、変更を保存してください。",
       "proposalSaved": "提案を保存しました",
       "proposalDismissed": "提案を却下しました",
+      "dismissProposalTitle": "提案を却下しますか？",
+      "dismissProposalMessage": "この提案はアクティブなリストから削除され、復元できなくなります。",
       "prOpened": "REVIEW.mdのプルリクエストを作成しました",
       "alreadyPresent": "指針はすでにREVIEW.mdに記載されています",
       "status": {

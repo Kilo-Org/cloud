@@ -1472,6 +1472,8 @@
       "saveFirst": "Պահպանիր փոփոխություններդ՝ նախքան pull request բացելը։",
       "proposalSaved": "Առաջարկը պահպանված է",
       "proposalDismissed": "Առաջարկը մերժված է",
+      "dismissProposalTitle": "Մերժե՞լ առաջարկը։",
+      "dismissProposalMessage": "Այս առաջարկը կհեռացվի ակտիվ ցանկից և չի կարող վերականգնվել։",
       "prOpened": "REVIEW.md-ի pull request-ը բացված է",
       "alreadyPresent": "Հրահանգներն արդեն կան REVIEW.md-ում",
       "status": {

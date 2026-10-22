@@ -1563,6 +1563,8 @@
       "saveFirst": "Save your edits before opening a pull request.",
       "proposalSaved": "Proposal saved",
       "proposalDismissed": "Proposal dismissed",
+      "dismissProposalTitle": "Dismiss proposal?",
+      "dismissProposalMessage": "This proposal will leave the active list and cannot be restored.",
       "prOpened": "REVIEW.md pull request opened",
       "alreadyPresent": "Guidance is already present in REVIEW.md",
       "status": {

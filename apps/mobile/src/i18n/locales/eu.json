@@ -1472,6 +1472,8 @@
       "saveFirst": "Gorde aldaketak pull request bat ireki aurretik.",
       "proposalSaved": "Proposamena gordeta",
       "proposalDismissed": "Proposamena baztertuta",
+      "dismissProposalTitle": "Proposamena baztertu?",
+      "dismissProposalMessage": "Proposamen hau zerrenda aktibotik kenduko da, eta ezin izango da berrezarri.",
       "prOpened": "REVIEW.md fitxategirako pull requesta irekita",
       "alreadyPresent": "Jarraibideak dagoeneko REVIEW.md fitxategian daude",
       "status": {

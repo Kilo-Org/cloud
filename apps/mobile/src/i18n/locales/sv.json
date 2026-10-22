@@ -1472,6 +1472,8 @@
       "saveFirst": "Spara dina ändringar innan du öppnar en pull request.",
       "proposalSaved": "Förslaget har sparats",
       "proposalDismissed": "Förslaget har avfärdats",
+      "dismissProposalTitle": "Avfärda förslaget?",
+      "dismissProposalMessage": "Förslaget tas bort från den aktiva listan och kan inte återställas.",
       "prOpened": "Pull request för REVIEW.md har öppnats",
       "alreadyPresent": "Riktlinjerna finns redan i REVIEW.md",
       "status": {

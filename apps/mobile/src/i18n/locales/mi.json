@@ -1472,6 +1472,8 @@
       "saveFirst": "Tiakina ō whakatikatika i mua i te whakatuwhera i tētahi PR.",
       "proposalSaved": "Kua tiakina te tono",
       "proposalDismissed": "Kua whakakorea te tono",
+      "dismissProposalTitle": "Whakakorea te tono?",
+      "dismissProposalMessage": "Ka tangohia tēnei tono i te rārangi hohe, ā, kāore e taea te whakahoki mai.",
       "prOpened": "Kua whakatuwheratia te PR mō REVIEW.md",
       "alreadyPresent": "Kei roto kē ngā aratohu i REVIEW.md",
       "status": {

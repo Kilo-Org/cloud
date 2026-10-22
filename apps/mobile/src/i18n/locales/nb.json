@@ -1472,6 +1472,8 @@
       "saveFirst": "Lagre endringene dine før du åpner en pull request.",
       "proposalSaved": "Forslaget er lagret",
       "proposalDismissed": "Forslaget er avvist",
+      "dismissProposalTitle": "Avvise forslaget?",
+      "dismissProposalMessage": "Dette forslaget vil bli fjernet fra den aktive listen og kan ikke gjenopprettes.",
       "prOpened": "Pull request for REVIEW.md er åpnet",
       "alreadyPresent": "Retningslinjene finnes allerede i REVIEW.md",
       "status": {

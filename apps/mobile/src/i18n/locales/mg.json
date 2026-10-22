@@ -1472,6 +1472,8 @@
       "saveFirst": "Tehirizo ny fanovana nataonao alohan'ny hanokafana PR.",
       "proposalSaved": "Voatahiry ny soso-kevitra",
       "proposalDismissed": "Nolavina ny soso-kevitra",
+      "dismissProposalTitle": "Holavina ve ny soso-kevitra?",
+      "dismissProposalMessage": "Hesorina ao amin’ny lisitra mavitrika ity soso-kevitra ity ary tsy azo averina intsony.",
       "prOpened": "Nosokafana ny PR ho an'ny REVIEW.md",
       "alreadyPresent": "Efa ao amin'ny REVIEW.md ny torolalana",
       "status": {

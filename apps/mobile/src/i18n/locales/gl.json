@@ -1472,6 +1472,8 @@
       "saveFirst": "Garda os cambios antes de abrir unha solicitude de incorporación.",
       "proposalSaved": "Proposta gardada",
       "proposalDismissed": "Proposta descartada",
+      "dismissProposalTitle": "Descartar a proposta?",
+      "dismissProposalMessage": "Esta proposta eliminarase da lista de propostas activas e non se poderá restaurar.",
       "prOpened": "Solicitude de incorporación para REVIEW.md aberta",
       "alreadyPresent": "As pautas xa están en REVIEW.md",
       "status": {

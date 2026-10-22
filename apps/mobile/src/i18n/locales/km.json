@@ -1472,6 +1472,8 @@
       "saveFirst": "រក្សាទុកការកែសម្រួលរបស់អ្នក មុនពេលបើក pull request។",
       "proposalSaved": "បានរក្សាទុកសំណើ",
       "proposalDismissed": "បានច្រានចោលសំណើ",
+      "dismissProposalTitle": "ច្រានចោលសំណើនេះឬ?",
+      "dismissProposalMessage": "សំណើនេះនឹងត្រូវដកចេញពីបញ្ជីសកម្ម ហើយមិនអាចស្ដារឡើងវិញបានទេ។",
       "prOpened": "បានបើក pull request សម្រាប់ REVIEW.md",
       "alreadyPresent": "ការណែនាំមានរួចហើយនៅក្នុង REVIEW.md",
       "status": {

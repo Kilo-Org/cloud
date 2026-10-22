@@ -1472,6 +1472,8 @@
       "saveFirst": "Ruaji ndryshimet para se të hapësh një pull request.",
       "proposalSaved": "Propozimi u ruajt",
       "proposalDismissed": "Propozimi u hodh poshtë",
+      "dismissProposalTitle": "Të hidhet poshtë propozimi?",
+      "dismissProposalMessage": "Ky propozim do të hiqet nga lista aktive dhe nuk mund të rikthehet.",
       "prOpened": "U hap pull request për REVIEW.md",
       "alreadyPresent": "Udhëzimet janë tashmë në REVIEW.md",
       "status": {

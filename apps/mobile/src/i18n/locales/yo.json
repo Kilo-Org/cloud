@@ -1472,6 +1472,8 @@
       "saveFirst": "Fi àwọn àtúnṣe rẹ pamọ́ kí o tó ṣí PR.",
       "proposalSaved": "A ti fi àbá pamọ́",
       "proposalDismissed": "A ti kọ àbá sílẹ̀",
+      "dismissProposalTitle": "Kọ àbá sílẹ̀?",
+      "dismissProposalMessage": "Àbá yìí yóò kúrò nínú àtòjọ tó ń ṣiṣẹ́, kò sì ṣeé mú padà.",
       "prOpened": "A ti ṣí PR fún REVIEW.md",
       "alreadyPresent": "Ìtọ́sọ́nà ti wà nínú REVIEW.md tẹ́lẹ̀",
       "status": {

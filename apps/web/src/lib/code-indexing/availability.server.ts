@@ -8,8 +8,5 @@ export function isCodeIndexingEnabled(): boolean {
 }
 
 export function codeIndexingGoneResponse() {
-  return NextResponse.json(
-    { error: 'gone', message: CODE_INDEXING_GONE_MESSAGE },
-    { status: 410 }
-  );
+  return NextResponse.json({ error: 'gone', message: CODE_INDEXING_GONE_MESSAGE }, { status: 410 });
 }

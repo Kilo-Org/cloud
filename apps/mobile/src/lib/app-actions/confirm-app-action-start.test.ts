@@ -88,10 +88,10 @@ describe('confirmAppActionStart', () => {
 
   it('shows no alert until a backgrounded app reaches an activity', async () => {
     mocks.state = 'background';
-    let onChange: (state: string) => void = () => {};
+    const listeners: ((state: string) => void)[] = [];
     mocks.addEventListener.mockImplementation(
       (_event: string, listener: (state: string) => void) => {
-        onChange = listener;
+        listeners.push(listener);
         return { remove: vi.fn() };
       }
     );
@@ -100,7 +100,7 @@ describe('confirmAppActionStart', () => {
     await Promise.resolve();
     expect(mocks.alert).not.toHaveBeenCalled();
 
-    onChange('active');
+    listeners[0]?.('active');
     const { buttons } = await openedAlert();
     buttons[0]?.onPress();
     await expect(answer).resolves.toBe(false);

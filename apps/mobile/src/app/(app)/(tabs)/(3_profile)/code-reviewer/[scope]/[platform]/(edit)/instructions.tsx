@@ -50,6 +50,8 @@ function InstructionsEditor({
       <Text className="text-sm text-muted-foreground">
         {t('codeReviewer.instructions.deprecation')}
       </Text>
+      {/* A multiline field takes the platform's generic text-view name on iOS,
+          so the accessible name is the localized heading this screen renders. */}
       <TextInput
         className="min-h-32 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
         accessibilityLabel={t('codeReviewer.instructions.title')}
